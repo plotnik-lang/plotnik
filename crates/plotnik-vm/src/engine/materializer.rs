@@ -132,20 +132,13 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
         let result_builder = self.builder_for_type(result_type);
         stack.push(result_builder);
 
-        // Pending value from Node/Text/Null (consumed by Set/Push)
+        // Pending value from Node/Null (consumed by Set/Push)
         let mut pending: Option<Value> = None;
 
         for (effect_idx, effect) in effects.iter().enumerate() {
             match effect {
                 RuntimeEffect::Node(n) => {
                     pending = Some(Value::Node(NodeHandle::from_node(*n, self.source)));
-                }
-                RuntimeEffect::Text(n) => {
-                    let text = n
-                        .utf8_text(self.source.as_bytes())
-                        .expect("invalid UTF-8")
-                        .to_owned();
-                    pending = Some(Value::String(text));
                 }
                 RuntimeEffect::Null => {
                     pending = Some(Value::Null);

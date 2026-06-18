@@ -15,10 +15,10 @@ use super::frame::FrameArena;
 use super::trace::{NoopTracer, Tracer};
 
 /// Tracks the node matched by the most recent `Match`, which node-valued
-/// captures (`Node`/`Text`) read. A missing node means the source matched
-/// nothing (e.g. a zero-width callee return, #383), so the consuming effect
-/// fails rather than fabricating a node. Centralizing the set/clear/refresh
-/// transitions here keeps that contract in one place.
+/// captures (`Node`) read. A missing node means the source matched nothing
+/// (e.g. a zero-width callee return, #383), so the consuming effect fails
+/// rather than fabricating a node. Centralizing the set/clear/refresh transitions
+/// here keeps that contract in one place.
 #[derive(Clone, Copy, Default)]
 struct MatchedNode<'t>(Option<Node<'t>>);
 
@@ -735,14 +735,11 @@ impl<'t> VM<'t> {
             // Node-valued captures. A missing `matched_node` means the source
             // matched nothing (a zero-width callee return, #383): fail this path
             // rather than fabricate the call-site node.
-            Node | Text => {
+            Node => {
                 let Some(node) = self.matched_node.get() else {
                     return Err(self.backtrack(tracer));
                 };
-                match op.opcode {
-                    Node => RuntimeEffect::Node(node),
-                    _ => RuntimeEffect::Text(node),
-                }
+                RuntimeEffect::Node(node)
             }
             Arr => RuntimeEffect::Arr,
             Push => RuntimeEffect::Push,

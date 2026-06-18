@@ -1,5 +1,5 @@
 Expr = [
-  Lit: (number) @value :: string
+  Lit: (number) @value
   Binary: (binary_expression
     left: (Expr) @left
     right: (Expr) @right
@@ -8,7 +8,7 @@ Expr = [
 ==== types ====
 export interface ExprLit {
   $tag: "Lit";
-  $data: { value: string };
+  $data: { value: Node };
 }
 
 export interface ExprBinary {

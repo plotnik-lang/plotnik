@@ -97,8 +97,8 @@ For node patterns with internal captures, wrap explicitly:
 (parameter (identifier) @name)*
 
 // OK: struct capture on the sequence
-{ (parameter (identifier) @name) @param }* @params
-→ { params: { param: Node, name: string }[] }
+{ (formal_parameters (identifier) @name) @param }* @params
+→ { params: { name: Node, param: Node }[] }
 ```
 
 The strict rule forces you to think about structure upfront.
@@ -248,9 +248,9 @@ Shallow unification across untagged branches:
 ]  // x: Node, y: Node | null
 
 [
-  (a) @x ::string
-  (b) @x
-]  // ERROR: String vs Node
+  (a) @x :: Foo
+  (b) @x :: Bar
+]  // ERROR: Foo vs Bar
 ```
 
 The choice of shallow unification is intentional. For more precision, users should use tagged unions.
@@ -272,8 +272,8 @@ When types start to conflict, use tagged alternations:
 
 ```
 [
-    Str: (a) @x ::string
-    Node: (b) @x
+    A: (a) @x :: Foo
+    B: (b) @x :: Bar
 ] @result
 ```
 
@@ -290,7 +290,7 @@ Top-level fields merge with optionality; nested mismatches are errors:
 
 ```
 // OK: top-level merge (absent scalars become nullable, always present)
-{ x: Node, y: Node } ∪ { x: Node, z: String } → { x: Node, y: Node | null, z: String | null }
+{ x: Node, y: Node } ∪ { x: Node, z: Node } → { x: Node, y: Node | null, z: Node | null }
 
 // OK: arrays emit [] when missing (not null)
 { items: Node[], x: Node } ∪ { x: Node } → { items: Node[], x: Node }
@@ -317,7 +317,7 @@ Self-referential types via:
 
 ```
 Expr = [
-    Lit: (number) @value ::string
+    Lit: (number) @value
     Binary: (binary_expression
         left: (Expr) @left
         right: (Expr) @right

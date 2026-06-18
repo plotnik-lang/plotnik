@@ -12,13 +12,12 @@ Type system metadata for code generation and runtime validation. Describes the s
 | ----- | ----------------- | ------------------------------- |
 | 0     | `Void`            | Unit type, captures nothing     |
 | 1     | `Node`            | AST node reference              |
-| 2     | `String`          | Source text                     |
-| 3     | `Optional`        | Wraps another type              |
-| 4     | `ArrayZeroOrMore` | Zero or more (T\*)              |
-| 5     | `ArrayOneOrMore`  | One or more (T+)                |
-| 6     | `Struct`          | Record with named fields        |
-| 7     | `Enum`            | Discriminated union             |
-| 8     | `Alias`           | Named reference to another type |
+| 2     | `Optional`        | Wraps another type              |
+| 3     | `ArrayZeroOrMore` | Zero or more (T\*)              |
+| 4     | `ArrayOneOrMore`  | One or more (T+)                |
+| 5     | `Struct`          | Record with named fields        |
+| 6     | `Enum`            | Discriminated union             |
+| 7     | `Alias`           | Named reference to another type |
 
 ### Node Semantics
 
@@ -55,7 +54,6 @@ struct TypeDef {
 | :---------------- | :------------ | :----------- |
 | `Void`            | 0             | 0            |
 | `Node`            | 0             | 0            |
-| `String`          | 0             | 0            |
 | `Optional`        | Inner TypeId  | 0            |
 | `ArrayZeroOrMore` | Inner TypeId  | 0            |
 | `ArrayOneOrMore`  | Inner TypeId  | 0            |
@@ -106,7 +104,7 @@ Sorted lexicographically by name (resolved via String Table) for binary search.
 
 ## Examples
 
-> **Note**: Only **used** primitives are emitted to TypeDefs. The emitter writes them first in order (Void, Node, String), then composite types.
+> **Note**: Only **used** primitives are emitted to TypeDefs. The emitter writes them first in order (Void, Node), then composite types.
 
 ### Simple Struct
 
@@ -178,7 +176,7 @@ Loaders must verify:
   member's `ty` is a valid TypeId (`< type_defs_count`).
 - Wrapper/`Alias`: `data` (inner/target TypeId) is `< type_defs_count`, and the
   reserved `count` is `0`.
-- `Void`/`Node`/`String`: the reserved `data` and `count` are both `0`.
+- `Void`/`Node`: the reserved `data` and `count` are both `0`.
 
 The bounds checks prevent out-of-bounds reads from malformed binaries; the
 reserved-zero checks reject smuggled state where the format pins a field to zero.

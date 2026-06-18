@@ -6,9 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use plotnik_core::Interner;
 
-use crate::analyze::type_check::{
-    FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TypeContext, TypeId, TypeShape,
-};
+use crate::analyze::type_check::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeContext, TypeId, TypeShape};
 use plotnik_bytecode::{
     TypeData, TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeName,
 };
@@ -75,7 +73,7 @@ impl TypeTableBuilder {
         }
 
         // Determine which builtins are actually used by scanning all types
-        let mut used_builtins = [false; 3]; // [Void, Node, String]
+        let mut used_builtins = [false; 2]; // [Void, Node]
         let mut seen = HashSet::new();
         for &type_id in &ordered_types {
             collect_builtin_refs(type_id, type_ctx, &mut used_builtins, &mut seen);
@@ -86,17 +84,11 @@ impl TypeTableBuilder {
                 used_builtins[0] = true;
             } else if type_id == TYPE_NODE {
                 used_builtins[1] = true;
-            } else if type_id == TYPE_STRING {
-                used_builtins[2] = true;
             }
         }
 
-        // Phase 1: Emit used builtins first (in order: Void, Node, String)
-        let builtin_types = [
-            (TYPE_VOID, TypeKind::Void),
-            (TYPE_NODE, TypeKind::Node),
-            (TYPE_STRING, TypeKind::String),
-        ];
+        // Phase 1: Emit used builtins first (in order: Void, Node)
+        let builtin_types = [(TYPE_VOID, TypeKind::Void), (TYPE_NODE, TypeKind::Node)];
         for (i, &(builtin_id, kind)) in builtin_types.iter().enumerate() {
             if used_builtins[i] {
                 let bc_id = BytecodeTypeId(self.type_defs.len() as u16);
@@ -161,7 +153,7 @@ impl TypeTableBuilder {
         strings: &mut StringTableBuilder,
     ) -> Result<(), EmitError> {
         match type_shape {
-            TypeShape::Void | TypeShape::Node | TypeShape::String => {
+            TypeShape::Void | TypeShape::Node => {
                 unreachable!("builtins should be handled separately")
             }
 
@@ -435,7 +427,7 @@ fn collect_types_dfs(
 fn collect_builtin_refs(
     type_id: TypeId,
     type_ctx: &TypeContext,
-    used: &mut [bool; 3],
+    used: &mut [bool; 2],
     seen: &mut HashSet<TypeId>,
 ) {
     if !seen.insert(type_id) {
@@ -449,7 +441,6 @@ fn collect_builtin_refs(
     match type_shape {
         TypeShape::Void => used[0] = true,
         TypeShape::Node => used[1] = true,
-        TypeShape::String => used[2] = true,
         TypeShape::Custom(_) => used[1] = true, // Custom types alias Node
         TypeShape::Struct(fields) => {
             for field_info in fields.values() {

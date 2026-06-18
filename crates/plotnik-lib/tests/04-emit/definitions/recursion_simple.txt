@@ -1,5 +1,5 @@
 Expr = [
-  Lit: (number) @value :: string
+  Lit: (number) @value
   Rec: (call_expression
     function: (identifier) @fn
     arguments: (Expr) @inner
@@ -22,23 +22,22 @@ S11 "arguments"
 
 [type_defs]
 T0 = <Node>
-T1 = <String>
-T2 = Struct  M0:1  ; { value }
-T3 = Struct  M1:2  ; { fn, inner }
-T4 = Enum    M3:2  ; Lit | Rec
+T1 = Struct  M0:1  ; { value }
+T2 = Struct  M1:2  ; { fn, inner }
+T3 = Enum    M3:2  ; Lit | Rec
 
 [type_members]
-M0: S01 → T1  ; value: <String>
+M0: S01 → T0  ; value: <Node>
 M1: S02 → T0  ; fn: <Node>
-M2: S03 → T4  ; inner: Expr
-M3: S04 → T2  ; Lit: T2
-M4: S05 → T3  ; Rec: T3
+M2: S03 → T3  ; inner: Expr
+M3: S04 → T1  ; Lit: T1
+M4: S05 → T2  ; Rec: T2
 
 [type_names]
-N0: S06 → T4  ; Expr
+N0: S06 → T3  ; Expr
 
 [entrypoints]
-Expr = 06 :: T4
+Expr = 06 :: T3
 
 [transitions]
 _ObjWrap:
@@ -52,7 +51,7 @@ Expr:
   08  ─‣─  arguments: (Expr)                06 : 09
   09  ─‣┘  [Set(M2)] _ [EndEnum]            11
   11                                        ▶
-  12   !   [Enum(M3)] (number) [Text Set(M0) EndEnum]  11
+  12   !   [Enum(M3)] (number) [Node Set(M0) EndEnum]  11
   15  ...  
   16  └‣─  function: (identifier) [Node Set(M1)]  08
   18   !   [Enum(M4)] (call_expression)     16

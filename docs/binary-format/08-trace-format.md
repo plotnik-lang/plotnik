@@ -403,7 +403,6 @@ For the complete table of connector symbols, see [07-dump-format.md](07-dump-for
 | Effect         | Description                    |
 | -------------- | ------------------------------ |
 | Node           | Capture matched node           |
-| Text           | Extract node text as string    |
 | Set "field"    | Assign to struct field         |
 | Enum "variant" | Start tagged union variant     |
 | EndEnum        | End tagged union variant       |

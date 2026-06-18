@@ -6,4 +6,4 @@ error: expected a type name after `::`
 1 | (identifier) @name ::
   |                      ^
   |
-help: e.g., `::MyType` or `::string`
+help: e.g., `::MyType`

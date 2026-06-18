@@ -349,7 +349,6 @@ impl<'s> PrintTracer<'s> {
         use RuntimeEffect::*;
         match effect {
             Node(_) => "Node".to_string(),
-            Text(_) => "Text".to_string(),
             Arr => "Arr".to_string(),
             Push => "Push".to_string(),
             EndArr => "EndArr".to_string(),
@@ -367,7 +366,6 @@ impl<'s> PrintTracer<'s> {
         use EffectOpcode::*;
         match opcode {
             Node => "Node".to_string(),
-            Text => "Text".to_string(),
             Arr => "Arr".to_string(),
             Push => "Push".to_string(),
             EndArr => "EndArr".to_string(),

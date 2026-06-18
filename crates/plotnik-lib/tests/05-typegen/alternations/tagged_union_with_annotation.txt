@@ -1,11 +1,11 @@
 Q = [
-  Str: (string) @s :: string
+  Str: (string) @s :: Foo
   Num: (number) @n
 ]
 ==== types ====
 export interface QStr {
   $tag: "Str";
-  $data: { s: string };
+  $data: { s: Foo };
 }
 
 export interface QNum {
@@ -14,3 +14,5 @@ export interface QNum {
 }
 
 export type Q = QStr | QNum;
+
+export type Foo = Node;

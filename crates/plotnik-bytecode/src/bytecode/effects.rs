@@ -7,7 +7,7 @@ pub const EFFECT_PAYLOAD_BITS: u32 = 10;
 /// Largest representable effect payload (the low [`EFFECT_PAYLOAD_BITS`]).
 pub const EFFECT_PAYLOAD_MAX: usize = (1 << EFFECT_PAYLOAD_BITS) - 1;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
 pub enum EffectOpcode {
     Node = 0,
@@ -19,11 +19,10 @@ pub enum EffectOpcode {
     Set = 6,
     Enum = 7,
     EndEnum = 8,
-    Text = 9,
-    Clear = 10,
-    Null = 11,
-    SuppressBegin = 12,
-    SuppressEnd = 13,
+    Clear = 9,
+    Null = 10,
+    SuppressBegin = 11,
+    SuppressEnd = 12,
 }
 
 impl EffectOpcode {
@@ -44,11 +43,10 @@ impl EffectOpcode {
             6 => Self::Set,
             7 => Self::Enum,
             8 => Self::EndEnum,
-            9 => Self::Text,
-            10 => Self::Clear,
-            11 => Self::Null,
-            12 => Self::SuppressBegin,
-            13 => Self::SuppressEnd,
+            9 => Self::Clear,
+            10 => Self::Null,
+            11 => Self::SuppressBegin,
+            12 => Self::SuppressEnd,
             _ => return None,
         };
         Some(op)

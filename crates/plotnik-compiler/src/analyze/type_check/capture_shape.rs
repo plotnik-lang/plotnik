@@ -18,8 +18,8 @@ use super::types::{QuantifierKind, TYPE_NODE, TypeFlow, TypeId, TypeShape};
 /// the emitted effects.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CaptureMechanism {
-    /// The matched tree-sitter node itself (`Node`/`Text` effect). If the inner
-    /// has bubbling child captures, they set into the enclosing scope as siblings.
+    /// The matched tree-sitter node itself (`Node` effect). If the inner has
+    /// bubbling child captures, they set into the enclosing scope as siblings.
     Node,
     /// A fresh struct built from the inner sequence/alternation's bubbling
     /// captures (`Obj … EndObj`).
@@ -97,8 +97,8 @@ pub fn capture_mechanism(inner: &Expr, ctx: &TypeContext, interner: &Interner) -
 }
 
 /// Whether a type is a meaningful structured output (enum/struct/ref, or an
-/// array/optional thereof). Plain `Node`/`String` are not — they are the matched
-/// node, captured directly.
+/// array/optional thereof). Plain `Node` is not — it is the matched node,
+/// captured directly.
 pub fn produces_output(type_id: TypeId, ctx: &TypeContext) -> bool {
     match ctx.get_type(type_id) {
         Some(TypeShape::Enum(_) | TypeShape::Struct(_) | TypeShape::Ref(_)) => true,

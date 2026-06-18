@@ -1,5 +1,5 @@
 Q = (function
-  name: (identifier) @name :: string
+  name: (identifier) @name :: Foo
   body: (block (statement)* @body_stmts :: Statement)
 ) @func :: Function
 ==== cst ====
@@ -23,7 +23,7 @@ Root
           CaptureToken "@name"
           Type
             DoubleColon "::"
-            Id "string"
+            Id "Foo"
         Field
           Id "body"
           Colon ":"
@@ -53,7 +53,7 @@ Root
   Def Q
     CapturedExpr @func :: Function
       NamedNode function
-        CapturedExpr @name :: string
+        CapturedExpr @name :: Foo
           FieldExpr name:
             NamedNode identifier
         FieldExpr body:

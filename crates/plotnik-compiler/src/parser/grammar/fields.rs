@@ -8,7 +8,7 @@ use crate::parser::cst::token_sets::QUANTIFIERS;
 use super::utils::starts_uppercase;
 
 impl Parser<'_, '_> {
-    /// Type annotation: `::Type` (PascalCase) or `::string` (primitive)
+    /// Type annotation: `::Type` (PascalCase)
     pub(crate) fn parse_type_annotation(&mut self) {
         self.start_node(SyntaxKind::Type);
         self.expect(SyntaxKind::DoubleColon, "'::' for type annotation");

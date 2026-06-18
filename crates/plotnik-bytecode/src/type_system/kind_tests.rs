@@ -4,18 +4,17 @@ use super::*;
 fn from_u8_valid() {
     assert_eq!(TypeKind::from_u8(0), Some(TypeKind::Void));
     assert_eq!(TypeKind::from_u8(1), Some(TypeKind::Node));
-    assert_eq!(TypeKind::from_u8(2), Some(TypeKind::String));
-    assert_eq!(TypeKind::from_u8(3), Some(TypeKind::Optional));
-    assert_eq!(TypeKind::from_u8(4), Some(TypeKind::ArrayZeroOrMore));
-    assert_eq!(TypeKind::from_u8(5), Some(TypeKind::ArrayOneOrMore));
-    assert_eq!(TypeKind::from_u8(6), Some(TypeKind::Struct));
-    assert_eq!(TypeKind::from_u8(7), Some(TypeKind::Enum));
-    assert_eq!(TypeKind::from_u8(8), Some(TypeKind::Alias));
+    assert_eq!(TypeKind::from_u8(2), Some(TypeKind::Optional));
+    assert_eq!(TypeKind::from_u8(3), Some(TypeKind::ArrayZeroOrMore));
+    assert_eq!(TypeKind::from_u8(4), Some(TypeKind::ArrayOneOrMore));
+    assert_eq!(TypeKind::from_u8(5), Some(TypeKind::Struct));
+    assert_eq!(TypeKind::from_u8(6), Some(TypeKind::Enum));
+    assert_eq!(TypeKind::from_u8(7), Some(TypeKind::Alias));
 }
 
 #[test]
 fn from_u8_invalid() {
-    assert_eq!(TypeKind::from_u8(9), None);
+    assert_eq!(TypeKind::from_u8(8), None);
     assert_eq!(TypeKind::from_u8(255), None);
 }
 
@@ -23,7 +22,6 @@ fn from_u8_invalid() {
 fn is_primitive() {
     assert!(TypeKind::Void.is_primitive());
     assert!(TypeKind::Node.is_primitive());
-    assert!(TypeKind::String.is_primitive());
     assert!(!TypeKind::Optional.is_primitive());
     assert!(!TypeKind::Struct.is_primitive());
 }
@@ -80,6 +78,5 @@ fn is_alias() {
 fn primitive_name() {
     assert_eq!(TypeKind::Void.primitive_name(), Some("Void"));
     assert_eq!(TypeKind::Node.primitive_name(), Some("Node"));
-    assert_eq!(TypeKind::String.primitive_name(), Some("String"));
     assert_eq!(TypeKind::Struct.primitive_name(), None);
 }

@@ -27,7 +27,7 @@ impl NodeHandle {
     pub fn from_node(node: Node<'_>, source: &str) -> Self {
         let text = node
             .utf8_text(source.as_bytes())
-            .expect("node text extraction failed")
+            .expect("node source text must be valid UTF-8")
             .to_owned();
         Self {
             kind: node.kind(),
@@ -57,7 +57,6 @@ impl Serialize for NodeHandle {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Null,
-    String(String),
     Node(NodeHandle),
     Array(Vec<Value>),
     /// Object with ordered fields.
@@ -76,7 +75,6 @@ impl Serialize for Value {
     {
         match self {
             Value::Null => serializer.serialize_none(),
-            Value::String(s) => serializer.serialize_str(s),
             Value::Node(h) => h.serialize(serializer),
             Value::Array(arr) => {
                 let mut seq = serializer.serialize_seq(Some(arr.len()))?;
@@ -126,13 +124,6 @@ fn format_value(out: &mut String, value: &Value, c: &Colors, pretty: bool, inden
         Value::Null => {
             out.push_str(c.dim);
             out.push_str("null");
-            out.push_str(c.reset);
-        }
-        Value::String(s) => {
-            out.push_str(c.green);
-            out.push('"');
-            escape_json_into(out, s);
-            out.push('"');
             out.push_str(c.reset);
         }
         Value::Node(h) => {

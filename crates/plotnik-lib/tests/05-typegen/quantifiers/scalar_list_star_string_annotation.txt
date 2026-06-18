@@ -1,5 +1,0 @@
-Q = (identifier)* @names :: string
-==== types ====
-export interface Q {
-  names: string[];
-}

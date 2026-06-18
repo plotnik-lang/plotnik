@@ -77,14 +77,6 @@ fn verify_type(
                     ));
                 }
             }
-            TypeKind::String => {
-                if !matches!(value, Value::String(_)) {
-                    errors.push(format_error(
-                        path,
-                        &format!("type: string, value: {}", value_kind_name(value)),
-                    ));
-                }
-            }
             _ => unreachable!(),
         },
 
@@ -251,7 +243,6 @@ fn verify_type(
 fn value_kind_name(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
-        Value::String(_) => "string",
         Value::Node(_) => "Node",
         Value::Array(_) => "array",
         Value::Object(_) => "object",

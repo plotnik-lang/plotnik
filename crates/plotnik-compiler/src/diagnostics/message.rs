@@ -76,7 +76,6 @@ pub enum DiagnosticKind {
     DuplicateCaptureInScope,
     IncompatibleCaptureTypes,
     IncompatibleStructShapes,
-    InvalidTypeAnnotation,
 
     PredicateOnNonLeaf,
     EmptyRegex,
@@ -154,7 +153,7 @@ impl DiagnosticKind {
     pub fn default_hint(&self) -> Option<&'static str> {
         match self {
             Self::ExpectedSubtype => Some("e.g., `expression#binary_expression`"),
-            Self::ExpectedTypeName => Some("e.g., `::MyType` or `::string`"),
+            Self::ExpectedTypeName => Some("e.g., `::MyType`"),
             Self::ExpectedFieldName => Some("e.g., `-value`"),
             Self::EmptyTree => Some("use `(_)` to match any named node, or `_` for any node"),
             Self::EmptyAnonymousNode => {
@@ -286,7 +285,7 @@ impl DiagnosticKind {
             Self::DefNameInvalid => "definition names must be PascalCase",
             Self::BranchLabelInvalid => "branch labels must be PascalCase",
             Self::FieldNameInvalid => "field names must be snake_case",
-            Self::TypeNameInvalid => "type names cannot contain `.` or `-`",
+            Self::TypeNameInvalid => "type names must be PascalCase",
             Self::TreeSitterSequenceSyntax => "parenthesized sequences are tree-sitter syntax",
             Self::NegationSyntaxDeprecated => "`!field` negation is deprecated",
             Self::SupertypeSlashDeprecated => "`supertype/subtype` paths are tree-sitter syntax",
@@ -315,7 +314,6 @@ impl DiagnosticKind {
             Self::DuplicateCaptureInScope => "duplicate capture in scope",
             Self::IncompatibleCaptureTypes => "incompatible capture types",
             Self::IncompatibleStructShapes => "incompatible struct shapes",
-            Self::InvalidTypeAnnotation => "invalid type annotation",
             Self::PredicateOnNonLeaf => {
                 "predicates match text content, but this node can contain children"
             }
@@ -361,7 +359,6 @@ impl DiagnosticKind {
             Self::IncompatibleStructShapes => {
                 "capture `@{}` has incompatible struct fields across branches".to_string()
             }
-            Self::InvalidTypeAnnotation => "{}".to_string(),
             Self::UnknownNodeType => "`{}` is not a valid node type".to_string(),
             Self::UnknownField => "`{}` is not a valid field".to_string(),
             Self::FieldNotOnNodeType => "field `{}` is not valid on this node type".to_string(),

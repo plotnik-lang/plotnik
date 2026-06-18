@@ -75,17 +75,17 @@ Extract function signatures from Rust. `Type` references itself to handle nested
 
 ```clojure
 Type = [
-  Simple: [(type_identifier) (primitive_type)] @name :: string
+  Simple: [(type_identifier) (primitive_type)] @name
   Generic: (generic_type
-    type: (type_identifier) @name :: string
+    type: (type_identifier) @name
     type_arguments: (type_arguments (Type)* @args))
 ]
 
 Func = (function_item
-  name: (identifier) @name :: string
+  name: (identifier) @name
   parameters: (parameters
     (parameter
-      pattern: (identifier) @param :: string
+      pattern: (identifier) @param
       type: (Type) @type
     )* @params))
 
@@ -104,13 +104,32 @@ Plotnik infers TypeScript types from the query structure. `Type` is recursive: `
 
 ```sh
 ❯ plotnik infer query.ptk --lang rust
-export type Type =
-  | { $tag: "Simple"; $data: { name: string } }
-  | { $tag: "Generic"; $data: { name: string; args: Type[] } };
+export interface Node {
+  kind: string;
+  text: string;
+  span: [number, number];
+}
+
+export interface TypeSimple {
+  $tag: "Simple";
+  $data: { name: Node };
+}
+
+export interface TypeGeneric {
+  $tag: "Generic";
+  $data: { args: Type[]; name: Node };
+}
+
+export type Type = TypeSimple | TypeGeneric;
+
+export interface FuncParams {
+  param: Node;
+  type: Type;
+}
 
 export interface Func {
-  name: string;
-  params: { param: string; type: Type }[];
+  name: Node;
+  params: FuncParams[];
 }
 
 export interface Funcs {
@@ -121,22 +140,25 @@ export interface Funcs {
 Run the query against `lib.rs` to extract structured JSON:
 
 ```sh
-❯ plotnik exec query.ptk lib.rs
+❯ plotnik exec query.ptk lib.rs --entry Funcs
 {
   "funcs": [
     {
-      "name": "get",
+      "name": { "kind": "identifier", "text": "get", "span": [3, 6] },
       "params": [{
-        "param": "key",
+        "param": { "kind": "identifier", "text": "key", "span": [7, 10] },
         "type": {
           "$tag": "Generic",
           "$data": {
-            "name": "Option",
+            "name": { "kind": "type_identifier", "text": "Option", "span": [12, 18] },
             "args": [{
               "$tag": "Generic",
               "$data": {
-                "name": "Vec",
-                "args": [{ "$tag": "Simple", "$data": { "name": "String" } }]
+                "name": { "kind": "type_identifier", "text": "Vec", "span": [19, 22] },
+                "args": [{
+                  "$tag": "Simple",
+                  "$data": { "name": { "kind": "type_identifier", "text": "String", "span": [23, 29] } }
+                }]
               }
             }]
           }
@@ -144,10 +166,16 @@ Run the query against `lib.rs` to extract structured JSON:
       }]
     },
     {
-      "name": "set",
+      "name": { "kind": "identifier", "text": "set", "span": [40, 43] },
       "params": [
-        { "param": "key", "type": { "$tag": "Simple", "$data": { "name": "String" } } },
-        { "param": "val", "type": { "$tag": "Simple", "$data": { "name": "i32" } } }
+        {
+          "param": { "kind": "identifier", "text": "key", "span": [44, 47] },
+          "type": { "$tag": "Simple", "$data": { "name": { "kind": "type_identifier", "text": "String", "span": [49, 55] } } }
+        },
+        {
+          "param": { "kind": "identifier", "text": "val", "span": [57, 60] },
+          "type": { "$tag": "Simple", "$data": { "name": { "kind": "primitive_type", "text": "i32", "span": [62, 65] } } }
+        }
       ]
     }
   ]

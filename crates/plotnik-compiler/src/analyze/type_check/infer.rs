@@ -14,8 +14,7 @@ use super::capture_shape::{CaptureMechanism, capture_mechanism, quantifier_arity
 use super::context::TypeContext;
 use super::symbol::Symbol;
 use super::types::{
-    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_STRING, TYPE_VOID, TermInfo, TypeFlow,
-    TypeId, TypeShape,
+    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_VOID, TermInfo, TypeFlow, TypeId, TypeShape,
 };
 use super::unify::{UnifyError, unify_flows};
 
@@ -29,19 +28,6 @@ use crate::parser::{
     Ref, Root, SeqExpr, is_truly_empty_scope,
 };
 use crate::query::SourceId;
-
-/// Type annotation kind from `@capture :: Type` syntax.
-///
-/// The caller decides how to use the annotation based on context:
-/// - `String`: always converts the capture to string type
-/// - `TypeName`: either names a struct (for scope-creating captures) or creates a Node alias
-#[derive(Clone, Copy, Debug)]
-enum AnnotationKind {
-    /// `:: string` - extract text as string
-    String,
-    /// `:: TypeName` - custom type name
-    TypeName(Symbol),
-}
 
 /// Shared state for a single inference pass over the AST.
 pub struct InferenceContext<'a, 'd> {
@@ -344,14 +330,10 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         let capture_name = self.ctx.interner.intern(&name_tok.text()[1..]); // Strip @ prefix
 
         let annotation = self.resolve_annotation(cap);
-        let ann_range = cap
-            .type_annotation()
-            .map(|t| t.text_range())
-            .unwrap_or_else(|| name_tok.text_range());
 
         let Some(inner) = cap.inner() else {
-            // Capture without inner -> a Node field (annotation may alias/stringify it).
-            let type_id = self.apply_annotation(TYPE_NODE, annotation, ann_range);
+            // Capture without inner -> a Node field (annotation may alias it).
+            let type_id = annotation.map_or(TYPE_NODE, |name| self.annotate_named(TYPE_NODE, name));
             let field = FieldInfo::required(type_id);
             return TermInfo::new(
                 Arity::One,
@@ -379,7 +361,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         } else {
             self.determine_captured_base_type(&inner, &inner_info)
         };
-        let captured_type = self.apply_annotation(base, annotation, ann_range);
+        let captured_type = annotation.map_or(base, |name| self.annotate_named(base, name));
         let field_info = if is_optional {
             FieldInfo::optional(captured_type)
         } else {
@@ -409,50 +391,6 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
         }
     }
 
-    /// Apply a `:: string` / `:: TypeName` annotation to a capture's base type.
-    ///
-    /// The single place that decides what each annotation means for each shape —
-    /// recursing through arrays and optionals so the annotation lands on the
-    /// element, and rejecting combinations that have no meaning.
-    fn apply_annotation(
-        &mut self,
-        base: TypeId,
-        annotation: Option<AnnotationKind>,
-        range: TextRange,
-    ) -> TypeId {
-        match annotation {
-            None => base,
-            Some(AnnotationKind::String) => self.annotate_string(base, range),
-            Some(AnnotationKind::TypeName(name)) => self.annotate_named(base, name),
-        }
-    }
-
-    /// `:: string` — project the matched node's text. Recurses into arrays and
-    /// optionals; structured captures (struct/enum) have no text form and are
-    /// rejected with a diagnostic.
-    fn annotate_string(&mut self, type_id: TypeId, range: TextRange) -> TypeId {
-        match self.ctx.type_ctx.get_type(type_id).cloned() {
-            Some(TypeShape::Node | TypeShape::String | TypeShape::Custom(_)) => TYPE_STRING,
-            Some(TypeShape::Array { element, non_empty }) => {
-                let element = self.annotate_string(element, range);
-                self.ctx
-                    .type_ctx
-                    .intern_type(TypeShape::Array { element, non_empty })
-            }
-            Some(TypeShape::Optional(inner)) => {
-                let inner = self.annotate_string(inner, range);
-                self.ctx.type_ctx.intern_type(TypeShape::Optional(inner))
-            }
-            _ => {
-                self.report_invalid_annotation(
-                    range,
-                    "`:: string` cannot extract text from a structured capture",
-                );
-                type_id
-            }
-        }
-    }
-
     /// `:: TypeName` — name a structured capture (struct/enum) or alias a node.
     /// Recurses into arrays and optionals so the name lands on the element.
     fn annotate_named(&mut self, type_id: TypeId, name: Symbol) -> TypeId {
@@ -471,34 +409,17 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 let inner = self.annotate_named(inner, name);
                 self.ctx.type_ctx.intern_type(TypeShape::Optional(inner))
             }
-            // Node, recursive Ref, string, or void: a named alias to the value.
+            // Node, recursive Ref, or void: a named alias to the value.
             _ => self.ctx.type_ctx.intern_type(TypeShape::Custom(name)),
         }
     }
 
-    fn report_invalid_annotation(&mut self, range: TextRange, message: &str) {
-        self.ctx
-            .reporter
-            .report(DiagnosticKind::InvalidTypeAnnotation, range)
-            .message(message)
-            .emit();
-    }
-
-    /// Resolves explicit type annotation like `@foo :: string` or `@foo :: TypeName`.
-    ///
-    /// Returns the annotation kind without creating types - the caller decides
-    /// how to use the annotation based on the capture's flow.
-    fn resolve_annotation(&mut self, cap: &CapturedExpr) -> Option<AnnotationKind> {
-        cap.type_annotation().and_then(|t| {
-            t.name().map(|n| {
-                let text = n.text();
-                if text == "string" {
-                    AnnotationKind::String
-                } else {
-                    AnnotationKind::TypeName(self.ctx.interner.intern(text))
-                }
-            })
-        })
+    /// Resolves an explicit type annotation like `@foo :: TypeName` into the
+    /// interned type name. Returns `None` when the capture has no annotation.
+    fn resolve_annotation(&mut self, cap: &CapturedExpr) -> Option<Symbol> {
+        cap.type_annotation()
+            .and_then(|t| t.name())
+            .map(|n| self.ctx.interner.intern(n.text()))
     }
 
     /// Logic for how quantifier on the inner expression affects the capture field.
@@ -775,7 +696,7 @@ impl<'a, 'd> InferenceVisitor<'a, 'd> {
                 *element != TYPE_NODE && self.produces_output(*element)
             }
             TypeShape::Optional(inner) => *inner != TYPE_NODE && self.produces_output(*inner),
-            TypeShape::Node | TypeShape::String | TypeShape::Void | TypeShape::Custom(_) => false,
+            TypeShape::Node | TypeShape::Void | TypeShape::Custom(_) => false,
         }
     }
 

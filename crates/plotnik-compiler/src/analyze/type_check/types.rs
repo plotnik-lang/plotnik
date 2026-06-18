@@ -10,22 +10,21 @@ use super::symbol::{DefId, Symbol};
 
 // Re-export shared type system components
 pub use plotnik_bytecode::type_system::{Arity, QuantifierKind};
-use plotnik_bytecode::type_system::{PrimitiveType, TYPE_STRING as PRIM_TYPE_STRING};
+use plotnik_bytecode::type_system::{PrimitiveType, TYPE_NODE as PRIM_TYPE_NODE};
 
 /// Interned type identifier.
 ///
-/// Index into the type registry. Values 0-2 are reserved for builtins
-/// (Void, Node, String); custom types start at index 3.
+/// Index into the type registry. Values 0-1 are reserved for builtins
+/// (Void, Node); custom types start at index 2.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct TypeId(pub u32);
 
 pub const TYPE_VOID: TypeId = TypeId(PrimitiveType::Void.index() as u32);
 pub const TYPE_NODE: TypeId = TypeId(PrimitiveType::Node.index() as u32);
-pub const TYPE_STRING: TypeId = TypeId(PrimitiveType::String.index() as u32);
 
 impl TypeId {
     pub fn is_builtin(self) -> bool {
-        self.0 <= PRIM_TYPE_STRING as u32
+        self.0 <= PRIM_TYPE_NODE as u32
     }
 }
 
@@ -40,8 +39,6 @@ pub enum TypeShape {
     Void,
     /// A tree-sitter node.
     Node,
-    /// Extracted text from a node.
-    String,
     /// User-specified type via `@x :: TypeName`.
     Custom(Symbol),
     /// Object with named fields.

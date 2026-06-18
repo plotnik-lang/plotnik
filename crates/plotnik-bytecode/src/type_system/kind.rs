@@ -2,7 +2,7 @@
 
 /// Semantic type kind.
 ///
-/// Primitive types (Void, Node, String) are stored as `TypeDef`s like any other
+/// Primitive types (Void, Node) are stored as `TypeDef`s like any other
 /// type — the kind field is the only thing that distinguishes them.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
@@ -11,20 +11,18 @@ pub enum TypeKind {
     Void = 0,
     /// AST node reference.
     Node = 1,
-    /// Text content extracted from node.
-    String = 2,
     /// `T?` - optional wrapper, contains zero or one value.
-    Optional = 3,
+    Optional = 2,
     /// `T*` - array of zero or more values.
-    ArrayZeroOrMore = 4,
+    ArrayZeroOrMore = 3,
     /// `T+` - array of one or more values (non-empty).
-    ArrayOneOrMore = 5,
+    ArrayOneOrMore = 4,
     /// Record with named fields.
-    Struct = 6,
+    Struct = 5,
     /// Discriminated union with tagged variants.
-    Enum = 7,
+    Enum = 6,
     /// Named reference to another type (e.g., `type Foo = Bar`).
-    Alias = 8,
+    Alias = 7,
 }
 
 impl TypeKind {
@@ -33,20 +31,19 @@ impl TypeKind {
         match v {
             0 => Some(Self::Void),
             1 => Some(Self::Node),
-            2 => Some(Self::String),
-            3 => Some(Self::Optional),
-            4 => Some(Self::ArrayZeroOrMore),
-            5 => Some(Self::ArrayOneOrMore),
-            6 => Some(Self::Struct),
-            7 => Some(Self::Enum),
-            8 => Some(Self::Alias),
+            2 => Some(Self::Optional),
+            3 => Some(Self::ArrayZeroOrMore),
+            4 => Some(Self::ArrayOneOrMore),
+            5 => Some(Self::Struct),
+            6 => Some(Self::Enum),
+            7 => Some(Self::Alias),
             _ => None,
         }
     }
 
-    /// Whether this is a primitive/builtin type (Void, Node, String).
+    /// Whether this is a primitive/builtin type (Void, Node).
     pub fn is_primitive(self) -> bool {
-        matches!(self, Self::Void | Self::Node | Self::String)
+        matches!(self, Self::Void | Self::Node)
     }
 
     /// Whether this is a wrapper type (Optional, ArrayZeroOrMore, ArrayOneOrMore).
@@ -82,7 +79,6 @@ impl TypeKind {
         match self {
             Self::Void => Some("Void"),
             Self::Node => Some("Node"),
-            Self::String => Some("String"),
             _ => None,
         }
     }

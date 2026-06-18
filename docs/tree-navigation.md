@@ -329,4 +329,4 @@ This is the same forward-search-with-backtracking that in-pattern anchors and qu
 
 ### Zero-width returns
 
-A captured ref binds the node its callee matched. If the callee returns without matching anything — e.g. a non-greedy optional that took its skip path — there is no such node. `matched_node` is cleared on callee entry and only a successful `Match` sets it, so a zero-width return leaves it cleared and a `Node`/`Text` capture over it fails the path rather than fabricating the call-site node. A required capture therefore yields no match instead of a stale ancestor.
+A captured ref binds the node its callee matched. If the callee returns without matching anything — e.g. a non-greedy optional that took its skip path — there is no such node. `matched_node` is cleared on callee entry and only a successful `Match` sets it, so a zero-width return leaves it cleared and a `Node` capture over it fails the path rather than fabricating the call-site node. A required capture therefore yields no match instead of a stale ancestor.

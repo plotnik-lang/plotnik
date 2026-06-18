@@ -1,5 +1,0 @@
-@name :: string
-==== tokens ====
-CaptureToken "@name"
-DoubleColon "::"
-Id "string"

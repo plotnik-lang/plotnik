@@ -1,6 +1,6 @@
 (a) @x :: My-Type
 ==== diagnostics ====
-error: type names cannot contain `.` or `-`
+error: type names must be PascalCase
  --> query.ptk:1:11
   |
 1 | (a) @x :: My-Type

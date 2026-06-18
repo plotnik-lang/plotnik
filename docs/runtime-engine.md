@@ -153,7 +153,6 @@ Operations logged instead of inline output. Backtracking: `truncate(watermark)`.
 ```rust
 pub enum RuntimeEffect<'t> {
     Node(tree_sitter::Node<'t>),
-    Text(tree_sitter::Node<'t>),
     Arr,
     Push,
     EndArr,
@@ -174,7 +173,6 @@ Lifetime `'t` denotes the parsed tree-sitter tree (per project conventions).
 | Effect       | Action                                     |
 | ------------ | ------------------------------------------ |
 | Node(n)      | Capture node `n`                           |
-| Text(n)      | Extract source text from node `n`          |
 | Obj/EndObj   | Object boundaries                          |
 | Set(idx)     | Assign to field at member index            |
 | Arr/EndArr   | Array boundaries                           |
@@ -183,7 +181,7 @@ Lifetime `'t` denotes the parsed tree-sitter tree (per project conventions).
 | Clear        | Reset current value                        |
 | Null         | Null placeholder (optional/alternation)    |
 
-The `Node` and `Text` variants carry the actual `tree_sitter::Node` so the materializer has direct access without needing a separate node buffer. This single-stream design allows natural iteration: `for effect in log.0 { match effect { ... } }`.
+The `Node` variant carries the actual `tree_sitter::Node` so the materializer has direct access without needing a separate node buffer. This single-stream design allows natural iteration: `for effect in log.0 { match effect { ... } }`.
 
 ### Bytecode vs Runtime Effects
 
