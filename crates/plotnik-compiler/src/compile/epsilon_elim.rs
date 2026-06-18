@@ -35,62 +35,76 @@ fn build_predecessor_map(instructions: &[InstructionIR]) -> HashMap<Label, Vec<L
     preds
 }
 
-fn get_match<'a>(
-    label: Label,
-    instructions: &'a [InstructionIR],
-    idx: &HashMap<Label, usize>,
-) -> Option<&'a MatchIR> {
-    match &instructions[*idx.get(&label)?] {
-        InstructionIR::Match(m) => Some(m),
-        _ => None,
-    }
-}
-
-fn get_match_mut<'a>(
-    label: Label,
-    instructions: &'a mut [InstructionIR],
-    idx: &HashMap<Label, usize>,
-) -> Option<&'a mut MatchIR> {
-    match &mut instructions[*idx.get(&label)?] {
-        InstructionIR::Match(m) => Some(m),
-        _ => None,
-    }
-}
-
-/// See through single-successor epsilon chains.
+/// An immutable view over the instruction list paired with its label→index map.
 ///
-/// Returns `(target, accumulated_effects)` or `None` if blocked by:
-/// - Branching epsilon (multiple successors)
-/// - Cycle
-fn see_through(
-    start: Label,
-    instructions: &[InstructionIR],
-    idx: &HashMap<Label, usize>,
-) -> Option<(Label, Vec<EffectIR>)> {
-    let mut current = start;
-    let mut effects = Vec::new();
-    let mut visited = HashSet::new();
+/// Bundles the `(instructions, idx)` clump every lookup threads, so a label is
+/// always resolved against the index built for that exact list.
+struct InstrIndex<'a> {
+    instructions: &'a [InstructionIR],
+    idx: &'a HashMap<Label, usize>,
+}
 
-    loop {
-        if !visited.insert(current) {
-            return None;
+impl<'a> InstrIndex<'a> {
+    fn new(instructions: &'a [InstructionIR], idx: &'a HashMap<Label, usize>) -> Self {
+        Self { instructions, idx }
+    }
+
+    fn get_match(&self, label: Label) -> Option<&'a MatchIR> {
+        match &self.instructions[*self.idx.get(&label)?] {
+            InstructionIR::Match(m) => Some(m),
+            _ => None,
         }
+    }
 
-        let Some(m) = get_match(current, instructions, idx) else {
-            return Some((current, effects)); // Non-Match target (Call/Return/Trampoline)
-        };
+    /// See through single-successor epsilon chains.
+    ///
+    /// Returns `(target, accumulated_effects)` or `None` if blocked by:
+    /// - Branching epsilon (multiple successors)
+    /// - Cycle
+    fn see_through(&self, start: Label) -> Option<(Label, Vec<EffectIR>)> {
+        let mut current = start;
+        let mut effects = Vec::new();
+        let mut visited = HashSet::new();
 
-        if !m.is_epsilon() {
-            return Some((current, effects));
+        loop {
+            if !visited.insert(current) {
+                return None;
+            }
+
+            let Some(m) = self.get_match(current) else {
+                return Some((current, effects)); // Non-Match target (Call/Return/Trampoline)
+            };
+
+            if !m.is_epsilon() {
+                return Some((current, effects));
+            }
+
+            if m.successors.len() != 1 {
+                return Some((current, effects)); // Branching epsilon: visible but can't see through
+            }
+
+            effects.extend(m.pre_effects.iter().cloned());
+            effects.extend(m.post_effects.iter().cloned());
+            current = m.successors[0];
         }
+    }
+}
 
-        if m.successors.len() != 1 {
-            return Some((current, effects)); // Branching epsilon: visible but can't see through
+struct InstrIndexMut<'a> {
+    instructions: &'a mut [InstructionIR],
+    idx: &'a HashMap<Label, usize>,
+}
+
+impl<'a> InstrIndexMut<'a> {
+    fn new(instructions: &'a mut [InstructionIR], idx: &'a HashMap<Label, usize>) -> Self {
+        Self { instructions, idx }
+    }
+
+    fn get_match_mut(&mut self, label: Label) -> Option<&mut MatchIR> {
+        match &mut self.instructions[*self.idx.get(&label)?] {
+            InstructionIR::Match(m) => Some(m),
+            _ => None,
         }
-
-        effects.extend(m.pre_effects.iter().cloned());
-        effects.extend(m.post_effects.iter().cloned());
-        current = m.successors[0];
     }
 }
 
@@ -126,7 +140,7 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
 
         let succ_label = eps.successors[0];
 
-        let Some(succ) = get_match(succ_label, instructions, &idx) else {
+        let Some(succ) = InstrIndex::new(instructions, &idx).get_match(succ_label) else {
             continue;
         };
         if succ.is_epsilon() {
@@ -154,14 +168,18 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
         let eps_pre = eps.pre_effects.clone();
         let eps_post = eps.post_effects.clone();
 
-        let succ = get_match_mut(succ_label, instructions, &idx)
+        let mut view = InstrIndexMut::new(instructions, &idx);
+
+        let succ = view
+            .get_match_mut(succ_label)
             .expect("succ_label resolved via get_match above, so it indexes a Match instruction");
         let mut new_pre = eps_pre;
         new_pre.extend(eps_post);
         new_pre.append(&mut succ.pre_effects);
         succ.pre_effects = new_pre;
 
-        let eps = get_match_mut(eps_label, instructions, &idx)
+        let eps = view
+            .get_match_mut(eps_label)
             .expect("eps_label is the current epsilon Match instruction at index i");
         eps.pre_effects.clear();
         eps.post_effects.clear();
@@ -184,7 +202,8 @@ fn laser_vision(result: &mut CompileResult) -> bool {
     // Track old→new entry remaps to fix up Call targets referencing them.
     let mut entry_remaps: HashMap<Label, Label> = HashMap::new();
     for entry in result.def_entries.values_mut() {
-        if let Some((target, effects)) = see_through(*entry, &result.instructions, &idx)
+        if let Some((target, effects)) =
+            InstrIndex::new(&result.instructions, &idx).see_through(*entry)
             && effects.is_empty()
             && target != *entry
         {
@@ -202,7 +221,8 @@ fn laser_vision(result: &mut CompileResult) -> bool {
         }
     }
 
-    if let Some((target, effects)) = see_through(result.preamble_entry, &result.instructions, &idx)
+    if let Some((target, effects)) =
+        InstrIndex::new(&result.instructions, &idx).see_through(result.preamble_entry)
         && effects.is_empty()
         && target != result.preamble_entry
     {
@@ -221,7 +241,9 @@ fn laser_vision(result: &mut CompileResult) -> bool {
         let mut edited: Option<(Vec<Label>, Vec<EffectIR>)> = None;
 
         for (j, &succ) in m.successors.iter().enumerate() {
-            let Some((target, effects)) = see_through(succ, &result.instructions, &idx) else {
+            let Some((target, effects)) =
+                InstrIndex::new(&result.instructions, &idx).see_through(succ)
+            else {
                 continue;
             };
 
@@ -265,7 +287,8 @@ fn laser_vision(result: &mut CompileResult) -> bool {
         };
 
         let Some(next) = next_label else { continue };
-        let Some((target, effects)) = see_through(next, &result.instructions, &idx) else {
+        let Some((target, effects)) = InstrIndex::new(&result.instructions, &idx).see_through(next)
+        else {
             continue;
         };
 
@@ -398,7 +421,9 @@ mod tests {
         ];
         let idx = build_label_to_index(&instructions);
 
-        let (target, effects) = see_through(Label(0), &instructions, &idx).unwrap();
+        let (target, effects) = InstrIndex::new(&instructions, &idx)
+            .see_through(Label(0))
+            .unwrap();
         assert_eq!(target, Label(2));
         assert!(effects.is_empty());
     }
@@ -413,7 +438,9 @@ mod tests {
         ];
         let idx = build_label_to_index(&instructions);
 
-        let (target, effects) = see_through(Label(0), &instructions, &idx).unwrap();
+        let (target, effects) = InstrIndex::new(&instructions, &idx)
+            .see_through(Label(0))
+            .unwrap();
         assert_eq!(target, Label(2));
         assert_eq!(effects.len(), 2); // Obj from 0, EndObj from 1
     }
@@ -430,12 +457,16 @@ mod tests {
         let idx = build_label_to_index(&instructions);
 
         // Can see through 0 to 1, but 1 is branching
-        let (target, effects) = see_through(Label(0), &instructions, &idx).unwrap();
+        let (target, effects) = InstrIndex::new(&instructions, &idx)
+            .see_through(Label(0))
+            .unwrap();
         assert_eq!(target, Label(1)); // Stops at branching epsilon
         assert!(effects.is_empty());
 
         // Starting from branching epsilon returns itself
-        let (target, effects) = see_through(Label(1), &instructions, &idx).unwrap();
+        let (target, effects) = InstrIndex::new(&instructions, &idx)
+            .see_through(Label(1))
+            .unwrap();
         assert_eq!(target, Label(1));
         assert!(effects.is_empty());
     }

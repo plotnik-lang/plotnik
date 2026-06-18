@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{
+    lower::PreResolveGrammar,
     prepared::{ReservedWordContext, ResolvedGrammar, Variable, VariableType},
     rules::{Rule, Symbol},
 };
@@ -24,17 +25,18 @@ pub enum InternSymbolsError {
     UndefinedWordToken(String),
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn resolve_symbols(
-    source_variables: &[Variable],
-    extra_rules: &[Rule],
-    expected_conflicts: &[Vec<String>],
-    external_rules: &[Rule],
-    variables_to_inline: &[String],
-    supertype_names: &[String],
-    word_token_name: Option<&str>,
-    reserved_word_sets: &[ReservedWordContext<Rule>],
-) -> InternSymbolsResult<ResolvedGrammar> {
+pub(super) fn resolve_symbols(grammar: PreResolveGrammar<'_>) -> InternSymbolsResult<ResolvedGrammar> {
+    let PreResolveGrammar {
+        variables: source_variables,
+        extra_symbols: extra_rules,
+        expected_conflicts,
+        external_tokens: external_rules,
+        variables_to_inline,
+        supertype_symbols: supertype_names,
+        word_token: word_token_name,
+        reserved_words: reserved_word_sets,
+    } = grammar;
+
     let interner = Interner::new(source_variables, external_rules);
 
     if variable_type_for_name(&source_variables[0].name) == VariableType::Hidden {

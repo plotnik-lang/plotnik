@@ -55,42 +55,43 @@ impl TypeTableBuilder {
         // emitted effect's member ref names a type that one of these reaches, so
         // this single walk also covers all effect-referenced types. Definition
         // order fixes the emission order entrypoints rely on.
-        let mut ordered_types: Vec<TypeId> = Vec::new();
-        let mut seen: HashSet<TypeId> = HashSet::new();
-
+        let mut collector = TypeCollector::new();
         for (_def_id, type_id) in type_ctx.iter_def_types() {
-            collect_types_dfs(type_id, type_ctx, &mut ordered_types, &mut seen);
+            collector.collect(type_id, type_ctx);
 
             if !matches!(type_ctx.get_type(type_id), Some(TypeShape::Ref(_))) {
                 continue;
             }
 
-            if !seen.insert(type_id) {
+            if !collector.seen.insert(type_id) {
                 continue;
             }
 
-            ordered_types.push(type_id);
+            collector.out.push(type_id);
         }
+        let ordered_types = collector.out;
 
         // Determine which builtins are actually used by scanning all types
-        let mut used_builtins = [false; 2]; // [Void, Node]
-        let mut seen = HashSet::new();
+        let mut usage = BuiltinUsage::new();
         for &type_id in &ordered_types {
-            collect_builtin_refs(type_id, type_ctx, &mut used_builtins, &mut seen);
+            usage.collect(type_id, type_ctx);
         }
         // Also check entrypoint result types directly
         for (_def_id, type_id) in type_ctx.iter_def_types() {
             if type_id == TYPE_VOID {
-                used_builtins[0] = true;
+                usage.void = true;
             } else if type_id == TYPE_NODE {
-                used_builtins[1] = true;
+                usage.node = true;
             }
         }
 
         // Phase 1: Emit used builtins first (in order: Void, Node)
-        let builtin_types = [(TYPE_VOID, TypeKind::Void), (TYPE_NODE, TypeKind::Node)];
-        for (i, &(builtin_id, kind)) in builtin_types.iter().enumerate() {
-            if used_builtins[i] {
+        let builtin_types = [
+            (TYPE_VOID, TypeKind::Void, usage.void),
+            (TYPE_NODE, TypeKind::Node, usage.node),
+        ];
+        for &(builtin_id, kind, used) in &builtin_types {
+            if used {
                 let bc_id = BytecodeTypeId(self.type_defs.len() as u16);
                 self.mapping.insert(builtin_id, bc_id);
                 self.type_defs.push(TypeDef::builtin(kind));
@@ -106,18 +107,23 @@ impl TypeTableBuilder {
 
         // Phase 3: Fill in custom type definitions
         // We need to calculate slot index as offset from where custom types start
-        let builtin_count = used_builtins.iter().filter(|&&b| b).count();
+        let builtin_count = usage.void as usize + usage.node as usize;
+        let mut ctx = EmitCtx {
+            type_ctx,
+            interner,
+            strings,
+        };
         for (i, &type_id) in ordered_types.iter().enumerate() {
             let slot_index = builtin_count + i;
             let type_shape = type_ctx
                 .get_type(type_id)
                 .expect("collected type must exist");
-            self.emit_type_at_slot(slot_index, type_shape, type_ctx, interner, strings)?;
+            self.emit_type_at_slot(slot_index, type_shape, &mut ctx)?;
         }
 
         for (def_id, type_id) in type_ctx.iter_def_types() {
             let name_sym = type_ctx.def_name_sym(def_id);
-            let name = strings.get_or_intern(name_sym, interner)?;
+            let name = ctx.strings.get_or_intern(name_sym, ctx.interner)?;
             let bc_type_id = self
                 .mapping
                 .get(&type_id)
@@ -137,7 +143,7 @@ impl TypeTableBuilder {
                 .get(&type_id)
                 .copied()
                 .expect("named type annotation must survive dead-type elimination");
-            let name = strings.get_or_intern(name_sym, interner)?;
+            let name = ctx.strings.get_or_intern(name_sym, ctx.interner)?;
             self.type_names.push(TypeName::new(name, bc_type_id));
         }
 
@@ -148,9 +154,7 @@ impl TypeTableBuilder {
         &mut self,
         slot_index: usize,
         type_shape: &TypeShape,
-        type_ctx: &TypeContext,
-        interner: &Interner,
-        strings: &mut StringTableBuilder,
+        ctx: &mut EmitCtx,
     ) -> Result<(), EmitError> {
         match type_shape {
             TypeShape::Void | TypeShape::Node => {
@@ -161,13 +165,13 @@ impl TypeTableBuilder {
                 // Custom type annotation: @x :: Identifier → type Identifier = Node
                 let bc_type_id = BytecodeTypeId(slot_index as u16);
 
-                let name = strings.get_or_intern(*sym, interner)?;
+                let name = ctx.strings.get_or_intern(*sym, ctx.interner)?;
                 self.type_names.push(TypeName::new(name, bc_type_id));
 
                 // Custom types alias Node - look up Node's actual bytecode ID.
                 // Reaching a Custom type means it was in `ordered_types`, so
-                // `collect_builtin_refs` marked Node used (type_table.rs: `Custom(_) =>
-                // used[1] = true`) and Phase 1 emitted it into `mapping`.
+                // `BuiltinUsage::collect` marked Node used (type_table.rs: `Custom(_) =>
+                // usage.node = true`) and Phase 1 emitted it into `mapping`.
                 let node_bc_id =
                     self.mapping.get(&TYPE_NODE).copied().expect(
                         "Node must be mapped before a Custom alias that targets it is emitted",
@@ -177,13 +181,13 @@ impl TypeTableBuilder {
             }
 
             TypeShape::Optional(inner) => {
-                let inner_bc = self.resolve_type(*inner, type_ctx)?;
+                let inner_bc = self.resolve_type(*inner, ctx.type_ctx)?;
                 self.type_defs[slot_index] = TypeDef::optional(inner_bc);
                 Ok(())
             }
 
             TypeShape::Array { element, non_empty } => {
-                let element_bc = self.resolve_type(*element, type_ctx)?;
+                let element_bc = self.resolve_type(*element, ctx.type_ctx)?;
                 self.type_defs[slot_index] = if *non_empty {
                     TypeDef::array_plus(element_bc)
                 } else {
@@ -196,8 +200,8 @@ impl TypeTableBuilder {
                 // Resolve field types (this may create Optional wrappers at later indices)
                 let mut resolved_fields = Vec::with_capacity(fields.len());
                 for (field_sym, field_info) in fields {
-                    let field_name = strings.get_or_intern(*field_sym, interner)?;
-                    let field_type = self.resolve_field_type(field_info, type_ctx)?;
+                    let field_name = ctx.strings.get_or_intern(*field_sym, ctx.interner)?;
+                    let field_type = self.resolve_field_type(field_info, ctx.type_ctx)?;
                     resolved_fields.push((field_name, field_type));
                 }
 
@@ -217,8 +221,8 @@ impl TypeTableBuilder {
                 // Resolve variant types (this may create types at later indices)
                 let mut resolved_variants = Vec::with_capacity(variants.len());
                 for (variant_sym, variant_type_id) in variants {
-                    let variant_name = strings.get_or_intern(*variant_sym, interner)?;
-                    let variant_type = self.resolve_type(*variant_type_id, type_ctx)?;
+                    let variant_name = ctx.strings.get_or_intern(*variant_sym, ctx.interner)?;
+                    let variant_type = self.resolve_type(*variant_type_id, ctx.type_ctx)?;
                     resolved_variants.push((variant_name, variant_type));
                 }
 
@@ -235,10 +239,12 @@ impl TypeTableBuilder {
             }
 
             TypeShape::Ref(def_id) => {
-                let target = type_ctx
+                let target = ctx
+                    .type_ctx
                     .get_def_type(*def_id)
                     .expect("alias def target must exist");
-                self.type_defs[slot_index] = TypeDef::alias(self.resolve_type(target, type_ctx)?);
+                self.type_defs[slot_index] =
+                    TypeDef::alias(self.resolve_type(target, ctx.type_ctx)?);
                 Ok(())
             }
         }
@@ -371,96 +377,124 @@ impl Default for TypeTableBuilder {
     }
 }
 
-fn collect_types_dfs(
-    type_id: TypeId,
-    type_ctx: &TypeContext,
-    out: &mut Vec<TypeId>,
-    seen: &mut HashSet<TypeId>,
-) {
-    if type_id.is_builtin() || seen.contains(&type_id) {
-        return;
+struct EmitCtx<'a> {
+    type_ctx: &'a TypeContext,
+    interner: &'a Interner,
+    strings: &'a mut StringTableBuilder,
+}
+
+/// Depth-first collector for custom types reachable from definition results.
+/// `out` preserves the post-order (children before self) the emitter relies on;
+/// `seen` guards against revisiting shared sub-types and cycles.
+struct TypeCollector {
+    out: Vec<TypeId>,
+    seen: HashSet<TypeId>,
+}
+
+impl TypeCollector {
+    fn new() -> Self {
+        Self {
+            out: Vec::new(),
+            seen: HashSet::new(),
+        }
     }
 
-    let Some(type_shape) = type_ctx.get_type(type_id) else {
-        return;
-    };
-
-    if let TypeShape::Ref(def_id) = type_shape {
-        if let Some(target_id) = type_ctx.get_def_type(*def_id) {
-            collect_types_dfs(target_id, type_ctx, out, seen);
+    fn collect(&mut self, type_id: TypeId, type_ctx: &TypeContext) {
+        if type_id.is_builtin() || self.seen.contains(&type_id) {
+            return;
         }
-        return;
-    }
 
-    seen.insert(type_id);
+        let Some(type_shape) = type_ctx.get_type(type_id) else {
+            return;
+        };
 
-    // Collect children first (depth-first), then add self
-    match type_shape {
-        TypeShape::Struct(fields) => {
-            for field_info in fields.values() {
-                collect_types_dfs(field_info.type_id, type_ctx, out, seen);
+        if let TypeShape::Ref(def_id) = type_shape {
+            if let Some(target_id) = type_ctx.get_def_type(*def_id) {
+                self.collect(target_id, type_ctx);
             }
-            out.push(type_id);
+            return;
         }
-        TypeShape::Enum(variants) => {
-            for &variant_type_id in variants.values() {
-                collect_types_dfs(variant_type_id, type_ctx, out, seen);
+
+        self.seen.insert(type_id);
+
+        match type_shape {
+            TypeShape::Struct(fields) => {
+                for field_info in fields.values() {
+                    self.collect(field_info.type_id, type_ctx);
+                }
+                self.out.push(type_id);
             }
-            out.push(type_id);
+            TypeShape::Enum(variants) => {
+                for &variant_type_id in variants.values() {
+                    self.collect(variant_type_id, type_ctx);
+                }
+                self.out.push(type_id);
+            }
+            TypeShape::Array { element, .. } => {
+                self.collect(*element, type_ctx);
+                self.out.push(type_id);
+            }
+            TypeShape::Optional(inner) => {
+                self.collect(*inner, type_ctx);
+                self.out.push(type_id);
+            }
+            TypeShape::Custom(_) => {
+                // Custom types alias Node, no children to collect
+                self.out.push(type_id);
+            }
+            _ => {}
         }
-        TypeShape::Array { element, .. } => {
-            collect_types_dfs(*element, type_ctx, out, seen);
-            out.push(type_id);
-        }
-        TypeShape::Optional(inner) => {
-            collect_types_dfs(*inner, type_ctx, out, seen);
-            out.push(type_id);
-        }
-        TypeShape::Custom(_) => {
-            // Custom types alias Node, no children to collect
-            out.push(type_id);
-        }
-        _ => {}
     }
 }
 
-fn collect_builtin_refs(
-    type_id: TypeId,
-    type_ctx: &TypeContext,
-    used: &mut [bool; 2],
-    seen: &mut HashSet<TypeId>,
-) {
-    if !seen.insert(type_id) {
-        return;
+struct BuiltinUsage {
+    void: bool,
+    node: bool,
+    seen: HashSet<TypeId>,
+}
+
+impl BuiltinUsage {
+    fn new() -> Self {
+        Self {
+            void: false,
+            node: false,
+            seen: HashSet::new(),
+        }
     }
 
-    let Some(type_shape) = type_ctx.get_type(type_id) else {
-        return;
-    };
+    fn collect(&mut self, type_id: TypeId, type_ctx: &TypeContext) {
+        if !self.seen.insert(type_id) {
+            return;
+        }
 
-    match type_shape {
-        TypeShape::Void => used[0] = true,
-        TypeShape::Node => used[1] = true,
-        TypeShape::Custom(_) => used[1] = true, // Custom types alias Node
-        TypeShape::Struct(fields) => {
-            for field_info in fields.values() {
-                collect_builtin_refs(field_info.type_id, type_ctx, used, seen);
+        let Some(type_shape) = type_ctx.get_type(type_id) else {
+            return;
+        };
+
+        match type_shape {
+            TypeShape::Void => self.void = true,
+            TypeShape::Node => self.node = true,
+            TypeShape::Custom(_) => self.node = true, // Custom types alias Node
+            TypeShape::Struct(fields) => {
+                for field_info in fields.values() {
+                    self.collect(field_info.type_id, type_ctx);
+                }
             }
-        }
-        TypeShape::Enum(variants) => {
-            for &variant_type_id in variants.values() {
-                collect_builtin_refs(variant_type_id, type_ctx, used, seen);
+            TypeShape::Enum(variants) => {
+                for &variant_type_id in variants.values() {
+                    self.collect(variant_type_id, type_ctx);
+                }
             }
-        }
-        TypeShape::Array { element, .. } => {
-            collect_builtin_refs(*element, type_ctx, used, seen);
-        }
-        TypeShape::Optional(inner) => {
-            collect_builtin_refs(*inner, type_ctx, used, seen);
-        }
-        TypeShape::Ref(def_id) => {
-            if let Some(target_id) = type_ctx.get_def_type(*def_id) {
-                collect_builtin_refs(target_id, type_ctx, used, seen);
+            TypeShape::Array { element, .. } => {
+                self.collect(*element, type_ctx);
+            }
+            TypeShape::Optional(inner) => {
+                self.collect(*inner, type_ctx);
+            }
+            TypeShape::Ref(def_id) => {
+                if let Some(target_id) = type_ctx.get_def_type(*def_id) {
+                    self.collect(target_id, type_ctx);
+                }
             }
         }
     }

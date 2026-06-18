@@ -4,16 +4,16 @@
 //! `compile_quantified_unified` entry point so greediness and search-nav logic
 //! stay in one place.
 
-use crate::analyze::type_check::{TypeId, is_repeating_quantifier};
+use crate::analyze::type_check::is_repeating_quantifier;
 use crate::bytecode::{EffectIR, Label};
 use crate::parser::SyntaxKind;
 use crate::parser::ast::{self, Expr};
 use plotnik_bytecode::Nav;
 
 use super::Compiler;
-use super::capture::{CaptureEffects, check_needs_struct_wrapper, get_row_type_id};
+use super::capture::{CaptureEffects, ExprCtx, check_needs_struct_wrapper, get_row_type_id};
 use super::navigation::resumable_search_nav;
-use super::scope::CaptureExits;
+use super::scope::{BranchTargets, CaptureExits, CaptureRequest, EndScopeEffects, SplitExits};
 
 /// The nav under which a quantifier iteration runs a resumable position search,
 /// or `None` for a bounded anchor that matches a single candidate directly.
@@ -88,14 +88,28 @@ fn parse_quantifier(quant: &ast::QuantifiedExpr) -> QuantifierParse {
     }
 }
 
+/// Whether a quantifier iterates inside an array capture. In `InArray` each
+/// matched element gets a Push and rows scope to the array's row type; `Standalone`
+/// is a plain `?`/`*`/`+` with no surrounding array.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum ArrayContext {
+    Standalone,
+    InArray,
+}
+
+impl ArrayContext {
+    fn is_in_array(self) -> bool {
+        matches!(self, ArrayContext::InArray)
+    }
+}
+
 /// Configuration for unified quantifier compilation.
 pub(super) struct QuantifierConfig<'a> {
     pub inner: &'a Expr,
     pub kind: QuantifierKind,
     /// Navigation for the first iteration.
     pub first_nav: Option<Nav>,
-    /// Inside an array capture context — each matched element gets a Push.
-    pub in_array_context: bool,
+    pub array_context: ArrayContext,
     pub element_capture: CaptureEffects,
     /// `Split` carries both the match and skip labels, so a skippable
     /// quantifier cannot be requested without a skip exit.
@@ -107,17 +121,19 @@ impl Compiler<'_> {
     pub(super) fn compile_quantified_inner(
         &mut self,
         quant: &ast::QuantifiedExpr,
-        exit: Label,
-        nav_override: Option<Nav>,
-        capture: CaptureEffects,
+        ctx: ExprCtx,
     ) -> Label {
         let (inner, kind) = match parse_quantifier(quant) {
-            QuantifierParse::Empty => return exit,
-            QuantifierParse::Plain(inner) => {
-                return self.compile_expr_inner(&inner, exit, nav_override, capture);
-            }
+            QuantifierParse::Empty => return ctx.exit,
+            QuantifierParse::Plain(inner) => return self.compile_expr_inner(&inner, ctx),
             QuantifierParse::Quantified { inner, kind } => (inner, kind),
         };
+
+        let ExprCtx {
+            exit,
+            nav: nav_override,
+            capture,
+        } = ctx;
 
         // When the inner returns a structured type (enum/struct) and this is a star/plus
         // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
@@ -127,11 +143,14 @@ impl Compiler<'_> {
 
         if needs_implicit_array {
             // No Set on the array itself — collect structured values via Push only.
+            let quant_expr = Expr::QuantifiedExpr(quant.clone());
             return self.compile_array_capture(
-                &Expr::QuantifiedExpr(quant.clone()),
-                nav_override,
-                vec![],
-                capture,
+                CaptureRequest {
+                    inner: &quant_expr,
+                    nav: nav_override,
+                    capture_effects: vec![],
+                    outer_capture: capture,
+                },
                 CaptureExits::Single(exit),
             );
         }
@@ -140,7 +159,7 @@ impl Compiler<'_> {
             inner: &inner,
             kind,
             first_nav: nav_override,
-            in_array_context: false,
+            array_context: ArrayContext::Standalone,
             element_capture: capture,
             exits: CaptureExits::Single(exit),
         };
@@ -161,7 +180,14 @@ impl Compiler<'_> {
         let (inner, kind) = match parse_quantifier(quant) {
             QuantifierParse::Empty => return exit,
             QuantifierParse::Plain(inner) => {
-                return self.compile_expr_inner(&inner, exit, nav_override, element_capture);
+                return self.compile_expr_inner(
+                    &inner,
+                    ExprCtx {
+                        exit,
+                        nav: nav_override,
+                        capture: element_capture,
+                    },
+                );
             }
             QuantifierParse::Quantified { inner, kind } => (inner, kind),
         };
@@ -170,7 +196,7 @@ impl Compiler<'_> {
             inner: &inner,
             kind,
             first_nav: nav_override,
-            in_array_context: true,
+            array_context: ArrayContext::InArray,
             element_capture,
             exits: CaptureExits::Single(exit),
         };
@@ -182,11 +208,14 @@ impl Compiler<'_> {
     pub(super) fn compile_skippable_with_exits(
         &mut self,
         expr: &Expr,
-        match_exit: Label,
-        skip_exit: Label,
+        exits: SplitExits,
         nav_override: Option<Nav>,
         capture: CaptureEffects,
     ) -> Label {
+        let SplitExits {
+            match_exit,
+            skip_exit,
+        } = exits;
         // A captured optional/star at this navigating position shares the single
         // mechanism dispatch with the ordinary capture path (`compile_captured`),
         // split exits and all, so the two can never drift — the gap behind both
@@ -209,13 +238,27 @@ impl Compiler<'_> {
 
         // Must be a QuantifiedExpr at this point
         let Expr::QuantifiedExpr(quant) = expr else {
-            return self.compile_expr_inner(expr, match_exit, nav_override, capture);
+            return self.compile_expr_inner(
+                expr,
+                ExprCtx {
+                    exit: match_exit,
+                    nav: nav_override,
+                    capture,
+                },
+            );
         };
 
         let (inner, kind) = match parse_quantifier(quant) {
             QuantifierParse::Empty => return match_exit,
             QuantifierParse::Plain(inner) => {
-                return self.compile_expr_inner(&inner, match_exit, nav_override, capture);
+                return self.compile_expr_inner(
+                    &inner,
+                    ExprCtx {
+                        exit: match_exit,
+                        nav: nav_override,
+                        capture,
+                    },
+                );
             }
             QuantifierParse::Quantified { inner, kind } => (inner, kind),
         };
@@ -227,11 +270,14 @@ impl Compiler<'_> {
             is_repeating_quantifier(quant) && self.is_ref_returning_structured(&inner);
 
         if needs_implicit_array {
+            let quant_expr = Expr::QuantifiedExpr(quant.clone());
             return self.compile_array_capture(
-                &Expr::QuantifiedExpr(quant.clone()),
-                nav_override,
-                vec![],
-                capture,
+                CaptureRequest {
+                    inner: &quant_expr,
+                    nav: nav_override,
+                    capture_effects: vec![],
+                    outer_capture: capture,
+                },
                 CaptureExits::Split {
                     match_exit,
                     skip_exit,
@@ -246,7 +292,7 @@ impl Compiler<'_> {
             inner: &inner,
             kind,
             first_nav: nav_override,
-            in_array_context: false,
+            array_context: ArrayContext::Standalone,
             element_capture: capture,
             exits: CaptureExits::Split {
                 match_exit,
@@ -267,12 +313,15 @@ impl Compiler<'_> {
     /// value ([`quantifier_needs_node_for_push`](Self::quantifier_needs_node_for_push)).
     pub(super) fn compile_array_capture(
         &mut self,
-        inner: &Expr,
-        nav_override: Option<Nav>,
-        capture_effects: Vec<EffectIR>,
-        outer_capture: CaptureEffects,
+        req: CaptureRequest<'_>,
         exits: CaptureExits,
     ) -> Label {
+        let CaptureRequest {
+            inner,
+            nav,
+            capture_effects,
+            outer_capture,
+        } = req;
         let push_effects =
             CaptureEffects::new_post(if self.quantifier_needs_node_for_push(inner) {
                 vec![EffectIR::node(), EffectIR::push()]
@@ -280,28 +329,32 @@ impl Compiler<'_> {
                 vec![EffectIR::push()]
             });
 
+        let end_effects = EndScopeEffects {
+            capture: &capture_effects,
+            outer: &outer_capture.post,
+        };
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
-                let endarr = self.emit_endarr_step(&capture_effects, &outer_capture.post, exit);
+                let endarr = self.emit_endarr_step(end_effects, exit);
                 if let Expr::QuantifiedExpr(quant) = inner {
-                    self.compile_quantified_for_array(quant, endarr, nav_override, push_effects)
+                    self.compile_quantified_for_array(quant, endarr, nav, push_effects)
                 } else {
-                    self.compile_expr_with_nav(inner, endarr, nav_override)
+                    self.compile_expr_with_nav(inner, endarr, nav)
                 }
             }
             CaptureExits::Split {
                 match_exit,
                 skip_exit,
             } => {
-                let match_endarr =
-                    self.emit_endarr_step(&capture_effects, &outer_capture.post, match_exit);
-                let skip_endarr =
-                    self.emit_endarr_step(&capture_effects, &outer_capture.post, skip_exit);
+                let match_endarr = self.emit_endarr_step(end_effects, match_exit);
+                let skip_endarr = self.emit_endarr_step(end_effects, skip_exit);
                 self.compile_star_for_array_with_exits(
                     inner,
-                    match_endarr,
-                    skip_endarr,
-                    nav_override,
+                    SplitExits {
+                        match_exit: match_endarr,
+                        skip_exit: skip_endarr,
+                    },
+                    nav,
                     push_effects,
                 )
             }
@@ -314,19 +367,36 @@ impl Compiler<'_> {
     fn compile_star_for_array_with_exits(
         &mut self,
         expr: &Expr,
-        match_exit: Label,
-        skip_exit: Label,
+        exits: SplitExits,
         nav_override: Option<Nav>,
         capture: CaptureEffects,
     ) -> Label {
+        let SplitExits {
+            match_exit,
+            skip_exit,
+        } = exits;
         let Expr::QuantifiedExpr(quant) = expr else {
-            return self.compile_expr_inner(expr, match_exit, nav_override, capture);
+            return self.compile_expr_inner(
+                expr,
+                ExprCtx {
+                    exit: match_exit,
+                    nav: nav_override,
+                    capture,
+                },
+            );
         };
 
         let (inner, kind) = match parse_quantifier(quant) {
             QuantifierParse::Empty => return match_exit,
             QuantifierParse::Plain(inner) => {
-                return self.compile_expr_inner(&inner, match_exit, nav_override, capture);
+                return self.compile_expr_inner(
+                    &inner,
+                    ExprCtx {
+                        exit: match_exit,
+                        nav: nav_override,
+                        capture,
+                    },
+                );
             }
             QuantifierParse::Quantified { inner, kind } => (inner, kind),
         };
@@ -335,7 +405,7 @@ impl Compiler<'_> {
             inner: &inner,
             kind,
             first_nav: nav_override,
-            in_array_context: true,
+            array_context: ArrayContext::InArray,
             element_capture: capture,
             exits: CaptureExits::Split {
                 match_exit,
@@ -410,13 +480,14 @@ impl Compiler<'_> {
             inner,
             kind,
             first_nav,
-            in_array_context,
+            array_context,
             element_capture,
             exits,
         } = config;
 
         let match_exit = exits.match_exit();
 
+        let in_array_context = array_context.is_in_array();
         let needs_struct_wrapper =
             in_array_context && check_needs_struct_wrapper(inner, self.ctx.type_ctx);
         let row_type_id = if in_array_context {
@@ -430,10 +501,24 @@ impl Compiler<'_> {
                 this.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
             } else if in_array_context {
                 this.compile_with_optional_scope(row_type_id, |t| {
-                    t.compile_expr_inner(inner, exit, Some(nav), element_capture.clone())
+                    t.compile_expr_inner(
+                        inner,
+                        ExprCtx {
+                            exit,
+                            nav: Some(nav),
+                            capture: element_capture.clone(),
+                        },
+                    )
                 })
             } else {
-                this.compile_expr_inner(inner, exit, Some(nav), element_capture.clone())
+                this.compile_expr_inner(
+                    inner,
+                    ExprCtx {
+                        exit,
+                        nav: Some(nav),
+                        capture: element_capture.clone(),
+                    },
+                )
             }
         };
 
@@ -448,7 +533,14 @@ impl Compiler<'_> {
                 let (first_iterate, repeat_iterate) =
                     self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
 
-                self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
+                self.emit_branch_epsilon_at(
+                    loop_entry,
+                    BranchTargets {
+                        prefer: repeat_iterate,
+                        other: match_exit,
+                    },
+                    is_greedy,
+                );
 
                 first_iterate
             }
@@ -457,23 +549,69 @@ impl Compiler<'_> {
                 CaptureExits::Split {
                     match_exit,
                     skip_exit,
-                } => self.compile_star_with_skip_retry_split_exits(
-                    inner,
-                    match_exit,
-                    skip_exit,
-                    first_nav,
-                    element_capture,
-                    is_greedy,
-                    needs_struct_wrapper,
-                    row_type_id,
-                ),
+                } => {
+                    // The split-exit star's body deliberately omits the array-context
+                    // `compile_with_optional_scope` wrap that `compile_body` applies:
+                    // its element scope is owned by the EndArr step on each exit, not
+                    // per-iteration. Use a dedicated body closure to keep that intact.
+                    let split_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
+                        if needs_struct_wrapper {
+                            this.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
+                        } else {
+                            this.compile_expr_inner(
+                                inner,
+                                ExprCtx {
+                                    exit,
+                                    nav: Some(nav),
+                                    capture: element_capture.clone(),
+                                },
+                            )
+                        }
+                    };
+
+                    let loop_entry = self.fresh_label();
+                    let (first_iterate, repeat_iterate) =
+                        self.emit_loop_iterations(first_nav_mode, loop_entry, split_body);
+
+                    self.emit_branch_epsilon_at(
+                        loop_entry,
+                        BranchTargets {
+                            prefer: repeat_iterate,
+                            other: match_exit,
+                        },
+                        is_greedy,
+                    );
+
+                    // zero-match backtracks to the entry epsilon's checkpoint, restoring
+                    // the pre-nav cursor and taking skip_exit.
+                    self.emit_branch_epsilon(
+                        BranchTargets {
+                            prefer: first_iterate,
+                            other: skip_exit,
+                        },
+                        is_greedy,
+                    )
+                }
                 CaptureExits::Single(_) => {
                     let loop_entry = self.fresh_label();
                     let (first_iterate, repeat_iterate) =
                         self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
 
-                    self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
-                    self.emit_branch_epsilon(first_iterate, match_exit, is_greedy)
+                    self.emit_branch_epsilon_at(
+                        loop_entry,
+                        BranchTargets {
+                            prefer: repeat_iterate,
+                            other: match_exit,
+                        },
+                        is_greedy,
+                    );
+                    self.emit_branch_epsilon(
+                        BranchTargets {
+                            prefer: first_iterate,
+                            other: match_exit,
+                        },
+                        is_greedy,
+                    )
                 }
             },
 
@@ -489,40 +627,14 @@ impl Compiler<'_> {
                 // Any failure backtracks to the entry epsilon's checkpoint, restoring
                 // the pre-navigation cursor and taking skip_with_null.
                 let iterate = self.emit_iteration(first_nav_mode, match_exit, compile_body);
-                self.emit_branch_epsilon(iterate, skip_with_null, is_greedy)
+                self.emit_branch_epsilon(
+                    BranchTargets {
+                        prefer: iterate,
+                        other: skip_with_null,
+                    },
+                    is_greedy,
+                )
             }
         }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn compile_star_with_skip_retry_split_exits(
-        &mut self,
-        inner: &Expr,
-        match_exit: Label,
-        skip_exit: Label,
-        nav_override: Option<Nav>,
-        capture: CaptureEffects,
-        is_greedy: bool,
-        needs_struct_wrapper: bool,
-        row_type_id: Option<TypeId>,
-    ) -> Label {
-        let compile_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
-            if needs_struct_wrapper {
-                this.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
-            } else {
-                this.compile_expr_inner(inner, exit, Some(nav), capture.clone())
-            }
-        };
-
-        let loop_entry = self.fresh_label();
-        let first_nav_mode = nav_override.unwrap_or(Nav::Down);
-        let (first_iterate, repeat_iterate) =
-            self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
-
-        self.emit_branch_epsilon_at(loop_entry, repeat_iterate, match_exit, is_greedy);
-
-        // zero-match backtracks to the entry epsilon's checkpoint, restoring the
-        // pre-nav cursor and taking skip_exit.
-        self.emit_branch_epsilon(first_iterate, skip_exit, is_greedy)
     }
 }

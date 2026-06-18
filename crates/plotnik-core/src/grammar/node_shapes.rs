@@ -467,7 +467,7 @@ pub fn generate_node_shapes_json(
 
     let aliases_by_symbol = get_aliases_by_symbol(syntax_grammar, default_aliases);
 
-    let extra_names = collect_extra_names(syntax_grammar, lexical_grammar, &aliases_by_symbol);
+    let extra_names = collect_extra_names(ctx, &aliases_by_symbol);
 
     let mut subtype_map = Vec::new();
     for (i, info) in variable_info.iter().enumerate() {
@@ -700,19 +700,18 @@ fn symbol_to_node_type(
 }
 
 fn collect_extra_names<'a>(
-    syntax_grammar: &'a SyntaxGrammar,
-    lexical_grammar: &'a LexicalGrammar,
+    ctx: GrammarContext<'a>,
     aliases_by_symbol: &'a FxHashMap<Symbol, BTreeSet<Option<Alias>>>,
 ) -> FxHashSet<&'a str> {
     let mut names = FxHashSet::default();
-    for symbol in &syntax_grammar.extra_symbols {
+    for symbol in &ctx.syntax.extra_symbols {
         let Some(aliases) = aliases_by_symbol.get(symbol) else {
             continue;
         };
 
         for alias in aliases {
             let name = alias.as_ref().map_or_else(
-                || symbol_node_metadata(*symbol, syntax_grammar, lexical_grammar).0,
+                || symbol_node_metadata(*symbol, ctx.syntax, ctx.lexical).0,
                 |alias| alias.value.as_str(),
             );
             names.insert(name);

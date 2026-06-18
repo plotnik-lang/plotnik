@@ -114,34 +114,50 @@ impl Value {
     /// - Structure `{}[]:,`: Dim
     pub fn format(&self, pretty: bool, colors: Colors) -> String {
         let mut out = String::new();
-        format_value(&mut out, self, &colors, pretty, 0);
+        let mut ctx = FormatCtx {
+            out: &mut out,
+            colors: &colors,
+            pretty,
+        };
+        format_value(&mut ctx, self, 0);
         out
     }
 }
 
-fn format_value(out: &mut String, value: &Value, c: &Colors, pretty: bool, indent: usize) {
+/// `indent` varies per recursion step; the rest is shared state threaded through every call.
+struct FormatCtx<'a> {
+    out: &'a mut String,
+    colors: &'a Colors,
+    pretty: bool,
+}
+
+fn format_value(ctx: &mut FormatCtx<'_>, value: &Value, indent: usize) {
     match value {
         Value::Null => {
-            out.push_str(c.dim);
-            out.push_str("null");
-            out.push_str(c.reset);
+            let c = ctx.colors;
+            ctx.out.push_str(c.dim);
+            ctx.out.push_str("null");
+            ctx.out.push_str(c.reset);
         }
         Value::Node(h) => {
-            format_node_handle(out, h, c, pretty, indent);
+            format_node_handle(ctx, h, indent);
         }
         Value::Array(arr) => {
-            format_array(out, arr, c, pretty, indent);
+            format_array(ctx, arr, indent);
         }
         Value::Object(fields) => {
-            format_object(out, fields, c, pretty, indent);
+            format_object(ctx, fields, indent);
         }
         Value::Tagged { tag, data } => {
-            format_tagged(out, tag, data, c, pretty, indent);
+            format_tagged(ctx, tag, data, indent);
         }
     }
 }
 
-fn format_node_handle(out: &mut String, h: &NodeHandle, c: &Colors, pretty: bool, indent: usize) {
+fn format_node_handle(ctx: &mut FormatCtx<'_>, h: &NodeHandle, indent: usize) {
+    let c = ctx.colors;
+    let pretty = ctx.pretty;
+    let out = &mut *ctx.out;
     out.push_str(c.dim);
     out.push('{');
     out.push_str(c.reset);
@@ -227,15 +243,17 @@ fn format_node_handle(out: &mut String, h: &NodeHandle, c: &Colors, pretty: bool
     out.push_str(c.reset);
 }
 
-fn format_array(out: &mut String, arr: &[Value], c: &Colors, pretty: bool, indent: usize) {
-    out.push_str(c.dim);
-    out.push('[');
-    out.push_str(c.reset);
+fn format_array(ctx: &mut FormatCtx<'_>, arr: &[Value], indent: usize) {
+    let c = ctx.colors;
+    let pretty = ctx.pretty;
+    ctx.out.push_str(c.dim);
+    ctx.out.push('[');
+    ctx.out.push_str(c.reset);
 
     if arr.is_empty() {
-        out.push_str(c.dim);
-        out.push(']');
-        out.push_str(c.reset);
+        ctx.out.push_str(c.dim);
+        ctx.out.push(']');
+        ctx.out.push_str(c.reset);
         return;
     }
 
@@ -243,44 +261,40 @@ fn format_array(out: &mut String, arr: &[Value], c: &Colors, pretty: bool, inden
 
     for (i, item) in arr.iter().enumerate() {
         if i > 0 {
-            out.push_str(c.dim);
-            out.push(',');
-            out.push_str(c.reset);
+            ctx.out.push_str(c.dim);
+            ctx.out.push(',');
+            ctx.out.push_str(c.reset);
         }
 
         if pretty {
-            out.push('\n');
-            push_indent(out, elem_indent);
+            ctx.out.push('\n');
+            push_indent(ctx.out, elem_indent);
         }
 
-        format_value(out, item, c, pretty, elem_indent);
+        format_value(ctx, item, elem_indent);
     }
 
     if pretty {
-        out.push('\n');
-        push_indent(out, indent);
+        ctx.out.push('\n');
+        push_indent(ctx.out, indent);
     }
 
-    out.push_str(c.dim);
-    out.push(']');
-    out.push_str(c.reset);
+    ctx.out.push_str(c.dim);
+    ctx.out.push(']');
+    ctx.out.push_str(c.reset);
 }
 
-fn format_object(
-    out: &mut String,
-    fields: &[(String, Value)],
-    c: &Colors,
-    pretty: bool,
-    indent: usize,
-) {
-    out.push_str(c.dim);
-    out.push('{');
-    out.push_str(c.reset);
+fn format_object(ctx: &mut FormatCtx<'_>, fields: &[(String, Value)], indent: usize) {
+    let c = ctx.colors;
+    let pretty = ctx.pretty;
+    ctx.out.push_str(c.dim);
+    ctx.out.push('{');
+    ctx.out.push_str(c.reset);
 
     if fields.is_empty() {
-        out.push_str(c.dim);
-        out.push('}');
-        out.push_str(c.reset);
+        ctx.out.push_str(c.dim);
+        ctx.out.push('}');
+        ctx.out.push_str(c.reset);
         return;
     }
 
@@ -288,114 +302,109 @@ fn format_object(
 
     for (i, (key, value)) in fields.iter().enumerate() {
         if i > 0 {
-            out.push_str(c.dim);
-            out.push(',');
-            out.push_str(c.reset);
+            ctx.out.push_str(c.dim);
+            ctx.out.push(',');
+            ctx.out.push_str(c.reset);
         }
 
         if pretty {
-            out.push('\n');
-            push_indent(out, field_indent);
+            ctx.out.push('\n');
+            push_indent(ctx.out, field_indent);
         }
 
-        out.push_str(c.blue);
-        out.push('"');
-        escape_json_into(out, key);
-        out.push('"');
-        out.push_str(c.reset);
+        ctx.out.push_str(c.blue);
+        ctx.out.push('"');
+        escape_json_into(ctx.out, key);
+        ctx.out.push('"');
+        ctx.out.push_str(c.reset);
 
-        out.push_str(c.dim);
-        out.push(':');
-        out.push_str(c.reset);
+        ctx.out.push_str(c.dim);
+        ctx.out.push(':');
+        ctx.out.push_str(c.reset);
 
         if pretty {
-            out.push(' ');
+            ctx.out.push(' ');
         }
 
-        format_value(out, value, c, pretty, field_indent);
+        format_value(ctx, value, field_indent);
     }
 
     if pretty {
-        out.push('\n');
-        push_indent(out, indent);
+        ctx.out.push('\n');
+        push_indent(ctx.out, indent);
     }
 
-    out.push_str(c.dim);
-    out.push('}');
-    out.push_str(c.reset);
+    ctx.out.push_str(c.dim);
+    ctx.out.push('}');
+    ctx.out.push_str(c.reset);
 }
 
-fn format_tagged(
-    out: &mut String,
-    tag: &str,
-    data: &Option<Box<Value>>,
-    c: &Colors,
-    pretty: bool,
-    indent: usize,
-) {
-    out.push_str(c.dim);
-    out.push('{');
-    out.push_str(c.reset);
+fn format_tagged(ctx: &mut FormatCtx<'_>, tag: &str, data: &Option<Box<Value>>, indent: usize) {
+    let c = ctx.colors;
+    let pretty = ctx.pretty;
+    ctx.out.push_str(c.dim);
+    ctx.out.push('{');
+    ctx.out.push_str(c.reset);
 
     let field_indent = if pretty { indent + 2 } else { 0 };
 
     if pretty {
-        out.push('\n');
-        push_indent(out, field_indent);
+        ctx.out.push('\n');
+        push_indent(ctx.out, field_indent);
     }
 
-    out.push_str(c.blue);
-    out.push_str("\"$tag\"");
-    out.push_str(c.reset);
+    ctx.out.push_str(c.blue);
+    ctx.out.push_str("\"$tag\"");
+    ctx.out.push_str(c.reset);
 
-    out.push_str(c.dim);
-    out.push(':');
-    out.push_str(c.reset);
+    ctx.out.push_str(c.dim);
+    ctx.out.push(':');
+    ctx.out.push_str(c.reset);
 
     if pretty {
-        out.push(' ');
+        ctx.out.push(' ');
     }
 
-    out.push_str(c.green);
-    out.push('"');
-    escape_json_into(out, tag);
-    out.push('"');
-    out.push_str(c.reset);
+    ctx.out.push_str(c.green);
+    ctx.out.push('"');
+    escape_json_into(ctx.out, tag);
+    ctx.out.push('"');
+    ctx.out.push_str(c.reset);
 
     // Void payloads have no $data field.
     if let Some(d) = data {
-        out.push_str(c.dim);
-        out.push(',');
-        out.push_str(c.reset);
+        ctx.out.push_str(c.dim);
+        ctx.out.push(',');
+        ctx.out.push_str(c.reset);
 
         if pretty {
-            out.push('\n');
-            push_indent(out, field_indent);
+            ctx.out.push('\n');
+            push_indent(ctx.out, field_indent);
         }
 
-        out.push_str(c.blue);
-        out.push_str("\"$data\"");
-        out.push_str(c.reset);
+        ctx.out.push_str(c.blue);
+        ctx.out.push_str("\"$data\"");
+        ctx.out.push_str(c.reset);
 
-        out.push_str(c.dim);
-        out.push(':');
-        out.push_str(c.reset);
+        ctx.out.push_str(c.dim);
+        ctx.out.push(':');
+        ctx.out.push_str(c.reset);
 
         if pretty {
-            out.push(' ');
+            ctx.out.push(' ');
         }
 
-        format_value(out, d, c, pretty, field_indent);
+        format_value(ctx, d, field_indent);
     }
 
     if pretty {
-        out.push('\n');
-        push_indent(out, indent);
+        ctx.out.push('\n');
+        push_indent(ctx.out, indent);
     }
 
-    out.push_str(c.dim);
-    out.push('}');
-    out.push_str(c.reset);
+    ctx.out.push_str(c.dim);
+    ctx.out.push('}');
+    ctx.out.push_str(c.reset);
 }
 
 /// Escape `s` as a JSON string body, appending to `out`.

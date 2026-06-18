@@ -236,118 +236,128 @@ impl CacheAligned {
         let chains = extract_chains(&graph, instructions, entries);
         let ordered = order_chains(chains, entries);
 
-        let mut ir = build_layout_ir(&ordered, &label_to_instr);
-        let refs = build_block_refs(&ir, &label_to_instr);
-        pack_successors(&mut ir, &refs, &label_to_instr);
-
-        ir.finalize()
+        let mut layout = Layout::new(&label_to_instr);
+        layout.place_chains(&ordered);
+        layout.pack_successors();
+        layout.finish()
     }
 }
 
-fn build_layout_ir(
-    chains: &[Vec<Label>],
-    label_to_instr: &BTreeMap<Label, &InstructionIR>,
-) -> LayoutIR {
-    let mut ir = LayoutIR::new();
+/// Cache-aligned placement of instructions into blocks. Owns the `LayoutIR`
+/// under construction so the passes hand it off through `self` rather than
+/// threading `ir`/`refs` between free functions.
+struct Layout<'a> {
+    label_to_instr: &'a BTreeMap<Label, &'a InstructionIR>,
+    ir: LayoutIR,
+}
 
-    for chain in chains {
-        for &label in chain {
-            let Some(instr) = label_to_instr.get(&label) else {
+impl<'a> Layout<'a> {
+    fn new(label_to_instr: &'a BTreeMap<Label, &'a InstructionIR>) -> Self {
+        Self {
+            label_to_instr,
+            ir: LayoutIR::new(),
+        }
+    }
+
+    fn place_chains(&mut self, chains: &[Vec<Label>]) {
+        for chain in chains {
+            for &label in chain {
+                let Some(instr) = self.label_to_instr.get(&label) else {
+                    continue;
+                };
+                let size = instr.size() as u8;
+
+                if self.ir.blocks.is_empty()
+                    || !self
+                        .ir
+                        .blocks
+                        .last()
+                        .expect("blocks is non-empty by the guard above")
+                        .can_fit(size)
+                {
+                    self.ir.blocks.push(Block::new());
+                }
+                let block_idx = self.ir.blocks.len() - 1;
+
+                self.ir.place(label, block_idx, size);
+            }
+        }
+    }
+
+    fn block_refs(&self) -> BlockRefs {
+        let mut refs = BlockRefs::new();
+
+        for (&label, &block_idx) in &self.ir.label_to_block {
+            let Some(instr) = self.label_to_instr.get(&label) else {
+                continue;
+            };
+            for &succ in instr.successors() {
+                if let Some(&succ_block) = self.ir.label_to_block.get(&succ)
+                    && succ_block != block_idx
+                {
+                    refs.add_ref(block_idx, succ_block);
+                }
+            }
+        }
+
+        refs
+    }
+
+    /// Pack successor instructions into free space of predecessor blocks.
+    ///
+    /// When X → Y and X is in block B, try to move Y to an earlier block
+    /// that has free space and high reference score to B.
+    fn pack_successors(&mut self) {
+        let refs = self.block_refs();
+
+        let mut candidates: Vec<(Label, usize, usize)> = Vec::new();
+
+        for (&label, &block_idx) in &self.ir.label_to_block {
+            let Some(instr) = self.label_to_instr.get(&label) else {
+                continue;
+            };
+
+            for &succ in instr.successors() {
+                if let Some(&succ_block) = self.ir.label_to_block.get(&succ)
+                    && succ_block > block_idx
+                {
+                    candidates.push((succ, succ_block, block_idx));
+                }
+            }
+        }
+
+        candidates.sort_by_key(|(_, succ_block, _)| std::cmp::Reverse(*succ_block));
+
+        for (succ_label, _succ_block, pred_block) in candidates {
+            let Some(&current_block) = self.ir.label_to_block.get(&succ_label) else {
+                continue;
+            };
+
+            let Some(instr) = self.label_to_instr.get(&succ_label) else {
                 continue;
             };
             let size = instr.size() as u8;
 
-            if ir.blocks.is_empty()
-                || !ir
-                    .blocks
-                    .last()
-                    .expect("blocks is non-empty by the guard above")
-                    .can_fit(size)
-            {
-                ir.blocks.push(Block::new());
-            }
-            let block_idx = ir.blocks.len() - 1;
+            // Prefer blocks that reference the predecessor block (cache locality)
+            let scores: Vec<_> = (0..current_block)
+                .map(|c| block_score(pred_block, c, &refs))
+                .collect();
+            let best = (0..current_block)
+                .filter(|&c| self.ir.blocks[c].can_fit(size))
+                .max_by(|&a, &b| {
+                    scores[a]
+                        .partial_cmp(&scores[b])
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
 
-            ir.place(label, block_idx, size);
-        }
-    }
-
-    ir
-}
-
-fn build_block_refs(ir: &LayoutIR, label_to_instr: &BTreeMap<Label, &InstructionIR>) -> BlockRefs {
-    let mut refs = BlockRefs::new();
-
-    for (&label, &block_idx) in &ir.label_to_block {
-        let Some(instr) = label_to_instr.get(&label) else {
-            continue;
-        };
-        for &succ in instr.successors() {
-            if let Some(&succ_block) = ir.label_to_block.get(&succ)
-                && succ_block != block_idx
-            {
-                refs.add_ref(block_idx, succ_block);
+            if let Some(candidate) = best {
+                self.ir.move_to(succ_label, candidate, size);
             }
         }
     }
 
-    refs
-}
-
-/// Pack successor instructions into free space of predecessor blocks.
-///
-/// When X → Y and X is in block B, try to move Y to an earlier block
-/// that has free space and high reference score to B.
-fn pack_successors(
-    ir: &mut LayoutIR,
-    refs: &BlockRefs,
-    label_to_instr: &BTreeMap<Label, &InstructionIR>,
-) {
-    let mut candidates: Vec<(Label, usize, usize)> = Vec::new();
-
-    for (&label, &block_idx) in &ir.label_to_block {
-        let Some(instr) = label_to_instr.get(&label) else {
-            continue;
-        };
-
-        for &succ in instr.successors() {
-            if let Some(&succ_block) = ir.label_to_block.get(&succ)
-                && succ_block > block_idx
-            {
-                candidates.push((succ, succ_block, block_idx));
-            }
-        }
-    }
-
-    // Sort by successor block descending (process later blocks first)
-    candidates.sort_by_key(|(_, succ_block, _)| std::cmp::Reverse(*succ_block));
-
-    for (succ_label, _succ_block, pred_block) in candidates {
-        // Re-check current block (might have changed)
-        let Some(&current_block) = ir.label_to_block.get(&succ_label) else {
-            continue;
-        };
-
-        let Some(instr) = label_to_instr.get(&succ_label) else {
-            continue;
-        };
-        let size = instr.size() as u8;
-
-        // Prefer blocks that reference the predecessor block (cache locality)
-        let scores: Vec<_> = (0..current_block)
-            .map(|c| block_score(pred_block, c, refs))
-            .collect();
-        let best = (0..current_block)
-            .filter(|&c| ir.blocks[c].can_fit(size))
-            .max_by(|&a, &b| {
-                scores[a]
-                    .partial_cmp(&scores[b])
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-
-        if let Some(candidate) = best {
-            ir.move_to(succ_label, candidate, size);
-        }
+    fn finish(self) -> LayoutResult {
+        self.ir.finalize()
     }
 }
 

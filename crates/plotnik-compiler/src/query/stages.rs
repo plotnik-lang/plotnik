@@ -220,15 +220,14 @@ impl QueryAnalyzed {
     pub fn link(mut self, grammar: &Grammar) -> LinkedQuery {
         let mut output = link::LinkOutput::default();
 
-        link::link(
-            &mut self.interner,
+        link::LinkCtx {
+            interner: &mut self.interner,
             grammar,
-            &self.query_parsed.source_map,
-            &self.query_parsed.ast_map,
-            &self.symbol_table,
-            &mut output,
-            &mut self.query_parsed.diag,
-        );
+            source_map: &self.query_parsed.source_map,
+            ast_map: &self.query_parsed.ast_map,
+            symbol_table: &self.symbol_table,
+        }
+        .link(&mut output, &mut self.query_parsed.diag);
 
         LinkedQuery {
             inner: self,

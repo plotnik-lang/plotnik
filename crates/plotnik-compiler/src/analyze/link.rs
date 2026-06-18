@@ -48,32 +48,35 @@ use crate::parser::ast::{self, Expr, NamedNode};
 use crate::parser::{SyntaxKind, SyntaxToken, token_src};
 use crate::query::{AstMap, SourceId, SourceMap};
 
-/// Decoupled from `Query` to allow testing without a full query context.
-pub fn link<'q>(
-    interner: &mut Interner,
-    grammar: &Grammar,
-    source_map: &'q SourceMap,
-    ast_map: &AstMap,
-    symbol_table: &SymbolTable,
-    output: &mut LinkOutput,
-    diagnostics: &mut Diagnostics,
-) {
-    // Local deduplication maps (not exposed in output)
-    let mut node_type_ids: HashMap<NodeType<&'q str>, Option<NodeTypeId>> = HashMap::new();
-    let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
+/// The threaded dependencies of the link pass. Decoupled from `Query` to allow
+/// testing without a full query context.
+pub struct LinkCtx<'a, 'q> {
+    pub interner: &'a mut Interner,
+    pub grammar: &'a Grammar,
+    pub source_map: &'q SourceMap,
+    pub ast_map: &'q AstMap,
+    pub symbol_table: &'a SymbolTable,
+}
 
-    for (&source_id, root) in ast_map {
-        let mut linker = Linker {
-            interner,
-            grammar,
-            source_map,
-            symbol_table,
-            node_type_ids: &mut node_type_ids,
-            node_field_ids: &mut node_field_ids,
-            output,
-            reporter: Reporter::new(source_id, diagnostics),
-        };
-        linker.link(root);
+impl<'q> LinkCtx<'_, 'q> {
+    pub fn link(self, output: &mut LinkOutput, diagnostics: &mut Diagnostics) {
+        // Local deduplication maps (not exposed in output)
+        let mut node_type_ids: HashMap<NodeType<&'q str>, Option<NodeTypeId>> = HashMap::new();
+        let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
+
+        for (&source_id, root) in self.ast_map {
+            let mut linker = Linker {
+                interner: &mut *self.interner,
+                grammar: self.grammar,
+                source_map: self.source_map,
+                symbol_table: self.symbol_table,
+                node_type_ids: &mut node_type_ids,
+                node_field_ids: &mut node_field_ids,
+                output,
+                reporter: Reporter::new(source_id, diagnostics),
+            };
+            linker.link(root);
+        }
     }
 }
 
@@ -190,20 +193,17 @@ impl<'a, 'q> Linker<'a, 'q> {
         for def in defs {
             let Some(body) = def.body() else { continue };
             let mut walk = RefWalk::default();
-            self.validate_expr_structure(&body, None, false, &mut walk);
+            self.validate_expr_structure(&body, None, CheckMode::Immediate, &mut walk);
         }
     }
 
-    /// Walk the query, validating each node's own grammar constraints. `deferred` is set once the
-    /// walk descends into an alternation branch or a quantified body: inside those, nothing is
-    /// guaranteed to participate in a match (a sibling branch or zero repetitions can satisfy the
-    /// query), so the grammar checks must NOT fire there — doing so would reject queries that can
-    /// match. Skipping a check can only miss a rejection, never reject a valid query.
+    /// Walk the query, validating each node's own grammar constraints. See `CheckMode` for why
+    /// `Deferred` positions skip their checks.
     fn validate_expr_structure(
         &mut self,
         expr: &Expr,
         ctx: Option<ValidationContext>,
-        deferred: bool,
+        mode: CheckMode,
         walk: &mut RefWalk,
     ) {
         match expr {
@@ -211,13 +211,13 @@ impl<'a, 'q> Linker<'a, 'q> {
                 let child_ctx = self.make_node_context(node);
 
                 // A `#subtype` refinement must denote a satisfiable kind of its base type.
-                if !deferred {
+                if mode.is_immediate() {
                     self.validate_subtype(node);
                 }
 
                 // Predicates are only valid on leaf nodes. Skipped under a disjunction/option,
                 // where this position need not match for the query to.
-                if !deferred
+                if mode.is_immediate()
                     && let Some(pred) = node.predicate()
                     && let Some(ctx) = &child_ctx
                     && (!self.grammar.valid_child_types(ctx.parent_id).is_empty()
@@ -231,32 +231,26 @@ impl<'a, 'q> Linker<'a, 'q> {
                         .emit();
                 }
 
-                // Computed once for both the inadmissible-child and child-under-leaf-token checks.
-                let parent_admissibility = child_ctx.as_ref().map(|ctx| {
-                    (
-                        self.admissible_set(ctx.parent_id),
-                        self.grammar.is_token(ctx.parent_id),
-                    )
-                });
+                let admissible = child_ctx.as_ref().map(|ctx| self.admissible_set(ctx.parent_id));
 
                 for child in node.children() {
                     if let Expr::FieldExpr(f) = &child {
-                        self.validate_field_expr(f, child_ctx.as_ref(), deferred, walk);
+                        self.validate_field_expr(f, child_ctx.as_ref(), mode, walk);
                     } else {
-                        if !deferred
-                            && let (Some(ctx), Some((adm, parent_is_token))) =
-                                (child_ctx.as_ref(), parent_admissibility.as_ref())
+                        if mode.is_immediate()
+                            && let (Some(ctx), Some(adm)) =
+                                (child_ctx.as_ref(), admissible.as_ref())
                         {
-                            self.check_bare_child(&child, ctx, *parent_is_token, adm);
+                            self.check_bare_child(&child, ctx, adm);
                         }
-                        self.validate_expr_structure(&child, child_ctx, deferred, walk);
+                        self.validate_expr_structure(&child, child_ctx, mode, walk);
                     }
                 }
 
                 if let Some(ctx) = child_ctx {
                     for child in node.as_cst().children() {
                         if let Some(neg) = ast::NegatedField::cast(child) {
-                            self.validate_negated_field(&neg, &ctx, deferred);
+                            self.validate_negated_field(&neg, &ctx, mode);
                         }
                     }
                 }
@@ -265,39 +259,39 @@ impl<'a, 'q> Linker<'a, 'q> {
             Expr::FieldExpr(f) => {
                 // Normally handled by the parent NamedNode; reached only on a bare field
                 // at root or inside a seq without a named-node parent.
-                self.validate_field_expr(f, ctx.as_ref(), deferred, walk);
+                self.validate_field_expr(f, ctx.as_ref(), mode, walk);
             }
             Expr::AltExpr(alt) => {
                 // A branch is disjunctive — none is guaranteed to match, so defer its contents.
                 for branch in alt.branches() {
                     let Some(body) = branch.body() else { continue };
-                    self.validate_expr_structure(&body, ctx, true, walk);
+                    self.validate_expr_structure(&body, ctx, CheckMode::Deferred, walk);
                 }
             }
             Expr::SeqExpr(seq) => {
                 for child in seq.children() {
-                    self.validate_expr_structure(&child, ctx, deferred, walk);
+                    self.validate_expr_structure(&child, ctx, mode, walk);
                 }
             }
             Expr::CapturedExpr(cap) => {
                 let Some(inner) = cap.inner() else { return };
-                self.validate_expr_structure(&inner, ctx, deferred, walk);
+                self.validate_expr_structure(&inner, ctx, mode, walk);
             }
             Expr::QuantifiedExpr(q) => {
                 let Some(inner) = q.inner() else { return };
                 // The body is optional/repeated — zero occurrences can satisfy it, so defer.
-                self.validate_expr_structure(&inner, ctx, true, walk);
+                self.validate_expr_structure(&inner, ctx, CheckMode::Deferred, walk);
             }
             Expr::Ref(r) => {
                 let Some(name_token) = r.name() else { return };
                 let name = name_token.text();
-                // Validation is a pure function of `(name, ctx, deferred)`, so caching it
+                // Validation is a pure function of `(name, ctx, mode)`, so caching it
                 // collapses diamond-shaped reference graphs that would otherwise be re-walked
-                // 2^depth times. `deferred` is part of the key: a definition reached both inside
-                // and outside an alternation/quantifier must still be checked in its non-deferred
+                // 2^depth times. `mode` is part of the key: a definition reached both inside
+                // and outside an alternation/quantifier must still be checked in its immediate
                 // context even after the deferred reach cached it. Cut cycles are never cached:
                 // they return below without reaching the `validated.insert`.
-                let key = (name.to_string(), ctx, deferred);
+                let key = (name.to_string(), ctx, mode);
                 if walk.validated.contains(&key) {
                     return;
                 }
@@ -316,7 +310,7 @@ impl<'a, 'q> Linker<'a, 'q> {
                 // Validate its body under ITS source so token slicing and
                 // diagnostics resolve against the right content.
                 self.with_source(ref_source, |this| {
-                    this.validate_expr_structure(&body, ctx, deferred, walk);
+                    this.validate_expr_structure(&body, ctx, mode, walk);
                 });
                 walk.in_progress.remove(name);
                 walk.validated.insert(key);
@@ -349,7 +343,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         &mut self,
         field: &ast::FieldExpr,
         ctx: Option<&ValidationContext>,
-        deferred: bool,
+        mode: CheckMode,
         walk: &mut RefWalk,
     ) {
         let Some(name_token) = field.name() else {
@@ -368,32 +362,32 @@ impl<'a, 'q> Linker<'a, 'q> {
         if !self.grammar.has_field(ctx.parent_id, field_id) {
             // A field absent from this kind can never match here, but a sibling branch or zero
             // repetitions can — so skip when deferred.
-            if !deferred {
+            if mode.is_immediate() {
                 self.emit_field_not_on_node(name_token.text_range(), name_token.text(), ctx);
             }
             return;
         }
 
+        let field_ref = FieldRef {
+            id: field_id,
+            name: name_token.text(),
+            range: name_token.text_range(),
+        };
+
         let Some(value) = field.value() else { return };
         // The field value's kind must be admissible for this field. Skipped under a
         // disjunction/option, where the field constraint need not hold for the query to match.
-        if !deferred {
-            self.check_field_value(
-                &value,
-                ctx,
-                field_id,
-                name_token.text(),
-                name_token.text_range(),
-            );
+        if mode.is_immediate() {
+            self.check_field_value(&value, ctx, &field_ref);
         }
-        self.validate_expr_structure(&value, Some(*ctx), deferred, walk);
+        self.validate_expr_structure(&value, Some(*ctx), mode, walk);
     }
 
     fn validate_negated_field(
         &mut self,
         neg: &ast::NegatedField,
         ctx: &ValidationContext,
-        deferred: bool,
+        mode: CheckMode,
     ) {
         let Some(name_token) = neg.name() else {
             return;
@@ -405,7 +399,7 @@ impl<'a, 'q> Linker<'a, 'q> {
         };
 
         if !self.grammar.has_field(ctx.parent_id, field_id) {
-            if !deferred {
+            if mode.is_immediate() {
                 self.emit_field_not_on_node(name_token.text_range(), field_name, ctx);
             }
             return;
@@ -413,7 +407,7 @@ impl<'a, 'q> Linker<'a, 'q> {
 
         // A required field is present in every production, so asserting its absence can never
         // match. Skipped under a disjunction/option, where the negation need not hold.
-        if !deferred
+        if mode.is_immediate()
             && self
                 .grammar
                 .field_cardinality(ctx.parent_id, field_id)
@@ -535,26 +529,20 @@ impl<'a, 'q> Linker<'a, 'q> {
     /// wrappers (capture, sequence) and reports at the deepest pinned leaf; alternations,
     /// quantifiers, and references are skipped — their satisfiability is not checked here, and
     /// skipping can only miss a rejection, never reject a valid query.
-    fn check_bare_child(
-        &mut self,
-        expr: &Expr,
-        ctx: &ValidationContext,
-        parent_is_token: bool,
-        adm: &HashSet<NodeTypeId>,
-    ) {
+    fn check_bare_child(&mut self, expr: &Expr, ctx: &ValidationContext, adm: &HashSet<NodeTypeId>) {
         match expr {
             Expr::CapturedExpr(cap) => {
                 if let Some(inner) = cap.inner() {
-                    self.check_bare_child(&inner, ctx, parent_is_token, adm);
+                    self.check_bare_child(&inner, ctx, adm);
                 }
             }
             Expr::SeqExpr(seq) => {
                 for child in seq.children() {
-                    self.check_bare_child(&child, ctx, parent_is_token, adm);
+                    self.check_bare_child(&child, ctx, adm);
                 }
             }
             Expr::NamedNode(node) => {
-                self.check_bare_named_child(node, ctx, parent_is_token, adm);
+                self.check_bare_named_child(node, ctx, adm);
             }
             // Anonymous children are untracked (grammar children arrays never list anonymous
             // tokens). Alternations, quantifiers, and references are not checked here.
@@ -570,9 +558,10 @@ impl<'a, 'q> Linker<'a, 'q> {
         &mut self,
         node: &NamedNode,
         ctx: &ValidationContext,
-        parent_is_token: bool,
         adm: &HashSet<NodeTypeId>,
     ) {
+        let parent_is_token = self.grammar.is_token(ctx.parent_id);
+
         // `(_)` matches any named node, so it is impossible only beneath a leaf token.
         if node.is_any() {
             if parent_is_token {
@@ -601,25 +590,18 @@ impl<'a, 'q> Linker<'a, 'q> {
     /// Validate one field value against the field's admissible types. Mirrors `check_bare_child`
     /// but uses the field's type set and has no extras/leaf-token rescue (fields hold specific
     /// kinds, never comments).
-    fn check_field_value(
-        &mut self,
-        expr: &Expr,
-        ctx: &ValidationContext,
-        field_id: NodeFieldId,
-        field_name: &str,
-        field_range: TextRange,
-    ) {
+    fn check_field_value(&mut self, expr: &Expr, ctx: &ValidationContext, field: &FieldRef) {
         match expr {
             Expr::CapturedExpr(cap) => {
                 if let Some(inner) = cap.inner() {
-                    self.check_field_value(&inner, ctx, field_id, field_name, field_range);
+                    self.check_field_value(&inner, ctx, field);
                 }
             }
             Expr::NamedNode(node) => {
-                self.check_field_named_value(node, ctx, field_id, field_name, field_range);
+                self.check_field_named_value(node, ctx, field);
             }
             Expr::AnonymousNode(anon) => {
-                self.check_field_anon_value(anon, ctx, field_id, field_name, field_range);
+                self.check_field_anon_value(anon, ctx, field);
             }
             // Alternations, quantifiers, and references are not checked here; a field value
             // can't be a sequence (rejected earlier as `FieldSequenceValue`).
@@ -635,23 +617,14 @@ impl<'a, 'q> Linker<'a, 'q> {
         &mut self,
         node: &NamedNode,
         ctx: &ValidationContext,
-        field_id: NodeFieldId,
-        field_name: &str,
-        field_range: TextRange,
+        field: &FieldRef,
     ) {
         if node.is_any() {
             // `(_)` matches any named node — impossible only when the field admits literal
             // tokens exclusively.
-            if self.field_is_anonymous_only(ctx.parent_id, field_id) {
-                let message = format!("a named node can't be the value of `{}`", field_name);
-                self.emit_invalid_field_value(
-                    node.text_range(),
-                    message,
-                    ctx,
-                    field_id,
-                    field_name,
-                    field_range,
-                );
+            if self.field_is_anonymous_only(ctx.parent_id, field.id) {
+                let message = format!("a named node can't be the value of `{}`", field.name);
+                self.emit_invalid_field_value(node.text_range(), message, ctx, field);
             }
             return;
         }
@@ -663,7 +636,7 @@ impl<'a, 'q> Linker<'a, 'q> {
             return;
         };
 
-        if self.field_admissible(value_id, ctx.parent_id, field_id) {
+        if self.field_admissible(value_id, ctx.parent_id, field.id) {
             return;
         }
 
@@ -671,24 +644,15 @@ impl<'a, 'q> Linker<'a, 'q> {
             .grammar
             .node_type_name(value_id)
             .expect("resolved value must have a name");
-        let message = format!("`{}` can't be the value of `{}`", value_name, field_name);
-        self.emit_invalid_field_value(
-            type_token.text_range(),
-            message,
-            ctx,
-            field_id,
-            field_name,
-            field_range,
-        );
+        let message = format!("`{}` can't be the value of `{}`", value_name, field.name);
+        self.emit_invalid_field_value(type_token.text_range(), message, ctx, field);
     }
 
     fn check_field_anon_value(
         &mut self,
         anon: &ast::AnonymousNode,
         ctx: &ValidationContext,
-        field_id: NodeFieldId,
-        field_name: &str,
-        field_range: TextRange,
+        field: &FieldRef,
     ) {
         // The bare `_` matches any node, anonymous tokens included, so it always fits.
         if anon.is_any() {
@@ -703,22 +667,15 @@ impl<'a, 'q> Linker<'a, 'q> {
         };
 
         if self
-            .field_admissible_set(ctx.parent_id, field_id)
+            .field_admissible_set(ctx.parent_id, field.id)
             .contains(&value_id)
         {
             return;
         }
 
         let value_name = value_token.text().to_string();
-        let message = format!("`{}` can't be the value of `{}`", value_name, field_name);
-        self.emit_invalid_field_value(
-            value_token.text_range(),
-            message,
-            ctx,
-            field_id,
-            field_name,
-            field_range,
-        );
+        let message = format!("`{}` can't be the value of `{}`", value_name, field.name);
+        self.emit_invalid_field_value(value_token.text_range(), message, ctx, field);
     }
 
     fn field_admissible_set(
@@ -959,16 +916,14 @@ impl<'a, 'q> Linker<'a, 'q> {
         range: TextRange,
         message: String,
         ctx: &ValidationContext,
-        field_id: NodeFieldId,
-        field_name: &str,
-        field_range: TextRange,
+        field: &FieldRef,
     ) {
-        let hint = self.field_value_hint(ctx.parent_id, field_id, field_name);
+        let hint = self.field_value_hint(ctx.parent_id, field.id, field.name);
         let source = self.reporter.source();
         self.reporter
             .report(DiagnosticKind::InvalidFieldChildType, range)
             .message(message)
-            .related_to(source, field_range, format!("field `{}`", field_name))
+            .related_to(source, field.range, format!("field `{}`", field.name))
             .hint(hint)
             .emit();
     }
@@ -1025,6 +980,29 @@ fn format_list(items: &[&str], max_items: usize) -> String {
     }
 }
 
+/// Whether structural checks must fire at this position. Set to `Deferred` once the
+/// walk descends into an alternation branch or a quantified body: inside those, nothing is
+/// guaranteed to participate in a match (a sibling branch or zero repetitions can satisfy the
+/// query), so the grammar checks must NOT fire there — doing so would reject queries that can
+/// match. Skipping a check can only miss a rejection, never reject a valid query.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum CheckMode {
+    Immediate,
+    Deferred,
+}
+
+impl CheckMode {
+    fn is_immediate(self) -> bool {
+        matches!(self, CheckMode::Immediate)
+    }
+}
+
+struct FieldRef<'a> {
+    id: NodeFieldId,
+    name: &'a str,
+    range: TextRange,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct ValidationContext {
     parent_id: NodeTypeId,
@@ -1040,9 +1018,9 @@ struct RefWalk {
     /// Definitions currently on the recursion stack — guards against cycles.
     in_progress: HashSet<String>,
     /// Definitions already validated under a given context. A definition's
-    /// validation depends only on `(name, ctx, deferred)`, so caching it keeps shared
+    /// validation depends only on `(name, ctx, mode)`, so caching it keeps shared
     /// references (e.g. diamond graphs) from being re-walked exponentially.
-    validated: HashSet<(String, Option<ValidationContext>, bool)>,
+    validated: HashSet<(String, Option<ValidationContext>, CheckMode)>,
 }
 
 struct SymbolResolver<'l, 'a, 'q> {
