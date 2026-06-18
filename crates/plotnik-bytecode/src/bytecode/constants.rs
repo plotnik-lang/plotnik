@@ -9,7 +9,8 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// v4: Removed the trivia section.
 /// v5: Added extras-only anchor navigation modes.
 /// v6: Reserved bit 7 of a Nav byte for the Up family (uniform 5-bit level).
-pub const VERSION: u32 = 6;
+/// v7: Type kind and effect opcode discriminants renumbered contiguously.
+pub const VERSION: u32 = 7;
 
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;

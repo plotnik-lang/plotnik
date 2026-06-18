@@ -277,7 +277,6 @@ pub fn format_effect(effect: &EffectOp) -> String {
         EffectOpcode::Set => format!("Set(M{})", effect.payload),
         EffectOpcode::Enum => format!("Enum(M{})", effect.payload),
         EffectOpcode::EndEnum => "EndEnum".to_string(),
-        EffectOpcode::Text => "Text".to_string(),
         EffectOpcode::Clear => "Clear".to_string(),
         EffectOpcode::Null => "Null".to_string(),
         EffectOpcode::SuppressBegin => "SuppressBegin".to_string(),

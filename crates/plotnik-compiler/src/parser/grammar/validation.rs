@@ -59,9 +59,9 @@ impl Parser<'_, '_> {
         }
     }
 
-    /// Type names: PascalCase user types or lowercase primitives; never `.` or `-`.
+    /// Type names must be PascalCase identifiers; never `.`, `-`, or lowercase.
     pub(crate) fn validate_type_name(&mut self, name: &str, span: TextRange) {
-        if name.contains(['.', '-']) {
+        if name.contains(['.', '-']) || !starts_uppercase(name) {
             let suggested = to_pascal_case(name);
             self.error_with_fix(
                 DiagnosticKind::TypeNameInvalid,

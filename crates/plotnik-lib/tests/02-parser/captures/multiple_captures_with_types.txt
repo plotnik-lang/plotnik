@@ -1,6 +1,6 @@
 Q = (binary
   left: (_) @left :: Node
-  right: (_) @right :: string
+  right: (_) @right :: Foo
 ) @expr :: BinaryExpr
 ==== cst ====
 # query.ptk
@@ -35,7 +35,7 @@ Root
           CaptureToken "@right"
           Type
             DoubleColon "::"
-            Id "string"
+            Id "Foo"
         ParenClose ")"
       CaptureToken "@expr"
       Type
@@ -50,6 +50,6 @@ Root
         CapturedExpr @left :: Node
           FieldExpr left:
             NamedNode (any)
-        CapturedExpr @right :: string
+        CapturedExpr @right :: Foo
           FieldExpr right:
             NamedNode (any)

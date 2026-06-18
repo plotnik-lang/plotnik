@@ -64,7 +64,7 @@ mod debug_impl {
     use std::num::NonZeroU16;
 
     use indexmap::IndexMap;
-    use plotnik_bytecode::Nav;
+    use plotnik_bytecode::{EffectOpcode, Nav};
     use plotnik_core::{NodeType, Symbol};
 
     use crate::analyze::type_check::DefId;
@@ -106,7 +106,7 @@ mod debug_impl {
         Field(String),
         NegField(String),
         Predicate(u8, String),
-        Effect(u8, Option<String>),
+        Effect(EffectOpcode, Option<String>),
         Call(String),
         Return,
         /// Traversal marker (cycle back-reference, dangling label, depth cut).
@@ -151,7 +151,7 @@ mod debug_impl {
         // Member names aren't resolved at the IR fingerprint stage (that needs the
         // type table); the effect opcode alone keys the fingerprint.
         for e in &m.pre_effects {
-            ops.push(SemanticOp::Effect(e.opcode() as u8, None));
+            ops.push(SemanticOp::Effect(e.opcode(), None));
         }
 
         if m.nav != Nav::Epsilon {
@@ -202,7 +202,7 @@ mod debug_impl {
         }
 
         for e in &m.post_effects {
-            ops.push(SemanticOp::Effect(e.opcode() as u8, None));
+            ops.push(SemanticOp::Effect(e.opcode(), None));
         }
 
         ops
@@ -432,34 +432,26 @@ mod debug_impl {
         paths
     }
 
-    /// Effect opcodes that open a value scope, paired with the close that ends it.
-    /// (Arr/EndArr, Obj/EndObj, Enum/EndEnum, SuppressBegin/SuppressEnd.)
-    fn scope_open_for_close(close: u8) -> Option<u8> {
-        match close {
-            3 => Some(1),
-            5 => Some(4),
-            8 => Some(7),
-            13 => Some(12),
-            _ => None,
-        }
+    /// The role an effect plays in value-scope nesting: it opens a scope, closes
+    /// the scope a specific opcode opened, or is scope-neutral. The match is
+    /// exhaustive on purpose — a new `EffectOpcode` cannot compile until it
+    /// declares its scope behaviour here.
+    enum ScopeRole {
+        Open,
+        Close(EffectOpcode),
     }
 
-    fn is_scope_open(opcode: u8) -> bool {
-        matches!(opcode, 1 | 4 | 7 | 12)
-    }
-
-    fn effect_name(opcode: u8) -> &'static str {
-        match opcode {
-            1 => "Arr",
-            3 => "EndArr",
-            4 => "Obj",
-            5 => "EndObj",
-            7 => "Enum",
-            8 => "EndEnum",
-            12 => "SuppressBegin",
-            13 => "SuppressEnd",
-            _ => "?",
-        }
+    fn scope_role(op: EffectOpcode) -> Option<ScopeRole> {
+        use EffectOpcode::*;
+        let role = match op {
+            Arr | Obj | Enum | SuppressBegin => ScopeRole::Open,
+            EndArr => ScopeRole::Close(Arr),
+            EndObj => ScopeRole::Close(Obj),
+            EndEnum => ScopeRole::Close(Enum),
+            SuppressEnd => ScopeRole::Close(SuppressBegin),
+            Node | Push | Set | Clear | Null => return None,
+        };
+        Some(role)
     }
 
     /// A single path's scope effects must nest like brackets: every close matches
@@ -467,39 +459,32 @@ mod debug_impl {
     /// open. Paths cut by a cycle/depth marker are partial, so their leftover opens
     /// are expected and not flagged.
     fn check_path_scopes(path: &Path) -> Result<(), String> {
-        let mut stack: Vec<u8> = Vec::new();
+        let mut stack: Vec<EffectOpcode> = Vec::new();
         for op in path {
             let SemanticOp::Effect(opcode, _) = op else {
                 continue;
             };
             let opcode = *opcode;
-            if is_scope_open(opcode) {
-                stack.push(opcode);
-            } else if let Some(expected) = scope_open_for_close(opcode) {
-                match stack.pop() {
+            match scope_role(opcode) {
+                None => {}
+                Some(ScopeRole::Open) => stack.push(opcode),
+                Some(ScopeRole::Close(expected)) => match stack.pop() {
                     Some(top) if top == expected => {}
                     Some(top) => {
                         return Err(format!(
-                            "{} closes a {} scope but the innermost open scope is {}",
-                            effect_name(opcode),
-                            effect_name(expected),
-                            effect_name(top)
+                            "{opcode:?} closes a {expected:?} scope but the innermost open scope is {top:?}"
                         ));
                     }
                     None => {
-                        return Err(format!(
-                            "{} has no matching open scope",
-                            effect_name(opcode)
-                        ));
+                        return Err(format!("{opcode:?} has no matching open scope"));
                     }
-                }
+                },
             }
         }
 
         let truncated = matches!(path.last(), Some(SemanticOp::Marker(_)));
         if !truncated && !stack.is_empty() {
-            let open: Vec<_> = stack.iter().map(|&o| effect_name(o)).collect();
-            return Err(format!("path ends with unclosed scope(s): {open:?}"));
+            return Err(format!("path ends with unclosed scope(s): {stack:?}"));
         }
         Ok(())
     }

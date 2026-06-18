@@ -9,8 +9,6 @@ use arborium_tree_sitter::Node;
 pub enum RuntimeEffect<'t> {
     /// Capture a node reference.
     Node(Node<'t>),
-    /// Extract source text from a node.
-    Text(Node<'t>),
     /// Begin array scope.
     Arr,
     /// Push current value to array.

@@ -18,7 +18,6 @@ impl Emitter<'_> {
                 VoidType::Null => "null".to_string(),
             },
             TypeData::Primitive(TypeKind::Node) => "Node".to_string(),
-            TypeData::Primitive(TypeKind::String) => "string".to_string(),
             TypeData::Primitive(_) => "unknown".to_string(),
             TypeData::Wrapper {
                 kind: TypeKind::Alias,

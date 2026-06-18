@@ -18,7 +18,7 @@ Run: `plotnik dump -q '<query>' -l json`
 **Epsilon transitions** (`-ε-`) succeed unconditionally without cursor interaction.
 They are identified by `nav == Epsilon` — a distinct navigation mode (not Stay).
 
-**Capture effect consolidation**: Scalar capture effects (`Node`, `Text`, `Set`) are
+**Capture effect consolidation**: Scalar capture effects (`Node`, `Set`) are
 placed directly on match instructions rather than in separate epsilon steps. Structural
 effects (`Obj`, `EndObj`, `Arr`, `EndArr`, `Enum`, `EndEnum`) may appear in epsilons or
 consolidated into match instructions.
@@ -197,7 +197,6 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 | Enum(Mxx) | Start enum variant Mxx |
 | EndEnum   | End enum variant       |
 | Node      | Capture matched node   |
-| Text      | Convert node to string |
 | Set(Mxx)  | Set field/member Mxx   |
 | Null      | Null value             |
 | Clear     | Clear current          |
@@ -219,8 +218,7 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 | Kind     | Format          | Example               |
 | -------- | --------------- | --------------------- |
 | Node     | `<Node>`        | `T0 = <Node>`         |
-| String   | `<String>`      | `T1 = <String>`       |
-| Void     | `<Void>`        | `T2 = <Void>`         |
+| Void     | `<Void>`        | `T1 = <Void>`         |
 | Struct   | `Struct  Mx:n`  | `T2 = Struct  M0:1`   |
 | Enum     | `Enum    Mx:n`  | `T5 = Enum    M3:2`   |
 | Optional | `Optional(Tx)`  | `T7 = Optional(T5)`   |

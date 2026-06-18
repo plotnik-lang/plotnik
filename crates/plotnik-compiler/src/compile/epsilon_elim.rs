@@ -94,13 +94,11 @@ fn see_through(
     }
 }
 
-/// Whether any effect reads the VM's `matched_node` (`Node`/`Text`). Such
+/// Whether any effect reads the VM's `matched_node` (`Node`). Such
 /// effects are position-sensitive: their meaning depends on which node was
 /// most recently matched, so they cannot be reordered across a navigation.
 fn reads_matched_node(effects: &[EffectIR]) -> bool {
-    effects
-        .iter()
-        .any(|e| matches!(e.opcode(), EffectOpcode::Node | EffectOpcode::Text))
+    effects.iter().any(|e| e.opcode() == EffectOpcode::Node)
 }
 
 /// Phase A: Forward migration.
@@ -135,7 +133,7 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
             continue;
         }
 
-        // Effects that read `matched_node` (Node/Text) must not migrate forward:
+        // Effects that read `matched_node` (Node) must not migrate forward:
         // the non-epsilon successor's navigation clears `matched_node` before the
         // migrated effects would run, so they'd capture the successor's node
         // instead of the inbound one (#383). Keep such epsilons in place.

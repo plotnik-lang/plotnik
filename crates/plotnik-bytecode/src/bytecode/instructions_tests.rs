@@ -193,7 +193,6 @@ fn arb_effect() -> impl Strategy<Value = EffectOp> {
         EffectOpcode::Set,
         EffectOpcode::Enum,
         EffectOpcode::EndEnum,
-        EffectOpcode::Text,
         EffectOpcode::Clear,
         EffectOpcode::Null,
         EffectOpcode::SuppressBegin,

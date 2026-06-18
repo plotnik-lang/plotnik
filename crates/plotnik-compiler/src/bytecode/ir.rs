@@ -126,11 +126,6 @@ impl EffectIR {
         Self::simple(EffectOpcode::Node, 0)
     }
 
-    /// Capture current node text.
-    pub fn text() -> Self {
-        Self::simple(EffectOpcode::Text, 0)
-    }
-
     /// Push null value.
     pub fn null() -> Self {
         Self::simple(EffectOpcode::Null, 0)

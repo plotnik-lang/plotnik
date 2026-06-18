@@ -132,7 +132,6 @@ impl Compiler<'_> {
                 nav_override,
                 vec![],
                 capture,
-                false, // Not a string capture
                 CaptureExits::Single(exit),
             );
         }
@@ -233,7 +232,6 @@ impl Compiler<'_> {
                 nav_override,
                 vec![],
                 capture,
-                false, // Not a string capture
                 CaptureExits::Split {
                     match_exit,
                     skip_exit,
@@ -265,7 +263,7 @@ impl Compiler<'_> {
     /// through; with `Split` exits a zero-match takes `skip_exit` and a loop-exit
     /// takes `match_exit`, each closing the array. `capture_effects` is built once
     /// by the caller (empty for an implicit array); the matched element's
-    /// `Node`/`Text` is pushed only when the element is not already a structured
+    /// `Node` is pushed only when the element is not already a structured
     /// value ([`quantifier_needs_node_for_push`](Self::quantifier_needs_node_for_push)).
     pub(super) fn compile_array_capture(
         &mut self,
@@ -273,17 +271,11 @@ impl Compiler<'_> {
         nav_override: Option<Nav>,
         capture_effects: Vec<EffectIR>,
         outer_capture: CaptureEffects,
-        use_text_for_elements: bool,
         exits: CaptureExits,
     ) -> Label {
         let push_effects =
             CaptureEffects::new_post(if self.quantifier_needs_node_for_push(inner) {
-                let node_eff = if use_text_for_elements {
-                    EffectIR::text()
-                } else {
-                    EffectIR::node()
-                };
-                vec![node_eff, EffectIR::push()]
+                vec![EffectIR::node(), EffectIR::push()]
             } else {
                 vec![EffectIR::push()]
             });

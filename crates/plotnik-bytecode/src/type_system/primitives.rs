@@ -1,7 +1,7 @@
 //! Primitive (builtin) type definitions.
 //!
 //! These are the fundamental types that exist in every query,
-//! with fixed indices 0, 1, 2 reserved across both analysis and bytecode.
+//! with fixed indices 0, 1 reserved across both analysis and bytecode.
 
 /// Index for the Void type (produces nothing).
 pub const TYPE_VOID: u16 = 0;
@@ -9,11 +9,8 @@ pub const TYPE_VOID: u16 = 0;
 /// Index for the Node type (tree-sitter AST node reference).
 pub const TYPE_NODE: u16 = 1;
 
-/// Index for the String type (extracted source text).
-pub const TYPE_STRING: u16 = 2;
-
 /// First index available for user-defined/composite types.
-pub const TYPE_CUSTOM_START: u16 = 3;
+pub const TYPE_CUSTOM_START: u16 = 2;
 
 /// Builtin scalar types; no additional metadata in the type table.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -23,8 +20,6 @@ pub enum PrimitiveType {
     Void = TYPE_VOID,
     /// A tree-sitter AST node reference.
     Node = TYPE_NODE,
-    /// Extracted text from a node.
-    String = TYPE_STRING,
 }
 
 impl PrimitiveType {
@@ -34,7 +29,6 @@ impl PrimitiveType {
         match index {
             TYPE_VOID => Some(Self::Void),
             TYPE_NODE => Some(Self::Node),
-            TYPE_STRING => Some(Self::String),
             _ => None,
         }
     }
@@ -48,7 +42,7 @@ impl PrimitiveType {
     /// Check if a type index is a builtin primitive.
     #[inline]
     pub fn is_builtin(index: u16) -> bool {
-        index <= TYPE_STRING
+        index <= TYPE_NODE
     }
 
     /// Get the display name for this primitive (for bytecode dumps).
@@ -56,7 +50,6 @@ impl PrimitiveType {
         match self {
             Self::Void => "Void",
             Self::Node => "Node",
-            Self::String => "String",
         }
     }
 }

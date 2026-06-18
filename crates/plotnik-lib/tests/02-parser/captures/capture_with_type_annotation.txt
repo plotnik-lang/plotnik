@@ -1,4 +1,4 @@
-Q = (identifier) @name :: string
+Q = (identifier) @name :: Foo
 ==== cst ====
 # query.ptk
 Root
@@ -13,10 +13,10 @@ Root
       CaptureToken "@name"
       Type
         DoubleColon "::"
-        Id "string"
+        Id "Foo"
 ==== ast ====
 # query.ptk
 Root
   Def Q
-    CapturedExpr @name :: string
+    CapturedExpr @name :: Foo
       NamedNode identifier

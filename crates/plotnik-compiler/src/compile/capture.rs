@@ -1,6 +1,6 @@
 //! Capture effects handling for query compilation.
 //!
-//! Manages the construction and propagation of capture effects (Node/Text + Set)
+//! Manages the construction and propagation of capture effects (Node + Set)
 //! through the compilation pipeline.
 
 use std::collections::HashSet;
@@ -94,7 +94,7 @@ impl CaptureEffects {
 
     /// Add post-match value effects (run before any scope closes).
     ///
-    /// Use for: Node/Text+Set capture effects, Push for arrays
+    /// Use for: Node+Set capture effects, Push for arrays
     ///
     /// Given `post=[Scope_Close]`, adding value effects:
     /// - Result: `post=[Value1, Value2, Scope_Close]`
@@ -105,7 +105,7 @@ impl CaptureEffects {
 }
 
 impl Compiler<'_> {
-    /// Build capture effects (Node/Text + Set) for a capture whose inner was
+    /// Build capture effects (Node + Set) for a capture whose inner was
     /// classified as `mechanism` (or `None` for a bare `@x`).
     ///
     /// The caller already runs [`capture_mechanism`] to dispatch, so it passes the
@@ -117,18 +117,13 @@ impl Compiler<'_> {
     ) -> Vec<EffectIR> {
         let mut effects = Vec::with_capacity(2);
 
-        // Only the `Node` mechanism captures the matched node/text directly. Every
+        // Only the `Node` mechanism captures the matched node directly. Every
         // other mechanism (struct scope, pass-through ref/enum/forward, array)
         // produces its value via EndObj/EndEnum/EndArr/Call, so the capture itself
-        // emits no Node/Text. A bare capture (`@x` with no inner) is a Node.
+        // emits no Node. A bare capture (`@x` with no inner) is a Node.
         let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureMechanism::Node);
         if is_node_mechanism {
-            let effect = if cap.has_string_annotation() {
-                EffectIR::text()
-            } else {
-                EffectIR::node()
-            };
-            effects.push(effect);
+            effects.push(EffectIR::node());
         }
 
         // Add Set effect if we have a capture name.
@@ -147,7 +142,7 @@ impl Compiler<'_> {
 
     /// Check if a quantifier body needs Node effect before Push.
     ///
-    /// For scalar array elements (Node/String types), we need [Node/Text, Push]
+    /// For scalar array elements (Node type), we need [Node, Push]
     /// to capture the matched node value.
     /// For structured elements (Struct/Enum), EndObj/EndEnum provides the value.
     /// For refs returning structured types, Call provides the value.

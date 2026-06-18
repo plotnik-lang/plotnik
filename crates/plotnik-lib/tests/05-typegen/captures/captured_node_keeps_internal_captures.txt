@@ -1,5 +1,5 @@
 Q = (function_declaration
-  name: (identifier) @name :: string
+  name: (identifier) @name
   body: (statement_block) @body
 ) @func :: FunctionInfo
 ==== types ====
@@ -8,5 +8,5 @@ export type FunctionInfo = Node;
 export interface Q {
   body: Node;
   func: FunctionInfo;
-  name: string;
+  name: Node;
 }

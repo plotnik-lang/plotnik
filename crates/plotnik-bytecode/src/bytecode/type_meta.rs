@@ -35,7 +35,7 @@ const _: () = assert!(std::mem::size_of::<TypeDef>() == TypeDef::SIZE);
 /// Structured view of TypeDef data, eliminating the need for Option-returning accessors.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TypeData {
-    /// Primitive types: Void, Node, String.
+    /// Primitive types: Void, Node.
     Primitive(TypeKind),
     /// Wrapper types: Optional, ArrayZeroOrMore, ArrayOneOrMore, Alias.
     Wrapper { kind: TypeKind, inner: TypeId },
@@ -51,7 +51,7 @@ impl TypeDef {
     /// Serialized size in bytes.
     pub const SIZE: usize = 4;
 
-    /// Create a builtin type (Void, Node, String).
+    /// Create a builtin type (Void, Node).
     pub fn builtin(kind: TypeKind) -> Self {
         Self {
             data: 0,
@@ -160,7 +160,7 @@ impl TypeDef {
     pub fn try_classify(&self) -> Option<TypeData> {
         let kind = TypeKind::from_u8(self.kind)?;
         Some(match kind {
-            TypeKind::Void | TypeKind::Node | TypeKind::String => TypeData::Primitive(kind),
+            TypeKind::Void | TypeKind::Node => TypeData::Primitive(kind),
             TypeKind::Optional
             | TypeKind::ArrayZeroOrMore
             | TypeKind::ArrayOneOrMore

@@ -1,8 +1,8 @@
-(identifier) @name :: string
+(identifier) @name :: Foo
 ==== tokens ====
 ParenOpen "("
 Id "identifier"
 ParenClose ")"
 CaptureToken "@name"
 DoubleColon "::"
-Id "string"
+Id "Foo"

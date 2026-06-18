@@ -65,9 +65,9 @@ impl Compiler<'_> {
             Nav::Up(1)
         };
 
-        // Split capture.post: Node/Text effects (and their Set) go on entry (need matched_node
+        // Split capture.post: Node effects (and their Set) go on entry (need matched_node
         // right after match), other effects go on final_exit (after children processing).
-        // Node/Text capture effects use matched_node which is only valid immediately after the match,
+        // Node capture effects use matched_node which is only valid immediately after the match,
         // before descending into children (which may clobber matched_node via backtracking).
         use plotnik_bytecode::EffectOpcode;
 
@@ -75,9 +75,9 @@ impl Compiler<'_> {
         let mut exit_effects = Vec::new();
         let mut iter = capture.post.into_iter().peekable();
         while let Some(eff) = iter.next() {
-            if matches!(eff.opcode(), EffectOpcode::Node | EffectOpcode::Text) {
+            if eff.opcode() == EffectOpcode::Node {
                 entry_effects.push(eff);
-                // Node/Text are always paired with a following Set
+                // Node is always paired with a following Set
                 if iter.peek().is_some_and(|e| e.opcode() == EffectOpcode::Set) {
                     entry_effects.push(
                         iter.next()
@@ -321,7 +321,7 @@ impl Compiler<'_> {
     /// other (the drift behind #470 and the suppressive `@_` panic).
     ///
     /// Capture effects land on the innermost match / scope-close instruction:
-    /// - Node:   inner_pattern[Node/Text, Set] → exit
+    /// - Node:   inner_pattern[Node, Set] → exit
     /// - Struct: Obj → inner[…] → EndObj+capture → exit
     /// - Array:  Arr → quantifier (with Push) → EndArr+capture → exit
     /// - Ref:    Call → Set epsilon → exit
@@ -365,7 +365,6 @@ impl Compiler<'_> {
                 nav_override,
                 capture_effects,
                 outer_capture,
-                cap.has_string_annotation(),
                 exits,
             ),
 
@@ -424,7 +423,7 @@ impl Compiler<'_> {
 
     /// Single-exit lowering for the pass-through mechanisms (Node/Ref/SetAfter):
     /// the captured value is produced by the inner itself, so the capture emits no
-    /// scope — only a trailing `Set` (plus the `Node`/`Text` for a plain node).
+    /// scope — only a trailing `Set` (plus `Node` for a plain node).
     fn compile_passthrough_capture(
         &mut self,
         mechanism: CaptureMechanism,

@@ -276,7 +276,7 @@ fn apply_effect(
 
     let err = || ModuleError::EffectStackImbalance(step);
     match op {
-        Node | Text | Null | Clear => {}
+        Node | Null | Clear => {}
         SuppressBegin => *suppress += 1,
         // At depth 0 a `SuppressEnd` would drive the counter negative — the
         // exact underflow the VM panics on.

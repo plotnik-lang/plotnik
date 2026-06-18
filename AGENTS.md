@@ -28,8 +28,7 @@ Validate once, at the boundary. Two smells to fix on sight: a swallowed must-hol
 | `(_)`               | Any named node                     |
 | `_`                 | Any node                           |
 | `@name`             | Capture (snake_case only)          |
-| `@x :: T`           | Type annotation                    |
-| `@x :: string`      | Extract node text                  |
+| `@x :: T`           | Type annotation (T is PascalCase)  |
 | `field: pattern`    | Field constraint                   |
 | `-field`            | Negated field (assert absent)      |
 | `?` `*` `+`         | Quantifiers (0-1, 0+, 1+)          |

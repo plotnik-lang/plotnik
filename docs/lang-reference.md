@@ -276,15 +276,14 @@ The `@func` capture on the sequence creates a nested scope. All captures inside 
 
 ### Type Annotations
 
-`::` after a capture controls the output type:
+`::` after a capture names the output type in codegen:
 
-| Annotation     | Effect                        |
-| -------------- | ----------------------------- |
-| `@x`           | Inferred (usually `Node`)     |
-| `@x :: string` | Extract `node.text` as string |
-| `@x :: T`      | Name the type `T` in codegen  |
+| Annotation | Effect                       |
+| ---------- | ---------------------------- |
+| `@x`       | Inferred (usually `Node`)    |
+| `@x :: T`  | Name the type `T` in codegen |
 
-Only `:: string` changes data; other `:: T` affect only generated type names.
+Type names must be `PascalCase`.
 
 ### Suppressive Captures
 
@@ -317,9 +316,9 @@ Rules:
 Example:
 
 ```
-{
+FuncDecl = {
   (function_declaration
-    name: (identifier) @name :: string
+    name: (identifier) @name
     body: (_) @body
   ) @node
 } @func :: FunctionDeclaration
@@ -329,27 +328,26 @@ Output type:
 
 ```typescript
 interface FunctionDeclaration {
-  node: Node;
-  name: string; // :: string converted this
   body: Node;
+  name: Node;
+  node: Node;
 }
 
-{
+interface FuncDecl {
   func: FunctionDeclaration;
 }
 ```
 
 ### Summary
 
-| Pattern                 | Output                                |
-| ----------------------- | ------------------------------------- |
-| `@name`                 | Field in current scope                |
-| `(x)? @a`               | Optional field                        |
-| `(x)* @a`               | Node array (no internal captures)     |
-| `{...}* @items`         | Struct array (with internal captures) |
+| Pattern                  | Output                                |
+| ------------------------ | ------------------------------------- |
+| `@name`                  | Field in current scope                |
+| `(x)? @a`                | Optional field                        |
+| `(x)* @a`                | Node array (no internal captures)     |
+| `{...}* @items`          | Struct array (with internal captures) |
 | `{...} @x` / `[...] @x` | Nested object (new scope)             |
-| `@x :: string`          | String value                          |
-| `@x :: T`               | Custom type name                      |
+| `@x :: T`                | Custom type name                      |
 
 ---
 
@@ -523,20 +521,6 @@ Output type:
 
 ```typescript
 { target: Node, value: Node }
-```
-
-With type annotations:
-
-```
-(assignment_expression
-  left: (identifier) @target :: string
-  right: (call_expression) @value)
-```
-
-Output type:
-
-```typescript
-{ target: string, value: Node }
 ```
 
 ### Quantifiers and Captures on Fields
@@ -737,7 +721,7 @@ Output type:
 Type mismatch is an error:
 
 ```
-[(identifier) @x :: string (number) @x :: number]  // ERROR: @x has different types
+[(identifier) @x :: Foo (number) @x :: Bar]  // ERROR: @x has different types
 ```
 
 With a capture on the alternation itself, the type is non-optional since exactly one branch must match:
@@ -999,19 +983,19 @@ MemberChain = [
 ```
 Statement = [
   Assign: (assignment_expression
-    left: (identifier) @target :: string
+    left: (identifier) @target
     right: (Expression) @value)
   Call: (call_expression
-    function: (identifier) @func :: string
+    function: (identifier) @func
     arguments: (arguments (Expression)* @args))
   Return: (return_statement
     (Expression)? @value)
 ]
 
 Expression = [
-  Ident: (identifier) @name :: string
-  Num: (number) @value :: string
-  Str: (string) @value :: string
+  Ident: (identifier) @name
+  Num: (number) @value
+  Str: (string) @value
 ]
 
 Root = (program (Statement)+ @statements)
@@ -1020,19 +1004,43 @@ Root = (program (Statement)+ @statements)
 Output types:
 
 ```typescript
-type Statement =
-  | { $tag: "Assign"; $data: { target: string; value: Expression } }
-  | { $tag: "Call"; $data: { func: string; args: Expression[] } }
-  | { $tag: "Return"; $data: { value: Expression | null } };
+type Expression = ExpressionIdent | ExpressionNum | ExpressionStr;
 
-type Expression =
-  | { $tag: "Ident"; $data: { name: string } }
-  | { $tag: "Num"; $data: { value: string } }
-  | { $tag: "Str"; $data: { value: string } };
+interface ExpressionIdent {
+  $tag: "Ident";
+  $data: { name: Node };
+}
 
-type Root = {
+interface ExpressionNum {
+  $tag: "Num";
+  $data: { value: Node };
+}
+
+interface ExpressionStr {
+  $tag: "Str";
+  $data: { value: Node };
+}
+
+type Statement = StatementAssign | StatementCall | StatementReturn;
+
+interface StatementAssign {
+  $tag: "Assign";
+  $data: { target: Node; value: Expression };
+}
+
+interface StatementCall {
+  $tag: "Call";
+  $data: { func: Node; args: Expression[] };
+}
+
+interface StatementReturn {
+  $tag: "Return";
+  $data: { value: Expression | null };
+}
+
+interface Root {
   statements: [Statement, ...Statement[]];
-};
+}
 ```
 
 ---
@@ -1044,7 +1052,6 @@ type Root = {
 | Capture              | `@name`            | `@name` (snake_case only) |
 | Suppressive capture  |                    | `@_` or `@_name`          |
 | Type annotation      |                    | `@x :: T`                 |
-| Text extraction      |                    | `@x :: string`            |
 | Named node           | `(type)`           | `(type)`                  |
 | Anonymous node       | `"text"`           | `"text"`                  |
 | Any node             | `_`                | `_`                       |

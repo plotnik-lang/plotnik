@@ -9,9 +9,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use crate::parser::Expr;
 
 use super::symbol::{DefId, Interner, Symbol};
-use super::types::{
-    Arity, FieldInfo, TYPE_NODE, TYPE_STRING, TYPE_VOID, TermInfo, TypeId, TypeShape,
-};
+use super::types::{Arity, FieldInfo, TYPE_NODE, TYPE_VOID, TermInfo, TypeId, TypeShape};
 
 /// Central registry for types, symbols, and expression metadata.
 #[derive(Clone, Debug)]
@@ -58,9 +56,6 @@ impl TypeContext {
 
         let node_id = ctx.intern_type(TypeShape::Node);
         debug_assert_eq!(node_id, TYPE_NODE);
-
-        let string_id = ctx.intern_type(TypeShape::String);
-        debug_assert_eq!(string_id, TYPE_STRING);
 
         ctx
     }

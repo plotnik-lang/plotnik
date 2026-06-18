@@ -8,7 +8,7 @@
 //! # Module Organization
 //!
 //! The compiler is split into focused modules:
-//! - `capture`: Capture effects handling (Node/Text + Set)
+//! - `capture`: Capture effects handling (Node + Set)
 //! - `expressions`: Leaf expression compilation (named/anon nodes, refs, fields, captures)
 //! - `navigation`: Navigation mode computation for anchors and quantifiers
 //! - `quantifier`: Unified quantifier compilation (*, +, ?)

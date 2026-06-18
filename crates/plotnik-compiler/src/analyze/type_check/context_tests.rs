@@ -8,7 +8,6 @@ fn builtin_types_have_correct_ids() {
 
     assert_eq!(ctx.get_type(TYPE_VOID), Some(&TypeShape::Void));
     assert_eq!(ctx.get_type(TYPE_NODE), Some(&TypeShape::Node));
-    assert_eq!(ctx.get_type(TYPE_STRING), Some(&TypeShape::String));
 }
 
 #[test]

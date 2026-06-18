@@ -1,6 +1,6 @@
 Q = [
-  (identifier) @x :: string
-  (number) @x
+  (identifier) @x
+  (number)* @x
 ]
 ==== diagnostics ====
 error: capture `@x` has incompatible types across branches
@@ -8,8 +8,8 @@ error: capture `@x` has incompatible types across branches
   |
 1 |   Q = [
   |  _____^
-2 | |   (identifier) @x :: string
-3 | |   (number) @x
+2 | |   (identifier) @x
+3 | |   (number)* @x
 4 | | ]
   | |_^
   |

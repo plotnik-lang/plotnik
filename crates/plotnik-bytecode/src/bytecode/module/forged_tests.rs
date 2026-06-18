@@ -394,12 +394,12 @@ fn forged_invalid_nav_is_rejected() {
 
 #[test]
 fn forged_invalid_effect_opcode_is_rejected() {
-    // `14` is past the 0..=13 effect range; `EffectOpcode::from_u8` would panic
+    // `13` is past the 0..=12 effect range; `EffectOpcode::from_u8` would panic
     // when the VM emits this effect.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let slot = effect_slots(&bytes)[0];
     let existing = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]);
-    let forged = (14u16 << 10) | (existing & 0x3FF);
+    let forged = (13u16 << 10) | (existing & 0x3FF);
     bytes[slot..slot + 2].copy_from_slice(&forged.to_le_bytes());
     reseal(&mut bytes);
 
@@ -639,12 +639,12 @@ fn forged_dropped_scope_close_is_rejected() {
 
 #[test]
 fn forged_suppress_underflow_is_rejected() {
-    // Replace a data effect with a bare `SuppressEnd` (opcode 13). With no
+    // Replace a data effect with a bare `SuppressEnd` (opcode 12). With no
     // matching `SuppressBegin` on the path, the VM's suppression counter would
     // underflow and `.expect()` panic; the verifier rejects it at load.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let slot = first_effect_op(&bytes, |op| op == 4 || op == 6);
-    bytes[slot..slot + 2].copy_from_slice(&(13u16 << 10).to_le_bytes());
+    bytes[slot..slot + 2].copy_from_slice(&(12u16 << 10).to_le_bytes());
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged SuppressEnd underflow must be rejected");

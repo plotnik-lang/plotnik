@@ -1,7 +1,7 @@
 Expression = [
-  Ident: (identifier) @name :: string
-  Num: (number) @value :: string
-  Str: (string) @value :: string
+  Ident: (identifier) @name :: Foo
+  Num: (number) @value :: Foo
+  Str: (string) @value :: Foo
   Binary: (binary_expression
     left: (Expression) @left
     right: (Expression) @right
@@ -26,7 +26,7 @@ Root
           CaptureToken "@name"
           Type
             DoubleColon "::"
-            Id "string"
+            Id "Foo"
       Branch
         Id "Num"
         Colon ":"
@@ -38,7 +38,7 @@ Root
           CaptureToken "@value"
           Type
             DoubleColon "::"
-            Id "string"
+            Id "Foo"
       Branch
         Id "Str"
         Colon ":"
@@ -50,7 +50,7 @@ Root
           CaptureToken "@value"
           Type
             DoubleColon "::"
-            Id "string"
+            Id "Foo"
       Branch
         Id "Binary"
         Colon ":"
@@ -83,13 +83,13 @@ Root
   Def Expression
     Alt
       Branch Ident:
-        CapturedExpr @name :: string
+        CapturedExpr @name :: Foo
           NamedNode identifier
       Branch Num:
-        CapturedExpr @value :: string
+        CapturedExpr @value :: Foo
           NamedNode number
       Branch Str:
-        CapturedExpr @value :: string
+        CapturedExpr @value :: Foo
           NamedNode string
       Branch Binary:
         NamedNode binary_expression
