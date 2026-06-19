@@ -137,6 +137,6 @@ Validation, in order:
 11. **Effect stack** — an interprocedural walk of the committed-effect order
     (across `Call`/`Return`/`Trampoline`, under the suppression filter) proves no
     path can drive the materializer's builder stack (`Push`/`Set`/`ArrayClose`/
-    `ObjectClose`/`EnumClose`) or the VM's suppression counter into a panic. This closes
+    `StructClose`/`EnumClose`) or the VM's suppression counter into a panic. This closes
     the last forged-module panic class — the materializer's builder-stack panics
     and the VM's `SuppressEnd` underflow — that decode-level checks cannot see.

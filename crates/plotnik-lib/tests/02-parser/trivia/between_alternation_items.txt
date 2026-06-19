@@ -32,7 +32,7 @@ Root
 # query.ptk
 Root
   Def Q
-    Alt
+    Union
       Branch
         NamedNode a
       Branch

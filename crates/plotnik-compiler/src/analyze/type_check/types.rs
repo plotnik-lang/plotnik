@@ -41,7 +41,7 @@ pub enum TypeShape {
     Node,
     /// User-specified type via `@x :: TypeName`.
     Custom(Symbol),
-    /// Object with named fields.
+    /// Struct with named fields.
     Struct(BTreeMap<Symbol, FieldInfo>),
     /// Enum from labeled alternations.
     Enum(BTreeMap<Symbol, TypeId>),

@@ -39,7 +39,7 @@ Root
 # query.ptk
 Root
   Def Q
-    Alt
+    Enum
       Branch Pair:
         Seq
           NamedNode key

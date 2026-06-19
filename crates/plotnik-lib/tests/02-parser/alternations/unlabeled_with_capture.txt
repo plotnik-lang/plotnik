@@ -28,7 +28,7 @@ Root
 Root
   Def Q
     CapturedPattern @value
-      Alt
+      Union
         Branch
           NamedNode identifier
         Branch

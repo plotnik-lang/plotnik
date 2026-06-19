@@ -37,7 +37,7 @@ impl Emitter<'_> {
             TypeDefKind::Wrapper { inner, .. } => {
                 self.visit_for_node_use(inner);
             }
-            TypeDefKind::Composite { .. } => {
+            TypeDefKind::Struct { .. } | TypeDefKind::Enum { .. } => {
                 let member_types: Vec<_> = self
                     .types
                     .members_of(&type_def)
@@ -116,25 +116,18 @@ impl Emitter<'_> {
             TypeDefKind::Wrapper { inner, .. } => {
                 self.collect_emit_set(inner, out);
             }
-            TypeDefKind::Composite {
-                kind: TypeKind::Struct,
-                ..
-            } => {
+            TypeDefKind::Struct { .. } => {
                 out.insert(type_id);
                 for member in self.types.members_of(&type_def) {
                     self.collect_emit_set(member.type_id, out);
                 }
             }
-            TypeDefKind::Composite {
-                kind: TypeKind::Enum,
-                ..
-            } => {
+            TypeDefKind::Enum { .. } => {
                 out.insert(type_id);
                 for member in self.types.members_of(&type_def) {
                     self.collect_variant_payload_types(member.type_id, out);
                 }
             }
-            TypeDefKind::Composite { .. } => {}
         }
     }
 
@@ -147,13 +140,7 @@ impl Emitter<'_> {
 
         // For struct payloads, don't add the struct itself (it will be inlined),
         // but recurse into its fields to find named types.
-        if matches!(
-            type_def.decode(),
-            TypeDefKind::Composite {
-                kind: TypeKind::Struct,
-                ..
-            }
-        ) {
+        if matches!(type_def.decode(), TypeDefKind::Struct { .. }) {
             for member in self.types.members_of(&type_def) {
                 self.collect_emit_set(member.type_id, out);
             }
@@ -174,7 +161,7 @@ impl Emitter<'_> {
                 ..
             } => vec![],
             TypeDefKind::Wrapper { inner, .. } => self.peel_to_named_dep(inner),
-            TypeDefKind::Composite { .. } => self
+            TypeDefKind::Struct { .. } | TypeDefKind::Enum { .. } => self
                 .types
                 .members_of(&type_def)
                 .flat_map(|member| self.peel_to_named_dep(member.type_id))
@@ -195,7 +182,7 @@ impl Emitter<'_> {
                 ..
             } => vec![type_id],
             TypeDefKind::Wrapper { inner, .. } => self.peel_to_named_dep(inner),
-            TypeDefKind::Composite { .. } => vec![type_id],
+            TypeDefKind::Struct { .. } | TypeDefKind::Enum { .. } => vec![type_id],
         }
     }
 }

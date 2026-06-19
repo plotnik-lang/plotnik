@@ -73,11 +73,11 @@ fn compile_nested() {
 
 // Split-exit captures at a navigating first-child position (`?`/`*` whose skip
 // path must restore the cursor). These pin the bytecode of the unified
-// exit-aware emitters — `Obj`/`Arr`/`Suppress` opening once and closing on both
+// exit-aware emitters — `Struct`/`Arr`/`Suppress` opening once and closing on both
 // the match and skip exits — so an effect-ordering regression is caught here even
 // when it still produces the right conformance JSON on a narrow input (#470).
 
-/// Struct capture: `Obj → inner → EndObj+Set`, one EndObj per exit.
+/// Struct capture: `Struct → inner → EndStruct+Set`, one EndStruct per exit.
 #[test]
 fn compile_optional_struct_capture_split_exits() {
     shot_bytecode!("Test = (program {(identifier) @id}? @outer)");

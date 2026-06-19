@@ -53,14 +53,14 @@ impl Serialize for NodeHandle {
 
 /// Self-contained output value.
 ///
-/// `Object` uses `Vec<(String, Value)>` to preserve field order from type metadata.
+/// `Struct` uses `Vec<(String, Value)>` to preserve field order from type metadata.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Null,
     Node(NodeHandle),
     Array(Vec<Value>),
-    /// Object with ordered fields.
-    Object(Vec<(String, Value)>),
+    /// Struct with ordered fields.
+    Struct(Vec<(String, Value)>),
     /// Enum variant. `data` is None for Void payloads.
     Enum {
         tag: String,
@@ -83,7 +83,7 @@ impl Serialize for Value {
                 }
                 seq.end()
             }
-            Value::Object(fields) => {
+            Value::Struct(fields) => {
                 let mut map = serializer.serialize_map(Some(fields.len()))?;
                 for (key, value) in fields {
                     map.serialize_entry(key, value)?;
@@ -145,8 +145,8 @@ fn format_value(ctx: &mut FormatCtx<'_>, value: &Value, indent: usize) {
         Value::Array(arr) => {
             format_array(ctx, arr, indent);
         }
-        Value::Object(fields) => {
-            format_object(ctx, fields, indent);
+        Value::Struct(fields) => {
+            format_struct(ctx, fields, indent);
         }
         Value::Enum { tag, data } => {
             format_enum(ctx, tag, data, indent);
@@ -284,7 +284,7 @@ fn format_array(ctx: &mut FormatCtx<'_>, arr: &[Value], indent: usize) {
     ctx.out.push_str(c.reset);
 }
 
-fn format_object(ctx: &mut FormatCtx<'_>, fields: &[(String, Value)], indent: usize) {
+fn format_struct(ctx: &mut FormatCtx<'_>, fields: &[(String, Value)], indent: usize) {
     let c = ctx.colors;
     let pretty = ctx.pretty;
     ctx.out.push_str(c.dim);

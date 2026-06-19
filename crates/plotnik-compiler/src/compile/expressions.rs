@@ -163,10 +163,10 @@ impl Compiler<'_> {
 
     /// Compile a reference with capture effects.
     ///
-    /// Call-site scoping: the caller decides whether to wrap with Obj/EndObj based on
+    /// Call-site scoping: the caller decides whether to wrap with Struct/EndStruct based on
     /// whether the ref is captured and the called definition returns a struct.
     ///
-    /// - Captured ref returning struct: `Obj → Call → EndObj → Set → exit`
+    /// - Captured ref returning struct: `Struct → Call → EndStruct → Set → exit`
     /// - Captured ref returning scalar: `Call → Set → exit`
     /// - Uncaptured ref: `Call → exit` (def's Sets go to parent scope)
     pub(super) fn compile_ref(
@@ -215,11 +215,11 @@ impl Compiler<'_> {
 
         // Call instructions don't have pre_effects, so emit epsilon if needed
         let call_entry = if needs_scope {
-            // Obj isolates the definition's internal captures before the Set.
+            // Struct isolates the definition's internal captures before the Set.
             let set_step = self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
-            let endobj_step = self.emit_endobj_step(set_step);
-            let call_label = self.emit_call(nav, field_override, endobj_step, target);
-            self.emit_obj_step(call_label)
+            let struct_close_step = self.emit_struct_close_step(set_step);
+            let call_label = self.emit_call(nav, field_override, struct_close_step, target);
+            self.emit_struct_step(call_label)
         } else if is_captured {
             let return_addr =
                 self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
@@ -281,7 +281,10 @@ impl Compiler<'_> {
         let needs_wrapper = node_field.is_some()
             && matches!(
                 &value,
-                Pattern::AltPattern(_) | Pattern::SeqPattern(_) | Pattern::QuantifiedPattern(_)
+                Pattern::Union(_)
+                    | Pattern::Enum(_)
+                    | Pattern::SeqPattern(_)
+                    | Pattern::QuantifiedPattern(_)
             );
 
         if needs_wrapper {
@@ -352,7 +355,7 @@ impl Compiler<'_> {
     ///
     /// Capture effects land on the innermost match / scope-close instruction:
     /// - Node:   inner_pattern[Node, Set] → exit
-    /// - Struct: Obj → inner[…] → EndObj+capture → exit
+    /// - Struct: Struct → inner[…] → EndStruct+capture → exit
     /// - Array:  Arr → quantifier (with Push) → EndArr+capture → exit
     /// - Ref:    Call → Set epsilon → exit
     /// - Suppressive: SuppressBegin → inner → SuppressEnd → outer_effects → exit
@@ -400,7 +403,7 @@ impl Compiler<'_> {
                 exits,
             ),
 
-            // Struct scope: Obj → inner → EndObj+capture → exit(s) (also empty `{}`).
+            // Struct scope: Struct → inner → EndStruct+capture → exit(s) (also empty `{}`).
             // Without the wrapper the Set lands on the raw inner node and both the
             // struct scope and the inner Sets are lost (#470).
             CaptureKind::StructScope => self.compile_struct_capture(
@@ -478,7 +481,7 @@ impl Compiler<'_> {
     }
 
     /// Single-exit lowering for a `Ref` capture: hand the capture to the call
-    /// site, which wraps Call/Return (and Obj/EndObj for struct-returning
+    /// site, which wraps Call/Return (and Struct/EndStruct for struct-returning
     /// definitions) to isolate the definition's internal captures before the Set.
     fn compile_ref_capture(&mut self, req: CaptureRequest<'_>, exit: Label) -> Label {
         let CaptureRequest {

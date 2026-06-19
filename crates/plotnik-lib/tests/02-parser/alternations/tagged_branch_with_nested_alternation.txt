@@ -41,9 +41,9 @@ Root
 # query.ptk
 Root
   Def Q
-    Alt
+    Enum
       Branch Literal:
-        Alt
+        Union
           Branch
             NamedNode number
           Branch

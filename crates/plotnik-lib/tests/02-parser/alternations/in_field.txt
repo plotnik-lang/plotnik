@@ -36,7 +36,7 @@ Root
   Def Q
     NamedNode call
       FieldPattern arguments:
-        Alt
+        Union
           Branch
             NamedNode string
           Branch

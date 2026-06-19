@@ -31,7 +31,7 @@ Root
 # query.ptk
 Root
   Def Q
-    Alt
+    Union
       Branch
         Seq
           NamedNode a

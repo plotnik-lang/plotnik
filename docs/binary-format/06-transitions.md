@@ -117,8 +117,8 @@ EffectOp (u16)
 | 1      | `ArrayOpen`     | -                      |
 | 2      | `Push`          | -                      |
 | 3      | `ArrayClose`    | -                      |
-| 4      | `ObjectOpen`    | -                      |
-| 5      | `ObjectClose`   | -                      |
+| 4      | `StructOpen`    | -                      |
+| 5      | `StructClose`   | -                      |
 | 6      | `Set`           | Member index (0-1023)  |
 | 7      | `EnumOpen`      | Variant index (0-1023) |
 | 8      | `EnumClose`     | -                      |
@@ -266,7 +266,7 @@ A Match instruction with `nav == Epsilon` is an **epsilon transition** — it su
 
 - **Branching at EOF**: `(a)?` must succeed when no node exists to match.
 - **Pure control flow**: Decision points for quantifiers.
-- **Effect-only steps**: Scope openers/closers (`ObjectOpen`, `ObjectClose`) without node interaction.
+- **Effect-only steps**: Scope openers/closers (`StructOpen`, `StructClose`) without node interaction.
 
 When `nav == Epsilon`:
 
@@ -320,7 +320,7 @@ struct Trampoline {
 }
 ```
 
-The preamble at step 0 typically looks like: `ObjectOpen → Trampoline → ObjectClose → Accept`. When executed:
+The preamble at step 0 typically looks like: `StructOpen → Trampoline → StructClose → Accept`. When executed:
 
 1. VM pushes `next` (return address) onto call stack
 2. VM jumps to `entrypoint_target` (set from entrypoint before execution)

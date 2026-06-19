@@ -59,7 +59,7 @@ impl<'a> Compiler<'a> {
     pub fn build_ir(ctx: &'a CompileCtx<'a>) -> Result<CompileResult, CompileError> {
         let mut compiler = Compiler::new(ctx);
 
-        // Emit universal preamble first: Obj -> Trampoline -> EndObj -> Return
+        // Emit universal preamble first: Struct -> Trampoline -> EndStruct -> Return
         // This wraps any entrypoint to create the top-level scope.
         let preamble_entry = compiler.emit_preamble();
 
@@ -90,7 +90,7 @@ impl<'a> Compiler<'a> {
         Ok(result)
     }
 
-    /// Emit the universal preamble: Obj -> Trampoline -> EndObj -> Return
+    /// Emit the universal preamble: Struct -> Trampoline -> EndStruct -> Return
     ///
     /// The preamble creates a scope for the entrypoint's captures.
     /// The Trampoline instruction jumps to the actual entrypoint (set via VM context).
@@ -99,13 +99,13 @@ impl<'a> Compiler<'a> {
         let return_label = self.fresh_label();
         self.instructions.push(ReturnIR::new(return_label).into());
 
-        let endobj_label = self.emit_endobj_step(return_label);
+        let struct_close_label = self.emit_struct_close_step(return_label);
 
         let trampoline_label = self.fresh_label();
         self.instructions
-            .push(TrampolineIR::new(trampoline_label, endobj_label).into());
+            .push(TrampolineIR::new(trampoline_label, struct_close_label).into());
 
-        self.emit_obj_step(trampoline_label)
+        self.emit_struct_step(trampoline_label)
     }
 
     /// Generate a fresh label.
@@ -136,7 +136,7 @@ impl<'a> Compiler<'a> {
         let body_nav = Some(Nav::StayExact);
 
         // Definitions are compiled in normalized form: body -> Return
-        // No Obj/EndObj wrapper - that's the caller's responsibility (call-site scoping).
+        // No Struct/EndStruct wrapper - that's the caller's responsibility (call-site scoping).
         // We still use with_scope for member index lookup during compilation.
         let body_entry = if let Some(type_id) = self.ctx.type_ctx.def_type(def_id) {
             self.with_scope(type_id, |this| {
@@ -174,7 +174,8 @@ impl<'a> Compiler<'a> {
             Pattern::NodePattern(n) => self.compile_node_pattern(n, ctx),
             Pattern::TokenPattern(n) => self.compile_token_pattern(n, ctx),
             Pattern::SeqPattern(s) => self.compile_seq(s, ctx),
-            Pattern::AltPattern(a) => self.compile_alt(a, ctx),
+            Pattern::Union(u) => self.compile_union(u, ctx),
+            Pattern::Enum(e) => self.compile_enum(e, ctx),
             Pattern::CapturedPattern(c) => {
                 let ExprCtx { exit, nav, capture } = ctx;
                 self.compile_captured(c, c.inner(), nav, capture, CaptureExits::Single(exit))

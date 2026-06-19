@@ -48,7 +48,7 @@ Root
   Def NestedCall
     NamedNode call_expression
       FieldPattern function:
-        Alt
+        Union
           Branch
             CapturedPattern @name
               NamedNode identifier

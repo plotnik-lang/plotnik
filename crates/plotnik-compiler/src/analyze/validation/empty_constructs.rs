@@ -4,9 +4,9 @@
 
 use super::ValidationInput;
 use crate::analyze::Reporter;
-use crate::analyze::visitor::{Visitor, walk_alt_pattern, walk_node_pattern, walk_seq_pattern};
+use crate::analyze::visitor::{Visitor, walk_node_pattern, walk_seq_pattern, walk_union_pattern};
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::{AltPattern, NodePattern, SeqPattern};
+use crate::parser::{NodePattern, SeqPattern, UnionPattern};
 
 pub fn validate_empty_constructs(input: ValidationInput) {
     let ValidationInput {
@@ -45,12 +45,14 @@ impl Visitor for EmptyConstructsValidator<'_> {
         walk_seq_pattern(self, seq);
     }
 
-    fn visit_alt_pattern(&mut self, alt: &AltPattern) {
-        if alt.branches().next().is_none() {
+    fn visit_union_pattern(&mut self, union: &UnionPattern) {
+        // An empty alternation `[]` has no labels, so it always casts to a union;
+        // an enum always has at least one labeled branch.
+        if union.branches().next().is_none() {
             self.reporter
-                .report(DiagnosticKind::EmptyAlternation, alt.text_range())
+                .report(DiagnosticKind::EmptyAlternation, union.text_range())
                 .emit();
         }
-        walk_alt_pattern(self, alt);
+        walk_union_pattern(self, union);
     }
 }

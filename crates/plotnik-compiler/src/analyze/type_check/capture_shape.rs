@@ -22,10 +22,10 @@ pub enum CaptureKind {
     /// bubbling child captures, they set into the enclosing scope as siblings.
     Node,
     /// A fresh struct built from the inner sequence/alternation's bubbling
-    /// captures (`Obj … EndObj`).
+    /// captures (`Struct … EndStruct`).
     StructScope,
     /// A reference whose definition returns a structured type. The call site wraps
-    /// the `Call`/`Return` (with an `Obj`/`EndObj` scope when the definition
+    /// the `Call`/`Return` (with an `Struct`/`EndStruct` scope when the definition
     /// returns a struct) and consumes the result — the capture emits no `Node`.
     Ref,
     /// The inner expression itself leaves the captured value pending — an enum
@@ -61,7 +61,7 @@ pub fn capture_kind(inner: &Pattern, ctx: &TypeContext, interner: &Interner) -> 
     }
 
     // A reference whose definition returns a structured type: the call site does
-    // its own Call/Return (and Obj/EndObj) scoping. A reference to a node/void
+    // its own Call/Return (and Struct/EndStruct) scoping. A reference to a node/void
     // definition falls through to `Node` — its matched node is captured directly.
     if ref_returns_structured(&pattern, ctx, interner) {
         return CaptureKind::Ref;
@@ -79,7 +79,9 @@ pub fn capture_kind(inner: &Pattern, ctx: &TypeContext, interner: &Interner) -> 
         // scope; a named node instead captures its matched node and lets the
         // children bubble alongside as sibling fields.
         Some(TypeFlow::Fields(_)) => {
-            if matches!(pattern, Pattern::SeqPattern(_) | Pattern::AltPattern(_)) {
+            // Only a union alternation flows `Fields` here; an enum flows `Scalar`
+            // and is handled below, so it must not appear in this arm.
+            if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Union(_)) {
                 CaptureKind::StructScope
             } else {
                 CaptureKind::Node

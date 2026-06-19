@@ -32,7 +32,7 @@ Root
 Root
   Def Q
     NamedNode expr
-      Alt
+      Union
         Branch
           NamedNode binary
         Branch

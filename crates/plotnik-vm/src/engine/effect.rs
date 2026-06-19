@@ -15,12 +15,12 @@ pub enum RuntimeEffect<'t> {
     Push,
     /// End array scope.
     ArrayClose,
-    /// Begin object scope.
-    ObjectOpen,
+    /// Begin struct scope.
+    StructOpen,
     /// Set field at member index.
     Set(u16),
-    /// End object scope.
-    ObjectClose,
+    /// End struct scope.
+    StructClose,
     /// Begin enum variant at variant index.
     EnumOpen(u16),
     /// End enum variant.

@@ -134,10 +134,10 @@ Run: `plotnik trace -q '<query>' -s '<source>' -l json -v --no-result`
 Value = 06 :: T3
 
 [transitions]
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [ObjectClose]                    05
+  03  -ε-  [StructClose]                    05
   05                                        ▶
 
 Value:
@@ -166,9 +166,9 @@ Value:
 ### Execution Trace
 
 ```
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
-       ⬥   ObjectOpen
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+       ⬥   StructOpen
   02       Trampoline                       03
        ▶   (Value)
 
@@ -192,11 +192,11 @@ Value:
        ●   document 42
   10   ◀   (Value)
 
-_ObjWrap:
+_StructWrap:
   --------------------------------------------
-  03  -ε-  [ObjectClose]                    05
-       ⬥   ObjectClose
-  05   ◀   _ObjWrap                         ◼
+  03  -ε-  [StructClose]                    05
+       ⬥   StructClose
+  05   ◀   _StructWrap                      ◼
 ```
 
 First branch (`Num`) matches — checkpoints at steps 16 and 19 are never used.
@@ -215,9 +215,9 @@ First branch (`Num`) matches — checkpoints at steps 16 and 19 are never used.
 ### Execution Trace
 
 ```
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
-       ⬥   ObjectOpen
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+       ⬥   StructOpen
   02       Trampoline                       03
        ▶   (Value)
 
@@ -247,16 +247,16 @@ Value:
        ●   document "hello"
   10   ◀   (Value)
 
-_ObjWrap:
+_StructWrap:
   --------------------------------------------
-  03  -ε-  [ObjectClose]                    05
-       ⬥   ObjectClose
-  05   ◀   _ObjWrap                         ◼
+  03  -ε-  [StructClose]                    05
+       ⬥   StructClose
+  05   ◀   _StructWrap                      ◼
 ```
 
 ### Execution Summary
 
-1. **00→02**: Preamble starts, emit `ObjectOpen`
+1. **00→02**: Preamble starts, emit `StructOpen`
 2. **02→Value**: `Trampoline` dispatches to entrypoint
 3. **06→08**: Match `(document)` succeeds
 4. **08**: Search document children, create checkpoints for `Str` (16) and retry (19), try `Num` (11) first
@@ -264,7 +264,7 @@ _ObjWrap:
 6. **08 ❮❮❮**: Backtrack to the `Str` checkpoint
 7. **16**: Try `Str` branch at the same child — match (`●`)
 8. **14→10**: Navigate up, return from `Value`
-9. **03→05**: Preamble cleanup, emit `ObjectClose`, accept (`◼`)
+9. **03→05**: Preamble cleanup, emit `StructClose`, accept (`◼`)
 
 ---
 
@@ -280,9 +280,9 @@ _ObjWrap:
 ### Execution Trace
 
 ```
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
-       ⬥   ObjectOpen
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+       ⬥   StructOpen
   02       Trampoline                       03
        ▶   (Value)
 
@@ -316,8 +316,8 @@ Both branches fail. No more checkpoints — query does not match. The CLI exits 
 Same as Trace 2 but with default verbosity (no `-v` flag). Navigation and effect sub-lines are hidden:
 
 ```
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
        ▶   (Value)
 
@@ -335,9 +335,9 @@ Value:
        ●   document
   10   ◀   (Value)
 
-_ObjWrap:
-  03  -ε-  [ObjectClose]                    05
-  05   ◀   _ObjWrap                         ◼
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼
 ```
 
 Default shows:
@@ -409,8 +409,8 @@ For the complete table of connector symbols, see [07-dump-format.md](07-dump-for
 | ArrayOpen           | Start array                    |
 | Push                | Push to array                  |
 | ArrayClose          | End array                      |
-| ObjectOpen          | Start object                   |
-| ObjectClose         | End object                     |
+| StructOpen          | Start struct                   |
+| StructClose         | End struct                     |
 | Null                | Null value                     |
 | Clear               | Clear pending value            |
 | SuppressBegin       | Enter suppression scope (`@_`) |

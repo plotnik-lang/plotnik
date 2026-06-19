@@ -146,14 +146,14 @@ impl EffectIR {
         Self::literal(EffectKind::ArrayClose, 0)
     }
 
-    /// Begin object scope.
-    pub fn start_obj() -> Self {
-        Self::literal(EffectKind::ObjectOpen, 0)
+    /// Begin struct scope.
+    pub fn start_struct() -> Self {
+        Self::literal(EffectKind::StructOpen, 0)
     }
 
-    /// End object scope.
-    pub fn end_obj() -> Self {
-        Self::literal(EffectKind::ObjectClose, 0)
+    /// End struct scope.
+    pub fn end_struct() -> Self {
+        Self::literal(EffectKind::StructClose, 0)
     }
 
     /// Begin enum scope.

@@ -36,7 +36,7 @@ Root
 Root
   Def Q
     NamedNode expr
-      Alt
+      Enum
         Branch Binary:
           NamedNode binary_expression
         Branch Unary:

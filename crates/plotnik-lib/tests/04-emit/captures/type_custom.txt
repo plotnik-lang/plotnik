@@ -23,10 +23,10 @@ N1: S3 → T2  ; Q
 Q = 6 :: T2
 
 [transitions]
-_ObjWrap:
-  0  -ε-  [ObjectOpen]                      2
+_StructWrap:
+  0  -ε-  [StructOpen]                      2
   2       Trampoline                        3
-  3  -ε-  [ObjectClose]                     5
+  3  -ε-  [StructClose]                     5
   5                                         ▶
 
 Q:

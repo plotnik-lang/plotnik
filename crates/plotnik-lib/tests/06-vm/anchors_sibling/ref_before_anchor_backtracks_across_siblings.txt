@@ -40,10 +40,10 @@ Comma = 06 :: T0
 Q     = 08 :: T2
 
 [transitions]
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [ObjectClose]                    05
+  03  -ε-  [StructClose]                    05
   05                                        ▶
 
 Comma:
@@ -67,8 +67,8 @@ export interface Q {
 
 export type Comma = undefined;
 ==== trace ====
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -138,7 +138,7 @@ Comma:
   16   ◀   (Comma)                          
 
 Comma:
-  03  -ε-  [ObjectClose]                    05
+  03  -ε-  [StructClose]                    05
   05   ◀   (Comma)                          
 
 Comma:

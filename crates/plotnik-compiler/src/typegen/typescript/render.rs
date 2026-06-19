@@ -52,31 +52,18 @@ impl Emitter<'_> {
                 }
             }
             TypeDefKind::Wrapper { .. } => (),
-            TypeDefKind::Composite { .. } => {
+            TypeDefKind::Struct { .. } => {
                 if let Some(name) = self.type_names.get(&type_id).cloned() {
-                    self.emit_composite_type(type_id, &name);
+                    self.emitted_types.insert(type_id);
+                    self.emit_interface(&name, &type_def);
                 }
             }
-        }
-    }
-
-    fn emit_composite_type(&mut self, type_id: TypeId, name: &str) {
-        self.emitted_types.insert(type_id);
-
-        let Some(type_def) = self.types.get(type_id) else {
-            return;
-        };
-
-        match type_def.decode() {
-            TypeDefKind::Composite {
-                kind: TypeKind::Struct,
-                ..
-            } => self.emit_interface(name, &type_def),
-            TypeDefKind::Composite {
-                kind: TypeKind::Enum,
-                ..
-            } => self.emit_enum(name, &type_def),
-            _ => {}
+            TypeDefKind::Enum { .. } => {
+                if let Some(name) = self.type_names.get(&type_id).cloned() {
+                    self.emitted_types.insert(type_id);
+                    self.emit_enum(&name, &type_def);
+                }
+            }
         }
     }
 
@@ -91,14 +78,8 @@ impl Emitter<'_> {
         };
 
         match type_def.decode() {
-            TypeDefKind::Composite {
-                kind: TypeKind::Struct,
-                ..
-            } => self.emit_interface(&type_name, &type_def),
-            TypeDefKind::Composite {
-                kind: TypeKind::Enum,
-                ..
-            } => self.emit_enum(&type_name, &type_def),
+            TypeDefKind::Struct { .. } => self.emit_interface(&type_name, &type_def),
+            TypeDefKind::Enum { .. } => self.emit_enum(&type_name, &type_def),
             _ => {
                 let ts_type = self.render_ty(type_id);
                 self.emit_type_decl(&type_name, &ts_type);

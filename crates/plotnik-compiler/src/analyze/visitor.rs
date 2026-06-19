@@ -16,8 +16,8 @@
 //! ```
 
 use crate::parser::{
-    AltPattern, TokenPattern, CapturedPattern, Def, Pattern, FieldPattern, NodePattern, QuantifiedPattern, Ref,
-    Root, SeqPattern,
+    CapturedPattern, Def, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
+    Root, SeqPattern, TokenPattern, UnionPattern,
 };
 
 pub trait Visitor: Sized {
@@ -41,8 +41,12 @@ pub trait Visitor: Sized {
 
     fn visit_ref(&mut self, _ref: &Ref) {}
 
-    fn visit_alt_pattern(&mut self, alt: &AltPattern) {
-        walk_alt_pattern(self, alt);
+    fn visit_union_pattern(&mut self, union: &UnionPattern) {
+        walk_union_pattern(self, union);
+    }
+
+    fn visit_enum_pattern(&mut self, e: &EnumPattern) {
+        walk_enum_pattern(self, e);
     }
 
     fn visit_seq_pattern(&mut self, seq: &SeqPattern) {
@@ -79,7 +83,8 @@ pub fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Pattern) {
         Pattern::NodePattern(n) => visitor.visit_node_pattern(n),
         Pattern::TokenPattern(n) => visitor.visit_token_pattern(n),
         Pattern::Ref(r) => visitor.visit_ref(r),
-        Pattern::AltPattern(a) => visitor.visit_alt_pattern(a),
+        Pattern::Union(u) => visitor.visit_union_pattern(u),
+        Pattern::Enum(e) => visitor.visit_enum_pattern(e),
         Pattern::SeqPattern(s) => visitor.visit_seq_pattern(s),
         Pattern::CapturedPattern(c) => visitor.visit_captured_pattern(c),
         Pattern::QuantifiedPattern(q) => visitor.visit_quantified_pattern(q),
@@ -93,14 +98,26 @@ pub fn walk_node_pattern<V: Visitor>(visitor: &mut V, node: &NodePattern) {
     }
 }
 
-pub fn walk_alt_pattern<V: Visitor>(visitor: &mut V, alt: &AltPattern) {
-    for branch in alt.branches() {
+pub fn walk_union_pattern<V: Visitor>(visitor: &mut V, union: &UnionPattern) {
+    for branch in union.branches() {
         if let Some(body) = branch.body() {
             visitor.visit_pattern(&body);
         }
     }
 
-    for pattern in alt.patterns() {
+    for pattern in union.patterns() {
+        visitor.visit_pattern(&pattern);
+    }
+}
+
+pub fn walk_enum_pattern<V: Visitor>(visitor: &mut V, e: &EnumPattern) {
+    for branch in e.branches() {
+        if let Some(body) = branch.body() {
+            visitor.visit_pattern(&body);
+        }
+    }
+
+    for pattern in e.patterns() {
         visitor.visit_pattern(&pattern);
     }
 }
