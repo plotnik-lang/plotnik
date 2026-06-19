@@ -13,4 +13,7 @@ pub mod trace;
 mod abi_compat_tests;
 
 #[cfg(test)]
+mod check_tests;
+
+#[cfg(test)]
 mod lang_tests;

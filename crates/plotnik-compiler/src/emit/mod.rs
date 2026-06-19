@@ -24,7 +24,7 @@ mod string_table_tests;
 #[cfg(test)]
 mod type_table_tests;
 
-pub use emitter::emit;
+pub use emitter::{emit, emit_unchecked};
 pub use error::EmitError;
 pub use regex_table::{RegexTableBuilder, deserialize_dfa};
 pub use string_table::StringTableBuilder;

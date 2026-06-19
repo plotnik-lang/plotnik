@@ -139,9 +139,9 @@ A directory of `.ptk` files loaded as a single compilation unit.
 - **Non-recursive**: Subdirectories are separate workspaces
 - **Dead code elimination**: Unreachable internals stripped
 
-### Language Inference
+### Language
 
-Inferred from directory name (`queries.ts/` → TypeScript, `java-checks/` → Java). Override with `-l/--lang`.
+Set with `-l/--lang` or a shebang (`#!/usr/bin/env -S plotnik run -l <language>`); an explicit `-l` must agree with the shebang.
 
 ### Execution
 

@@ -94,6 +94,12 @@ pub enum DiagnosticKind {
     NegatedRequiredField,
 
     MissingDefName,
+
+    // Placed last (lowest priority): `check`'s dry run reports these only when no
+    // earlier-stage error exists.
+    EmitFailed,
+    BytecodeRejected,
+    NoEntrypoints,
 }
 
 impl DiagnosticKind {
@@ -247,6 +253,9 @@ impl DiagnosticKind {
             Self::RefCannotHaveChildren => Some(
                 "a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children",
             ),
+            Self::NoEntrypoints => Some(
+                "every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing",
+            ),
             _ => None,
         }
     }
@@ -333,6 +342,9 @@ impl DiagnosticKind {
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
             Self::NegatedRequiredField => "this field is always present",
             Self::MissingDefName => "definition must be named",
+            Self::EmitFailed => "bytecode emission failed",
+            Self::BytecodeRejected => "query compiles to invalid bytecode",
+            Self::NoEntrypoints => "query produces no entrypoints",
         }
     }
 
@@ -373,6 +385,8 @@ impl DiagnosticKind {
             Self::DuplicateAlternationLabel => {
                 "branch label `{}` is already used in this alternation".to_string()
             }
+            // The detail (an `EmitError`/`ModuleError` Display) is already a complete message.
+            Self::EmitFailed | Self::BytecodeRejected => "{}".to_string(),
             _ => format!("{}: {{}}", self.summary()),
         }
     }

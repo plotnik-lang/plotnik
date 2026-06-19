@@ -43,7 +43,6 @@ pub fn run(args: InferArgs) -> CliResult {
     let lang = require_lang(
         args.lang.as_deref(),
         loaded.shebang.lang.as_deref(),
-        args.query_path.as_deref(),
         "infer",
     )?;
 
