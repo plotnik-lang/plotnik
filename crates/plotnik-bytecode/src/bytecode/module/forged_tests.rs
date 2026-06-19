@@ -394,7 +394,7 @@ fn forged_invalid_nav_is_rejected() {
 
 #[test]
 fn forged_invalid_effect_opcode_is_rejected() {
-    // `13` is past the 0..=12 effect range; `EffectKind::from_u8` would panic
+    // `13` is past the 0..=11 effect range; `EffectKind::from_u8` would panic
     // when the VM emits this effect.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let slot = effect_slots(&bytes)[0];
@@ -639,12 +639,12 @@ fn forged_dropped_scope_close_is_rejected() {
 
 #[test]
 fn forged_suppress_underflow_is_rejected() {
-    // Replace a data effect with a bare `SuppressEnd` (opcode 12). With no
+    // Replace a data effect with a bare `SuppressEnd` (opcode 11). With no
     // matching `SuppressBegin` on the path, the VM's suppression counter would
     // underflow and `.expect()` panic; the verifier rejects it at load.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let slot = first_effect_op(&bytes, |op| op == 4 || op == 6);
-    bytes[slot..slot + 2].copy_from_slice(&(12u16 << 10).to_le_bytes());
+    bytes[slot..slot + 2].copy_from_slice(&(11u16 << 10).to_le_bytes());
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged SuppressEnd underflow must be rejected");
@@ -658,7 +658,7 @@ fn forged_suppress_underflow_is_rejected() {
 fn forged_preamble_without_root_struct_is_rejected() {
     // The shared preamble opens a root `StructOpen` before trampolining into the entry
     // body, so the body always has a Struct to `Set` into. Neutralize that `StructOpen`
-    // and its matching `StructClose` (turn both into no-op `Clear`s) and lie that the
+    // and its matching `StructClose` (turn both into no-op `Null`s) and lie that the
     // result type is scalar: the entry's `Set` would then hit the materializer's
     // scalar root frame and panic. The preamble has no caller, so a requirement
     // bubbling out of it must be rejected, not silently dropped.

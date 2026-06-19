@@ -19,10 +19,9 @@ pub enum EffectKind {
     Set = 6,
     EnumOpen = 7,
     EnumClose = 8,
-    Clear = 9,
-    Null = 10,
-    SuppressBegin = 11,
-    SuppressEnd = 12,
+    Null = 9,
+    SuppressBegin = 10,
+    SuppressEnd = 11,
 }
 
 impl EffectKind {
@@ -43,10 +42,9 @@ impl EffectKind {
             6 => Self::Set,
             7 => Self::EnumOpen,
             8 => Self::EnumClose,
-            9 => Self::Clear,
-            10 => Self::Null,
-            11 => Self::SuppressBegin,
-            12 => Self::SuppressEnd,
+            9 => Self::Null,
+            10 => Self::SuppressBegin,
+            11 => Self::SuppressEnd,
             _ => return None,
         };
         Some(op)

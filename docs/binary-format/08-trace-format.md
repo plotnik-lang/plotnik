@@ -412,7 +412,6 @@ For the complete table of connector symbols, see [07-dump-format.md](07-dump-for
 | StructOpen          | Start struct                   |
 | StructClose         | End struct                     |
 | Null                | Null value                     |
-| Clear               | Clear pending value            |
 | SuppressBegin       | Enter suppression scope (`@_`) |
 | SuppressEnd         | Exit suppression scope         |
 

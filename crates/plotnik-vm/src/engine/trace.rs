@@ -357,7 +357,6 @@ impl<'s> PrintTracer<'s> {
             Set(idx) => format!("Set \"{}\"", self.member_name(*idx)),
             EnumOpen(idx) => format!("EnumOpen \"{}\"", self.member_name(*idx)),
             EnumClose => "EnumClose".to_string(),
-            Clear => "Clear".to_string(),
             Null => "Null".to_string(),
         }
     }
@@ -374,7 +373,6 @@ impl<'s> PrintTracer<'s> {
             Set => format!("Set \"{}\"", self.member_name(payload as u16)),
             EnumOpen => format!("EnumOpen \"{}\"", self.member_name(payload as u16)),
             EnumClose => "EnumClose".to_string(),
-            Clear => "Clear".to_string(),
             Null => "Null".to_string(),
             SuppressBegin | SuppressEnd => unreachable!(),
         }
