@@ -269,6 +269,65 @@ fn invalid_three_way_mutual_recursion_across_files() {
 }
 
 #[test]
+fn check_compile_rejects_enum_zero_width_branch_in_quantifier() {
+    // Passes analysis; the emitted bytecode is rejected by `Module::load`
+    // (EffectStackImbalance). `check_compile` must report it, not panic.
+    let linked = Query::parse_and_validate("Q = (program [A: (comment)? @c]* @items)").link(javascript());
+    let diag = linked.check_compile();
+    assert!(diag.has_errors());
+    let rendered = diag.render(linked.source_map());
+    assert!(rendered.contains("effect stack imbalance"), "{rendered}");
+}
+
+#[test]
+fn check_compile_rejects_byte_oriented_regex() {
+    // Passes analysis; the DFA build fails at emit time (EmitError::RegexCompile).
+    let linked = Query::parse_and_validate(r"Q = (identifier =~ /(?-u:\xFF)/) @x").link(javascript());
+    let diag = linked.check_compile();
+    assert!(diag.has_errors());
+    let rendered = diag.render(linked.source_map());
+    assert!(rendered.contains("regex compile error"), "{rendered}");
+}
+
+#[test]
+fn check_compile_rejects_value_less_definition() {
+    // `Q = .` compiles to a module with no entrypoints.
+    let linked = Query::parse_and_validate("Q = .").link(javascript());
+    let diag = linked.check_compile();
+    assert!(diag.has_errors());
+    let rendered = diag.render(linked.source_map());
+    assert!(rendered.contains("no entrypoint"), "{rendered}");
+}
+
+#[test]
+fn check_compile_accepts_valid_query() {
+    let linked = Query::parse_and_validate("Q = (identifier) @id").link(javascript());
+    assert!(!linked.check_compile().has_errors());
+}
+
+#[test]
+fn check_compile_flags_dropped_value_less_def_among_valid() {
+    // A value-less def silently omitted from the entrypoint table while a sibling
+    // def compiles fine must still be reported, not hidden by the sibling.
+    let linked = Query::parse_and_validate("Bad = .\nGood = (identifier) @id").link(javascript());
+    let diag = linked.check_compile();
+    assert!(diag.has_errors());
+    let rendered = diag.render(linked.source_map());
+    assert!(rendered.contains("no entrypoint"), "{rendered}");
+}
+
+#[test]
+fn check_compile_is_total_on_empty_source_map() {
+    // The dry run must never panic — even on a query with zero sources.
+    let linked = QueryBuilder::new(SourceMap::new())
+        .parse()
+        .unwrap()
+        .analyze()
+        .link(javascript());
+    assert!(!linked.check_compile().has_errors());
+}
+
+#[test]
 fn multifile_field_with_ref_to_seq_error() {
     let res = expect_invalid! {
         "defs.ptk": "X = {(a) (b)}",

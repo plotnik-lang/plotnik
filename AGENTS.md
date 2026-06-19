@@ -222,7 +222,7 @@ Validate a query (silent on success, like `cargo check`).
 
 ```sh
 cargo run -p plotnik -- check query.ptk -l typescript
-cargo run -p plotnik -- check queries.ts/              # workspace with lang inference
+cargo run -p plotnik -- check queries.ts/ -l typescript   # workspace directory
 cargo run -p plotnik -- check -q '(identifier) @id' -l javascript
 ```
 
@@ -241,7 +241,7 @@ Generate TypeScript type definitions from a query.
 
 ```sh
 cargo run -p plotnik -- infer query.ptk -l javascript
-cargo run -p plotnik -- infer queries.ts/ -o types.d.ts
+cargo run -p plotnik -- infer queries.ts/ -l typescript -o types.d.ts
 cargo run -p plotnik -- infer -q '(identifier) @id' -l typescript
 ```
 

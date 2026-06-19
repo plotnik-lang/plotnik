@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use plotnik::language_registry::{self, Lang};
 
 use crate::error::CliError;
@@ -50,40 +48,19 @@ fn wrap_shebang_error(err: CliError) -> CliError {
     }
 }
 
-/// Legacy directory-name inference: `queries.ts/` → typescript.
-/// Slated for retirement once shebang declarations are the norm.
-pub fn infer_lang_from_dir(query_path: Option<&Path>) -> Option<&'static Lang> {
-    if let Some(path) = query_path
-        && path.is_dir()
-        && let Some(name) = path.file_name().and_then(|n| n.to_str())
-        && let Some((_, ext)) = name.rsplit_once('.')
-    {
-        return language_registry::from_ext(ext);
-    }
-
-    None
-}
-
-/// Resolve the language for commands that require one (dump, infer).
-/// Priority: explicit `-l` (must agree with shebang) > shebang > dir inference.
+/// Resolve the language for commands that require one (check, dump, infer).
+/// Priority: explicit `-l` (must agree with shebang) > shebang.
 pub fn require_lang(
     explicit: Option<&str>,
     declared: Option<&str>,
-    query_path: Option<&Path>,
     command: &str,
 ) -> Result<&'static Lang, CliError> {
-    if let Some(lang) = reconcile_lang(explicit, declared)? {
-        return Ok(lang);
-    }
-
-    if let Some(lang) = infer_lang_from_dir(query_path) {
-        return Ok(lang);
-    }
-
-    Err(CliError::fatal(format!(
-        "language is required for {}\n\nhint: use -l <language> or declare it in the query shebang:\n  #!/usr/bin/env -S plotnik run -l <language>",
-        command
-    )))
+    reconcile_lang(explicit, declared)?.ok_or_else(|| {
+        CliError::fatal(format!(
+            "language is required for {}\n\nhint: use -l <language> or declare it in the query shebang:\n  #!/usr/bin/env -S plotnik run -l <language>",
+            command
+        ))
+    })
 }
 
 pub fn suggest_language(input: &str) -> Option<String> {

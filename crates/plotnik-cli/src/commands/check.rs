@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use plotnik_lib::QueryBuilder;
 
-use super::lang_resolver::{infer_lang_from_dir, reconcile_lang};
+use super::lang_resolver::require_lang;
 use super::query_loader::load_query;
 use crate::error::{CliError, CliResult};
 
@@ -27,44 +27,29 @@ pub fn run(args: CheckArgs) -> CliResult {
         .map_err(|e| CliError::fatal(e.to_string()))?
         .analyze();
 
-    // Resolve language: explicit -l (must agree with shebang) > shebang > dir inference
-    let lang = match reconcile_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref())? {
-        Some(lang) => Some(lang),
-        None => infer_lang_from_dir(args.query_path.as_deref()),
-    };
+    let lang = require_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref(), "check")?;
+    let linked = query.link(lang.grammar());
 
-    let (is_valid, diagnostics, source_map) = match lang {
-        Some(lang) => {
-            let linked = query.link(lang.grammar());
-            let valid = is_valid(linked.diagnostics(), args.strict);
-            (valid, linked.diagnostics(), linked.source_map().clone())
-        }
-        None => {
-            let valid = is_valid(query.diagnostics(), args.strict);
-            (valid, query.diagnostics(), query.source_map().clone())
-        }
+    let diagnostics = linked.check_compile();
+    let source_map = linked.source_map();
+    let valid = if args.strict {
+        !diagnostics.has_errors() && !diagnostics.has_warnings()
+    } else {
+        !diagnostics.has_errors()
     };
 
     if args.json {
         // Contract: on exit 0/1 stdout is a JSON array, `[]` when clean.
         // Exit 2 (couldn't answer) keeps text on stderr and emits no JSON.
-        println!("{}", diagnostics.render_json(&source_map));
-    } else if !is_valid {
-        eprint!("{}", diagnostics.render_colored(&source_map, args.color));
+        println!("{}", diagnostics.render_json(source_map));
+    } else if !valid {
+        eprint!("{}", diagnostics.render_colored(source_map, args.color));
     }
 
-    if !is_valid {
+    if !valid {
         return Err(CliError::No);
     }
 
     // Silent on success (like cargo check)
     Ok(())
-}
-
-fn is_valid(diagnostics: plotnik_lib::Diagnostics, strict: bool) -> bool {
-    if strict {
-        !diagnostics.has_errors() && !diagnostics.has_warnings()
-    } else {
-        !diagnostics.has_errors()
-    }
 }
