@@ -108,7 +108,7 @@ EffectOp (u16)
 └──────────────┴─────────────────────┘
 ```
 
-- **Opcode**: 6 bits (0-63), currently 12 defined.
+- **Opcode**: 6 bits (0-63).
 - **Payload**: 10 bits (0-1023), member/variant index.
 
 | Opcode | Name            | Payload                |
@@ -133,9 +133,9 @@ EffectOp (u16)
 | 0-31  | Single word | 10-bit payload in same word    |
 | 32-63 | Extended    | Next u16 word is full argument |
 
-Current opcodes (0-11) fit in the single-word range. Future predicates needing `StringId` (u16) use extended format.
+Effect opcodes fit in the single-word range. Future predicates needing `StringId` (u16) use extended format.
 
-**Suppression Opcodes**: `SuppressBegin` (10) and `SuppressEnd` (11) implement suppressive captures (`@_`). When `SuppressBegin` is executed, the VM enters suppression mode and all subsequent effects are skipped until `SuppressEnd` is executed. Suppression nesting is supported via a depth counter.
+**Suppression Opcodes**: `SuppressBegin` and `SuppressEnd` implement suppressive captures (`@_`). When `SuppressBegin` is executed, the VM enters suppression mode and all subsequent effects are skipped until `SuppressEnd` is executed. Suppression nesting is supported via a depth counter.
 
 ## 4. Instructions
 
