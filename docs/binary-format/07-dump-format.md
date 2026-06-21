@@ -199,7 +199,6 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 | Node           | Capture matched node   |
 | Set(Mxx)       | Set field/member Mxx   |
 | Null           | Null value             |
-| Clear          | Clear current          |
 
 ## Index Prefixes
 

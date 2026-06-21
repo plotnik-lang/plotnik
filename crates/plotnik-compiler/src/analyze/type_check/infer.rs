@@ -9,7 +9,7 @@ use std::collections::btree_map::Entry;
 use plotnik_core::Interner;
 use rowan::TextRange;
 
-use super::capture_shape::{CaptureKind, capture_kind, quantifier_arity};
+use super::capture_shape::{CaptureKind, capture_kind, produces_output, quantifier_arity};
 use super::context::TypeContext;
 use super::def_id::Symbol;
 use super::types::{
@@ -97,7 +97,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     );
                 }
                 TypeFlow::Scalar(type_id) => {
-                    if self.produces_output(*type_id) {
+                    if produces_output(*type_id, self.ctx.type_ctx) {
                         output_children.push((child.node().text_range(), *type_id));
                     }
                 }
@@ -205,7 +205,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     );
                 }
                 TypeFlow::Scalar(type_id) => {
-                    if self.produces_output(*type_id) {
+                    if produces_output(*type_id, self.ctx.type_ctx) {
                         output_children.push((child.node().text_range(), *type_id));
                     }
                 }
@@ -556,10 +556,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 TypeFlow::Scalar(self.ctx.type_ctx.intern_type(TypeShape::Optional(t)))
             }
             TypeFlow::Fields(type_id) => {
-                let fields = self.ctx.type_ctx.expect_struct_fields(type_id).clone();
-                let optional_fields = fields
-                    .into_iter()
-                    .map(|(k, v)| (k, v.make_optional()))
+                let optional_fields: BTreeMap<_, _> = self
+                    .ctx
+                    .type_ctx
+                    .expect_struct_fields(type_id)
+                    .iter()
+                    .map(|(&k, &v)| (k, v.make_optional()))
                     .collect();
                 TypeFlow::Fields(self.ctx.type_ctx.intern_struct(optional_fields))
             }
@@ -731,24 +733,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    /// Check if a type produces meaningful output for propagation.
-    ///
-    /// Meaningful outputs are structured types (enums, structs, refs) or arrays/optionals
-    /// of such types. Simple `Node[]` from quantified named nodes is NOT meaningful.
-    fn produces_output(&self, type_id: TypeId) -> bool {
-        let Some(shape) = self.ctx.type_ctx.type_shape(type_id) else {
-            return false;
-        };
-        match shape {
-            TypeShape::Enum(_) | TypeShape::Struct(_) | TypeShape::Ref(_) => true,
-            TypeShape::Array { element, .. } => {
-                *element != TYPE_NODE && self.produces_output(*element)
-            }
-            TypeShape::Optional(inner) => *inner != TYPE_NODE && self.produces_output(*inner),
-            TypeShape::Node | TypeShape::Void | TypeShape::Custom(_) => false,
-        }
-    }
-
     /// Compute flow from merged bubble fields and output-producing children.
     ///
     /// Rules:
@@ -818,7 +802,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let (kind, msg, hint) = match err {
             UnifyError::ScalarInUnion => (
                 DiagnosticKind::IncompatibleTypes,
-                "a branch produces a value but the alternation is unlabeled".to_string(),
+                "a branch produces a value but this is a union alternation".to_string(),
                 Some("give every branch a branch label for an enum, e.g. `[A: ... B: ...]`"),
             ),
             UnifyError::IncompatibleTypes { field } => (

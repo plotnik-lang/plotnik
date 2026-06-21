@@ -41,7 +41,7 @@ Tree-sitter gives you the syntax tree. Extracting structured data from it still 
 - [x] Static type inference from query structure
 - [x] Named expressions for composition and reuse
 - [x] Recursion for nested structures
-- [x] Tagged unions (discriminated unions)
+- [x] Enums (discriminated unions)
 - [x] TypeScript type generation
 - [x] CLI: `exec` for matches, `infer` for types, `ast`/`trace`/`dump` for debug
 - [ ] Full validation against grammar (reject queries that can never match)

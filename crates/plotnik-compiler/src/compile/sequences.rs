@@ -612,7 +612,7 @@ impl Compiler<'_> {
         self.assemble_alt_branches(successors, search_nav, exit)
     }
 
-    /// Enum alternation: each labeled branch opens its variant scope
+    /// Enum alternation: each enum branch opens its variant scope
     /// (`EnumOpen`…`EnumClose`) and compiles its payload inside it.
     pub(super) fn compile_enum(&mut self, e: &ast::EnumPattern, ctx: ExprCtx) -> Label {
         let ExprCtx {
@@ -667,7 +667,7 @@ impl Compiler<'_> {
                 .get(label.text())
                 .and_then(|sym| variant_info.get(&sym))
                 .map(|&(idx, type_id)| (idx, type_id))
-                .expect("variant must exist for labeled branch");
+                .expect("variant must exist for enum branch");
 
             let e_effect = if let Some(type_id) = enum_type_id {
                 EffectIR::with_member(EffectKind::EnumOpen, MemberRef::new(type_id, variant_idx))
@@ -675,17 +675,45 @@ impl Compiler<'_> {
                 EffectIR::start_enum()
             };
 
-            let branch_capture = capture.clone().nest_scope(e_effect, EffectIR::end_enum());
-
             let body_entry = self.with_scope(payload_type_id, |this| {
-                this.dispatch_pattern(
-                    &body,
-                    ExprCtx {
-                        exit: branch_exit,
-                        nav: branch_nav,
-                        capture: branch_capture,
-                    },
-                )
+                if is_skippable_quantifier(&body) {
+                    // Enum bracket dominance. A skippable arm body builds its
+                    // skip path with `emit_null_for_skip_path`, whose `Set`-only filter drops
+                    // a folded `EnumClose` (and never reads `pre`, so `EnumOpen` is lost too):
+                    // the skip path would leave the enum unbracketed and value-unbalanced.
+                    // Put `EnumClose` — plus any outer post-effect that must follow it (an array
+                    // `Push`, a captured `Set`) — on a dominating exit epsilon, and `EnumOpen`
+                    // (after the enclosing scope's pre) on a dominating entry epsilon, so both
+                    // the match and skip paths bracket the enum. Mirrors `compile_seq_items`.
+                    let close_exit = this.emit_effects_epsilon(
+                        branch_exit,
+                        vec![EffectIR::end_enum()],
+                        CaptureEffects::new_post(capture.post.clone()),
+                    );
+                    let inner_entry = this.dispatch_pattern(
+                        &body,
+                        ExprCtx {
+                            exit: close_exit,
+                            nav: branch_nav,
+                            capture: CaptureEffects::default(),
+                        },
+                    );
+                    let mut entry_pre = capture.pre.clone();
+                    entry_pre.push(e_effect);
+                    this.wrap_entry_pre(inner_entry, entry_pre)
+                } else {
+                    // Non-skippable arm: the body's innermost match is on every accepting
+                    // path, so folding the brackets onto it already dominates.
+                    let branch_capture = capture.clone().nest_scope(e_effect, EffectIR::end_enum());
+                    this.dispatch_pattern(
+                        &body,
+                        ExprCtx {
+                            exit: branch_exit,
+                            nav: branch_nav,
+                            capture: branch_capture,
+                        },
+                    )
+                }
             });
 
             successors.push(body_entry);

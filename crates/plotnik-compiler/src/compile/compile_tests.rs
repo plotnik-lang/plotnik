@@ -119,8 +119,8 @@ fn compile_large_enum_alternation() {
 }
 
 #[test]
-fn compile_unlabeled_alternation_5_branches_with_captures() {
-    // Regression test: unlabeled alternation with 5+ branches where each has
+fn compile_union_alternation_5_branches_with_captures() {
+    // Regression test: union alternation with 5+ branches where each has
     // a unique capture requires 8+ pre-effects (4 nulls + 4 sets per branch).
     // This exceeds the 3-bit limit (max 7) and must cascade via epsilon chain.
     shot_bytecode!(
@@ -129,7 +129,7 @@ fn compile_unlabeled_alternation_5_branches_with_captures() {
 }
 
 #[test]
-fn compile_unlabeled_alternation_8_branches_with_captures() {
+fn compile_union_alternation_8_branches_with_captures() {
     // Even more extreme: 8 branches means 14 pre-effects per branch (7 nulls + 7 sets).
     // This requires 2 cascade steps per branch.
     shot_bytecode!(

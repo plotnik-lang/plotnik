@@ -33,8 +33,8 @@ pub(in crate::grammar) fn flatten_grammar(
 ) -> FlattenGrammarResult<SyntaxGrammar> {
     let reserved_word_set_names = grammar
         .reserved_word_sets
-        .iter()
-        .map(|set| set.name.clone())
+        .into_iter()
+        .map(|set| set.name)
         .collect();
 
     let mut flattener = RuleFlattener::new(reserved_word_set_names);

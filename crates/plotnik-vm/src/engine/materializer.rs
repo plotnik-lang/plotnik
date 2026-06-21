@@ -233,9 +233,6 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
                     };
                     pending = Some(Value::Enum { tag, data });
                 }
-                RuntimeEffect::Clear => {
-                    pending = None;
-                }
             }
         }
 
