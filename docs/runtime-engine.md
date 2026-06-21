@@ -191,14 +191,44 @@ The `Node` variant carries the actual `tree_sitter::Node` so the materializer ha
 
 Materializer consumes `EffectLog` to build output. Stream is purely structural; nominal types come from `Entrypoint.result_type`. See `docs/wip/materializer.md` for the materialization API.
 
-## Fuel Limits
+## Execution Limits
 
-| Limit          | Default   | Purpose           |
-| -------------- | --------- | ----------------- |
-| Exec fuel      | 1,000,000 | Total transitions |
-| Recursion fuel | 1,024     | Call depth        |
+A run is bounded by two orthogonal resources, each a `Limit` (`Auto`, `Of(n)`,
+or `Unbounded`):
 
-Exhaustion returns `RuntimeError`, not panic.
+| Resource | `Auto` default            | Bounds                                            |
+| -------- | ------------------------- | ------------------------------------------------- |
+| Steps    | `1M + 1024 · node_count`  | total work (instruction dispatches)               |
+| Memory   | `64 MiB + 256 · node_count` | live runtime heap (frame, checkpoint, effect arenas) |
+
+Both `Auto` ceilings scale linearly with the source's node count, so a
+legitimate query — whose work and live state are ~linear in input — stays under
+them while super-linear blowup (catastrophic backtracking, unbounded checkpoint
+growth) trips. A `RuntimeLimitSpec` is resolved against the node count into
+concrete numbers at VM build time; exhaustion returns `RuntimeError`
+(`StepLimitExceeded` / `MemoryLimitExceeded`), never a panic.
+
+There is no separate recursion/depth limit. Backtracking is iterative and the
+output path is stack-safe, so call depth no longer touches the native stack; its
+only cost is heap, which the memory ceiling bounds directly (the frame arena is
+part of the sum). See `docs/cli.md` for the `--max-steps` / `--max-memory` /
+`--limits` flags.
+
+### Migrating from the old limits API
+
+This replaced the previous `ExecLimits` (a fixed step budget + recursion limit)
+with no back-compat shim:
+
+| Old                                            | New                                                              |
+| ---------------------------------------------- | ---------------------------------------------------------------- |
+| `ExecLimits { step_budget, recursion_limit }`  | `RuntimeLimitSpec { steps: Limit, memory: Limit }`               |
+| `VM::builder(src, t).step_budget(n)`           | `VM::builder(src, t).limits(RuntimeLimitSpec { steps: Limit::Of(n), memory: Limit::Auto })` |
+| `.recursion_limit(m)`                          | *removed* — call depth is bounded by `memory`, not its own limit |
+| `VM::new(src, t, limits)` (deprecated)         | `VM::builder(src, t).limits(spec).build()`                       |
+| `RuntimeError::ExecFuelExhausted(u32)`         | `RuntimeError::StepLimitExceeded(u64)`                           |
+| `RuntimeError::RecursionLimitExceeded(u32)`    | `RuntimeError::MemoryLimitExceeded(u64)` (the nearest analogue)  |
+
+Omitting `.limits(..)` resolves to `Auto`/`Auto` — the size-based safety net.
 
 ## Trivia Handling
 

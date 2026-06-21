@@ -10,7 +10,7 @@
 //!     (assignment left: (Expr) @lhs right: (Expr) @rhs)
 //! "#;
 //!
-//! let query = Query::try_from(source).expect("out of fuel");
+//! let query = Query::try_from(source).expect("query compiles");
 //! eprintln!("{}", query.diagnostics().render(query.source_map()));
 //! ```
 

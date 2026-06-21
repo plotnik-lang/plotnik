@@ -214,17 +214,23 @@ plotnik run -q 'Q = (identifier) @id' -s 'let x = 1' -l javascript
 
 # Start from a specific definition
 plotnik run query.ptk app.js --entry FunctionDef
+
+# Lift the work limit for a known-heavy query
+plotnik run query.ptk app.js --max-steps unbounded
 ```
 
 **Flags:**
 
-| Flag           | Purpose                           |
-| -------------- | --------------------------------- |
-| `-q, --query`  | Inline query text                 |
-| `-s, --source` | Inline source text                |
-| `-l, --lang`   | Language (inferred from file ext) |
-| `--compact`    | Output compact JSON               |
-| `--entry NAME` | Start from specific definition    |
+| Flag           | Purpose                             |
+| -------------- | ----------------------------------- |
+| `-q, --query`  | Inline query text                   |
+| `-s, --source` | Inline source text                  |
+| `-l, --lang`   | Language (inferred from file ext)   |
+| `--compact`    | Output compact JSON                 |
+| `--entry NAME` | Start from specific definition      |
+| `--max-steps`  | Work limit (see Execution Limits)   |
+| `--max-memory` | Memory limit (see Execution Limits) |
+| `--limits`     | Limit preset (`auto`/`unbounded`)   |
 
 ---
 
@@ -252,13 +258,56 @@ plotnik trace query.ptk app.js -vv  # very verbose
 
 **Flags:**
 
-| Flag          | Purpose                        |
-| ------------- | ------------------------------ |
-| `-v`          | Verbose output                 |
-| `-vv`         | Very verbose output            |
-| `--no-result` | Skip materialization           |
-| `--fuel N`    | Execution fuel limit           |
-| `--entry`     | Start from specific definition |
+| Flag             | Purpose                          |
+| ---------------- | -------------------------------- |
+| `-v`             | Verbose output                   |
+| `-vv`            | Very verbose output              |
+| `--no-result`    | Skip materialization             |
+| `--max-steps`    | Work limit (see Execution Limits) |
+| `--max-memory`   | Memory limit (see Execution Limits) |
+| `--limits`       | Limit preset (`auto`/`unbounded`) |
+| `--entry`        | Start from specific definition   |
+
+---
+
+## Execution Limits
+
+`run` and `trace` bound a run by two orthogonal resources, on by default and
+sized from the input so they stay invisible to legitimate queries:
+
+| Flag           | Accepts                            | Default |
+| -------------- | ---------------------------------- | ------- |
+| `--max-steps`  | a step count, `auto`, `unbounded`  | `auto`  |
+| `--max-memory` | a binary size, `auto`, `unbounded` | `auto`  |
+| `--limits`     | `auto` or `unbounded` (preset)     | `auto`  |
+
+- **Steps** bound total work (instruction dispatches) — the guard against
+  catastrophic backtracking.
+- **Memory** bounds the live runtime heap (frame, checkpoint, and effect
+  arenas), summed and checked as a lazily-grown ceiling — never pre-allocated,
+  so a generous default is free on small inputs.
+- `auto` scales each ceiling with the source's node count; `unbounded` opts out.
+
+**Sizes** use binary units only: a bare integer is bytes; `KiB`/`MiB`/`GiB`
+scale by 1024. SI units (`MB`, `GB`) are rejected as ambiguous — use `MiB`/`GiB`.
+
+**Precedence** is order-independent: `--limits` sets the baseline for every
+resource, and an explicit `--max-*` overrides that one. So `--limits unbounded
+--max-steps 5` means "unbounded everywhere except steps = 5".
+
+```sh
+plotnik run q.ptk app.js --max-steps 5000000      # explicit work ceiling
+plotnik run q.ptk app.js --max-memory 256MiB      # explicit memory ceiling
+plotnik run q.ptk app.js --limits unbounded       # opt out of both
+```
+
+A run that exceeds a limit stops cleanly with exit code `2` and a message
+carrying a stable code (`E-limit-steps` / `E-limit-memory`); with `--json` the
+message is a one-line JSON object instead.
+
+There is no recursion/depth limit: backtracking and output rendering are
+iterative, so deep nesting consumes heap (bounded by `--max-memory`), not the
+native stack.
 
 ---
 

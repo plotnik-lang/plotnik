@@ -9,7 +9,7 @@ plotnik trace query.ptk source.js
 plotnik trace -q 'Pattern = (identifier) @id' -l javascript --source 'let x = 1'
 plotnik trace query.ptk source.js -v          # moderate verbosity
 plotnik trace query.ptk source.js -vv         # maximum verbosity
-plotnik trace query.ptk source.js --fuel 10000
+plotnik trace query.ptk source.js --max-steps 10000
 ```
 
 ## Verbosity Levels
@@ -417,12 +417,13 @@ For the complete table of connector symbols, see [07-dump-format.md](07-dump-for
 
 ## Command Options
 
-| Option         | Description                             |
-| -------------- | --------------------------------------- |
-| `-v`           | Moderate verbosity (all sub-lines)      |
-| `-vv`          | Maximum verbosity (text on navigation)  |
-| `--fuel N`     | Set execution fuel limit (default: 1M)  |
-| `--entry NAME` | Select entrypoint for multi-def queries |
+| Option           | Description                              |
+| ---------------- | ---------------------------------------- |
+| `-v`             | Moderate verbosity (all sub-lines)       |
+| `-vv`            | Maximum verbosity (text on navigation)   |
+| `--max-steps N`  | Work limit (default: `auto`, size-based) |
+| `--max-memory S` | Memory limit (default: `auto`)           |
+| `--entry NAME`   | Select entrypoint for multi-def queries  |
 
 ## Files
 

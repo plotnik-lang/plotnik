@@ -1,10 +1,13 @@
 mod args;
 mod commands;
 mod dispatch;
+mod limits;
 pub mod shebang;
 
 #[cfg(test)]
 mod dispatch_tests;
+#[cfg(test)]
+mod limits_tests;
 #[cfg(test)]
 mod shebang_tests;
 
