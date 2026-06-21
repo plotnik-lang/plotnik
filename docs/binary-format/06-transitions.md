@@ -118,8 +118,8 @@ EffectOp (u16)
 | 2      | `Push`          | -                      |
 | 3      | `ArrayClose`    | -                      |
 | 4      | `StructOpen`    | -                      |
-| 5      | `StructClose`   | -                      |
-| 6      | `Set`           | Member index (0-1023)  |
+| 5      | `Set`           | Member index (0-1023)  |
+| 6      | `StructClose`   | -                      |
 | 7      | `EnumOpen`      | Variant index (0-1023) |
 | 8      | `EnumClose`     | -                      |
 | 9      | `Null`          | -                      |
