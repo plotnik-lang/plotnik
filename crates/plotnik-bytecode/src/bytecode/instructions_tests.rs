@@ -193,7 +193,6 @@ fn arb_effect() -> impl Strategy<Value = Effect> {
         EffectKind::Set,
         EffectKind::EnumOpen,
         EffectKind::EnumClose,
-        EffectKind::Clear,
         EffectKind::Null,
         EffectKind::SuppressBegin,
         EffectKind::SuppressEnd,

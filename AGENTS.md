@@ -56,10 +56,10 @@ Validate once, at the boundary. Two smells to fix on sight: a swallowed must-hol
 
 An alternation `[...]` matches one of several branches; its form determines its type:
 
-- **Union** (unlabeled) — `[(identifier) @x (number) @y]` → `{ x?: Node, y?: Node }`. Branch captures merge into one struct of optional fields. This is an *untagged union* in the C/Rust sense: fields overlap, with no discriminant for which branch matched.
-- **Enum** (labeled) — `[A: (id) @x  B: (num) @y]` → `{ $tag: "A", $data: { x } } | { $tag: "B", $data: { y } }`. Each branch label becomes a discriminant tag — a *tagged union*, i.e. a Rust-style `enum`.
+- **Union** — `[(identifier) @x (number) @y]` → `{ x?: Node, y?: Node }`. Branch captures merge into one struct of optional fields: the fields overlap, with no discriminant for which branch matched.
+- **Enum** — `[A: (id) @x  B: (num) @y]` → `{ $tag: "A", $data: { x } } | { $tag: "B", $data: { y } }`. Each branch label becomes a discriminant tag, i.e. a Rust-style `enum`.
 
-Mixing labeled and unlabeled branches in one `[...]` is an error.
+Mixing enum and union branches in one `[...]` is an error.
 
 Note the output shapes invert the usual TypeScript intuition: an **enum** compiles to a TS *discriminated union* (`A | B`), while a **union** compiles to a TS *struct* (`{ x?, y? }`).
 

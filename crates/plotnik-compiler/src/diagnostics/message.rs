@@ -227,7 +227,7 @@ impl DiagnosticKind {
                 Some("`(Name)` uses a definition; define `Name = ...` or check the spelling")
             }
             Self::DuplicateCaptureInScope => Some(
-                "rename one capture, or use a labeled alternation if they are mutually exclusive branches",
+                "rename one capture, or use an enum if they are mutually exclusive branches",
             ),
             Self::PredicateOnNonLeaf => Some(
                 "predicates match text content; apply them to a leaf node or an anonymous node like `\"foo\"`",
@@ -302,7 +302,7 @@ impl DiagnosticKind {
             Self::SupertypeSlashDeprecated => "`supertype/subtype` paths are tree-sitter syntax",
             Self::DuplicateDefinition => "duplicate definition",
             Self::UndefinedReference => "undefined reference",
-            Self::MixedAltBranches => "cannot mix labeled and unlabeled branches",
+            Self::MixedAltBranches => "cannot mix enum and union branches",
             Self::DuplicateAlternationLabel => "duplicate branch label",
             Self::RecursionNoEscape => "infinite recursion: no escape path",
             Self::DirectRecursion => "infinite recursion: cycle consumes no input",
@@ -381,7 +381,7 @@ impl DiagnosticKind {
             Self::InvalidSubtype => "{}".to_string(),
             Self::ChildUnderLeafToken => "`{}` is a leaf token — it has no child nodes".to_string(),
             Self::NegatedRequiredField => "`-{}` can never match".to_string(),
-            Self::MixedAltBranches => "cannot mix labeled and unlabeled branches: {}".to_string(),
+            Self::MixedAltBranches => "cannot mix enum and union branches: {}".to_string(),
             Self::DuplicateAlternationLabel => {
                 "branch label `{}` is already used in this alternation".to_string()
             }

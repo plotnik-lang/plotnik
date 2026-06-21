@@ -25,8 +25,6 @@ pub enum RuntimeEffect<'t> {
     EnumOpen(u16),
     /// End enum variant.
     EnumClose,
-    /// Clear current value.
-    Clear,
     /// Null placeholder (for optional/alternation).
     Null,
 }

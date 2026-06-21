@@ -1,7 +1,13 @@
 //! Source storage for query compilation.
 
+#[cfg(test)]
+mod source_tests;
+
 /// Lightweight handle to a source in a compilation session.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
+///
+/// `Ord` follows insertion order (file index); diagnostics sort by it to group
+/// by file before falling back to in-file offset.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub struct SourceId(pub(crate) u32);
 
 #[derive(Clone, PartialEq, Eq, Debug)]

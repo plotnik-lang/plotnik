@@ -85,6 +85,19 @@ pub fn analyze_dependencies(
 ) -> DependencyAnalysis {
     let sccs = SccFinder::find(symbol_table);
 
+    // Tarjan runs `strongconnect` from every symbol-table key, so each def lands in
+    // exactly one SCC. Type inference leans on this: a def missing from the partition
+    // would never be processed in dependency order, breaking `infer_ref`'s guarantee
+    // that a non-recursive target is computed before its referrer.
+    debug_assert!(
+        {
+            let mut seen = HashSet::new();
+            sccs.iter().flatten().all(|name| seen.insert(name.as_str()))
+                && seen.len() == symbol_table.len()
+        },
+        "every symbol-table definition must appear in exactly one SCC"
+    );
+
     // Assign DefIds in SCC order (leaves first, so dependencies get lower IDs)
     let mut def_ids_by_sym = HashMap::new();
     let mut def_names = Vec::new();

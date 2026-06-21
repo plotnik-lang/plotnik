@@ -141,7 +141,6 @@ impl QueryParsed {
 
         let type_context = type_check::infer_types(
             &mut interner,
-            &self.ast_map,
             &symbol_table,
             &dependency_analysis,
             &mut self.diag,
@@ -159,8 +158,8 @@ impl QueryParsed {
         &self.source_map
     }
 
-    pub fn diagnostics(&self) -> Diagnostics {
-        self.diag.clone()
+    pub fn diagnostics(&self) -> &Diagnostics {
+        &self.diag
     }
 
     pub fn ast_map(&self) -> &AstMap {
@@ -304,7 +303,7 @@ impl GrammarBoundQuery {
     /// Uses [`emit_unchecked`](Self::emit_unchecked) and loads the bytecode itself,
     /// so it never reaches the emitter's debug self-check panic — in debug or release.
     pub fn check_compile(&self) -> Diagnostics {
-        let mut diag = self.diagnostics();
+        let mut diag = self.diagnostics().clone();
         if diag.has_errors() {
             return diag;
         }

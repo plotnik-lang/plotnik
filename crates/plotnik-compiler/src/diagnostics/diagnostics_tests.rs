@@ -498,6 +498,70 @@ fn filtered_same_span_higher_priority_wins() {
 }
 
 #[test]
+fn filtered_no_cross_file_containment_suppression() {
+    let mut map = SourceMap::new();
+    let file_a = map.add_file("a.ptk", "01234567890123456789");
+    let file_b = map.add_file("b.ptk", "0123456789");
+
+    let mut diagnostics = Diagnostics::new();
+    // File A: a structural error whose suppression range spans the whole file.
+    diagnostics
+        .report(
+            file_a,
+            DiagnosticKind::UnclosedTree,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .suppression_range(TextRange::new(0.into(), 20.into()))
+        .emit();
+    // File B: a real error at an offset that numerically falls inside A's range.
+    diagnostics
+        .report(
+            file_b,
+            DiagnosticKind::UndefinedReference,
+            TextRange::new(5.into(), 10.into()),
+        )
+        .emit();
+
+    // Without the source guard, A would swallow B via Rule 1 (contains + suppresses).
+    let filtered = diagnostics.live();
+    assert_eq!(filtered.len(), 2);
+}
+
+#[test]
+fn filtered_no_cross_file_consequence_suppression() {
+    let mut map = SourceMap::new();
+    let file_a = map.add_file("a.ptk", "01234567890123456789");
+    let file_b = map.add_file("b.ptk", "0123456789");
+
+    let mut diagnostics = Diagnostics::new();
+    // File A: a consequence error, with no root diagnostic in its own source.
+    diagnostics
+        .report(
+            file_a,
+            DiagnosticKind::MissingDefName,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .emit();
+    // File B: a root diagnostic, in a different source.
+    diagnostics
+        .report(
+            file_b,
+            DiagnosticKind::UndefinedReference,
+            TextRange::new(0.into(), 5.into()),
+        )
+        .emit();
+
+    // Rule 3 is per-source: B's root error must not suppress A's consequence.
+    let filtered = diagnostics.live();
+    assert_eq!(filtered.len(), 2);
+    assert!(
+        filtered
+            .iter()
+            .any(|m| m.kind == DiagnosticKind::MissingDefName)
+    );
+}
+
+#[test]
 fn filtered_empty_diagnostics() {
     let diagnostics = Diagnostics::new();
     let filtered = diagnostics.live();

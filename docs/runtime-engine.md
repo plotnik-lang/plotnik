@@ -161,7 +161,6 @@ pub enum RuntimeEffect<'t> {
     StructClose,
     EnumOpen(u16),    // variant index
     EnumClose,
-    Clear,
     Null,
 }
 
@@ -178,7 +177,6 @@ Lifetime `'t` denotes the parsed tree-sitter tree (per project conventions).
 | ArrayOpen/ArrayClose    | Array boundaries                          |
 | Push                    | Append to array                           |
 | EnumOpen/EnumClose      | Enum boundaries (variant at index)        |
-| Clear                   | Reset current value                       |
 | Null                    | Null placeholder (optional/alternation)   |
 
 The `Node` variant carries the actual `tree_sitter::Node` so the materializer has direct access without needing a separate node buffer. This single-stream design allows natural iteration: `for effect in log.0 { match effect { ... } }`.

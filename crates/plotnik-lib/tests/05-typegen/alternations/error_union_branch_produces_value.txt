@@ -8,7 +8,7 @@ Q = [
   (number) @b
 ]
 ==== diagnostics ====
-error: incompatible types: a branch produces a value but the alternation is unlabeled
+error: incompatible types: a branch produces a value but this is a union alternation
  --> query.ptk:6:5
   |
 6 |   Q = [

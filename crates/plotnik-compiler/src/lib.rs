@@ -6,6 +6,7 @@
 //! - `compile` - Thompson NFA construction
 //! - `emit` - bytecode emission
 //! - `diagnostics` - error reporting
+//! - `source` - source file storage and identity
 //! - `query` - high-level Query facade
 //! - `typegen` - TypeScript type generation
 
@@ -18,6 +19,7 @@ pub mod diagnostics;
 pub mod emit;
 pub mod parser;
 pub mod query;
+pub mod source;
 pub mod typegen;
 
 #[cfg(test)]
@@ -31,7 +33,7 @@ pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;
 
 pub use diagnostics::{Diagnostics, Severity, Span};
 pub use query::{Query, QueryBuilder};
-pub use query::{SourceId, SourceMap};
+pub use source::{SourceId, SourceMap};
 
 /// Errors that can occur during query parsing.
 #[derive(Debug, Clone, thiserror::Error)]

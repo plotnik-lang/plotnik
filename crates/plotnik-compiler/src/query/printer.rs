@@ -102,7 +102,7 @@ impl<'q> QueryPrinter<'q> {
         Ok(())
     }
 
-    fn should_show_headers(&self, source_map: &super::source_map::SourceMap) -> bool {
+    fn should_show_headers(&self, source_map: &super::SourceMap) -> bool {
         source_map.len() > 1
             || source_map
                 .iter()
