@@ -44,10 +44,12 @@ struct TypeVerifier<'a> {
     depth: u32,
 }
 
-/// Native-recursion bound for the verifier. Type-soundness bugs are structural and
-/// surface at the first occurrence, so capping depth loses nothing meaningful while
-/// keeping a deep value (from a deep match under a high depth limit) from
-/// overflowing the stack in debug builds.
+/// Native-recursion bound for the verifier — the one remaining recursive walk over
+/// a materialized value. The cap keeps a pathologically deep value from overflowing
+/// the stack in debug builds. Past it, verification simply stops: a type-soundness
+/// bug deeper than the cap goes unchecked. That is an accepted trade, not a
+/// guarantee of completeness — the verifier is debug-only defense-in-depth (release
+/// builds skip it entirely) and such bugs almost always surface shallow.
 #[cfg(debug_assertions)]
 const MAX_VERIFY_DEPTH: u32 = 4096;
 

@@ -283,9 +283,11 @@ sized from the input so they stay invisible to legitimate queries:
 
 - **Steps** bound total work (instruction dispatches) — the guard against
   catastrophic backtracking.
-- **Memory** bounds the live runtime heap (frame, checkpoint, and effect
-  arenas), summed and checked as a lazily-grown ceiling — never pre-allocated,
-  so a generous default is free on small inputs.
+- **Memory** bounds the VM's live execution state (frame, checkpoint, and effect
+  arenas), summed and sampled once per step against a fixed ceiling. The arenas
+  grow on demand rather than pre-allocating, so a generous default is free on
+  small inputs. It meters execution, not the separate output-rendering pass (see
+  below).
 - `auto` scales each ceiling with the source's node count; `unbounded` opts out.
 
 **Sizes** use binary units only: a bare integer is bytes; `KiB`/`MiB`/`GiB`
@@ -306,8 +308,10 @@ carrying a stable code (`E-limit-steps` / `E-limit-memory`); with `--json` the
 message is a one-line JSON object instead.
 
 There is no recursion/depth limit: backtracking and output rendering are
-iterative, so deep nesting consumes heap (bounded by `--max-memory`), not the
-native stack.
+iterative, so deep nesting consumes heap, not the native stack. `--max-memory`
+meters the VM's execution arenas during the run; output rendering happens
+afterward and is not separately metered, though its size tracks the
+already-bounded effect log.
 
 ---
 
