@@ -7,11 +7,12 @@
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
+use super::Located;
 use super::dependencies::{DependencyAnalysis, collect_refs};
 use super::symbol_table::SymbolTable;
 use super::visitor::{Visitor, walk_pattern, walk_node_pattern};
 use crate::Diagnostics;
-use crate::diagnostics::DiagnosticKind;
+use crate::diagnostics::{DiagnosticKind, Span};
 use crate::parser::{TokenPattern, Def, Pattern, NodePattern, Ref, Root, SeqPattern};
 use crate::query::SourceId;
 
@@ -63,39 +64,36 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
 
         if !has_escape {
             // Every cycle is an infinite loop — no escape path exists anywhere in the SCC.
-            if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, _, pattern, target| {
-                find_ref_range(pattern, target)
-            }) {
+            if let Some(raw_chain) = self.find_cycle(scc, &scc_set, find_ref_range) {
                 let chain = self.format_chain(raw_chain, false);
                 self.report_cycle(DiagnosticKind::RecursionNoEscape, scc, chain);
             }
             return;
         }
 
-        if let Some(raw_chain) = self.find_cycle(scc, &scc_set, |_, _, pattern, target| {
-            find_unguarded_ref_range(pattern, target)
-        }) {
+        if let Some(raw_chain) = self.find_cycle(scc, &scc_set, find_unguarded_ref_range) {
             let chain = self.format_chain(raw_chain, true);
             self.report_cycle(DiagnosticKind::DirectRecursion, scc, chain);
         }
     }
 
     /// Finds a cycle within the given set of nodes (SCC).
-    /// `get_edge_location` returns the location of a reference from `pattern` to `target`.
+    /// `get_edge_location` returns the range of a reference from `pattern` to `target`;
+    /// the range is paired with `pattern`'s source into the edge's `Span`.
     fn find_cycle<'b>(
         &self,
         nodes: &'b [String],
         domain: &IndexSet<&'b str>,
-        get_edge_location: impl Fn(&Self, SourceId, &Pattern, &str) -> Option<TextRange>,
-    ) -> Option<Vec<(SourceId, TextRange, &'b str)>> {
+        get_edge_location: impl Fn(SourceId, &Pattern, &str) -> Option<TextRange>,
+    ) -> Option<Vec<(Span, &'b str)>> {
         let mut adj = IndexMap::new();
         for name in nodes {
             if let Some((source_id, body)) = self.symbol_table.definition(name) {
                 let neighbors = domain
                     .iter()
                     .filter_map(|target| {
-                        get_edge_location(self, source_id, body, target)
-                            .map(|range| (*target, source_id, range))
+                        get_edge_location(source_id, body, target)
+                            .map(|range| (*target, Span::new(source_id, range)))
                     })
                     .collect::<Vec<_>>();
                 adj.insert(name.as_str(), neighbors);
@@ -108,80 +106,76 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
 
     fn format_chain(
         &self,
-        raw_chain: Vec<(SourceId, TextRange, &str)>,
+        raw_chain: Vec<(Span, &str)>,
         is_unguarded: bool,
-    ) -> Vec<(SourceId, TextRange, String)> {
+    ) -> Vec<(Span, String)> {
         if raw_chain.len() == 1 {
-            let (source_id, range, target) = &raw_chain[0];
+            let (span, target) = &raw_chain[0];
             let msg = if is_unguarded {
                 "references itself".to_string()
             } else {
                 format!("{} references itself", target)
             };
-            return vec![(*source_id, *range, msg)];
+            return vec![(*span, msg)];
         }
 
         let len = raw_chain.len();
         raw_chain
             .into_iter()
             .enumerate()
-            .map(|(i, (source_id, range, target))| {
+            .map(|(i, (span, target))| {
                 let msg = if i == len - 1 {
                     format!("references {} (completing cycle)", target)
                 } else {
                     format!("references {}", target)
                 };
-                (source_id, range, msg)
+                (span, msg)
             })
             .collect()
     }
 
-    fn report_cycle(
-        &mut self,
-        kind: DiagnosticKind,
-        scc: &[String],
-        chain: Vec<(SourceId, TextRange, String)>,
-    ) {
-        let (primary_source, primary_loc) = chain
+    fn report_cycle(&mut self, kind: DiagnosticKind, scc: &[String], chain: Vec<(Span, String)>) {
+        let primary = chain
             .first()
-            .map(|(s, r, _)| (*s, *r))
-            .unwrap_or_else(|| (SourceId::default(), TextRange::empty(0.into())));
+            .map(|(span, _)| *span)
+            .expect("a detected cycle yields a non-empty chain");
 
         let related_def = if scc.len() > 1 {
-            self.find_def_info_containing(scc, primary_loc)
+            self.find_def_info_containing(scc, primary)
         } else {
             None
         };
 
-        let mut builder = self.diag.report(primary_source, kind, primary_loc);
+        let mut builder = self.diag.report(primary.source, kind, primary.range);
 
-        for (source_id, range, msg) in chain {
-            builder = builder.related_to(source_id, range, msg);
+        for (span, msg) in chain {
+            builder = builder.related_to(span.source, span.range, msg);
         }
 
-        if let Some((source_id, msg, range)) = related_def {
-            builder = builder.related_to(source_id, range, msg);
+        if let Some((span, msg)) = related_def {
+            builder = builder.related_to(span.source, span.range, msg);
         }
 
         builder.emit();
     }
 
-    fn find_def_info_containing(
-        &self,
-        scc: &[String],
-        range: TextRange,
-    ) -> Option<(SourceId, String, TextRange)> {
+    fn find_def_info_containing(&self, scc: &[String], primary: Span) -> Option<(Span, String)> {
+        // A range is only meaningfully contained by a body in the SAME source: two
+        // files' bodies can share numeric offsets, so a source-blind containment
+        // test would attribute the cycle to whichever file happens to be checked
+        // first. Match the source before comparing offsets.
         let name = scc.iter().find(|name| {
             self.symbol_table
-                .body(name.as_str())
-                .is_some_and(|body| body.text_range().contains_range(range))
+                .definition(name.as_str())
+                .is_some_and(|(def_source, body)| {
+                    def_source == primary.source && body.text_range().contains_range(primary.range)
+                })
         })?;
         let (source_id, def) = self.find_def_by_name(name)?;
         let n = def.name()?;
         Some((
-            source_id,
+            Span::new(source_id, n.text_range()),
             format!("{} is defined here", name),
-            n.text_range(),
         ))
     }
 
@@ -195,18 +189,18 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
 }
 
 struct CycleFinder<'a, 'q> {
-    adj: &'a IndexMap<&'q str, Vec<(&'q str, SourceId, TextRange)>>,
+    adj: &'a IndexMap<&'q str, Vec<(&'q str, Span)>>,
     visited: IndexSet<&'q str>,
     on_path: IndexMap<&'q str, usize>,
     path: Vec<&'q str>,
-    edges: Vec<(SourceId, TextRange)>,
+    edges: Vec<Span>,
 }
 
 impl<'a, 'q> CycleFinder<'a, 'q> {
     fn find(
         nodes: &[&'q str],
-        adj: &'a IndexMap<&'q str, Vec<(&'q str, SourceId, TextRange)>>,
-    ) -> Option<Vec<(SourceId, TextRange, &'q str)>> {
+        adj: &'a IndexMap<&'q str, Vec<(&'q str, Span)>>,
+    ) -> Option<Vec<(Span, &'q str)>> {
         let mut finder = Self {
             adj,
             visited: IndexSet::new(),
@@ -223,7 +217,7 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
         None
     }
 
-    fn dfs(&mut self, current: &'q str) -> Option<Vec<(SourceId, TextRange, &'q str)>> {
+    fn dfs(&mut self, current: &'q str) -> Option<Vec<(Span, &'q str)>> {
         if self.on_path.contains_key(current) {
             return None;
         }
@@ -237,19 +231,18 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
         self.path.push(current);
 
         if let Some(neighbors) = self.adj.get(current) {
-            for (target, source_id, range) in neighbors {
+            for (target, span) in neighbors {
                 if let Some(&start_index) = self.on_path.get(target) {
                     // Cycle detected!
                     let mut chain = Vec::new();
                     for i in start_index..self.path.len() - 1 {
-                        let (src, rng) = self.edges[i];
-                        chain.push((src, rng, self.path[i + 1]));
+                        chain.push((self.edges[i], self.path[i + 1]));
                     }
-                    chain.push((*source_id, *range, *target));
+                    chain.push((*span, *target));
                     return Some(chain);
                 }
 
-                self.edges.push((*source_id, *range));
+                self.edges.push(*span);
                 if let Some(chain) = self.dfs(target) {
                     return Some(chain);
                 }
@@ -333,65 +326,66 @@ struct RefFinder<'a> {
 }
 
 impl Visitor for RefFinder<'_> {
-    fn visit_pattern(&mut self, pattern: &Pattern) {
+    fn visit_pattern(&mut self, pattern: &Located<Pattern>) {
         if self.found.is_some() {
             return;
         }
         walk_pattern(self, pattern);
     }
 
-    fn visit_node_pattern(&mut self, node: &NodePattern) {
+    fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
         if self.mode == RefSearchMode::Unguarded {
             return; // Guarded: stop recursion
         }
         walk_node_pattern(self, node);
     }
 
-    fn visit_token_pattern(&mut self, _node: &TokenPattern) {
+    fn visit_token_pattern(&mut self, _node: &Located<TokenPattern>) {
         // TokenPattern has no child expressions, so nothing to walk.
         // In Unguarded mode this also acts as a guard (stops recursion).
     }
 
-    fn visit_ref(&mut self, r: &Ref) {
+    fn visit_ref(&mut self, r: &Located<Ref>) {
         if self.found.is_some() {
             return;
         }
-        if let Some(name) = r.name()
+        if let Some(name) = r.node().name()
             && name.text() == self.target
         {
             self.found = Some(name.text_range());
         }
     }
 
-    fn visit_seq_pattern(&mut self, seq: &SeqPattern) {
-        for child in seq.children() {
+    fn visit_seq_pattern(&mut self, seq: &Located<SeqPattern>) {
+        for child in seq.node().children() {
+            let child = seq.wrap(child);
             self.visit_pattern(&child);
             if self.found.is_some() {
                 return;
             }
-            if self.mode == RefSearchMode::Unguarded && expr_guarantees_consumption(&child) {
+            if self.mode == RefSearchMode::Unguarded && expr_guarantees_consumption(child.node()) {
                 return;
             }
         }
     }
 }
 
-fn find_ref_range(pattern: &Pattern, target: &str) -> Option<TextRange> {
+fn find_ref_range(source: SourceId, pattern: &Pattern, target: &str) -> Option<TextRange> {
     let mut visitor = RefFinder {
         target,
         found: None,
         mode: RefSearchMode::Any,
     };
-    visitor.visit_pattern(pattern);
+    visitor.visit_pattern(&Located::new(source, pattern.clone()));
     visitor.found
 }
 
-fn find_unguarded_ref_range(pattern: &Pattern, target: &str) -> Option<TextRange> {
+fn find_unguarded_ref_range(source: SourceId, pattern: &Pattern, target: &str) -> Option<TextRange> {
     let mut visitor = RefFinder {
         target,
         found: None,
         mode: RefSearchMode::Unguarded,
     };
-    visitor.visit_pattern(pattern);
+    visitor.visit_pattern(&Located::new(source, pattern.clone()));
     visitor.found
 }

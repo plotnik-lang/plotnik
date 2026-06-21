@@ -21,6 +21,11 @@ pub struct TypeContext {
     def_ids: HashMap<Symbol, DefId>,
     /// Definition-level type info (for TypeScript emission), keyed by DefId
     def_types: HashMap<DefId, TypeId>,
+    /// Full inferred TermInfo per definition, keyed by DefId. Lets a non-recursive
+    /// `Ref` return its target's result (Arity + TypeFlow, fields intact for
+    /// bubbling) without re-descending into the referenced body. Analysis-only:
+    /// `def_types` stays the sole ordering source for emission.
+    def_results: HashMap<DefId, TermInfo>,
     /// Definitions that are part of a recursive SCC
     recursive_defs: HashSet<DefId>,
 
@@ -45,6 +50,7 @@ impl TypeContext {
             def_names: Vec::new(),
             def_ids: HashMap::new(),
             def_types: HashMap::new(),
+            def_results: HashMap::new(),
             recursive_defs: HashSet::new(),
             term_info: HashMap::new(),
             type_names: HashMap::new(),
@@ -177,6 +183,16 @@ impl TypeContext {
 
     pub fn def_type(&self, def_id: DefId) -> Option<TypeId> {
         self.def_types.get(&def_id).copied()
+    }
+
+    /// Record a definition's full inferred result, so non-recursive references
+    /// can resolve to it instead of re-descending into the body.
+    pub fn set_def_result(&mut self, def_id: DefId, info: TermInfo) {
+        self.def_results.insert(def_id, info);
+    }
+
+    pub fn def_result(&self, def_id: DefId) -> Option<&TermInfo> {
+        self.def_results.get(&def_id)
     }
 
     pub fn def_type_for_name(&self, interner: &Interner, name: &str) -> Option<TypeId> {

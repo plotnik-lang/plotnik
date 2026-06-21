@@ -141,7 +141,6 @@ impl QueryParsed {
 
         let type_context = type_check::infer_types(
             &mut interner,
-            &self.ast_map,
             &symbol_table,
             &dependency_analysis,
             &mut self.diag,
