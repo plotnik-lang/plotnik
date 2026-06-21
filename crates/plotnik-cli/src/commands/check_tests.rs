@@ -19,13 +19,11 @@ fn check_js(query: &str) -> CliResult {
 }
 
 #[test]
-fn rejects_enum_zero_width_branch_in_quantifier() {
-    // Passes analysis; the emitted bytecode is rejected by `Module::load`
-    // (EffectStackImbalance). Must surface as exit 1, not the emit debug panic.
-    assert!(matches!(
-        check_js("Q = (program [A: (comment)? @c]* @items)"),
-        Err(CliError::No)
-    ));
+fn accepts_enum_zero_width_branch_in_quantifier() {
+    // A skippable enum arm in a quantifier (`[A: (comment)? @c]*`) used to emit
+    // an unbracketed skip path rejected by `Module::load` (EffectStackImbalance);
+    // enum bracket dominance makes both arm paths close the enum, so it compiles.
+    assert!(check_js("Q = (program [A: (comment)? @c]* @items)").is_ok());
 }
 
 #[test]
