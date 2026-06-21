@@ -35,8 +35,6 @@ pub enum EmitError {
     RegexCompile(String, String),
     /// An instruction could not be encoded (count or payload out of range).
     Encode(EncodeError),
-    /// Compilation error.
-    Compile(crate::compile::CompileError),
 }
 
 impl std::fmt::Display for EmitError {
@@ -56,7 +54,6 @@ impl std::fmt::Display for EmitError {
             Self::StringNotFound(sym) => write!(f, "string not found for symbol: {sym:?}"),
             Self::RegexCompile(pat, err) => write!(f, "regex compile error for '{pat}': {err}"),
             Self::Encode(e) => write!(f, "instruction encoding error: {e}"),
-            Self::Compile(e) => write!(f, "compilation error: {e}"),
         }
     }
 }

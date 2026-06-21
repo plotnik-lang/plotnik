@@ -42,4 +42,4 @@ mod quantifier_tests;
 
 pub use capture::CaptureEffects;
 pub use compiler::{CompileCtx, Compiler};
-pub use error::{CompileError, CompileResult};
+pub use error::CompileResult;

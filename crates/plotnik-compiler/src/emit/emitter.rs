@@ -38,7 +38,7 @@ pub fn emit_unchecked(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
         target_node_kinds: node_kind_ids,
         target_node_fields: node_field_ids,
     };
-    let compile_result = Compiler::build_ir(&ctx).map_err(EmitError::Compile)?;
+    let compile_result = Compiler::build_ir(&ctx);
 
     // Every emitted effect's member ref names a type reachable from an entrypoint
     // result, so dead-type elimination roots at those results alone. Built after
