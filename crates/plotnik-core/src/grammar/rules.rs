@@ -52,8 +52,9 @@ pub struct Symbol {
     pub index: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Rule {
+    #[default]
     Blank,
     String(String),
     Pattern(String, String),

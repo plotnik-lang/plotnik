@@ -90,7 +90,8 @@ pub(in crate::grammar) fn extract_tokens(
     );
 
     for variable in &mut variables {
-        variable.rule = symbol_replacer.replace_symbols_in_rule(&variable.rule);
+        let rule = std::mem::take(&mut variable.rule);
+        variable.rule = symbol_replacer.replace_symbols_in_rule(rule);
     }
 
     let supertype_symbols: Vec<Symbol> = grammar
@@ -126,7 +127,7 @@ pub(in crate::grammar) fn extract_tokens(
 
     let mut external_tokens = Vec::with_capacity(grammar.external_tokens.len());
     for external_token in grammar.external_tokens {
-        let rule = symbol_replacer.replace_symbols_in_rule(&external_token.rule);
+        let rule = symbol_replacer.replace_symbols_in_rule(external_token.rule);
         if let Rule::Symbol(symbol) = rule {
             if symbol.is_non_terminal() {
                 Err(ExtractTokensError::ExternalTokenNonTerminal(
@@ -296,76 +297,82 @@ impl TokenExtractor {
         self.current_variable_name.push_str(&variable.name);
         self.current_variable_token_count = 0;
         self.is_first_rule = is_first;
-        variable.rule = self.extract_tokens_in_rule(&variable.rule)?;
+        let rule = std::mem::take(&mut variable.rule);
+        variable.rule = self.extract_tokens_in_rule(rule)?;
         Ok(())
     }
 
-    fn extract_tokens_in_rule(&mut self, input: &Rule) -> ExtractTokensResult<Rule> {
+    fn extract_tokens_in_rule(&mut self, input: Rule) -> ExtractTokensResult<Rule> {
         match input {
-            Rule::String(name) => Ok(self.extract_token(input, Some(name))?.into()),
+            Rule::String(name) => {
+                let rule = Rule::String(name.clone());
+                Ok(self.extract_token(rule, Some(name))?.into())
+            }
             Rule::Pattern(..) => Ok(self.extract_token(input, None)?.into()),
-            Rule::Metadata { params, rule } => self.extract_metadata_rule(input, params, rule),
+            Rule::Metadata { params, rule } => self.extract_metadata_rule(params, *rule),
             Rule::Repeat(content) => Ok(Rule::Repeat(Box::new(
-                self.extract_tokens_in_rule(content)?,
+                self.extract_tokens_in_rule(*content)?,
             ))),
             Rule::Seq(elements) => Ok(Rule::Seq(
                 elements
-                    .iter()
+                    .into_iter()
                     .map(|e| self.extract_tokens_in_rule(e))
                     .collect::<ExtractTokensResult<Vec<_>>>()?,
             )),
             Rule::Choice(elements) => Ok(Rule::Choice(
                 elements
-                    .iter()
+                    .into_iter()
                     .map(|e| self.extract_tokens_in_rule(e))
                     .collect::<ExtractTokensResult<Vec<_>>>()?,
             )),
             Rule::Reserved { rule, context_name } => Ok(Rule::Reserved {
-                rule: Box::new(self.extract_tokens_in_rule(rule)?),
-                context_name: context_name.clone(),
+                rule: Box::new(self.extract_tokens_in_rule(*rule)?),
+                context_name,
             }),
-            _ => Ok(input.clone()),
+            _ => Ok(input),
         }
     }
 
     fn extract_metadata_rule(
         &mut self,
-        input: &Rule,
-        params: &MetadataParams,
-        rule: &Rule,
+        params: MetadataParams,
+        rule: Rule,
     ) -> ExtractTokensResult<Rule> {
         if params.is_token {
-            let mut params = params.clone();
-            params.is_token = false;
+            let mut cleared_params = params.clone();
+            cleared_params.is_token = false;
 
-            let string_value = if let Rule::String(value) = rule {
-                Some(value)
+            let string_value = if let Rule::String(value) = &rule {
+                Some(value.clone())
             } else {
                 None
             };
 
-            let rule_to_extract = if params == MetadataParams::default() {
+            let rule_to_extract = if cleared_params == MetadataParams::default() {
                 rule
             } else {
-                input
+                Rule::Metadata {
+                    params,
+                    rule: Box::new(rule),
+                }
             };
 
             return Ok(self.extract_token(rule_to_extract, string_value)?.into());
         }
 
         Ok(Rule::Metadata {
-            params: params.clone(),
+            params,
             rule: Box::new(self.extract_tokens_in_rule(rule)?),
         })
     }
 
     fn extract_token(
         &mut self,
-        rule: &Rule,
-        string_value: Option<&String>,
+        rule: Rule,
+        string_value: Option<String>,
     ) -> ExtractTokensResult<Symbol> {
         for (i, variable) in self.extracted_variables.iter_mut().enumerate() {
-            if variable.rule == *rule {
+            if variable.rule == rule {
                 self.extracted_usage_counts[i] += 1;
                 return Ok(Symbol::terminal(i));
             }
@@ -379,9 +386,9 @@ impl TokenExtractor {
                 ))?;
             }
             Variable {
-                name: string_value.clone(),
+                name: string_value,
                 kind: VariableType::Anonymous,
-                rule: rule.clone(),
+                rule,
             }
         } else {
             self.current_variable_token_count += 1;
@@ -391,7 +398,7 @@ impl TokenExtractor {
                     self.current_variable_name, self.current_variable_token_count
                 ),
                 kind: VariableType::Auxiliary,
-                rule: rule.clone(),
+                rule,
             }
         };
 
@@ -402,31 +409,33 @@ impl TokenExtractor {
 }
 
 impl SymbolReplacer {
-    fn replace_symbols_in_rule(&mut self, rule: &Rule) -> Rule {
+    fn replace_symbols_in_rule(&mut self, rule: Rule) -> Rule {
         match rule {
-            Rule::Symbol(symbol) => self.replace_symbol(*symbol).into(),
+            Rule::Symbol(symbol) => self.replace_symbol(symbol).into(),
             Rule::Choice(elements) => Rule::Choice(
                 elements
-                    .iter()
+                    .into_iter()
                     .map(|e| self.replace_symbols_in_rule(e))
                     .collect(),
             ),
             Rule::Seq(elements) => Rule::Seq(
                 elements
-                    .iter()
+                    .into_iter()
                     .map(|e| self.replace_symbols_in_rule(e))
                     .collect(),
             ),
-            Rule::Repeat(content) => Rule::Repeat(Box::new(self.replace_symbols_in_rule(content))),
+            Rule::Repeat(content) => {
+                Rule::Repeat(Box::new(self.replace_symbols_in_rule(*content)))
+            }
             Rule::Metadata { rule, params } => Rule::Metadata {
-                params: params.clone(),
-                rule: Box::new(self.replace_symbols_in_rule(rule)),
+                params,
+                rule: Box::new(self.replace_symbols_in_rule(*rule)),
             },
             Rule::Reserved { rule, context_name } => Rule::Reserved {
-                rule: Box::new(self.replace_symbols_in_rule(rule)),
-                context_name: context_name.clone(),
+                rule: Box::new(self.replace_symbols_in_rule(*rule)),
+                context_name,
             },
-            _ => rule.clone(),
+            _ => rule,
         }
     }
 
