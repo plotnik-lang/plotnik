@@ -233,7 +233,6 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
         if let Some(neighbors) = self.adj.get(current) {
             for (target, span) in neighbors {
                 if let Some(&start_index) = self.on_path.get(target) {
-                    // Cycle detected!
                     let mut chain = Vec::new();
                     for i in start_index..self.path.len() - 1 {
                         chain.push((self.edges[i], self.path[i + 1]));

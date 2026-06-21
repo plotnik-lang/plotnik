@@ -2,8 +2,7 @@
 //!
 //! A `TextRange` is meaningless without the `SourceId` it indexes into. `Located`
 //! binds the two so a location carries its source by construction: passing a node
-//! across a workspace-file boundary cannot silently misattribute its diagnostics,
-//! and there is no ambient "current source" to keep in sync.
+//! across a workspace-file boundary cannot silently misattribute its diagnostics.
 
 use rowan::TextRange;
 

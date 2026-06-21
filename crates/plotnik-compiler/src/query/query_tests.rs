@@ -31,26 +31,6 @@ macro_rules! expect_invalid {
     }};
 }
 
-/// Multi-file query that must pass analysis but fail grammar linking.
-macro_rules! expect_invalid_linking {
-    ($($name:literal: $content:literal),+ $(,)?) => {{
-        let mut source_map = SourceMap::new();
-        $(source_map.add_file($name, $content);)+
-        let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
-        if !query.is_valid() {
-            panic!(
-                "Expected analysis to pass, got error:\n{}",
-                query.dump_diagnostics()
-            );
-        }
-        let linked = query.link(javascript());
-        if linked.is_valid() {
-            panic!("Expected failed linking, got valid");
-        }
-        linked.dump_diagnostics()
-    }};
-}
-
 impl Query {
     #[track_caller]
     fn parse_and_validate(src: &str) -> Self {
@@ -355,10 +335,18 @@ fn multifile_link_field_error_in_referenced_body_spans_two_files() {
     // primary span must resolve against a.ptk (where `name:` is written) and the
     // related note against b.ptk (the parent node). Each `Located` node carries its
     // own source, so the split survives crossing the reference between files.
-    let res = expect_invalid_linking! {
-        "a.ptk": "Foo = name: (identifier)",
-        "b.ptk": "Bar = (call_expression (Foo))",
-    };
+    let mut source_map = SourceMap::new();
+    source_map.add_file("a.ptk", "Foo = name: (identifier)");
+    source_map.add_file("b.ptk", "Bar = (call_expression (Foo))");
+    let analyzed = QueryBuilder::new(source_map).parse().unwrap().analyze();
+    assert!(
+        analyzed.is_valid(),
+        "expected analysis to pass:\n{}",
+        analyzed.dump_diagnostics()
+    );
+    let linked = analyzed.link(javascript());
+    assert!(!linked.is_valid(), "expected linking to fail");
+    let res = linked.dump_diagnostics();
 
     insta::assert_snapshot!(res, @"
     error: field `name` is not valid on this node kind

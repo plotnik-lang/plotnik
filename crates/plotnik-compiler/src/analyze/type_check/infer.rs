@@ -48,8 +48,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// Infer the TermInfo for an expression, caching the result.
     ///
     /// The walk only ever descends through one definition's body (a finite AST
-    /// tree); references resolve to precomputed results rather than re-entering,
-    /// so no cycle sentinel is needed.
+    /// tree); references resolve to precomputed results rather than re-entering.
     pub fn infer_pattern(&mut self, pattern: &Located<Pattern>) -> TermInfo {
         if let Some(info) = self.ctx.type_ctx.term_info(pattern.node()) {
             return info.clone();
@@ -931,8 +930,7 @@ impl<'a, 'd> InferencePass<'a, 'd> {
         };
 
         // Infer this definition's body only; references into other definitions
-        // resolve to their precomputed results, so the walk stays single-source —
-        // every node the visitor reports against carries this `source_id`.
+        // resolve to their precomputed results.
         let info = {
             let located_body = Located::new(source_id, body);
             let mut visitor = InferVisitor::new(InferCtx {

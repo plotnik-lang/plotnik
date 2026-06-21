@@ -194,8 +194,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     /// `Deferred` positions skip their checks.
     ///
     /// The `Located` carries the source of the pattern being walked, so a reference
-    /// into another workspace file is followed by descending into the target's own
-    /// `Located` — no ambient source to save and restore.
+    /// into another workspace file is validated against the target's own source.
     fn check_pattern_grammar(
         &mut self,
         located: &Located<Pattern>,
@@ -310,7 +309,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 };
                 // The referenced definition may live in another workspace file; the
                 // target carries its own source, so its body is validated against the
-                // right content with no ambient source switch.
+                // right content.
                 self.check_pattern_grammar(&target, ctx, mode, walk);
                 walk.in_progress.remove(name);
                 walk.validated.insert(key);

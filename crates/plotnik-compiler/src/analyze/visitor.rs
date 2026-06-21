@@ -6,8 +6,7 @@
 //! Call `walk_*` within your override to continue recursion (or omit it to stop).
 //!
 //! Every node is visited as a [`Located`] so a pass always knows which source the
-//! node lives in — diagnostics carry their source by construction, with no ambient
-//! "current source" to track across workspace-file references.
+//! node lives in — diagnostics carry their source by construction.
 //!
 //! ```ignore
 //! impl Visitor for MyPass {
