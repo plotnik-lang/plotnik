@@ -656,40 +656,49 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
+    // Loops rather than self-recurses: a run of contiguous call-retry checkpoints
+    // with exhausted siblings (or failed field constraints) is unwound here in one
+    // call. The depth of that run is set by the source-tree shape and is decoupled
+    // from `recursion_limit`, so tail-recursion would let untrusted source abort the
+    // process on the native stack (Rust does not guarantee TCO). The `continue`
+    // paths pop without re-pushing, so the checkpoint stack strictly shrinks until
+    // a resume succeeds or it empties — the loop always terminates.
     fn backtrack<T: Tracer>(&mut self, tracer: &mut T) -> Signal {
-        let Some(cp) = self.checkpoints.pop() else {
-            return RuntimeError::NoMatch.into();
-        };
-        tracer.trace_backtrack();
-        self.restore_checkpoint_state(cp.state);
+        loop {
+            let Some(cp) = self.checkpoints.pop() else {
+                return RuntimeError::NoMatch.into();
+            };
+            tracer.trace_backtrack();
+            self.restore_checkpoint_state(cp.state);
 
-        let Some(resume) = cp.call_resume else {
-            self.ip = cp.ip;
-            return ControlFlow::Backtracked.into();
-        };
+            let Some(resume) = cp.call_resume else {
+                self.ip = cp.ip;
+                return ControlFlow::Backtracked.into();
+            };
 
-        // Call retry: advance to the next candidate, then re-enter the callee.
-        // If siblings are exhausted, keep backtracking to an earlier checkpoint.
-        if !self.cursor.continue_search(resume.policy) {
-            return self.backtrack(tracer);
-        }
-        tracer.trace_nav(Nav::Down.sibling_continuation(), self.cursor.node());
-
-        // Enforce the field constraint at the new candidate. A mismatch ends
-        // this Call's search, exactly like the navigate-time field check.
-        if let Some(field_id) = resume.field {
-            if self.cursor.field_id() != Some(field_id) {
-                tracer.trace_field_failure(self.cursor.node());
-                return self.backtrack(tracer);
+            // Call retry: advance to the next candidate, then re-enter the callee.
+            // If siblings are exhausted, keep backtracking to an earlier checkpoint.
+            if !self.cursor.continue_search(resume.policy) {
+                continue;
             }
-            tracer.trace_field_success(field_id);
-        }
+            tracer.trace_nav(Nav::Down.sibling_continuation(), self.cursor.node());
 
-        self.checkpoints
-            .push(self.call_retry_checkpoint(cp.ip, resume));
-        tracer.trace_checkpoint_created(cp.ip);
-        self.enter_callee(resume.target, resume.next, tracer);
-        ControlFlow::Backtracked.into()
+            // Enforce the field constraint at the new candidate. A mismatch ends
+            // this Call's search, exactly like the navigate-time field check.
+            if let Some(field_id) = resume.field {
+                if self.cursor.field_id() != Some(field_id) {
+                    tracer.trace_field_failure(self.cursor.node());
+                    continue;
+                }
+                tracer.trace_field_success(field_id);
+            }
+
+            self.checkpoints
+                .push(self.call_retry_checkpoint(cp.ip, resume));
+            tracer.trace_checkpoint_created(cp.ip);
+            self.enter_callee(resume.target, resume.next, tracer);
+            return ControlFlow::Backtracked.into();
+        }
     }
 
     fn advance_or_backtrack<T: Tracer>(

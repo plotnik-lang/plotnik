@@ -44,3 +44,9 @@ tempfile = "=3.27.0"
 name = "snapshots"
 path = "tests/mod.rs"
 harness = false
+
+# Stack-safety regression for VM backtracking. Standard libtest harness, so it must
+# be declared by hand too (autotests = false suppresses autodiscovery).
+[[test]]
+name = "stack_safety"
+path = "tests/stack_safety.rs"
