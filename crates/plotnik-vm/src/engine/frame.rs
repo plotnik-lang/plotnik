@@ -66,6 +66,14 @@ impl FrameArena {
         self.current
     }
 
+    /// Live heap bytes for the append-only frame arena: frame count × frame
+    /// size. The arena is never deallocated mid-run (only pruned), so its
+    /// `len()` is the true live span.
+    #[inline]
+    pub fn byte_footprint(&self) -> u64 {
+        (self.frames.len() * std::mem::size_of::<Frame>()) as u64
+    }
+
     /// Check if frame stack is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {

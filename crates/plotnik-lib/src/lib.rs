@@ -38,8 +38,9 @@ pub use plotnik_compiler::{Diagnostics, Error, PassResult, Result, Severity, Spa
 pub use plotnik_compiler::{Query, QueryBuilder, SourceId, SourceMap};
 
 pub use plotnik_vm::{
-    EffectLog, ExecLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
-    Tracer, VM, Value, ValueMaterializer, Verbosity, debug_verify_type, materialize_verified,
+    EffectLog, Limit, Materializer, NodeHandle, PrintTracer, ResolvedRuntimeLimits, RuntimeEffect,
+    RuntimeError, RuntimeLimitSpec, Tracer, VM, Value, ValueMaterializer, Verbosity,
+    debug_verify_type, materialize_verified,
 };
 
 /// Embed bytecode with 64-byte alignment (zero-copy loading).

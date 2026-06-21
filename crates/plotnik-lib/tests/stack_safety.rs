@@ -2,15 +2,15 @@
 //!
 //! `VM::backtrack` once self-recursed in tail position over the checkpoint stack
 //! (vm.rs). The checkpoint stack's depth is set by the *source-tree shape* and is
-//! decoupled from `recursion_limit` (which bounds only the frame stack), so a
-//! single `backtrack` could unwind a run of call-retry checkpoints far deeper than
-//! any execution limit. Rust does not guarantee tail-call optimization, so on
-//! untrusted source that recursion aborted the process on the native stack.
+//! decoupled from call depth (the frame stack), so a single `backtrack` could
+//! unwind a run of call-retry checkpoints far deeper than the frame stack ever
+//! grew. Rust does not guarantee tail-call optimization, so on untrusted source
+//! that recursion aborted the process on the native stack.
 //!
 //! The fix turned `backtrack` into a loop. This test pins it two ways:
 //!   1. a probe `Tracer` asserts a single `backtrack` call unwinds a run of
 //!      checkpoints far past any plausible native-stack depth, and
-//!   2. the run happens on a deliberately tiny (512 KiB) thread stack, so the
+//!   2. the run happens on a deliberately tiny (256 KiB) thread stack, so the
 //!      pre-fix recursive version would abort the test binary here.
 
 use std::num::NonZeroU16;
@@ -21,7 +21,10 @@ use arborium_tree_sitter::{Language as TsLanguage, Node, Parser as TsParser, Tre
 
 use plotnik_lib::bytecode::{EffectKind, Instruction, Module, Nav};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
-use plotnik_lib::{Colors, QueryBuilder, RuntimeEffect, RuntimeError, SourceMap, Tracer, VM, Value};
+use plotnik_lib::{
+    Colors, Limit, QueryBuilder, RuntimeEffect, RuntimeError, RuntimeLimitSpec, SourceMap, Tracer,
+    VM, Value,
+};
 
 /// Number of nested `unary_expression`s the query descends through. Each level
 /// leaves one call-retry checkpoint; the final failure unwinds all of them in a
@@ -166,24 +169,27 @@ fn deep_backtrack_does_not_overflow_native_stack() {
         .expect("Top is an entrypoint");
 
     // Run the VM on a tiny stack so the pre-fix recursive `backtrack` would abort
-    // here. `recursion_limit` is raised above DEPTH so the descent reaches the leaf
-    // (the frame stack lives on the heap); the native stack is what's under test.
+    // here. Both runtime limits are Unbounded so no resource ceiling cuts the run
+    // short before the deep unwind (the frame stack lives on the heap); the native
+    // stack is what's under test.
     let (outcome, max_run) = thread::scope(|scope| {
         let handle = thread::Builder::new()
             .name("deep-backtrack".into())
             .stack_size(STACK_SIZE)
             .spawn_scoped(scope, || {
                 let vm = VM::builder(&source, &tree)
-                    .recursion_limit((DEPTH as u32) + 1024)
-                    .step_budget(u32::MAX)
+                    .limits(RuntimeLimitSpec {
+                        steps: Limit::Unbounded,
+                        memory: Limit::Unbounded,
+                    })
                     .build();
                 let mut probe = DepthProbe::default();
                 let result = vm.execute_with(&module, 0, &entry, &mut probe);
                 let outcome = match result {
                     Ok(_) => "matched",
                     Err(RuntimeError::NoMatch) => "no-match",
-                    Err(RuntimeError::ExecFuelExhausted(_)) => "fuel",
-                    Err(RuntimeError::RecursionLimitExceeded(_)) => "recursion",
+                    Err(RuntimeError::StepLimitExceeded(_)) => "steps",
+                    Err(RuntimeError::MemoryLimitExceeded(_)) => "memory",
                     Err(_) => "other-error",
                 };
                 (outcome, probe.max_run)

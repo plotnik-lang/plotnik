@@ -161,6 +161,12 @@ impl CheckpointStack {
     pub fn len(&self) -> usize {
         self.stack.len()
     }
+
+    /// Live heap bytes: checkpoint count × checkpoint size.
+    #[inline]
+    pub fn byte_footprint(&self) -> u64 {
+        (self.stack.len() * std::mem::size_of::<Checkpoint>()) as u64
+    }
 }
 
 impl Default for CheckpointStack {

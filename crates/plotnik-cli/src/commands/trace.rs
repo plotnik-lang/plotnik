@@ -3,7 +3,9 @@
 use std::path::PathBuf;
 
 use plotnik_lib::Colors;
-use plotnik_lib::engine::{PrintTracer, RuntimeError, VM, Verbosity, materialize_verified};
+use plotnik_lib::engine::{
+    Limit, PrintTracer, RuntimeError, RuntimeLimitSpec, VM, Verbosity, materialize_verified,
+};
 
 use super::run_common::{self, ExecPlan, ExecRequest};
 use crate::error::{CliError, CliResult};
@@ -38,7 +40,10 @@ pub fn run(args: TraceArgs) -> CliResult {
     })?;
 
     let vm = VM::builder(&source_code, &tree)
-        .step_budget(args.fuel)
+        .limits(RuntimeLimitSpec {
+            steps: Limit::Of(args.fuel as u64),
+            memory: Limit::Auto,
+        })
         .build();
     let colors = Colors::new(args.color);
     let mut tracer = PrintTracer::builder(&source_code, &module)

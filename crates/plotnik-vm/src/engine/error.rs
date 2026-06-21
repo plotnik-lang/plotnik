@@ -5,11 +5,11 @@ use plotnik_bytecode::ModuleError;
 /// Errors during VM execution.
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
-    #[error("execution fuel exhausted after {0} steps")]
-    ExecFuelExhausted(u32),
+    #[error("exceeded the step limit of {0} steps")]
+    StepLimitExceeded(u64),
 
-    #[error("recursion limit exceeded (depth {0})")]
-    RecursionLimitExceeded(u32),
+    #[error("exceeded the memory limit of {0} bytes")]
+    MemoryLimitExceeded(u64),
 
     #[error("no match found")]
     NoMatch,
