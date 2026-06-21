@@ -654,8 +654,8 @@ interface Section {
 
 Match alternatives with `[...]`:
 
-- **Union** (unlabeled): Fields merge across branches
-- **Enum** (with labels): Discriminated union
+- **Union** (no branch labels): Fields merge across branches
+- **Enum** (with branch labels): Discriminated union
 
 ```
 [
@@ -664,7 +664,7 @@ Match alternatives with `[...]`:
 ] @value
 ```
 
-### Union Style (Unlabeled)
+### Union Style
 
 Captures merge: present in all branches → required; some branches → nullable (`T | null`, always present). Same-name captures must have compatible types.
 
@@ -743,7 +743,7 @@ Output type:
 }
 ```
 
-### Enum Style (Labeled)
+### Enum Style
 
 Labels create a discriminated union (`$tag` + `$data`):
 
@@ -967,7 +967,7 @@ NestedCall =
 
 Matches `a()`, `a()()`, `a()()()`, etc. → `{ name: Node | null, inner: NestedCall | null }`
 
-Tagged recursive example:
+Enum recursive example:
 
 ```
 MemberChain = [

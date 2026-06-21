@@ -769,7 +769,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let (kind, msg, hint) = match err {
             UnifyError::ScalarInUnion => (
                 DiagnosticKind::IncompatibleTypes,
-                "a branch produces a value but the alternation is unlabeled".to_string(),
+                "a branch produces a value but this is a union alternation".to_string(),
                 Some("give every branch a branch label for an enum, e.g. `[A: ... B: ...]`"),
             ),
             UnifyError::IncompatibleTypes { field } => (

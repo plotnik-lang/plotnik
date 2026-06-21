@@ -612,7 +612,7 @@ impl Compiler<'_> {
         self.assemble_alt_branches(successors, search_nav, exit)
     }
 
-    /// Enum alternation: each labeled branch opens its variant scope
+    /// Enum alternation: each enum branch opens its variant scope
     /// (`EnumOpen`…`EnumClose`) and compiles its payload inside it.
     pub(super) fn compile_enum(&mut self, e: &ast::EnumPattern, ctx: ExprCtx) -> Label {
         let ExprCtx {
@@ -667,7 +667,7 @@ impl Compiler<'_> {
                 .get(label.text())
                 .and_then(|sym| variant_info.get(&sym))
                 .map(|&(idx, type_id)| (idx, type_id))
-                .expect("variant must exist for labeled branch");
+                .expect("variant must exist for enum branch");
 
             let e_effect = if let Some(type_id) = enum_type_id {
                 EffectIR::with_member(EffectKind::EnumOpen, MemberRef::new(type_id, variant_idx))

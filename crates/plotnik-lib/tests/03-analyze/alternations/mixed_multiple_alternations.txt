@@ -9,7 +9,7 @@ Q = (foo
   ]
 )
 ==== diagnostics ====
-error: cannot mix labeled and unlabeled branches
+error: cannot mix enum and union branches
  --> query.ptk:4:5
   |
 3 |     A: (a)
@@ -19,7 +19,7 @@ error: cannot mix labeled and unlabeled branches
   |
 help: use all labels for an enum, or none for a merged struct
 
-error: cannot mix labeled and unlabeled branches
+error: cannot mix enum and union branches
  --> query.ptk:8:5
   |
 7 |     C: (c)
