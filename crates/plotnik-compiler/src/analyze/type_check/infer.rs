@@ -517,10 +517,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 TypeFlow::Scalar(self.ctx.type_ctx.intern_type(TypeShape::Optional(t)))
             }
             TypeFlow::Fields(type_id) => {
-                let fields = self.ctx.type_ctx.expect_struct_fields(type_id).clone();
-                let optional_fields = fields
-                    .into_iter()
-                    .map(|(k, v)| (k, v.make_optional()))
+                let optional_fields: BTreeMap<_, _> = self
+                    .ctx
+                    .type_ctx
+                    .expect_struct_fields(type_id)
+                    .iter()
+                    .map(|(&k, &v)| (k, v.make_optional()))
                     .collect();
                 TypeFlow::Fields(self.ctx.type_ctx.intern_struct(optional_fields))
             }

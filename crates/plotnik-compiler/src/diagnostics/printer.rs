@@ -49,7 +49,7 @@ impl<'q> DiagnosticsPrinter<'q> {
                 primary_snippet = primary_snippet.path(name);
             }
             primary_snippet =
-                primary_snippet.annotation(AnnotationKind::Primary.span(range.clone()));
+                primary_snippet.annotation(AnnotationKind::Primary.span(range));
 
             let mut cross_file_snippets = Vec::new();
 
@@ -87,7 +87,8 @@ impl<'q> DiagnosticsPrinter<'q> {
 
             if let Some(fix) = &diag.fix {
                 report.push(Level::HELP.secondary_title(&fix.description).element(
-                    Snippet::source(primary_content).patch(Patch::new(range, &fix.replacement)),
+                    Snippet::source(primary_content)
+                        .patch(Patch::new(diag.range.into(), &fix.replacement)),
                 ));
             }
 
