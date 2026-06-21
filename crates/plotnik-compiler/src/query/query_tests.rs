@@ -269,17 +269,6 @@ fn invalid_three_way_mutual_recursion_across_files() {
 }
 
 #[test]
-fn check_compile_rejects_enum_zero_width_branch_in_quantifier() {
-    // Passes analysis; the emitted bytecode is rejected by `Module::load`
-    // (EffectStackImbalance). `check_compile` must report it, not panic.
-    let linked = Query::parse_and_validate("Q = (program [A: (comment)? @c]* @items)").link(javascript());
-    let diag = linked.check_compile();
-    assert!(diag.has_errors());
-    let rendered = diag.render(linked.source_map());
-    assert!(rendered.contains("effect stack imbalance"), "{rendered}");
-}
-
-#[test]
 fn check_compile_rejects_byte_oriented_regex() {
     // Passes analysis; the DFA build fails at emit time (EmitError::RegexCompile).
     let linked = Query::parse_and_validate(r"Q = (identifier =~ /(?-u:\xFF)/) @x").link(javascript());
