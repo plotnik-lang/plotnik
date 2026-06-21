@@ -44,6 +44,8 @@ pub fn resolve_limit_spec(m: &ArgMatches) -> RuntimeLimitSpec {
             steps: Limit::Unbounded,
             memory: Limit::Unbounded,
         },
+        // `auto` and the absent flag both mean the size-based default; the
+        // value_parser admits no other preset.
         _ => RuntimeLimitSpec::default(),
     };
     RuntimeLimitSpec {
@@ -76,11 +78,12 @@ pub(crate) fn parse_memory(raw: &str) -> Result<Limit, String> {
     parse_size(raw).map(Limit::Of)
 }
 
-/// The `auto`/`unbounded` keywords shared by both numeric knobs.
+/// The `auto`/`unbounded` keywords shared by both numeric knobs. These are the
+/// only spellings, matching `--limits` — there is deliberately no `none` synonym.
 fn keyword(raw: &str) -> Option<Limit> {
     match raw.trim().to_ascii_lowercase().as_str() {
         "auto" => Some(Limit::Auto),
-        "unbounded" | "none" => Some(Limit::Unbounded),
+        "unbounded" => Some(Limit::Unbounded),
         _ => None,
     }
 }

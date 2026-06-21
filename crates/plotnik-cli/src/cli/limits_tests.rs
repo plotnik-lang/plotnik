@@ -53,9 +53,10 @@ fn parse_steps_keywords_and_numbers() {
     assert_eq!(parse_steps("auto"), Ok(Limit::Auto));
     assert_eq!(parse_steps("AUTO"), Ok(Limit::Auto));
     assert_eq!(parse_steps("unbounded"), Ok(Limit::Unbounded));
-    assert_eq!(parse_steps("none"), Ok(Limit::Unbounded));
     assert_eq!(parse_steps("5000"), Ok(Limit::Of(5000)));
     assert!(parse_steps("lots").is_err());
+    // `unbounded` is the one opt-out spelling — no `none` synonym, matching `--limits`.
+    assert!(parse_steps("none").is_err());
 }
 
 #[test]
