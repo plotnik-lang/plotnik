@@ -317,6 +317,65 @@ fn check_compile_is_total_on_empty_source_map() {
 }
 
 #[test]
+fn multifile_link_field_error_in_referenced_body_spans_two_files() {
+    // `Foo`'s body is a bare field — valid on its own (no parent to validate it
+    // against). Only when `Bar` places `(Foo)` under `call_expression` does the
+    // field-on-node-kind check fire, while validation has crossed into a.ptk. The
+    // primary span must resolve against a.ptk (where `name:` is written) and the
+    // related note against b.ptk (the parent node). Each `Located` node carries its
+    // own source, so the split survives crossing the reference between files.
+    let mut source_map = SourceMap::new();
+    source_map.add_file("a.ptk", "Foo = name: (identifier)");
+    source_map.add_file("b.ptk", "Bar = (call_expression (Foo))");
+    let analyzed = QueryBuilder::new(source_map).parse().unwrap().analyze();
+    assert!(
+        analyzed.is_valid(),
+        "expected analysis to pass:\n{}",
+        analyzed.dump_diagnostics()
+    );
+    let linked = analyzed.link(javascript());
+    assert!(!linked.is_valid(), "expected linking to fail");
+    let res = linked.dump_diagnostics();
+
+    insta::assert_snapshot!(res, @"
+    error: field `name` is not valid on this node kind
+     --> a.ptk:1:7
+      |
+    1 | Foo = name: (identifier)
+      |       ^^^^
+      |
+     ::: b.ptk:1:8
+      |
+    1 | Bar = (call_expression (Foo))
+      |        --------------- on `call_expression`
+      |
+    help: valid fields for `call_expression`: `arguments`, `function`, `optional_chain`
+    ");
+}
+
+#[test]
+fn multifile_ref_to_body_with_internal_error_attributes_to_defining_file() {
+    // The duplicate-capture error lives inside `Foo`'s body in a.ptk; b.ptk only
+    // references `Foo`. Inference no longer descends across the reference, so the
+    // error is emitted by `Foo`'s own pass and must resolve against a.ptk — never
+    // b.ptk, whose offsets don't even reach that far.
+    let res = expect_invalid! {
+        "a.ptk": "Foo = (program (identifier) @x (identifier) @x)",
+        "b.ptk": "Bar = (Foo)",
+    };
+
+    insta::assert_snapshot!(res, @"
+    error: capture `@x` already defined in this scope
+     --> a.ptk:1:32
+      |
+    1 | Foo = (program (identifier) @x (identifier) @x)
+      |                                ^^^^^^^^^^^^^^^
+      |
+    help: rename one capture, or use an enum if they are mutually exclusive branches
+    ");
+}
+
+#[test]
 fn multifile_field_with_ref_to_seq_error() {
     let res = expect_invalid! {
         "defs.ptk": "X = {(a) (b)}",

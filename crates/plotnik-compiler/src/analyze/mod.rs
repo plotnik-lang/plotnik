@@ -10,9 +10,9 @@
 pub mod dependencies;
 mod invariants;
 pub mod link;
+mod located;
 mod recursion;
 pub mod refs;
-mod reporter;
 pub mod symbol_table;
 pub mod type_check;
 mod utils;
@@ -26,11 +26,10 @@ mod refs_tests;
 
 pub use dependencies::DependencyAnalysis;
 pub use link::GrammarBinding;
+pub(crate) use located::Located;
 pub use recursion::validate_recursion;
-pub(crate) use reporter::Reporter;
 pub use symbol_table::{SymbolTable, UNNAMED_DEF};
 pub use type_check::{TypeContext, infer_types, primary_def_name};
 pub use validation::{
     validate_alt_kinds, validate_anchors, validate_empty_constructs, validate_predicates,
 };
-pub use visitor::{Visitor, walk_pattern};

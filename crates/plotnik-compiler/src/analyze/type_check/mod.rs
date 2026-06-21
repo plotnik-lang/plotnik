@@ -26,13 +26,9 @@ pub use types::{
 };
 pub use unify::{UnifyError, unify_flow, unify_flows};
 
-use indexmap::IndexMap;
-
 use crate::analyze::dependencies::DependencyAnalysis;
 use crate::analyze::symbol_table::{SymbolTable, UNNAMED_DEF};
 use crate::diagnostics::Diagnostics;
-use crate::parser::Root;
-use crate::query::SourceId;
 
 /// Run type inference on all definitions.
 ///
@@ -40,14 +36,12 @@ use crate::query::SourceId;
 /// recursive definitions correctly.
 pub fn infer_types(
     interner: &mut Interner,
-    ast_map: &IndexMap<SourceId, Root>,
     symbol_table: &SymbolTable,
     dependency_analysis: &DependencyAnalysis,
     diag: &mut Diagnostics,
 ) -> TypeContext {
     let analysis = infer::InferPassInput {
         interner,
-        ast_map,
         symbol_table,
         dependency_analysis,
         diag,

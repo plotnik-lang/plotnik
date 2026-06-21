@@ -2,16 +2,13 @@
 
 mod dump;
 mod printer;
-mod source_map;
 mod stages;
 
 #[cfg(test)]
 mod printer_tests;
 #[cfg(test)]
 mod query_tests;
-#[cfg(test)]
-mod source_map_tests;
 
 pub use printer::QueryPrinter;
-pub use source_map::{Source, SourceId, SourceKind, SourceMap};
+pub use crate::source::{Source, SourceId, SourceKind, SourceMap};
 pub use stages::{AstMap, GrammarBoundQuery, Query, QueryBuilder, QueryConfig, QueryParsed};

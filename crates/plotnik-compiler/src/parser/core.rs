@@ -6,7 +6,8 @@ use super::ast::Root;
 use super::cst::{SyntaxKind, SyntaxNode, TokenSet};
 use super::lexer::{Token, token_text};
 use crate::Error;
-use crate::diagnostics::{DiagnosticKind, Diagnostics, SourceId};
+use crate::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::source::SourceId;
 
 #[derive(Debug)]
 pub struct ParseResult {
