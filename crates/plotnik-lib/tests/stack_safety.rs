@@ -189,7 +189,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
                     Ok(_) => "matched",
                     Err(RuntimeError::NoMatch) => "no-match",
                     Err(RuntimeError::StepLimitExceeded(_)) => "steps",
-                    Err(RuntimeError::MemoryLimitExceeded(_)) => "memory",
+                    Err(RuntimeError::MemoryLimitExceeded { .. }) => "memory",
                     Err(_) => "other-error",
                 };
                 (outcome, probe.max_run)

@@ -8,8 +8,11 @@ pub enum RuntimeError {
     #[error("exceeded the step limit of {0} steps")]
     StepLimitExceeded(u64),
 
-    #[error("exceeded the memory limit of {0} bytes")]
-    MemoryLimitExceeded(u64),
+    /// `used` is the live-heap measurement at the trip point; because the arenas
+    /// grow geometrically it can overshoot `limit` by up to a doubling, so it is
+    /// reported alongside the ceiling to make the limit tunable.
+    #[error("exceeded the memory limit of {limit} bytes (used {used} bytes)")]
+    MemoryLimitExceeded { used: u64, limit: u64 },
 
     #[error("no match found")]
     NoMatch,

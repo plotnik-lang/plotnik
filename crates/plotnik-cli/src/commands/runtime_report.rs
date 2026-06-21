@@ -17,6 +17,8 @@ pub fn render_runtime_error(error: &RuntimeError, json: bool) -> String {
                 code: "E-limit-steps",
                 title: "step limit exceeded",
                 ceiling: format!("{} steps", group_thousands(*limit)),
+                // Steps trip exactly at the ceiling, so usage adds nothing.
+                used: None,
                 why: "the query did more work than the step limit allows — usually \
                       catastrophic backtracking, or an unusually large input",
                 flag: "--max-steps",
@@ -25,11 +27,17 @@ pub fn render_runtime_error(error: &RuntimeError, json: bool) -> String {
             },
             json,
         ),
-        RuntimeError::MemoryLimitExceeded(limit) => render_limit(
+        RuntimeError::MemoryLimitExceeded { used, limit } => render_limit(
             LimitReport {
                 code: "E-limit-memory",
                 title: "memory limit exceeded",
                 ceiling: human_size(*limit),
+                // Arenas grow geometrically, so usage overshoots the ceiling;
+                // reporting it is what makes a new `--max-memory` computable.
+                used: Some(Usage {
+                    human: human_size(*used),
+                    bytes: *used,
+                }),
                 why: "the query's live state outgrew the memory limit — usually \
                       catastrophic backtracking, or an unusually large input",
                 flag: "--max-memory",
@@ -52,27 +60,44 @@ struct LimitReport {
     title: &'static str,
     /// The ceiling, already formatted for humans (`"2,000,000 steps"`, `"64.0 MiB"`).
     ceiling: String,
+    /// Actual usage at the trip point, when it is worth reporting separately from
+    /// the ceiling (memory). `None` for steps, where usage equals the limit.
+    used: Option<Usage>,
     why: &'static str,
     flag: &'static str,
     json_key: &'static str,
     json_value: String,
 }
 
+/// Measured usage at the trip point, pre-formatted for both renderers.
+struct Usage {
+    human: String,
+    bytes: u64,
+}
+
 fn render_limit(r: LimitReport, json: bool) -> String {
     if json {
+        let used = match &r.used {
+            Some(u) => format!(r#","used":{}"#, u.bytes),
+            None => String::new(),
+        };
         return format!(
-            r#"{{"error":"limit-exceeded","code":"{}","{}":{}}}"#,
-            r.code, r.json_key, r.json_value
+            r#"{{"error":"limit-exceeded","code":"{}","{}":{}{}}}"#,
+            r.code, r.json_key, r.json_value, used
         );
     }
+    let halted = match &r.used {
+        Some(u) => format!("used {} of the {} limit", u.human, r.ceiling),
+        None => format!("the limit is {}", r.ceiling),
+    };
     format!(
         "error: {} [{}]\n  \
-         halted before completing — the limit is {}\n  \
+         halted before completing — {}\n  \
          {}\n  \
          raise it with {flag} <VALUE>, or {flag} unbounded to opt out",
         r.title,
         r.code,
-        r.ceiling,
+        halted,
         r.why,
         flag = r.flag,
     )

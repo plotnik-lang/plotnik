@@ -266,10 +266,11 @@ impl<'t> VM<'t> {
             // Memory ceiling: bound the live runtime heap, sampled once per
             // dispatch. Per-step growth is bounded, so this catches blowup
             // promptly. `None` opts out (Unbounded).
-            if let Some(max) = self.limits.max_memory
-                && self.heap_bytes() > max
-            {
-                return Err(RuntimeError::MemoryLimitExceeded(max));
+            if let Some(max) = self.limits.max_memory {
+                let used = self.heap_bytes();
+                if used > max {
+                    return Err(RuntimeError::MemoryLimitExceeded { used, limit: max });
+                }
             }
 
             // Fetch and dispatch. The IP must address a validated instruction
