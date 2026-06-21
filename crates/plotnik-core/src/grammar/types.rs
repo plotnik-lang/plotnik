@@ -118,7 +118,6 @@ impl Grammar {
     }
 
     pub(super) fn from_tables(name: String, tables: GrammarTables) -> Result<Self, String> {
-        let mut node_ids = HashMap::<NodeKind<&str>, NodeKindId>::new();
         let mut named_node_ids = HashMap::new();
         let mut anonymous_node_ids = HashMap::new();
         let mut node_names = HashMap::new();
@@ -130,7 +129,7 @@ impl Grammar {
         // keeps the kind out of the token set even when it otherwise looks childless.
         let mut all_terminal: HashMap<NodeKindId, bool> = HashMap::new();
 
-        for symbol in &tables.symbols {
+        for symbol in tables.symbols {
             let node_id = node_kind_id(symbol.id);
             node_names.insert(node_id, symbol.type_name.clone());
 
@@ -147,35 +146,26 @@ impl Grammar {
                 continue;
             }
 
-            let node_kind = if symbol.named {
-                NodeKind::Named(symbol.type_name.as_str())
-            } else {
-                NodeKind::Anonymous(symbol.type_name.as_str())
-            };
-            node_ids.entry(node_kind).or_insert(node_id);
-
             if symbol.named {
-                named_node_ids
-                    .entry(symbol.type_name.clone())
-                    .or_insert(node_id);
+                named_node_ids.entry(symbol.type_name).or_insert(node_id);
             } else {
                 anonymous_node_ids
-                    .entry(symbol.type_name.clone())
+                    .entry(symbol.type_name)
                     .or_insert(node_id);
             }
         }
 
         let mut field_ids = HashMap::new();
         let mut field_names = HashMap::new();
-        for field in &tables.fields {
+        for field in tables.fields {
             let field_id = node_field_id(field.id);
-            field_ids.insert(field.name.clone(), field_id);
             field_names.insert(field_id, field.name.clone());
+            field_ids.insert(field.name, field_id);
         }
 
         let (node_constraints, extra_node_kinds, root_node_kind) = build_node_constraints(
             &tables.node_shapes,
-            |node_kind| node_ids.get(&node_kind).copied(),
+            |node_kind| resolve_node_id(&named_node_ids, &anonymous_node_ids, node_kind),
             |name| field_ids.get(name).copied(),
         )
         .map_err(format_node_shape_error)?;
@@ -185,25 +175,31 @@ impl Grammar {
             let Some(shape_subtypes) = &shape.subtypes else {
                 continue;
             };
-            let Some(supertype) = node_ids.get(&shape.node_kind()) else {
+            let Some(supertype) =
+                resolve_node_id(&named_node_ids, &anonymous_node_ids, shape.node_kind())
+            else {
                 continue;
             };
 
             let resolved = shape_subtypes
                 .iter()
-                .filter_map(|subtype| node_ids.get(&subtype.node_kind()).copied())
+                .filter_map(|subtype| {
+                    resolve_node_id(&named_node_ids, &anonymous_node_ids, subtype.node_kind())
+                })
                 .collect::<Vec<_>>();
-            subtypes.insert(*supertype, resolved);
+            subtypes.insert(supertype, resolved);
         }
 
         let mut fields_by_node = HashMap::new();
         for shape in &tables.node_shapes {
-            let Some(node_id) = node_ids.get(&shape.node_kind()) else {
+            let Some(node_id) =
+                resolve_node_id(&named_node_ids, &anonymous_node_ids, shape.node_kind())
+            else {
                 continue;
             };
             let mut fields = shape.fields.keys().cloned().collect::<Vec<_>>();
             fields.sort();
-            fields_by_node.insert(*node_id, fields);
+            fields_by_node.insert(node_id, fields);
         }
 
         let mut all_named_node_kinds = named_node_ids.keys().cloned().collect::<Vec<_>>();
@@ -450,6 +446,20 @@ impl Grammar {
 
 fn node_kind_id(id: u16) -> NodeKindId {
     NonZeroU16::new(id).expect("lowered node symbol id must be non-zero in production grammar")
+}
+
+/// Resolve a node kind to its id via the public name maps. Equivalent to the former
+/// `node_ids: HashMap<NodeKind<&str>, _>`: both maps are populated in lockstep with it, so the
+/// lookups match — but these own their keys, freeing the symbol loop to consume `tables.symbols`.
+fn resolve_node_id(
+    named_node_ids: &HashMap<String, NodeKindId>,
+    anonymous_node_ids: &HashMap<String, NodeKindId>,
+    node_kind: NodeKind<&str>,
+) -> Option<NodeKindId> {
+    match node_kind {
+        NodeKind::Named(name) => named_node_ids.get(name).copied(),
+        NodeKind::Anonymous(name) => anonymous_node_ids.get(name).copied(),
+    }
 }
 
 fn node_field_id(id: u16) -> NodeFieldId {
