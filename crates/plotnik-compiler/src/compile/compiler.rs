@@ -16,7 +16,7 @@ use super::capture::ExprCtx;
 use super::collapse_up::collapse_up;
 use super::dce::remove_unreachable;
 use super::epsilon_elim::eliminate_epsilons;
-use super::error::{CompileError, CompileResult};
+use super::error::CompileResult;
 use super::lower::lower;
 use super::scope::{CaptureExits, StructScope};
 use super::verify::{run_verified, verify_constructed};
@@ -56,7 +56,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn build_ir(ctx: &'a CompileCtx<'a>) -> Result<CompileResult, CompileError> {
+    pub fn build_ir(ctx: &'a CompileCtx<'a>) -> CompileResult {
         let mut compiler = Compiler::new(ctx);
 
         // Emit universal preamble first: Struct -> Trampoline -> EndStruct -> Return
@@ -69,7 +69,7 @@ impl<'a> Compiler<'a> {
         }
 
         for (def_id, _) in ctx.type_ctx.iter_def_types() {
-            compiler.compile_def(def_id)?;
+            compiler.compile_def(def_id);
         }
 
         let mut result = CompileResult {
@@ -87,7 +87,7 @@ impl<'a> Compiler<'a> {
         run_verified("collapse_up", &mut result, ctx, collapse_up);
         run_verified("lower", &mut result, ctx, lower);
 
-        Ok(result)
+        result
     }
 
     /// Emit the universal preamble: Struct -> Trampoline -> EndStruct -> Return
@@ -115,13 +115,15 @@ impl<'a> Compiler<'a> {
         l
     }
 
-    fn compile_def(&mut self, def_id: DefId) -> Result<(), CompileError> {
+    fn compile_def(&mut self, def_id: DefId) {
         let name_sym = self.ctx.type_ctx.def_name_sym(def_id);
         let name = self.ctx.interner.resolve(name_sym);
 
-        let Some(body) = self.ctx.symbol_table.body(name) else {
-            return Err(CompileError::DefinitionNotFound(name.to_string()));
-        };
+        let body = self
+            .ctx
+            .symbol_table
+            .body(name)
+            .expect("analyzed definition has a body");
 
         let entry_label = self.def_entries[&def_id];
 
@@ -149,8 +151,6 @@ impl<'a> Compiler<'a> {
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
         }
-
-        Ok(())
     }
 
     pub(super) fn compile_pattern(
