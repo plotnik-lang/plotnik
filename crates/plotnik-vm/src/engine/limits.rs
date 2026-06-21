@@ -7,11 +7,11 @@
 //! against the source's node count yields the concrete [`ResolvedRuntimeLimits`]
 //! the VM enforces.
 //!
-//! Why only these two: after backtracking was made iterative, nothing of
-//! interest reaches the native stack, so call depth no longer needs its own
-//! ceiling — the frame arena is just more heap, folded into the memory sum.
-//! Steps bound time-like blowup (catastrophic backtracking); memory bounds
-//! space-like blowup (unbounded checkpoint/effect growth).
+//! Two orthogonal resources are enough. Steps bound time-like blowup
+//! (catastrophic backtracking); memory bounds space-like blowup (unbounded
+//! checkpoint or effect growth). Call depth needs no ceiling of its own:
+//! backtracking and output rendering are iterative, so depth is pure heap — the
+//! frame arena, already part of the memory sum — not a native-stack risk.
 
 /// One resource's limit policy, independent of any particular input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

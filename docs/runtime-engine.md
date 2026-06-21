@@ -214,21 +214,8 @@ only cost is heap, which the memory ceiling bounds directly (the frame arena is
 part of the sum). See `docs/cli.md` for the `--max-steps` / `--max-memory` /
 `--limits` flags.
 
-### Migrating from the old limits API
-
-This replaced the previous `ExecLimits` (a fixed step budget + recursion limit)
-with no back-compat shim:
-
-| Old                                            | New                                                              |
-| ---------------------------------------------- | ---------------------------------------------------------------- |
-| `ExecLimits { step_budget, recursion_limit }`  | `RuntimeLimitSpec { steps: Limit, memory: Limit }`               |
-| `VM::builder(src, t).step_budget(n)`           | `VM::builder(src, t).limits(RuntimeLimitSpec { steps: Limit::Of(n), memory: Limit::Auto })` |
-| `.recursion_limit(m)`                          | *removed* — call depth is bounded by `memory`, not its own limit |
-| `VM::new(src, t, limits)` (deprecated)         | `VM::builder(src, t).limits(spec).build()`                       |
-| `RuntimeError::ExecFuelExhausted(u32)`         | `RuntimeError::StepLimitExceeded(u64)`                           |
-| `RuntimeError::RecursionLimitExceeded(u32)`    | `RuntimeError::MemoryLimitExceeded(u64)` (the nearest analogue)  |
-
-Omitting `.limits(..)` resolves to `Auto`/`Auto` — the size-based safety net.
+Omitting `.limits(..)` on the builder resolves to `Auto`/`Auto` — the size-based
+safety net.
 
 ## Trivia Handling
 
