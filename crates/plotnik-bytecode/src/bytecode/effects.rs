@@ -11,8 +11,6 @@ pub const EFFECT_PAYLOAD_MAX: usize = (1 << EFFECT_PAYLOAD_BITS) - 1;
 #[repr(u8)]
 pub enum EffectKind {
     Node = 0,
-    // Composite effects are ordered open / insert / close, the same for arrays
-    // and structs.
     ArrayOpen = 1,
     Push = 2,
     ArrayClose = 3,

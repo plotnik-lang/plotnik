@@ -262,7 +262,6 @@ fn first_effect_op(bytes: &[u8], want: impl Fn(u16) -> bool) -> usize {
         .expect("no matching effect slot in transitions")
 }
 
-/// Little-endian bytes of a payload-less effect word for `kind`.
 fn effect_word(kind: EffectKind) -> [u8; 2] {
     ((kind as u16) << EFFECT_PAYLOAD_BITS).to_le_bytes()
 }
