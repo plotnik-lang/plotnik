@@ -108,7 +108,7 @@ EffectOp (u16)
 └──────────────┴─────────────────────┘
 ```
 
-- **Opcode**: 6 bits (0-63), currently 13 defined.
+- **Opcode**: 6 bits (0-63).
 - **Payload**: 10 bits (0-1023), member/variant index.
 
 | Opcode | Name            | Payload                |
@@ -117,15 +117,14 @@ EffectOp (u16)
 | 1      | `ArrayOpen`     | -                      |
 | 2      | `Push`          | -                      |
 | 3      | `ArrayClose`    | -                      |
-| 4      | `ObjectOpen`    | -                      |
-| 5      | `ObjectClose`   | -                      |
-| 6      | `Set`           | Member index (0-1023)  |
+| 4      | `StructOpen`    | -                      |
+| 5      | `Set`           | Member index (0-1023)  |
+| 6      | `StructClose`   | -                      |
 | 7      | `EnumOpen`      | Variant index (0-1023) |
 | 8      | `EnumClose`     | -                      |
-| 9      | `Clear`         | -                      |
-| 10     | `Null`          | -                      |
-| 11     | `SuppressBegin` | -                      |
-| 12     | `SuppressEnd`   | -                      |
+| 9      | `Null`          | -                      |
+| 10     | `SuppressBegin` | -                      |
+| 11     | `SuppressEnd`   | -                      |
 
 **Opcode Ranges** (future extensibility):
 
@@ -134,9 +133,9 @@ EffectOp (u16)
 | 0-31  | Single word | 10-bit payload in same word    |
 | 32-63 | Extended    | Next u16 word is full argument |
 
-Current opcodes (0-12) fit in the single-word range. Future predicates needing `StringId` (u16) use extended format.
+Effect opcodes fit in the single-word range. Future predicates needing `StringId` (u16) use extended format.
 
-**Suppression Opcodes**: `SuppressBegin` (11) and `SuppressEnd` (12) implement suppressive captures (`@_`). When `SuppressBegin` is executed, the VM enters suppression mode and all subsequent effects are skipped until `SuppressEnd` is executed. Suppression nesting is supported via a depth counter.
+**Suppression Opcodes**: `SuppressBegin` and `SuppressEnd` implement suppressive captures (`@_`). When `SuppressBegin` is executed, the VM enters suppression mode and all subsequent effects are skipped until `SuppressEnd` is executed. Suppression nesting is supported via a depth counter.
 
 ## 4. Instructions
 
@@ -266,7 +265,7 @@ A Match instruction with `nav == Epsilon` is an **epsilon transition** — it su
 
 - **Branching at EOF**: `(a)?` must succeed when no node exists to match.
 - **Pure control flow**: Decision points for quantifiers.
-- **Effect-only steps**: Scope openers/closers (`ObjectOpen`, `ObjectClose`) without node interaction.
+- **Effect-only steps**: Scope openers/closers (`StructOpen`, `StructClose`) without node interaction.
 
 When `nav == Epsilon`:
 
@@ -320,7 +319,7 @@ struct Trampoline {
 }
 ```
 
-The preamble at step 0 typically looks like: `ObjectOpen → Trampoline → ObjectClose → Accept`. When executed:
+The preamble at step 0 typically looks like: `StructOpen → Trampoline → StructClose → Accept`. When executed:
 
 1. VM pushes `next` (return address) onto call stack
 2. VM jumps to `entrypoint_target` (set from entrypoint before execution)

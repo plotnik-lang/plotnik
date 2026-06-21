@@ -17,10 +17,10 @@ use printer::DiagnosticsPrinter;
 
 use message::{Diagnostic, Fix, Related};
 
-pub use crate::query::{SourceId, SourceMap};
+pub use crate::source::{SourceId, SourceMap};
 
 /// A location that knows which source it belongs to.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Span {
     pub source: SourceId,
     pub range: TextRange,
@@ -85,29 +85,35 @@ impl Diagnostics {
 
     /// Returns diagnostics with cascading errors suppressed.
     ///
+    /// All suppression is intra-file: offsets are per-source, so two diagnostics
+    /// are only ever compared when they share a `source`.
+    ///
     /// Suppression rules:
     /// 1. Containment: when error A's suppression_range contains error B's display range,
     ///    and A has higher priority, suppress B (only for structural errors)
     /// 2. Same position: when spans start at the same position, root-cause errors suppress structural ones
-    /// 3. Consequence errors (MissingDefName) suppressed when any other error exists
+    /// 3. Consequence errors (MissingDefName) suppressed when any other error exists in the same source
     /// 4. Adjacent: when error A ends exactly where error B starts, A suppresses B
-    pub(crate) fn live(&self) -> Vec<Diagnostic> {
+    pub(crate) fn live(&self) -> Vec<&Diagnostic> {
         if self.messages.is_empty() {
             return Vec::new();
         }
 
         let mut suppressed = vec![false; self.messages.len()];
 
-        // Rule 3: Suppress consequence errors if any non-consequence error exists
-        let has_root_diagnostic = self
-            .messages
-            .iter()
-            .any(|m| !m.kind.is_cascade_consequence());
-        if has_root_diagnostic {
-            for (i, msg) in self.messages.iter().enumerate() {
-                if msg.kind.is_cascade_consequence() {
-                    suppressed[i] = true;
-                }
+        // Rule 3: Suppress a consequence error only when a root diagnostic exists
+        // in its OWN source. A cascade is an intra-file phenomenon; a structural
+        // error in one file must not silence a real error in another.
+        for (i, msg) in self.messages.iter().enumerate() {
+            if !msg.kind.is_cascade_consequence() {
+                continue;
+            }
+            let has_root_in_source = self
+                .messages
+                .iter()
+                .any(|m| m.source == msg.source && !m.kind.is_cascade_consequence());
+            if has_root_in_source {
+                suppressed[i] = true;
             }
         }
 
@@ -115,6 +121,12 @@ impl Diagnostics {
         for (i, a) in self.messages.iter().enumerate() {
             for (j, b) in self.messages.iter().enumerate() {
                 if i == j || suppressed[i] || suppressed[j] {
+                    continue;
+                }
+
+                // Rules 1/2/4 below all compare raw offsets, which are only
+                // meaningful within one source. Never suppress across files.
+                if a.source != b.source {
                     continue;
                 }
 
@@ -163,9 +175,9 @@ impl Diagnostics {
             .iter()
             .enumerate()
             .filter(|(i, _)| !suppressed[*i])
-            .map(|(_, m)| m.clone())
+            .map(|(_, m)| m)
             .collect();
-        result.sort_by_key(|m| m.range.start());
+        result.sort_by_key(|m| (m.source, m.range.start()));
         result
     }
 
@@ -189,14 +201,14 @@ impl Diagnostics {
 
     /// Render every diagnostic including suppressed cascades; for debugging only.
     pub fn render_raw(&self, sources: &SourceMap) -> String {
-        DiagnosticsPrinter::new(self.messages.clone(), sources).render()
+        DiagnosticsPrinter::new(self.messages.iter().collect(), sources).render()
     }
 
     /// Cascading errors are suppressed, same as `render`.
     pub fn to_wire(&self, sources: &SourceMap) -> Vec<JsonDiagnostic> {
         self.live()
             .iter()
-            .map(|m| json::Diagnostic::from_diagnostic(m, sources))
+            .map(|&m| json::Diagnostic::from_diagnostic(m, sources))
             .collect()
     }
 

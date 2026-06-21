@@ -286,11 +286,21 @@ impl TypeTableBuilder {
     ) -> Result<BytecodeTypeId, EmitError> {
         let base_type = self.resolve_type(field_info.type_id, type_ctx)?;
 
-        if field_info.optional {
+        // `Optional` is idempotent. A captured optional whose base already carries
+        // `Optional` — `(Inner)? @x`, where `make_flow_optional` wrapped the inner
+        // before the capture set `optional` too — must not become
+        // `Optional(Optional(T))`: one skip path emits one `Null`, so the field is a
+        // single `| null`.
+        if field_info.optional && !self.source_is_optional(field_info.type_id, type_ctx) {
             self.get_or_create_optional(base_type)
         } else {
             Ok(base_type)
         }
+    }
+
+    fn source_is_optional(&self, type_id: TypeId, type_ctx: &TypeContext) -> bool {
+        let underlying = self.resolve_underlying_type_id(type_id, type_ctx);
+        matches!(type_ctx.type_shape(underlying), Some(TypeShape::Optional(_)))
     }
 
     fn get_or_create_optional(
@@ -330,7 +340,9 @@ impl TypeTableBuilder {
         let bc_type_id = self.mapping.get(&type_id)?;
         let type_def = self.type_defs.get(bc_type_id.0 as usize)?;
         match type_def.decode() {
-            TypeDefKind::Composite { member_start, .. } => Some(member_start),
+            TypeDefKind::Struct { member_start, .. } | TypeDefKind::Enum { member_start, .. } => {
+                Some(member_start)
+            }
             _ => None,
         }
     }

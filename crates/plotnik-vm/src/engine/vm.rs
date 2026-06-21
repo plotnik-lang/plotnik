@@ -741,12 +741,11 @@ impl<'t> VM<'t> {
             ArrayOpen => RuntimeEffect::ArrayOpen,
             Push => RuntimeEffect::Push,
             ArrayClose => RuntimeEffect::ArrayClose,
-            ObjectOpen => RuntimeEffect::ObjectOpen,
-            ObjectClose => RuntimeEffect::ObjectClose,
+            StructOpen => RuntimeEffect::StructOpen,
+            StructClose => RuntimeEffect::StructClose,
             Set => RuntimeEffect::Set(op.payload as u16),
             EnumOpen => RuntimeEffect::EnumOpen(op.payload as u16),
             EnumClose => RuntimeEffect::EnumClose,
-            Clear => RuntimeEffect::Clear,
             Null => RuntimeEffect::Null,
         };
 

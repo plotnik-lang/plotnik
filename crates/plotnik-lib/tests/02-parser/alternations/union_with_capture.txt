@@ -1,0 +1,35 @@
+Q = [
+  (identifier)
+  (string)
+] @value
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Alt
+        BracketOpen "["
+        Branch
+          Tree
+            ParenOpen "("
+            Id "identifier"
+            ParenClose ")"
+        Branch
+          Tree
+            ParenOpen "("
+            Id "string"
+            ParenClose ")"
+        BracketClose "]"
+      CaptureToken "@value"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedPattern @value
+      Union
+        Branch
+          NamedNode identifier
+        Branch
+          NamedNode string

@@ -55,7 +55,7 @@ fn struct_field_count_overflow_is_emit_error() {
 
 #[test]
 fn enum_variant_count_overflow_is_emit_error() {
-    // 256 labeled alternatives → an enum with 256 variants, past the u8 limit.
+    // 256 enum branches → an enum with 256 variants, past the u8 limit.
     let mut query = String::from("Q = (program [");
     for i in 0..256 {
         write!(query, " L{i}: (identifier) @v{i}").unwrap();

@@ -36,10 +36,10 @@ N0: S6 → T3  ; Test
 Test = 06 :: T3
 
 [transitions]
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [ObjectClose]                    05
+  03  -ε-  [StructClose]                    05
   05                                        ▶
 
 Test:
@@ -50,11 +50,11 @@ Test:
   11  ─‣┘  [ArrayClose Set(M4)] _           13
   13                                        ▶
   14  -ε-  [ArrayClose Set(M4)]             13
-  16  -ε-  [ObjectClose Push]               32, 10
+  16  -ε-  [StructClose Push]               32, 10
   18  ─‣─  (pair) [Node Set(M3)]            16
   20  ─‣─  (pair) [Node Set(M2)]            18
   22  ─‣─  (pair) [Node Set(M1)]            20
-  24   !   [ObjectOpen] (pair) [Node Set(M0)]  22
+  24   !   [StructOpen] (pair) [Node Set(M0)]  22
   26  ─‣─  _                                24, 26
   28  └‣─  _                                24, 26
   30  ─‣─  _                                24, 30

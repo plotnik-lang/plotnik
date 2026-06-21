@@ -102,7 +102,7 @@ impl<'q> QueryPrinter<'q> {
         Ok(())
     }
 
-    fn should_show_headers(&self, source_map: &super::source_map::SourceMap) -> bool {
+    fn should_show_headers(&self, source_map: &super::SourceMap) -> bool {
         source_map.len() > 1
             || source_map
                 .iter()
@@ -270,12 +270,21 @@ impl<'q> QueryPrinter<'q> {
                     writeln!(w, "{}AnonymousNode{}{} \"{}\"", prefix, arity, span, value)?;
                 }
             }
-            ast::Pattern::AltPattern(a) => {
-                writeln!(w, "{}Alt{}{}", prefix, arity, span)?;
-                for branch in a.branches() {
+            ast::Pattern::Union(u) => {
+                writeln!(w, "{}Union{}{}", prefix, arity, span)?;
+                for branch in u.branches() {
                     self.format_branch(&branch, depth + 1, w)?;
                 }
-                for pattern in a.patterns() {
+                for pattern in u.patterns() {
+                    self.format_pattern(&pattern, depth + 1, w)?;
+                }
+            }
+            ast::Pattern::Enum(e) => {
+                writeln!(w, "{}Enum{}{}", prefix, arity, span)?;
+                for branch in e.branches() {
+                    self.format_branch(&branch, depth + 1, w)?;
+                }
+                for pattern in e.patterns() {
                     self.format_pattern(&pattern, depth + 1, w)?;
                 }
             }

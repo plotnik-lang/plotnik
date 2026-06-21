@@ -26,6 +26,6 @@ pub struct CompileResult {
     /// Entry labels for each definition (in definition order).
     pub def_entries: IndexMap<DefId, Label>,
     /// Entry label for the universal preamble.
-    /// The preamble wraps any entrypoint: Obj -> Trampoline -> EndObj -> Return
+    /// The preamble wraps any entrypoint: Struct -> Trampoline -> EndStruct -> Return
     pub preamble_entry: Label,
 }

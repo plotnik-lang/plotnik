@@ -50,15 +50,10 @@ impl<'a> ValueMaterializer<'a> {
             .unwrap_or_else(|| panic!("unknown type_id {}", type_id.0));
 
         match def.decode() {
-            TypeDefKind::Composite {
-                kind: TypeKind::Struct,
-                member_count,
-                ..
-            } => ValueAccumulator::Object(Vec::with_capacity(member_count as usize)),
-            TypeDefKind::Composite {
-                kind: TypeKind::Enum,
-                ..
-            } => ValueAccumulator::Scalar(None),
+            TypeDefKind::Struct { member_count, .. } => {
+                ValueAccumulator::Struct(Vec::with_capacity(member_count as usize))
+            }
+            TypeDefKind::Enum { .. } => ValueAccumulator::Scalar(None),
             TypeDefKind::Wrapper {
                 kind: TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore,
                 ..
@@ -92,7 +87,7 @@ pub fn materialize_verified<'t>(
 enum ValueAccumulator {
     Scalar(Option<Value>),
     Array(Vec<Value>),
-    Object(Vec<(String, Value)>),
+    Struct(Vec<(String, Value)>),
     Enum {
         tag: String,
         payload_type: TypeId,
@@ -105,10 +100,10 @@ impl ValueAccumulator {
         match self {
             ValueAccumulator::Scalar(v) => v.unwrap_or(Value::Null),
             ValueAccumulator::Array(arr) => Value::Array(arr),
-            ValueAccumulator::Object(fields) => Value::Object(fields),
+            ValueAccumulator::Struct(fields) => Value::Struct(fields),
             ValueAccumulator::Enum { tag, fields, .. } => Value::Enum {
                 tag,
-                data: Some(Box::new(Value::Object(fields))),
+                data: Some(Box::new(Value::Struct(fields))),
             },
         }
     }
@@ -117,7 +112,7 @@ impl ValueAccumulator {
         match self {
             ValueAccumulator::Scalar(_) => "Scalar",
             ValueAccumulator::Array(_) => "Array",
-            ValueAccumulator::Object(_) => "Object",
+            ValueAccumulator::Struct(_) => "Struct",
             ValueAccumulator::Enum { .. } => "Enum",
         }
     }
@@ -166,41 +161,41 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
                     };
                     pending = Some(Value::Array(arr));
                 }
-                RuntimeEffect::ObjectOpen => {
-                    stack.push(ValueAccumulator::Object(vec![]));
+                RuntimeEffect::StructOpen => {
+                    stack.push(ValueAccumulator::Struct(vec![]));
                 }
                 RuntimeEffect::Set(idx) => {
                     let field_name = self.resolve_member_name(*idx);
                     let val = pending.take().unwrap_or(Value::Null);
                     match stack.last_mut() {
-                        Some(ValueAccumulator::Object(obj)) => obj.push((field_name, val)),
+                        Some(ValueAccumulator::Struct(fields)) => fields.push((field_name, val)),
                         Some(ValueAccumulator::Enum { fields, .. }) => {
                             fields.push((field_name, val))
                         }
                         other => panic!(
-                            "effect {effect_idx}: Set expects Object/Enum on stack, found {:?}",
+                            "effect {effect_idx}: Set expects Struct/Enum on stack, found {:?}",
                             other.map(|b| b.kind())
                         ),
                     }
                 }
-                RuntimeEffect::ObjectClose => {
+                RuntimeEffect::StructClose => {
                     let top = stack.pop();
-                    let Some(ValueAccumulator::Object(fields)) = top else {
+                    let Some(ValueAccumulator::Struct(fields)) = top else {
                         panic!(
-                            "effect {effect_idx}: ObjectClose expects Object on stack, found {:?}",
+                            "effect {effect_idx}: StructClose expects Struct on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
                     if !fields.is_empty() {
-                        pending = Some(Value::Object(fields));
+                        pending = Some(Value::Struct(fields));
                     } else if pending.is_none() {
-                        // Empty object with no pending value:
-                        // - If nested (stack.len() > 1): produce empty object {}
+                        // Empty struct with no pending value:
+                        // - If nested (stack.len() > 1): produce empty struct {}
                         //   This handles captured empty sequences like `{ } @x`
                         //   Note: stack always has at least the result_builder, so we check > 1
                         // - If at root (stack.len() <= 1): void result → null
                         if stack.len() > 1 {
-                            pending = Some(Value::Object(vec![]));
+                            pending = Some(Value::Struct(vec![]));
                         }
                         // else: pending stays None (void result)
                     }
@@ -232,14 +227,11 @@ impl<'t> Materializer<'t> for ValueMaterializer<'_> {
                     let data = if self.is_void_type(payload_type) {
                         None
                     } else {
-                        // If inner returned a structured value (via ObjectOpen/ObjectClose), use it as data
+                        // If inner returned a structured value (via StructOpen/StructClose), use it as data
                         // Otherwise use fields collected from direct Set effects
-                        Some(Box::new(pending.take().unwrap_or(Value::Object(fields))))
+                        Some(Box::new(pending.take().unwrap_or(Value::Struct(fields))))
                     };
                     pending = Some(Value::Enum { tag, data });
-                }
-                RuntimeEffect::Clear => {
-                    pending = None;
                 }
             }
         }

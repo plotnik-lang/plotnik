@@ -1,0 +1,107 @@
+Q = (program
+  [
+    (((expression_statement) @a) @grp)
+    ((comment) @b)
+  ] @w
+)
+==== input ====
+a;
+==== diagnostics ====
+warning: parenthesized sequences are tree-sitter syntax
+ --> query.ptk:3:5
+  |
+3 |     (((expression_statement) @a) @grp)
+  |     ^
+  |
+help: use `{(a) (b)}` to match a sequence of siblings
+
+warning: parenthesized sequences are tree-sitter syntax
+ --> query.ptk:4:5
+  |
+4 |     ((comment) @b)
+  |     ^
+  |
+help: use `{(a) (b)}` to match a sequence of siblings
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "grp"
+S3 "b"
+S4 "w"
+S5 "Q"
+S6 "program"
+S7 "expression_statement"
+S8 "comment"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { a }
+T2 = Struct  M1:2  ; { grp, b }
+T3 = Struct  M3:1  ; { w }
+T4 = Optional(T1)  ; T1?
+T5 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T4  ; grp: T4
+M2: S3 → T5  ; b: T5
+M3: S4 → T2  ; w: T2
+
+[type_names]
+N0: S5 → T3  ; Q
+
+[entrypoints]
+Q = 06 :: T3
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07  ...  
+  08  └‣─  [StructOpen] _                   11, 16, 19
+  10                                        ▶
+  11   !   [Null Set(M2) StructOpen] (expression_statement) [Node Set(M0) StructClose Set(M1)]  14
+  14  ─‣┘  [StructClose Set(M3)] _          10
+  16   !   [Null Set(M1)] (comment) [Node Set(M2)]  14
+  19  ─‣─  _                                11, 16, 19
+==== types ====
+export interface QGrp {
+  a: Node;
+}
+
+export interface Qw {
+  b: Node | null;
+  grp: QGrp | null;
+}
+
+export interface Q {
+  w: Qw;
+}
+==== trace ====
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        08
+       ●   program
+  08       [StructOpen] _                   11, 16, 19
+       ●   expression_statement
+  11       [Null Set(M2) StructOpen] (expression_statement) [Node Set(M0) StructClose Set(M1)]  14
+       ●   expression_statement
+  14       [StructClose Set(M3)] _          10
+       ●   program
+  10   ◀   (Q)                              
+
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼
+==== output ====
+{"w":{"b":null,"grp":{"a":{"kind":"expression_statement","text":"a;","span":[0, 2]}}}}

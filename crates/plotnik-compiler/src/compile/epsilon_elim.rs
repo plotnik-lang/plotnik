@@ -397,7 +397,7 @@ mod tests {
         InstructionIR::Match(
             MatchIR::terminal(Label(label))
                 .nav(Nav::Epsilon)
-                .pre_effect(EffectIR::start_obj())
+                .pre_effect(EffectIR::start_struct())
                 .successors(succs.into_iter().map(Label).collect()),
         )
     }
@@ -406,7 +406,7 @@ mod tests {
         InstructionIR::Match(
             MatchIR::terminal(Label(label))
                 .nav(Nav::Epsilon)
-                .post_effect(EffectIR::end_obj())
+                .post_effect(EffectIR::end_struct())
                 .successors(succs.into_iter().map(Label).collect()),
         )
     }
@@ -430,7 +430,7 @@ mod tests {
 
     #[test]
     fn see_through_with_effects() {
-        // 0 (ε+Obj) → 1 (ε+EndObj) → 2 (match)
+        // 0 (ε+Struct) → 1 (ε+EndStruct) → 2 (match)
         let instructions = vec![
             make_epsilon_with_pre(0, vec![1]),
             make_epsilon_with_post(1, vec![2]),
@@ -442,7 +442,7 @@ mod tests {
             .see_through(Label(0))
             .unwrap();
         assert_eq!(target, Label(2));
-        assert_eq!(effects.len(), 2); // Obj from 0, EndObj from 1
+        assert_eq!(effects.len(), 2); // Struct from 0, EndStruct from 1
     }
 
     #[test]
@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn forward_migrate_to_exclusive_successor() {
-        // 0 (ε+Obj) → 1 (match), only 0 points to 1
+        // 0 (ε+Struct) → 1 (match), only 0 points to 1
         let mut instructions = vec![
             make_epsilon_with_pre(0, vec![1]),
             make_match(1, Nav::Down, vec![]),
@@ -516,7 +516,7 @@ mod tests {
 
     #[test]
     fn laser_vision_single_succ_absorbs_effects() {
-        // 0 (match, single succ) → 1 (ε+Obj) → 2 (match)
+        // 0 (match, single succ) → 1 (ε+Struct) → 2 (match)
         let instructions = vec![
             make_match(0, Nav::Down, vec![1]),
             make_epsilon_with_pre(1, vec![2]),
@@ -543,7 +543,7 @@ mod tests {
     #[test]
     fn laser_vision_multi_succ_effectless_only() {
         // 0 (match) → [1 (ε), 3]
-        // 1 (ε+Obj) → 2
+        // 1 (ε+Struct) → 2
         let instructions = vec![
             make_match(0, Nav::Down, vec![1, 3]),
             make_epsilon_with_pre(1, vec![2]),
@@ -571,10 +571,10 @@ mod tests {
     #[test]
     fn combined_forward_then_laser() {
         // The tricky case:
-        // 0 (match) → [1 (ε+Obj), 3]
+        // 0 (match) → [1 (ε+Struct), 3]
         // 1 → 2 (match), only 1 points to 2
         //
-        // Phase A: 1 forward-migrates Obj to 2.pre, 1 becomes effectless
+        // Phase A: 1 forward-migrates Struct to 2.pre, 1 becomes effectless
         // Phase B: 0 sees through 1 (now effectless) to 2
         let instructions = vec![
             make_match(0, Nav::Down, vec![1, 3]),

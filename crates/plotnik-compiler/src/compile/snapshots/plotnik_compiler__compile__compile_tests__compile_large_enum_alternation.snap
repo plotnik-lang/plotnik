@@ -182,10 +182,10 @@ N0: S61 → T31  ; Q
 Q = 008 :: T31
 
 [transitions]
-_ObjWrap:
-  000  -ε-  [ObjectOpen]                    002
+_StructWrap:
+  000  -ε-  [StructOpen]                    002
   002       Trampoline                      003
-  003  -ε-  [ObjectClose]                   005
+  003  -ε-  [StructClose]                   005
   005                                       ▶
   006  ...  
   007  ...  

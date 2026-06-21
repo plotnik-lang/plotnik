@@ -1,0 +1,53 @@
+Q = (pair
+  key: [
+    A: (identifier) @a
+    B: (number)
+  ] @kind
+)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "A"
+S3 "B"
+S4 "kind"
+S5 "Q"
+S6 "pair"
+S7 "identifier"
+S8 "number"
+S9 "key"
+
+[type_defs]
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { a }
+T3 = Enum    M1:2  ; A | B
+T4 = Struct  M3:1  ; { kind }
+
+[type_members]
+M0: S1 → T1  ; a: <Node>
+M1: S2 → T2  ; A: T2
+M2: S3 → T0  ; B: <Void>
+M3: S4 → T3  ; kind: T3
+
+[type_names]
+N0: S5 → T4  ; Q
+
+[entrypoints]
+Q = 06 :: T4
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06   !   (pair)                           08
+  07  ...  
+  08  └‣─  key: _                           11, 14
+  10                                        ▶
+  11   !   [EnumOpen(M1)] (identifier) [Node Set(M0) EnumClose]  16
+  14   !   [EnumOpen(M2)] (number) [EnumClose]  16
+  16  ─‣┘  [Set(M3)] _                      10

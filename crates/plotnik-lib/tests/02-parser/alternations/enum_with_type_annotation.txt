@@ -1,0 +1,57 @@
+Q = [
+  Base: (identifier) @name
+  Access: (member_expression object: (_) @obj)
+] @chain :: MemberChain
+==== cst ====
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Alt
+        BracketOpen "["
+        Branch
+          Id "Base"
+          Colon ":"
+          Capture
+            Tree
+              ParenOpen "("
+              Id "identifier"
+              ParenClose ")"
+            CaptureToken "@name"
+        Branch
+          Id "Access"
+          Colon ":"
+          Tree
+            ParenOpen "("
+            Id "member_expression"
+            Capture
+              Field
+                Id "object"
+                Colon ":"
+                Tree
+                  ParenOpen "("
+                  Underscore "_"
+                  ParenClose ")"
+              CaptureToken "@obj"
+            ParenClose ")"
+        BracketClose "]"
+      CaptureToken "@chain"
+      Type
+        DoubleColon "::"
+        Id "MemberChain"
+==== ast ====
+# query.ptk
+Root
+  Def Q
+    CapturedPattern @chain :: MemberChain
+      Enum
+        Branch Base:
+          CapturedPattern @name
+            NamedNode identifier
+        Branch Access:
+          NamedNode member_expression
+            CapturedPattern @obj
+              FieldPattern object:
+                NamedNode (any)

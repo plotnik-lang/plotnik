@@ -38,17 +38,6 @@ fn is_wrapper() {
 }
 
 #[test]
-fn is_composite() {
-    assert!(!TypeKind::Optional.is_composite());
-    assert!(!TypeKind::ArrayZeroOrMore.is_composite());
-    assert!(!TypeKind::ArrayOneOrMore.is_composite());
-    assert!(TypeKind::Struct.is_composite());
-    assert!(TypeKind::Enum.is_composite());
-    assert!(!TypeKind::Alias.is_composite());
-    assert!(!TypeKind::Node.is_composite());
-}
-
-#[test]
 fn is_array() {
     assert!(!TypeKind::Optional.is_array());
     assert!(TypeKind::ArrayZeroOrMore.is_array());

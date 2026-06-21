@@ -48,7 +48,7 @@ impl CaptureEffects {
 
     /// Add an inner scope (opens after existing scopes, closes before them).
     ///
-    /// Use for: Obj/EndObj, Enum/EndEnum, Arr/EndArr, SuppressBegin/SuppressEnd
+    /// Use for: Struct/EndStruct, Enum/EndEnum, Arr/EndArr, SuppressBegin/SuppressEnd
     ///
     /// Given existing `pre=[A_Open]`, `post=[A_Close]`, adding inner scope B:
     /// - Result: `pre=[A_Open, B_Open]`, `post=[B_Close, A_Close]`
@@ -57,7 +57,7 @@ impl CaptureEffects {
         assert!(
             matches!(
                 open.kind(),
-                EffectKind::ObjectOpen
+                EffectKind::StructOpen
                     | EffectKind::EnumOpen
                     | EffectKind::ArrayOpen
                     | EffectKind::SuppressBegin
@@ -68,7 +68,7 @@ impl CaptureEffects {
         assert!(
             matches!(
                 close.kind(),
-                EffectKind::ObjectClose
+                EffectKind::StructClose
                     | EffectKind::EnumClose
                     | EffectKind::ArrayClose
                     | EffectKind::SuppressEnd
@@ -142,7 +142,7 @@ impl Compiler<'_> {
 
         // Only the `Node` mechanism captures the matched node directly. Every
         // other mechanism (struct scope, pass-through ref/enum/forward, array)
-        // produces its value via EndObj/EndEnum/EndArr/Call, so the capture itself
+        // produces its value via EndStruct/EndEnum/EndArr/Call, so the capture itself
         // emits no Node. A bare capture (`@x` with no inner) is a Node.
         let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureKind::Node);
         if is_node_mechanism {
@@ -167,7 +167,7 @@ impl Compiler<'_> {
     ///
     /// For scalar array elements (Node type), we need [Node, Push]
     /// to capture the matched node value.
-    /// For structured elements (Struct/Enum), EndObj/EndEnum provides the value.
+    /// For structured elements (Struct/Enum), EndStruct/EndEnum provides the value.
     /// For refs returning structured types, Call provides the value.
     pub(super) fn quantifier_needs_node_for_push(&self, pattern: &Pattern) -> bool {
         let Pattern::QuantifiedPattern(quant) = pattern else {

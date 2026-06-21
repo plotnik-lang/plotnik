@@ -20,7 +20,7 @@ They are identified by `nav == Epsilon` — a distinct navigation mode (not Stay
 
 **Capture effect consolidation**: Scalar capture effects (`Node`, `Set`) are
 placed directly on match instructions rather than in separate epsilon steps. Structural
-effects (`ObjectOpen`, `ObjectClose`, `ArrayOpen`, `ArrayClose`, `EnumOpen`, `EnumClose`) may appear in epsilons or
+effects (`StructOpen`, `StructClose`, `ArrayOpen`, `ArrayClose`, `EnumOpen`, `EnumClose`) may appear in epsilons or
 consolidated into match instructions.
 
 ```
@@ -54,10 +54,10 @@ N0: S5 → T3  ; Value
 Value = 06 :: T3
 
 [transitions]
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [ObjectClose]                    05
+  03  -ε-  [StructClose]                    05
   05                                        ▶
 
 Value:
@@ -74,7 +74,7 @@ Value:
 
 ### Sections Explained
 
-- **`_ObjWrap`**: Universal entry preamble. Wraps all entrypoints with `ObjectOpen`/`ObjectClose` and dispatches via `Trampoline`.
+- **`_StructWrap`**: Universal entry preamble. Wraps all entrypoints with `StructOpen`/`StructClose` and dispatches via `Trampoline`.
 - **`Value`**: The compiled query definition. Step 08 searches the document children, tries `Num` (step 11) or `Str` (step 16), and uses step 19 to advance to the next candidate on backtracking.
 - **`...`**: Padding slots (multi-step instructions occupy consecutive step IDs).
 
@@ -189,8 +189,8 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 
 | Effect         | Description            |
 | -------------- | ---------------------- |
-| ObjectOpen     | Start struct           |
-| ObjectClose    | End struct             |
+| StructOpen     | Start struct           |
+| StructClose    | End struct             |
 | ArrayOpen      | Start array            |
 | ArrayClose     | End array              |
 | Push           | Push to array          |
@@ -199,7 +199,6 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 | Node           | Capture matched node   |
 | Set(Mxx)       | Set field/member Mxx   |
 | Null           | Null value             |
-| Clear          | Clear current          |
 
 ## Index Prefixes
 

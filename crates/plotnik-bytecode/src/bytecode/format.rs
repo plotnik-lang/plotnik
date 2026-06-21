@@ -14,7 +14,7 @@ use super::nav::Nav;
 
 /// Display label for the bootstrap preamble at step 0. The preamble has no name
 /// in the format; `dump` and `trace` share this so both render it identically.
-pub const PREAMBLE_NAME: &str = "_ObjWrap";
+pub const PREAMBLE_NAME: &str = "_StructWrap";
 
 /// Column widths for instruction line formatting.
 pub mod cols {
@@ -272,12 +272,11 @@ pub fn format_effect(effect: &Effect) -> String {
         EffectKind::ArrayOpen => "ArrayOpen".to_string(),
         EffectKind::Push => "Push".to_string(),
         EffectKind::ArrayClose => "ArrayClose".to_string(),
-        EffectKind::ObjectOpen => "ObjectOpen".to_string(),
-        EffectKind::ObjectClose => "ObjectClose".to_string(),
+        EffectKind::StructOpen => "StructOpen".to_string(),
+        EffectKind::StructClose => "StructClose".to_string(),
         EffectKind::Set => format!("Set(M{})", effect.payload),
         EffectKind::EnumOpen => format!("EnumOpen(M{})", effect.payload),
         EffectKind::EnumClose => "EnumClose".to_string(),
-        EffectKind::Clear => "Clear".to_string(),
         EffectKind::Null => "Null".to_string(),
         EffectKind::SuppressBegin => "SuppressBegin".to_string(),
         EffectKind::SuppressEnd => "SuppressEnd".to_string(),

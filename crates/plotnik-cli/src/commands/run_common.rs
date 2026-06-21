@@ -5,10 +5,9 @@ use std::io::{self, Read};
 use std::path::Path;
 
 use arborium_tree_sitter as tree_sitter;
-use plotnik_lib::QueryBuilder;
 use plotnik_lib::bytecode::{Entrypoint, Module};
-use plotnik_lib::emit::emit;
 
+use super::compile::compile_module;
 use super::lang_resolver::reconcile_lang;
 use super::query_loader::load_query;
 use crate::error::CliError;
@@ -153,24 +152,7 @@ pub fn plan_exec(input: ExecRequest) -> Result<ExecPlan, CliError> {
         input.source_path,
     )?;
 
-    let query = QueryBuilder::new(loaded.sources)
-        .parse()
-        .map_err(|e| CliError::fatal(e.to_string()))?
-        .analyze()
-        .link(lang.grammar());
-
-    if !query.is_valid() {
-        eprint!(
-            "{}",
-            query
-                .diagnostics()
-                .render_colored(query.source_map(), input.color)
-        );
-        return Err(CliError::FatalRendered);
-    }
-
-    let bytecode = emit(&query).map_err(|e| CliError::fatal(e.to_string()))?;
-    let module = Module::load(&bytecode).expect("module load failed");
+    let module = compile_module(loaded.sources, lang, input.color)?;
 
     let entry = input.entry.or(loaded.shebang.entry.as_deref());
     let entrypoint = resolve_entrypoint(&module, entry)?;

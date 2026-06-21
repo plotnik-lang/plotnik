@@ -2,8 +2,8 @@
 //!
 //! The runtime `ValueMaterializer` is a stack machine over the flat effect
 //! sequence of the winning path. Five of its operations panic on an ill-shaped
-//! builder stack — `Push`/`ArrayClose` want an `Array` on top, `Set` an `Object` or
-//! `Enum`, `ObjectClose` an `Object`, `EnumClose` an `Enum`
+//! builder stack — `Push`/`ArrayClose` want an `Array` on top, `Set` a `Struct` or
+//! `Enum`, `StructClose` a `Struct`, `EnumClose` an `Enum`
 //! (`crates/plotnik-vm/src/engine/materializer.rs`) — and the VM's `emit_effect`
 //! panics if a `SuppressEnd` underflows the suppression counter
 //! (`crates/plotnik-vm/src/engine/vm.rs`). On compiler output these are
@@ -48,12 +48,12 @@ use super::{Instruction, Module, ModuleError};
 use crate::bytecode::effects::EffectKind;
 
 /// Builder frames the materializer pushes. The root/result frame can be a
-/// scalar, but the walk starts at the always-`ObjectOpen` preamble, so only these three
+/// scalar, but the walk starts at the always-`StructOpen` preamble, so only these three
 /// ever reach the abstract stack.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum FrameKind {
     Array,
-    Object,
+    Struct,
     Enum,
 }
 
@@ -61,7 +61,7 @@ impl FrameKind {
     fn bit(self) -> u8 {
         match self {
             FrameKind::Array => KS_ARRAY,
-            FrameKind::Object => KS_OBJECT,
+            FrameKind::Struct => KS_STRUCT,
             FrameKind::Enum => KS_ENUM,
         }
     }
@@ -69,12 +69,12 @@ impl FrameKind {
 
 // `entry_tos` is a set of tolerated caller-top kinds, a 3-bit mask.
 const KS_ARRAY: u8 = 0b001;
-const KS_OBJECT: u8 = 0b010;
+const KS_STRUCT: u8 = 0b010;
 const KS_ENUM: u8 = 0b100;
 /// No constraint (every kind tolerated): the body never reads its caller's top.
-const KS_ANY: u8 = KS_ARRAY | KS_OBJECT | KS_ENUM;
-/// `Set` targets — an `Object` or an `Enum` frame.
-const KS_SET: u8 = KS_OBJECT | KS_ENUM;
+const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_ENUM;
+/// `Set` targets — a `Struct` or an `Enum` frame.
+const KS_SET: u8 = KS_STRUCT | KS_ENUM;
 
 /// Summaries keyed by definition-entry step. The value is the `entry_tos` mask.
 type DefSummaries = HashMap<u16, u8>;
@@ -127,13 +127,13 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     }
 
     // ...and the preamble per entrypoint. The shared preamble (step 0) opens the
-    // root `ObjectOpen`, trampolines into the entrypoint body, then closes it; binding
+    // root `StructOpen`, trampolines into the entrypoint body, then closes it; binding
     // the trampoline to this entrypoint's target checks that the body tolerates
-    // the `Object` the preamble hands it.
+    // the `Struct` the preamble hands it.
     //
     // The preamble has no caller. A residual constraint on *its* entry means some
     // effect read below the frames the preamble itself opened — with the root
-    // `ObjectOpen` intact, every entry read lands on that `Object` and nothing bubbles,
+    // `StructOpen` intact, every entry read lands on that `Struct` and nothing bubbles,
     // so a non-`KS_ANY` result is a forged preamble that fails to provide the
     // frame. At runtime such a read would hit the materializer's result-type root
     // frame, whose kind is attacker-controlled, and panic. Reject it instead of
@@ -276,13 +276,13 @@ fn apply_effect(
 
     let err = || ModuleError::EffectStackImbalance(step);
     match op {
-        Node | Null | Clear => {}
+        Node | Null => {}
         SuppressBegin => *suppress += 1,
         // At depth 0 a `SuppressEnd` would drive the counter negative — the
         // exact underflow the VM panics on.
         SuppressEnd => return Err(err()),
         ArrayOpen => stack.push(FrameKind::Array),
-        ObjectOpen => stack.push(FrameKind::Object),
+        StructOpen => stack.push(FrameKind::Struct),
         EnumOpen => stack.push(FrameKind::Enum),
         Push => match stack.last() {
             Some(FrameKind::Array) => {}
@@ -290,7 +290,7 @@ fn apply_effect(
             None => *entry_tos &= KS_ARRAY,
         },
         Set => match stack.last() {
-            Some(FrameKind::Object | FrameKind::Enum) => {}
+            Some(FrameKind::Struct | FrameKind::Enum) => {}
             Some(FrameKind::Array) => return Err(err()),
             None => *entry_tos &= KS_SET,
         },
@@ -298,8 +298,8 @@ fn apply_effect(
             Some(FrameKind::Array) => {}
             _ => return Err(err()),
         },
-        ObjectClose => match stack.pop() {
-            Some(FrameKind::Object) => {}
+        StructClose => match stack.pop() {
+            Some(FrameKind::Struct) => {}
             _ => return Err(err()),
         },
         EnumClose => match stack.pop() {

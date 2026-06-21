@@ -794,7 +794,7 @@ impl Default for Return {
 ///
 /// Like Call, but the target comes from VM context (external parameter)
 /// rather than being encoded in the instruction. Used at address 0 for
-/// the entry preamble: `ObjectOpen → Trampoline → ObjectClose → Accept`.
+/// the entry preamble: `StructOpen → Trampoline → StructClose → Accept`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Trampoline {
     /// Segment index (0-3).

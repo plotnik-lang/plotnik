@@ -444,12 +444,12 @@ mod debug_impl {
     fn scope_role(op: EffectKind) -> Option<ScopeRole> {
         use EffectKind::*;
         let role = match op {
-            ArrayOpen | ObjectOpen | EnumOpen | SuppressBegin => ScopeRole::Open,
+            ArrayOpen | StructOpen | EnumOpen | SuppressBegin => ScopeRole::Open,
             ArrayClose => ScopeRole::Close(ArrayOpen),
-            ObjectClose => ScopeRole::Close(ObjectOpen),
+            StructClose => ScopeRole::Close(StructOpen),
             EnumClose => ScopeRole::Close(EnumOpen),
             SuppressEnd => ScopeRole::Close(SuppressBegin),
-            Node | Push | Set | Clear | Null => return None,
+            Node | Push | Set | Null => return None,
         };
         Some(role)
     }

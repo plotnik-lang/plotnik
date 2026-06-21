@@ -3,7 +3,6 @@
 mod aliases;
 mod json;
 mod lower;
-mod nfa;
 mod node_shapes;
 mod prepared;
 mod productions;

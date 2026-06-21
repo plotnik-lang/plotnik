@@ -34,10 +34,10 @@ A = 06 :: T1
 Q = 09 :: T2
 
 [transitions]
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [ObjectClose]                    05
+  03  -ε-  [StructClose]                    05
   05                                        ▶
 
 A:
@@ -65,8 +65,8 @@ export type A = AX;
 
 export type Q = [A, ...A[]];
 ==== trace ====
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
        ▶   (Q)
 
@@ -108,8 +108,8 @@ Q:
        ●   program
   15   ◀   (Q)                              
 
-_ObjWrap:
-  03  -ε-  [ObjectClose]                    05
-  05   ◀   _ObjWrap                         ◼
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼
 ==== output ====
 [{"$tag":"X"},{"$tag":"X"}]

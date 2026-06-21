@@ -85,7 +85,7 @@ fn nav_for_alt_branch(
     })
 }
 
-/// A scope-closing effect (`EndArr`/`EndObj`/`EndEnum`/`SuppressEnd`).
+/// A scope-closing effect (`EndArr`/`EndStruct`/`EndEnum`/`SuppressEnd`).
 ///
 /// Used to split a sequence's post-effects when its last item is skippable. The list
 /// is `[value effects…, scope close, consumers of the scope value…]` — e.g.
@@ -100,7 +100,7 @@ fn is_scope_close_effect(e: &EffectIR) -> bool {
     matches!(
         e.kind(),
         EffectKind::ArrayClose
-            | EffectKind::ObjectClose
+            | EffectKind::StructClose
             | EffectKind::EnumClose
             | EffectKind::SuppressEnd
     )
@@ -452,61 +452,20 @@ impl Compiler<'_> {
         Some(label)
     }
 
-    /// Compile an alternation with capture effects (passed to each branch).
-    pub(super) fn compile_alt(&mut self, alt: &ast::AltPattern, ctx: ExprCtx) -> Label {
-        let ExprCtx {
-            exit,
-            nav: first_nav,
-            capture,
-        } = ctx;
-        let branches: Vec<_> = alt.branches().collect();
-        if branches.is_empty() {
-            return exit;
-        }
-
-        let alt_pattern = Pattern::AltPattern(alt.clone());
-        let alt_type_id = self
-            .ctx
-            .type_ctx
-            .term_info(&alt_pattern)
-            .and_then(|info| info.flow.type_id());
-        let alt_type_shape = alt_type_id.and_then(|id| self.ctx.type_ctx.type_shape(id));
-
-        // Check if THIS alternation is syntactically an enum (all branches have labels).
-        // This is distinct from whether the type is an Enum - a nested union alternation
-        // like `[[A: (x)]]` can inherit an enum type from its inner branch while the outer
-        // branches have no labels.
-        let all_branches_labeled = branches.iter().all(|b| b.label().is_some());
-        let is_enum = all_branches_labeled
-            && alt_type_shape.is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
-
-        // BTreeMap order gives stable variant indices independent of AST iteration order.
-        let variant_info: BTreeMap<Symbol, (u16, TypeId)> = match alt_type_shape {
-            Some(TypeShape::Enum(variants)) => variants
-                .iter()
-                .enumerate()
-                .map(|(idx, (&sym, &type_id))| (sym, (idx as u16, type_id)))
-                .collect(),
-            _ => BTreeMap::new(),
-        };
-        let merged_fields = alt_type_id.and_then(|id| self.ctx.type_ctx.struct_fields(id));
-
-        // Branches match at the current candidate position. For resumable search
-        // navs (`Down`, `Next`, `Stay`), the alternation itself emits the retry
-        // wrapper below; otherwise the branch performs the exact navigation.
-        let search_nav = resumable_search_nav(first_nav);
-        let branch_search = AltSearchNav(search_nav);
-        let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
-
-        // A branch is "named" (eligible for the soft-skip follower twin) when it
-        // cannot match an anonymous node and does not own its own iteration. A
-        // quantified branch's zero-match path leaves no named node on the anchor's
-        // left, so the soft-skip upgrade is unsound there; quantified followers are
-        // a separate (deferred) case. The anonymity test is whole-branch, matching
-        // `nav_for_alt_branch`'s before-anchor classification: a sequence branch
-        // with a named tail but interior punctuation stays conservative (safe, not
-        // a wrong match) until a trailing-position classifier exists. Computed once
-        // and reused for both the twin gate and per-branch routing.
+    /// Per-branch "named" flags plus the soft-skip follower twin — shared by both
+    /// alternation kinds. A branch is "named" (eligible for the twin) when it cannot
+    /// match an anonymous node and does not own its own iteration. A quantified
+    /// branch's zero-match path leaves no named node on the anchor's left, so the
+    /// soft-skip upgrade is unsound there. The anonymity test is whole-branch,
+    /// matching `nav_for_alt_branch`'s before-anchor classification. The twin is a
+    /// `NextSkip` clone of a conservative (`NextSkipExtras`) soft follower, worth
+    /// cloning only when at least one branch is itself named.
+    fn alt_branch_routing(
+        &mut self,
+        branches: &[ast::Branch],
+        exit: Label,
+        classifier: &AnonymousClassifier,
+    ) -> (Vec<bool>, Option<Label>) {
         let branch_named: Vec<bool> = branches
             .iter()
             .map(|b| {
@@ -516,130 +475,24 @@ impl Compiler<'_> {
             })
             .collect();
 
-        // A soft sibling anchor after this alternation classified the named follower
-        // conservatively (`NextSkipExtras`) because some branch may match an anonymous
-        // node. Give named branches a `NextSkip` twin of that follower to route to.
-        // Only worth cloning when at least one branch is itself named.
         let named_exit = branch_named
             .iter()
             .any(|&named| named)
             .then(|| self.clone_named_follower_skip_entry(exit))
             .flatten();
 
-        let mut successors = Vec::new();
-        for (branch_idx, branch) in branches.iter().enumerate() {
-            let Some(body) = branch.body() else {
-                continue;
-            };
+        (branch_named, named_exit)
+    }
 
-            // Named branches route to the soft-skip follower twin; anonymous branches
-            // keep the conservative extras-only follower at `exit`.
-            let branch_exit = match named_exit {
-                Some(skip) if branch_named[branch_idx] => skip,
-                _ => exit,
-            };
-
-            if is_enum {
-                let branch_nav = nav_for_alt_branch(first_nav, branch_search, &body, &classifier);
-
-                // Look up variant info by branch label (using BTreeMap order, not AST order)
-                let label = branch.label().expect("enum branch must have label");
-                let label_text = label.text();
-                let (variant_idx, payload_type_id) = self
-                    .ctx
-                    .interner
-                    .get(label_text)
-                    .and_then(|sym| variant_info.get(&sym))
-                    .map(|&(idx, type_id)| (idx, type_id))
-                    .expect("variant must exist for labeled branch");
-
-                let e_effect = if let Some(type_id) = alt_type_id {
-                    EffectIR::with_member(EffectKind::EnumOpen, MemberRef::new(type_id, variant_idx))
-                } else {
-                    EffectIR::start_enum()
-                };
-
-                let branch_capture = capture.clone().nest_scope(e_effect, EffectIR::end_enum());
-
-                let body_entry = self.with_scope(payload_type_id, |this| {
-                    this.dispatch_pattern(
-                        &body,
-                        ExprCtx {
-                            exit: branch_exit,
-                            nav: branch_nav,
-                            capture: branch_capture,
-                        },
-                    )
-                });
-
-                successors.push(body_entry);
-            } else {
-                // Union branch: inject a default value for every merged field this
-                // branch does not itself produce, so the output shape stays stable.
-                // "Produces" means a top-level (bubbling) field — a capture nested in a
-                // child scope (`{...} @row`) belongs to that scope, not here. The
-                // branch's inferred bubble is the single source of truth; a syntactic
-                // capture walk would miscount nested names and drop a needed default.
-                let null_effects: Vec<EffectIR> = if let Some(fields) = merged_fields {
-                    let provided: HashSet<Symbol> = self
-                        .ctx
-                        .type_ctx
-                        .term_info(&body)
-                        .and_then(|info| info.flow.type_id())
-                        .and_then(|id| self.ctx.type_ctx.struct_fields(id))
-                        .map(|f| f.keys().copied().collect())
-                        .unwrap_or_default();
-                    fields
-                        .iter()
-                        .filter(|(sym, _)| !provided.contains(*sym))
-                        .flat_map(|(sym, field_info)| {
-                            // Resolve the default into the enclosing scope — the same
-                            // struct this branch's real captures Set into — so the member
-                            // ref names a type an entrypoint result reaches. The
-                            // alternation's own merged struct is otherwise unreachable;
-                            // pointing defaults at it would force dead-type elimination to
-                            // keep a parallel root set of effect-referenced types alive.
-                            let name = self.ctx.interner.resolve(*sym);
-                            let member_ref = self.lookup_member_in_scope(name).expect(
-                                "alternation bubbling field must resolve in enclosing scope",
-                            );
-                            let set = EffectIR::with_member(EffectKind::Set, member_ref);
-                            // A non-optional list defaults to `[]`; everything else
-                            // — scalars, and optional lists like `((x)+ @a)?` —
-                            // defaults to null. The `optional` flag, not the array
-                            // shape, is the source of truth, matching the relaxed
-                            // type from `relax_for_absence`.
-                            let is_required_list = !field_info.optional
-                                && matches!(
-                                    self.ctx.type_ctx.type_shape(field_info.type_id),
-                                    Some(TypeShape::Array { .. })
-                                );
-                            if is_required_list {
-                                vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
-                            } else {
-                                vec![EffectIR::null(), set]
-                            }
-                        })
-                        .collect()
-                } else {
-                    vec![]
-                };
-
-                let branch_capture = capture.clone().with_pre_values(null_effects);
-
-                let branch_nav = nav_for_alt_branch(first_nav, branch_search, &body, &classifier);
-                let branch_entry = self.dispatch_pattern(
-                    &body,
-                    ExprCtx {
-                        exit: branch_exit,
-                        nav: branch_nav,
-                        capture: branch_capture,
-                    },
-                );
-                successors.push(branch_entry);
-            }
-        }
-
+    /// A resumable search nav (`Down`/`Next`/`Stay`) gets one position-search retry
+    /// wrapper around the fanned-in branches; otherwise each branch already performed
+    /// its own exact navigation.
+    fn assemble_alt_branches(
+        &mut self,
+        successors: Vec<Label>,
+        search_nav: Option<Nav>,
+        exit: Label,
+    ) -> Label {
         if successors.is_empty() {
             return exit;
         }
@@ -657,5 +510,246 @@ impl Compiler<'_> {
         }
 
         alt_entry
+    }
+
+    /// Union alternation: each branch merges into one struct.
+    pub(super) fn compile_union(&mut self, union: &ast::UnionPattern, ctx: ExprCtx) -> Label {
+        let ExprCtx {
+            exit,
+            nav: first_nav,
+            capture,
+        } = ctx;
+        let branches: Vec<_> = union.branches().collect();
+        if branches.is_empty() {
+            return exit;
+        }
+
+        let union_type_id = self
+            .ctx
+            .type_ctx
+            .term_info(&Pattern::Union(union.clone()))
+            .and_then(|info| info.flow.type_id());
+        let merged_fields = union_type_id.and_then(|id| self.ctx.type_ctx.struct_fields(id));
+
+        let search_nav = resumable_search_nav(first_nav);
+        let branch_search = AltSearchNav(search_nav);
+        let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
+        let (branch_named, named_exit) = self.alt_branch_routing(&branches, exit, &classifier);
+
+        let mut successors = Vec::new();
+        for (branch_idx, branch) in branches.iter().enumerate() {
+            let Some(body) = branch.body() else {
+                continue;
+            };
+
+            let branch_exit = match named_exit {
+                Some(skip) if branch_named[branch_idx] => skip,
+                _ => exit,
+            };
+
+            // Inject a default for every merged field this branch does not itself
+            // produce, so the output shape stays stable. "Produces" means a top-level
+            // (bubbling) field — a capture nested in a child scope (`{...} @row`)
+            // belongs to that scope, not here. The branch's inferred bubble is the
+            // single source of truth; a syntactic capture walk would miscount nested
+            // names and drop a needed default.
+            let null_effects: Vec<EffectIR> = if let Some(fields) = merged_fields {
+                let provided: HashSet<Symbol> = self
+                    .ctx
+                    .type_ctx
+                    .term_info(&body)
+                    .and_then(|info| info.flow.type_id())
+                    .and_then(|id| self.ctx.type_ctx.struct_fields(id))
+                    .map(|f| f.keys().copied().collect())
+                    .unwrap_or_default();
+                fields
+                    .iter()
+                    .filter(|(sym, _)| !provided.contains(*sym))
+                    .flat_map(|(sym, field_info)| {
+                        // Resolve the default into the enclosing scope — the same struct
+                        // this branch's real captures Set into — so the member ref names a
+                        // type an entrypoint result reaches. The union's own merged struct
+                        // is otherwise unreachable; pointing defaults at it would force
+                        // dead-type elimination to keep a parallel root set alive.
+                        let name = self.ctx.interner.resolve(*sym);
+                        let member_ref = self
+                            .lookup_member_in_scope(name)
+                            .expect("union bubbling field must resolve in enclosing scope");
+                        let set = EffectIR::with_member(EffectKind::Set, member_ref);
+                        // A non-optional list defaults to `[]`; everything else — scalars,
+                        // and optional lists like `((x)+ @a)?` — defaults to null. The
+                        // `optional` flag, not the array shape, is the source of truth,
+                        // matching the relaxed type from `relax_for_absence`.
+                        let is_required_list = !field_info.optional
+                            && matches!(
+                                self.ctx.type_ctx.type_shape(field_info.type_id),
+                                Some(TypeShape::Array { .. })
+                            );
+                        if is_required_list {
+                            vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
+                        } else {
+                            vec![EffectIR::null(), set]
+                        }
+                    })
+                    .collect()
+            } else {
+                vec![]
+            };
+
+            let branch_nav = nav_for_alt_branch(first_nav, branch_search, &body, &classifier);
+            let branch_entry = if is_skippable_quantifier(&body) {
+                // A skippable branch body drops its folded pre/post on the zero-match
+                // skip path (`emit_null_for_skip_path` is `Set`-only and never reads
+                // `pre`), so the union's missing-field defaults would be lost there —
+                // the skip path would emit a partial struct and the materializer would
+                // reject the absent field. Put the defaults (after the enclosing scope's
+                // pre) on a dominating entry epsilon, and any outer post that must follow
+                // the branch (an array `Push`, a captured `Set`) on a dominating exit
+                // epsilon, so both the match and skip paths build the full branch shape.
+                let exit = if capture.post.is_empty() {
+                    branch_exit
+                } else {
+                    self.emit_effects_epsilon(
+                        branch_exit,
+                        vec![],
+                        CaptureEffects::new_post(capture.post.clone()),
+                    )
+                };
+                let entry = self.dispatch_pattern(
+                    &body,
+                    ExprCtx {
+                        exit,
+                        nav: branch_nav,
+                        capture: CaptureEffects::default(),
+                    },
+                );
+                let mut pre = capture.pre.clone();
+                pre.extend(null_effects);
+                self.wrap_entry_pre(entry, pre)
+            } else {
+                let branch_capture = capture.clone().with_pre_values(null_effects);
+                self.dispatch_pattern(
+                    &body,
+                    ExprCtx {
+                        exit: branch_exit,
+                        nav: branch_nav,
+                        capture: branch_capture,
+                    },
+                )
+            };
+            successors.push(branch_entry);
+        }
+
+        self.assemble_alt_branches(successors, search_nav, exit)
+    }
+
+    /// Enum alternation: each enum branch opens its variant scope
+    /// (`EnumOpen`…`EnumClose`) and compiles its payload inside it.
+    pub(super) fn compile_enum(&mut self, e: &ast::EnumPattern, ctx: ExprCtx) -> Label {
+        let ExprCtx {
+            exit,
+            nav: first_nav,
+            capture,
+        } = ctx;
+        let branches: Vec<_> = e.branches().collect();
+        if branches.is_empty() {
+            return exit;
+        }
+
+        let enum_type_id = self
+            .ctx
+            .type_ctx
+            .term_info(&Pattern::Enum(e.clone()))
+            .and_then(|info| info.flow.type_id());
+        let enum_type_shape = enum_type_id.and_then(|id| self.ctx.type_ctx.type_shape(id));
+
+        // BTreeMap order gives stable variant indices independent of AST iteration order.
+        let variant_info: BTreeMap<Symbol, (u16, TypeId)> = match enum_type_shape {
+            Some(TypeShape::Enum(variants)) => variants
+                .iter()
+                .enumerate()
+                .map(|(idx, (&sym, &type_id))| (sym, (idx as u16, type_id)))
+                .collect(),
+            _ => BTreeMap::new(),
+        };
+
+        let search_nav = resumable_search_nav(first_nav);
+        let branch_search = AltSearchNav(search_nav);
+        let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
+        let (branch_named, named_exit) = self.alt_branch_routing(&branches, exit, &classifier);
+
+        let mut successors = Vec::new();
+        for (branch_idx, branch) in branches.iter().enumerate() {
+            let Some(body) = branch.body() else {
+                continue;
+            };
+
+            let branch_exit = match named_exit {
+                Some(skip) if branch_named[branch_idx] => skip,
+                _ => exit,
+            };
+
+            let branch_nav = nav_for_alt_branch(first_nav, branch_search, &body, &classifier);
+
+            let label = branch.label().expect("enum branch must have label");
+            let (variant_idx, payload_type_id) = self
+                .ctx
+                .interner
+                .get(label.text())
+                .and_then(|sym| variant_info.get(&sym))
+                .map(|&(idx, type_id)| (idx, type_id))
+                .expect("variant must exist for enum branch");
+
+            let e_effect = if let Some(type_id) = enum_type_id {
+                EffectIR::with_member(EffectKind::EnumOpen, MemberRef::new(type_id, variant_idx))
+            } else {
+                EffectIR::start_enum()
+            };
+
+            let body_entry = self.with_scope(payload_type_id, |this| {
+                if is_skippable_quantifier(&body) {
+                    // Enum bracket dominance. A skippable arm body builds its
+                    // skip path with `emit_null_for_skip_path`, whose `Set`-only filter drops
+                    // a folded `EnumClose` (and never reads `pre`, so `EnumOpen` is lost too):
+                    // the skip path would leave the enum unbracketed and value-unbalanced.
+                    // Put `EnumClose` — plus any outer post-effect that must follow it (an array
+                    // `Push`, a captured `Set`) — on a dominating exit epsilon, and `EnumOpen`
+                    // (after the enclosing scope's pre) on a dominating entry epsilon, so both
+                    // the match and skip paths bracket the enum. Mirrors `compile_seq_items`.
+                    let close_exit = this.emit_effects_epsilon(
+                        branch_exit,
+                        vec![EffectIR::end_enum()],
+                        CaptureEffects::new_post(capture.post.clone()),
+                    );
+                    let inner_entry = this.dispatch_pattern(
+                        &body,
+                        ExprCtx {
+                            exit: close_exit,
+                            nav: branch_nav,
+                            capture: CaptureEffects::default(),
+                        },
+                    );
+                    let mut entry_pre = capture.pre.clone();
+                    entry_pre.push(e_effect);
+                    this.wrap_entry_pre(inner_entry, entry_pre)
+                } else {
+                    // Non-skippable arm: the body's innermost match is on every accepting
+                    // path, so folding the brackets onto it already dominates.
+                    let branch_capture = capture.clone().nest_scope(e_effect, EffectIR::end_enum());
+                    this.dispatch_pattern(
+                        &body,
+                        ExprCtx {
+                            exit: branch_exit,
+                            nav: branch_nav,
+                            capture: branch_capture,
+                        },
+                    )
+                }
+            });
+
+            successors.push(body_entry);
+        }
+
+        self.assemble_alt_branches(successors, search_nav, exit)
     }
 }

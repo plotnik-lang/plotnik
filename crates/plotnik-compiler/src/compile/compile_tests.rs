@@ -73,11 +73,11 @@ fn compile_nested() {
 
 // Split-exit captures at a navigating first-child position (`?`/`*` whose skip
 // path must restore the cursor). These pin the bytecode of the unified
-// exit-aware emitters — `Obj`/`Arr`/`Suppress` opening once and closing on both
+// exit-aware emitters — `Struct`/`Arr`/`Suppress` opening once and closing on both
 // the match and skip exits — so an effect-ordering regression is caught here even
 // when it still produces the right conformance JSON on a narrow input (#470).
 
-/// Struct capture: `Obj → inner → EndObj+Set`, one EndObj per exit.
+/// Struct capture: `Struct → inner → EndStruct+Set`, one EndStruct per exit.
 #[test]
 fn compile_optional_struct_capture_split_exits() {
     shot_bytecode!("Test = (program {(identifier) @id}? @outer)");
@@ -119,8 +119,8 @@ fn compile_large_enum_alternation() {
 }
 
 #[test]
-fn compile_unlabeled_alternation_5_branches_with_captures() {
-    // Regression test: unlabeled alternation with 5+ branches where each has
+fn compile_union_alternation_5_branches_with_captures() {
+    // Regression test: union alternation with 5+ branches where each has
     // a unique capture requires 8+ pre-effects (4 nulls + 4 sets per branch).
     // This exceeds the 3-bit limit (max 7) and must cascade via epsilon chain.
     shot_bytecode!(
@@ -129,7 +129,7 @@ fn compile_unlabeled_alternation_5_branches_with_captures() {
 }
 
 #[test]
-fn compile_unlabeled_alternation_8_branches_with_captures() {
+fn compile_union_alternation_8_branches_with_captures() {
     // Even more extreme: 8 branches means 14 pre-effects per branch (7 nulls + 7 sets).
     // This requires 2 cascade steps per branch.
     shot_bytecode!(

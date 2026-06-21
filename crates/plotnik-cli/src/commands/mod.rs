@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod check;
+pub mod compile;
 pub mod dump;
 pub mod infer;
 pub mod lang;
@@ -11,6 +12,9 @@ pub mod trace;
 
 #[cfg(test)]
 mod abi_compat_tests;
+
+#[cfg(test)]
+mod check_tests;
 
 #[cfg(test)]
 mod lang_tests;

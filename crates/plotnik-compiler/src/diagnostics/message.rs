@@ -94,6 +94,12 @@ pub enum DiagnosticKind {
     NegatedRequiredField,
 
     MissingDefName,
+
+    // Placed last (lowest priority): `check`'s dry run reports these only when no
+    // earlier-stage error exists.
+    EmitFailed,
+    BytecodeRejected,
+    NoEntrypoints,
 }
 
 impl DiagnosticKind {
@@ -221,7 +227,7 @@ impl DiagnosticKind {
                 Some("`(Name)` uses a definition; define `Name = ...` or check the spelling")
             }
             Self::DuplicateCaptureInScope => Some(
-                "rename one capture, or use a labeled alternation if they are mutually exclusive branches",
+                "rename one capture, or use an enum if they are mutually exclusive branches",
             ),
             Self::PredicateOnNonLeaf => Some(
                 "predicates match text content; apply them to a leaf node or an anonymous node like `\"foo\"`",
@@ -246,6 +252,9 @@ impl DiagnosticKind {
             ),
             Self::RefCannotHaveChildren => Some(
                 "a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children",
+            ),
+            Self::NoEntrypoints => Some(
+                "every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing",
             ),
             _ => None,
         }
@@ -293,7 +302,7 @@ impl DiagnosticKind {
             Self::SupertypeSlashDeprecated => "`supertype/subtype` paths are tree-sitter syntax",
             Self::DuplicateDefinition => "duplicate definition",
             Self::UndefinedReference => "undefined reference",
-            Self::MixedAltBranches => "cannot mix labeled and unlabeled branches",
+            Self::MixedAltBranches => "cannot mix enum and union branches",
             Self::DuplicateAlternationLabel => "duplicate branch label",
             Self::RecursionNoEscape => "infinite recursion: no escape path",
             Self::DirectRecursion => "infinite recursion: cycle consumes no input",
@@ -333,6 +342,9 @@ impl DiagnosticKind {
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
             Self::NegatedRequiredField => "this field is always present",
             Self::MissingDefName => "definition must be named",
+            Self::EmitFailed => "bytecode emission failed",
+            Self::BytecodeRejected => "query compiles to invalid bytecode",
+            Self::NoEntrypoints => "query produces no entrypoints",
         }
     }
 
@@ -369,10 +381,12 @@ impl DiagnosticKind {
             Self::InvalidSubtype => "{}".to_string(),
             Self::ChildUnderLeafToken => "`{}` is a leaf token — it has no child nodes".to_string(),
             Self::NegatedRequiredField => "`-{}` can never match".to_string(),
-            Self::MixedAltBranches => "cannot mix labeled and unlabeled branches: {}".to_string(),
+            Self::MixedAltBranches => "cannot mix enum and union branches: {}".to_string(),
             Self::DuplicateAlternationLabel => {
                 "branch label `{}` is already used in this alternation".to_string()
             }
+            // The detail (an `EmitError`/`ModuleError` Display) is already a complete message.
+            Self::EmitFailed | Self::BytecodeRejected => "{}".to_string(),
             _ => format!("{}: {{}}", self.summary()),
         }
     }

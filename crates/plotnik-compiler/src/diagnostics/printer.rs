@@ -4,17 +4,17 @@ use std::fmt::Write;
 
 use annotate_snippets::{AnnotationKind, Group, Level, Patch, Renderer, Snippet};
 
-use super::SourceMap;
+use super::{SourceId, SourceMap};
 use super::message::{Diagnostic, Severity};
 
 pub struct DiagnosticsPrinter<'q> {
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: Vec<&'q Diagnostic>,
     sources: &'q SourceMap,
     colored: bool,
 }
 
 impl<'q> DiagnosticsPrinter<'q> {
-    pub(crate) fn new(diagnostics: Vec<Diagnostic>, sources: &'q SourceMap) -> Self {
+    pub(crate) fn new(diagnostics: Vec<&'q Diagnostic>, sources: &'q SourceMap) -> Self {
         Self {
             diagnostics,
             sources,
@@ -49,7 +49,7 @@ impl<'q> DiagnosticsPrinter<'q> {
                 primary_snippet = primary_snippet.path(name);
             }
             primary_snippet =
-                primary_snippet.annotation(AnnotationKind::Primary.span(range.clone()));
+                primary_snippet.annotation(AnnotationKind::Primary.span(range));
 
             let mut cross_file_snippets = Vec::new();
 
@@ -87,7 +87,8 @@ impl<'q> DiagnosticsPrinter<'q> {
 
             if let Some(fix) = &diag.fix {
                 report.push(Level::HELP.secondary_title(&fix.description).element(
-                    Snippet::source(primary_content).patch(Patch::new(range, &fix.replacement)),
+                    Snippet::source(primary_content)
+                        .patch(Patch::new(diag.range.into(), &fix.replacement)),
                 ));
             }
 
@@ -104,7 +105,7 @@ impl<'q> DiagnosticsPrinter<'q> {
         Ok(())
     }
 
-    fn source_path(&self, source: crate::query::SourceId) -> Option<&'q str> {
+    fn source_path(&self, source: SourceId) -> Option<&'q str> {
         self.sources.path(source)
     }
 }

@@ -1,0 +1,65 @@
+Q = (program [(expression_statement) @expr])
+==== input ====
+a;
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "expr"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { expr }
+
+[type_members]
+M0: S1 → T0  ; expr: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        08
+  07  ...  
+  08  └‣─  _                                10, 14
+  10   !   (expression_statement) [Node Set(M0)]  12
+  12  ─‣┘  _                                13
+  13                                        ▶
+  14  ─‣─  _                                10, 14
+==== types ====
+export interface Q {
+  expr: Node;
+}
+==== trace ====
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        08
+       ●   program
+  08       _                                10, 14
+       ●   expression_statement
+  10       (expression_statement) [Node Set(M0)]  12
+       ●   expression_statement
+  12       _                                13
+       ●   program
+  13   ◀   (Q)                              
+
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼
+==== output ====
+{"expr":{"kind":"expression_statement","text":"a;","span":[0, 2]}}

@@ -18,7 +18,10 @@ use super::regex_table::RegexTableBuilder;
 use super::string_table::StringTableBuilder;
 use super::type_table::TypeTableBuilder;
 
-pub fn emit(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
+/// Emit bytecode without the debug load self-check. Used by callers that load
+/// the bytecode themselves (e.g. `check`'s dry run) and want a malformed-bytecode
+/// case to surface as a diagnostic rather than the debug panic in [`emit`].
+pub fn emit_unchecked(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
     let type_ctx = query.type_context();
     let interner = query.interner();
     let symbol_table = query.symbol_table();
@@ -153,18 +156,28 @@ pub fn emit(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
     header.checksum = crc32fast::hash(&output[HEADER_SIZE..]);
     output[..HEADER_SIZE].copy_from_slice(&header.to_bytes());
 
-    // In debug/test builds, prove the emitter only ever produces bytecode the
-    // loader accepts: every emission is gated through the full structural
-    // validator. This makes "the compiler never emits invalid bytecode" an
-    // enforced invariant across the whole test suite — and the load-time
-    // checks (including the effect-stack verifier) the trust gate relies on
-    // double as an emit-correctness oracle. Compiled out in release, where the
-    // CLI's own `Module::load(...).expect(...)` is the boundary instead.
+    Ok(output)
+}
+
+/// Emit bytecode, asserting in debug/test builds that the loader accepts it.
+///
+/// In debug/test builds this proves the emitter only ever produces bytecode the
+/// loader accepts: every emission is gated through the full structural
+/// validator. This makes "the compiler never emits invalid bytecode" an
+/// enforced invariant across the whole test suite — and the load-time
+/// checks (including the effect-stack verifier) the trust gate relies on
+/// double as an emit-correctness oracle. Compiled out in release, where the
+/// CLI's own `Module::load(...).expect(...)` is the boundary instead.
+///
+/// `check` deliberately bypasses this via [`emit_unchecked`]: it loads the
+/// bytecode itself and reports a rejection as a diagnostic, so it must never
+/// reach this panic, in debug or release.
+pub fn emit(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
+    let output = emit_unchecked(query)?;
     #[cfg(debug_assertions)]
     if let Err(err) = plotnik_bytecode::Module::load(&output) {
         panic!("compiler emitted bytecode rejected by Module::load: {err:?}");
     }
-
     Ok(output)
 }
 

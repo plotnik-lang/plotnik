@@ -67,10 +67,10 @@ fn printer_alt_branches() {
 
     let res = q.printer().dump();
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     Root
       Def Q
-        Alt
+        Enum
           Branch A:
             NamedNode a
           Branch B:
@@ -315,7 +315,7 @@ fn printer_spans_comprehensive() {
 
     let res = q.printer().with_spans(true).dump();
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     Root [0..43]
       Def [0..28] Foo
         NamedNode [6..28] call
@@ -323,7 +323,7 @@ fn printer_spans_comprehensive() {
             NamedNode [18..22] id
           NegatedField [23..27] -bar
       Def [29..42] Q
-        Alt [33..42]
+        Union [33..42]
           Branch [34..37]
             NamedNode [34..37] a
           Branch [38..41]
@@ -372,10 +372,10 @@ fn printer_spans_alt_branches() {
 
     let res = q.printer().with_spans(true).dump();
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     Root [0..19]
       Def [0..19] Q
-        Alt [4..19]
+        Enum [4..19]
           Branch [5..11] A:
             NamedNode [8..11] a
           Branch [12..18] B:

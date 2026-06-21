@@ -143,8 +143,8 @@ This enables reusable pattern fragments that contribute fields directly to paren
 New data structures are created only when explicitly requested:
 
 1. **Captured Sequences**: `{...} @name` → Struct
-2. **Captured Alternations** (unlabeled): `[...] @name` → Union
-3. **Enum Alternations** (labeled): `[ L: ... ] @name` → Enum
+2. **Captured Alternations** (no branch labels): `[...] @name` → Union
+3. **Enum Alternations** (with branch labels): `[ L: ... ] @name` → Enum
 
 In case of using quantifiers with captures, compiler forces you to create scope boundaries.
 
@@ -167,8 +167,8 @@ Created by `{ ... } @name`:
 
 Created by `[ ... ]`:
 
-- **Enum** (labeled): `[ L1: (a) @a  L2: (b) @b ]` → `{ "$tag": "L1", "$data": { a: Node } }`
-- **Union** (unlabeled): `[ (a) @a  (b) @b ]` → `{ a: Node | null, b: Node | null }` (merged 1-level deep)
+- **Enum** (with branch labels): `[ L1: (a) @a  L2: (b) @b ]` → `{ "$tag": "L1", "$data": { a: Node } }`
+- **Union** (no branch labels): `[ (a) @a  (b) @b ]` → `{ a: Node | null, b: Node | null }` (merged 1-level deep)
 
 ### Enum Variants
 
@@ -266,7 +266,7 @@ When a quantified capture appears in some branches but not others, the missing b
 ]  // x: Node[]
 ```
 
-Untagged alternations are "I don't care which branch matched" — so distinguishing "branch didn't match" from "matched zero times" is irrelevant. The empty array is easier to consume downstream.
+Union alternations are "I don't care which branch matched" — so distinguishing "branch didn't match" from "matched zero times" is irrelevant. The empty array is easier to consume downstream.
 
 When types start to conflict, use enum alternations:
 

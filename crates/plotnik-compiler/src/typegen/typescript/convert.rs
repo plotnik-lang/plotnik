@@ -54,28 +54,27 @@ impl Emitter<'_> {
                 format!("{} {}|{} null", inner_type, c.dim, c.reset)
             }
             TypeDefKind::Wrapper { .. } => "unknown".to_string(),
-            TypeDefKind::Composite { kind, .. } => {
+            TypeDefKind::Struct { .. } => {
                 if let Some(name) = self.type_names.get(&type_id) {
                     format!("{}{}{}", c.blue, name, c.reset)
                 } else {
-                    self.inline_composite(&type_def, kind)
+                    self.inline_struct(&type_def)
                 }
             }
-        }
-    }
-
-    fn inline_composite(&self, type_def: &TypeDef, kind: TypeKind) -> String {
-        match kind {
-            TypeKind::Struct => self.inline_struct(type_def),
-            TypeKind::Enum => self.inline_enum(type_def),
-            _ => "unknown".to_string(),
+            TypeDefKind::Enum { .. } => {
+                if let Some(name) = self.type_names.get(&type_id) {
+                    format!("{}{}{}", c.blue, name, c.reset)
+                } else {
+                    self.inline_enum(&type_def)
+                }
+            }
         }
     }
 
     pub(super) fn inline_struct(&self, type_def: &TypeDef) -> String {
         let c = self.colors();
         let member_count = match type_def.decode() {
-            TypeDefKind::Composite { member_count, .. } => member_count,
+            TypeDefKind::Struct { member_count, .. } => member_count,
             _ => 0,
         };
         if member_count == 0 {
@@ -155,10 +154,7 @@ impl Emitter<'_> {
 
         match type_def.decode() {
             TypeDefKind::Primitive(TypeKind::Void) => format!("{}{{}}{}", c.dim, c.reset),
-            TypeDefKind::Composite {
-                kind: TypeKind::Struct,
-                ..
-            } => self.inline_struct(&type_def),
+            TypeDefKind::Struct { .. } => self.inline_struct(&type_def),
             _ => self.render_ty(type_id),
         }
     }

@@ -1,12 +1,15 @@
+use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
 use indexmap::IndexMap;
+use rowan::TextRange;
 
 use plotnik_core::grammar::Grammar;
 use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 
 use super::{SourceId, SourceMap};
 use crate::Diagnostics;
+use crate::diagnostics::DiagnosticKind;
 use crate::analyze::link;
 use crate::analyze::symbol_table::{SymbolTable, resolve_names};
 use crate::analyze::type_check::{self, Arity, TypeContext};
@@ -138,7 +141,6 @@ impl QueryParsed {
 
         let type_context = type_check::infer_types(
             &mut interner,
-            &self.ast_map,
             &symbol_table,
             &dependency_analysis,
             &mut self.diag,
@@ -156,8 +158,8 @@ impl QueryParsed {
         &self.source_map
     }
 
-    pub fn diagnostics(&self) -> Diagnostics {
-        self.diag.clone()
+    pub fn diagnostics(&self) -> &Diagnostics {
+        &self.diag
     }
 
     pub fn ast_map(&self) -> &AstMap {
@@ -282,6 +284,90 @@ impl GrammarBoundQuery {
             return Err(crate::emit::EmitError::InvalidQuery);
         }
         crate::emit::emit(self)
+    }
+
+    /// Like [`emit`](Self::emit), but without the emitter's debug load self-check.
+    /// The caller must load the bytecode itself; used by [`check_compile`](Self::check_compile)
+    /// so a malformed-bytecode case surfaces as a diagnostic instead of the debug panic.
+    pub fn emit_unchecked(&self) -> Result<Vec<u8>, crate::emit::EmitError> {
+        if !self.is_valid() {
+            return Err(crate::emit::EmitError::InvalidQuery);
+        }
+        crate::emit::emit_unchecked(self)
+    }
+
+    /// Full-pipeline dry run for `check`: emit bytecode and load it, reporting any
+    /// failure as a diagnostic instead of panicking. Returns the analyze/link
+    /// diagnostics plus any emit/load failure; the caller inspects `has_errors()`.
+    ///
+    /// Uses [`emit_unchecked`](Self::emit_unchecked) and loads the bytecode itself,
+    /// so it never reaches the emitter's debug self-check panic — in debug or release.
+    pub fn check_compile(&self) -> Diagnostics {
+        let mut diag = self.diagnostics().clone();
+        if diag.has_errors() {
+            return diag;
+        }
+
+        let bytes = match self.emit_unchecked() {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                if let Some((source, range)) = self.fallback_span() {
+                    diag.report(source, DiagnosticKind::EmitFailed, range)
+                        .detail(err.to_string())
+                        .emit();
+                }
+                return diag;
+            }
+        };
+
+        match plotnik_bytecode::Module::load(&bytes) {
+            Ok(_) => self.report_value_less_defs(&mut diag),
+            Err(err) => {
+                if let Some((source, range)) = self.fallback_span() {
+                    diag.report(source, DiagnosticKind::BytecodeRejected, range)
+                        .detail(err.to_string())
+                        .emit();
+                }
+            }
+        }
+
+        diag
+    }
+
+    /// Report every definition that compiles to no entrypoint. A value-less body
+    /// (`.`, `-field`, `.!`) yields no type, so the emitter silently omits it;
+    /// `iter_def_types` is exactly the set of defs that do emit an entrypoint, so
+    /// any def outside it is dropped — including when other defs compile fine.
+    fn report_value_less_defs(&self, diag: &mut Diagnostics) {
+        let typed: HashSet<Symbol> = self
+            .type_context()
+            .iter_def_types()
+            .map(|(def_id, _)| self.type_context().def_name_sym(def_id))
+            .collect();
+
+        for (source_id, root) in self.ast_map() {
+            for def in root.defs() {
+                let Some(name) = def.name() else { continue };
+                let has_entrypoint = self
+                    .interner()
+                    .get(name.text())
+                    .is_some_and(|sym| typed.contains(&sym));
+                if !has_entrypoint {
+                    diag.report(*source_id, DiagnosticKind::NoEntrypoints, name.text_range())
+                        .emit();
+                }
+            }
+        }
+    }
+
+    /// A coarse fallback span for emit/load failures, none of which carry a
+    /// source mapping. Points at the whole first source; the diagnostic's detail
+    /// carries the specifics. `None` when the query has no sources at all, so the
+    /// dry run is total even on an empty source map.
+    fn fallback_span(&self) -> Option<(SourceId, TextRange)> {
+        let source = self.source_map().iter().next()?;
+        let len = u32::try_from(source.content.len()).unwrap_or(u32::MAX);
+        Some((source.id, TextRange::up_to(len.into())))
     }
 }
 

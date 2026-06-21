@@ -36,10 +36,10 @@ Item    = 06 :: T1
 Test    = 11 :: T4
 
 [transitions]
-_ObjWrap:
-  00  -ε-  [ObjectOpen]                     02
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
   02       Trampoline                       03
-  03  -ε-  [ObjectClose]                    05
+  03  -ε-  [StructClose]                    05
   05                                        ▶
 
 Item:
@@ -56,12 +56,12 @@ Test:
   14                                        ▶
   15                                        ▶
   16  -ε-  [ArrayClose Set(M2)]             15
-  18  -ε-  [ObjectClose Push]               36, 16
+  18  -ε-  [StructClose Push]               36, 16
   20  -ε-  [Set(M1)]                        18
-  22  -ε-  [ObjectClose]                    20
+  22  -ε-  [StructClose]                    20
   24   !   (Item)                           06 : 22
-  25  -ε-  [ObjectOpen]                     24
-  27  -ε-  [ObjectOpen]                     25
+  25  -ε-  [StructOpen]                     24
+  27  -ε-  [StructOpen]                     25
   29  ─‣─  _                                27, 29
   31  ...  
   32   !   _                                27, 29

@@ -16,7 +16,7 @@ pub struct AnonymousClassifier<'a> {
 
 fn expr_has_direct_alt_branch_nav(pattern: &Pattern) -> bool {
     match pattern {
-        Pattern::AltPattern(_) => true,
+        Pattern::Union(_) | Pattern::Enum(_) => true,
         Pattern::CapturedPattern(cap) => cap
             .inner()
             .as_ref()
@@ -50,10 +50,10 @@ impl<'a> AnonymousClassifier<'a> {
                 .value()
                 .as_ref()
                 .is_some_and(|value| self.expr_may_match_anonymous_inner(value, visited)),
-            Pattern::AltPattern(alt) => alt
-                .branches()
-                .filter_map(|branch| branch.body())
-                .any(|body| self.expr_may_match_anonymous_inner(&body, visited)),
+            Pattern::Union(_) | Pattern::Enum(_) => pattern
+                .children()
+                .iter()
+                .any(|body| self.expr_may_match_anonymous_inner(body, visited)),
             Pattern::SeqPattern(seq) => seq
                 .children()
                 .any(|child| self.expr_may_match_anonymous_inner(&child, visited)),
