@@ -22,6 +22,7 @@ use plotnik_compiler::{QueryBuilder, SourceMap};
 use plotnik_core::grammar::{Grammar, raw::RawGrammar};
 
 use super::{Module, ModuleError};
+use crate::bytecode::effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectKind};
 use crate::bytecode::type_meta::TypeDefKind;
 
 fn javascript() -> &'static Grammar {
@@ -251,13 +252,19 @@ fn first_ext_successor(bytes: &[u8]) -> usize {
     panic!("no extended-match successor in transitions");
 }
 
-/// Byte offset of the first pre/post effect slot whose opcode (`raw >> 10`)
-/// satisfies `want`.
+/// Byte offset of the first pre/post effect slot whose opcode satisfies `want`.
 fn first_effect_op(bytes: &[u8], want: impl Fn(u16) -> bool) -> usize {
     effect_slots(bytes)
         .into_iter()
-        .find(|&off| want(u16::from_le_bytes([bytes[off], bytes[off + 1]]) >> 10))
+        .find(|&off| {
+            want(u16::from_le_bytes([bytes[off], bytes[off + 1]]) >> EFFECT_PAYLOAD_BITS)
+        })
         .expect("no matching effect slot in transitions")
+}
+
+/// Little-endian bytes of a payload-less effect word for `kind`.
+fn effect_word(kind: EffectKind) -> [u8; 2] {
+    ((kind as u16) << EFFECT_PAYLOAD_BITS).to_le_bytes()
 }
 
 /// Byte offset of the first non-empty inter-section alignment gap — the padding
@@ -394,12 +401,13 @@ fn forged_invalid_nav_is_rejected() {
 
 #[test]
 fn forged_invalid_effect_opcode_is_rejected() {
-    // `13` is past the 0..=11 effect range; `EffectKind::from_u8` would panic
-    // when the VM emits this effect.
+    // One past the last effect opcode: `EffectKind::from_u8` would panic when
+    // the VM emits this effect.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let slot = effect_slots(&bytes)[0];
     let existing = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]);
-    let forged = (13u16 << 10) | (existing & 0x3FF);
+    let invalid_op = EffectKind::SuppressEnd as u16 + 1;
+    let forged = (invalid_op << EFFECT_PAYLOAD_BITS) | (existing & EFFECT_PAYLOAD_MAX as u16);
     bytes[slot..slot + 2].copy_from_slice(&forged.to_le_bytes());
     reseal(&mut bytes);
 
@@ -423,11 +431,14 @@ fn forged_oob_member_operand_is_rejected() {
         .into_iter()
         .find(|&off| {
             let e = u16::from_le_bytes([bytes[off], bytes[off + 1]]);
-            matches!(e >> 10, 6 | 7) // Set | EnumOpen
+            matches!(
+                EffectKind::try_from_u8((e >> EFFECT_PAYLOAD_BITS) as u8),
+                Some(EffectKind::Set | EffectKind::EnumOpen)
+            )
         })
         .expect("struct query must emit a Set/EnumOpen effect");
-    let opcode_bits = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & 0xFC00;
-    let forged = opcode_bits | (members & 0x3FF);
+    let opcode_bits = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & !(EFFECT_PAYLOAD_MAX as u16);
+    let forged = opcode_bits | (members & EFFECT_PAYLOAD_MAX as u16);
     bytes[slot..slot + 2].copy_from_slice(&forged.to_le_bytes());
     reseal(&mut bytes);
 
@@ -585,13 +596,12 @@ fn forged_entrypoint_into_instruction_interior_is_rejected() {
 
 #[test]
 fn forged_effect_set_to_push_is_rejected() {
-    // Swap an executed `Set` (opcode 6) for `Push` (opcode 2). A loaded module
-    // would accept it, then the materializer would panic because the builder on
-    // top is a Struct, not an Array. The effect-stack verifier rejects it at
-    // load instead.
+    // Swap an executed `Set` for `Push`. A loaded module would accept it, then
+    // the materializer would panic because the builder on top is a Struct, not
+    // an Array. The effect-stack verifier rejects it at load instead.
     let mut bytes = emit_bytes(STRUCT_QUERY);
-    let slot = first_effect_op(&bytes, |op| op == 6);
-    bytes[slot..slot + 2].copy_from_slice(&(2u16 << 10).to_le_bytes());
+    let slot = first_effect_op(&bytes, |op| op == EffectKind::Set as u16);
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Push));
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged Set->Push must be rejected");
@@ -608,8 +618,8 @@ fn forged_scalar_capture_set_to_push_is_rejected() {
     // top while the preamble hands it a Struct — caught when the entrypoint
     // summary is checked against the preamble.
     let mut bytes = emit_bytes(r#"Q = (identifier) @id"#);
-    let slot = first_effect_op(&bytes, |op| op == 6);
-    bytes[slot..slot + 2].copy_from_slice(&(2u16 << 10).to_le_bytes());
+    let slot = first_effect_op(&bytes, |op| op == EffectKind::Set as u16);
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Push));
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged scalar Set->Push must be rejected");
@@ -621,13 +631,12 @@ fn forged_scalar_capture_set_to_push_is_rejected() {
 
 #[test]
 fn forged_dropped_scope_close_is_rejected() {
-    // Turn a `StructClose` (opcode 5) into a no-op `Node` (opcode 0): the struct's
-    // `StructOpen` is never closed, so the body returns with an open frame — the
-    // materializer would leave the builder stack unbalanced. Rejected as a
-    // non-neutral body.
+    // Turn a `StructClose` into a no-op `Node`: the struct's `StructOpen` is
+    // never closed, so the body returns with an open frame — the materializer
+    // would leave the builder stack unbalanced. Rejected as a non-neutral body.
     let mut bytes = emit_bytes(STRUCT_QUERY);
-    let slot = first_effect_op(&bytes, |op| op == 5);
-    bytes[slot..slot + 2].copy_from_slice(&0u16.to_le_bytes());
+    let slot = first_effect_op(&bytes, |op| op == EffectKind::StructClose as u16);
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Node));
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged dropped StructClose must be rejected");
@@ -639,12 +648,14 @@ fn forged_dropped_scope_close_is_rejected() {
 
 #[test]
 fn forged_suppress_underflow_is_rejected() {
-    // Replace a data effect with a bare `SuppressEnd` (opcode 11). With no
-    // matching `SuppressBegin` on the path, the VM's suppression counter would
-    // underflow and `.expect()` panic; the verifier rejects it at load.
+    // Replace a data effect with a bare `SuppressEnd`. With no matching
+    // `SuppressBegin` on the path, the VM's suppression counter would underflow
+    // and `.expect()` panic; the verifier rejects it at load.
     let mut bytes = emit_bytes(STRUCT_QUERY);
-    let slot = first_effect_op(&bytes, |op| op == 4 || op == 6);
-    bytes[slot..slot + 2].copy_from_slice(&(11u16 << 10).to_le_bytes());
+    let slot = first_effect_op(&bytes, |op| {
+        op == EffectKind::StructOpen as u16 || op == EffectKind::Set as u16
+    });
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::SuppressEnd));
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged SuppressEnd underflow must be rejected");
@@ -667,11 +678,12 @@ fn forged_preamble_without_root_struct_is_rejected() {
         .expect("module loads before tampering")
         .offsets()
         .entrypoints as usize;
-    let struct_open_slot = first_effect_op(&bytes, |op| op == 4); // preamble StructOpen
-    let struct_close_slot = first_effect_op(&bytes, |op| op == 5); // preamble StructClose
+    let struct_open_slot = first_effect_op(&bytes, |op| op == EffectKind::StructOpen as u16);
+    let struct_close_slot = first_effect_op(&bytes, |op| op == EffectKind::StructClose as u16);
 
-    bytes[struct_open_slot..struct_open_slot + 2].copy_from_slice(&(10u16 << 10).to_le_bytes());
-    bytes[struct_close_slot..struct_close_slot + 2].copy_from_slice(&(10u16 << 10).to_le_bytes());
+    let null = effect_word(EffectKind::Null);
+    bytes[struct_open_slot..struct_open_slot + 2].copy_from_slice(&null);
+    bytes[struct_close_slot..struct_close_slot + 2].copy_from_slice(&null);
     // Result type T1 (struct) -> T0 (scalar <Node>): the root frame is now a Scalar.
     bytes[ep_off + 4..ep_off + 6].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
