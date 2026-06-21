@@ -5,7 +5,8 @@
 //!
 //! The interner can be serialized to a binary blob format for the compiled query.
 
-use rustc_hash::FxHashMap;
+use indexmap::IndexSet;
+use rustc_hash::FxBuildHasher;
 
 /// A lightweight handle to an interned string.
 ///
@@ -43,11 +44,10 @@ impl Ord for Symbol {
 /// String interner. Deduplicates strings and returns cheap Symbol handles.
 #[derive(Debug, Clone, Default)]
 pub struct Interner {
-    /// Map from string to symbol for deduplication. Keys are trusted internal
-    /// identifiers, never adversarial input, so a non-cryptographic hasher is fine.
-    map: FxHashMap<String, Symbol>,
-    /// Storage for interned strings, indexed by Symbol.
-    strings: Vec<String>,
+    /// Interned strings in insertion order; each string's index is its `Symbol`, and the set
+    /// doubles as the dedup lookup. Strings are trusted internal identifiers, never adversarial
+    /// input, so a non-cryptographic hasher is fine.
+    strings: IndexSet<String, FxBuildHasher>,
 }
 
 impl Interner {
@@ -58,31 +58,17 @@ impl Interner {
     /// Intern a string, returning its Symbol.
     /// If the string was already interned, returns the existing Symbol.
     pub fn intern(&mut self, s: &str) -> Symbol {
-        if let Some(&sym) = self.map.get(s) {
-            return sym;
+        if let Some(idx) = self.strings.get_index_of(s) {
+            return Symbol(idx as u32);
         }
 
-        let sym = Symbol(self.strings.len() as u32);
-        self.strings.push(s.to_owned());
-        self.map.insert(s.to_owned(), sym);
-        sym
-    }
-
-    /// Intern an owned string, avoiding clone if not already present.
-    pub fn intern_owned(&mut self, s: String) -> Symbol {
-        if let Some(&sym) = self.map.get(&s) {
-            return sym;
-        }
-
-        let sym = Symbol(self.strings.len() as u32);
-        self.strings.push(s.clone());
-        self.map.insert(s, sym);
-        sym
+        let (idx, _) = self.strings.insert_full(s.to_owned());
+        Symbol(idx as u32)
     }
 
     /// Return the symbol for an already-interned string.
     pub fn get(&self, s: &str) -> Option<Symbol> {
-        self.map.get(s).copied()
+        self.strings.get_index_of(s).map(|i| Symbol(i as u32))
     }
 
     /// Resolve a Symbol back to its string.
@@ -91,13 +77,15 @@ impl Interner {
     /// Panics if the symbol was not created by this interner.
     #[inline]
     pub fn resolve(&self, sym: Symbol) -> &str {
-        &self.strings[sym.0 as usize]
+        self.strings
+            .get_index(sym.0 as usize)
+            .expect("symbol was not created by this interner")
     }
 
     /// Try to resolve a Symbol, returning None if invalid.
     #[inline]
     pub fn try_resolve(&self, sym: Symbol) -> Option<&str> {
-        self.strings.get(sym.0 as usize).map(|s| s.as_str())
+        self.strings.get_index(sym.0 as usize).map(String::as_str)
     }
 
     /// Number of interned strings.

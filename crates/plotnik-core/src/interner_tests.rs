@@ -22,17 +22,6 @@ fn resolve_roundtrip() {
 }
 
 #[test]
-fn intern_owned_avoids_clone_on_hit() {
-    let mut interner = Interner::new();
-
-    let a = interner.intern("test");
-    let b = interner.intern_owned("test".to_string());
-
-    assert_eq!(a, b);
-    assert_eq!(interner.len(), 1);
-}
-
-#[test]
 fn symbols_are_copy() {
     let mut interner = Interner::new();
     let sym = interner.intern("x");
