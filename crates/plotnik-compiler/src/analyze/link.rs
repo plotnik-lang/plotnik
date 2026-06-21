@@ -46,7 +46,8 @@ use super::visitor::{Visitor, walk};
 use crate::diagnostics::{DiagnosticKind, Diagnostics, Span};
 use crate::parser::ast::{self, Pattern, NodePattern};
 use crate::parser::{SyntaxKind, SyntaxToken, token_src};
-use crate::query::{AstMap, SourceId, SourceMap};
+use crate::query::AstMap;
+use crate::source::{SourceId, SourceMap};
 
 /// The threaded dependencies of the link pass. Decoupled from `Query` to allow
 /// testing without a full query context.

@@ -14,7 +14,7 @@ use super::visitor::{Visitor, walk_pattern, walk_node_pattern};
 use crate::Diagnostics;
 use crate::diagnostics::{DiagnosticKind, Span};
 use crate::parser::{TokenPattern, Def, Pattern, NodePattern, Ref, Root, SeqPattern};
-use crate::query::SourceId;
+use crate::source::SourceId;
 
 pub fn validate_recursion(
     analysis: &DependencyAnalysis,

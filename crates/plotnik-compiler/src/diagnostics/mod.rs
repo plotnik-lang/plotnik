@@ -17,7 +17,7 @@ use printer::DiagnosticsPrinter;
 
 use message::{Diagnostic, Fix, Related};
 
-pub use crate::query::{SourceId, SourceMap};
+pub use crate::source::{SourceId, SourceMap};
 
 /// A location that knows which source it belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

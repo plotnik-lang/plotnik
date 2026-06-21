@@ -25,7 +25,7 @@ use crate::parser::{
     TokenPattern, CapturedPattern, EnumPattern, Pattern, FieldPattern, NodePattern, QuantifiedPattern, UnionPattern,
     Ref, SeqPattern, is_empty_group,
 };
-use crate::query::SourceId;
+use crate::source::SourceId;
 
 /// Shared state for a single inference pass over the AST.
 pub struct InferCtx<'a, 'd> {

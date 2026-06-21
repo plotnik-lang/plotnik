@@ -7,7 +7,7 @@
 use rowan::TextRange;
 
 use crate::diagnostics::Span;
-use crate::query::SourceId;
+use crate::source::SourceId;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Located<T> {

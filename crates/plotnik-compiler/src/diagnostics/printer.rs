@@ -4,7 +4,7 @@ use std::fmt::Write;
 
 use annotate_snippets::{AnnotationKind, Group, Level, Patch, Renderer, Snippet};
 
-use super::SourceMap;
+use super::{SourceId, SourceMap};
 use super::message::{Diagnostic, Severity};
 
 pub struct DiagnosticsPrinter<'q> {
@@ -104,7 +104,7 @@ impl<'q> DiagnosticsPrinter<'q> {
         Ok(())
     }
 
-    fn source_path(&self, source: crate::query::SourceId) -> Option<&'q str> {
+    fn source_path(&self, source: SourceId) -> Option<&'q str> {
         self.sources.path(source)
     }
 }

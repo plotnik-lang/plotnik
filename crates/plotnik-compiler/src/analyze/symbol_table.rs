@@ -12,7 +12,7 @@ use crate::parser::{Root, ast, token_src};
 
 use super::Located;
 use super::visitor::Visitor;
-use crate::query::{SourceId, SourceMap};
+use crate::source::{SourceId, SourceMap};
 
 /// Sentinel name for unnamed definitions (bare expressions at root level).
 /// Code generators can emit whatever name they want for this.
