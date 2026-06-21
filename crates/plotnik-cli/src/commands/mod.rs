@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod check;
+pub mod compile;
 pub mod dump;
 pub mod infer;
 pub mod lang;
