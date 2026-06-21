@@ -94,7 +94,7 @@ impl Diagnostics {
     /// 2. Same position: when spans start at the same position, root-cause errors suppress structural ones
     /// 3. Consequence errors (MissingDefName) suppressed when any other error exists in the same source
     /// 4. Adjacent: when error A ends exactly where error B starts, A suppresses B
-    pub(crate) fn live(&self) -> Vec<Diagnostic> {
+    pub(crate) fn live(&self) -> Vec<&Diagnostic> {
         if self.messages.is_empty() {
             return Vec::new();
         }
@@ -175,7 +175,7 @@ impl Diagnostics {
             .iter()
             .enumerate()
             .filter(|(i, _)| !suppressed[*i])
-            .map(|(_, m)| m.clone())
+            .map(|(_, m)| m)
             .collect();
         result.sort_by_key(|m| (m.source, m.range.start()));
         result
@@ -201,14 +201,14 @@ impl Diagnostics {
 
     /// Render every diagnostic including suppressed cascades; for debugging only.
     pub fn render_raw(&self, sources: &SourceMap) -> String {
-        DiagnosticsPrinter::new(self.messages.clone(), sources).render()
+        DiagnosticsPrinter::new(self.messages.iter().collect(), sources).render()
     }
 
     /// Cascading errors are suppressed, same as `render`.
     pub fn to_wire(&self, sources: &SourceMap) -> Vec<JsonDiagnostic> {
         self.live()
             .iter()
-            .map(|m| json::Diagnostic::from_diagnostic(m, sources))
+            .map(|&m| json::Diagnostic::from_diagnostic(m, sources))
             .collect()
     }
 
