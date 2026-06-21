@@ -43,7 +43,7 @@ pub enum TypeShape {
     Custom(Symbol),
     /// Struct with named fields.
     Struct(BTreeMap<Symbol, FieldInfo>),
-    /// Enum from labeled alternations.
+    /// Enum from an alternation with branch labels.
     Enum(BTreeMap<Symbol, TypeId>),
     /// Array type with element type.
     Array { element: TypeId, non_empty: bool },

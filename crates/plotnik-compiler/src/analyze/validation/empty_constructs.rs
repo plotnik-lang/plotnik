@@ -47,7 +47,7 @@ impl Visitor for EmptyConstructsValidator<'_> {
 
     fn visit_union_pattern(&mut self, union: &UnionPattern) {
         // An empty alternation `[]` has no labels, so it always casts to a union;
-        // an enum always has at least one labeled branch.
+        // an enum always has at least one branch with a label.
         if union.branches().next().is_none() {
             self.reporter
                 .report(DiagnosticKind::EmptyAlternation, union.text_range())

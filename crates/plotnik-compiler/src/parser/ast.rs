@@ -61,9 +61,9 @@ macro_rules! define_pattern {
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub enum Pattern {
             $($variant($variant),)+
-            /// Unlabeled alternation `[a b]`.
+            /// Union alternation `[a b]`.
             Union(UnionPattern),
-            /// Labeled alternation `[A: a B: b]`.
+            /// Enum alternation `[A: a B: b]`.
             Enum(EnumPattern),
         }
 
@@ -129,14 +129,14 @@ ast_node!(Ref, Ref);
 // Classification happens exactly once, in `Pattern::cast` (via `classify_alt`),
 // which is their sole constructor.
 
-/// Unlabeled alternation `[a b]`. A refinement of `SyntaxKind::Alt`,
+/// Union alternation `[a b]`. A refinement of `SyntaxKind::Alt`,
 /// constructed only by `Pattern::cast` when no branch carries a label (mixed
 /// alternations recover here too; their `MixedAltBranches` diagnostic is raised
 /// separately).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnionPattern(SyntaxNode);
 
-/// Labeled alternation `[A: a B: b]`. A refinement of `SyntaxKind::Alt`,
+/// Enum alternation `[A: a B: b]`. A refinement of `SyntaxKind::Alt`,
 /// constructed only by `Pattern::cast` when every branch carries a label.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EnumPattern(SyntaxNode);

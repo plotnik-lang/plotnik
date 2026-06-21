@@ -1,15 +1,15 @@
 Q = [
-  (a)
-  B: (b)
+  A: (a)
+  (b)
 ]
 ==== diagnostics ====
-error: cannot mix labeled and unlabeled branches
- --> query.ptk:2:3
+error: cannot mix enum and union branches
+ --> query.ptk:3:3
   |
-2 |   (a)
-  |   ^^^
-3 |   B: (b)
+2 |   A: (a)
   |   - enum branch here
+3 |   (b)
+  |   ^^^
   |
 help: use all labels for an enum, or none for a merged struct
 ==== symbols ====

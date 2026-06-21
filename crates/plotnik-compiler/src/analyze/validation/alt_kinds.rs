@@ -1,7 +1,7 @@
 //! Mixed enum/union alternation diagnostic.
 //!
 //! Runs over the raw syntax tree rather than the typed `Pattern` split: union
-//! and enum are distinct AST nodes, but "are some branches labeled and others
+//! and enum are distinct AST nodes, but "do some branches have labels and others
 //! not" is a purely syntactic question. Classifying here keeps the typed split
 //! mixed-blind while preserving a precise diagnostic for `[A: (x) (y)]`.
 

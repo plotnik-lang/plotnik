@@ -41,7 +41,7 @@ pub enum TypeDefKind {
     Wrapper { kind: TypeKind, inner: TypeId },
     /// A fixed set of named fields.
     Struct { member_start: u16, member_count: u8 },
-    /// A tagged set of variants.
+    /// Discriminated union with named variants.
     Enum { member_start: u16, member_count: u8 },
 }
 
