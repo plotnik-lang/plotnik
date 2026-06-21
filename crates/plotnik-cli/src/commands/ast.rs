@@ -97,89 +97,108 @@ fn print_source_ast(args: &AstArgs, declared_lang: Option<&str>) -> CliResult {
     Ok(())
 }
 
+/// One emission for the iterative tree dumper's work stack.
+enum Step<'a> {
+    /// Render a node: its indent, optional field, and `(kind …)` body.
+    Node {
+        node: tree_sitter::Node<'a>,
+        field: Option<&'a str>,
+        depth: usize,
+    },
+    /// Write a literal verbatim (newlines between children, the closing paren).
+    Lit(&'static str),
+}
+
+/// Dump a parsed tree as indented S-expressions, iteratively.
+///
+/// The source tree is untrusted and can nest past any native-stack budget (a long
+/// unary/parenthesis chain, say), so the walk uses an explicit work stack rather
+/// than native recursion.
 fn dump_tree(tree: &tree_sitter::Tree, source: &str, raw: bool) -> String {
     let mut out = String::new();
-    format_node(&mut out, tree.root_node(), source, 0, raw);
+    let mut stack = vec![Step::Node {
+        node: tree.root_node(),
+        field: None,
+        depth: 0,
+    }];
+    while let Some(step) = stack.pop() {
+        let (node, field, depth) = match step {
+            Step::Lit(s) => {
+                out.push_str(s);
+                continue;
+            }
+            Step::Node { node, field, depth } => (node, field, depth),
+        };
+
+        // Anonymous nodes are dropped unless `--raw`. Children are pre-filtered
+        // below, so this only guards a (hypothetical) anonymous root.
+        if !raw && !node.is_named() {
+            continue;
+        }
+
+        for _ in 0..depth {
+            out.push_str("  ");
+        }
+        if let Some(f) = field {
+            let _ = write!(out, "{}: ", f);
+        }
+        let kind = node.kind();
+
+        let children = collect_children(node, raw);
+        if children.is_empty() {
+            let text = node
+                .utf8_text(source.as_bytes())
+                .unwrap_or("<invalid utf8>");
+            if text == kind {
+                out.push_str("(\"");
+                escape_string_into(&mut out, kind);
+                out.push_str("\")");
+            } else {
+                let _ = write!(out, "({} \"", kind);
+                escape_string_into(&mut out, text);
+                out.push_str("\")");
+            }
+            continue;
+        }
+
+        let _ = write!(out, "({}", kind);
+        // Queue, in source order, a newline + each child, then the closing paren.
+        let mut deferred = Vec::with_capacity(children.len() * 2 + 1);
+        for (child, child_field) in children {
+            deferred.push(Step::Lit("\n"));
+            deferred.push(Step::Node {
+                node: child,
+                field: child_field,
+                depth: depth + 1,
+            });
+        }
+        deferred.push(Step::Lit(")"));
+        stack.extend(deferred.into_iter().rev());
+    }
     out.push('\n');
     out
 }
 
-fn format_node(
-    out: &mut String,
-    node: tree_sitter::Node,
-    source: &str,
-    depth: usize,
-    include_anonymous: bool,
-) {
-    format_node_with_field(out, node, None, source, depth, include_anonymous);
-}
-
-fn format_node_with_field(
-    out: &mut String,
-    node: tree_sitter::Node,
-    field_name: Option<&str>,
-    source: &str,
-    depth: usize,
-    include_anonymous: bool,
-) {
-    if !include_anonymous && !node.is_named() {
-        return;
-    }
-
-    for _ in 0..depth {
-        out.push_str("  ");
-    }
-    if let Some(f) = field_name {
-        let _ = write!(out, "{}: ", f);
-    }
-    let kind = node.kind();
-
-    let children: Vec<_> = {
-        let mut cursor = node.walk();
-        let mut result = Vec::new();
-        if cursor.goto_first_child() {
-            loop {
-                let child = cursor.node();
-                if include_anonymous || child.is_named() {
-                    result.push((child, cursor.field_name()));
-                }
-                if !cursor.goto_next_sibling() {
-                    break;
-                }
+/// Collect a node's children, keeping anonymous ones only in `raw` mode, paired
+/// with their field names.
+fn collect_children<'a>(
+    node: tree_sitter::Node<'a>,
+    raw: bool,
+) -> Vec<(tree_sitter::Node<'a>, Option<&'a str>)> {
+    let mut cursor = node.walk();
+    let mut result = Vec::new();
+    if cursor.goto_first_child() {
+        loop {
+            let child = cursor.node();
+            if raw || child.is_named() {
+                result.push((child, cursor.field_name()));
+            }
+            if !cursor.goto_next_sibling() {
+                break;
             }
         }
-        result
-    };
-
-    if children.is_empty() {
-        let text = node
-            .utf8_text(source.as_bytes())
-            .unwrap_or("<invalid utf8>");
-        if text == kind {
-            out.push_str("(\"");
-            escape_string_into(out, kind);
-            out.push_str("\")");
-        } else {
-            let _ = write!(out, "({} \"", kind);
-            escape_string_into(out, text);
-            out.push_str("\")");
-        }
-        return;
     }
-
-    let _ = write!(out, "({}", kind);
-    for (child, child_field) in children {
-        out.push('\n');
-        format_node_with_field(
-            out,
-            child,
-            child_field,
-            source,
-            depth + 1,
-            include_anonymous,
-        );
-    }
-    out.push(')');
+    result
 }
 
 fn escape_string_into(out: &mut String, s: &str) {

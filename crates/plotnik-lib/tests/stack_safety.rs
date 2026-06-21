@@ -21,7 +21,7 @@ use arborium_tree_sitter::{Language as TsLanguage, Node, Parser as TsParser, Tre
 
 use plotnik_lib::bytecode::{EffectKind, Instruction, Module, Nav};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
-use plotnik_lib::{QueryBuilder, RuntimeEffect, RuntimeError, SourceMap, Tracer, VM};
+use plotnik_lib::{Colors, QueryBuilder, RuntimeEffect, RuntimeError, SourceMap, Tracer, VM, Value};
 
 /// Number of nested `unary_expression`s the query descends through. Each level
 /// leaves one call-retry checkpoint; the final failure unwinds all of them in a
@@ -201,5 +201,41 @@ fn deep_backtrack_does_not_overflow_native_stack() {
     assert!(
         max_run >= DEPTH as u64,
         "expected a single backtrack to unwind >= {DEPTH} checkpoints, saw {max_run}"
+    );
+}
+
+/// A captured-recursive query materializes output as deep as the match, so both
+/// rendering (`Value::format`) and dropping the value must avoid native recursion.
+/// Build a deeply nested value, then render and drop it on a tiny stack: the
+/// recursive printer and the derived recursive drop would each overflow here.
+#[test]
+fn deep_value_render_and_drop_do_not_overflow_native_stack() {
+    // Far past any native-stack frame budget. Construction is bottom-up and linear,
+    // and compact rendering is linear in depth, so a large depth stays cheap.
+    const VALUE_DEPTH: usize = 200_000;
+
+    let len = thread::scope(|scope| {
+        let handle = thread::Builder::new()
+            .name("deep-value".into())
+            .stack_size(STACK_SIZE)
+            .spawn_scoped(scope, || {
+                // Bottom-up so construction itself never recurses.
+                let mut value = Value::Null;
+                for _ in 0..VALUE_DEPTH {
+                    value = Value::Struct(vec![("inner".to_string(), value)]);
+                }
+                let rendered = value.format(false, Colors::new(false));
+                // `value` drops here, on this same tiny stack.
+                rendered.len()
+            })
+            .expect("spawn deep-value thread");
+        handle.join().expect("deep-value thread did not abort")
+    });
+
+    // Each level contributes a fixed `{"inner":…}` wrapper, so output is linear in
+    // depth and non-trivial — confirming the whole chain was rendered.
+    assert!(
+        len > VALUE_DEPTH,
+        "expected rendered output longer than {VALUE_DEPTH}, saw {len}"
     );
 }
