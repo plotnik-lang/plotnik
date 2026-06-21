@@ -746,7 +746,6 @@ impl<'t> VM<'t> {
             Set => RuntimeEffect::Set(op.payload as u16),
             EnumOpen => RuntimeEffect::EnumOpen(op.payload as u16),
             EnumClose => RuntimeEffect::EnumClose,
-            Clear => RuntimeEffect::Clear,
             Null => RuntimeEffect::Null,
         };
 

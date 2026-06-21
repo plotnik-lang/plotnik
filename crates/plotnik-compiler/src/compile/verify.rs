@@ -449,7 +449,7 @@ mod debug_impl {
             StructClose => ScopeRole::Close(StructOpen),
             EnumClose => ScopeRole::Close(EnumOpen),
             SuppressEnd => ScopeRole::Close(SuppressBegin),
-            Node | Push | Set | Clear | Null => return None,
+            Node | Push | Set | Null => return None,
         };
         Some(role)
     }
