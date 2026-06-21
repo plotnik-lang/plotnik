@@ -8,13 +8,13 @@ use super::{SourceId, SourceMap};
 use super::message::{Diagnostic, Severity};
 
 pub struct DiagnosticsPrinter<'q> {
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: Vec<&'q Diagnostic>,
     sources: &'q SourceMap,
     colored: bool,
 }
 
 impl<'q> DiagnosticsPrinter<'q> {
-    pub(crate) fn new(diagnostics: Vec<Diagnostic>, sources: &'q SourceMap) -> Self {
+    pub(crate) fn new(diagnostics: Vec<&'q Diagnostic>, sources: &'q SourceMap) -> Self {
         Self {
             diagnostics,
             sources,
