@@ -97,15 +97,13 @@ pub(super) fn extract_default_aliases(
         }
 
         // On ties, keep the earliest alias so selection is deterministic across grammars.
-        if let Some(default_entry) = status
+        if let Some((_, default_entry)) = status
             .aliases
-            .iter()
+            .drain(..)
             .enumerate()
             .max_by_key(|(i, (_, count))| (*count, Reverse(*i)))
-            .map(|(_, entry)| entry.clone())
         {
-            status.aliases.clear();
-            status.aliases.push(default_entry.clone());
+            status.aliases.push((default_entry.0.clone(), default_entry.1));
             result.insert(symbol, default_entry.0);
         }
     });

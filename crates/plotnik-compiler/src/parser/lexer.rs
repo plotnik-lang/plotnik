@@ -102,7 +102,7 @@ pub fn lex(source: &str) -> Vec<Token> {
 
 /// Splits a string literal token into: quote + content + quote
 fn split_string_literal(source: &str, span: Range<usize>, tokens: &mut Vec<Token>) {
-    let text = &source[span.clone()];
+    let text = &source[span.start..span.end];
     let quote_char = text
         .chars()
         .next()
@@ -141,8 +141,9 @@ fn split_regex_predicate(
     op_kind: SyntaxKind,
     tokens: &mut Vec<Token>,
 ) {
-    let text = &source[span.clone()];
     let start = span.start;
+    let end = span.end;
+    let text = &source[start..end];
 
     tokens.push(Token::new(op_kind, range_to_text_range(start..start + 2)));
 
@@ -160,7 +161,7 @@ fn split_regex_predicate(
 
     tokens.push(Token::new(
         SyntaxKind::RegexLiteral,
-        range_to_text_range(start + regex_start_in_text..span.end),
+        range_to_text_range(start + regex_start_in_text..end),
     ));
 }
 
