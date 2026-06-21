@@ -9,7 +9,7 @@
 
 use plotnik_core::Interner;
 
-use crate::parser::{Pattern, QuantifiedPattern, SyntaxKind, is_empty_group};
+use crate::parser::{Pattern, QuantifiedPattern, SeqItem, SyntaxKind, is_empty_group};
 
 use super::context::TypeContext;
 use super::types::{QuantifierKind, TYPE_NODE, TypeFlow, TypeId, TypeShape};
@@ -109,6 +109,35 @@ pub fn produces_output(type_id: TypeId, ctx: &TypeContext) -> bool {
         }
         Some(TypeShape::Optional(inner)) => *inner != TYPE_NODE && produces_output(*inner, ctx),
         _ => false,
+    }
+}
+
+/// Collapse sole-child sequences to a fixpoint: `{{X}}` → `X`.
+///
+/// A one-item, unanchored `Seq` is transparent to flow — the value mechanism and
+/// optionality — so capture inference must see through it: `{(id)?}` has the same
+/// flow as `(id)?`. Transparency is flow-only; strict dimensionality does not see
+/// through such sequences (`{{(id) @a}*} @rows` stays rejected), so never run this
+/// on the dimensionality path. An anchored `Seq` (`{. (a)}`) carries a real
+/// constraint and is returned unchanged.
+pub(crate) fn normalize_sole_child_sequence(pattern: &Pattern) -> Pattern {
+    let mut current = pattern.clone();
+    while let Some(child) = sole_child(&current) {
+        current = child;
+    }
+    current
+}
+
+/// The single child of a one-item, unanchored `Seq`, or `None` if it is
+/// anchored, holds more than one item, or is not a `Seq`.
+fn sole_child(pattern: &Pattern) -> Option<Pattern> {
+    let Pattern::SeqPattern(seq) = pattern else {
+        return None;
+    };
+    let mut items = seq.items();
+    match (items.next(), items.next()) {
+        (Some(SeqItem::Pattern(child)), None) => Some(child),
+        _ => None,
     }
 }
 

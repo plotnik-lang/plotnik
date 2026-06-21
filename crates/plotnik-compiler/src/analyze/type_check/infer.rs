@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 use plotnik_core::Interner;
 use rowan::TextRange;
 
-use super::capture_shape::{CaptureKind, capture_kind, quantifier_arity};
+use super::capture_shape::{CaptureKind, capture_kind, normalize_sole_child_sequence, quantifier_arity};
 use super::context::TypeContext;
 use super::def_id::Symbol;
 use super::types::{
@@ -413,18 +413,33 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// Returns (Info, is_optional).
     fn resolve_capture_inner(&mut self, inner: &Pattern) -> (TermInfo, bool) {
         if let Pattern::QuantifiedPattern(q) = inner {
-            let quantifier = self.quantifier_kind(q);
-            match quantifier {
+            return match self.quantifier_kind(q) {
                 // * or + acts as row capture here (skipping strict dimensionality)
                 QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
                     (self.infer_quantified_pattern_as_row(q), false)
                 }
                 // ? makes the resulting capture field optional
                 QuantifierKind::Optional => (self.infer_pattern(inner), true),
-            }
-        } else {
-            (self.infer_pattern(inner), false)
+            };
         }
+
+        let info = self.infer_pattern(inner);
+        // `{(id)?} @b` captures through a sole-child sequence, so the `?` still
+        // makes the field optional. Without this it infers a non-optional `Node`
+        // while the skip path materializes `null` — a check-pass / run-panic.
+        // Gated to a void body (the matched node is captured); a sequence-wrapped
+        // `?` over a fields/scalar/array body is the wider captured-optional work.
+        let optional = info.flow.is_void() && self.is_optional_through_sequence(inner);
+        (info, optional)
+    }
+
+    /// A capture body that reduces to `?` through sole-child sequences, e.g.
+    /// `{(id)?}`. The `?` need not be the immediate inner.
+    fn is_optional_through_sequence(&self, inner: &Pattern) -> bool {
+        let Pattern::QuantifiedPattern(q) = normalize_sole_child_sequence(inner) else {
+            return false;
+        };
+        self.quantifier_kind(&q) == QuantifierKind::Optional
     }
 
     /// The capture's base type from the inner flow, before any annotation.
