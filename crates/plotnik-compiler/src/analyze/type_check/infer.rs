@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 use plotnik_core::Interner;
 use rowan::TextRange;
 
-use super::capture_shape::{CaptureKind, capture_kind, quantifier_arity};
+use super::capture_shape::{CaptureKind, capture_kind, produces_output, quantifier_arity};
 use super::context::TypeContext;
 use super::def_id::Symbol;
 use super::types::{
@@ -102,7 +102,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     self.merge_fields(&mut merged_fields, &fields, child.text_range());
                 }
                 TypeFlow::Scalar(type_id) => {
-                    if self.produces_output(*type_id) {
+                    if produces_output(*type_id, self.ctx.type_ctx) {
                         output_children.push((child.text_range(), *type_id));
                     }
                 }
@@ -182,7 +182,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     self.merge_fields(&mut merged_fields, &fields, child.text_range());
                 }
                 TypeFlow::Scalar(type_id) => {
-                    if self.produces_output(*type_id) {
+                    if produces_output(*type_id, self.ctx.type_ctx) {
                         output_children.push((child.text_range(), *type_id));
                     }
                 }
@@ -684,24 +684,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         match flow {
             TypeFlow::Void => TYPE_VOID,
             TypeFlow::Scalar(t) | TypeFlow::Fields(t) => *t,
-        }
-    }
-
-    /// Check if a type produces meaningful output for propagation.
-    ///
-    /// Meaningful outputs are structured types (enums, structs, refs) or arrays/optionals
-    /// of such types. Simple `Node[]` from quantified named nodes is NOT meaningful.
-    fn produces_output(&self, type_id: TypeId) -> bool {
-        let Some(shape) = self.ctx.type_ctx.type_shape(type_id) else {
-            return false;
-        };
-        match shape {
-            TypeShape::Enum(_) | TypeShape::Struct(_) | TypeShape::Ref(_) => true,
-            TypeShape::Array { element, .. } => {
-                *element != TYPE_NODE && self.produces_output(*element)
-            }
-            TypeShape::Optional(inner) => *inner != TYPE_NODE && self.produces_output(*inner),
-            TypeShape::Node | TypeShape::Void | TypeShape::Custom(_) => false,
         }
     }
 
