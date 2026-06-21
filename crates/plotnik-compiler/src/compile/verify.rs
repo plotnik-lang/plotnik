@@ -220,14 +220,14 @@ mod debug_impl {
         let mut out: Vec<SemanticOp> = Vec::with_capacity(ops.len());
         // (mode, index in `out`) of the most recent Up run still open for merging.
         let mut pending: Option<(u8, usize)> = None;
-        let mut i = 0;
+        let mut iter = ops.into_iter().peekable();
 
-        while i < ops.len() {
+        while let Some(op) = iter.next() {
             // An Up node is always `UpNav` immediately followed by `MatchAny`
             // (pure navigation checks no node kind). Only such pairs coalesce.
-            let up_pair = match ops[i] {
+            let up_pair = match op {
                 SemanticOp::UpNav(mode, level)
-                    if matches!(ops.get(i + 1), Some(SemanticOp::MatchAny)) =>
+                    if matches!(iter.peek(), Some(SemanticOp::MatchAny)) =>
                 {
                     Some((mode, level))
                 }
@@ -235,6 +235,7 @@ mod debug_impl {
             };
 
             if let Some((mode, level)) = up_pair {
+                iter.next();
                 let merged = matches!(pending, Some((pm, _)) if pm == mode);
                 if merged {
                     let (_, idx) = pending.expect("merged is true only when pending is Some");
@@ -246,14 +247,11 @@ mod debug_impl {
                     pending = Some((mode, out.len() - 1));
                     out.push(SemanticOp::MatchAny);
                 }
-                i += 2;
-            } else if matches!(ops[i], SemanticOp::Effect(..)) {
-                out.push(ops[i].clone());
-                i += 1;
+            } else if matches!(op, SemanticOp::Effect(..)) {
+                out.push(op);
             } else {
-                out.push(ops[i].clone());
+                out.push(op);
                 pending = None;
-                i += 1;
             }
         }
 

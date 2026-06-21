@@ -235,7 +235,7 @@ impl Compiler<'_> {
                 );
                 capture.post[..split].to_vec()
             }
-            None => capture.post.clone(),
+            None => capture.post,
         };
         let count = nav_modes.len();
         // Seed the reverse walk so the last expression sees a trailing anchor as
@@ -298,7 +298,7 @@ impl Compiler<'_> {
             following_nav = nav_override;
         }
         if first_is_skippable {
-            current_exit = self.wrap_entry_pre(current_exit, capture.pre.clone());
+            current_exit = self.wrap_entry_pre(current_exit, capture.pre);
         }
         current_exit
     }
@@ -348,7 +348,7 @@ impl Compiler<'_> {
                     capture.post[..split].to_vec(),
                     capture.post[split..].to_vec(),
                 ),
-                None => (capture.post.clone(), vec![]),
+                None => (capture.post, vec![]),
             };
         let exit = if post_close.is_empty() {
             exit
@@ -414,7 +414,7 @@ impl Compiler<'_> {
         );
 
         // Open the scope on a single entry epsilon every path crosses first.
-        self.wrap_entry_pre(entry, capture.pre.clone())
+        self.wrap_entry_pre(entry, capture.pre)
     }
 
     /// When an alternation sits immediately before a soft sibling anchor into a

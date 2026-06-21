@@ -166,13 +166,10 @@ pub enum SeqItem {
 
 impl SeqItem {
     pub fn cast(node: SyntaxNode) -> Option<Self> {
-        if let Some(pattern) = Pattern::cast(node.clone()) {
-            return Some(SeqItem::Pattern(pattern));
+        if Anchor::can_cast(node.kind()) {
+            return Anchor::cast(node).map(SeqItem::Anchor);
         }
-        if let Some(anchor) = Anchor::cast(node) {
-            return Some(SeqItem::Anchor(anchor));
-        }
-        None
+        Pattern::cast(node).map(SeqItem::Pattern)
     }
 
     pub fn as_anchor(&self) -> Option<&Anchor> {

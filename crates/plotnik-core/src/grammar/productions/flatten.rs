@@ -94,7 +94,7 @@ impl RuleFlattener {
         self.alias_stack.clear();
         self.field_name_stack.clear();
         self.apply(rule)?;
-        Ok(self.production.clone())
+        Ok(std::mem::take(&mut self.production))
     }
 
     fn apply(&mut self, rule: Rule) -> FlattenGrammarResult<bool> {
