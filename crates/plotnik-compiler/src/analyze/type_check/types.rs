@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-pub use plotnik_core::TypeId;
+pub use plotnik_compiler_core::TypeId;
 
 use super::def_id::{DefId, Symbol};
 

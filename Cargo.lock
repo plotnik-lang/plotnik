@@ -1981,6 +1981,7 @@ dependencies = [
  "plotnik-compiler-analyze-refs",
  "plotnik-compiler-analyze-shape",
  "plotnik-compiler-analyze-types",
+ "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
  "plotnik-compiler-emit-instructions",
  "plotnik-compiler-emit-layout",
@@ -2066,6 +2067,7 @@ dependencies = [
  "plotnik-compiler-analyze-names",
  "plotnik-compiler-analyze-refs",
  "plotnik-compiler-analyze-shape",
+ "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
  "plotnik-compiler-parse",
  "plotnik-core",
@@ -2161,7 +2163,7 @@ version = "0.3.3"
 dependencies = [
  "indexmap",
  "plotnik-bytecode",
- "plotnik-core",
+ "plotnik-compiler-core",
 ]
 
 [[package]]

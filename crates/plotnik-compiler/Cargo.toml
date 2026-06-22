@@ -12,6 +12,7 @@ workspace = true
 [dependencies]
 plotnik-bytecode.workspace = true
 plotnik-core.workspace = true
+plotnik-compiler-core.workspace = true
 plotnik-compiler-analyze-grammar.workspace = true
 plotnik-compiler-analyze-names.workspace = true
 plotnik-compiler-analyze-refs.workspace = true

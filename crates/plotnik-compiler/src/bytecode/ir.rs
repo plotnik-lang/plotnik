@@ -10,7 +10,7 @@ use std::num::NonZeroU16;
 
 use indexmap::IndexMap;
 use plotnik_bytecode::{EffectKind, Nav, PredicateOp, StepAddr, select_match_opcode};
-use plotnik_core::{DefId, TypeId};
+use plotnik_compiler_core::{DefId, TypeId};
 
 /// Node kind constraint for Match instructions.
 ///

@@ -1,1 +1,1 @@
-pub use plotnik_core::{DefId, Interner, Symbol};
+pub use plotnik_compiler_core::{DefId, Interner, Symbol};

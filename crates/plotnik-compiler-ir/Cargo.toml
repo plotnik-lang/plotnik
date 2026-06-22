@@ -11,5 +11,5 @@ workspace = true
 
 [dependencies]
 plotnik-bytecode.workspace = true
-plotnik-core.workspace = true
+plotnik-compiler-core.workspace = true
 indexmap = "2"
