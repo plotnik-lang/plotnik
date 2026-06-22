@@ -18,7 +18,6 @@ pub mod diagnostics;
 pub mod emit;
 #[cfg(test)]
 pub mod parser;
-#[cfg(test)]
 pub mod query;
 #[cfg(test)]
 pub mod source {
@@ -30,21 +29,125 @@ pub mod test_utils;
 pub mod typegen;
 
 #[cfg(not(test))]
-pub use plotnik_compiler_analyze as analyze;
+pub mod analyze {
+    pub mod dependencies {
+        pub use plotnik_compiler_analyze_refs::dependencies::*;
+    }
+
+    pub mod link {
+        pub use plotnik_compiler_analyze_grammar::link::*;
+    }
+
+    pub mod refs {
+        pub use plotnik_compiler_analyze_refs::refs::*;
+    }
+
+    pub mod symbol_table {
+        pub use plotnik_compiler_analyze_names::symbol_table::*;
+    }
+
+    pub mod type_check {
+        pub use plotnik_compiler_analyze_types::type_check::*;
+    }
+
+    pub mod validation {
+        pub use plotnik_compiler_analyze_shape::validation::*;
+    }
+
+    pub mod visitor {
+        pub use plotnik_compiler_analyze_shape::visitor::*;
+    }
+
+    pub use dependencies::{DependencyAnalysis, analyze_dependencies};
+    pub use link::GrammarBinding;
+    pub use plotnik_compiler_analyze_grammar::GrammarLinkCtx;
+    pub use plotnik_compiler_analyze_names::{SymbolTable, UNNAMED_DEF, resolve_names};
+    pub use plotnik_compiler_analyze_refs::validate_recursion;
+    pub use plotnik_compiler_analyze_shape::Located;
+    pub use plotnik_compiler_analyze_shape::validation::{
+        validate_alt_kinds, validate_anchors, validate_empty_constructs, validate_predicates,
+    };
+    pub use plotnik_compiler_analyze_types::{
+        TypeContext, infer_types, primary_def_name, validate_entrypoints,
+    };
+}
 #[cfg(not(test))]
-pub use plotnik_compiler_lower as compile;
+pub mod compile {
+    pub use plotnik_compiler_lower_dead::remove_unreachable;
+    pub use plotnik_compiler_lower_epsilon::eliminate_epsilons;
+    pub use plotnik_compiler_lower_nav::collapse_up;
+    pub use plotnik_compiler_lower_pack::lower;
+    pub use plotnik_compiler_lower_thompson::{CaptureEffects, CompileCtx, CompileResult, Compiler};
+
+    pub fn build_ir(ctx: &CompileCtx<'_>) -> CompileResult {
+        let mut result = Compiler::build_ir(ctx);
+
+        plotnik_compiler_lower_thompson::compile::verify::run_verified(
+            "eliminate_epsilons",
+            &mut result,
+            ctx,
+            eliminate_epsilons,
+        );
+        plotnik_compiler_lower_thompson::compile::verify::run_verified(
+            "remove_unreachable",
+            &mut result,
+            ctx,
+            remove_unreachable,
+        );
+        plotnik_compiler_lower_thompson::compile::verify::run_verified(
+            "collapse_up",
+            &mut result,
+            ctx,
+            collapse_up,
+        );
+        plotnik_compiler_lower_thompson::compile::verify::run_verified(
+            "lower",
+            &mut result,
+            ctx,
+            lower,
+        );
+
+        result
+    }
+}
 #[cfg(not(test))]
-pub use plotnik_compiler_diagnostics as diagnostics;
+pub mod diagnostics {
+    pub use plotnik_compiler_diagnostics::*;
+    pub use plotnik_compiler_diagnostics::diagnostics::*;
+}
 #[cfg(not(test))]
 pub use plotnik_compiler_diagnostics::source;
 #[cfg(not(test))]
-pub use plotnik_compiler_emit as emit;
+pub mod emit {
+    pub mod instructions {
+        pub use plotnik_compiler_emit_instructions::instructions::*;
+    }
+
+    pub mod layout {
+        pub use plotnik_compiler_emit_layout::layout::*;
+    }
+
+    pub mod regex_table {
+        pub use plotnik_compiler_emit_regex::regex_table::*;
+    }
+
+    pub mod string_table {
+        pub use plotnik_compiler_emit_strings::string_table::*;
+    }
+
+    pub mod type_table {
+        pub use plotnik_compiler_emit_types::type_table::*;
+    }
+
+    pub use plotnik_compiler_emit_module::{EmitInput, emit, emit_unchecked};
+    pub use plotnik_compiler_emit_regex::{RegexTableBuilder, deserialize_dfa};
+    pub use plotnik_compiler_emit_strings::{EmitError, StringTableBuilder};
+    pub use plotnik_compiler_emit_types::TypeTableBuilder;
+}
 #[cfg(not(test))]
 pub use plotnik_compiler_ir as bytecode;
 #[cfg(not(test))]
 pub use plotnik_compiler_parse as parser;
-#[cfg(not(test))]
-pub use plotnik_query as query;
 #[cfg(not(test))]
 pub use plotnik_compiler_typegen as typegen;
 
@@ -82,4 +185,4 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[cfg(not(test))]
 pub use plotnik_compiler_diagnostics::{Diagnostics, Error, PassResult, Result, Severity, SourceId, SourceMap, Span};
 #[cfg(not(test))]
-pub use plotnik_query::{Query, QueryBuilder};
+pub use query::{Query, QueryBuilder};

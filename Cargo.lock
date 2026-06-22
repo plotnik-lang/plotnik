@@ -1976,15 +1976,27 @@ dependencies = [
  "logos",
  "memmap2",
  "plotnik-bytecode",
- "plotnik-compiler-analyze",
+ "plotnik-compiler-analyze-grammar",
+ "plotnik-compiler-analyze-names",
+ "plotnik-compiler-analyze-refs",
+ "plotnik-compiler-analyze-shape",
+ "plotnik-compiler-analyze-types",
  "plotnik-compiler-diagnostics",
- "plotnik-compiler-emit",
+ "plotnik-compiler-emit-instructions",
+ "plotnik-compiler-emit-layout",
+ "plotnik-compiler-emit-module",
+ "plotnik-compiler-emit-regex",
+ "plotnik-compiler-emit-strings",
+ "plotnik-compiler-emit-types",
  "plotnik-compiler-ir",
- "plotnik-compiler-lower",
+ "plotnik-compiler-lower-dead",
+ "plotnik-compiler-lower-epsilon",
+ "plotnik-compiler-lower-nav",
+ "plotnik-compiler-lower-pack",
+ "plotnik-compiler-lower-thompson",
  "plotnik-compiler-parse",
  "plotnik-compiler-typegen",
  "plotnik-core",
- "plotnik-query",
  "regex-automata",
  "regex-syntax",
  "rowan",
@@ -1992,19 +2004,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
-]
-
-[[package]]
-name = "plotnik-compiler-analyze"
-version = "0.3.3"
-dependencies = [
- "indexmap",
- "plotnik-bytecode",
- "plotnik-compiler-diagnostics",
- "plotnik-compiler-parse",
- "plotnik-core",
- "regex-syntax",
- "rowan",
 ]
 
 [[package]]
@@ -2094,20 +2093,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "plotnik-compiler-emit"
-version = "0.3.3"
-dependencies = [
- "crc32fast",
- "indexmap",
- "plotnik-bytecode",
- "plotnik-compiler-analyze",
- "plotnik-compiler-ir",
- "plotnik-core",
- "regex-automata",
- "thiserror",
-]
-
-[[package]]
 name = "plotnik-compiler-emit-instructions"
 version = "0.3.3"
 dependencies = [
@@ -2176,18 +2161,6 @@ version = "0.3.3"
 dependencies = [
  "indexmap",
  "plotnik-bytecode",
- "plotnik-core",
-]
-
-[[package]]
-name = "plotnik-compiler-lower"
-version = "0.3.3"
-dependencies = [
- "indexmap",
- "plotnik-bytecode",
- "plotnik-compiler-analyze",
- "plotnik-compiler-ir",
- "plotnik-compiler-parse",
  "plotnik-core",
 ]
 
@@ -2294,22 +2267,6 @@ dependencies = [
  "serde_json",
  "similar 3.1.1",
  "tempfile",
-]
-
-[[package]]
-name = "plotnik-query"
-version = "0.3.3"
-dependencies = [
- "indexmap",
- "plotnik-bytecode",
- "plotnik-compiler-analyze",
- "plotnik-compiler-diagnostics",
- "plotnik-compiler-emit",
- "plotnik-compiler-ir",
- "plotnik-compiler-lower",
- "plotnik-compiler-parse",
- "plotnik-core",
- "rowan",
 ]
 
 [[package]]
