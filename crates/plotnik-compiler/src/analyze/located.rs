@@ -10,28 +10,28 @@ use crate::diagnostics::Span;
 use crate::source::SourceId;
 
 #[derive(Clone, Debug)]
-pub(crate) struct Located<T> {
+pub struct Located<T> {
     source: SourceId,
     node: T,
 }
 
 impl<T> Located<T> {
-    pub(crate) fn new(source: SourceId, node: T) -> Self {
+    pub fn new(source: SourceId, node: T) -> Self {
         Self { source, node }
     }
 
-    pub(crate) fn source(&self) -> SourceId {
+    pub fn source(&self) -> SourceId {
         self.source
     }
 
-    pub(crate) fn node(&self) -> &T {
+    pub fn node(&self) -> &T {
         &self.node
     }
 
     /// Re-tag a value reached from this node with the SAME source — a child of a
     /// node always lives in the same file as the node. Crossing into another
     /// file is done with a fresh `Located::new`, never `wrap`.
-    pub(crate) fn wrap<U>(&self, child: U) -> Located<U> {
+    pub fn wrap<U>(&self, child: U) -> Located<U> {
         Located {
             source: self.source,
             node: child,
@@ -39,7 +39,7 @@ impl<T> Located<T> {
     }
 
     /// Pair a range from this node's source with that source.
-    pub(crate) fn span_of(&self, range: TextRange) -> Span {
+    pub fn span_of(&self, range: TextRange) -> Span {
         Span::new(self.source, range)
     }
 }

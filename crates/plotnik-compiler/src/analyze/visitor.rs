@@ -24,7 +24,7 @@ use crate::parser::{
     Root, SeqPattern, TokenPattern, UnionPattern,
 };
 
-pub(crate) trait Visitor: Sized {
+pub trait Visitor: Sized {
     fn visit(&mut self, ast: &Located<Root>) {
         walk(self, ast);
     }
@@ -70,19 +70,19 @@ pub(crate) trait Visitor: Sized {
     }
 }
 
-pub(crate) fn walk<V: Visitor>(visitor: &mut V, ast: &Located<Root>) {
+pub fn walk<V: Visitor>(visitor: &mut V, ast: &Located<Root>) {
     for def in ast.node().defs() {
         visitor.visit_def(&ast.wrap(def));
     }
 }
 
-pub(crate) fn walk_def<V: Visitor>(visitor: &mut V, def: &Located<Def>) {
+pub fn walk_def<V: Visitor>(visitor: &mut V, def: &Located<Def>) {
     if let Some(body) = def.node().body() {
         visitor.visit_pattern(&def.wrap(body));
     }
 }
 
-pub(crate) fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Located<Pattern>) {
+pub fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Located<Pattern>) {
     match pattern.node() {
         Pattern::NodePattern(n) => visitor.visit_node_pattern(&pattern.wrap(n.clone())),
         Pattern::TokenPattern(n) => visitor.visit_token_pattern(&pattern.wrap(n.clone())),
@@ -96,13 +96,13 @@ pub(crate) fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Located<Patter
     }
 }
 
-pub(crate) fn walk_node_pattern<V: Visitor>(visitor: &mut V, node: &Located<NodePattern>) {
+pub fn walk_node_pattern<V: Visitor>(visitor: &mut V, node: &Located<NodePattern>) {
     for child in node.node().children() {
         visitor.visit_pattern(&node.wrap(child));
     }
 }
 
-pub(crate) fn walk_union_pattern<V: Visitor>(visitor: &mut V, union: &Located<UnionPattern>) {
+pub fn walk_union_pattern<V: Visitor>(visitor: &mut V, union: &Located<UnionPattern>) {
     for branch in union.node().branches() {
         if let Some(body) = branch.body() {
             visitor.visit_pattern(&union.wrap(body));
@@ -114,7 +114,7 @@ pub(crate) fn walk_union_pattern<V: Visitor>(visitor: &mut V, union: &Located<Un
     }
 }
 
-pub(crate) fn walk_enum_pattern<V: Visitor>(visitor: &mut V, e: &Located<EnumPattern>) {
+pub fn walk_enum_pattern<V: Visitor>(visitor: &mut V, e: &Located<EnumPattern>) {
     for branch in e.node().branches() {
         if let Some(body) = branch.body() {
             visitor.visit_pattern(&e.wrap(body));
@@ -126,19 +126,19 @@ pub(crate) fn walk_enum_pattern<V: Visitor>(visitor: &mut V, e: &Located<EnumPat
     }
 }
 
-pub(crate) fn walk_seq_pattern<V: Visitor>(visitor: &mut V, seq: &Located<SeqPattern>) {
+pub fn walk_seq_pattern<V: Visitor>(visitor: &mut V, seq: &Located<SeqPattern>) {
     for child in seq.node().children() {
         visitor.visit_pattern(&seq.wrap(child));
     }
 }
 
-pub(crate) fn walk_captured_pattern<V: Visitor>(visitor: &mut V, cap: &Located<CapturedPattern>) {
+pub fn walk_captured_pattern<V: Visitor>(visitor: &mut V, cap: &Located<CapturedPattern>) {
     if let Some(inner) = cap.node().inner() {
         visitor.visit_pattern(&cap.wrap(inner));
     }
 }
 
-pub(crate) fn walk_quantified_pattern<V: Visitor>(
+pub fn walk_quantified_pattern<V: Visitor>(
     visitor: &mut V,
     quant: &Located<QuantifiedPattern>,
 ) {
@@ -147,7 +147,7 @@ pub(crate) fn walk_quantified_pattern<V: Visitor>(
     }
 }
 
-pub(crate) fn walk_field_pattern<V: Visitor>(visitor: &mut V, field: &Located<FieldPattern>) {
+pub fn walk_field_pattern<V: Visitor>(visitor: &mut V, field: &Located<FieldPattern>) {
     if let Some(val) = field.node().value() {
         visitor.visit_pattern(&field.wrap(val));
     }

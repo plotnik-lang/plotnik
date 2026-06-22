@@ -2008,6 +2008,72 @@ dependencies = [
 ]
 
 [[package]]
+name = "plotnik-compiler-analyze-grammar"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-compiler-analyze-names",
+ "plotnik-compiler-analyze-shape",
+ "plotnik-compiler-core",
+ "plotnik-compiler-diagnostics",
+ "plotnik-compiler-parse",
+ "plotnik-core",
+ "rowan",
+]
+
+[[package]]
+name = "plotnik-compiler-analyze-names"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-compiler-analyze-shape",
+ "plotnik-compiler-core",
+ "plotnik-compiler-diagnostics",
+ "plotnik-compiler-parse",
+]
+
+[[package]]
+name = "plotnik-compiler-analyze-refs"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-compiler-analyze-names",
+ "plotnik-compiler-analyze-shape",
+ "plotnik-compiler-core",
+ "plotnik-compiler-diagnostics",
+ "plotnik-compiler-parse",
+ "plotnik-core",
+ "rowan",
+]
+
+[[package]]
+name = "plotnik-compiler-analyze-shape"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-compiler-core",
+ "plotnik-compiler-diagnostics",
+ "plotnik-compiler-parse",
+ "regex-syntax",
+ "rowan",
+]
+
+[[package]]
+name = "plotnik-compiler-analyze-types"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-bytecode",
+ "plotnik-compiler-analyze-names",
+ "plotnik-compiler-analyze-refs",
+ "plotnik-compiler-analyze-shape",
+ "plotnik-compiler-diagnostics",
+ "plotnik-compiler-parse",
+ "plotnik-core",
+ "rowan",
+]
+
+[[package]]
 name = "plotnik-compiler-core"
 version = "0.3.3"
 dependencies = [

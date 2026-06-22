@@ -1,0 +1,17 @@
+[package]
+name = "plotnik-compiler-analyze-names"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Name analysis pass for the Plotnik compiler"
+
+[lints]
+workspace = true
+
+[dependencies]
+plotnik-compiler-core.workspace = true
+plotnik-compiler-diagnostics.workspace = true
+plotnik-compiler-parse.workspace = true
+plotnik-compiler-analyze-shape.workspace = true
+indexmap = "2"

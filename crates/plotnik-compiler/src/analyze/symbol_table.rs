@@ -67,7 +67,7 @@ impl SymbolTable {
 
     /// A definition's body bound to the source it lives in, so a pass crossing a
     /// reference into another workspace file carries the target's source with the node.
-    pub(crate) fn located_definition(&self, name: &str) -> Option<Located<ast::Pattern>> {
+    pub fn located_definition(&self, name: &str) -> Option<Located<ast::Pattern>> {
         let (source_id, pattern) = self.definition(name)?;
         Some(Located::new(source_id, pattern.clone()))
     }
