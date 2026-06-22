@@ -21,7 +21,9 @@ pub mod parser;
 #[cfg(test)]
 pub mod query;
 #[cfg(test)]
-pub mod source;
+pub mod source {
+    pub use plotnik_compiler_diagnostics::source::*;
+}
 #[cfg(test)]
 pub mod test_utils;
 #[cfg(test)]

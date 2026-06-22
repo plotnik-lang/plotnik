@@ -38,7 +38,6 @@ pub struct Source<'q> {
     pub content: &'q str,
 }
 
-
 #[derive(Clone, Debug)]
 struct SourceEntry {
     kind: SourceKind,
