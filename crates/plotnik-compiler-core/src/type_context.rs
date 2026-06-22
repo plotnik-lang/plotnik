@@ -4,7 +4,7 @@
 //! Symbols are stored but resolved via external Interner reference.
 //! TermInfo is cached per-expression to avoid recomputation.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::ast::Pattern;
 
@@ -26,8 +26,6 @@ pub struct TypeContext {
     /// bubbling) without re-descending into the referenced body. Analysis-only:
     /// `def_types` stays the sole ordering source for emission.
     def_results: HashMap<DefId, TermInfo>,
-    /// Definitions that are part of a recursive SCC
-    recursive_defs: HashSet<DefId>,
 
     term_info: HashMap<Pattern, TermInfo>,
 
@@ -51,7 +49,6 @@ impl TypeContext {
             def_ids: HashMap::new(),
             def_types: HashMap::new(),
             def_results: HashMap::new(),
-            recursive_defs: HashSet::new(),
             term_info: HashMap::new(),
             type_names: HashMap::new(),
         };
@@ -161,14 +158,6 @@ impl TypeContext {
 
     pub fn def_name<'a>(&self, interner: &'a Interner, def_id: DefId) -> &'a str {
         interner.resolve(self.def_names[def_id.index()])
-    }
-
-    pub fn mark_recursive(&mut self, def_id: DefId) {
-        self.recursive_defs.insert(def_id);
-    }
-
-    pub fn is_recursive(&self, def_id: DefId) -> bool {
-        self.recursive_defs.contains(&def_id)
     }
 
     pub fn set_def_type(&mut self, def_id: DefId, type_id: TypeId) {

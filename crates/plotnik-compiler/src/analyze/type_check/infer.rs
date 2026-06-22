@@ -32,6 +32,7 @@ pub struct InferCtx<'a, 'd> {
     pub type_ctx: &'a mut TypeContext,
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
+    pub dependency_analysis: &'a DependencyAnalysis,
     pub(crate) diag: &'d mut Diagnostics,
 }
 
@@ -151,7 +152,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // Recursive refs are opaque boundaries - they don't bubble captures.
         // For enum alternations, return Scalar(Ref) since they always produce Enum output.
         // For other definitions, return Void to avoid type errors in union alternation contexts.
-        if self.ctx.type_ctx.is_recursive(def_id) {
+        if self.ctx.dependency_analysis.is_recursive_def(def_id) {
             if self.body_is_enum(body) {
                 let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
                 return TermInfo::new(Arity::One, TypeFlow::Scalar(ref_type));
@@ -484,7 +485,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 let name = name_tok.text();
                 let sym = self.ctx.interner.intern(name);
                 let def_id = self.ctx.type_ctx.def_id_for_sym(sym)?;
-                if self.ctx.type_ctx.is_recursive(def_id) {
+                if self.ctx.dependency_analysis.is_recursive_def(def_id) {
                     Some(self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id)))
                 } else {
                     None
@@ -860,26 +861,10 @@ impl<'a, 'd> InferencePass<'a, 'd> {
             self.analysis.dependency_analysis.def_ids_by_sym(),
         );
 
-        self.mark_recursion();
         self.process_sccs();
         self.process_orphans();
 
         self.ctx
-    }
-
-    /// Identify and mark recursive definitions.
-    fn mark_recursion(&mut self) {
-        for scc in self.analysis.dependency_analysis.sccs() {
-            for def_name in scc {
-                let sym = self.analysis.interner.intern(def_name);
-                let Some(def_id) = self.ctx.def_id_for_sym(sym) else {
-                    continue;
-                };
-                if self.analysis.dependency_analysis.is_recursive_def(def_id) {
-                    self.ctx.mark_recursive(def_id);
-                }
-            }
-        }
     }
 
     /// Process definitions in SCC order (leaves first).
@@ -920,6 +905,7 @@ impl<'a, 'd> InferencePass<'a, 'd> {
                 type_ctx: &mut self.ctx,
                 interner: self.analysis.interner,
                 symbol_table: self.analysis.symbol_table,
+                dependency_analysis: self.analysis.dependency_analysis,
                 diag: &mut *self.analysis.diag,
             });
             visitor.infer_pattern(&located_body)

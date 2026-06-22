@@ -105,7 +105,7 @@ impl QueryParsed {
     pub fn analyze(mut self) -> Query {
         let mut interner = Interner::new();
 
-        let (symbol_table, type_context) = {
+        let (symbol_table, type_context, dependency_analysis) = {
             let validated = validate_ast(AstValidationInput {
                 source_map: &self.source_map,
                 ast_map: &self.ast_map,
@@ -133,7 +133,7 @@ impl QueryParsed {
                 validate_entrypoints(validated.ast_map(), &interner, &type_context, &mut self.diag);
             }
 
-            (symbol_table, type_context)
+            (symbol_table, type_context, dependency_analysis)
         };
 
         Query {
@@ -141,6 +141,7 @@ impl QueryParsed {
             interner,
             symbol_table,
             type_context,
+            dependency_analysis,
         }
     }
 
@@ -163,6 +164,7 @@ pub struct Query {
     interner: Interner,
     symbol_table: SymbolTable,
     type_context: TypeContext,
+    dependency_analysis: dependencies::DependencyAnalysis,
 }
 
 impl Query {
@@ -206,6 +208,10 @@ impl Query {
 
     pub fn interner(&self) -> &Interner {
         &self.interner
+    }
+
+    pub fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
+        &self.dependency_analysis
     }
 
     pub fn source_map(&self) -> &SourceMap {
@@ -270,6 +276,10 @@ impl GrammarBoundQuery {
 
     pub fn symbol_table(&self) -> &SymbolTable {
         self.analyzed.symbol_table()
+    }
+
+    pub fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
+        self.analyzed.dependency_analysis()
     }
 
     pub fn source_map(&self) -> &SourceMap {
@@ -356,6 +366,7 @@ impl GrammarBoundQuery {
             type_ctx: self.type_context(),
             symbol_table: self.symbol_table(),
             grammar: self.grammar(),
+            dependency_analysis: self.dependency_analysis(),
         };
         let mut ir = Compiler::build_ir(&ctx);
         crate::compile::verify::run_verified(

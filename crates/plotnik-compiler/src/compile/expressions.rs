@@ -208,7 +208,7 @@ impl Compiler<'_> {
             .and_then(|tid| self.ctx.type_ctx.type_shape(tid))
             .is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
         let suppress_opaque_recursion =
-            !is_captured && self.ctx.type_ctx.is_recursive(def_id) && !ref_returns_enum;
+            !is_captured && self.ctx.dependency_analysis.is_recursive_def(def_id) && !ref_returns_enum;
 
         let nav = nav_override.unwrap_or(Nav::Stay);
 

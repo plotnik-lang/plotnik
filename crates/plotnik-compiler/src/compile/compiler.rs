@@ -1,7 +1,7 @@
 //! Core compiler state and entry points.
 
 use indexmap::IndexMap;
-use plotnik_compiler_core::GrammarBinding;
+use plotnik_compiler_core::{DependencyAnalysis, GrammarBinding};
 use plotnik_core::Interner;
 
 use crate::analyze::symbol_table::SymbolTable;
@@ -22,6 +22,7 @@ pub struct CompileCtx<'a> {
     pub type_ctx: &'a TypeContext,
     pub symbol_table: &'a SymbolTable,
     pub grammar: &'a GrammarBinding,
+    pub dependency_analysis: &'a DependencyAnalysis,
 }
 
 /// Compiler state for Thompson construction.

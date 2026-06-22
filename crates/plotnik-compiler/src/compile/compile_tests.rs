@@ -8,7 +8,7 @@ use crate::analyze::type_check::TypeContext;
 use crate::bytecode::NodeKindConstraint;
 use crate::compile::{CompileCtx, Compiler};
 use crate::shot_bytecode;
-use plotnik_compiler_core::GrammarBinding;
+use plotnik_compiler_core::{DependencyAnalysis, GrammarBinding};
 
 #[test]
 fn compile_simple_named_node() {
@@ -34,11 +34,13 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
     let symbol_table = SymbolTableBuilder::new().finish();
     let node_fields = IndexMap::new();
     let grammar = GrammarBinding::new(node_kinds, node_fields);
+    let dependency_analysis = DependencyAnalysis::default();
     let ctx = CompileCtx {
         interner: &interner,
         type_ctx: &type_ctx,
         symbol_table: &symbol_table,
         grammar: &grammar,
+        dependency_analysis: &dependency_analysis,
     };
     let mut compiler = Compiler::new(&ctx);
 
