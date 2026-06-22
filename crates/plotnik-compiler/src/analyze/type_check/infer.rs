@@ -871,14 +871,13 @@ impl<'a, 'd> InferencePass<'a, 'd> {
     fn mark_recursion(&mut self) {
         for scc in self.analysis.dependency_analysis.sccs() {
             for def_name in scc {
-                if !self.analysis.dependency_analysis.is_recursive(def_name) {
-                    continue;
-                }
                 let sym = self.analysis.interner.intern(def_name);
                 let Some(def_id) = self.ctx.def_id_for_sym(sym) else {
                     continue;
                 };
-                self.ctx.mark_recursive(def_id);
+                if self.analysis.dependency_analysis.is_recursive_def(def_id) {
+                    self.ctx.mark_recursive(def_id);
+                }
             }
         }
     }

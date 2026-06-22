@@ -41,20 +41,19 @@ pub fn analyze_dependencies(
     let mut recursive_defs = HashSet::new();
 
     for scc in &sccs {
-        if scc.len() > 1 {
-            recursive_defs.extend(scc.iter().cloned());
-        } else if let Some(name) = scc.first()
-            && let Some(body) = symbol_table.body(name)
-            && super::refs::contains_ref(body, name)
-        {
-            recursive_defs.insert(name.clone());
-        }
-
+        let mutually_recursive = scc.len() > 1;
         for name in scc {
             let sym = interner.intern(name);
             let def_id = DefId::from_raw(def_names.len() as u32);
             def_ids_by_sym.insert(sym, def_id);
             def_names.push(sym);
+
+            let self_recursive = symbol_table
+                .body(name)
+                .is_some_and(|body| super::refs::contains_ref(body, name));
+            if mutually_recursive || self_recursive {
+                recursive_defs.insert(def_id);
+            }
         }
     }
 

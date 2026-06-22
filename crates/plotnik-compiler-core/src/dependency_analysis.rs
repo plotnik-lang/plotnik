@@ -19,7 +19,7 @@ pub struct DependencyAnalysis {
 
     def_names: Vec<Symbol>,
 
-    recursive_defs: HashSet<String>,
+    recursive_defs: HashSet<DefId>,
 }
 
 impl DependencyAnalysis {
@@ -27,7 +27,7 @@ impl DependencyAnalysis {
         sccs: Vec<Vec<String>>,
         def_ids_by_sym: HashMap<Symbol, DefId>,
         def_names: Vec<Symbol>,
-        recursive_defs: HashSet<String>,
+        recursive_defs: HashSet<DefId>,
     ) -> Self {
         Self {
             sccs,
@@ -75,8 +75,8 @@ impl DependencyAnalysis {
     }
 
     /// True if the definition is in a mutual recursion group (SCC > 1) or references itself.
-    pub fn is_recursive(&self, name: &str) -> bool {
-        self.recursive_defs.contains(name)
+    pub fn is_recursive_def(&self, id: DefId) -> bool {
+        self.recursive_defs.contains(&id)
     }
 
     pub fn sccs(&self) -> &[Vec<String>] {
