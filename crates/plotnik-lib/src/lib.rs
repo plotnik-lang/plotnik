@@ -10,7 +10,7 @@
 //!     (assignment left: (Expr) @lhs right: (Expr) @rhs)
 //! "#;
 //!
-//! let query = Query::try_from(source).expect("out of fuel");
+//! let query = Query::try_from(source).expect("query compiles");
 //! eprintln!("{}", query.diagnostics().render(query.source_map()));
 //! ```
 
@@ -38,8 +38,9 @@ pub use plotnik_compiler::{Diagnostics, Error, PassResult, Result, Severity, Spa
 pub use plotnik_compiler::{Query, QueryBuilder, SourceId, SourceMap};
 
 pub use plotnik_vm::{
-    EffectLog, ExecLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
-    Tracer, VM, Value, ValueMaterializer, Verbosity, debug_verify_type, materialize_verified,
+    EffectLog, Limit, Materializer, NodeHandle, PrintTracer, ResolvedRuntimeLimits, RuntimeEffect,
+    RuntimeError, RuntimeLimitSpec, Tracer, VM, Value, ValueMaterializer, Verbosity,
+    debug_verify_type, materialize_verified,
 };
 
 /// Embed bytecode with 64-byte alignment (zero-copy loading).

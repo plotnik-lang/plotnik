@@ -3,9 +3,12 @@
 use std::path::PathBuf;
 
 use plotnik_lib::Colors;
-use plotnik_lib::engine::{PrintTracer, RuntimeError, VM, Verbosity, materialize_verified};
+use plotnik_lib::engine::{
+    PrintTracer, RuntimeError, RuntimeLimitSpec, VM, Verbosity, materialize_verified,
+};
 
 use super::run_common::{self, ExecPlan, ExecRequest};
+use super::runtime_report::render_runtime_error;
 use crate::error::{CliError, CliResult};
 
 pub struct TraceArgs {
@@ -17,7 +20,8 @@ pub struct TraceArgs {
     pub entry: Option<String>,
     pub verbosity: Verbosity,
     pub no_result: bool,
-    pub fuel: u32,
+    pub limits: RuntimeLimitSpec,
+    pub json: bool,
     pub color: bool,
 }
 
@@ -37,9 +41,7 @@ pub fn run(args: TraceArgs) -> CliResult {
         color: args.color,
     })?;
 
-    let vm = VM::builder(&source_code, &tree)
-        .step_budget(args.fuel)
-        .build();
+    let vm = VM::builder(&source_code, &tree).limits(args.limits).build();
     let colors = Colors::new(args.color);
     let mut tracer = PrintTracer::builder(&source_code, &module)
         .verbosity(args.verbosity)
@@ -57,8 +59,12 @@ pub fn run(args: TraceArgs) -> CliResult {
             return Err(CliError::No);
         }
         Err(e) => {
+            // `--json` structures only this error (on stderr); the trace itself is
+            // always the textual trace format on stdout. trace is a debug tool, not
+            // a JSON producer, so the two streams stay separate by design.
             tracer.print();
-            return Err(CliError::fatal(format!("runtime error: {}", e)));
+            eprintln!("{}", render_runtime_error(&e, args.json));
+            return Err(CliError::FatalRendered);
         }
     };
 

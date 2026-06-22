@@ -9,8 +9,10 @@
 use std::path::PathBuf;
 
 use clap::ArgMatches;
+use plotnik_lib::RuntimeLimitSpec;
 
 use super::ColorChoice;
+use super::limits::resolve_limit_spec;
 use crate::commands::ast::AstArgs;
 use crate::commands::check::CheckArgs;
 use crate::commands::dump::DumpArgs;
@@ -106,8 +108,8 @@ pub struct DumpOpts {
     pub query_text: Option<String>,
     pub lang: Option<String>,
     pub color: ColorChoice,
-    // Note: source_path, source_text, entry, compact, verbose_nodes,
-    // verbose, no_result, fuel are parsed but not extracted (unified flags)
+    // Note: source_path, source_text, entry, compact, verbose_nodes, verbose,
+    // no_result, and the runtime-limit flags are parsed but not extracted.
 }
 
 impl DumpOpts {
@@ -190,8 +192,10 @@ pub struct RunOpts {
     pub lang: Option<String>,
     pub compact: bool,
     pub entry: Option<String>,
+    pub limits: RuntimeLimitSpec,
+    pub json: bool,
     pub color: ColorChoice,
-    // Note: verbose_nodes, verbose, no_result, fuel are hidden unified flags,
+    // Note: verbose_nodes, verbose, no_result are hidden unified flags,
     // parsed but not extracted.
 }
 
@@ -212,6 +216,8 @@ impl RunOpts {
             lang: m.get_one::<String>("lang").cloned(),
             compact: m.get_flag("compact"),
             entry: m.get_one::<String>("entry").cloned(),
+            limits: resolve_limit_spec(m),
+            json: m.get_flag("json"),
             color: ColorChoice::from_matches(m),
         }
     }
@@ -229,6 +235,8 @@ impl From<RunOpts> for RunArgs {
             lang: p.lang,
             pretty,
             entry: p.entry,
+            limits: p.limits,
+            json: p.json,
             color: p.color.should_colorize(),
         }
     }
@@ -243,7 +251,8 @@ pub struct TraceOpts {
     pub entry: Option<String>,
     pub verbose: u8,
     pub no_result: bool,
-    pub fuel: u32,
+    pub limits: RuntimeLimitSpec,
+    pub json: bool,
     pub color: ColorChoice,
     // Note: compact, verbose_nodes are parsed but not extracted (unified flags)
 }
@@ -266,7 +275,8 @@ impl TraceOpts {
             entry: m.get_one::<String>("entry").cloned(),
             verbose: m.get_count("verbose"),
             no_result: m.get_flag("no_result"),
-            fuel: m.get_one::<u32>("fuel").copied().unwrap_or(1_000_000),
+            limits: resolve_limit_spec(m),
+            json: m.get_flag("json"),
             color: ColorChoice::from_matches(m),
         }
     }
@@ -291,7 +301,8 @@ impl From<TraceOpts> for TraceArgs {
             entry: p.entry,
             verbosity,
             no_result: p.no_result,
-            fuel: p.fuel,
+            limits: p.limits,
+            json: p.json,
             color: p.color.should_colorize(),
         }
     }

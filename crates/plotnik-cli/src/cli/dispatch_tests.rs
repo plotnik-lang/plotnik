@@ -8,6 +8,8 @@
 
 use std::path::PathBuf;
 
+use plotnik_lib::Limit;
+
 use super::*;
 use crate::cli::commands::{
     ast_command, check_command, dump_command, infer_command, run_command, trace_command,
@@ -16,7 +18,7 @@ use crate::cli::commands::{
 #[test]
 fn dump_accepts_trace_flags() {
     let cmd = dump_command();
-    let result = cmd.try_get_matches_from(["dump", "query.ptk", "--fuel", "500", "-vv"]);
+    let result = cmd.try_get_matches_from(["dump", "query.ptk", "--max-steps", "500", "-vv"]);
     assert!(
         result.is_ok(),
         "dump should accept trace flags: {:?}",
@@ -84,7 +86,7 @@ fn run_accepts_trace_flags() {
         "run",
         "query.ptk",
         "app.js",
-        "--fuel",
+        "--max-steps",
         "500",
         "-vv",
         "--no-result",
@@ -158,7 +160,7 @@ fn check_accepts_run_flags() {
 fn check_accepts_trace_flags() {
     let cmd = check_command();
     let result =
-        cmd.try_get_matches_from(["check", "query.ptk", "--fuel", "500", "-vv", "--no-result"]);
+        cmd.try_get_matches_from(["check", "query.ptk", "--max-steps", "500", "-vv", "--no-result"]);
     assert!(
         result.is_ok(),
         "check should accept trace flags: {:?}",
@@ -192,7 +194,7 @@ fn infer_accepts_run_flags() {
 fn infer_accepts_trace_flags() {
     let cmd = infer_command();
     let result =
-        cmd.try_get_matches_from(["infer", "query.ptk", "--fuel", "500", "-vv", "--no-result"]);
+        cmd.try_get_matches_from(["infer", "query.ptk", "--max-steps", "500", "-vv", "--no-result"]);
     assert!(
         result.is_ok(),
         "infer should accept trace flags: {:?}",
@@ -205,7 +207,10 @@ fn dump_help_hides_trace_flags() {
     let mut cmd = dump_command();
     let help = cmd.render_help().to_string();
 
-    assert!(!help.contains("--fuel"), "dump help should not show --fuel");
+    assert!(
+        !help.contains("--max-steps"),
+        "dump help should not show --max-steps"
+    );
     assert!(
         !help.contains("--no-result"),
         "dump help should not show --no-result"
@@ -255,10 +260,24 @@ fn run_help_hides_trace_flags() {
     let mut cmd = run_command();
     let help = cmd.render_help().to_string();
 
-    assert!(!help.contains("--fuel"), "run help should not show --fuel");
     assert!(
         !help.contains("--no-result"),
         "run help should not show --no-result"
+    );
+}
+
+#[test]
+fn run_help_shows_limit_flags() {
+    let mut cmd = run_command();
+    let help = cmd.render_help().to_string();
+
+    assert!(
+        help.contains("--max-steps"),
+        "run help SHOULD show --max-steps"
+    );
+    assert!(
+        help.contains("--max-memory"),
+        "run help SHOULD show --max-memory"
     );
 }
 
@@ -303,8 +322,8 @@ fn check_help_hides_unified_flags() {
         "check help should not show --entry"
     );
     assert!(
-        !help.contains("--fuel"),
-        "check help should not show --fuel"
+        !help.contains("--max-steps"),
+        "check help should not show --max-steps"
     );
     assert!(
         !help.contains("--no-result"),
@@ -334,8 +353,8 @@ fn infer_help_hides_unified_flags() {
         "infer help should not show --entry"
     );
     assert!(
-        !help.contains("--fuel"),
-        "infer help should not show --fuel"
+        !help.contains("--max-steps"),
+        "infer help should not show --max-steps"
     );
     assert!(
         !help.contains("--no-result"),
@@ -401,7 +420,7 @@ fn trace_params_extracts_all_fields() {
         "Main",
         "-vv",
         "--no-result",
-        "--fuel",
+        "--max-steps",
         "500",
         "--color",
         "always",
@@ -417,7 +436,7 @@ fn trace_params_extracts_all_fields() {
     assert_eq!(params.entry, Some("Main".to_string()));
     assert_eq!(params.verbose, 2);
     assert!(params.no_result);
-    assert_eq!(params.fuel, 500);
+    assert_eq!(params.limits.steps, Limit::Of(500));
     assert!(matches!(params.color, ColorChoice::Always));
 }
 
@@ -461,7 +480,7 @@ fn dump_params_extracts_only_relevant_fields() {
         "--color",
         "auto",
         "app.rs",
-        "--fuel",
+        "--max-steps",
         "100",
         "--compact",
     ]);
@@ -506,7 +525,7 @@ fn ast_accepts_trace_flags() {
         "ast",
         "query.ptk",
         "app.js",
-        "--fuel",
+        "--max-steps",
         "500",
         "-vv",
         "--no-result",
@@ -575,7 +594,10 @@ fn ast_help_hides_unified_flags() {
         !help.contains("--entry"),
         "ast help should not show --entry"
     );
-    assert!(!help.contains("--fuel"), "ast help should not show --fuel");
+    assert!(
+        !help.contains("--max-steps"),
+        "ast help should not show --max-steps"
+    );
     assert!(
         !help.contains("--no-result"),
         "ast help should not show --no-result"

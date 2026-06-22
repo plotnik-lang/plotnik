@@ -41,7 +41,17 @@ struct TypeVerifier<'a> {
     strings: StringsView<'a>,
     path: String,
     errors: Vec<String>,
+    depth: u32,
 }
+
+/// Native-recursion bound for the verifier — the one remaining recursive walk over
+/// a materialized value. The cap keeps a pathologically deep value from overflowing
+/// the stack in debug builds. Past it, verification simply stops: a type-soundness
+/// bug deeper than the cap goes unchecked. That is an accepted trade, not a
+/// guarantee of completeness — the verifier is debug-only defense-in-depth (release
+/// builds skip it entirely) and such bugs almost always surface shallow.
+#[cfg(debug_assertions)]
+const MAX_VERIFY_DEPTH: u32 = 4096;
 
 #[cfg(debug_assertions)]
 impl<'a> TypeVerifier<'a> {
@@ -51,10 +61,21 @@ impl<'a> TypeVerifier<'a> {
             strings: module.strings(),
             path: String::new(),
             errors: Vec::new(),
+            depth: 0,
         }
     }
 
+    /// Depth-guarded entry; every recursive descent goes through here.
     fn verify(&mut self, value: &Value, declared: TypeId) {
+        if self.depth >= MAX_VERIFY_DEPTH {
+            return;
+        }
+        self.depth += 1;
+        self.verify_inner(value, declared);
+        self.depth -= 1;
+    }
+
+    fn verify_inner(&mut self, value: &Value, declared: TypeId) {
         let Some(type_def) = self.types.get(declared) else {
             self.errors.push(format_error(
                 &self.path,

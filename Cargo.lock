@@ -2014,6 +2014,7 @@ dependencies = [
  "plotnik-compiler",
  "plotnik-core",
  "plotnik-vm",
+ "proptest",
  "serde",
  "serde_json",
  "similar 3.1.1",

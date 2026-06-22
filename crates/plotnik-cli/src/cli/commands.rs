@@ -7,6 +7,7 @@
 use clap::Command;
 
 use super::args::*;
+use super::limits::{limits_preset_arg, max_memory_arg, max_steps_arg};
 
 fn with_hidden_source_args(cmd: Command) -> Command {
     cmd.arg(source_path_arg().hide(true))
@@ -28,7 +29,14 @@ fn with_hidden_exec_args_partial(cmd: Command) -> Command {
 fn with_hidden_trace_args(cmd: Command) -> Command {
     cmd.arg(verbose_arg().hide(true))
         .arg(no_result_arg().hide(true))
-        .arg(fuel_arg().hide(true))
+}
+
+// Runtime-limit flags, hidden. Added to non-exec commands so the unified flag
+// set parses them without error; only `run`/`trace` surface them visibly.
+fn with_hidden_runtime_limit_args(cmd: Command) -> Command {
+    cmd.arg(max_steps_arg().hide(true))
+        .arg(max_memory_arg().hide(true))
+        .arg(limits_preset_arg().hide(true))
 }
 
 fn with_hidden_ast_args(cmd: Command) -> Command {
@@ -99,7 +107,9 @@ pub fn ast_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_trace_args(with_hidden_exec_args(cmd)))
+    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_trace_args(
+        with_hidden_exec_args(cmd),
+    )))
 }
 
 pub fn check_command() -> Command {
@@ -129,8 +139,8 @@ pub fn check_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_ast_args(with_hidden_trace_args(with_hidden_exec_args(
-        with_hidden_source_args(cmd),
+    with_hidden_runtime_limit_args(with_hidden_ast_args(with_hidden_trace_args(
+        with_hidden_exec_args(with_hidden_source_args(cmd)),
     )))
 }
 
@@ -155,8 +165,8 @@ pub fn dump_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_ast_args(with_hidden_trace_args(
-        with_hidden_exec_args(with_hidden_source_args(cmd)),
+    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_ast_args(
+        with_hidden_trace_args(with_hidden_exec_args(with_hidden_source_args(cmd))),
     )))
 }
 
@@ -188,8 +198,8 @@ pub fn infer_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_ast_args(with_hidden_trace_args(
-        with_hidden_exec_args_partial(with_hidden_source_args(cmd)),
+    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_ast_args(
+        with_hidden_trace_args(with_hidden_exec_args_partial(with_hidden_source_args(cmd))),
     )))
 }
 
@@ -219,6 +229,10 @@ pub fn run_command() -> Command {
         .next_help_heading("Output options")
         .arg(compact_arg())
         .arg(verbose_nodes_arg().hide(true))
+        .next_help_heading("Limit options")
+        .arg(max_steps_arg())
+        .arg(max_memory_arg())
+        .arg(limits_preset_arg())
         .next_help_heading("Global options")
         .arg(color_arg());
 
@@ -250,7 +264,10 @@ pub fn trace_command() -> Command {
         .next_help_heading("Trace options")
         .arg(verbose_arg())
         .arg(no_result_arg())
-        .arg(fuel_arg())
+        .next_help_heading("Limit options")
+        .arg(max_steps_arg())
+        .arg(max_memory_arg())
+        .arg(limits_preset_arg())
         .next_help_heading("Global options")
         .arg(color_arg());
 

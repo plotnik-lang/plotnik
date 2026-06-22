@@ -50,6 +50,13 @@ impl<'t> EffectLog<'t> {
         self.0.len()
     }
 
+    /// Live heap bytes: occupied element count × element size. Spare `Vec`
+    /// capacity is not counted — this measures live data, not the allocation.
+    #[inline]
+    pub fn byte_footprint(&self) -> u64 {
+        (self.0.len() * std::mem::size_of::<RuntimeEffect<'t>>()) as u64
+    }
+
     /// Check if empty.
     #[inline]
     #[allow(dead_code)]

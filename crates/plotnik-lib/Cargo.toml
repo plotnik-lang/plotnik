@@ -35,6 +35,7 @@ arborium-tree-sitter = "2.18.0"
 insta = { version = "=1.48.0", features = ["yaml"] }
 indoc = "=2.0.7"
 libtest-mimic = "=0.8.2"
+proptest = "=1.11.0"
 serde_json = "=1.0.150"
 similar = "=3.1.1"
 tempfile = "=3.27.0"
@@ -44,3 +45,14 @@ tempfile = "=3.27.0"
 name = "snapshots"
 path = "tests/mod.rs"
 harness = false
+
+# Stack-safety regression for VM backtracking. Standard libtest harness, so it must
+# be declared by hand too (autotests = false suppresses autodiscovery).
+[[test]]
+name = "stack_safety"
+path = "tests/stack_safety.rs"
+
+# Property safety net: arbitrary query/source never panics or aborts the pipeline.
+[[test]]
+name = "fuzz_no_panic"
+path = "tests/fuzz_no_panic.rs"

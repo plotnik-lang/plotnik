@@ -2,10 +2,11 @@
 
 use std::path::PathBuf;
 
-use plotnik_lib::Colors;
 use plotnik_lib::engine::{RuntimeError, VM, materialize_verified};
+use plotnik_lib::{Colors, RuntimeLimitSpec};
 
 use super::run_common::{self, ExecPlan, ExecRequest};
+use super::runtime_report::render_runtime_error;
 use crate::error::{CliError, CliResult};
 
 pub struct RunArgs {
@@ -16,6 +17,8 @@ pub struct RunArgs {
     pub lang: Option<String>,
     pub pretty: bool,
     pub entry: Option<String>,
+    pub limits: RuntimeLimitSpec,
+    pub json: bool,
     pub color: bool,
 }
 
@@ -35,7 +38,7 @@ pub fn run(args: RunArgs) -> CliResult {
         color: args.color,
     })?;
 
-    let vm = VM::builder(&source_code, &tree).build();
+    let vm = VM::builder(&source_code, &tree).limits(args.limits).build();
     let effects = match vm.execute(&module, 0, &entrypoint) {
         Ok(effects) => effects,
         Err(RuntimeError::NoMatch) => {
@@ -43,7 +46,10 @@ pub fn run(args: RunArgs) -> CliResult {
             eprintln!("no match");
             return Err(CliError::No);
         }
-        Err(e) => return Err(CliError::fatal(format!("runtime error: {}", e))),
+        Err(e) => {
+            eprintln!("{}", render_runtime_error(&e, args.json));
+            return Err(CliError::FatalRendered);
+        }
     };
 
     let colors = Colors::new(args.color);
