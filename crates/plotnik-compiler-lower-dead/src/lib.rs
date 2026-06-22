@@ -2,7 +2,7 @@
 
 pub mod analyze {
     pub mod type_check {
-        pub use plotnik_compiler_analyze_types::type_check::*;
+        pub use plotnik_compiler_core::DefId;
     }
 }
 

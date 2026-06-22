@@ -2118,7 +2118,6 @@ dependencies = [
  "crc32fast",
  "indexmap",
  "plotnik-bytecode",
- "plotnik-compiler-analyze-types",
  "plotnik-compiler-core",
  "plotnik-compiler-emit-instructions",
  "plotnik-compiler-emit-layout",
@@ -2150,7 +2149,7 @@ name = "plotnik-compiler-emit-types"
 version = "0.3.3"
 dependencies = [
  "plotnik-bytecode",
- "plotnik-compiler-analyze-types",
+ "plotnik-compiler-core",
  "plotnik-compiler-emit-strings",
  "plotnik-core",
 ]
@@ -2161,7 +2160,6 @@ version = "0.3.3"
 dependencies = [
  "indexmap",
  "plotnik-bytecode",
- "plotnik-compiler-analyze-types",
  "plotnik-compiler-core",
 ]
 
@@ -2171,7 +2169,6 @@ version = "0.3.3"
 dependencies = [
  "indexmap",
  "plotnik-bytecode",
- "plotnik-compiler-analyze-types",
  "plotnik-compiler-core",
 ]
 
