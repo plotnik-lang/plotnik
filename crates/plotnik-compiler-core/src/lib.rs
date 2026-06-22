@@ -34,7 +34,7 @@ pub use source::{Source, SourceId, SourceKind, SourceMap};
 pub use span::Span;
 pub use symbol_table::SymbolTable;
 pub use type_context::TypeContext;
-pub use type_shape::{FieldInfo, TermInfo, TypeFlow, TypeShape};
+pub use type_shape::{FieldInfo, PatternResult, OutputFlow, TypeShape};
 pub use validated_ast::ValidatedAst;
 
 /// A lightweight handle to a named query definition.

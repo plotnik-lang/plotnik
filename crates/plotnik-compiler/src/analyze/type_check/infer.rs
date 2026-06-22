@@ -1,6 +1,6 @@
 //! Bottom-up type inference visitor.
 //!
-//! Traverses the AST and computes TermInfo (Arity + TypeFlow) for each expression.
+//! Traverses the AST and computes PatternResult (Arity + OutputFlow) for each expression.
 //! Reports diagnostics for type errors like strict dimensionality violations.
 
 use std::collections::BTreeMap;
@@ -13,7 +13,7 @@ use super::capture_shape::{CaptureKind, capture_kind};
 use super::context::TypeContext;
 use super::def_id::Symbol;
 use super::types::{
-    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_VOID, TermInfo, TypeFlow, TypeId, TypeShape,
+    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_VOID, PatternResult, OutputFlow, TypeId, TypeShape,
 };
 use super::unify::{UnifyError, unify_flows};
 
@@ -46,11 +46,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         Self { ctx }
     }
 
-    /// Infer the TermInfo for an expression, caching the result.
+    /// Infer the PatternResult for an expression, caching the result.
     ///
     /// The walk only ever descends through one definition's body (a finite AST
     /// tree); references resolve to precomputed results rather than re-entering.
-    pub fn infer_pattern(&mut self, pattern: &Located<Pattern>) -> TermInfo {
+    pub fn infer_pattern(&mut self, pattern: &Located<Pattern>) -> PatternResult {
         if let Some(info) = self.ctx.type_ctx.term_info(pattern.node()) {
             return info.clone();
         }
@@ -62,7 +62,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         info
     }
 
-    fn compute_pattern(&mut self, pattern: &Located<Pattern>) -> TermInfo {
+    fn compute_pattern(&mut self, pattern: &Located<Pattern>) -> PatternResult {
         match pattern.node() {
             Pattern::NodePattern(n) => self.infer_named_node(&pattern.wrap(n.clone())),
             Pattern::TokenPattern(n) => self.infer_anonymous_node(n),
@@ -79,7 +79,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     /// Named node: matches one position, bubbles up child captures or propagates output.
-    fn infer_named_node(&mut self, node: &Located<NodePattern>) -> TermInfo {
+    fn infer_named_node(&mut self, node: &Located<NodePattern>) -> PatternResult {
         let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
         let mut output_children: Vec<(TextRange, TypeId)> = Vec::new();
 
@@ -88,7 +88,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             let child_info = self.infer_pattern(&child);
 
             match &child_info.flow {
-                TypeFlow::Fields(type_id) => {
+                OutputFlow::Fields(type_id) => {
                     let fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
                     self.merge_fields(
                         node.source(),
@@ -97,12 +97,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                         child.node().text_range(),
                     );
                 }
-                TypeFlow::Scalar(type_id) => {
+                OutputFlow::Value(type_id) => {
                     if self.ctx.type_ctx.is_structured_output(*type_id) {
                         output_children.push((child.node().text_range(), *type_id));
                     }
                 }
-                TypeFlow::Void => {}
+                OutputFlow::Void => {}
             }
         }
 
@@ -112,12 +112,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             output_children,
             node.node().text_range(),
         );
-        TermInfo::new(Arity::One, flow)
+        PatternResult::new(Arity::One, flow)
     }
 
     /// Anonymous node (literal or wildcard): matches one position, produces nothing.
-    fn infer_anonymous_node(&mut self, _node: &TokenPattern) -> TermInfo {
-        TermInfo::new(Arity::One, TypeFlow::Void)
+    fn infer_anonymous_node(&mut self, _node: &TokenPattern) -> PatternResult {
+        PatternResult::new(Arity::One, OutputFlow::Void)
     }
 
     /// Reference: transparent for non-recursive defs, opaque boundary for recursive ones.
@@ -127,9 +127,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// SCC order (leaves first), so a non-recursive target is always computed before
     /// any referrer — the body is never re-walked, and its diagnostics stay attributed
     /// to its own definition's pass (and source).
-    fn infer_ref(&mut self, r: &Ref) -> TermInfo {
+    fn infer_ref(&mut self, r: &Ref) -> PatternResult {
         let Some(name_tok) = r.name() else {
-            return TermInfo::void();
+            return PatternResult::void();
         };
         let name = name_tok.text();
         let name_sym = self.ctx.interner.intern(name);
@@ -137,7 +137,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // No definition: an undefined reference, already diagnosed upstream
         // (`UndefinedReference`). Outside the trust boundary — answer with void.
         let Some(body) = self.ctx.symbol_table.body(name) else {
-            return TermInfo::void();
+            return PatternResult::void();
         };
 
         // Every symbol-table definition is assigned a DefId during dependency
@@ -150,14 +150,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .expect("a defined reference has a DefId");
 
         // Recursive refs are opaque boundaries - they don't bubble captures.
-        // For enum alternations, return Scalar(Ref) since they always produce Enum output.
+        // For enum alternations, return Value(Ref) since they always produce Enum output.
         // For other definitions, return Void to avoid type errors in union alternation contexts.
         if self.ctx.dependency_analysis.is_recursive_def(def_id) {
             if self.body_is_enum(body) {
                 let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
-                return TermInfo::new(Arity::One, TypeFlow::Scalar(ref_type));
+                return PatternResult::new(Arity::One, OutputFlow::Value(ref_type));
             }
-            return TermInfo::new(Arity::One, TypeFlow::Void);
+            return PatternResult::new(Arity::One, OutputFlow::Void);
         }
 
         // Non-recursive refs are transparent: return the target's precomputed
@@ -170,15 +170,15 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .expect("non-recursive reference target is inferred before the referrer (SCC order)")
     }
 
-    /// An enum body always produces an Enum type (Scalar flow), so a recursive
-    /// `Ref` to such a definition is safe to treat as `Scalar(Ref)` in uncaptured
+    /// An enum body always produces an Enum type (Value flow), so a recursive
+    /// `Ref` to such a definition is safe to treat as `Value(Ref)` in uncaptured
     /// contexts rather than `Void`.
     fn body_is_enum(&self, body: &Pattern) -> bool {
         matches!(body, Pattern::Enum(_))
     }
 
     /// Sequence: Arity aggregation, strict field merging, and output propagation.
-    fn infer_seq_pattern(&mut self, seq: &Located<SeqPattern>) -> TermInfo {
+    fn infer_seq_pattern(&mut self, seq: &Located<SeqPattern>) -> PatternResult {
         let children: Vec<Located<Pattern>> = seq.node().children().map(|c| seq.wrap(c)).collect();
 
         let arity = match children.len() {
@@ -196,7 +196,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             let child_info = self.infer_pattern(child);
 
             match &child_info.flow {
-                TypeFlow::Fields(type_id) => {
+                OutputFlow::Fields(type_id) => {
                     let fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
                     self.merge_fields(
                         seq.source(),
@@ -205,12 +205,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                         child.node().text_range(),
                     );
                 }
-                TypeFlow::Scalar(type_id) => {
+                OutputFlow::Value(type_id) => {
                     if self.ctx.type_ctx.is_structured_output(*type_id) {
                         output_children.push((child.node().text_range(), *type_id));
                     }
                 }
-                TypeFlow::Void => {}
+                OutputFlow::Void => {}
             }
         }
 
@@ -220,7 +220,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             output_children,
             seq.node().text_range(),
         );
-        TermInfo::new(arity, flow)
+        PatternResult::new(arity, flow)
     }
 
     /// Fold `source` fields into `target` in place, reporting a diagnostic on any
@@ -249,7 +249,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    fn infer_enum(&mut self, e: &Located<EnumPattern>) -> TermInfo {
+    fn infer_enum(&mut self, e: &Located<EnumPattern>) -> PatternResult {
         let mut variants: BTreeMap<Symbol, TypeId> = BTreeMap::new();
         let mut combined_arity = Arity::One;
 
@@ -288,11 +288,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
 
         let enum_type = self.ctx.type_ctx.intern_type(TypeShape::Enum(variants));
-        TermInfo::new(combined_arity, TypeFlow::Scalar(enum_type))
+        PatternResult::new(combined_arity, OutputFlow::Value(enum_type))
     }
 
-    fn infer_union(&mut self, union: &Located<UnionPattern>) -> TermInfo {
-        let mut flows: Vec<TypeFlow> = Vec::new();
+    fn infer_union(&mut self, union: &Located<UnionPattern>) -> PatternResult {
+        let mut flows: Vec<OutputFlow> = Vec::new();
         let mut combined_arity = Arity::One;
 
         for branch in union.node().branches() {
@@ -313,11 +313,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Ok(flow) => flow,
             Err(err) => {
                 self.report_unify_error(union.source(), union.node().text_range(), &err);
-                TypeFlow::Void
+                OutputFlow::Void
             }
         };
 
-        TermInfo::new(combined_arity, unified_flow)
+        PatternResult::new(combined_arity, unified_flow)
     }
 
     /// Captured expression: wraps inner's flow into a field.
@@ -327,7 +327,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     ///   Inner fields become the captured type's fields.
     /// - Other expressions (named nodes, refs) don't create scopes.
     ///   Inner fields bubble up alongside the capture field.
-    fn infer_captured_pattern(&mut self, cap: &Located<CapturedPattern>) -> TermInfo {
+    fn infer_captured_pattern(&mut self, cap: &Located<CapturedPattern>) -> PatternResult {
         let node = cap.node();
 
         // Suppressive captures don't contribute to output type
@@ -336,8 +336,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             return node
                 .inner()
                 .map(|i| self.infer_pattern(&cap.wrap(i)))
-                .map(|info| TermInfo::new(info.arity, TypeFlow::Void))
-                .unwrap_or_else(TermInfo::void);
+                .map(|info| PatternResult::new(info.arity, OutputFlow::Void))
+                .unwrap_or_else(PatternResult::void);
         }
 
         let Some(name_tok) = node.name() else {
@@ -345,7 +345,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             return node
                 .inner()
                 .map(|i| self.infer_pattern(&cap.wrap(i)))
-                .unwrap_or_else(TermInfo::void);
+                .unwrap_or_else(PatternResult::void);
         };
         let capture_name = self.ctx.interner.intern(&name_tok.text()[1..]); // Strip @ prefix
 
@@ -355,9 +355,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             // Capture without inner -> a Node field (annotation may alias it).
             let type_id = annotation.map_or(TYPE_NODE, |name| self.annotate_named(TYPE_NODE, name));
             let field = FieldInfo::required(type_id);
-            return TermInfo::new(
+            return PatternResult::new(
                 Arity::One,
-                TypeFlow::Fields(self.ctx.type_ctx.intern_single_field(capture_name, field)),
+                OutputFlow::Fields(self.ctx.type_ctx.intern_single_field(capture_name, field)),
             );
         };
         let inner = cap.wrap(inner);
@@ -372,7 +372,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // lockstep.
         let mechanism = capture_kind(inner.node(), self.ctx.type_ctx, self.ctx.interner);
         let should_merge_fields =
-            mechanism == CaptureKind::Node && matches!(&inner_info.flow, TypeFlow::Fields(_));
+            mechanism == CaptureKind::Node && matches!(&inner_info.flow, OutputFlow::Fields(_));
 
         // The capture's base type, before its `:: …` annotation is applied.
         let base = if should_merge_fields {
@@ -390,20 +390,20 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         };
 
         if should_merge_fields {
-            let TypeFlow::Fields(type_id) = &inner_info.flow else {
+            let OutputFlow::Fields(type_id) = &inner_info.flow else {
                 unreachable!()
             };
             let mut fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
             fields.insert(capture_name, field_info);
 
-            TermInfo::new(
+            PatternResult::new(
                 inner_info.arity,
-                TypeFlow::Fields(self.ctx.type_ctx.intern_struct(fields)),
+                OutputFlow::Fields(self.ctx.type_ctx.intern_struct(fields)),
             )
         } else {
-            TermInfo::new(
+            PatternResult::new(
                 inner_info.arity,
-                TypeFlow::Fields(
+                OutputFlow::Fields(
                     self.ctx
                         .type_ctx
                         .intern_single_field(capture_name, field_info),
@@ -445,7 +445,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     /// Logic for how quantifier on the inner expression affects the capture field.
     /// Returns (Info, is_optional).
-    fn resolve_capture_inner(&mut self, inner: &Located<Pattern>) -> (TermInfo, bool) {
+    fn resolve_capture_inner(&mut self, inner: &Located<Pattern>) -> (PatternResult, bool) {
         if let Pattern::QuantifiedPattern(q) = inner.node() {
             let quantifier = self.quantifier_kind(q);
             match quantifier {
@@ -462,18 +462,18 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     /// The capture's base type from the inner flow, before any annotation.
-    fn determine_captured_base_type(&mut self, inner: &Pattern, inner_info: &TermInfo) -> TypeId {
+    fn determine_captured_base_type(&mut self, inner: &Pattern, inner_info: &PatternResult) -> TypeId {
         match &inner_info.flow {
             // A truly empty scope (`{}`) captures an empty struct; any other void
             // capture is the matched node (or a recursive reference's type).
-            TypeFlow::Void => {
+            OutputFlow::Void => {
                 if is_empty_group(inner) {
                     self.ctx.type_ctx.intern_struct(BTreeMap::new())
                 } else {
                     self.recursive_ref_type(inner).unwrap_or(TYPE_NODE)
                 }
             }
-            TypeFlow::Scalar(type_id) | TypeFlow::Fields(type_id) => *type_id,
+            OutputFlow::Value(type_id) | OutputFlow::Fields(type_id) => *type_id,
         }
     }
 
@@ -498,9 +498,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    fn infer_quantified_pattern(&mut self, quant: &Located<QuantifiedPattern>) -> TermInfo {
+    fn infer_quantified_pattern(&mut self, quant: &Located<QuantifiedPattern>) -> PatternResult {
         let Some(inner) = quant.node().inner() else {
-            return TermInfo::void();
+            return PatternResult::void();
         };
         let inner = quant.wrap(inner);
 
@@ -524,12 +524,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
         };
 
-        TermInfo::new(inner_info.arity, flow)
+        PatternResult::new(inner_info.arity, flow)
     }
 
-    fn infer_quantified_pattern_as_row(&mut self, quant: &Located<QuantifiedPattern>) -> TermInfo {
+    fn infer_quantified_pattern_as_row(&mut self, quant: &Located<QuantifiedPattern>) -> PatternResult {
         let Some(inner) = quant.node().inner() else {
-            return TermInfo::void();
+            return PatternResult::void();
         };
         let inner = quant.wrap(inner);
 
@@ -547,16 +547,16 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
         };
 
-        TermInfo::new(inner_info.arity, flow)
+        PatternResult::new(inner_info.arity, flow)
     }
 
-    fn make_flow_optional(&mut self, flow: TypeFlow) -> TypeFlow {
+    fn make_flow_optional(&mut self, flow: OutputFlow) -> OutputFlow {
         match flow {
-            TypeFlow::Void => TypeFlow::Void,
-            TypeFlow::Scalar(t) => {
-                TypeFlow::Scalar(self.ctx.type_ctx.intern_type(TypeShape::Optional(t)))
+            OutputFlow::Void => OutputFlow::Void,
+            OutputFlow::Value(t) => {
+                OutputFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Optional(t)))
             }
-            TypeFlow::Fields(type_id) => {
+            OutputFlow::Fields(type_id) => {
                 let optional_fields: BTreeMap<_, _> = self
                     .ctx
                     .type_ctx
@@ -564,30 +564,30 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     .iter()
                     .map(|(&k, &v)| (k, v.make_optional()))
                     .collect();
-                TypeFlow::Fields(self.ctx.type_ctx.intern_struct(optional_fields))
+                OutputFlow::Fields(self.ctx.type_ctx.intern_struct(optional_fields))
             }
         }
     }
 
-    fn make_flow_array(&mut self, flow: TypeFlow, inner: &Pattern, non_empty: bool) -> TypeFlow {
+    fn make_flow_array(&mut self, flow: OutputFlow, inner: &Pattern, non_empty: bool) -> OutputFlow {
         match flow {
-            TypeFlow::Void => {
+            OutputFlow::Void => {
                 // Scalar list: void inner -> array of Node (or Ref)
                 let element = self.recursive_ref_type(inner).unwrap_or(TYPE_NODE);
                 let array_type = self
                     .ctx
                     .type_ctx
                     .intern_type(TypeShape::Array { element, non_empty });
-                TypeFlow::Scalar(array_type)
+                OutputFlow::Value(array_type)
             }
-            TypeFlow::Scalar(t) => {
+            OutputFlow::Value(t) => {
                 let array_type = self.ctx.type_ctx.intern_type(TypeShape::Array {
                     element: t,
                     non_empty,
                 });
-                TypeFlow::Scalar(array_type)
+                OutputFlow::Value(array_type)
             }
-            TypeFlow::Fields(struct_type) => {
+            OutputFlow::Fields(struct_type) => {
                 // `check_internal_capture_dimensionality` already emitted an error for
                 // this case (Fields under * or + without a row capture). We still
                 // produce a plausible array type so downstream inference isn't poisoned
@@ -596,15 +596,15 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     element: struct_type,
                     non_empty,
                 });
-                TypeFlow::Scalar(array_type)
+                OutputFlow::Value(array_type)
             }
         }
     }
 
     /// Field expression: arity One, delegates type to value.
-    fn infer_field_pattern(&mut self, field: &Located<FieldPattern>) -> TermInfo {
+    fn infer_field_pattern(&mut self, field: &Located<FieldPattern>) -> PatternResult {
         let Some(value) = field.node().value() else {
-            return TermInfo::void();
+            return PatternResult::void();
         };
         let value = field.wrap(value);
 
@@ -615,7 +615,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             self.report_field_arity_error(field.source(), field.node(), value.node());
         }
 
-        TermInfo::new(Arity::One, value_info.flow)
+        PatternResult::new(Arity::One, value_info.flow)
     }
 
     fn report_field_arity_error(&mut self, source: SourceId, field: &FieldPattern, value: &Pattern) {
@@ -651,7 +651,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         &mut self,
         source: SourceId,
         quant: &QuantifiedPattern,
-        inner_info: &TermInfo,
+        inner_info: &PatternResult,
     ) -> bool {
         if !(inner_info.arity == Arity::Many && inner_info.flow.is_void()) {
             return false;
@@ -680,9 +680,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         &mut self,
         source: SourceId,
         quant: &QuantifiedPattern,
-        inner_info: &TermInfo,
+        inner_info: &PatternResult,
     ) {
-        let TypeFlow::Fields(type_id) = &inner_info.flow else {
+        let OutputFlow::Fields(type_id) = &inner_info.flow else {
             return;
         };
 
@@ -727,10 +727,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         quant.quantifier_kind().unwrap_or(QuantifierKind::ZeroOrMore)
     }
 
-    fn flow_to_type(&mut self, flow: &TypeFlow) -> TypeId {
+    fn flow_to_type(&mut self, flow: &OutputFlow) -> TypeId {
         match flow {
-            TypeFlow::Void => TYPE_VOID,
-            TypeFlow::Scalar(t) | TypeFlow::Fields(t) => *t,
+            OutputFlow::Void => TYPE_VOID,
+            OutputFlow::Value(t) | OutputFlow::Fields(t) => *t,
         }
     }
 
@@ -748,20 +748,20 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         merged_fields: BTreeMap<Symbol, FieldInfo>,
         output_children: Vec<(TextRange, TypeId)>,
         parent_range: TextRange,
-    ) -> TypeFlow {
+    ) -> OutputFlow {
         let has_bubbles = !merged_fields.is_empty();
 
         match (has_bubbles, output_children.len()) {
-            (false, 0) => TypeFlow::Void,
-            (false, 1) => TypeFlow::Scalar(output_children[0].1),
+            (false, 0) => OutputFlow::Void,
+            (false, 1) => OutputFlow::Value(output_children[0].1),
             (false, _) => {
                 self.report_ambiguous_outputs(source, parent_range, &output_children);
-                TypeFlow::Void
+                OutputFlow::Void
             }
-            (true, 0) => TypeFlow::Fields(self.ctx.type_ctx.intern_struct(merged_fields)),
+            (true, 0) => OutputFlow::Fields(self.ctx.type_ctx.intern_struct(merged_fields)),
             (true, _) => {
                 self.report_uncaptured_output_with_captures(source, &output_children);
-                TypeFlow::Fields(self.ctx.type_ctx.intern_struct(merged_fields))
+                OutputFlow::Fields(self.ctx.type_ctx.intern_struct(merged_fields))
             }
         }
     }
@@ -917,10 +917,10 @@ impl<'a, 'd> InferencePass<'a, 'd> {
         self.ctx.set_def_type(def_id, type_id);
     }
 
-    fn flow_to_type_id(&mut self, flow: &TypeFlow) -> TypeId {
+    fn flow_to_type_id(&mut self, flow: &OutputFlow) -> TypeId {
         match flow {
-            TypeFlow::Void => TYPE_VOID,
-            TypeFlow::Scalar(id) | TypeFlow::Fields(id) => *id,
+            OutputFlow::Void => TYPE_VOID,
+            OutputFlow::Value(id) | OutputFlow::Fields(id) => *id,
         }
     }
 }

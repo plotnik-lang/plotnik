@@ -2,7 +2,7 @@
 //!
 //! The type system tracks two orthogonal properties:
 //! - Arity: Whether an expression matches one or many node positions.
-//! - TypeFlow: What data flows through an expression.
+//! - OutputFlow: What data flows through an expression.
 
 use std::collections::BTreeMap;
 
@@ -86,22 +86,22 @@ impl FieldInfo {
 
 /// Data flow through an expression.
 #[derive(Clone, Debug)]
-pub enum TypeFlow {
+pub enum OutputFlow {
     /// Transparent, produces nothing.
     Void,
     /// Opaque single value that doesn't bubble (scope boundary).
-    Scalar(TypeId),
+    Value(TypeId),
     /// Struct type whose fields bubble to parent scope.
     Fields(TypeId),
 }
 
-impl TypeFlow {
+impl OutputFlow {
     pub fn is_void(&self) -> bool {
         matches!(self, Self::Void)
     }
 
     pub fn is_scalar(&self) -> bool {
-        matches!(self, Self::Scalar(_))
+        matches!(self, Self::Value(_))
     }
 
     pub fn has_fields(&self) -> bool {
@@ -111,43 +111,43 @@ impl TypeFlow {
     pub fn type_id(&self) -> Option<TypeId> {
         match self {
             Self::Void => None,
-            Self::Scalar(id) | Self::Fields(id) => Some(*id),
+            Self::Value(id) | Self::Fields(id) => Some(*id),
         }
     }
 }
 
 /// Combined arity and type flow information for an expression.
 #[derive(Clone, Debug)]
-pub struct TermInfo {
+pub struct PatternResult {
     /// How many times this expression matches (one vs many).
     pub arity: Arity,
     /// What data flows through this expression.
-    pub flow: TypeFlow,
+    pub flow: OutputFlow,
 }
 
-impl TermInfo {
-    pub fn new(arity: Arity, flow: TypeFlow) -> Self {
+impl PatternResult {
+    pub fn new(arity: Arity, flow: OutputFlow) -> Self {
         Self { arity, flow }
     }
 
     pub fn void() -> Self {
         Self {
             arity: Arity::One,
-            flow: TypeFlow::Void,
+            flow: OutputFlow::Void,
         }
     }
 
     pub fn scalar(arity: Arity, type_id: TypeId) -> Self {
         Self {
             arity,
-            flow: TypeFlow::Scalar(type_id),
+            flow: OutputFlow::Value(type_id),
         }
     }
 
     pub fn bubble(arity: Arity, struct_type_id: TypeId) -> Self {
         Self {
             arity,
-            flow: TypeFlow::Fields(struct_type_id),
+            flow: OutputFlow::Fields(struct_type_id),
         }
     }
 }

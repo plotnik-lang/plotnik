@@ -2,13 +2,13 @@
 //!
 //! Types are interned to enable cheap equality checks and cycle handling.
 //! Symbols are stored but resolved via external Interner reference.
-//! TermInfo is cached per-expression to avoid recomputation.
+//! PatternResult is cached per-expression to avoid recomputation.
 
 use std::collections::{BTreeMap, HashMap};
 
 use crate::ast::Pattern;
 
-use crate::type_shape::{Arity, FieldInfo, TYPE_NODE, TYPE_VOID, TermInfo, TypeId, TypeShape};
+use crate::type_shape::{Arity, FieldInfo, TYPE_NODE, TYPE_VOID, PatternResult, TypeId, TypeShape};
 use crate::{DefId, Interner, Symbol};
 
 /// Central registry for types, symbols, and expression metadata.
@@ -21,13 +21,13 @@ pub struct TypeContext {
     def_ids: HashMap<Symbol, DefId>,
     /// Definition-level type info (for TypeScript emission), keyed by DefId
     def_types: HashMap<DefId, TypeId>,
-    /// Full inferred TermInfo per definition, keyed by DefId. Lets a non-recursive
-    /// `Ref` return its target's result (Arity + TypeFlow, fields intact for
+    /// Full inferred PatternResult per definition, keyed by DefId. Lets a non-recursive
+    /// `Ref` return its target's result (Arity + OutputFlow, fields intact for
     /// bubbling) without re-descending into the referenced body. Analysis-only:
     /// `def_types` stays the sole ordering source for emission.
-    def_results: HashMap<DefId, TermInfo>,
+    def_results: HashMap<DefId, PatternResult>,
 
-    term_info: HashMap<Pattern, TermInfo>,
+    term_info: HashMap<Pattern, PatternResult>,
 
     /// Explicit type names from annotations like `{...} @x :: TypeName`.
     /// Maps a struct/enum TypeId to the name it should have in generated code.
@@ -107,7 +107,7 @@ impl TypeContext {
 
     /// Fields of the struct a `Fields` flow points to.
     ///
-    /// Every `TypeFlow::Fields` is constructed by interning a `Struct` (see the
+    /// Every `OutputFlow::Fields` is constructed by interning a `Struct` (see the
     /// `intern_struct`/`intern_single_field` calls at every `Fields` construction
     /// site), so a non-`Struct` id here is a broken type-system invariant, not a
     /// runtime condition the query can trigger. We surface it loudly instead of
@@ -133,11 +133,11 @@ impl TypeContext {
         }
     }
 
-    pub fn cache_term_info(&mut self, pattern: Pattern, info: TermInfo) {
+    pub fn cache_term_info(&mut self, pattern: Pattern, info: PatternResult) {
         self.term_info.insert(pattern, info);
     }
 
-    pub fn term_info(&self, pattern: &Pattern) -> Option<&TermInfo> {
+    pub fn term_info(&self, pattern: &Pattern) -> Option<&PatternResult> {
         self.term_info.get(pattern)
     }
 
@@ -192,11 +192,11 @@ impl TypeContext {
 
     /// Record a definition's full inferred result, so non-recursive references
     /// can resolve to it instead of re-descending into the body.
-    pub fn set_def_result(&mut self, def_id: DefId, info: TermInfo) {
+    pub fn set_def_result(&mut self, def_id: DefId, info: PatternResult) {
         self.def_results.insert(def_id, info);
     }
 
-    pub fn def_result(&self, def_id: DefId) -> Option<&TermInfo> {
+    pub fn def_result(&self, def_id: DefId) -> Option<&PatternResult> {
         self.def_results.get(&def_id)
     }
 

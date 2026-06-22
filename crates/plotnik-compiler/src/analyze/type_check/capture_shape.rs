@@ -12,7 +12,7 @@ use plotnik_core::Interner;
 use crate::parser::{Pattern, is_empty_group};
 
 use super::context::TypeContext;
-use super::types::{QuantifierKind, TypeFlow, TypeShape};
+use super::types::{QuantifierKind, OutputFlow, TypeShape};
 
 /// How a captured value is produced — the bridge between the inferred type and
 /// the emitted effects.
@@ -78,8 +78,8 @@ pub fn capture_kind(inner: &Pattern, ctx: &TypeContext, interner: &Interner) -> 
         // Bubbling captures: a sequence/alternation wraps them in a fresh struct
         // scope; a named node instead captures its matched node and lets the
         // children bubble alongside as sibling fields.
-        Some(TypeFlow::Fields(_)) => {
-            // Only a union alternation flows `Fields` here; an enum flows `Scalar`
+        Some(OutputFlow::Fields(_)) => {
+            // Only a union alternation flows `Fields` here; an enum flows `Value`
             // and is handled below, so it must not appear in this arm.
             if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Union(_)) {
                 CaptureKind::StructScope
@@ -90,7 +90,7 @@ pub fn capture_kind(inner: &Pattern, ctx: &TypeContext, interner: &Interner) -> 
         // A structured scalar is left pending by the inner itself — an enum
         // alternation (`Enum`/`EndEnum`) or a named node forwarding a structured
         // output child.
-        Some(TypeFlow::Scalar(type_id)) if ctx.is_structured_output(*type_id) => {
+        Some(OutputFlow::Value(type_id)) if ctx.is_structured_output(*type_id) => {
             CaptureKind::SetAfter
         }
         // Void, or a plain scalar node: the matched node is captured directly.
@@ -132,8 +132,8 @@ fn ref_returns_structured(pattern: &Pattern, ctx: &TypeContext, interner: &Inter
     // the reference's own transparently-inferred flow: a structured result either
     // bubbles its fields (struct) or is a structured scalar (enum/array).
     match ctx.term_info(pattern).map(|info| &info.flow) {
-        Some(TypeFlow::Fields(_)) => true,
-        Some(TypeFlow::Scalar(t)) => ctx.is_structured_output(*t),
+        Some(OutputFlow::Fields(_)) => true,
+        Some(OutputFlow::Value(t)) => ctx.is_structured_output(*t),
         _ => false,
     }
 }

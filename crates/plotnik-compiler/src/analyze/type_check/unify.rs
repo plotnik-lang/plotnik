@@ -1,13 +1,13 @@
 //! Unification logic for alternation branches.
 //!
-//! Handles merging TypeFlow from different branches of union alternations.
+//! Handles merging OutputFlow from different branches of union alternations.
 //! Enum alternations don't unify — they produce Enum types directly.
 
 use std::collections::BTreeMap;
 
 use super::context::TypeContext;
 use super::def_id::Symbol;
-use super::types::{FieldInfo, TYPE_VOID, TypeFlow, TypeId, TypeShape};
+use super::types::{FieldInfo, TYPE_VOID, OutputFlow, TypeId, TypeShape};
 
 /// Error during type unification.
 #[derive(Clone, Debug)]
@@ -35,50 +35,50 @@ impl UnifyError {
 
 pub fn unify_flows(
     ctx: &mut TypeContext,
-    flows: impl IntoIterator<Item = TypeFlow>,
-) -> Result<TypeFlow, UnifyError> {
+    flows: impl IntoIterator<Item = OutputFlow>,
+) -> Result<OutputFlow, UnifyError> {
     let mut iter = flows.into_iter();
     let Some(first) = iter.next() else {
-        return Ok(TypeFlow::Void);
+        return Ok(OutputFlow::Void);
     };
 
     iter.try_fold(first, |acc, flow| unify_flow(ctx, acc, flow))
 }
 
-/// Unify two TypeFlows from alternation branches.
+/// Unify two OutputFlows from alternation branches.
 ///
 /// Rules:
 /// - Void ∪ Void → Void
 /// - Void ∪ Fields(s) → Fields(make_all_optional(s))
 /// - Fields(a) ∪ Fields(b) → Fields(merge_fields(a, b))
-/// - Scalar in union → Error
-pub fn unify_flow(ctx: &mut TypeContext, a: TypeFlow, b: TypeFlow) -> Result<TypeFlow, UnifyError> {
+/// - Value in union → Error
+pub fn unify_flow(ctx: &mut TypeContext, a: OutputFlow, b: OutputFlow) -> Result<OutputFlow, UnifyError> {
     // Union alternations cannot contain scalars.
-    if matches!(a, TypeFlow::Scalar(_)) || matches!(b, TypeFlow::Scalar(_)) {
+    if matches!(a, OutputFlow::Value(_)) || matches!(b, OutputFlow::Value(_)) {
         return Err(UnifyError::ScalarInUnion);
     }
 
     match (a, b) {
-        (TypeFlow::Void, TypeFlow::Void) => Ok(TypeFlow::Void),
+        (OutputFlow::Void, OutputFlow::Void) => Ok(OutputFlow::Void),
 
         // Void ∪ Fields -> Fields (every field is absent in the Void branch)
-        (TypeFlow::Void, TypeFlow::Fields(id)) | (TypeFlow::Fields(id), TypeFlow::Void) => {
+        (OutputFlow::Void, OutputFlow::Fields(id)) | (OutputFlow::Fields(id), OutputFlow::Void) => {
             let fields = ctx.expect_struct_fields(id).clone();
             let relaxed = relax_all_for_absence(ctx, fields);
-            Ok(TypeFlow::Fields(ctx.intern_struct(relaxed)))
+            Ok(OutputFlow::Fields(ctx.intern_struct(relaxed)))
         }
 
-        (TypeFlow::Fields(a_id), TypeFlow::Fields(b_id)) => {
+        (OutputFlow::Fields(a_id), OutputFlow::Fields(b_id)) => {
             let a_fields = ctx.expect_struct_fields(a_id).clone();
             let b_fields = ctx.expect_struct_fields(b_id).clone();
 
             let merged = merge_fields(ctx, a_fields, b_fields)?;
-            Ok(TypeFlow::Fields(ctx.intern_struct(merged)))
+            Ok(OutputFlow::Fields(ctx.intern_struct(merged)))
         }
 
-        // The scalar guard above (`matches!(a|b, Scalar)`) already returns Err.
-        // Every remaining TypeFlow variant (Void, Fields) is matched explicitly above.
-        _ => unreachable!("unify_flow: unexpected TypeFlow variant after scalar guard"),
+        // The scalar guard above (`matches!(a|b, Value)`) already returns Err.
+        // Every remaining OutputFlow variant (Void, Fields) is matched explicitly above.
+        _ => unreachable!("unify_flow: unexpected OutputFlow variant after scalar guard"),
     }
 }
 

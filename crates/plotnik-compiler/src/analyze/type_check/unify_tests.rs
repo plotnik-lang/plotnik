@@ -7,8 +7,8 @@ use plotnik_core::Interner;
 #[test]
 fn unify_void_void() {
     let mut ctx = TypeContext::new();
-    let result = unify_flow(&mut ctx, TypeFlow::Void, TypeFlow::Void);
-    assert!(matches!(result, Ok(TypeFlow::Void)));
+    let result = unify_flow(&mut ctx, OutputFlow::Void, OutputFlow::Void);
+    assert!(matches!(result, Ok(OutputFlow::Void)));
 }
 
 #[test]
@@ -18,10 +18,10 @@ fn unify_void_bubble() {
     let x = interner.intern("x");
     let struct_id = ctx.intern_single_field(x, FieldInfo::required(TYPE_NODE));
 
-    let result = unify_flow(&mut ctx, TypeFlow::Void, TypeFlow::Fields(struct_id)).unwrap();
+    let result = unify_flow(&mut ctx, OutputFlow::Void, OutputFlow::Fields(struct_id)).unwrap();
 
     match result {
-        TypeFlow::Fields(id) => {
+        OutputFlow::Fields(id) => {
             let fields = ctx.struct_fields(id).unwrap();
             assert!(fields.get(&x).unwrap().optional);
         }
@@ -43,10 +43,10 @@ fn unify_bubble_merge() {
     b_fields.insert(y, FieldInfo::required(TYPE_NODE));
     let b_id = ctx.intern_struct(b_fields);
 
-    let result = unify_flow(&mut ctx, TypeFlow::Fields(a_id), TypeFlow::Fields(b_id)).unwrap();
+    let result = unify_flow(&mut ctx, OutputFlow::Fields(a_id), OutputFlow::Fields(b_id)).unwrap();
 
     match result {
-        TypeFlow::Fields(id) => {
+        OutputFlow::Fields(id) => {
             let fields = ctx.struct_fields(id).unwrap();
             // x is in both, so required
             assert!(!fields.get(&x).unwrap().optional);
@@ -60,6 +60,6 @@ fn unify_bubble_merge() {
 #[test]
 fn unify_scalar_error() {
     let mut ctx = TypeContext::new();
-    let result = unify_flow(&mut ctx, TypeFlow::Scalar(TYPE_NODE), TypeFlow::Void);
+    let result = unify_flow(&mut ctx, OutputFlow::Value(TYPE_NODE), OutputFlow::Void);
     assert!(matches!(result, Err(UnifyError::ScalarInUnion)));
 }

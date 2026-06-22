@@ -21,7 +21,7 @@ pub use capture_shape::{CaptureKind, capture_kind};
 pub use context::TypeContext;
 pub use def_id::{DefId, Interner, Symbol};
 pub use types::{
-    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_VOID, TermInfo, TypeFlow, TypeId, TypeShape,
+    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_VOID, PatternResult, OutputFlow, TypeId, TypeShape,
 };
 pub use unify::{UnifyError, unify_flow, unify_flows};
 
