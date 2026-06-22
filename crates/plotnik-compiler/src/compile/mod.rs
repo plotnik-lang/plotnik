@@ -27,7 +27,7 @@ mod navigation;
 mod quantifier;
 mod scope;
 mod sequences;
-mod verify;
+pub mod verify;
 
 #[cfg(test)]
 mod capture_tests;
@@ -41,5 +41,9 @@ mod lower_tests;
 mod quantifier_tests;
 
 pub use capture::CaptureEffects;
+pub use collapse_up::collapse_up;
 pub use compiler::{CompileCtx, Compiler};
+pub use dce::remove_unreachable;
+pub use epsilon_elim::eliminate_epsilons;
 pub use error::CompileResult;
+pub use lower::lower;

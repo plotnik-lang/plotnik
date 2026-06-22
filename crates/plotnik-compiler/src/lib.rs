@@ -79,35 +79,8 @@ pub mod compile {
     pub use plotnik_compiler_lower_pack::lower;
     pub use plotnik_compiler_lower_thompson::{CaptureEffects, CompileCtx, CompileResult, Compiler};
 
-    pub fn build_ir(ctx: &CompileCtx<'_>) -> CompileResult {
-        let mut result = Compiler::build_ir(ctx);
-
-        plotnik_compiler_lower_thompson::compile::verify::run_verified(
-            "eliminate_epsilons",
-            &mut result,
-            ctx,
-            eliminate_epsilons,
-        );
-        plotnik_compiler_lower_thompson::compile::verify::run_verified(
-            "remove_unreachable",
-            &mut result,
-            ctx,
-            remove_unreachable,
-        );
-        plotnik_compiler_lower_thompson::compile::verify::run_verified(
-            "collapse_up",
-            &mut result,
-            ctx,
-            collapse_up,
-        );
-        plotnik_compiler_lower_thompson::compile::verify::run_verified(
-            "lower",
-            &mut result,
-            ctx,
-            lower,
-        );
-
-        result
+    pub mod verify {
+        pub use plotnik_compiler_lower_thompson::compile::verify::*;
     }
 }
 #[cfg(not(test))]
