@@ -2,6 +2,7 @@
 
 pub mod ast;
 pub mod cst;
+pub mod dependency_analysis;
 pub mod grammar_binding;
 pub mod ir;
 pub mod located;
@@ -23,6 +24,7 @@ pub use ast::{
     is_empty_group, token_src,
 };
 pub use cst::{QueryLang, SyntaxKind, SyntaxNode, SyntaxToken};
+pub use dependency_analysis::DependencyAnalysis;
 pub use grammar_binding::GrammarBinding;
 pub use located::Located;
 pub use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};

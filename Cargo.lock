@@ -2061,7 +2061,6 @@ dependencies = [
  "indexmap",
  "plotnik-bytecode",
  "plotnik-compiler-analyze-names",
- "plotnik-compiler-analyze-refs",
  "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
  "plotnik-compiler-parse",

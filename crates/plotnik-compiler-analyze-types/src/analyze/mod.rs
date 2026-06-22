@@ -4,7 +4,7 @@ mod entrypoints;
 pub mod type_check;
 
 pub mod dependencies {
-    pub use plotnik_compiler_analyze_refs::dependencies::*;
+    pub use plotnik_compiler_core::DependencyAnalysis;
 }
 
 pub mod symbol_table {
