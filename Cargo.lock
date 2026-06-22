@@ -2168,7 +2168,6 @@ dependencies = [
  "plotnik-bytecode",
  "plotnik-compiler-analyze-types",
  "plotnik-compiler-core",
- "plotnik-compiler-lower-thompson",
 ]
 
 [[package]]
@@ -2179,7 +2178,6 @@ dependencies = [
  "plotnik-bytecode",
  "plotnik-compiler-analyze-types",
  "plotnik-compiler-core",
- "plotnik-compiler-lower-thompson",
 ]
 
 [[package]]
@@ -2188,7 +2186,6 @@ version = "0.3.3"
 dependencies = [
  "plotnik-bytecode",
  "plotnik-compiler-core",
- "plotnik-compiler-lower-thompson",
 ]
 
 [[package]]
@@ -2197,7 +2194,6 @@ version = "0.3.3"
 dependencies = [
  "plotnik-bytecode",
  "plotnik-compiler-core",
- "plotnik-compiler-lower-thompson",
 ]
 
 [[package]]

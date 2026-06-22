@@ -19,8 +19,7 @@ use std::collections::{HashMap, HashSet};
 
 use plotnik_bytecode::Nav;
 
-use crate::bytecode::{InstructionIR, Label, MatchIR, NodeKindConstraint};
-use crate::compile::CompileResult;
+use crate::bytecode::{CompileResult, InstructionIR, Label, MatchIR, NodeKindConstraint};
 
 pub fn collapse_up(result: &mut CompileResult) {
     let label_to_idx: HashMap<Label, usize> = result

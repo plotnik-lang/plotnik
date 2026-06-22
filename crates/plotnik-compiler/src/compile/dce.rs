@@ -6,9 +6,7 @@
 
 use std::collections::HashSet;
 
-use crate::bytecode::Label;
-
-use super::error::CompileResult;
+use crate::bytecode::{CompileResult, Label};
 
 pub fn remove_unreachable(result: &mut CompileResult) {
     let reachable = compute_reachable(result);

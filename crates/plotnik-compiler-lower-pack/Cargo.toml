@@ -12,4 +12,3 @@ workspace = true
 [dependencies]
 plotnik-bytecode.workspace = true
 plotnik-compiler-core.workspace = true
-plotnik-compiler-lower-thompson.workspace = true

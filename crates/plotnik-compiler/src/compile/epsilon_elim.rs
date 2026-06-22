@@ -13,8 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 use plotnik_bytecode::EffectKind;
 
-use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR};
-use crate::compile::error::CompileResult;
+use crate::bytecode::{CompileResult, EffectIR, InstructionIR, Label, MatchIR};
 
 fn build_label_to_index(instructions: &[InstructionIR]) -> HashMap<Label, usize> {
     instructions
