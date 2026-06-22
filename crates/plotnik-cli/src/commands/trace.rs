@@ -59,6 +59,9 @@ pub fn run(args: TraceArgs) -> CliResult {
             return Err(CliError::No);
         }
         Err(e) => {
+            // `--json` structures only this error (on stderr); the trace itself is
+            // always the textual trace format on stdout. trace is a debug tool, not
+            // a JSON producer, so the two streams stay separate by design.
             tracer.print();
             eprintln!("{}", render_runtime_error(&e, args.json));
             return Err(CliError::FatalRendered);
