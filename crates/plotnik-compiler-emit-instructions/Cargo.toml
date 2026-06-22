@@ -1,0 +1,17 @@
+[package]
+name = "plotnik-compiler-emit-instructions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Instruction emission pass for the Plotnik compiler"
+
+[lints]
+workspace = true
+
+[dependencies]
+plotnik-bytecode.workspace = true
+plotnik-compiler-emit-regex.workspace = true
+plotnik-compiler-emit-strings.workspace = true
+plotnik-compiler-emit-types.workspace = true
+plotnik-compiler-ir.workspace = true

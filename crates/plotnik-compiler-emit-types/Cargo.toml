@@ -1,0 +1,16 @@
+[package]
+name = "plotnik-compiler-emit-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Type table emission pass for the Plotnik compiler"
+
+[lints]
+workspace = true
+
+[dependencies]
+plotnik-bytecode.workspace = true
+plotnik-compiler-analyze-types.workspace = true
+plotnik-compiler-emit-strings.workspace = true
+plotnik-core.workspace = true

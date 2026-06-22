@@ -13,6 +13,12 @@ members = [
     "crates/plotnik-compiler-core",
     "crates/plotnik-compiler-diagnostics",
     "crates/plotnik-compiler-emit",
+    "crates/plotnik-compiler-emit-instructions",
+    "crates/plotnik-compiler-emit-layout",
+    "crates/plotnik-compiler-emit-module",
+    "crates/plotnik-compiler-emit-regex",
+    "crates/plotnik-compiler-emit-strings",
+    "crates/plotnik-compiler-emit-types",
     "crates/plotnik-compiler-ir",
     "crates/plotnik-compiler-lower",
     "crates/plotnik-compiler-lower-dead",
@@ -46,6 +52,12 @@ plotnik-compiler-analyze-types = { path = "crates/plotnik-compiler-analyze-types
 plotnik-compiler-core = { path = "crates/plotnik-compiler-core", version = "0.3.3" }
 plotnik-compiler-diagnostics = { path = "crates/plotnik-compiler-diagnostics", version = "0.3.3" }
 plotnik-compiler-emit = { path = "crates/plotnik-compiler-emit", version = "0.3.3" }
+plotnik-compiler-emit-instructions = { path = "crates/plotnik-compiler-emit-instructions", version = "0.3.3" }
+plotnik-compiler-emit-layout = { path = "crates/plotnik-compiler-emit-layout", version = "0.3.3" }
+plotnik-compiler-emit-module = { path = "crates/plotnik-compiler-emit-module", version = "0.3.3" }
+plotnik-compiler-emit-regex = { path = "crates/plotnik-compiler-emit-regex", version = "0.3.3" }
+plotnik-compiler-emit-strings = { path = "crates/plotnik-compiler-emit-strings", version = "0.3.3" }
+plotnik-compiler-emit-types = { path = "crates/plotnik-compiler-emit-types", version = "0.3.3" }
 plotnik-compiler-ir = { path = "crates/plotnik-compiler-ir", version = "0.3.3" }
 plotnik-compiler-lower = { path = "crates/plotnik-compiler-lower", version = "0.3.3" }
 plotnik-compiler-lower-dead = { path = "crates/plotnik-compiler-lower-dead", version = "0.3.3" }

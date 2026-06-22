@@ -8,6 +8,7 @@
 
 mod emitter;
 mod error;
+mod instructions;
 pub mod layout;
 mod regex_table;
 mod string_table;

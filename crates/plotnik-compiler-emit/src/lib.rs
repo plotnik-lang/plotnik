@@ -13,6 +13,8 @@ pub mod emit {
     mod emitter;
     #[path = "../../../plotnik-compiler/src/emit/error.rs"]
     mod error;
+    #[path = "../../../plotnik-compiler/src/emit/instructions.rs"]
+    mod instructions;
     #[path = "../../../plotnik-compiler/src/emit/layout.rs"]
     pub mod layout;
     #[path = "../../../plotnik-compiler/src/emit/regex_table.rs"]

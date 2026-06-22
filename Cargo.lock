@@ -2108,6 +2108,69 @@ dependencies = [
 ]
 
 [[package]]
+name = "plotnik-compiler-emit-instructions"
+version = "0.3.3"
+dependencies = [
+ "plotnik-bytecode",
+ "plotnik-compiler-emit-regex",
+ "plotnik-compiler-emit-strings",
+ "plotnik-compiler-emit-types",
+ "plotnik-compiler-ir",
+]
+
+[[package]]
+name = "plotnik-compiler-emit-layout"
+version = "0.3.3"
+dependencies = [
+ "plotnik-bytecode",
+ "plotnik-compiler-ir",
+]
+
+[[package]]
+name = "plotnik-compiler-emit-module"
+version = "0.3.3"
+dependencies = [
+ "crc32fast",
+ "indexmap",
+ "plotnik-bytecode",
+ "plotnik-compiler-analyze-types",
+ "plotnik-compiler-emit-instructions",
+ "plotnik-compiler-emit-layout",
+ "plotnik-compiler-emit-regex",
+ "plotnik-compiler-emit-strings",
+ "plotnik-compiler-emit-types",
+ "plotnik-compiler-ir",
+ "plotnik-core",
+]
+
+[[package]]
+name = "plotnik-compiler-emit-regex"
+version = "0.3.3"
+dependencies = [
+ "plotnik-bytecode",
+ "plotnik-compiler-emit-strings",
+ "regex-automata",
+]
+
+[[package]]
+name = "plotnik-compiler-emit-strings"
+version = "0.3.3"
+dependencies = [
+ "plotnik-bytecode",
+ "plotnik-core",
+]
+
+[[package]]
+name = "plotnik-compiler-emit-types"
+version = "0.3.3"
+dependencies = [
+ "plotnik-bytecode",
+ "plotnik-compiler-analyze-types",
+ "plotnik-compiler-emit-strings",
+ "plotnik-core",
+]
+
+[[package]]
 name = "plotnik-compiler-ir"
 version = "0.3.3"
 dependencies = [

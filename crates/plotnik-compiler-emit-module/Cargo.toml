@@ -1,0 +1,23 @@
+[package]
+name = "plotnik-compiler-emit-module"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Bytecode module emission pass for the Plotnik compiler"
+
+[lints]
+workspace = true
+
+[dependencies]
+plotnik-bytecode.workspace = true
+plotnik-compiler-analyze-types.workspace = true
+plotnik-compiler-emit-instructions.workspace = true
+plotnik-compiler-emit-layout.workspace = true
+plotnik-compiler-emit-regex.workspace = true
+plotnik-compiler-emit-strings.workspace = true
+plotnik-compiler-emit-types.workspace = true
+plotnik-compiler-ir.workspace = true
+plotnik-core.workspace = true
+crc32fast = "1.4"
+indexmap = "2"

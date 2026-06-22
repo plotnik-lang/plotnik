@@ -1,0 +1,15 @@
+[package]
+name = "plotnik-compiler-emit-regex"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Regex table emission pass for the Plotnik compiler"
+
+[lints]
+workspace = true
+
+[dependencies]
+plotnik-bytecode.workspace = true
+plotnik-compiler-emit-strings.workspace = true
+regex-automata = { version = "0.4", features = ["dfa-build", "dfa-search"] }
