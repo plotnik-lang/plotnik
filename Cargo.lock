@@ -2078,6 +2078,7 @@ dependencies = [
 name = "plotnik-compiler-core"
 version = "0.3.3"
 dependencies = [
+ "indexmap",
  "plotnik-core",
 ]
 
@@ -2121,6 +2122,7 @@ dependencies = [
  "indexmap",
  "plotnik-bytecode",
  "plotnik-compiler-analyze-types",
+ "plotnik-compiler-core",
  "plotnik-compiler-emit-instructions",
  "plotnik-compiler-emit-layout",
  "plotnik-compiler-emit-regex",
@@ -2214,6 +2216,7 @@ dependencies = [
  "plotnik-bytecode",
  "plotnik-compiler-analyze-names",
  "plotnik-compiler-analyze-types",
+ "plotnik-compiler-core",
  "plotnik-compiler-ir",
  "plotnik-compiler-parse",
  "plotnik-core",

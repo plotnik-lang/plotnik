@@ -65,7 +65,6 @@ mod debug_impl {
 
     use indexmap::IndexMap;
     use plotnik_bytecode::{EffectKind, Nav};
-    use plotnik_core::{NodeKind, Symbol};
 
     use crate::analyze::type_check::DefId;
     use crate::bytecode::{InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR};
@@ -169,27 +168,26 @@ mod debug_impl {
             match &m.node_kind {
                 NodeKindConstraint::Any => ops.push(SemanticOp::MatchAny),
                 NodeKindConstraint::Named(id) => {
-                    let name =
-                        id.and_then(|i| resolve_node_kind_name(i, ctx.target_node_kinds, ctx.interner));
+                    let name = id.and_then(|i| ctx.grammar.kind_name(i, ctx.interner));
                     ops.push(SemanticOp::MatchNamed(name));
                 }
                 NodeKindConstraint::Anonymous(id) => {
-                    let name =
-                        id.and_then(|i| resolve_node_kind_name(i, ctx.target_node_kinds, ctx.interner));
+                    let name = id.and_then(|i| ctx.grammar.kind_name(i, ctx.interner));
                     ops.push(SemanticOp::MatchAnon(name));
                 }
             }
         }
 
         if let Some(f) = m.node_field {
-            let name = resolve_field_name(Some(f), ctx.target_node_fields, ctx.interner);
+            let name = ctx.grammar.field_name(f, ctx.interner);
             ops.push(SemanticOp::Field(
                 name.unwrap_or_else(|| format!("field#{f}")),
             ));
         }
 
         for &f in &m.neg_fields {
-            let name = resolve_field_name(NonZeroU16::new(f), ctx.target_node_fields, ctx.interner);
+            let name =
+                NonZeroU16::new(f).and_then(|id| ctx.grammar.field_name(id, ctx.interner));
             ops.push(SemanticOp::NegField(
                 name.unwrap_or_else(|| format!("field#{f}")),
             ));
@@ -646,37 +644,6 @@ mod debug_impl {
                 panic!("[verify] construction produced unbalanced scope effects for {key:?}:\n{e}");
             }
         }
-    }
-
-    fn resolve_node_kind_name(
-        id: NonZeroU16,
-        node_kinds: &IndexMap<NodeKind<Symbol>, plotnik_core::NodeKindId>,
-        interner: &plotnik_core::Interner,
-    ) -> Option<String> {
-        for (node_kind, kind_id) in node_kinds {
-            if kind_id.get() != id.get() {
-                continue;
-            }
-            let sym = match node_kind {
-                NodeKind::Named(sym) | NodeKind::Anonymous(sym) => *sym,
-            };
-            return interner.try_resolve(sym).map(|s| s.to_string());
-        }
-        None
-    }
-
-    fn resolve_field_name(
-        id: Option<NonZeroU16>,
-        node_fields: &IndexMap<Symbol, plotnik_core::NodeFieldId>,
-        interner: &plotnik_core::Interner,
-    ) -> Option<String> {
-        let id = id?;
-        for (sym, field_id) in node_fields {
-            if field_id.get() == id.get() {
-                return interner.try_resolve(*sym).map(|s| s.to_string());
-            }
-        }
-        None
     }
 
     fn resolve_predicate_value(value: &PredicateValueIR) -> String {

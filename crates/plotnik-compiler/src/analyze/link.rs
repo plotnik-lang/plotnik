@@ -11,21 +11,18 @@ use plotnik_core::grammar::Grammar;
 use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 use rowan::TextRange;
 
+pub use plotnik_compiler_core::GrammarBinding;
+
+/// Mutable accumulator for a [`GrammarBinding`], owned by the link pass.
 #[derive(Default)]
-pub struct GrammarBinding {
-    /// Interned named/anonymous node kind → NodeKindId (for binary: StringId → NodeKindId)
+pub struct GrammarBindingBuilder {
     node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
-    /// Interned name → NodeFieldId (for binary: StringId → NodeFieldId)
     node_field_ids: IndexMap<Symbol, NodeFieldId>,
 }
 
-impl GrammarBinding {
-    pub fn node_kind_ids(&self) -> &IndexMap<NodeKind<Symbol>, NodeKindId> {
-        &self.node_kind_ids
-    }
-
-    pub fn node_field_ids(&self) -> &IndexMap<Symbol, NodeFieldId> {
-        &self.node_field_ids
+impl GrammarBindingBuilder {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Record the first NodeKindId seen for a node kind, keeping the existing entry.
@@ -36,6 +33,11 @@ impl GrammarBinding {
     /// Record the first NodeFieldId seen for a field, keeping the existing entry.
     pub(crate) fn insert_node_field_id(&mut self, sym: Symbol, id: NodeFieldId) {
         self.node_field_ids.entry(sym).or_insert(id);
+    }
+
+    /// Freeze the accumulated resolution tables into an immutable [`GrammarBinding`].
+    pub fn finish(self) -> GrammarBinding {
+        GrammarBinding::new(self.node_kind_ids, self.node_field_ids)
     }
 }
 
@@ -60,7 +62,7 @@ pub struct GrammarLinkCtx<'a, 'q> {
 }
 
 impl<'q> GrammarLinkCtx<'_, 'q> {
-    pub fn link(self, output: &mut GrammarBinding, diagnostics: &mut Diagnostics) {
+    pub fn link(self, output: &mut GrammarBindingBuilder, diagnostics: &mut Diagnostics) {
         // Local deduplication maps (not exposed in output)
         let mut node_kind_ids: HashMap<NodeKind<&'q str>, Option<NodeKindId>> = HashMap::new();
         let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();
@@ -89,7 +91,7 @@ struct GrammarLinker<'a, 'q> {
     symbol_table: &'a SymbolTable,
     node_kind_ids: &'a mut HashMap<NodeKind<&'q str>, Option<NodeKindId>>,
     node_field_ids: &'a mut HashMap<&'q str, Option<NodeFieldId>>,
-    output: &'a mut GrammarBinding,
+    output: &'a mut GrammarBindingBuilder,
     diag: &'a mut Diagnostics,
 }
 

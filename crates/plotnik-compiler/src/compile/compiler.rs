@@ -1,7 +1,8 @@
 //! Core compiler state and entry points.
 
 use indexmap::IndexMap;
-use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
+use plotnik_compiler_core::GrammarBinding;
+use plotnik_core::Interner;
 
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::type_check::{DefId, TypeContext};
@@ -20,8 +21,7 @@ pub struct CompileCtx<'a> {
     pub interner: &'a Interner,
     pub type_ctx: &'a TypeContext,
     pub symbol_table: &'a SymbolTable,
-    pub target_node_kinds: &'a IndexMap<NodeKind<Symbol>, NodeKindId>,
-    pub target_node_fields: &'a IndexMap<Symbol, NodeFieldId>,
+    pub grammar: &'a GrammarBinding,
 }
 
 /// Compiler state for Thompson construction.

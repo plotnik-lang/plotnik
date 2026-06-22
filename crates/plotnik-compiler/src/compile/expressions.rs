@@ -13,7 +13,6 @@ use crate::analyze::type_check::TypeShape;
 use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR};
 use crate::parser::ast::{self, Pattern};
 use plotnik_bytecode::Nav;
-use plotnik_core::NodeKind;
 
 use crate::analyze::type_check::{CaptureKind, capture_kind};
 
@@ -614,8 +613,8 @@ impl Compiler<'_> {
             return NodeKindConstraint::Anonymous(None);
         };
         self.ctx
-            .target_node_kinds
-            .get(&NodeKind::Anonymous(sym))
+            .grammar
+            .resolve_anonymous_kind(sym)
             .and_then(|id| NonZeroU16::new(id.get()))
             .map_or(NodeKindConstraint::Anonymous(None), |id| {
                 NodeKindConstraint::Anonymous(Some(id))
@@ -641,8 +640,8 @@ impl Compiler<'_> {
             return NodeKindConstraint::Named(None);
         };
         self.ctx
-            .target_node_kinds
-            .get(&NodeKind::Named(sym))
+            .grammar
+            .resolve_named_kind(sym)
             .and_then(|id| NonZeroU16::new(id.get()))
             .map_or(NodeKindConstraint::Named(None), |id| {
                 NodeKindConstraint::Named(Some(id))
@@ -663,7 +662,7 @@ impl Compiler<'_> {
         self.ctx
             .interner
             .get(field_name)
-            .and_then(|sym| self.ctx.target_node_fields.get(&sym))
+            .and_then(|sym| self.ctx.grammar.resolve_field(sym))
             .and_then(|id| NonZeroU16::new(id.get()))
     }
 

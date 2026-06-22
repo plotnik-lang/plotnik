@@ -11,5 +11,5 @@ pub mod visitor {
     pub use plotnik_compiler_analyze_shape::visitor::*;
 }
 
-pub use link::{GrammarBinding, GrammarLinkCtx};
+pub use link::{GrammarBinding, GrammarBindingBuilder, GrammarLinkCtx};
 pub use plotnik_compiler_analyze_shape::Located;

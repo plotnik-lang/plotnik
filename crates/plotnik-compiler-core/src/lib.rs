@@ -1,7 +1,9 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+pub mod grammar_binding;
 pub mod source;
 
+pub use grammar_binding::GrammarBinding;
 pub use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 pub use source::{Source, SourceId, SourceKind, SourceMap};
 

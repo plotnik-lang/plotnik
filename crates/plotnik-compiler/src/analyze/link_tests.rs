@@ -1,6 +1,5 @@
 use crate::test_utils::colliding_node_kind_grammar;
 use crate::{Query, QueryBuilder, SourceMap};
-use plotnik_core::NodeKind;
 
 fn assert_links_colliding_node_types(files: &[(&str, &str)]) {
     let grammar = colliding_node_kind_grammar();
@@ -33,14 +32,8 @@ fn assert_links_colliding_node_types(files: &[(&str, &str)]) {
     let anonymous_id = grammar.resolve_anonymous_node("number").unwrap();
 
     assert_ne!(named_id, anonymous_id);
-    assert_eq!(
-        query.node_kind_ids().get(&NodeKind::Named(sym)),
-        Some(&named_id)
-    );
-    assert_eq!(
-        query.node_kind_ids().get(&NodeKind::Anonymous(sym)),
-        Some(&anonymous_id)
-    );
+    assert_eq!(query.grammar().resolve_named_kind(sym), Some(named_id));
+    assert_eq!(query.grammar().resolve_anonymous_kind(sym), Some(anonymous_id));
 }
 
 #[test]

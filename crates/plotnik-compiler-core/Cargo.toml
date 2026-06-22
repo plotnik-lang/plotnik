@@ -11,4 +11,5 @@ workspace = true
 
 [dependencies]
 plotnik-core.workspace = true
+indexmap = "2"
 

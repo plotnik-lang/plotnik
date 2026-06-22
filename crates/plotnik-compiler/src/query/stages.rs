@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use rowan::TextRange;
 
 use plotnik_core::grammar::Grammar;
-use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
+use plotnik_core::Interner;
 
 use super::{SourceId, SourceMap};
 use crate::Diagnostics;
@@ -221,7 +221,7 @@ impl Query {
     }
 
     pub fn link(mut self, grammar: &Grammar) -> GrammarBoundQuery {
-        let mut output = link::GrammarBinding::default();
+        let mut output = link::GrammarBindingBuilder::new();
         let parsed = &mut self.parsed;
 
         link::GrammarLinkCtx {
@@ -235,7 +235,7 @@ impl Query {
 
         GrammarBoundQuery {
             analyzed: self,
-            grammar: output,
+            grammar: output.finish(),
         }
     }
 }
@@ -288,12 +288,8 @@ impl GrammarBoundQuery {
         self.analyzed.arity(node)
     }
 
-    pub fn node_kind_ids(&self) -> &IndexMap<NodeKind<Symbol>, NodeKindId> {
-        self.grammar.node_kind_ids()
-    }
-
-    pub fn node_field_ids(&self) -> &IndexMap<Symbol, NodeFieldId> {
-        self.grammar.node_field_ids()
+    pub fn grammar(&self) -> &link::GrammarBinding {
+        &self.grammar
     }
 
     /// Emit bytecode. Returns `Err(EmitError::InvalidQuery)` if the query has errors.
@@ -359,8 +355,7 @@ impl GrammarBoundQuery {
             interner: self.interner(),
             type_ctx: self.type_context(),
             symbol_table: self.symbol_table(),
-            target_node_kinds: self.node_kind_ids(),
-            target_node_fields: self.node_field_ids(),
+            grammar: self.grammar(),
         };
         let mut ir = Compiler::build_ir(&ctx);
         crate::compile::verify::run_verified(
@@ -379,8 +374,7 @@ impl GrammarBoundQuery {
         EmitInput {
             interner: self.interner(),
             type_ctx: self.type_context(),
-            node_kind_ids: self.node_kind_ids(),
-            node_field_ids: self.node_field_ids(),
+            grammar: self.grammar(),
         }
     }
 

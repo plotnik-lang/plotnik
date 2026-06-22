@@ -1,7 +1,7 @@
 //! Core bytecode emission logic.
 
-use indexmap::IndexMap;
-use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
+use plotnik_compiler_core::GrammarBinding;
+use plotnik_core::{Interner, NodeKind};
 
 use crate::analyze::type_check::TypeContext;
 use crate::bytecode::{CompileResult, Label};
@@ -20,8 +20,7 @@ use super::type_table::TypeTableBuilder;
 pub struct EmitInput<'a> {
     pub interner: &'a Interner,
     pub type_ctx: &'a TypeContext,
-    pub node_kind_ids: &'a IndexMap<NodeKind<Symbol>, NodeKindId>,
-    pub node_field_ids: &'a IndexMap<Symbol, NodeFieldId>,
+    pub grammar: &'a GrammarBinding,
 }
 
 /// Emit bytecode without the debug load self-check. Used by callers that load
@@ -34,8 +33,7 @@ pub fn emit_unchecked(
     let EmitInput {
         interner,
         type_ctx,
-        node_kind_ids,
-        node_field_ids,
+        grammar,
     } = input;
 
     // Every emitted effect's member ref names a type reachable from an entrypoint
@@ -58,16 +56,16 @@ pub fn emit_unchecked(
     }
 
     let mut node_kinds: Vec<NodeKindEntry> = Vec::new();
-    for (node_kind, &node_id) in node_kind_ids {
+    for (node_kind, node_id) in grammar.kind_entries() {
         let sym = match node_kind {
-            NodeKind::Named(sym) | NodeKind::Anonymous(sym) => *sym,
+            NodeKind::Named(sym) | NodeKind::Anonymous(sym) => sym,
         };
         let name = strings.get_or_intern(sym, interner)?;
         node_kinds.push(NodeKindEntry::new(node_id.get(), name));
     }
 
     let mut fields: Vec<FieldEntry> = Vec::new();
-    for (&sym, &field_id) in node_field_ids {
+    for (sym, field_id) in grammar.field_entries() {
         let name = strings.get_or_intern(sym, interner)?;
         fields.push(FieldEntry::new(field_id.get(), name));
     }
