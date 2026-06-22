@@ -1,7 +1,8 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-#[path = "../../plotnik-compiler/src/source/mod.rs"]
-pub mod source;
+pub mod source {
+    pub use plotnik_compiler_core::source::*;
+}
 #[path = "../../plotnik-compiler/src/diagnostics/mod.rs"]
 pub mod diagnostics;
 

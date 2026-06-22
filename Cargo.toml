@@ -5,6 +5,7 @@ members = [
     "crates/plotnik-cli",
     "crates/plotnik-compiler",
     "crates/plotnik-compiler-analyze",
+    "crates/plotnik-compiler-core",
     "crates/plotnik-compiler-diagnostics",
     "crates/plotnik-compiler-emit",
     "crates/plotnik-compiler-ir",
@@ -27,6 +28,7 @@ edition = "2024"
 plotnik-bytecode = { path = "crates/plotnik-bytecode", version = "0.3.3" }
 plotnik-compiler = { path = "crates/plotnik-compiler", version = "0.3.3" }
 plotnik-compiler-analyze = { path = "crates/plotnik-compiler-analyze", version = "0.3.3" }
+plotnik-compiler-core = { path = "crates/plotnik-compiler-core", version = "0.3.3" }
 plotnik-compiler-diagnostics = { path = "crates/plotnik-compiler-diagnostics", version = "0.3.3" }
 plotnik-compiler-emit = { path = "crates/plotnik-compiler-emit", version = "0.3.3" }
 plotnik-compiler-ir = { path = "crates/plotnik-compiler-ir", version = "0.3.3" }

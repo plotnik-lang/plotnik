@@ -2008,11 +2008,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "plotnik-compiler-core"
+version = "0.3.3"
+dependencies = [
+ "plotnik-core",
+]
+
+[[package]]
 name = "plotnik-compiler-diagnostics"
 version = "0.3.3"
 dependencies = [
  "annotate-snippets",
  "insta",
+ "plotnik-compiler-core",
  "rowan",
  "serde",
  "serde_json",
