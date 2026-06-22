@@ -14,7 +14,6 @@ plotnik-bytecode.workspace = true
 plotnik-compiler-core.workspace = true
 plotnik-compiler-analyze-names.workspace = true
 plotnik-compiler-analyze-types.workspace = true
-plotnik-compiler-ir.workspace = true
 plotnik-compiler-parse.workspace = true
 plotnik-core.workspace = true
 indexmap = "2"

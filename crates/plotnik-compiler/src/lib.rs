@@ -118,7 +118,7 @@ pub mod emit {
     pub use plotnik_compiler_emit_types::TypeTableBuilder;
 }
 #[cfg(not(test))]
-pub use plotnik_compiler_ir as bytecode;
+pub use plotnik_compiler_core::ir as bytecode;
 #[cfg(not(test))]
 pub use plotnik_compiler_parse as parser;
 #[cfg(not(test))]

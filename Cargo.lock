@@ -1989,7 +1989,6 @@ dependencies = [
  "plotnik-compiler-emit-regex",
  "plotnik-compiler-emit-strings",
  "plotnik-compiler-emit-types",
- "plotnik-compiler-ir",
  "plotnik-compiler-lower-dead",
  "plotnik-compiler-lower-epsilon",
  "plotnik-compiler-lower-nav",
@@ -2103,10 +2102,10 @@ name = "plotnik-compiler-emit-instructions"
 version = "0.3.3"
 dependencies = [
  "plotnik-bytecode",
+ "plotnik-compiler-core",
  "plotnik-compiler-emit-regex",
  "plotnik-compiler-emit-strings",
  "plotnik-compiler-emit-types",
- "plotnik-compiler-ir",
 ]
 
 [[package]]
@@ -2114,7 +2113,7 @@ name = "plotnik-compiler-emit-layout"
 version = "0.3.3"
 dependencies = [
  "plotnik-bytecode",
- "plotnik-compiler-ir",
+ "plotnik-compiler-core",
 ]
 
 [[package]]
@@ -2131,7 +2130,6 @@ dependencies = [
  "plotnik-compiler-emit-regex",
  "plotnik-compiler-emit-strings",
  "plotnik-compiler-emit-types",
- "plotnik-compiler-ir",
  "plotnik-core",
 ]
 
@@ -2163,22 +2161,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "plotnik-compiler-ir"
-version = "0.3.3"
-dependencies = [
- "indexmap",
- "plotnik-bytecode",
- "plotnik-compiler-core",
-]
-
-[[package]]
 name = "plotnik-compiler-lower-dead"
 version = "0.3.3"
 dependencies = [
  "indexmap",
  "plotnik-bytecode",
  "plotnik-compiler-analyze-types",
- "plotnik-compiler-ir",
+ "plotnik-compiler-core",
  "plotnik-compiler-lower-thompson",
 ]
 
@@ -2189,7 +2178,7 @@ dependencies = [
  "indexmap",
  "plotnik-bytecode",
  "plotnik-compiler-analyze-types",
- "plotnik-compiler-ir",
+ "plotnik-compiler-core",
  "plotnik-compiler-lower-thompson",
 ]
 
@@ -2198,7 +2187,7 @@ name = "plotnik-compiler-lower-nav"
 version = "0.3.3"
 dependencies = [
  "plotnik-bytecode",
- "plotnik-compiler-ir",
+ "plotnik-compiler-core",
  "plotnik-compiler-lower-thompson",
 ]
 
@@ -2207,7 +2196,7 @@ name = "plotnik-compiler-lower-pack"
 version = "0.3.3"
 dependencies = [
  "plotnik-bytecode",
- "plotnik-compiler-ir",
+ "plotnik-compiler-core",
  "plotnik-compiler-lower-thompson",
 ]
 
@@ -2220,7 +2209,6 @@ dependencies = [
  "plotnik-compiler-analyze-names",
  "plotnik-compiler-analyze-types",
  "plotnik-compiler-core",
- "plotnik-compiler-ir",
  "plotnik-compiler-parse",
  "plotnik-core",
 ]

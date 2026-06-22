@@ -1,7 +1,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod bytecode {
-    pub use plotnik_compiler_ir::*;
+    pub use plotnik_compiler_core::ir::*;
 }
 
 pub mod compile;

@@ -11,4 +11,4 @@ workspace = true
 
 [dependencies]
 plotnik-bytecode.workspace = true
-plotnik-compiler-ir.workspace = true
+plotnik-compiler-core.workspace = true

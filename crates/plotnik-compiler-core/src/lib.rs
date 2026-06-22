@@ -3,6 +3,7 @@
 pub mod ast;
 pub mod cst;
 pub mod grammar_binding;
+pub mod ir;
 pub mod located;
 pub mod source;
 pub mod span;
@@ -10,6 +11,8 @@ pub mod symbol_table;
 
 #[cfg(test)]
 mod cst_tests;
+#[cfg(test)]
+mod ir_tests;
 
 pub use ast::{
     AltKind, Anchor, Branch, CapturedPattern, Def, EnumPattern, FieldPattern, NegatedField,

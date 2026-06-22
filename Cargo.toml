@@ -17,7 +17,6 @@ members = [
     "crates/plotnik-compiler-emit-regex",
     "crates/plotnik-compiler-emit-strings",
     "crates/plotnik-compiler-emit-types",
-    "crates/plotnik-compiler-ir",
     "crates/plotnik-compiler-lower-dead",
     "crates/plotnik-compiler-lower-epsilon",
     "crates/plotnik-compiler-lower-nav",
@@ -52,7 +51,6 @@ plotnik-compiler-emit-module = { path = "crates/plotnik-compiler-emit-module", v
 plotnik-compiler-emit-regex = { path = "crates/plotnik-compiler-emit-regex", version = "0.3.3" }
 plotnik-compiler-emit-strings = { path = "crates/plotnik-compiler-emit-strings", version = "0.3.3" }
 plotnik-compiler-emit-types = { path = "crates/plotnik-compiler-emit-types", version = "0.3.3" }
-plotnik-compiler-ir = { path = "crates/plotnik-compiler-ir", version = "0.3.3" }
 plotnik-compiler-lower-dead = { path = "crates/plotnik-compiler-lower-dead", version = "0.3.3" }
 plotnik-compiler-lower-epsilon = { path = "crates/plotnik-compiler-lower-epsilon", version = "0.3.3" }
 plotnik-compiler-lower-nav = { path = "crates/plotnik-compiler-lower-nav", version = "0.3.3" }
