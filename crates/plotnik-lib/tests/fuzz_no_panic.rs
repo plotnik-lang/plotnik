@@ -7,7 +7,8 @@
 //!      and formatting the result — never panics or overflows the native stack.
 //!
 //! The query side of (2) is covered by a fixed set of diverse templates
-//! (recursive, alternation, quantifier, fields) rather than fuzzed query text,
+//! (recursive, alternation, quantifier, fields, suppressive capture) rather than
+//! fuzzed query text,
 //! because randomly generated queries almost never compile; the *source* is
 //! fuzzed, including deep nests that exercise the iterative backtrack/output
 //! paths. Runs use the default (auto) limits, so every case terminates.
@@ -28,7 +29,8 @@ use plotnik_lib::{Colors, QueryBuilder, SourceMap, VM, materialize_verified};
 
 /// Queries known to compile, spanning the shapes whose runtime paths matter:
 /// a root match, a leaf match, an alternation, a scalar quantifier, a row
-/// quantifier, and a self-recursive definition.
+/// quantifier, a self-recursive definition, and a recursive suppressive capture
+/// (the `@_` SuppressBegin/skip/SuppressEnd path).
 const TEMPLATES: &[&str] = &[
     "Q = (program) @p",
     "Q = (identifier) @id",
@@ -36,6 +38,7 @@ const TEMPLATES: &[&str] = &[
     "Q = (program (_)* @items)",
     "Q = (program (expression_statement (_) @stmt)* @rows)",
     "Rec = [Leaf: (statement_block) Deep: (unary_expression (Rec))]\nTop = (program (Rec))",
+    "Sup = [Deep: (unary_expression argument: (Sup) @_) Leaf: (identifier) @_]\nSupTop = (program (expression_statement (Sup)))",
 ];
 
 fn javascript_grammar() -> &'static Grammar {

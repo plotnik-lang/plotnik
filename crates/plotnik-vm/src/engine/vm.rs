@@ -62,9 +62,14 @@ pub struct VM<'t> {
     pub(crate) recursion_depth: u32,
     pub(crate) limits: ResolvedRuntimeLimits,
 
-    /// Suppression depth counter. When > 0, effects are suppressed (not emitted to log).
-    /// Incremented by SuppressBegin, decremented by SuppressEnd.
-    pub(crate) suppress_depth: u16,
+    /// Suppression nesting on the active match path: when `> 0`, effects are
+    /// suppressed (not emitted to the log). `SuppressBegin` increments,
+    /// `SuppressEnd` decrements. Each open scope lives inside an active call frame,
+    /// so it is bounded by call-nesting depth (`recursion_depth`) times a per-query
+    /// constant — and call depth is itself capped by the `u32`-indexed frame arena.
+    /// A `u16` was far too narrow (deep `@_` recursion overflowed it at 65_536);
+    /// `u64` cannot overflow before the frame arena does.
+    pub(crate) suppress_depth: u64,
 
     /// Target address for Trampoline instruction.
     /// Set from entrypoint before execution; Trampoline jumps to this address.
