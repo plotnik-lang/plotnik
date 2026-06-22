@@ -13,8 +13,6 @@ One rule, two sides of a trust boundary — where untrusted input becomes truste
 
 Validate once, at the boundary. Two smells to fix on sight: a swallowed must-hold fact (`unwrap_or`, `.ok()`) → make it loud; a `panic!` on untrusted input → make it a clean error.
 
-A subtler outside-the-boundary failure is a *native-stack overflow* or *unbounded heap* on untrusted input — an abort, not a clean error. So: a resource-limit or stack-safety change must enumerate **every** native-recursive path, **every** unbounded heap, and **every** input-scaling integer counter or state index the pipeline owns — execution, output formatting, serialization, verification, CLI tree walks — and show each is iterative, bounded, or wide enough that input size cannot overflow it, before claiming the class is closed. (A counter is the subtle one: a `u16` nesting depth overflows on valid input at 65_536 — debug panic, release wrap — long before any heap or step ceiling trips.) A property test (`fuzz_no_panic`) is a probabilistic safety net for the thesis — arbitrary query × source ⇒ always a `Result`, never a panic or abort — backstopping the deterministic depth proof in `stack_safety`, not standing in for the enumeration above.
-
 # Documentation
 
 [docs/README.md](docs/README.md) | [CLI Guide](docs/cli.md) | [Language Reference](docs/lang-reference.md) | [Type System](docs/type-system.md) | [Runtime Engine](docs/runtime-engine.md) | [Tree Navigation](docs/tree-navigation.md) | [Binary Format](docs/binary-format/01-overview.md)
