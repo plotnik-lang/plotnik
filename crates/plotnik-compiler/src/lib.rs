@@ -61,14 +61,14 @@ pub mod analyze {
     pub use dependencies::{DependencyAnalysis, analyze_dependencies};
     pub use link::GrammarBinding;
     pub use plotnik_compiler_analyze_grammar::GrammarLinkCtx;
-    pub use plotnik_compiler_analyze_names::{SymbolTable, UNNAMED_DEF, resolve_names};
+    pub use plotnik_compiler_analyze_names::{SymbolTable, resolve_names};
     pub use plotnik_compiler_analyze_refs::validate_recursion;
     pub use plotnik_compiler_analyze_shape::Located;
     pub use plotnik_compiler_analyze_shape::validation::{
         validate_alt_kinds, validate_anchors, validate_empty_constructs, validate_predicates,
     };
     pub use plotnik_compiler_analyze_types::{
-        TypeContext, infer_types, primary_def_name, validate_entrypoints,
+        TypeContext, infer_types, validate_entrypoints,
     };
 }
 #[cfg(not(test))]

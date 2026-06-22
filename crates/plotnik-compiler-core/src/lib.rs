@@ -23,7 +23,7 @@ pub use located::Located;
 pub use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 pub use source::{Source, SourceId, SourceKind, SourceMap};
 pub use span::Span;
-pub use symbol_table::{SymbolTable, UNNAMED_DEF};
+pub use symbol_table::SymbolTable;
 
 /// A lightweight handle to a named query definition.
 ///

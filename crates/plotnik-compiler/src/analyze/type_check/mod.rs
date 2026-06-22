@@ -27,7 +27,7 @@ pub use types::{
 pub use unify::{UnifyError, unify_flow, unify_flows};
 
 use crate::analyze::dependencies::DependencyAnalysis;
-use crate::analyze::symbol_table::{SymbolTable, UNNAMED_DEF};
+use crate::analyze::symbol_table::SymbolTable;
 use crate::diagnostics::Diagnostics;
 
 /// Run type inference on all definitions.
@@ -47,15 +47,4 @@ pub fn infer_types(
         diag,
     };
     infer::InferencePass::new(analysis).run()
-}
-
-/// Get the primary definition name (first non-underscore, or underscore if none).
-pub fn primary_def_name(symbol_table: &SymbolTable) -> &str {
-    for name in symbol_table.names() {
-        if name != UNNAMED_DEF {
-            return name;
-        }
-    }
-
-    UNNAMED_DEF
 }

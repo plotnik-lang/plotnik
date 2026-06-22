@@ -6,12 +6,8 @@ use crate::ast;
 use crate::located::Located;
 use crate::source::SourceId;
 
-/// Sentinel name for unnamed definitions (bare expressions at root level).
-/// Code generators can emit whatever name they want for this.
-pub const UNNAMED_DEF: &str = "_";
-
-/// Name-resolution registry: every named definition (plus the `_` root) bound to
-/// its body AST and the source file that defines it.
+/// Name-resolution registry: every named definition bound to its body AST and the
+/// source file that defines it.
 ///
 /// Immutable once analysis produces it; the name-resolution pass builds one
 /// through its `SymbolTableBuilder`.

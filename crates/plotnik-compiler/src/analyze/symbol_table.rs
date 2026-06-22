@@ -18,7 +18,7 @@ use super::validation::ValidatedAst;
 use super::visitor::Visitor;
 use crate::source::SourceId;
 
-pub use plotnik_compiler_core::{SymbolTable, UNNAMED_DEF};
+pub use plotnik_compiler_core::SymbolTable;
 
 /// Mutable accumulator for a [`SymbolTable`], owned by the name-resolution pass.
 #[derive(Default)]
@@ -43,12 +43,6 @@ impl SymbolTableBuilder {
         self.table.insert(name.to_owned(), pattern);
         self.files.insert(name.to_owned(), source_id);
         is_new
-    }
-
-    pub fn remove(&mut self, name: &str) -> Option<(SourceId, ast::Pattern)> {
-        let pattern = self.table.shift_remove(name)?;
-        let source_id = self.files.shift_remove(name)?;
-        Some((source_id, pattern))
     }
 
     /// Freeze the accumulated definitions into an immutable [`SymbolTable`].
@@ -92,23 +86,18 @@ struct ReferenceResolver<'q, 'd, 'a> {
 impl Visitor for ReferenceResolver<'_, '_, '_> {
     fn visit_def(&mut self, def: &Located<ast::Def>) {
         let Some(body) = def.node().body() else { return };
+        // A nameless def is a parser-level error (MissingDefName); there is no name
+        // to resolve, so it never enters the table.
+        let Some(token) = def.node().name() else { return };
 
-        if let Some(token) = def.node().name() {
-            let name = token_src(&token, self.src);
-            if self.builder.contains(name) {
-                self.diag
-                    .report(def.source(), DiagnosticKind::DuplicateDefinition, token.text_range())
-                    .detail(name)
-                    .emit();
-            } else {
-                self.builder.insert(name, def.source(), body);
-            }
+        let name = token_src(&token, self.src);
+        if self.builder.contains(name) {
+            self.diag
+                .report(def.source(), DiagnosticKind::DuplicateDefinition, token.text_range())
+                .detail(name)
+                .emit();
         } else {
-            // Parser already validates multiple unnamed defs; we keep the last one.
-            if self.builder.contains(UNNAMED_DEF) {
-                self.builder.remove(UNNAMED_DEF);
-            }
-            self.builder.insert(UNNAMED_DEF, def.source(), body);
+            self.builder.insert(name, def.source(), body);
         }
     }
 }

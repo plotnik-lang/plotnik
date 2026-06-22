@@ -10,4 +10,4 @@ pub mod visitor {
 pub mod symbol_table;
 
 pub use plotnik_compiler_analyze_shape::Located;
-pub use symbol_table::{SymbolTable, UNNAMED_DEF, resolve_names};
+pub use symbol_table::{SymbolTable, resolve_names};
