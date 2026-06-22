@@ -42,21 +42,7 @@ pub struct AstValidationInput<'q, 'd> {
     pub diag: &'d mut Diagnostics,
 }
 
-/// Validated AST bundle admitted past the semantic validation boundary.
-pub struct ValidatedAst<'q> {
-    source_map: &'q SourceMap,
-    ast_map: &'q IndexMap<SourceId, Root>,
-}
-
-impl<'q> ValidatedAst<'q> {
-    pub fn source_map(&self) -> &'q SourceMap {
-        self.source_map
-    }
-
-    pub fn ast_map(&self) -> &'q IndexMap<SourceId, Root> {
-        self.ast_map
-    }
-}
+pub use plotnik_compiler_core::ValidatedAst;
 
 pub fn validate_ast<'q>(input: AstValidationInput<'q, '_>) -> ValidatedAst<'q> {
     for source in input.source_map.iter() {
@@ -87,10 +73,7 @@ pub fn validate_ast<'q>(input: AstValidationInput<'q, '_>) -> ValidatedAst<'q> {
         });
     }
 
-    ValidatedAst {
-        source_map: input.source_map,
-        ast_map: input.ast_map,
-    }
+    ValidatedAst::new(input.source_map, input.ast_map)
 }
 
 pub use alt_kinds::validate_alt_kinds;

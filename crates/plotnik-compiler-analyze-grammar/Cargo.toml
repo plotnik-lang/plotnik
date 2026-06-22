@@ -14,7 +14,6 @@ plotnik-compiler-core.workspace = true
 plotnik-compiler-diagnostics.workspace = true
 plotnik-compiler-parse.workspace = true
 plotnik-compiler-analyze-names.workspace = true
-plotnik-compiler-analyze-shape.workspace = true
 plotnik-core.workspace = true
 indexmap = "2"
 rowan = "0.16.1"

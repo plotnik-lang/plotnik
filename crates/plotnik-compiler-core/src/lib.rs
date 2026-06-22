@@ -8,6 +8,8 @@ pub mod located;
 pub mod source;
 pub mod span;
 pub mod symbol_table;
+pub mod validated_ast;
+pub mod visitor;
 
 #[cfg(test)]
 mod cst_tests;
@@ -27,6 +29,7 @@ pub use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 pub use source::{Source, SourceId, SourceKind, SourceMap};
 pub use span::Span;
 pub use symbol_table::SymbolTable;
+pub use validated_ast::ValidatedAst;
 
 /// A lightweight handle to a named query definition.
 ///

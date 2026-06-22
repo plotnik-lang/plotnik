@@ -13,5 +13,4 @@ workspace = true
 plotnik-compiler-core.workspace = true
 plotnik-compiler-diagnostics.workspace = true
 plotnik-compiler-parse.workspace = true
-plotnik-compiler-analyze-shape.workspace = true
 indexmap = "2"

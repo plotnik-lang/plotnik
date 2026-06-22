@@ -8,8 +8,8 @@ pub mod symbol_table {
 }
 
 pub mod visitor {
-    pub use plotnik_compiler_analyze_shape::visitor::*;
+    pub use plotnik_compiler_core::visitor::*;
 }
 
 pub use link::{GrammarBinding, GrammarBindingBuilder, GrammarLinkCtx};
-pub use plotnik_compiler_analyze_shape::Located;
+pub use plotnik_compiler_core::Located;

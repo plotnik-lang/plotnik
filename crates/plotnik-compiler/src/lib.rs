@@ -55,7 +55,7 @@ pub mod analyze {
     }
 
     pub mod visitor {
-        pub use plotnik_compiler_analyze_shape::visitor::*;
+        pub use plotnik_compiler_core::visitor::*;
     }
 
     pub use dependencies::{DependencyAnalysis, analyze_dependencies};
@@ -63,7 +63,7 @@ pub mod analyze {
     pub use plotnik_compiler_analyze_grammar::GrammarLinkCtx;
     pub use plotnik_compiler_analyze_names::{SymbolTable, resolve_names};
     pub use plotnik_compiler_analyze_refs::validate_recursion;
-    pub use plotnik_compiler_analyze_shape::Located;
+    pub use plotnik_compiler_core::Located;
     pub use plotnik_compiler_analyze_shape::validation::{
         validate_alt_kinds, validate_anchors, validate_empty_constructs, validate_predicates,
     };

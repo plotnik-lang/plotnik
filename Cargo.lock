@@ -2012,7 +2012,6 @@ version = "0.3.3"
 dependencies = [
  "indexmap",
  "plotnik-compiler-analyze-names",
- "plotnik-compiler-analyze-shape",
  "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
  "plotnik-compiler-parse",
@@ -2025,7 +2024,6 @@ name = "plotnik-compiler-analyze-names"
 version = "0.3.3"
 dependencies = [
  "indexmap",
- "plotnik-compiler-analyze-shape",
  "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
  "plotnik-compiler-parse",
@@ -2037,7 +2035,6 @@ version = "0.3.3"
 dependencies = [
  "indexmap",
  "plotnik-compiler-analyze-names",
- "plotnik-compiler-analyze-shape",
  "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
  "plotnik-compiler-parse",
@@ -2065,7 +2062,6 @@ dependencies = [
  "plotnik-bytecode",
  "plotnik-compiler-analyze-names",
  "plotnik-compiler-analyze-refs",
- "plotnik-compiler-analyze-shape",
  "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
  "plotnik-compiler-parse",

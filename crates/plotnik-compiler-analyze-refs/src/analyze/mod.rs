@@ -14,9 +14,9 @@ pub mod type_check {
 }
 
 pub mod visitor {
-    pub use plotnik_compiler_analyze_shape::visitor::*;
+    pub use plotnik_compiler_core::visitor::*;
 }
 
 pub use dependencies::{DependencyAnalysis, analyze_dependencies};
-pub use plotnik_compiler_analyze_shape::Located;
+pub use plotnik_compiler_core::Located;
 pub use recursion::validate_recursion;
