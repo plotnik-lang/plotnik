@@ -6,9 +6,12 @@
 //! - Empty constructs (empty_constructs)
 //! - Predicate regex patterns (predicates)
 
+use indexmap::IndexMap;
+
 use crate::SourceId;
 use crate::diagnostics::Diagnostics;
 use crate::parser::Root;
+use crate::source::SourceMap;
 
 pub mod alt_kinds;
 pub mod anchors;
@@ -30,6 +33,64 @@ pub struct PredicateInput<'q, 'd> {
     pub ast: &'q Root,
     pub source_content: &'q str,
     pub diag: &'d mut Diagnostics,
+}
+
+/// Inputs for the whole AST validation stage.
+pub struct AstValidationInput<'q, 'd> {
+    pub source_map: &'q SourceMap,
+    pub ast_map: &'q IndexMap<SourceId, Root>,
+    pub diag: &'d mut Diagnostics,
+}
+
+/// Validated AST bundle admitted past the semantic validation boundary.
+pub struct ValidatedAst<'q> {
+    source_map: &'q SourceMap,
+    ast_map: &'q IndexMap<SourceId, Root>,
+}
+
+impl<'q> ValidatedAst<'q> {
+    pub fn source_map(&self) -> &'q SourceMap {
+        self.source_map
+    }
+
+    pub fn ast_map(&self) -> &'q IndexMap<SourceId, Root> {
+        self.ast_map
+    }
+}
+
+pub fn validate_ast<'q>(input: AstValidationInput<'q, '_>) -> ValidatedAst<'q> {
+    for source in input.source_map.iter() {
+        let ast = input
+            .ast_map
+            .get(&source.id)
+            .expect("parsed source must have an AST");
+        validate_alt_kinds(ValidationInput {
+            source_id: source.id,
+            ast,
+            diag: &mut *input.diag,
+        });
+        validate_anchors(ValidationInput {
+            source_id: source.id,
+            ast,
+            diag: &mut *input.diag,
+        });
+        validate_empty_constructs(ValidationInput {
+            source_id: source.id,
+            ast,
+            diag: &mut *input.diag,
+        });
+        validate_predicates(PredicateInput {
+            source_id: source.id,
+            ast,
+            source_content: source.content,
+            diag: &mut *input.diag,
+        });
+    }
+
+    ValidatedAst {
+        source_map: input.source_map,
+        ast_map: input.ast_map,
+    }
 }
 
 pub use alt_kinds::validate_alt_kinds;

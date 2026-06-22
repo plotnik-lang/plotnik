@@ -8,11 +8,12 @@ use indexmap::IndexMap;
 
 use crate::Diagnostics;
 use crate::diagnostics::DiagnosticKind;
-use crate::parser::{Root, ast, token_src};
+use crate::parser::{ast, token_src};
 
 use super::Located;
+use super::validation::ValidatedAst;
 use super::visitor::Visitor;
-use crate::source::{SourceId, SourceMap};
+use crate::source::SourceId;
 
 /// Sentinel name for unnamed definitions (bare expressions at root level).
 /// Code generators can emit whatever name they want for this.
@@ -106,15 +107,11 @@ impl SymbolTable {
     }
 }
 
-pub fn resolve_names(
-    source_map: &SourceMap,
-    ast_map: &IndexMap<SourceId, Root>,
-    diag: &mut Diagnostics,
-) -> SymbolTable {
+pub fn resolve_names(validated: &ValidatedAst<'_>, diag: &mut Diagnostics) -> SymbolTable {
     let mut symbol_table = SymbolTable::new();
 
-    for (&source_id, ast) in ast_map {
-        let src = source_map.content(source_id);
+    for (&source_id, ast) in validated.ast_map() {
+        let src = validated.source_map().content(source_id);
         let mut resolver = ReferenceResolver {
             src,
             diag: &mut *diag,
@@ -123,7 +120,7 @@ pub fn resolve_names(
         resolver.visit(&Located::new(source_id, ast.clone()));
     }
 
-    for (&source_id, ast) in ast_map {
+    for (&source_id, ast) in validated.ast_map() {
         let mut validator = ReferenceValidator {
             diag: &mut *diag,
             symbol_table: &symbol_table,

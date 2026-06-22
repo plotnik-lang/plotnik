@@ -9,10 +9,7 @@ use crate::Diagnostics;
 use crate::analyze::link;
 use crate::analyze::symbol_table::{SymbolTable, resolve_names};
 use crate::analyze::type_check::{self, Arity, TypeContext};
-use crate::analyze::validation::{
-    PredicateInput, ValidationInput, validate_alt_kinds, validate_anchors,
-    validate_empty_constructs, validate_predicates,
-};
+use crate::analyze::validation::{AstValidationInput, validate_ast};
 use crate::analyze::{dependencies, validate_entrypoints, validate_recursion};
 use crate::compile::{CompileCtx, Compiler};
 use crate::diagnostics::DiagnosticKind;
@@ -106,27 +103,36 @@ impl QueryParsed {
     pub fn analyze(mut self) -> Query {
         let mut interner = Interner::new();
 
-        self.validate();
+        let (symbol_table, type_context) = {
+            let validated = validate_ast(AstValidationInput {
+                source_map: &self.source_map,
+                ast_map: &self.ast_map,
+                diag: &mut self.diag,
+            });
 
-        let symbol_table = resolve_names(&self.source_map, &self.ast_map, &mut self.diag);
+            let symbol_table = resolve_names(&validated, &mut self.diag);
 
-        let dependency_analysis = dependencies::analyze_dependencies(&symbol_table, &mut interner);
-        validate_recursion(
-            &dependency_analysis,
-            &self.ast_map,
-            &symbol_table,
-            &mut self.diag,
-        );
+            let dependency_analysis =
+                dependencies::analyze_dependencies(&symbol_table, &mut interner);
+            validate_recursion(
+                &dependency_analysis,
+                validated.ast_map(),
+                &symbol_table,
+                &mut self.diag,
+            );
 
-        let type_context = type_check::infer_types(
-            &mut interner,
-            &symbol_table,
-            &dependency_analysis,
-            &mut self.diag,
-        );
-        if !self.diag.has_errors() {
-            validate_entrypoints(&self.ast_map, &interner, &type_context, &mut self.diag);
-        }
+            let type_context = type_check::infer_types(
+                &mut interner,
+                &symbol_table,
+                &dependency_analysis,
+                &mut self.diag,
+            );
+            if !self.diag.has_errors() {
+                validate_entrypoints(validated.ast_map(), &interner, &type_context, &mut self.diag);
+            }
+
+            (symbol_table, type_context)
+        };
 
         Query {
             parsed: self,
@@ -148,35 +154,6 @@ impl QueryParsed {
         &self.ast_map
     }
 
-    fn validate(&mut self) {
-        for source in self.source_map.iter() {
-            let ast = self
-                .ast_map
-                .get(&source.id)
-                .expect("parsed source must have an AST");
-            validate_alt_kinds(ValidationInput {
-                source_id: source.id,
-                ast,
-                diag: &mut self.diag,
-            });
-            validate_anchors(ValidationInput {
-                source_id: source.id,
-                ast,
-                diag: &mut self.diag,
-            });
-            validate_empty_constructs(ValidationInput {
-                source_id: source.id,
-                ast,
-                diag: &mut self.diag,
-            });
-            validate_predicates(PredicateInput {
-                source_id: source.id,
-                ast,
-                source_content: source.content,
-                diag: &mut self.diag,
-            });
-        }
-    }
 }
 
 pub struct Query {
