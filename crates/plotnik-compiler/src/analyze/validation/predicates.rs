@@ -6,6 +6,7 @@
 //! - Named captures (`(?P<name>...)`)
 
 use regex_syntax::ast::{self, Ast, GroupKind, Visitor as RegexVisitor, visit};
+use regex_syntax::hir;
 use rowan::TextRange;
 
 use super::PredicateInput;
@@ -41,7 +42,11 @@ impl Visitor for PredicateValidator<'_, '_> {
             && op.is_regex_op()
             && let Some(regex) = pred.regex()
         {
-            self.validate_regex(node.source(), regex.pattern(self.source), regex.text_range());
+            self.validate_regex(
+                node.source(),
+                regex.pattern(self.source),
+                regex.text_range(),
+            );
         }
         walk_node_pattern(self, node);
     }
@@ -67,9 +72,10 @@ impl PredicateValidator<'_, '_> {
             Err(e) => {
                 let span = self.map_regex_span(e.span(), regex_range);
                 let report = match e.kind() {
-                    ast::ErrorKind::UnsupportedBackreference => self
-                        .diag
-                        .report(source_id, DiagnosticKind::RegexBackreference, span),
+                    ast::ErrorKind::UnsupportedBackreference => {
+                        self.diag
+                            .report(source_id, DiagnosticKind::RegexBackreference, span)
+                    }
                     ast::ErrorKind::UnsupportedLookAround => {
                         // Skip the opening `(` - point at `?=` / `?!` / `?<=` / `?<!`
                         use rowan::TextSize;
@@ -102,6 +108,27 @@ impl PredicateValidator<'_, '_> {
                 .fix("remove the named-capture marker", "")
                 .emit();
         }
+
+        self.validate_hir(source_id, pattern, &parsed_ast, regex_range);
+    }
+
+    fn validate_hir(
+        &mut self,
+        source_id: SourceId,
+        pattern: &str,
+        parsed_ast: &Ast,
+        regex_range: TextRange,
+    ) {
+        let mut translator = hir::translate::TranslatorBuilder::new().build();
+        let Err(error) = translator.translate(pattern, parsed_ast) else {
+            return;
+        };
+
+        let span = self.map_regex_span(error.span(), regex_range);
+        self.diag
+            .report(source_id, DiagnosticKind::RegexSyntaxError, span)
+            .detail(error.kind().to_string())
+            .emit();
     }
 
     fn map_regex_span(&self, regex_span: &ast::Span, regex_range: TextRange) -> TextRange {

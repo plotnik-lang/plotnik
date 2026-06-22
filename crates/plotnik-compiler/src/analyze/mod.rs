@@ -8,6 +8,7 @@
 //! - Semantic validation (validation)
 
 pub mod dependencies;
+mod entrypoints;
 mod invariants;
 pub mod link;
 mod located;
@@ -25,6 +26,7 @@ mod link_tests;
 mod refs_tests;
 
 pub use dependencies::DependencyAnalysis;
+pub use entrypoints::validate_entrypoints;
 pub use link::GrammarBinding;
 pub(crate) use located::Located;
 pub use recursion::validate_recursion;

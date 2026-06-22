@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod test_helpers {
-    use crate::Query;
+    use crate::query::{GrammarBoundQuery, Query};
 
     impl Query {
         pub fn dump_cst(&self) -> String {
@@ -29,6 +29,16 @@ mod test_helpers {
             self.printer().definitions_only(true).dump()
         }
 
+        pub fn dump_diagnostics(&self) -> String {
+            self.diagnostics().render(self.source_map())
+        }
+
+        pub fn dump_diagnostics_raw(&self) -> String {
+            self.diagnostics().render_raw(self.source_map())
+        }
+    }
+
+    impl GrammarBoundQuery {
         pub fn dump_diagnostics(&self) -> String {
             self.diagnostics().render(self.source_map())
         }

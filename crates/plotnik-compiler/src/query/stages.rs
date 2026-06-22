@@ -1,6 +1,3 @@
-use std::collections::HashSet;
-use std::ops::{Deref, DerefMut};
-
 use indexmap::IndexMap;
 use rowan::TextRange;
 
@@ -9,16 +6,16 @@ use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 
 use super::{SourceId, SourceMap};
 use crate::Diagnostics;
-use crate::diagnostics::DiagnosticKind;
 use crate::analyze::link;
 use crate::analyze::symbol_table::{SymbolTable, resolve_names};
 use crate::analyze::type_check::{self, Arity, TypeContext};
 use crate::analyze::validation::{
-    PredicateInput, ValidationInput, validate_alt_kinds, validate_anchors, validate_empty_constructs,
-    validate_predicates,
+    PredicateInput, ValidationInput, validate_alt_kinds, validate_anchors,
+    validate_empty_constructs, validate_predicates,
 };
-use crate::analyze::{dependencies, validate_recursion};
+use crate::analyze::{dependencies, validate_entrypoints, validate_recursion};
 use crate::compile::{CompileCtx, Compiler};
+use crate::diagnostics::DiagnosticKind;
 use crate::emit::EmitInput;
 use crate::parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser, Root, SyntaxNode, lex};
 
@@ -78,28 +75,6 @@ impl QueryBuilder {
             );
 
             let res = parser.parse()?;
-
-            validate_alt_kinds(ValidationInput {
-                source_id: source.id,
-                ast: res.ast(),
-                diag: &mut diag,
-            });
-            validate_anchors(ValidationInput {
-                source_id: source.id,
-                ast: res.ast(),
-                diag: &mut diag,
-            });
-            validate_empty_constructs(ValidationInput {
-                source_id: source.id,
-                ast: res.ast(),
-                diag: &mut diag,
-            });
-            validate_predicates(PredicateInput {
-                source_id: source.id,
-                ast: res.ast(),
-                source_content: source.content,
-                diag: &mut diag,
-            });
             total_fuel_consumed = total_fuel_consumed.saturating_add(res.fuel_consumed());
             ast.insert(source.id, res.into_ast());
         }
@@ -131,6 +106,8 @@ impl QueryParsed {
     pub fn analyze(mut self) -> Query {
         let mut interner = Interner::new();
 
+        self.validate();
+
         let symbol_table = resolve_names(&self.source_map, &self.ast_map, &mut self.diag);
 
         let dependency_analysis = dependencies::analyze_dependencies(&symbol_table, &mut interner);
@@ -147,6 +124,9 @@ impl QueryParsed {
             &dependency_analysis,
             &mut self.diag,
         );
+        if !self.diag.has_errors() {
+            validate_entrypoints(&self.ast_map, &interner, &type_context, &mut self.diag);
+        }
 
         Query {
             parsed: self,
@@ -167,6 +147,36 @@ impl QueryParsed {
     pub fn ast_map(&self) -> &AstMap {
         &self.ast_map
     }
+
+    fn validate(&mut self) {
+        for source in self.source_map.iter() {
+            let ast = self
+                .ast_map
+                .get(&source.id)
+                .expect("parsed source must have an AST");
+            validate_alt_kinds(ValidationInput {
+                source_id: source.id,
+                ast,
+                diag: &mut self.diag,
+            });
+            validate_anchors(ValidationInput {
+                source_id: source.id,
+                ast,
+                diag: &mut self.diag,
+            });
+            validate_empty_constructs(ValidationInput {
+                source_id: source.id,
+                ast,
+                diag: &mut self.diag,
+            });
+            validate_predicates(PredicateInput {
+                source_id: source.id,
+                ast,
+                source_content: source.content,
+                diag: &mut self.diag,
+            });
+        }
+    }
 }
 
 pub struct Query {
@@ -178,7 +188,7 @@ pub struct Query {
 
 impl Query {
     pub fn is_valid(&self) -> bool {
-        !self.diag.has_errors()
+        !self.parsed.diag.has_errors()
     }
 
     pub fn arity(&self, node: &SyntaxNode) -> Option<Arity> {
@@ -219,36 +229,35 @@ impl Query {
         &self.interner
     }
 
+    pub fn source_map(&self) -> &SourceMap {
+        self.parsed.source_map()
+    }
+
+    pub fn diagnostics(&self) -> &Diagnostics {
+        self.parsed.diagnostics()
+    }
+
+    pub fn ast_map(&self) -> &AstMap {
+        self.parsed.ast_map()
+    }
+
     pub fn link(mut self, grammar: &Grammar) -> GrammarBoundQuery {
         let mut output = link::GrammarBinding::default();
+        let parsed = &mut self.parsed;
 
         link::GrammarLinkCtx {
             interner: &mut self.interner,
             grammar,
-            source_map: &self.parsed.source_map,
-            ast_map: &self.parsed.ast_map,
+            source_map: &parsed.source_map,
+            ast_map: &parsed.ast_map,
             symbol_table: &self.symbol_table,
         }
-        .link(&mut output, &mut self.parsed.diag);
+        .link(&mut output, &mut parsed.diag);
 
         GrammarBoundQuery {
             analyzed: self,
             grammar: output,
         }
-    }
-}
-
-impl Deref for Query {
-    type Target = QueryParsed;
-
-    fn deref(&self) -> &Self::Target {
-        &self.parsed
-    }
-}
-
-impl DerefMut for Query {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.parsed
     }
 }
 
@@ -268,8 +277,36 @@ pub struct GrammarBoundQuery {
 }
 
 impl GrammarBoundQuery {
+    pub fn is_valid(&self) -> bool {
+        self.analyzed.is_valid()
+    }
+
     pub fn interner(&self) -> &Interner {
         &self.analyzed.interner
+    }
+
+    pub fn type_context(&self) -> &TypeContext {
+        self.analyzed.type_context()
+    }
+
+    pub fn symbol_table(&self) -> &SymbolTable {
+        self.analyzed.symbol_table()
+    }
+
+    pub fn source_map(&self) -> &SourceMap {
+        self.analyzed.source_map()
+    }
+
+    pub fn diagnostics(&self) -> &Diagnostics {
+        self.analyzed.diagnostics()
+    }
+
+    pub fn ast_map(&self) -> &AstMap {
+        self.analyzed.ast_map()
+    }
+
+    pub fn arity(&self, node: &SyntaxNode) -> Option<Arity> {
+        self.analyzed.arity(node)
     }
 
     pub fn node_kind_ids(&self) -> &IndexMap<NodeKind<Symbol>, NodeKindId> {
@@ -325,7 +362,7 @@ impl GrammarBoundQuery {
         };
 
         match plotnik_bytecode::Module::load(&bytes) {
-            Ok(_) => self.report_value_less_defs(&mut diag),
+            Ok(_) => {}
             Err(err) => {
                 if let Some((source, range)) = self.fallback_span() {
                     diag.report(source, DiagnosticKind::BytecodeRejected, range)
@@ -336,32 +373,6 @@ impl GrammarBoundQuery {
         }
 
         diag
-    }
-
-    /// Report every definition that compiles to no entrypoint. A value-less body
-    /// (`.`, `-field`, `.!`) yields no type, so the emitter silently omits it;
-    /// `iter_def_types` is exactly the set of defs that do emit an entrypoint, so
-    /// any def outside it is dropped — including when other defs compile fine.
-    fn report_value_less_defs(&self, diag: &mut Diagnostics) {
-        let typed: HashSet<Symbol> = self
-            .type_context()
-            .iter_def_types()
-            .map(|(def_id, _)| self.type_context().def_name_sym(def_id))
-            .collect();
-
-        for (source_id, root) in self.ast_map() {
-            for def in root.defs() {
-                let Some(name) = def.name() else { continue };
-                let has_entrypoint = self
-                    .interner()
-                    .get(name.text())
-                    .is_some_and(|sym| typed.contains(&sym));
-                if !has_entrypoint {
-                    diag.report(*source_id, DiagnosticKind::NoEntrypoints, name.text_range())
-                        .emit();
-                }
-            }
-        }
     }
 
     fn compile(&self) -> crate::bytecode::CompileResult {
@@ -392,19 +403,5 @@ impl GrammarBoundQuery {
         let source = self.source_map().iter().next()?;
         let len = u32::try_from(source.content.len()).unwrap_or(u32::MAX);
         Some((source.id, TextRange::up_to(len.into())))
-    }
-}
-
-impl Deref for GrammarBoundQuery {
-    type Target = Query;
-
-    fn deref(&self) -> &Self::Target {
-        &self.analyzed
-    }
-}
-
-impl DerefMut for GrammarBoundQuery {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.analyzed
     }
 }

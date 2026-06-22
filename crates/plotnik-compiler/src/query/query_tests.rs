@@ -269,19 +269,20 @@ fn invalid_three_way_mutual_recursion_across_files() {
 }
 
 #[test]
-fn check_compile_rejects_byte_oriented_regex() {
-    // Passes analysis; the DFA build fails at emit time (EmitError::RegexCompile).
-    let linked = Query::parse_and_validate(r"Q = (identifier =~ /(?-u:\xFF)/) @x").link(javascript());
+fn analysis_rejects_byte_oriented_regex() {
+    let linked = Query::expect(r"Q = (identifier =~ /(?-u:\xFF)/) @x").link(javascript());
     let diag = linked.check_compile();
     assert!(diag.has_errors());
     let rendered = diag.render(linked.source_map());
-    assert!(rendered.contains("regex compile error"), "{rendered}");
+    assert!(
+        rendered.contains("pattern can match invalid UTF-8"),
+        "{rendered}"
+    );
 }
 
 #[test]
 fn check_compile_rejects_value_less_definition() {
-    // `Q = .` compiles to a module with no entrypoints.
-    let linked = Query::parse_and_validate("Q = .").link(javascript());
+    let linked = Query::expect("Q = .").link(javascript());
     let diag = linked.check_compile();
     assert!(diag.has_errors());
     let rendered = diag.render(linked.source_map());
@@ -296,9 +297,7 @@ fn check_compile_accepts_valid_query() {
 
 #[test]
 fn check_compile_flags_dropped_value_less_def_among_valid() {
-    // A value-less def silently omitted from the entrypoint table while a sibling
-    // def compiles fine must still be reported, not hidden by the sibling.
-    let linked = Query::parse_and_validate("Bad = .\nGood = (identifier) @id").link(javascript());
+    let linked = Query::expect("Bad = .\nGood = (identifier) @id").link(javascript());
     let diag = linked.check_compile();
     assert!(diag.has_errors());
     let rendered = diag.render(linked.source_map());
