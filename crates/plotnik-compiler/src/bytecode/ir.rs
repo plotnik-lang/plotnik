@@ -63,7 +63,7 @@ pub struct EffectIR {
 /// An effect's argument: a literal value, or a symbolic member reference — used by
 /// Set/Enum effects — resolved to a member index during emission.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum EffectArg {
+pub enum EffectArg {
     Literal(usize),
     Member(MemberRef),
 }
@@ -146,7 +146,7 @@ impl EffectIR {
     }
 
     #[inline]
-    pub(crate) fn payload(&self) -> &EffectArg {
+    pub fn payload(&self) -> &EffectArg {
         &self.payload
     }
 }
@@ -249,23 +249,23 @@ impl InstructionIR {
 #[derive(Clone, Debug)]
 pub struct MatchIR {
     /// Where this instruction lives.
-    pub(crate) label: Label,
+    pub label: Label,
     /// Navigation command. `Epsilon` means pure control flow (no node check).
-    pub(crate) nav: Nav,
+    pub nav: Nav,
     /// Node kind constraint (Any = wildcard, Named/Anonymous for specific checks).
-    pub(crate) node_kind: NodeKindConstraint,
+    pub node_kind: NodeKindConstraint,
     /// Field constraint (None = wildcard).
-    pub(crate) node_field: Option<NonZeroU16>,
+    pub node_field: Option<NonZeroU16>,
     /// Effects to execute before match attempt.
-    pub(crate) pre_effects: Vec<EffectIR>,
+    pub pre_effects: Vec<EffectIR>,
     /// Fields that must NOT be present on the node.
-    pub(crate) neg_fields: Vec<u16>,
+    pub neg_fields: Vec<u16>,
     /// Effects to execute after successful match.
-    pub(crate) post_effects: Vec<EffectIR>,
+    pub post_effects: Vec<EffectIR>,
     /// Predicate for node text filtering (None = no text check).
-    pub(crate) predicate: Option<PredicateIR>,
+    pub predicate: Option<PredicateIR>,
     /// Successor labels (empty = accept, 1 = linear, 2+ = branch).
-    pub(crate) successors: Vec<Label>,
+    pub successors: Vec<Label>,
 }
 
 impl MatchIR {

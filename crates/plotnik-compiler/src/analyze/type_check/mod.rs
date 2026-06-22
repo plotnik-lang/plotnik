@@ -17,7 +17,7 @@ mod def_id_tests;
 #[cfg(test)]
 mod unify_tests;
 
-pub(crate) use capture_shape::is_repeating_quantifier;
+pub use capture_shape::is_repeating_quantifier;
 pub use capture_shape::{CaptureKind, capture_kind, produces_output};
 pub use context::TypeContext;
 pub use def_id::{DefId, Interner, Symbol};

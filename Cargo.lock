@@ -1949,6 +1949,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "plotnik-analyze"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-bytecode",
+ "plotnik-core",
+ "plotnik-diagnostics",
+ "plotnik-parser",
+ "regex-syntax",
+ "rowan",
+]
+
+[[package]]
 name = "plotnik-bytecode"
 version = "0.3.3"
 dependencies = [
@@ -1960,6 +1973,18 @@ dependencies = [
  "proptest",
  "regex-automata",
  "thiserror",
+]
+
+[[package]]
+name = "plotnik-compile"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-analyze",
+ "plotnik-bytecode",
+ "plotnik-core",
+ "plotnik-ir",
+ "plotnik-parser",
 ]
 
 [[package]]
@@ -1975,8 +2000,16 @@ dependencies = [
  "insta",
  "logos",
  "memmap2",
+ "plotnik-analyze",
  "plotnik-bytecode",
+ "plotnik-compile",
  "plotnik-core",
+ "plotnik-diagnostics",
+ "plotnik-emit",
+ "plotnik-ir",
+ "plotnik-parser",
+ "plotnik-query",
+ "plotnik-typegen",
  "regex-automata",
  "regex-syntax",
  "rowan",
@@ -2001,6 +2034,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "plotnik-diagnostics"
+version = "0.3.3"
+dependencies = [
+ "annotate-snippets",
+ "rowan",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "plotnik-emit"
+version = "0.3.3"
+dependencies = [
+ "crc32fast",
+ "indexmap",
+ "plotnik-analyze",
+ "plotnik-bytecode",
+ "plotnik-core",
+ "plotnik-ir",
+ "regex-automata",
+ "thiserror",
+]
+
+[[package]]
+name = "plotnik-ir"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-bytecode",
+ "plotnik-core",
+]
+
+[[package]]
 name = "plotnik-lib"
 version = "0.3.3"
 dependencies = [
@@ -2018,6 +2085,41 @@ dependencies = [
  "serde_json",
  "similar 3.1.1",
  "tempfile",
+]
+
+[[package]]
+name = "plotnik-parser"
+version = "0.3.3"
+dependencies = [
+ "logos",
+ "plotnik-bytecode",
+ "plotnik-core",
+ "plotnik-diagnostics",
+ "rowan",
+]
+
+[[package]]
+name = "plotnik-query"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-analyze",
+ "plotnik-bytecode",
+ "plotnik-compile",
+ "plotnik-core",
+ "plotnik-diagnostics",
+ "plotnik-emit",
+ "plotnik-ir",
+ "plotnik-parser",
+ "rowan",
+]
+
+[[package]]
+name = "plotnik-typegen"
+version = "0.3.3"
+dependencies = [
+ "plotnik-bytecode",
+ "plotnik-core",
 ]
 
 [[package]]

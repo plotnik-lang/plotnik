@@ -1,0 +1,22 @@
+[package]
+name = "plotnik-query"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Query facade and pipeline orchestration for Plotnik"
+
+[lints]
+workspace = true
+
+[dependencies]
+plotnik-analyze.workspace = true
+plotnik-bytecode.workspace = true
+plotnik-compile.workspace = true
+plotnik-core.workspace = true
+plotnik-diagnostics.workspace = true
+plotnik-emit.workspace = true
+plotnik-ir.workspace = true
+plotnik-parser.workspace = true
+indexmap = "2"
+rowan = "0.16.1"

@@ -226,7 +226,7 @@ pub enum AltKind {
 
 /// Classify an alternation node by scanning its branches for labels — the shared
 /// boundary used by `Pattern::cast` and the mixed-branch diagnostic.
-pub(crate) fn classify_alt(node: &SyntaxNode) -> AltKind {
+pub fn classify_alt(node: &SyntaxNode) -> AltKind {
     let mut is_enum = false;
     let mut is_union = false;
 

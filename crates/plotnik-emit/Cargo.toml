@@ -1,0 +1,20 @@
+[package]
+name = "plotnik-emit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Bytecode emitter for Plotnik IR"
+
+[lints]
+workspace = true
+
+[dependencies]
+plotnik-analyze.workspace = true
+plotnik-bytecode.workspace = true
+plotnik-core.workspace = true
+plotnik-ir.workspace = true
+indexmap = "2"
+crc32fast = "1.4"
+regex-automata = { version = "0.4", features = ["dfa-build", "dfa-search"] }
+thiserror = "2.0.17"

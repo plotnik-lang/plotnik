@@ -354,9 +354,9 @@ fn intern_regex_predicates(
             && let PredicateValueIR::Regex(pattern) = &pred.value
         {
             let string_id = strings
-                .lookup_str(pattern)
+                .lookup_str(pattern.as_ref())
                 .expect("regex predicate string must be interned before regex emission");
-            regexes.intern(pattern, string_id)?;
+            regexes.intern(pattern.as_ref(), string_id)?;
         }
     }
     Ok(())

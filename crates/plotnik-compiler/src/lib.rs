@@ -1,57 +1,20 @@
-//! Plotnik compiler: parser, analyzer, and bytecode emitter.
+//! Plotnik compiler compatibility facade.
 //!
-//! This crate provides the compilation pipeline for Plotnik queries:
-//! - `parser` - lexer, CST, and AST construction
-//! - `analyze` - semantic analysis (symbol table, type checking, validation)
-//! - `compile` - Thompson NFA construction
-//! - `emit` - bytecode emission
-//! - `diagnostics` - error reporting
-//! - `source` - source file storage and identity
-//! - `query` - high-level Query facade
-//! - `typegen` - TypeScript type generation
+//! The pipeline stages live in separate crates. This crate preserves the
+//! historical `plotnik_compiler::{parser, analyze, compile, emit, query, ...}`
+//! public surface for downstream callers.
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod analyze;
-pub mod bytecode;
-pub mod compile;
-pub mod diagnostics;
-pub mod emit;
-pub mod parser;
-pub mod query;
-pub mod source;
-pub mod typegen;
+pub use plotnik_analyze as analyze;
+pub use plotnik_compile as compile;
+pub use plotnik_diagnostics as diagnostics;
+pub use plotnik_diagnostics::source;
+pub use plotnik_emit as emit;
+pub use plotnik_ir as bytecode;
+pub use plotnik_parser as parser;
+pub use plotnik_query as query;
+pub use plotnik_typegen as typegen;
 
-#[cfg(test)]
-pub mod test_utils;
-
-/// Result type for analysis passes that produce both output and diagnostics.
-///
-/// Each pass returns its typed output alongside any diagnostics it collected.
-/// Fatal errors (like fuel exhaustion) use the outer `Result`.
-pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;
-
-pub use diagnostics::{Diagnostics, Severity, Span};
-pub use query::{Query, QueryBuilder};
-pub use source::{SourceId, SourceMap};
-
-/// Errors that can occur during query parsing.
-#[derive(Debug, Clone, thiserror::Error)]
-pub enum Error {
-    /// Execution fuel exhausted (too many parser operations).
-    #[error("execution limit exceeded")]
-    ParseFuelExhausted,
-
-    /// Recursion fuel exhausted (input nested too deeply).
-    #[error("recursion limit exceeded")]
-    RecursionLimitExceeded,
-
-    #[error("query parsing failed with {} errors", .0.error_count())]
-    QueryParseError(Diagnostics),
-
-    #[error("query analysis failed with {} errors", .0.error_count())]
-    QueryAnalyzeError(Diagnostics),
-}
-
-/// Result type for query operations.
-pub type Result<T> = std::result::Result<T, Error>;
+pub use plotnik_diagnostics::{Diagnostics, Error, PassResult, Result, Severity, SourceId, SourceMap, Span};
+pub use plotnik_query::{Query, QueryBuilder};

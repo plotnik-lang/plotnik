@@ -1,0 +1,17 @@
+[package]
+name = "plotnik-parser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Parser for the Plotnik query language"
+
+[lints]
+workspace = true
+
+[dependencies]
+plotnik-bytecode.workspace = true
+plotnik-core.workspace = true
+plotnik-diagnostics.workspace = true
+logos = "0.16.0"
+rowan = "0.16.1"

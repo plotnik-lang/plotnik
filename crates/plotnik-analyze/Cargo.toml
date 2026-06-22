@@ -1,0 +1,19 @@
+[package]
+name = "plotnik-analyze"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Semantic analysis for Plotnik queries"
+
+[lints]
+workspace = true
+
+[dependencies]
+plotnik-bytecode.workspace = true
+plotnik-core.workspace = true
+plotnik-diagnostics.workspace = true
+plotnik-parser.workspace = true
+indexmap = "2"
+regex-syntax = "0.8"
+rowan = "0.16.1"

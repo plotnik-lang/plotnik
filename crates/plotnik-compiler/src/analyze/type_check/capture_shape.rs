@@ -139,7 +139,7 @@ pub(crate) fn quantifier_arity(quant: &QuantifiedPattern) -> Option<QuantifierKi
 /// as opposed to `?`. Gating an implicit array scope on the greedy kinds alone
 /// drops it for the non-greedy twins (#469), so this reads [`quantifier_arity`]
 /// rather than re-listing the operators.
-pub(crate) fn is_repeating_quantifier(quant: &QuantifiedPattern) -> bool {
+pub fn is_repeating_quantifier(quant: &QuantifiedPattern) -> bool {
     matches!(
         quantifier_arity(quant),
         Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore)
