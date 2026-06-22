@@ -9,10 +9,10 @@
 
 use plotnik_core::Interner;
 
-use crate::parser::{Pattern, QuantifiedPattern, SyntaxKind, is_empty_group};
+use crate::parser::{Pattern, is_empty_group};
 
 use super::context::TypeContext;
-use super::types::{QuantifierKind, TYPE_NODE, TypeFlow, TypeId, TypeShape};
+use super::types::{QuantifierKind, TypeFlow, TypeShape};
 
 /// How a captured value is produced — the bridge between the inferred type and
 /// the emitted effects.
@@ -48,7 +48,7 @@ pub fn capture_kind(inner: &Pattern, ctx: &TypeContext, interner: &Interner) -> 
     let pattern = unwrap_field(inner);
 
     if let Pattern::QuantifiedPattern(quant) = &pattern {
-        return match quantifier_arity(quant) {
+        return match quant.quantifier_kind() {
             // `*` / `+` collect into an array regardless of element shape.
             Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore) => CaptureKind::Array,
             // `?` only adds optionality; the value mechanism is the inner's.
@@ -90,25 +90,11 @@ pub fn capture_kind(inner: &Pattern, ctx: &TypeContext, interner: &Interner) -> 
         // A structured scalar is left pending by the inner itself — an enum
         // alternation (`Enum`/`EndEnum`) or a named node forwarding a structured
         // output child.
-        Some(TypeFlow::Scalar(type_id)) if produces_output(*type_id, ctx) => {
+        Some(TypeFlow::Scalar(type_id)) if ctx.is_structured_output(*type_id) => {
             CaptureKind::SetAfter
         }
         // Void, or a plain scalar node: the matched node is captured directly.
         _ => CaptureKind::Node,
-    }
-}
-
-/// Whether a type is a meaningful structured output (enum/struct/ref, or an
-/// array/optional thereof). Plain `Node` is not — it is the matched node,
-/// captured directly.
-pub fn produces_output(type_id: TypeId, ctx: &TypeContext) -> bool {
-    match ctx.type_shape(type_id) {
-        Some(TypeShape::Enum(_) | TypeShape::Struct(_) | TypeShape::Ref(_)) => true,
-        Some(TypeShape::Array { element, .. }) => {
-            *element != TYPE_NODE && produces_output(*element, ctx)
-        }
-        Some(TypeShape::Optional(inner)) => *inner != TYPE_NODE && produces_output(*inner, ctx),
-        _ => false,
     }
 }
 
@@ -118,32 +104,6 @@ fn unwrap_field(pattern: &Pattern) -> Pattern {
         Pattern::FieldPattern(f) => f.value().unwrap_or_else(|| pattern.clone()),
         other => other.clone(),
     }
-}
-
-/// Classify a quantifier operator into its arity — the single source of truth for
-/// which quantifier `SyntaxKind`s repeat. `capture_kind` (here), the arity
-/// inference in `infer.rs`, and the implicit-array gate in `compile/quantifier.rs`
-/// all read this, so the type system and the emitter can never disagree on whether
-/// a quantifier collects an array. `None` only for a malformed quantifier with no
-/// operator (the parser guarantees a valid `QuantifiedPattern` carries one).
-pub(crate) fn quantifier_arity(quant: &QuantifiedPattern) -> Option<QuantifierKind> {
-    Some(match quant.operator()?.kind() {
-        SyntaxKind::Question | SyntaxKind::QuestionQuestion => QuantifierKind::Optional,
-        SyntaxKind::Star | SyntaxKind::StarQuestion => QuantifierKind::ZeroOrMore,
-        SyntaxKind::Plus | SyntaxKind::PlusQuestion => QuantifierKind::OneOrMore,
-        _ => return None,
-    })
-}
-
-/// Whether a quantifier repeats (`*`/`+`, greedy or not) — i.e. collects an array,
-/// as opposed to `?`. Gating an implicit array scope on the greedy kinds alone
-/// drops it for the non-greedy twins (#469), so this reads [`quantifier_arity`]
-/// rather than re-listing the operators.
-pub fn is_repeating_quantifier(quant: &QuantifiedPattern) -> bool {
-    matches!(
-        quantifier_arity(quant),
-        Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore)
-    )
 }
 
 /// Whether `pattern` is a reference to a definition that returns a structured type.
@@ -173,7 +133,7 @@ fn ref_returns_structured(pattern: &Pattern, ctx: &TypeContext, interner: &Inter
     // bubbles its fields (struct) or is a structured scalar (enum/array).
     match ctx.term_info(pattern).map(|info| &info.flow) {
         Some(TypeFlow::Fields(_)) => true,
-        Some(TypeFlow::Scalar(t)) => produces_output(*t, ctx),
+        Some(TypeFlow::Scalar(t)) => ctx.is_structured_output(*t),
         _ => false,
     }
 }

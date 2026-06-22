@@ -13,6 +13,7 @@
 //! `SymbolTable<'q>`), use [`token_src`] instead of `token.text()`.
 
 use crate::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
+use crate::type_shape::QuantifierKind;
 use rowan::TextRange;
 
 /// Extracts token text with source lifetime.
@@ -532,6 +533,28 @@ impl QuantifiedPattern {
                     | SyntaxKind::QuestionQuestion
             )
         })
+    }
+
+    /// Classify the quantifier operator into its arity. `None` only for a
+    /// malformed quantifier with no operator — the parser guarantees a valid
+    /// `QuantifiedPattern` carries one.
+    pub fn quantifier_kind(&self) -> Option<QuantifierKind> {
+        Some(match self.operator()?.kind() {
+            SyntaxKind::Question | SyntaxKind::QuestionQuestion => QuantifierKind::Optional,
+            SyntaxKind::Star | SyntaxKind::StarQuestion => QuantifierKind::ZeroOrMore,
+            SyntaxKind::Plus | SyntaxKind::PlusQuestion => QuantifierKind::OneOrMore,
+            _ => return None,
+        })
+    }
+
+    /// Whether the quantifier repeats (`*`/`+`, greedy or not) — i.e. collects an
+    /// array, as opposed to `?`. Reads [`quantifier_kind`](Self::quantifier_kind)
+    /// rather than re-listing operators so the non-greedy twins stay included (#469).
+    pub fn is_repeating(&self) -> bool {
+        matches!(
+            self.quantifier_kind(),
+            Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore)
+        )
     }
 
     /// Returns true if quantifier allows zero matches (?, *, ??, *?).

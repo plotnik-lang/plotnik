@@ -4,7 +4,6 @@
 //! `compile_quantified_unified` entry point so greediness and search-nav logic
 //! stay in one place.
 
-use crate::analyze::type_check::is_repeating_quantifier;
 use crate::bytecode::{EffectIR, Label};
 use crate::parser::SyntaxKind;
 use crate::parser::ast::{self, Pattern};
@@ -139,7 +138,7 @@ impl Compiler<'_> {
         // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
         // because the type system expects an array of these values.
         let needs_implicit_array =
-            is_repeating_quantifier(quant) && self.is_ref_returning_structured(&inner);
+            quant.is_repeating() && self.is_ref_returning_structured(&inner);
 
         if needs_implicit_array {
             // No Set on the array itself — collect structured values via Push only.
@@ -267,7 +266,7 @@ impl Compiler<'_> {
         // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
         // with split exits for the skip/match paths.
         let needs_implicit_array =
-            is_repeating_quantifier(quant) && self.is_ref_returning_structured(&inner);
+            quant.is_repeating() && self.is_ref_returning_structured(&inner);
 
         if needs_implicit_array {
             let quant_pattern = Pattern::QuantifiedPattern(quant.clone());

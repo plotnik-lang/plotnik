@@ -117,6 +117,22 @@ impl TypeContext {
             .expect("Fields flow must point to a Struct type")
     }
 
+    /// Whether a type is a meaningful structured output (enum/struct/ref, or an
+    /// array/optional thereof). Plain `Node` is not — it is the matched node,
+    /// captured directly.
+    pub fn is_structured_output(&self, type_id: TypeId) -> bool {
+        match self.type_shape(type_id) {
+            Some(TypeShape::Enum(_) | TypeShape::Struct(_) | TypeShape::Ref(_)) => true,
+            Some(TypeShape::Array { element, .. }) => {
+                *element != TYPE_NODE && self.is_structured_output(*element)
+            }
+            Some(TypeShape::Optional(inner)) => {
+                *inner != TYPE_NODE && self.is_structured_output(*inner)
+            }
+            _ => false,
+        }
+    }
+
     pub fn cache_term_info(&mut self, pattern: Pattern, info: TermInfo) {
         self.term_info.insert(pattern, info);
     }

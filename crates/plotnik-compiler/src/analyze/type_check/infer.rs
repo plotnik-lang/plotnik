@@ -9,7 +9,7 @@ use std::collections::btree_map::Entry;
 use plotnik_core::Interner;
 use rowan::TextRange;
 
-use super::capture_shape::{CaptureKind, capture_kind, produces_output, quantifier_arity};
+use super::capture_shape::{CaptureKind, capture_kind};
 use super::context::TypeContext;
 use super::def_id::Symbol;
 use super::types::{
@@ -98,7 +98,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     );
                 }
                 TypeFlow::Scalar(type_id) => {
-                    if produces_output(*type_id, self.ctx.type_ctx) {
+                    if self.ctx.type_ctx.is_structured_output(*type_id) {
                         output_children.push((child.node().text_range(), *type_id));
                     }
                 }
@@ -206,7 +206,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     );
                 }
                 TypeFlow::Scalar(type_id) => {
-                    if produces_output(*type_id, self.ctx.type_ctx) {
+                    if self.ctx.type_ctx.is_structured_output(*type_id) {
                         output_children.push((child.node().text_range(), *type_id));
                     }
                 }
@@ -724,7 +724,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // Shared with `capture_kind` and `compile`'s implicit-array gate so the
         // three never disagree on a quantifier's arity. A malformed operator-less
         // quantifier can't reach inference, so the fallback is unreachable in practice.
-        quantifier_arity(quant).unwrap_or(QuantifierKind::ZeroOrMore)
+        quant.quantifier_kind().unwrap_or(QuantifierKind::ZeroOrMore)
     }
 
     fn flow_to_type(&mut self, flow: &TypeFlow) -> TypeId {
