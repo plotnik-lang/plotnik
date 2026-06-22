@@ -11,5 +11,8 @@ workspace = true
 
 [dependencies]
 plotnik-core.workspace = true
+plotnik-bytecode.workspace = true
 indexmap = "2"
+logos = "0.16.0"
+rowan = "0.16.1"
 

@@ -1,8 +1,20 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+pub mod ast;
+pub mod cst;
 pub mod grammar_binding;
 pub mod source;
 
+#[cfg(test)]
+mod cst_tests;
+
+pub use ast::{
+    AltKind, Anchor, Branch, CapturedPattern, Def, EnumPattern, FieldPattern, NegatedField,
+    NodePattern, NodePredicate, Pattern, PredicateOp, PredicateValue, QuantifiedPattern, Ref,
+    RegexLiteral, Root, SeqItem, SeqPattern, TokenPattern, Type, UnionPattern, classify_alt,
+    is_empty_group, token_src,
+};
+pub use cst::{QueryLang, SyntaxKind, SyntaxNode, SyntaxToken};
 pub use grammar_binding::GrammarBinding;
 pub use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 pub use source::{Source, SourceId, SourceKind, SourceMap};

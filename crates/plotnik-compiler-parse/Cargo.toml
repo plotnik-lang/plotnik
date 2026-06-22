@@ -12,6 +12,7 @@ workspace = true
 [dependencies]
 plotnik-bytecode.workspace = true
 plotnik-core.workspace = true
+plotnik-compiler-core.workspace = true
 plotnik-compiler-diagnostics.workspace = true
 logos = "0.16.0"
 rowan = "0.16.1"

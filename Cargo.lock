@@ -2079,7 +2079,10 @@ name = "plotnik-compiler-core"
 version = "0.3.3"
 dependencies = [
  "indexmap",
+ "logos",
+ "plotnik-bytecode",
  "plotnik-core",
+ "rowan",
 ]
 
 [[package]]
@@ -2228,6 +2231,7 @@ version = "0.3.3"
 dependencies = [
  "logos",
  "plotnik-bytecode",
+ "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
  "plotnik-core",
  "rowan",
