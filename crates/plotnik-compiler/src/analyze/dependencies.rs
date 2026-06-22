@@ -93,7 +93,7 @@ pub fn analyze_dependencies(
         {
             let mut seen = HashSet::new();
             sccs.iter().flatten().all(|name| seen.insert(name.as_str()))
-                && seen.len() == symbol_table.len()
+                && seen.len() == symbol_table.count()
         },
         "every symbol-table definition must appear in exactly one SCC"
     );
@@ -151,7 +151,7 @@ impl<'a> SccFinder<'a> {
             sccs: Vec::new(),
         };
 
-        for name in symbol_table.keys() {
+        for name in symbol_table.names() {
             if !finder.indices.contains_key(name as &str) {
                 finder.strongconnect(name);
             }
@@ -222,7 +222,7 @@ pub(super) fn collect_refs<'a>(pattern: &Pattern, symbol_table: &'a SymbolTable)
             continue;
         };
         let Some(name_tok) = r.name() else { continue };
-        let Some(key) = symbol_table.lookup_key(name_tok.text()) else {
+        let Some(key) = symbol_table.defined_name(name_tok.text()) else {
             continue;
         };
         refs.insert(key);

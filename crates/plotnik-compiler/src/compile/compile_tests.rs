@@ -3,7 +3,7 @@ use std::num::NonZeroU16;
 use indexmap::IndexMap;
 use plotnik_core::{Interner, NodeKind};
 
-use crate::analyze::symbol_table::SymbolTable;
+use crate::analyze::symbol_table::SymbolTableBuilder;
 use crate::analyze::type_check::TypeContext;
 use crate::bytecode::NodeKindConstraint;
 use crate::compile::{CompileCtx, Compiler};
@@ -30,7 +30,7 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
         (NodeKind::Anonymous(number), anonymous_id),
     ]);
     let type_ctx = TypeContext::new();
-    let symbol_table = SymbolTable::new();
+    let symbol_table = SymbolTableBuilder::new().finish();
     let node_fields = IndexMap::new();
     let ctx = CompileCtx {
         interner: &interner,

@@ -51,7 +51,7 @@ pub fn infer_types(
 
 /// Get the primary definition name (first non-underscore, or underscore if none).
 pub fn primary_def_name(symbol_table: &SymbolTable) -> &str {
-    for name in symbol_table.keys() {
+    for name in symbol_table.names() {
         if name != UNNAMED_DEF {
             return name;
         }

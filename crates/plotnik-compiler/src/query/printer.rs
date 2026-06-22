@@ -116,7 +116,7 @@ impl<'q> QueryPrinter<'q> {
             return Ok(());
         }
 
-        let defined: IndexSet<&str> = symbols.keys().collect();
+        let defined: IndexSet<&str> = symbols.names().collect();
 
         // Collect body nodes from all files
         let mut body_nodes: HashMap<String, SyntaxNode> = HashMap::new();
@@ -128,7 +128,7 @@ impl<'q> QueryPrinter<'q> {
             }
         }
 
-        for name in symbols.keys() {
+        for name in symbols.names() {
             let mut visited = IndexSet::new();
             self.format_symbol_tree(name, 0, &defined, &body_nodes, &mut visited, w)?;
         }

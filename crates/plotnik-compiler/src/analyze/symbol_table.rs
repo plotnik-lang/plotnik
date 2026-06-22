@@ -19,46 +19,34 @@ use crate::source::SourceId;
 /// Code generators can emit whatever name they want for this.
 pub const UNNAMED_DEF: &str = "_";
 
-#[derive(Clone, Debug, Default)]
+/// Name-resolution registry: every named definition (plus the `_` root) bound to
+/// its body AST and the source file that defines it.
+///
+/// Immutable once analysis produces it; build one with [`SymbolTableBuilder`].
+#[derive(Clone, Debug)]
 pub struct SymbolTable {
     table: IndexMap<String, ast::Pattern>,
     files: IndexMap<String, SourceId>,
 }
 
 impl SymbolTable {
-    pub fn new() -> Self {
-        Self::default()
+    /// Freeze finished name-resolution data into the registry. The pass-owned
+    /// [`SymbolTableBuilder`] is the intended caller.
+    pub fn new(table: IndexMap<String, ast::Pattern>, files: IndexMap<String, SourceId>) -> Self {
+        Self { table, files }
     }
 
-    /// Insert a symbol definition.
-    ///
-    /// Returns `true` if the symbol was newly inserted, `false` if it already existed
-    /// (in which case the old value is replaced).
-    pub fn insert(&mut self, name: &str, source_id: SourceId, pattern: ast::Pattern) -> bool {
-        let is_new = !self.table.contains_key(name);
-        self.table.insert(name.to_owned(), pattern);
-        self.files.insert(name.to_owned(), source_id);
-        is_new
-    }
-
-    pub fn remove(&mut self, name: &str) -> Option<(SourceId, ast::Pattern)> {
-        let pattern = self.table.shift_remove(name)?;
-        let source_id = self.files.shift_remove(name)?;
-        Some((source_id, pattern))
-    }
-
-    pub fn contains(&self, name: &str) -> bool {
-        self.table.contains_key(name)
-    }
-
+    /// Body of the definition named `name` — the question consumers ask most.
     pub fn body(&self, name: &str) -> Option<&ast::Pattern> {
         self.table.get(name)
     }
 
+    /// Which file defines `name`.
     pub fn source_id(&self, name: &str) -> Option<SourceId> {
         self.files.get(name).copied()
     }
 
+    /// A definition's body together with the file it lives in.
     pub fn definition(&self, name: &str) -> Option<(SourceId, &ast::Pattern)> {
         let pattern = self.table.get(name)?;
         let source_id = self.files.get(name).copied()?;
@@ -72,53 +60,84 @@ impl SymbolTable {
         Some(Located::new(source_id, pattern.clone()))
     }
 
-    /// Number of symbols in the symbol table.
-    pub fn len(&self) -> usize {
-        self.table.len()
+    /// Whether `name` is defined, yielding the registry's own borrow of the
+    /// canonical name — a `&str` tied to the table, not to the caller's lookup string.
+    pub fn defined_name(&self, name: &str) -> Option<&str> {
+        self.table.get_key_value(name).map(|(k, _)| k.as_str())
     }
 
-    /// Check if the symbol table is empty.
+    /// The defined names, in definition order — the vertex set for dependency analysis.
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.table.keys().map(String::as_str)
+    }
+
+    /// Each defined name with the file that defines it, in definition order.
+    pub fn definitions(&self) -> impl Iterator<Item = (&str, SourceId)> {
+        self.table.keys().map(|k| (k.as_str(), self.files[k]))
+    }
+
+    /// Whether no definitions were resolved.
     pub fn is_empty(&self) -> bool {
         self.table.is_empty()
     }
 
-    /// Iterate over symbol names in insertion order.
-    pub fn keys(&self) -> impl Iterator<Item = &str> {
-        self.table.keys().map(String::as_str)
+    /// Number of resolved definitions.
+    pub fn count(&self) -> usize {
+        self.table.len()
+    }
+}
+
+/// Mutable accumulator for a [`SymbolTable`], owned by the name-resolution pass.
+#[derive(Default)]
+pub struct SymbolTableBuilder {
+    table: IndexMap<String, ast::Pattern>,
+    files: IndexMap<String, SourceId>,
+}
+
+impl SymbolTableBuilder {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Return the table's own borrow of the stored key for `name` — for callers
-    /// that need a `&str` tied to the table's lifetime, not to their search string.
-    pub fn lookup_key(&self, name: &str) -> Option<&str> {
-        self.table.get_key_value(name).map(|(k, _)| k.as_str())
+    pub fn contains(&self, name: &str) -> bool {
+        self.table.contains_key(name)
     }
 
-    /// Iterate over (name, pattern) pairs in insertion order.
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &ast::Pattern)> {
-        self.table.iter().map(|(k, v)| (k.as_str(), v))
+    /// Record a definition. Returns `true` if newly inserted, `false` if it
+    /// replaced an existing entry.
+    pub fn insert(&mut self, name: &str, source_id: SourceId, pattern: ast::Pattern) -> bool {
+        let is_new = !self.table.contains_key(name);
+        self.table.insert(name.to_owned(), pattern);
+        self.files.insert(name.to_owned(), source_id);
+        is_new
     }
 
-    /// Iterate over (name, source_id, pattern) tuples in insertion order.
-    pub fn definitions(&self) -> impl Iterator<Item = (&str, SourceId, &ast::Pattern)> {
-        self.table.iter().map(|(k, v)| {
-            let source_id = self.files[k];
-            (k.as_str(), source_id, v)
-        })
+    pub fn remove(&mut self, name: &str) -> Option<(SourceId, ast::Pattern)> {
+        let pattern = self.table.shift_remove(name)?;
+        let source_id = self.files.shift_remove(name)?;
+        Some((source_id, pattern))
+    }
+
+    /// Freeze the accumulated definitions into an immutable [`SymbolTable`].
+    pub fn finish(self) -> SymbolTable {
+        SymbolTable::new(self.table, self.files)
     }
 }
 
 pub fn resolve_names(validated: &ValidatedAst<'_>, diag: &mut Diagnostics) -> SymbolTable {
-    let mut symbol_table = SymbolTable::new();
+    let mut builder = SymbolTableBuilder::new();
 
     for (&source_id, ast) in validated.ast_map() {
         let src = validated.source_map().content(source_id);
         let mut resolver = ReferenceResolver {
             src,
             diag: &mut *diag,
-            symbol_table: &mut symbol_table,
+            builder: &mut builder,
         };
         resolver.visit(&Located::new(source_id, ast.clone()));
     }
+
+    let symbol_table = builder.finish();
 
     for (&source_id, ast) in validated.ast_map() {
         let mut validator = ReferenceValidator {
@@ -134,7 +153,7 @@ pub fn resolve_names(validated: &ValidatedAst<'_>, diag: &mut Diagnostics) -> Sy
 struct ReferenceResolver<'q, 'd, 'a> {
     src: &'q str,
     diag: &'d mut Diagnostics,
-    symbol_table: &'a mut SymbolTable,
+    builder: &'a mut SymbolTableBuilder,
 }
 
 impl Visitor for ReferenceResolver<'_, '_, '_> {
@@ -143,20 +162,20 @@ impl Visitor for ReferenceResolver<'_, '_, '_> {
 
         if let Some(token) = def.node().name() {
             let name = token_src(&token, self.src);
-            if self.symbol_table.contains(name) {
+            if self.builder.contains(name) {
                 self.diag
                     .report(def.source(), DiagnosticKind::DuplicateDefinition, token.text_range())
                     .detail(name)
                     .emit();
             } else {
-                self.symbol_table.insert(name, def.source(), body);
+                self.builder.insert(name, def.source(), body);
             }
         } else {
             // Parser already validates multiple unnamed defs; we keep the last one.
-            if self.symbol_table.contains(UNNAMED_DEF) {
-                self.symbol_table.remove(UNNAMED_DEF);
+            if self.builder.contains(UNNAMED_DEF) {
+                self.builder.remove(UNNAMED_DEF);
             }
-            self.symbol_table.insert(UNNAMED_DEF, def.source(), body);
+            self.builder.insert(UNNAMED_DEF, def.source(), body);
         }
     }
 }
@@ -171,7 +190,7 @@ impl Visitor for ReferenceValidator<'_, '_> {
         let Some(name_token) = r.node().name() else { return };
         let name = name_token.text();
 
-        if self.symbol_table.contains(name) {
+        if self.symbol_table.defined_name(name).is_some() {
             return;
         }
 

@@ -896,7 +896,7 @@ impl<'a, 'd> InferencePass<'a, 'd> {
 
     /// Handle any definitions not in an SCC (safety net).
     fn process_orphans(&mut self) {
-        for (name, source_id, _body) in self.analysis.symbol_table.definitions() {
+        for (name, source_id) in self.analysis.symbol_table.definitions() {
             if self
                 .ctx
                 .def_type_for_name(self.analysis.interner, name)
