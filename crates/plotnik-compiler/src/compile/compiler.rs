@@ -10,13 +10,9 @@ use crate::parser::Pattern;
 use plotnik_bytecode::Nav;
 
 use super::capture::ExprCtx;
-use super::collapse_up::collapse_up;
-use super::dce::remove_unreachable;
-use super::epsilon_elim::eliminate_epsilons;
 use super::error::CompileResult;
-use super::lower::lower;
 use super::scope::{CaptureExits, StructScope};
-use super::verify::{run_verified, verify_constructed};
+use super::verify::verify_constructed;
 
 /// Compilation context bundling all shared compilation state.
 ///
@@ -66,20 +62,13 @@ impl<'a> Compiler<'a> {
             compiler.compile_def(def_id);
         }
 
-        let mut result = CompileResult {
+        let result = CompileResult {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
             preamble_entry,
         };
 
-        // Each pass is wrapped so debug builds assert it preserved the IR's
-        // order-sensitive semantic fingerprint and structural invariants. The
-        // wrapping compiles to a direct call in release builds.
         verify_constructed(&result, ctx);
-        run_verified("eliminate_epsilons", &mut result, ctx, eliminate_epsilons);
-        run_verified("remove_unreachable", &mut result, ctx, remove_unreachable);
-        run_verified("collapse_up", &mut result, ctx, collapse_up);
-        run_verified("lower", &mut result, ctx, lower);
 
         result
     }

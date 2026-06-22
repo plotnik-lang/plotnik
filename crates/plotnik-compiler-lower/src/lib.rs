@@ -38,11 +38,26 @@ pub mod compile {
     #[path = "../../../plotnik-compiler/src/compile/sequences.rs"]
     mod sequences;
     #[path = "../../../plotnik-compiler/src/compile/verify.rs"]
-    mod verify;
+    pub mod verify;
 
     pub use capture::CaptureEffects;
     pub use compiler::{CompileCtx, Compiler};
+    pub use collapse_up::collapse_up;
+    pub use dce::remove_unreachable;
+    pub use epsilon_elim::eliminate_epsilons;
     pub use error::CompileResult;
+    pub use lower::lower;
+
+    pub fn build_ir(ctx: &CompileCtx<'_>) -> CompileResult {
+        let mut result = Compiler::build_ir(ctx);
+
+        verify::run_verified("eliminate_epsilons", &mut result, ctx, eliminate_epsilons);
+        verify::run_verified("remove_unreachable", &mut result, ctx, remove_unreachable);
+        verify::run_verified("collapse_up", &mut result, ctx, collapse_up);
+        verify::run_verified("lower", &mut result, ctx, lower);
+
+        result
+    }
 }
 
 pub use compile::*;

@@ -11,7 +11,7 @@ use crate::analyze::symbol_table::{SymbolTable, resolve_names};
 use crate::analyze::type_check::{self, Arity, TypeContext};
 use crate::analyze::validation::{AstValidationInput, validate_ast};
 use crate::analyze::{dependencies, validate_entrypoints, validate_recursion};
-use crate::compile::{CompileCtx, Compiler};
+use crate::compile::CompileCtx;
 use crate::diagnostics::DiagnosticKind;
 use crate::emit::EmitInput;
 use crate::parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser, Root, SyntaxNode, lex};
@@ -360,7 +360,7 @@ impl GrammarBoundQuery {
             target_node_kinds: self.node_kind_ids(),
             target_node_fields: self.node_field_ids(),
         };
-        Compiler::build_ir(&ctx)
+        crate::compile::build_ir(&ctx)
     }
 
     fn emit_input(&self) -> EmitInput<'_> {

@@ -15,6 +15,11 @@ members = [
     "crates/plotnik-compiler-emit",
     "crates/plotnik-compiler-ir",
     "crates/plotnik-compiler-lower",
+    "crates/plotnik-compiler-lower-dead",
+    "crates/plotnik-compiler-lower-epsilon",
+    "crates/plotnik-compiler-lower-nav",
+    "crates/plotnik-compiler-lower-pack",
+    "crates/plotnik-compiler-lower-thompson",
     "crates/plotnik-compiler-parse",
     "crates/plotnik-compiler-typegen",
     "crates/plotnik-core",
@@ -43,6 +48,11 @@ plotnik-compiler-diagnostics = { path = "crates/plotnik-compiler-diagnostics", v
 plotnik-compiler-emit = { path = "crates/plotnik-compiler-emit", version = "0.3.3" }
 plotnik-compiler-ir = { path = "crates/plotnik-compiler-ir", version = "0.3.3" }
 plotnik-compiler-lower = { path = "crates/plotnik-compiler-lower", version = "0.3.3" }
+plotnik-compiler-lower-dead = { path = "crates/plotnik-compiler-lower-dead", version = "0.3.3" }
+plotnik-compiler-lower-epsilon = { path = "crates/plotnik-compiler-lower-epsilon", version = "0.3.3" }
+plotnik-compiler-lower-nav = { path = "crates/plotnik-compiler-lower-nav", version = "0.3.3" }
+plotnik-compiler-lower-pack = { path = "crates/plotnik-compiler-lower-pack", version = "0.3.3" }
+plotnik-compiler-lower-thompson = { path = "crates/plotnik-compiler-lower-thompson", version = "0.3.3" }
 plotnik-compiler-parse = { path = "crates/plotnik-compiler-parse", version = "0.3.3" }
 plotnik-compiler-typegen = { path = "crates/plotnik-compiler-typegen", version = "0.3.3" }
 plotnik-core = { path = "crates/plotnik-core", version = "0.3.3" }

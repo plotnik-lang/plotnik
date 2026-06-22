@@ -2129,6 +2129,58 @@ dependencies = [
 ]
 
 [[package]]
+name = "plotnik-compiler-lower-dead"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-bytecode",
+ "plotnik-compiler-analyze-types",
+ "plotnik-compiler-ir",
+ "plotnik-compiler-lower-thompson",
+]
+
+[[package]]
+name = "plotnik-compiler-lower-epsilon"
+version = "0.3.3"
+dependencies = [
+ "plotnik-bytecode",
+ "plotnik-compiler-analyze-types",
+ "plotnik-compiler-ir",
+ "plotnik-compiler-lower-thompson",
+]
+
+[[package]]
+name = "plotnik-compiler-lower-nav"
+version = "0.3.3"
+dependencies = [
+ "plotnik-bytecode",
+ "plotnik-compiler-ir",
+ "plotnik-compiler-lower-thompson",
+]
+
+[[package]]
+name = "plotnik-compiler-lower-pack"
+version = "0.3.3"
+dependencies = [
+ "plotnik-bytecode",
+ "plotnik-compiler-ir",
+ "plotnik-compiler-lower-thompson",
+]
+
+[[package]]
+name = "plotnik-compiler-lower-thompson"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-bytecode",
+ "plotnik-compiler-analyze-names",
+ "plotnik-compiler-analyze-types",
+ "plotnik-compiler-ir",
+ "plotnik-compiler-parse",
+ "plotnik-core",
+]
+
+[[package]]
 name = "plotnik-compiler-parse"
 version = "0.3.3"
 dependencies = [
