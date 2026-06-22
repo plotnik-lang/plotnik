@@ -3,6 +3,7 @@
 pub mod ast;
 pub mod cst;
 pub mod grammar_binding;
+pub mod located;
 pub mod source;
 pub mod span;
 
@@ -17,6 +18,7 @@ pub use ast::{
 };
 pub use cst::{QueryLang, SyntaxKind, SyntaxNode, SyntaxToken};
 pub use grammar_binding::GrammarBinding;
+pub use located::Located;
 pub use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 pub use source::{Source, SourceId, SourceKind, SourceMap};
 pub use span::Span;
