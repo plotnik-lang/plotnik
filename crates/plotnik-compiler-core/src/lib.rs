@@ -6,6 +6,7 @@ pub mod grammar_binding;
 pub mod located;
 pub mod source;
 pub mod span;
+pub mod symbol_table;
 
 #[cfg(test)]
 mod cst_tests;
@@ -22,6 +23,7 @@ pub use located::Located;
 pub use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 pub use source::{Source, SourceId, SourceKind, SourceMap};
 pub use span::Span;
+pub use symbol_table::{SymbolTable, UNNAMED_DEF};
 
 /// A lightweight handle to a named query definition.
 ///
