@@ -2181,6 +2181,7 @@ dependencies = [
 name = "plotnik-compiler-lower-epsilon"
 version = "0.3.3"
 dependencies = [
+ "indexmap",
  "plotnik-bytecode",
  "plotnik-compiler-analyze-types",
  "plotnik-compiler-ir",
