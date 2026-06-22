@@ -18,6 +18,8 @@ use crate::analyze::validation::{
     validate_predicates,
 };
 use crate::analyze::{dependencies, validate_recursion};
+use crate::compile::{CompileCtx, Compiler};
+use crate::emit::EmitInput;
 use crate::parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser, Root, SyntaxNode, lex};
 
 pub type AstMap = IndexMap<SourceId, Root>;
@@ -283,7 +285,8 @@ impl GrammarBoundQuery {
         if !self.is_valid() {
             return Err(crate::emit::EmitError::InvalidQuery);
         }
-        crate::emit::emit(self)
+        let compile_result = self.compile();
+        crate::emit::emit(self.emit_input(), &compile_result)
     }
 
     /// Like [`emit`](Self::emit), but without the emitter's debug load self-check.
@@ -293,7 +296,8 @@ impl GrammarBoundQuery {
         if !self.is_valid() {
             return Err(crate::emit::EmitError::InvalidQuery);
         }
-        crate::emit::emit_unchecked(self)
+        let compile_result = self.compile();
+        crate::emit::emit_unchecked(self.emit_input(), &compile_result)
     }
 
     /// Full-pipeline dry run for `check`: emit bytecode and load it, reporting any
@@ -357,6 +361,26 @@ impl GrammarBoundQuery {
                         .emit();
                 }
             }
+        }
+    }
+
+    fn compile(&self) -> crate::bytecode::CompileResult {
+        let ctx = CompileCtx {
+            interner: self.interner(),
+            type_ctx: self.type_context(),
+            symbol_table: self.symbol_table(),
+            target_node_kinds: self.node_kind_ids(),
+            target_node_fields: self.node_field_ids(),
+        };
+        Compiler::build_ir(&ctx)
+    }
+
+    fn emit_input(&self) -> EmitInput<'_> {
+        EmitInput {
+            interner: self.interner(),
+            type_ctx: self.type_context(),
+            node_kind_ids: self.node_kind_ids(),
+            node_field_ids: self.node_field_ids(),
         }
     }
 

@@ -8,35 +8,9 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU16;
 
-use crate::analyze::type_check::TypeId;
-use crate::emit::EmitError;
-use plotnik_bytecode::{
-    Call, Effect, EffectKind, MatchInstr, MatchPredicate, Nav, PredicateOp, Return, StepAddr,
-    StepId, Trampoline, select_match_opcode,
-};
-
-/// Resolver bundle for bytecode emission.
-///
-/// Bundles the deferred-reference resolvers (`member_base` for struct/enum
-/// member bases, `lookup_regex` for predicate patterns) into one value so
-/// `resolve` signatures stay flat. The resolvers borrow the emission tables;
-/// build via [`EmitResolvers::new`].
-pub struct EmitResolvers<'a> {
-    member_base: &'a dyn Fn(TypeId) -> Option<u16>,
-    lookup_regex: &'a dyn Fn(plotnik_bytecode::StringId) -> Option<u16>,
-}
-
-impl<'a> EmitResolvers<'a> {
-    pub fn new(
-        member_base: &'a dyn Fn(TypeId) -> Option<u16>,
-        lookup_regex: &'a dyn Fn(plotnik_bytecode::StringId) -> Option<u16>,
-    ) -> Self {
-        Self {
-            member_base,
-            lookup_regex,
-        }
-    }
-}
+use indexmap::IndexMap;
+use plotnik_bytecode::{EffectKind, Nav, PredicateOp, StepAddr, select_match_opcode};
+use plotnik_core::{DefId, TypeId};
 
 /// Node kind constraint for Match instructions.
 ///
@@ -76,11 +50,6 @@ impl MemberRef {
             relative_index,
         }
     }
-
-    pub fn resolve(self, ctx: &EmitResolvers) -> u16 {
-        (ctx.member_base)(self.parent_type).expect("member base must resolve")
-            + self.relative_index
-    }
 }
 
 /// Effect operation with symbolic member references.
@@ -94,7 +63,7 @@ pub struct EffectIR {
 /// An effect's argument: a literal value, or a symbolic member reference — used by
 /// Set/Enum effects — resolved to a member index during emission.
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum EffectArg {
+pub(crate) enum EffectArg {
     Literal(usize),
     Member(MemberRef),
 }
@@ -176,25 +145,34 @@ impl EffectIR {
         Self::literal(EffectKind::SuppressEnd, 0)
     }
 
-    pub fn resolve(&self, ctx: &EmitResolvers) -> Effect {
-        let payload = match &self.payload {
-            EffectArg::Member(member_ref) => member_ref.resolve(ctx) as usize,
-            EffectArg::Literal(payload) => *payload,
-        };
-        Effect::new(self.kind, payload)
+    #[inline]
+    pub(crate) fn payload(&self) -> &EffectArg {
+        &self.payload
     }
 }
 
 /// Predicate value: string or regex pattern.
 ///
-/// Both variants store StringId (index into StringTable). For regex predicates,
-/// the pattern string is also compiled to a DFA during emit.
+/// Both variants store predicate text. Emit interns that text into the bytecode
+/// string table after the IR is complete.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PredicateValueIR {
     /// String comparison value.
-    String(plotnik_bytecode::StringId),
-    /// Regex pattern (StringId for pattern, compiled to DFA during emit).
-    Regex(plotnik_bytecode::StringId),
+    String(Box<str>),
+    /// Regex pattern, compiled to a DFA during emit.
+    Regex(Box<str>),
+}
+
+impl PredicateValueIR {
+    pub fn text(&self) -> &str {
+        match self {
+            Self::String(text) | Self::Regex(text) => text,
+        }
+    }
+
+    pub fn is_regex(&self) -> bool {
+        matches!(self, Self::Regex(_))
+    }
 }
 
 /// Predicate IR for node text filtering.
@@ -208,17 +186,17 @@ pub struct PredicateIR {
 }
 
 impl PredicateIR {
-    pub fn string(op: PredicateOp, value: plotnik_bytecode::StringId) -> Self {
+    pub fn string(op: PredicateOp, value: impl Into<Box<str>>) -> Self {
         Self {
             op,
-            value: PredicateValueIR::String(value),
+            value: PredicateValueIR::String(value.into()),
         }
     }
 
-    pub fn regex(op: PredicateOp, pattern_id: plotnik_bytecode::StringId) -> Self {
+    pub fn regex(op: PredicateOp, pattern: impl Into<Box<str>>) -> Self {
         Self {
             op,
-            value: PredicateValueIR::Regex(pattern_id),
+            value: PredicateValueIR::Regex(pattern.into()),
         }
     }
 
@@ -263,20 +241,6 @@ impl InstructionIR {
             Self::Call(c) => std::slice::from_ref(&c.next),
             Self::Return(_) => &[],
             Self::Trampoline(t) => std::slice::from_ref(&t.next),
-        }
-    }
-
-    /// Resolve labels and serialize to bytecode bytes.
-    pub fn resolve(
-        &self,
-        map: &BTreeMap<Label, StepAddr>,
-        ctx: &EmitResolvers,
-    ) -> Result<Vec<u8>, EmitError> {
-        match self {
-            Self::Match(m) => m.resolve(map, ctx),
-            Self::Call(c) => Ok(c.resolve(map).to_vec()),
-            Self::Return(r) => Ok(r.resolve().to_vec()),
-            Self::Trampoline(t) => Ok(t.resolve(map).to_vec()),
         }
     }
 }
@@ -408,51 +372,6 @@ impl MatchIR {
         select_match_opcode(slots).map(|op| op.size()).unwrap_or(64)
     }
 
-    /// Resolve symbolic references and encode to bytecode bytes.
-    ///
-    /// Builds the owned [`MatchInstr`] the bytecode crate knows how to encode,
-    /// so encode and decode live together and capacity overflows surface as
-    /// [`EmitError`] instead of panicking.
-    pub fn resolve(
-        &self,
-        map: &BTreeMap<Label, StepAddr>,
-        ctx: &EmitResolvers,
-    ) -> Result<Vec<u8>, EmitError> {
-        let pre_effects = self.pre_effects.iter().map(|e| e.resolve(ctx)).collect();
-        let post_effects = self.post_effects.iter().map(|e| e.resolve(ctx)).collect();
-        let predicate = self.predicate.as_ref().map(|pred| {
-            let is_regex = matches!(pred.value, PredicateValueIR::Regex(_));
-            let value_ref = match &pred.value {
-                PredicateValueIR::String(string_id) => string_id.as_u16(),
-                PredicateValueIR::Regex(string_id) => {
-                    (ctx.lookup_regex)(*string_id).expect("regex predicate must be interned")
-                }
-            };
-            MatchPredicate {
-                op: pred.op_byte(),
-                is_regex,
-                value_ref,
-            }
-        });
-        let successors = self
-            .successors
-            .iter()
-            .map(|&l| StepId::new(l.resolve(map)))
-            .collect();
-
-        let instr = MatchInstr {
-            nav: self.nav,
-            node_kind: self.node_kind,
-            node_field: self.node_field,
-            pre_effects,
-            neg_fields: self.neg_fields.clone(),
-            post_effects,
-            predicate,
-            successors,
-        };
-        instr.encode().map_err(EmitError::from)
-    }
-
     /// Check if this is an epsilon transition (no node interaction).
     #[inline]
     pub fn is_epsilon(&self) -> bool {
@@ -502,16 +421,6 @@ impl CallIR {
         self.node_field = f.into();
         self
     }
-
-    pub fn resolve(&self, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
-        Call::new(
-            self.nav,
-            self.node_field,
-            StepId::new(self.next.resolve(map)),
-            StepId::new(self.target.resolve(map)),
-        )
-        .to_bytes()
-    }
 }
 
 impl From<CallIR> for InstructionIR {
@@ -530,10 +439,6 @@ pub struct ReturnIR {
 impl ReturnIR {
     pub fn new(label: Label) -> Self {
         Self { label }
-    }
-
-    pub fn resolve(&self) -> [u8; 8] {
-        Return::new().to_bytes()
     }
 }
 
@@ -558,10 +463,6 @@ pub struct TrampolineIR {
 impl TrampolineIR {
     pub fn new(label: Label, next: Label) -> Self {
         Self { label, next }
-    }
-
-    pub fn resolve(&self, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
-        Trampoline::new(StepId::new(self.next.resolve(map))).to_bytes()
     }
 }
 
@@ -603,4 +504,15 @@ impl LayoutMap {
     pub fn total_steps(&self) -> u32 {
         self.total_steps
     }
+}
+
+/// Compiled query IR plus entry labels produced by the compile stage.
+#[derive(Clone, Debug)]
+pub struct CompileResult {
+    pub instructions: Vec<InstructionIR>,
+    /// Entry labels for each definition (in definition order).
+    pub def_entries: IndexMap<DefId, Label>,
+    /// Entry label for the universal preamble.
+    /// The preamble wraps any entrypoint: Struct -> Trampoline -> EndStruct -> Return
+    pub preamble_entry: Label,
 }

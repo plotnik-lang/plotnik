@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::num::NonZeroU16;
 
 use indexmap::IndexMap;
@@ -8,7 +7,6 @@ use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::type_check::TypeContext;
 use crate::bytecode::NodeKindConstraint;
 use crate::compile::{CompileCtx, Compiler};
-use crate::emit::StringTableBuilder;
 use crate::shot_bytecode;
 
 #[test]
@@ -33,13 +31,11 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
     ]);
     let type_ctx = TypeContext::new();
     let symbol_table = SymbolTable::new();
-    let strings = RefCell::new(StringTableBuilder::new());
     let node_fields = IndexMap::new();
     let ctx = CompileCtx {
         interner: &interner,
         type_ctx: &type_ctx,
         symbol_table: &symbol_table,
-        strings: &strings,
         target_node_kinds: &node_kinds,
         target_node_fields: &node_fields,
     };

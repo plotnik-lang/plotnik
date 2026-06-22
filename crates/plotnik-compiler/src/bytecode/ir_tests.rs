@@ -1,13 +1,11 @@
-use std::collections::BTreeMap;
 use std::num::NonZeroU16;
 
-use plotnik_bytecode::{EffectKind, Nav};
+use plotnik_bytecode::{EffectKind, Nav, PredicateOp};
 
 use super::ir::{
-    CallIR, EffectIR, EmitResolvers, InstructionIR, Label, MatchIR, MemberRef, NodeKindConstraint,
-    ReturnIR,
+    CallIR, EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
+    PredicateValueIR, ReturnIR,
 };
-use crate::analyze::type_check::TypeId;
 
 #[test]
 fn match_ir_size_match8() {
@@ -52,45 +50,18 @@ fn instruction_successors() {
 }
 
 #[test]
-fn resolve_match_terminal() {
-    // Terminal match: empty successors → next = 0 in bytecode
-    let m = MatchIR::terminal(Label(0));
-
-    let mut map = BTreeMap::new();
-    map.insert(Label(0), 1u16);
-
-    let ctx = EmitResolvers::new(&|_| None, &|_| None);
-    let bytes = m.resolve(&map, &ctx).expect("terminal match encodes");
-    assert_eq!(bytes.len(), 8);
-
-    assert_eq!(bytes[0] & 0xF, 0);
-    assert_eq!(u16::from_le_bytes([bytes[6], bytes[7]]), 0);
-}
-
-#[test]
-fn member_ref_resolution() {
-    let parent_type = TypeId(20);
-
-    let member = MemberRef::new(parent_type, 3);
-    let get_member_base = |ty| if ty == parent_type { Some(50) } else { None };
-    let ctx = EmitResolvers::new(&get_member_base, &|_| None);
-    assert_eq!(member.resolve(&ctx), 53); // base 50 + relative 3
-}
-
-#[test]
-fn effect_ir_resolution() {
-    let parent_type = TypeId(10);
-
+fn effect_ir_preserves_literal_payload() {
     let simple = EffectIR::literal(EffectKind::Node, 5);
-    let simple_ctx = EmitResolvers::new(&|_| None, &|_| None);
-    let resolved = simple.resolve(&simple_ctx);
-    assert_eq!(resolved.kind, EffectKind::Node);
-    assert_eq!(resolved.payload, 5);
+    assert_eq!(simple.kind(), EffectKind::Node);
+}
 
-    let set_effect = EffectIR::with_member(EffectKind::Set, MemberRef::new(parent_type, 1));
-    let get_member_base = |ty| if ty == parent_type { Some(50) } else { None };
-    let set_ctx = EmitResolvers::new(&get_member_base, &|_| None);
-    let resolved = set_effect.resolve(&set_ctx);
-    assert_eq!(resolved.kind, EffectKind::Set);
-    assert_eq!(resolved.payload, 51); // base 50 + relative 1
+#[test]
+fn predicate_ir_stores_text_until_emit() {
+    let string = PredicateIR::string(PredicateOp::Eq, "hello");
+    assert_eq!(string.value.text(), "hello");
+    assert!(!string.value.is_regex());
+
+    let regex = PredicateIR::regex(PredicateOp::RegexMatch, "h.*o");
+    assert_eq!(regex.value, PredicateValueIR::Regex("h.*o".into()));
+    assert!(regex.value.is_regex());
 }

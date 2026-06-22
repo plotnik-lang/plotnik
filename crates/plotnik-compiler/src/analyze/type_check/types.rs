@@ -6,27 +6,16 @@
 
 use std::collections::BTreeMap;
 
+pub use plotnik_core::TypeId;
+
 use super::def_id::{DefId, Symbol};
 
 // Re-export shared type system components
+use plotnik_bytecode::type_system::PrimitiveType;
 pub use plotnik_bytecode::type_system::{Arity, QuantifierKind};
-use plotnik_bytecode::type_system::{PrimitiveType, TYPE_NODE as PRIM_TYPE_NODE};
-
-/// Interned type identifier.
-///
-/// Index into the type registry. Values 0-1 are reserved for builtins
-/// (Void, Node); custom types start at index 2.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct TypeId(pub u32);
 
 pub const TYPE_VOID: TypeId = TypeId(PrimitiveType::Void.index() as u32);
 pub const TYPE_NODE: TypeId = TypeId(PrimitiveType::Node.index() as u32);
-
-impl TypeId {
-    pub fn is_builtin(self) -> bool {
-        self.0 <= PRIM_TYPE_NODE as u32
-    }
-}
 
 /// The shape of an inferred type, determining its structure.
 ///

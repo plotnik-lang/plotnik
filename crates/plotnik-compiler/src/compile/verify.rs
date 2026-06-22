@@ -70,7 +70,6 @@ mod debug_impl {
     use crate::analyze::type_check::DefId;
     use crate::bytecode::{InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR};
     use crate::compile::CompileResult;
-    use crate::emit::StringTableBuilder;
 
     use super::super::compiler::CompileCtx;
 
@@ -197,7 +196,7 @@ mod debug_impl {
         }
 
         if let Some(p) = &m.predicate {
-            let value = resolve_predicate_value(&p.value, &ctx.strings.borrow());
+            let value = resolve_predicate_value(&p.value);
             ops.push(SemanticOp::Predicate(p.op.to_byte(), value));
         }
 
@@ -680,10 +679,10 @@ mod debug_impl {
         None
     }
 
-    fn resolve_predicate_value(value: &PredicateValueIR, strings: &StringTableBuilder) -> String {
+    fn resolve_predicate_value(value: &PredicateValueIR) -> String {
         match value {
-            PredicateValueIR::String(id) => strings.get_str(*id).to_string(),
-            PredicateValueIR::Regex(id) => format!("/{}/", strings.get_str(*id)),
+            PredicateValueIR::String(text) => text.to_string(),
+            PredicateValueIR::Regex(text) => format!("/{text}/"),
         }
     }
 }

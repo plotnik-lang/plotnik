@@ -5,7 +5,8 @@ mod ir;
 #[cfg(test)]
 mod ir_tests;
 
+pub(crate) use ir::EffectArg;
 pub use ir::{
-    CallIR, EffectIR, EmitResolvers, InstructionIR, Label, LayoutMap, MatchIR, MemberRef,
+    CallIR, CompileResult, EffectIR, InstructionIR, Label, LayoutMap, MatchIR, MemberRef,
     NodeKindConstraint, PredicateIR, PredicateValueIR, ReturnIR, TrampolineIR,
 };

@@ -103,6 +103,11 @@ impl StringTableBuilder {
         self.mapping.get(&sym).copied()
     }
 
+    /// Get the StringId for direct string content, if it was interned.
+    pub fn lookup_str(&self, s: &str) -> Option<StringId> {
+        self.str_lookup.get(s).copied()
+    }
+
     pub fn get_str(&self, id: StringId) -> &str {
         self.strings[id.as_u16() as usize].as_ref()
     }

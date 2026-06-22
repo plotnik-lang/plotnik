@@ -1,14 +1,11 @@
 //! Core compiler state and entry points.
 
-use std::cell::RefCell;
-
 use indexmap::IndexMap;
 use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 
 use crate::analyze::symbol_table::SymbolTable;
 use crate::analyze::type_check::{DefId, TypeContext};
 use crate::bytecode::{InstructionIR, Label, ReturnIR, TrampolineIR};
-use crate::emit::StringTableBuilder;
 use crate::parser::Pattern;
 use plotnik_bytecode::Nav;
 
@@ -23,13 +20,10 @@ use super::verify::{run_verified, verify_constructed};
 
 /// Compilation context bundling all shared compilation state.
 ///
-/// Uses `RefCell` for `strings` to allow interior mutability while
-/// sharing the context across compilation phases.
 pub struct CompileCtx<'a> {
     pub interner: &'a Interner,
     pub type_ctx: &'a TypeContext,
     pub symbol_table: &'a SymbolTable,
-    pub strings: &'a RefCell<StringTableBuilder>,
     pub target_node_kinds: &'a IndexMap<NodeKind<Symbol>, NodeKindId>,
     pub target_node_fields: &'a IndexMap<Symbol, NodeFieldId>,
 }

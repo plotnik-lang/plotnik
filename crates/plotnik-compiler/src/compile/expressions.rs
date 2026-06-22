@@ -687,8 +687,7 @@ impl Compiler<'_> {
         let op = pred.operator()?;
 
         if let Some(str_token) = pred.string_value() {
-            let string_id = self.ctx.strings.borrow_mut().get_or_intern_str(str_token.text());
-            return Some(PredicateIR::string(op, string_id));
+            return Some(PredicateIR::string(op, str_token.text()));
         }
 
         if let Some(regex) = pred.regex() {
@@ -696,8 +695,7 @@ impl Compiler<'_> {
             let text: String = regex.syntax().text().into();
             let without_prefix = text.strip_prefix('/').unwrap_or(&text);
             let pattern = without_prefix.strip_suffix('/').unwrap_or(without_prefix);
-            let string_id = self.ctx.strings.borrow_mut().get_or_intern_str(pattern);
-            return Some(PredicateIR::regex(op, string_id));
+            return Some(PredicateIR::regex(op, pattern));
         }
 
         None

@@ -1,15 +1,17 @@
 //! Core bytecode emission logic.
 
-use std::cell::RefCell;
+use std::collections::BTreeMap;
 
-use plotnik_core::NodeKind;
+use indexmap::IndexMap;
+use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 
-use crate::analyze::type_check::TypeId;
-use crate::bytecode::{EmitResolvers, InstructionIR, Label, PredicateValueIR};
-use crate::compile::{CompileCtx, Compiler};
-use crate::query::GrammarBoundQuery;
+use crate::analyze::type_check::TypeContext;
+use crate::bytecode::{
+    CompileResult, EffectArg, EffectIR, InstructionIR, Label, MatchIR, MemberRef, PredicateValueIR,
+};
 use plotnik_bytecode::{
-    Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, STEP_SIZE,
+    Call, Effect, Entrypoint, FieldEntry, HEADER_SIZE, Header, MatchInstr, MatchPredicate,
+    NodeKindEntry, Return, SECTION_ALIGN, STEP_SIZE, StepAddr, StepId, Trampoline,
 };
 
 use super::EmitError;
@@ -18,33 +20,35 @@ use super::regex_table::RegexTableBuilder;
 use super::string_table::StringTableBuilder;
 use super::type_table::TypeTableBuilder;
 
+#[derive(Clone, Copy)]
+pub struct EmitInput<'a> {
+    pub interner: &'a Interner,
+    pub type_ctx: &'a TypeContext,
+    pub node_kind_ids: &'a IndexMap<NodeKind<Symbol>, NodeKindId>,
+    pub node_field_ids: &'a IndexMap<Symbol, NodeFieldId>,
+}
+
 /// Emit bytecode without the debug load self-check. Used by callers that load
 /// the bytecode themselves (e.g. `check`'s dry run) and want a malformed-bytecode
 /// case to surface as a diagnostic rather than the debug panic in [`emit`].
-pub fn emit_unchecked(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
-    let type_ctx = query.type_context();
-    let interner = query.interner();
-    let symbol_table = query.symbol_table();
-    let node_kind_ids = query.node_kind_ids();
-    let node_field_ids = query.node_field_ids();
-
-    let strings = RefCell::new(StringTableBuilder::new());
-
-    let ctx = CompileCtx {
+pub fn emit_unchecked(
+    input: EmitInput<'_>,
+    compile_result: &CompileResult,
+) -> Result<Vec<u8>, EmitError> {
+    let EmitInput {
         interner,
         type_ctx,
-        symbol_table,
-        strings: &strings,
-        target_node_kinds: node_kind_ids,
-        target_node_fields: node_field_ids,
-    };
-    let compile_result = Compiler::build_ir(&ctx);
+        node_kind_ids,
+        node_field_ids,
+    } = input;
 
     // Every emitted effect's member ref names a type reachable from an entrypoint
-    // result, so dead-type elimination roots at those results alone. Built after
-    // `compile` so both share one string table (`strings`).
+    // result, so dead-type elimination roots at those results alone.
+    let mut strings = StringTableBuilder::new();
+    intern_predicate_strings(&compile_result.instructions, &mut strings);
+
     let mut types = TypeTableBuilder::new();
-    types.build(type_ctx, interner, &mut strings.borrow_mut())?;
+    types.build(type_ctx, interner, &mut strings)?;
 
     // Preamble entry FIRST ensures it gets the lowest address (step 0)
     let mut entry_labels: Vec<Label> = vec![compile_result.preamble_entry];
@@ -62,20 +66,20 @@ pub fn emit_unchecked(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
         let sym = match node_kind {
             NodeKind::Named(sym) | NodeKind::Anonymous(sym) => *sym,
         };
-        let name = strings.borrow_mut().get_or_intern(sym, interner)?;
+        let name = strings.get_or_intern(sym, interner)?;
         node_kinds.push(NodeKindEntry::new(node_id.get(), name));
     }
 
     let mut fields: Vec<FieldEntry> = Vec::new();
     for (&sym, &field_id) in node_field_ids {
-        let name = strings.borrow_mut().get_or_intern(sym, interner)?;
+        let name = strings.get_or_intern(sym, interner)?;
         fields.push(FieldEntry::new(field_id.get(), name));
     }
 
     let mut entrypoints: Vec<Entrypoint> = Vec::new();
     for (def_id, type_id) in type_ctx.iter_def_types() {
         let name_sym = type_ctx.def_name_sym(def_id);
-        let name = strings.borrow_mut().get_or_intern(name_sym, interner)?;
+        let name = strings.get_or_intern(name_sym, interner)?;
         let result_type = types.resolve_type(type_id, type_ctx)?;
 
         let target = compile_result
@@ -87,8 +91,6 @@ pub fn emit_unchecked(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
 
         entrypoints.push(Entrypoint::new(name, target, result_type));
     }
-
-    let strings = strings.into_inner();
 
     strings.validate()?;
     types.validate()?;
@@ -106,8 +108,13 @@ pub fn emit_unchecked(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
     intern_regex_predicates(&compile_result.instructions, &strings, &mut regexes)?;
     regexes.validate()?;
 
-    let transitions_bytes =
-        emit_transitions(&compile_result.instructions, &layout, &types, &regexes)?;
+    let transitions_bytes = emit_transitions(
+        &compile_result.instructions,
+        &layout,
+        &types,
+        &strings,
+        &regexes,
+    )?;
 
     let (str_blob, str_table) = strings.emit();
     let (regex_blob, regex_table) = regexes.emit();
@@ -172,8 +179,8 @@ pub fn emit_unchecked(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
 /// `check` deliberately bypasses this via [`emit_unchecked`]: it loads the
 /// bytecode itself and reports a rejection as a diagnostic, so it must never
 /// reach this panic, in debug or release.
-pub fn emit(query: &GrammarBoundQuery) -> Result<Vec<u8>, EmitError> {
-    let output = emit_unchecked(query)?;
+pub fn emit(input: EmitInput<'_>, compile_result: &CompileResult) -> Result<Vec<u8>, EmitError> {
+    let output = emit_unchecked(input, compile_result)?;
     #[cfg(debug_assertions)]
     if let Err(err) = plotnik_bytecode::Module::load(&output) {
         panic!("compiler emitted bytecode rejected by Module::load: {err:?}");
@@ -194,16 +201,16 @@ fn emit_transitions(
     instructions: &[crate::bytecode::InstructionIR],
     layout: &crate::bytecode::LayoutMap,
     types: &TypeTableBuilder,
+    strings: &StringTableBuilder,
     regexes: &RegexTableBuilder,
 ) -> Result<Vec<u8>, EmitError> {
     let mut bytes = vec![0u8; layout.total_steps() as usize * STEP_SIZE];
 
-    // Member index resolvers: struct fields and enum variants both resolve via
-    // parent_type + relative_index (get_member_base); regex predicates index the
-    // RegexTable. Bundled into EmitResolvers so resolution signatures stay flat.
-    let get_member_base = |type_id: TypeId| types.get_member_base(type_id);
-    let lookup_regex = |string_id: plotnik_bytecode::StringId| regexes.lookup(string_id);
-    let ctx = EmitResolvers::new(&get_member_base, &lookup_regex);
+    let ctx = ResolveCtx {
+        types,
+        strings,
+        regexes,
+    };
 
     for instr in instructions {
         let label = instr.label();
@@ -212,7 +219,7 @@ fn emit_transitions(
         };
 
         let offset = step_id as usize * STEP_SIZE;
-        let resolved = instr.resolve(layout.step_addrs(), &ctx)?;
+        let resolved = resolve_instruction(instr, layout.step_addrs(), &ctx)?;
 
         let end = offset + resolved.len();
         if end <= bytes.len() {
@@ -223,6 +230,119 @@ fn emit_transitions(
     Ok(bytes)
 }
 
+struct ResolveCtx<'a> {
+    types: &'a TypeTableBuilder,
+    strings: &'a StringTableBuilder,
+    regexes: &'a RegexTableBuilder,
+}
+
+fn resolve_instruction(
+    instr: &InstructionIR,
+    map: &BTreeMap<Label, StepAddr>,
+    ctx: &ResolveCtx<'_>,
+) -> Result<Vec<u8>, EmitError> {
+    match instr {
+        InstructionIR::Match(m) => resolve_match(m, map, ctx),
+        InstructionIR::Call(c) => Ok(resolve_call(c, map).to_vec()),
+        InstructionIR::Return(_) => Ok(Return::new().to_bytes().to_vec()),
+        InstructionIR::Trampoline(t) => Ok(resolve_trampoline(t, map).to_vec()),
+    }
+}
+
+fn resolve_match(
+    m: &MatchIR,
+    map: &BTreeMap<Label, StepAddr>,
+    ctx: &ResolveCtx<'_>,
+) -> Result<Vec<u8>, EmitError> {
+    let pre_effects = m
+        .pre_effects
+        .iter()
+        .map(|e| resolve_effect(e, ctx))
+        .collect();
+    let post_effects = m
+        .post_effects
+        .iter()
+        .map(|e| resolve_effect(e, ctx))
+        .collect();
+    let predicate = m.predicate.as_ref().map(|pred| {
+        let string_id = ctx
+            .strings
+            .lookup_str(pred.value.text())
+            .expect("predicate string must be interned before transition emission");
+        let value_ref = if pred.value.is_regex() {
+            ctx.regexes
+                .lookup(string_id)
+                .expect("regex predicate must be interned")
+        } else {
+            string_id.as_u16()
+        };
+        MatchPredicate {
+            op: pred.op_byte(),
+            is_regex: pred.value.is_regex(),
+            value_ref,
+        }
+    });
+    let successors = m
+        .successors
+        .iter()
+        .map(|&l| StepId::new(l.resolve(map)))
+        .collect();
+
+    let instr = MatchInstr {
+        nav: m.nav,
+        node_kind: m.node_kind,
+        node_field: m.node_field,
+        pre_effects,
+        neg_fields: m.neg_fields.clone(),
+        post_effects,
+        predicate,
+        successors,
+    };
+    instr.encode().map_err(EmitError::from)
+}
+
+fn resolve_call(c: &crate::bytecode::CallIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
+    Call::new(
+        c.nav,
+        c.node_field,
+        StepId::new(c.next.resolve(map)),
+        StepId::new(c.target.resolve(map)),
+    )
+    .to_bytes()
+}
+
+fn resolve_trampoline(
+    t: &crate::bytecode::TrampolineIR,
+    map: &BTreeMap<Label, StepAddr>,
+) -> [u8; 8] {
+    Trampoline::new(StepId::new(t.next.resolve(map))).to_bytes()
+}
+
+fn resolve_effect(effect: &EffectIR, ctx: &ResolveCtx<'_>) -> Effect {
+    let payload = match effect.payload() {
+        EffectArg::Literal(payload) => *payload,
+        EffectArg::Member(member_ref) => resolve_member_ref(*member_ref, ctx) as usize,
+    };
+    Effect::new(effect.kind(), payload)
+}
+
+fn resolve_member_ref(member_ref: MemberRef, ctx: &ResolveCtx<'_>) -> u16 {
+    ctx.types
+        .get_member_base(member_ref.parent_type)
+        .expect("member base must resolve")
+        + member_ref.relative_index
+}
+
+fn intern_predicate_strings(instructions: &[InstructionIR], strings: &mut StringTableBuilder) {
+    for instr in instructions {
+        if let InstructionIR::Match(m) = instr
+            && let Some(pred) = &m.predicate
+        {
+            strings.get_or_intern_str(pred.value.text());
+        }
+    }
+}
+
 fn intern_regex_predicates(
     instructions: &[InstructionIR],
     strings: &StringTableBuilder,
@@ -231,10 +351,12 @@ fn intern_regex_predicates(
     for instr in instructions {
         if let InstructionIR::Match(m) = instr
             && let Some(pred) = &m.predicate
-            && let PredicateValueIR::Regex(string_id) = &pred.value
+            && let PredicateValueIR::Regex(pattern) = &pred.value
         {
-            let pattern = strings.get_str(*string_id);
-            regexes.intern(pattern, *string_id)?;
+            let string_id = strings
+                .lookup_str(pattern)
+                .expect("regex predicate string must be interned before regex emission");
+            regexes.intern(pattern, string_id)?;
         }
     }
     Ok(())
