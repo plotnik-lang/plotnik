@@ -9,6 +9,7 @@ pub mod located;
 pub mod source;
 pub mod span;
 pub mod symbol_table;
+pub mod type_context;
 pub mod type_shape;
 pub mod validated_ast;
 pub mod visitor;
@@ -32,6 +33,7 @@ pub use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 pub use source::{Source, SourceId, SourceKind, SourceMap};
 pub use span::Span;
 pub use symbol_table::SymbolTable;
+pub use type_context::TypeContext;
 pub use type_shape::{FieldInfo, TermInfo, TypeFlow, TypeShape};
 pub use validated_ast::ValidatedAst;
 
