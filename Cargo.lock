@@ -2038,6 +2038,7 @@ name = "plotnik-diagnostics"
 version = "0.3.3"
 dependencies = [
  "annotate-snippets",
+ "insta",
  "rowan",
  "serde",
  "serde_json",
