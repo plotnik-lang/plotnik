@@ -10,13 +10,13 @@ description = "Query facade and pipeline orchestration for Plotnik"
 workspace = true
 
 [dependencies]
-plotnik-analyze.workspace = true
+plotnik-compiler-analyze.workspace = true
 plotnik-bytecode.workspace = true
-plotnik-compile.workspace = true
+plotnik-compiler-lower.workspace = true
 plotnik-core.workspace = true
-plotnik-diagnostics.workspace = true
-plotnik-emit.workspace = true
-plotnik-ir.workspace = true
-plotnik-parser.workspace = true
+plotnik-compiler-diagnostics.workspace = true
+plotnik-compiler-emit.workspace = true
+plotnik-compiler-ir.workspace = true
+plotnik-compiler-parse.workspace = true
 indexmap = "2"
 rowan = "0.16.1"

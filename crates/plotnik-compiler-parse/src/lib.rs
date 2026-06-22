@@ -1,14 +1,14 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod diagnostics {
-    pub use plotnik_diagnostics::diagnostics::*;
+    pub use plotnik_compiler_diagnostics::diagnostics::*;
 }
 
 pub mod source {
-    pub use plotnik_diagnostics::source::*;
+    pub use plotnik_compiler_diagnostics::source::*;
 }
 
-pub use plotnik_diagnostics::{Error, Result};
+pub use plotnik_compiler_diagnostics::{Error, Result};
 
 pub mod parser {
     #[path = "../../../plotnik-compiler/src/parser/ast.rs"]

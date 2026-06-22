@@ -1949,19 +1949,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "plotnik-analyze"
-version = "0.3.3"
-dependencies = [
- "indexmap",
- "plotnik-bytecode",
- "plotnik-core",
- "plotnik-diagnostics",
- "plotnik-parser",
- "regex-syntax",
- "rowan",
-]
-
-[[package]]
 name = "plotnik-bytecode"
 version = "0.3.3"
 dependencies = [
@@ -1973,18 +1960,6 @@ dependencies = [
  "proptest",
  "regex-automata",
  "thiserror",
-]
-
-[[package]]
-name = "plotnik-compile"
-version = "0.3.3"
-dependencies = [
- "indexmap",
- "plotnik-analyze",
- "plotnik-bytecode",
- "plotnik-core",
- "plotnik-ir",
- "plotnik-parser",
 ]
 
 [[package]]
@@ -2000,16 +1975,16 @@ dependencies = [
  "insta",
  "logos",
  "memmap2",
- "plotnik-analyze",
  "plotnik-bytecode",
- "plotnik-compile",
+ "plotnik-compiler-analyze",
+ "plotnik-compiler-diagnostics",
+ "plotnik-compiler-emit",
+ "plotnik-compiler-ir",
+ "plotnik-compiler-lower",
+ "plotnik-compiler-parse",
+ "plotnik-compiler-typegen",
  "plotnik-core",
- "plotnik-diagnostics",
- "plotnik-emit",
- "plotnik-ir",
- "plotnik-parser",
  "plotnik-query",
- "plotnik-typegen",
  "regex-automata",
  "regex-syntax",
  "rowan",
@@ -2017,6 +1992,85 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
+]
+
+[[package]]
+name = "plotnik-compiler-analyze"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-bytecode",
+ "plotnik-compiler-diagnostics",
+ "plotnik-compiler-parse",
+ "plotnik-core",
+ "regex-syntax",
+ "rowan",
+]
+
+[[package]]
+name = "plotnik-compiler-diagnostics"
+version = "0.3.3"
+dependencies = [
+ "annotate-snippets",
+ "insta",
+ "rowan",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "plotnik-compiler-emit"
+version = "0.3.3"
+dependencies = [
+ "crc32fast",
+ "indexmap",
+ "plotnik-bytecode",
+ "plotnik-compiler-analyze",
+ "plotnik-compiler-ir",
+ "plotnik-core",
+ "regex-automata",
+ "thiserror",
+]
+
+[[package]]
+name = "plotnik-compiler-ir"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-bytecode",
+ "plotnik-core",
+]
+
+[[package]]
+name = "plotnik-compiler-lower"
+version = "0.3.3"
+dependencies = [
+ "indexmap",
+ "plotnik-bytecode",
+ "plotnik-compiler-analyze",
+ "plotnik-compiler-ir",
+ "plotnik-compiler-parse",
+ "plotnik-core",
+]
+
+[[package]]
+name = "plotnik-compiler-parse"
+version = "0.3.3"
+dependencies = [
+ "logos",
+ "plotnik-bytecode",
+ "plotnik-compiler-diagnostics",
+ "plotnik-core",
+ "rowan",
+]
+
+[[package]]
+name = "plotnik-compiler-typegen"
+version = "0.3.3"
+dependencies = [
+ "plotnik-bytecode",
+ "plotnik-core",
 ]
 
 [[package]]
@@ -2031,41 +2085,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "topological-sort",
-]
-
-[[package]]
-name = "plotnik-diagnostics"
-version = "0.3.3"
-dependencies = [
- "annotate-snippets",
- "insta",
- "rowan",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "plotnik-emit"
-version = "0.3.3"
-dependencies = [
- "crc32fast",
- "indexmap",
- "plotnik-analyze",
- "plotnik-bytecode",
- "plotnik-core",
- "plotnik-ir",
- "regex-automata",
- "thiserror",
-]
-
-[[package]]
-name = "plotnik-ir"
-version = "0.3.3"
-dependencies = [
- "indexmap",
- "plotnik-bytecode",
- "plotnik-core",
 ]
 
 [[package]]
@@ -2089,38 +2108,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "plotnik-parser"
-version = "0.3.3"
-dependencies = [
- "logos",
- "plotnik-bytecode",
- "plotnik-core",
- "plotnik-diagnostics",
- "rowan",
-]
-
-[[package]]
 name = "plotnik-query"
 version = "0.3.3"
 dependencies = [
  "indexmap",
- "plotnik-analyze",
  "plotnik-bytecode",
- "plotnik-compile",
+ "plotnik-compiler-analyze",
+ "plotnik-compiler-diagnostics",
+ "plotnik-compiler-emit",
+ "plotnik-compiler-ir",
+ "plotnik-compiler-lower",
+ "plotnik-compiler-parse",
  "plotnik-core",
- "plotnik-diagnostics",
- "plotnik-emit",
- "plotnik-ir",
- "plotnik-parser",
  "rowan",
-]
-
-[[package]]
-name = "plotnik-typegen"
-version = "0.3.3"
-dependencies = [
- "plotnik-bytecode",
- "plotnik-core",
 ]
 
 [[package]]

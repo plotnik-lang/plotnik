@@ -28,23 +28,23 @@ pub mod test_utils;
 pub mod typegen;
 
 #[cfg(not(test))]
-pub use plotnik_analyze as analyze;
+pub use plotnik_compiler_analyze as analyze;
 #[cfg(not(test))]
-pub use plotnik_compile as compile;
+pub use plotnik_compiler_lower as compile;
 #[cfg(not(test))]
-pub use plotnik_diagnostics as diagnostics;
+pub use plotnik_compiler_diagnostics as diagnostics;
 #[cfg(not(test))]
-pub use plotnik_diagnostics::source;
+pub use plotnik_compiler_diagnostics::source;
 #[cfg(not(test))]
-pub use plotnik_emit as emit;
+pub use plotnik_compiler_emit as emit;
 #[cfg(not(test))]
-pub use plotnik_ir as bytecode;
+pub use plotnik_compiler_ir as bytecode;
 #[cfg(not(test))]
-pub use plotnik_parser as parser;
+pub use plotnik_compiler_parse as parser;
 #[cfg(not(test))]
 pub use plotnik_query as query;
 #[cfg(not(test))]
-pub use plotnik_typegen as typegen;
+pub use plotnik_compiler_typegen as typegen;
 
 #[cfg(test)]
 pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;
@@ -78,6 +78,6 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[cfg(not(test))]
-pub use plotnik_diagnostics::{Diagnostics, Error, PassResult, Result, Severity, SourceId, SourceMap, Span};
+pub use plotnik_compiler_diagnostics::{Diagnostics, Error, PassResult, Result, Severity, SourceId, SourceMap, Span};
 #[cfg(not(test))]
 pub use plotnik_query::{Query, QueryBuilder};

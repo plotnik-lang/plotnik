@@ -1,18 +1,19 @@
 [package]
-name = "plotnik-compile"
+name = "plotnik-compiler-analyze"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "AST to IR compilation for Plotnik queries"
+description = "Semantic analysis for Plotnik queries"
 
 [lints]
 workspace = true
 
 [dependencies]
-plotnik-analyze.workspace = true
 plotnik-bytecode.workspace = true
 plotnik-core.workspace = true
-plotnik-ir.workspace = true
-plotnik-parser.workspace = true
+plotnik-compiler-diagnostics.workspace = true
+plotnik-compiler-parse.workspace = true
 indexmap = "2"
+regex-syntax = "0.8"
+rowan = "0.16.1"

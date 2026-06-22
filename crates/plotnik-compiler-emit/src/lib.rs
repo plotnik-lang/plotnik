@@ -1,11 +1,11 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod analyze {
-    pub use plotnik_analyze::analyze::*;
+    pub use plotnik_compiler_analyze::analyze::*;
 }
 
 pub mod bytecode {
-    pub use plotnik_ir::*;
+    pub use plotnik_compiler_ir::*;
 }
 
 pub mod emit {

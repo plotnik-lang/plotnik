@@ -1,5 +1,5 @@
 [package]
-name = "plotnik-diagnostics"
+name = "plotnik-compiler-diagnostics"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

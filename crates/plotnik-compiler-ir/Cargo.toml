@@ -1,10 +1,10 @@
 [package]
-name = "plotnik-typegen"
+name = "plotnik-compiler-ir"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Type declaration generation for Plotnik bytecode"
+description = "Intermediate representation for Plotnik compilation"
 
 [lints]
 workspace = true
@@ -12,3 +12,4 @@ workspace = true
 [dependencies]
 plotnik-bytecode.workspace = true
 plotnik-core.workspace = true
+indexmap = "2"

@@ -1,5 +1,5 @@
 [package]
-name = "plotnik-parser"
+name = "plotnik-compiler-parse"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,6 +12,6 @@ workspace = true
 [dependencies]
 plotnik-bytecode.workspace = true
 plotnik-core.workspace = true
-plotnik-diagnostics.workspace = true
+plotnik-compiler-diagnostics.workspace = true
 logos = "0.16.0"
 rowan = "0.16.1"

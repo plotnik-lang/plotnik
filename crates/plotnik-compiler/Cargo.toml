@@ -10,16 +10,16 @@ description = "Compiler for Plotnik query language (parser, analyzer, bytecode e
 workspace = true
 
 [dependencies]
-plotnik-analyze.workspace = true
+plotnik-compiler-analyze.workspace = true
 plotnik-bytecode.workspace = true
-plotnik-compile.workspace = true
+plotnik-compiler-lower.workspace = true
 plotnik-core.workspace = true
-plotnik-diagnostics.workspace = true
-plotnik-emit.workspace = true
-plotnik-ir.workspace = true
-plotnik-parser.workspace = true
+plotnik-compiler-diagnostics.workspace = true
+plotnik-compiler-emit.workspace = true
+plotnik-compiler-ir.workspace = true
+plotnik-compiler-parse.workspace = true
 plotnik-query.workspace = true
-plotnik-typegen.workspace = true
+plotnik-compiler-typegen.workspace = true
 annotate-snippets = "0.12.9"
 logos = "0.16.0"
 indexmap = "2"

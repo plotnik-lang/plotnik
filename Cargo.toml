@@ -2,18 +2,18 @@
 resolver = "2"
 members = [
     "crates/plotnik-bytecode",
-    "crates/plotnik-analyze",
     "crates/plotnik-cli",
-    "crates/plotnik-compile",
     "crates/plotnik-compiler",
+    "crates/plotnik-compiler-analyze",
+    "crates/plotnik-compiler-diagnostics",
+    "crates/plotnik-compiler-emit",
+    "crates/plotnik-compiler-ir",
+    "crates/plotnik-compiler-lower",
+    "crates/plotnik-compiler-parse",
+    "crates/plotnik-compiler-typegen",
     "crates/plotnik-core",
-    "crates/plotnik-diagnostics",
-    "crates/plotnik-emit",
-    "crates/plotnik-ir",
     "crates/plotnik-lib",
-    "crates/plotnik-parser",
     "crates/plotnik-query",
-    "crates/plotnik-typegen",
     "crates/plotnik-vm",
 ]
 
@@ -25,17 +25,17 @@ edition = "2024"
 
 [workspace.dependencies]
 plotnik-bytecode = { path = "crates/plotnik-bytecode", version = "0.3.3" }
-plotnik-analyze = { path = "crates/plotnik-analyze", version = "0.3.3" }
-plotnik-compile = { path = "crates/plotnik-compile", version = "0.3.3" }
 plotnik-compiler = { path = "crates/plotnik-compiler", version = "0.3.3" }
+plotnik-compiler-analyze = { path = "crates/plotnik-compiler-analyze", version = "0.3.3" }
+plotnik-compiler-diagnostics = { path = "crates/plotnik-compiler-diagnostics", version = "0.3.3" }
+plotnik-compiler-emit = { path = "crates/plotnik-compiler-emit", version = "0.3.3" }
+plotnik-compiler-ir = { path = "crates/plotnik-compiler-ir", version = "0.3.3" }
+plotnik-compiler-lower = { path = "crates/plotnik-compiler-lower", version = "0.3.3" }
+plotnik-compiler-parse = { path = "crates/plotnik-compiler-parse", version = "0.3.3" }
+plotnik-compiler-typegen = { path = "crates/plotnik-compiler-typegen", version = "0.3.3" }
 plotnik-core = { path = "crates/plotnik-core", version = "0.3.3" }
-plotnik-diagnostics = { path = "crates/plotnik-diagnostics", version = "0.3.3" }
-plotnik-emit = { path = "crates/plotnik-emit", version = "0.3.3" }
-plotnik-ir = { path = "crates/plotnik-ir", version = "0.3.3" }
 plotnik-lib = { path = "crates/plotnik-lib", version = "0.3.3" }
-plotnik-parser = { path = "crates/plotnik-parser", version = "0.3.3" }
 plotnik-query = { path = "crates/plotnik-query", version = "0.3.3" }
-plotnik-typegen = { path = "crates/plotnik-typegen", version = "0.3.3" }
 plotnik-vm = { path = "crates/plotnik-vm", version = "0.3.3" }
 
 [workspace.lints.rust]
