@@ -4,7 +4,7 @@ pub mod link;
 mod utils;
 
 pub mod symbol_table {
-    pub use plotnik_compiler_analyze_names::symbol_table::*;
+    pub use plotnik_compiler_core::SymbolTable;
 }
 
 pub mod visitor {

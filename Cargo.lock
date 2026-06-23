@@ -2011,10 +2011,8 @@ name = "plotnik-compiler-analyze-grammar"
 version = "0.3.3"
 dependencies = [
  "indexmap",
- "plotnik-compiler-analyze-names",
  "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
- "plotnik-compiler-parse",
  "plotnik-core",
  "rowan",
 ]
@@ -2026,7 +2024,6 @@ dependencies = [
  "indexmap",
  "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
- "plotnik-compiler-parse",
 ]
 
 [[package]]
@@ -2034,10 +2031,8 @@ name = "plotnik-compiler-analyze-refs"
 version = "0.3.3"
 dependencies = [
  "indexmap",
- "plotnik-compiler-analyze-names",
  "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
- "plotnik-compiler-parse",
  "plotnik-core",
  "rowan",
 ]
@@ -2049,7 +2044,6 @@ dependencies = [
  "indexmap",
  "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
- "plotnik-compiler-parse",
  "regex-syntax",
  "rowan",
 ]
@@ -2060,10 +2054,8 @@ version = "0.3.3"
 dependencies = [
  "indexmap",
  "plotnik-bytecode",
- "plotnik-compiler-analyze-names",
  "plotnik-compiler-core",
  "plotnik-compiler-diagnostics",
- "plotnik-compiler-parse",
  "plotnik-core",
  "rowan",
 ]

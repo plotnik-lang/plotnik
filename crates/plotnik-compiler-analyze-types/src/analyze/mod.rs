@@ -8,7 +8,7 @@ pub mod dependencies {
 }
 
 pub mod symbol_table {
-    pub use plotnik_compiler_analyze_names::symbol_table::*;
+    pub use plotnik_compiler_core::SymbolTable;
 }
 
 pub use entrypoints::validate_entrypoints;
