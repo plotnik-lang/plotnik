@@ -109,14 +109,19 @@ impl QueryParsed {
 
 impl QueryParsed {
     pub fn analyze(mut self) -> Query {
-        let mut interner = Interner::new();
-
-        let (symbol_table, type_analysis, dependency_analysis) = {
-            let validated = validate_ast(AstValidationInput {
+        let analysis = {
+            let Some(validated) = validate_ast(AstValidationInput {
                 source_map: &self.source_map,
                 ast_map: &self.ast_map,
                 diag: &mut self.diag,
-            });
+            }) else {
+                return Query {
+                    parsed: self,
+                    analysis: None,
+                };
+            };
+
+            let mut interner = Interner::new();
 
             let symbol_table = resolve_names(&validated, &mut self.diag);
 
@@ -145,15 +150,17 @@ impl QueryParsed {
                 );
             }
 
-            (symbol_table, type_analysis, dependency_analysis)
+            QueryAnalysis {
+                interner,
+                symbol_table,
+                type_analysis,
+                dependency_analysis,
+            }
         };
 
         Query {
             parsed: self,
-            interner,
-            symbol_table,
-            type_analysis,
-            dependency_analysis,
+            analysis: Some(analysis),
         }
     }
 
@@ -172,22 +179,28 @@ impl QueryParsed {
 
 pub struct Query {
     parsed: QueryParsed,
-    interner: Interner,
-    symbol_table: SymbolTable,
-    type_analysis: TypeAnalysis,
-    dependency_analysis: dependencies::DependencyAnalysis,
+    analysis: Option<QueryAnalysis>,
+}
+
+pub(super) struct QueryAnalysis {
+    pub(super) interner: Interner,
+    pub(super) symbol_table: SymbolTable,
+    pub(super) type_analysis: TypeAnalysis,
+    pub(super) dependency_analysis: dependencies::DependencyAnalysis,
 }
 
 impl Query {
     pub fn is_valid(&self) -> bool {
-        !self.parsed.diag.has_errors()
+        self.analysis.is_some() && !self.parsed.diag.has_errors()
     }
 
     pub fn arity(&self, node: &SyntaxNode) -> Option<Arity> {
+        let analysis = self.analysis.as_ref()?;
+
         use crate::compiler::parse::ast;
 
         if let Some(pattern) = ast::Pattern::cast(node.clone()) {
-            return self.type_analysis.arity(&pattern);
+            return analysis.type_analysis.arity(&pattern);
         }
 
         if let Some(root) = ast::Root::cast(node.clone()) {
@@ -199,30 +212,40 @@ impl Query {
         }
 
         if let Some(def) = ast::Def::cast(node.clone()) {
-            return def.body().and_then(|b| self.type_analysis.arity(&b));
+            return def.body().and_then(|b| analysis.type_analysis.arity(&b));
         }
 
         if let Some(branch) = ast::Branch::cast(node.clone()) {
-            return branch.body().and_then(|b| self.type_analysis.arity(&b));
+            return branch.body().and_then(|b| analysis.type_analysis.arity(&b));
         }
 
         None
     }
 
-    pub fn type_analysis(&self) -> &TypeAnalysis {
-        &self.type_analysis
+    pub(super) fn analysis(&self) -> Option<&QueryAnalysis> {
+        self.analysis.as_ref()
     }
 
-    pub fn symbol_table(&self) -> &SymbolTable {
-        &self.symbol_table
+    fn expect_analysis(&self) -> &QueryAnalysis {
+        self.analysis
+            .as_ref()
+            .expect("query analysis is only available after structural validation succeeds")
     }
 
-    pub fn interner(&self) -> &Interner {
-        &self.interner
+    pub(crate) fn type_analysis(&self) -> &TypeAnalysis {
+        &self.expect_analysis().type_analysis
     }
 
-    pub fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
-        &self.dependency_analysis
+    pub(crate) fn symbol_table(&self) -> &SymbolTable {
+        &self.expect_analysis().symbol_table
+    }
+
+    pub(crate) fn interner(&self) -> &Interner {
+        &self.expect_analysis().interner
+    }
+
+    pub(crate) fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
+        &self.expect_analysis().dependency_analysis
     }
 
     pub fn source_map(&self) -> &SourceMap {
@@ -241,14 +264,16 @@ impl Query {
         let mut output = link::GrammarBindingBuilder::new();
         let parsed = &mut self.parsed;
 
-        link::GrammarLinkCtx {
-            interner: &mut self.interner,
-            grammar,
-            source_map: &parsed.source_map,
-            ast_map: &parsed.ast_map,
-            symbol_table: &self.symbol_table,
+        if let Some(analysis) = &mut self.analysis {
+            link::GrammarLinkCtx {
+                interner: &mut analysis.interner,
+                grammar,
+                source_map: &parsed.source_map,
+                ast_map: &parsed.ast_map,
+                symbol_table: &analysis.symbol_table,
+            }
+            .link(&mut output, &mut parsed.diag);
         }
-        .link(&mut output, &mut parsed.diag);
 
         GrammarBoundQuery {
             analyzed: self,
@@ -277,19 +302,19 @@ impl GrammarBoundQuery {
         self.analyzed.is_valid()
     }
 
-    pub fn interner(&self) -> &Interner {
-        &self.analyzed.interner
+    pub(crate) fn interner(&self) -> &Interner {
+        self.analyzed.interner()
     }
 
-    pub fn type_analysis(&self) -> &TypeAnalysis {
+    pub(crate) fn type_analysis(&self) -> &TypeAnalysis {
         self.analyzed.type_analysis()
     }
 
-    pub fn symbol_table(&self) -> &SymbolTable {
+    pub(crate) fn symbol_table(&self) -> &SymbolTable {
         self.analyzed.symbol_table()
     }
 
-    pub fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
+    pub(crate) fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
         self.analyzed.dependency_analysis()
     }
 

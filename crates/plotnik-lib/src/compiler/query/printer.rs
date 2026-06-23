@@ -111,7 +111,10 @@ impl<'q> QueryPrinter<'q> {
     }
 
     fn format_symbols(&self, w: &mut impl Write) -> std::fmt::Result {
-        let symbols = self.query.symbol_table();
+        let Some(analysis) = self.query.analysis() else {
+            return Ok(());
+        };
+        let symbols = &analysis.symbol_table;
         if symbols.is_empty() {
             return Ok(());
         }
@@ -164,7 +167,11 @@ impl<'q> QueryPrinter<'q> {
         writeln!(w, "{}{}{}", prefix, name, arity)?;
         visited.insert(name.to_string());
 
-        if let Some(body) = self.query.symbol_table().body(name) {
+        let analysis = self
+            .query
+            .analysis()
+            .expect("symbol formatting only recurses after analysis exists");
+        if let Some(body) = analysis.symbol_table.body(name) {
             let refs_set = crate::compiler::analyze::refs::refs::ref_names(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();

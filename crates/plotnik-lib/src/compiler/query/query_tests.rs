@@ -4,6 +4,7 @@ use crate::core::grammar::{Grammar, raw::RawGrammar};
 use std::sync::LazyLock;
 
 use crate::compiler::SourceMap;
+use crate::compiler::diagnostics::DiagnosticKind;
 
 use super::{GrammarBoundQuery, Query, QueryBuilder};
 
@@ -27,6 +28,17 @@ macro_rules! expect_invalid {
         }
         query.dump_diagnostics()
     }};
+}
+
+#[test]
+fn structural_validation_failure_stops_later_analysis() {
+    let query = Query::expect("Q = {. (Missing)}");
+
+    assert!(!query.is_valid());
+    let kinds: Vec<_> = query.diagnostics().kinds().collect();
+    assert!(kinds.contains(&DiagnosticKind::AnchorWithoutContext));
+    assert!(!kinds.contains(&DiagnosticKind::UndefinedReference));
+    assert_eq!(query.dump_symbols(), "");
 }
 
 impl Query {
@@ -235,6 +247,24 @@ impl Query {
 
         query.dump_cst()
     }
+}
+
+#[test]
+fn parse_errors_do_not_admit_analysis() {
+    let query = Query::expect("Q = (identifier");
+
+    assert!(!query.is_valid());
+    assert!(query.analysis().is_none());
+    assert!(query.dump_cst().contains("Root"));
+}
+
+#[test]
+fn structural_validation_errors_do_not_admit_analysis() {
+    let query = Query::expect("Q = {. (identifier)}");
+
+    assert!(!query.is_valid());
+    assert!(query.analysis().is_none());
+    assert!(query.dump_cst().contains("Root"));
 }
 
 #[test]

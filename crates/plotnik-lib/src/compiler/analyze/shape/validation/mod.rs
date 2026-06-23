@@ -44,7 +44,7 @@ pub struct AstValidationInput<'q, 'd> {
 
 pub use crate::compiler::core::ValidatedAst;
 
-pub fn validate_ast<'q>(input: AstValidationInput<'q, '_>) -> ValidatedAst<'q> {
+pub fn validate_ast<'q>(input: AstValidationInput<'q, '_>) -> Option<ValidatedAst<'q>> {
     for source in input.source_map.iter() {
         let ast = input
             .ast_map
@@ -73,7 +73,7 @@ pub fn validate_ast<'q>(input: AstValidationInput<'q, '_>) -> ValidatedAst<'q> {
         });
     }
 
-    ValidatedAst::new(input.source_map, input.ast_map)
+    (!input.diag.has_errors()).then(|| ValidatedAst::new(input.source_map, input.ast_map))
 }
 
 pub use alt_kinds::validate_alt_kinds;

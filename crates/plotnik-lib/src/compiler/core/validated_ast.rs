@@ -11,7 +11,22 @@ pub struct ValidatedAst<'q> {
 }
 
 impl<'q> ValidatedAst<'q> {
-    pub fn new(source_map: &'q SourceMap, ast_map: &'q IndexMap<SourceId, Root>) -> Self {
+    pub(in crate::compiler) fn new(
+        source_map: &'q SourceMap,
+        ast_map: &'q IndexMap<SourceId, Root>,
+    ) -> Self {
+        assert_eq!(
+            source_map.len(),
+            ast_map.len(),
+            "validated AST must contain exactly one root per source",
+        );
+        assert!(
+            source_map
+                .iter()
+                .all(|source| ast_map.contains_key(&source.id)),
+            "validated AST must contain every source",
+        );
+
         Self {
             source_map,
             ast_map,
