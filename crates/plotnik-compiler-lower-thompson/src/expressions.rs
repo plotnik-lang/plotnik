@@ -9,12 +9,12 @@
 
 use std::num::NonZeroU16;
 
-use crate::analyze::type_check::TypeShape;
-use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR};
-use crate::parser::ast::{self, Pattern};
+use plotnik_compiler_core::TypeShape;
+use plotnik_compiler_core::ir::{EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR};
+use plotnik_compiler_core::ast::{self, Pattern};
 use plotnik_bytecode::Nav;
 
-use crate::analyze::type_check::{CaptureMechanism, classify_capture_mechanism};
+use plotnik_compiler_core::{CaptureMechanism, classify_capture_mechanism};
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};

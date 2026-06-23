@@ -8,9 +8,9 @@ use std::collections::{BTreeMap, HashSet};
 
 use plotnik_core::Symbol;
 
-use crate::analyze::type_check::{TypeId, TypeShape};
-use crate::bytecode::{EffectIR, InstructionIR, Label, MemberRef, NodeKindConstraint};
-use crate::parser::ast::{self, Pattern, SeqItem};
+use plotnik_compiler_core::{TypeId, TypeShape};
+use plotnik_compiler_core::ir::{EffectIR, InstructionIR, Label, MemberRef, NodeKindConstraint};
+use plotnik_compiler_core::ast::{self, Pattern, SeqItem};
 use plotnik_bytecode::{EffectKind, Nav};
 
 use super::Compiler;

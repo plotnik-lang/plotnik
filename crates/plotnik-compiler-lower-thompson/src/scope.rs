@@ -4,9 +4,9 @@
 
 use std::num::NonZeroU16;
 
-use crate::analyze::type_check::TypeId;
-use crate::bytecode::{CallIR, EffectIR, Label, MatchIR, MemberRef};
-use crate::parser::Pattern;
+use plotnik_compiler_core::TypeId;
+use plotnik_compiler_core::ir::{CallIR, EffectIR, Label, MatchIR, MemberRef};
+use plotnik_compiler_core::Pattern;
 use plotnik_bytecode::{EffectKind, Nav};
 
 use super::Compiler;

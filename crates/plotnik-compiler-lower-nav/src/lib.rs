@@ -1,8 +1,10 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod bytecode {
-    pub use plotnik_compiler_core::ir::*;
-}
+//! Up-navigation collapse: merge consecutive `Up` moves in the compiled IR.
 
-pub mod compile;
-pub use compile::*;
+mod collapse_up;
+
+#[cfg(test)]
+mod collapse_up_tests;
+
+pub use collapse_up::collapse_up;

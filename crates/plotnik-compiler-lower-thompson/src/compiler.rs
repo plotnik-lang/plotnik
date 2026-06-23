@@ -4,14 +4,14 @@ use indexmap::IndexMap;
 use plotnik_compiler_core::{DependencyAnalysis, GrammarBinding};
 use plotnik_core::Interner;
 
-use crate::analyze::symbol_table::SymbolTable;
-use crate::analyze::type_check::{DefId, TypeAnalysis};
-use crate::bytecode::{InstructionIR, Label, ReturnIR, TrampolineIR};
-use crate::parser::Pattern;
+use plotnik_compiler_core::SymbolTable;
+use plotnik_compiler_core::{DefId, TypeAnalysis};
+use plotnik_compiler_core::ir::{InstructionIR, Label, ReturnIR, TrampolineIR};
+use plotnik_compiler_core::Pattern;
 use plotnik_bytecode::Nav;
 
 use super::capture::ExprCtx;
-use super::error::CompileResult;
+use crate::CompileResult;
 use super::scope::{CaptureExits, StructScope};
 use super::verify::verify_constructed;
 

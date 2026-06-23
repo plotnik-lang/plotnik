@@ -8,10 +8,6 @@
 
 #[cfg(test)]
 pub mod analyze;
-#[cfg(test)]
-pub mod bytecode;
-#[cfg(test)]
-pub mod compile;
 pub mod emit;
 #[cfg(test)]
 pub mod parser;
@@ -62,7 +58,6 @@ pub mod analyze {
         TypeAnalysis, TypeAnalysisBuilder, infer_types, validate_entrypoints,
     };
 }
-#[cfg(not(test))]
 pub mod compile {
     pub use plotnik_compiler_lower_dead::remove_unreachable;
     pub use plotnik_compiler_lower_epsilon::eliminate_epsilons;
@@ -71,15 +66,17 @@ pub mod compile {
     pub use plotnik_compiler_lower_thompson::{CaptureEffects, CompileCtx, CompileResult, Compiler};
 
     pub mod verify {
-        pub use plotnik_compiler_lower_thompson::compile::verify::*;
+        pub use plotnik_compiler_lower_thompson::verify::*;
     }
+
+    #[cfg(test)]
+    mod compile_tests;
 }
 pub mod diagnostics {
     pub use plotnik_compiler_diagnostics::*;
     pub use plotnik_compiler_diagnostics::diagnostics::*;
 }
 pub use plotnik_compiler_diagnostics::source;
-#[cfg(not(test))]
 pub use plotnik_compiler_core::ir as bytecode;
 #[cfg(not(test))]
 pub use plotnik_compiler_parse as parser;

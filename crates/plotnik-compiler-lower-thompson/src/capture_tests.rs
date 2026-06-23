@@ -1,6 +1,6 @@
 use super::capture::CaptureEffects;
-use crate::analyze::type_check::TypeId;
-use crate::bytecode::{EffectIR, MemberRef};
+use plotnik_compiler_core::TypeId;
+use plotnik_compiler_core::ir::{EffectIR, MemberRef};
 use plotnik_bytecode::EffectKind;
 
 #[test]

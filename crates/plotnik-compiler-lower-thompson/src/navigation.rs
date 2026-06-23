@@ -5,8 +5,8 @@
 
 use std::collections::HashSet;
 
-use crate::analyze::symbol_table::SymbolTable;
-use crate::parser::{Pattern, Ref, SeqItem};
+use plotnik_compiler_core::SymbolTable;
+use plotnik_compiler_core::{Pattern, Ref, SeqItem};
 use plotnik_bytecode::Nav;
 
 /// Classifies whether expressions may match anonymous nodes after syntactic wrappers.
@@ -225,7 +225,7 @@ pub fn is_down_nav(nav: Option<Nav>) -> bool {
 }
 
 /// Unwraps CapturedPattern wrappers before testing for a quantifier operator.
-fn quantifier_operator_kind(pattern: &Pattern) -> Option<crate::parser::SyntaxKind> {
+fn quantifier_operator_kind(pattern: &Pattern) -> Option<plotnik_compiler_core::SyntaxKind> {
     let pattern = match pattern {
         Pattern::CapturedPattern(cap) => cap.inner()?,
         e => e.clone(),
@@ -238,7 +238,7 @@ fn quantifier_operator_kind(pattern: &Pattern) -> Option<crate::parser::SyntaxKi
 }
 
 pub fn is_skippable_quantifier(pattern: &Pattern) -> bool {
-    use crate::parser::SyntaxKind;
+    use plotnik_compiler_core::SyntaxKind;
     quantifier_operator_kind(pattern).is_some_and(|k| {
         matches!(
             k,

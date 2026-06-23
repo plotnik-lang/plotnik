@@ -36,7 +36,7 @@ pub use release_impl::{run_verified, verify_constructed};
 
 #[cfg(not(debug_assertions))]
 mod release_impl {
-    use crate::compile::CompileResult;
+    use crate::CompileResult;
 
     use super::super::compiler::CompileCtx;
 
@@ -66,9 +66,9 @@ mod debug_impl {
     use indexmap::IndexMap;
     use plotnik_bytecode::{EffectKind, Nav};
 
-    use crate::analyze::type_check::DefId;
-    use crate::bytecode::{InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR};
-    use crate::compile::CompileResult;
+    use plotnik_compiler_core::DefId;
+    use plotnik_compiler_core::ir::{InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR};
+    use crate::CompileResult;
 
     use super::super::compiler::CompileCtx;
 

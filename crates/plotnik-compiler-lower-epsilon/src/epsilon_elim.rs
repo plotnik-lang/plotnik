@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 use plotnik_bytecode::EffectKind;
 
-use crate::bytecode::{CompileResult, EffectIR, InstructionIR, Label, MatchIR};
+use plotnik_compiler_core::ir::{CompileResult, EffectIR, InstructionIR, Label, MatchIR};
 
 fn build_label_to_index(instructions: &[InstructionIR]) -> HashMap<Label, usize> {
     instructions
@@ -373,7 +373,7 @@ pub fn eliminate_epsilons(result: &mut CompileResult) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bytecode::EffectIR;
+    use plotnik_compiler_core::ir::EffectIR;
     use plotnik_bytecode::Nav;
 
     fn make_epsilon(label: u32, succs: Vec<u32>) -> InstructionIR {
@@ -626,7 +626,7 @@ mod tests {
             instructions,
             def_entries: {
                 let mut m = indexmap::IndexMap::new();
-                m.insert(crate::analyze::type_check::DefId::from_raw(0), Label(0));
+                m.insert(plotnik_compiler_core::DefId::from_raw(0), Label(0));
                 m
             },
             preamble_entry: Label(0),
@@ -635,7 +635,7 @@ mod tests {
         laser_vision(&mut result);
 
         assert_eq!(
-            result.def_entries[&crate::analyze::type_check::DefId::from_raw(0)],
+            result.def_entries[&plotnik_compiler_core::DefId::from_raw(0)],
             Label(2)
         );
     }

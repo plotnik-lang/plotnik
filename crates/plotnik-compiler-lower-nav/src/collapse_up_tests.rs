@@ -2,9 +2,9 @@
 
 use plotnik_bytecode::Nav;
 
-use super::CompileResult;
+use plotnik_compiler_core::ir::CompileResult;
 use super::collapse_up::collapse_up;
-use crate::bytecode::{InstructionIR, Label, MatchIR};
+use plotnik_compiler_core::ir::{InstructionIR, Label, MatchIR};
 
 #[test]
 fn collapse_up_single_mode() {
@@ -165,7 +165,7 @@ fn collapse_up_exact_same_mode() {
 #[test]
 fn collapse_up_with_effects_no_merge() {
     // Up(1) with post_effects → Up(1) should NOT merge
-    use crate::bytecode::EffectIR;
+    use plotnik_compiler_core::ir::EffectIR;
     use plotnik_bytecode::EffectKind;
 
     let mut result = CompileResult {

@@ -1,14 +1,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod analyze {
-    pub mod type_check {
-        pub use plotnik_compiler_core::DefId;
-    }
-}
+//! Dead-code elimination: remove unreachable steps from the compiled IR.
 
-pub mod bytecode {
-    pub use plotnik_compiler_core::ir::*;
-}
+mod dce;
 
-pub mod compile;
-pub use compile::*;
+pub use dce::remove_unreachable;

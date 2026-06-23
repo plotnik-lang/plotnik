@@ -4,9 +4,9 @@
 //! `compile_quantified_unified` entry point so greediness and search-nav logic
 //! stay in one place.
 
-use crate::bytecode::{EffectIR, Label};
-use crate::parser::SyntaxKind;
-use crate::parser::ast::{self, Pattern};
+use plotnik_compiler_core::ir::{EffectIR, Label};
+use plotnik_compiler_core::SyntaxKind;
+use plotnik_compiler_core::ast::{self, Pattern};
 use plotnik_bytecode::Nav;
 
 use super::Compiler;

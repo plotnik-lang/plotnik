@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use crate::bytecode::{CompileResult, Label};
+use plotnik_compiler_core::ir::{CompileResult, Label};
 
 pub fn remove_unreachable(result: &mut CompileResult) {
     let reachable = compute_reachable(result);
@@ -41,8 +41,8 @@ fn compute_reachable(result: &CompileResult) -> HashSet<Label> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analyze::type_check::DefId;
-    use crate::bytecode::MatchIR;
+    use plotnik_compiler_core::DefId;
+    use plotnik_compiler_core::ir::MatchIR;
     use indexmap::IndexMap;
     use plotnik_bytecode::Nav;
 

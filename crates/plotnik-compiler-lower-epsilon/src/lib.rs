@@ -1,14 +1,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod analyze {
-    pub mod type_check {
-        pub use plotnik_compiler_core::DefId;
-    }
-}
+//! Epsilon-transition elimination over the compiled IR.
 
-pub mod bytecode {
-    pub use plotnik_compiler_core::ir::*;
-}
+mod epsilon_elim;
 
-pub mod compile;
-pub use compile::*;
+pub use epsilon_elim::eliminate_epsilons;

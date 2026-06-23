@@ -1,8 +1,8 @@
 use plotnik_bytecode::{EffectKind, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, Nav};
 
-use super::CompileResult;
+use plotnik_compiler_core::ir::CompileResult;
 use super::lower::lower;
-use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR};
+use plotnik_compiler_core::ir::{EffectIR, InstructionIR, Label, MatchIR};
 
 const MAX_POST_EFFECTS: usize = 7;
 const MAX_NEG_FIELDS: usize = 7;

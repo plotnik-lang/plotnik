@@ -1,26 +1,38 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod analyze {
-    pub mod symbol_table {
-        pub use plotnik_compiler_core::SymbolTable;
-    }
+//! Thompson-like NFA construction for query compilation.
+//!
+//! Compiles query AST expressions into bytecode IR with symbolic labels.
+//! Labels are resolved to concrete StepIds during the layout phase.
+//! A `MemberRef` carries a parent type plus relative index, resolved to an
+//! absolute member index at emit time.
+//!
+//! # Module Organization
+//!
+//! The compiler is split into focused modules:
+//! - `capture`: Capture effects handling (Node + Set)
+//! - `expressions`: Leaf expression compilation (named/anon nodes, refs, fields, captures)
+//! - `navigation`: Navigation mode computation for anchors and quantifiers
+//! - `quantifier`: Unified quantifier compilation (*, +, ?)
+//! - `scope`: Scope management for struct/array wrappers
+//! - `sequences`: Sequence and alternation compilation
 
-    pub mod type_check {
-        pub use plotnik_compiler_core::{
-            CaptureMechanism, DefId, TypeAnalysis, TypeId, TypeShape, classify_capture_mechanism,
-            ref_returns_structured,
-        };
-    }
-}
+mod capture;
+mod compiler;
+mod expressions;
+mod navigation;
+mod quantifier;
+mod scope;
+mod sequences;
+pub mod verify;
 
-pub mod bytecode {
-    pub use plotnik_compiler_core::ir::*;
-}
+#[cfg(test)]
+mod capture_tests;
+#[cfg(test)]
+mod expressions_tests;
+#[cfg(test)]
+mod quantifier_tests;
 
-pub mod parser {
-    pub use plotnik_compiler_core::ast;
-    pub use plotnik_compiler_core::{Pattern, Ref, SeqItem, SyntaxKind};
-}
-
-pub mod compile;
-pub use compile::*;
+pub use capture::CaptureEffects;
+pub use compiler::{CompileCtx, Compiler};
+pub use plotnik_compiler_core::ir::CompileResult;

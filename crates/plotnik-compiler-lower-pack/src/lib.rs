@@ -1,8 +1,10 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod bytecode {
-    pub use plotnik_compiler_core::ir::*;
-}
+//! Instruction packing: lower the symbolic IR into its final packed form.
 
-pub mod compile;
-pub use compile::*;
+mod lower;
+
+#[cfg(test)]
+mod lower_tests;
+
+pub use lower::lower;
