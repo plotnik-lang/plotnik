@@ -23,7 +23,7 @@
 
 pub use crate::compiler::diagnostics::Error;
 
-pub mod ast;
+pub(crate) mod ast;
 mod cst;
 mod lexer;
 
