@@ -16,27 +16,42 @@
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub use plotnik_core::colors;
-pub use plotnik_core::grammar;
+pub mod bytecode;
+pub mod core;
+mod compiler;
+mod vm;
 
-pub use plotnik_bytecode as bytecode;
-pub use plotnik_bytecode::type_system;
+pub use crate::core::colors;
+pub use crate::core::grammar;
+pub use crate::bytecode::type_system;
 
-pub use plotnik_compiler::diagnostics;
-pub use plotnik_compiler::emit;
-pub use plotnik_compiler::query;
+pub mod diagnostics {
+    pub use crate::compiler::diagnostics::diagnostics::*;
+    pub use crate::compiler::diagnostics::*;
+}
 
-pub use plotnik_compiler_parse as parser;
-pub use plotnik_compiler_typegen as typegen;
+pub mod emit {
+    pub use crate::compiler::emit::*;
+}
 
-pub use plotnik_vm::engine;
+pub mod query {
+    pub use crate::compiler::query::*;
+}
 
-pub use plotnik_core::Colors;
+pub mod typegen {
+    pub use crate::compiler::typegen::*;
+}
 
-pub use plotnik_compiler::{Diagnostics, Error, PassResult, Result, Severity, Span};
-pub use plotnik_compiler::{Query, QueryBuilder, SourceId, SourceMap};
+pub mod engine {
+    pub use crate::vm::engine::*;
+}
 
-pub use plotnik_vm::{
+pub use crate::core::Colors;
+
+pub use crate::compiler::{Diagnostics, Error, PassResult, Result, Severity, Span};
+pub use crate::compiler::{Query, QueryBuilder, SourceId, SourceMap};
+
+pub use crate::vm::{
     EffectLog, ExecLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
     Tracer, VM, Value, ValueMaterializer, Verbosity, debug_verify_type, materialize_verified,
 };

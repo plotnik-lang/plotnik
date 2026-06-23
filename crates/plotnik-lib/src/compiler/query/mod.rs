@@ -1,0 +1,14 @@
+//! Query facade for Plotnik compilation.
+
+mod dump;
+mod printer;
+mod stages;
+
+#[cfg(test)]
+mod printer_tests;
+#[cfg(test)]
+mod query_tests;
+
+pub use crate::compiler::source::{Source, SourceId, SourceKind, SourceMap};
+pub use printer::QueryPrinter;
+pub use stages::{AstMap, GrammarBoundQuery, Query, QueryBuilder, QueryConfig, QueryParsed};

@@ -2199,22 +2199,28 @@ dependencies = [
 name = "plotnik-lib"
 version = "0.3.3"
 dependencies = [
+ "annotate-snippets",
  "arborium-javascript",
  "arborium-tree-sitter",
+ "bitflags",
  "cargo_metadata",
+ "crc32fast",
+ "indexmap",
  "indoc",
  "insta",
  "libtest-mimic",
- "plotnik-bytecode",
- "plotnik-compiler",
- "plotnik-compiler-parse",
- "plotnik-compiler-typegen",
- "plotnik-core",
- "plotnik-vm",
+ "log",
+ "logos",
+ "regex-automata",
+ "regex-syntax",
+ "rowan",
+ "rustc-hash 2.1.2",
  "serde",
  "serde_json",
  "similar 3.1.1",
  "tempfile",
+ "thiserror",
+ "topological-sort",
 ]
 
 [[package]]

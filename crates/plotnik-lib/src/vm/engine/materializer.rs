@@ -1,0 +1,243 @@
+//! Materializer transforms effect logs into output values.
+
+use crate::bytecode::{Entrypoint, Module, StringsView, TypeDefKind, TypeId, TypeKind, TypesView};
+use crate::core::Colors;
+
+use super::effect::RuntimeEffect;
+use super::value::{NodeHandle, Value};
+use super::verify::debug_verify_type;
+
+pub trait Materializer<'t> {
+    type Output;
+
+    fn materialize(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Self::Output;
+}
+
+pub struct ValueMaterializer<'a> {
+    source: &'a str,
+    types: TypesView<'a>,
+    strings: StringsView<'a>,
+}
+
+impl<'a> ValueMaterializer<'a> {
+    pub fn new(source: &'a str, module: &'a Module) -> Self {
+        Self {
+            source,
+            types: module.types(),
+            strings: module.strings(),
+        }
+    }
+
+    fn resolve_member_name(&self, idx: u16) -> String {
+        let member = self.types.get_member(idx as usize);
+        self.strings.get(member.name_id).to_owned()
+    }
+
+    fn resolve_member_type(&self, idx: u16) -> TypeId {
+        self.types.get_member(idx as usize).type_id
+    }
+
+    fn is_void_type(&self, type_id: TypeId) -> bool {
+        self.types
+            .get(type_id)
+            .is_some_and(|def| matches!(def.decode(), TypeDefKind::Primitive(TypeKind::Void)))
+    }
+
+    fn accumulator_for_type(&self, type_id: TypeId) -> ValueAccumulator {
+        let def = self
+            .types
+            .get(type_id)
+            .unwrap_or_else(|| panic!("unknown type_id {}", type_id.0));
+
+        match def.decode() {
+            TypeDefKind::Struct { member_count, .. } => {
+                ValueAccumulator::Struct(Vec::with_capacity(member_count as usize))
+            }
+            TypeDefKind::Enum { .. } => ValueAccumulator::Scalar(None),
+            TypeDefKind::Wrapper {
+                kind: TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore,
+                ..
+            } => ValueAccumulator::Array(vec![]),
+            _ => ValueAccumulator::Scalar(None),
+        }
+    }
+}
+
+/// Materialize the effect log into a [`Value`], then check it against the
+/// entrypoint's declared type.
+///
+/// The type check is the trailing half of materialization, not an optional
+/// follow-up: it catches materializer/typegen drift and compiles to a no-op in
+/// release. Folding it in here keeps each call site from re-threading
+/// `result_type` and from materializing a value that silently skips the check.
+pub fn materialize_verified<'t>(
+    source: &'t str,
+    module: &Module,
+    entrypoint: &Entrypoint,
+    effects: &[RuntimeEffect<'t>],
+    colors: Colors,
+) -> Value {
+    let materializer = ValueMaterializer::new(source, module);
+    let value = materializer.materialize(effects, entrypoint.result_type());
+    debug_verify_type(&value, entrypoint.result_type(), module, colors);
+    value
+}
+
+/// Value accumulator for stack-based materialization.
+enum ValueAccumulator {
+    Scalar(Option<Value>),
+    Array(Vec<Value>),
+    Struct(Vec<(String, Value)>),
+    Enum {
+        tag: String,
+        payload_type: TypeId,
+        fields: Vec<(String, Value)>,
+    },
+}
+
+impl ValueAccumulator {
+    fn finish(self) -> Value {
+        match self {
+            ValueAccumulator::Scalar(v) => v.unwrap_or(Value::Null),
+            ValueAccumulator::Array(arr) => Value::Array(arr),
+            ValueAccumulator::Struct(fields) => Value::Struct(fields),
+            ValueAccumulator::Enum { tag, fields, .. } => Value::Enum {
+                tag,
+                data: Some(Box::new(Value::Struct(fields))),
+            },
+        }
+    }
+
+    fn kind(&self) -> &'static str {
+        match self {
+            ValueAccumulator::Scalar(_) => "Scalar",
+            ValueAccumulator::Array(_) => "Array",
+            ValueAccumulator::Struct(_) => "Struct",
+            ValueAccumulator::Enum { .. } => "Enum",
+        }
+    }
+}
+
+impl<'t> Materializer<'t> for ValueMaterializer<'_> {
+    type Output = Value;
+
+    fn materialize(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Value {
+        let mut stack: Vec<ValueAccumulator> = vec![];
+
+        let result_builder = self.accumulator_for_type(result_type);
+        stack.push(result_builder);
+
+        // Pending value from Node/Null (consumed by Set/Push)
+        let mut pending: Option<Value> = None;
+
+        for (effect_idx, effect) in effects.iter().enumerate() {
+            match effect {
+                RuntimeEffect::Node(n) => {
+                    pending = Some(Value::Node(NodeHandle::from_node(*n, self.source)));
+                }
+                RuntimeEffect::Null => {
+                    pending = Some(Value::Null);
+                }
+                RuntimeEffect::ArrayOpen => {
+                    stack.push(ValueAccumulator::Array(vec![]));
+                }
+                RuntimeEffect::Push => {
+                    let val = pending.take().unwrap_or(Value::Null);
+                    let Some(ValueAccumulator::Array(arr)) = stack.last_mut() else {
+                        panic!(
+                            "effect {effect_idx}: Push expects Array on stack, found {:?}",
+                            stack.last().map(|b| b.kind())
+                        );
+                    };
+                    arr.push(val);
+                }
+                RuntimeEffect::ArrayClose => {
+                    let top = stack.pop();
+                    let Some(ValueAccumulator::Array(arr)) = top else {
+                        panic!(
+                            "effect {effect_idx}: ArrayClose expects Array on stack, found {:?}",
+                            top.as_ref().map(|b| b.kind())
+                        );
+                    };
+                    pending = Some(Value::Array(arr));
+                }
+                RuntimeEffect::StructOpen => {
+                    stack.push(ValueAccumulator::Struct(vec![]));
+                }
+                RuntimeEffect::Set(idx) => {
+                    let field_name = self.resolve_member_name(*idx);
+                    let val = pending.take().unwrap_or(Value::Null);
+                    match stack.last_mut() {
+                        Some(ValueAccumulator::Struct(fields)) => fields.push((field_name, val)),
+                        Some(ValueAccumulator::Enum { fields, .. }) => {
+                            fields.push((field_name, val))
+                        }
+                        other => panic!(
+                            "effect {effect_idx}: Set expects Struct/Enum on stack, found {:?}",
+                            other.map(|b| b.kind())
+                        ),
+                    }
+                }
+                RuntimeEffect::StructClose => {
+                    let top = stack.pop();
+                    let Some(ValueAccumulator::Struct(fields)) = top else {
+                        panic!(
+                            "effect {effect_idx}: StructClose expects Struct on stack, found {:?}",
+                            top.as_ref().map(|b| b.kind())
+                        );
+                    };
+                    if !fields.is_empty() {
+                        pending = Some(Value::Struct(fields));
+                    } else if pending.is_none() {
+                        // Empty struct with no pending value:
+                        // - If nested (stack.len() > 1): produce empty struct {}
+                        //   This handles captured empty sequences like `{ } @x`
+                        //   Note: stack always has at least the result_builder, so we check > 1
+                        // - If at root (stack.len() <= 1): void result → null
+                        if stack.len() > 1 {
+                            pending = Some(Value::Struct(vec![]));
+                        }
+                        // else: pending stays None (void result)
+                    }
+                    // else: pending has a value, keep it (passthrough for enums, suppressive, etc.)
+                }
+                RuntimeEffect::EnumOpen(idx) => {
+                    let tag = self.resolve_member_name(*idx);
+                    let payload_type = self.resolve_member_type(*idx);
+                    stack.push(ValueAccumulator::Enum {
+                        tag,
+                        payload_type,
+                        fields: vec![],
+                    });
+                }
+                RuntimeEffect::EnumClose => {
+                    let top = stack.pop();
+                    let Some(ValueAccumulator::Enum {
+                        tag,
+                        payload_type,
+                        fields,
+                    }) = top
+                    else {
+                        panic!(
+                            "effect {effect_idx}: EnumClose expects Enum on stack, found {:?}",
+                            top.as_ref().map(|b| b.kind())
+                        );
+                    };
+                    // Void payloads produce no $data field
+                    let data = if self.is_void_type(payload_type) {
+                        None
+                    } else {
+                        // If inner returned a structured value (via StructOpen/StructClose), use it as data
+                        // Otherwise use fields collected from direct Set effects
+                        Some(Box::new(pending.take().unwrap_or(Value::Struct(fields))))
+                    };
+                    pending = Some(Value::Enum { tag, data });
+                }
+            }
+        }
+
+        pending
+            .or_else(|| stack.pop().map(ValueAccumulator::finish))
+            .unwrap_or(Value::Null)
+    }
+}
