@@ -41,6 +41,7 @@ pub mod typegen {
 
 pub use crate::core::Colors;
 
+pub use crate::compiler::query::QueryPrinter;
 pub use crate::compiler::{Diagnostics, EmitError, Error, PassResult, Result, Severity, Span};
 pub use crate::compiler::{
     GrammarBoundQuery, Query, QueryBuilder, QueryParsed, SourceId, SourceMap,
