@@ -68,7 +68,7 @@ pub mod analyze {
         validate_alt_kinds, validate_anchors, validate_empty_constructs, validate_predicates,
     };
     pub use plotnik_compiler_analyze_types::{
-        TypeContext, infer_types, validate_entrypoints,
+        TypeAnalysis, TypeAnalysisBuilder, infer_types, validate_entrypoints,
     };
 }
 #[cfg(not(test))]

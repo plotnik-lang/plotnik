@@ -13,4 +13,4 @@ pub mod symbol_table {
 
 pub use entrypoints::validate_entrypoints;
 pub use plotnik_compiler_core::Located;
-pub use type_check::{TypeContext, infer_types};
+pub use type_check::{TypeAnalysis, TypeAnalysisBuilder, infer_types};

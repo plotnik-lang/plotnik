@@ -6,7 +6,7 @@
 use std::collections::HashSet;
 
 use crate::analyze::type_check::{
-    CaptureMechanism, TypeContext, TypeId, TypeShape, ref_returns_structured,
+    CaptureMechanism, TypeAnalysis, TypeId, TypeShape, ref_returns_structured,
 };
 use crate::bytecode::{EffectIR, Label};
 use crate::parser::ast::{self, Pattern};
@@ -201,9 +201,12 @@ impl Compiler<'_> {
     /// the structured result (Enum/Struct/Array) pending for Set to consume.
     pub(super) fn is_ref_returning_structured(&self, pattern: &Pattern) -> bool {
         match pattern {
-            Pattern::Ref(_) => {
-                ref_returns_structured(pattern, self.ctx.type_ctx, self.ctx.interner)
-            }
+            Pattern::Ref(_) => ref_returns_structured(
+                pattern,
+                self.ctx.type_ctx,
+                self.ctx.dependency_analysis,
+                self.ctx.interner,
+            ),
             Pattern::QuantifiedPattern(q) => q
                 .inner()
                 .is_some_and(|i| self.is_ref_returning_structured(&i)),
@@ -242,7 +245,7 @@ impl Compiler<'_> {
 /// - Named nodes with bubble captures: `(node (child) @x)*`
 ///
 /// Enums use Enum/EndEnum instead (handled separately).
-pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeContext) -> bool {
+pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
     let Some(info) = type_ctx.term_info(inner) else {
         return false;
     };
@@ -259,7 +262,7 @@ pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeContext) -> bool {
 }
 
 /// Get row type ID for array element scoping.
-pub fn row_type_id(inner: &Pattern, type_ctx: &TypeContext) -> Option<TypeId> {
+pub fn row_type_id(inner: &Pattern, type_ctx: &TypeAnalysis) -> Option<TypeId> {
     type_ctx
         .term_info(inner)
         .and_then(|info| info.flow.type_id())

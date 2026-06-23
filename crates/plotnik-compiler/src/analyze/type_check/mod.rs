@@ -18,7 +18,7 @@ mod def_id_tests;
 mod unify_tests;
 
 pub use capture_mechanism::{CaptureMechanism, classify_capture_mechanism, ref_returns_structured};
-pub use context::TypeContext;
+pub use context::{TypeAnalysis, TypeAnalysisBuilder};
 pub use def_id::{DefId, Interner, Symbol};
 pub use types::{
     Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_VOID, PatternResult, OutputFlow, TypeId, TypeShape,
@@ -38,7 +38,7 @@ pub fn infer_types(
     symbol_table: &SymbolTable,
     dependency_analysis: &DependencyAnalysis,
     diag: &mut Diagnostics,
-) -> TypeContext {
+) -> TypeAnalysis {
     let analysis = infer::InferPassInput {
         interner,
         symbol_table,

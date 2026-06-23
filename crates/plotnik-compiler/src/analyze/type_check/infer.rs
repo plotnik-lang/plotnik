@@ -10,7 +10,7 @@ use plotnik_core::Interner;
 use rowan::TextRange;
 
 use super::capture_mechanism::{CaptureMechanism, classify_capture_mechanism};
-use super::context::TypeContext;
+use super::context::{TypeAnalysis, TypeAnalysisBuilder};
 use super::def_id::Symbol;
 use super::types::{
     Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_VOID, PatternResult, OutputFlow, TypeId, TypeShape,
@@ -29,7 +29,7 @@ use crate::source::SourceId;
 
 /// Shared state for a single inference pass over the AST.
 pub struct InferCtx<'a, 'd> {
-    pub type_ctx: &'a mut TypeContext,
+    pub type_ctx: &'a mut TypeAnalysisBuilder,
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
     pub dependency_analysis: &'a DependencyAnalysis,
@@ -145,7 +145,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // resolves — a miss is our bug.
         let def_id = self
             .ctx
-            .type_ctx
+            .dependency_analysis
             .def_id_for_sym(name_sym)
             .expect("a defined reference has a DefId");
 
@@ -370,8 +370,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // mechanism owns the inner's fields, so they must not also bubble. Sharing
         // the classifier with emission keeps the declared type and the effects in
         // lockstep.
-        let mechanism =
-            classify_capture_mechanism(inner.node(), self.ctx.type_ctx, self.ctx.interner);
+        let mechanism = classify_capture_mechanism(
+            inner.node(),
+            self.ctx.type_ctx.analysis(),
+            self.ctx.dependency_analysis,
+            self.ctx.interner,
+        );
         let should_merge_fields =
             mechanism == CaptureMechanism::Node && matches!(&inner_info.flow, OutputFlow::Fields(_));
 
@@ -485,7 +489,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 let name_tok = r.name()?;
                 let name = name_tok.text();
                 let sym = self.ctx.interner.intern(name);
-                let def_id = self.ctx.type_ctx.def_id_for_sym(sym)?;
+                let def_id = self.ctx.dependency_analysis.def_id_for_sym(sym)?;
                 if self.ctx.dependency_analysis.is_recursive_def(def_id) {
                     Some(self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id)))
                 } else {
@@ -843,29 +847,25 @@ pub(super) struct InferPassInput<'a, 'd> {
 
 /// Orchestrates type inference across all definitions in dependency order.
 pub(super) struct InferencePass<'a, 'd> {
-    ctx: TypeContext,
+    ctx: TypeAnalysisBuilder,
     analysis: InferPassInput<'a, 'd>,
 }
 
 impl<'a, 'd> InferencePass<'a, 'd> {
     pub fn new(analysis: InferPassInput<'a, 'd>) -> Self {
         Self {
-            ctx: TypeContext::new(),
+            ctx: TypeAnalysisBuilder::new(),
             analysis,
         }
     }
 
-    pub fn run(mut self) -> TypeContext {
-        // Avoid re-registration of definitions
-        self.ctx.seed_defs(
-            self.analysis.dependency_analysis.def_names(),
-            self.analysis.dependency_analysis.def_ids_by_sym(),
-        );
-
+    pub fn run(mut self) -> TypeAnalysis {
+        // Definition identity (names, DefIds) is owned by DependencyAnalysis and
+        // read from there; the builder only accumulates inferred types.
         self.process_sccs();
         self.process_orphans();
 
-        self.ctx
+        self.ctx.finish()
     }
 
     /// Process definitions in SCC order (leaves first).
@@ -882,11 +882,13 @@ impl<'a, 'd> InferencePass<'a, 'd> {
     /// Handle any definitions not in an SCC (safety net).
     fn process_orphans(&mut self) {
         for (name, source_id) in self.analysis.symbol_table.definitions() {
-            if self
-                .ctx
-                .def_type_for_name(self.analysis.interner, name)
-                .is_some()
-            {
+            let already_typed = self
+                .analysis
+                .dependency_analysis
+                .def_id_for_name(self.analysis.interner, name)
+                .and_then(|def_id| self.ctx.def_type(def_id))
+                .is_some();
+            if already_typed {
                 continue;
             }
             self.infer_and_register(name, source_id);
@@ -912,7 +914,13 @@ impl<'a, 'd> InferencePass<'a, 'd> {
             visitor.infer_pattern(&located_body)
         };
 
-        let def_id = self.ctx.register_def(self.analysis.interner, def_name);
+        // DependencyAnalysis assigned every definition a DefId; this lookup is the
+        // identity, the builder only records the inferred type against it.
+        let def_id = self
+            .analysis
+            .dependency_analysis
+            .def_id_for_name(self.analysis.interner, def_name)
+            .expect("an analyzed definition has a DefId");
         self.ctx.set_def_result(def_id, info.clone());
         let type_id = self.flow_to_type_id(&info.flow);
         self.ctx.set_def_type(def_id, type_id);

@@ -9,7 +9,8 @@
 
 use crate::Interner;
 use crate::ast::{Pattern, is_empty_group};
-use crate::type_context::TypeContext;
+use crate::dependency_analysis::DependencyAnalysis;
+use crate::type_analysis::TypeAnalysis;
 use crate::type_shape::{OutputFlow, QuantifierKind, TypeShape};
 
 /// How a captured value is produced — the bridge between the inferred type and
@@ -42,7 +43,8 @@ pub enum CaptureMechanism {
 /// during emission (all type info is available).
 pub fn classify_capture_mechanism(
     inner: &Pattern,
-    ctx: &TypeContext,
+    ctx: &TypeAnalysis,
+    deps: &DependencyAnalysis,
     interner: &Interner,
 ) -> CaptureMechanism {
     // `field: x @cap` parses as `(field: x) @cap`; the field is only a navigation
@@ -56,7 +58,7 @@ pub fn classify_capture_mechanism(
             // `?` only adds optionality; the value mechanism is the inner's.
             Some(QuantifierKind::Optional) => quant
                 .inner()
-                .map(|i| classify_capture_mechanism(&i, ctx, interner))
+                .map(|i| classify_capture_mechanism(&i, ctx, deps, interner))
                 .unwrap_or(CaptureMechanism::Node),
             None => CaptureMechanism::Array,
         };
@@ -65,7 +67,7 @@ pub fn classify_capture_mechanism(
     // A reference whose definition returns a structured type: the call site does
     // its own Call/Return (and Struct/EndStruct) scoping. A reference to a node/void
     // definition falls through to `Node` — its matched node is captured directly.
-    if ref_returns_structured(&pattern, ctx, interner) {
+    if ref_returns_structured(&pattern, ctx, deps, interner) {
         return CaptureMechanism::Ref;
     }
 
@@ -109,14 +111,19 @@ fn unwrap_field(pattern: &Pattern) -> Pattern {
 }
 
 /// Whether `pattern` is a reference to a definition that returns a structured type.
-pub fn ref_returns_structured(pattern: &Pattern, ctx: &TypeContext, interner: &Interner) -> bool {
+pub fn ref_returns_structured(
+    pattern: &Pattern,
+    ctx: &TypeAnalysis,
+    deps: &DependencyAnalysis,
+    interner: &Interner,
+) -> bool {
     let Pattern::Ref(r) = pattern else {
         return false;
     };
     let Some(name) = r.name() else {
         return false;
     };
-    let Some(def_id) = ctx.def_id_for_name(interner, name.text()) else {
+    let Some(def_id) = deps.def_id_for_name(interner, name.text()) else {
         return false;
     };
 

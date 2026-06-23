@@ -10,7 +10,7 @@ pub mod located;
 pub mod source;
 pub mod span;
 pub mod symbol_table;
-pub mod type_context;
+pub mod type_analysis;
 pub mod type_shape;
 pub mod validated_ast;
 pub mod visitor;
@@ -35,14 +35,16 @@ pub use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 pub use source::{Source, SourceId, SourceKind, SourceMap};
 pub use span::Span;
 pub use symbol_table::SymbolTable;
-pub use type_context::TypeContext;
+pub use type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
 pub use type_shape::{FieldInfo, PatternResult, OutputFlow, TypeShape};
 pub use validated_ast::ValidatedAst;
 
 /// A lightweight handle to a named query definition.
 ///
 /// Assigned during dependency analysis and shared by later compiler artifacts.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+/// Ordered by assignment index, which is SCC processing order (leaves first):
+/// iterating a `DefId`-keyed map yields definitions in emission order.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct DefId(u32);
 
 impl DefId {

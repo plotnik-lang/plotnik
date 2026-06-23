@@ -6,14 +6,14 @@ use plotnik_core::Interner;
 
 #[test]
 fn unify_void_void() {
-    let mut ctx = TypeContext::new();
+    let mut ctx = TypeAnalysisBuilder::new();
     let result = unify_flow(&mut ctx, OutputFlow::Void, OutputFlow::Void);
     assert!(matches!(result, Ok(OutputFlow::Void)));
 }
 
 #[test]
 fn unify_void_bubble() {
-    let mut ctx = TypeContext::new();
+    let mut ctx = TypeAnalysisBuilder::new();
     let mut interner = Interner::new();
     let x = interner.intern("x");
     let struct_id = ctx.intern_single_field(x, FieldInfo::required(TYPE_NODE));
@@ -31,7 +31,7 @@ fn unify_void_bubble() {
 
 #[test]
 fn unify_bubble_merge() {
-    let mut ctx = TypeContext::new();
+    let mut ctx = TypeAnalysisBuilder::new();
     let mut interner = Interner::new();
     let x = interner.intern("x");
     let y = interner.intern("y");
@@ -59,7 +59,7 @@ fn unify_bubble_merge() {
 
 #[test]
 fn unify_scalar_error() {
-    let mut ctx = TypeContext::new();
+    let mut ctx = TypeAnalysisBuilder::new();
     let result = unify_flow(&mut ctx, OutputFlow::Value(TYPE_NODE), OutputFlow::Void);
     assert!(matches!(result, Err(UnifyError::ScalarInUnion)));
 }

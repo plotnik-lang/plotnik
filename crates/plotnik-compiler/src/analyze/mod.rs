@@ -31,7 +31,7 @@ pub use link::GrammarBinding;
 pub(crate) use located::Located;
 pub use recursion::validate_recursion;
 pub use symbol_table::SymbolTable;
-pub use type_check::{TypeContext, infer_types};
+pub use type_check::{TypeAnalysis, TypeAnalysisBuilder, infer_types};
 pub use validation::{
     validate_alt_kinds, validate_anchors, validate_empty_constructs, validate_predicates,
 };

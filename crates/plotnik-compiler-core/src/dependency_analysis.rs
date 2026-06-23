@@ -42,13 +42,8 @@ impl DependencyAnalysis {
     }
 
     pub fn def_id_for_name(&self, interner: &Interner, name: &str) -> Option<DefId> {
-        // Linear scan - only used during analysis, not hot path
-        for (&sym, &def_id) in &self.def_ids_by_sym {
-            if interner.resolve(sym) == name {
-                return Some(def_id);
-            }
-        }
-        None
+        let sym = interner.get(name)?;
+        self.def_id_for_sym(sym)
     }
 
     pub fn def_name_sym(&self, id: DefId) -> Symbol {
@@ -62,16 +57,6 @@ impl DependencyAnalysis {
     /// Number of definitions.
     pub fn def_count(&self) -> usize {
         self.def_names.len()
-    }
-
-    /// Get the def_names slice (for seeding TypeContext).
-    pub fn def_names(&self) -> &[Symbol] {
-        &self.def_names
-    }
-
-    /// Get the def_ids_by_sym map (for seeding TypeContext).
-    pub fn def_ids_by_sym(&self) -> &HashMap<Symbol, DefId> {
-        &self.def_ids_by_sym
     }
 
     /// True if the definition is in a mutual recursion group (SCC > 1) or references itself.

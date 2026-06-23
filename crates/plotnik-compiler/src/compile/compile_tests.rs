@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use plotnik_core::{Interner, NodeKind};
 
 use crate::analyze::symbol_table::SymbolTableBuilder;
-use crate::analyze::type_check::TypeContext;
+use crate::analyze::type_check::TypeAnalysisBuilder;
 use crate::bytecode::NodeKindConstraint;
 use crate::compile::{CompileCtx, Compiler};
 use crate::shot_bytecode;
@@ -30,7 +30,7 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
         (NodeKind::Named(number), named_id),
         (NodeKind::Anonymous(number), anonymous_id),
     ]);
-    let type_ctx = TypeContext::new();
+    let type_ctx = TypeAnalysisBuilder::new().finish();
     let symbol_table = SymbolTableBuilder::new().finish();
     let node_fields = IndexMap::new();
     let grammar = GrammarBinding::new(node_kinds, node_fields);

@@ -4,7 +4,7 @@ use super::*;
 
 #[test]
 fn builtin_types_have_correct_ids() {
-    let ctx = TypeContext::new();
+    let ctx = TypeAnalysisBuilder::new();
 
     assert_eq!(ctx.type_shape(TYPE_VOID), Some(&TypeShape::Void));
     assert_eq!(ctx.type_shape(TYPE_NODE), Some(&TypeShape::Node));
@@ -12,7 +12,7 @@ fn builtin_types_have_correct_ids() {
 
 #[test]
 fn type_interning_deduplicates() {
-    let mut ctx = TypeContext::new();
+    let mut ctx = TypeAnalysisBuilder::new();
 
     let id1 = ctx.intern_type(TypeShape::Node);
     let id2 = ctx.intern_type(TypeShape::Node);
@@ -23,7 +23,7 @@ fn type_interning_deduplicates() {
 
 #[test]
 fn struct_types_intern_correctly() {
-    let mut ctx = TypeContext::new();
+    let mut ctx = TypeAnalysisBuilder::new();
     let mut interner = Interner::new();
 
     let x_sym = interner.intern("x");
@@ -51,39 +51,13 @@ fn symbol_interning_works() {
 }
 
 #[test]
-fn def_type_by_name() {
-    let mut ctx = TypeContext::new();
-    let mut interner = Interner::new();
+fn def_type_round_trips_by_def_id() {
+    let mut ctx = TypeAnalysisBuilder::new();
+    let def_id = DefId::from_raw(0);
 
-    ctx.set_def_type_by_name(&mut interner, "Query", TYPE_NODE);
-    assert_eq!(
-        ctx.def_type_for_name(&interner, "Query"),
-        Some(TYPE_NODE)
-    );
-    assert_eq!(ctx.def_type_for_name(&interner, "Missing"), None);
-}
+    ctx.set_def_type(def_id, TYPE_NODE);
 
-#[test]
-fn register_def_returns_stable_id() {
-    let mut ctx = TypeContext::new();
-    let mut interner = Interner::new();
-
-    let id1 = ctx.register_def(&mut interner, "Foo");
-    let id2 = ctx.register_def(&mut interner, "Bar");
-    let id3 = ctx.register_def(&mut interner, "Foo"); // duplicate
-
-    assert_eq!(id1, id3);
-    assert_ne!(id1, id2);
-    assert_eq!(ctx.def_name(&interner, id1), "Foo");
-    assert_eq!(ctx.def_name(&interner, id2), "Bar");
-}
-
-#[test]
-fn def_id_lookup() {
-    let mut ctx = TypeContext::new();
-    let mut interner = Interner::new();
-
-    ctx.register_def(&mut interner, "Query");
-    assert!(ctx.def_id_for_name(&interner, "Query").is_some());
-    assert!(ctx.def_id_for_name(&interner, "Missing").is_none());
+    let analysis = ctx.finish();
+    assert_eq!(analysis.def_type(def_id), Some(TYPE_NODE));
+    assert_eq!(analysis.def_type(DefId::from_raw(1)), None);
 }

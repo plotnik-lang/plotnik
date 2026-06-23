@@ -1,9 +1,9 @@
 //! Core bytecode emission logic.
 
-use plotnik_compiler_core::GrammarBinding;
+use plotnik_compiler_core::{DependencyAnalysis, GrammarBinding};
 use plotnik_core::{Interner, NodeKind};
 
-use crate::analyze::type_check::TypeContext;
+use crate::analyze::type_check::TypeAnalysis;
 use crate::bytecode::{CompileResult, Label};
 use plotnik_bytecode::{
     Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN,
@@ -19,7 +19,8 @@ use super::type_table::TypeTableBuilder;
 #[derive(Clone, Copy)]
 pub struct EmitInput<'a> {
     pub interner: &'a Interner,
-    pub type_ctx: &'a TypeContext,
+    pub type_ctx: &'a TypeAnalysis,
+    pub dependency_analysis: &'a DependencyAnalysis,
     pub grammar: &'a GrammarBinding,
 }
 
@@ -33,6 +34,7 @@ pub fn emit_unchecked(
     let EmitInput {
         interner,
         type_ctx,
+        dependency_analysis,
         grammar,
     } = input;
 
@@ -42,7 +44,7 @@ pub fn emit_unchecked(
     intern_predicate_strings(&compile_result.instructions, &mut strings);
 
     let mut types = TypeTableBuilder::new();
-    types.build(type_ctx, interner, &mut strings)?;
+    types.build(type_ctx, dependency_analysis, interner, &mut strings)?;
 
     // Preamble entry FIRST ensures it gets the lowest address (step 0)
     let mut entry_labels: Vec<Label> = vec![compile_result.preamble_entry];
@@ -72,7 +74,7 @@ pub fn emit_unchecked(
 
     let mut entrypoints: Vec<Entrypoint> = Vec::new();
     for (def_id, type_id) in type_ctx.iter_def_types() {
-        let name_sym = type_ctx.def_name_sym(def_id);
+        let name_sym = dependency_analysis.def_name_sym(def_id);
         let name = strings.get_or_intern(name_sym, interner)?;
         let result_type = types.resolve_type(type_id, type_ctx)?;
 

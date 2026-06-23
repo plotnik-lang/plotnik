@@ -184,7 +184,11 @@ impl Compiler<'_> {
         };
         let name = name_token.text();
 
-        let Some(def_id) = self.ctx.type_ctx.def_id_for_name(self.ctx.interner, name) else {
+        let Some(def_id) = self
+            .ctx
+            .dependency_analysis
+            .def_id_for_name(self.ctx.interner, name)
+        else {
             return exit;
         };
 
@@ -380,9 +384,14 @@ impl Compiler<'_> {
         // Classify the inner once — both the capture effects and the dispatch below
         // read it, so the declared type and the emitted effects can't disagree
         // (#420). `None` is a bare capture (`@x`), which captures the matched node.
-        let mechanism = inner_opt
-            .as_ref()
-            .map(|inner| classify_capture_mechanism(inner, self.ctx.type_ctx, self.ctx.interner));
+        let mechanism = inner_opt.as_ref().map(|inner| {
+            classify_capture_mechanism(
+                inner,
+                self.ctx.type_ctx,
+                self.ctx.dependency_analysis,
+                self.ctx.interner,
+            )
+        });
 
         let capture_effects = self.build_capture_effects(cap, mechanism);
 

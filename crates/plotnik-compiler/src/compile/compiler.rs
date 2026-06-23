@@ -5,7 +5,7 @@ use plotnik_compiler_core::{DependencyAnalysis, GrammarBinding};
 use plotnik_core::Interner;
 
 use crate::analyze::symbol_table::SymbolTable;
-use crate::analyze::type_check::{DefId, TypeContext};
+use crate::analyze::type_check::{DefId, TypeAnalysis};
 use crate::bytecode::{InstructionIR, Label, ReturnIR, TrampolineIR};
 use crate::parser::Pattern;
 use plotnik_bytecode::Nav;
@@ -19,7 +19,7 @@ use super::verify::verify_constructed;
 ///
 pub struct CompileCtx<'a> {
     pub interner: &'a Interner,
-    pub type_ctx: &'a TypeContext,
+    pub type_ctx: &'a TypeAnalysis,
     pub symbol_table: &'a SymbolTable,
     pub grammar: &'a GrammarBinding,
     pub dependency_analysis: &'a DependencyAnalysis,
@@ -100,7 +100,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_def(&mut self, def_id: DefId) {
-        let name_sym = self.ctx.type_ctx.def_name_sym(def_id);
+        let name_sym = self.ctx.dependency_analysis.def_name_sym(def_id);
         let name = self.ctx.interner.resolve(name_sym);
 
         let body = self

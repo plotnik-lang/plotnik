@@ -8,7 +8,7 @@ use super::{SourceId, SourceMap};
 use crate::Diagnostics;
 use crate::analyze::link;
 use crate::analyze::symbol_table::{SymbolTable, resolve_names};
-use crate::analyze::type_check::{self, Arity, TypeContext};
+use crate::analyze::type_check::{self, Arity, TypeAnalysis};
 use crate::analyze::validation::{AstValidationInput, validate_ast};
 use crate::analyze::{dependencies, validate_entrypoints, validate_recursion};
 use crate::compile::{
@@ -130,7 +130,13 @@ impl QueryParsed {
                 &mut self.diag,
             );
             if !self.diag.has_errors() {
-                validate_entrypoints(validated.ast_map(), &interner, &type_context, &mut self.diag);
+                validate_entrypoints(
+                    validated.ast_map(),
+                    &interner,
+                    &type_context,
+                    &dependency_analysis,
+                    &mut self.diag,
+                );
             }
 
             (symbol_table, type_context, dependency_analysis)
@@ -163,7 +169,7 @@ pub struct Query {
     parsed: QueryParsed,
     interner: Interner,
     symbol_table: SymbolTable,
-    type_context: TypeContext,
+    type_context: TypeAnalysis,
     dependency_analysis: dependencies::DependencyAnalysis,
 }
 
@@ -198,7 +204,7 @@ impl Query {
         None
     }
 
-    pub fn type_context(&self) -> &TypeContext {
+    pub fn type_context(&self) -> &TypeAnalysis {
         &self.type_context
     }
 
@@ -270,7 +276,7 @@ impl GrammarBoundQuery {
         &self.analyzed.interner
     }
 
-    pub fn type_context(&self) -> &TypeContext {
+    pub fn type_context(&self) -> &TypeAnalysis {
         self.analyzed.type_context()
     }
 
@@ -385,6 +391,7 @@ impl GrammarBoundQuery {
         EmitInput {
             interner: self.interner(),
             type_ctx: self.type_context(),
+            dependency_analysis: self.dependency_analysis(),
             grammar: self.grammar(),
         }
     }

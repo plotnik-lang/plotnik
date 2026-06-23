@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use super::context::TypeContext;
+use super::context::TypeAnalysisBuilder;
 use super::def_id::Symbol;
 use super::types::{FieldInfo, TYPE_VOID, OutputFlow, TypeId, TypeShape};
 
@@ -34,7 +34,7 @@ impl UnifyError {
 }
 
 pub fn unify_flows(
-    ctx: &mut TypeContext,
+    ctx: &mut TypeAnalysisBuilder,
     flows: impl IntoIterator<Item = OutputFlow>,
 ) -> Result<OutputFlow, UnifyError> {
     let mut iter = flows.into_iter();
@@ -52,7 +52,7 @@ pub fn unify_flows(
 /// - Void ∪ Fields(s) → Fields(make_all_optional(s))
 /// - Fields(a) ∪ Fields(b) → Fields(merge_fields(a, b))
 /// - Value in union → Error
-pub fn unify_flow(ctx: &mut TypeContext, a: OutputFlow, b: OutputFlow) -> Result<OutputFlow, UnifyError> {
+pub fn unify_flow(ctx: &mut TypeAnalysisBuilder, a: OutputFlow, b: OutputFlow) -> Result<OutputFlow, UnifyError> {
     // Union alternations cannot contain scalars.
     if matches!(a, OutputFlow::Value(_)) || matches!(b, OutputFlow::Value(_)) {
         return Err(UnifyError::ScalarInUnion);
@@ -91,7 +91,7 @@ pub fn unify_flow(ctx: &mut TypeContext, a: OutputFlow, b: OutputFlow) -> Result
 /// `?` is skipped, so forcing it to a non-null `[]` here would make the declared
 /// type lie. Nullability (`optional`), not the array shape, decides the default,
 /// which keeps inference in lockstep with what the emitter writes.
-fn relax_for_absence(ctx: &mut TypeContext, info: FieldInfo) -> FieldInfo {
+fn relax_for_absence(ctx: &mut TypeAnalysisBuilder, info: FieldInfo) -> FieldInfo {
     if !info.optional
         && let Some(TypeShape::Array { element, .. }) = ctx.type_shape(info.type_id)
     {
@@ -107,7 +107,7 @@ fn relax_for_absence(ctx: &mut TypeContext, info: FieldInfo) -> FieldInfo {
 
 /// Relax every field in a map for absence (see [`relax_for_absence`]).
 fn relax_all_for_absence(
-    ctx: &mut TypeContext,
+    ctx: &mut TypeAnalysisBuilder,
     fields: BTreeMap<Symbol, FieldInfo>,
 ) -> BTreeMap<Symbol, FieldInfo> {
     fields
@@ -122,7 +122,7 @@ fn relax_all_for_absence(
 /// - Keys in both: types must be compatible, field is required iff required in both.
 /// - Keys in only one: relaxed for absence (nullable, or an empty-able list).
 fn merge_fields(
-    ctx: &mut TypeContext,
+    ctx: &mut TypeAnalysisBuilder,
     a: BTreeMap<Symbol, FieldInfo>,
     mut b: BTreeMap<Symbol, FieldInfo>,
 ) -> Result<BTreeMap<Symbol, FieldInfo>, UnifyError> {

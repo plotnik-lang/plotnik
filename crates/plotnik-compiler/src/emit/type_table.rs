@@ -1,12 +1,13 @@
 //! Type table builder for bytecode emission.
 //!
-//! Converts query-level types (TypeContext) into bytecode-level types (BytecodeTypeId).
+//! Converts query-level types (TypeAnalysis) into bytecode-level types (BytecodeTypeId).
 
 use std::collections::{HashMap, HashSet};
 
+use plotnik_compiler_core::DependencyAnalysis;
 use plotnik_core::Interner;
 
-use crate::analyze::type_check::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeContext, TypeId, TypeShape};
+use crate::analyze::type_check::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeAnalysis, TypeId, TypeShape};
 use plotnik_bytecode::{
     TypeDefKind, TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeNameEntry,
 };
@@ -47,7 +48,8 @@ impl TypeTableBuilder {
     /// emitted first, then custom types in definition order, depth-first.
     pub fn build(
         &mut self,
-        type_ctx: &TypeContext,
+        type_ctx: &TypeAnalysis,
+        dependency_analysis: &DependencyAnalysis,
         interner: &Interner,
         strings: &mut StringTableBuilder,
     ) -> Result<(), EmitError> {
@@ -122,7 +124,7 @@ impl TypeTableBuilder {
         }
 
         for (def_id, type_id) in type_ctx.iter_def_types() {
-            let name_sym = type_ctx.def_name_sym(def_id);
+            let name_sym = dependency_analysis.def_name_sym(def_id);
             let name = ctx.strings.get_or_intern(name_sym, ctx.interner)?;
             let bc_type_id = self
                 .mapping
@@ -257,7 +259,7 @@ impl TypeTableBuilder {
     pub fn resolve_type(
         &self,
         type_id: TypeId,
-        type_ctx: &TypeContext,
+        type_ctx: &TypeAnalysis,
     ) -> Result<BytecodeTypeId, EmitError> {
         let type_id = self.resolve_underlying_type_id(type_id, type_ctx);
         let bc_id = self
@@ -268,7 +270,7 @@ impl TypeTableBuilder {
         Ok(bc_id)
     }
 
-    fn resolve_underlying_type_id(&self, type_id: TypeId, type_ctx: &TypeContext) -> TypeId {
+    fn resolve_underlying_type_id(&self, type_id: TypeId, type_ctx: &TypeAnalysis) -> TypeId {
         let Some(TypeShape::Ref(def_id)) = type_ctx.type_shape(type_id) else {
             return type_id;
         };
@@ -282,7 +284,7 @@ impl TypeTableBuilder {
     fn resolve_field_type(
         &mut self,
         field_info: &FieldInfo,
-        type_ctx: &TypeContext,
+        type_ctx: &TypeAnalysis,
     ) -> Result<BytecodeTypeId, EmitError> {
         let base_type = self.resolve_type(field_info.type_id, type_ctx)?;
 
@@ -298,7 +300,7 @@ impl TypeTableBuilder {
         }
     }
 
-    fn source_is_optional(&self, type_id: TypeId, type_ctx: &TypeContext) -> bool {
+    fn source_is_optional(&self, type_id: TypeId, type_ctx: &TypeAnalysis) -> bool {
         let underlying = self.resolve_underlying_type_id(type_id, type_ctx);
         matches!(type_ctx.type_shape(underlying), Some(TypeShape::Optional(_)))
     }
@@ -390,7 +392,7 @@ impl Default for TypeTableBuilder {
 }
 
 struct TypeEmitSlots<'a> {
-    type_ctx: &'a TypeContext,
+    type_ctx: &'a TypeAnalysis,
     interner: &'a Interner,
     strings: &'a mut StringTableBuilder,
 }
@@ -411,7 +413,7 @@ impl TypeCollector {
         }
     }
 
-    fn collect(&mut self, type_id: TypeId, type_ctx: &TypeContext) {
+    fn collect(&mut self, type_id: TypeId, type_ctx: &TypeAnalysis) {
         if type_id.is_builtin() || self.seen.contains(&type_id) {
             return;
         }
@@ -474,7 +476,7 @@ impl BuiltinUses {
         }
     }
 
-    fn collect(&mut self, type_id: TypeId, type_ctx: &TypeContext) {
+    fn collect(&mut self, type_id: TypeId, type_ctx: &TypeAnalysis) {
         if !self.seen.insert(type_id) {
             return;
         }
