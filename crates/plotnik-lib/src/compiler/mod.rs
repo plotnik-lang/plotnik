@@ -38,4 +38,4 @@ pub use crate::compiler::diagnostics::source;
 pub use crate::compiler::diagnostics::{
     Diagnostics, Error, PassResult, Result, Severity, SourceId, SourceMap, Span,
 };
-pub use query::{GrammarBoundQuery, Query, QueryBuilder};
+pub use query::{CheckedQuery, CompiledQuery, Query, QueryBuilder};

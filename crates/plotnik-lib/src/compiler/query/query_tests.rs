@@ -140,7 +140,7 @@ impl Query {
     }
 
     #[track_caller]
-    pub fn expect_valid_linking(src: &str) -> GrammarBoundQuery {
+    pub(crate) fn expect_valid_linking(src: &str) -> GrammarBoundQuery {
         let query = Self::parse_and_validate(src).link(javascript());
         if !query.is_valid() {
             panic!(

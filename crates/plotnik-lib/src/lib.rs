@@ -30,14 +30,14 @@ pub mod diagnostics {
     pub use crate::compiler::diagnostics::*;
 }
 
-pub mod typegen {
-    pub use crate::compiler::typegen::*;
-}
+pub use crate::compiler::typegen::typescript::{
+    Config as TypeScriptConfig, VoidType as TypeScriptVoidType,
+};
 
 pub use crate::core::Colors;
 
+pub use crate::compiler::{CheckedQuery, CompiledQuery, Query, QueryBuilder, SourceId, SourceMap};
 pub use crate::compiler::{Diagnostics, EmitError, Error, PassResult, Result, Severity, Span};
-pub use crate::compiler::{GrammarBoundQuery, Query, QueryBuilder, SourceId, SourceMap};
 
 pub use crate::vm::{
     EffectLog, ExecLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,

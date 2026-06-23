@@ -22,19 +22,17 @@ pub fn run(args: CheckArgs) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let query = QueryBuilder::new(loaded.sources)
-        .analyze()
-        .map_err(|e| CliError::fatal(e.to_string()))?;
-
     let lang = require_lang(
         args.lang.as_deref(),
         loaded.shebang.lang.as_deref(),
         "check",
     )?;
-    let linked = query.link(lang.grammar());
+    let checked = QueryBuilder::new(loaded.sources)
+        .check(lang.grammar())
+        .map_err(|e| CliError::fatal(e.to_string()))?;
 
-    let diagnostics = linked.check_compile();
-    let source_map = linked.source_map();
+    let diagnostics = checked.diagnostics();
+    let source_map = checked.source_map();
     let valid = if args.strict {
         !diagnostics.has_errors() && !diagnostics.has_warnings()
     } else {

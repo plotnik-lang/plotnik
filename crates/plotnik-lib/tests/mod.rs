@@ -42,9 +42,9 @@ use similar::TextDiff;
 
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
-use plotnik_lib::typegen::typescript;
 use plotnik_lib::{
-    Colors, PrintTracer, QueryBuilder, RuntimeError, SourceMap, VM, Verbosity, materialize_verified,
+    Colors, CompiledQuery, PrintTracer, QueryBuilder, RuntimeError, SourceMap, TypeScriptConfig,
+    VM, Verbosity, materialize_verified,
 };
 
 const FIXTURE_EXT: &str = "txt";
@@ -330,45 +330,46 @@ fn render_compile(
     kind: Compile,
 ) -> Result<Vec<(String, String)>, String> {
     let lang = Lang::resolve(input.and_then(|i| i.ext.as_deref()))?;
-    let linked = QueryBuilder::new(source_map(query))
-        .link(lang.grammar)
+    let compiled = QueryBuilder::new(source_map(query))
+        .compile(lang.grammar)
         .expect("query parsing should not exhaust fuel");
-    let diagnostics = linked.diagnostics();
+    let diagnostics = compiled.diagnostics();
 
     let mut out = Vec::new();
     if diagnostics.has_errors() {
         out.push((
             "diagnostics".into(),
-            diagnostics.render(linked.source_map()),
+            diagnostics.render(compiled.source_map()),
         ));
         return Ok(out);
     }
     if diagnostics.has_warnings() {
         out.push((
             "diagnostics".into(),
-            diagnostics.render(linked.source_map()),
+            diagnostics.render(compiled.source_map()),
         ));
     }
 
-    let bytes = linked.emit().expect("valid query should emit");
-    let module = Module::load(&bytes).expect("emitted bytecode should load");
+    let module = compiled
+        .module()
+        .expect("valid query should compile to a module");
 
     match kind {
         Compile::Bytecode => out.push((
             "bytecode".into(),
             dump_bytecode(&module, Colors::new(false)),
         )),
-        Compile::Types => out.push(("types".into(), render_types(&module))),
+        Compile::Types => out.push(("types".into(), render_types(&compiled))),
         Compile::Vm => {
             out.push((
                 "bytecode".into(),
                 dump_bytecode(&module, Colors::new(false)),
             ));
-            out.push(("types".into(), render_types(&module)));
+            out.push(("types".into(), render_types(&compiled)));
             let input = input.ok_or_else(|| {
                 "06-vm fixtures require an `==== input ====` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
             })?;
-            let entry = linked
+            let entry = compiled
                 .definition_names()
                 .last()
                 .expect("a valid query has at least one named definition");
@@ -380,11 +381,10 @@ fn render_compile(
     Ok(out)
 }
 
-fn render_types(module: &Module) -> String {
-    typescript::emit(
-        module,
-        typescript::Config::builder().emit_node_interface(false),
-    )
+fn render_types(compiled: &CompiledQuery) -> String {
+    compiled
+        .emit_typescript(TypeScriptConfig::builder().emit_node_interface(false))
+        .expect("valid query should compile to a module")
 }
 
 fn run_vm(

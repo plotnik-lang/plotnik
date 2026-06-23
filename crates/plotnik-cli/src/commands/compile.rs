@@ -4,9 +4,8 @@
 //! `check` runs — so a query `check` rejects fails here too, as a rendered
 //! diagnostic rather than a panic on `Module::load`.
 
-use plotnik_lib::QueryBuilder;
-use plotnik_lib::SourceMap;
 use plotnik_lib::bytecode::Module;
+use plotnik_lib::{CompiledQuery, QueryBuilder, SourceMap};
 
 use crate::error::CliError;
 use crate::language_registry::Lang;
@@ -15,17 +14,30 @@ use crate::language_registry::Lang;
 ///
 /// `check_compile` already proves emit+load succeed, so the final load can only
 /// fail on a genuine bug; it is surfaced as a clean error, never a panic.
-pub fn compile_module(sources: SourceMap, lang: &Lang, color: bool) -> Result<Module, CliError> {
-    let linked = QueryBuilder::new(sources)
-        .link(lang.grammar())
+pub fn compile_query(
+    sources: SourceMap,
+    lang: &Lang,
+    color: bool,
+) -> Result<CompiledQuery, CliError> {
+    let compiled = QueryBuilder::new(sources)
+        .compile(lang.grammar())
         .map_err(|e| CliError::fatal(e.to_string()))?;
 
-    let diagnostics = linked.check_compile();
+    let diagnostics = compiled.diagnostics();
     if diagnostics.has_errors() {
-        eprint!("{}", diagnostics.render_colored(linked.source_map(), color));
+        eprint!(
+            "{}",
+            diagnostics.render_colored(compiled.source_map(), color)
+        );
         return Err(CliError::FatalRendered);
     }
 
-    let bytecode = linked.emit().map_err(|e| CliError::fatal(e.to_string()))?;
-    Module::load(&bytecode).map_err(|e| CliError::fatal(format!("bytecode rejected: {e}")))
+    Ok(compiled)
+}
+
+pub fn compile_module(sources: SourceMap, lang: &Lang, color: bool) -> Result<Module, CliError> {
+    let compiled = compile_query(sources, lang, color)?;
+    compiled
+        .into_module()
+        .ok_or_else(|| CliError::fatal("compile produced no module"))
 }

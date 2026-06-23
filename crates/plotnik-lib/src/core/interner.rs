@@ -90,18 +90,14 @@ impl Interner {
 
     /// Number of interned strings.
     #[inline]
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.strings.len()
     }
 
-    /// Whether the interner is empty.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.strings.is_empty()
-    }
-
     /// Iterate over all interned strings with their symbols.
     #[inline]
+    #[cfg(test)]
     pub fn iter(&self) -> impl Iterator<Item = (Symbol, &str)> {
         self.strings
             .iter()
@@ -113,6 +109,7 @@ impl Interner {
     ///
     /// Returns (concatenated UTF-8 bytes, offset for each string + sentinel).
     /// The offsets array has `len() + 1` entries; the last is the total blob size.
+    #[cfg(test)]
     pub fn to_blob(&self) -> (Vec<u8>, Vec<u32>) {
         let mut blob = Vec::new();
         let mut offsets = Vec::with_capacity(self.strings.len() + 1);

@@ -20,6 +20,7 @@ use crate::compiler::parse::{
 use crate::core::Interner;
 use crate::core::grammar::Grammar;
 
+use crate::bytecode::Module;
 use crate::compiler::Diagnostics;
 use crate::compiler::diagnostics::DiagnosticKind;
 use crate::compiler::source::{SourceId, SourceMap};
@@ -65,7 +66,15 @@ impl QueryBuilder {
         Ok(self.parse()?.analyze())
     }
 
-    pub fn link(self, grammar: &Grammar) -> crate::compiler::Result<GrammarBoundQuery> {
+    pub fn check(self, grammar: &Grammar) -> crate::compiler::Result<CheckedQuery> {
+        Ok(self.link(grammar)?.check())
+    }
+
+    pub fn compile(self, grammar: &Grammar) -> crate::compiler::Result<CompiledQuery> {
+        Ok(self.link(grammar)?.compile_module())
+    }
+
+    pub(crate) fn link(self, grammar: &Grammar) -> crate::compiler::Result<GrammarBoundQuery> {
         Ok(self.analyze()?.link(grammar))
     }
 
@@ -267,7 +276,7 @@ impl Query {
             .map(|name| name.text().to_string())
     }
 
-    pub fn link(mut self, grammar: &Grammar) -> GrammarBoundQuery {
+    pub(crate) fn link(mut self, grammar: &Grammar) -> GrammarBoundQuery {
         let mut output = link::GrammarBindingBuilder::new();
         let parsed = &mut self.parsed;
 
@@ -297,9 +306,77 @@ impl TryFrom<&str> for Query {
     }
 }
 
-pub struct GrammarBoundQuery {
+pub(crate) struct GrammarBoundQuery {
     analyzed: Query,
     grammar: link::GrammarBinding,
+}
+
+pub struct CheckedQuery {
+    query: GrammarBoundQuery,
+    diagnostics: Diagnostics,
+}
+
+impl CheckedQuery {
+    pub fn is_valid(&self) -> bool {
+        !self.diagnostics.has_errors()
+    }
+
+    pub fn source_map(&self) -> &SourceMap {
+        self.query.source_map()
+    }
+
+    pub fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
+    }
+
+    pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.query.definition_names()
+    }
+}
+
+pub struct CompiledQuery {
+    checked: CheckedQuery,
+    bytecode: Option<Vec<u8>>,
+    module: Option<Module>,
+}
+
+impl CompiledQuery {
+    pub fn is_valid(&self) -> bool {
+        self.module.is_some() && self.checked.is_valid()
+    }
+
+    pub fn source_map(&self) -> &SourceMap {
+        self.checked.source_map()
+    }
+
+    pub fn diagnostics(&self) -> &Diagnostics {
+        self.checked.diagnostics()
+    }
+
+    pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.checked.definition_names()
+    }
+
+    pub fn bytecode(&self) -> Option<&[u8]> {
+        self.bytecode.as_deref()
+    }
+
+    pub fn module(&self) -> Option<&Module> {
+        self.module.as_ref()
+    }
+
+    pub fn into_module(self) -> Option<Module> {
+        self.module
+    }
+
+    pub fn emit_typescript(
+        &self,
+        config: crate::compiler::typegen::typescript::Config,
+    ) -> Option<String> {
+        self.module
+            .as_ref()
+            .map(|module| crate::compiler::typegen::typescript::emit(module, config))
+    }
 }
 
 impl GrammarBoundQuery {
@@ -335,8 +412,58 @@ impl GrammarBoundQuery {
         self.analyzed.definition_names()
     }
 
-    pub fn grammar(&self) -> &link::GrammarBinding {
+    pub(crate) fn grammar(&self) -> &link::GrammarBinding {
         &self.grammar
+    }
+
+    pub(crate) fn check(self) -> CheckedQuery {
+        let diagnostics = self.check_compile();
+        CheckedQuery {
+            query: self,
+            diagnostics,
+        }
+    }
+
+    pub(crate) fn compile_module(self) -> CompiledQuery {
+        let mut diagnostics = self.check_compile();
+        let mut bytecode = None;
+        let mut module = None;
+
+        if !diagnostics.has_errors() {
+            match self.emit() {
+                Ok(bytes) => match Module::load(&bytes) {
+                    Ok(loaded) => {
+                        module = Some(loaded);
+                        bytecode = Some(bytes);
+                    }
+                    Err(err) => {
+                        if let Some((source, range)) = self.fallback_span() {
+                            diagnostics
+                                .report(source, DiagnosticKind::BytecodeRejected, range)
+                                .detail(err.to_string())
+                                .emit();
+                        }
+                    }
+                },
+                Err(err) => {
+                    if let Some((source, range)) = self.fallback_span() {
+                        diagnostics
+                            .report(source, DiagnosticKind::EmitFailed, range)
+                            .detail(err.to_string())
+                            .emit();
+                    }
+                }
+            }
+        }
+
+        CompiledQuery {
+            checked: CheckedQuery {
+                query: self,
+                diagnostics,
+            },
+            bytecode,
+            module,
+        }
     }
 
     /// Emit bytecode. Returns `Err(EmitError::InvalidQuery)` if the query has errors.
