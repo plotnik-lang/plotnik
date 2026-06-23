@@ -525,7 +525,7 @@ impl GrammarBoundQuery {
         diag
     }
 
-    fn compile(&self) -> crate::compiler::bytecode::CompileResult {
+    fn compile(&self) -> crate::compiler::core::ir::CompileResult {
         let ctx = CompileCtx {
             interner: self.interner(),
             type_ctx: self.type_analysis(),
