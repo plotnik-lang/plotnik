@@ -24,8 +24,6 @@ pub mod source {
 }
 #[cfg(test)]
 pub mod test_utils;
-#[cfg(test)]
-pub mod typegen;
 
 #[cfg(not(test))]
 pub mod analyze {
@@ -93,7 +91,6 @@ pub use plotnik_compiler_diagnostics::source;
 pub use plotnik_compiler_core::ir as bytecode;
 #[cfg(not(test))]
 pub use plotnik_compiler_parse as parser;
-#[cfg(not(test))]
 pub use plotnik_compiler_typegen as typegen;
 
 #[cfg(test)]
