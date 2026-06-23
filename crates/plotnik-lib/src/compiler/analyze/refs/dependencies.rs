@@ -26,7 +26,7 @@ pub fn analyze_dependencies(
     // exactly one SCC. Type inference leans on this: a def missing from the partition
     // would never be processed in dependency order, breaking `infer_ref`'s guarantee
     // that a non-recursive target is computed before its referrer.
-    debug_assert!(
+    assert!(
         {
             let mut seen = HashSet::new();
             sccs.iter().flatten().all(|name| seen.insert(name.as_str()))

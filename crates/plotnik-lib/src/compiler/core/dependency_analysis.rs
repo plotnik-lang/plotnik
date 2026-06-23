@@ -23,12 +23,53 @@ pub struct DependencyAnalysis {
 }
 
 impl DependencyAnalysis {
-    pub fn new(
+    pub(in crate::compiler) fn new(
         sccs: Vec<Vec<String>>,
         def_ids_by_sym: HashMap<Symbol, DefId>,
         def_names: Vec<Symbol>,
         recursive_defs: HashSet<DefId>,
     ) -> Self {
+        assert_eq!(
+            sccs.iter().flatten().count(),
+            def_names.len(),
+            "every SCC member must correspond to exactly one definition",
+        );
+        assert_eq!(
+            def_ids_by_sym.len(),
+            def_names.len(),
+            "every definition name must have exactly one DefId",
+        );
+
+        for (index, sym) in def_names.iter().copied().enumerate() {
+            let def_id = def_ids_by_sym
+                .get(&sym)
+                .copied()
+                .expect("every def_names entry must be indexed by symbol");
+            assert_eq!(
+                def_id.index(),
+                index,
+                "DefId index must point at its definition name",
+            );
+        }
+
+        for (sym, def_id) in &def_ids_by_sym {
+            let def_name = def_names
+                .get(def_id.index())
+                .copied()
+                .expect("DefId index must be within def_names");
+            assert_eq!(
+                def_name, *sym,
+                "DefId reverse lookup must point back to its symbol",
+            );
+        }
+
+        for def_id in &recursive_defs {
+            assert!(
+                def_id.index() < def_names.len(),
+                "recursive DefId must be within def_names",
+            );
+        }
+
         Self {
             sccs,
             def_ids_by_sym,
