@@ -9,11 +9,12 @@
 #[cfg(test)]
 pub mod analyze;
 pub mod emit;
-#[cfg(test)]
-pub mod parser;
 pub mod query;
 #[cfg(test)]
 pub mod test_utils;
+
+#[cfg(test)]
+mod parser_tests;
 
 #[cfg(not(test))]
 pub mod analyze {
@@ -78,7 +79,6 @@ pub mod diagnostics {
 }
 pub use plotnik_compiler_diagnostics::source;
 pub use plotnik_compiler_core::ir as bytecode;
-#[cfg(not(test))]
 pub use plotnik_compiler_parse as parser;
 pub use plotnik_compiler_typegen as typegen;
 

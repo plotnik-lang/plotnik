@@ -1,6 +1,6 @@
 use rowan::TextRange;
 
-use crate::diagnostics::DiagnosticKind;
+use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
 

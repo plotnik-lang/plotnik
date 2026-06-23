@@ -30,11 +30,7 @@ mod grammar;
 mod invariants;
 
 #[cfg(test)]
-mod ast_tests;
-#[cfg(test)]
 mod cst_tests;
-#[cfg(test)]
-mod tests;
 
 pub use cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 
@@ -43,7 +39,7 @@ pub use ast::{
     NegatedField, NodePattern, NodePredicate, PredicateOp, PredicateValue, QuantifiedPattern, Ref,
     RegexLiteral, Root, SeqPattern, SeqItem, Type, UnionPattern, is_empty_group, token_src,
 };
-pub(crate) use ast::classify_alt;
+pub use ast::classify_alt;
 
 pub use core::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, ParseResult, Parser};
 

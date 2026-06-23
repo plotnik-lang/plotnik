@@ -1,6 +1,6 @@
 use rowan::TextRange;
 
-use crate::diagnostics::DiagnosticKind;
+use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 
 use super::utils::{starts_uppercase, to_pascal_case, to_snake_case};

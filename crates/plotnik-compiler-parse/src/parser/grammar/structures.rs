@@ -1,6 +1,6 @@
 use rowan::{Checkpoint, TextRange};
 
-use crate::diagnostics::DiagnosticKind;
+use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::token_sets::{
     ALT_RECOVERY_TOKENS, EXPR_FIRST_TOKENS, NODE_RECOVERY_TOKENS, PREDICATE_OPS, SEPARATORS,
