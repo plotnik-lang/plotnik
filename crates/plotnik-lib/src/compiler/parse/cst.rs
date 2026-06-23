@@ -8,7 +8,7 @@
 
 use rowan::Language;
 
-pub use crate::compiler::core::cst::{QueryLang, SyntaxKind, SyntaxNode, SyntaxToken};
+pub use crate::compiler::core::cst::{QueryLang, SyntaxKind, SyntaxNode};
 
 use crate::compiler::core::cst::SyntaxKind::*;
 

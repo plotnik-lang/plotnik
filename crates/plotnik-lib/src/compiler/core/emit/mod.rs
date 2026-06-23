@@ -20,5 +20,5 @@ mod type_table_tests;
 pub use context::EmitInput;
 pub use error::EmitError;
 pub use regex_table::RegexTableBuilder;
-pub use string_table::{EASTER_EGG, StringTableBuilder};
+pub use string_table::StringTableBuilder;
 pub use type_table::TypeTableBuilder;

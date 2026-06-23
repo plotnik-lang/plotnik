@@ -38,10 +38,6 @@ impl CaptureEffects {
         Self { pre, post }
     }
 
-    pub fn new_pre(pre: Vec<EffectIR>) -> Self {
-        Self { pre, post: vec![] }
-    }
-
     pub fn new_post(post: Vec<EffectIR>) -> Self {
         Self { pre: vec![], post }
     }

@@ -1,4 +1,4 @@
-use super::*;
+use crate::compiler::core::DefId;
 
 #[test]
 fn def_id_roundtrip() {

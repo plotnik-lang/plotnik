@@ -21,7 +21,7 @@
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub use crate::compiler::diagnostics::{Error, Result};
+pub use crate::compiler::diagnostics::Error;
 
 pub mod ast;
 mod cst;
@@ -34,16 +34,10 @@ mod invariants;
 #[cfg(test)]
 mod cst_tests;
 
-pub use cst::{SyntaxKind, SyntaxNode, SyntaxToken};
+pub use cst::{SyntaxKind, SyntaxNode};
 
-pub use ast::classify_alt;
-pub use ast::{
-    AltKind, Anchor, Branch, CapturedPattern, Def, EnumPattern, FieldPattern, NegatedField,
-    NodePattern, NodePredicate, Pattern, PredicateOp, PredicateValue, QuantifiedPattern, Ref,
-    RegexLiteral, Root, SeqItem, SeqPattern, TokenPattern, Type, UnionPattern, is_empty_group,
-    token_src,
-};
+pub use ast::{Anchor, Branch, Def, NegatedField, Pattern, Root};
 
-pub use core::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, ParseResult, Parser};
+pub use core::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser};
 
-pub use lexer::{Token, dump_tokens, lex, token_text};
+pub use lexer::{dump_tokens, lex};

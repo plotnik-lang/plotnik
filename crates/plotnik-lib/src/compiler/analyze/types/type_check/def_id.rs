@@ -1,1 +1,1 @@
-pub use crate::compiler::core::{DefId, Interner, Symbol};
+pub use crate::compiler::core::{Interner, Symbol};

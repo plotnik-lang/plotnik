@@ -225,10 +225,6 @@ impl TypeAnalysisBuilder {
         self.analysis.type_shape(id)
     }
 
-    pub fn struct_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, FieldInfo>> {
-        self.analysis.struct_fields(id)
-    }
-
     pub fn expect_struct_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
         self.analysis.expect_struct_fields(id)
     }

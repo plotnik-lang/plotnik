@@ -21,26 +21,23 @@ mod cst_tests;
 #[cfg(test)]
 mod ir_tests;
 
-pub use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
+pub use crate::core::{Interner, Symbol};
 pub use ast::{
-    AltKind, Anchor, Branch, CapturedPattern, Def, EnumPattern, FieldPattern, NegatedField,
-    NodePattern, NodePredicate, Pattern, PredicateOp, PredicateValue, QuantifiedPattern, Ref,
-    RegexLiteral, Root, SeqItem, SeqPattern, TokenPattern, Type, UnionPattern, classify_alt,
+    AltKind, Branch, CapturedPattern, Def, EnumPattern, FieldPattern, NodePattern, Pattern,
+    QuantifiedPattern, Ref, Root, SeqItem, SeqPattern, TokenPattern, UnionPattern, classify_alt,
     is_empty_group, token_src,
 };
 pub use capture_mechanism::CaptureMechanism;
-pub use cst::{QueryLang, SyntaxKind, SyntaxNode, SyntaxToken};
+pub use cst::{SyntaxKind, SyntaxToken};
 pub use dependency_analysis::DependencyAnalysis;
-pub use emit::{
-    EASTER_EGG, EmitError, EmitInput, RegexTableBuilder, StringTableBuilder, TypeTableBuilder,
-};
+pub use emit::{EmitError, EmitInput, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
 pub use grammar_binding::GrammarBinding;
 pub use located::Located;
-pub use source::{Source, SourceId, SourceKind, SourceMap};
+pub use source::{SourceId, SourceMap};
 pub use span::Span;
 pub use symbol_table::SymbolTable;
 pub use type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
-pub use type_shape::{FieldInfo, OutputFlow, PatternResult, TypeShape};
+pub use type_shape::TypeShape;
 pub use validated_ast::ValidatedAst;
 
 /// A lightweight handle to a named query definition.

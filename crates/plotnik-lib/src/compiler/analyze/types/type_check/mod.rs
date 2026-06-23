@@ -17,14 +17,9 @@ mod def_id_tests;
 #[cfg(test)]
 mod unify_tests;
 
-pub use capture_mechanism::CaptureMechanism;
-pub use context::{TypeAnalysis, TypeAnalysisBuilder};
-pub use def_id::{DefId, Interner, Symbol};
-pub use types::{
-    Arity, FieldInfo, OutputFlow, PatternResult, QuantifierKind, TYPE_NODE, TYPE_VOID, TypeId,
-    TypeShape,
-};
-pub use unify::{UnifyError, unify_flow, unify_flows};
+pub use context::TypeAnalysis;
+pub use def_id::Interner;
+pub use types::Arity;
 
 use crate::compiler::core::DependencyAnalysis;
 use crate::compiler::core::SymbolTable;

@@ -20,7 +20,7 @@ fn nest_scope_preserves_outer_and_nests_inner() {
 
 #[test]
 fn with_pre_values_appends_after_scope_opens() {
-    let outer = CaptureEffects::new_pre(vec![EffectIR::start_struct()]);
+    let outer = CaptureEffects::new(vec![EffectIR::start_struct()], vec![]);
 
     let result = outer.with_pre_values(vec![
         EffectIR::null(),

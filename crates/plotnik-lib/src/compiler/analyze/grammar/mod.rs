@@ -4,5 +4,3 @@
 
 pub mod link;
 mod utils;
-
-pub use link::{GrammarBinding, GrammarBindingBuilder, GrammarLinkCtx};

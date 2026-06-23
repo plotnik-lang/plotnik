@@ -841,16 +841,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 self.ctx.interner.resolve(*field).to_string(),
                 Some("make every branch produce the same type, or label the branches for an enum"),
             ),
-            UnifyError::IncompatibleStructs { field } => (
-                DiagnosticKind::IncompatibleStructShapes,
-                self.ctx.interner.resolve(*field).to_string(),
-                Some("use an enum if branches need different fields"),
-            ),
-            UnifyError::IncompatibleArrayElements { field } => (
-                DiagnosticKind::IncompatibleCaptureTypes,
-                self.ctx.interner.resolve(*field).to_string(),
-                Some("array element types must be compatible across branches"),
-            ),
         };
 
         let mut builder = self.ctx.diag.report(source, kind, range).detail(msg);

@@ -16,10 +16,6 @@ pub struct ParseResult {
 }
 
 impl ParseResult {
-    pub fn ast(&self) -> &Root {
-        &self.ast
-    }
-
     pub fn into_ast(self) -> Root {
         self.ast
     }

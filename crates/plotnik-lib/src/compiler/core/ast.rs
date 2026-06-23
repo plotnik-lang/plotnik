@@ -45,6 +45,9 @@ macro_rules! ast_node {
                 matches!(kind, $(SyntaxKind::$kind)|+)
             }
 
+            // Uniform AST wrapper API; some wrapper kinds are only queried by
+            // typed accessors, not by direct syntax traversal today.
+            #[allow(dead_code)]
             pub fn syntax(&self) -> &SyntaxNode {
                 &self.0
             }

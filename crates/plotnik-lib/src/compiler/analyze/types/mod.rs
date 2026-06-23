@@ -6,4 +6,3 @@ mod entrypoints;
 pub mod type_check;
 
 pub use entrypoints::validate_entrypoints;
-pub use type_check::{TypeAnalysis, TypeAnalysisBuilder, infer_types};

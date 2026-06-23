@@ -5,9 +5,6 @@
 //! module; the crate root re-exports only the facade-level API.
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-// Former crate-local pass APIs remain module boundaries after the fold; not
-// every re-export is used by the public facade.
-#![allow(dead_code, unused_imports)]
 
 pub mod core;
 pub mod diagnostics;

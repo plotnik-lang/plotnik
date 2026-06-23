@@ -6,5 +6,4 @@ pub mod dependencies;
 mod recursion;
 pub mod refs;
 
-pub use dependencies::{DependencyAnalysis, analyze_dependencies};
 pub use recursion::validate_recursion;

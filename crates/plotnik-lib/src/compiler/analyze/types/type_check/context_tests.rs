@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use super::*;
+use super::context::TypeAnalysisBuilder;
+use super::def_id::Interner;
+use super::types::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
+use crate::compiler::core::DefId;
 
 #[test]
 fn builtin_types_have_correct_ids() {

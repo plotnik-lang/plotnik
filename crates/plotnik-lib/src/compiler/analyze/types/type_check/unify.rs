@@ -16,21 +16,6 @@ pub enum UnifyError {
     ScalarInUnion,
     /// Capture has incompatible types across branches
     IncompatibleTypes { field: Symbol },
-    /// Capture has incompatible struct shapes across branches
-    IncompatibleStructs { field: Symbol },
-    /// Array element types don't match
-    IncompatibleArrayElements { field: Symbol },
-}
-
-impl UnifyError {
-    pub fn field_symbol(&self) -> Option<Symbol> {
-        match self {
-            UnifyError::ScalarInUnion => None,
-            UnifyError::IncompatibleTypes { field }
-            | UnifyError::IncompatibleStructs { field }
-            | UnifyError::IncompatibleArrayElements { field } => Some(*field),
-        }
-    }
 }
 
 pub fn unify_flows(

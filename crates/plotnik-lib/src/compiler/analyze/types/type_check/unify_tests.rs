@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
-use super::*;
-use crate::compiler::analyze::types::type_check::TYPE_NODE;
+use super::context::TypeAnalysisBuilder;
+use super::types::{FieldInfo, OutputFlow, TYPE_NODE};
+use super::unify::{UnifyError, unify_flow};
 use crate::core::Interner;
 
 #[test]
@@ -22,7 +23,7 @@ fn unify_void_bubble() {
 
     match result {
         OutputFlow::Fields(id) => {
-            let fields = ctx.struct_fields(id).unwrap();
+            let fields = ctx.analysis().struct_fields(id).unwrap();
             assert!(fields.get(&x).unwrap().optional);
         }
         _ => panic!("expected Fields"),
@@ -47,7 +48,7 @@ fn unify_bubble_merge() {
 
     match result {
         OutputFlow::Fields(id) => {
-            let fields = ctx.struct_fields(id).unwrap();
+            let fields = ctx.analysis().struct_fields(id).unwrap();
             // x is in both, so required
             assert!(!fields.get(&x).unwrap().optional);
             // y only in b, so optional
