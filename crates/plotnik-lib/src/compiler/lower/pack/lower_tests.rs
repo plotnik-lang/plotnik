@@ -1,8 +1,8 @@
 use crate::bytecode::{EffectKind, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, Nav};
 
 use super::lower::lower;
-use crate::compiler::core::ir::CompileResult;
-use crate::compiler::core::ir::{EffectIR, InstructionIR, Label, MatchIR};
+use crate::compiler::lower::ir::CompileResult;
+use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR};
 
 const MAX_POST_EFFECTS: usize = 7;
 const MAX_NEG_FIELDS: usize = 7;

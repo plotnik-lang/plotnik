@@ -3,8 +3,8 @@
 use crate::bytecode::Nav;
 
 use super::collapse_up::collapse_up;
-use crate::compiler::core::ir::CompileResult;
-use crate::compiler::core::ir::{InstructionIR, Label, MatchIR};
+use crate::compiler::lower::ir::CompileResult;
+use crate::compiler::lower::ir::{InstructionIR, Label, MatchIR};
 
 #[test]
 fn collapse_up_single_mode() {
@@ -184,7 +184,7 @@ fn collapse_up_exact_same_mode() {
 fn collapse_up_with_effects_no_merge() {
     // Up(1) with post_effects → Up(1) should NOT merge
     use crate::bytecode::EffectKind;
-    use crate::compiler::core::ir::EffectIR;
+    use crate::compiler::lower::ir::EffectIR;
 
     let mut result = CompileResult {
         instructions: vec![

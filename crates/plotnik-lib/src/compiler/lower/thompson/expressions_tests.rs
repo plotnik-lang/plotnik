@@ -3,7 +3,7 @@ use std::num::NonZeroU16;
 use crate::core::{Interner, NodeKind};
 use indexmap::IndexMap;
 
-use crate::compiler::core::ir::NodeKindConstraint;
+use crate::compiler::lower::ir::NodeKindConstraint;
 use crate::compiler::core::{GrammarBinding, TypeAnalysisBuilder};
 use crate::compiler::test_utils::{empty_dependency_analysis, empty_symbol_table};
 

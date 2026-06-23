@@ -33,5 +33,5 @@ mod expressions_tests;
 #[cfg(test)]
 mod quantifier_tests;
 
-pub use crate::compiler::core::ir::CompileResult;
+pub use crate::compiler::lower::ir::CompileResult;
 pub use compiler::{CompileCtx, Compiler};

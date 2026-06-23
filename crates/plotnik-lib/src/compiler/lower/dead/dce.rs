@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use crate::compiler::core::ir::{CompileResult, Label};
+use crate::compiler::lower::ir::{CompileResult, Label};
 
 pub fn remove_unreachable(result: &mut CompileResult) {
     let reachable = compute_reachable(result);
@@ -43,7 +43,7 @@ mod tests {
     use super::*;
     use crate::bytecode::Nav;
     use crate::compiler::core::DefId;
-    use crate::compiler::core::ir::MatchIR;
+    use crate::compiler::lower::ir::MatchIR;
     use indexmap::IndexMap;
 
     #[test]

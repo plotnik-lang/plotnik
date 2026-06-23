@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::bytecode::EffectKind;
 
-use crate::compiler::core::ir::{CompileResult, EffectIR, InstructionIR, Label, MatchIR};
+use crate::compiler::lower::ir::{CompileResult, EffectIR, InstructionIR, Label, MatchIR};
 
 fn build_label_to_index(instructions: &[InstructionIR]) -> HashMap<Label, usize> {
     instructions
@@ -374,7 +374,7 @@ pub fn eliminate_epsilons(result: &mut CompileResult) {
 mod tests {
     use super::*;
     use crate::bytecode::Nav;
-    use crate::compiler::core::ir::EffectIR;
+    use crate::compiler::lower::ir::EffectIR;
 
     fn make_epsilon(label: u32, succs: Vec<u32>) -> InstructionIR {
         InstructionIR::Match(

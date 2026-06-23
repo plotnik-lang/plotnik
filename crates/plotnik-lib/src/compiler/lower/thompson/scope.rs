@@ -7,7 +7,7 @@ use std::num::NonZeroU16;
 use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::core::Pattern;
 use crate::compiler::core::TypeId;
-use crate::compiler::core::ir::{CallIR, EffectIR, Label, MatchIR, MemberRef};
+use crate::compiler::lower::ir::{CallIR, EffectIR, Label, MatchIR, MemberRef};
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};

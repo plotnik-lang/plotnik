@@ -6,7 +6,6 @@ pub(crate) mod cst;
 pub(crate) mod dependency_analysis;
 pub(crate) mod emit;
 pub(crate) mod grammar_binding;
-pub(crate) mod ir;
 pub(crate) mod located;
 pub(crate) mod source;
 pub(crate) mod span;
@@ -17,8 +16,6 @@ pub(crate) mod visitor;
 
 #[cfg(test)]
 mod cst_tests;
-#[cfg(test)]
-mod ir_tests;
 
 pub use crate::core::{Interner, Symbol};
 pub use ast::{

@@ -1,7 +1,7 @@
 use super::capture::CaptureEffects;
 use crate::bytecode::EffectKind;
 use crate::compiler::core::TypeId;
-use crate::compiler::core::ir::{EffectIR, MemberRef};
+use crate::compiler::lower::ir::{EffectIR, MemberRef};
 
 #[test]
 fn nest_scope_preserves_outer_and_nests_inner() {

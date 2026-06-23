@@ -9,7 +9,7 @@
 
 use crate::bytecode::{MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS};
 
-use crate::compiler::core::ir::{CompileResult, EffectIR, InstructionIR, Label, MatchIR};
+use crate::compiler::lower::ir::{CompileResult, EffectIR, InstructionIR, Label, MatchIR};
 
 const MAX_POST_EFFECTS: usize = 7;
 const MAX_NEG_FIELDS: usize = 7;

@@ -67,7 +67,7 @@ mod debug_impl {
     use indexmap::IndexMap;
 
     use crate::compiler::core::DefId;
-    use crate::compiler::core::ir::{
+    use crate::compiler::lower::ir::{
         InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR,
     };
     use crate::compiler::lower::thompson::CompileResult;

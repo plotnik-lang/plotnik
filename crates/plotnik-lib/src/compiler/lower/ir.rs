@@ -15,8 +15,8 @@ use crate::compiler::core::{DefId, TypeId};
 
 /// Node kind constraint for Match instructions.
 ///
-/// The bytecode crate owns this type; re-exported here so existing
-/// `crate::compiler::core::bytecode::NodeKindConstraint` references resolve unchanged.
+/// The bytecode crate owns this type; re-exported here so IR producers and
+/// consumers can name it as `ir::NodeKindConstraint`.
 pub(crate) use crate::bytecode::NodeKindConstraint;
 
 /// Symbolic reference, resolved to step address at layout time.

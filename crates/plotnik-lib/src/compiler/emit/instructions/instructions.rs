@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use crate::bytecode::{
     Call, Effect, MatchInstr, MatchPredicate, Return, STEP_SIZE, StepAddr, StepId, Trampoline,
 };
-use crate::compiler::core::ir::{
+use crate::compiler::lower::ir::{
     CallIR, EffectArg, EffectIR, InstructionIR, Label, LayoutMap, MatchIR, MemberRef, TrampolineIR,
 };
 use crate::compiler::core::{EmitError, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};

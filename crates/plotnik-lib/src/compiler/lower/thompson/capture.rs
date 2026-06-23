@@ -7,7 +7,7 @@ use std::collections::HashSet;
 
 use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::core::ast::{self, Pattern};
-use crate::compiler::core::ir::{EffectIR, Label};
+use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::core::{CaptureMechanism, TypeAnalysis, TypeId, TypeShape};
 
 use super::Compiler;

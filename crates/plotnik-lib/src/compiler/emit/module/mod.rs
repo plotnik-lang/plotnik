@@ -8,7 +8,7 @@ use crate::core::NodeKind;
 
 use crate::bytecode::{Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN};
 
-use crate::compiler::core::ir::{CompileResult, LayoutMap};
+use crate::compiler::lower::ir::{CompileResult, LayoutMap};
 use crate::compiler::core::{
     EmitError, EmitInput, RegexTableBuilder, StringTableBuilder, TypeTableBuilder,
 };

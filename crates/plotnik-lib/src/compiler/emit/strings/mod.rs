@@ -4,7 +4,7 @@
 //! stream references.
 
 use crate::compiler::core::StringTableBuilder;
-use crate::compiler::core::ir::{CompileResult, InstructionIR};
+use crate::compiler::lower::ir::{CompileResult, InstructionIR};
 
 /// The sole creator of the string table — seeds it from the predicate strings
 /// reachable in the instruction stream. Later phases extend or read this table.

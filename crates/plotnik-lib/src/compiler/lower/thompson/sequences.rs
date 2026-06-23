@@ -10,7 +10,7 @@ use crate::core::Symbol;
 
 use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::core::ast::{self, Pattern, SeqItem};
-use crate::compiler::core::ir::{EffectIR, InstructionIR, Label, MemberRef, NodeKindConstraint};
+use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MemberRef, NodeKindConstraint};
 use crate::compiler::core::{TypeId, TypeShape};
 
 use super::Compiler;

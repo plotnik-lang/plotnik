@@ -7,7 +7,7 @@
 use crate::bytecode::Nav;
 use crate::compiler::core::SyntaxKind;
 use crate::compiler::core::ast::{self, Pattern};
-use crate::compiler::core::ir::{EffectIR, Label};
+use crate::compiler::lower::ir::{EffectIR, Label};
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx, needs_struct_wrapper, row_type_id};

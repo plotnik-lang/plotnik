@@ -8,7 +8,7 @@
 use regex_automata::dfa::dense;
 
 use crate::bytecode::StringId;
-use crate::compiler::core::ir::{CompileResult, InstructionIR, PredicateValueIR};
+use crate::compiler::lower::ir::{CompileResult, InstructionIR, PredicateValueIR};
 use crate::compiler::core::{EmitError, RegexTableBuilder, StringTableBuilder};
 
 #[cfg(test)]
