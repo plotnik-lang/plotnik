@@ -6,7 +6,7 @@ use crate::shot_bytecode;
 
 #[test]
 fn total_steps_past_u16_does_not_wrap() {
-    use super::layout_pass::CacheAligned;
+    use super::layout::CacheAligned;
     use crate::compiler::core::ir::{InstructionIR, Label, MatchIR};
 
     // 70_000 independent terminal matches pack 8-per-block into 70_000 steps,

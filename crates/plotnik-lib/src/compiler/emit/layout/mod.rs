@@ -3,9 +3,9 @@
 //! Instruction-layout emission phase: assign a cache-aligned step address to
 //! every label.
 
-mod layout;
+mod cache_aligned;
 
-pub use layout::CacheAligned;
+pub use cache_aligned::CacheAligned;
 
 use crate::compiler::core::EmitError;
 use crate::compiler::core::ir::{CompileResult, Label, LayoutMap};

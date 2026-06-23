@@ -6,8 +6,8 @@
 
 mod driver;
 mod instructions;
-mod layout_pass;
-mod module_pass;
+mod layout;
+mod module;
 mod regex;
 mod strings;
 mod types;

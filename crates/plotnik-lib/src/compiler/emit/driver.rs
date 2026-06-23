@@ -11,8 +11,8 @@ use crate::compiler::core::ir::CompileResult;
 use crate::compiler::core::{EmitError, EmitInput};
 
 use crate::compiler::emit::instructions::encode;
-use crate::compiler::emit::layout_pass::compute_layout;
-use crate::compiler::emit::module_pass::{build_tables, write_module};
+use crate::compiler::emit::layout::compute_layout;
+use crate::compiler::emit::module::{build_tables, write_module};
 use crate::compiler::emit::regex::build_regex_table;
 use crate::compiler::emit::strings::intern_predicates;
 use crate::compiler::emit::types::build_type_table;
