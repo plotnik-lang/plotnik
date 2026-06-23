@@ -2194,10 +2194,7 @@ version = "0.3.3"
 dependencies = [
  "indexmap",
  "plotnik-bytecode",
- "plotnik-compiler-analyze-names",
- "plotnik-compiler-analyze-types",
  "plotnik-compiler-core",
- "plotnik-compiler-parse",
  "plotnik-core",
 ]
 
