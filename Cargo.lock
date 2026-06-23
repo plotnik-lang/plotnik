@@ -1935,7 +1935,6 @@ dependencies = [
  "flate2",
  "insta",
  "libc",
- "plotnik-core",
  "plotnik-lib",
 ]
 

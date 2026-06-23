@@ -1,5 +1,5 @@
 //! Corpus-level invariants for the structural skeleton that `Grammar::from_raw`
-//! retains (`plotnik_core::grammar::StructureTable`).
+//! retains (`plotnik_lib::grammar::StructureTable`).
 //!
 //! Every shipped grammar is built through the real `from_raw` path and its table
 //! checked: it is populated, and every descent `body` points at a real variable.

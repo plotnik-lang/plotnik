@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use plotnik_core::grammar::raw::{RawGrammar, RawRule};
+use plotnik_lib::grammar::raw::{RawGrammar, RawRule};
 
 use crate::error::CliResult;
 use plotnik::language_registry;

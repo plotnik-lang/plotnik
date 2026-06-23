@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
-use plotnik_core::grammar::raw::RawGrammar;
+use plotnik_lib::grammar::raw::RawGrammar;
 
 fn main() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");

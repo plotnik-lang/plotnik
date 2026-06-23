@@ -1,4 +1,4 @@
-use plotnik_core::grammar::raw::{RawGrammar, RawRule};
+use plotnik_lib::grammar::raw::{RawGrammar, RawRule};
 
 use super::lang::GrammarPrinter;
 use plotnik::language_registry::{self, Lang};

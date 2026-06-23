@@ -3,7 +3,7 @@ use std::sync::OnceLock;
 
 use arborium_tree_sitter::{Language, Parser, Tree};
 use flate2::read::GzDecoder;
-use plotnik_core::grammar::{Grammar, raw::RawGrammar};
+use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 
 #[derive(Debug)]
 pub struct Lang {
