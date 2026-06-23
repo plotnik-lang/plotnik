@@ -10,4 +10,5 @@ description = "Type table emission pass for the Plotnik compiler"
 workspace = true
 
 [dependencies]
+plotnik-bytecode.workspace = true
 plotnik-compiler-core.workspace = true
