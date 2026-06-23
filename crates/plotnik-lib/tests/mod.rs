@@ -304,18 +304,15 @@ fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
     match kind {
         // Parser recovery fixtures pin diagnostics only; a half-built error CST is noise.
         Front::Parser { trivia } if !has_errors => {
-            let cst = analyzed.printer().cst(true).with_trivia(trivia).dump();
+            let cst = analyzed.dump_cst_with_trivia(trivia);
             out.push(("cst".into(), cst));
-            out.push(("ast".into(), analyzed.printer().dump()));
+            out.push(("ast".into(), analyzed.dump_ast()));
         }
         Front::Parser { .. } => {}
         // The symbol table is meaningful even with unresolved refs, so it renders
         // alongside any error diagnostics rather than being suppressed.
         Front::Analyze => {
-            out.push((
-                "symbols".into(),
-                analyzed.printer().definitions_only(true).dump(),
-            ));
+            out.push(("symbols".into(), analyzed.dump_symbols()));
         }
     }
     out

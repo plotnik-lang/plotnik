@@ -192,7 +192,7 @@ impl Query {
         self.analysis.is_some() && !self.parsed.diag.has_errors()
     }
 
-    pub fn arity(&self, node: &SyntaxNode) -> Option<Arity> {
+    pub(crate) fn arity(&self, node: &SyntaxNode) -> Option<Arity> {
         let analysis = self.analysis.as_ref()?;
 
         use crate::compiler::parse::ast;
@@ -333,10 +333,6 @@ impl GrammarBoundQuery {
 
     pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
         self.analyzed.definition_names()
-    }
-
-    pub fn arity(&self, node: &SyntaxNode) -> Option<Arity> {
-        self.analyzed.arity(node)
     }
 
     pub fn grammar(&self) -> &link::GrammarBinding {

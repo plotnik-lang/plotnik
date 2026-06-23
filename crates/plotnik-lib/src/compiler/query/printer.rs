@@ -16,7 +16,7 @@ fn indent(level: usize) -> String {
     "  ".repeat(level)
 }
 
-pub struct QueryPrinter<'q> {
+pub(crate) struct QueryPrinter<'q> {
     query: &'q Query,
     cst: bool,
     trivia: bool,
@@ -26,7 +26,7 @@ pub struct QueryPrinter<'q> {
 }
 
 impl<'q> QueryPrinter<'q> {
-    pub fn new(query: &'q Query) -> Self {
+    pub(crate) fn new(query: &'q Query) -> Self {
         Self {
             query,
             cst: false,
@@ -37,38 +37,40 @@ impl<'q> QueryPrinter<'q> {
         }
     }
 
-    pub fn cst(mut self, value: bool) -> Self {
+    pub(crate) fn cst(mut self, value: bool) -> Self {
         self.cst = value;
         self
     }
 
-    pub fn with_trivia(mut self, value: bool) -> Self {
+    pub(crate) fn with_trivia(mut self, value: bool) -> Self {
         self.trivia = value;
         self
     }
 
-    pub fn with_arities(mut self, value: bool) -> Self {
+    #[cfg(test)]
+    pub(crate) fn with_arities(mut self, value: bool) -> Self {
         self.arities = value;
         self
     }
 
-    pub fn with_spans(mut self, value: bool) -> Self {
+    #[cfg(test)]
+    pub(crate) fn with_spans(mut self, value: bool) -> Self {
         self.spans = value;
         self
     }
 
-    pub fn definitions_only(mut self, value: bool) -> Self {
+    pub(crate) fn definitions_only(mut self, value: bool) -> Self {
         self.definitions = value;
         self
     }
 
-    pub fn dump(&self) -> String {
+    pub(crate) fn dump(&self) -> String {
         let mut out = String::new();
         self.format(&mut out).expect("String write never fails");
         out
     }
 
-    pub fn format(&self, w: &mut impl Write) -> std::fmt::Result {
+    pub(crate) fn format(&self, w: &mut impl Write) -> std::fmt::Result {
         if self.definitions {
             return self.format_symbols(w);
         }
@@ -445,7 +447,7 @@ impl<'q> QueryPrinter<'q> {
 }
 
 impl Query {
-    pub fn printer(&self) -> QueryPrinter<'_> {
+    pub(crate) fn printer(&self) -> QueryPrinter<'_> {
         QueryPrinter::new(self)
     }
 }

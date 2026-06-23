@@ -73,7 +73,11 @@ fn print_query_ast(args: &AstArgs) -> Result<Option<String>, CliError> {
         );
     }
 
-    let output = query.printer().cst(args.raw).with_trivia(args.raw).dump();
+    let output = if args.raw {
+        query.dump_cst_with_trivia(true)
+    } else {
+        query.dump_ast()
+    };
     print!("{}", output);
 
     Ok(loaded.shebang.lang)
