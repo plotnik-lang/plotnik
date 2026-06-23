@@ -10,11 +10,11 @@ use regex_syntax::hir;
 use rowan::TextRange;
 
 use super::PredicateInput;
-use crate::SourceId;
-use crate::analyze::Located;
-use crate::analyze::visitor::{Visitor, walk_node_pattern};
-use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::parser::NodePattern;
+use plotnik_compiler_core::source::SourceId;
+use plotnik_compiler_core::Located;
+use plotnik_compiler_core::visitor::{Visitor, walk_node_pattern};
+use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use plotnik_compiler_core::NodePattern;
 
 pub fn validate_predicates(input: PredicateInput) {
     let PredicateInput {

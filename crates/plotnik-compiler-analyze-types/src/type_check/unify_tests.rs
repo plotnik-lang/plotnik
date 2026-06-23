@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::*;
-use crate::analyze::type_check::TYPE_NODE;
+use crate::type_check::TYPE_NODE;
 use plotnik_core::Interner;
 
 #[test]

@@ -8,10 +8,10 @@
 
 use indexmap::IndexMap;
 
-use crate::SourceId;
-use crate::diagnostics::Diagnostics;
-use crate::parser::Root;
-use crate::source::SourceMap;
+use plotnik_compiler_core::source::SourceId;
+use plotnik_compiler_diagnostics::diagnostics::Diagnostics;
+use plotnik_compiler_core::Root;
+use plotnik_compiler_core::source::SourceMap;
 
 pub mod alt_kinds;
 pub mod anchors;

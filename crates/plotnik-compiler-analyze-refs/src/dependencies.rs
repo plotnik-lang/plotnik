@@ -10,9 +10,9 @@ use std::collections::{HashMap, HashSet};
 use indexmap::{IndexMap, IndexSet};
 use plotnik_core::Interner;
 
-use super::symbol_table::SymbolTable;
-use super::type_check::DefId;
-use crate::parser::{Pattern, Ref};
+use plotnik_compiler_core::SymbolTable;
+use plotnik_compiler_core::DefId;
+use plotnik_compiler_core::{Pattern, Ref};
 
 pub use plotnik_compiler_core::DependencyAnalysis;
 

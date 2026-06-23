@@ -6,9 +6,9 @@
 //! mixed-blind while preserving a precise diagnostic for `[A: (x) (y)]`.
 
 use super::ValidationInput;
-use crate::analyze::invariants::ensure_both_branch_kinds;
-use crate::diagnostics::DiagnosticKind;
-use crate::parser::{AltKind, Branch, SyntaxKind, classify_alt};
+use crate::invariants::ensure_both_branch_kinds;
+use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
+use plotnik_compiler_core::{AltKind, Branch, SyntaxKind, classify_alt};
 
 pub fn validate_alt_kinds(input: ValidationInput) {
     let ValidationInput {

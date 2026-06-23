@@ -7,14 +7,14 @@
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
-use super::Located;
+use plotnik_compiler_core::Located;
 use super::dependencies::{DependencyAnalysis, collect_refs};
-use super::symbol_table::SymbolTable;
-use super::visitor::{Visitor, walk_pattern, walk_node_pattern};
-use crate::Diagnostics;
-use crate::diagnostics::{DiagnosticKind, Span};
-use crate::parser::{TokenPattern, Def, Pattern, NodePattern, Ref, Root, SeqPattern};
-use crate::source::SourceId;
+use plotnik_compiler_core::SymbolTable;
+use plotnik_compiler_core::visitor::{Visitor, walk_pattern, walk_node_pattern};
+use plotnik_compiler_diagnostics::diagnostics::Diagnostics;
+use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Span};
+use plotnik_compiler_core::{TokenPattern, Def, Pattern, NodePattern, Ref, Root, SeqPattern};
+use plotnik_compiler_core::source::SourceId;
 
 pub fn validate_recursion(
     analysis: &DependencyAnalysis,

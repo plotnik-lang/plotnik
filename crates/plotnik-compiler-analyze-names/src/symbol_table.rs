@@ -9,14 +9,14 @@
 
 use indexmap::IndexMap;
 
-use crate::Diagnostics;
-use crate::diagnostics::DiagnosticKind;
-use crate::parser::{ast, token_src};
+use plotnik_compiler_diagnostics::diagnostics::Diagnostics;
+use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
+use plotnik_compiler_core::{ast, token_src};
 
-use super::Located;
-use super::validation::ValidatedAst;
-use super::visitor::Visitor;
-use crate::source::SourceId;
+use plotnik_compiler_core::Located;
+use plotnik_compiler_core::ValidatedAst;
+use plotnik_compiler_core::visitor::Visitor;
+use plotnik_compiler_core::source::SourceId;
 
 pub use plotnik_compiler_core::SymbolTable;
 

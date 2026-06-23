@@ -3,10 +3,10 @@
 //! Bans empty trees `()`, empty sequences `{}`, and empty alternations `[]`.
 
 use super::ValidationInput;
-use crate::analyze::Located;
-use crate::analyze::visitor::{Visitor, walk_node_pattern, walk_seq_pattern, walk_union_pattern};
-use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::parser::{NodePattern, SeqPattern, UnionPattern};
+use plotnik_compiler_core::Located;
+use plotnik_compiler_core::visitor::{Visitor, walk_node_pattern, walk_seq_pattern, walk_union_pattern};
+use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use plotnik_compiler_core::{NodePattern, SeqPattern, UnionPattern};
 
 pub fn validate_empty_constructs(input: ValidationInput) {
     let ValidationInput {

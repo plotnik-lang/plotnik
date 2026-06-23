@@ -7,11 +7,11 @@
 //! This validation ensures anchors are placed where they can be meaningfully compiled.
 
 use super::ValidationInput;
-use crate::SourceId;
-use crate::analyze::Located;
-use crate::analyze::visitor::{Visitor, walk_node_pattern, walk_seq_pattern};
-use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::parser::{NodePattern, SeqPattern, SeqItem};
+use plotnik_compiler_core::source::SourceId;
+use plotnik_compiler_core::Located;
+use plotnik_compiler_core::visitor::{Visitor, walk_node_pattern, walk_seq_pattern};
+use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use plotnik_compiler_core::{NodePattern, SeqPattern, SeqItem};
 
 pub fn validate_anchors(input: ValidationInput) {
     let ValidationInput {

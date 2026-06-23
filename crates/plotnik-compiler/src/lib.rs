@@ -6,17 +6,16 @@
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-#[cfg(test)]
-pub mod analyze;
 pub mod emit;
 pub mod query;
 #[cfg(test)]
 pub mod test_utils;
 
 #[cfg(test)]
+mod analyze_tests;
+#[cfg(test)]
 mod parser_tests;
 
-#[cfg(not(test))]
 pub mod analyze {
     pub mod dependencies {
         pub use plotnik_compiler_analyze_refs::dependencies::*;

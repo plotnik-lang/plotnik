@@ -2,7 +2,7 @@
 
 #![cfg_attr(coverage_nightly, coverage(off))]
 
-use crate::parser::Branch;
+use plotnik_compiler_core::Branch;
 
 #[inline]
 pub fn ensure_both_branch_kinds<'a>(

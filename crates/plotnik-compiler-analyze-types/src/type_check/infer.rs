@@ -17,15 +17,15 @@ use super::types::{
 };
 use super::unify::{UnifyError, unify_flows};
 
-use crate::analyze::Located;
-use crate::analyze::dependencies::DependencyAnalysis;
-use crate::analyze::symbol_table::SymbolTable;
-use crate::diagnostics::{DiagnosticKind, Diagnostics};
-use crate::parser::{
+use plotnik_compiler_core::Located;
+use plotnik_compiler_core::DependencyAnalysis;
+use plotnik_compiler_core::SymbolTable;
+use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use plotnik_compiler_core::{
     TokenPattern, CapturedPattern, EnumPattern, Pattern, FieldPattern, NodePattern, QuantifiedPattern, UnionPattern,
     Ref, SeqPattern, is_empty_group,
 };
-use crate::source::SourceId;
+use plotnik_compiler_core::source::SourceId;
 
 /// Shared state for a single inference pass over the AST.
 pub struct InferCtx<'a, 'd> {

@@ -25,9 +25,9 @@ pub use types::{
 };
 pub use unify::{UnifyError, unify_flow, unify_flows};
 
-use crate::analyze::dependencies::DependencyAnalysis;
-use crate::analyze::symbol_table::SymbolTable;
-use crate::diagnostics::Diagnostics;
+use plotnik_compiler_core::DependencyAnalysis;
+use plotnik_compiler_core::SymbolTable;
+use plotnik_compiler_diagnostics::diagnostics::Diagnostics;
 
 /// Run type inference on all definitions.
 ///

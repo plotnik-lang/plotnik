@@ -41,15 +41,15 @@ impl GrammarBindingBuilder {
     }
 }
 
-use super::Located;
-use super::symbol_table::SymbolTable;
+use plotnik_compiler_core::Located;
+use plotnik_compiler_core::SymbolTable;
 use super::utils::find_similar;
-use super::visitor::{Visitor, walk};
-use crate::diagnostics::{DiagnosticKind, Diagnostics, Span};
-use crate::parser::Root;
-use crate::parser::ast::{self, Pattern, NodePattern};
-use crate::parser::{SyntaxKind, SyntaxToken, token_src};
-use crate::source::{SourceId, SourceMap};
+use plotnik_compiler_core::visitor::{Visitor, walk};
+use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics, Span};
+use plotnik_compiler_core::Root;
+use plotnik_compiler_core::ast::{self, Pattern, NodePattern};
+use plotnik_compiler_core::{SyntaxKind, SyntaxToken, token_src};
+use plotnik_compiler_core::source::{SourceId, SourceMap};
 
 /// The threaded dependencies of the link pass. Decoupled from `Query` to allow
 /// testing without a full query context.
@@ -1063,7 +1063,7 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
             self.linker.resolve_field_by_token(node.source(), neg.name());
         }
 
-        super::visitor::walk_node_pattern(self, node);
+        plotnik_compiler_core::visitor::walk_node_pattern(self, node);
     }
 
     fn visit_token_pattern(&mut self, node: &Located<ast::TokenPattern>) {
@@ -1101,6 +1101,6 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
 
     fn visit_field_pattern(&mut self, field: &Located<ast::FieldPattern>) {
         self.linker.resolve_field_by_token(field.source(), field.node().name());
-        super::visitor::walk_field_pattern(self, field);
+        plotnik_compiler_core::visitor::walk_field_pattern(self, field);
     }
 }
