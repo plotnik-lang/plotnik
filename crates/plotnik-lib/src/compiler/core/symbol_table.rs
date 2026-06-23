@@ -76,11 +76,6 @@ impl SymbolTable {
         self.table.keys().map(String::as_str)
     }
 
-    /// Each defined name with the file that defines it, in definition order.
-    pub fn definitions(&self) -> impl Iterator<Item = (&str, SourceId)> {
-        self.table.keys().map(|k| (k.as_str(), self.files[k]))
-    }
-
     /// Whether no definitions were resolved.
     pub fn is_empty(&self) -> bool {
         self.table.is_empty()
