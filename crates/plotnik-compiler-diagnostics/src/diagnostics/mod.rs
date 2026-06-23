@@ -169,10 +169,9 @@ impl Diagnostics {
         result
     }
 
-    /// Raw access to all diagnostics (for debugging/testing).
-    #[allow(dead_code)]
-    pub(crate) fn raw(&self) -> &[Diagnostic] {
-        &self.messages
+    /// The kind of every diagnostic, including suppressed cascades.
+    pub fn kinds(&self) -> impl Iterator<Item = DiagnosticKind> + '_ {
+        self.messages.iter().map(|d| d.kind)
     }
 
     /// Cascading errors are suppressed; see [`Self::render_raw`] for raw output.

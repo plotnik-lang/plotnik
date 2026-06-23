@@ -53,9 +53,9 @@ impl Query {
         let source_map = SourceMap::from_inline(src);
         let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
         let diag = query.diagnostics();
-        let has_parse_error = diag.raw().iter().any(|d| {
+        let has_parse_error = diag.kinds().any(|kind| {
             matches!(
-                d.kind,
+                kind,
                 UnclosedTree
                     | UnclosedSequence
                     | UnclosedAlternation

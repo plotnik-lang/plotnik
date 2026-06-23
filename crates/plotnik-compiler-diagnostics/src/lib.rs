@@ -3,7 +3,6 @@
 pub mod source {
     pub use plotnik_compiler_core::source::*;
 }
-#[path = "../../plotnik-compiler/src/diagnostics/mod.rs"]
 pub mod diagnostics;
 
 pub use diagnostics::{Diagnostics, Severity, Span};
