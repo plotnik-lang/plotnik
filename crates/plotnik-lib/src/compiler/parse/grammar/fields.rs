@@ -1,9 +1,9 @@
 use rowan::{Checkpoint, TextRange, TextSize};
 
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
-use crate::compiler::parse::parser::Parser;
-use crate::compiler::parse::parser::cst::SyntaxKind;
-use crate::compiler::parse::parser::cst::token_sets::QUANTIFIERS;
+use crate::compiler::parse::Parser;
+use crate::compiler::parse::cst::SyntaxKind;
+use crate::compiler::parse::cst::token_sets::QUANTIFIERS;
 
 use super::utils::starts_uppercase;
 

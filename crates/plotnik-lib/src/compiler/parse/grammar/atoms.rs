@@ -1,8 +1,8 @@
 use rowan::TextRange;
 
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
-use crate::compiler::parse::parser::Parser;
-use crate::compiler::parse::parser::cst::SyntaxKind;
+use crate::compiler::parse::Parser;
+use crate::compiler::parse::cst::SyntaxKind;
 
 impl Parser<'_, '_> {
     pub(crate) fn parse_wildcard(&mut self) {

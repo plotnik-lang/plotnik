@@ -1,7 +1,7 @@
 use rowan::TextRange;
 
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
-use crate::compiler::parse::parser::Parser;
+use crate::compiler::parse::Parser;
 
 use super::utils::{starts_uppercase, to_pascal_case, to_snake_case};
 
