@@ -5,7 +5,7 @@
 
 #![allow(clippy::comparison_chain)]
 
-pub mod engine;
+mod engine;
 
 pub use engine::{
     EffectLog, ExecLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,

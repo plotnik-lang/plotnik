@@ -6,10 +6,10 @@
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod core;
-pub mod diagnostics;
-pub mod parse;
-pub mod typegen;
+mod core;
+pub(crate) mod diagnostics;
+pub(crate) mod parse;
+pub(crate) mod typegen;
 
 mod analyze;
 mod lower;
