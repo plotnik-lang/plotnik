@@ -1,12 +1,12 @@
 use rowan::{Checkpoint, TextRange};
 
-use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::token_sets::{
     ALT_RECOVERY_TOKENS, EXPR_FIRST_TOKENS, NODE_RECOVERY_TOKENS, PREDICATE_OPS, SEPARATORS,
     SEQ_RECOVERY_TOKENS,
 };
 use crate::parser::cst::{SyntaxKind, TokenSet};
+use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 
 use super::utils::{starts_uppercase, to_pascal_case};
 

@@ -7,8 +7,8 @@
 
 use super::ValidationInput;
 use crate::invariants::ensure_both_branch_kinds;
-use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 use plotnik_compiler_core::{AltKind, Branch, SyntaxKind, classify_alt};
+use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 
 pub fn validate_alt_kinds(input: ValidationInput) {
     let ValidationInput {
@@ -32,8 +32,12 @@ pub fn validate_alt_kinds(input: ValidationInput) {
             .expect("enum branch found via filter must have label")
             .text_range();
 
-        diag.report(source_id, DiagnosticKind::MixedAltBranches, union_branch.text_range())
-            .related_to(source_id, enum_range, "enum branch here")
-            .emit();
+        diag.report(
+            source_id,
+            DiagnosticKind::MixedAltBranches,
+            union_branch.text_range(),
+        )
+        .related_to(source_id, enum_range, "enum branch here")
+        .emit();
     }
 }

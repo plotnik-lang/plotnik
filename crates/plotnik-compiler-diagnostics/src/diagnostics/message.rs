@@ -226,9 +226,9 @@ impl DiagnosticKind {
             Self::UndefinedReference => {
                 Some("`(Name)` uses a definition; define `Name = ...` or check the spelling")
             }
-            Self::DuplicateCaptureInScope => Some(
-                "rename one capture, or use an enum if they are mutually exclusive branches",
-            ),
+            Self::DuplicateCaptureInScope => {
+                Some("rename one capture, or use an enum if they are mutually exclusive branches")
+            }
             Self::PredicateOnNonLeaf => Some(
                 "predicates match text content; apply them to a leaf node or an anonymous node like `\"foo\"`",
             ),

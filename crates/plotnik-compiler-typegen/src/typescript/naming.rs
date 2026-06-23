@@ -101,17 +101,18 @@ impl Emitter<'_> {
 
     pub(super) fn contextual_name(&mut self, ctx: &NameHint) -> String {
         let base = if let Some(field) = &ctx.member_name {
-            format!("{}{}", to_pascal_case(&ctx.entry_name), to_pascal_case(field))
+            format!(
+                "{}{}",
+                to_pascal_case(&ctx.entry_name),
+                to_pascal_case(field)
+            )
         } else {
             to_pascal_case(&ctx.entry_name)
         };
         self.unique_name(&base)
     }
 
-    pub(super) fn fallback_name(
-        &mut self,
-        type_def: &plotnik_bytecode::TypeDef,
-    ) -> String {
+    pub(super) fn fallback_name(&mut self, type_def: &plotnik_bytecode::TypeDef) -> String {
         let base = match type_def.decode() {
             TypeDefKind::Struct { .. } => "Struct",
             TypeDefKind::Enum { .. } => "Enum",

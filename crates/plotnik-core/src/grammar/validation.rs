@@ -109,10 +109,7 @@ pub(super) fn validate_indirect_recursion(
 fn single_symbol_productions(rule: &Rule) -> BTreeSet<String> {
     match rule {
         Rule::NamedSymbol(name) => BTreeSet::from([name.clone()]),
-        Rule::Choice(choices) => choices
-            .iter()
-            .flat_map(single_symbol_productions)
-            .collect(),
+        Rule::Choice(choices) => choices.iter().flat_map(single_symbol_productions).collect(),
         Rule::Metadata { rule, .. } => single_symbol_productions(rule),
         _ => BTreeSet::new(),
     }

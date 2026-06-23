@@ -8,8 +8,8 @@ mod diagnostics_tests;
 use rowan::TextRange;
 
 pub use json::{
-    Diagnostic as JsonDiagnostic, Fix as JsonFix, Position as JsonPosition,
-    Related as JsonRelated, Span as JsonSpan,
+    Diagnostic as JsonDiagnostic, Fix as JsonFix, Position as JsonPosition, Related as JsonRelated,
+    Span as JsonSpan,
 };
 pub use message::{DiagnosticKind, Severity};
 
@@ -222,9 +222,7 @@ impl<'d> DiagnosticBuilder<'d> {
         range: TextRange,
         msg: impl Into<String>,
     ) -> Self {
-        self.message
-            .related
-            .push(Related::new(source, range, msg));
+        self.message.related.push(Related::new(source, range, msg));
         self
     }
 

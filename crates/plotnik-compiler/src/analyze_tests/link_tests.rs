@@ -33,7 +33,10 @@ fn assert_links_colliding_node_types(files: &[(&str, &str)]) {
 
     assert_ne!(named_id, anonymous_id);
     assert_eq!(query.grammar().resolve_named_kind(sym), Some(named_id));
-    assert_eq!(query.grammar().resolve_anonymous_kind(sym), Some(anonymous_id));
+    assert_eq!(
+        query.grammar().resolve_anonymous_kind(sym),
+        Some(anonymous_id)
+    );
 }
 
 #[test]

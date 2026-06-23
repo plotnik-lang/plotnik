@@ -34,12 +34,13 @@ mod cst_tests;
 
 pub use cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 
-pub use ast::{
-    AltKind, Anchor, Branch, CapturedPattern, Def, EnumPattern, Pattern, FieldPattern, TokenPattern,
-    NegatedField, NodePattern, NodePredicate, PredicateOp, PredicateValue, QuantifiedPattern, Ref,
-    RegexLiteral, Root, SeqPattern, SeqItem, Type, UnionPattern, is_empty_group, token_src,
-};
 pub use ast::classify_alt;
+pub use ast::{
+    AltKind, Anchor, Branch, CapturedPattern, Def, EnumPattern, FieldPattern, NegatedField,
+    NodePattern, NodePredicate, Pattern, PredicateOp, PredicateValue, QuantifiedPattern, Ref,
+    RegexLiteral, Root, SeqItem, SeqPattern, TokenPattern, Type, UnionPattern, is_empty_group,
+    token_src,
+};
 
 pub use core::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, ParseResult, Parser};
 

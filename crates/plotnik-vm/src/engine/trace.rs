@@ -742,7 +742,10 @@ fn format_match_successors(m: &Match<'_>) -> String {
     } else if m.succ_count() == 1 {
         format!("{:02}", m.successor(0).as_u16())
     } else {
-        let succs: Vec<_> = m.successors().map(|s| format!("{:02}", s.as_u16())).collect();
+        let succs: Vec<_> = m
+            .successors()
+            .map(|s| format!("{:02}", s.as_u16()))
+            .collect();
         succs.join(", ")
     }
 }

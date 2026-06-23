@@ -8,10 +8,10 @@ use std::collections::{BTreeMap, HashSet};
 
 use plotnik_core::Symbol;
 
-use plotnik_compiler_core::{TypeId, TypeShape};
-use plotnik_compiler_core::ir::{EffectIR, InstructionIR, Label, MemberRef, NodeKindConstraint};
-use plotnik_compiler_core::ast::{self, Pattern, SeqItem};
 use plotnik_bytecode::{EffectKind, Nav};
+use plotnik_compiler_core::ast::{self, Pattern, SeqItem};
+use plotnik_compiler_core::ir::{EffectIR, InstructionIR, Label, MemberRef, NodeKindConstraint};
+use plotnik_compiler_core::{TypeId, TypeShape};
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};
@@ -439,7 +439,8 @@ impl Compiler<'_> {
             else {
                 return None;
             };
-            if m.nav != Nav::NextSkipExtras || !matches!(m.node_kind, NodeKindConstraint::Named(_)) {
+            if m.nav != Nav::NextSkipExtras || !matches!(m.node_kind, NodeKindConstraint::Named(_))
+            {
                 return None;
             }
             m.clone()

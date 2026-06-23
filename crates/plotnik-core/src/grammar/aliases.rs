@@ -103,7 +103,9 @@ pub(super) fn extract_default_aliases(
             .enumerate()
             .max_by_key(|(i, (_, count))| (*count, Reverse(*i)))
         {
-            status.aliases.push((default_entry.0.clone(), default_entry.1));
+            status
+                .aliases
+                .push((default_entry.0.clone(), default_entry.1));
             result.insert(symbol, default_entry.0);
         }
     });

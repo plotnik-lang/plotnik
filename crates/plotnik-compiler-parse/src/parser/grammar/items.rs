@@ -1,9 +1,9 @@
 use rowan::TextRange;
 
-use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::cst::token_sets::ROOT_EXPR_FIRST_TOKENS;
+use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 
 impl Parser<'_, '_> {
     pub fn parse_root(&mut self) {

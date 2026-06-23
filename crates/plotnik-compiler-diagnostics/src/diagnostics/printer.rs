@@ -4,8 +4,8 @@ use std::fmt::Write;
 
 use annotate_snippets::{AnnotationKind, Group, Level, Patch, Renderer, Snippet};
 
-use super::{SourceId, SourceMap};
 use super::message::{Diagnostic, Severity};
+use super::{SourceId, SourceMap};
 
 pub struct DiagnosticsPrinter<'q> {
     diagnostics: Vec<&'q Diagnostic>,
@@ -48,8 +48,7 @@ impl<'q> DiagnosticsPrinter<'q> {
             if let Some(name) = self.source_path(diag.source) {
                 primary_snippet = primary_snippet.path(name);
             }
-            primary_snippet =
-                primary_snippet.annotation(AnnotationKind::Primary.span(range));
+            primary_snippet = primary_snippet.annotation(AnnotationKind::Primary.span(range));
 
             let mut cross_file_snippets = Vec::new();
 
@@ -86,10 +85,12 @@ impl<'q> DiagnosticsPrinter<'q> {
             let mut report: Vec<Group> = vec![title_group];
 
             if let Some(fix) = &diag.fix {
-                report.push(Level::HELP.secondary_title(&fix.description).element(
-                    Snippet::source(primary_content)
-                        .patch(Patch::new(diag.range.into(), &fix.replacement)),
-                ));
+                report.push(
+                    Level::HELP.secondary_title(&fix.description).element(
+                        Snippet::source(primary_content)
+                            .patch(Patch::new(diag.range.into(), &fix.replacement)),
+                    ),
+                );
             }
 
             for hint in &diag.hints {

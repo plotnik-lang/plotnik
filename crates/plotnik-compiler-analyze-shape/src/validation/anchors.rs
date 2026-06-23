@@ -7,11 +7,11 @@
 //! This validation ensures anchors are placed where they can be meaningfully compiled.
 
 use super::ValidationInput;
-use plotnik_compiler_core::source::SourceId;
 use plotnik_compiler_core::Located;
+use plotnik_compiler_core::source::SourceId;
 use plotnik_compiler_core::visitor::{Visitor, walk_node_pattern, walk_seq_pattern};
+use plotnik_compiler_core::{NodePattern, SeqItem, SeqPattern};
 use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
-use plotnik_compiler_core::{NodePattern, SeqPattern, SeqItem};
 
 pub fn validate_anchors(input: ValidationInput) {
     let ValidationInput {
@@ -62,7 +62,11 @@ impl AnchorValidator<'_> {
 
                 if is_boundary && !self.in_named_node {
                     self.diag
-                        .report(source, DiagnosticKind::AnchorWithoutContext, anchor.text_range())
+                        .report(
+                            source,
+                            DiagnosticKind::AnchorWithoutContext,
+                            anchor.text_range(),
+                        )
                         .emit();
                 }
             }

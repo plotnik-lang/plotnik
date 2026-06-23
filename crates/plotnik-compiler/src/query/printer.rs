@@ -240,7 +240,12 @@ impl<'q> QueryPrinter<'q> {
         self.format_pattern(&body, depth + 1, w)
     }
 
-    fn format_pattern(&self, pattern: &ast::Pattern, depth: usize, w: &mut impl Write) -> std::fmt::Result {
+    fn format_pattern(
+        &self,
+        pattern: &ast::Pattern,
+        depth: usize,
+        w: &mut impl Write,
+    ) -> std::fmt::Result {
         let prefix = indent(depth);
         let arity = self.arity_glyph(pattern.syntax());
         let span = self.span_str(pattern.text_range());

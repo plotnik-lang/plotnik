@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use super::context::TypeAnalysisBuilder;
 use super::def_id::Symbol;
-use super::types::{FieldInfo, TYPE_VOID, OutputFlow, TypeId, TypeShape};
+use super::types::{FieldInfo, OutputFlow, TYPE_VOID, TypeId, TypeShape};
 
 /// Error during type unification.
 #[derive(Clone, Debug)]
@@ -52,7 +52,11 @@ pub fn unify_flows(
 /// - Void ∪ Fields(s) → Fields(make_all_optional(s))
 /// - Fields(a) ∪ Fields(b) → Fields(merge_fields(a, b))
 /// - Value in union → Error
-pub fn unify_flow(ctx: &mut TypeAnalysisBuilder, a: OutputFlow, b: OutputFlow) -> Result<OutputFlow, UnifyError> {
+pub fn unify_flow(
+    ctx: &mut TypeAnalysisBuilder,
+    a: OutputFlow,
+    b: OutputFlow,
+) -> Result<OutputFlow, UnifyError> {
     // Union alternations cannot contain scalars.
     if matches!(a, OutputFlow::Value(_)) || matches!(b, OutputFlow::Value(_)) {
         return Err(UnifyError::ScalarInUnion);

@@ -112,8 +112,11 @@ impl LoweredGrammar {
     }
 
     fn remove_dropped_rule_references(&mut self, dropped: &FxHashSet<&str>) {
-        self.expected_conflicts
-            .retain(|conflict| !conflict.iter().any(|symbol| dropped.contains(symbol.as_str())));
+        self.expected_conflicts.retain(|conflict| {
+            !conflict
+                .iter()
+                .any(|symbol| dropped.contains(symbol.as_str()))
+        });
         self.supertype_symbols
             .retain(|symbol| !dropped.contains(symbol.as_str()));
         self.variables_to_inline

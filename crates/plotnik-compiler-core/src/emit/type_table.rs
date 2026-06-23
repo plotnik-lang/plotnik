@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use plotnik_core::Interner;
 
 use plotnik_bytecode::{
-    TypeDefKind, TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeNameEntry,
+    TypeDef, TypeDefKind, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeNameEntry,
 };
 
 use crate::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
@@ -304,7 +304,10 @@ impl TypeTableBuilder {
 
     fn source_is_optional(&self, type_id: TypeId, type_ctx: &TypeAnalysis) -> bool {
         let underlying = self.resolve_underlying_type_id(type_id, type_ctx);
-        matches!(type_ctx.type_shape(underlying), Some(TypeShape::Optional(_)))
+        matches!(
+            type_ctx.type_shape(underlying),
+            Some(TypeShape::Optional(_))
+        )
     }
 
     fn get_or_create_optional(

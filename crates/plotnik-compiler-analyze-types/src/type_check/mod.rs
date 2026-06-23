@@ -5,8 +5,8 @@
 
 mod capture_mechanism;
 mod context;
-mod infer;
 mod def_id;
+mod infer;
 pub(crate) mod types;
 mod unify;
 
@@ -21,7 +21,8 @@ pub use capture_mechanism::{CaptureMechanism, classify_capture_mechanism, ref_re
 pub use context::{TypeAnalysis, TypeAnalysisBuilder};
 pub use def_id::{DefId, Interner, Symbol};
 pub use types::{
-    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_VOID, PatternResult, OutputFlow, TypeId, TypeShape,
+    Arity, FieldInfo, OutputFlow, PatternResult, QuantifierKind, TYPE_NODE, TYPE_VOID, TypeId,
+    TypeShape,
 };
 pub use unify::{UnifyError, unify_flow, unify_flows};
 

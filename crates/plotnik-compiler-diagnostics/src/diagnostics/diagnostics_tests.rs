@@ -314,14 +314,8 @@ fn diagnostics_collection_methods() {
 
 #[test]
 fn diagnostic_kind_default_severity() {
-    assert_eq!(
-        DiagnosticKind::UnclosedTree.severity(),
-        Severity::Error
-    );
-    assert_eq!(
-        DiagnosticKind::MissingDefName.severity(),
-        Severity::Error
-    );
+    assert_eq!(DiagnosticKind::UnclosedTree.severity(), Severity::Error);
+    assert_eq!(DiagnosticKind::MissingDefName.severity(), Severity::Error);
 }
 
 #[test]

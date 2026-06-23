@@ -10,8 +10,8 @@ use std::collections::{HashMap, HashSet};
 use indexmap::{IndexMap, IndexSet};
 use plotnik_core::Interner;
 
-use plotnik_compiler_core::SymbolTable;
 use plotnik_compiler_core::DefId;
+use plotnik_compiler_core::SymbolTable;
 use plotnik_compiler_core::{Pattern, Ref};
 
 pub use plotnik_compiler_core::DependencyAnalysis;
@@ -146,7 +146,10 @@ impl<'a> SccFinder<'a> {
 /// Collect references to definitions within the symbol table.
 ///
 /// Returns only refs that point to defined names (filters out node kind references).
-pub(super) fn collect_refs<'a>(pattern: &Pattern, symbol_table: &'a SymbolTable) -> IndexSet<&'a str> {
+pub(super) fn collect_refs<'a>(
+    pattern: &Pattern,
+    symbol_table: &'a SymbolTable,
+) -> IndexSet<&'a str> {
     let mut refs = IndexSet::new();
     for descendant in pattern.syntax().descendants() {
         let Some(r) = Ref::cast(descendant) else {

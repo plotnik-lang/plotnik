@@ -181,7 +181,11 @@ fn resolve_visible_id(
     }
 }
 
-fn classify_step(step: &ProductionStep, ctx: GrammarContext<'_>, grammar: &Grammar) -> SkeletonStep {
+fn classify_step(
+    step: &ProductionStep,
+    ctx: GrammarContext<'_>,
+    grammar: &Grammar,
+) -> SkeletonStep {
     // Fold the step's own alias and the grammar's default alias into one effective
     // child type, exactly as node-shape derivation does, so a default-aliased step
     // resolves to the same public kind here and there.

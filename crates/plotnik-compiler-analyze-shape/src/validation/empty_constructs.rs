@@ -4,9 +4,11 @@
 
 use super::ValidationInput;
 use plotnik_compiler_core::Located;
-use plotnik_compiler_core::visitor::{Visitor, walk_node_pattern, walk_seq_pattern, walk_union_pattern};
-use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use plotnik_compiler_core::visitor::{
+    Visitor, walk_node_pattern, walk_seq_pattern, walk_union_pattern,
+};
 use plotnik_compiler_core::{NodePattern, SeqPattern, UnionPattern};
+use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 
 pub fn validate_empty_constructs(input: ValidationInput) {
     let ValidationInput {
@@ -28,7 +30,11 @@ impl Visitor for EmptyConstructsValidator<'_> {
         // This excludes invalid content like predicates which create Error nodes
         if node.node().syntax().children().next().is_none() && node.node().kind_token().is_none() {
             self.diag
-                .report(node.source(), DiagnosticKind::EmptyTree, node.node().text_range())
+                .report(
+                    node.source(),
+                    DiagnosticKind::EmptyTree,
+                    node.node().text_range(),
+                )
                 .emit();
         }
         walk_node_pattern(self, node);
@@ -37,7 +43,11 @@ impl Visitor for EmptyConstructsValidator<'_> {
     fn visit_seq_pattern(&mut self, seq: &Located<SeqPattern>) {
         if seq.node().children().next().is_none() {
             self.diag
-                .report(seq.source(), DiagnosticKind::EmptySequence, seq.node().text_range())
+                .report(
+                    seq.source(),
+                    DiagnosticKind::EmptySequence,
+                    seq.node().text_range(),
+                )
                 .emit();
         }
         walk_seq_pattern(self, seq);
@@ -48,7 +58,11 @@ impl Visitor for EmptyConstructsValidator<'_> {
         // an enum always has at least one labeled branch.
         if union.node().branches().next().is_none() {
             self.diag
-                .report(union.source(), DiagnosticKind::EmptyAlternation, union.node().text_range())
+                .report(
+                    union.source(),
+                    DiagnosticKind::EmptyAlternation,
+                    union.node().text_range(),
+                )
                 .emit();
         }
         walk_union_pattern(self, union);

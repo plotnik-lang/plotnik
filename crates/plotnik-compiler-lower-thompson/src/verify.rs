@@ -66,9 +66,11 @@ mod debug_impl {
     use indexmap::IndexMap;
     use plotnik_bytecode::{EffectKind, Nav};
 
-    use plotnik_compiler_core::DefId;
-    use plotnik_compiler_core::ir::{InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR};
     use crate::CompileResult;
+    use plotnik_compiler_core::DefId;
+    use plotnik_compiler_core::ir::{
+        InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR,
+    };
 
     use super::super::compiler::CompileCtx;
 
@@ -186,8 +188,7 @@ mod debug_impl {
         }
 
         for &f in &m.neg_fields {
-            let name =
-                NonZeroU16::new(f).and_then(|id| ctx.grammar.field_name(id, ctx.interner));
+            let name = NonZeroU16::new(f).and_then(|id| ctx.grammar.field_name(id, ctx.interner));
             ops.push(SemanticOp::NegField(
                 name.unwrap_or_else(|| format!("field#{f}")),
             ));

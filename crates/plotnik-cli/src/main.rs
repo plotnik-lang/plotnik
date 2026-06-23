@@ -8,8 +8,8 @@ use std::process::ExitCode;
 use clap::ArgMatches;
 
 use cli::{
-    AstOpts, CheckOpts, DumpOpts, InferOpts, LangDumpOpts, RunOpts, TraceOpts,
-    build_cli, route_default_subcommand,
+    AstOpts, CheckOpts, DumpOpts, InferOpts, LangDumpOpts, RunOpts, TraceOpts, build_cli,
+    route_default_subcommand,
 };
 use error::CliResult;
 

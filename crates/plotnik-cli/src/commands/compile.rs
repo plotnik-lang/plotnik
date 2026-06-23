@@ -15,11 +15,7 @@ use plotnik::language_registry::Lang;
 ///
 /// `check_compile` already proves emit+load succeed, so the final load can only
 /// fail on a genuine bug; it is surfaced as a clean error, never a panic.
-pub fn compile_module(
-    sources: SourceMap,
-    lang: &Lang,
-    color: bool,
-) -> Result<Module, CliError> {
+pub fn compile_module(sources: SourceMap, lang: &Lang, color: bool) -> Result<Module, CliError> {
     let linked = QueryBuilder::new(sources)
         .parse()
         .map_err(|e| CliError::fatal(e.to_string()))?

@@ -3,8 +3,8 @@
 //! Reference analysis: dependency graph, recursion validation, ref collection.
 
 pub mod dependencies;
-pub mod refs;
 mod recursion;
+pub mod refs;
 
 pub use dependencies::{DependencyAnalysis, analyze_dependencies};
 pub use recursion::validate_recursion;

@@ -218,13 +218,13 @@ impl<'t> VM<'t> {
             recursion_depth,
             suppress_depth,
             // Deliberately outside `CheckpointState`:
-            ip: _,                  // resumed separately by `backtrack` (cp.ip / call_resume)
-            checkpoints: _,         // the stack this checkpoint was just popped from
-            matched_node: _,        // intentionally not snapshotted (#383)
-            steps_remaining: _,     // monotonic fuel, never rewound on backtrack
-            limits: _,              // immutable execution config
-            trampoline_target: _,   // set once before the run, never mutated
-            source: _,              // immutable input text
+            ip: _,                // resumed separately by `backtrack` (cp.ip / call_resume)
+            checkpoints: _,       // the stack this checkpoint was just popped from
+            matched_node: _,      // intentionally not snapshotted (#383)
+            steps_remaining: _,   // monotonic fuel, never rewound on backtrack
+            limits: _,            // immutable execution config
+            trampoline_target: _, // set once before the run, never mutated
+            source: _,            // immutable input text
         } = self;
 
         debug_assert_eq!(

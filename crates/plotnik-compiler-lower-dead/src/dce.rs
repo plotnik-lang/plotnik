@@ -41,16 +41,19 @@ fn compute_reachable(result: &CompileResult) -> HashSet<Label> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use plotnik_compiler_core::DefId;
-    use plotnik_compiler_core::ir::MatchIR;
     use indexmap::IndexMap;
     use plotnik_bytecode::Nav;
+    use plotnik_compiler_core::DefId;
+    use plotnik_compiler_core::ir::MatchIR;
 
     #[test]
     fn removes_unreachable_instructions() {
         // A -> B (reachable), C (unreachable)
         let instructions = vec![
-            MatchIR::terminal(Label(0)).nav(Nav::Down).next(Label(1)).into(),
+            MatchIR::terminal(Label(0))
+                .nav(Nav::Down)
+                .next(Label(1))
+                .into(),
             MatchIR::terminal(Label(1)).nav(Nav::Down).into(),
             MatchIR::terminal(Label(2)).nav(Nav::Down).into(), // unreachable
         ];
@@ -77,8 +80,14 @@ mod tests {
     fn keeps_all_when_all_reachable() {
         // A -> B -> C (all reachable)
         let instructions = vec![
-            MatchIR::terminal(Label(0)).nav(Nav::Down).next(Label(1)).into(),
-            MatchIR::terminal(Label(1)).nav(Nav::Down).next(Label(2)).into(),
+            MatchIR::terminal(Label(0))
+                .nav(Nav::Down)
+                .next(Label(1))
+                .into(),
+            MatchIR::terminal(Label(1))
+                .nav(Nav::Down)
+                .next(Label(2))
+                .into(),
             MatchIR::terminal(Label(2)).nav(Nav::Down).into(),
         ];
 

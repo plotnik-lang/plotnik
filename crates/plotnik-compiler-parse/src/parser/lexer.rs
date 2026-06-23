@@ -178,7 +178,11 @@ pub fn dump_tokens(source: &str) -> String {
     let mut out = String::new();
     for token in lex(source) {
         if !token.kind.is_trivia() {
-            out.push_str(&format!("{:?} {:?}\n", token.kind, token_text(source, &token)));
+            out.push_str(&format!(
+                "{:?} {:?}\n",
+                token.kind,
+                token_text(source, &token)
+            ));
         }
     }
     out

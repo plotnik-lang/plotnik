@@ -8,10 +8,10 @@
 
 use indexmap::IndexMap;
 
-use plotnik_compiler_core::source::SourceId;
-use plotnik_compiler_diagnostics::diagnostics::Diagnostics;
 use plotnik_compiler_core::Root;
+use plotnik_compiler_core::source::SourceId;
 use plotnik_compiler_core::source::SourceMap;
+use plotnik_compiler_diagnostics::diagnostics::Diagnostics;
 
 pub mod alt_kinds;
 pub mod anchors;

@@ -41,15 +41,15 @@ impl GrammarBindingBuilder {
     }
 }
 
-use plotnik_compiler_core::Located;
-use plotnik_compiler_core::SymbolTable;
 use super::utils::find_similar;
-use plotnik_compiler_core::visitor::{Visitor, walk};
-use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics, Span};
+use plotnik_compiler_core::Located;
 use plotnik_compiler_core::Root;
-use plotnik_compiler_core::ast::{self, Pattern, NodePattern};
-use plotnik_compiler_core::{SyntaxKind, SyntaxToken, token_src};
+use plotnik_compiler_core::SymbolTable;
+use plotnik_compiler_core::ast::{self, NodePattern, Pattern};
 use plotnik_compiler_core::source::{SourceId, SourceMap};
+use plotnik_compiler_core::visitor::{Visitor, walk};
+use plotnik_compiler_core::{SyntaxKind, SyntaxToken, token_src};
+use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics, Span};
 
 /// The threaded dependencies of the link pass. Decoupled from `Query` to allow
 /// testing without a full query context.
@@ -142,7 +142,11 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
             let mut builder = self
                 .diag
-                .report(located.source(), DiagnosticKind::UnknownNodeKind, type_token.text_range())
+                .report(
+                    located.source(),
+                    DiagnosticKind::UnknownNodeKind,
+                    type_token.text_range(),
+                )
                 .detail(type_name);
 
             if let Some(similar) = suggestion {
@@ -174,7 +178,11 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         let mut builder = self
             .diag
-            .report(source, DiagnosticKind::UnknownField, name_token.text_range())
+            .report(
+                source,
+                DiagnosticKind::UnknownField,
+                name_token.text_range(),
+            )
             .detail(field_name);
 
         if let Some(similar) = suggestion {
@@ -232,7 +240,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                         .emit();
                 }
 
-                let admissible = child_ctx.as_ref().map(|ctx| self.admissible_set(ctx.parent_id));
+                let admissible = child_ctx
+                    .as_ref()
+                    .map(|ctx| self.admissible_set(ctx.parent_id));
 
                 for child in node.children() {
                     if let Pattern::FieldPattern(f) = &child {
@@ -270,7 +280,12 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 // A branch is disjunctive — none is guaranteed to match, so defer its contents.
                 for body in located.node().children() {
                     let body_located = located.wrap(body);
-                    self.check_pattern_grammar(&body_located, ctx, GrammarCheckMode::Deferred, walk);
+                    self.check_pattern_grammar(
+                        &body_located,
+                        ctx,
+                        GrammarCheckMode::Deferred,
+                        walk,
+                    );
                 }
             }
             Pattern::SeqPattern(seq) => {
@@ -608,7 +623,12 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     /// Validate one field value against the field's admissible types. Mirrors `check_bare_child`
     /// but uses the field's type set and has no extras/leaf-token rescue (fields hold specific
     /// kinds, never comments).
-    fn check_field_value(&mut self, located: &Located<Pattern>, ctx: &ParentNodeCtx, field: &FieldRef) {
+    fn check_field_value(
+        &mut self,
+        located: &Located<Pattern>,
+        ctx: &ParentNodeCtx,
+        field: &FieldRef,
+    ) {
         match located.node() {
             Pattern::CapturedPattern(cap) => {
                 if let Some(inner) = cap.inner() {
@@ -644,7 +664,12 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             // tokens exclusively.
             if self.field_is_anonymous_only(ctx.parent_id, field.id) {
                 let message = format!("a named node can't be the value of `{}`", field.name);
-                self.emit_invalid_field_value(located.span_of(node.text_range()), message, ctx, field);
+                self.emit_invalid_field_value(
+                    located.span_of(node.text_range()),
+                    message,
+                    ctx,
+                    field,
+                );
             }
             return;
         }
@@ -665,7 +690,12 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             .node_kind(value_id)
             .expect("resolved value must have a name");
         let message = format!("`{}` can't be the value of `{}`", value_name, field.name);
-        self.emit_invalid_field_value(located.span_of(type_token.text_range()), message, ctx, field);
+        self.emit_invalid_field_value(
+            located.span_of(type_token.text_range()),
+            message,
+            ctx,
+            field,
+        );
     }
 
     fn check_field_anon_value(
@@ -696,7 +726,12 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         let value_name = value_token.text().to_string();
         let message = format!("`{}` can't be the value of `{}`", value_name, field.name);
-        self.emit_invalid_field_value(located.span_of(value_token.text_range()), message, ctx, field);
+        self.emit_invalid_field_value(
+            located.span_of(value_token.text_range()),
+            message,
+            ctx,
+            field,
+        );
     }
 
     fn field_admissible_set(
@@ -780,7 +815,11 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             let suggestion = find_similar(sub_name, &all_types, max_dist).map(str::to_string);
             let mut builder = self
                 .diag
-                .report(located.source(), DiagnosticKind::UnknownNodeKind, sub_token.text_range())
+                .report(
+                    located.source(),
+                    DiagnosticKind::UnknownNodeKind,
+                    sub_token.text_range(),
+                )
                 .detail(sub_name);
             if let Some(similar) = suggestion {
                 builder = builder.fix(format!("did you mean `{}`?", similar), similar);
@@ -819,7 +858,11 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         let mut builder = self
             .diag
-            .report(located.source(), DiagnosticKind::InvalidSubtype, sub_token.text_range())
+            .report(
+                located.source(),
+                DiagnosticKind::InvalidSubtype,
+                sub_token.text_range(),
+            )
             .detail(format!(
                 "`{}` is not a subtype of `{}`",
                 sub_name, super_name
@@ -835,12 +878,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         builder.emit();
     }
 
-    fn emit_invalid_child(
-        &mut self,
-        span: Span,
-        child_id: NodeKindId,
-        ctx: &ParentNodeCtx,
-    ) {
+    fn emit_invalid_child(&mut self, span: Span, child_id: NodeKindId, ctx: &ParentNodeCtx) {
         let child_name = self
             .grammar
             .node_kind(child_id)
@@ -941,7 +979,11 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     ) {
         let hint = self.field_value_hint(ctx.parent_id, field.id, field.name);
         self.diag
-            .report(span.source, DiagnosticKind::InvalidFieldChildType, span.range)
+            .report(
+                span.source,
+                DiagnosticKind::InvalidFieldChildType,
+                span.range,
+            )
             .detail(message)
             .related_to(
                 field.span.source,
@@ -1059,8 +1101,14 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
     fn visit_node_pattern(&mut self, node: &Located<ast::NodePattern>) {
         self.linker.resolve_named_node(node);
 
-        for neg in node.node().syntax().children().filter_map(ast::NegatedField::cast) {
-            self.linker.resolve_field_by_token(node.source(), neg.name());
+        for neg in node
+            .node()
+            .syntax()
+            .children()
+            .filter_map(ast::NegatedField::cast)
+        {
+            self.linker
+                .resolve_field_by_token(node.source(), neg.name());
         }
 
         plotnik_compiler_core::visitor::walk_node_pattern(self, node);
@@ -1094,13 +1142,18 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
 
         self.linker
             .diag
-            .report(home, DiagnosticKind::UnknownNodeKind, value_token.text_range())
+            .report(
+                home,
+                DiagnosticKind::UnknownNodeKind,
+                value_token.text_range(),
+            )
             .detail(value)
             .emit();
     }
 
     fn visit_field_pattern(&mut self, field: &Located<ast::FieldPattern>) {
-        self.linker.resolve_field_by_token(field.source(), field.node().name());
+        self.linker
+            .resolve_field_by_token(field.source(), field.node().name());
         plotnik_compiler_core::visitor::walk_field_pattern(self, field);
     }
 }

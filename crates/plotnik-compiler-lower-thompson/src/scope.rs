@@ -4,10 +4,10 @@
 
 use std::num::NonZeroU16;
 
+use plotnik_bytecode::{EffectKind, Nav};
+use plotnik_compiler_core::Pattern;
 use plotnik_compiler_core::TypeId;
 use plotnik_compiler_core::ir::{CallIR, EffectIR, Label, MatchIR, MemberRef};
-use plotnik_compiler_core::Pattern;
-use plotnik_bytecode::{EffectKind, Nav};
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};
@@ -180,8 +180,10 @@ impl Compiler<'_> {
                 match_exit,
                 skip_exit,
             } => {
-                let match_struct_close = self.emit_struct_close_step_with_effects(end_effects, match_exit);
-                let skip_struct_close = self.emit_struct_close_step_with_effects(end_effects, skip_exit);
+                let match_struct_close =
+                    self.emit_struct_close_step_with_effects(end_effects, match_exit);
+                let skip_struct_close =
+                    self.emit_struct_close_step_with_effects(end_effects, skip_exit);
                 self.compile_with_optional_scope(scope_type_id, |this| {
                     this.compile_skippable_with_exits(
                         inner,
@@ -474,7 +476,11 @@ impl Compiler<'_> {
     /// Unlike `emit_null_for_skip_path` which handles captures passed as effects,
     /// this function handles captures defined INSIDE the expression (e.g., `{(x) @cap}?`).
     /// It collects all capture names from the expression and emits Null Set for each.
-    pub(super) fn emit_null_for_internal_captures(&mut self, exit: Label, inner: &Pattern) -> Label {
+    pub(super) fn emit_null_for_internal_captures(
+        &mut self,
+        exit: Label,
+        inner: &Pattern,
+    ) -> Label {
         let captures = Self::collect_captures(inner);
         if captures.is_empty() {
             return exit;

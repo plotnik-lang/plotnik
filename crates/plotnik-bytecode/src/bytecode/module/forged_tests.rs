@@ -256,9 +256,7 @@ fn first_ext_successor(bytes: &[u8]) -> usize {
 fn first_effect_op(bytes: &[u8], want: impl Fn(u16) -> bool) -> usize {
     effect_slots(bytes)
         .into_iter()
-        .find(|&off| {
-            want(u16::from_le_bytes([bytes[off], bytes[off + 1]]) >> EFFECT_PAYLOAD_BITS)
-        })
+        .find(|&off| want(u16::from_le_bytes([bytes[off], bytes[off + 1]]) >> EFFECT_PAYLOAD_BITS))
         .expect("no matching effect slot in transitions")
 }
 
@@ -436,7 +434,8 @@ fn forged_oob_member_operand_is_rejected() {
             )
         })
         .expect("struct query must emit a Set/EnumOpen effect");
-    let opcode_bits = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & !(EFFECT_PAYLOAD_MAX as u16);
+    let opcode_bits =
+        u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & !(EFFECT_PAYLOAD_MAX as u16);
     let forged = opcode_bits | (members & EFFECT_PAYLOAD_MAX as u16);
     bytes[slot..slot + 2].copy_from_slice(&forged.to_le_bytes());
     reseal(&mut bytes);

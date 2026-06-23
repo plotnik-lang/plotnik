@@ -9,7 +9,7 @@ use std::io;
 
 use super::super::effects::{Effect, EffectKind};
 use super::super::instructions::{
-    MatchCounts, MATCH_PAYLOAD_START, MatchPredicate, PAYLOAD_SLOT_SIZE, PREDICATE_SIZE,
+    MATCH_PAYLOAD_START, MatchCounts, MatchPredicate, PAYLOAD_SLOT_SIZE, PREDICATE_SIZE,
     PREDICATE_SLOTS, header_byte,
 };
 use super::super::nav::Nav;
@@ -631,7 +631,9 @@ impl Module {
                 _ => {
                     // A Match variant (`Match8` or extended).
                     let node_kind = header_byte::node_class_bits(header);
-                    if NodeKindConstraint::try_from_bytes(node_kind, read_u16(instr_off + 2)?).is_none() {
+                    if NodeKindConstraint::try_from_bytes(node_kind, read_u16(instr_off + 2)?)
+                        .is_none()
+                    {
                         return Err(ModuleError::MalformedTransitions);
                     }
                     if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {

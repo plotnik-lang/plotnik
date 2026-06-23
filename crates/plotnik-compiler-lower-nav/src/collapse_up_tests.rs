@@ -2,8 +2,8 @@
 
 use plotnik_bytecode::Nav;
 
-use plotnik_compiler_core::ir::CompileResult;
 use super::collapse_up::collapse_up;
+use plotnik_compiler_core::ir::CompileResult;
 use plotnik_compiler_core::ir::{InstructionIR, Label, MatchIR};
 
 #[test]
@@ -11,8 +11,14 @@ fn collapse_up_single_mode() {
     // Up(1) → Up(1) → exit should become Up(2) → exit
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::terminal(Label(0)).nav(Nav::Up(1)).next(Label(1)).into(),
-            MatchIR::terminal(Label(1)).nav(Nav::Up(1)).next(Label(2)).into(),
+            MatchIR::terminal(Label(0))
+                .nav(Nav::Up(1))
+                .next(Label(1))
+                .into(),
+            MatchIR::terminal(Label(1))
+                .nav(Nav::Up(1))
+                .next(Label(2))
+                .into(),
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
@@ -35,9 +41,18 @@ fn collapse_up_chain_of_three() {
     // Up(1) → Up(2) → Up(3) should become Up(6)
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::terminal(Label(0)).nav(Nav::Up(1)).next(Label(1)).into(),
-            MatchIR::terminal(Label(1)).nav(Nav::Up(2)).next(Label(2)).into(),
-            MatchIR::terminal(Label(2)).nav(Nav::Up(3)).next(Label(3)).into(),
+            MatchIR::terminal(Label(0))
+                .nav(Nav::Up(1))
+                .next(Label(1))
+                .into(),
+            MatchIR::terminal(Label(1))
+                .nav(Nav::Up(2))
+                .next(Label(2))
+                .into(),
+            MatchIR::terminal(Label(2))
+                .nav(Nav::Up(3))
+                .next(Label(3))
+                .into(),
             MatchIR::terminal(Label(3)).into(),
         ],
         def_entries: Default::default(),
@@ -59,7 +74,10 @@ fn collapse_up_mixed_modes_no_merge() {
     // Up(1) → UpSkipTrivia(1) should NOT merge (different modes)
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::terminal(Label(0)).nav(Nav::Up(1)).next(Label(1)).into(),
+            MatchIR::terminal(Label(0))
+                .nav(Nav::Up(1))
+                .next(Label(1))
+                .into(),
             MatchIR::terminal(Label(1))
                 .nav(Nav::UpSkipTrivia(1))
                 .next(Label(2))
@@ -165,12 +183,15 @@ fn collapse_up_exact_same_mode() {
 #[test]
 fn collapse_up_with_effects_no_merge() {
     // Up(1) with post_effects → Up(1) should NOT merge
-    use plotnik_compiler_core::ir::EffectIR;
     use plotnik_bytecode::EffectKind;
+    use plotnik_compiler_core::ir::EffectIR;
 
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::terminal(Label(0)).nav(Nav::Up(1)).next(Label(1)).into(),
+            MatchIR::terminal(Label(0))
+                .nav(Nav::Up(1))
+                .next(Label(1))
+                .into(),
             MatchIR::terminal(Label(1))
                 .nav(Nav::Up(1))
                 .post_effects(vec![EffectIR::literal(EffectKind::Null, 0)])
@@ -196,7 +217,10 @@ fn collapse_up_merges_up_to_max() {
                 .nav(Nav::Up(Nav::MAX_UP_LEVEL - 3))
                 .next(Label(1))
                 .into(),
-            MatchIR::terminal(Label(1)).nav(Nav::Up(3)).next(Label(2)).into(),
+            MatchIR::terminal(Label(1))
+                .nav(Nav::Up(3))
+                .next(Label(2))
+                .into(),
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
@@ -223,7 +247,10 @@ fn collapse_up_refuses_merge_exceeding_max() {
                 .nav(Nav::Up(Nav::MAX_UP_LEVEL))
                 .next(Label(1))
                 .into(),
-            MatchIR::terminal(Label(1)).nav(Nav::Up(10)).next(Label(2)).into(),
+            MatchIR::terminal(Label(1))
+                .nav(Nav::Up(10))
+                .next(Label(2))
+                .into(),
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
@@ -249,8 +276,14 @@ fn collapse_up_branching_no_merge() {
                 .nav(Nav::Up(1))
                 .successors(vec![Label(1), Label(2)])
                 .into(),
-            MatchIR::terminal(Label(1)).nav(Nav::Up(1)).next(Label(3)).into(),
-            MatchIR::terminal(Label(2)).nav(Nav::Up(1)).next(Label(3)).into(),
+            MatchIR::terminal(Label(1))
+                .nav(Nav::Up(1))
+                .next(Label(3))
+                .into(),
+            MatchIR::terminal(Label(2))
+                .nav(Nav::Up(1))
+                .next(Label(3))
+                .into(),
             MatchIR::terminal(Label(3)).into(),
         ],
         def_entries: Default::default(),
@@ -322,7 +355,12 @@ fn assert_constraint_chain_splits(make: fn(u8) -> Nav) {
     const DEPTH: u32 = 130;
 
     let mut instructions: Vec<InstructionIR> = (0..DEPTH)
-        .map(|i| MatchIR::terminal(Label(i)).nav(make(1)).next(Label(i + 1)).into())
+        .map(|i| {
+            MatchIR::terminal(Label(i))
+                .nav(make(1))
+                .next(Label(i + 1))
+                .into()
+        })
         .collect();
     instructions.push(MatchIR::terminal(Label(DEPTH)).into());
 
@@ -383,8 +421,14 @@ fn collapse_up_no_up_unchanged() {
     // Non-Up instructions should pass through unchanged
     let mut result = CompileResult {
         instructions: vec![
-            MatchIR::terminal(Label(0)).nav(Nav::Down).next(Label(1)).into(),
-            MatchIR::terminal(Label(1)).nav(Nav::Next).next(Label(2)).into(),
+            MatchIR::terminal(Label(0))
+                .nav(Nav::Down)
+                .next(Label(1))
+                .into(),
+            MatchIR::terminal(Label(1))
+                .nav(Nav::Next)
+                .next(Label(2))
+                .into(),
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),

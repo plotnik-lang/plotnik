@@ -2,7 +2,7 @@
 
 use plotnik_core::utils::to_pascal_case;
 
-use plotnik_bytecode::{TypeDefKind, TypeDef, TypeId, TypeKind};
+use plotnik_bytecode::{TypeDef, TypeDefKind, TypeId, TypeKind};
 
 use super::Emitter;
 

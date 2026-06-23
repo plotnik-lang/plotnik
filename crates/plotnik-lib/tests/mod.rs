@@ -393,7 +393,10 @@ fn render_compile(
 }
 
 fn render_types(module: &Module) -> String {
-    typescript::emit(module, typescript::Config::builder().emit_node_interface(false))
+    typescript::emit(
+        module,
+        typescript::Config::builder().emit_node_interface(false),
+    )
 }
 
 /// VM fixtures run the source-last named definition. Entrypoints in the module

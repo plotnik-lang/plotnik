@@ -216,7 +216,9 @@ pub enum VariableSummaryError {
 ///    *appear* to be direct children of `N`.
 /// 2. aliases. If a parent node kind `M` is aliased as some other kind `N`, then nodes which
 ///    *appear* to have kind `N` may have internal structure based on `M`.
-pub fn derive_variable_summaries(ctx: GrammarContext<'_>) -> Result<Vec<VariableSummary>, VariableSummaryError> {
+pub fn derive_variable_summaries(
+    ctx: GrammarContext<'_>,
+) -> Result<Vec<VariableSummary>, VariableSummaryError> {
     let GrammarContext {
         syntax: syntax_grammar,
         lexical: lexical_grammar,
@@ -384,7 +386,9 @@ fn validate_supertype_info(
     for supertype_symbol in &syntax_grammar.supertype_symbols {
         if variable_info[supertype_symbol.index].has_multi_step_production {
             let variable = &syntax_grammar.variables[supertype_symbol.index];
-            Err(VariableSummaryError::InvalidSupertype(variable.name.clone()))?;
+            Err(VariableSummaryError::InvalidSupertype(
+                variable.name.clone(),
+            ))?;
         }
     }
 
@@ -867,7 +871,10 @@ fn sort_subtypes_topologically(
     Ok(())
 }
 
-fn process_supertypes(info: &mut SlotRecord, subtype_map: &[(NodeKindRecord, Vec<NodeKindRecord>)]) {
+fn process_supertypes(
+    info: &mut SlotRecord,
+    subtype_map: &[(NodeKindRecord, Vec<NodeKindRecord>)],
+) {
     for (supertype, subtypes) in subtype_map {
         if info.types.contains(supertype) {
             info.types.retain(|t| !subtypes.contains(t));

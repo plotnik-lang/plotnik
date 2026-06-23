@@ -5,9 +5,9 @@
 
 use std::collections::HashSet;
 
+use plotnik_bytecode::Nav;
 use plotnik_compiler_core::SymbolTable;
 use plotnik_compiler_core::{Pattern, Ref, SeqItem};
-use plotnik_bytecode::Nav;
 
 /// Classifies whether expressions may match anonymous nodes after syntactic wrappers.
 pub struct AnonymousClassifier<'a> {
@@ -35,7 +35,11 @@ impl<'a> AnonymousClassifier<'a> {
         pattern.is_some_and(|pattern| self.expr_may_match_anonymous_inner(pattern, &mut visited))
     }
 
-    fn expr_may_match_anonymous_inner(&self, pattern: &Pattern, visited: &mut HashSet<String>) -> bool {
+    fn expr_may_match_anonymous_inner(
+        &self,
+        pattern: &Pattern,
+        visited: &mut HashSet<String>,
+    ) -> bool {
         match pattern {
             Pattern::TokenPattern(_) => true,
             Pattern::CapturedPattern(cap) => cap

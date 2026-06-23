@@ -9,14 +9,14 @@
 
 use indexmap::IndexMap;
 
-use plotnik_compiler_diagnostics::diagnostics::Diagnostics;
-use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 use plotnik_compiler_core::{ast, token_src};
+use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
+use plotnik_compiler_diagnostics::diagnostics::Diagnostics;
 
 use plotnik_compiler_core::Located;
 use plotnik_compiler_core::ValidatedAst;
-use plotnik_compiler_core::visitor::Visitor;
 use plotnik_compiler_core::source::SourceId;
+use plotnik_compiler_core::visitor::Visitor;
 
 pub use plotnik_compiler_core::SymbolTable;
 
@@ -85,15 +85,23 @@ struct ReferenceResolver<'q, 'd, 'a> {
 
 impl Visitor for ReferenceResolver<'_, '_, '_> {
     fn visit_def(&mut self, def: &Located<ast::Def>) {
-        let Some(body) = def.node().body() else { return };
+        let Some(body) = def.node().body() else {
+            return;
+        };
         // A nameless def is a parser-level error (MissingDefName); there is no name
         // to resolve, so it never enters the table.
-        let Some(token) = def.node().name() else { return };
+        let Some(token) = def.node().name() else {
+            return;
+        };
 
         let name = token_src(&token, self.src);
         if self.builder.contains(name) {
             self.diag
-                .report(def.source(), DiagnosticKind::DuplicateDefinition, token.text_range())
+                .report(
+                    def.source(),
+                    DiagnosticKind::DuplicateDefinition,
+                    token.text_range(),
+                )
                 .detail(name)
                 .emit();
         } else {
@@ -109,7 +117,9 @@ struct ReferenceValidator<'d, 'a> {
 
 impl Visitor for ReferenceValidator<'_, '_> {
     fn visit_ref(&mut self, r: &Located<ast::Ref>) {
-        let Some(name_token) = r.node().name() else { return };
+        let Some(name_token) = r.node().name() else {
+            return;
+        };
         let name = name_token.text();
 
         if self.symbol_table.defined_name(name).is_some() {
@@ -117,7 +127,11 @@ impl Visitor for ReferenceValidator<'_, '_> {
         }
 
         self.diag
-            .report(r.source(), DiagnosticKind::UndefinedReference, name_token.text_range())
+            .report(
+                r.source(),
+                DiagnosticKind::UndefinedReference,
+                name_token.text_range(),
+            )
             .detail(name)
             .emit();
     }

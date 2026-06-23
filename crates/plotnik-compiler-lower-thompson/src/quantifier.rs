@@ -4,10 +4,10 @@
 //! `compile_quantified_unified` entry point so greediness and search-nav logic
 //! stay in one place.
 
-use plotnik_compiler_core::ir::{EffectIR, Label};
+use plotnik_bytecode::Nav;
 use plotnik_compiler_core::SyntaxKind;
 use plotnik_compiler_core::ast::{self, Pattern};
-use plotnik_bytecode::Nav;
+use plotnik_compiler_core::ir::{EffectIR, Label};
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx, needs_struct_wrapper, row_type_id};
@@ -69,7 +69,10 @@ enum QuantifierForm {
     /// Inner expression exists but no valid quantifier operator.
     Plain(Pattern),
     /// Valid quantified expression with inner and kind.
-    Quantified { inner: Pattern, kind: QuantifierKind },
+    Quantified {
+        inner: Pattern,
+        kind: QuantifierKind,
+    },
 }
 
 fn classify_quantifier(quant: &ast::QuantifiedPattern) -> QuantifierForm {
@@ -137,8 +140,7 @@ impl Compiler<'_> {
         // When the inner returns a structured type (enum/struct) and this is a star/plus
         // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
         // because the type system expects an array of these values.
-        let needs_implicit_array =
-            quant.is_repeating() && self.is_ref_returning_structured(&inner);
+        let needs_implicit_array = quant.is_repeating() && self.is_ref_returning_structured(&inner);
 
         if needs_implicit_array {
             // No Set on the array itself — collect structured values via Push only.
@@ -265,8 +267,7 @@ impl Compiler<'_> {
         // When the inner returns a structured type (enum/struct) and this is a star/plus
         // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
         // with split exits for the skip/match paths.
-        let needs_implicit_array =
-            quant.is_repeating() && self.is_ref_returning_structured(&inner);
+        let needs_implicit_array = quant.is_repeating() && self.is_ref_returning_structured(&inner);
 
         if needs_implicit_array {
             let quant_pattern = Pattern::QuantifiedPattern(quant.clone());
@@ -487,8 +488,7 @@ impl Compiler<'_> {
         let match_exit = exits.match_exit();
 
         let in_array_context = array_context.is_in_array();
-        let has_struct_wrapper =
-            in_array_context && needs_struct_wrapper(inner, self.ctx.type_ctx);
+        let has_struct_wrapper = in_array_context && needs_struct_wrapper(inner, self.ctx.type_ctx);
         let element_row_type_id = if in_array_context {
             row_type_id(inner, self.ctx.type_ctx)
         } else {
@@ -555,7 +555,12 @@ impl Compiler<'_> {
                     // per-iteration. Use a dedicated body closure to keep that intact.
                     let split_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
                         if has_struct_wrapper {
-                            this.compile_struct_for_array(inner, exit, Some(nav), element_row_type_id)
+                            this.compile_struct_for_array(
+                                inner,
+                                exit,
+                                Some(nav),
+                                element_row_type_id,
+                            )
                         } else {
                             this.dispatch_pattern(
                                 inner,

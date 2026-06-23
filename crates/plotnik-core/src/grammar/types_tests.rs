@@ -1,7 +1,7 @@
 use std::num::NonZeroU16;
 
 use super::types::{
-    Grammar, GrammarTables, NodeKindRef, NodeShape, NodeShapeBuildError, NodeSlot, NodeKindEntry,
+    Grammar, GrammarTables, NodeKindEntry, NodeKindRef, NodeShape, NodeShapeBuildError, NodeSlot,
     build_node_constraints,
 };
 use crate::{NodeKind, NodeKindId};

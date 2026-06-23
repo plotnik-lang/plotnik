@@ -5,12 +5,12 @@
 
 use std::collections::HashSet;
 
+use plotnik_bytecode::{EffectKind, Nav};
+use plotnik_compiler_core::ast::{self, Pattern};
+use plotnik_compiler_core::ir::{EffectIR, Label};
 use plotnik_compiler_core::{
     CaptureMechanism, TypeAnalysis, TypeId, TypeShape, ref_returns_structured,
 };
-use plotnik_compiler_core::ir::{EffectIR, Label};
-use plotnik_compiler_core::ast::{self, Pattern};
-use plotnik_bytecode::{EffectKind, Nav};
 
 use super::Compiler;
 

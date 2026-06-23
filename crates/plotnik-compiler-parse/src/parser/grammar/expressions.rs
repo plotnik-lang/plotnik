@@ -1,7 +1,7 @@
-use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::cst::token_sets::{EXPR_FIRST_TOKENS, QUANTIFIERS};
+use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 
 /// Whether a parsed expression should absorb a trailing quantifier/capture suffix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

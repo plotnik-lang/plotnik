@@ -1,6 +1,6 @@
 //! Type to TypeScript string conversion.
 
-use plotnik_bytecode::{TypeDefKind, TypeDef, TypeId, TypeKind};
+use plotnik_bytecode::{TypeDef, TypeDefKind, TypeId, TypeKind};
 
 use super::Emitter;
 use super::config::VoidType;

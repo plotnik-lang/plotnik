@@ -6,9 +6,9 @@ use indexmap::IndexMap;
 use plotnik_compiler_core::DependencyAnalysis;
 use plotnik_core::{Interner, Symbol};
 
-use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 use plotnik_compiler_core::Root;
 use plotnik_compiler_core::source::SourceId;
+use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 
 use super::type_check::TypeAnalysis;
 

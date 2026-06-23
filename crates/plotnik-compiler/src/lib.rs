@@ -50,20 +50,22 @@ pub mod analyze {
     pub use plotnik_compiler_analyze_grammar::GrammarLinkCtx;
     pub use plotnik_compiler_analyze_names::{SymbolTable, resolve_names};
     pub use plotnik_compiler_analyze_refs::validate_recursion;
-    pub use plotnik_compiler_core::Located;
     pub use plotnik_compiler_analyze_shape::validation::{
         validate_alt_kinds, validate_anchors, validate_empty_constructs, validate_predicates,
     };
     pub use plotnik_compiler_analyze_types::{
         TypeAnalysis, TypeAnalysisBuilder, infer_types, validate_entrypoints,
     };
+    pub use plotnik_compiler_core::Located;
 }
 pub mod compile {
     pub use plotnik_compiler_lower_dead::remove_unreachable;
     pub use plotnik_compiler_lower_epsilon::eliminate_epsilons;
     pub use plotnik_compiler_lower_nav::collapse_up;
     pub use plotnik_compiler_lower_pack::lower;
-    pub use plotnik_compiler_lower_thompson::{CaptureEffects, CompileCtx, CompileResult, Compiler};
+    pub use plotnik_compiler_lower_thompson::{
+        CaptureEffects, CompileCtx, CompileResult, Compiler,
+    };
 
     pub mod verify {
         pub use plotnik_compiler_lower_thompson::verify::*;
@@ -73,11 +75,11 @@ pub mod compile {
     mod compile_tests;
 }
 pub mod diagnostics {
-    pub use plotnik_compiler_diagnostics::*;
     pub use plotnik_compiler_diagnostics::diagnostics::*;
+    pub use plotnik_compiler_diagnostics::*;
 }
-pub use plotnik_compiler_diagnostics::source;
 pub use plotnik_compiler_core::ir as bytecode;
+pub use plotnik_compiler_diagnostics::source;
 pub use plotnik_compiler_parse as parser;
 pub use plotnik_compiler_typegen as typegen;
 

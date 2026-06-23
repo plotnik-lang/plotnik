@@ -5,8 +5,8 @@ use thiserror::Error;
 
 use super::super::{
     prepared::{
-        ExternalToken, ExtractedLexicalGrammar, ExtractedSyntaxGrammar, ReservedWordSet,
-        InternedGrammar, Variable, VariableType,
+        ExternalToken, ExtractedLexicalGrammar, ExtractedSyntaxGrammar, InternedGrammar,
+        ReservedWordSet, Variable, VariableType,
     },
     rules::{MetadataParams, Rule, Symbol, SymbolType},
 };
@@ -424,9 +424,7 @@ impl SymbolReplacer {
                     .map(|e| self.replace_symbols_in_rule(e))
                     .collect(),
             ),
-            Rule::Repeat(content) => {
-                Rule::Repeat(Box::new(self.replace_symbols_in_rule(*content)))
-            }
+            Rule::Repeat(content) => Rule::Repeat(Box::new(self.replace_symbols_in_rule(*content))),
             Rule::Metadata { rule, params } => Rule::Metadata {
                 params,
                 rule: Box::new(self.replace_symbols_in_rule(*rule)),

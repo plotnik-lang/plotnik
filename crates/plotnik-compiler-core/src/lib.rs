@@ -40,7 +40,7 @@ pub use source::{Source, SourceId, SourceKind, SourceMap};
 pub use span::Span;
 pub use symbol_table::SymbolTable;
 pub use type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
-pub use type_shape::{FieldInfo, PatternResult, OutputFlow, TypeShape};
+pub use type_shape::{FieldInfo, OutputFlow, PatternResult, TypeShape};
 pub use validated_ast::ValidatedAst;
 
 /// A lightweight handle to a named query definition.

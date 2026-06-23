@@ -27,7 +27,11 @@ pub fn run(args: CheckArgs) -> CliResult {
         .map_err(|e| CliError::fatal(e.to_string()))?
         .analyze();
 
-    let lang = require_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref(), "check")?;
+    let lang = require_lang(
+        args.lang.as_deref(),
+        loaded.shebang.lang.as_deref(),
+        "check",
+    )?;
     let linked = query.link(lang.grammar());
 
     let diagnostics = linked.check_compile();

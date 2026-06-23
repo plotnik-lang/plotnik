@@ -33,7 +33,7 @@ pub use sections::{FieldEntry, NodeKindEntry, Slice};
 
 pub use entrypoint::Entrypoint;
 
-pub use type_meta::{TypeDefKind, TypeDef, TypeKind, TypeMember, TypeNameEntry};
+pub use type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 
 pub use nav::Nav;
 

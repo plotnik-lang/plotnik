@@ -9,9 +9,7 @@ mod dispatch_tests;
 mod shebang_tests;
 
 pub use commands::build_cli;
-pub use dispatch::{
-    AstOpts, CheckOpts, DumpOpts, InferOpts, LangDumpOpts, RunOpts, TraceOpts,
-};
+pub use dispatch::{AstOpts, CheckOpts, DumpOpts, InferOpts, LangDumpOpts, RunOpts, TraceOpts};
 
 /// Bare default subcommand: `plotnik query.ptk …` routes to `run`.
 /// This is what makes flag-free shebang execution (`#!/usr/bin/env plotnik`) work.

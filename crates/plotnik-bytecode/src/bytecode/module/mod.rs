@@ -12,7 +12,7 @@ use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline, header_byte};
 use super::sections::{FieldEntry, NodeKindEntry};
-use super::type_meta::{TypeDefKind, TypeDef, TypeKind, TypeMember, TypeNameEntry};
+use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
     Entrypoint, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
 };
@@ -214,7 +214,10 @@ impl Module {
     /// under `debug_assertions` and does not exist in release.
     #[cfg(debug_assertions)]
     pub fn is_validated_step_start(&self, step: u16) -> bool {
-        self.instr_start_bitmap.get(step as usize).copied().unwrap_or(false)
+        self.instr_start_bitmap
+            .get(step as usize)
+            .copied()
+            .unwrap_or(false)
     }
 
     pub fn strings(&self) -> StringsView<'_> {
@@ -271,7 +274,8 @@ impl Module {
             defs_bytes: &self.storage[defs_offset..defs_offset + defs_count * TypeDef::SIZE],
             members_bytes: &self.storage
                 [members_offset..members_offset + members_count * TypeMember::SIZE],
-            names_bytes: &self.storage[names_offset..names_offset + names_count * TypeNameEntry::SIZE],
+            names_bytes: &self.storage
+                [names_offset..names_offset + names_count * TypeNameEntry::SIZE],
             defs_count,
             members_count,
             names_count,

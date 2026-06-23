@@ -1,8 +1,8 @@
 use indexmap::IndexMap;
 use rowan::TextRange;
 
-use plotnik_core::grammar::Grammar;
 use plotnik_core::Interner;
+use plotnik_core::grammar::Grammar;
 
 use super::{SourceId, SourceMap};
 use crate::Diagnostics;
@@ -162,7 +162,6 @@ impl QueryParsed {
     pub fn ast_map(&self) -> &AstMap {
         &self.ast_map
     }
-
 }
 
 pub struct Query {
@@ -381,7 +380,12 @@ impl GrammarBoundQuery {
             &ctx,
             eliminate_epsilons,
         );
-        crate::compile::verify::run_verified("remove_unreachable", &mut ir, &ctx, remove_unreachable);
+        crate::compile::verify::run_verified(
+            "remove_unreachable",
+            &mut ir,
+            &ctx,
+            remove_unreachable,
+        );
         crate::compile::verify::run_verified("collapse_up", &mut ir, &ctx, collapse_up);
         crate::compile::verify::run_verified("lower", &mut ir, &ctx, lower);
         ir

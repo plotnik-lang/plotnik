@@ -9,10 +9,12 @@
 
 use std::num::NonZeroU16;
 
-use plotnik_compiler_core::TypeShape;
-use plotnik_compiler_core::ir::{EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR};
-use plotnik_compiler_core::ast::{self, Pattern};
 use plotnik_bytecode::Nav;
+use plotnik_compiler_core::TypeShape;
+use plotnik_compiler_core::ast::{self, Pattern};
+use plotnik_compiler_core::ir::{
+    EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
+};
 
 use plotnik_compiler_core::{CaptureMechanism, classify_capture_mechanism};
 
@@ -23,11 +25,7 @@ use super::scope::{CaptureExits, CaptureRequest, SplitExits};
 use super::sequences::SeqItemsCtx;
 
 impl Compiler<'_> {
-    pub(super) fn compile_node_pattern(
-        &mut self,
-        node: &ast::NodePattern,
-        ctx: ExprCtx,
-    ) -> Label {
+    pub(super) fn compile_node_pattern(&mut self, node: &ast::NodePattern, ctx: ExprCtx) -> Label {
         let ExprCtx {
             exit,
             nav: nav_override,
@@ -211,8 +209,9 @@ impl Compiler<'_> {
         let ref_returns_enum = def_output_id
             .and_then(|tid| self.ctx.type_ctx.type_shape(tid))
             .is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
-        let suppress_opaque_recursion =
-            !is_captured && self.ctx.dependency_analysis.is_recursive_def(def_id) && !ref_returns_enum;
+        let suppress_opaque_recursion = !is_captured
+            && self.ctx.dependency_analysis.is_recursive_def(def_id)
+            && !ref_returns_enum;
 
         let nav = nav_override.unwrap_or(Nav::Stay);
 
@@ -480,8 +479,7 @@ impl Compiler<'_> {
         let CaptureEffects { pre, post } = outer_capture;
         let set_step =
             self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
-        let inner_entry =
-            self.dispatch_pattern(inner, ExprCtx::with_nav(set_step, nav_override));
+        let inner_entry = self.dispatch_pattern(inner, ExprCtx::with_nav(set_step, nav_override));
         // The enclosing variant's `Enum`-open (in `pre`) must run before the
         // inner produces its pending value; routing it through the trailing
         // `Set` step would drop it and unbalance the scope.

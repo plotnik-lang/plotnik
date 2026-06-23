@@ -21,7 +21,7 @@ pub use bytecode::{
     Match, MatchInstr, MatchPredicate, Module, ModuleError, Nav, NodeKindConstraint, NodeKindEntry,
     Opcode, PREAMBLE_NAME, REGEX_TABLE_ENTRY_SIZE, RegexView, Return, SECTION_ALIGN, STEP_SIZE,
     STRING_TABLE_ENTRY_SIZE, SectionOffsets, Slice, StepAddr, StepId, StringId, StringsView,
-    Symbol, Trampoline, TypeDefKind, TypeDef, TypeId, TypeKind, TypeMember, TypeNameEntry,
+    Symbol, Trampoline, TypeDef, TypeDefKind, TypeId, TypeKind, TypeMember, TypeNameEntry,
     TypesView, VERSION, align_to_section, cols, dump, format_effect, nav_symbol,
     select_match_opcode, superscript, trace, truncate_text, width_for_count,
 };

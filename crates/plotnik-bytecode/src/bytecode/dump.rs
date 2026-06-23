@@ -90,9 +90,7 @@ impl DumpContext {
         }
 
         let str_count = header.str_table_count as usize;
-        let all_strings: Vec<String> = (0..str_count)
-            .map(|i| strings.at(i).to_string())
-            .collect();
+        let all_strings: Vec<String> = (0..str_count).map(|i| strings.at(i).to_string()).collect();
 
         let types = module.types();
         // Builtins precede custom types; widen for both.

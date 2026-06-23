@@ -22,11 +22,7 @@ pub fn run(args: DumpArgs) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let lang = require_lang(
-        args.lang.as_deref(),
-        loaded.shebang.lang.as_deref(),
-        "dump",
-    )?;
+    let lang = require_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref(), "dump")?;
 
     let module = compile_module(loaded.sources, lang, args.color)?;
     let colors = Colors::new(args.color);

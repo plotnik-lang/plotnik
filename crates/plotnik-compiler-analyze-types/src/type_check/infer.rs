@@ -13,19 +13,20 @@ use super::capture_mechanism::{CaptureMechanism, classify_capture_mechanism};
 use super::context::{TypeAnalysis, TypeAnalysisBuilder};
 use super::def_id::Symbol;
 use super::types::{
-    Arity, FieldInfo, QuantifierKind, TYPE_NODE, TYPE_VOID, PatternResult, OutputFlow, TypeId, TypeShape,
+    Arity, FieldInfo, OutputFlow, PatternResult, QuantifierKind, TYPE_NODE, TYPE_VOID, TypeId,
+    TypeShape,
 };
 use super::unify::{UnifyError, unify_flows};
 
-use plotnik_compiler_core::Located;
 use plotnik_compiler_core::DependencyAnalysis;
+use plotnik_compiler_core::Located;
 use plotnik_compiler_core::SymbolTable;
-use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
-use plotnik_compiler_core::{
-    TokenPattern, CapturedPattern, EnumPattern, Pattern, FieldPattern, NodePattern, QuantifiedPattern, UnionPattern,
-    Ref, SeqPattern, is_empty_group,
-};
 use plotnik_compiler_core::source::SourceId;
+use plotnik_compiler_core::{
+    CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
+    SeqPattern, TokenPattern, UnionPattern, is_empty_group,
+};
+use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 
 /// Shared state for a single inference pass over the AST.
 pub struct InferCtx<'a, 'd> {
@@ -376,8 +377,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             self.ctx.dependency_analysis,
             self.ctx.interner,
         );
-        let should_merge_fields =
-            mechanism == CaptureMechanism::Node && matches!(&inner_info.flow, OutputFlow::Fields(_));
+        let should_merge_fields = mechanism == CaptureMechanism::Node
+            && matches!(&inner_info.flow, OutputFlow::Fields(_));
 
         // The capture's base type, before its `:: …` annotation is applied.
         let base = if should_merge_fields {
@@ -455,9 +456,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             let quantifier = self.quantifier_kind(q);
             match quantifier {
                 // * or + acts as row capture here (skipping strict dimensionality)
-                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                    (self.infer_quantified_pattern_as_row(&inner.wrap(q.clone())), false)
-                }
+                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => (
+                    self.infer_quantified_pattern_as_row(&inner.wrap(q.clone())),
+                    false,
+                ),
                 // ? makes the resulting capture field optional
                 QuantifierKind::Optional => (self.infer_pattern(inner), true),
             }
@@ -467,7 +469,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     /// The capture's base type from the inner flow, before any annotation.
-    fn determine_captured_base_type(&mut self, inner: &Pattern, inner_info: &PatternResult) -> TypeId {
+    fn determine_captured_base_type(
+        &mut self,
+        inner: &Pattern,
+        inner_info: &PatternResult,
+    ) -> TypeId {
         match &inner_info.flow {
             // A truly empty scope (`{}`) captures an empty struct; any other void
             // capture is the matched node (or a recursive reference's type).
@@ -532,7 +538,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         PatternResult::new(inner_info.arity, flow)
     }
 
-    fn infer_quantified_pattern_as_row(&mut self, quant: &Located<QuantifiedPattern>) -> PatternResult {
+    fn infer_quantified_pattern_as_row(
+        &mut self,
+        quant: &Located<QuantifiedPattern>,
+    ) -> PatternResult {
         let Some(inner) = quant.node().inner() else {
             return PatternResult::void();
         };
@@ -574,7 +583,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         }
     }
 
-    fn make_flow_array(&mut self, flow: OutputFlow, inner: &Pattern, non_empty: bool) -> OutputFlow {
+    fn make_flow_array(
+        &mut self,
+        flow: OutputFlow,
+        inner: &Pattern,
+        non_empty: bool,
+    ) -> OutputFlow {
         match flow {
             OutputFlow::Void => {
                 // Scalar list: void inner -> array of Node (or Ref)
@@ -623,16 +637,22 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         PatternResult::new(Arity::One, value_info.flow)
     }
 
-    fn report_field_arity_error(&mut self, source: SourceId, field: &FieldPattern, value: &Pattern) {
+    fn report_field_arity_error(
+        &mut self,
+        source: SourceId,
+        field: &FieldPattern,
+        value: &Pattern,
+    ) {
         let field_name = field
             .name()
             .map(|t| t.text().to_string())
             .unwrap_or_else(|| "field".to_string());
 
-        let mut builder = self
-            .ctx
-            .diag
-            .report(source, DiagnosticKind::FieldSequenceValue, value.text_range());
+        let mut builder = self.ctx.diag.report(
+            source,
+            DiagnosticKind::FieldSequenceValue,
+            value.text_range(),
+        );
         builder = builder.detail(field_name);
 
         if let Pattern::Ref(r) = value
@@ -729,7 +749,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // Shared with `classify_capture_mechanism` and `compile`'s implicit-array gate so the
         // three never disagree on a quantifier's arity. A malformed operator-less
         // quantifier can't reach inference, so the fallback is unreachable in practice.
-        quant.quantifier_kind().unwrap_or(QuantifierKind::ZeroOrMore)
+        quant
+            .quantifier_kind()
+            .unwrap_or(QuantifierKind::ZeroOrMore)
     }
 
     fn flow_to_type(&mut self, flow: &OutputFlow) -> TypeId {
@@ -780,7 +802,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let mut builder = self
             .ctx
             .diag
-            .report(source, DiagnosticKind::AmbiguousUncapturedOutputs, parent_range)
+            .report(
+                source,
+                DiagnosticKind::AmbiguousUncapturedOutputs,
+                parent_range,
+            )
             .detail(format!(
                 "{} expressions here produce a value but none is captured",
                 outputs.len()
@@ -814,9 +840,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             UnifyError::IncompatibleTypes { field } => (
                 DiagnosticKind::IncompatibleCaptureTypes,
                 self.ctx.interner.resolve(*field).to_string(),
-                Some(
-                    "make every branch produce the same type, or label the branches for an enum",
-                ),
+                Some("make every branch produce the same type, or label the branches for an enum"),
             ),
             UnifyError::IncompatibleStructs { field } => (
                 DiagnosticKind::IncompatibleStructShapes,

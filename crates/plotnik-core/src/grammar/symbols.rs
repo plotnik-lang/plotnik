@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use super::{
     lower::UninternedGrammar,
-    prepared::{ReservedWordSet, InternedGrammar, Variable, VariableType},
+    prepared::{InternedGrammar, ReservedWordSet, Variable, VariableType},
     rules::{Rule, Symbol},
 };
 
@@ -23,7 +23,9 @@ pub enum InternSymbolsError {
     UndefinedWordToken(String),
 }
 
-pub(super) fn intern_symbols(grammar: UninternedGrammar<'_>) -> Result<InternedGrammar, InternSymbolsError> {
+pub(super) fn intern_symbols(
+    grammar: UninternedGrammar<'_>,
+) -> Result<InternedGrammar, InternSymbolsError> {
     let UninternedGrammar {
         variables: source_variables,
         extra_symbols: extra_rules,

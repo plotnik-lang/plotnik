@@ -373,8 +373,8 @@ pub fn eliminate_epsilons(result: &mut CompileResult) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use plotnik_compiler_core::ir::EffectIR;
     use plotnik_bytecode::Nav;
+    use plotnik_compiler_core::ir::EffectIR;
 
     fn make_epsilon(label: u32, succs: Vec<u32>) -> InstructionIR {
         InstructionIR::Match(

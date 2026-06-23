@@ -1,9 +1,9 @@
 use rowan::{Checkpoint, TextRange, TextSize};
 
-use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 use crate::parser::Parser;
 use crate::parser::cst::SyntaxKind;
 use crate::parser::cst::token_sets::QUANTIFIERS;
+use plotnik_compiler_diagnostics::diagnostics::DiagnosticKind;
 
 use super::utils::starts_uppercase;
 

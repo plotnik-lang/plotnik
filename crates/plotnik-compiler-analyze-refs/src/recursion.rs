@@ -7,14 +7,14 @@
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
-use plotnik_compiler_core::Located;
 use super::dependencies::{DependencyAnalysis, collect_refs};
+use plotnik_compiler_core::Located;
 use plotnik_compiler_core::SymbolTable;
-use plotnik_compiler_core::visitor::{Visitor, walk_pattern, walk_node_pattern};
+use plotnik_compiler_core::source::SourceId;
+use plotnik_compiler_core::visitor::{Visitor, walk_node_pattern, walk_pattern};
+use plotnik_compiler_core::{Def, NodePattern, Pattern, Ref, Root, SeqPattern, TokenPattern};
 use plotnik_compiler_diagnostics::diagnostics::Diagnostics;
 use plotnik_compiler_diagnostics::diagnostics::{DiagnosticKind, Span};
-use plotnik_compiler_core::{TokenPattern, Def, Pattern, NodePattern, Ref, Root, SeqPattern};
-use plotnik_compiler_core::source::SourceId;
 
 pub fn validate_recursion(
     analysis: &DependencyAnalysis,
@@ -379,7 +379,11 @@ fn find_ref_range(source: SourceId, pattern: &Pattern, target: &str) -> Option<T
     visitor.found
 }
 
-fn find_unguarded_ref_range(source: SourceId, pattern: &Pattern, target: &str) -> Option<TextRange> {
+fn find_unguarded_ref_range(
+    source: SourceId,
+    pattern: &Pattern,
+    target: &str,
+) -> Option<TextRange> {
     let mut visitor = RefFinder {
         target,
         found: None,

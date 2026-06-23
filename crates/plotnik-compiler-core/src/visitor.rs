@@ -138,10 +138,7 @@ pub fn walk_captured_pattern<V: Visitor>(visitor: &mut V, cap: &Located<Captured
     }
 }
 
-pub fn walk_quantified_pattern<V: Visitor>(
-    visitor: &mut V,
-    quant: &Located<QuantifiedPattern>,
-) {
+pub fn walk_quantified_pattern<V: Visitor>(visitor: &mut V, quant: &Located<QuantifiedPattern>) {
     if let Some(inner) = quant.node().inner() {
         visitor.visit_pattern(&quant.wrap(inner));
     }
