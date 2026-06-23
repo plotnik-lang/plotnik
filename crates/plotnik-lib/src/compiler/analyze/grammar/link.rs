@@ -62,7 +62,7 @@ pub struct GrammarLinkCtx<'a, 'q> {
 }
 
 impl<'q> GrammarLinkCtx<'_, 'q> {
-    pub fn link(self, output: &mut GrammarBindingBuilder, diagnostics: &mut Diagnostics) {
+    pub(crate) fn link(self, output: &mut GrammarBindingBuilder, diagnostics: &mut Diagnostics) {
         // Local deduplication maps (not exposed in output)
         let mut node_kind_ids: HashMap<NodeKind<&'q str>, Option<NodeKindId>> = HashMap::new();
         let mut node_field_ids: HashMap<&'q str, Option<NodeFieldId>> = HashMap::new();

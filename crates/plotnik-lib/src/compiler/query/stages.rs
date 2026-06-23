@@ -467,7 +467,7 @@ impl GrammarBoundQuery {
     }
 
     /// Emit bytecode. Returns `Err(EmitError::InvalidQuery)` if the query has errors.
-    pub fn emit(&self) -> Result<Vec<u8>, EmitError> {
+    pub(crate) fn emit(&self) -> Result<Vec<u8>, EmitError> {
         if !self.is_valid() {
             return Err(EmitError::InvalidQuery);
         }
@@ -493,7 +493,7 @@ impl GrammarBoundQuery {
     ///
     /// Loads the bytecode itself, so it never reaches the emitter's debug
     /// self-check panic in debug or release.
-    pub fn check_compile(&self) -> Diagnostics {
+    pub(crate) fn check_compile(&self) -> Diagnostics {
         let mut diag = self.diagnostics().clone();
         if diag.has_errors() {
             return diag;
