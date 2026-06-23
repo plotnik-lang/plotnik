@@ -190,9 +190,14 @@ impl Compiler<'_> {
             return exit;
         };
 
-        let Some(&target) = self.def_entries.get(&def_id) else {
-            return exit;
-        };
+        // Inside the trust boundary: `def_id_for_name` only yields DefIds for
+        // symbol-table definitions, and `assert_all_definitions_processed` makes
+        // `def_output` total over those — so `build_ir` registered a label for
+        // every one. A miss is a desynced `def_output`/`def_entries`, our bug.
+        let &target = self
+            .def_entries
+            .get(&def_id)
+            .expect("every analyzed DefId has a def_entries label");
 
         let def_output_id = self.ctx.type_ctx.def_output(def_id);
         let ref_returns_struct = def_output_id
