@@ -12,16 +12,11 @@ use crate::compiler::parse::Error;
 #[derive(Debug)]
 pub struct ParseResult {
     ast: Root,
-    fuel_consumed: u32,
 }
 
 impl ParseResult {
     pub fn into_ast(self) -> Root {
         self.ast
-    }
-
-    pub fn fuel_consumed(&self) -> u32 {
-        self.fuel_consumed
     }
 }
 
@@ -58,7 +53,6 @@ pub struct Parser<'q, 'd> {
     pub(super) last_diagnostic_pos: Option<TextSize>,
     delimiter_stack: Vec<OpenDelimiter>,
     pub(super) stall_guard: std::cell::Cell<u32>,
-    pub(crate) fuel_initial: u32,
     pub(crate) fuel_remaining: u32,
     pub(crate) max_depth: u32,
     pub(crate) fatal_error: Option<Error>,
@@ -85,7 +79,6 @@ impl<'q, 'd> Parser<'q, 'd> {
             last_diagnostic_pos: None,
             delimiter_stack: Vec::with_capacity(8),
             stall_guard: std::cell::Cell::new(MAX_STALL_LOOKAHEADS),
-            fuel_initial: config.fuel,
             fuel_remaining: config.fuel,
             max_depth: config.max_depth,
             fatal_error: None,
@@ -94,21 +87,17 @@ impl<'q, 'd> Parser<'q, 'd> {
 
     pub fn parse(mut self) -> Result<ParseResult, Error> {
         self.parse_root();
-        let (cst, parse_fuel_consumed) = self.finish()?;
+        let cst = self.finish()?;
         let root = Root::cast(SyntaxNode::new_root(cst)).expect("parser always produces Root");
-        Ok(ParseResult {
-            ast: root,
-            fuel_consumed: parse_fuel_consumed,
-        })
+        Ok(ParseResult { ast: root })
     }
 
-    fn finish(mut self) -> Result<(GreenNode, u32), Error> {
+    fn finish(mut self) -> Result<GreenNode, Error> {
         self.drain_trivia();
         if let Some(err) = self.fatal_error {
             return Err(err);
         }
-        let fuel_consumed = self.fuel_initial.saturating_sub(self.fuel_remaining);
-        Ok((self.builder.finish(), fuel_consumed))
+        Ok(self.builder.finish())
     }
 
     pub(super) fn has_fatal_error(&self) -> bool {

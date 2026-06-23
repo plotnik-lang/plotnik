@@ -60,11 +60,6 @@ impl AlignedVec {
         self.len
     }
 
-    /// Check if empty.
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-
     /// View as byte slice.
     pub fn as_slice(&self) -> &[u8] {
         if self.blocks.is_empty() {

@@ -22,7 +22,7 @@ macro_rules! expect_invalid {
     ($($name:literal: $content:literal),+ $(,)?) => {{
         let mut source_map = SourceMap::new();
         $(source_map.add_file($name, $content);)+
-        let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+        let query = QueryBuilder::new(source_map).analyze().unwrap();
         if query.is_valid() {
             panic!("Expected invalid query, got valid");
         }
@@ -45,7 +45,7 @@ impl Query {
     #[track_caller]
     fn parse_and_validate(src: &str) -> Self {
         let source_map = SourceMap::from_inline(src);
-        let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+        let query = QueryBuilder::new(source_map).analyze().unwrap();
         if !query.is_valid() {
             panic!(
                 "Expected valid query, got error:\n{}",
@@ -61,7 +61,7 @@ impl Query {
     fn parse_syntax_only(src: &str) -> Self {
         use crate::compiler::diagnostics::DiagnosticKind::*;
         let source_map = SourceMap::from_inline(src);
-        let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+        let query = QueryBuilder::new(source_map).analyze().unwrap();
         let diag = query.diagnostics();
         let has_parse_error = diag.kinds().any(|kind| {
             matches!(
@@ -100,7 +100,7 @@ impl Query {
     #[track_caller]
     pub fn expect(src: &str) -> Self {
         let source_map = SourceMap::from_inline(src);
-        QueryBuilder::new(source_map).parse().unwrap().analyze()
+        QueryBuilder::new(source_map).analyze().unwrap()
     }
 
     #[track_caller]
@@ -207,7 +207,7 @@ impl Query {
     #[track_caller]
     pub fn expect_invalid(src: &str) -> String {
         let source_map = SourceMap::from_inline(src);
-        let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+        let query = QueryBuilder::new(source_map).analyze().unwrap();
         if query.is_valid() {
             panic!("Expected invalid query, got valid:\n{}", query.dump_cst());
         }
@@ -217,7 +217,7 @@ impl Query {
     #[track_caller]
     pub fn expect_warning(src: &str) -> String {
         let source_map = SourceMap::from_inline(src);
-        let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+        let query = QueryBuilder::new(source_map).analyze().unwrap();
 
         if !query.is_valid() {
             panic!(
@@ -236,7 +236,7 @@ impl Query {
     #[track_caller]
     pub fn expect_cst_with_warnings(src: &str) -> String {
         let source_map = SourceMap::from_inline(src);
-        let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+        let query = QueryBuilder::new(source_map).analyze().unwrap();
 
         if !query.is_valid() {
             panic!(
@@ -339,10 +339,8 @@ fn check_compile_flags_dropped_value_less_def_among_valid() {
 fn check_compile_is_total_on_empty_source_map() {
     // The dry run must never panic — even on a query with zero sources.
     let linked = QueryBuilder::new(SourceMap::new())
-        .parse()
-        .unwrap()
-        .analyze()
-        .link(javascript());
+        .link(javascript())
+        .unwrap();
     assert!(!linked.check_compile().has_errors());
 }
 
@@ -357,7 +355,7 @@ fn multifile_link_field_error_in_referenced_body_spans_two_files() {
     let mut source_map = SourceMap::new();
     source_map.add_file("a.ptk", "Foo = name: (identifier)");
     source_map.add_file("b.ptk", "Bar = (call_expression (Foo))");
-    let analyzed = QueryBuilder::new(source_map).parse().unwrap().analyze();
+    let analyzed = QueryBuilder::new(source_map).analyze().unwrap();
     assert!(
         analyzed.is_valid(),
         "expected analysis to pass:\n{}",

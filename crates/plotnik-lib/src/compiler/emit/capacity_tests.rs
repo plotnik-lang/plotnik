@@ -29,10 +29,8 @@ fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
     let mut source_map = SourceMap::new();
     source_map.add_file("query.ptk", src);
     let query = QueryBuilder::new(source_map)
-        .parse()
-        .expect("query parses")
-        .analyze()
-        .link(javascript());
+        .link(javascript())
+        .expect("query parses");
     assert!(query.is_valid(), "query should link:\n{src}");
     query.emit()
 }

@@ -1,4 +1,5 @@
 use super::*;
+use crate::bytecode::TypeKind;
 
 #[test]
 fn type_def_size() {

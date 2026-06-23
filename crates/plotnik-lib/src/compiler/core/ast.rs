@@ -36,6 +36,10 @@ macro_rules! ast_node {
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub struct $name(SyntaxNode);
 
+        // Uniform generated AST wrapper API; not every wrapper currently needs
+        // every accessor directly, but keeping the shape identical avoids
+        // one-off wrapper special cases.
+        #[allow(dead_code)]
         impl $name {
             pub fn cast(node: SyntaxNode) -> Option<Self> {
                 Self::can_cast(node.kind()).then(|| Self(node))
@@ -45,9 +49,6 @@ macro_rules! ast_node {
                 matches!(kind, $(SyntaxKind::$kind)|+)
             }
 
-            // Uniform AST wrapper API; some wrapper kinds are only queried by
-            // typed accessors, not by direct syntax traversal today.
-            #[allow(dead_code)]
             pub fn syntax(&self) -> &SyntaxNode {
                 &self.0
             }
@@ -176,13 +177,6 @@ impl SeqItem {
         Pattern::cast(node).map(SeqItem::Pattern)
     }
 
-    pub fn as_anchor(&self) -> Option<&Anchor> {
-        match self {
-            SeqItem::Anchor(a) => Some(a),
-            _ => None,
-        }
-    }
-
     pub fn as_pattern(&self) -> Option<&Pattern> {
         match self {
             SeqItem::Pattern(e) => Some(e),
@@ -264,15 +258,6 @@ fn predicate_op_from_syntax_kind(kind: SyntaxKind) -> Option<PredicateOp> {
     }
 }
 
-/// Predicate value: either a string or a regex pattern.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PredicateValue<'q> {
-    /// String literal value
-    String(&'q str),
-    /// Regex pattern (the content between `/` delimiters)
-    Regex(&'q str),
-}
-
 define_pattern!(
     NodePattern,
     Ref,
@@ -337,34 +322,8 @@ impl NodePattern {
             .unwrap_or(false)
     }
 
-    pub fn is_missing(&self) -> bool {
-        self.kind_token()
-            .map(|t| t.kind() == SyntaxKind::KwMissing)
-            .unwrap_or(false)
-    }
-
-    /// For MISSING nodes, returns the inner type constraint if present.
-    ///
-    /// `(MISSING identifier)` → Some("identifier")
-    /// `(MISSING ";")` → Some(";")
-    /// `(MISSING)` → None
-    pub fn missing_constraint(&self) -> Option<SyntaxToken> {
-        if !self.is_missing() {
-            return None;
-        }
-        self.0
-            .children_with_tokens()
-            .filter_map(|it| it.into_token())
-            .skip_while(|t| t.kind() != SyntaxKind::KwMissing)
-            .find(|t| matches!(t.kind(), SyntaxKind::Id | SyntaxKind::StrVal))
-    }
-
     pub fn children(&self) -> impl Iterator<Item = Pattern> + '_ {
         self.0.children().filter_map(Pattern::cast)
-    }
-
-    pub fn anchors(&self) -> impl Iterator<Item = Anchor> + '_ {
-        self.0.children().filter_map(Anchor::cast)
     }
 
     /// Returns children interleaved with anchors, preserving order.
@@ -394,16 +353,6 @@ impl NodePredicate {
 
     pub fn regex(&self) -> Option<RegexLiteral> {
         self.0.children().find_map(RegexLiteral::cast)
-    }
-
-    pub fn value<'q>(&self, source: &'q str) -> Option<PredicateValue<'q>> {
-        if let Some(str_token) = self.string_value() {
-            return Some(PredicateValue::String(token_src(&str_token, source)));
-        }
-        if let Some(regex) = self.regex() {
-            return Some(PredicateValue::Regex(regex.pattern(source)));
-        }
-        None
     }
 }
 
@@ -477,10 +426,6 @@ impl Branch {
 impl SeqPattern {
     pub fn children(&self) -> impl Iterator<Item = Pattern> + '_ {
         self.0.children().filter_map(Pattern::cast)
-    }
-
-    pub fn anchors(&self) -> impl Iterator<Item = Anchor> + '_ {
-        self.0.children().filter_map(Anchor::cast)
     }
 
     /// Returns children interleaved with anchors, preserving order.

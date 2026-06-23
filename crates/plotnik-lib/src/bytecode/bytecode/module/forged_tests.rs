@@ -38,10 +38,8 @@ fn emit_bytes(query_src: &str) -> Vec<u8> {
     let mut source_map = SourceMap::new();
     source_map.add_file("query.ptk", query_src);
     let query = QueryBuilder::new(source_map)
-        .parse()
-        .expect("query parsing should not exhaust fuel")
-        .analyze()
-        .link(javascript());
+        .link(javascript())
+        .expect("query parsing should not exhaust fuel");
     assert!(query.is_valid(), "query should link: {query_src}");
     query.emit().expect("bytecode emission should succeed")
 }

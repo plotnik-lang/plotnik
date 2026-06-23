@@ -8,7 +8,7 @@ fn assert_links_colliding_node_types(files: &[(&str, &str)]) {
         source_map.add_file(path, content);
     }
 
-    let query = QueryBuilder::new(source_map).parse().unwrap().analyze();
+    let query = QueryBuilder::new(source_map).analyze().unwrap();
     if !query.is_valid() {
         panic!(
             "Expected valid query, got error:\n{}",

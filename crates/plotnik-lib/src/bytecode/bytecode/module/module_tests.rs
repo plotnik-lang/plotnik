@@ -1,6 +1,6 @@
 use super::{ByteStorage, Module, ModuleError};
 use crate::bytecode::bytecode::Header;
-use crate::bytecode::bytecode::{AlignedVec, STEP_SIZE};
+use crate::bytecode::bytecode::STEP_SIZE;
 
 /// Build a minimal-but-valid module whose only populated section is Transitions,
 /// carrying `transitions_count` steps drawn from `transitions`.
@@ -43,15 +43,6 @@ fn byte_storage_copy_from_slice() {
     assert_eq!(&*storage, &data[..]);
     assert_eq!(storage.len(), 5);
     assert_eq!(storage[2], 3);
-}
-
-#[test]
-fn byte_storage_from_aligned() {
-    let vec = AlignedVec::copy_from_slice(&[1, 2, 3, 4, 5]);
-    let storage = ByteStorage::from_aligned(vec);
-
-    assert_eq!(&*storage, &[1, 2, 3, 4, 5]);
-    assert_eq!(storage.len(), 5);
 }
 
 #[test]

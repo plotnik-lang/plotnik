@@ -86,10 +86,6 @@ impl ByteStorage {
         Self::Static(bytes)
     }
 
-    pub fn from_aligned(vec: AlignedVec) -> Self {
-        Self::Aligned(vec)
-    }
-
     /// Create by copying bytes into aligned storage.
     ///
     /// Use this when receiving bytes from unknown sources (e.g., network).
@@ -157,11 +153,6 @@ pub struct Module {
 }
 
 impl Module {
-    /// Primary constructor for bytecode produced by the compiler.
-    pub fn from_aligned(vec: AlignedVec) -> Result<Self, ModuleError> {
-        Self::from_storage(ByteStorage::from_aligned(vec))
-    }
-
     /// Load a module from static bytes (zero-copy).
     ///
     /// Use with `include_query_aligned!` to embed aligned bytecode:
@@ -188,11 +179,12 @@ impl Module {
         Self::from_storage(ByteStorage::copy_from_slice(bytes))
     }
 
-    pub fn header(&self) -> &Header {
+    pub(crate) fn header(&self) -> &Header {
         &self.header
     }
 
-    pub fn offsets(&self) -> &SectionOffsets {
+    #[cfg(test)]
+    pub(crate) fn offsets(&self) -> &SectionOffsets {
         &self.offsets
     }
 
@@ -201,7 +193,7 @@ impl Module {
     }
 
     #[inline]
-    pub fn decode_step(&self, step: u16) -> Instruction<'_> {
+    pub(crate) fn decode_step(&self, step: u16) -> Instruction<'_> {
         let offset = self.offsets.transitions as usize + (step as usize) * STEP_SIZE;
         Instruction::from_bytes(&self.storage[offset..])
     }
@@ -220,14 +212,14 @@ impl Module {
             .unwrap_or(false)
     }
 
-    pub fn strings(&self) -> StringsView<'_> {
+    pub(crate) fn strings(&self) -> StringsView<'_> {
         StringsView {
             blob: &self.storage[self.offsets.str_blob as usize..],
             table: self.string_table_slice(),
         }
     }
 
-    pub fn node_types(&self) -> GrammarTableView<'_, NodeKindEntry> {
+    pub(crate) fn node_types(&self) -> GrammarTableView<'_, NodeKindEntry> {
         let offset = self.offsets.node_types as usize;
         let count = self.header.node_types_count as usize;
         GrammarTableView {
@@ -237,7 +229,7 @@ impl Module {
         }
     }
 
-    pub fn node_fields(&self) -> GrammarTableView<'_, FieldEntry> {
+    pub(crate) fn node_fields(&self) -> GrammarTableView<'_, FieldEntry> {
         let offset = self.offsets.node_fields as usize;
         let count = self.header.node_fields_count as usize;
         GrammarTableView {
@@ -247,7 +239,7 @@ impl Module {
         }
     }
 
-    pub fn regexes(&self) -> RegexView<'_> {
+    pub(crate) fn regexes(&self) -> RegexView<'_> {
         RegexView {
             blob: &self.storage[self.offsets.regex_blob as usize..],
             table: self.regex_table_slice(),
@@ -258,11 +250,11 @@ impl Module {
     ///
     /// The VM evaluates `=~`/`!~` against these cached automata; rebuilding them
     /// from [`regexes`](Self::regexes)'s raw blob per call is what this avoids.
-    pub fn regex_dfas(&self) -> &RegexDfas {
+    pub(crate) fn regex_dfas(&self) -> &RegexDfas {
         &self.regex_dfas
     }
 
-    pub fn types(&self) -> TypesView<'_> {
+    pub(crate) fn types(&self) -> TypesView<'_> {
         let defs_offset = self.offsets.type_defs as usize;
         let defs_count = self.header.type_defs_count as usize;
         let members_offset = self.offsets.type_members as usize;
@@ -282,13 +274,25 @@ impl Module {
         }
     }
 
-    pub fn entrypoints(&self) -> EntrypointsView<'_> {
+    pub(crate) fn entrypoints(&self) -> EntrypointsView<'_> {
         let offset = self.offsets.entrypoints as usize;
         let count = self.header.entrypoints_count as usize;
         EntrypointsView {
             bytes: &self.storage[offset..offset + count * Entrypoint::SIZE],
             count,
         }
+    }
+
+    pub fn entrypoint_count(&self) -> usize {
+        self.header.entrypoints_count as usize
+    }
+
+    pub fn entrypoint_at(&self, idx: usize) -> Option<Entrypoint> {
+        (idx < self.entrypoint_count()).then(|| self.entrypoints().get(idx))
+    }
+
+    pub fn entrypoint(&self, name: &str) -> Option<Entrypoint> {
+        self.entrypoints().find_by_name(name, &self.strings())
     }
 
     /// `count + 1` entries: the extra sentinel offset gives the final string's end.
@@ -348,11 +352,6 @@ impl<'a> GrammarTableView<'a, NodeKindEntry> {
     pub fn len(&self) -> usize {
         self.count
     }
-
-    /// Check if empty.
-    pub fn is_empty(&self) -> bool {
-        self.count == 0
-    }
 }
 
 impl<'a> GrammarTableView<'a, FieldEntry> {
@@ -368,11 +367,6 @@ impl<'a> GrammarTableView<'a, FieldEntry> {
     /// Number of entries.
     pub fn len(&self) -> usize {
         self.count
-    }
-
-    /// Check if empty.
-    pub fn is_empty(&self) -> bool {
-        self.count == 0
     }
 }
 
@@ -531,11 +525,6 @@ impl<'a> EntrypointsView<'a> {
     /// Number of entrypoints.
     pub fn len(&self) -> usize {
         self.count
-    }
-
-    /// Check if empty.
-    pub fn is_empty(&self) -> bool {
-        self.count == 0
     }
 
     /// Find an entrypoint by name (requires StringsView for comparison).

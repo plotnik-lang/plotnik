@@ -215,24 +215,6 @@ impl LineBuilder {
         )
     }
 
-    /// Build a sub-line prefix (blank step area): `       <symbol> `
-    pub fn subline_prefix(&self, symbol: Symbol) -> String {
-        let step_area = cols::INDENT + self.step_width + cols::GAP;
-        format!("{:step_area$}{} ", "", symbol.format())
-    }
-
-    /// Build a backtrack line: `  <step>  ❮❮❮`
-    pub fn backtrack_line(&self, step: u16) -> String {
-        format!(
-            "{:indent$}{:0sw$} {}",
-            "",
-            step,
-            trace::BACKTRACK.format(),
-            indent = cols::INDENT,
-            sw = self.step_width,
-        )
-    }
-
     /// Pad content to total width and append successors.
     ///
     /// Ensures at least 2 spaces between content and successors.

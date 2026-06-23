@@ -17,10 +17,8 @@ use crate::language_registry::Lang;
 /// fail on a genuine bug; it is surfaced as a clean error, never a panic.
 pub fn compile_module(sources: SourceMap, lang: &Lang, color: bool) -> Result<Module, CliError> {
     let linked = QueryBuilder::new(sources)
-        .parse()
-        .map_err(|e| CliError::fatal(e.to_string()))?
-        .analyze()
-        .link(lang.grammar());
+        .link(lang.grammar())
+        .map_err(|e| CliError::fatal(e.to_string()))?;
 
     let diagnostics = linked.check_compile();
     if diagnostics.has_errors() {

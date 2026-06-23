@@ -24,7 +24,6 @@ fn copy_from_slice() {
 #[test]
 fn empty_slice() {
     let vec = AlignedVec::copy_from_slice(&[]);
-    assert!(vec.is_empty());
     assert_eq!(vec.len(), 0);
     assert_eq!(vec.as_slice(), &[] as &[u8]);
 }

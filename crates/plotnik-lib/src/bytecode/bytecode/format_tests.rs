@@ -1,3 +1,4 @@
+use super::format::superscript;
 use super::*;
 
 #[test]

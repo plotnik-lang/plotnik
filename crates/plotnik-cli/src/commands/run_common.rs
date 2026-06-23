@@ -71,24 +71,19 @@ pub fn resolve_run_lang(
 
 /// Resolve entrypoint by name or use the single available one.
 pub fn resolve_entrypoint(module: &Module, name: Option<&str>) -> Result<Entrypoint, CliError> {
-    let entries = module.entrypoints();
-    let strings = module.strings();
-
     match name {
-        Some(name) => entries
-            .find_by_name(name, &strings)
+        Some(name) => module
+            .entrypoint(name)
             .ok_or_else(|| CliError::fatal(format!("invalid entrypoint: {}", name))),
-        None => {
-            if entries.len() == 1 {
-                Ok(entries.get(0))
-            } else if entries.is_empty() {
-                Err(CliError::fatal("no entrypoints in module"))
-            } else {
-                Err(CliError::fatal(
-                    "multiple entrypoints, specify one with --entry",
-                ))
-            }
-        }
+        None => match module.entrypoint_count() {
+            0 => Err(CliError::fatal("no entrypoints in module")),
+            1 => module
+                .entrypoint_at(0)
+                .ok_or_else(|| CliError::fatal("no entrypoints in module")),
+            _ => Err(CliError::fatal(
+                "multiple entrypoints, specify one with --entry",
+            )),
+        },
     }
 }
 

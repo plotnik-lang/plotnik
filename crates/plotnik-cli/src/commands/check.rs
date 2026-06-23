@@ -23,9 +23,8 @@ pub fn run(args: CheckArgs) -> CliResult {
     }
 
     let query = QueryBuilder::new(loaded.sources)
-        .parse()
-        .map_err(|e| CliError::fatal(e.to_string()))?
-        .analyze();
+        .analyze()
+        .map_err(|e| CliError::fatal(e.to_string()))?;
 
     let lang = require_lang(
         args.lang.as_deref(),

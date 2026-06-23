@@ -5,9 +5,11 @@
 
 use std::num::NonZeroU16;
 
+#[cfg(test)]
+use super::constants::SECTION_ALIGN;
 use super::constants::{
     MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS, MAX_PRE_EFFECTS, MAX_SUCCESSORS,
-    SECTION_ALIGN, STEP_SIZE,
+    STEP_SIZE,
 };
 use super::effects::{EFFECT_PAYLOAD_MAX, Effect};
 use super::nav::Nav;
@@ -864,6 +866,7 @@ pub fn select_match_opcode(slots_needed: usize) -> Option<Opcode> {
 
 /// Pad a size to the next multiple of SECTION_ALIGN (64 bytes).
 #[inline]
+#[cfg(test)]
 pub fn align_to_section(size: usize) -> usize {
     (size + SECTION_ALIGN - 1) & !(SECTION_ALIGN - 1)
 }

@@ -61,9 +61,8 @@ fn print_query_ast(args: &AstArgs) -> Result<Option<String>, CliError> {
     reconcile_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref())?;
 
     let query = QueryBuilder::new(loaded.sources)
-        .parse()
-        .map_err(|e| CliError::fatal(e.to_string()))?
-        .analyze();
+        .analyze()
+        .map_err(|e| CliError::fatal(e.to_string()))?;
 
     if query.diagnostics().has_errors() || query.diagnostics().has_warnings() {
         eprint!(

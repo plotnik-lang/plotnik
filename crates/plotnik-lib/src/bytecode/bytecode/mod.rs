@@ -17,43 +17,37 @@ mod node_kind_constraint;
 mod sections;
 mod type_meta;
 
-pub use aligned_vec::AlignedVec;
-
 pub use constants::{
-    HEADER_SIZE, MAGIC, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS, MAX_PRE_EFFECTS,
-    MAX_SUCCESSORS, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
-    VERSION,
+    HEADER_SIZE, MAGIC, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, REGEX_TABLE_ENTRY_SIZE,
+    SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE, VERSION,
 };
 
 pub use ids::{StringId, TypeId};
 
-pub use header::{Header, SectionOffsets};
+pub use header::Header;
 
-pub use sections::{FieldEntry, NodeKindEntry, Slice};
+pub use sections::{FieldEntry, NodeKindEntry};
 
 pub use entrypoint::Entrypoint;
 
-pub use type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
+pub use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
 
 pub use nav::Nav;
 
-pub use effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, Effect, EffectKind};
+pub use effects::{Effect, EffectKind};
 
 pub use instructions::{
     Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepAddr, StepId,
-    Trampoline, align_to_section, select_match_opcode,
+    Trampoline, select_match_opcode,
 };
 
-pub use module::{
-    ByteStorage, EntrypointsView, GrammarTableView, Instruction, Module, ModuleError, RegexView,
-    StringsView, TypesView,
-};
+pub use module::{EntrypointsView, Instruction, Module, ModuleError, StringsView, TypesView};
 
 pub use dump::dump;
 
 pub use format::{
-    LineBuilder, PREAMBLE_NAME, Symbol, cols, format_effect, nav_symbol, superscript, trace,
-    truncate_text, width_for_count,
+    LineBuilder, PREAMBLE_NAME, Symbol, cols, format_effect, nav_symbol, trace, truncate_text,
+    width_for_count,
 };
 
 pub use node_kind_constraint::NodeKindConstraint;
@@ -74,7 +68,5 @@ mod instructions_tests;
 mod nav_tests;
 #[cfg(test)]
 mod node_kind_constraint_tests;
-#[cfg(test)]
-mod sections_tests;
 #[cfg(test)]
 mod type_meta_tests;

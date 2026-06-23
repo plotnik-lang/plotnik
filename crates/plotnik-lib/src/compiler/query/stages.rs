@@ -24,7 +24,7 @@ use crate::compiler::Diagnostics;
 use crate::compiler::diagnostics::DiagnosticKind;
 use crate::compiler::source::{SourceId, SourceMap};
 
-pub type AstMap = IndexMap<SourceId, Root>;
+pub(crate) type AstMap = IndexMap<SourceId, Root>;
 
 struct QueryConfig {
     pub parse_fuel: u32,
@@ -61,10 +61,17 @@ impl QueryBuilder {
         self
     }
 
-    pub fn parse(self) -> crate::compiler::Result<QueryParsed> {
+    pub fn analyze(self) -> crate::compiler::Result<Query> {
+        Ok(self.parse()?.analyze())
+    }
+
+    pub fn link(self, grammar: &Grammar) -> crate::compiler::Result<GrammarBoundQuery> {
+        Ok(self.analyze()?.link(grammar))
+    }
+
+    pub(crate) fn parse(self) -> crate::compiler::Result<QueryParsed> {
         let mut ast = IndexMap::new();
         let mut diag = Diagnostics::new();
-        let mut total_fuel_consumed = 0u32;
 
         for source in self.source_map.iter() {
             let tokens = lex(source.content);
@@ -80,7 +87,6 @@ impl QueryBuilder {
             );
 
             let res = parser.parse()?;
-            total_fuel_consumed = total_fuel_consumed.saturating_add(res.fuel_consumed());
             ast.insert(source.id, res.into_ast());
         }
 
@@ -88,27 +94,19 @@ impl QueryBuilder {
             source_map: self.source_map,
             diag,
             ast_map: ast,
-            fuel_consumed: total_fuel_consumed,
         })
     }
 }
 
 #[derive(Debug)]
-pub struct QueryParsed {
+pub(crate) struct QueryParsed {
     source_map: SourceMap,
     ast_map: AstMap,
     diag: Diagnostics,
-    fuel_consumed: u32,
 }
 
 impl QueryParsed {
-    pub fn fuel_consumed(&self) -> u32 {
-        self.fuel_consumed
-    }
-}
-
-impl QueryParsed {
-    pub fn analyze(mut self) -> Query {
+    pub(crate) fn analyze(mut self) -> Query {
         let analysis = {
             let Some(validated) = validate_ast(AstValidationInput {
                 source_map: &self.source_map,
@@ -164,15 +162,15 @@ impl QueryParsed {
         }
     }
 
-    pub fn source_map(&self) -> &SourceMap {
+    pub(crate) fn source_map(&self) -> &SourceMap {
         &self.source_map
     }
 
-    pub fn diagnostics(&self) -> &Diagnostics {
+    pub(crate) fn diagnostics(&self) -> &Diagnostics {
         &self.diag
     }
 
-    pub fn ast_map(&self) -> &AstMap {
+    pub(crate) fn ast_map(&self) -> &AstMap {
         &self.ast_map
     }
 }
@@ -256,8 +254,17 @@ impl Query {
         self.parsed.diagnostics()
     }
 
-    pub fn ast_map(&self) -> &AstMap {
+    pub(crate) fn ast_map(&self) -> &AstMap {
         self.parsed.ast_map()
+    }
+
+    pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.parsed
+            .ast_map
+            .values()
+            .flat_map(|root| root.defs())
+            .filter_map(|def| def.name())
+            .map(|name| name.text().to_string())
     }
 
     pub fn link(mut self, grammar: &Grammar) -> GrammarBoundQuery {
@@ -286,9 +293,7 @@ impl TryFrom<&str> for Query {
     type Error = crate::compiler::Error;
 
     fn try_from(src: &str) -> crate::compiler::Result<Self> {
-        Ok(QueryBuilder::new(SourceMap::from_inline(src))
-            .parse()?
-            .analyze())
+        QueryBuilder::new(SourceMap::from_inline(src)).analyze()
     }
 }
 
@@ -326,8 +331,8 @@ impl GrammarBoundQuery {
         self.analyzed.diagnostics()
     }
 
-    pub fn ast_map(&self) -> &AstMap {
-        self.analyzed.ast_map()
+    pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.analyzed.definition_names()
     }
 
     pub fn arity(&self, node: &SyntaxNode) -> Option<Arity> {

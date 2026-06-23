@@ -46,8 +46,7 @@ use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::parser::dump_tokens;
 use plotnik_lib::typegen::typescript;
 use plotnik_lib::{
-    Colors, GrammarBoundQuery, PrintTracer, QueryBuilder, RuntimeError, SourceMap, VM, Verbosity,
-    materialize_verified,
+    Colors, PrintTracer, QueryBuilder, RuntimeError, SourceMap, VM, Verbosity, materialize_verified,
 };
 
 const FIXTURE_EXT: &str = "txt";
@@ -298,9 +297,8 @@ enum Front {
 
 fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
     let analyzed = QueryBuilder::new(source_map(query))
-        .parse()
-        .expect("query parsing should not exhaust fuel")
-        .analyze();
+        .analyze()
+        .expect("query parsing should not exhaust fuel");
     let diagnostics = analyzed.diagnostics();
     let has_errors = diagnostics.has_errors();
 
@@ -344,10 +342,8 @@ fn render_compile(
 ) -> Result<Vec<(String, String)>, String> {
     let lang = Lang::resolve(input.and_then(|i| i.ext.as_deref()))?;
     let linked = QueryBuilder::new(source_map(query))
-        .parse()
-        .expect("query parsing should not exhaust fuel")
-        .analyze()
-        .link(lang.grammar);
+        .link(lang.grammar)
+        .expect("query parsing should not exhaust fuel");
     let diagnostics = linked.diagnostics();
 
     let mut out = Vec::new();
@@ -383,7 +379,10 @@ fn render_compile(
             let input = input.ok_or_else(|| {
                 "06-vm fixtures require an `==== input ====` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
             })?;
-            let entry = last_def_name(&linked);
+            let entry = linked
+                .definition_names()
+                .last()
+                .expect("a valid query has at least one named definition");
             let (trace, output) = run_vm(&lang, &module, &entry, &input.text)?;
             out.push(("trace".into(), trace));
             out.push(("output".into(), output));
@@ -399,18 +398,6 @@ fn render_types(module: &Module) -> String {
     )
 }
 
-/// VM fixtures run the source-last named definition. Entrypoints in the module
-/// are ordered by dependency (SCC), not source, so resolve that definition by name.
-fn last_def_name(query: &GrammarBoundQuery) -> String {
-    query
-        .ast_map()
-        .values()
-        .last()
-        .and_then(|root| root.defs().filter_map(|def| def.name()).last())
-        .map(|name| name.text().to_string())
-        .expect("a valid query has at least one named definition")
-}
-
 fn run_vm(
     lang: &Lang,
     module: &Module,
@@ -419,8 +406,7 @@ fn run_vm(
 ) -> Result<(String, String), String> {
     let tree = lang.parse(source);
     let entrypoint = module
-        .entrypoints()
-        .find_by_name(entry, &module.strings())
+        .entrypoint(entry)
         .expect("every named definition is an entrypoint");
 
     let vm = VM::builder(source, &tree).build();

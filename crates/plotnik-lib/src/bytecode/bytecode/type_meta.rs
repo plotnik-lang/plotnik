@@ -129,14 +129,6 @@ impl TypeDef {
         bytes
     }
 
-    /// Raw kind discriminant byte, without interpreting it.
-    ///
-    /// Use this for validation: unlike [`decode`](Self::decode) it never
-    /// panics on an unknown kind.
-    pub fn kind_byte(&self) -> u8 {
-        self.kind
-    }
-
     /// Member range `(start, count)` as stored, regardless of kind.
     ///
     /// Meaningful only for Struct/Enum, where `start` indexes TypeMembers and
