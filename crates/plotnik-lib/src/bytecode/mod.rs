@@ -11,18 +11,16 @@ mod dfa_tests;
 mod predicate_op;
 pub mod type_system;
 
-pub use bytecode::{
-    Call, Effect, EffectKind, EncodeError, Entrypoint, Instruction, Match, MatchInstr,
-    MatchPredicate, Module, ModuleError, Nav, NodeKindConstraint, Opcode, Return, StepAddr, StepId,
-    StringId, Trampoline, TypeId, dump,
-};
-pub use predicate_op::PredicateOp;
+pub use bytecode::{EncodeError, Entrypoint, Module, ModuleError, TypeId, dump};
 pub use type_system::{Arity, PrimitiveType, QuantifierKind, TypeKind};
 
 pub(crate) use bytecode::{
-    EntrypointsView, FieldEntry, HEADER_SIZE, Header, LineBuilder, MAX_MATCH_PAYLOAD_SLOTS,
-    MAX_PRE_EFFECTS, NodeKindEntry, PREAMBLE_NAME, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN,
-    STEP_SIZE, StringsView, Symbol, TypeDef, TypeDefKind, TypeMember, TypeNameEntry, TypesView,
-    cols, format_effect, nav_symbol, select_match_opcode, trace, truncate_text, width_for_count,
+    Call, Effect, EffectKind, EntrypointsView, FieldEntry, HEADER_SIZE, Header, Instruction,
+    LineBuilder, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, Match, MatchInstr, MatchPredicate, Nav,
+    NodeKindConstraint, NodeKindEntry, PREAMBLE_NAME, REGEX_TABLE_ENTRY_SIZE, Return,
+    SECTION_ALIGN, STEP_SIZE, StepAddr, StepId, StringId, StringsView, Symbol, Trampoline, TypeDef,
+    TypeDefKind, TypeMember, TypeNameEntry, TypesView, cols, format_effect, nav_symbol,
+    select_match_opcode, trace, truncate_text, width_for_count,
 };
 pub(crate) use dfa::deserialize_dfa;
+pub(crate) use predicate_op::PredicateOp;

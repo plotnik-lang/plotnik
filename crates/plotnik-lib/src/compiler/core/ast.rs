@@ -243,7 +243,7 @@ pub fn classify_alt(node: &SyntaxNode) -> AltKind {
     }
 }
 
-pub use crate::bytecode::PredicateOp;
+pub(crate) use crate::bytecode::PredicateOp;
 
 fn predicate_op_from_syntax_kind(kind: SyntaxKind) -> Option<PredicateOp> {
     match kind {

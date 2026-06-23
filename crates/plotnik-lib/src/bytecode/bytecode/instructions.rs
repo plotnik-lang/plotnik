@@ -210,14 +210,6 @@ impl Opcode {
         )
     }
 
-    /// Whether this is an extended Match (Match16-64).
-    pub const fn is_extended_match(self) -> bool {
-        matches!(
-            self,
-            Self::Match16 | Self::Match24 | Self::Match32 | Self::Match48 | Self::Match64
-        )
-    }
-
     /// Payload capacity in u16 slots — whatever follows the one-step header.
     /// Zero for non-extended variants (Match8, Call, Return, Trampoline).
     pub const fn payload_slots(self) -> usize {

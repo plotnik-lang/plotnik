@@ -37,8 +37,8 @@ pub use nav::Nav;
 pub use effects::{Effect, EffectKind};
 
 pub use instructions::{
-    Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepAddr, StepId,
-    Trampoline, select_match_opcode,
+    Call, EncodeError, Match, MatchInstr, MatchPredicate, Return, StepAddr, StepId, Trampoline,
+    select_match_opcode,
 };
 
 pub use module::{EntrypointsView, Instruction, Module, ModuleError, StringsView, TypesView};

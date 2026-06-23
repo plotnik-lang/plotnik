@@ -17,7 +17,7 @@ use crate::compiler::core::{DefId, TypeId};
 ///
 /// The bytecode crate owns this type; re-exported here so existing
 /// `crate::compiler::core::bytecode::NodeKindConstraint` references resolve unchanged.
-pub use crate::bytecode::NodeKindConstraint;
+pub(crate) use crate::bytecode::NodeKindConstraint;
 
 /// Symbolic reference, resolved to step address at layout time.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
