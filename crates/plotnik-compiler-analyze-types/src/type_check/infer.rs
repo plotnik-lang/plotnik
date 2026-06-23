@@ -9,7 +9,7 @@ use std::collections::btree_map::Entry;
 use plotnik_core::Interner;
 use rowan::TextRange;
 
-use super::capture_mechanism::{CaptureMechanism, classify_capture_mechanism};
+use super::capture_mechanism::CaptureMechanism;
 use super::context::{TypeAnalysis, TypeAnalysisBuilder};
 use super::def_id::Symbol;
 use super::types::{
@@ -371,9 +371,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // mechanism owns the inner's fields, so they must not also bubble. Sharing
         // the classifier with emission keeps the declared type and the effects in
         // lockstep.
-        let mechanism = classify_capture_mechanism(
+        let mechanism = self.ctx.type_ctx.analysis().capture_mechanism(
             inner.node(),
-            self.ctx.type_ctx.analysis(),
             self.ctx.dependency_analysis,
             self.ctx.interner,
         );
@@ -746,7 +745,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     fn quantifier_kind(&self, quant: &QuantifiedPattern) -> QuantifierKind {
-        // Shared with `classify_capture_mechanism` and `compile`'s implicit-array gate so the
+        // Shared with `TypeAnalysis::capture_mechanism` and `compile`'s implicit-array gate so the
         // three never disagree on a quantifier's arity. A malformed operator-less
         // quantifier can't reach inference, so the fallback is unreachable in practice.
         quant

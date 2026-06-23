@@ -27,7 +27,7 @@ pub use ast::{
     RegexLiteral, Root, SeqItem, SeqPattern, TokenPattern, Type, UnionPattern, classify_alt,
     is_empty_group, token_src,
 };
-pub use capture_mechanism::{CaptureMechanism, classify_capture_mechanism, ref_returns_structured};
+pub use capture_mechanism::CaptureMechanism;
 pub use cst::{QueryLang, SyntaxKind, SyntaxNode, SyntaxToken};
 pub use dependency_analysis::DependencyAnalysis;
 pub use emit::{

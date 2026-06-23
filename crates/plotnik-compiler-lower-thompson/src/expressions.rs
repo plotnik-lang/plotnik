@@ -16,7 +16,7 @@ use plotnik_compiler_core::ir::{
     EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
 };
 
-use plotnik_compiler_core::{CaptureMechanism, classify_capture_mechanism};
+use plotnik_compiler_core::CaptureMechanism;
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};
@@ -384,9 +384,8 @@ impl Compiler<'_> {
         // read it, so the declared type and the emitted effects can't disagree
         // (#420). `None` is a bare capture (`@x`), which captures the matched node.
         let mechanism = inner_opt.as_ref().map(|inner| {
-            classify_capture_mechanism(
+            self.ctx.type_ctx.capture_mechanism(
                 inner,
-                self.ctx.type_ctx,
                 self.ctx.dependency_analysis,
                 self.ctx.interner,
             )

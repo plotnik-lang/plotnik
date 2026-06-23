@@ -17,7 +17,7 @@ mod def_id_tests;
 #[cfg(test)]
 mod unify_tests;
 
-pub use capture_mechanism::{CaptureMechanism, classify_capture_mechanism, ref_returns_structured};
+pub use capture_mechanism::CaptureMechanism;
 pub use context::{TypeAnalysis, TypeAnalysisBuilder};
 pub use def_id::{DefId, Interner, Symbol};
 pub use types::{

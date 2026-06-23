@@ -91,6 +91,19 @@ impl TypeAnalysis {
         self.def_output.get(&def_id).copied()
     }
 
+    /// Follow a `Ref` chain to the underlying materialized type; non-ref types
+    /// resolve to themselves. The accessor type-table emission uses to map a
+    /// query type to the concrete shape it stands for.
+    pub fn resolve_underlying_type_id(&self, type_id: TypeId) -> TypeId {
+        let Some(TypeShape::Ref(def_id)) = self.type_shape(type_id) else {
+            return type_id;
+        };
+        let target = self
+            .def_output(*def_id)
+            .expect("ref target def type must exist");
+        self.resolve_underlying_type_id(target)
+    }
+
     /// Iterate over all definition output types as `(DefId, TypeId)` in `DefId`
     /// order, which corresponds to SCC processing order (leaves first).
     pub fn iter_def_output(&self) -> impl Iterator<Item = (DefId, TypeId)> + '_ {
@@ -156,9 +169,9 @@ impl TypeAnalysisBuilder {
         self.analysis
     }
 
-    /// Read-only view of the in-progress artifact, for the shared functions
-    /// (`classify_capture_mechanism`, `ref_returns_structured`) that also run
-    /// against the frozen result during emission.
+    /// Read-only view of the in-progress artifact, for the shared accessors
+    /// ([`TypeAnalysis::capture_mechanism`], [`TypeAnalysis::ref_returns_structured`])
+    /// that also run against the frozen result during emission.
     pub fn analysis(&self) -> &TypeAnalysis {
         &self.analysis
     }

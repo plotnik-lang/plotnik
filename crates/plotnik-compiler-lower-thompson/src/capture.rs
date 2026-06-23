@@ -8,9 +8,7 @@ use std::collections::HashSet;
 use plotnik_bytecode::{EffectKind, Nav};
 use plotnik_compiler_core::ast::{self, Pattern};
 use plotnik_compiler_core::ir::{EffectIR, Label};
-use plotnik_compiler_core::{
-    CaptureMechanism, TypeAnalysis, TypeId, TypeShape, ref_returns_structured,
-};
+use plotnik_compiler_core::{CaptureMechanism, TypeAnalysis, TypeId, TypeShape};
 
 use super::Compiler;
 
@@ -204,9 +202,8 @@ impl Compiler<'_> {
     /// the structured result (Enum/Struct/Array) pending for Set to consume.
     pub(super) fn is_ref_returning_structured(&self, pattern: &Pattern) -> bool {
         match pattern {
-            Pattern::Ref(_) => ref_returns_structured(
+            Pattern::Ref(_) => self.ctx.type_ctx.ref_returns_structured(
                 pattern,
-                self.ctx.type_ctx,
                 self.ctx.dependency_analysis,
                 self.ctx.interner,
             ),
