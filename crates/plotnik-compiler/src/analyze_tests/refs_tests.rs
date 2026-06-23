@@ -1,5 +1,6 @@
+use plotnik_compiler_analyze_refs::refs::{contains_ref, ref_names};
+
 use crate::Query;
-use crate::analyze::refs::{contains_ref, ref_names};
 
 #[test]
 fn collect_refs_from_simple_ref() {

@@ -162,7 +162,10 @@ impl Query {
 
         let bytecode = query.emit().expect("bytecode emission should succeed");
         let module = Module::load(&bytecode).expect("module loading should succeed");
-        crate::typegen::typescript::emit(&module, crate::typegen::typescript::Config::default())
+        plotnik_compiler_typegen::typescript::emit(
+            &module,
+            plotnik_compiler_typegen::typescript::Config::default(),
+        )
     }
 
     #[track_caller]

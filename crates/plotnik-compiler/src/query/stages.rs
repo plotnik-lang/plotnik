@@ -1,22 +1,28 @@
 use indexmap::IndexMap;
 use rowan::TextRange;
 
+use plotnik_compiler_analyze_grammar::link;
+use plotnik_compiler_analyze_names::{SymbolTable, resolve_names};
+use plotnik_compiler_analyze_refs::{dependencies, validate_recursion};
+use plotnik_compiler_analyze_shape::validation::{AstValidationInput, validate_ast};
+use plotnik_compiler_analyze_types::type_check::{self, Arity, TypeAnalysis};
+use plotnik_compiler_analyze_types::validate_entrypoints;
+use plotnik_compiler_lower_dead::remove_unreachable;
+use plotnik_compiler_lower_epsilon::eliminate_epsilons;
+use plotnik_compiler_lower_nav::collapse_up;
+use plotnik_compiler_lower_pack::lower;
+use plotnik_compiler_lower_thompson::verify::run_verified;
+use plotnik_compiler_lower_thompson::{CompileCtx, Compiler};
+use plotnik_compiler_parse::{
+    DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser, Root, SyntaxNode, lex,
+};
 use plotnik_core::Interner;
 use plotnik_core::grammar::Grammar;
 
 use super::{SourceId, SourceMap};
 use crate::Diagnostics;
-use crate::analyze::link;
-use crate::analyze::symbol_table::{SymbolTable, resolve_names};
-use crate::analyze::type_check::{self, Arity, TypeAnalysis};
-use crate::analyze::validation::{AstValidationInput, validate_ast};
-use crate::analyze::{dependencies, validate_entrypoints, validate_recursion};
-use crate::compile::{
-    CompileCtx, Compiler, collapse_up, eliminate_epsilons, lower, remove_unreachable,
-};
 use crate::diagnostics::DiagnosticKind;
 use crate::emit::EmitInput;
-use crate::parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser, Root, SyntaxNode, lex};
 
 pub type AstMap = IndexMap<SourceId, Root>;
 
@@ -178,7 +184,7 @@ impl Query {
     }
 
     pub fn arity(&self, node: &SyntaxNode) -> Option<Arity> {
-        use crate::parser::ast;
+        use plotnik_compiler_parse::ast;
 
         if let Some(pattern) = ast::Pattern::cast(node.clone()) {
             return self.type_analysis.arity(&pattern);
@@ -374,20 +380,10 @@ impl GrammarBoundQuery {
             dependency_analysis: self.dependency_analysis(),
         };
         let mut ir = Compiler::build_ir(&ctx);
-        crate::compile::verify::run_verified(
-            "eliminate_epsilons",
-            &mut ir,
-            &ctx,
-            eliminate_epsilons,
-        );
-        crate::compile::verify::run_verified(
-            "remove_unreachable",
-            &mut ir,
-            &ctx,
-            remove_unreachable,
-        );
-        crate::compile::verify::run_verified("collapse_up", &mut ir, &ctx, collapse_up);
-        crate::compile::verify::run_verified("lower", &mut ir, &ctx, lower);
+        run_verified("eliminate_epsilons", &mut ir, &ctx, eliminate_epsilons);
+        run_verified("remove_unreachable", &mut ir, &ctx, remove_unreachable);
+        run_verified("collapse_up", &mut ir, &ctx, collapse_up);
+        run_verified("lower", &mut ir, &ctx, lower);
         ir
     }
 

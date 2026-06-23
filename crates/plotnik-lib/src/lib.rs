@@ -22,13 +22,12 @@ pub use plotnik_core::grammar;
 pub use plotnik_bytecode as bytecode;
 pub use plotnik_bytecode::type_system;
 
-pub use plotnik_compiler::analyze;
-pub use plotnik_compiler::compile;
 pub use plotnik_compiler::diagnostics;
 pub use plotnik_compiler::emit;
-pub use plotnik_compiler::parser;
 pub use plotnik_compiler::query;
-pub use plotnik_compiler::typegen;
+
+pub use plotnik_compiler_parse as parser;
+pub use plotnik_compiler_typegen as typegen;
 
 pub use plotnik_vm::engine;
 

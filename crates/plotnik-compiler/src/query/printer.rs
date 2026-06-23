@@ -6,11 +6,11 @@ use std::fmt::Write;
 use indexmap::IndexSet;
 use rowan::NodeOrToken;
 
-use crate::parser::{self as ast, SyntaxNode};
+use plotnik_compiler_analyze_types::type_check::Arity;
+use plotnik_compiler_parse::{self as ast, SyntaxNode};
 
 use super::Query;
 use super::SourceKind;
-use crate::analyze::type_check::Arity;
 
 fn indent(level: usize) -> String {
     "  ".repeat(level)
@@ -165,7 +165,7 @@ impl<'q> QueryPrinter<'q> {
         visited.insert(name.to_string());
 
         if let Some(body) = self.query.symbol_table().body(name) {
-            let refs_set = crate::analyze::refs::ref_names(body);
+            let refs_set = plotnik_compiler_analyze_refs::refs::ref_names(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
             for r in refs {
@@ -348,7 +348,7 @@ impl<'q> QueryPrinter<'q> {
         depth: usize,
         w: &mut impl Write,
     ) -> std::fmt::Result {
-        use crate::parser::SyntaxKind;
+        use plotnik_compiler_parse::SyntaxKind;
         for child in node.children() {
             if child.kind() == SyntaxKind::Anchor {
                 self.mark_anchor(
