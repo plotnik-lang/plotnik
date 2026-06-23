@@ -20,7 +20,24 @@ pub struct SymbolTable {
 impl SymbolTable {
     /// Freeze finished name-resolution data into the registry. The pass-owned
     /// builder is the intended caller.
-    pub fn new(table: IndexMap<String, ast::Pattern>, files: IndexMap<String, SourceId>) -> Self {
+    pub(in crate::compiler) fn new(
+        table: IndexMap<String, ast::Pattern>,
+        files: IndexMap<String, SourceId>,
+    ) -> Self {
+        assert_eq!(
+            table.len(),
+            files.len(),
+            "symbol-table body and source maps must have the same definitions",
+        );
+        assert!(
+            table.keys().all(|name| files.contains_key(name)),
+            "every symbol-table body must have a source file",
+        );
+        assert!(
+            files.keys().all(|name| table.contains_key(name)),
+            "every symbol-table source file must have a body",
+        );
+
         Self { table, files }
     }
 

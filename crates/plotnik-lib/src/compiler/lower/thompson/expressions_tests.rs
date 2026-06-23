@@ -4,7 +4,8 @@ use crate::core::{Interner, NodeKind};
 use indexmap::IndexMap;
 
 use crate::compiler::core::ir::NodeKindConstraint;
-use crate::compiler::core::{DependencyAnalysis, GrammarBinding, SymbolTable, TypeAnalysisBuilder};
+use crate::compiler::core::{GrammarBinding, TypeAnalysisBuilder};
+use crate::compiler::test_utils::{empty_dependency_analysis, empty_symbol_table};
 
 use crate::compiler::lower::thompson::{CompileCtx, Compiler};
 
@@ -19,10 +20,10 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
         (NodeKind::Anonymous(number), anonymous_id),
     ]);
     let type_ctx = TypeAnalysisBuilder::new().finish();
-    let symbol_table = SymbolTable::new(IndexMap::new(), IndexMap::new());
+    let symbol_table = empty_symbol_table();
     let node_fields = IndexMap::new();
     let grammar = GrammarBinding::new(node_kinds, node_fields);
-    let dependency_analysis = DependencyAnalysis::default();
+    let dependency_analysis = empty_dependency_analysis();
     let ctx = CompileCtx {
         interner: &interner,
         type_ctx: &type_ctx,

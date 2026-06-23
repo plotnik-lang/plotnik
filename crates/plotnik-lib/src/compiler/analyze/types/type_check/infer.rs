@@ -886,7 +886,7 @@ impl<'a, 'd> InferencePass<'a, 'd> {
         // Definition identity (names, DefIds) is owned by DependencyAnalysis and
         // read from there; the builder only accumulates inferred types.
         self.process_sccs();
-        self.process_orphans();
+        self.assert_all_definitions_processed();
 
         self.ctx.finish()
     }
@@ -895,33 +895,37 @@ impl<'a, 'd> InferencePass<'a, 'd> {
     fn process_sccs(&mut self) {
         for scc in self.analysis.dependency_analysis.sccs() {
             for def_name in scc {
-                if let Some(source_id) = self.analysis.symbol_table.source_id(def_name) {
-                    self.infer_and_register(def_name, source_id);
-                }
+                let source_id = self
+                    .analysis
+                    .symbol_table
+                    .source_id(def_name)
+                    .expect("SCC definition must exist in the symbol table");
+                self.infer_and_register(def_name, source_id);
             }
         }
     }
 
-    /// Handle any definitions not in an SCC (safety net).
-    fn process_orphans(&mut self) {
-        for (name, source_id) in self.analysis.symbol_table.definitions() {
-            let already_typed = self
+    fn assert_all_definitions_processed(&mut self) {
+        for name in self.analysis.symbol_table.names() {
+            let def_id = self
                 .analysis
                 .dependency_analysis
                 .def_id_for_name(self.analysis.interner, name)
-                .and_then(|def_id| self.ctx.def_output(def_id))
-                .is_some();
-            if already_typed {
-                continue;
-            }
-            self.infer_and_register(name, source_id);
+                .expect("dependency analysis must assign every definition a DefId");
+            assert!(
+                self.ctx.def_output(def_id).is_some(),
+                "dependency analysis must schedule every definition before type analysis",
+            );
         }
     }
 
     fn infer_and_register(&mut self, def_name: &str, source_id: SourceId) {
-        let Some(body) = self.analysis.symbol_table.body(def_name).cloned() else {
-            return;
-        };
+        let body = self
+            .analysis
+            .symbol_table
+            .body(def_name)
+            .cloned()
+            .expect("symbol-table source entry must have a body");
 
         // Infer this definition's body only; references into other definitions
         // resolve to their precomputed results.

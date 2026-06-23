@@ -1,6 +1,18 @@
 //! Test utilities and snapshot macros.
 
+use std::collections::{HashMap, HashSet};
+
+use crate::compiler::core::{DependencyAnalysis, SymbolTable};
 use crate::core::grammar::{Grammar, raw::RawGrammar};
+use indexmap::IndexMap;
+
+pub fn empty_symbol_table() -> SymbolTable {
+    SymbolTable::new(IndexMap::new(), IndexMap::new())
+}
+
+pub fn empty_dependency_analysis() -> DependencyAnalysis {
+    DependencyAnalysis::new(Vec::new(), HashMap::new(), Vec::new(), HashSet::new())
+}
 
 pub fn colliding_node_kind_grammar() -> Grammar {
     let raw = RawGrammar::from_json(

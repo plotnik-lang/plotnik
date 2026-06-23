@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::compiler::core::{DefId, Interner, Symbol};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct DependencyAnalysis {
     /// Strongly connected components in reverse topological order.
     ///
