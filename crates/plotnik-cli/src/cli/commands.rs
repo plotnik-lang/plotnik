@@ -46,7 +46,7 @@ pub fn build_cli() -> Command {
         .long_version(format!(
             "{} ({} bundled languages)",
             env!("CARGO_PKG_VERSION"),
-            plotnik::language_registry::all().len()
+            crate::language_registry::all().len()
         ))
         .propagate_version(true)
         .subcommand_required(true)

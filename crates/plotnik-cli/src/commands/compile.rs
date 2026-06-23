@@ -9,7 +9,7 @@ use plotnik_lib::SourceMap;
 use plotnik_lib::bytecode::Module;
 
 use crate::error::CliError;
-use plotnik::language_registry::Lang;
+use crate::language_registry::Lang;
 
 /// Parse, analyze, link, validate (full `check_compile`), emit, load.
 ///

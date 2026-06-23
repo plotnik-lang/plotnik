@@ -1,6 +1,5 @@
-use plotnik::language_registry::{self, Lang};
-
 use crate::error::CliError;
+use crate::language_registry::{self, Lang};
 
 /// Resolve a language name or alias, with typo suggestions on failure.
 pub fn resolve_lang_name(name: &str) -> Result<&'static Lang, CliError> {

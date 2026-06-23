@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::num::NonZeroU16;
 
-use plotnik::language_registry::{self, Lang};
+use crate::language_registry::{self, Lang};
 
 #[derive(Debug)]
 enum CheckResult {

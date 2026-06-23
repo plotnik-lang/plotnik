@@ -11,7 +11,7 @@ use super::compile::compile_module;
 use super::lang_resolver::reconcile_lang;
 use super::query_loader::load_query;
 use crate::error::CliError;
-use plotnik::language_registry::{self, Lang};
+use crate::language_registry::{self, Lang};
 
 pub fn load_source(
     source_text: Option<&str>,

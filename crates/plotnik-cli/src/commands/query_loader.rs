@@ -119,7 +119,7 @@ fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
 /// Normalize aliases (`ts` → `typescript`) so workspace agreement isn't
 /// fooled by spelling. Unknown names stay raw; resolution errors surface later.
 fn normalize_lang_alias(raw: &str) -> String {
-    plotnik::language_registry::from_name(raw)
+    crate::language_registry::from_name(raw)
         .map(|l| l.name().to_string())
         .unwrap_or_else(|| raw.to_string())
 }

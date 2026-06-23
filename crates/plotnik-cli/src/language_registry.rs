@@ -61,6 +61,7 @@ impl Lang {
         })
     }
 
+    #[cfg(test)]
     pub fn ts_language(&self) -> &Language {
         &self.ts_language
     }
