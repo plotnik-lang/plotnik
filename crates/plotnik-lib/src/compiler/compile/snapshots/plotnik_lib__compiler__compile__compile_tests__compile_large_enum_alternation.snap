@@ -1,5 +1,5 @@
 ---
-source: crates/plotnik-compiler/src/compile/compile_tests.rs
+source: crates/plotnik-lib/src/compiler/compile/compile_tests.rs
 ---
 Q = [
     A0: (identifier) @x0   A1: (identifier) @x1   A2: (identifier) @x2

@@ -1,5 +1,5 @@
 ---
-source: crates/plotnik-compiler/src/emit/layout_tests.rs
+source: crates/plotnik-lib/src/compiler/emit/layout_tests.rs
 ---
 Inner = (identifier) @name
 Test = (array (Inner) @item)

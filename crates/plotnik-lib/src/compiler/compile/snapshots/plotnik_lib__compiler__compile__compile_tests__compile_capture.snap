@@ -1,5 +1,5 @@
 ---
-source: crates/plotnik-compiler/src/compile/compile_tests.rs
+source: crates/plotnik-lib/src/compiler/compile/compile_tests.rs
 ---
 Test = (identifier) @id
 ---

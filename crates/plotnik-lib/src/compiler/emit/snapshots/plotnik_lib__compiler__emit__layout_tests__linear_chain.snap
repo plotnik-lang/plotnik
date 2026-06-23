@@ -1,5 +1,5 @@
 ---
-source: crates/plotnik-compiler/src/emit/layout_tests.rs
+source: crates/plotnik-lib/src/compiler/emit/layout_tests.rs
 ---
 Test = (array (identifier) @a (number) @b)
 ---
