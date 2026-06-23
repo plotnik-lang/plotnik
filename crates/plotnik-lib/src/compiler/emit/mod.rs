@@ -1,9 +1,8 @@
 //! Bytecode emission.
 //!
 //! The pipeline runs as per-phase modules under `compiler::emit`, each
-//! depending only on `compiler::core`. This module is the
-//! driver that sequences them, plus the historical `crate::compiler::emit`
-//! facade for downstream callers.
+//! depending only on `compiler::core`. This module is the driver that sequences
+//! them.
 
 mod driver;
 mod instructions;

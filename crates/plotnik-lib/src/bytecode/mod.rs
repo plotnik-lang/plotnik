@@ -1,6 +1,6 @@
 //! Bytecode format and runtime types for Plotnik.
 //!
-//! This crate contains:
+//! This module contains:
 //! - Bytecode format definitions (Module, Header, instructions)
 //! - Type system primitives (TypeKind, Arity, QuantifierKind)
 //! - Runtime helpers (Colors, PredicateOp, DFA deserialization)

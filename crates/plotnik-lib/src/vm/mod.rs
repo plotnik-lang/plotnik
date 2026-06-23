@@ -1,6 +1,6 @@
 //! Runtime VM for executing compiled Plotnik queries.
 //!
-//! This crate provides the virtual machine that executes bytecode against
+//! This module provides the virtual machine that executes bytecode against
 //! tree-sitter syntax trees, producing structured output.
 
 #![allow(clippy::comparison_chain)]
