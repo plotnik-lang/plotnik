@@ -9,6 +9,4 @@ mod printer_tests;
 #[cfg(test)]
 mod query_tests;
 
-pub use crate::compiler::source::{Source, SourceId, SourceKind, SourceMap};
-pub use printer::QueryPrinter;
-pub use stages::{AstMap, GrammarBoundQuery, Query, QueryBuilder, QueryConfig, QueryParsed};
+pub use stages::{GrammarBoundQuery, Query, QueryBuilder, QueryParsed};

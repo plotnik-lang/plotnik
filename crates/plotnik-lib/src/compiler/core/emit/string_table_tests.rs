@@ -9,7 +9,6 @@ fn new_builder_has_easter_egg_at_index_zero() {
     let builder = StringTableBuilder::new();
 
     assert_eq!(builder.len(), 1);
-    assert!(!builder.is_empty());
 
     let (blob, _) = builder.emit();
     assert_eq!(std::str::from_utf8(&blob).unwrap(), EASTER_EGG);
@@ -58,16 +57,16 @@ fn intern_str_deduplicates() {
 }
 
 #[test]
-fn get_returns_none_for_unknown_symbol() {
+fn intern_symbol_is_not_shared_across_symbol_ids() {
     let mut interner = Interner::new();
     let known = interner.intern("known");
     let unknown = interner.intern("unknown");
 
     let mut builder = StringTableBuilder::new();
-    builder.get_or_intern(known, &interner).unwrap();
+    let known_id = builder.get_or_intern(known, &interner).unwrap();
+    let unknown_id = builder.get_or_intern(unknown, &interner).unwrap();
 
-    assert!(builder.lookup(known).is_some());
-    assert!(builder.lookup(unknown).is_none());
+    assert_ne!(known_id, unknown_id);
 }
 
 #[test]

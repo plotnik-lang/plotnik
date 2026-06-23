@@ -18,7 +18,7 @@
 
 pub mod bytecode;
 mod compiler;
-pub mod core;
+mod core;
 mod vm;
 
 pub use crate::bytecode::type_system;
@@ -30,14 +30,6 @@ pub mod diagnostics {
     pub use crate::compiler::diagnostics::*;
 }
 
-pub mod emit {
-    pub use crate::compiler::emit::*;
-}
-
-pub mod query {
-    pub use crate::compiler::query::*;
-}
-
 #[doc(hidden)]
 pub mod parser {
     pub use crate::compiler::parse::dump_tokens;
@@ -47,14 +39,12 @@ pub mod typegen {
     pub use crate::compiler::typegen::*;
 }
 
-pub mod engine {
-    pub use crate::vm::engine::*;
-}
-
 pub use crate::core::Colors;
 
-pub use crate::compiler::{Diagnostics, Error, PassResult, Result, Severity, Span};
-pub use crate::compiler::{Query, QueryBuilder, SourceId, SourceMap};
+pub use crate::compiler::{Diagnostics, EmitError, Error, PassResult, Result, Severity, Span};
+pub use crate::compiler::{
+    GrammarBoundQuery, Query, QueryBuilder, QueryParsed, SourceId, SourceMap,
+};
 
 pub use crate::vm::{
     EffectLog, ExecLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,

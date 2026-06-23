@@ -2,11 +2,10 @@
 
 //! Regex-table emission phase: compile predicate regexes to sparse DFAs.
 //!
-//! Compilation and DFA (de)serialization live here so the regex engine stays
-//! out of `core`; the table that accumulates the compiled bytes is a core type.
+//! Compilation lives here so the regex engine stays out of `core`; the table
+//! that accumulates the compiled bytes is a core type.
 
 use regex_automata::dfa::dense;
-use regex_automata::dfa::sparse::DFA;
 
 use crate::bytecode::StringId;
 use crate::compiler::core::ir::{CompileResult, InstructionIR, PredicateValueIR};
@@ -72,16 +71,4 @@ fn intern(
         .map_err(|e| EmitError::RegexCompile(pattern.to_string(), e.to_string()))?;
 
     regexes.push_dfa(string_id, sparse.to_bytes_little_endian())
-}
-
-/// Deserialize a sparse DFA from bytecode.
-///
-/// # Safety
-/// The bytes must have been produced by `DFA::to_bytes_little_endian()`.
-pub fn deserialize_dfa(bytes: &[u8]) -> Result<DFA<&[u8]>, String> {
-    // SAFETY: We only serialize DFAs we built, and the format is stable
-    // within the same regex-automata version.
-    DFA::from_bytes(bytes)
-        .map(|(dfa, _)| dfa)
-        .map_err(|e| e.to_string())
 }

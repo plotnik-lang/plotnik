@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use plotnik_lib::Colors;
-use plotnik_lib::engine::{RuntimeError, VM, materialize_verified};
+use plotnik_lib::{RuntimeError, VM, materialize_verified};
 
 use super::run_common::{self, ExecPlan, ExecRequest};
 use crate::error::{CliError, CliResult};

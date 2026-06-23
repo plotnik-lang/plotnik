@@ -83,11 +83,6 @@ impl StringTableBuilder {
         self.strings.len()
     }
 
-    /// Whether the builder is empty.
-    pub fn is_empty(&self) -> bool {
-        self.strings.is_empty()
-    }
-
     /// Validate that the string count fits in u16.
     pub fn validate(&self) -> Result<(), EmitError> {
         // Max count is 65534 because the table needs count+1 entries.
@@ -98,18 +93,9 @@ impl StringTableBuilder {
         Ok(())
     }
 
-    /// Get the StringId for a Symbol, if it was interned.
-    pub fn lookup(&self, sym: Symbol) -> Option<StringId> {
-        self.mapping.get(&sym).copied()
-    }
-
     /// Get the StringId for direct string content, if it was interned.
     pub fn lookup_str(&self, s: &str) -> Option<StringId> {
         self.str_lookup.get(s).copied()
-    }
-
-    pub fn get_str(&self, id: StringId) -> &str {
-        self.strings[id.as_u16() as usize].as_ref()
     }
 
     /// Returns `(blob_bytes, table_bytes)`.

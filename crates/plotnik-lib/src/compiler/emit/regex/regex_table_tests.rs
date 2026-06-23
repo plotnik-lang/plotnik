@@ -1,10 +1,10 @@
-use crate::bytecode::StringId;
+use crate::bytecode::{StringId, deserialize_dfa};
 use regex_automata::Input;
 use regex_automata::dfa::Automaton;
 
 use crate::compiler::core::RegexTableBuilder;
 
-use super::{deserialize_dfa, intern};
+use super::intern;
 
 #[test]
 fn intern_and_lookup() {
@@ -94,6 +94,5 @@ fn escaped_slash_pattern() {
 #[test]
 fn empty_builder() {
     let builder = RegexTableBuilder::new();
-    assert!(builder.is_empty());
     assert_eq!(builder.len(), 1); // just reserved slot
 }

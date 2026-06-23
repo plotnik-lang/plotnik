@@ -12,16 +12,7 @@ mod regex;
 mod strings;
 mod types;
 
-pub use driver::{emit, emit_unchecked};
-
-pub use crate::compiler::core::{
-    EmitError, EmitInput, RegexTableBuilder, StringTableBuilder, TypeTableBuilder,
-};
-pub use crate::compiler::emit::regex::deserialize_dfa;
-
-pub mod layout {
-    pub use crate::compiler::emit::layout_pass::CacheAligned;
-}
+pub(in crate::compiler) use driver::{emit, emit_unchecked};
 
 #[cfg(test)]
 mod capacity_tests;

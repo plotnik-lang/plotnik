@@ -91,15 +91,6 @@ impl DependencyAnalysis {
         self.def_names[id.index()]
     }
 
-    pub fn def_name<'a>(&self, interner: &'a Interner, id: DefId) -> &'a str {
-        interner.resolve(self.def_names[id.index()])
-    }
-
-    /// Number of definitions.
-    pub fn def_count(&self) -> usize {
-        self.def_names.len()
-    }
-
     /// True if the definition is in a mutual recursion group (SCC > 1) or references itself.
     pub fn is_recursive_def(&self, id: DefId) -> bool {
         self.recursive_defs.contains(&id)

@@ -31,10 +31,11 @@ mod compile {
     mod compile_tests;
 }
 
+pub use crate::compiler::core::EmitError;
 pub use crate::compiler::core::ir as bytecode;
 pub use crate::compiler::diagnostics::source;
 
 pub use crate::compiler::diagnostics::{
     Diagnostics, Error, PassResult, Result, Severity, SourceId, SourceMap, Span,
 };
-pub use query::{Query, QueryBuilder};
+pub use query::{GrammarBoundQuery, Query, QueryBuilder, QueryParsed};

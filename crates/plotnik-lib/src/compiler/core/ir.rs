@@ -305,11 +305,6 @@ impl MatchIR {
         self
     }
 
-    pub fn neg_field(mut self, f: u16) -> Self {
-        self.neg_fields.push(f);
-        self
-    }
-
     pub fn pre_effect(mut self, e: EffectIR) -> Self {
         self.pre_effects.push(e);
         self

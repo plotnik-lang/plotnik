@@ -8,9 +8,9 @@ use rowan::NodeOrToken;
 
 use crate::compiler::analyze::types::type_check::Arity;
 use crate::compiler::parse::{self as ast, SyntaxNode};
+use crate::compiler::source::{SourceKind, SourceMap};
 
 use super::Query;
-use super::SourceKind;
 
 fn indent(level: usize) -> String {
     "  ".repeat(level)
@@ -102,7 +102,7 @@ impl<'q> QueryPrinter<'q> {
         Ok(())
     }
 
-    fn should_show_headers(&self, source_map: &super::SourceMap) -> bool {
+    fn should_show_headers(&self, source_map: &SourceMap) -> bool {
         source_map.len() > 1
             || source_map
                 .iter()

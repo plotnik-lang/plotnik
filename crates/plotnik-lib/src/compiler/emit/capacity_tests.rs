@@ -10,9 +10,8 @@ use std::sync::LazyLock;
 use crate::bytecode::{EncodeError, Module};
 use crate::core::grammar::{Grammar, raw::RawGrammar};
 
-use crate::compiler::SourceMap;
-use crate::compiler::emit::EmitError;
 use crate::compiler::query::QueryBuilder;
+use crate::compiler::{EmitError, SourceMap};
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {

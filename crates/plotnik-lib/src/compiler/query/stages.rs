@@ -7,6 +7,7 @@ use crate::compiler::analyze::refs::{dependencies, validate_recursion};
 use crate::compiler::analyze::shape::validation::{AstValidationInput, validate_ast};
 use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
 use crate::compiler::analyze::types::validate_entrypoints;
+use crate::compiler::core::{EmitError, EmitInput};
 use crate::compiler::lower::dead::remove_unreachable;
 use crate::compiler::lower::epsilon::eliminate_epsilons;
 use crate::compiler::lower::nav::collapse_up;
@@ -19,14 +20,13 @@ use crate::compiler::parse::{
 use crate::core::Interner;
 use crate::core::grammar::Grammar;
 
-use super::{SourceId, SourceMap};
 use crate::compiler::Diagnostics;
 use crate::compiler::diagnostics::DiagnosticKind;
-use crate::compiler::emit::EmitInput;
+use crate::compiler::source::{SourceId, SourceMap};
 
 pub type AstMap = IndexMap<SourceId, Root>;
 
-pub struct QueryConfig {
+struct QueryConfig {
     pub parse_fuel: u32,
     pub parse_max_depth: u32,
 }
@@ -339,20 +339,21 @@ impl GrammarBoundQuery {
     }
 
     /// Emit bytecode. Returns `Err(EmitError::InvalidQuery)` if the query has errors.
-    pub fn emit(&self) -> Result<Vec<u8>, crate::compiler::emit::EmitError> {
+    pub fn emit(&self) -> Result<Vec<u8>, EmitError> {
         if !self.is_valid() {
-            return Err(crate::compiler::emit::EmitError::InvalidQuery);
+            return Err(EmitError::InvalidQuery);
         }
         let compile_result = self.compile();
         crate::compiler::emit::emit(self.emit_input(), &compile_result)
     }
 
-    /// Like [`emit`](Self::emit), but without the emitter's debug load self-check.
-    /// The caller must load the bytecode itself; used by [`check_compile`](Self::check_compile)
-    /// so a malformed-bytecode case surfaces as a diagnostic instead of the debug panic.
-    pub fn emit_unchecked(&self) -> Result<Vec<u8>, crate::compiler::emit::EmitError> {
+    /// Emit without the emitter's debug load self-check.
+    ///
+    /// `check_compile` loads the bytecode itself so malformed output is reported
+    /// as a diagnostic instead of reaching the debug self-check panic.
+    fn emit_unchecked(&self) -> Result<Vec<u8>, EmitError> {
         if !self.is_valid() {
-            return Err(crate::compiler::emit::EmitError::InvalidQuery);
+            return Err(EmitError::InvalidQuery);
         }
         let compile_result = self.compile();
         crate::compiler::emit::emit_unchecked(self.emit_input(), &compile_result)
@@ -362,8 +363,8 @@ impl GrammarBoundQuery {
     /// failure as a diagnostic instead of panicking. Returns the analyze/link
     /// diagnostics plus any emit/load failure; the caller inspects `has_errors()`.
     ///
-    /// Uses [`emit_unchecked`](Self::emit_unchecked) and loads the bytecode itself,
-    /// so it never reaches the emitter's debug self-check panic — in debug or release.
+    /// Loads the bytecode itself, so it never reaches the emitter's debug
+    /// self-check panic in debug or release.
     pub fn check_compile(&self) -> Diagnostics {
         let mut diag = self.diagnostics().clone();
         if diag.has_errors() {

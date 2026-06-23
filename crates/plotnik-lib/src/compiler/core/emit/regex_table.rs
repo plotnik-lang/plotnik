@@ -69,11 +69,6 @@ impl RegexTableBuilder {
         self.entries.len()
     }
 
-    /// Whether the builder has any regexes (beyond reserved index 0).
-    pub fn is_empty(&self) -> bool {
-        self.entries.len() <= 1
-    }
-
     /// Validate that the regex count fits in u16.
     pub fn validate(&self) -> Result<(), EmitError> {
         if self.entries.len() > 65535 {
