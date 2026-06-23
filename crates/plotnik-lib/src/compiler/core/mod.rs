@@ -13,7 +13,6 @@ pub(crate) mod span;
 pub(crate) mod symbol_table;
 pub(crate) mod type_analysis;
 pub(crate) mod type_shape;
-pub(crate) mod validated_ast;
 pub(crate) mod visitor;
 
 #[cfg(test)]
@@ -33,12 +32,10 @@ pub use dependency_analysis::DependencyAnalysis;
 pub use emit::{EmitError, EmitInput, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
 pub use grammar_binding::GrammarBinding;
 pub use located::Located;
-pub use source::{SourceId, SourceMap};
 pub use span::Span;
 pub use symbol_table::SymbolTable;
 pub use type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
 pub use type_shape::TypeShape;
-pub use validated_ast::ValidatedAst;
 
 /// A lightweight handle to a named query definition.
 ///
