@@ -14,7 +14,6 @@ pub mod bytecode;
 pub mod compile;
 #[cfg(test)]
 pub mod diagnostics;
-#[cfg(test)]
 pub mod emit;
 #[cfg(test)]
 pub mod parser;
@@ -90,33 +89,6 @@ pub mod diagnostics {
 }
 #[cfg(not(test))]
 pub use plotnik_compiler_diagnostics::source;
-#[cfg(not(test))]
-pub mod emit {
-    pub mod instructions {
-        pub use plotnik_compiler_emit_instructions::instructions::*;
-    }
-
-    pub mod layout {
-        pub use plotnik_compiler_emit_layout::layout::*;
-    }
-
-    pub mod regex_table {
-        pub use plotnik_compiler_emit_regex::regex_table::*;
-    }
-
-    pub mod string_table {
-        pub use plotnik_compiler_emit_strings::string_table::*;
-    }
-
-    pub mod type_table {
-        pub use plotnik_compiler_emit_types::type_table::*;
-    }
-
-    pub use plotnik_compiler_emit_module::{EmitInput, emit, emit_unchecked};
-    pub use plotnik_compiler_emit_regex::{RegexTableBuilder, deserialize_dfa};
-    pub use plotnik_compiler_emit_strings::{EmitError, StringTableBuilder};
-    pub use plotnik_compiler_emit_types::TypeTableBuilder;
-}
 #[cfg(not(test))]
 pub use plotnik_compiler_core::ir as bytecode;
 #[cfg(not(test))]

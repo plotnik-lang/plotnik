@@ -4,6 +4,7 @@ pub mod ast;
 pub mod capture_mechanism;
 pub mod cst;
 pub mod dependency_analysis;
+pub mod emit;
 pub mod grammar_binding;
 pub mod ir;
 pub mod located;
@@ -29,6 +30,9 @@ pub use ast::{
 pub use capture_mechanism::{CaptureMechanism, classify_capture_mechanism, ref_returns_structured};
 pub use cst::{QueryLang, SyntaxKind, SyntaxNode, SyntaxToken};
 pub use dependency_analysis::DependencyAnalysis;
+pub use emit::{
+    EASTER_EGG, EmitError, EmitInput, RegexTableBuilder, StringTableBuilder, TypeTableBuilder,
+};
 pub use grammar_binding::GrammarBinding;
 pub use located::Located;
 pub use plotnik_core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};

@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use plotnik_bytecode::{SECTION_ALIGN as CACHE_LINE, STEP_SIZE};
 
-use crate::bytecode::{InstructionIR, Label, LayoutMap};
+use plotnik_compiler_core::ir::{InstructionIR, Label, LayoutMap};
 
 /// Intermediate representation for layout optimization.
 struct BlockArena {

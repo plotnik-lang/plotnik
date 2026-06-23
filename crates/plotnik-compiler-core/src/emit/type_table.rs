@@ -4,15 +4,17 @@
 
 use std::collections::{HashMap, HashSet};
 
-use plotnik_compiler_core::DependencyAnalysis;
 use plotnik_core::Interner;
 
-use crate::analyze::type_check::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeAnalysis, TypeId, TypeShape};
 use plotnik_bytecode::{
     TypeDefKind, TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeNameEntry,
 };
 
-use super::{EmitError, StringTableBuilder};
+use crate::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
+use crate::{DependencyAnalysis, TypeAnalysis, TypeId};
+
+use super::error::EmitError;
+use super::string_table::StringTableBuilder;
 
 /// Builds the type metadata, remapping query TypeIds to bytecode BytecodeTypeIds.
 #[derive(Debug)]

@@ -1,7 +1,10 @@
-use super::regex_table::{RegexTableBuilder, deserialize_dfa};
 use plotnik_bytecode::StringId;
 use regex_automata::Input;
 use regex_automata::dfa::Automaton;
+
+use plotnik_compiler_core::RegexTableBuilder;
+
+use super::{deserialize_dfa, intern};
 
 #[test]
 fn intern_and_lookup() {
@@ -10,9 +13,9 @@ fn intern_and_lookup() {
     let str1 = StringId::new(1);
     let str2 = StringId::new(2);
 
-    let id1 = builder.intern("foo", str1).unwrap();
-    let id2 = builder.intern("bar", str2).unwrap();
-    let id3 = builder.intern("foo", str1).unwrap(); // duplicate
+    let id1 = intern(&mut builder, "foo", str1).unwrap();
+    let id2 = intern(&mut builder, "bar", str2).unwrap();
+    let id3 = intern(&mut builder, "foo", str1).unwrap(); // duplicate
 
     assert_eq!(id1, 1); // 0 is reserved
     assert_eq!(id2, 2);
@@ -26,8 +29,8 @@ fn intern_and_lookup() {
 #[test]
 fn emit_and_deserialize() {
     let mut builder = RegexTableBuilder::new();
-    builder.intern("hello", StringId::new(1)).unwrap();
-    builder.intern("world", StringId::new(2)).unwrap();
+    intern(&mut builder, "hello", StringId::new(1)).unwrap();
+    intern(&mut builder, "world", StringId::new(2)).unwrap();
 
     let (blob, table) = builder.emit();
 
@@ -64,7 +67,7 @@ fn emit_and_deserialize() {
 fn escaped_slash_pattern() {
     let mut builder = RegexTableBuilder::new();
     // Pattern "a\/b" should match literal "a/b"
-    let id = builder.intern(r"a\/b", StringId::new(1)).unwrap();
+    let id = intern(&mut builder, r"a\/b", StringId::new(1)).unwrap();
     assert_eq!(id, 1);
 
     let (blob, table) = builder.emit();

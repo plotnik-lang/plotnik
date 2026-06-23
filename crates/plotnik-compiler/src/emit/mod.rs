@@ -1,32 +1,24 @@
-//! Bytecode emission from compiled queries.
+//! Bytecode emission.
 //!
-//! Converts the compiled IR into the binary bytecode format. This module handles:
-//! - String table construction and interning
-//! - Type table building with field resolution
-//! - Cache-aligned instruction layout
-//! - Section assembly and header generation
+//! The pipeline runs as per-phase passes in the `plotnik-compiler-emit-*`
+//! crates, each depending only on `plotnik-compiler-core`. This module is the
+//! driver that sequences them, plus the historical `plotnik_compiler::emit`
+//! facade for downstream callers.
 
-mod emitter;
-mod error;
-mod instructions;
-pub mod layout;
-mod regex_table;
-mod string_table;
-mod type_table;
+mod driver;
+
+pub use driver::{emit, emit_unchecked};
+
+pub use plotnik_compiler_core::{
+    EmitError, EmitInput, RegexTableBuilder, StringTableBuilder, TypeTableBuilder,
+};
+pub use plotnik_compiler_emit_regex::deserialize_dfa;
+
+pub mod layout {
+    pub use plotnik_compiler_emit_layout::CacheAligned;
+}
 
 #[cfg(test)]
 mod capacity_tests;
 #[cfg(test)]
 mod layout_tests;
-#[cfg(test)]
-mod regex_table_tests;
-#[cfg(test)]
-mod string_table_tests;
-#[cfg(test)]
-mod type_table_tests;
-
-pub use emitter::{EmitInput, emit, emit_unchecked};
-pub use error::EmitError;
-pub use regex_table::{RegexTableBuilder, deserialize_dfa};
-pub use string_table::StringTableBuilder;
-pub use type_table::TypeTableBuilder;

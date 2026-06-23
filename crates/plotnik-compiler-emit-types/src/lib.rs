@@ -1,13 +1,22 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod analyze {
-    pub mod type_check {
-        pub use plotnik_compiler_core::TypeAnalysis;
-        pub use plotnik_compiler_core::type_shape::{
-            FieldInfo, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
-        };
-    }
-}
+//! Type-table emission phase: lower the inferred types into the bytecode type
+//! table, interning their names into the shared string table.
 
-pub mod emit;
-pub use emit::*;
+use plotnik_compiler_core::{EmitError, EmitInput, StringTableBuilder, TypeTableBuilder};
+
+/// Build the type table, interning type, member, and name strings into the
+/// shared string table. Threads the string table by value because it extends it.
+pub fn build_type_table(
+    input: &EmitInput<'_>,
+    mut strings: StringTableBuilder,
+) -> Result<(TypeTableBuilder, StringTableBuilder), EmitError> {
+    let mut types = TypeTableBuilder::new();
+    types.build(
+        input.type_ctx,
+        input.dependency_analysis,
+        input.interner,
+        &mut strings,
+    )?;
+    Ok((types, strings))
+}

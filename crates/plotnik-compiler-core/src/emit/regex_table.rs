@@ -1,16 +1,16 @@
-//! Regex table builder for bytecode emission.
+//! Regex table data for bytecode emission.
 //!
-//! Compiles regex patterns to sparse DFAs and builds the regex blob/table sections.
-//! Each entry stores both the pattern's StringId (for display) and DFA offset (for matching).
+//! Accumulates pre-compiled sparse-DFA bytes per pattern and builds the regex
+//! blob/table sections. Each entry stores both the pattern's StringId (for
+//! display in dump/trace) and the serialized DFA (for matching). Pattern
+//! *compilation* is the emit-regex pass's job; this type only stores the bytes
+//! it is handed, so `core` carries no regex engine dependency.
 
 use std::collections::HashMap;
 
-use regex_automata::dfa::dense;
-use regex_automata::dfa::sparse::DFA;
-
 use plotnik_bytecode::{REGEX_TABLE_ENTRY_SIZE, StringId};
 
-use super::EmitError;
+use super::error::EmitError;
 
 /// Compiled regex entry with pattern reference and serialized DFA.
 #[derive(Debug)]
@@ -21,7 +21,7 @@ struct RegexEntry {
     dfa_bytes: Vec<u8>,
 }
 
-/// Builds the regex table, compiling patterns to sparse DFAs.
+/// Builds the regex table from pre-compiled DFAs.
 ///
 /// Index 0 is unused (regex_id 0 means "no regex").
 #[derive(Debug, Default)]
@@ -40,26 +40,16 @@ impl RegexTableBuilder {
         }
     }
 
-    /// Intern a regex pattern, compiling it to a DFA. Returns the regex ID.
-    pub fn intern(&mut self, pattern: &str, string_id: StringId) -> Result<u16, EmitError> {
-        if let Some(&id) = self.lookup.get(&string_id) {
+    /// Store a pre-compiled DFA for `pattern_string_id`, returning its regex ID.
+    /// Deduplicates by StringId, so a repeated pattern reuses its first ID.
+    pub fn push_dfa(
+        &mut self,
+        pattern_string_id: StringId,
+        dfa_bytes: Vec<u8>,
+    ) -> Result<u16, EmitError> {
+        if let Some(&id) = self.lookup.get(&pattern_string_id) {
             return Ok(id);
         }
-
-        let dense = dense::DFA::builder()
-            .configure(
-                dense::DFA::config()
-                    .start_kind(regex_automata::dfa::StartKind::Unanchored)
-                    .minimize(true),
-            )
-            .build(pattern)
-            .map_err(|e| EmitError::RegexCompile(pattern.to_string(), e.to_string()))?;
-
-        let sparse = dense
-            .to_sparse()
-            .map_err(|e| EmitError::RegexCompile(pattern.to_string(), e.to_string()))?;
-
-        let dfa_bytes = sparse.to_bytes_little_endian();
 
         let id = self.entries.len() as u16;
         if id == u16::MAX {
@@ -67,10 +57,10 @@ impl RegexTableBuilder {
         }
 
         self.entries.push(Some(RegexEntry {
-            string_id,
+            string_id: pattern_string_id,
             dfa_bytes,
         }));
-        self.lookup.insert(string_id, id);
+        self.lookup.insert(pattern_string_id, id);
         Ok(id)
     }
 
@@ -129,16 +119,4 @@ impl RegexTableBuilder {
 
         (blob, table)
     }
-}
-
-/// Deserialize a sparse DFA from bytecode.
-///
-/// # Safety
-/// The bytes must have been produced by `DFA::to_bytes_little_endian()`.
-pub fn deserialize_dfa(bytes: &[u8]) -> Result<DFA<&[u8]>, String> {
-    // SAFETY: We only serialize DFAs we built, and the format is stable
-    // within the same regex-automata version.
-    DFA::from_bytes(bytes)
-        .map(|(dfa, _)| dfa)
-        .map_err(|e| e.to_string())
 }

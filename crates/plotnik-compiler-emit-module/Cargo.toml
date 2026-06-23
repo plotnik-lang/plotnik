@@ -12,11 +12,5 @@ workspace = true
 [dependencies]
 plotnik-bytecode.workspace = true
 plotnik-compiler-core.workspace = true
-plotnik-compiler-emit-instructions.workspace = true
-plotnik-compiler-emit-layout.workspace = true
-plotnik-compiler-emit-regex.workspace = true
-plotnik-compiler-emit-strings.workspace = true
-plotnik-compiler-emit-types.workspace = true
 plotnik-core.workspace = true
 crc32fast = "1.4"
-indexmap = "2"

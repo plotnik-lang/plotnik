@@ -2,17 +2,13 @@
 
 use std::collections::BTreeMap;
 
-use crate::bytecode::{
-    EffectArg, EffectIR, InstructionIR, Label, LayoutMap, MatchIR, MemberRef, PredicateValueIR,
-};
 use plotnik_bytecode::{
     Call, Effect, MatchInstr, MatchPredicate, Return, STEP_SIZE, StepAddr, StepId, Trampoline,
 };
-
-use super::EmitError;
-use super::regex_table::RegexTableBuilder;
-use super::string_table::StringTableBuilder;
-use super::type_table::TypeTableBuilder;
+use plotnik_compiler_core::ir::{
+    CallIR, EffectArg, EffectIR, InstructionIR, Label, LayoutMap, MatchIR, MemberRef, TrampolineIR,
+};
+use plotnik_compiler_core::{EmitError, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
 
 pub fn emit_instructions(
     instructions: &[InstructionIR],
@@ -118,7 +114,7 @@ fn resolve_match(
     instr.encode().map_err(EmitError::from)
 }
 
-fn resolve_call(c: &crate::bytecode::CallIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
+fn resolve_call(c: &CallIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
     Call::new(
         c.nav,
         c.node_field,
@@ -128,10 +124,7 @@ fn resolve_call(c: &crate::bytecode::CallIR, map: &BTreeMap<Label, StepAddr>) ->
     .to_bytes()
 }
 
-fn resolve_trampoline(
-    t: &crate::bytecode::TrampolineIR,
-    map: &BTreeMap<Label, StepAddr>,
-) -> [u8; 8] {
+fn resolve_trampoline(t: &TrampolineIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
     Trampoline::new(StepId::new(t.next.resolve(map))).to_bytes()
 }
 
@@ -148,33 +141,4 @@ fn resolve_member_ref(member_ref: MemberRef, ctx: &ResolveCtx<'_>) -> u16 {
         .get_member_base(member_ref.parent_type)
         .expect("member base must resolve")
         + member_ref.relative_index
-}
-
-pub fn intern_predicate_strings(instructions: &[InstructionIR], strings: &mut StringTableBuilder) {
-    for instr in instructions {
-        if let InstructionIR::Match(m) = instr
-            && let Some(pred) = &m.predicate
-        {
-            strings.get_or_intern_str(pred.value.text());
-        }
-    }
-}
-
-pub fn intern_regex_predicates(
-    instructions: &[InstructionIR],
-    strings: &StringTableBuilder,
-    regexes: &mut RegexTableBuilder,
-) -> Result<(), EmitError> {
-    for instr in instructions {
-        if let InstructionIR::Match(m) = instr
-            && let Some(pred) = &m.predicate
-            && let PredicateValueIR::Regex(pattern) = &pred.value
-        {
-            let string_id = strings
-                .lookup_str(pattern.as_ref())
-                .expect("regex predicate string must be interned before regex emission");
-            regexes.intern(pattern.as_ref(), string_id)?;
-        }
-    }
-    Ok(())
 }

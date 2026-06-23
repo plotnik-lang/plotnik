@@ -9,7 +9,7 @@ use plotnik_core::{Interner, Symbol};
 
 use plotnik_bytecode::StringId;
 
-use super::EmitError;
+use super::error::EmitError;
 
 /// Easter egg string at index 0 (Dostoevsky, The Idiot).
 /// StringId(0) is reserved and never referenced by instructions.

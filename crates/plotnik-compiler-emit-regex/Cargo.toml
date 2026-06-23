@@ -11,5 +11,5 @@ workspace = true
 
 [dependencies]
 plotnik-bytecode.workspace = true
-plotnik-compiler-emit-strings.workspace = true
+plotnik-compiler-core.workspace = true
 regex-automata = { version = "0.4", features = ["dfa-build", "dfa-search"] }
