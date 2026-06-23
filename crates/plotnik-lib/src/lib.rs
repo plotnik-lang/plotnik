@@ -30,11 +30,6 @@ pub mod diagnostics {
     pub use crate::compiler::diagnostics::*;
 }
 
-#[doc(hidden)]
-pub mod parser {
-    pub use crate::compiler::parse::dump_tokens;
-}
-
 pub mod typegen {
     pub use crate::compiler::typegen::*;
 }

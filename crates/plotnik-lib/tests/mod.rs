@@ -7,7 +7,6 @@
 //!
 //! | dir          | sections                                   |
 //! | ------------ | ------------------------------------------ |
-//! | `01-lexer`   | tokens                                     |
 //! | `02-parser`  | cst, ast                                   |
 //! | `03-analyze` | symbols                                    |
 //! | `04-emit`    | bytecode                                   |
@@ -43,7 +42,6 @@ use similar::TextDiff;
 
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
-use plotnik_lib::parser::dump_tokens;
 use plotnik_lib::typegen::typescript;
 use plotnik_lib::{
     Colors, PrintTracer, QueryBuilder, RuntimeError, SourceMap, VM, Verbosity, materialize_verified,
@@ -93,7 +91,11 @@ fn discover(root: &Path) -> Vec<Fixture> {
 
 fn is_stage_dir(name: &str) -> bool {
     let bytes = name.as_bytes();
-    bytes.len() >= 3 && bytes[0].is_ascii_digit() && bytes[1].is_ascii_digit() && bytes[2] == b'-'
+    bytes.len() >= 3
+        && bytes[0].is_ascii_digit()
+        && bytes[1].is_ascii_digit()
+        && bytes[2] == b'-'
+        && !name.starts_with("01-")
 }
 
 fn walk(dir: &Path, stage: &str, root: &Path, out: &mut Vec<Fixture>) {
@@ -235,7 +237,6 @@ fn validate_generated_headers(stage: &str, sections: &[(&str, Vec<&str>)]) -> Re
 
 fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
     match stage.split('-').next().unwrap_or("") {
-        "01" => Some(&["tokens"]),
         "02" => Some(&["diagnostics", "cst", "ast"]),
         "03" => Some(&["diagnostics", "symbols"]),
         "04" => Some(&["diagnostics", "bytecode"]),
@@ -253,15 +254,7 @@ fn parse_section_header(line: &str) -> Option<&str> {
         || inner.starts_with("input.")
         || matches!(
             inner,
-            "tokens"
-                | "cst"
-                | "ast"
-                | "symbols"
-                | "bytecode"
-                | "types"
-                | "trace"
-                | "output"
-                | "diagnostics"
+            "cst" | "ast" | "symbols" | "bytecode" | "types" | "trace" | "output" | "diagnostics"
         );
     known.then_some(inner)
 }
@@ -273,7 +266,6 @@ fn render(
     input: Option<&Input>,
 ) -> Result<Vec<(String, String)>, String> {
     match stage.split('-').next().unwrap_or("") {
-        "01" => Ok(vec![("tokens".into(), dump_tokens(query))]),
         // The `trivia` folder pins how whitespace/comments attach to the CST, so it
         // renders the trivia-inclusive CST; every other parser fixture omits trivia.
         "02" => Ok(render_frontend(

@@ -174,7 +174,8 @@ pub fn token_text<'q>(source: &'q str, token: &Token) -> &'q str {
 /// Render the non-trivia token stream as one `Kind "text"` line per token.
 ///
 /// `Token.kind` is `pub(crate)`, so a downstream test cannot format the stream itself.
-pub fn dump_tokens(source: &str) -> String {
+#[cfg(test)]
+pub(super) fn dump_tokens(source: &str) -> String {
     let mut out = String::new();
     for token in lex(source) {
         if !token.kind.is_trivia() {

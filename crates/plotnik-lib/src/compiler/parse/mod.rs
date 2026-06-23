@@ -33,6 +33,8 @@ mod invariants;
 
 #[cfg(test)]
 mod cst_tests;
+#[cfg(test)]
+mod lexer_fixture_tests;
 
 pub use cst::{SyntaxKind, SyntaxNode};
 
@@ -40,4 +42,4 @@ pub use ast::{Anchor, Branch, Def, NegatedField, Pattern, Root};
 
 pub use core::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser};
 
-pub use lexer::{dump_tokens, lex};
+pub use lexer::lex;
