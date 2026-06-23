@@ -32,7 +32,7 @@ mod compile {
 }
 
 pub use crate::compiler::core::EmitError;
-pub use crate::compiler::core::ir as bytecode;
+pub(crate) use crate::compiler::core::ir as bytecode;
 pub use crate::compiler::diagnostics::source;
 
 pub use crate::compiler::diagnostics::{

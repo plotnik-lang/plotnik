@@ -1,20 +1,20 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod ast;
-pub mod capture_mechanism;
-pub mod cst;
-pub mod dependency_analysis;
-pub mod emit;
-pub mod grammar_binding;
-pub mod ir;
-pub mod located;
-pub mod source;
-pub mod span;
-pub mod symbol_table;
-pub mod type_analysis;
-pub mod type_shape;
-pub mod validated_ast;
-pub mod visitor;
+pub(crate) mod ast;
+pub(crate) mod capture_mechanism;
+pub(crate) mod cst;
+pub(crate) mod dependency_analysis;
+pub(crate) mod emit;
+pub(crate) mod grammar_binding;
+pub(crate) mod ir;
+pub(crate) mod located;
+pub(crate) mod source;
+pub(crate) mod span;
+pub(crate) mod symbol_table;
+pub(crate) mod type_analysis;
+pub(crate) mod type_shape;
+pub(crate) mod validated_ast;
+pub(crate) mod visitor;
 
 #[cfg(test)]
 mod cst_tests;
