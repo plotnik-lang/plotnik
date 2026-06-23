@@ -8,4 +8,3 @@ error: empty regex pattern
   |
 help: put a pattern between the slashes, e.g. `=~ /^foo/`, or use a string predicate like `== "foo"`
 ==== symbols ====
-Q

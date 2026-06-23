@@ -6,4 +6,3 @@ error: invalid regex syntax: unclosed character class
 1 | Q = (identifier =~ /[/)
   |                     ^
 ==== symbols ====
-Q
