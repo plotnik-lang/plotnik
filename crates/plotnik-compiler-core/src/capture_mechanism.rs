@@ -78,7 +78,7 @@ pub fn classify_capture_mechanism(
 
     // Everything else is decided by the inner's inferred data flow, so the type
     // and the emitted effects can't disagree.
-    match ctx.term_info(&pattern).map(|info| &info.flow) {
+    match ctx.pattern_result(&pattern).map(|info| &info.flow) {
         // Bubbling captures: a sequence/alternation wraps them in a fresh struct
         // scope; a named node instead captures its matched node and lets the
         // children bubble alongside as sibling fields.
@@ -129,9 +129,9 @@ pub fn ref_returns_structured(
 
     // After inference the definition's registered output type is authoritative;
     // this is the path emission always takes.
-    if let Some(def_type) = ctx.def_type(def_id) {
+    if let Some(output_type) = ctx.def_output(def_id) {
         return matches!(
-            ctx.type_shape(def_type),
+            ctx.type_shape(output_type),
             Some(TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. })
         );
     }
@@ -140,7 +140,7 @@ pub fn ref_returns_structured(
     // walks every definition in a file before any output type is set. Fall back to
     // the reference's own transparently-inferred flow: a structured result either
     // bubbles its fields (struct) or is a structured scalar (enum/array).
-    match ctx.term_info(pattern).map(|info| &info.flow) {
+    match ctx.pattern_result(pattern).map(|info| &info.flow) {
         Some(OutputFlow::Fields(_)) => true,
         Some(OutputFlow::Value(t)) => ctx.is_structured_output(*t),
         _ => false,

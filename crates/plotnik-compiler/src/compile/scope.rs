@@ -160,8 +160,10 @@ impl Compiler<'_> {
         let scope_type_id = self
             .ctx
             .type_ctx
-            .term_info(inner)
-            .and_then(|info| info.flow.type_id());
+            .pattern_result(inner)
+            .expect("an analyzed scope inner has a pattern result")
+            .flow
+            .type_id();
 
         let end_effects = EndScopeEffects {
             capture: &capture_effects,

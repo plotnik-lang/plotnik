@@ -51,14 +51,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// The walk only ever descends through one definition's body (a finite AST
     /// tree); references resolve to precomputed results rather than re-entering.
     pub fn infer_pattern(&mut self, pattern: &Located<Pattern>) -> PatternResult {
-        if let Some(info) = self.ctx.type_ctx.term_info(pattern.node()) {
+        if let Some(info) = self.ctx.type_ctx.pattern_result(pattern.node()) {
             return info.clone();
         }
 
         let info = self.compute_pattern(pattern);
         self.ctx
             .type_ctx
-            .cache_term_info(pattern.node().clone(), info.clone());
+            .record_pattern_result(pattern.node().clone(), info.clone());
         info
     }
 
@@ -165,7 +165,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // body were inlined here. SCC order guarantees it is already present.
         self.ctx
             .type_ctx
-            .def_result(def_id)
+            .def_memo(def_id)
             .cloned()
             .expect("non-recursive reference target is inferred before the referrer (SCC order)")
     }
@@ -422,7 +422,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn annotate_named(&mut self, type_id: TypeId, name: Symbol) -> TypeId {
         match self.ctx.type_ctx.type_shape(type_id).cloned() {
             Some(TypeShape::Struct(_) | TypeShape::Enum(_)) => {
-                self.ctx.type_ctx.set_type_name(type_id, name);
+                self.ctx.type_ctx.set_type_alias(type_id, name);
                 type_id
             }
             Some(TypeShape::Array { element, non_empty }) => {
@@ -886,7 +886,7 @@ impl<'a, 'd> InferencePass<'a, 'd> {
                 .analysis
                 .dependency_analysis
                 .def_id_for_name(self.analysis.interner, name)
-                .and_then(|def_id| self.ctx.def_type(def_id))
+                .and_then(|def_id| self.ctx.def_output(def_id))
                 .is_some();
             if already_typed {
                 continue;
@@ -921,9 +921,9 @@ impl<'a, 'd> InferencePass<'a, 'd> {
             .dependency_analysis
             .def_id_for_name(self.analysis.interner, def_name)
             .expect("an analyzed definition has a DefId");
-        self.ctx.set_def_result(def_id, info.clone());
+        self.ctx.set_def_memo(def_id, info.clone());
         let type_id = self.flow_to_type_id(&info.flow);
-        self.ctx.set_def_type(def_id, type_id);
+        self.ctx.set_def_output(def_id, type_id);
     }
 
     fn flow_to_type_id(&mut self, flow: &OutputFlow) -> TypeId {

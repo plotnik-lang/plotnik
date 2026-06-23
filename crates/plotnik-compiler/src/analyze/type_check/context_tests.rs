@@ -51,13 +51,13 @@ fn symbol_interning_works() {
 }
 
 #[test]
-fn def_type_round_trips_by_def_id() {
+fn def_output_round_trips_by_def_id() {
     let mut ctx = TypeAnalysisBuilder::new();
     let def_id = DefId::from_raw(0);
 
-    ctx.set_def_type(def_id, TYPE_NODE);
+    ctx.set_def_output(def_id, TYPE_NODE);
 
     let analysis = ctx.finish();
-    assert_eq!(analysis.def_type(def_id), Some(TYPE_NODE));
-    assert_eq!(analysis.def_type(DefId::from_raw(1)), None);
+    assert_eq!(analysis.def_output(def_id), Some(TYPE_NODE));
+    assert_eq!(analysis.def_output(DefId::from_raw(1)), None);
 }

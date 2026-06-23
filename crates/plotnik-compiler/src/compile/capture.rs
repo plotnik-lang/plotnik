@@ -183,10 +183,13 @@ impl Compiler<'_> {
             return false;
         }
 
-        // Check the actual inferred type, not syntax
-        let Some(info) = self.ctx.type_ctx.term_info(&inner) else {
-            return true;
-        };
+        // Check the actual inferred type, not syntax. Compile runs after the type
+        // analysis is frozen, so every pattern it visits has a recorded result.
+        let info = self
+            .ctx
+            .type_ctx
+            .pattern_result(&inner)
+            .expect("an analyzed quantifier inner has a pattern result");
 
         !info
             .flow
@@ -246,9 +249,9 @@ impl Compiler<'_> {
 ///
 /// Enums use Enum/EndEnum instead (handled separately).
 pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
-    let Some(info) = type_ctx.term_info(inner) else {
-        return false;
-    };
+    let info = type_ctx
+        .pattern_result(inner)
+        .expect("an analyzed quantifier inner has a pattern result");
 
     // Must be a bubble (fields flow to parent scope)
     if !info.flow.has_fields() {
@@ -264,6 +267,8 @@ pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
 /// Get row type ID for array element scoping.
 pub fn row_type_id(inner: &Pattern, type_ctx: &TypeAnalysis) -> Option<TypeId> {
     type_ctx
-        .term_info(inner)
-        .and_then(|info| info.flow.type_id())
+        .pattern_result(inner)
+        .expect("an analyzed quantifier inner has a pattern result")
+        .flow
+        .type_id()
 }

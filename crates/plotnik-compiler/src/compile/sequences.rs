@@ -527,8 +527,10 @@ impl Compiler<'_> {
         let union_type_id = self
             .ctx
             .type_ctx
-            .term_info(&Pattern::Union(union.clone()))
-            .and_then(|info| info.flow.type_id());
+            .pattern_result(&Pattern::Union(union.clone()))
+            .expect("an analyzed union has a pattern result")
+            .flow
+            .type_id();
         let merged_fields = union_type_id.and_then(|id| self.ctx.type_ctx.struct_fields(id));
 
         let search_nav = resumable_search_nav(first_nav);
@@ -557,8 +559,10 @@ impl Compiler<'_> {
                 let provided: HashSet<Symbol> = self
                     .ctx
                     .type_ctx
-                    .term_info(&body)
-                    .and_then(|info| info.flow.type_id())
+                    .pattern_result(&body)
+                    .expect("an analyzed branch body has a pattern result")
+                    .flow
+                    .type_id()
                     .and_then(|id| self.ctx.type_ctx.struct_fields(id))
                     .map(|f| f.keys().copied().collect())
                     .unwrap_or_default();
@@ -659,8 +663,10 @@ impl Compiler<'_> {
         let enum_type_id = self
             .ctx
             .type_ctx
-            .term_info(&Pattern::Enum(e.clone()))
-            .and_then(|info| info.flow.type_id());
+            .pattern_result(&Pattern::Enum(e.clone()))
+            .expect("an analyzed enum has a pattern result")
+            .flow
+            .type_id();
         let enum_type_shape = enum_type_id.and_then(|id| self.ctx.type_ctx.type_shape(id));
 
         // BTreeMap order gives stable variant indices independent of AST iteration order.

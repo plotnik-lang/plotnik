@@ -42,16 +42,6 @@ pub enum TypeShape {
     Ref(DefId),
 }
 
-impl TypeShape {
-    pub fn is_void(&self) -> bool {
-        matches!(self, Self::Void)
-    }
-
-    pub fn is_scalar(&self) -> bool {
-        !self.is_void()
-    }
-}
-
 /// Field information within a struct type.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct FieldInfo {
@@ -100,10 +90,6 @@ impl OutputFlow {
         matches!(self, Self::Void)
     }
 
-    pub fn is_scalar(&self) -> bool {
-        matches!(self, Self::Value(_))
-    }
-
     pub fn has_fields(&self) -> bool {
         matches!(self, Self::Fields(_))
     }
@@ -134,20 +120,6 @@ impl PatternResult {
         Self {
             arity: Arity::One,
             flow: OutputFlow::Void,
-        }
-    }
-
-    pub fn scalar(arity: Arity, type_id: TypeId) -> Self {
-        Self {
-            arity,
-            flow: OutputFlow::Value(type_id),
-        }
-    }
-
-    pub fn bubble(arity: Arity, struct_type_id: TypeId) -> Self {
-        Self {
-            arity,
-            flow: OutputFlow::Fields(struct_type_id),
         }
     }
 }

@@ -73,7 +73,7 @@ pub fn emit_unchecked(
     }
 
     let mut entrypoints: Vec<Entrypoint> = Vec::new();
-    for (def_id, type_id) in type_ctx.iter_def_types() {
+    for (def_id, type_id) in type_ctx.iter_def_output() {
         let name_sym = dependency_analysis.def_name_sym(def_id);
         let name = strings.get_or_intern(name_sym, interner)?;
         let result_type = types.resolve_type(type_id, type_ctx)?;

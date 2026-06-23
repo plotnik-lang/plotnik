@@ -15,7 +15,7 @@ use super::type_check::TypeAnalysis;
 /// Report every definition that compiles to no entrypoint.
 ///
 /// Value-less bodies (`.`, `-field`, `.!`) produce no type, so they are absent
-/// from `TypeAnalysis::iter_def_types()`. The AST is the source of truth for the
+/// from `TypeAnalysis::iter_def_output()`. The AST is the source of truth for the
 /// original definition list, including definitions that never reached the symbol
 /// table.
 pub fn validate_entrypoints(
@@ -26,7 +26,7 @@ pub fn validate_entrypoints(
     diag: &mut Diagnostics,
 ) {
     let typed: HashSet<Symbol> = type_analysis
-        .iter_def_types()
+        .iter_def_output()
         .map(|(def_id, _)| dependency_analysis.def_name_sym(def_id))
         .collect();
 

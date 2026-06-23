@@ -58,7 +58,7 @@ impl TypeTableBuilder {
         // this single walk also covers all effect-referenced types. Definition
         // order fixes the emission order entrypoints rely on.
         let mut collector = TypeCollector::new();
-        for (_def_id, type_id) in type_ctx.iter_def_types() {
+        for (_def_id, type_id) in type_ctx.iter_def_output() {
             collector.collect(type_id, type_ctx);
 
             if !matches!(type_ctx.type_shape(type_id), Some(TypeShape::Ref(_))) {
@@ -79,7 +79,7 @@ impl TypeTableBuilder {
             usage.collect(type_id, type_ctx);
         }
         // Also check entrypoint result types directly
-        for (_def_id, type_id) in type_ctx.iter_def_types() {
+        for (_def_id, type_id) in type_ctx.iter_def_output() {
             if type_id == TYPE_VOID {
                 usage.uses_void = true;
             } else if type_id == TYPE_NODE {
@@ -123,7 +123,7 @@ impl TypeTableBuilder {
             self.emit_type_at_slot(slot_index, type_shape, &mut ctx)?;
         }
 
-        for (def_id, type_id) in type_ctx.iter_def_types() {
+        for (def_id, type_id) in type_ctx.iter_def_output() {
             let name_sym = dependency_analysis.def_name_sym(def_id);
             let name = ctx.strings.get_or_intern(name_sym, ctx.interner)?;
             let bc_type_id = self
@@ -139,7 +139,7 @@ impl TypeTableBuilder {
         // A name only attaches to a non-suppressive capture's struct/enum, so the
         // type is reachable from a def result and must survive dead-type elimination;
         // a miss here is a compiler bug, not anything a query can trigger.
-        for (type_id, name_sym) in type_ctx.iter_type_names() {
+        for (type_id, name_sym) in type_ctx.iter_type_aliases() {
             let bc_type_id = self
                 .mapping
                 .get(&type_id)
@@ -243,7 +243,7 @@ impl TypeTableBuilder {
             TypeShape::Ref(def_id) => {
                 let target = ctx
                     .type_ctx
-                    .def_type(*def_id)
+                    .def_output(*def_id)
                     .expect("alias def target must exist");
                 self.type_defs[slot_index] =
                     TypeDef::alias(self.resolve_type(target, ctx.type_ctx)?);
@@ -276,7 +276,7 @@ impl TypeTableBuilder {
         };
 
         let target = type_ctx
-            .def_type(*def_id)
+            .def_output(*def_id)
             .expect("ref target def type must exist");
         self.resolve_underlying_type_id(target, type_ctx)
     }
@@ -423,7 +423,7 @@ impl TypeCollector {
         };
 
         if let TypeShape::Ref(def_id) = type_shape {
-            if let Some(target_id) = type_ctx.def_type(*def_id) {
+            if let Some(target_id) = type_ctx.def_output(*def_id) {
                 self.collect(target_id, type_ctx);
             }
             return;
@@ -506,7 +506,7 @@ impl BuiltinUses {
                 self.collect(*inner, type_ctx);
             }
             TypeShape::Ref(def_id) => {
-                if let Some(target_id) = type_ctx.def_type(*def_id) {
+                if let Some(target_id) = type_ctx.def_output(*def_id) {
                     self.collect(target_id, type_ctx);
                 }
             }

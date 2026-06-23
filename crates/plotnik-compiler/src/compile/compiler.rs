@@ -54,12 +54,12 @@ impl<'a> Compiler<'a> {
         // This wraps any entrypoint to create the top-level scope.
         let preamble_entry = compiler.emit_preamble();
 
-        for (def_id, _) in ctx.type_ctx.iter_def_types() {
+        for (def_id, _) in ctx.type_ctx.iter_def_output() {
             let label = compiler.fresh_label();
             compiler.def_entries.insert(def_id, label);
         }
 
-        for (def_id, _) in ctx.type_ctx.iter_def_types() {
+        for (def_id, _) in ctx.type_ctx.iter_def_output() {
             compiler.compile_def(def_id);
         }
 
@@ -124,7 +124,7 @@ impl<'a> Compiler<'a> {
         // Definitions are compiled in normalized form: body -> Return
         // No Struct/EndStruct wrapper - that's the caller's responsibility (call-site scoping).
         // We still use with_scope for member index lookup during compilation.
-        let body_entry = if let Some(type_id) = self.ctx.type_ctx.def_type(def_id) {
+        let body_entry = if let Some(type_id) = self.ctx.type_ctx.def_output(def_id) {
             self.with_scope(type_id, |this| {
                 this.compile_pattern(body, return_label, body_nav)
             })

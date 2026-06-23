@@ -105,7 +105,7 @@ impl QueryParsed {
     pub fn analyze(mut self) -> Query {
         let mut interner = Interner::new();
 
-        let (symbol_table, type_context, dependency_analysis) = {
+        let (symbol_table, type_analysis, dependency_analysis) = {
             let validated = validate_ast(AstValidationInput {
                 source_map: &self.source_map,
                 ast_map: &self.ast_map,
@@ -123,7 +123,7 @@ impl QueryParsed {
                 &mut self.diag,
             );
 
-            let type_context = type_check::infer_types(
+            let type_analysis = type_check::infer_types(
                 &mut interner,
                 &symbol_table,
                 &dependency_analysis,
@@ -133,20 +133,20 @@ impl QueryParsed {
                 validate_entrypoints(
                     validated.ast_map(),
                     &interner,
-                    &type_context,
+                    &type_analysis,
                     &dependency_analysis,
                     &mut self.diag,
                 );
             }
 
-            (symbol_table, type_context, dependency_analysis)
+            (symbol_table, type_analysis, dependency_analysis)
         };
 
         Query {
             parsed: self,
             interner,
             symbol_table,
-            type_context,
+            type_analysis,
             dependency_analysis,
         }
     }
@@ -169,7 +169,7 @@ pub struct Query {
     parsed: QueryParsed,
     interner: Interner,
     symbol_table: SymbolTable,
-    type_context: TypeAnalysis,
+    type_analysis: TypeAnalysis,
     dependency_analysis: dependencies::DependencyAnalysis,
 }
 
@@ -182,7 +182,7 @@ impl Query {
         use crate::parser::ast;
 
         if let Some(pattern) = ast::Pattern::cast(node.clone()) {
-            return self.type_context.arity(&pattern);
+            return self.type_analysis.arity(&pattern);
         }
 
         if let Some(root) = ast::Root::cast(node.clone()) {
@@ -194,18 +194,18 @@ impl Query {
         }
 
         if let Some(def) = ast::Def::cast(node.clone()) {
-            return def.body().and_then(|b| self.type_context.arity(&b));
+            return def.body().and_then(|b| self.type_analysis.arity(&b));
         }
 
         if let Some(branch) = ast::Branch::cast(node.clone()) {
-            return branch.body().and_then(|b| self.type_context.arity(&b));
+            return branch.body().and_then(|b| self.type_analysis.arity(&b));
         }
 
         None
     }
 
-    pub fn type_context(&self) -> &TypeAnalysis {
-        &self.type_context
+    pub fn type_analysis(&self) -> &TypeAnalysis {
+        &self.type_analysis
     }
 
     pub fn symbol_table(&self) -> &SymbolTable {
@@ -276,8 +276,8 @@ impl GrammarBoundQuery {
         &self.analyzed.interner
     }
 
-    pub fn type_context(&self) -> &TypeAnalysis {
-        self.analyzed.type_context()
+    pub fn type_analysis(&self) -> &TypeAnalysis {
+        self.analyzed.type_analysis()
     }
 
     pub fn symbol_table(&self) -> &SymbolTable {
@@ -369,7 +369,7 @@ impl GrammarBoundQuery {
     fn compile(&self) -> crate::bytecode::CompileResult {
         let ctx = CompileCtx {
             interner: self.interner(),
-            type_ctx: self.type_context(),
+            type_ctx: self.type_analysis(),
             symbol_table: self.symbol_table(),
             grammar: self.grammar(),
             dependency_analysis: self.dependency_analysis(),
@@ -390,7 +390,7 @@ impl GrammarBoundQuery {
     fn emit_input(&self) -> EmitInput<'_> {
         EmitInput {
             interner: self.interner(),
-            type_ctx: self.type_context(),
+            type_ctx: self.type_analysis(),
             dependency_analysis: self.dependency_analysis(),
             grammar: self.grammar(),
         }
