@@ -1,6 +1,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod ast;
+pub mod capture_mechanism;
 pub mod cst;
 pub mod dependency_analysis;
 pub mod grammar_binding;
@@ -25,6 +26,7 @@ pub use ast::{
     RegexLiteral, Root, SeqItem, SeqPattern, TokenPattern, Type, UnionPattern, classify_alt,
     is_empty_group, token_src,
 };
+pub use capture_mechanism::{CaptureMechanism, classify_capture_mechanism, ref_returns_structured};
 pub use cst::{QueryLang, SyntaxKind, SyntaxNode, SyntaxToken};
 pub use dependency_analysis::DependencyAnalysis;
 pub use grammar_binding::GrammarBinding;

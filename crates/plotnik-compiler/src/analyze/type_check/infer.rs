@@ -9,7 +9,7 @@ use std::collections::btree_map::Entry;
 use plotnik_core::Interner;
 use rowan::TextRange;
 
-use super::capture_shape::{CaptureKind, capture_kind};
+use super::capture_mechanism::{CaptureMechanism, classify_capture_mechanism};
 use super::context::TypeContext;
 use super::def_id::Symbol;
 use super::types::{
@@ -370,9 +370,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // mechanism owns the inner's fields, so they must not also bubble. Sharing
         // the classifier with emission keeps the declared type and the effects in
         // lockstep.
-        let mechanism = capture_kind(inner.node(), self.ctx.type_ctx, self.ctx.interner);
+        let mechanism =
+            classify_capture_mechanism(inner.node(), self.ctx.type_ctx, self.ctx.interner);
         let should_merge_fields =
-            mechanism == CaptureKind::Node && matches!(&inner_info.flow, OutputFlow::Fields(_));
+            mechanism == CaptureMechanism::Node && matches!(&inner_info.flow, OutputFlow::Fields(_));
 
         // The capture's base type, before its `:: …` annotation is applied.
         let base = if should_merge_fields {
@@ -721,7 +722,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     fn quantifier_kind(&self, quant: &QuantifiedPattern) -> QuantifierKind {
-        // Shared with `capture_kind` and `compile`'s implicit-array gate so the
+        // Shared with `classify_capture_mechanism` and `compile`'s implicit-array gate so the
         // three never disagree on a quantifier's arity. A malformed operator-less
         // quantifier can't reach inference, so the fallback is unreachable in practice.
         quant.quantifier_kind().unwrap_or(QuantifierKind::ZeroOrMore)

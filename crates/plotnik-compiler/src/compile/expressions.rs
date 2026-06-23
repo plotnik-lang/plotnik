@@ -14,7 +14,7 @@ use crate::bytecode::{EffectIR, InstructionIR, Label, MatchIR, NodeKindConstrain
 use crate::parser::ast::{self, Pattern};
 use plotnik_bytecode::Nav;
 
-use crate::analyze::type_check::{CaptureKind, capture_kind};
+use crate::analyze::type_check::{CaptureMechanism, classify_capture_mechanism};
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};
@@ -382,7 +382,7 @@ impl Compiler<'_> {
         // (#420). `None` is a bare capture (`@x`), which captures the matched node.
         let mechanism = inner_opt
             .as_ref()
-            .map(|inner| capture_kind(inner, self.ctx.type_ctx, self.ctx.interner));
+            .map(|inner| classify_capture_mechanism(inner, self.ctx.type_ctx, self.ctx.interner));
 
         let capture_effects = self.build_capture_effects(cap, mechanism);
 
@@ -392,7 +392,7 @@ impl Compiler<'_> {
 
         match mechanism {
             // Array: Arr → quantifier (with Push) → EndArr+capture → exit(s).
-            CaptureKind::Array => self.compile_array_capture(
+            CaptureMechanism::Array => self.compile_array_capture(
                 CaptureRequest {
                     inner: &inner,
                     nav: nav_override,
@@ -405,7 +405,7 @@ impl Compiler<'_> {
             // Struct scope: Struct → inner → EndStruct+capture → exit(s) (also empty `{}`).
             // Without the wrapper the Set lands on the raw inner node and both the
             // struct scope and the inner Sets are lost (#470).
-            CaptureKind::StructScope => self.compile_struct_capture(
+            CaptureMechanism::StructScope => self.compile_struct_capture(
                 CaptureRequest {
                     inner: &inner,
                     nav: nav_override,
@@ -421,9 +421,9 @@ impl Compiler<'_> {
             // split; that context always enters with empty `pre`, so the per-mechanism
             // single-exit handling (SetAfter's trailing Set, Node's bubble) is
             // unnecessary there.
-            mechanism @ (CaptureKind::Node
-            | CaptureKind::Ref
-            | CaptureKind::SetAfter) => match exits {
+            mechanism @ (CaptureMechanism::Node
+            | CaptureMechanism::Ref
+            | CaptureMechanism::SetAfter) => match exits {
                 CaptureExits::Split {
                     match_exit,
                     skip_exit,
@@ -447,10 +447,10 @@ impl Compiler<'_> {
                         outer_capture,
                     };
                     match mechanism {
-                        CaptureKind::SetAfter => self.compile_setafter_capture(req, exit),
-                        CaptureKind::Ref => self.compile_ref_capture(req, exit),
-                        CaptureKind::Node => self.compile_node_capture(req, exit),
-                        CaptureKind::Array | CaptureKind::StructScope => {
+                        CaptureMechanism::SetAfter => self.compile_setafter_capture(req, exit),
+                        CaptureMechanism::Ref => self.compile_ref_capture(req, exit),
+                        CaptureMechanism::Node => self.compile_node_capture(req, exit),
+                        CaptureMechanism::Array | CaptureMechanism::StructScope => {
                             unreachable!("scope mechanisms are handled above in compile_captured")
                         }
                     }

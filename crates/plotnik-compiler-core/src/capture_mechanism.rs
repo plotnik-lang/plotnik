@@ -1,23 +1,21 @@
 //! Single source of truth for "what value shape does a capture hold".
 //!
-//! Inference (`infer.rs`) and emission (`compile/`) both have to decide what a
-//! `@capture` produces. Historically they re-derived this from overlapping but
-//! divergent syntactic predicates, which is exactly what let the declared type
-//! and the emitted effects disagree (issue #420). This classifier answers the
-//! question once, reading the inner expression's already-inferred type, so both
-//! sides stay in lockstep.
+//! Inference and emission both have to decide what a `@capture` produces.
+//! Historically they re-derived this from overlapping but divergent syntactic
+//! predicates, which is exactly what let the declared type and the emitted
+//! effects disagree (issue #420). This classifier answers the question once,
+//! reading the inner expression's already-inferred type, so both sides stay in
+//! lockstep.
 
-use plotnik_core::Interner;
-
-use crate::parser::{Pattern, is_empty_group};
-
-use super::context::TypeContext;
-use super::types::{QuantifierKind, OutputFlow, TypeShape};
+use crate::Interner;
+use crate::ast::{Pattern, is_empty_group};
+use crate::type_context::TypeContext;
+use crate::type_shape::{OutputFlow, QuantifierKind, TypeShape};
 
 /// How a captured value is produced — the bridge between the inferred type and
 /// the emitted effects.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum CaptureKind {
+pub enum CaptureMechanism {
     /// The matched tree-sitter node itself (`Node` effect). If the inner has
     /// bubbling child captures, they set into the enclosing scope as siblings.
     Node,
@@ -42,7 +40,11 @@ pub enum CaptureKind {
 /// Reads the inner's cached type info, so it is valid both during bottom-up
 /// inference (a capture's inner is inferred before the capture itself) and
 /// during emission (all type info is available).
-pub fn capture_kind(inner: &Pattern, ctx: &TypeContext, interner: &Interner) -> CaptureKind {
+pub fn classify_capture_mechanism(
+    inner: &Pattern,
+    ctx: &TypeContext,
+    interner: &Interner,
+) -> CaptureMechanism {
     // `field: x @cap` parses as `(field: x) @cap`; the field is only a navigation
     // constraint, so the value mechanism is that of `x`.
     let pattern = unwrap_field(inner);
@@ -50,13 +52,13 @@ pub fn capture_kind(inner: &Pattern, ctx: &TypeContext, interner: &Interner) -> 
     if let Pattern::QuantifiedPattern(quant) = &pattern {
         return match quant.quantifier_kind() {
             // `*` / `+` collect into an array regardless of element shape.
-            Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore) => CaptureKind::Array,
+            Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore) => CaptureMechanism::Array,
             // `?` only adds optionality; the value mechanism is the inner's.
             Some(QuantifierKind::Optional) => quant
                 .inner()
-                .map(|i| capture_kind(&i, ctx, interner))
-                .unwrap_or(CaptureKind::Node),
-            None => CaptureKind::Array,
+                .map(|i| classify_capture_mechanism(&i, ctx, interner))
+                .unwrap_or(CaptureMechanism::Node),
+            None => CaptureMechanism::Array,
         };
     }
 
@@ -64,12 +66,12 @@ pub fn capture_kind(inner: &Pattern, ctx: &TypeContext, interner: &Interner) -> 
     // its own Call/Return (and Struct/EndStruct) scoping. A reference to a node/void
     // definition falls through to `Node` — its matched node is captured directly.
     if ref_returns_structured(&pattern, ctx, interner) {
-        return CaptureKind::Ref;
+        return CaptureMechanism::Ref;
     }
 
     // An empty `{}` is an empty struct scope.
     if is_empty_group(&pattern) {
-        return CaptureKind::StructScope;
+        return CaptureMechanism::StructScope;
     }
 
     // Everything else is decided by the inner's inferred data flow, so the type
@@ -82,19 +84,19 @@ pub fn capture_kind(inner: &Pattern, ctx: &TypeContext, interner: &Interner) -> 
             // Only a union alternation flows `Fields` here; an enum flows `Value`
             // and is handled below, so it must not appear in this arm.
             if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Union(_)) {
-                CaptureKind::StructScope
+                CaptureMechanism::StructScope
             } else {
-                CaptureKind::Node
+                CaptureMechanism::Node
             }
         }
         // A structured scalar is left pending by the inner itself — an enum
         // alternation (`Enum`/`EndEnum`) or a named node forwarding a structured
         // output child.
         Some(OutputFlow::Value(type_id)) if ctx.is_structured_output(*type_id) => {
-            CaptureKind::SetAfter
+            CaptureMechanism::SetAfter
         }
         // Void, or a plain scalar node: the matched node is captured directly.
-        _ => CaptureKind::Node,
+        _ => CaptureMechanism::Node,
     }
 }
 
@@ -107,7 +109,7 @@ fn unwrap_field(pattern: &Pattern) -> Pattern {
 }
 
 /// Whether `pattern` is a reference to a definition that returns a structured type.
-fn ref_returns_structured(pattern: &Pattern, ctx: &TypeContext, interner: &Interner) -> bool {
+pub fn ref_returns_structured(pattern: &Pattern, ctx: &TypeContext, interner: &Interner) -> bool {
     let Pattern::Ref(r) = pattern else {
         return false;
     };

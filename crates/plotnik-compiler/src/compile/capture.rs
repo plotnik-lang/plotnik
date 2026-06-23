@@ -5,7 +5,9 @@
 
 use std::collections::HashSet;
 
-use crate::analyze::type_check::{CaptureKind, TypeContext, TypeId, TypeShape};
+use crate::analyze::type_check::{
+    CaptureMechanism, TypeContext, TypeId, TypeShape, ref_returns_structured,
+};
 use crate::bytecode::{EffectIR, Label};
 use crate::parser::ast::{self, Pattern};
 use plotnik_bytecode::{EffectKind, Nav};
@@ -131,12 +133,12 @@ impl Compiler<'_> {
     /// Build capture effects (Node + Set) for a capture whose inner was
     /// classified as `mechanism` (or `None` for a bare `@x`).
     ///
-    /// The caller already runs [`capture_kind`] to dispatch, so it passes the
-    /// result in rather than have this re-classify the same inner.
+    /// The caller already classifies the inner to dispatch, so it passes the
+    /// mechanism in rather than have this re-classify the same inner.
     pub(super) fn build_capture_effects(
         &self,
         cap: &ast::CapturedPattern,
-        mechanism: Option<CaptureKind>,
+        mechanism: Option<CaptureMechanism>,
     ) -> Vec<EffectIR> {
         let mut effects = Vec::with_capacity(2);
 
@@ -144,7 +146,7 @@ impl Compiler<'_> {
         // other mechanism (struct scope, pass-through ref/enum/forward, array)
         // produces its value via EndStruct/EndEnum/EndArr/Call, so the capture itself
         // emits no Node. A bare capture (`@x` with no inner) is a Node.
-        let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureKind::Node);
+        let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureMechanism::Node);
         if is_node_mechanism {
             effects.push(EffectIR::node());
         }
@@ -199,7 +201,9 @@ impl Compiler<'_> {
     /// the structured result (Enum/Struct/Array) pending for Set to consume.
     pub(super) fn is_ref_returning_structured(&self, pattern: &Pattern) -> bool {
         match pattern {
-            Pattern::Ref(r) => self.ref_returns_structured(r),
+            Pattern::Ref(_) => {
+                ref_returns_structured(pattern, self.ctx.type_ctx, self.ctx.interner)
+            }
             Pattern::QuantifiedPattern(q) => q
                 .inner()
                 .is_some_and(|i| self.is_ref_returning_structured(&i)),
@@ -211,19 +215,6 @@ impl Compiler<'_> {
                 .is_some_and(|v| self.is_ref_returning_structured(&v)),
             _ => false,
         }
-    }
-
-    fn ref_returns_structured(&self, r: &ast::Ref) -> bool {
-        r.name()
-            .and_then(|name| self.ctx.type_ctx.def_id_for_name(self.ctx.interner, name.text()))
-            .and_then(|def_id| self.ctx.type_ctx.def_type(def_id))
-            .and_then(|def_type| self.ctx.type_ctx.type_shape(def_type))
-            .is_some_and(|shape| {
-                matches!(
-                    shape,
-                    TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. }
-                )
-            })
     }
 
     pub(super) fn collect_captures(pattern: &Pattern) -> HashSet<String> {

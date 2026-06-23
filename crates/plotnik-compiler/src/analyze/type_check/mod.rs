@@ -3,7 +3,7 @@
 //! Computes both structural arity (for field validation) and data flow types
 //! (for TypeScript emission) in a single traversal.
 
-mod capture_shape;
+mod capture_mechanism;
 mod context;
 mod infer;
 mod def_id;
@@ -17,7 +17,7 @@ mod def_id_tests;
 #[cfg(test)]
 mod unify_tests;
 
-pub use capture_shape::{CaptureKind, capture_kind};
+pub use capture_mechanism::{CaptureMechanism, classify_capture_mechanism, ref_returns_structured};
 pub use context::TypeContext;
 pub use def_id::{DefId, Interner, Symbol};
 pub use types::{
