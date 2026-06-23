@@ -29,9 +29,10 @@ pub struct TypeAnalysis {
     types: Vec<TypeShape>,
 
     /// Each definition's output type, keyed by `DefId`. `BTreeMap` so iteration
-    /// is in `DefId` order — the SCC/emission order entrypoints rely on. A
-    /// value-less body (`.`, `-field`) has no entry, so a lookup can legitimately
-    /// miss; that absence is meaningful, not an invariant violation.
+    /// is in `DefId` order — the SCC/emission order entrypoints rely on. Total
+    /// over every scheduled definition: a value-less body (`.`, `-field`) maps to
+    /// `TYPE_VOID`, so a lookup for any real `DefId` hits. `finish` admits the map
+    /// only after checking its type ids and every `Ref` target are consistent.
     def_output: BTreeMap<DefId, TypeId>,
 
     pattern_result: HashMap<Pattern, PatternResult>,
@@ -115,6 +116,54 @@ impl TypeAnalysis {
     pub fn iter_type_aliases(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
         self.type_aliases.iter().map(|(&id, &sym)| (id, sym))
     }
+
+    /// Admission check for [`TypeAnalysisBuilder::finish`]: the frozen result must
+    /// be internally consistent before any trusting accessor reads it. Every
+    /// failure here is a type-inference bug, not a query condition, so we assert
+    /// loudly — the same discipline `DependencyAnalysis::new` follows.
+    fn assert_well_formed(&self) {
+        let count = self.types.len() as u32;
+        let in_range = |id: TypeId| id.0 < count;
+
+        assert!(
+            matches!(self.type_shape(TYPE_VOID), Some(TypeShape::Void)),
+            "TYPE_VOID must be interned at its canonical id",
+        );
+        assert!(
+            matches!(self.type_shape(TYPE_NODE), Some(TypeShape::Node)),
+            "TYPE_NODE must be interned at its canonical id",
+        );
+
+        for shape in &self.types {
+            match shape {
+                TypeShape::Struct(fields) => {
+                    for info in fields.values() {
+                        assert!(in_range(info.type_id), "struct field type id out of range");
+                    }
+                }
+                TypeShape::Enum(variants) => {
+                    for &id in variants.values() {
+                        assert!(in_range(id), "enum variant type id out of range");
+                    }
+                }
+                TypeShape::Array { element, .. } => {
+                    assert!(in_range(*element), "array element type id out of range");
+                }
+                TypeShape::Optional(inner) => {
+                    assert!(in_range(*inner), "optional inner type id out of range");
+                }
+                TypeShape::Ref(def_id) => assert!(
+                    self.def_output.contains_key(def_id),
+                    "every Ref target must have an inferred output type",
+                ),
+                TypeShape::Void | TypeShape::Node | TypeShape::Custom(_) => {}
+            }
+        }
+
+        for &type_id in self.def_output.values() {
+            assert!(in_range(type_id), "def output type id out of range");
+        }
+    }
 }
 
 /// Mutable accumulator that produces a [`TypeAnalysis`].
@@ -166,8 +215,10 @@ impl TypeAnalysisBuilder {
         builder
     }
 
-    /// Freeze the accumulated state, dropping the inference-only scratch.
+    /// Freeze the accumulated state, dropping the inference-only scratch. Admits
+    /// the result only after asserting it is internally consistent.
     pub fn finish(self) -> TypeAnalysis {
+        self.analysis.assert_well_formed();
         self.analysis
     }
 
