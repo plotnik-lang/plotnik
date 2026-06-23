@@ -17,13 +17,13 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod bytecode;
-pub mod core;
 mod compiler;
+pub mod core;
 mod vm;
 
+pub use crate::bytecode::type_system;
 pub use crate::core::colors;
 pub use crate::core::grammar;
-pub use crate::bytecode::type_system;
 
 pub mod diagnostics {
     pub use crate::compiler::diagnostics::diagnostics::*;
@@ -36,6 +36,11 @@ pub mod emit {
 
 pub mod query {
     pub use crate::compiler::query::*;
+}
+
+#[doc(hidden)]
+pub mod parser {
+    pub use crate::compiler::parse::dump_tokens;
 }
 
 pub mod typegen {

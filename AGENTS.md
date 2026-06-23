@@ -157,25 +157,22 @@ Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax error.
 
 ```
 crates/
-  plotnik-bytecode/    # Binary format definitions
-    src/
-      bytecode/        # Instruction set, modules, linking
-      type_system/     # Shared type primitives
   plotnik-cli/         # CLI tool and language-feature registry
     src/commands/      # Subcommands (run, check, ast, infer, dump, trace, lang)
-  plotnik-compiler/    # Compilation pipeline
+  plotnik-lib/         # Published library crate and internal implementation modules
     src/
-      analyze/         # Semantic analysis (symbol_table, dependencies, type_check, validation)
-      compile/         # Thompson NFA construction (AST → IR)
-      diagnostics/     # User-friendly error reporting
-      emit/            # Bytecode emission (IR → binary)
-      parser/          # Syntactic parsing (lexer, grammar, AST)
-      query/           # Query facade (Query, QueryBuilder, SourceMap)
-      typegen/         # Type declaration extraction (bytecode → .d.ts)
-  plotnik-core/        # Grammar metadata, node kind database, and string interning (Interner, Symbol)
-  plotnik-lib/         # Facade crate re-exporting bytecode, compiler, vm
-  plotnik-vm/          # Runtime VM
-    src/engine/        # Execution, backtracking, effects
+      bytecode/        # Binary format definitions, instruction set, module loading
+      compiler/        # Private compilation pipeline
+        core/          # Inter-pass data types: AST, IR, source maps, type shapes
+        diagnostics/   # User-friendly error reporting
+        parse/         # Syntactic parsing (lexer, grammar, AST wrappers)
+        analyze/       # Semantic analysis (names, refs, recursion, shape, types, grammar)
+        lower/         # AST/type analysis → bytecode IR lowering passes
+        emit/          # Bytecode emission (IR → binary)
+        query/         # Query facade (Query, QueryBuilder, SourceMap)
+        typegen/       # Type declaration extraction (bytecode → .d.ts)
+      core/            # Grammar metadata, node kind database, interning, colors
+      vm/              # Runtime VM execution, backtracking, effects, materialization
 docs/
   binary-format/       # Bytecode format specification
   lang-reference.md    # Language specification

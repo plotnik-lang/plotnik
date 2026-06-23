@@ -7,8 +7,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use indexmap::{IndexMap, IndexSet};
 use crate::core::Interner;
+use indexmap::{IndexMap, IndexSet};
 
 use crate::compiler::core::DefId;
 use crate::compiler::core::SymbolTable;

@@ -1,7 +1,7 @@
 //! Parser-internal token sets (FIRST/recovery sets) over `SyntaxKind`.
 //!
 //! `SyntaxKind`, `QueryLang`, and the rowan tree types are shared data and live
-//! in `plotnik-compiler-core`; they are re-exported here so the parser and its
+//! in `compiler::core`; they are re-exported here so the parser and its
 //! consumers keep referring to them as `crate::compiler::parse::parser::cst::*`. `TokenSet` and
 //! the `token_sets` consts are parser recovery policy, not shared data, so they
 //! stay with the parser.

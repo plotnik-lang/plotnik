@@ -16,10 +16,8 @@ use crate::compiler::query::QueryBuilder;
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw = RawGrammar::from_json(include_str!(env!(
-            "PLOTNIK_COMPILER_JAVASCRIPT_GRAMMAR_JSON"
-        )))
-        .expect("javascript grammar fixture");
+        let raw = RawGrammar::from_json(include_str!(env!("PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON")))
+            .expect("javascript grammar fixture");
         Grammar::from_raw(&raw).expect("javascript grammar metadata")
     });
     &GRAMMAR

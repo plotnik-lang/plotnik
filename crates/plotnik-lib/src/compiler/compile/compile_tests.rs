@@ -1,4 +1,4 @@
-use crate::compiler::shot_bytecode;
+use crate::shot_bytecode;
 
 #[test]
 fn compile_simple_named_node() {

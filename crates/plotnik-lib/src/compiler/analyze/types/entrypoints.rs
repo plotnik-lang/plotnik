@@ -2,9 +2,9 @@
 
 use std::collections::HashSet;
 
-use indexmap::IndexMap;
 use crate::compiler::core::DependencyAnalysis;
 use crate::core::{Interner, Symbol};
+use indexmap::IndexMap;
 
 use crate::compiler::core::Root;
 use crate::compiler::core::source::SourceId;

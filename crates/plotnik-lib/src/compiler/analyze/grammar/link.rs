@@ -6,9 +6,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use indexmap::IndexMap;
 use crate::core::grammar::Grammar;
 use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
+use indexmap::IndexMap;
 use rowan::TextRange;
 
 pub use crate::compiler::core::GrammarBinding;

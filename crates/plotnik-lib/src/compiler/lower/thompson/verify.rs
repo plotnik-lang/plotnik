@@ -63,14 +63,14 @@ mod debug_impl {
     use std::hash::{Hash, Hasher};
     use std::num::NonZeroU16;
 
-    use indexmap::IndexMap;
     use crate::bytecode::{EffectKind, Nav};
+    use indexmap::IndexMap;
 
-    use crate::compiler::lower::thompson::CompileResult;
     use crate::compiler::core::DefId;
     use crate::compiler::core::ir::{
         InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR,
     };
+    use crate::compiler::lower::thompson::CompileResult;
 
     use super::super::compiler::CompileCtx;
 

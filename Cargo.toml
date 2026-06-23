@@ -1,32 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/plotnik-bytecode",
     "crates/plotnik-cli",
-    "crates/plotnik-compiler",
-    "crates/plotnik-compiler-analyze-grammar",
-    "crates/plotnik-compiler-analyze-names",
-    "crates/plotnik-compiler-analyze-refs",
-    "crates/plotnik-compiler-analyze-shape",
-    "crates/plotnik-compiler-analyze-types",
-    "crates/plotnik-compiler-core",
-    "crates/plotnik-compiler-diagnostics",
-    "crates/plotnik-compiler-emit-instructions",
-    "crates/plotnik-compiler-emit-layout",
-    "crates/plotnik-compiler-emit-module",
-    "crates/plotnik-compiler-emit-regex",
-    "crates/plotnik-compiler-emit-strings",
-    "crates/plotnik-compiler-emit-types",
-    "crates/plotnik-compiler-lower-dead",
-    "crates/plotnik-compiler-lower-epsilon",
-    "crates/plotnik-compiler-lower-nav",
-    "crates/plotnik-compiler-lower-pack",
-    "crates/plotnik-compiler-lower-thompson",
-    "crates/plotnik-compiler-parse",
-    "crates/plotnik-compiler-typegen",
-    "crates/plotnik-core",
     "crates/plotnik-lib",
-    "crates/plotnik-vm",
 ]
 
 [workspace.package]
@@ -36,31 +12,7 @@ repository = "https://github.com/plotnik-lang/plotnik"
 edition = "2024"
 
 [workspace.dependencies]
-plotnik-bytecode = { path = "crates/plotnik-bytecode", version = "0.3.3" }
-plotnik-compiler = { path = "crates/plotnik-compiler", version = "0.3.3" }
-plotnik-compiler-analyze-grammar = { path = "crates/plotnik-compiler-analyze-grammar", version = "0.3.3" }
-plotnik-compiler-analyze-names = { path = "crates/plotnik-compiler-analyze-names", version = "0.3.3" }
-plotnik-compiler-analyze-refs = { path = "crates/plotnik-compiler-analyze-refs", version = "0.3.3" }
-plotnik-compiler-analyze-shape = { path = "crates/plotnik-compiler-analyze-shape", version = "0.3.3" }
-plotnik-compiler-analyze-types = { path = "crates/plotnik-compiler-analyze-types", version = "0.3.3" }
-plotnik-compiler-core = { path = "crates/plotnik-compiler-core", version = "0.3.3" }
-plotnik-compiler-diagnostics = { path = "crates/plotnik-compiler-diagnostics", version = "0.3.3" }
-plotnik-compiler-emit-instructions = { path = "crates/plotnik-compiler-emit-instructions", version = "0.3.3" }
-plotnik-compiler-emit-layout = { path = "crates/plotnik-compiler-emit-layout", version = "0.3.3" }
-plotnik-compiler-emit-module = { path = "crates/plotnik-compiler-emit-module", version = "0.3.3" }
-plotnik-compiler-emit-regex = { path = "crates/plotnik-compiler-emit-regex", version = "0.3.3" }
-plotnik-compiler-emit-strings = { path = "crates/plotnik-compiler-emit-strings", version = "0.3.3" }
-plotnik-compiler-emit-types = { path = "crates/plotnik-compiler-emit-types", version = "0.3.3" }
-plotnik-compiler-lower-dead = { path = "crates/plotnik-compiler-lower-dead", version = "0.3.3" }
-plotnik-compiler-lower-epsilon = { path = "crates/plotnik-compiler-lower-epsilon", version = "0.3.3" }
-plotnik-compiler-lower-nav = { path = "crates/plotnik-compiler-lower-nav", version = "0.3.3" }
-plotnik-compiler-lower-pack = { path = "crates/plotnik-compiler-lower-pack", version = "0.3.3" }
-plotnik-compiler-lower-thompson = { path = "crates/plotnik-compiler-lower-thompson", version = "0.3.3" }
-plotnik-compiler-parse = { path = "crates/plotnik-compiler-parse", version = "0.3.3" }
-plotnik-compiler-typegen = { path = "crates/plotnik-compiler-typegen", version = "0.3.3" }
-plotnik-core = { path = "crates/plotnik-core", version = "0.3.3" }
 plotnik-lib = { path = "crates/plotnik-lib", version = "0.3.3" }
-plotnik-vm = { path = "crates/plotnik-vm", version = "0.3.3" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }

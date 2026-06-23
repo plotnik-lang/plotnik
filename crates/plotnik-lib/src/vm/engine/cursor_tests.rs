@@ -8,8 +8,8 @@
 //! failure, masking whether `go_up` itself restored — so the restore contract is
 //! verified here, against real trees, by inspecting the cursor after the call.
 
-use arborium_tree_sitter::{Language, Parser, Tree, TreeCursor};
 use crate::bytecode::Nav;
+use arborium_tree_sitter::{Language, Parser, Tree, TreeCursor};
 
 use super::cursor::CursorWrapper;
 

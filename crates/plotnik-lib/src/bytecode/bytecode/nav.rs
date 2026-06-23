@@ -43,7 +43,7 @@ impl Nav {
     /// bits 4-0, so the range is `1..=31`. The compiler splits a deeper ascent
     /// into a chain of same-mode `Up*` instructions, which is exact because
     /// `Up*` composes — the VM re-checks the exit constraint at every level it
-    /// leaves (see `plotnik_vm`'s `go_up`).
+    /// leaves (see `the VM`'s `go_up`).
     pub const MAX_UP_LEVEL: u8 = (1 << UP_MODE_SHIFT) - 1;
 
     /// Decode from a bytecode byte, panicking on an invalid encoding.

@@ -23,7 +23,7 @@ const ALL_NAVS: &[Nav] = &[
 /// `emit_loop_iterations` relies on this: a nav that begins a quantifier search
 /// must repeat as a search, so its `.expect("a search nav repeats as a search")`
 /// can never fire. The invariant straddles two crates — `Nav::sibling_continuation`
-/// (plotnik-bytecode) and `quantifier_search_nav` (here) — so neither side's
+/// (bytecode) and `quantifier_search_nav` (here) — so neither side's
 /// compiler can catch a future divergence; this test does.
 #[test]
 fn search_nav_repeats_as_search() {

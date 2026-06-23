@@ -4,9 +4,9 @@
 //! sequence of the winning path. Five of its operations panic on an ill-shaped
 //! builder stack — `Push`/`ArrayClose` want an `Array` on top, `Set` a `Struct` or
 //! `Enum`, `StructClose` a `Struct`, `EnumClose` an `Enum`
-//! (`crates/plotnik-vm/src/engine/materializer.rs`) — and the VM's `emit_effect`
+//! (`crates/plotnik-lib/src/vm/engine/materializer.rs`) — and the VM's `emit_effect`
 //! panics if a `SuppressEnd` underflows the suppression counter
-//! (`crates/plotnik-vm/src/engine/vm.rs`). On compiler output these are
+//! (`crates/plotnik-lib/src/vm/engine/vm.rs`). On compiler output these are
 //! unreachable by construction; on a forged module that swaps one effect they
 //! are not. This pass proves them unreachable for *any* module that passes
 //! `Module::load`, so they stay sound loud invariants instead of reachable

@@ -1,10 +1,10 @@
 //! Shared bytecode-emission data types.
 //!
-//! The emit pipeline lives in the per-phase `plotnik-compiler-emit-*` crates;
+//! The emit pipeline lives in the per-phase `compiler::emit` modules;
 //! this module owns the data the phases produce and read across crate
 //! boundaries: the error type and the string, type, and regex tables. The
 //! tables carry their construction *state* and serialization, but no algorithm
-//! that walks the IR and no regex engine — those belong to the phase crates.
+//! that walks the IR and no regex engine — those belong to the phase modules.
 
 mod context;
 mod error;

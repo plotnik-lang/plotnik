@@ -8,8 +8,8 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU16;
 
-use indexmap::IndexMap;
 use crate::bytecode::{EffectKind, Nav, PredicateOp, StepAddr, select_match_opcode};
+use indexmap::IndexMap;
 
 use crate::compiler::core::{DefId, TypeId};
 

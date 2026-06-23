@@ -2,7 +2,7 @@
 //!
 //! Tests verify cache-line aligned layout and gap-filling optimization.
 
-use crate::compiler::shot_bytecode;
+use crate::shot_bytecode;
 
 #[test]
 fn total_steps_past_u16_does_not_wrap() {

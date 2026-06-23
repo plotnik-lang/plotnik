@@ -1,9 +1,9 @@
 use rowan::TextRange;
 
+use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 use crate::compiler::parse::parser::Parser;
 use crate::compiler::parse::parser::cst::SyntaxKind;
 use crate::compiler::parse::parser::cst::token_sets::ROOT_EXPR_FIRST_TOKENS;
-use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 
 impl Parser<'_, '_> {
     pub fn parse_root(&mut self) {

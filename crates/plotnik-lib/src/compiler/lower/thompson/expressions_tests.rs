@@ -1,7 +1,7 @@
 use std::num::NonZeroU16;
 
-use indexmap::IndexMap;
 use crate::core::{Interner, NodeKind};
+use indexmap::IndexMap;
 
 use crate::compiler::core::ir::NodeKindConstraint;
 use crate::compiler::core::{DependencyAnalysis, GrammarBinding, SymbolTable, TypeAnalysisBuilder};

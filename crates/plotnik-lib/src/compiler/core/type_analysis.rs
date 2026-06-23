@@ -14,7 +14,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::compiler::core::ast::Pattern;
-use crate::compiler::core::type_shape::{Arity, FieldInfo, PatternResult, TYPE_NODE, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::core::type_shape::{
+    Arity, FieldInfo, PatternResult, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
+};
 use crate::compiler::core::{DefId, Symbol};
 
 /// Frozen registry of inferred types and per-definition / per-pattern results.

@@ -1,8 +1,8 @@
 //! Core compiler state and entry points.
 
-use indexmap::IndexMap;
 use crate::compiler::core::{DependencyAnalysis, GrammarBinding};
 use crate::core::Interner;
+use indexmap::IndexMap;
 
 use crate::bytecode::Nav;
 use crate::compiler::core::Pattern;

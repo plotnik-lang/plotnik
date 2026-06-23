@@ -21,6 +21,7 @@ mod cst_tests;
 #[cfg(test)]
 mod ir_tests;
 
+pub use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 pub use ast::{
     AltKind, Anchor, Branch, CapturedPattern, Def, EnumPattern, FieldPattern, NegatedField,
     NodePattern, NodePredicate, Pattern, PredicateOp, PredicateValue, QuantifiedPattern, Ref,
@@ -35,7 +36,6 @@ pub use emit::{
 };
 pub use grammar_binding::GrammarBinding;
 pub use located::Located;
-pub use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 pub use source::{Source, SourceId, SourceKind, SourceMap};
 pub use span::Span;
 pub use symbol_table::SymbolTable;

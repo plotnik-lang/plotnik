@@ -5,9 +5,9 @@ use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 use super::ast::Root;
 use super::cst::{SyntaxKind, SyntaxNode, TokenSet};
 use super::lexer::{Token, token_text};
-use crate::compiler::parse::Error;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::parse::Error;
 
 #[derive(Debug)]
 pub struct ParseResult {

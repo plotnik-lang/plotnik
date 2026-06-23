@@ -4,7 +4,7 @@
 //!
 //! Merging the constraint-carrying modes (`UpSkipTrivia`/`UpSkipExtras`/`UpExact`)
 //! is sound because `Up*` composes: the VM re-validates the exit constraint at
-//! every level it ascends (see `plotnik_vm`'s `go_up`), so `Up*(a)` then `Up*(b)`
+//! every level it ascends (see `the VM`'s `go_up`), so `Up*(a)` then `Up*(b)`
 //! is exactly `Up*(a+b)`. A merge that would overflow the level field is refused,
 //! leaving a contiguous chain whose per-level checks partition the levels with no
 //! gap — never a capped instruction that silently drops upward movement.

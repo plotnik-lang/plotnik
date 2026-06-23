@@ -3,7 +3,7 @@
 //! Type-table emission phase: walk the inferred types (TypeAnalysis) and lower
 //! them into the bytecode type table, interning their names into the shared
 //! string table. The table storage and its read accessors live in
-//! `plotnik-compiler-core`; this crate owns the walk.
+//! `compiler::core`; this module owns the walk.
 
 use std::collections::HashSet;
 

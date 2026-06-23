@@ -17,8 +17,8 @@ use printer::DiagnosticsPrinter;
 
 use message::{Diagnostic, Fix, Related};
 
-pub use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 pub use crate::compiler::core::Span;
+pub use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 
 #[derive(Debug, Clone, Default)]
 pub struct Diagnostics {

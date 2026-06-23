@@ -4,7 +4,7 @@
 //! 1. Collect all `Name = pattern` definitions from all sources
 //! 2. Check that all `(UpperIdent)` references are defined
 //!
-//! The `SymbolTable` registry itself lives in `plotnik-compiler-core`; this module
+//! The `SymbolTable` registry itself lives in `compiler::core`; this module
 //! owns the builder that fills it and the resolution/validation passes.
 
 use indexmap::IndexMap;

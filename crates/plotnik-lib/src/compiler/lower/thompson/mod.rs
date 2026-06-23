@@ -33,6 +33,6 @@ mod expressions_tests;
 #[cfg(test)]
 mod quantifier_tests;
 
+pub use crate::compiler::core::ir::CompileResult;
 pub use capture::CaptureEffects;
 pub use compiler::{CompileCtx, Compiler};
-pub use crate::compiler::core::ir::CompileResult;

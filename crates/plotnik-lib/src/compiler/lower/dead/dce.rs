@@ -41,10 +41,10 @@ fn compute_reachable(result: &CompileResult) -> HashSet<Label> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use indexmap::IndexMap;
     use crate::bytecode::Nav;
     use crate::compiler::core::DefId;
     use crate::compiler::core::ir::MatchIR;
+    use indexmap::IndexMap;
 
     #[test]
     fn removes_unreachable_instructions() {

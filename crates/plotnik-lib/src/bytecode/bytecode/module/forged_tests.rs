@@ -27,10 +27,8 @@ use crate::bytecode::bytecode::type_meta::TypeDefKind;
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw = RawGrammar::from_json(include_str!(env!(
-            "PLOTNIK_BYTECODE_JAVASCRIPT_GRAMMAR_JSON"
-        )))
-        .expect("javascript grammar fixture");
+        let raw = RawGrammar::from_json(include_str!(env!("PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON")))
+            .expect("javascript grammar fixture");
         Grammar::from_raw(&raw).expect("javascript grammar metadata")
     });
     &GRAMMAR
