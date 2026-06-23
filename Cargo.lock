@@ -1782,15 +1782,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
 
 [[package]]
-name = "memmap2"
-version = "0.9.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "714098028fe011992e1c3962653c96b2d578c4b4bce9036e15ff220319b1e0e3"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "miniz_oxide"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1966,15 +1957,11 @@ dependencies = [
 name = "plotnik-compiler"
 version = "0.3.3"
 dependencies = [
- "annotate-snippets",
  "arborium-javascript",
  "cargo_metadata",
- "crc32fast",
  "indexmap",
  "indoc",
  "insta",
- "logos",
- "memmap2",
  "plotnik-bytecode",
  "plotnik-compiler-analyze-grammar",
  "plotnik-compiler-analyze-names",
@@ -1997,13 +1984,9 @@ dependencies = [
  "plotnik-compiler-parse",
  "plotnik-compiler-typegen",
  "plotnik-core",
- "regex-automata",
- "regex-syntax",
  "rowan",
- "serde",
  "serde_json",
  "tempfile",
- "thiserror",
 ]
 
 [[package]]
@@ -2130,6 +2113,7 @@ dependencies = [
 name = "plotnik-compiler-emit-types"
 version = "0.3.3"
 dependencies = [
+ "plotnik-bytecode",
  "plotnik-compiler-core",
 ]
 
@@ -2223,6 +2207,8 @@ dependencies = [
  "libtest-mimic",
  "plotnik-bytecode",
  "plotnik-compiler",
+ "plotnik-compiler-parse",
+ "plotnik-compiler-typegen",
  "plotnik-core",
  "plotnik-vm",
  "serde",
