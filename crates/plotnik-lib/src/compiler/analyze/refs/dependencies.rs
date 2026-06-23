@@ -50,7 +50,7 @@ pub fn analyze_dependencies(
 
             let self_recursive = symbol_table
                 .body(name)
-                .is_some_and(|body| super::refs::contains_ref(body, name));
+                .is_some_and(|body| super::collect::contains_ref(body, name));
             if mutually_recursive || self_recursive {
                 recursive_defs.insert(def_id);
             }

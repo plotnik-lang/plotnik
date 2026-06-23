@@ -174,7 +174,7 @@ impl<'q> QueryPrinter<'q> {
             .analysis()
             .expect("symbol formatting only recurses after analysis exists");
         if let Some(body) = analysis.symbol_table.body(name) {
-            let refs_set = crate::compiler::analyze::refs::refs::ref_names(body);
+            let refs_set = crate::compiler::analyze::refs::collect::ref_names(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
             for r in refs {

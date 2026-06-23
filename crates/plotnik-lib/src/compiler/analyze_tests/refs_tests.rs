@@ -1,4 +1,4 @@
-use crate::compiler::analyze::refs::refs::{contains_ref, ref_names};
+use crate::compiler::analyze::refs::collect::{contains_ref, ref_names};
 
 use crate::compiler::Query;
 
