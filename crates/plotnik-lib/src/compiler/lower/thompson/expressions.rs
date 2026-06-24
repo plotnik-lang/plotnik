@@ -566,28 +566,22 @@ impl Compiler<'_> {
     /// Single-exit lowering for a `Node` capture. Bubbling children, if any, set
     /// into the current scope alongside the capture.
     fn compile_node_capture(&mut self, req: CaptureRequest<'_>, exit: Label) -> Label {
+        let inner_is_bubble = self
+            .ctx
+            .type_ctx
+            .expect_pattern_result(req.inner)
+            .flow
+            .has_fields();
+        if inner_is_bubble {
+            return self.compile_bubble_with_node_capture(req, exit);
+        }
+
         let CaptureRequest {
             inner,
             nav: nav_override,
             capture_effects,
             outer_capture,
         } = req;
-        let inner_is_bubble = self
-            .ctx
-            .type_ctx
-            .expect_pattern_result(inner)
-            .flow
-            .has_fields();
-        if inner_is_bubble {
-            return self.compile_bubble_with_node_capture(
-                inner,
-                exit,
-                nav_override,
-                None,
-                capture_effects,
-                outer_capture,
-            );
-        }
         let combined = outer_capture.with_post_values(capture_effects);
         self.dispatch_pattern(
             inner,

@@ -192,76 +192,41 @@ impl Compiler<'_> {
     /// Compile a node capture that also contains bubbling inner captures.
     ///
     /// `capture_effects` land on the inner match instruction (not an EndStruct step).
-    /// When `scope_type_id` is `None` the inner captures use the already-open outer
-    /// scope (e.g., an array row struct) — no Struct/EndStruct is emitted. When it is
-    /// `Some`, Struct/EndStruct wraps the inner to open a fresh struct scope.
+    /// The inner captures use the already-open outer scope, so no Struct/EndStruct
+    /// wrapper is emitted.
     pub(super) fn compile_bubble_with_node_capture(
         &mut self,
-        inner: &Pattern,
+        req: CaptureRequest<'_>,
         exit: Label,
-        nav_override: Option<Nav>,
-        scope_type_id: Option<TypeId>,
-        capture_effects: Vec<EffectIR>,
-        outer_capture: CaptureEffects,
     ) -> Label {
-        if scope_type_id.is_none() {
-            let actual_exit = if outer_capture.post.is_empty() {
-                exit
-            } else {
-                let outer_step = self.fresh_label();
-                self.instructions.push(
-                    MatchIR::epsilon(outer_step, exit)
-                        .post_effects(outer_capture.post)
-                        .into(),
-                );
-                outer_step
-            };
+        let CaptureRequest {
+            inner,
+            nav,
+            capture_effects,
+            outer_capture,
+        } = req;
 
-            let inner_capture = CaptureEffects::new(outer_capture.pre, capture_effects);
-            return self.dispatch_pattern(
-                inner,
-                ExprCtx {
-                    exit: actual_exit,
-                    nav: nav_override,
-                    capture: inner_capture,
-                },
+        let actual_exit = if outer_capture.post.is_empty() {
+            exit
+        } else {
+            let outer_step = self.fresh_label();
+            self.instructions.push(
+                MatchIR::epsilon(outer_step, exit)
+                    .post_effects(outer_capture.post)
+                    .into(),
             );
-        }
+            outer_step
+        };
 
-        // StructClose carries ONLY outer_capture effects (e.g. Push), not capture_effects,
-        // which belong on the inner match instruction.
-        let struct_close_step = self.fresh_label();
-        self.instructions.push(
-            MatchIR::epsilon(struct_close_step, exit)
-                .post_effect(EffectIR::end_struct())
-                .post_effects(outer_capture.post)
-                .into(),
-        );
-
-        // pre effects don't propagate through a StructOpen/StructClose scope wrapper.
-        let inner_capture = CaptureEffects::new_post(capture_effects);
-        let inner_entry = self.with_scope(
-            scope_type_id.expect("scope_type_id is Some after the early return on None above"),
-            |this| {
-                this.dispatch_pattern(
-                    inner,
-                    ExprCtx {
-                        exit: struct_close_step,
-                        nav: nav_override,
-                        capture: inner_capture,
-                    },
-                )
+        let inner_capture = CaptureEffects::new(outer_capture.pre, capture_effects);
+        self.dispatch_pattern(
+            inner,
+            ExprCtx {
+                exit: actual_exit,
+                nav,
+                capture: inner_capture,
             },
-        );
-
-        let struct_step = self.fresh_label();
-        self.instructions.push(
-            MatchIR::epsilon(struct_step, inner_entry)
-                .pre_effect(EffectIR::start_struct())
-                .into(),
-        );
-
-        struct_step
+        )
     }
 
     /// Compile an expression with Struct/EndStruct wrapping for array iteration.
