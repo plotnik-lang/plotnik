@@ -22,11 +22,10 @@
 use arborium_tree_sitter::Node;
 
 use crate::bytecode::{
-    EffectKind, Instruction, LineBuilder, Match, Module, Nav, NodeKindConstraint, PREAMBLE_NAME,
-    PredicateOp, SECTION_ALIGN, STEP_SIZE, Symbol, cols, format_effect, nav_symbol, trace,
-    truncate_text, width_for_count,
+    EffectKind, Instruction, LineBuilder, Match, Module, ModuleRenderContext, Nav, PREAMBLE_NAME,
+    SECTION_ALIGN, STEP_SIZE, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
 };
-use crate::core::{Colors, NodeFieldId, NodeKindId};
+use crate::core::{Colors, NodeFieldId};
 
 use super::effect::RuntimeEffect;
 
@@ -152,19 +151,12 @@ impl Tracer for NoopTracer {
     fn trace_enter_preamble(&mut self) {}
 }
 
-use std::collections::BTreeMap;
-
 pub struct PrintTracer<'s> {
     pub(crate) source: &'s [u8],
     pub(crate) verbosity: Verbosity,
     pub(crate) lines: Vec<String>,
     pub(crate) builder: LineBuilder,
-    pub(crate) node_kind_names: BTreeMap<NodeKindId, String>,
-    pub(crate) node_field_names: BTreeMap<NodeFieldId, String>,
-    pub(crate) member_names: Vec<String>,
-    pub(crate) all_strings: Vec<String>,
-    pub(crate) regex_patterns: Vec<String>,
-    pub(crate) entrypoint_by_ip: BTreeMap<u16, String>,
+    pub(crate) render: ModuleRenderContext,
     /// Parallel stack of checkpoint creation IPs (for backtrack display).
     pub(crate) checkpoint_creation_ips: Vec<u16>,
     pub(crate) call_stack: Vec<String>,
@@ -206,51 +198,6 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
     /// Build the PrintTracer.
     pub fn build(self) -> PrintTracer<'s> {
         let header = self.module.header();
-        let strings = self.module.strings();
-        let regexes = self.module.regexes();
-        let types = self.module.types();
-        let node_kinds = self.module.node_kinds();
-        let node_fields = self.module.node_fields();
-        let entrypoints = self.module.entrypoints();
-
-        let mut node_kind_names = BTreeMap::new();
-        for t in node_kinds.iter() {
-            node_kind_names.insert(
-                NodeKindId::try_from(t.symbol).expect("node kind id must be non-zero"),
-                strings.get(t.name).to_string(),
-            );
-        }
-
-        let mut node_field_names = BTreeMap::new();
-        for f in node_fields.iter() {
-            node_field_names.insert(
-                NodeFieldId::try_from(f.symbol).expect("node field id must be non-zero"),
-                strings.get(f.name).to_string(),
-            );
-        }
-
-        let member_names: Vec<String> = types
-            .members()
-            .map(|member| strings.get(member.name_id).to_string())
-            .collect();
-
-        // Same index space as dump.rs — must stay aligned with StringTable layout.
-        let all_strings: Vec<String> = (0..header.str_table_count as usize)
-            .map(|i| strings.at(i).to_string())
-            .collect();
-
-        // Index 0 is reserved in RegexTable, so seed with a placeholder.
-        let mut regex_patterns = vec![String::new()];
-        for i in 1..header.regex_table_count as usize {
-            let string_id = regexes.pattern_string_id(i);
-            regex_patterns.push(strings.get(string_id).to_string());
-        }
-
-        let mut entrypoint_by_ip = BTreeMap::new();
-        for e in entrypoints.iter() {
-            entrypoint_by_ip.insert(u16::from(e.target()), strings.get(e.name()).to_string());
-        }
-
         let step_width = width_for_count(header.transitions_count as usize);
 
         PrintTracer {
@@ -258,12 +205,7 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
             verbosity: self.verbosity,
             lines: Vec::new(),
             builder: LineBuilder::new(step_width),
-            node_kind_names,
-            node_field_names,
-            member_names,
-            all_strings,
-            regex_patterns,
-            entrypoint_by_ip,
+            render: ModuleRenderContext::new(self.module),
             checkpoint_creation_ips: Vec::new(),
             call_stack: Vec::new(),
             deferred_return_ip: None,
@@ -274,28 +216,68 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
     }
 }
 
+enum TraceEffect {
+    Node,
+    ArrayOpen,
+    Push,
+    ArrayClose,
+    StructOpen,
+    StructClose,
+    Set(u16),
+    EnumOpen(u16),
+    EnumClose,
+    Null,
+}
+
+impl TraceEffect {
+    fn from_runtime(effect: &RuntimeEffect<'_>) -> Self {
+        match effect {
+            RuntimeEffect::Node(_) => Self::Node,
+            RuntimeEffect::ArrayOpen => Self::ArrayOpen,
+            RuntimeEffect::Push => Self::Push,
+            RuntimeEffect::ArrayClose => Self::ArrayClose,
+            RuntimeEffect::StructOpen => Self::StructOpen,
+            RuntimeEffect::StructClose => Self::StructClose,
+            RuntimeEffect::Set(idx) => Self::Set(*idx),
+            RuntimeEffect::EnumOpen(idx) => Self::EnumOpen(*idx),
+            RuntimeEffect::EnumClose => Self::EnumClose,
+            RuntimeEffect::Null => Self::Null,
+        }
+    }
+
+    fn from_opcode(opcode: EffectKind, payload: usize) -> Self {
+        match opcode {
+            EffectKind::Node => Self::Node,
+            EffectKind::ArrayOpen => Self::ArrayOpen,
+            EffectKind::Push => Self::Push,
+            EffectKind::ArrayClose => Self::ArrayClose,
+            EffectKind::StructOpen => Self::StructOpen,
+            EffectKind::StructClose => Self::StructClose,
+            EffectKind::Set => Self::Set(payload as u16),
+            EffectKind::EnumOpen => Self::EnumOpen(payload as u16),
+            EffectKind::EnumClose => Self::EnumClose,
+            EffectKind::Null => Self::Null,
+            EffectKind::SuppressBegin | EffectKind::SuppressEnd => unreachable!(),
+        }
+    }
+}
+
 impl<'s> PrintTracer<'s> {
     /// Create a builder for PrintTracer.
     pub fn builder<'m>(source: &'s str, module: &'m Module) -> PrintTracerBuilder<'s, 'm> {
         PrintTracerBuilder::new(source, module)
     }
 
-    fn node_kind_name(&self, id: NodeKindId) -> &str {
-        self.node_kind_names.get(&id).map_or("?", |s| s.as_str())
-    }
-
     fn node_field_name(&self, id: NodeFieldId) -> &str {
-        self.node_field_names.get(&id).map_or("?", |s| s.as_str())
+        self.render.node_field_name(id).unwrap_or("?")
     }
 
     fn member_name(&self, idx: u16) -> &str {
-        self.member_names
-            .get(idx as usize)
-            .map_or("?", |s| s.as_str())
+        self.render.member_name(idx).unwrap_or("?")
     }
 
     fn entrypoint_name(&self, ip: u16) -> &str {
-        self.entrypoint_by_ip.get(&ip).map_or("?", |s| s.as_str())
+        self.render.entrypoint_name(ip).unwrap_or("?")
     }
 
     /// Format kind without text content.
@@ -335,115 +317,37 @@ impl<'s> PrintTracer<'s> {
         }
     }
 
-    fn format_effect(&self, effect: &RuntimeEffect<'_>) -> String {
-        use RuntimeEffect::*;
+    fn format_effect(&self, effect: TraceEffect) -> String {
         match effect {
-            Node(_) => "Node".to_string(),
-            ArrayOpen => "ArrayOpen".to_string(),
-            Push => "Push".to_string(),
-            ArrayClose => "ArrayClose".to_string(),
-            StructOpen => "StructOpen".to_string(),
-            StructClose => "StructClose".to_string(),
-            Set(idx) => format!("Set \"{}\"", self.member_name(*idx)),
-            EnumOpen(idx) => format!("EnumOpen \"{}\"", self.member_name(*idx)),
-            EnumClose => "EnumClose".to_string(),
-            Null => "Null".to_string(),
+            TraceEffect::Node => "Node".to_string(),
+            TraceEffect::ArrayOpen => "ArrayOpen".to_string(),
+            TraceEffect::Push => "Push".to_string(),
+            TraceEffect::ArrayClose => "ArrayClose".to_string(),
+            TraceEffect::StructOpen => "StructOpen".to_string(),
+            TraceEffect::StructClose => "StructClose".to_string(),
+            TraceEffect::Set(idx) => format!("Set \"{}\"", self.member_name(idx)),
+            TraceEffect::EnumOpen(idx) => format!("EnumOpen \"{}\"", self.member_name(idx)),
+            TraceEffect::EnumClose => "EnumClose".to_string(),
+            TraceEffect::Null => "Null".to_string(),
         }
     }
 
-    fn format_effect_from_opcode(&self, opcode: EffectKind, payload: usize) -> String {
-        use EffectKind::*;
-        match opcode {
-            Node => "Node".to_string(),
-            ArrayOpen => "ArrayOpen".to_string(),
-            Push => "Push".to_string(),
-            ArrayClose => "ArrayClose".to_string(),
-            StructOpen => "StructOpen".to_string(),
-            StructClose => "StructClose".to_string(),
-            Set => format!("Set \"{}\"", self.member_name(payload as u16)),
-            EnumOpen => format!("EnumOpen \"{}\"", self.member_name(payload as u16)),
-            EnumClose => "EnumClose".to_string(),
-            Null => "Null".to_string(),
-            SuppressBegin | SuppressEnd => unreachable!(),
-        }
+    fn trace_match_result(&mut self, symbol: Symbol, node: Node<'_>) {
+        let kind = node.kind();
+        let content = if self.verbosity == Verbosity::Default {
+            self.format_kind_simple(kind, node.is_named())
+        } else {
+            let text = node.utf8_text(self.source).unwrap_or("?");
+            self.format_kind_with_text(kind, text, node.is_named())
+        };
+        self.add_subline(symbol, &content);
     }
 
     /// Format match content for instruction line (matches dump format exactly).
     ///
     /// Order: [pre-effects] -neg_fields field: (type) predicate [post-effects]
     fn format_match_content(&self, m: &Match<'_>) -> String {
-        let mut parts = Vec::new();
-
-        let pre: Vec<_> = m.pre_effects().map(|e| format_effect(&e)).collect();
-        if !pre.is_empty() {
-            parts.push(format!("[{}]", pre.join(" ")));
-        }
-
-        // Skip neg_fields and node pattern for epsilon (no node interaction)
-        if !m.is_epsilon() {
-            for field_id in m.neg_fields() {
-                let name = self.node_field_name(field_id);
-                parts.push(format!("-{name}"));
-            }
-
-            let node_part = self.format_node_pattern(m);
-            if !node_part.is_empty() {
-                parts.push(node_part);
-            }
-
-            if let Some(predicate) = m.predicate() {
-                let op = PredicateOp::from_byte(predicate.op);
-                let value = if predicate.is_regex {
-                    let pattern = &self.regex_patterns[predicate.value_ref as usize];
-                    format!("/{}/", pattern)
-                } else {
-                    let s = &self.all_strings[predicate.value_ref as usize];
-                    format!("{:?}", s)
-                };
-                parts.push(format!("{} {}", op.as_str(), value));
-            }
-        }
-
-        let post: Vec<_> = m.post_effects().map(|e| format_effect(&e)).collect();
-        if !post.is_empty() {
-            parts.push(format!("[{}]", post.join(" ")));
-        }
-
-        parts.join(" ")
-    }
-
-    /// Format node pattern: `field: (type)` or `(type)` or `field: _` or `"text"` or empty.
-    fn format_node_pattern(&self, m: &Match<'_>) -> String {
-        let mut result = String::new();
-
-        if let Some(f) = m.node_field {
-            result.push_str(self.node_field_name(f));
-            result.push_str(": ");
-        }
-
-        match m.node_kind {
-            NodeKindConstraint::Any => {
-                result.push('_');
-            }
-            NodeKindConstraint::Named(None) => {
-                result.push_str("(_)");
-            }
-            NodeKindConstraint::Named(Some(t)) => {
-                result.push('(');
-                result.push_str(self.node_kind_name(t));
-                result.push(')');
-            }
-            NodeKindConstraint::Anonymous(None) => {
-                result.push_str("\"_\"");
-            }
-            NodeKindConstraint::Anonymous(Some(t)) => {
-                result.push('"');
-                result.push_str(self.node_kind_name(t));
-                result.push('"');
-            }
-        }
-
-        result
+        self.render.trace_match_content(m)
     }
 
     pub fn print(&self) {
@@ -596,29 +500,11 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_match_success(&mut self, node: Node<'_>) {
-        let kind = node.kind();
-
-        if self.verbosity != Verbosity::Default {
-            let text = node.utf8_text(self.source).unwrap_or("?");
-            let content = self.format_kind_with_text(kind, text, node.is_named());
-            self.add_subline(trace::MATCH_SUCCESS, &content);
-        } else {
-            let content = self.format_kind_simple(kind, node.is_named());
-            self.add_subline(trace::MATCH_SUCCESS, &content);
-        }
+        self.trace_match_result(trace::MATCH_SUCCESS, node);
     }
 
     fn trace_match_failure(&mut self, node: Node<'_>) {
-        let kind = node.kind();
-
-        if self.verbosity != Verbosity::Default {
-            let text = node.utf8_text(self.source).unwrap_or("?");
-            let content = self.format_kind_with_text(kind, text, node.is_named());
-            self.add_subline(trace::MATCH_FAILURE, &content);
-        } else {
-            let content = self.format_kind_simple(kind, node.is_named());
-            self.add_subline(trace::MATCH_FAILURE, &content);
-        }
+        self.trace_match_result(trace::MATCH_FAILURE, node);
     }
 
     fn trace_field_success(&mut self, field_id: NodeFieldId) {
@@ -639,7 +525,7 @@ impl Tracer for PrintTracer<'_> {
             return;
         }
 
-        let effect_str = self.format_effect(effect);
+        let effect_str = self.format_effect(TraceEffect::from_runtime(effect));
         self.add_subline(trace::EFFECT, &effect_str);
     }
 
@@ -648,7 +534,7 @@ impl Tracer for PrintTracer<'_> {
             return;
         }
 
-        let effect_str = self.format_effect_from_opcode(opcode, payload);
+        let effect_str = self.format_effect(TraceEffect::from_opcode(opcode, payload));
         self.add_subline(trace::EFFECT_SUPPRESSED, &effect_str);
     }
 

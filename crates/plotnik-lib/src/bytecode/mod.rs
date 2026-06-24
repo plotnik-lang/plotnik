@@ -19,6 +19,7 @@ mod module;
 mod nav;
 mod node_kind_constraint;
 mod predicate_op;
+mod render;
 mod sections;
 mod type_meta;
 pub mod type_system;
@@ -37,8 +38,7 @@ pub(crate) use constants::{
 pub(crate) use dfa::deserialize_dfa;
 pub(crate) use effects::{Effect, EffectKind};
 pub(crate) use format::{
-    LineBuilder, PREAMBLE_NAME, Symbol, cols, format_effect, nav_symbol, trace, truncate_text,
-    width_for_count,
+    LineBuilder, PREAMBLE_NAME, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
 };
 pub(crate) use header::Header;
 pub(crate) use ids::StringId;
@@ -49,6 +49,7 @@ pub(crate) use module::{EntrypointsView, Instruction, StringsView, TypesView};
 pub(crate) use nav::Nav;
 pub(crate) use node_kind_constraint::NodeKindConstraint;
 pub(crate) use predicate_op::PredicateOp;
+pub(crate) use render::ModuleRenderContext;
 pub(crate) use sections::{FieldEntry, NodeKindEntry, SymbolNameEntry};
 pub(crate) use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
 

@@ -6,17 +6,15 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use crate::bytecode::StepAddr;
-use crate::bytecode::predicate_op::PredicateOp;
-use crate::core::{Colors, NodeFieldId, NodeKindId};
+use crate::core::Colors;
 
-use super::format::{
-    LineBuilder, PREAMBLE_NAME, Symbol, format_effect, nav_symbol, width_for_count,
-};
+use super::format::{LineBuilder, PREAMBLE_NAME, Symbol, nav_symbol, width_for_count};
 use super::ids::TypeId;
 use super::instructions::StepId;
 use super::module::{Instruction, Module};
 use super::nav::Nav;
 use super::node_kind_constraint::NodeKindConstraint;
+use super::render::ModuleRenderContext;
 use super::type_meta::{TypeDefKind, TypeKind};
 use super::{Call, Match, Return, Trampoline};
 use crate::bytecode::type_system::TYPE_CUSTOM_START;
@@ -41,12 +39,8 @@ pub fn dump(module: &Module, colors: Colors) -> String {
 struct DumpContext {
     /// Maps step ID to entrypoint name for labeling.
     step_labels: BTreeMap<u16, String>,
-    /// Maps node kind ID to name.
-    node_kind_names: BTreeMap<NodeKindId, String>,
-    /// Maps node field ID to name.
-    node_field_names: BTreeMap<NodeFieldId, String>,
-    /// All strings (for predicate values, regex patterns, etc).
-    all_strings: Vec<String>,
+    /// Shared symbol/string decoding and match rendering.
+    render: ModuleRenderContext,
     /// Width for string indices (S#).
     str_width: usize,
     /// Width for type indices (T#).
@@ -66,8 +60,6 @@ impl DumpContext {
         let header = module.header();
         let strings = module.strings();
         let entrypoints = module.entrypoints();
-        let node_kinds = module.node_kinds();
-        let node_fields = module.node_fields();
 
         let mut step_labels = BTreeMap::new();
         // Preamble always at step 0 (first in layout)
@@ -77,22 +69,7 @@ impl DumpContext {
             step_labels.insert(u16::from(ep.target()), name);
         }
 
-        let mut node_kind_names = BTreeMap::new();
-        for t in node_kinds.iter() {
-            if let Ok(id) = NodeKindId::try_from(t.symbol) {
-                node_kind_names.insert(id, strings.get(t.name).to_string());
-            }
-        }
-
-        let mut node_field_names = BTreeMap::new();
-        for f in node_fields.iter() {
-            if let Ok(id) = NodeFieldId::try_from(f.symbol) {
-                node_field_names.insert(id, strings.get(f.name).to_string());
-            }
-        }
-
         let str_count = header.str_table_count as usize;
-        let all_strings: Vec<String> = (0..str_count).map(|i| strings.at(i).to_string()).collect();
 
         let types = module.types();
         // Builtins precede custom types; widen for both.
@@ -105,9 +82,7 @@ impl DumpContext {
 
         Self {
             step_labels,
-            node_kind_names,
-            node_field_names,
-            all_strings,
+            render: ModuleRenderContext::new(module),
             str_width,
             type_width,
             member_width,
@@ -119,14 +94,6 @@ impl DumpContext {
 
     fn label_for(&self, step: StepId) -> Option<&str> {
         self.step_labels.get(&u16::from(step)).map(|s| s.as_str())
-    }
-
-    fn node_kind_name(&self, id: NodeKindId) -> Option<&str> {
-        self.node_kind_names.get(&id).map(|s| s.as_str())
-    }
-
-    fn node_field_name(&self, id: NodeFieldId) -> Option<&str> {
-        self.node_field_names.get(&id).map(|s| s.as_str())
     }
 }
 
@@ -159,7 +126,7 @@ fn dump_regexes(out: &mut String, module: &Module, ctx: &DumpContext) {
     writeln!(out, "{}[regex]{}", c.blue, c.reset).expect("writing to a String is infallible");
     for i in 1..count {
         let string_id = regexes.pattern_string_id(i);
-        let pattern = &ctx.all_strings[u16::from(string_id) as usize];
+        let pattern = ctx.render.string(u16::from(string_id) as usize);
         writeln!(out, "R{i:0w$} {}/{pattern}/{}", c.green, c.reset)
             .expect("writing to a String is infallible");
     }
@@ -373,7 +340,6 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     let header = module.header();
     let transitions_count = header.transitions_count as usize;
     let fmt = DumpFormatter {
-        module,
         ctx,
         step_width: ctx.step_width,
     };
@@ -412,10 +378,9 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     }
 }
 
-/// Bundles the module, precomputed context, and step-index width threaded
-/// through every per-instruction formatting routine.
+/// Bundles the precomputed context and step-index width threaded through every
+/// per-instruction formatting routine.
 struct DumpFormatter<'a> {
-    module: &'a Module,
     ctx: &'a DumpContext,
     step_width: usize,
 }
@@ -457,100 +422,7 @@ impl DumpFormatter<'_> {
     }
 
     fn format_match_content(&self, m: &Match) -> String {
-        let ctx = self.ctx;
-        let mut parts = Vec::new();
-
-        let pre: Vec<_> = m.pre_effects().map(|e| format_effect(&e)).collect();
-        if !pre.is_empty() {
-            parts.push(format!("[{}]", pre.join(" ")));
-        }
-
-        // Skip neg_fields and node pattern for epsilon (no node interaction)
-        if !m.is_epsilon() {
-            for field_id in m.neg_fields() {
-                let name = ctx
-                    .node_field_name(field_id)
-                    .map(String::from)
-                    .unwrap_or_else(|| format!("field#{field_id}"));
-                parts.push(format!("-{name}"));
-            }
-
-            let node_part = self.format_node_pattern(m);
-            if !node_part.is_empty() {
-                parts.push(node_part);
-            }
-
-            if let Some(predicate) = m.predicate() {
-                let op = PredicateOp::from_byte(predicate.op);
-                let value = if predicate.is_regex {
-                    let string_id = self
-                        .module
-                        .regexes()
-                        .pattern_string_id(predicate.value_ref as usize);
-                    let pattern = &ctx.all_strings[u16::from(string_id) as usize];
-                    format!("/{}/", pattern)
-                } else {
-                    let s = &ctx.all_strings[predicate.value_ref as usize];
-                    format!("{:?}", s)
-                };
-                parts.push(format!("{} {}", op.as_str(), value));
-            }
-        }
-
-        let post: Vec<_> = m.post_effects().map(|e| format_effect(&e)).collect();
-        if !post.is_empty() {
-            parts.push(format!("[{}]", post.join(" ")));
-        }
-
-        parts.join(" ")
-    }
-
-    /// Format node pattern: `field: (type)` or `(type)` or `field: _` or `(_)` or `"text"`
-    fn format_node_pattern(&self, m: &Match) -> String {
-        let ctx = self.ctx;
-        let mut result = String::new();
-
-        if let Some(field_id) = m.node_field {
-            let name = ctx
-                .node_field_name(field_id)
-                .map(String::from)
-                .unwrap_or_else(|| format!("field#{field_id}"));
-            result.push_str(&name);
-            result.push_str(": ");
-        }
-
-        match m.node_kind {
-            NodeKindConstraint::Any => {
-                result.push('_');
-            }
-            NodeKindConstraint::Named(None) => {
-                result.push_str("(_)");
-            }
-            NodeKindConstraint::Named(Some(type_id)) => {
-                let name = ctx
-                    .node_kind_name(type_id)
-                    .map(String::from)
-                    .unwrap_or_else(|| format!("node#{type_id}"));
-                result.push('(');
-                result.push_str(&name);
-                result.push(')');
-            }
-            NodeKindConstraint::Anonymous(None) => {
-                // future syntax: anonymous wildcard has no concrete form yet
-                result.push_str("\"_\"");
-            }
-            NodeKindConstraint::Anonymous(Some(type_id)) => {
-                let name = ctx
-                    .node_kind_name(type_id)
-                    .map(String::from)
-                    .unwrap_or_else(|| format!("anon#{type_id}"));
-                result.push('"');
-                result.push_str(&name);
-                result.push('"');
-            }
-        }
-
-        result
+        self.ctx.render.dump_match_content(m)
     }
 
     fn format_match_successors(&self, m: &Match) -> String {
@@ -572,11 +444,7 @@ impl DumpFormatter<'_> {
 
         // Format field constraint if present
         let field_part = if let Some(field_id) = call.node_field {
-            let name = self
-                .ctx
-                .node_field_name(field_id)
-                .map(String::from)
-                .unwrap_or_else(|| format!("field#{field_id}"));
+            let name = self.ctx.render.dump_node_field_name(field_id);
             format!("{name}: ")
         } else {
             String::new()
