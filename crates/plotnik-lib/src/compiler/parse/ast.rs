@@ -13,7 +13,6 @@
 //! `SymbolTable<'q>`), use [`token_src`] instead of `token.text()`.
 
 use crate::compiler::parse::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
-use crate::compiler::analyze::types::type_shape::QuantifierKind;
 use rowan::TextRange;
 
 /// Extracts token text with source lifetime.
@@ -243,18 +242,51 @@ pub fn classify_alt(node: &SyntaxNode) -> AltKind {
     }
 }
 
-pub(crate) use crate::bytecode::PredicateOp;
+/// Syntactic predicate operator parsed from `(node OP value)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PredicateOperator {
+    Eq,
+    Ne,
+    StartsWith,
+    EndsWith,
+    Contains,
+    RegexMatch,
+    RegexNoMatch,
+}
 
-fn predicate_op_from_syntax_kind(kind: SyntaxKind) -> Option<PredicateOp> {
+impl PredicateOperator {
+    pub fn is_regex_op(self) -> bool {
+        matches!(self, Self::RegexMatch | Self::RegexNoMatch)
+    }
+}
+
+fn predicate_op_from_syntax_kind(kind: SyntaxKind) -> Option<PredicateOperator> {
     match kind {
-        SyntaxKind::OpEq => Some(PredicateOp::Eq),
-        SyntaxKind::OpNe => Some(PredicateOp::Ne),
-        SyntaxKind::OpStartsWith => Some(PredicateOp::StartsWith),
-        SyntaxKind::OpEndsWith => Some(PredicateOp::EndsWith),
-        SyntaxKind::OpContains => Some(PredicateOp::Contains),
-        SyntaxKind::OpRegexMatch => Some(PredicateOp::RegexMatch),
-        SyntaxKind::OpRegexNoMatch => Some(PredicateOp::RegexNoMatch),
+        SyntaxKind::OpEq => Some(PredicateOperator::Eq),
+        SyntaxKind::OpNe => Some(PredicateOperator::Ne),
+        SyntaxKind::OpStartsWith => Some(PredicateOperator::StartsWith),
+        SyntaxKind::OpEndsWith => Some(PredicateOperator::EndsWith),
+        SyntaxKind::OpContains => Some(PredicateOperator::Contains),
+        SyntaxKind::OpRegexMatch => Some(PredicateOperator::RegexMatch),
+        SyntaxKind::OpRegexNoMatch => Some(PredicateOperator::RegexNoMatch),
         _ => None,
+    }
+}
+
+/// Syntactic quantifier arity parsed from `?`, `*`, `+`, and non-greedy twins.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum QuantifierKind {
+    /// `?` or `??` - zero or one.
+    Optional,
+    /// `*` or `*?` - zero or more.
+    ZeroOrMore,
+    /// `+` or `+?` - one or more.
+    OneOrMore,
+}
+
+impl QuantifierKind {
+    pub fn is_non_empty(self) -> bool {
+        matches!(self, Self::OneOrMore)
     }
 }
 
@@ -342,7 +374,7 @@ impl NodePredicate {
         find_token(&self.0, |k| predicate_op_from_syntax_kind(k).is_some())
     }
 
-    pub fn operator(&self) -> Option<PredicateOp> {
+    pub fn operator(&self) -> Option<PredicateOperator> {
         self.operator_token()
             .and_then(|t| predicate_op_from_syntax_kind(t.kind()))
     }

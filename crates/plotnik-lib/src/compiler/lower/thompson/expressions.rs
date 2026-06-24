@@ -9,7 +9,7 @@
 
 use std::num::NonZeroU16;
 
-use crate::bytecode::Nav;
+use crate::bytecode::{Nav, PredicateOp};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::lower::ir::{
     EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
@@ -698,7 +698,7 @@ impl Compiler<'_> {
     /// Returns `Some(PredicateIR)` if the node has a valid predicate, `None` otherwise.
     pub(super) fn compile_predicate(&mut self, node: &ast::NodePattern) -> Option<PredicateIR> {
         let pred = node.predicate()?;
-        let op = pred.operator()?;
+        let op = lower_predicate_op(pred.operator()?);
 
         if let Some(str_token) = pred.string_value() {
             return Some(PredicateIR::string(op, str_token.text()));
@@ -713,5 +713,17 @@ impl Compiler<'_> {
         }
 
         None
+    }
+}
+
+fn lower_predicate_op(op: ast::PredicateOperator) -> PredicateOp {
+    match op {
+        ast::PredicateOperator::Eq => PredicateOp::Eq,
+        ast::PredicateOperator::Ne => PredicateOp::Ne,
+        ast::PredicateOperator::StartsWith => PredicateOp::StartsWith,
+        ast::PredicateOperator::EndsWith => PredicateOp::EndsWith,
+        ast::PredicateOperator::Contains => PredicateOp::Contains,
+        ast::PredicateOperator::RegexMatch => PredicateOp::RegexMatch,
+        ast::PredicateOperator::RegexNoMatch => PredicateOp::RegexNoMatch,
     }
 }

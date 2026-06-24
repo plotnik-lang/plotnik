@@ -11,9 +11,9 @@ pub use crate::compiler::ids::TypeId;
 use crate::compiler::ids::DefId;
 use crate::core::Symbol;
 
-// Re-export shared type system components
+pub use crate::bytecode::type_system::Arity;
 use crate::bytecode::type_system::PrimitiveType;
-pub use crate::bytecode::type_system::{Arity, QuantifierKind};
+pub use crate::compiler::parse::ast::QuantifierKind;
 
 pub const TYPE_VOID: TypeId = TypeId(PrimitiveType::Void.index() as u32);
 pub const TYPE_NODE: TypeId = TypeId(PrimitiveType::Node.index() as u32);

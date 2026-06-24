@@ -33,6 +33,8 @@ mod grammar;
 mod invariants;
 
 #[cfg(test)]
+mod ast_quantifier_tests;
+#[cfg(test)]
 mod cst_tests;
 #[cfg(test)]
 mod lexer_fixture_tests;

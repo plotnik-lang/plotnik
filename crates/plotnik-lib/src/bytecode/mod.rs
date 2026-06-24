@@ -12,7 +12,7 @@ mod predicate_op;
 pub mod type_system;
 
 pub use bytecode::{EncodeError, Entrypoint, Module, ModuleError, TypeId, dump};
-pub use type_system::{Arity, PrimitiveType, QuantifierKind, TypeKind};
+pub use type_system::{Arity, PrimitiveType, TypeKind};
 
 pub(crate) use bytecode::{
     Call, Effect, EffectKind, EntrypointsView, FieldEntry, HEADER_SIZE, Header, Instruction,
