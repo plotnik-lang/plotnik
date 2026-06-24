@@ -50,6 +50,11 @@ enum QuantifiedCaptureMode {
     RowCapture,
 }
 
+struct CaptureInner {
+    info: PatternResult,
+    makes_field_optional: bool,
+}
+
 impl<'a, 'd> InferVisitor<'a, 'd> {
     pub fn new(ctx: InferCtx<'a, 'd>) -> Self {
         Self { ctx }
@@ -377,7 +382,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let inner = cap.wrap(inner);
 
         // Determine how inner flow relates to capture (e.g., ? makes field optional)
-        let (inner_info, is_optional) = self.resolve_capture_inner(&inner);
+        let captured_inner = self.resolve_capture_inner(&inner);
+        let inner_info = captured_inner.info;
 
         // Only the `Node` mechanism captures the matched node and lets the inner's
         // fields bubble up alongside (e.g. `(named (child) @c) @cap`). Every other
@@ -393,7 +399,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             && matches!(&inner_info.flow, OutputFlow::Fields(_));
 
         let base = self.captured_base_type(inner.node(), &inner_info, should_merge_fields);
-        let field_info = self.captured_field_info(base, annotation, is_optional);
+        let field_info =
+            self.captured_field_info(base, annotation, captured_inner.makes_field_optional);
         let flow =
             self.captured_field_flow(capture_name, field_info, &inner_info, should_merge_fields);
 
@@ -492,21 +499,26 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     /// Logic for how quantifier on the inner expression affects the capture field.
-    /// Returns (Info, is_optional).
-    fn resolve_capture_inner(&mut self, inner: &Located<Pattern>) -> (PatternResult, bool) {
+    fn resolve_capture_inner(&mut self, inner: &Located<Pattern>) -> CaptureInner {
         if let Pattern::QuantifiedPattern(q) = inner.node() {
             let quantifier = self.quantifier_kind(q);
             match quantifier {
                 // * or + acts as row capture here (skipping strict dimensionality)
-                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => (
-                    self.infer_quantified_pattern_as_row(&inner.wrap(q.clone())),
-                    false,
-                ),
+                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureInner {
+                    info: self.infer_quantified_pattern_as_row(&inner.wrap(q.clone())),
+                    makes_field_optional: false,
+                },
                 // ? makes the resulting capture field optional
-                QuantifierKind::Optional => (self.infer_pattern(inner), true),
+                QuantifierKind::Optional => CaptureInner {
+                    info: self.infer_pattern(inner),
+                    makes_field_optional: true,
+                },
             }
         } else {
-            (self.infer_pattern(inner), false)
+            CaptureInner {
+                info: self.infer_pattern(inner),
+                makes_field_optional: false,
+            }
         }
     }
 
