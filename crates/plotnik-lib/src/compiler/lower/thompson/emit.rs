@@ -90,17 +90,7 @@ impl Compiler<'_> {
             .flat_map(|set_eff| [EffectIR::null(), set_eff.clone()])
             .collect();
 
-        if null_effects.is_empty() {
-            return exit;
-        }
-
-        let null_step = self.fresh_label();
-        self.instructions.push(
-            MatchIR::epsilon(null_step, exit)
-                .post_effects(null_effects)
-                .into(),
-        );
-        null_step
+        self.emit_effects_if_nonempty(exit, null_effects)
     }
 
     /// Emit null effects for internal captures when skipping an optional/star pattern.
@@ -126,11 +116,15 @@ impl Compiler<'_> {
             }
         }
 
-        if null_effects.is_empty() {
+        self.emit_effects_if_nonempty(exit, null_effects)
+    }
+
+    fn emit_effects_if_nonempty(&mut self, exit: Label, effects: Vec<EffectIR>) -> Label {
+        if effects.is_empty() {
             return exit;
         }
 
-        self.emit_effects_epsilon(exit, null_effects, CaptureEffects::default())
+        self.emit_effects_epsilon(exit, effects, CaptureEffects::default())
     }
 
     /// Cascading for bytecode limits is handled by the lowering pass.
