@@ -6,6 +6,7 @@ use std::fmt::Write;
 use indexmap::IndexSet;
 use rowan::NodeOrToken;
 
+use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::types::type_check::Arity;
 use crate::compiler::parse::{self as ast, SyntaxNode};
 use crate::compiler::source::{SourceKind, SourceMap};
@@ -135,7 +136,7 @@ impl<'q> QueryPrinter<'q> {
 
         for name in symbols.names() {
             let mut visited = IndexSet::new();
-            self.format_symbol_tree(name, 0, &defined, &body_nodes, &mut visited, w)?;
+            self.format_symbol_tree(name, symbols, 0, &defined, &body_nodes, &mut visited, w)?;
         }
         Ok(())
     }
@@ -143,10 +144,11 @@ impl<'q> QueryPrinter<'q> {
     fn format_symbol_tree(
         &self,
         name: &str,
+        symbols: &SymbolTable,
         depth: usize,
-        defined: &indexmap::IndexSet<&str>,
-        body_nodes: &std::collections::HashMap<String, SyntaxNode>,
-        visited: &mut indexmap::IndexSet<String>,
+        defined: &IndexSet<&str>,
+        body_nodes: &HashMap<String, SyntaxNode>,
+        visited: &mut IndexSet<String>,
         w: &mut impl Write,
     ) -> std::fmt::Result {
         let prefix = indent(depth);
@@ -169,16 +171,12 @@ impl<'q> QueryPrinter<'q> {
         writeln!(w, "{}{}{}", prefix, name, arity)?;
         visited.insert(name.to_string());
 
-        let analysis = self
-            .query
-            .analysis()
-            .expect("symbol formatting only recurses after analysis exists");
-        if let Some(body) = analysis.symbol_table.body(name) {
+        if let Some(body) = symbols.body(name) {
             let refs_set = crate::compiler::analyze::refs::collect::ref_names(body);
             let mut refs: Vec<_> = refs_set.iter().map(|s| s.as_str()).collect();
             refs.sort();
             for r in refs {
-                self.format_symbol_tree(r, depth + 1, defined, body_nodes, visited, w)?;
+                self.format_symbol_tree(r, symbols, depth + 1, defined, body_nodes, visited, w)?;
             }
         }
 
