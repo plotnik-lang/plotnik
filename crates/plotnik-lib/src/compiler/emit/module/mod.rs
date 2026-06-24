@@ -100,22 +100,22 @@ pub fn write_module(
     // Header → StringBlob → RegexBlob → StringTable → RegexTable →
     // NodeTypes → NodeFields → TypeDefs → TypeMembers → TypeNames →
     // Entrypoints → Transitions
-    let mut output = vec![0u8; HEADER_SIZE]; // Reserve header space
+    let mut writer = SectionWriter::new();
 
-    emit_section(&mut output, &str_blob);
-    emit_section(&mut output, &regex_blob);
-    emit_section(&mut output, &str_table);
-    emit_section(&mut output, &regex_table);
-    emit_section(&mut output, &node_types_bytes);
-    emit_section(&mut output, &node_fields_bytes);
-    emit_section(&mut output, &type_defs_bytes);
-    emit_section(&mut output, &type_members_bytes);
-    emit_section(&mut output, &type_names_bytes);
-    emit_section(&mut output, &entrypoints_bytes);
-    emit_section(&mut output, transitions);
+    writer.emit_section(&str_blob);
+    writer.emit_section(&regex_blob);
+    writer.emit_section(&str_table);
+    writer.emit_section(&regex_table);
+    writer.emit_section(&node_types_bytes);
+    writer.emit_section(&node_fields_bytes);
+    writer.emit_section(&type_defs_bytes);
+    writer.emit_section(&type_members_bytes);
+    writer.emit_section(&type_names_bytes);
+    writer.emit_section(&entrypoints_bytes);
+    writer.emit_section(transitions);
 
-    pad_to_section(&mut output);
-    let total_size = output.len() as u32;
+    writer.finish_sections();
+    let total_size = writer.len() as u32;
 
     let mut header = Header {
         str_table_count: pool.string_count() as u16,
@@ -132,24 +132,58 @@ pub fn write_module(
         total_size,
         ..Default::default()
     };
-    header.checksum = crc32fast::hash(&output[HEADER_SIZE..]);
-    output[..HEADER_SIZE].copy_from_slice(&header.to_bytes());
+    header.checksum = crc32fast::hash(writer.body());
+    writer.write_header(&header);
 
-    output
+    writer.into_vec()
 }
 
-/// Pad a buffer to the section alignment boundary.
-fn pad_to_section(buf: &mut Vec<u8>) {
-    let rem = buf.len() % SECTION_ALIGN;
-    if rem != 0 {
-        let padding = SECTION_ALIGN - rem;
-        buf.resize(buf.len() + padding, 0);
+struct SectionWriter {
+    output: Vec<u8>,
+}
+
+impl SectionWriter {
+    fn new() -> Self {
+        Self {
+            output: vec![0u8; HEADER_SIZE],
+        }
     }
-}
 
-fn emit_section(output: &mut Vec<u8>, data: &[u8]) {
-    pad_to_section(output);
-    output.extend_from_slice(data);
+    fn emit_section(&mut self, data: &[u8]) {
+        self.pad_to_section();
+        self.output.extend_from_slice(data);
+    }
+
+    fn finish_sections(&mut self) {
+        self.pad_to_section();
+    }
+
+    fn len(&self) -> usize {
+        self.output.len()
+    }
+
+    fn body(&self) -> &[u8] {
+        &self.output[HEADER_SIZE..]
+    }
+
+    fn write_header(&mut self, header: &Header) {
+        self.output[..HEADER_SIZE].copy_from_slice(&header.to_bytes());
+    }
+
+    fn into_vec(self) -> Vec<u8> {
+        self.output
+    }
+
+    /// Pad a buffer to the section alignment boundary.
+    fn pad_to_section(&mut self) {
+        let rem = self.output.len() % SECTION_ALIGN;
+        if rem == 0 {
+            return;
+        }
+
+        let padding = SECTION_ALIGN - rem;
+        self.output.resize(self.output.len() + padding, 0);
+    }
 }
 
 fn emit_node_kinds(symbols: &[NodeKindEntry]) -> Vec<u8> {
