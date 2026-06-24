@@ -31,6 +31,26 @@ fn range_to_text_range(range: Range<usize>) -> TextRange {
     TextRange::new((range.start as u32).into(), (range.end as u32).into())
 }
 
+struct Lexeme<'q> {
+    text: &'q str,
+    span: Range<usize>,
+}
+
+impl<'q> Lexeme<'q> {
+    fn new(source: &'q str, span: Range<usize>) -> Self {
+        let text = &source[span.clone()];
+        Self { text, span }
+    }
+
+    fn start(&self) -> usize {
+        self.span.start
+    }
+
+    fn end(&self) -> usize {
+        self.span.end
+    }
+}
+
 /// Tokenizes source into a vector of span-based tokens.
 ///
 /// Post-processes the Logos output:
@@ -62,15 +82,18 @@ pub fn lex(source: &str) -> Vec<Token> {
                         tokens.push(Token::new(SyntaxKind::Garbage, range_to_text_range(span)));
                     }
                     SyntaxKind::StringLiteral => {
-                        split_string_literal(source, span, &mut tokens);
+                        split_string_literal(Lexeme::new(source, span), &mut tokens);
                     }
                     SyntaxKind::RegexPredicateMatch => {
-                        split_regex_predicate(source, span, SyntaxKind::OpRegexMatch, &mut tokens);
+                        split_regex_predicate(
+                            Lexeme::new(source, span),
+                            SyntaxKind::OpRegexMatch,
+                            &mut tokens,
+                        );
                     }
                     SyntaxKind::RegexPredicateNoMatch => {
                         split_regex_predicate(
-                            source,
-                            span,
+                            Lexeme::new(source, span),
                             SyntaxKind::OpRegexNoMatch,
                             &mut tokens,
                         );
@@ -101,9 +124,9 @@ pub fn lex(source: &str) -> Vec<Token> {
 }
 
 /// Splits a string literal token into: quote + content + quote
-fn split_string_literal(source: &str, span: Range<usize>, tokens: &mut Vec<Token>) {
-    let text = &source[span.start..span.end];
-    let quote_char = text
+fn split_string_literal(lexeme: Lexeme<'_>, tokens: &mut Vec<Token>) {
+    let quote_char = lexeme
+        .text
         .chars()
         .next()
         .expect("StringLiteral always begins with a quote char");
@@ -113,8 +136,8 @@ fn split_string_literal(source: &str, span: Range<usize>, tokens: &mut Vec<Token
         SyntaxKind::SingleQuote
     };
 
-    let start = span.start;
-    let end = span.end;
+    let start = lexeme.start();
+    let end = lexeme.end();
 
     tokens.push(Token::new(
         quote_kind,
@@ -135,19 +158,13 @@ fn split_string_literal(source: &str, span: Range<usize>, tokens: &mut Vec<Token
 ///
 /// Input: `=~ /pattern/` or `!~ /pattern/`
 /// Output: `OpRegexMatch`/`OpRegexNoMatch` + `Whitespace`? + `RegexLiteral`
-fn split_regex_predicate(
-    source: &str,
-    span: Range<usize>,
-    op_kind: SyntaxKind,
-    tokens: &mut Vec<Token>,
-) {
-    let start = span.start;
-    let end = span.end;
-    let text = &source[start..end];
+fn split_regex_predicate(lexeme: Lexeme<'_>, op_kind: SyntaxKind, tokens: &mut Vec<Token>) {
+    let start = lexeme.start();
+    let end = lexeme.end();
 
     tokens.push(Token::new(op_kind, range_to_text_range(start..start + 2)));
 
-    let regex_start_in_text = text[2..]
+    let regex_start_in_text = lexeme.text[2..]
         .find('/')
         .expect("regex predicate always contains '/' after the 2-char operator")
         + 2;
