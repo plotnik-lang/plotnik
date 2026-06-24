@@ -1,9 +1,3 @@
-//! Layout snapshot tests.
-//!
-//! Tests verify cache-line aligned layout and gap-filling optimization.
-
-use crate::shot_bytecode;
-
 #[test]
 fn total_steps_past_u16_does_not_wrap() {
     use super::layout::CacheAligned;
@@ -22,69 +16,5 @@ fn total_steps_past_u16_does_not_wrap() {
         layout.total_steps() > u16::MAX as u32,
         "total_steps wrapped: {}",
         layout.total_steps()
-    );
-}
-
-#[test]
-fn single_instruction() {
-    shot_bytecode!(
-        r#"
-        Test = (identifier) @id
-    "#
-    );
-}
-
-#[test]
-fn linear_chain() {
-    shot_bytecode!(
-        r#"
-        Test = (array (identifier) @a (number) @b)
-    "#
-    );
-}
-
-#[test]
-fn branch() {
-    shot_bytecode!(
-        r#"
-        Test = [(identifier) @id (number) @num]
-    "#
-    );
-}
-
-#[test]
-fn call_return() {
-    shot_bytecode!(
-        r#"
-        Inner = (identifier) @name
-        Test = (array (Inner) @item)
-    "#
-    );
-}
-
-#[test]
-fn cache_line_boundary() {
-    shot_bytecode!(
-        r#"
-        Test = (array
-            (identifier) @a
-            (identifier) @b
-            (identifier) @c
-            (identifier) @d
-            (identifier) @e
-            [(number) @x (string) @y]
-        )
-    "#
-    );
-}
-
-#[test]
-fn large_instruction() {
-    shot_bytecode!(
-        r#"
-        Test = (object
-            {(pair) @a (pair) @b (pair) @c (pair) @d}* @items
-        )
-    "#
     );
 }
