@@ -6,6 +6,11 @@ use crate::bytecode::{TypeDefKind, TypeId, TypeKind};
 
 use super::Emitter;
 
+struct TypeDependencyGraph {
+    deps: HashMap<TypeId, HashSet<TypeId>>,
+    rdeps: HashMap<TypeId, HashSet<TypeId>>,
+}
+
 impl Emitter<'_> {
     pub(super) fn mark_node_reachable(&mut self) {
         for i in 0..self.entrypoints.len() {
@@ -51,22 +56,7 @@ impl Emitter<'_> {
     }
 
     pub(super) fn sort_topologically(&self, types: HashSet<TypeId>) -> Vec<TypeId> {
-        let mut deps: HashMap<TypeId, HashSet<TypeId>> = HashMap::new();
-        let mut rdeps: HashMap<TypeId, HashSet<TypeId>> = HashMap::new();
-
-        for &tid in &types {
-            deps.entry(tid).or_default();
-            rdeps.entry(tid).or_default();
-        }
-
-        for &tid in &types {
-            for dep in self.direct_type_deps(tid) {
-                if types.contains(&dep) && dep != tid {
-                    deps.entry(tid).or_default().insert(dep);
-                    rdeps.entry(dep).or_default().insert(tid);
-                }
-            }
-        }
+        let TypeDependencyGraph { mut deps, rdeps } = self.type_dependency_graph(&types);
 
         // Kahn's algorithm. Ready types are kept in a max-heap keyed by raw id
         // (TypeId is not Ord) so each step deterministically takes the largest
@@ -94,6 +84,27 @@ impl Emitter<'_> {
         }
 
         result
+    }
+
+    fn type_dependency_graph(&self, types: &HashSet<TypeId>) -> TypeDependencyGraph {
+        let mut deps: HashMap<TypeId, HashSet<TypeId>> = HashMap::new();
+        let mut rdeps: HashMap<TypeId, HashSet<TypeId>> = HashMap::new();
+
+        for &tid in types {
+            deps.entry(tid).or_default();
+            rdeps.entry(tid).or_default();
+        }
+
+        for &tid in types {
+            for dep in self.direct_type_deps(tid) {
+                if types.contains(&dep) && dep != tid {
+                    deps.entry(tid).or_default().insert(dep);
+                    rdeps.entry(dep).or_default().insert(tid);
+                }
+            }
+        }
+
+        TypeDependencyGraph { deps, rdeps }
     }
 
     pub(super) fn collect_emit_set(&self, type_id: TypeId, out: &mut HashSet<TypeId>) {
