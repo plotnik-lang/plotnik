@@ -178,18 +178,14 @@ impl Compiler<'_> {
             nav: nav_override,
             capture,
         } = ctx;
-        let Some(name_token) = r.name() else {
-            return exit;
-        };
+        let name_token = r.name().expect("validated reference must have a name");
         let name = name_token.text();
 
-        let Some(def_id) = self
+        let def_id = self
             .ctx
             .dependency_analysis
             .def_id_for_name(self.ctx.interner, name)
-        else {
-            return exit;
-        };
+            .expect("analyzed reference must resolve to a definition");
 
         // Inside the trust boundary: `def_id_for_name` only yields DefIds for
         // symbol-table definitions, and `assert_all_definitions_processed` makes
@@ -265,9 +261,9 @@ impl Compiler<'_> {
             nav: nav_override,
             capture,
         } = ctx;
-        let Some(value) = field.value() else {
-            return exit;
-        };
+        let value = field
+            .value()
+            .expect("validated field pattern must have a value");
 
         let node_field = self.resolve_field(field);
 
