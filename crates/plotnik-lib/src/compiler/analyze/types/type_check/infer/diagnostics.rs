@@ -71,8 +71,7 @@ impl InferVisitor<'_, '_> {
     }
 
     /// Strict-dimensionality check 2: internal captures require a row capture on
-    /// the quantifier. Skipped when the quantifier already sits under a row
-    /// capture (see `infer_quantified_pattern_as_row`).
+    /// the quantifier. Skipped when inference runs in row-capture mode.
     pub(super) fn check_internal_capture_dimensionality(
         &mut self,
         source: SourceId,

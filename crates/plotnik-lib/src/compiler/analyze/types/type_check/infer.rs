@@ -44,6 +44,12 @@ pub struct InferVisitor<'a, 'd> {
     ctx: InferCtx<'a, 'd>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum QuantifiedCaptureMode {
+    Bare,
+    RowCapture,
+}
+
 impl<'a, 'd> InferVisitor<'a, 'd> {
     pub fn new(ctx: InferCtx<'a, 'd>) -> Self {
         Self { ctx }
@@ -540,37 +546,20 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     fn infer_quantified_pattern(&mut self, quant: &Located<QuantifiedPattern>) -> PatternResult {
-        let Some(inner) = quant.node().inner() else {
-            return PatternResult::void();
-        };
-        let inner = quant.wrap(inner);
-
-        let inner_info = self.infer_pattern(&inner);
-        let quantifier = self.quantifier_kind(quant.node());
-
-        let flow = match quantifier {
-            QuantifierKind::Optional => self.make_flow_optional(inner_info.flow),
-            QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                // A bare quantifier must satisfy both strict-dimensionality checks:
-                // multi-element scalars short-circuit, otherwise internal captures
-                // require a row capture this expression doesn't have.
-                if !self.check_multi_element_scalar(quant.source(), quant.node(), &inner_info) {
-                    self.check_internal_capture_dimensionality(
-                        quant.source(),
-                        quant.node(),
-                        &inner_info,
-                    );
-                }
-                self.make_flow_array(inner_info.flow, inner.node(), quantifier.is_non_empty())
-            }
-        };
-
-        PatternResult::new(inner_info.arity, flow)
+        self.infer_quantified_pattern_in(quant, QuantifiedCaptureMode::Bare)
     }
 
     fn infer_quantified_pattern_as_row(
         &mut self,
         quant: &Located<QuantifiedPattern>,
+    ) -> PatternResult {
+        self.infer_quantified_pattern_in(quant, QuantifiedCaptureMode::RowCapture)
+    }
+
+    fn infer_quantified_pattern_in(
+        &mut self,
+        quant: &Located<QuantifiedPattern>,
+        capture_mode: QuantifiedCaptureMode,
     ) -> PatternResult {
         let Some(inner) = quant.node().inner() else {
             return PatternResult::void();
@@ -583,15 +572,34 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let flow = match quantifier {
             QuantifierKind::Optional => self.make_flow_optional(inner_info.flow),
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                // The surrounding row capture supplies the missing dimension, so only
-                // the multi-element scalar check still applies; internal captures are
-                // legal here.
-                self.check_multi_element_scalar(quant.source(), quant.node(), &inner_info);
+                self.check_quantified_array_dimensionality(
+                    quant.source(),
+                    quant.node(),
+                    &inner_info,
+                    capture_mode,
+                );
                 self.make_flow_array(inner_info.flow, inner.node(), quantifier.is_non_empty())
             }
         };
 
         PatternResult::new(inner_info.arity, flow)
+    }
+
+    fn check_quantified_array_dimensionality(
+        &mut self,
+        source: SourceId,
+        quant: &QuantifiedPattern,
+        inner_info: &PatternResult,
+        capture_mode: QuantifiedCaptureMode,
+    ) {
+        let reported_scalar = self.check_multi_element_scalar(source, quant, inner_info);
+        if reported_scalar {
+            return;
+        }
+
+        if capture_mode == QuantifiedCaptureMode::Bare {
+            self.check_internal_capture_dimensionality(source, quant, inner_info);
+        }
     }
 
     fn make_flow_optional(&mut self, flow: OutputFlow) -> OutputFlow {
