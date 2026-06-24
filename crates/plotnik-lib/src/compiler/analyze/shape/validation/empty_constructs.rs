@@ -3,8 +3,8 @@
 //! Bans empty trees `()`, empty sequences `{}`, and empty alternations `[]`.
 
 use super::ValidationInput;
-use crate::compiler::core::Located;
-use crate::compiler::core::visitor::{
+use crate::compiler::analyze::Located;
+use crate::compiler::analyze::visitor::{
     Visitor, walk_node_pattern, walk_seq_pattern, walk_union_pattern,
 };
 use crate::compiler::core::{NodePattern, SeqPattern, UnionPattern};

@@ -10,10 +10,10 @@ use regex_syntax::hir;
 use rowan::TextRange;
 
 use super::PredicateInput;
-use crate::compiler::core::Located;
+use crate::compiler::analyze::Located;
 use crate::compiler::core::NodePattern;
 use crate::compiler::core::source::SourceId;
-use crate::compiler::core::visitor::{Visitor, walk_node_pattern};
+use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern};
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 
 pub fn validate_predicates(input: PredicateInput) {

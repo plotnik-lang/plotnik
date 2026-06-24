@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 
 use crate::compiler::core::ast;
-use crate::compiler::core::located::Located;
+use crate::compiler::analyze::located::Located;
 use crate::compiler::core::source::SourceId;
 
 /// Name-resolution registry: every named definition bound to its body AST and the

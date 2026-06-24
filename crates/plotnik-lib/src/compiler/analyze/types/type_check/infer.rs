@@ -19,7 +19,7 @@ use super::types::{
 use super::unify::{UnifyError, unify_flows};
 
 use crate::compiler::core::DependencyAnalysis;
-use crate::compiler::core::Located;
+use crate::compiler::analyze::Located;
 use crate::compiler::core::SymbolTable;
 use crate::compiler::core::source::SourceId;
 use crate::compiler::core::{

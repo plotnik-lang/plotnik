@@ -14,9 +14,9 @@ use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 use crate::compiler::diagnostics::diagnostics::Diagnostics;
 
 use crate::compiler::analyze::shape::validation::ValidatedAst;
-use crate::compiler::core::Located;
+use crate::compiler::analyze::Located;
 use crate::compiler::core::source::SourceId;
-use crate::compiler::core::visitor::Visitor;
+use crate::compiler::analyze::visitor::Visitor;
 
 pub use crate::compiler::core::SymbolTable;
 

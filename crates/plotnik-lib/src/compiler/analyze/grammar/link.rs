@@ -42,12 +42,12 @@ impl GrammarBindingBuilder {
 }
 
 use super::utils::find_similar;
-use crate::compiler::core::Located;
+use crate::compiler::analyze::Located;
 use crate::compiler::core::Root;
 use crate::compiler::core::SymbolTable;
 use crate::compiler::core::ast::{self, NodePattern, Pattern};
 use crate::compiler::core::source::{SourceId, SourceMap};
-use crate::compiler::core::visitor::{Visitor, walk};
+use crate::compiler::analyze::visitor::{Visitor, walk};
 use crate::compiler::core::{SyntaxKind, SyntaxToken, token_src};
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics, Span};
 
@@ -1111,7 +1111,7 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
                 .resolve_field_by_token(node.source(), neg.name());
         }
 
-        crate::compiler::core::visitor::walk_node_pattern(self, node);
+        crate::compiler::analyze::visitor::walk_node_pattern(self, node);
     }
 
     fn visit_token_pattern(&mut self, node: &Located<ast::TokenPattern>) {
@@ -1154,6 +1154,6 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
     fn visit_field_pattern(&mut self, field: &Located<ast::FieldPattern>) {
         self.linker
             .resolve_field_by_token(field.source(), field.node().name());
-        crate::compiler::core::visitor::walk_field_pattern(self, field);
+        crate::compiler::analyze::visitor::walk_field_pattern(self, field);
     }
 }

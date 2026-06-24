@@ -7,9 +7,9 @@
 //! This validation ensures anchors are placed where they can be meaningfully compiled.
 
 use super::ValidationInput;
-use crate::compiler::core::Located;
+use crate::compiler::analyze::Located;
 use crate::compiler::core::source::SourceId;
-use crate::compiler::core::visitor::{Visitor, walk_node_pattern, walk_seq_pattern};
+use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_seq_pattern};
 use crate::compiler::core::{NodePattern, SeqItem, SeqPattern};
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 

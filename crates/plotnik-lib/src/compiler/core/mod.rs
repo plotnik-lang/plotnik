@@ -5,13 +5,11 @@ pub(crate) mod capture_mechanism;
 pub(crate) mod cst;
 pub(crate) mod dependency_analysis;
 pub(crate) mod grammar_binding;
-pub(crate) mod located;
 pub(crate) mod source;
 pub(crate) mod span;
 pub(crate) mod symbol_table;
 pub(crate) mod type_analysis;
 pub(crate) mod type_shape;
-pub(crate) mod visitor;
 
 #[cfg(test)]
 mod cst_tests;
@@ -26,7 +24,6 @@ pub use capture_mechanism::CaptureMechanism;
 pub use cst::{SyntaxKind, SyntaxToken};
 pub use dependency_analysis::DependencyAnalysis;
 pub use grammar_binding::GrammarBinding;
-pub use located::Located;
 pub use span::Span;
 pub use symbol_table::SymbolTable;
 pub use type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
