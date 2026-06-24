@@ -11,10 +11,10 @@ use rowan::TextRange;
 
 use super::PredicateInput;
 use crate::compiler::analyze::Located;
-use crate::compiler::parse::ast::NodePattern;
-use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern};
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::parse::ast::NodePattern;
 
 pub fn validate_predicates(input: PredicateInput) {
     let PredicateInput {
@@ -25,6 +25,7 @@ pub fn validate_predicates(input: PredicateInput) {
     } = input;
     let mut validator = PredicateValidator {
         diag,
+        source_id,
         source: source_content,
     };
     validator.visit(&Located::new(source_id, ast.clone()));
@@ -32,7 +33,24 @@ pub fn validate_predicates(input: PredicateInput) {
 
 struct PredicateValidator<'q, 'd> {
     diag: &'d mut Diagnostics,
+    source_id: SourceId,
     source: &'q str,
+}
+
+#[derive(Clone, Copy)]
+struct RegexLiteral<'q> {
+    pattern: &'q str,
+    range: TextRange,
+}
+
+impl RegexLiteral<'_> {
+    fn map_span(self, regex_span: &ast::Span) -> TextRange {
+        // `range` includes the `/` delimiters, so content starts at +1.
+        let content_start = u32::from(self.range.start()) + 1;
+        let start = content_start + regex_span.start.offset as u32;
+        let end = content_start + regex_span.end.offset as u32;
+        TextRange::new(start.into(), end.into())
+    }
 }
 
 impl Visitor for PredicateValidator<'_, '_> {
@@ -42,21 +60,20 @@ impl Visitor for PredicateValidator<'_, '_> {
             && op.is_regex_op()
             && let Some(regex) = pred.regex()
         {
-            self.validate_regex(
-                node.source(),
-                regex.pattern(self.source),
-                regex.text_range(),
-            );
+            self.validate_regex(RegexLiteral {
+                pattern: regex.pattern(self.source),
+                range: regex.text_range(),
+            });
         }
         walk_node_pattern(self, node);
     }
 }
 
 impl PredicateValidator<'_, '_> {
-    fn validate_regex(&mut self, source_id: SourceId, pattern: &str, regex_range: TextRange) {
-        if pattern.is_empty() {
+    fn validate_regex(&mut self, regex: RegexLiteral<'_>) {
+        if regex.pattern.is_empty() {
             self.diag
-                .report(source_id, DiagnosticKind::EmptyRegex, regex_range)
+                .report(self.source_id, DiagnosticKind::EmptyRegex, regex.range)
                 .emit();
             return;
         }
@@ -65,16 +82,16 @@ impl PredicateValidator<'_, '_> {
         let parser_result = ast::parse::ParserBuilder::new()
             .octal(false)
             .build()
-            .parse(pattern);
+            .parse(regex.pattern);
 
         let parsed_ast = match parser_result {
             Ok(ast) => ast,
             Err(e) => {
-                let span = self.map_regex_span(e.span(), regex_range);
+                let span = regex.map_span(e.span());
                 let report = match e.kind() {
                     ast::ErrorKind::UnsupportedBackreference => {
                         self.diag
-                            .report(source_id, DiagnosticKind::RegexBackreference, span)
+                            .report(self.source_id, DiagnosticKind::RegexBackreference, span)
                     }
                     ast::ErrorKind::UnsupportedLookAround => {
                         // Skip the opening `(` - point at `?=` / `?!` / `?<=` / `?<!`
@@ -82,11 +99,11 @@ impl PredicateValidator<'_, '_> {
                         let adjusted =
                             TextRange::new(span.start() + TextSize::from(1u32), span.end());
                         self.diag
-                            .report(source_id, DiagnosticKind::RegexLookaround, adjusted)
+                            .report(self.source_id, DiagnosticKind::RegexLookaround, adjusted)
                     }
                     _ => self
                         .diag
-                        .report(source_id, DiagnosticKind::RegexSyntaxError, span)
+                        .report(self.source_id, DiagnosticKind::RegexSyntaxError, span)
                         .detail(format!("{}", e.kind())),
                 };
                 report.emit();
@@ -100,43 +117,29 @@ impl PredicateValidator<'_, '_> {
         let detector = visit(&parsed_ast, detector).unwrap();
 
         for capture_span in detector.named_captures {
-            let span = self.map_regex_span(&capture_span, regex_range);
+            let span = regex.map_span(&capture_span);
             // The span covers `?P<name>` / `?<name>` (the `(` is excluded), so deleting it
             // turns `(?P<name>foo)` into a plain group `(foo)`.
             self.diag
-                .report(source_id, DiagnosticKind::RegexNamedCapture, span)
+                .report(self.source_id, DiagnosticKind::RegexNamedCapture, span)
                 .fix("remove the named-capture marker", "")
                 .emit();
         }
 
-        self.validate_hir(source_id, pattern, &parsed_ast, regex_range);
+        self.validate_hir(regex, &parsed_ast);
     }
 
-    fn validate_hir(
-        &mut self,
-        source_id: SourceId,
-        pattern: &str,
-        parsed_ast: &Ast,
-        regex_range: TextRange,
-    ) {
+    fn validate_hir(&mut self, regex: RegexLiteral<'_>, parsed_ast: &Ast) {
         let mut translator = hir::translate::TranslatorBuilder::new().build();
-        let Err(error) = translator.translate(pattern, parsed_ast) else {
+        let Err(error) = translator.translate(regex.pattern, parsed_ast) else {
             return;
         };
 
-        let span = self.map_regex_span(error.span(), regex_range);
+        let span = regex.map_span(error.span());
         self.diag
-            .report(source_id, DiagnosticKind::RegexSyntaxError, span)
+            .report(self.source_id, DiagnosticKind::RegexSyntaxError, span)
             .detail(error.kind().to_string())
             .emit();
-    }
-
-    fn map_regex_span(&self, regex_span: &ast::Span, regex_range: TextRange) -> TextRange {
-        // regex_range includes the `/` delimiters, so content starts at +1
-        let content_start = u32::from(regex_range.start()) + 1;
-        let start = content_start + regex_span.start.offset as u32;
-        let end = content_start + regex_span.end.offset as u32;
-        TextRange::new(start.into(), end.into())
     }
 }
 
