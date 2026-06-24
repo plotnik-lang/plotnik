@@ -50,10 +50,10 @@ impl TypeAnalysis {
         deps: &DependencyAnalysis,
         interner: &Interner,
     ) -> CaptureMechanism {
-        self.capture_mechanism_with_mode(inner, deps, interner, CaptureLookupMode::Admitted)
+        self.classify(inner, deps, interner, CaptureLookupMode::Admitted)
     }
 
-    fn capture_mechanism_with_mode(
+    fn classify(
         &self,
         inner: &Pattern,
         deps: &DependencyAnalysis,
@@ -65,28 +65,19 @@ impl TypeAnalysis {
         let pattern = unwrap_field(inner);
 
         if let Pattern::QuantifiedPattern(quant) = &pattern {
-            let kind = match mode {
-                CaptureLookupMode::Admitted => quant
-                    .quantifier_kind()
-                    .expect("admitted quantified pattern must have a quantifier operator"),
-                CaptureLookupMode::InProgress => quant
-                    .quantifier_kind()
-                    .unwrap_or(QuantifierKind::ZeroOrMore),
-            };
+            let kind = mode.quantifier_kind(quant);
             return match kind {
                 // `*` / `+` collect into an array regardless of element shape.
                 QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureMechanism::Array,
                 // `?` only adds optionality; the value mechanism is the inner's.
                 QuantifierKind::Optional => {
                     let Some(inner) = quant.inner() else {
-                        return match mode {
-                            CaptureLookupMode::Admitted => {
-                                panic!("admitted optional quantifier must have an inner pattern")
-                            }
-                            CaptureLookupMode::InProgress => CaptureMechanism::Node,
-                        };
+                        return mode.recover(
+                            "admitted optional quantifier must have an inner pattern",
+                            CaptureMechanism::Node,
+                        );
                     };
-                    self.capture_mechanism_with_mode(&inner, deps, interner, mode)
+                    self.classify(&inner, deps, interner, mode)
                 }
             };
         }
@@ -94,7 +85,7 @@ impl TypeAnalysis {
         // A reference whose definition returns a structured type: the call site does
         // its own Call/Return (and Struct/EndStruct) scoping. A reference to a node/void
         // definition falls through to `Node` — its matched node is captured directly.
-        if self.ref_returns_structured_with_mode(&pattern, deps, interner, mode) {
+        if self.ref_structured(&pattern, deps, interner, mode) {
             return CaptureMechanism::Ref;
         }
 
@@ -105,12 +96,8 @@ impl TypeAnalysis {
 
         // Everything else is decided by the inner's inferred data flow, so the type
         // and the emitted effects can't disagree.
-        let flow = match mode {
-            CaptureLookupMode::Admitted => &self.expect_pattern_result(&pattern).flow,
-            CaptureLookupMode::InProgress => match self.pattern_result(&pattern) {
-                Some(info) => &info.flow,
-                None => return CaptureMechanism::Node,
-            },
+        let Some(flow) = mode.pattern_flow(self, &pattern) else {
+            return CaptureMechanism::Node;
         };
 
         match flow {
@@ -144,10 +131,10 @@ impl TypeAnalysis {
         deps: &DependencyAnalysis,
         interner: &Interner,
     ) -> bool {
-        self.ref_returns_structured_with_mode(pattern, deps, interner, CaptureLookupMode::Admitted)
+        self.ref_structured(pattern, deps, interner, CaptureLookupMode::Admitted)
     }
 
-    fn ref_returns_structured_with_mode(
+    fn ref_structured(
         &self,
         pattern: &Pattern,
         deps: &DependencyAnalysis,
@@ -157,32 +144,16 @@ impl TypeAnalysis {
         let Pattern::Ref(r) = pattern else {
             return false;
         };
-        let name = match r.name() {
-            Some(name) => name,
-            None => {
-                return match mode {
-                    CaptureLookupMode::Admitted => {
-                        panic!("admitted reference pattern must have a name")
-                    }
-                    CaptureLookupMode::InProgress => false,
-                };
-            }
+        let Some(name) = r.name() else {
+            return mode.recover("admitted reference pattern must have a name", false);
         };
-        let def_id = match deps.def_id_for_name(interner, name.text()) {
-            Some(def_id) => def_id,
-            None => {
-                return match mode {
-                    CaptureLookupMode::Admitted => {
-                        panic!("admitted reference must resolve to a definition")
-                    }
-                    CaptureLookupMode::InProgress => false,
-                };
-            }
+        let Some(def_id) = deps.def_id_for_name(interner, name.text()) else {
+            return mode.recover("admitted reference must resolve to a definition", false);
         };
 
         // After inference the definition's registered output type is authoritative;
         // this is the path emission always takes.
-        if matches!(mode, CaptureLookupMode::Admitted) {
+        if mode.is_admitted() {
             let output_type = self.expect_def_output(def_id);
             return matches!(
                 self.expect_type_shape(output_type),
@@ -221,12 +192,8 @@ impl InProgressTypeAnalysis<'_> {
         deps: &DependencyAnalysis,
         interner: &Interner,
     ) -> CaptureMechanism {
-        self.analysis.capture_mechanism_with_mode(
-            inner,
-            deps,
-            interner,
-            CaptureLookupMode::InProgress,
-        )
+        self.analysis
+            .classify(inner, deps, interner, CaptureLookupMode::InProgress)
     }
 }
 
@@ -234,6 +201,44 @@ impl InProgressTypeAnalysis<'_> {
 enum CaptureLookupMode {
     Admitted,
     InProgress,
+}
+
+impl CaptureLookupMode {
+    fn is_admitted(self) -> bool {
+        matches!(self, Self::Admitted)
+    }
+
+    fn recover<T>(self, message: &str, fallback: T) -> T {
+        match self {
+            Self::Admitted => panic!("{message}"),
+            Self::InProgress => fallback,
+        }
+    }
+
+    fn quantifier_kind(
+        self,
+        quant: &crate::compiler::parse::ast::QuantifiedPattern,
+    ) -> QuantifierKind {
+        match self {
+            Self::Admitted => quant
+                .quantifier_kind()
+                .expect("admitted quantified pattern must have a quantifier operator"),
+            Self::InProgress => quant
+                .quantifier_kind()
+                .unwrap_or(QuantifierKind::ZeroOrMore),
+        }
+    }
+
+    fn pattern_flow<'a>(
+        self,
+        analysis: &'a TypeAnalysis,
+        pattern: &Pattern,
+    ) -> Option<&'a OutputFlow> {
+        match self {
+            Self::Admitted => Some(&analysis.expect_pattern_result(pattern).flow),
+            Self::InProgress => analysis.pattern_result(pattern).map(|info| &info.flow),
+        }
+    }
 }
 
 /// Look through a `field: x` wrapper to the value it constrains.
