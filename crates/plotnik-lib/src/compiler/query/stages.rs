@@ -6,8 +6,8 @@ use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
 use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate_ast};
-use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
 use crate::compiler::analyze::types::check_entrypoints;
+use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
 use crate::compiler::emit::tables::{EmitError, EmitInput};
 use crate::compiler::lower::{LowerInput, lower_to_nfa};
 use crate::compiler::parse::{
@@ -128,6 +128,7 @@ impl QueryParsed {
             &dependency_analysis,
             validated.ast_map(),
             &symbol_table,
+            &interner,
             &mut self.diag,
         );
 
@@ -444,7 +445,6 @@ impl CompiledQuery {
         self.module()
             .map(|module| crate::compiler::typegen::typescript::emit(module, config))
     }
-
 }
 
 impl LinkOutcome {

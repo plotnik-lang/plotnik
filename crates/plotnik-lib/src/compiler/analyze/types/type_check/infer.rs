@@ -8,13 +8,13 @@ use std::collections::BTreeMap;
 use crate::core::{Interner, Symbol};
 use rowan::TextRange;
 
+use super::unify::unify_flows;
 use crate::compiler::analyze::types::capture_kind::CaptureKind;
 use crate::compiler::analyze::types::type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
 use crate::compiler::analyze::types::type_shape::{
     Arity, FieldInfo, PatternFlow, PatternShape, QuantifierKind, TYPE_NODE, TYPE_VOID, TypeId,
     TypeShape,
 };
-use super::unify::unify_flows;
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
@@ -400,8 +400,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             self.ctx.dependency_analysis,
             self.ctx.interner,
         );
-        let should_merge_fields = mechanism == CaptureKind::Node
-            && matches!(&inner_info.flow, PatternFlow::Fields(_));
+        let should_merge_fields =
+            mechanism == CaptureKind::Node && matches!(&inner_info.flow, PatternFlow::Fields(_));
 
         let base = self.captured_base_type(inner.node(), &inner_info, should_merge_fields);
         let field_info =
@@ -731,13 +731,14 @@ impl<'a, 'd> InferPass<'a, 'd> {
     /// Process definitions in SCC order (leaves first).
     fn process_sccs(&mut self) {
         for scc in self.analysis.dependency_analysis.sccs() {
-            for def_name in scc {
-                let source_id = self
+            for &def_id in scc {
+                let def_name = self
                     .analysis
-                    .symbol_table
-                    .source_id(def_name)
-                    .expect("SCC definition must exist in the symbol table");
-                self.infer_and_register(def_name, source_id);
+                    .interner
+                    .resolve(self.analysis.dependency_analysis.def_name_sym(def_id))
+                    .to_owned();
+                let source_id = self.analysis.dependency_analysis.def_source_id(def_id);
+                self.infer_and_register(def_id, &def_name, source_id);
             }
         }
     }
@@ -756,7 +757,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
         }
     }
 
-    fn infer_and_register(&mut self, def_name: &str, source_id: SourceId) {
+    fn infer_and_register(&mut self, def_id: DefId, def_name: &str, source_id: SourceId) {
         let body = self
             .analysis
             .symbol_table
@@ -781,13 +782,6 @@ impl<'a, 'd> InferPass<'a, 'd> {
             visitor.infer_pattern(&located_body)
         };
 
-        // DependencyAnalysis assigned every definition a DefId; this lookup is the
-        // identity, the builder only records the inferred type against it.
-        let def_id = self
-            .analysis
-            .dependency_analysis
-            .def_id_for_name(self.analysis.interner, def_name)
-            .expect("an analyzed definition has a DefId");
         self.ctx.record_def_memo(def_id, info.clone());
         let type_id = flow_to_type(&info.flow);
         self.ctx.record_def_output(def_id, type_id);

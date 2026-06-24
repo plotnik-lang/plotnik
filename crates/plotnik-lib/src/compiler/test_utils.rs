@@ -1,7 +1,5 @@
 //! Test utilities.
 
-use std::collections::{HashMap, HashSet};
-
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::core::grammar::{Grammar, raw::RawGrammar};
@@ -12,7 +10,7 @@ pub fn empty_symbol_table() -> SymbolTable {
 }
 
 pub fn empty_dependency_analysis() -> DependencyAnalysis {
-    DependencyAnalysis::new(Vec::new(), HashMap::new(), Vec::new(), HashSet::new())
+    DependencyAnalysis::empty()
 }
 
 pub fn colliding_node_kind_grammar() -> Grammar {

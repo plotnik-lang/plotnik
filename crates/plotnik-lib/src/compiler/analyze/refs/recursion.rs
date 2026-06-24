@@ -14,25 +14,31 @@ use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_pattern
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::diagnostics::source::SourceId;
-use crate::compiler::parse::ast::{Def, NodePattern, Pattern, DefRef, Root, SeqPattern, TokenPattern};
+use crate::compiler::parse::ast::{
+    Def, DefRef, NodePattern, Pattern, Root, SeqPattern, TokenPattern,
+};
+use crate::core::Interner;
 
 pub fn validate_recursion(
     analysis: &DependencyAnalysis,
     ast_map: &IndexMap<SourceId, Root>,
     symbol_table: &SymbolTable,
+    interner: &Interner,
     diag: &mut Diagnostics,
 ) {
     let mut validator = RecursionValidator {
         ast_map,
         symbol_table,
+        interner,
         diag,
     };
-    validator.validate(analysis.sccs());
+    validator.validate(analysis);
 }
 
 struct RecursionValidator<'a, 'd> {
     ast_map: &'a IndexMap<SourceId, Root>,
     symbol_table: &'a SymbolTable,
+    interner: &'a Interner,
     diag: &'d mut Diagnostics,
 }
 
@@ -66,25 +72,29 @@ impl RecursionFlaw {
 }
 
 impl<'a, 'd> RecursionValidator<'a, 'd> {
-    fn validate(&mut self, sccs: &[Vec<String>]) {
-        for scc in sccs {
-            self.validate_scc(scc);
+    fn validate(&mut self, analysis: &DependencyAnalysis) {
+        for scc in analysis.sccs() {
+            let names: Vec<_> = scc
+                .iter()
+                .map(|def_id| self.interner.resolve(analysis.def_name_sym(*def_id)))
+                .collect();
+            self.validate_scc(&names);
         }
     }
 
-    fn validate_scc(&mut self, scc: &[String]) {
+    fn validate_scc(&mut self, scc: &[&str]) {
         if scc.len() == 1 {
-            let name = &scc[0];
+            let name = scc[0];
             let body = self
                 .symbol_table
                 .body(name)
                 .expect("node in SCC must exist in symbol table");
-            if !collect_defined_refs(body, self.symbol_table).contains(name.as_str()) {
+            if !collect_defined_refs(body, self.symbol_table).contains(name) {
                 return;
             }
         }
 
-        let scc_set: IndexSet<&str> = scc.iter().map(String::as_str).collect();
+        let scc_set: IndexSet<&str> = scc.iter().copied().collect();
 
         let has_escape = scc
             .iter()
@@ -111,13 +121,13 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
     /// Finds a cycle within the given set of nodes (SCC).
     fn find_cycle<'b>(
         &self,
-        nodes: &'b [String],
+        nodes: &'b [&'b str],
         domain: &IndexSet<&'b str>,
         kind: RecursionFlaw,
     ) -> Option<Vec<(Span, &'b str)>> {
         let search_mode = kind.search_mode();
         let mut adj = IndexMap::new();
-        for name in nodes {
+        for &name in nodes {
             if let Some((source_id, body)) = self.symbol_table.definition(name) {
                 let neighbors = domain
                     .iter()
@@ -127,15 +137,18 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
                             .map(|range| (*target, Span::new(source_id, range)))
                     })
                     .collect::<Vec<_>>();
-                adj.insert(name.as_str(), neighbors);
+                adj.insert(name, neighbors);
             }
         }
 
-        let node_strs: Vec<&str> = nodes.iter().map(String::as_str).collect();
-        CycleFinder::find(&node_strs, &adj)
+        CycleFinder::find(nodes, &adj)
     }
 
-    fn format_chain(&self, raw_chain: Vec<(Span, &str)>, kind: RecursionFlaw) -> Vec<(Span, String)> {
+    fn format_chain(
+        &self,
+        raw_chain: Vec<(Span, &str)>,
+        kind: RecursionFlaw,
+    ) -> Vec<(Span, String)> {
         if raw_chain.len() == 1 {
             let (span, target) = &raw_chain[0];
             let msg = kind.self_reference_message(target);
@@ -157,7 +170,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
             .collect()
     }
 
-    fn report_cycle(&mut self, kind: DiagnosticKind, scc: &[String], chain: Vec<(Span, String)>) {
+    fn report_cycle(&mut self, kind: DiagnosticKind, scc: &[&str], chain: Vec<(Span, String)>) {
         let primary = chain
             .first()
             .map(|(span, _)| *span)
@@ -182,14 +195,14 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         builder.emit();
     }
 
-    fn find_def_info_containing(&self, scc: &[String], primary: Span) -> Option<(Span, String)> {
+    fn find_def_info_containing(&self, scc: &[&str], primary: Span) -> Option<(Span, String)> {
         // A range is only meaningfully contained by a body in the SAME source: two
         // files' bodies can share numeric offsets, so a source-blind containment
         // test would attribute the cycle to whichever file happens to be checked
         // first. Match the source before comparing offsets.
-        let name = scc.iter().find(|name| {
+        let name = scc.iter().copied().find(|name| {
             self.symbol_table
-                .definition(name.as_str())
+                .definition(name)
                 .is_some_and(|(def_source, body)| {
                     def_source == primary.source && body.text_range().contains_range(primary.range)
                 })

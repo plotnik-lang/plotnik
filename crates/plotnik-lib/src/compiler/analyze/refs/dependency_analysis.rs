@@ -3,6 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::ids::DefId;
 use crate::core::{Interner, Symbol};
 
@@ -14,38 +15,44 @@ pub struct DependencyAnalysis {
     /// - `sccs.last()` depends on everything else.
     /// - Definitions within an SCC are mutually recursive.
     /// - Every definition in the symbol table appears exactly once.
-    sccs: Vec<Vec<String>>,
+    sccs: Vec<Vec<DefId>>,
 
     def_ids_by_sym: HashMap<Symbol, DefId>,
 
-    def_names: Vec<Symbol>,
+    defs: Vec<DefInfo>,
 
     recursive_defs: HashSet<DefId>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(in crate::compiler::analyze::refs) struct DefInfo {
+    pub(in crate::compiler::analyze::refs) name: Symbol,
+    pub(in crate::compiler::analyze::refs) source: SourceId,
+}
+
 impl DependencyAnalysis {
-    pub(in crate::compiler) fn new(
-        sccs: Vec<Vec<String>>,
+    pub(in crate::compiler::analyze::refs) fn new(
+        sccs: Vec<Vec<DefId>>,
         def_ids_by_sym: HashMap<Symbol, DefId>,
-        def_names: Vec<Symbol>,
+        defs: Vec<DefInfo>,
         recursive_defs: HashSet<DefId>,
     ) -> Self {
         assert_eq!(
             sccs.iter().flatten().count(),
-            def_names.len(),
+            defs.len(),
             "every SCC member must correspond to exactly one definition",
         );
         assert_eq!(
             def_ids_by_sym.len(),
-            def_names.len(),
+            defs.len(),
             "every definition name must have exactly one DefId",
         );
 
-        for (index, sym) in def_names.iter().copied().enumerate() {
+        for (index, def) in defs.iter().copied().enumerate() {
             let def_id = def_ids_by_sym
-                .get(&sym)
+                .get(&def.name)
                 .copied()
-                .expect("every def_names entry must be indexed by symbol");
+                .expect("every definition record must be indexed by symbol");
             assert_eq!(
                 def_id.index(),
                 index,
@@ -53,11 +60,17 @@ impl DependencyAnalysis {
             );
         }
 
+        for scc in &sccs {
+            for def_id in scc {
+                assert!(def_id.index() < defs.len(), "SCC DefId must be within defs",);
+            }
+        }
+
         for (sym, def_id) in &def_ids_by_sym {
-            let def_name = def_names
+            let def_name = defs
                 .get(def_id.index())
-                .copied()
-                .expect("DefId index must be within def_names");
+                .map(|def| def.name)
+                .expect("DefId index must be within defs");
             assert_eq!(
                 def_name, *sym,
                 "DefId reverse lookup must point back to its symbol",
@@ -66,17 +79,22 @@ impl DependencyAnalysis {
 
         for def_id in &recursive_defs {
             assert!(
-                def_id.index() < def_names.len(),
-                "recursive DefId must be within def_names",
+                def_id.index() < defs.len(),
+                "recursive DefId must be within defs",
             );
         }
 
         Self {
             sccs,
             def_ids_by_sym,
-            def_names,
+            defs,
             recursive_defs,
         }
+    }
+
+    #[cfg(test)]
+    pub(in crate::compiler) fn empty() -> Self {
+        Self::new(Vec::new(), HashMap::new(), Vec::new(), HashSet::new())
     }
 
     pub fn def_id_for_sym(&self, sym: Symbol) -> Option<DefId> {
@@ -89,7 +107,11 @@ impl DependencyAnalysis {
     }
 
     pub fn def_name_sym(&self, id: DefId) -> Symbol {
-        self.def_names[id.index()]
+        self.defs[id.index()].name
+    }
+
+    pub fn def_source_id(&self, id: DefId) -> SourceId {
+        self.defs[id.index()].source
     }
 
     /// True if the definition is in a mutual recursion group (SCC > 1) or references itself.
@@ -97,7 +119,7 @@ impl DependencyAnalysis {
         self.recursive_defs.contains(&id)
     }
 
-    pub fn sccs(&self) -> &[Vec<String>] {
+    pub fn sccs(&self) -> &[Vec<DefId>] {
         &self.sccs
     }
 }

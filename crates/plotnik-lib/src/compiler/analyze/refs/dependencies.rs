@@ -10,10 +10,11 @@ use std::collections::{HashMap, HashSet};
 use crate::core::Interner;
 use indexmap::{IndexMap, IndexSet};
 
-use crate::compiler::ids::DefId;
 use crate::compiler::analyze::names::SymbolTable;
+use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{DefRef, Pattern};
 
+use super::dependency_analysis::DefInfo;
 pub use super::dependency_analysis::DependencyAnalysis;
 
 pub fn analyze_dependencies(
@@ -37,16 +38,22 @@ pub fn analyze_dependencies(
 
     // Assign DefIds in SCC order (leaves first, so dependencies get lower IDs)
     let mut def_ids_by_sym = HashMap::new();
-    let mut def_names = Vec::new();
+    let mut defs = Vec::new();
     let mut recursive_defs = HashSet::new();
+    let mut scc_ids_by_def = Vec::with_capacity(sccs.len());
 
     for scc in &sccs {
         let mutually_recursive = scc.len() > 1;
+        let mut scc_ids = Vec::with_capacity(scc.len());
         for name in scc {
             let sym = interner.intern(name);
-            let def_id = DefId::from_raw(def_names.len() as u32);
+            let source = symbol_table
+                .source_id(name)
+                .expect("Tarjan SCC member must exist in the symbol table");
+            let def_id = DefId::from_raw(defs.len() as u32);
             def_ids_by_sym.insert(sym, def_id);
-            def_names.push(sym);
+            defs.push(DefInfo { name: sym, source });
+            scc_ids.push(def_id);
 
             let self_recursive = symbol_table
                 .body(name)
@@ -55,9 +62,10 @@ pub fn analyze_dependencies(
                 recursive_defs.insert(def_id);
             }
         }
+        scc_ids_by_def.push(scc_ids);
     }
 
-    DependencyAnalysis::new(sccs, def_ids_by_sym, def_names, recursive_defs)
+    DependencyAnalysis::new(scc_ids_by_def, def_ids_by_sym, defs, recursive_defs)
 }
 
 struct TarjanScc<'a> {
