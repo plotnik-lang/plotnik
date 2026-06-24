@@ -57,8 +57,8 @@ mod release_impl {
 
 #[cfg(debug_assertions)]
 mod debug_impl {
-    use std::collections::HashSet;
     use std::collections::hash_map::DefaultHasher;
+    use std::collections::{HashMap, HashSet};
     use std::hash::{Hash, Hasher};
     use std::num::NonZeroU16;
 
@@ -129,6 +129,11 @@ mod debug_impl {
     enum WalkRoot {
         Preamble,
         Def(DefId),
+    }
+
+    struct PassSnapshot {
+        instructions: Vec<InstructionIR>,
+        fingerprints: Vec<(WalkRoot, Label, Fingerprint)>,
     }
 
     /// What one node contributes to the walk.
@@ -261,168 +266,168 @@ mod debug_impl {
 
     /// Compute one node's contribution. Cycle detection is the walker's job (it
     /// depends on traversal state), so this is a pure function of the graph.
-    fn node_step(
-        label: Label,
-        instr_map: &std::collections::HashMap<Label, &InstructionIR>,
-        label_to_def: &std::collections::HashMap<Label, DefId>,
-        ctx: &LowerInput,
-    ) -> WalkStep {
-        let Some(&instr) = instr_map.get(&label) else {
-            return WalkStep {
-                see_through: false,
-                ops: vec![SemanticOp::DanglingLabel],
-                succs: vec![],
+    struct GraphWalk<'a> {
+        instr_map: HashMap<Label, &'a InstructionIR>,
+        label_to_def: HashMap<Label, DefId>,
+        ctx: &'a LowerInput<'a>,
+    }
+
+    impl<'a> GraphWalk<'a> {
+        fn new(
+            instructions: &'a [InstructionIR],
+            def_entries: &IndexMap<DefId, Label>,
+            ctx: &'a LowerInput<'a>,
+        ) -> Self {
+            Self {
+                instr_map: instructions.iter().map(|i| (i.label(), i)).collect(),
+                label_to_def: def_entries.iter().map(|(&d, &l)| (l, d)).collect(),
+                ctx,
+            }
+        }
+
+        /// Compute one node's contribution. Cycle detection is the walker's job (it
+        /// depends on traversal state), so this is a pure function of the graph.
+        fn node_step(&self, label: Label) -> WalkStep {
+            let Some(&instr) = self.instr_map.get(&label) else {
+                return WalkStep {
+                    see_through: false,
+                    ops: vec![SemanticOp::DanglingLabel],
+                    succs: vec![],
+                };
             };
-        };
 
-        match instr {
-            InstructionIR::Match(m) => {
-                if m.is_epsilon() && m.pre_effects.is_empty() && m.post_effects.is_empty() {
-                    return WalkStep {
-                        see_through: true,
-                        ops: vec![],
+            match instr {
+                InstructionIR::Match(m) => {
+                    if m.is_epsilon() && m.pre_effects.is_empty() && m.post_effects.is_empty() {
+                        return WalkStep {
+                            see_through: true,
+                            ops: vec![],
+                            succs: m.successors.clone(),
+                        };
+                    }
+                    WalkStep {
+                        see_through: false,
+                        ops: collect_match_ops(m, self.ctx),
                         succs: m.successors.clone(),
-                    };
+                    }
                 }
-                WalkStep {
+                InstructionIR::Call(c) => {
+                    // Record the callee by stable DefId (label-rename invariant); follow
+                    // the return continuation rather than descending into the callee.
+                    let name = self
+                        .label_to_def
+                        .get(&c.target)
+                        .map(|def_id| format!("def#{}", def_id.as_u32()))
+                        .unwrap_or_else(|| format!("label#{}", c.target.0));
+                    WalkStep {
+                        see_through: false,
+                        ops: vec![SemanticOp::Call(name)],
+                        succs: vec![c.next],
+                    }
+                }
+                InstructionIR::Return(_) => WalkStep {
                     see_through: false,
-                    ops: collect_match_ops(m, ctx),
-                    succs: m.successors.clone(),
-                }
-            }
-            InstructionIR::Call(c) => {
-                // Record the callee by stable DefId (label-rename invariant); follow
-                // the return continuation rather than descending into the callee.
-                let name = label_to_def
-                    .get(&c.target)
-                    .map(|def_id| format!("def#{}", def_id.as_u32()))
-                    .unwrap_or_else(|| format!("label#{}", c.target.0));
-                WalkStep {
+                    ops: vec![SemanticOp::Return],
+                    succs: vec![],
+                },
+                InstructionIR::Trampoline(t) => WalkStep {
+                    // Part of the preamble; semantically transparent but still marked
+                    // visited so a (hypothetical) cycle through it terminates.
                     see_through: false,
-                    ops: vec![SemanticOp::Call(name)],
-                    succs: vec![c.next],
-                }
+                    ops: vec![],
+                    succs: vec![t.next],
+                },
             }
-            InstructionIR::Return(_) => WalkStep {
-                see_through: false,
-                ops: vec![SemanticOp::Return],
-                succs: vec![],
-            },
-            InstructionIR::Trampoline(t) => WalkStep {
-                // Part of the preamble; semantically transparent but still marked
-                // visited so a (hypothetical) cycle through it terminates.
-                see_through: false,
-                ops: vec![],
-                succs: vec![t.next],
-            },
         }
-    }
 
-    /// Iterative DFS over the graph reachable from `entry`, invoking `on_path` with
-    /// each completed path (coalesced) in pre-order. An explicit stack (no
-    /// recursion, so deep IRs can't overflow) carries per-branch op prefixes and
-    /// visited snapshots. Returns whether traversal was truncated by a budget.
-    fn walk(
-        entry: Label,
-        instr_map: &std::collections::HashMap<Label, &InstructionIR>,
-        label_to_def: &std::collections::HashMap<Label, DefId>,
-        ctx: &LowerInput,
-        max_paths: usize,
-        mut on_path: impl FnMut(Path),
-    ) -> bool {
-        let mut count = 0usize;
-        let mut truncated = false;
+        /// Iterative DFS over the graph reachable from `entry`, invoking `on_path` with
+        /// each completed path (coalesced) in pre-order. An explicit stack (no
+        /// recursion, so deep IRs can't overflow) carries per-branch op prefixes and
+        /// visited snapshots. Returns whether traversal was truncated by a budget.
+        fn walk(&self, entry: Label, max_paths: usize, mut on_path: impl FnMut(Path)) -> bool {
+            let mut count = 0usize;
+            let mut truncated = false;
 
-        // (label, ops-so-far, visited set, node depth)
-        let mut stack: Vec<(Label, Vec<SemanticOp>, HashSet<Label>, u32)> =
-            vec![(entry, Vec::new(), HashSet::new(), 0)];
+            // (label, ops-so-far, visited set, node depth)
+            let mut stack: Vec<(Label, Vec<SemanticOp>, HashSet<Label>, u32)> =
+                vec![(entry, Vec::new(), HashSet::new(), 0)];
 
-        while let Some((label, mut ops, mut visited, depth)) = stack.pop() {
-            if count >= max_paths {
-                truncated = true;
-                break;
-            }
-            if depth >= MAX_DEPTH {
-                ops.push(SemanticOp::DepthCut);
-                on_path(coalesce_ups(ops));
-                count += 1;
-                truncated = true;
-                continue;
-            }
-            if visited.contains(&label) {
-                ops.push(SemanticOp::CycleRef);
-                on_path(coalesce_ups(ops));
-                count += 1;
-                continue;
-            }
-
-            let walk_step = node_step(label, instr_map, label_to_def, ctx);
-
-            if walk_step.see_through {
-                // Reversed pushes so successors pop in priority order (pre-order).
-                for &succ in walk_step.succs.iter().rev() {
-                    stack.push((succ, ops.clone(), visited.clone(), depth + 1));
+            while let Some((label, mut ops, mut visited, depth)) = stack.pop() {
+                if count >= max_paths {
+                    truncated = true;
+                    break;
                 }
-                continue;
-            }
+                if depth >= MAX_DEPTH {
+                    ops.push(SemanticOp::DepthCut);
+                    on_path(coalesce_ups(ops));
+                    count += 1;
+                    truncated = true;
+                    continue;
+                }
+                if visited.contains(&label) {
+                    ops.push(SemanticOp::CycleRef);
+                    on_path(coalesce_ups(ops));
+                    count += 1;
+                    continue;
+                }
 
-            visited.insert(label);
-            ops.extend(walk_step.ops);
+                let walk_step = self.node_step(label);
 
-            if walk_step.succs.is_empty() {
-                on_path(coalesce_ups(ops));
-                count += 1;
-            } else {
+                if walk_step.see_through {
+                    // Reversed pushes so successors pop in priority order (pre-order).
+                    for &succ in walk_step.succs.iter().rev() {
+                        stack.push((succ, ops.clone(), visited.clone(), depth + 1));
+                    }
+                    continue;
+                }
+
+                visited.insert(label);
+                ops.extend(walk_step.ops);
+
+                if walk_step.succs.is_empty() {
+                    on_path(coalesce_ups(ops));
+                    count += 1;
+                    continue;
+                }
+
                 for &succ in walk_step.succs.iter().rev() {
                     stack.push((succ, ops.clone(), visited.clone(), depth + 1));
                 }
             }
+
+            truncated
         }
 
-        truncated
-    }
+        fn fingerprint(&self, entry: Label) -> Fingerprint {
+            let mut hashes = Vec::new();
+            let truncated = self.walk(entry, MAX_PATHS, |path| {
+                hashes.push(hash_path(&path));
+            });
+            Fingerprint { hashes, truncated }
+        }
 
-    fn build_instr_map(
-        instructions: &[InstructionIR],
-    ) -> std::collections::HashMap<Label, &InstructionIR> {
-        instructions.iter().map(|i| (i.label(), i)).collect()
-    }
+        fn paths(&self, entry: Label, max: usize) -> Vec<Path> {
+            let mut paths = Vec::new();
+            self.walk(entry, max, |path| {
+                paths.push(path);
+            });
+            paths
+        }
 
-    fn label_to_def_map(
-        def_entries: &IndexMap<DefId, Label>,
-    ) -> std::collections::HashMap<Label, DefId> {
-        def_entries.iter().map(|(&d, &l)| (l, d)).collect()
-    }
-
-    fn fingerprint_from_ir(
-        instructions: &[InstructionIR],
-        entry: Label,
-        def_entries: &IndexMap<DefId, Label>,
-        ctx: &LowerInput,
-    ) -> Fingerprint {
-        let instr_map = build_instr_map(instructions);
-        let label_to_def = label_to_def_map(def_entries);
-        let mut hashes = Vec::new();
-        let truncated = walk(entry, &instr_map, &label_to_def, ctx, MAX_PATHS, |path| {
-            hashes.push(hash_path(&path));
-        });
-        Fingerprint { hashes, truncated }
-    }
-
-    fn paths_from_ir(
-        instructions: &[InstructionIR],
-        entry: Label,
-        def_entries: &IndexMap<DefId, Label>,
-        ctx: &LowerInput,
-        max: usize,
-    ) -> Vec<Path> {
-        let instr_map = build_instr_map(instructions);
-        let label_to_def = label_to_def_map(def_entries);
-        let mut paths = Vec::new();
-        walk(entry, &instr_map, &label_to_def, ctx, max, |path| {
-            paths.push(path);
-        });
-        paths
+        fn check_scopes(&self, entry: Label) -> Result<(), String> {
+            let mut err: Option<String> = None;
+            self.walk(entry, MAX_PATHS, |path| {
+                if err.is_none()
+                    && let Err(e) = check_path_scopes(&path)
+                {
+                    err = Some(format!("{e}\n  path: {path:?}"));
+                }
+            });
+            match err {
+                Some(e) => Err(e),
+                None => Ok(()),
+            }
+        }
     }
 
     /// The role an effect plays in value-scope nesting: it opens a scope, closes
@@ -485,28 +490,6 @@ mod debug_impl {
         Ok(())
     }
 
-    fn check_scopes(
-        instructions: &[InstructionIR],
-        entry: Label,
-        def_entries: &IndexMap<DefId, Label>,
-        ctx: &LowerInput,
-    ) -> Result<(), String> {
-        let instr_map = build_instr_map(instructions);
-        let label_to_def = label_to_def_map(def_entries);
-        let mut err: Option<String> = None;
-        walk(entry, &instr_map, &label_to_def, ctx, MAX_PATHS, |path| {
-            if err.is_none()
-                && let Err(e) = check_path_scopes(&path)
-            {
-                err = Some(format!("{e}\n  path: {path:?}"));
-            }
-        });
-        match err {
-            Some(e) => Err(e),
-            None => Ok(()),
-        }
-    }
-
     /// Structural invariants independent of any entry point: every label is unique
     /// and every reference resolves to a real instruction.
     fn check_labels(instructions: &[InstructionIR]) -> Result<(), String> {
@@ -552,14 +535,19 @@ mod debug_impl {
         v
     }
 
-    fn snapshot(result: &CompileResult, ctx: &LowerInput) -> Vec<(WalkRoot, Label, Fingerprint)> {
-        entries(result)
+    fn snapshot(result: &CompileResult, ctx: &LowerInput) -> PassSnapshot {
+        let walk = GraphWalk::new(&result.instructions, &result.def_entries, ctx);
+        let fingerprints = entries(result)
             .into_iter()
             .map(|(key, entry)| {
-                let fp = fingerprint_from_ir(&result.instructions, entry, &result.def_entries, ctx);
+                let fp = walk.fingerprint(entry);
                 (key, entry, fp)
             })
-            .collect()
+            .collect();
+        PassSnapshot {
+            instructions: result.instructions.clone(),
+            fingerprints,
+        }
     }
 
     fn diff_paths(before: &[Path], after: &[Path]) -> String {
@@ -585,8 +573,7 @@ mod debug_impl {
 
     fn verify_after_pass(
         name: &str,
-        before_instrs: &[InstructionIR],
-        before: &[(WalkRoot, Label, Fingerprint)],
+        before: &PassSnapshot,
         result: &CompileResult,
         ctx: &LowerInput,
     ) {
@@ -594,19 +581,13 @@ mod debug_impl {
             panic!("[verify] pass `{name}` produced malformed IR: {e}");
         }
 
-        for (key, entry, before_fp) in before {
-            let after_fp =
-                fingerprint_from_ir(&result.instructions, *entry, &result.def_entries, ctx);
+        let before_walk = GraphWalk::new(&before.instructions, &result.def_entries, ctx);
+        let after_walk = GraphWalk::new(&result.instructions, &result.def_entries, ctx);
+        for (key, entry, before_fp) in &before.fingerprints {
+            let after_fp = after_walk.fingerprint(*entry);
             if *before_fp != after_fp {
-                let before_paths =
-                    paths_from_ir(before_instrs, *entry, &result.def_entries, ctx, DIAG_PATHS);
-                let after_paths = paths_from_ir(
-                    &result.instructions,
-                    *entry,
-                    &result.def_entries,
-                    ctx,
-                    DIAG_PATHS,
-                );
+                let before_paths = before_walk.paths(*entry, DIAG_PATHS);
+                let after_paths = after_walk.paths(*entry, DIAG_PATHS);
                 panic!(
                     "[verify] pass `{name}` changed semantics for {key:?}:\n{}",
                     diff_paths(&before_paths, &after_paths)
@@ -623,10 +604,9 @@ mod debug_impl {
         ctx: &LowerInput,
         pass: impl FnOnce(&mut CompileResult),
     ) {
-        let before_instrs = result.instructions.clone();
         let before = snapshot(result, ctx);
         pass(result);
-        verify_after_pass(name, &before_instrs, &before, result, ctx);
+        verify_after_pass(name, &before, result, ctx);
     }
 
     /// Check the freshly-constructed IR before any pass runs: structural soundness
@@ -637,8 +617,9 @@ mod debug_impl {
         if let Err(e) = check_labels(&result.instructions) {
             panic!("[verify] construction produced malformed IR: {e}");
         }
+        let walk = GraphWalk::new(&result.instructions, &result.def_entries, ctx);
         for (key, entry) in entries(result) {
-            if let Err(e) = check_scopes(&result.instructions, entry, &result.def_entries, ctx) {
+            if let Err(e) = walk.check_scopes(entry) {
                 panic!("[verify] construction produced unbalanced scope effects for {key:?}:\n{e}");
             }
         }
