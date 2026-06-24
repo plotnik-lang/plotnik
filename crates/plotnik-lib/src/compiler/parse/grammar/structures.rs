@@ -534,10 +534,8 @@ impl<'q> Parser<'q, '_> {
     fn parse_branch(&mut self) {
         self.start_node(SyntaxKind::Branch);
 
-        let span = self.current_span();
-        let text = self.current_text();
-        self.bump();
-        self.validate_branch_label(text, span);
+        let ident = self.bump_ident();
+        self.validate_branch_label(ident);
 
         self.expect(SyntaxKind::Colon, "':' after branch label");
 

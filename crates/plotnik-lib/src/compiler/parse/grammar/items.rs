@@ -66,10 +66,8 @@ impl Parser<'_, '_> {
     fn parse_def(&mut self) {
         self.start_node(SyntaxKind::Def);
 
-        let span = self.current_span();
-        let name = self.current_text();
-        self.bump();
-        self.validate_def_name(name, span);
+        let ident = self.bump_ident();
+        self.validate_def_name(ident);
 
         let ate_equals = self.eat_token(SyntaxKind::Equals);
         assert!(

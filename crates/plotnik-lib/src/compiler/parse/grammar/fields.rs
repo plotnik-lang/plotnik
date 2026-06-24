@@ -6,6 +6,7 @@ use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::parse::token_set::QUANTIFIERS;
 
 use super::utils::starts_uppercase;
+use super::validation::Ident;
 
 impl Parser<'_, '_> {
     /// Type annotation: `::Type` (PascalCase)
@@ -14,10 +15,8 @@ impl Parser<'_, '_> {
         self.expect(SyntaxKind::DoubleColon, "'::' for type annotation");
 
         if self.at(SyntaxKind::Id) {
-            let span = self.current_span();
-            let text = self.current_text();
-            self.bump();
-            self.validate_type_name(text, span);
+            let ident = self.bump_ident();
+            self.validate_type_name(ident);
         } else {
             self.error(DiagnosticKind::ExpectedTypeName);
         }
@@ -76,10 +75,8 @@ impl Parser<'_, '_> {
             return;
         }
 
-        let span = self.current_span();
-        let text = self.current_text();
-        self.bump();
-        self.validate_field_name(text, span);
+        let ident = self.bump_ident();
+        self.validate_field_name(ident);
         self.finish_node();
     }
 
@@ -116,10 +113,8 @@ impl Parser<'_, '_> {
         self.start_node(SyntaxKind::Field);
 
         self.assert_current(SyntaxKind::Id);
-        let span = self.current_span();
-        let text = self.current_text();
-        self.bump();
-        self.validate_field_name(text, span);
+        let ident = self.bump_ident();
+        self.validate_field_name(ident);
 
         self.expect(
             SyntaxKind::Colon,
@@ -171,7 +166,7 @@ impl Parser<'_, '_> {
         let end = self.consume_dotted_capture_tail(span.end());
         let full_span = TextRange::new(span.start(), end);
         let name = &source[usize::from(span.start()) + 1..usize::from(end)]; // strip @ prefix
-        self.validate_capture_name(name, full_span);
+        self.validate_capture_name(Ident::new(name, full_span));
 
         // Type annotation only on regular captures
         if is_capture {
