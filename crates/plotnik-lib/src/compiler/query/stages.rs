@@ -112,53 +112,49 @@ pub(crate) struct QueryParsed {
 
 impl QueryParsed {
     pub(crate) fn analyze(mut self) -> Query {
-        let analysis = {
-            let Some(validated) = validate_ast(AstValidationInput {
-                source_map: &self.source_map,
-                ast_map: &self.ast_map,
-                diag: &mut self.diag,
-            }) else {
-                return Query {
-                    parsed: self,
-                    analysis: None,
-                };
+        let Some(validated) = validate_ast(AstValidationInput {
+            source_map: &self.source_map,
+            ast_map: &self.ast_map,
+            diag: &mut self.diag,
+        }) else {
+            return Query {
+                parsed: self,
+                analysis: None,
             };
+        };
 
-            let mut interner = Interner::new();
+        let mut interner = Interner::new();
+        let symbol_table = resolve_names(&validated, &mut self.diag);
 
-            let symbol_table = resolve_names(&validated, &mut self.diag);
+        let dependency_analysis = dependencies::analyze_dependencies(&symbol_table, &mut interner);
+        validate_recursion(
+            &dependency_analysis,
+            validated.ast_map(),
+            &symbol_table,
+            &mut self.diag,
+        );
 
-            let dependency_analysis =
-                dependencies::analyze_dependencies(&symbol_table, &mut interner);
-            validate_recursion(
-                &dependency_analysis,
+        let type_analysis = type_check::infer_types(
+            &mut interner,
+            &symbol_table,
+            &dependency_analysis,
+            &mut self.diag,
+        );
+        if !self.diag.has_errors() {
+            validate_entrypoints(
                 validated.ast_map(),
-                &symbol_table,
-                &mut self.diag,
-            );
-
-            let type_analysis = type_check::infer_types(
-                &mut interner,
-                &symbol_table,
+                &interner,
+                &type_analysis,
                 &dependency_analysis,
                 &mut self.diag,
             );
-            if !self.diag.has_errors() {
-                validate_entrypoints(
-                    validated.ast_map(),
-                    &interner,
-                    &type_analysis,
-                    &dependency_analysis,
-                    &mut self.diag,
-                );
-            }
+        }
 
-            QueryAnalysis {
-                interner,
-                symbol_table,
-                type_analysis,
-                dependency_analysis,
-            }
+        let analysis = QueryAnalysis {
+            interner,
+            symbol_table,
+            type_analysis,
+            dependency_analysis,
         };
 
         Query {
