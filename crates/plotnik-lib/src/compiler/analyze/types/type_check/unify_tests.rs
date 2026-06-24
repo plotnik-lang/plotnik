@@ -1,4 +1,4 @@
-use super::context::TypeAnalysisBuilder;
+use super::analysis::TypeAnalysisBuilder;
 use super::types::{OutputFlow, TYPE_NODE};
 use super::unify::{UnifyError, unify_flow};
 

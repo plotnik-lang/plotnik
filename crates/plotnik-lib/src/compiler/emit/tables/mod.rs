@@ -9,8 +9,8 @@
 //! lives here at the emit root rather than inside one phase.
 
 mod constant_pool;
-mod context;
 mod error;
+mod input;
 mod regex_table;
 mod string_table;
 mod type_table;
@@ -21,8 +21,8 @@ mod error_tests;
 mod string_table_tests;
 
 pub(in crate::compiler::emit) use constant_pool::ConstantPool;
-pub use context::EmitInput;
 pub use error::EmitError;
+pub use input::EmitInput;
 pub use regex_table::RegexTableBuilder;
 pub use string_table::StringTableBuilder;
 pub use type_table::TypeTableBuilder;

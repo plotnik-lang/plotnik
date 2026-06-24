@@ -6,7 +6,7 @@ use crate::compiler::lower::pack::lower;
 use crate::compiler::lower::thompson::Compiler;
 use crate::compiler::lower::verify::{run_verified, verify_constructed};
 
-mod context;
+mod input;
 pub mod dead;
 pub mod epsilon;
 pub mod ir;
@@ -18,7 +18,7 @@ mod verify;
 #[cfg(test)]
 mod ir_tests;
 
-pub(crate) use context::LowerInput;
+pub(crate) use input::LowerInput;
 
 pub(crate) fn lower_to_ir(input: LowerInput<'_>) -> LoweredIr {
     let mut ir = Compiler::build_ir(&input);

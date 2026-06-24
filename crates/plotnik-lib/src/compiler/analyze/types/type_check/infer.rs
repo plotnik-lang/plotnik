@@ -9,7 +9,7 @@ use crate::core::Interner;
 use rowan::TextRange;
 
 use super::capture_mechanism::CaptureMechanism;
-use super::context::{TypeAnalysis, TypeAnalysisBuilder};
+use super::analysis::{TypeAnalysis, TypeAnalysisBuilder};
 use super::def_id::Symbol;
 use super::types::{
     Arity, FieldInfo, OutputFlow, PatternResult, QuantifierKind, TYPE_NODE, TYPE_VOID, TypeId,

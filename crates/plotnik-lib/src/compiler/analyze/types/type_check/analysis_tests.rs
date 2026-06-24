@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::context::TypeAnalysisBuilder;
+use super::analysis::TypeAnalysisBuilder;
 use super::def_id::Interner;
 use super::types::{FieldInfo, TYPE_NODE, TypeShape};
 

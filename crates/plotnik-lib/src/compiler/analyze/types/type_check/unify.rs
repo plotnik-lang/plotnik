@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use super::context::TypeAnalysisBuilder;
+use super::analysis::TypeAnalysisBuilder;
 use super::def_id::Symbol;
 use super::types::{FieldInfo, OutputFlow, TYPE_VOID, TypeId, TypeShape};
 
