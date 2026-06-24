@@ -30,6 +30,46 @@ impl std::fmt::Display for ZeroIdError {
 
 impl std::error::Error for ZeroIdError {}
 
+macro_rules! nonzero_u16_id {
+    ($Name:ident) => {
+        impl From<NonZeroU16> for $Name {
+            #[inline]
+            fn from(n: NonZeroU16) -> Self {
+                Self(n)
+            }
+        }
+
+        impl From<$Name> for NonZeroU16 {
+            #[inline]
+            fn from(v: $Name) -> Self {
+                v.0
+            }
+        }
+
+        impl From<$Name> for u16 {
+            #[inline]
+            fn from(v: $Name) -> Self {
+                v.0.get()
+            }
+        }
+
+        impl TryFrom<u16> for $Name {
+            type Error = ZeroIdError;
+
+            #[inline]
+            fn try_from(n: u16) -> Result<Self, Self::Error> {
+                NonZeroU16::new(n).map(Self).ok_or(ZeroIdError)
+            }
+        }
+
+        impl std::fmt::Display for $Name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0.get())
+            }
+        }
+    };
+}
+
 /// Concrete node kind identity, preserving tree-sitter's named/anonymous namespace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NodeKind<T> {
@@ -42,72 +82,14 @@ pub enum NodeKind<T> {
 #[repr(transparent)]
 pub struct NodeKindId(NonZeroU16);
 
-impl From<NonZeroU16> for NodeKindId {
-    #[inline]
-    fn from(n: NonZeroU16) -> Self {
-        Self(n)
-    }
-}
-impl From<NodeKindId> for NonZeroU16 {
-    #[inline]
-    fn from(v: NodeKindId) -> Self {
-        v.0
-    }
-}
-impl From<NodeKindId> for u16 {
-    #[inline]
-    fn from(v: NodeKindId) -> Self {
-        v.0.get()
-    }
-}
-impl TryFrom<u16> for NodeKindId {
-    type Error = ZeroIdError;
-    #[inline]
-    fn try_from(n: u16) -> Result<Self, Self::Error> {
-        NonZeroU16::new(n).map(Self).ok_or(ZeroIdError)
-    }
-}
-impl std::fmt::Display for NodeKindId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.get())
-    }
-}
+nonzero_u16_id!(NodeKindId);
 
 /// Field ID (tree-sitter uses NonZeroU16).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub struct NodeFieldId(NonZeroU16);
 
-impl From<NonZeroU16> for NodeFieldId {
-    #[inline]
-    fn from(n: NonZeroU16) -> Self {
-        Self(n)
-    }
-}
-impl From<NodeFieldId> for NonZeroU16 {
-    #[inline]
-    fn from(v: NodeFieldId) -> Self {
-        v.0
-    }
-}
-impl From<NodeFieldId> for u16 {
-    #[inline]
-    fn from(v: NodeFieldId) -> Self {
-        v.0.get()
-    }
-}
-impl TryFrom<u16> for NodeFieldId {
-    type Error = ZeroIdError;
-    #[inline]
-    fn try_from(n: u16) -> Result<Self, Self::Error> {
-        NonZeroU16::new(n).map(Self).ok_or(ZeroIdError)
-    }
-}
-impl std::fmt::Display for NodeFieldId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.get())
-    }
-}
+nonzero_u16_id!(NodeFieldId);
 
 /// Cardinality of a field or children slot: how many children may occupy it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
