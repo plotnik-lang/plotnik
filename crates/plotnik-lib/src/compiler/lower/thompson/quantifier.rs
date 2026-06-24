@@ -10,8 +10,9 @@ use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOpera
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx, needs_struct_wrapper, row_type_id};
+use super::emit::BranchTargets;
 use super::navigation::resumable_search_nav;
-use super::scope::{BranchTargets, CaptureExits, CaptureRequest, EndScopeEffects, SplitExits};
+use super::scope::{CaptureExits, CaptureRequest, EndScopeEffects, SplitExits};
 
 /// The nav under which a quantifier iteration runs a resumable position search,
 /// or `None` for a bounded anchor that matches a single candidate directly.

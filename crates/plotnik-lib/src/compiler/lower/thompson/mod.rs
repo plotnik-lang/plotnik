@@ -19,6 +19,7 @@
 
 mod capture;
 mod compiler;
+mod emit;
 mod expressions;
 mod navigation;
 mod quantifier;
