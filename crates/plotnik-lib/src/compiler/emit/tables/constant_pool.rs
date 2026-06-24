@@ -3,7 +3,7 @@
 use crate::bytecode::StringId;
 use crate::compiler::ids::TypeId;
 
-use super::{RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
+use super::{RegexId, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
 
 #[derive(Clone, Copy)]
 pub(in crate::compiler::emit) struct ConstantPool<'a> {
@@ -29,7 +29,7 @@ impl<'a> ConstantPool<'a> {
         self.strings.lookup_str(value)
     }
 
-    pub(in crate::compiler::emit) fn lookup_regex(self, string_id: StringId) -> Option<u16> {
+    pub(in crate::compiler::emit) fn lookup_regex(self, string_id: StringId) -> Option<RegexId> {
         self.regexes.lookup(string_id)
     }
 

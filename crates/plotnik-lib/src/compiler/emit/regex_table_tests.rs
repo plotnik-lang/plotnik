@@ -17,12 +17,12 @@ fn intern_and_lookup() {
     let id2 = intern(&mut builder, "bar", str2).unwrap();
     let id3 = intern(&mut builder, "foo", str1).unwrap(); // duplicate
 
-    assert_eq!(id1, 1); // 0 is reserved
-    assert_eq!(id2, 2);
+    assert_eq!(u16::from(id1), 1); // 0 is reserved
+    assert_eq!(u16::from(id2), 2);
     assert_eq!(id3, id1); // same StringId returns same regex ID
 
-    assert_eq!(builder.lookup(str1), Some(1));
-    assert_eq!(builder.lookup(str2), Some(2));
+    assert_eq!(builder.lookup(str1), Some(id1));
+    assert_eq!(builder.lookup(str2), Some(id2));
     assert_eq!(builder.lookup(StringId::try_from(99).unwrap()), None);
 }
 
@@ -68,7 +68,7 @@ fn escaped_slash_pattern() {
     let mut builder = RegexTableBuilder::new();
     // Pattern "a\/b" should match literal "a/b"
     let id = intern(&mut builder, r"a\/b", StringId::try_from(1).unwrap()).unwrap();
-    assert_eq!(id, 1);
+    assert_eq!(u16::from(id), 1);
 
     let (blob, table) = builder.emit();
 

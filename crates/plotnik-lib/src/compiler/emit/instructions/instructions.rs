@@ -68,8 +68,10 @@ fn resolve_match(
             .lookup_str(pred.value.text())
             .expect("predicate string must be interned before transition emission");
         let value_ref = if pred.value.is_regex() {
-            pool.lookup_regex(string_id)
-                .expect("regex predicate must be interned")
+            u16::from(
+                pool.lookup_regex(string_id)
+                    .expect("regex predicate must be interned"),
+            )
         } else {
             u16::from(string_id)
         };

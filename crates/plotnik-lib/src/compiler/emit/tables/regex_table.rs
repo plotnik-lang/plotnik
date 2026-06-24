@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use crate::bytecode::{REGEX_TABLE_ENTRY_SIZE, StringId};
 
 use super::error::EmitError;
+use super::regex_id::RegexId;
 
 /// Compiled regex entry with pattern reference and serialized DFA.
 #[derive(Debug)]
@@ -27,7 +28,7 @@ struct RegexEntry {
 #[derive(Debug)]
 pub struct RegexTableBuilder {
     /// Map from StringId to regex ID (for deduplication).
-    lookup: HashMap<StringId, u16>,
+    lookup: HashMap<StringId, RegexId>,
     /// Compiled regex entries (index 0 is unused).
     entries: Vec<Option<RegexEntry>>,
 }
@@ -46,7 +47,7 @@ impl RegexTableBuilder {
         &mut self,
         pattern_string_id: StringId,
         dfa_bytes: Vec<u8>,
-    ) -> Result<u16, EmitError> {
+    ) -> Result<RegexId, EmitError> {
         if let Some(&id) = self.lookup.get(&pattern_string_id) {
             return Ok(id);
         }
@@ -55,7 +56,7 @@ impl RegexTableBuilder {
             return Err(EmitError::TooManyRegexes(self.entries.len() + 1));
         }
 
-        let id = self.entries.len() as u16;
+        let id = RegexId::try_from(self.entries.len()).expect("regex count checked");
         self.entries.push(Some(RegexEntry {
             string_id: pattern_string_id,
             dfa_bytes,
@@ -77,7 +78,7 @@ impl RegexTableBuilder {
         Ok(())
     }
 
-    pub fn lookup(&self, string_id: StringId) -> Option<u16> {
+    pub fn lookup(&self, string_id: StringId) -> Option<RegexId> {
         self.lookup.get(&string_id).copied()
     }
 
