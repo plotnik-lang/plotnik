@@ -451,26 +451,24 @@ impl Compiler<'_> {
 
         match mechanism {
             // Array: Arr → quantifier (with Push) → EndArr+capture → exit(s).
-            CaptureMechanism::Array => self.compile_array_capture(
-                CaptureRequest {
-                    inner: &inner,
-                    nav: nav_override,
-                    capture_effects,
-                    outer_capture,
-                },
+            CaptureMechanism::Array => self.compile_scoped_capture(
+                CaptureMechanism::Array,
+                &inner,
+                nav_override,
+                capture_effects,
+                outer_capture,
                 exits,
             ),
 
             // Struct scope: Struct → inner → EndStruct+capture → exit(s) (also empty `{}`).
             // Without the wrapper the Set lands on the raw inner node and both the
             // struct scope and the inner Sets are lost (#470).
-            CaptureMechanism::StructScope => self.compile_struct_capture(
-                CaptureRequest {
-                    inner: &inner,
-                    nav: nav_override,
-                    capture_effects,
-                    outer_capture,
-                },
+            CaptureMechanism::StructScope => self.compile_scoped_capture(
+                CaptureMechanism::StructScope,
+                &inner,
+                nav_override,
+                capture_effects,
+                outer_capture,
                 exits,
             ),
 
@@ -515,6 +513,31 @@ impl Compiler<'_> {
                     }
                 }
             },
+        }
+    }
+
+    fn compile_scoped_capture(
+        &mut self,
+        mechanism: CaptureMechanism,
+        inner: &Pattern,
+        nav: Option<Nav>,
+        capture_effects: Vec<EffectIR>,
+        outer_capture: CaptureEffects,
+        exits: CaptureExits,
+    ) -> Label {
+        let req = CaptureRequest {
+            inner,
+            nav,
+            capture_effects,
+            outer_capture,
+        };
+
+        match mechanism {
+            CaptureMechanism::Array => self.compile_array_capture(req, exits),
+            CaptureMechanism::StructScope => self.compile_struct_capture(req, exits),
+            CaptureMechanism::Node | CaptureMechanism::Ref | CaptureMechanism::SetAfter => {
+                unreachable!("non-scope capture mechanism passed to compile_scoped_capture")
+            }
         }
     }
 
