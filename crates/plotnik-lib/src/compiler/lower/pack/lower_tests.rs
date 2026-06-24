@@ -1,6 +1,6 @@
 use crate::bytecode::{EffectKind, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, Nav};
 
-use super::lower::lower;
+use super::lower::pack_instructions;
 use crate::compiler::lower::ir::NfaGraph;
 use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR};
 
