@@ -391,21 +391,24 @@ impl CheckedQuery {
 
 pub struct CompiledQuery {
     checked: CheckedQuery,
-    bytecode: Option<Vec<u8>>,
-    module: Option<Module>,
+    compiled: Option<CompiledArtifact>,
+}
+
+struct CompiledArtifact {
+    bytecode: Vec<u8>,
+    module: Module,
 }
 
 impl CompiledQuery {
     fn failed(query: LinkOutcome, diagnostics: Diagnostics) -> Self {
         Self {
             checked: CheckedQuery::new(query, diagnostics),
-            bytecode: None,
-            module: None,
+            compiled: None,
         }
     }
 
     pub fn is_valid(&self) -> bool {
-        self.module.is_some() && self.checked.is_valid()
+        self.compiled.is_some() && self.checked.is_valid()
     }
 
     pub fn source_map(&self) -> &SourceMap {
@@ -421,23 +424,24 @@ impl CompiledQuery {
     }
 
     pub fn bytecode(&self) -> Option<&[u8]> {
-        self.bytecode.as_deref()
+        self.compiled
+            .as_ref()
+            .map(|compiled| compiled.bytecode.as_slice())
     }
 
     pub fn module(&self) -> Option<&Module> {
-        self.module.as_ref()
+        self.compiled.as_ref().map(|compiled| &compiled.module)
     }
 
     pub fn into_module(self) -> Option<Module> {
-        self.module
+        self.compiled.map(|compiled| compiled.module)
     }
 
     pub fn to_typescript(
         &self,
         config: crate::compiler::typegen::typescript::Config,
     ) -> Option<String> {
-        self.module
-            .as_ref()
+        self.module()
             .map(|module| crate::compiler::typegen::typescript::emit(module, config))
     }
 
@@ -519,8 +523,10 @@ impl LinkOutcome {
 
         CompiledQuery {
             checked: CheckedQuery::new(self, diagnostics),
-            bytecode: Some(bytes),
-            module: Some(module),
+            compiled: Some(CompiledArtifact {
+                bytecode: bytes,
+                module,
+            }),
         }
     }
 
