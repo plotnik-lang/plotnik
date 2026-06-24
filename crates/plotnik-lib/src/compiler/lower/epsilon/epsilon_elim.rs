@@ -107,6 +107,30 @@ impl<'a> InstrTableMut<'a> {
     }
 }
 
+struct MatchEdit {
+    successors: Vec<Label>,
+    post_effects: Vec<EffectIR>,
+}
+
+impl MatchEdit {
+    fn from_match(m: &MatchIR) -> Self {
+        Self {
+            successors: m.successors.clone(),
+            post_effects: m.post_effects.clone(),
+        }
+    }
+
+    fn rewrite_successor(&mut self, index: usize, target: Label, effects: Vec<EffectIR>) {
+        self.successors[index] = target;
+        self.post_effects.extend(effects);
+    }
+
+    fn apply_to(self, m: &mut MatchIR) {
+        m.successors = self.successors;
+        m.post_effects = self.post_effects;
+    }
+}
+
 /// Whether any effect reads the VM's `matched_node` (`Node`). Such
 /// effects are position-sensitive: their meaning depends on which node was
 /// most recently matched, so they cannot be reordered across a navigation.
@@ -237,7 +261,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
 
         let single = m.successors.len() == 1;
         // Cloned lazily on the first rewrite; the common no-op case allocates nothing.
-        let mut edited: Option<(Vec<Label>, Vec<EffectIR>)> = None;
+        let mut edited: Option<MatchEdit> = None;
 
         for (j, &succ) in m.successors.iter().enumerate() {
             let Some((target, effects)) =
@@ -261,19 +285,17 @@ fn laser_vision(result: &mut CompileResult) -> bool {
             // still reads `m`'s node — the node these effects saw at their original
             // position. forward_migrate is unsafe only because it pushes effects
             // *past* a navigation that clears `matched_node`.
-            let (succs, post) =
-                edited.get_or_insert_with(|| (m.successors.clone(), m.post_effects.clone()));
-            succs[j] = target;
-            post.extend(effects);
+            edited
+                .get_or_insert_with(|| MatchEdit::from_match(m))
+                .rewrite_successor(j, target, effects);
         }
 
-        if let Some((succs, post)) = edited {
+        if let Some(edit) = edited {
             let m = match &mut result.instructions[i] {
                 InstructionIR::Match(m) => m,
                 _ => unreachable!(),
             };
-            m.successors = succs;
-            m.post_effects = post;
+            edit.apply_to(m);
             changed = true;
         }
     }
