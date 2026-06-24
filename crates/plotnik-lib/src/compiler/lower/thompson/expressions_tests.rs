@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 
 use crate::compiler::lower::ir::NodeKindConstraint;
 use crate::compiler::analyze::grammar::GrammarBinding;
-use crate::compiler::core::TypeAnalysisBuilder;
+use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
 use crate::compiler::test_utils::{empty_dependency_analysis, empty_symbol_table};
 
 use crate::compiler::lower::thompson::{CompileCtx, Compiler};

@@ -9,7 +9,8 @@ use std::collections::HashMap;
 
 use crate::bytecode::{TypeDef, TypeDefKind, TypeId as BytecodeTypeId, TypeMember, TypeNameEntry};
 
-use crate::compiler::core::{TypeAnalysis, TypeId};
+use crate::compiler::analyze::types::TypeAnalysis;
+use crate::compiler::core::TypeId;
 
 use super::error::EmitError;
 

@@ -10,13 +10,13 @@
 use std::num::NonZeroU16;
 
 use crate::bytecode::Nav;
-use crate::compiler::core::TypeShape;
+use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::lower::ir::{
     EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
 };
 
-use crate::compiler::core::CaptureMechanism;
+use crate::compiler::analyze::types::CaptureMechanism;
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};

@@ -1,16 +1,10 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub(crate) mod capture_mechanism;
 pub(crate) mod source;
 pub(crate) mod span;
-pub(crate) mod type_analysis;
-pub(crate) mod type_shape;
 
 pub use crate::core::{Interner, Symbol};
-pub use capture_mechanism::CaptureMechanism;
 pub use span::Span;
-pub use type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
-pub use type_shape::TypeShape;
 
 /// A lightweight handle to a named query definition.
 ///

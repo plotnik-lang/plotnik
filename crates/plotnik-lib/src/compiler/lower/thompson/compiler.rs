@@ -9,7 +9,8 @@ use crate::bytecode::Nav;
 use crate::compiler::parse::ast::Pattern;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::lower::ir::{InstructionIR, Label, ReturnIR, TrampolineIR};
-use crate::compiler::core::{DefId, TypeAnalysis};
+use crate::compiler::analyze::types::TypeAnalysis;
+use crate::compiler::core::DefId;
 
 use super::capture::ExprCtx;
 use super::scope::{CaptureExits, StructScope};

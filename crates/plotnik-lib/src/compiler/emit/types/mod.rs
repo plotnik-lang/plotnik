@@ -3,15 +3,16 @@
 //! Type-table emission phase: walk the inferred types (TypeAnalysis) and lower
 //! them into the bytecode type table, interning their names into the shared
 //! string table. The table storage and its read accessors live in
-//! `compiler::core`; this module owns the walk.
+//! `emit::tables`; this module owns the walk.
 
 use std::collections::HashSet;
 
 use crate::bytecode::{TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeNameEntry};
 
-use crate::compiler::core::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
+use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
+use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::core::{Interner, TypeAnalysis, TypeId};
+use crate::compiler::core::{Interner, TypeId};
 use crate::compiler::emit::tables::{EmitError, EmitInput, StringTableBuilder, TypeTableBuilder};
 
 /// Build the type table, interning type, member, and name strings into the

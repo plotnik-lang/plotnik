@@ -13,7 +13,7 @@
 //! `SymbolTable<'q>`), use [`token_src`] instead of `token.text()`.
 
 use crate::compiler::parse::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
-use crate::compiler::core::type_shape::QuantifierKind;
+use crate::compiler::analyze::types::type_shape::QuantifierKind;
 use rowan::TextRange;
 
 /// Extracts token text with source lifetime.

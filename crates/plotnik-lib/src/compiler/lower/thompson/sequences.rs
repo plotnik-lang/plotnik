@@ -11,7 +11,8 @@ use crate::core::Symbol;
 use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::parse::ast::{self, Pattern, SeqItem};
 use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MemberRef, NodeKindConstraint};
-use crate::compiler::core::{TypeId, TypeShape};
+use crate::compiler::analyze::types::TypeShape;
+use crate::compiler::core::TypeId;
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};

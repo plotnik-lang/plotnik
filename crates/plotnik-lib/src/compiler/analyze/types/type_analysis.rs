@@ -14,7 +14,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::compiler::parse::ast::Pattern;
-use crate::compiler::core::type_shape::{
+use crate::compiler::analyze::types::type_shape::{
     Arity, FieldInfo, PatternResult, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::core::{DefId, Symbol};
