@@ -292,10 +292,15 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         let mut admissible = HashSet::new();
         for seed in seeds {
-            admissible.insert(seed);
-            admissible.extend(self.grammar.collect_subtypes(seed));
+            admissible.extend(self.kind_with_subtypes(seed));
         }
         admissible
+    }
+
+    fn kind_with_subtypes(&self, kind: NodeKindId) -> HashSet<NodeKindId> {
+        let mut kinds = self.grammar.collect_subtypes(kind);
+        kinds.insert(kind);
+        kinds
     }
 
     /// Whether a concrete child kind can occupy a bare child position whose parent admits
@@ -535,17 +540,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     /// including the kind itself) intersect. Even sibling supertypes can share a concrete member,
     /// so a non-empty overlap is what makes a `(super#sub)` refinement satisfiable.
     fn subtypes_overlap(&self, a: NodeKindId, b: NodeKindId) -> bool {
-        if a == b {
-            return true;
-        }
-        let mut a_members = self.grammar.collect_subtypes(a);
-        a_members.insert(a);
-        if a_members.contains(&b) {
-            return true;
-        }
-        let mut b_members = self.grammar.collect_subtypes(b);
-        b_members.insert(b);
-        a_members.iter().any(|member| b_members.contains(member))
+        let a_members = self.kind_with_subtypes(a);
+        let b_members = self.kind_with_subtypes(b);
+        !a_members.is_disjoint(&b_members)
     }
 
     /// A `(supertype#subtype)` refinement must be satisfiable — its base and refinement subtype
