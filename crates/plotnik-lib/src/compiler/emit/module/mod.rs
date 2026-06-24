@@ -6,7 +6,9 @@
 
 use crate::core::NodeKind;
 
-use crate::bytecode::{Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN};
+use crate::bytecode::{
+    Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SymbolNameEntry,
+};
 
 use crate::compiler::emit::tables::{
     ConstantPool, EmitError, EmitInput, StringTableBuilder, TypeTableBuilder,
@@ -124,13 +126,13 @@ impl<'a> EmitPipeline<'a> {
         let (regex_blob, regex_table) = pool.emit_regexes();
         let (type_defs_bytes, type_members_bytes, type_names_bytes) = pool.emit_types();
 
-        let node_types_bytes = emit_node_kinds(&tables.node_kinds);
-        let node_fields_bytes = emit_fields(&tables.fields);
+        let node_kinds_bytes = emit_symbol_name_table(&tables.node_kinds);
+        let node_fields_bytes = emit_symbol_name_table(&tables.fields);
         let entrypoints_bytes = emit_entrypoints(&tables.entrypoints);
 
         // Section order matches the binary format:
         // Header → StringBlob → RegexBlob → StringTable → RegexTable →
-        // NodeTypes → NodeFields → TypeDefs → TypeMembers → TypeNames →
+        // NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames →
         // Entrypoints → Transitions
         let mut writer = SectionWriter::new();
 
@@ -138,7 +140,7 @@ impl<'a> EmitPipeline<'a> {
         writer.emit_section(&regex_blob);
         writer.emit_section(&str_table);
         writer.emit_section(&regex_table);
-        writer.emit_section(&node_types_bytes);
+        writer.emit_section(&node_kinds_bytes);
         writer.emit_section(&node_fields_bytes);
         writer.emit_section(&type_defs_bytes);
         writer.emit_section(&type_members_bytes);
@@ -153,7 +155,7 @@ impl<'a> EmitPipeline<'a> {
             EmitError::MAX_STRINGS,
             EmitError::TooManyStrings,
         )?;
-        let node_types_count = checked_count(
+        let node_kinds_count = checked_count(
             tables.node_kinds.len(),
             EmitError::MAX_NODE_KINDS,
             EmitError::TooManyNodeKinds,
@@ -196,7 +198,7 @@ impl<'a> EmitPipeline<'a> {
 
         let mut header = Header {
             str_table_count,
-            node_types_count,
+            node_kinds_count,
             node_fields_count,
             regex_table_count,
             type_defs_count,
@@ -275,17 +277,8 @@ impl SectionWriter {
     }
 }
 
-fn emit_node_kinds(symbols: &[NodeKindEntry]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(symbols.len() * NodeKindEntry::SIZE);
-    for sym in symbols {
-        bytes.extend_from_slice(&sym.symbol.to_le_bytes());
-        bytes.extend_from_slice(&u16::from(sym.name).to_le_bytes());
-    }
-    bytes
-}
-
-fn emit_fields(symbols: &[FieldEntry]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(symbols.len() * FieldEntry::SIZE);
+fn emit_symbol_name_table(symbols: &[SymbolNameEntry]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(symbols.len() * SymbolNameEntry::SIZE);
     for sym in symbols {
         bytes.extend_from_slice(&sym.symbol.to_le_bytes());
         bytes.extend_from_slice(&u16::from(sym.name).to_le_bytes());

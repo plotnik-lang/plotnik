@@ -2,11 +2,11 @@
 //!
 //! Offsets are computed from counts + SECTION_ALIGN (64 bytes); no stored offsets.
 //! Section order: Header → StringBlob → RegexBlob → StringTable → RegexTable →
-//! NodeTypes → NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
+//! NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
 //! Transitions
 
 use super::entrypoint::Entrypoint;
-use super::sections::{FieldEntry, NodeKindEntry};
+use super::sections::SymbolNameEntry;
 use super::type_meta::{TypeDef, TypeMember, TypeNameEntry};
 use super::{
     HEADER_SIZE, MAGIC, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
@@ -43,7 +43,7 @@ pub struct Header {
     // Bytes 24-41: Element counts (9 × u16) — order matches section order
     pub str_table_count: u16,
     pub regex_table_count: u16,
-    pub node_types_count: u16,
+    pub node_kinds_count: u16,
     pub node_fields_count: u16,
     pub type_defs_count: u16,
     pub type_members_count: u16,
@@ -68,7 +68,7 @@ impl Default for Header {
             regex_blob_size: 0,
             str_table_count: 0,
             regex_table_count: 0,
-            node_types_count: 0,
+            node_kinds_count: 0,
             node_fields_count: 0,
             type_defs_count: 0,
             type_members_count: 0,
@@ -82,7 +82,7 @@ impl Default for Header {
 
 /// Computed section offsets derived from header counts.
 ///
-/// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeTypes →
+/// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeKinds →
 /// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints → Transitions
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SectionOffsets {
@@ -90,7 +90,7 @@ pub struct SectionOffsets {
     pub(crate) regex_blob: u32,
     pub(crate) str_table: u32,
     pub(crate) regex_table: u32,
-    pub(crate) node_types: u32,
+    pub(crate) node_kinds: u32,
     pub(crate) node_fields: u32,
     pub(crate) type_defs: u32,
     pub(crate) type_members: u32,
@@ -107,7 +107,7 @@ impl SectionOffsets {
             regex_blob: o[1],
             str_table: o[2],
             regex_table: o[3],
-            node_types: o[4],
+            node_kinds: o[4],
             node_fields: o[5],
             type_defs: o[6],
             type_members: o[7],
@@ -124,7 +124,7 @@ impl SectionOffsets {
             self.regex_blob,
             self.str_table,
             self.regex_table,
-            self.node_types,
+            self.node_kinds,
             self.node_fields,
             self.type_defs,
             self.type_members,
@@ -151,7 +151,7 @@ impl Header {
             regex_blob_size: u32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]),
             str_table_count: u16::from_le_bytes([bytes[24], bytes[25]]),
             regex_table_count: u16::from_le_bytes([bytes[26], bytes[27]]),
-            node_types_count: u16::from_le_bytes([bytes[28], bytes[29]]),
+            node_kinds_count: u16::from_le_bytes([bytes[28], bytes[29]]),
             node_fields_count: u16::from_le_bytes([bytes[30], bytes[31]]),
             type_defs_count: u16::from_le_bytes([bytes[32], bytes[33]]),
             type_members_count: u16::from_le_bytes([bytes[34], bytes[35]]),
@@ -172,7 +172,7 @@ impl Header {
         bytes[20..24].copy_from_slice(&self.regex_blob_size.to_le_bytes());
         bytes[24..26].copy_from_slice(&self.str_table_count.to_le_bytes());
         bytes[26..28].copy_from_slice(&self.regex_table_count.to_le_bytes());
-        bytes[28..30].copy_from_slice(&self.node_types_count.to_le_bytes());
+        bytes[28..30].copy_from_slice(&self.node_kinds_count.to_le_bytes());
         bytes[30..32].copy_from_slice(&self.node_fields_count.to_le_bytes());
         bytes[32..34].copy_from_slice(&self.type_defs_count.to_le_bytes());
         bytes[34..36].copy_from_slice(&self.type_members_count.to_le_bytes());
@@ -198,7 +198,7 @@ impl Header {
     ///
     /// Widened to `u64` so a corrupt header cannot overflow a running layout.
     ///
-    /// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeTypes →
+    /// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeKinds →
     /// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints → Transitions
     pub(crate) fn section_data_sizes(&self) -> [u64; SECTION_COUNT] {
         // Tables carry a trailing sentinel entry, hence the `+ 1`.
@@ -207,8 +207,8 @@ impl Header {
             self.regex_blob_size as u64,
             (self.str_table_count as u64 + 1) * STRING_TABLE_ENTRY_SIZE as u64,
             (self.regex_table_count as u64 + 1) * REGEX_TABLE_ENTRY_SIZE as u64,
-            self.node_types_count as u64 * NodeKindEntry::SIZE as u64,
-            self.node_fields_count as u64 * FieldEntry::SIZE as u64,
+            self.node_kinds_count as u64 * SymbolNameEntry::SIZE as u64,
+            self.node_fields_count as u64 * SymbolNameEntry::SIZE as u64,
             self.type_defs_count as u64 * TypeDef::SIZE as u64,
             self.type_members_count as u64 * TypeMember::SIZE as u64,
             self.type_names_count as u64 * TypeNameEntry::SIZE as u64,

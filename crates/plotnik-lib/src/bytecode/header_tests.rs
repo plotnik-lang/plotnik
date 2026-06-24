@@ -24,7 +24,7 @@ fn header_roundtrip() {
         regex_blob_size: 256,
         str_table_count: 10,
         regex_table_count: 3,
-        node_types_count: 20,
+        node_kinds_count: 20,
         node_fields_count: 5,
         type_defs_count: 8,
         type_members_count: 12,
@@ -51,7 +51,7 @@ fn compute_offsets_empty() {
     assert_eq!(offsets.regex_blob, 64); // 64 + align(0) = 64
     assert_eq!(offsets.str_table, 64); // 64 + align(0) = 64
     assert_eq!(offsets.regex_table, 128); // 64 + align(4) = 128
-    assert_eq!(offsets.node_types, 192); // 128 + align(8) = 192
+    assert_eq!(offsets.node_kinds, 192); // 128 + align(8) = 192
     assert_eq!(offsets.node_fields, 192); // 192 + align(0) = 192
     assert_eq!(offsets.type_defs, 192);
     assert_eq!(offsets.type_members, 192);
@@ -65,7 +65,7 @@ fn compute_offsets_with_data() {
     let h = Header {
         str_table_count: 5,     // (5+1)*4 = 24 bytes
         regex_table_count: 2,   // (2+1)*8 = 24 bytes
-        node_types_count: 10,   // 10*4 = 40 bytes
+        node_kinds_count: 10,   // 10*4 = 40 bytes
         node_fields_count: 5,   // 5*4 = 20 bytes
         type_defs_count: 8,     // 8*4 = 32 bytes
         type_members_count: 12, // 12*4 = 48 bytes
@@ -84,7 +84,7 @@ fn compute_offsets_with_data() {
     assert_eq!(offsets.regex_blob, 192); // 64 + 100 = 164 → 192
     assert_eq!(offsets.str_table, 320); // 192 + 128 = 320 (aligned)
     assert_eq!(offsets.regex_table, 384); // 320 + 24 = 344 → 384
-    assert_eq!(offsets.node_types, 448); // 384 + 24 = 408 → 448
+    assert_eq!(offsets.node_kinds, 448); // 384 + 24 = 408 → 448
     assert_eq!(offsets.node_fields, 512); // 448 + 40 = 488 → 512
     assert_eq!(offsets.type_defs, 576); // 512 + 20 = 532 → 576
     assert_eq!(offsets.type_members, 640); // 576 + 32 = 608 → 640

@@ -2,17 +2,17 @@
 
 use super::ids::StringId;
 
-/// Maps tree-sitter NodeTypeId to its string name.
+/// Maps a tree-sitter symbol id to its string name.
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
-pub struct NodeKindEntry {
-    /// Tree-sitter node kind ID
+pub struct SymbolNameEntry {
+    /// Tree-sitter symbol ID.
     pub symbol: u16,
-    /// StringId for the node kind name
+    /// StringId for the symbol name.
     pub name: StringId,
 }
 
-impl NodeKindEntry {
+impl SymbolNameEntry {
     /// Serialized size in bytes.
     pub const SIZE: usize = 4;
 
@@ -21,25 +21,10 @@ impl NodeKindEntry {
     }
 }
 
-const _: () = assert!(std::mem::size_of::<NodeKindEntry>() == NodeKindEntry::SIZE);
+const _: () = assert!(std::mem::size_of::<SymbolNameEntry>() == SymbolNameEntry::SIZE);
 
-/// Maps tree-sitter NodeFieldId to its string name.
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
-pub struct FieldEntry {
-    /// Tree-sitter field ID
-    pub symbol: u16,
-    /// StringId for the field name
-    pub name: StringId,
-}
+/// Maps tree-sitter node kind IDs to their string names.
+pub type NodeKindEntry = SymbolNameEntry;
 
-impl FieldEntry {
-    /// Serialized size in bytes.
-    pub const SIZE: usize = 4;
-
-    pub fn new(symbol: u16, name: StringId) -> Self {
-        Self { symbol, name }
-    }
-}
-
-const _: () = assert!(std::mem::size_of::<FieldEntry>() == FieldEntry::SIZE);
+/// Maps tree-sitter field IDs to their string names.
+pub type FieldEntry = SymbolNameEntry;

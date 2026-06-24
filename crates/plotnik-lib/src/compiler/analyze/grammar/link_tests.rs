@@ -1,7 +1,7 @@
 use crate::compiler::test_utils::colliding_node_kind_grammar;
 use crate::compiler::{Query, QueryBuilder, SourceMap, SourcePath};
 
-fn assert_links_colliding_node_types(files: &[(&str, &str)]) {
+fn assert_links_colliding_node_kinds(files: &[(&str, &str)]) {
     let grammar = colliding_node_kind_grammar();
     let mut source_map = SourceMap::new();
     for (path, content) in files {
@@ -40,12 +40,12 @@ fn assert_links_colliding_node_types(files: &[(&str, &str)]) {
 }
 
 #[test]
-fn resolves_named_and_anonymous_node_types_with_same_name() {
-    assert_links_colliding_node_types(&[
+fn resolves_named_and_anonymous_node_kinds_with_same_name() {
+    assert_links_colliding_node_kinds(&[
         ("named.ptk", "A = (number)"),
         ("anonymous.ptk", "Q = \"number\""),
     ]);
-    assert_links_colliding_node_types(&[
+    assert_links_colliding_node_kinds(&[
         ("anonymous.ptk", "Q = \"number\""),
         ("named.ptk", "A = (number)"),
     ]);

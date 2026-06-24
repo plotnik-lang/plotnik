@@ -209,12 +209,12 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
         let strings = self.module.strings();
         let regexes = self.module.regexes();
         let types = self.module.types();
-        let node_types = self.module.node_types();
+        let node_kinds = self.module.node_kinds();
         let node_fields = self.module.node_fields();
         let entrypoints = self.module.entrypoints();
 
         let mut node_kind_names = BTreeMap::new();
-        for t in node_types.iter() {
+        for t in node_kinds.iter() {
             node_kind_names.insert(
                 NodeKindId::try_from(t.symbol).expect("node kind id must be non-zero"),
                 strings.get(t.name).to_string(),

@@ -11,7 +11,7 @@ use super::aligned_vec::AlignedVec;
 use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, Trampoline, header_byte};
-use super::sections::{FieldEntry, NodeKindEntry};
+use super::sections::SymbolNameEntry;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
     Entrypoint, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
@@ -219,23 +219,21 @@ impl Module {
         }
     }
 
-    pub(crate) fn node_types(&self) -> GrammarTableView<'_, NodeKindEntry> {
-        let offset = self.offsets.node_types as usize;
-        let count = self.header.node_types_count as usize;
+    pub(crate) fn node_kinds(&self) -> GrammarTableView<'_> {
+        let offset = self.offsets.node_kinds as usize;
+        let count = self.header.node_kinds_count as usize;
         GrammarTableView {
-            bytes: &self.storage[offset..offset + count * NodeKindEntry::SIZE],
+            bytes: &self.storage[offset..offset + count * SymbolNameEntry::SIZE],
             count,
-            _marker: std::marker::PhantomData,
         }
     }
 
-    pub(crate) fn node_fields(&self) -> GrammarTableView<'_, FieldEntry> {
+    pub(crate) fn node_fields(&self) -> GrammarTableView<'_> {
         let offset = self.offsets.node_fields as usize;
         let count = self.header.node_fields_count as usize;
         GrammarTableView {
-            bytes: &self.storage[offset..offset + count * FieldEntry::SIZE],
+            bytes: &self.storage[offset..offset + count * SymbolNameEntry::SIZE],
             count,
-            _marker: std::marker::PhantomData,
         }
     }
 
@@ -332,40 +330,23 @@ impl<'a> StringsView<'a> {
     }
 }
 
-pub struct GrammarTableView<'a, T> {
+pub struct GrammarTableView<'a> {
     bytes: &'a [u8],
     count: usize,
-    _marker: std::marker::PhantomData<T>,
 }
 
-impl<'a> GrammarTableView<'a, NodeKindEntry> {
-    pub fn get(&self, idx: usize) -> NodeKindEntry {
-        assert!(idx < self.count, "node symbol index out of bounds");
-        let offset = idx * NodeKindEntry::SIZE;
-        NodeKindEntry::new(
+impl<'a> GrammarTableView<'a> {
+    pub fn get(&self, idx: usize) -> SymbolNameEntry {
+        assert!(idx < self.count, "symbol-name table index out of bounds");
+        let offset = idx * SymbolNameEntry::SIZE;
+        SymbolNameEntry::new(
             read_u16_le(self.bytes, offset),
             StringId::try_from(read_u16_le(self.bytes, offset + 2))
-                .expect("node kind name id must be non-zero"),
+                .expect("symbol name id must be non-zero"),
         )
     }
 
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = NodeKindEntry> + '_ {
-        (0..self.count).map(|idx| self.get(idx))
-    }
-}
-
-impl<'a> GrammarTableView<'a, FieldEntry> {
-    pub fn get(&self, idx: usize) -> FieldEntry {
-        assert!(idx < self.count, "field symbol index out of bounds");
-        let offset = idx * FieldEntry::SIZE;
-        FieldEntry::new(
-            read_u16_le(self.bytes, offset),
-            StringId::try_from(read_u16_le(self.bytes, offset + 2))
-                .expect("field name id must be non-zero"),
-        )
-    }
-
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = FieldEntry> + '_ {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = SymbolNameEntry> + '_ {
         (0..self.count).map(|idx| self.get(idx))
     }
 }

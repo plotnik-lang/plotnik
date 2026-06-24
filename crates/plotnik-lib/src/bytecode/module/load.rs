@@ -14,7 +14,7 @@ use super::super::instructions::{
 };
 use super::super::nav::Nav;
 use super::super::node_kind_constraint::NodeKindConstraint;
-use super::super::sections::{FieldEntry, NodeKindEntry};
+use super::super::sections::SymbolNameEntry;
 use super::super::type_meta::{TypeDefKind, TypeMember, TypeNameEntry};
 use super::super::{HEADER_SIZE, SECTION_ALIGN, VERSION};
 use super::*;
@@ -478,15 +478,15 @@ impl Module {
         )?;
         // node/field symbol name: u16 at entry+2
         check(
-            self.offsets.node_types,
-            NodeKindEntry::SIZE,
+            self.offsets.node_kinds,
+            SymbolNameEntry::SIZE,
             2,
             0,
-            self.header.node_types_count as usize,
+            self.header.node_kinds_count as usize,
         )?;
         check(
             self.offsets.node_fields,
-            FieldEntry::SIZE,
+            SymbolNameEntry::SIZE,
             2,
             0,
             self.header.node_fields_count as usize,

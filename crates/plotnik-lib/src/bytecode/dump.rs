@@ -66,7 +66,7 @@ impl DumpContext {
         let header = module.header();
         let strings = module.strings();
         let entrypoints = module.entrypoints();
-        let node_types = module.node_types();
+        let node_kinds = module.node_kinds();
         let node_fields = module.node_fields();
 
         let mut step_labels = BTreeMap::new();
@@ -78,7 +78,7 @@ impl DumpContext {
         }
 
         let mut node_kind_names = BTreeMap::new();
-        for t in node_types.iter() {
+        for t in node_kinds.iter() {
             if let Ok(id) = NodeKindId::try_from(t.symbol) {
                 node_kind_names.insert(id, strings.get(t.name).to_string());
             }

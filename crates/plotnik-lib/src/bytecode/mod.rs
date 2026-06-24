@@ -49,7 +49,7 @@ pub(crate) use module::{EntrypointsView, Instruction, StringsView, TypesView};
 pub(crate) use nav::Nav;
 pub(crate) use node_kind_constraint::NodeKindConstraint;
 pub(crate) use predicate_op::PredicateOp;
-pub(crate) use sections::{FieldEntry, NodeKindEntry};
+pub(crate) use sections::{FieldEntry, NodeKindEntry, SymbolNameEntry};
 pub(crate) use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
 
 #[cfg(test)]

@@ -276,7 +276,7 @@ fn first_section_gap(bytes: &[u8]) -> usize {
         (o.regex_blob, h.regex_blob_size),
         (o.str_table, (h.str_table_count as u32 + 1) * 4),
         (o.regex_table, (h.regex_table_count as u32 + 1) * 8),
-        (o.node_types, h.node_types_count as u32 * 4),
+        (o.node_kinds, h.node_kinds_count as u32 * 4),
         (o.node_fields, h.node_fields_count as u32 * 4),
         (o.type_defs, h.type_defs_count as u32 * 4),
         (o.type_members, h.type_members_count as u32 * 4),

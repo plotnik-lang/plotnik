@@ -45,11 +45,11 @@ Maps tree-sitter node kind IDs to their string names.
 
 - **Section Offset**: Computed (follows RegexTable)
 - **Record Size**: 4 bytes
-- **Count**: `header.node_types_count`
+- **Count**: `header.node_kinds_count`
 
 ```rust
 #[repr(C)]
-struct NodeKindEntry {
+struct SymbolNameEntry {
     symbol: u16,    // Tree-sitter node kind ID
     name: u16,      // StringId
 }
@@ -61,14 +61,14 @@ This table enables name lookup for debugging and error messages.
 
 Maps tree-sitter field IDs to their string names.
 
-- **Section Offset**: Computed (follows NodeTypes)
+- **Section Offset**: Computed (follows NodeKinds)
 - **Record Size**: 4 bytes
 - **Count**: `header.node_fields_count`
 
 ```rust
 #[repr(C)]
-struct FieldSymbol {
-    id: u16,        // Tree-sitter field ID
+struct SymbolNameEntry {
+    symbol: u16,    // Tree-sitter field ID
     name: u16,      // StringId
 }
 ```
