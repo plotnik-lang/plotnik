@@ -225,6 +225,13 @@ impl<'q> Parser<'q, '_> {
         self.start_node_at(checkpoint, SyntaxKind::Error);
         let (span, name) = self.consume_predicate_name();
         self.report_unsupported_predicate(span, name);
+        self.consume_until_matching_paren();
+        self.pop_delimiter();
+        self.expect(SyntaxKind::ParenClose, "closing ')' for predicate");
+        self.finish_node();
+    }
+
+    fn consume_until_matching_paren(&mut self) {
         // Swallow arguments up to the predicate's own closing `)`, tracking delimiter depth: a
         // nested argument like `(identifier)` ends at its own `)`, while an enclosing `]`/`}`
         // left by a missing `)` stops the run *without* being consumed — so the outer
@@ -245,9 +252,6 @@ impl<'q> Parser<'q, '_> {
             }
             self.bump();
         }
-        self.pop_delimiter();
-        self.expect(SyntaxKind::ParenClose, "closing ')' for predicate");
-        self.finish_node();
     }
 
     /// Report an unsupported tree-sitter predicate, suggesting the native node predicate only
