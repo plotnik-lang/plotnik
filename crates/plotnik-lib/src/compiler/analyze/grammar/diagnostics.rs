@@ -25,8 +25,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         if valid_fields.is_empty() {
             builder = builder.hint(format!("`{}` has no fields", parent_name));
         } else {
-            let max_dist = (field_name.len() / 3).clamp(2, 4);
-            if let Some(similar) = find_similar(field_name, &valid_fields, max_dist) {
+            if let Some(similar) = find_similar(field_name, &valid_fields) {
                 builder = builder.fix(format!("did you mean `{}`?", similar), similar);
             }
             builder = builder.hint(format!(

@@ -561,8 +561,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         let sub_name = sub_token.text();
         let Some(sub_id) = self.grammar.resolve_named_node(sub_name) else {
             let all_types = self.grammar.all_named_node_kinds();
-            let max_dist = (sub_name.len() / 3).clamp(2, 4);
-            let suggestion = find_similar(sub_name, &all_types, max_dist).map(str::to_string);
+            let suggestion = find_similar(sub_name, &all_types).map(str::to_string);
             let mut builder = self
                 .diag
                 .report(

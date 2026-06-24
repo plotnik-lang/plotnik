@@ -43,8 +43,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         }
         if resolved.is_none() {
             let all_types = self.grammar.all_named_node_kinds();
-            let max_dist = (type_name.len() / 3).clamp(2, 4);
-            let suggestion = find_similar(type_name, &all_types, max_dist);
+            let suggestion = find_similar(type_name, &all_types);
 
             let mut builder = self
                 .diag
@@ -78,8 +77,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             return;
         }
         let all_fields = self.grammar.all_field_names();
-        let max_dist = (field_name.len() / 3).clamp(2, 4);
-        let suggestion = find_similar(field_name, &all_fields, max_dist);
+        let suggestion = find_similar(field_name, &all_fields);
 
         let mut builder = self
             .diag

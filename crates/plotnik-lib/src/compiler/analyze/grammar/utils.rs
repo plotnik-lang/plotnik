@@ -34,14 +34,11 @@ pub fn edit_distance(a: &str, b: &str) -> usize {
     prev[b_len]
 }
 
-/// Find the best match from candidates within a maximum edit distance.
+/// Find the best match from candidates within the shared suggestion threshold.
 ///
-/// Returns the closest candidate (lowest distance) if it is within `max_distance`.
-pub fn find_similar<'a>(
-    name: &str,
-    candidates: &[&'a str],
-    max_distance: usize,
-) -> Option<&'a str> {
+/// Returns the closest candidate (lowest distance) if it is within the threshold.
+pub fn find_similar<'a>(name: &str, candidates: &[&'a str]) -> Option<&'a str> {
+    let max_distance = (name.len() / 3).clamp(2, 4);
     candidates
         .iter()
         .map(|&c| (c, edit_distance(name, c)))
