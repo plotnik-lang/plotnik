@@ -93,11 +93,11 @@ impl<'q> QueryPrinter<'q> {
                 writeln!(w, "# {}", source.kind.display_name())?;
             }
 
-            let mut emit = AstEmit::new(self, w);
+            let mut writer = AstWriter::new(self, w);
             if self.cst {
-                emit.format_cst(root.syntax(), 0)?;
+                writer.format_cst(root.syntax(), 0)?;
             } else {
-                emit.format_root(root)?;
+                writer.format_root(root)?;
             }
 
             first = false;
@@ -135,15 +135,15 @@ impl<'q> QueryPrinter<'q> {
             }
         }
 
-        let mut emit = SymbolEmit::new(self, symbols, &defined, &body_nodes, w);
+        let mut writer = SymbolWriter::new(self, symbols, &defined, &body_nodes, w);
         for name in symbols.names() {
-            emit.format_symbol_tree(name, 0)?;
+            writer.format_symbol_tree(name, 0)?;
         }
         Ok(())
     }
 }
 
-struct SymbolEmit<'p, 'q, 'a, W> {
+struct SymbolWriter<'p, 'q, 'a, W> {
     printer: &'p QueryPrinter<'q>,
     symbols: &'a SymbolTable,
     defined: &'a IndexSet<&'a str>,
@@ -152,7 +152,7 @@ struct SymbolEmit<'p, 'q, 'a, W> {
     w: &'p mut W,
 }
 
-impl<'p, 'q, 'a, W: Write> SymbolEmit<'p, 'q, 'a, W> {
+impl<'p, 'q, 'a, W: Write> SymbolWriter<'p, 'q, 'a, W> {
     fn new(
         printer: &'p QueryPrinter<'q>,
         symbols: &'a SymbolTable,
@@ -206,12 +206,12 @@ impl<'p, 'q, 'a, W: Write> SymbolEmit<'p, 'q, 'a, W> {
     }
 }
 
-struct AstEmit<'p, 'q, W> {
+struct AstWriter<'p, 'q, W> {
     printer: &'p QueryPrinter<'q>,
     w: &'p mut W,
 }
 
-impl<'p, 'q, W: Write> AstEmit<'p, 'q, W> {
+impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
     fn new(printer: &'p QueryPrinter<'q>, w: &'p mut W) -> Self {
         Self { printer, w }
     }

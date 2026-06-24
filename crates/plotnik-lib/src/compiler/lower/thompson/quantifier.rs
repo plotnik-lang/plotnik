@@ -11,7 +11,7 @@ use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOpera
 
 use super::Compiler;
 use super::capture::{CaptureEffects, PatternCtx, needs_struct_wrapper, row_type_id};
-use super::emit::{BranchTargets, Greediness};
+use super::nfa_emit::{BranchTargets, Greediness};
 use super::navigation::resumable_search_nav;
 use super::scope::{CaptureExits, CaptureRequest, EndScopeEffects, SplitExits};
 

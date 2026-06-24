@@ -20,9 +20,9 @@
 mod alternation;
 mod capture;
 mod compiler;
-mod emit;
 mod expressions;
 mod navigation;
+mod nfa_emit;
 mod quantifier;
 mod scope;
 mod sequences;

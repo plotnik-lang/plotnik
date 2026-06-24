@@ -434,7 +434,7 @@ impl CompiledQuery {
         self.module
     }
 
-    pub fn emit_typescript(
+    pub fn to_typescript(
         &self,
         config: crate::compiler::typegen::typescript::Config,
     ) -> Option<String> {
@@ -442,6 +442,7 @@ impl CompiledQuery {
             .as_ref()
             .map(|module| crate::compiler::typegen::typescript::emit(module, config))
     }
+
 }
 
 impl LinkOutcome {

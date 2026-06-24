@@ -55,7 +55,7 @@ pub fn run(args: InferArgs) -> CliResult {
         .void_type(void_type)
         .colored(use_colors);
     let output = compiled
-        .emit_typescript(config)
+        .to_typescript(config)
         .ok_or_else(|| CliError::fatal("compile produced no module"))?;
 
     if let Some(ref path) = args.output {
