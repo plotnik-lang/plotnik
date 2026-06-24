@@ -174,15 +174,21 @@ pub struct StepId(NonZeroU16);
 
 impl From<NonZeroU16> for StepId {
     #[inline]
-    fn from(n: NonZeroU16) -> Self { Self(n) }
+    fn from(n: NonZeroU16) -> Self {
+        Self(n)
+    }
 }
 impl From<StepId> for NonZeroU16 {
     #[inline]
-    fn from(v: StepId) -> Self { v.0 }
+    fn from(v: StepId) -> Self {
+        v.0
+    }
 }
 impl From<StepId> for u16 {
     #[inline]
-    fn from(v: StepId) -> Self { v.0.get() }
+    fn from(v: StepId) -> Self {
+        v.0.get()
+    }
 }
 impl TryFrom<u16> for StepId {
     type Error = ZeroIdError;
@@ -334,7 +340,8 @@ impl<'a> Match<'a> {
         let nav = Nav::from_byte(bytes[1]);
         let node_val = u16::from_le_bytes([bytes[2], bytes[3]]);
         let node_kind = NodeKindConstraint::from_bytes(node_class, node_val);
-        let node_field = NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]])).map(NodeFieldId::from);
+        let node_field =
+            NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]])).map(NodeFieldId::from);
 
         let layout = if opcode == Opcode::Match8 {
             let next = u16::from_le_bytes([bytes[6], bytes[7]]);
@@ -407,7 +414,8 @@ impl<'a> Match<'a> {
                 StepId::try_from(u16::from_le_bytes([
                     self.bytes[offset],
                     self.bytes[offset + 1],
-                ])).expect("step id must be non-zero")
+                ]))
+                .expect("step id must be non-zero")
             }
         }
     }
@@ -756,9 +764,12 @@ impl Call {
         Self {
             segment,
             nav: Nav::from_byte(bytes[1]),
-            node_field: NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]])).map(NodeFieldId::from),
-            next: StepId::try_from(u16::from_le_bytes([bytes[4], bytes[5]])).expect("step id must be non-zero"),
-            target: StepId::try_from(u16::from_le_bytes([bytes[6], bytes[7]])).expect("step id must be non-zero"),
+            node_field: NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]]))
+                .map(NodeFieldId::from),
+            next: StepId::try_from(u16::from_le_bytes([bytes[4], bytes[5]]))
+                .expect("step id must be non-zero"),
+            target: StepId::try_from(u16::from_le_bytes([bytes[6], bytes[7]]))
+                .expect("step id must be non-zero"),
         }
     }
 
@@ -856,7 +867,8 @@ impl Trampoline {
 
         Self {
             segment,
-            next: StepId::try_from(u16::from_le_bytes([bytes[2], bytes[3]])).expect("step id must be non-zero"),
+            next: StepId::try_from(u16::from_le_bytes([bytes[2], bytes[3]]))
+                .expect("step id must be non-zero"),
         }
     }
 

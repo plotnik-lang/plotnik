@@ -37,7 +37,5 @@ pub fn compile_query(
 
 pub fn compile_module(sources: SourceMap, lang: &Lang, color: bool) -> Result<Module, CliError> {
     let compiled = compile_query(sources, lang, color)?;
-    Ok(compiled
-        .into_module()
-        .expect("dry_run guarantees a module"))
+    Ok(compiled.into_module().expect("dry_run guarantees a module"))
 }

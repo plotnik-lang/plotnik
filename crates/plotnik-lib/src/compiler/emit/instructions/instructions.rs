@@ -111,7 +111,8 @@ fn resolve_call(c: &CallIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
 }
 
 fn resolve_trampoline(t: &TrampolineIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
-    Trampoline::new(StepId::try_from(t.next.resolve(map)).expect("step id must be non-zero")).to_bytes()
+    Trampoline::new(StepId::try_from(t.next.resolve(map)).expect("step id must be non-zero"))
+        .to_bytes()
 }
 
 fn resolve_effect(effect: &EffectIR, pool: ConstantPool<'_>) -> Effect {

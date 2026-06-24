@@ -8,8 +8,8 @@
 use regex_automata::dfa::dense;
 
 use crate::bytecode::StringId;
-use crate::compiler::lower::ir::{NfaGraph, InstructionIR, PredicateValueIR};
 use crate::compiler::emit::tables::{EmitError, RegexId, RegexTableBuilder, StringTableBuilder};
+use crate::compiler::lower::ir::{InstructionIR, NfaGraph, PredicateValueIR};
 
 /// Compile every regex predicate into the regex table, resolving each pattern's
 /// StringId from the finished string table. Reads the string table; interns

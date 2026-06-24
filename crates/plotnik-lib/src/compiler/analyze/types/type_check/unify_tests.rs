@@ -1,6 +1,6 @@
+use super::unify::{UnifyError, unify_flow};
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
 use crate::compiler::analyze::types::type_shape::{PatternFlow, TYPE_NODE};
-use super::unify::{UnifyError, unify_flow};
 
 #[test]
 fn unify_scalar_error() {

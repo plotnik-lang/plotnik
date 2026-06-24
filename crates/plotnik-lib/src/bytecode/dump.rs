@@ -266,7 +266,10 @@ fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
         writeln!(
             out,
             "M{i:0mw$}: S{:0sw$} → T{:0tw$}  {}; {name}: {type_name}{}",
-            u16::from(member.name_id), u16::from(member.type_id), c.dim, c.reset
+            u16::from(member.name_id),
+            u16::from(member.type_id),
+            c.dim,
+            c.reset
         )
         .expect("writing to a String is infallible");
     }
@@ -288,7 +291,11 @@ fn dump_types_names(out: &mut String, module: &Module, ctx: &DumpContext) {
         writeln!(
             out,
             "N{i:0nw$}: S{:0sw$} → T{:0tw$}  {}; {}{name}{}",
-            u16::from(entry.name_id), u16::from(entry.type_id), c.dim, c.blue, c.reset
+            u16::from(entry.name_id),
+            u16::from(entry.type_id),
+            c.dim,
+            c.blue,
+            c.reset
         )
         .expect("writing to a String is infallible");
     }

@@ -1,9 +1,9 @@
 use rowan::TextRange;
 
+use crate::compiler::analyze::types::type_shape::{Arity, PatternFlow, PatternShape, TypeId};
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::analyze::types::type_shape::{Arity, PatternFlow, PatternShape, TypeId};
 use crate::compiler::parse::ast::{FieldPattern, Pattern, QuantifiedPattern};
 
 use super::super::unify::UnifyError;

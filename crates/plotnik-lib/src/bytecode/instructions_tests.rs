@@ -178,9 +178,11 @@ fn arb_node_type() -> impl Strategy<Value = NodeKindConstraint> {
     prop_oneof![
         Just(NodeKindConstraint::Any),
         Just(NodeKindConstraint::Named(None)),
-        (1u16..=u16::MAX).prop_map(|n| NodeKindConstraint::Named(NonZeroU16::new(n).map(NodeKindId::from))),
+        (1u16..=u16::MAX)
+            .prop_map(|n| NodeKindConstraint::Named(NonZeroU16::new(n).map(NodeKindId::from))),
         Just(NodeKindConstraint::Anonymous(None)),
-        (1u16..=u16::MAX).prop_map(|n| NodeKindConstraint::Anonymous(NonZeroU16::new(n).map(NodeKindId::from))),
+        (1u16..=u16::MAX)
+            .prop_map(|n| NodeKindConstraint::Anonymous(NonZeroU16::new(n).map(NodeKindId::from))),
     ]
 }
 
@@ -218,10 +220,16 @@ fn arb_match_instr() -> impl Strategy<Value = MatchInstr> {
         arb_node_type(),
         prop::option::of((1u16..=u16::MAX).prop_map(|n| NodeFieldId::try_from(n).unwrap())),
         prop::collection::vec(arb_effect(), 0..=7),
-        prop::collection::vec((1u16..=u16::MAX).prop_map(|n| NodeFieldId::try_from(n).unwrap()), 0..=7),
+        prop::collection::vec(
+            (1u16..=u16::MAX).prop_map(|n| NodeFieldId::try_from(n).unwrap()),
+            0..=7,
+        ),
         prop::collection::vec(arb_effect(), 0..=7),
         prop::option::of(arb_predicate()),
-        prop::collection::vec((1u16..=u16::MAX).prop_map(|n| StepId::try_from(n).unwrap()), 0..=5),
+        prop::collection::vec(
+            (1u16..=u16::MAX).prop_map(|n| StepId::try_from(n).unwrap()),
+            0..=5,
+        ),
     )
         .prop_map(
             |(

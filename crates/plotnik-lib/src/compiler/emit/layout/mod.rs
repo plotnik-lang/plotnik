@@ -8,7 +8,7 @@ mod cache_aligned;
 pub use cache_aligned::CacheAligned;
 
 use crate::compiler::emit::tables::EmitError;
-use crate::compiler::lower::ir::{NfaGraph, Label, LayoutMap};
+use crate::compiler::lower::ir::{Label, LayoutMap, NfaGraph};
 
 /// Assign a cache-aligned step address to every label.
 pub fn compute_layout(ir: &NfaGraph) -> Result<LayoutMap, EmitError> {

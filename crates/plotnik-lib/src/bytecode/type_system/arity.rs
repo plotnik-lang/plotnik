@@ -17,5 +17,4 @@ impl Arity {
         }
         Self::Many
     }
-
 }

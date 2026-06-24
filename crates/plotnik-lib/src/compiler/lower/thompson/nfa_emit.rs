@@ -1,7 +1,7 @@
 use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::lower::ir::{CallIR, CalleeEntry, EffectIR, Label, MatchIR, ReturnAddr};
-use crate::core::NodeFieldId;
 use crate::compiler::parse::ast::{Pattern, QuantifierOperator};
+use crate::core::NodeFieldId;
 
 use super::NfaBuilder;
 use super::capture::CaptureEffects;

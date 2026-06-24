@@ -4,9 +4,9 @@
 //! The grammar follows tree-sitter query syntax with extensions for named subqueries.
 
 mod atoms;
-mod patterns;
 mod fields;
 mod items;
+mod patterns;
 mod structures;
 mod utils;
 mod validation;

@@ -12,7 +12,9 @@ use super::ir::{
 fn match_ir_size_match8() {
     let m = MatchIR::terminal(Label(0))
         .nav(Nav::Down)
-        .node_kind(NodeKindConstraint::Named(NonZeroU16::new(10).map(NodeKindId::from)))
+        .node_kind(NodeKindConstraint::Named(
+            NonZeroU16::new(10).map(NodeKindId::from),
+        ))
         .next(Label(1));
 
     assert_eq!(m.size(), 8);
@@ -22,7 +24,9 @@ fn match_ir_size_match8() {
 fn match_ir_size_extended() {
     let m = MatchIR::terminal(Label(0))
         .nav(Nav::Down)
-        .node_kind(NodeKindConstraint::Named(NonZeroU16::new(10).map(NodeKindId::from)))
+        .node_kind(NodeKindConstraint::Named(
+            NonZeroU16::new(10).map(NodeKindId::from),
+        ))
         .pre_effect(EffectIR::start_struct())
         .post_effect(EffectIR::node())
         .next(Label(1));

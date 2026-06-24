@@ -4,7 +4,7 @@
 //! stream references.
 
 use crate::compiler::emit::tables::{EmitError, StringTableBuilder};
-use crate::compiler::lower::ir::{NfaGraph, InstructionIR};
+use crate::compiler::lower::ir::{InstructionIR, NfaGraph};
 
 /// The sole creator of the string table — seeds it from the predicate strings
 /// reachable in the instruction stream. Later phases extend or read this table.

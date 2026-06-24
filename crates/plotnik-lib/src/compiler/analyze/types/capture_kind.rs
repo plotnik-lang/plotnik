@@ -8,7 +8,7 @@
 //! lockstep.
 
 use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::analyze::types::type_analysis::{TypeAnalysisView, TypeAnalysis};
+use crate::compiler::analyze::types::type_analysis::{TypeAnalysis, TypeAnalysisView};
 use crate::compiler::analyze::types::type_shape::{PatternFlow, QuantifierKind, TypeShape};
 use crate::compiler::parse::ast::{Pattern, is_empty_group};
 use crate::core::Interner;

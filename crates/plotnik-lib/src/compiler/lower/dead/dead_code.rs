@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use crate::compiler::lower::ir::{NfaGraph, Label};
+use crate::compiler::lower::ir::{Label, NfaGraph};
 
 pub fn remove_unreachable(result: &mut NfaGraph) {
     let reachable = compute_reachable(result);

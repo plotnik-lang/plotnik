@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::bytecode::EffectKind;
 
-use crate::compiler::lower::ir::{NfaGraph, EffectIR, InstructionIR, Label, MatchIR};
+use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR, NfaGraph};
 
 fn build_label_to_index(instructions: &[InstructionIR]) -> HashMap<Label, usize> {
     instructions

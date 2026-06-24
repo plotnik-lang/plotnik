@@ -6,9 +6,9 @@
 
 use indexmap::IndexMap;
 
-use crate::compiler::parse::ast;
 use crate::compiler::analyze::located::Located;
 use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::parse::ast;
 
 /// Name-resolution registry: every named definition bound to its body AST and the
 /// source file that defines it.

@@ -8,10 +8,10 @@
 
 use indexmap::IndexMap;
 
-use crate::compiler::parse::ast::Root;
+use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::source::SourceMap;
-use crate::compiler::diagnostics::report::Diagnostics;
+use crate::compiler::parse::ast::Root;
 
 pub mod alt_kinds;
 pub mod anchors;

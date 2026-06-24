@@ -10,7 +10,7 @@
 use crate::bytecode::{MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS};
 use crate::core::NodeFieldId;
 
-use crate::compiler::lower::ir::{NfaGraph, EffectIR, InstructionIR, Label, MatchIR};
+use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR, NfaGraph};
 
 const MAX_POST_EFFECTS: usize = 7;
 const MAX_NEG_FIELDS: usize = 7;

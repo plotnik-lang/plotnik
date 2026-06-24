@@ -35,11 +35,11 @@ mod parser;
 #[cfg(test)]
 mod ast_tests;
 #[cfg(test)]
-mod parser_tests;
-#[cfg(test)]
 mod cst_tests;
 #[cfg(test)]
 mod lexer_tests;
+#[cfg(test)]
+mod parser_tests;
 #[cfg(test)]
 mod token_set_tests;
 

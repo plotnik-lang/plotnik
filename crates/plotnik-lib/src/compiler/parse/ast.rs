@@ -332,15 +332,11 @@ fn quantifier_operator_from_syntax_kind(kind: SyntaxKind) -> Option<QuantifierOp
         SyntaxKind::QuestionQuestion => {
             QuantifierOperator::new(QuantifierKind::Optional, Greediness::NonGreedy)
         }
-        SyntaxKind::Star => {
-            QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::Greedy)
-        }
+        SyntaxKind::Star => QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::Greedy),
         SyntaxKind::StarQuestion => {
             QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::NonGreedy)
         }
-        SyntaxKind::Plus => {
-            QuantifierOperator::new(QuantifierKind::OneOrMore, Greediness::Greedy)
-        }
+        SyntaxKind::Plus => QuantifierOperator::new(QuantifierKind::OneOrMore, Greediness::Greedy),
         SyntaxKind::PlusQuestion => {
             QuantifierOperator::new(QuantifierKind::OneOrMore, Greediness::NonGreedy)
         }

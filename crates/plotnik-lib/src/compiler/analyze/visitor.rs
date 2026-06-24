@@ -20,8 +20,8 @@
 
 use crate::compiler::analyze::Located;
 use crate::compiler::parse::ast::{
-    CapturedPattern, Def, DefRef, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern,
-    Root, SeqPattern, TokenPattern, UnionPattern,
+    CapturedPattern, Def, DefRef, EnumPattern, FieldPattern, NodePattern, Pattern,
+    QuantifiedPattern, Root, SeqPattern, TokenPattern, UnionPattern,
 };
 
 pub trait Visitor: Sized {

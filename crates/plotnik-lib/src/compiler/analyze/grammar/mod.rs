@@ -2,9 +2,9 @@
 
 //! Grammar linking: resolve node-kind references against a tree-sitter grammar.
 
+pub mod binding;
 mod check;
 mod diagnostics;
-pub mod binding;
 pub mod link;
 mod resolve;
 mod utils;

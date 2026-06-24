@@ -42,11 +42,7 @@ impl TypeTableBuilder {
 
     /// Map `query_id` to the next bytecode slot and push `def`; returns the id.
     /// Used to emit builtins and to reserve placeholder slots for custom types.
-    pub fn push_mapped(
-        &mut self,
-        query_id: TypeId,
-        def: TypeDef,
-    ) -> Result<WireTypeId, EmitError> {
+    pub fn push_mapped(&mut self, query_id: TypeId, def: TypeDef) -> Result<WireTypeId, EmitError> {
         if self.type_defs.len() >= EmitError::MAX_TYPES {
             return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
         }
@@ -87,10 +83,7 @@ impl TypeTableBuilder {
     }
 
     /// Intern an `Optional(base_type)` wrapper, deduplicating by base type.
-    pub fn intern_optional(
-        &mut self,
-        base_type: WireTypeId,
-    ) -> Result<WireTypeId, EmitError> {
+    pub fn intern_optional(&mut self, base_type: WireTypeId) -> Result<WireTypeId, EmitError> {
         if let Some(&optional_id) = self.optional_wrappers.get(&base_type) {
             return Ok(optional_id);
         }

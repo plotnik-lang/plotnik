@@ -44,11 +44,7 @@ impl StringTableBuilder {
         builder
     }
 
-    pub fn intern(
-        &mut self,
-        sym: Symbol,
-        interner: &Interner,
-    ) -> Result<StringId, EmitError> {
+    pub fn intern(&mut self, sym: Symbol, interner: &Interner) -> Result<StringId, EmitError> {
         if let Some(&id) = self.mapping.get(&sym) {
             return Ok(id);
         }

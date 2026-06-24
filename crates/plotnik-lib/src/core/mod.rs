@@ -44,15 +44,21 @@ pub struct NodeKindId(NonZeroU16);
 
 impl From<NonZeroU16> for NodeKindId {
     #[inline]
-    fn from(n: NonZeroU16) -> Self { Self(n) }
+    fn from(n: NonZeroU16) -> Self {
+        Self(n)
+    }
 }
 impl From<NodeKindId> for NonZeroU16 {
     #[inline]
-    fn from(v: NodeKindId) -> Self { v.0 }
+    fn from(v: NodeKindId) -> Self {
+        v.0
+    }
 }
 impl From<NodeKindId> for u16 {
     #[inline]
-    fn from(v: NodeKindId) -> Self { v.0.get() }
+    fn from(v: NodeKindId) -> Self {
+        v.0.get()
+    }
 }
 impl TryFrom<u16> for NodeKindId {
     type Error = ZeroIdError;
@@ -74,15 +80,21 @@ pub struct NodeFieldId(NonZeroU16);
 
 impl From<NonZeroU16> for NodeFieldId {
     #[inline]
-    fn from(n: NonZeroU16) -> Self { Self(n) }
+    fn from(n: NonZeroU16) -> Self {
+        Self(n)
+    }
 }
 impl From<NodeFieldId> for NonZeroU16 {
     #[inline]
-    fn from(v: NodeFieldId) -> Self { v.0 }
+    fn from(v: NodeFieldId) -> Self {
+        v.0
+    }
 }
 impl From<NodeFieldId> for u16 {
     #[inline]
-    fn from(v: NodeFieldId) -> Self { v.0.get() }
+    fn from(v: NodeFieldId) -> Self {
+        v.0.get()
+    }
 }
 impl TryFrom<u16> for NodeFieldId {
     type Error = ZeroIdError;

@@ -14,9 +14,9 @@ use crate::compiler::lower::ir::{
     CalleeEntry, EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
     ReturnAddr,
 };
-use crate::core::NodeFieldId;
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
+use crate::core::NodeFieldId;
 
 use crate::compiler::analyze::types::CaptureKind;
 

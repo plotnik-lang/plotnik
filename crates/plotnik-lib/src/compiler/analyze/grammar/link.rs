@@ -10,8 +10,8 @@ use crate::core::grammar::Grammar;
 use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId};
 use indexmap::IndexMap;
 
-use super::check::{AdmissibilityMode, AdmissibilityWalkState};
 use super::binding::GrammarBindingBuilder;
+use super::check::{AdmissibilityMode, AdmissibilityWalkState};
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::report::Diagnostics;

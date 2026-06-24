@@ -478,7 +478,8 @@ fn resolve_node_id(
 }
 
 fn node_field_id(id: u16) -> NodeFieldId {
-    NodeFieldId::try_from(id).expect("lowered field symbol id must be non-zero in production grammar")
+    NodeFieldId::try_from(id)
+        .expect("lowered field symbol id must be non-zero in production grammar")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

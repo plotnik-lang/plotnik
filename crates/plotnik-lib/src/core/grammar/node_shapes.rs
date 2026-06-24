@@ -801,12 +801,9 @@ fn add_token_node_shape(
 ) {
     match kind {
         VariableType::Named => {
-            let node_shape_json =
-                node_shapes_json
-                    .entry(name.to_string())
-                    .or_insert_with(|| {
-                        NodeShapeRecord::bare(name.to_string(), true, extra_names.contains(name))
-                    });
+            let node_shape_json = node_shapes_json.entry(name.to_string()).or_insert_with(|| {
+                NodeShapeRecord::bare(name.to_string(), true, extra_names.contains(name))
+            });
             if let Some(children) = &mut node_shape_json.children {
                 children.required = false;
             }

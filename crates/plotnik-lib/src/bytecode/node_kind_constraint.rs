@@ -57,7 +57,9 @@ impl NodeKindConstraint {
         match node_class {
             0b00 => Some(Self::Any),
             0b01 => Some(Self::Named(NonZeroU16::new(node_val).map(NodeKindId::from))),
-            0b10 => Some(Self::Anonymous(NonZeroU16::new(node_val).map(NodeKindId::from))),
+            0b10 => Some(Self::Anonymous(
+                NonZeroU16::new(node_val).map(NodeKindId::from),
+            )),
             _ => None,
         }
     }

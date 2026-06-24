@@ -53,7 +53,8 @@ pub fn unify_flow(
         (PatternFlow::Void, PatternFlow::Void) => Ok(PatternFlow::Void),
 
         // Void ∪ Fields -> Fields (every field is absent in the Void branch)
-        (PatternFlow::Void, PatternFlow::Fields(id)) | (PatternFlow::Fields(id), PatternFlow::Void) => {
+        (PatternFlow::Void, PatternFlow::Fields(id))
+        | (PatternFlow::Fields(id), PatternFlow::Void) => {
             let fields = ctx.in_progress().expect_struct_fields(id).clone();
             let relaxed = relax_all_for_absence(ctx, fields);
             Ok(PatternFlow::Fields(ctx.intern_struct(relaxed)))

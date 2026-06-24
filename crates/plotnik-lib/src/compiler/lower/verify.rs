@@ -67,7 +67,7 @@ mod debug_impl {
     use crate::compiler::ids::DefId;
     use crate::compiler::lower::LowerInput;
     use crate::compiler::lower::ir::{
-        NfaGraph, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR,
+        InstructionIR, Label, MatchIR, NfaGraph, NodeKindConstraint, PredicateValueIR,
     };
 
     /// Max completed paths recorded per fingerprint. This counts root-to-leaf
@@ -570,12 +570,7 @@ mod debug_impl {
         s
     }
 
-    fn verify_after_pass(
-        name: &str,
-        before: &PassSnapshot,
-        result: &NfaGraph,
-        ctx: &LowerInput,
-    ) {
+    fn verify_after_pass(name: &str, before: &PassSnapshot, result: &NfaGraph, ctx: &LowerInput) {
         if let Err(e) = check_labels(&result.instructions) {
             panic!("[verify] pass `{name}` produced malformed IR: {e}");
         }

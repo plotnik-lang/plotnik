@@ -15,8 +15,8 @@ pub use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 pub use crate::compiler::analyze::types::type_shape::Arity;
 pub use crate::core::Interner;
 
-use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::names::SymbolTable;
+use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::diagnostics::report::Diagnostics;
 
 /// Run type inference on all definitions.

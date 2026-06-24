@@ -14,15 +14,21 @@ pub struct StringId(NonZeroU16);
 
 impl From<NonZeroU16> for StringId {
     #[inline]
-    fn from(n: NonZeroU16) -> Self { Self(n) }
+    fn from(n: NonZeroU16) -> Self {
+        Self(n)
+    }
 }
 impl From<StringId> for NonZeroU16 {
     #[inline]
-    fn from(v: StringId) -> Self { v.0 }
+    fn from(v: StringId) -> Self {
+        v.0
+    }
 }
 impl From<StringId> for u16 {
     #[inline]
-    fn from(v: StringId) -> Self { v.0.get() }
+    fn from(v: StringId) -> Self {
+        v.0.get()
+    }
 }
 impl TryFrom<u16> for StringId {
     type Error = ZeroIdError;
@@ -45,11 +51,15 @@ pub struct TypeId(u16);
 
 impl From<u16> for TypeId {
     #[inline]
-    fn from(n: u16) -> Self { Self(n) }
+    fn from(n: u16) -> Self {
+        Self(n)
+    }
 }
 impl From<TypeId> for u16 {
     #[inline]
-    fn from(v: TypeId) -> Self { v.0 }
+    fn from(v: TypeId) -> Self {
+        v.0
+    }
 }
 impl std::fmt::Display for TypeId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
