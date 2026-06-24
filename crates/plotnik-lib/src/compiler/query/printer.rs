@@ -321,10 +321,7 @@ impl<'q> QueryPrinter<'q> {
                     )?,
                     None => writeln!(w, "{}CapturedPattern{}{} @{}", prefix, arity, span, name)?,
                 }
-                let Some(inner) = c.inner() else {
-                    return Ok(());
-                };
-                self.format_pattern(&inner, depth + 1, w)?;
+                self.format_optional_pattern(c.inner(), depth + 1, w)?;
             }
             ast::Pattern::QuantifiedPattern(q) => {
                 let op = q
@@ -332,21 +329,28 @@ impl<'q> QueryPrinter<'q> {
                     .map(|t| t.text().to_string())
                     .unwrap_or_default();
                 writeln!(w, "{}QuantifiedPattern{}{} {}", prefix, arity, span, op)?;
-                let Some(inner) = q.inner() else {
-                    return Ok(());
-                };
-                self.format_pattern(&inner, depth + 1, w)?;
+                self.format_optional_pattern(q.inner(), depth + 1, w)?;
             }
             ast::Pattern::FieldPattern(f) => {
                 let name = f.name().map(|t| t.text().to_string()).unwrap_or_default();
                 writeln!(w, "{}FieldPattern{}{} {}:", prefix, arity, span, name)?;
-                let Some(value) = f.value() else {
-                    return Ok(());
-                };
-                self.format_pattern(&value, depth + 1, w)?;
+                self.format_optional_pattern(f.value(), depth + 1, w)?;
             }
         }
         Ok(())
+    }
+
+    fn format_optional_pattern(
+        &self,
+        pattern: Option<ast::Pattern>,
+        depth: usize,
+        w: &mut impl Write,
+    ) -> std::fmt::Result {
+        let Some(pattern) = pattern else {
+            return Ok(());
+        };
+
+        self.format_pattern(&pattern, depth, w)
     }
 
     fn format_tree_children(
