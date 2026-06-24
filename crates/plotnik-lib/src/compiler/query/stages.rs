@@ -7,7 +7,7 @@ use crate::compiler::analyze::refs::{dependencies, validate_recursion};
 use crate::compiler::analyze::shape::validation::{AstValidationInput, validate_ast};
 use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
 use crate::compiler::analyze::types::validate_entrypoints;
-use crate::compiler::core::{EmitError, EmitInput};
+use crate::compiler::emit::tables::{EmitError, EmitInput};
 use crate::compiler::lower::dead::remove_unreachable;
 use crate::compiler::lower::epsilon::eliminate_epsilons;
 use crate::compiler::lower::nav::collapse_up;

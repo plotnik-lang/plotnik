@@ -8,7 +8,7 @@ use crate::bytecode::{
 use crate::compiler::lower::ir::{
     CallIR, EffectArg, EffectIR, InstructionIR, Label, LayoutMap, MatchIR, MemberRef, TrampolineIR,
 };
-use crate::compiler::core::{EmitError, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
+use crate::compiler::emit::tables::{EmitError, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
 
 pub fn emit_instructions(
     instructions: &[InstructionIR],

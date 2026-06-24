@@ -31,7 +31,7 @@ mod compile {
     mod compile_tests;
 }
 
-pub use crate::compiler::core::EmitError;
+pub use crate::compiler::emit::tables::EmitError;
 pub use crate::compiler::diagnostics::source;
 
 pub use crate::compiler::diagnostics::{

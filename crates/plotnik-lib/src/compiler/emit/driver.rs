@@ -8,7 +8,7 @@
 //! the order of these calls matters.
 
 use crate::compiler::lower::ir::CompileResult;
-use crate::compiler::core::{EmitError, EmitInput};
+use crate::compiler::emit::tables::{EmitError, EmitInput};
 
 use crate::compiler::emit::instructions::encode;
 use crate::compiler::emit::layout::compute_layout;

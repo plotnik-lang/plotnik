@@ -9,7 +9,7 @@ use regex_automata::dfa::dense;
 
 use crate::bytecode::StringId;
 use crate::compiler::lower::ir::{CompileResult, InstructionIR, PredicateValueIR};
-use crate::compiler::core::{EmitError, RegexTableBuilder, StringTableBuilder};
+use crate::compiler::emit::tables::{EmitError, RegexTableBuilder, StringTableBuilder};
 
 #[cfg(test)]
 mod regex_table_tests;

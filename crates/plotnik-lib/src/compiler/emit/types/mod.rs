@@ -10,10 +10,8 @@ use std::collections::HashSet;
 use crate::bytecode::{TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeNameEntry};
 
 use crate::compiler::core::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
-use crate::compiler::core::{
-    DependencyAnalysis, EmitError, EmitInput, Interner, StringTableBuilder, TypeAnalysis, TypeId,
-    TypeTableBuilder,
-};
+use crate::compiler::core::{DependencyAnalysis, Interner, TypeAnalysis, TypeId};
+use crate::compiler::emit::tables::{EmitError, EmitInput, StringTableBuilder, TypeTableBuilder};
 
 /// Build the type table, interning type, member, and name strings into the
 /// shared string table. Threads the string table by value because it extends it.

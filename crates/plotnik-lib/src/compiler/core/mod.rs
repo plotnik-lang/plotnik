@@ -4,7 +4,6 @@ pub(crate) mod ast;
 pub(crate) mod capture_mechanism;
 pub(crate) mod cst;
 pub(crate) mod dependency_analysis;
-pub(crate) mod emit;
 pub(crate) mod grammar_binding;
 pub(crate) mod located;
 pub(crate) mod source;
@@ -26,7 +25,6 @@ pub use ast::{
 pub use capture_mechanism::CaptureMechanism;
 pub use cst::{SyntaxKind, SyntaxToken};
 pub use dependency_analysis::DependencyAnalysis;
-pub use emit::{EmitError, EmitInput, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
 pub use grammar_binding::GrammarBinding;
 pub use located::Located;
 pub use span::Span;

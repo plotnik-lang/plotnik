@@ -2,7 +2,7 @@ use crate::bytecode::{StringId, deserialize_dfa};
 use regex_automata::Input;
 use regex_automata::dfa::Automaton;
 
-use crate::compiler::core::RegexTableBuilder;
+use crate::compiler::emit::tables::RegexTableBuilder;
 
 use super::intern;
 

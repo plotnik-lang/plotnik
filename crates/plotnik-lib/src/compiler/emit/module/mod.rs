@@ -9,7 +9,7 @@ use crate::core::NodeKind;
 use crate::bytecode::{Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN};
 
 use crate::compiler::lower::ir::{CompileResult, LayoutMap};
-use crate::compiler::core::{
+use crate::compiler::emit::tables::{
     EmitError, EmitInput, RegexTableBuilder, StringTableBuilder, TypeTableBuilder,
 };
 

@@ -8,7 +8,7 @@ mod instructions;
 pub use instructions::emit_instructions;
 
 use crate::compiler::lower::ir::{CompileResult, LayoutMap};
-use crate::compiler::core::{EmitError, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
+use crate::compiler::emit::tables::{EmitError, RegexTableBuilder, StringTableBuilder, TypeTableBuilder};
 
 /// Encode each instruction into transition bytes. Fans in layout, types,
 /// strings, and regexes; mints nothing.

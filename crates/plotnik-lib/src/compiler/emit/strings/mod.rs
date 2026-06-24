@@ -3,7 +3,7 @@
 //! String-table emission phase: intern the predicate strings the instruction
 //! stream references.
 
-use crate::compiler::core::StringTableBuilder;
+use crate::compiler::emit::tables::StringTableBuilder;
 use crate::compiler::lower::ir::{CompileResult, InstructionIR};
 
 /// The sole creator of the string table — seeds it from the predicate strings
