@@ -50,7 +50,9 @@ impl InferVisitor<'_, '_> {
         quant: &QuantifiedPattern,
         inner_info: &PatternResult,
     ) -> bool {
-        if !(inner_info.arity == super::super::types::Arity::Many && inner_info.flow.is_void()) {
+        let is_multi_element_scalar =
+            inner_info.arity == super::super::types::Arity::Many && inner_info.flow.is_void();
+        if !is_multi_element_scalar {
             return false;
         }
 
