@@ -122,8 +122,8 @@ impl NfaBuilder<'_> {
     /// Emit null effects for internal captures when skipping an optional/star pattern.
     ///
     /// Unlike `emit_null_for_skip_path` which handles captures passed as effects,
-    /// this function handles captures defined INSIDE the expression (e.g., `{(x) @cap}?`).
-    /// It collects all capture names from the expression and emits Null Set for each.
+    /// this function handles captures defined INSIDE the pattern (e.g., `{(x) @cap}?`).
+    /// It collects all capture names from the pattern and emits Null Set for each.
     pub(super) fn emit_null_for_internal_captures(
         &mut self,
         exit: Label,

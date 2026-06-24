@@ -13,7 +13,7 @@ use super::capture::{CaptureEffects, PatternCtx};
 #[derive(Clone, Copy, Debug)]
 pub struct Struct(pub TypeId);
 
-/// Where a captured expression's compiled scope continues.
+/// Where a captured pattern's compiled scope continues.
 ///
 /// Most captures have one continuation (`Single`). A capture wrapping an
 /// optional/star at a navigating first-child position needs two: the parent must
@@ -43,7 +43,7 @@ impl CaptureExits {
     }
 }
 
-/// The two distinct continuations a skippable expression (`?`/`*`) routes to:
+/// The two distinct continuations a skippable pattern (`?`/`*`) routes to:
 /// the matched path and the zero-match skip path. Bundling them keeps the two
 /// adjacent `Label`s from being transposed at a call site.
 #[derive(Clone, Copy)]
@@ -229,9 +229,9 @@ impl NfaBuilder<'_> {
         )
     }
 
-    /// Compile an expression with Struct/EndStruct wrapping for array iteration.
+    /// Compile a pattern with Struct/EndStruct wrapping for array iteration.
     ///
-    /// Used when inner is a scope-creating expression (sequence/alternation) with
+    /// Used when inner is a scope-creating pattern (sequence/alternation) with
     /// internal captures. Each iteration produces: Struct → inner → EndStruct Push
     pub(super) fn compile_struct_for_array(
         &mut self,
@@ -263,7 +263,11 @@ impl NfaBuilder<'_> {
         struct_step
     }
 
-    pub(super) fn emit_endarr_step(&mut self, effects: ScopeCloseEffects<'_>, exit: Label) -> Label {
+    pub(super) fn emit_endarr_step(
+        &mut self,
+        effects: ScopeCloseEffects<'_>,
+        exit: Label,
+    ) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, exit)

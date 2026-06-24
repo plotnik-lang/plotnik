@@ -1,11 +1,11 @@
-//! Expression compilation for leaf and wrapper patterns.
+//! Pattern compilation for leaf and wrapper patterns.
 //!
 //! Handles compilation of:
 //! - Named nodes: `(identifier)`, `(call_expression ...)`
 //! - Anonymous nodes: `"+"`, `_`
 //! - References: `(Pattern)` (calls to other definitions)
 //! - Field constraints: `name: pattern`
-//! - Captured expressions: `@name`, `pattern @name`
+//! - Captured patterns: `@name`, `pattern @name`
 
 use std::num::NonZeroU16;
 
@@ -54,7 +54,11 @@ impl<'a> CaptureRequest<'a> {
 }
 
 impl NfaBuilder<'_> {
-    pub(super) fn compile_node_pattern(&mut self, node: &ast::NodePattern, ctx: PatternCtx) -> Label {
+    pub(super) fn compile_node_pattern(
+        &mut self,
+        node: &ast::NodePattern,
+        ctx: PatternCtx,
+    ) -> Label {
         let PatternCtx {
             exit,
             nav: nav_override,
@@ -418,7 +422,7 @@ impl NfaBuilder<'_> {
         value_entry
     }
 
-    /// Compile a captured expression, dispatching on its capture mechanism — the
+    /// Compile a captured pattern, dispatching on its capture mechanism — the
     /// single source of truth shared with inference (#420) — so the effects we
     /// emit always match the declared type.
     ///
@@ -458,11 +462,9 @@ impl NfaBuilder<'_> {
         // read it, so the declared type and the emitted effects can't disagree
         // (#420). `None` is a bare capture (`@x`), which captures the matched node.
         let mechanism = inner_opt.as_ref().map(|inner| {
-            self.ctx.type_ctx.capture_kind(
-                inner,
-                self.ctx.dependency_analysis,
-                self.ctx.interner,
-            )
+            self.ctx
+                .type_ctx
+                .capture_kind(inner, self.ctx.dependency_analysis, self.ctx.interner)
         });
 
         let (Some(inner), Some(mechanism)) = (inner_opt, mechanism) else {
@@ -487,39 +489,39 @@ impl NfaBuilder<'_> {
             // split; that context always enters with empty `pre`, so the per-mechanism
             // single-exit handling (PendingValue's trailing Set, Node's bubble) is
             // unnecessary there.
-            mechanism @ (CaptureKind::Node
-            | CaptureKind::Ref
-            | CaptureKind::PendingValue) => match exits {
-                CaptureExits::Split {
-                    match_exit,
-                    skip_exit,
-                } => {
-                    let CaptureRequest {
-                        inner,
-                        nav,
-                        capture_effects,
-                        outer_capture,
-                    } = req;
-                    let combined = outer_capture.with_post_values(capture_effects);
-                    self.compile_skippable_with_exits(
-                        inner,
-                        SplitExits {
-                            match_exit,
-                            skip_exit,
-                        },
-                        nav,
-                        combined,
-                    )
-                }
-                CaptureExits::Single(exit) => match mechanism {
-                    CaptureKind::PendingValue => self.compile_setafter_capture(req, exit),
-                    CaptureKind::Ref => self.compile_ref_capture(req, exit),
-                    CaptureKind::Node => self.compile_node_capture(req, exit),
-                    CaptureKind::Array | CaptureKind::Struct => {
-                        unreachable!("scope mechanisms are handled above in compile_captured")
+            mechanism @ (CaptureKind::Node | CaptureKind::Ref | CaptureKind::PendingValue) => {
+                match exits {
+                    CaptureExits::Split {
+                        match_exit,
+                        skip_exit,
+                    } => {
+                        let CaptureRequest {
+                            inner,
+                            nav,
+                            capture_effects,
+                            outer_capture,
+                        } = req;
+                        let combined = outer_capture.with_post_values(capture_effects);
+                        self.compile_skippable_with_exits(
+                            inner,
+                            SplitExits {
+                                match_exit,
+                                skip_exit,
+                            },
+                            nav,
+                            combined,
+                        )
                     }
-                },
-            },
+                    CaptureExits::Single(exit) => match mechanism {
+                        CaptureKind::PendingValue => self.compile_setafter_capture(req, exit),
+                        CaptureKind::Ref => self.compile_ref_capture(req, exit),
+                        CaptureKind::Node => self.compile_node_capture(req, exit),
+                        CaptureKind::Array | CaptureKind::Struct => {
+                            unreachable!("scope mechanisms are handled above in compile_captured")
+                        }
+                    },
+                }
+            }
         }
     }
 
@@ -535,7 +537,8 @@ impl NfaBuilder<'_> {
         let CaptureEffects { pre, post } = outer_capture;
         let set_step =
             self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
-        let inner_entry = self.dispatch_pattern(inner, PatternCtx::with_nav(set_step, nav_override));
+        let inner_entry =
+            self.dispatch_pattern(inner, PatternCtx::with_nav(set_step, nav_override));
         // The enclosing variant's `Enum`-open (in `pre`) must run before the
         // inner produces its pending value; routing it through the trailing
         // `Set` step would drop it and unbalance the scope.
@@ -704,7 +707,7 @@ impl NfaBuilder<'_> {
         NodeKindConstraint::Named(Some(self.ctx.grammar.expect_named_kind(sym)))
     }
 
-    /// Resolve a field expression to its grammar `NodeFieldId`.
+    /// Resolve a field pattern to its grammar `NodeFieldId`.
     pub(super) fn resolve_field(&mut self, field: &ast::FieldPattern) -> Option<NonZeroU16> {
         let name_token = field
             .name()

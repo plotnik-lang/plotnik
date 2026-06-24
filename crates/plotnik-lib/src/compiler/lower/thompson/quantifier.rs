@@ -11,8 +11,8 @@ use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOpera
 
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx, needs_struct_wrapper, row_type_id};
-use super::nfa_emit::{BranchTargets, Greediness};
 use super::navigation::resumable_search_nav;
+use super::nfa_emit::{BranchTargets, Greediness};
 use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SplitExits};
 
 /// The nav under which a quantifier iteration runs a resumable position search,
@@ -33,13 +33,13 @@ pub(super) fn quantifier_search_nav(nav: Nav) -> Option<Nav> {
     }
 }
 
-/// Result of parsing a quantified expression.
+/// Result of parsing a quantified pattern.
 enum QuantifierForm {
-    /// No inner expression found.
+    /// No inner pattern found.
     Empty,
-    /// Inner expression exists but no valid quantifier operator.
+    /// Inner pattern exists but no valid quantifier operator.
     Plain(Pattern),
-    /// Valid quantified expression with inner and kind.
+    /// Valid quantified pattern with inner and kind.
     Quantified {
         inner: Pattern,
         kind: QuantifierOperator,
@@ -172,7 +172,7 @@ pub(super) struct QuantifierConfig<'a> {
 }
 
 impl NfaBuilder<'_> {
-    /// Compile a quantified expression with capture effects (passed to body).
+    /// Compile a quantified pattern with capture effects (passed to body).
     pub(super) fn compile_quantified(
         &mut self,
         quant: &ast::QuantifiedPattern,
@@ -221,7 +221,7 @@ impl NfaBuilder<'_> {
         self.compile_quantified_unified(config)
     }
 
-    /// Compile a quantified expression for array capture with element-level effects.
+    /// Compile a quantified pattern for array capture with element-level effects.
     ///
     /// The element_capture effects (typically [Push]) are placed on each iteration.
     pub(super) fn compile_quantified_for_array(
@@ -258,7 +258,7 @@ impl NfaBuilder<'_> {
         self.compile_quantified_unified(config)
     }
 
-    /// Compile a skippable expression (optional/star) with separate exits for skip/match paths.
+    /// Compile a skippable pattern (optional/star) with separate exits for skip/match paths.
     pub(super) fn compile_skippable_with_exits(
         &mut self,
         pattern: &Pattern,

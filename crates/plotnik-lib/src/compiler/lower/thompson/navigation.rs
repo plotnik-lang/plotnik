@@ -7,20 +7,20 @@ use std::collections::HashSet;
 
 use crate::bytecode::Nav;
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::parse::ast::{Pattern, DefRef, SeqItem};
+use crate::compiler::parse::ast::{DefRef, Pattern, SeqItem};
 
-/// Classifies whether expressions may match anonymous nodes after syntactic wrappers.
+/// Classifies whether patterns may match anonymous nodes after syntactic wrappers.
 pub struct AnonymousClassifier<'a> {
     symbol_table: &'a SymbolTable,
 }
 
-fn expr_has_direct_alt_branch_nav(pattern: &Pattern) -> bool {
+fn pattern_has_direct_alt_branch_nav(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::Union(_) | Pattern::Enum(_) => true,
         Pattern::CapturedPattern(cap) => cap
             .inner()
             .as_ref()
-            .is_some_and(expr_has_direct_alt_branch_nav),
+            .is_some_and(pattern_has_direct_alt_branch_nav),
         _ => false,
     }
 }
@@ -30,12 +30,12 @@ impl<'a> AnonymousClassifier<'a> {
         Self { symbol_table }
     }
 
-    pub fn expr_may_match_anonymous(&self, pattern: Option<&Pattern>) -> bool {
+    pub fn pattern_may_match_anonymous(&self, pattern: Option<&Pattern>) -> bool {
         let mut visited = HashSet::new();
-        pattern.is_some_and(|pattern| self.expr_may_match_anonymous_inner(pattern, &mut visited))
+        pattern.is_some_and(|pattern| self.pattern_may_match_anonymous_inner(pattern, &mut visited))
     }
 
-    fn expr_may_match_anonymous_inner(
+    fn pattern_may_match_anonymous_inner(
         &self,
         pattern: &Pattern,
         visited: &mut HashSet<String>,
@@ -45,22 +45,22 @@ impl<'a> AnonymousClassifier<'a> {
             Pattern::CapturedPattern(cap) => cap
                 .inner()
                 .as_ref()
-                .is_some_and(|inner| self.expr_may_match_anonymous_inner(inner, visited)),
+                .is_some_and(|inner| self.pattern_may_match_anonymous_inner(inner, visited)),
             Pattern::QuantifiedPattern(q) => q
                 .inner()
                 .as_ref()
-                .is_some_and(|inner| self.expr_may_match_anonymous_inner(inner, visited)),
+                .is_some_and(|inner| self.pattern_may_match_anonymous_inner(inner, visited)),
             Pattern::FieldPattern(field) => field
                 .value()
                 .as_ref()
-                .is_some_and(|value| self.expr_may_match_anonymous_inner(value, visited)),
+                .is_some_and(|value| self.pattern_may_match_anonymous_inner(value, visited)),
             Pattern::Union(_) | Pattern::Enum(_) => pattern
                 .children()
                 .iter()
-                .any(|body| self.expr_may_match_anonymous_inner(body, visited)),
+                .any(|body| self.pattern_may_match_anonymous_inner(body, visited)),
             Pattern::SeqPattern(seq) => seq
                 .children()
-                .any(|child| self.expr_may_match_anonymous_inner(&child, visited)),
+                .any(|child| self.pattern_may_match_anonymous_inner(&child, visited)),
             Pattern::DefRef(r) => self.ref_may_match_anonymous(r, visited),
             Pattern::NodePattern(_) => false,
         }
@@ -79,7 +79,7 @@ impl<'a> AnonymousClassifier<'a> {
         let result = self
             .symbol_table
             .body(name)
-            .is_some_and(|body| self.expr_may_match_anonymous_inner(body, visited));
+            .is_some_and(|body| self.pattern_may_match_anonymous_inner(body, visited));
 
         visited.remove(name);
         result
@@ -102,7 +102,7 @@ pub fn check_trailing_anchor(items: &[SeqItem], symbol_table: &SymbolTable) -> (
         });
 
         let classifier = AnonymousClassifier::new(symbol_table);
-        let nav = if classifier.expr_may_match_anonymous(prev_pattern) {
+        let nav = if classifier.pattern_may_match_anonymous(prev_pattern) {
             Nav::UpSkipExtras(1)
         } else {
             Nav::UpSkipTrivia(1)
@@ -137,10 +137,11 @@ pub fn compute_nav_modes(
                 pending_anchor_strict = Some(anchor.is_strict());
             }
             SeqItem::Pattern(pattern) => {
-                let current_is_anonymous = classifier.expr_may_match_anonymous(Some(pattern));
+                let current_is_anonymous = classifier.pattern_may_match_anonymous(Some(pattern));
                 // Alternation branches compile their own entry nav, so the branch body—not
                 // the whole alternation—decides whether soft anchors use extras-only nav.
-                let current_is_anonymous_for_anchor = if expr_has_direct_alt_branch_nav(pattern) {
+                let current_is_anonymous_for_anchor = if pattern_has_direct_alt_branch_nav(pattern)
+                {
                     false
                 } else {
                     current_is_anonymous
@@ -182,7 +183,7 @@ pub fn compute_nav_modes(
     result
 }
 
-/// Check if an expression compiles to a loop that owns its own sibling
+/// Check if a pattern compiles to a loop that owns its own sibling
 /// iteration. Only quantifiers do: a quantifier matches a variable number of
 /// siblings *starting at a fixed position*, so it must drive its own
 /// advancement and must not be wrapped in a position search (that would let it
@@ -193,7 +194,7 @@ pub fn compute_nav_modes(
 /// and a `StayExact` body, so the wrapper — not the item — owns the resumable
 /// search. This is the single ownership rule that replaced the old
 /// per-form classification.
-pub fn expr_owns_iteration(pattern: &Pattern) -> bool {
+pub fn pattern_owns_iteration(pattern: &Pattern) -> bool {
     quantifier_kind(pattern).is_some()
 }
 

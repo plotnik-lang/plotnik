@@ -10,7 +10,7 @@ use crate::core::Symbol;
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::{
-    AnonymousClassifier, expr_owns_iteration, is_skippable_quantifier, resumable_search_nav,
+    AnonymousClassifier, is_skippable_quantifier, pattern_owns_iteration, resumable_search_nav,
 };
 
 /// The alternation's resumable search nav (from [`resumable_search_nav`]), kept
@@ -63,7 +63,7 @@ fn nav_for_alt_branch(
 ) -> Option<Nav> {
     let nav = exact_nav_for_alt_branch(first_nav, search_nav)?;
 
-    if !classifier.expr_may_match_anonymous(Some(body)) {
+    if !classifier.pattern_may_match_anonymous(Some(body)) {
         return Some(nav);
     }
 
@@ -135,7 +135,8 @@ impl NfaBuilder<'_> {
             .iter()
             .map(|b| {
                 b.body().is_some_and(|body| {
-                    !expr_owns_iteration(&body) && !classifier.expr_may_match_anonymous(Some(&body))
+                    !pattern_owns_iteration(&body)
+                        && !classifier.pattern_may_match_anonymous(Some(&body))
                 })
             })
             .collect();

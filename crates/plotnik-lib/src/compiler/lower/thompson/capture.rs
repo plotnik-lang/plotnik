@@ -240,7 +240,7 @@ impl NfaBuilder<'_> {
 
 /// Check if inner needs struct wrapper for array iterations.
 ///
-/// Returns true when the inner expression produces a Struct type (bubbling fields).
+/// Returns true when the inner pattern produces a Struct type (bubbling fields).
 /// This includes:
 /// - Sequences/alternations with captures: `{(a) @x (b) @y}*`
 /// - Named nodes with bubble captures: `(node (child) @x)*`

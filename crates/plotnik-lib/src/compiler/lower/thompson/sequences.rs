@@ -10,13 +10,13 @@ use crate::compiler::parse::ast::{self, SeqItem};
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::{
-    compute_nav_modes, expr_owns_iteration, is_down_nav, is_skippable_quantifier,
+    compute_nav_modes, is_down_nav, is_skippable_quantifier, pattern_owns_iteration,
     resumable_search_nav,
 };
 use super::scope::SplitExits;
 
 /// The sibling nav implied by a sequence's trailing anchor, used to mark the
-/// last expression as anchor-followed.
+/// last pattern as anchor-followed.
 ///
 /// A trailing anchor (`{… .}`) enforces last-child adjacency via the parent
 /// node's `Up*` nav. That check can still fail — the matched child is not the
@@ -142,10 +142,10 @@ impl NfaBuilder<'_> {
             nav_modes.first().and_then(|(_, n)| *n)
         };
 
-        // Check if first expression is skippable and uses Down navigation.
+        // Check if first pattern is skippable and uses Down navigation.
         // In this case, the skip path needs different navigation than the match path.
         // Also trigger when skip_exit is provided (for bypassing Up in parent node).
-        // Use the first *expression* index from `nav_modes`, not `items.first()`, so a
+        // Use the first *pattern* index from `nav_modes`, not `items.first()`, so a
         // leading anchor (e.g. `{. (a)? ...}`) doesn't hide a skippable first item.
         let first_is_skippable = nav_modes
             .first()
@@ -186,7 +186,7 @@ impl NfaBuilder<'_> {
             .and_then(|(idx, _)| items[*idx].as_pattern())
             .is_some_and(is_skippable_quantifier);
 
-        // Build chain in reverse: last expression exits to `exit`, each prior exits to next.
+        // Build chain in reverse: last pattern exits to `exit`, each prior exits to next.
         let mut current_exit = exit;
         let last_post = if last_is_skippable {
             let post_effects = split_sequence_post_effects(capture.post);
@@ -202,12 +202,12 @@ impl NfaBuilder<'_> {
             capture.post
         };
         let count = nav_modes.len();
-        // Seed the reverse walk so the last expression sees a trailing anchor as
+        // Seed the reverse walk so the last pattern sees a trailing anchor as
         // its follower: its child search then stays resumable for the up-nav
         // lastness retry. Interior items overwrite this with their real follower.
         let mut following_nav: Option<Nav> = trailing_anchor_follow_nav(items);
-        for (i, (expr_idx, nav_override)) in nav_modes.into_iter().rev().enumerate() {
-            let pattern = items[expr_idx]
+        for (i, (pattern_idx, nav_override)) in nav_modes.into_iter().rev().enumerate() {
+            let pattern = items[pattern_idx]
                 .as_pattern()
                 .expect("nav_modes only contains pattern indices");
 
@@ -237,7 +237,7 @@ impl NfaBuilder<'_> {
                 Some(Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact)
             );
             let search_nav = resumable_search_nav(nav_override)
-                .filter(|_| followed_by_anchor && !expr_owns_iteration(pattern));
+                .filter(|_| followed_by_anchor && !pattern_owns_iteration(pattern));
 
             current_exit = if let Some(nav) = search_nav {
                 let body = self.dispatch_pattern(
@@ -298,7 +298,7 @@ impl NfaBuilder<'_> {
         let first_pattern_idx = nav_modes[0].0;
         let first_pattern = items[first_pattern_idx]
             .as_pattern()
-            .expect("first item must be expression");
+            .expect("first item must be pattern");
 
         // Close the *scope* on a single exit epsilon every continuation converges to.
         // From the first scope close onward the suffix runs on every path; the value
@@ -321,7 +321,7 @@ impl NfaBuilder<'_> {
         // optional first item and its follower survives into `compute_nav_modes`:
         //
         // - Skip path (first item absent): the anchor degrades to a leading anchor
-        //   relative to the parent. Slicing *after* the first expression keeps the
+        //   relative to the parent. Slicing *after* the first pattern keeps the
         //   anchor, so it is re-derived as first-child (`Down*`) navigation.
         // - Match path (first item present): the follower is the first item's sibling.
         //   Slice *from* the follower (dropping the now-consumed leading anchor) and

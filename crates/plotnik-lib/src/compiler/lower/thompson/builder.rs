@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use crate::bytecode::Nav;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
-use crate::compiler::lower::ir::{NfaGraph, InstructionIR, Label, ReturnIR, TrampolineIR};
+use crate::compiler::lower::ir::{InstructionIR, Label, NfaGraph, ReturnIR, TrampolineIR};
 use crate::compiler::parse::ast::Pattern;
 
 use super::capture::PatternCtx;
@@ -125,7 +125,7 @@ impl<'a> NfaBuilder<'a> {
         self.dispatch_pattern(pattern, PatternCtx::with_nav(exit, nav_override))
     }
 
-    /// Compile an expression with navigation override and capture effects.
+    /// Compile a pattern with navigation override and capture effects.
     ///
     /// Capture effects are propagated to the innermost match instruction:
     /// - Named/Anonymous nodes: effects go on the match
