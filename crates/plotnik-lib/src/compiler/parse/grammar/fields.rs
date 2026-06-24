@@ -93,7 +93,7 @@ impl Parser<'_, '_> {
             return;
         }
 
-        // Bare identifiers are not valid expressions; patterns require parentheses
+        // Bare identifiers are not valid patterns; patterns require parentheses
         let span = self.current_span();
         let text = self.current_text();
         let replacement = format!("({text})");

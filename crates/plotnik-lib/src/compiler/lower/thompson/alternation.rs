@@ -8,7 +8,7 @@ use crate::compiler::parse::ast::{self, Pattern};
 use crate::core::Symbol;
 
 use super::Compiler;
-use super::capture::{CaptureEffects, ExprCtx};
+use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::{
     AnonymousClassifier, expr_owns_iteration, is_skippable_quantifier, resumable_search_nav,
 };
@@ -181,8 +181,8 @@ impl Compiler<'_> {
     }
 
     /// Union alternation: each branch merges into one struct.
-    pub(super) fn compile_union(&mut self, union: &ast::UnionPattern, ctx: ExprCtx) -> Label {
-        let ExprCtx {
+    pub(super) fn compile_union(&mut self, union: &ast::UnionPattern, ctx: PatternCtx) -> Label {
+        let PatternCtx {
             exit,
             nav: first_nav,
             capture,
@@ -267,7 +267,7 @@ impl Compiler<'_> {
                 };
                 let entry = self.dispatch_pattern(
                     &body,
-                    ExprCtx {
+                    PatternCtx {
                         exit,
                         nav: branch_nav,
                         capture: CaptureEffects::default(),
@@ -280,7 +280,7 @@ impl Compiler<'_> {
                 let branch_capture = capture.clone().with_pre_values(null_effects);
                 self.dispatch_pattern(
                     &body,
-                    ExprCtx {
+                    PatternCtx {
                         exit: branch_exit,
                         nav: branch_nav,
                         capture: branch_capture,
@@ -295,8 +295,8 @@ impl Compiler<'_> {
 
     /// Enum alternation: each enum branch opens its variant scope
     /// (`EnumOpen`...`EnumClose`) and compiles its payload inside it.
-    pub(super) fn compile_enum(&mut self, e: &ast::EnumPattern, ctx: ExprCtx) -> Label {
-        let ExprCtx {
+    pub(super) fn compile_enum(&mut self, e: &ast::EnumPattern, ctx: PatternCtx) -> Label {
+        let PatternCtx {
             exit,
             nav: first_nav,
             capture,
@@ -362,7 +362,7 @@ impl Compiler<'_> {
                     );
                     let inner_entry = this.dispatch_pattern(
                         &body,
-                        ExprCtx {
+                        PatternCtx {
                             exit: close_exit,
                             nav: branch_nav,
                             capture: CaptureEffects::default(),
@@ -375,7 +375,7 @@ impl Compiler<'_> {
                     let branch_capture = capture.clone().nest_scope(e_effect, EffectIR::end_enum());
                     this.dispatch_pattern(
                         &body,
-                        ExprCtx {
+                        PatternCtx {
                             exit: branch_exit,
                             nav: branch_nav,
                             capture: branch_capture,

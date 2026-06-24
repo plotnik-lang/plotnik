@@ -8,7 +8,7 @@ use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::{CompileResult, InstructionIR, Label, ReturnIR, TrampolineIR};
 use crate::compiler::parse::ast::Pattern;
 
-use super::capture::ExprCtx;
+use super::capture::PatternCtx;
 use super::scope::{CaptureExits, StructScope};
 
 /// Compiler state for Thompson construction.
@@ -122,7 +122,7 @@ impl<'a> Compiler<'a> {
         exit: Label,
         nav_override: Option<Nav>,
     ) -> Label {
-        self.dispatch_pattern(pattern, ExprCtx::with_nav(exit, nav_override))
+        self.dispatch_pattern(pattern, PatternCtx::with_nav(exit, nav_override))
     }
 
     /// Compile an expression with navigation override and capture effects.
@@ -132,7 +132,7 @@ impl<'a> Compiler<'a> {
     /// - Sequences: effects go on last item
     /// - Alternations: effects go on each branch
     /// - Other wrappers: effects propagate through
-    pub(super) fn dispatch_pattern(&mut self, pattern: &Pattern, ctx: ExprCtx) -> Label {
+    pub(super) fn dispatch_pattern(&mut self, pattern: &Pattern, ctx: PatternCtx) -> Label {
         match pattern {
             Pattern::NodePattern(n) => self.compile_node_pattern(n, ctx),
             Pattern::TokenPattern(n) => self.compile_token_pattern(n, ctx),
@@ -140,7 +140,7 @@ impl<'a> Compiler<'a> {
             Pattern::Union(u) => self.compile_union(u, ctx),
             Pattern::Enum(e) => self.compile_enum(e, ctx),
             Pattern::CapturedPattern(c) => {
-                let ExprCtx { exit, nav, capture } = ctx;
+                let PatternCtx { exit, nav, capture } = ctx;
                 self.compile_captured(c, c.inner(), nav, capture, CaptureExits::Single(exit))
             }
             Pattern::QuantifiedPattern(q) => self.compile_quantified(q, ctx),

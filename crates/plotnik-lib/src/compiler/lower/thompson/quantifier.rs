@@ -10,7 +10,7 @@ use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOperator};
 
 use super::Compiler;
-use super::capture::{CaptureEffects, ExprCtx, needs_struct_wrapper, row_type_id};
+use super::capture::{CaptureEffects, PatternCtx, needs_struct_wrapper, row_type_id};
 use super::emit::{BranchTargets, Greediness};
 use super::navigation::resumable_search_nav;
 use super::scope::{CaptureExits, CaptureRequest, EndScopeEffects, SplitExits};
@@ -176,7 +176,7 @@ impl Compiler<'_> {
     pub(super) fn compile_quantified(
         &mut self,
         quant: &ast::QuantifiedPattern,
-        ctx: ExprCtx,
+        ctx: PatternCtx,
     ) -> Label {
         let (inner, kind) = match classify_quantifier(quant) {
             QuantifierForm::Empty => return ctx.exit,
@@ -184,7 +184,7 @@ impl Compiler<'_> {
             QuantifierForm::Quantified { inner, kind } => (inner, kind),
         };
 
-        let ExprCtx {
+        let PatternCtx {
             exit,
             nav: nav_override,
             capture,
@@ -236,7 +236,7 @@ impl Compiler<'_> {
             QuantifierForm::Plain(inner) => {
                 return self.dispatch_pattern(
                     &inner,
-                    ExprCtx {
+                    PatternCtx {
                         exit,
                         nav: nav_override,
                         capture: element_capture,
@@ -294,7 +294,7 @@ impl Compiler<'_> {
         let Pattern::QuantifiedPattern(quant) = pattern else {
             return self.dispatch_pattern(
                 pattern,
-                ExprCtx {
+                PatternCtx {
                     exit: match_exit,
                     nav: nav_override,
                     capture,
@@ -307,7 +307,7 @@ impl Compiler<'_> {
             QuantifierForm::Plain(inner) => {
                 return self.dispatch_pattern(
                     &inner,
-                    ExprCtx {
+                    PatternCtx {
                         exit: match_exit,
                         nav: nav_override,
                         capture,
@@ -431,7 +431,7 @@ impl Compiler<'_> {
         let Pattern::QuantifiedPattern(quant) = pattern else {
             return self.dispatch_pattern(
                 pattern,
-                ExprCtx {
+                PatternCtx {
                     exit: match_exit,
                     nav: nav_override,
                     capture,
@@ -444,7 +444,7 @@ impl Compiler<'_> {
             QuantifierForm::Plain(inner) => {
                 return self.dispatch_pattern(
                     &inner,
-                    ExprCtx {
+                    PatternCtx {
                         exit: match_exit,
                         nav: nav_override,
                         capture,
@@ -661,7 +661,7 @@ impl Compiler<'_> {
             ElementScope::Standalone { capture }
             | ElementScope::RowScopedByArrayExit { capture } => self.dispatch_pattern(
                 inner,
-                ExprCtx {
+                PatternCtx {
                     exit,
                     nav: Some(nav),
                     capture,
@@ -676,7 +676,7 @@ impl Compiler<'_> {
             } => self.compile_with_optional_scope(row_type_id, |this| {
                 this.dispatch_pattern(
                     inner,
-                    ExprCtx {
+                    PatternCtx {
                         exit,
                         nav: Some(nav),
                         capture,

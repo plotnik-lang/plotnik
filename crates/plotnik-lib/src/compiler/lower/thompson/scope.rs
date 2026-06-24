@@ -8,7 +8,7 @@ use crate::compiler::lower::ir::{EffectIR, Label, MatchIR, MemberRef};
 use crate::compiler::parse::ast::Pattern;
 
 use super::Compiler;
-use super::capture::{CaptureEffects, ExprCtx};
+use super::capture::{CaptureEffects, PatternCtx};
 
 #[derive(Clone, Copy, Debug)]
 pub struct StructScope(pub TypeId);
@@ -221,7 +221,7 @@ impl Compiler<'_> {
         let inner_capture = CaptureEffects::new(outer_capture.pre, capture_effects);
         self.dispatch_pattern(
             inner,
-            ExprCtx {
+            PatternCtx {
                 exit: actual_exit,
                 nav,
                 capture: inner_capture,

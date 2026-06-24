@@ -52,9 +52,9 @@ impl std::fmt::Debug for TokenSet {
 }
 
 /// FIRST set of pattern. `At` excluded (captures wrap, not start).
-/// `UnterminatedString` included so every expression position reports
+/// `UnterminatedString` included so every pattern position reports
 /// it as an unclosed string instead of a generic unexpected token.
-pub const EXPR_FIRST_TOKENS: TokenSet = TokenSet::new(&[
+pub const PATTERN_FIRST_TOKENS: TokenSet = TokenSet::new(&[
     ParenOpen,
     BracketOpen,
     BraceOpen,
@@ -71,8 +71,8 @@ pub const EXPR_FIRST_TOKENS: TokenSet = TokenSet::new(&[
     KwMissing,
 ]);
 
-/// FIRST set for root-level expressions. Excludes anchors/`Negation` (tree-internal).
-pub const ROOT_EXPR_FIRST_TOKENS: TokenSet = TokenSet::new(&[
+/// FIRST set for root-level patterns. Excludes anchors/`Negation` (tree-internal).
+pub const ROOT_PATTERN_FIRST_TOKENS: TokenSet = TokenSet::new(&[
     ParenOpen,
     BracketOpen,
     BraceOpen,

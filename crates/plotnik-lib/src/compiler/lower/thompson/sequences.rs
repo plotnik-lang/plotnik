@@ -8,7 +8,7 @@ use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, SeqItem};
 
 use super::Compiler;
-use super::capture::{CaptureEffects, ExprCtx};
+use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::{
     compute_nav_modes, expr_owns_iteration, is_down_nav, is_skippable_quantifier,
     resumable_search_nav,
@@ -85,8 +85,8 @@ pub(super) struct SeqItemsCtx<'a> {
 }
 
 impl Compiler<'_> {
-    pub(super) fn compile_seq(&mut self, seq: &ast::SeqPattern, ctx: ExprCtx) -> Label {
-        let ExprCtx {
+    pub(super) fn compile_seq(&mut self, seq: &ast::SeqPattern, ctx: PatternCtx) -> Label {
+        let PatternCtx {
             exit,
             nav: first_nav,
             capture,
@@ -242,7 +242,7 @@ impl Compiler<'_> {
             current_exit = if let Some(nav) = search_nav {
                 let body = self.dispatch_pattern(
                     pattern,
-                    ExprCtx {
+                    PatternCtx {
                         exit: current_exit,
                         nav: Some(Nav::StayExact),
                         capture: item_capture,
@@ -252,7 +252,7 @@ impl Compiler<'_> {
             } else {
                 self.dispatch_pattern(
                     pattern,
-                    ExprCtx {
+                    PatternCtx {
                         exit: current_exit,
                         nav: nav_override,
                         capture: item_capture,

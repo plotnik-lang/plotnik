@@ -22,7 +22,7 @@ use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::analyze::types::CaptureMechanism;
 
 use super::Compiler;
-use super::capture::{CaptureEffects, ExprCtx};
+use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::check_trailing_anchor;
 use super::scope::{CaptureExits, CaptureRequest, SplitExits};
 use super::sequences::SeqItemsCtx;
@@ -54,8 +54,8 @@ impl<'a> CaptureRequest<'a> {
 }
 
 impl Compiler<'_> {
-    pub(super) fn compile_node_pattern(&mut self, node: &ast::NodePattern, ctx: ExprCtx) -> Label {
-        let ExprCtx {
+    pub(super) fn compile_node_pattern(&mut self, node: &ast::NodePattern, ctx: PatternCtx) -> Label {
+        let PatternCtx {
             exit,
             nav: nav_override,
             capture,
@@ -161,9 +161,9 @@ impl Compiler<'_> {
     pub(super) fn compile_token_pattern(
         &mut self,
         node: &ast::TokenPattern,
-        ctx: ExprCtx,
+        ctx: PatternCtx,
     ) -> Label {
-        let ExprCtx {
+        let PatternCtx {
             exit,
             nav: nav_override,
             capture,
@@ -198,10 +198,10 @@ impl Compiler<'_> {
     pub(super) fn compile_ref(
         &mut self,
         r: &ast::Ref,
-        ctx: ExprCtx,
+        ctx: PatternCtx,
         field_override: Option<NonZeroU16>,
     ) -> Label {
-        let ExprCtx {
+        let PatternCtx {
             exit,
             nav: nav_override,
             capture,
@@ -304,8 +304,8 @@ impl Compiler<'_> {
         RefCallLowering::PlainCall
     }
 
-    pub(super) fn compile_field(&mut self, field: &ast::FieldPattern, ctx: ExprCtx) -> Label {
-        let ExprCtx {
+    pub(super) fn compile_field(&mut self, field: &ast::FieldPattern, ctx: PatternCtx) -> Label {
+        let PatternCtx {
             exit,
             nav: nav_override,
             capture,
@@ -317,7 +317,7 @@ impl Compiler<'_> {
         let node_field = self.resolve_field(field);
 
         if let Pattern::Ref(r) = &value {
-            let value_ctx = ExprCtx {
+            let value_ctx = PatternCtx {
                 exit,
                 nav: nav_override,
                 capture,
@@ -331,7 +331,7 @@ impl Compiler<'_> {
         if let Some(field_id) = node_field
             && Self::field_value_needs_wrapper(&value)
         {
-            let value_ctx = ExprCtx {
+            let value_ctx = PatternCtx {
                 exit,
                 nav: nav_override,
                 capture,
@@ -341,7 +341,7 @@ impl Compiler<'_> {
 
         let value_entry = self.dispatch_pattern(
             &value,
-            ExprCtx {
+            PatternCtx {
                 exit,
                 nav: nav_override,
                 capture,
@@ -364,13 +364,13 @@ impl Compiler<'_> {
     fn compile_wrapped_field_value(
         &mut self,
         value: &Pattern,
-        ctx: ExprCtx,
+        ctx: PatternCtx,
         field_id: NonZeroU16,
     ) -> Label {
-        let ExprCtx { exit, nav, capture } = ctx;
+        let PatternCtx { exit, nav, capture } = ctx;
         let value_entry = self.dispatch_pattern(
             value,
-            ExprCtx {
+            PatternCtx {
                 exit,
                 nav: None,
                 capture,
@@ -535,7 +535,7 @@ impl Compiler<'_> {
         let CaptureEffects { pre, post } = outer_capture;
         let set_step =
             self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
-        let inner_entry = self.dispatch_pattern(inner, ExprCtx::with_nav(set_step, nav_override));
+        let inner_entry = self.dispatch_pattern(inner, PatternCtx::with_nav(set_step, nav_override));
         // The enclosing variant's `Enum`-open (in `pre`) must run before the
         // inner produces its pending value; routing it through the trailing
         // `Set` step would drop it and unbalance the scope.
@@ -555,7 +555,7 @@ impl Compiler<'_> {
         let combined = outer_capture.with_post_values(capture_effects);
         self.dispatch_pattern(
             inner,
-            ExprCtx {
+            PatternCtx {
                 exit,
                 nav: nav_override,
                 capture: combined,
@@ -585,7 +585,7 @@ impl Compiler<'_> {
         let combined = outer_capture.with_post_values(capture_effects);
         self.dispatch_pattern(
             inner,
-            ExprCtx {
+            PatternCtx {
                 exit,
                 nav: nav_override,
                 capture: combined,
@@ -630,7 +630,7 @@ impl Compiler<'_> {
                     vec![EffectIR::suppress_end()],
                     CaptureEffects::new_post(post),
                 );
-                self.dispatch_pattern(inner, ExprCtx::with_nav(end_label, nav_override))
+                self.dispatch_pattern(inner, PatternCtx::with_nav(end_label, nav_override))
             }
             CaptureExits::Split {
                 match_exit,

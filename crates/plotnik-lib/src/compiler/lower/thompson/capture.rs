@@ -104,18 +104,18 @@ impl CaptureEffects {
 
 /// The backbone calling convention threaded through the `dispatch_pattern` family.
 ///
-/// Bundles the three values every expression compiler needs: where the compiled
+/// Bundles the three values every pattern compiler needs: where the compiled
 /// fragment continues (`exit`), the navigation it should apply to reach its first
 /// candidate (`nav`, `None` meaning "use the form's default"), and the capture
 /// effects that land on its innermost match/scope-close instruction (`capture`).
 #[derive(Clone)]
-pub(super) struct ExprCtx {
+pub(super) struct PatternCtx {
     pub exit: Label,
     pub nav: Option<Nav>,
     pub capture: CaptureEffects,
 }
 
-impl ExprCtx {
+impl PatternCtx {
     pub(super) fn with_nav(exit: Label, nav: Option<Nav>) -> Self {
         Self {
             exit,

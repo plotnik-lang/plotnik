@@ -1,9 +1,9 @@
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 use crate::compiler::parse::Parser;
 use crate::compiler::parse::cst::SyntaxKind;
-use crate::compiler::parse::token_set::{EXPR_FIRST_TOKENS, QUANTIFIERS};
+use crate::compiler::parse::token_set::{PATTERN_FIRST_TOKENS, QUANTIFIERS};
 
-/// Whether a parsed expression should absorb a trailing quantifier/capture suffix.
+/// Whether a parsed pattern should absorb a trailing quantifier/capture suffix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SuffixMode {
     Apply,
@@ -11,10 +11,10 @@ enum SuffixMode {
 }
 
 impl Parser<'_, '_> {
-    /// Parse an expression, or emit an error if current token can't start one.
-    /// Returns `true` if a valid expression was parsed, `false` on error.
+    /// Parse a pattern, or emit an error if current token can't start one.
+    /// Returns `true` if a valid pattern was parsed, `false` on error.
     pub(crate) fn parse_pattern_or_error(&mut self) -> bool {
-        if self.at_ts(EXPR_FIRST_TOKENS) {
+        if self.at_ts(PATTERN_FIRST_TOKENS) {
             self.parse_pattern();
             return true;
         }
@@ -35,9 +35,9 @@ impl Parser<'_, '_> {
         false
     }
 
-    /// Parse an expression required after a prefix like `=`, `field:`, or a branch label.
+    /// Parse a pattern required after a prefix like `=`, `field:`, or a branch label.
     ///
-    /// On a non-expression token this reports `ExpectedExpression` at the current position,
+    /// On a non-pattern token this reports `ExpectedExpression` at the current position,
     /// except a misplaced tree-sitter predicate (`#eq?`), which gets its dedicated diagnostic
     /// instead of the generic one — these are exactly the spots a tree-sitter user pastes them.
     pub(crate) fn parse_required_pattern(&mut self) {
@@ -52,7 +52,7 @@ impl Parser<'_, '_> {
     }
 
     fn parse_required_pattern_inner(&mut self, suffix: SuffixMode) {
-        if self.at_ts(EXPR_FIRST_TOKENS) {
+        if self.at_ts(PATTERN_FIRST_TOKENS) {
             match suffix {
                 SuffixMode::Apply => self.parse_pattern(),
                 SuffixMode::Skip => self.parse_pattern_no_suffix(),
@@ -74,11 +74,11 @@ impl Parser<'_, '_> {
         self.parse_pattern_inner(SuffixMode::Apply)
     }
 
-    /// Parse expression without applying quantifier/capture suffix.
+    /// Parse pattern without applying quantifier/capture suffix.
     ///
     /// Used for field values so that suffixes apply to the whole field constraint:
     /// - `field: (x)*` parses as `(field: (x))*` — repeat the field (e.g., decorators)
-    /// - `field: (x) @cap` parses as `(field: (x)) @cap` — capture the field expression
+    /// - `field: (x) @cap` parses as `(field: (x)) @cap` — capture the field pattern
     ///
     /// For captures on structured values (enums/structs), the compilation handles this
     /// by looking through FieldPattern to determine the actual value type. See

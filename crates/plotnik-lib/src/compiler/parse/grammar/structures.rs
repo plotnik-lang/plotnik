@@ -4,7 +4,7 @@ use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 use crate::compiler::parse::Parser;
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::parse::token_set::{
-    ALT_RECOVERY_TOKENS, EXPR_FIRST_TOKENS, NODE_RECOVERY_TOKENS, PREDICATE_OPS, SEPARATORS,
+    ALT_RECOVERY_TOKENS, NODE_RECOVERY_TOKENS, PATTERN_FIRST_TOKENS, PREDICATE_OPS, SEPARATORS,
     SEQ_RECOVERY_TOKENS, TokenSet,
 };
 
@@ -66,7 +66,7 @@ impl<'q> Parser<'q, '_> {
                 }
                 // Tree-sitter style sequence: ((a) (b)) instead of {(a) (b)}
                 // Parse as Seq so it works correctly, but warn to encourage {} syntax
-                if self.at_ts(EXPR_FIRST_TOKENS) {
+                if self.at_ts(PATTERN_FIRST_TOKENS) {
                     self.start_node_at(checkpoint, SyntaxKind::Seq);
                     if let Some(report) = self.report_at(
                         DiagnosticKind::TreeSitterSequenceSyntaxDeprecated,
@@ -462,7 +462,7 @@ impl<'q> Parser<'q, '_> {
                 self.error_skip_separator();
                 continue;
             }
-            if self.at_ts(EXPR_FIRST_TOKENS) {
+            if self.at_ts(PATTERN_FIRST_TOKENS) {
                 self.parse_pattern();
                 continue;
             }
@@ -528,7 +528,7 @@ impl<'q> Parser<'q, '_> {
                 self.error_unsupported_predicate();
                 continue;
             }
-            if self.at_ts(EXPR_FIRST_TOKENS) {
+            if self.at_ts(PATTERN_FIRST_TOKENS) {
                 self.start_node(SyntaxKind::Branch);
                 self.parse_pattern();
                 self.finish_node();

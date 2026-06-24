@@ -89,7 +89,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         let has_escape = scc
             .iter()
             .filter_map(|name| self.symbol_table.body(name))
-            .any(|body| expr_has_escape(body, &scc_set));
+            .any(|body| pattern_has_escape(body, &scc_set));
 
         if !has_escape {
             // Every cycle is an infinite loop — no escape path exists anywhere in the SCC.
@@ -278,7 +278,7 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
     }
 }
 
-fn expr_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
+fn pattern_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
     match pattern {
         Pattern::Ref(r) => {
             let Some(name_token) = r.name() else {
@@ -288,48 +288,48 @@ fn expr_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
         }
         Pattern::NodePattern(node) => {
             let children: Vec<_> = node.children().collect();
-            children.is_empty() || children.iter().all(|c| expr_has_escape(c, scc_names))
+            children.is_empty() || children.iter().all(|c| pattern_has_escape(c, scc_names))
         }
         Pattern::Union(_) | Pattern::Enum(_) => pattern
             .children()
             .iter()
-            .any(|c| expr_has_escape(c, scc_names)),
+            .any(|c| pattern_has_escape(c, scc_names)),
         Pattern::SeqPattern(_) => pattern
             .children()
             .iter()
-            .all(|c| expr_has_escape(c, scc_names)),
+            .all(|c| pattern_has_escape(c, scc_names)),
         Pattern::QuantifiedPattern(q) => {
             if q.is_optional() {
                 return true;
             }
             q.inner()
-                .map(|inner| expr_has_escape(&inner, scc_names))
+                .map(|inner| pattern_has_escape(&inner, scc_names))
                 .unwrap_or(true)
         }
         Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => pattern
             .children()
             .iter()
-            .all(|c| expr_has_escape(c, scc_names)),
+            .all(|c| pattern_has_escape(c, scc_names)),
         Pattern::TokenPattern(_) => true,
     }
 }
 
-fn expr_guarantees_consumption(pattern: &Pattern) -> bool {
+fn pattern_consumes_input(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::NodePattern(_) | Pattern::TokenPattern(_) => true,
         Pattern::Ref(_) => false,
         Pattern::Union(_) | Pattern::Enum(_) => {
-            pattern.children().iter().all(expr_guarantees_consumption)
+            pattern.children().iter().all(pattern_consumes_input)
         }
-        Pattern::SeqPattern(_) => pattern.children().iter().any(expr_guarantees_consumption),
+        Pattern::SeqPattern(_) => pattern.children().iter().any(pattern_consumes_input),
         Pattern::QuantifiedPattern(q) => {
             !q.is_optional()
                 && q.inner()
-                    .map(|i| expr_guarantees_consumption(&i))
+                    .map(|i| pattern_consumes_input(&i))
                     .unwrap_or(false)
         }
         Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => {
-            pattern.children().iter().all(expr_guarantees_consumption)
+            pattern.children().iter().all(pattern_consumes_input)
         }
     }
 }
@@ -380,7 +380,7 @@ impl Visitor for RefFinder<'_> {
     }
 
     fn visit_token_pattern(&mut self, _node: &Located<TokenPattern>) {
-        // TokenPattern has no child expressions, so nothing to walk.
+        // TokenPattern has no child patterns, so nothing to walk.
         // In Unguarded mode this also acts as a guard (stops recursion).
     }
 
@@ -402,7 +402,7 @@ impl Visitor for RefFinder<'_> {
             if self.found.is_some() {
                 return;
             }
-            if self.mode == RefSearchMode::Unguarded && expr_guarantees_consumption(child.node()) {
+            if self.mode == RefSearchMode::Unguarded && pattern_consumes_input(child.node()) {
                 return;
             }
         }
