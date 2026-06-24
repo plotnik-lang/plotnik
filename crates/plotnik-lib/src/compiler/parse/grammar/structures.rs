@@ -87,7 +87,7 @@ impl<'q> Parser<'q, '_> {
         let head_end = self.current_span().end();
         self.bump();
 
-        let mut head = if starts_uppercase(name) {
+        let head = if starts_uppercase(name) {
             NodeHead::DefRef(name)
         } else {
             self.start_node_at(checkpoint, SyntaxKind::Tree);
@@ -96,12 +96,23 @@ impl<'q> Parser<'q, '_> {
 
         // A category separator binds only when tight against the node kind (tree-sitter
         // strictness): `expression#sub` / `expression/sub`, never `expression # sub`.
-        if let Some(sep) = self.tokens.get(self.pos).copied()
+        let head = if let Some(sep) = self.tokens.get(self.pos).copied()
             && matches!(sep.kind, SyntaxKind::Slash | SyntaxKind::Hash)
             && sep.span.start() == head_end
         {
-            self.parse_category_refinement(checkpoint, &mut head, sep.kind);
-        }
+            match head {
+                NodeHead::Concrete => {
+                    self.parse_concrete_category_refinement(sep.kind);
+                    NodeHead::Concrete
+                }
+                NodeHead::DefRef(_) => {
+                    self.reject_ref_category_refinement(checkpoint, sep.kind);
+                    NodeHead::Concrete
+                }
+            }
+        } else {
+            head
+        };
 
         if matches!(head, NodeHead::Concrete) && self.at_ts(PREDICATE_OPS) {
             self.parse_node_predicate();
@@ -118,25 +129,43 @@ impl<'q> Parser<'q, '_> {
     ///
     /// The separator is already known to be tight against the node kind; here we also require
     /// the subtype to be tight against the separator, matching tree-sitter exactly.
-    fn parse_category_refinement(
-        &mut self,
-        checkpoint: Checkpoint,
-        head: &mut NodeHead<'q>,
-        sep: SyntaxKind,
-    ) {
-        let is_ref = matches!(head, NodeHead::DefRef(_));
-        if is_ref {
-            self.start_node_at(checkpoint, SyntaxKind::Tree);
-            self.error(DiagnosticKind::InvalidSupertypeSyntax);
-            *head = NodeHead::Concrete;
+    fn parse_concrete_category_refinement(&mut self, sep: SyntaxKind) {
+        let sep_span = self.current_span();
+        let has_subtype = self.consume_category_refinement_subtype(sep_span);
+
+        if sep != SyntaxKind::Slash {
+            return;
         }
 
-        let sep_span = self.current_span();
-        self.bump(); // consume `/` or `#`
+        if has_subtype {
+            self.error_with_fix(
+                DiagnosticKind::SupertypeSlashDeprecated,
+                sep_span,
+                "use `#`",
+                "#",
+            );
+        } else {
+            self.error(DiagnosticKind::ExpectedSubtype);
+        }
+    }
 
+    fn reject_ref_category_refinement(&mut self, checkpoint: Checkpoint, sep: SyntaxKind) {
+        self.start_node_at(checkpoint, SyntaxKind::Tree);
+        self.error(DiagnosticKind::InvalidSupertypeSyntax);
+
+        let sep_span = self.current_span();
+        let has_subtype = self.consume_category_refinement_subtype(sep_span);
+
+        if sep == SyntaxKind::Slash && !has_subtype {
+            self.error(DiagnosticKind::ExpectedSubtype);
+        }
+    }
+
+    fn consume_category_refinement_subtype(&mut self, sep_span: TextRange) -> bool {
+        self.bump(); // consume `/` or `#`
         let subtype = self.tokens.get(self.pos).copied();
         let tight = subtype.is_some_and(|t| t.span.start() == sep_span.end());
-        let has_subtype = match subtype.map(|t| t.kind) {
+        match subtype.map(|t| t.kind) {
             Some(SyntaxKind::Id) if tight => {
                 self.bump();
                 true
@@ -146,19 +175,6 @@ impl<'q> Parser<'q, '_> {
                 true
             }
             _ => false,
-        };
-
-        if sep == SyntaxKind::Slash {
-            if has_subtype && !is_ref {
-                self.error_with_fix(
-                    DiagnosticKind::SupertypeSlashDeprecated,
-                    sep_span,
-                    "use `#`",
-                    "#",
-                );
-            } else if !has_subtype {
-                self.error(DiagnosticKind::ExpectedSubtype);
-            }
         }
     }
 
