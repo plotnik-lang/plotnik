@@ -11,7 +11,7 @@ use std::num::NonZeroU16;
 use crate::bytecode::{EffectKind, Nav, PredicateOp, StepAddr, select_match_opcode};
 use indexmap::IndexMap;
 
-use crate::compiler::core::{DefId, TypeId};
+use crate::compiler::ids::{DefId, TypeId};
 
 /// Node kind constraint for Match instructions.
 ///

@@ -1,6 +1,6 @@
 use super::capture::CaptureEffects;
 use crate::bytecode::EffectKind;
-use crate::compiler::core::TypeId;
+use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, MemberRef};
 
 #[test]

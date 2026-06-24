@@ -1,6 +1,8 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
-pub use crate::core::{Interner, Symbol};
+//! Compiler-internal identity newtypes shared across stages.
+//!
+//! `DefId` indexes a named definition; `TypeId` indexes the analysis-time type
+//! registry. Both are assigned during analysis and read forward by lower and
+//! emit, so they live at the compiler root rather than in any single stage.
 
 /// A lightweight handle to a named query definition.
 ///

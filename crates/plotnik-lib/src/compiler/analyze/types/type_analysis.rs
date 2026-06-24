@@ -17,7 +17,8 @@ use crate::compiler::parse::ast::Pattern;
 use crate::compiler::analyze::types::type_shape::{
     Arity, FieldInfo, PatternResult, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };
-use crate::compiler::core::{DefId, Symbol};
+use crate::compiler::ids::DefId;
+use crate::core::Symbol;
 
 /// Frozen registry of inferred types and per-definition / per-pattern results.
 ///

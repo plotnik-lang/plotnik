@@ -66,7 +66,7 @@ mod debug_impl {
     use crate::bytecode::{EffectKind, Nav};
     use indexmap::IndexMap;
 
-    use crate::compiler::core::DefId;
+    use crate::compiler::ids::DefId;
     use crate::compiler::lower::ir::{
         InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR,
     };

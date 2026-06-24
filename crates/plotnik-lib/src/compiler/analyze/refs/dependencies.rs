@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use crate::core::Interner;
 use indexmap::{IndexMap, IndexSet};
 
-use crate::compiler::core::DefId;
+use crate::compiler::ids::DefId;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::parse::ast::{Pattern, Ref};
 

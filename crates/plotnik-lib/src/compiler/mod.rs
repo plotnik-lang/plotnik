@@ -6,8 +6,8 @@
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-mod core;
 pub(crate) mod diagnostics;
+mod ids;
 pub(crate) mod parse;
 pub(crate) mod typegen;
 

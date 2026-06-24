@@ -6,9 +6,10 @@
 
 use std::collections::BTreeMap;
 
-pub use crate::compiler::core::TypeId;
+pub use crate::compiler::ids::TypeId;
 
-use crate::compiler::core::{DefId, Symbol};
+use crate::compiler::ids::DefId;
+use crate::core::Symbol;
 
 // Re-export shared type system components
 use crate::bytecode::type_system::PrimitiveType;

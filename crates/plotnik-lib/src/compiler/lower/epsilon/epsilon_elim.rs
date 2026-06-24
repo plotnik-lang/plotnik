@@ -626,7 +626,7 @@ mod tests {
             instructions,
             def_entries: {
                 let mut m = indexmap::IndexMap::new();
-                m.insert(crate::compiler::core::DefId::from_raw(0), Label(0));
+                m.insert(crate::compiler::ids::DefId::from_raw(0), Label(0));
                 m
             },
             preamble_entry: Label(0),
@@ -635,7 +635,7 @@ mod tests {
         laser_vision(&mut result);
 
         assert_eq!(
-            result.def_entries[&crate::compiler::core::DefId::from_raw(0)],
+            result.def_entries[&crate::compiler::ids::DefId::from_raw(0)],
             Label(2)
         );
     }

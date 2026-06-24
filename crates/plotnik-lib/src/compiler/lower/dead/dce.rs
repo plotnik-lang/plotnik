@@ -42,7 +42,7 @@ fn compute_reachable(result: &CompileResult) -> HashSet<Label> {
 mod tests {
     use super::*;
     use crate::bytecode::Nav;
-    use crate::compiler::core::DefId;
+    use crate::compiler::ids::DefId;
     use crate::compiler::lower::ir::MatchIR;
     use indexmap::IndexMap;
 

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use super::context::TypeAnalysisBuilder;
 use super::def_id::Interner;
 use super::types::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
-use crate::compiler::core::DefId;
+use crate::compiler::ids::DefId;
 
 #[test]
 fn builtin_types_have_correct_ids() {

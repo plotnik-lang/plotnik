@@ -3,7 +3,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::compiler::core::{DefId, Interner, Symbol};
+use crate::compiler::ids::DefId;
+use crate::core::{Interner, Symbol};
 
 #[derive(Clone, Debug)]
 pub struct DependencyAnalysis {

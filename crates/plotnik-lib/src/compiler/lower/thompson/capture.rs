@@ -9,7 +9,7 @@ use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::analyze::types::{CaptureMechanism, TypeAnalysis, TypeShape};
-use crate::compiler::core::TypeId;
+use crate::compiler::ids::TypeId;
 
 use super::Compiler;
 
