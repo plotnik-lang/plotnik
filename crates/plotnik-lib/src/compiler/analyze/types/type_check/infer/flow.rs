@@ -3,10 +3,10 @@ use std::collections::btree_map::Entry;
 
 use rowan::TextRange;
 
+use crate::compiler::analyze::types::type_shape::{FieldInfo, PatternFlow, TypeId};
 use crate::compiler::diagnostics::report::DiagnosticKind;
+use crate::core::Symbol;
 
-use super::super::strings::Symbol;
-use super::super::shapes::{FieldInfo, PatternFlow, TypeId};
 use super::InferVisitor;
 
 impl InferVisitor<'_, '_> {

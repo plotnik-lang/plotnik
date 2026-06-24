@@ -5,13 +5,12 @@
 
 use std::collections::BTreeMap;
 
-use crate::core::Interner;
+use crate::core::{Interner, Symbol};
 use rowan::TextRange;
 
-use super::capture_kind::CaptureKind;
-use super::analysis::{TypeAnalysis, TypeAnalysisBuilder};
-use super::strings::Symbol;
-use super::shapes::{
+use crate::compiler::analyze::types::capture_kind::CaptureKind;
+use crate::compiler::analyze::types::type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
+use crate::compiler::analyze::types::type_shape::{
     Arity, FieldInfo, PatternFlow, PatternShape, QuantifierKind, TYPE_NODE, TYPE_VOID, TypeId,
     TypeShape,
 };

@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use super::analysis::TypeAnalysisBuilder;
-use super::strings::Interner;
-use super::shapes::{FieldInfo, TYPE_NODE, TypeShape};
+use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
+use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TypeShape};
+use crate::core::Interner;
 
 #[test]
 fn type_interning_deduplicates() {

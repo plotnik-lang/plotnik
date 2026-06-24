@@ -3,11 +3,7 @@
 //! Computes both structural arity (for field validation) and data flow types
 //! (for TypeScript emission) in a single traversal.
 
-mod analysis;
-mod capture_kind;
-mod strings;
 mod infer;
-pub(crate) mod shapes;
 mod unify;
 
 #[cfg(test)]
@@ -15,9 +11,9 @@ mod analysis_tests;
 #[cfg(test)]
 mod unify_tests;
 
-pub use analysis::TypeAnalysis;
-pub use strings::Interner;
-pub use shapes::Arity;
+pub use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
+pub use crate::compiler::analyze::types::type_shape::Arity;
+pub use crate::core::Interner;
 
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::names::SymbolTable;

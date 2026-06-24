@@ -3,9 +3,9 @@ use rowan::TextRange;
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
+use crate::compiler::analyze::types::type_shape::{Arity, PatternFlow, PatternShape, TypeId};
 use crate::compiler::parse::ast::{FieldPattern, Pattern, QuantifiedPattern};
 
-use super::super::shapes::{PatternFlow, PatternShape, TypeId};
 use super::super::unify::UnifyError;
 use super::InferVisitor;
 
@@ -47,8 +47,7 @@ impl InferVisitor<'_, '_> {
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
     ) -> bool {
-        let is_multi_element_scalar =
-            inner_info.arity == super::super::shapes::Arity::Many && inner_info.flow.is_void();
+        let is_multi_element_scalar = inner_info.arity == Arity::Many && inner_info.flow.is_void();
         if !is_multi_element_scalar {
             return false;
         }

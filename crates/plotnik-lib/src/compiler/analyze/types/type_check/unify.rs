@@ -5,9 +5,11 @@
 
 use std::collections::BTreeMap;
 
-use super::analysis::TypeAnalysisBuilder;
-use super::strings::Symbol;
-use super::shapes::{FieldInfo, PatternFlow, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
+use crate::compiler::analyze::types::type_shape::{
+    FieldInfo, PatternFlow, TYPE_VOID, TypeId, TypeShape,
+};
+use crate::core::Symbol;
 
 /// Error during type unification.
 #[derive(Clone, Debug)]

@@ -1,5 +1,5 @@
-use super::analysis::TypeAnalysisBuilder;
-use super::shapes::{PatternFlow, TYPE_NODE};
+use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
+use crate::compiler::analyze::types::type_shape::{PatternFlow, TYPE_NODE};
 use super::unify::{UnifyError, unify_flow};
 
 #[test]
