@@ -34,7 +34,6 @@ pub enum RuntimeEffect<'t> {
 pub struct EffectLog<'t>(Vec<RuntimeEffect<'t>>);
 
 impl<'t> EffectLog<'t> {
-    /// Create an empty effect log.
     pub fn new() -> Self {
         Self(Vec::new())
     }
@@ -56,7 +55,6 @@ impl<'t> EffectLog<'t> {
         self.0.truncate(watermark);
     }
 
-    /// Get effects as slice.
     pub fn as_slice(&self) -> &[RuntimeEffect<'t>] {
         &self.0
     }

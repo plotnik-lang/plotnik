@@ -48,19 +48,16 @@ impl<'t> CursorWrapper<'t> {
         Self { cursor }
     }
 
-    /// Get the current node.
     #[inline]
     pub fn node(&self) -> Node<'t> {
         self.cursor.node()
     }
 
-    /// Get the current cursor position for checkpointing.
     #[inline]
     pub fn descendant_index(&self) -> u32 {
         self.cursor.descendant_index() as u32
     }
 
-    /// Restore cursor to a checkpointed position.
     #[inline]
     pub fn goto_descendant(&mut self, index: u32) {
         self.cursor.goto_descendant(index as usize);
@@ -71,7 +68,6 @@ impl<'t> CursorWrapper<'t> {
         self.cursor.field_id().map(NodeFieldId::from)
     }
 
-    /// Get current tree depth (root is 0).
     #[inline]
     pub fn depth(&self) -> u32 {
         self.cursor.depth()

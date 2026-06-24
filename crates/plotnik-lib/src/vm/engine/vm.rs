@@ -43,7 +43,6 @@ impl<'t> MatchedNode<'t> {
         }
     }
 
-    /// The matched node, if any.
     fn node(&self) -> Option<Node<'t>> {
         self.0
     }
@@ -68,7 +67,6 @@ impl Default for ExecLimits {
 }
 
 impl ExecLimits {
-    /// Create new fuel limits with defaults.
     pub fn new() -> Self {
         Self::default()
     }
@@ -117,7 +115,6 @@ pub struct VMBuilder<'t> {
 }
 
 impl<'t> VMBuilder<'t> {
-    /// Create a new VM builder.
     pub fn new(source: &'t str, tree: &'t Tree) -> Self {
         Self {
             source,
@@ -141,7 +138,6 @@ impl<'t> VMBuilder<'t> {
         self
     }
 
-    /// Build the VM.
     pub fn build(self) -> VM<'t> {
         VM {
             cursor: CursorWrapper::new(self.tree.walk()),
@@ -161,7 +157,6 @@ impl<'t> VMBuilder<'t> {
 }
 
 impl<'t> VM<'t> {
-    /// Create a VM builder.
     pub fn builder(source: &'t str, tree: &'t Tree) -> VMBuilder<'t> {
         VMBuilder::new(source, tree)
     }

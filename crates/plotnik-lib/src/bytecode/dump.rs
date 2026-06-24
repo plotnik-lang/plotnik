@@ -177,7 +177,7 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
 
     writeln!(out, "{}[type_defs]{}", c.blue, c.reset).expect("writing to a String is infallible");
 
-    // All types are now in type_defs, including builtins
+    // type_defs holds every type, builtins included.
     for i in 0..types.defs_count() {
         let def = types.def(i);
 

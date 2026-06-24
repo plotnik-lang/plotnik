@@ -48,18 +48,6 @@ pub enum Verbosity {
 ///
 /// All methods receive raw data (IDs, nodes) that the VM already has.
 /// Formatting and name resolution happen in the tracer implementation.
-///
-/// Each method is called at a specific point during execution:
-/// - `trace_instruction` - before executing an instruction
-/// - `trace_nav` - after navigation succeeds
-/// - `trace_match_success/failure` - after type check
-/// - `trace_field_success/failure` - after field check
-/// - `trace_effect` - after emitting an effect
-/// - `trace_call` - when entering a definition
-/// - `trace_return` - when returning from a definition
-/// - `trace_checkpoint_created` - when a checkpoint is pushed
-/// - `trace_backtrack` - when restoring a checkpoint
-/// - `trace_enter_entrypoint` - when entering an entrypoint (for labels)
 pub trait Tracer {
     /// Called before executing an instruction.
     fn trace_instruction(&mut self, ip: u16, instr: &Instruction<'_>);

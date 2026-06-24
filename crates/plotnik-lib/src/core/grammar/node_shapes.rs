@@ -875,8 +875,14 @@ fn sort_subtypes_topologically(
     }
 
     subtype_map.sort_by(|a, b| {
-        let a_idx = sorted_kinds.iter().position(|n| n.eq(&a.0.kind)).expect("every supertype kind was registered in the topological sort and is present in sorted_kinds");
-        let b_idx = sorted_kinds.iter().position(|n| n.eq(&b.0.kind)).expect("every supertype kind was registered in the topological sort and is present in sorted_kinds");
+        let a_idx = sorted_kinds
+            .iter()
+            .position(|n| n.eq(&a.0.kind))
+            .expect("supertype kind present in sorted_kinds");
+        let b_idx = sorted_kinds
+            .iter()
+            .position(|n| n.eq(&b.0.kind))
+            .expect("supertype kind present in sorted_kinds");
         a_idx.cmp(&b_idx)
     });
     Ok(())
