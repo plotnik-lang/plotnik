@@ -36,6 +36,28 @@ pub struct ExternalToken {
     pub corresponding_internal_token: Option<Symbol>,
 }
 
+impl ExternalToken {
+    pub(in crate::core::grammar) fn external(name: String, kind: VariableType) -> Self {
+        Self {
+            name,
+            kind,
+            corresponding_internal_token: None,
+        }
+    }
+
+    pub(in crate::core::grammar) fn internal(
+        name: String,
+        kind: VariableType,
+        symbol: Symbol,
+    ) -> Self {
+        Self {
+            name,
+            kind,
+            corresponding_internal_token: Some(symbol),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct InternedGrammar {
     pub variables: Vec<Variable>,

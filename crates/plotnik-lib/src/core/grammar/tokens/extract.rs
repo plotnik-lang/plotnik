@@ -136,17 +136,16 @@ pub(in crate::core::grammar) fn extract_tokens(
             }
 
             if symbol.is_external() {
-                external_tokens.push(ExternalToken {
-                    name: external_token.name,
-                    kind: external_token.kind,
-                    corresponding_internal_token: None,
-                });
+                external_tokens.push(ExternalToken::external(
+                    external_token.name,
+                    external_token.kind,
+                ));
             } else {
-                external_tokens.push(ExternalToken {
-                    name: lexical_variables[symbol.index].name.clone(),
-                    kind: external_token.kind,
-                    corresponding_internal_token: Some(symbol),
-                });
+                external_tokens.push(ExternalToken::internal(
+                    lexical_variables[symbol.index].name.clone(),
+                    external_token.kind,
+                    symbol,
+                ));
             }
         } else {
             Err(ExtractTokensError::NonSymbolExternalToken)?;
