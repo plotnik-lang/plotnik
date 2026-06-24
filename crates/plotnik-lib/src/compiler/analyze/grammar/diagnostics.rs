@@ -1,7 +1,7 @@
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Span};
 use crate::core::{NodeFieldId, NodeKindId};
 
-use super::admissibility::{FieldRef, ParentNodeCtx};
+use super::admissibility::{FieldRef, ParentNode};
 use super::link::GrammarLinker;
 use super::utils::find_similar;
 
@@ -10,21 +10,19 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         &mut self,
         span: Span,
         field_name: &str,
-        ctx: &ParentNodeCtx,
+        ctx: &ParentNode,
     ) {
-        let valid_fields = self.grammar.fields_for_node_kind(ctx.parent_id);
-        let parent_name = self
-            .grammar
-            .node_kind(ctx.parent_id)
-            .expect("validated parent_id must have a name");
+        let valid_fields = self.grammar.fields_for_node_kind(ctx.id());
+        let parent_name = ctx.name(self.grammar);
+        let parent_span = ctx.span();
 
         let mut builder = self
             .diag
             .report(span.source, DiagnosticKind::FieldNotOnNodeKind, span.range)
             .detail(field_name)
             .related_to(
-                ctx.parent_source,
-                ctx.parent_range,
+                parent_span.source,
+                parent_span.range,
                 format!("on `{}`", parent_name),
             );
 
@@ -48,45 +46,39 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         &mut self,
         span: Span,
         child_id: NodeKindId,
-        ctx: &ParentNodeCtx,
+        ctx: &ParentNode,
     ) {
         let child_name = self
             .grammar
             .node_kind(child_id)
             .expect("resolved child must have a name")
             .to_string();
-        let parent_name = self
-            .grammar
-            .node_kind(ctx.parent_id)
-            .expect("validated parent_id must have a name")
-            .to_string();
-        let hint = self.child_hint(ctx.parent_id, &parent_name);
+        let parent_name = ctx.name(self.grammar).to_string();
+        let parent_span = ctx.span();
+        let hint = self.child_hint(ctx.id(), &parent_name);
 
         self.diag
             .report(span.source, DiagnosticKind::InvalidChildType, span.range)
             .detail(child_name)
             .related_to(
-                ctx.parent_source,
-                ctx.parent_range,
+                parent_span.source,
+                parent_span.range,
                 format!("on `{}`", parent_name),
             )
             .hint(hint)
             .emit();
     }
 
-    pub(super) fn emit_child_under_leaf_token(&mut self, span: Span, ctx: &ParentNodeCtx) {
-        let parent_name = self
-            .grammar
-            .node_kind(ctx.parent_id)
-            .expect("validated parent_id must have a name")
-            .to_string();
+    pub(super) fn emit_child_under_leaf_token(&mut self, span: Span, ctx: &ParentNode) {
+        let parent_name = ctx.name(self.grammar).to_string();
+        let parent_span = ctx.span();
 
         self.diag
             .report(span.source, DiagnosticKind::ChildUnderLeafToken, span.range)
             .detail(&parent_name)
             .related_to(
-                ctx.parent_source,
-                ctx.parent_range,
+                parent_span.source,
+                parent_span.range,
                 format!("`{}`", parent_name),
             )
             .hint(format!(
@@ -145,10 +137,10 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         &mut self,
         span: Span,
         message: String,
-        ctx: &ParentNodeCtx,
+        ctx: &ParentNode,
         field: &FieldRef,
     ) {
-        let hint = self.field_value_hint(ctx.parent_id, field.id, field.name);
+        let hint = self.field_value_hint(ctx.id(), field.id, field.name);
         self.diag
             .report(
                 span.source,

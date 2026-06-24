@@ -3,7 +3,7 @@ use rowan::TextRange;
 use crate::compiler::diagnostics::source::SourceId;
 
 /// A location that knows which source it belongs to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Span {
     pub source: SourceId,
     pub range: TextRange,

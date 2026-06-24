@@ -2,12 +2,11 @@ use std::collections::HashSet;
 
 use crate::compiler::analyze::Located;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Span};
-use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::ast::token_src;
 use crate::compiler::parse::ast::{self, NodePattern, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
+use crate::core::grammar::Grammar;
 use crate::core::{NodeFieldId, NodeKind, NodeKindId};
-use rowan::TextRange;
 
 use super::diagnostics::format_list;
 use super::link::GrammarLinker;
@@ -22,7 +21,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     pub(super) fn check_pattern_grammar(
         &mut self,
         located: &Located<Pattern>,
-        ctx: Option<ParentNodeCtx>,
+        ctx: Option<ParentNode>,
         mode: GrammarCheckMode,
         walk: &mut RefCheckState,
     ) {
@@ -41,8 +40,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 if mode.is_required()
                     && let Some(pred) = node.predicate()
                     && let Some(ctx) = &child_ctx
-                    && (!self.grammar.valid_child_types(ctx.parent_id).is_empty()
-                        || !self.grammar.fields_for_node_kind(ctx.parent_id).is_empty())
+                    && (!self.grammar.valid_child_types(ctx.id()).is_empty()
+                        || !self.grammar.fields_for_node_kind(ctx.id()).is_empty())
                 {
                     self.diag
                         .report(
@@ -53,9 +52,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                         .emit();
                 }
 
-                let admissible = child_ctx
-                    .as_ref()
-                    .map(|ctx| self.admissible_set(ctx.parent_id));
+                let admissible = child_ctx.as_ref().map(|ctx| self.admissible_set(ctx.id()));
 
                 for child in node.children() {
                     if let Pattern::FieldPattern(f) = &child {
@@ -148,7 +145,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         }
     }
 
-    fn resolve_node_context(&self, located: &Located<NodePattern>) -> Option<ParentNodeCtx> {
+    fn resolve_node_context(&self, located: &Located<NodePattern>) -> Option<ParentNode> {
         let node = located.node();
         if node.is_any() {
             return None;
@@ -163,17 +160,16 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         let key = NodeKind::Named(token_src(&type_token, self.content(located.source())));
         let parent_id = self.node_kind_ids.get(&key).copied().flatten()?;
         self.grammar.node_kind(parent_id)?;
-        Some(ParentNodeCtx {
-            parent_id,
-            parent_range: type_token.text_range(),
-            parent_source: located.source(),
+        Some(ParentNode {
+            id: parent_id,
+            span: located.span_of(type_token.text_range()),
         })
     }
 
     fn validate_field_pattern(
         &mut self,
         located: &Located<ast::FieldPattern>,
-        ctx: Option<&ParentNodeCtx>,
+        ctx: Option<&ParentNode>,
         mode: GrammarCheckMode,
         walk: &mut RefCheckState,
     ) {
@@ -191,7 +187,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         };
         let Some(ctx) = ctx else { return };
 
-        if !self.grammar.has_field(ctx.parent_id, field_id) {
+        if !self.grammar.has_field(ctx.id(), field_id) {
             // A field absent from this kind can never match here, but a sibling branch or zero
             // repetitions can — so skip when deferred.
             if mode.is_required() {
@@ -223,7 +219,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     fn validate_negated_field(
         &mut self,
         located: &Located<ast::NegatedField>,
-        ctx: &ParentNodeCtx,
+        ctx: &ParentNode,
         mode: GrammarCheckMode,
     ) {
         let neg = located.node();
@@ -236,7 +232,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             return;
         };
 
-        if !self.grammar.has_field(ctx.parent_id, field_id) {
+        if !self.grammar.has_field(ctx.id(), field_id) {
             if mode.is_required() {
                 self.emit_field_not_on_node(
                     located.span_of(name_token.text_range()),
@@ -249,34 +245,37 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         // A required field is present in every production, so asserting its absence can never
         // match. Skipped under a disjunction/option, where the negation need not hold.
-        if mode.is_required()
-            && self
-                .grammar
-                .field_cardinality(ctx.parent_id, field_id)
-                .is_some_and(|cardinality| cardinality.is_required())
-        {
-            let parent_name = self
-                .grammar
-                .node_kind(ctx.parent_id)
-                .expect("validated parent_id must have a name");
-            self.diag
-                .report(
-                    located.source(),
-                    DiagnosticKind::NegatedRequiredField,
-                    name_token.text_range(),
-                )
-                .detail(field_name)
-                .related_to(
-                    ctx.parent_source,
-                    ctx.parent_range,
-                    format!("on `{}`", parent_name),
-                )
-                .hint(format!(
-                    "`-{0}` requires `{0}` to be absent, but every `{1}` has one — drop `-{0}`",
-                    field_name, parent_name
-                ))
-                .emit();
+        if !mode.is_required() {
+            return;
         }
+
+        if !self
+            .grammar
+            .field_cardinality(ctx.id(), field_id)
+            .is_some_and(|cardinality| cardinality.is_required())
+        {
+            return;
+        }
+
+        let parent_name = ctx.name(self.grammar);
+        let parent_span = ctx.span();
+        self.diag
+            .report(
+                located.source(),
+                DiagnosticKind::NegatedRequiredField,
+                name_token.text_range(),
+            )
+            .detail(field_name)
+            .related_to(
+                parent_span.source,
+                parent_span.range,
+                format!("on `{}`", parent_name),
+            )
+            .hint(format!(
+                "`-{0}` requires `{0}` to be absent, but every `{1}` has one — drop `-{0}`",
+                field_name, parent_name
+            ))
+            .emit();
     }
 
     /// All child kinds (named children and field values) the grammar can place under `parent`,
@@ -323,7 +322,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     fn check_bare_child(
         &mut self,
         located: &Located<Pattern>,
-        ctx: &ParentNodeCtx,
+        ctx: &ParentNode,
         adm: &HashSet<NodeKindId>,
     ) {
         match located.node() {
@@ -354,11 +353,11 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     fn check_bare_named_child(
         &mut self,
         located: &Located<NodePattern>,
-        ctx: &ParentNodeCtx,
+        ctx: &ParentNode,
         adm: &HashSet<NodeKindId>,
     ) {
         let node = located.node();
-        let parent_is_token = self.grammar.is_token(ctx.parent_id);
+        let parent_is_token = self.grammar.is_token(ctx.id());
 
         // `(_)` matches any named node, so it is impossible only beneath a leaf token.
         if node.is_any() {
@@ -391,7 +390,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     fn check_field_value(
         &mut self,
         located: &Located<Pattern>,
-        ctx: &ParentNodeCtx,
+        ctx: &ParentNode,
         field: &FieldRef,
     ) {
         match located.node() {
@@ -420,14 +419,14 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     fn check_field_named_value(
         &mut self,
         located: &Located<NodePattern>,
-        ctx: &ParentNodeCtx,
+        ctx: &ParentNode,
         field: &FieldRef,
     ) {
         let node = located.node();
         if node.is_any() {
             // `(_)` matches any named node — impossible only when the field admits literal
             // tokens exclusively.
-            if self.field_is_anonymous_only(ctx.parent_id, field.id) {
+            if self.field_is_anonymous_only(ctx.id(), field.id) {
                 let message = format!("a named node can't be the value of `{}`", field.name);
                 self.emit_invalid_field_value(
                     located.span_of(node.text_range()),
@@ -446,7 +445,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             return;
         };
 
-        if self.field_admissible(value_id, ctx.parent_id, field.id) {
+        if self.field_admissible(value_id, ctx.id(), field.id) {
             return;
         }
 
@@ -466,7 +465,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     fn check_field_anon_value(
         &mut self,
         located: &Located<ast::TokenPattern>,
-        ctx: &ParentNodeCtx,
+        ctx: &ParentNode,
         field: &FieldRef,
     ) {
         let anon = located.node();
@@ -483,7 +482,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         };
 
         if self
-            .field_admissible_set(ctx.parent_id, field.id)
+            .field_admissible_set(ctx.id(), field.id)
             .contains(&value_id)
         {
             return;
@@ -660,13 +659,28 @@ pub(super) struct FieldRef<'a> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) struct ParentNodeCtx {
-    pub(super) parent_id: NodeKindId,
-    pub(super) parent_range: TextRange,
+pub(super) struct ParentNode {
+    id: NodeKindId,
     /// Source the parent node lives in. May differ from the source currently
     /// being walked once validation crosses a reference into another workspace
-    /// file, so `parent_range` must be reported against this, not the active source.
-    pub(super) parent_source: SourceId,
+    /// file, so this span must be reported against its own source.
+    span: Span,
+}
+
+impl ParentNode {
+    pub(super) fn id(self) -> NodeKindId {
+        self.id
+    }
+
+    pub(super) fn span(self) -> Span {
+        self.span
+    }
+
+    pub(super) fn name<'a>(self, grammar: &'a Grammar) -> &'a str {
+        grammar
+            .node_kind(self.id)
+            .expect("validated parent node must have a name")
+    }
 }
 
 #[derive(Default)]
@@ -676,5 +690,5 @@ pub(super) struct RefCheckState {
     /// Definitions already validated under a given context. A definition's
     /// validation depends only on `(name, ctx, mode)`, so caching it keeps shared
     /// references (e.g. diamond graphs) from being re-walked exponentially.
-    validated: HashSet<(String, Option<ParentNodeCtx>, GrammarCheckMode)>,
+    validated: HashSet<(String, Option<ParentNode>, GrammarCheckMode)>,
 }
