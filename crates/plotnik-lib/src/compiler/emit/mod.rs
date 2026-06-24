@@ -5,6 +5,7 @@
 
 mod instructions;
 mod layout;
+mod layout_map;
 mod module;
 mod regex_table;
 mod string_table;

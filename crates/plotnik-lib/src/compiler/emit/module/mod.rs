@@ -10,10 +10,11 @@ use crate::bytecode::{
     Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SymbolNameEntry,
 };
 
+use crate::compiler::emit::layout_map::LayoutMap;
 use crate::compiler::emit::tables::{
     ConstantPool, EmitError, EmitInput, StringTableBuilder, TypeTableBuilder,
 };
-use crate::compiler::lower::ir::{LayoutMap, NfaGraph};
+use crate::compiler::lower::ir::NfaGraph;
 
 /// The node-kind, field, and entrypoint wire tables. Built together because all
 /// three intern their names into the one string table.

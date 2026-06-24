@@ -473,40 +473,6 @@ impl From<TrampolineIR> for InstructionIR {
     }
 }
 
-/// Result of layout: maps labels to step addresses.
-#[derive(Clone, Debug)]
-pub struct LayoutMap {
-    /// Mapping from symbolic labels to concrete step addresses (raw u16).
-    label_to_step: BTreeMap<Label, StepAddr>,
-    /// Total number of steps. Held as `u32` so a query whose layout overflows
-    /// the `u16` step-address space is detectable at emit time instead of
-    /// wrapping silently; `emit` rejects it before any address is used.
-    total_steps: u32,
-}
-
-impl LayoutMap {
-    pub fn new(label_to_step: BTreeMap<Label, StepAddr>, total_steps: u32) -> Self {
-        Self {
-            label_to_step,
-            total_steps,
-        }
-    }
-
-    pub fn empty() -> Self {
-        Self {
-            label_to_step: BTreeMap::new(),
-            total_steps: 0,
-        }
-    }
-
-    pub fn step_addrs(&self) -> &BTreeMap<Label, StepAddr> {
-        &self.label_to_step
-    }
-    pub fn total_steps(&self) -> u32 {
-        self.total_steps
-    }
-}
-
 /// Compiled query IR plus entry labels produced by the compile stage.
 #[derive(Clone, Debug)]
 pub struct NfaGraph {

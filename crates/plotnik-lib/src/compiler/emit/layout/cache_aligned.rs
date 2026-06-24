@@ -8,7 +8,8 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::bytecode::{SECTION_ALIGN as CACHE_LINE, STEP_SIZE, StepAddr};
 
-use crate::compiler::lower::ir::{InstructionIR, Label, LayoutMap};
+use crate::compiler::emit::layout_map::LayoutMap;
+use crate::compiler::lower::ir::{InstructionIR, Label};
 
 /// Intermediate representation for layout optimization.
 struct BlockArena {

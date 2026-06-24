@@ -5,9 +5,10 @@ use std::collections::BTreeMap;
 use crate::bytecode::{
     Call, Effect, MatchInstr, MatchPredicate, Return, STEP_SIZE, StepAddr, StepId, Trampoline,
 };
+use crate::compiler::emit::layout_map::LayoutMap;
 use crate::compiler::emit::tables::{ConstantPool, EmitError};
 use crate::compiler::lower::ir::{
-    CallIR, EffectArg, EffectIR, InstructionIR, Label, LayoutMap, MatchIR, MemberRef, TrampolineIR,
+    CallIR, EffectArg, EffectIR, InstructionIR, Label, MatchIR, MemberRef, TrampolineIR,
 };
 
 pub fn emit_instructions(
