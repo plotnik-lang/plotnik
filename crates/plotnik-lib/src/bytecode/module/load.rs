@@ -410,7 +410,7 @@ impl Module {
         for i in 0..entrypoints.len() {
             let invalid = || ModuleError::InvalidEntrypoint(i);
             let ep = entrypoints.get(i);
-            let target = ep.target();
+            let target = u16::from(ep.target());
 
             if target >= steps {
                 return Err(invalid());

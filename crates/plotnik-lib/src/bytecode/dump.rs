@@ -5,6 +5,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
+use crate::bytecode::StepAddr;
 use crate::bytecode::predicate_op::PredicateOp;
 use crate::core::{Colors, NodeFieldId, NodeKindId};
 
@@ -70,11 +71,11 @@ impl DumpContext {
 
         let mut step_labels = BTreeMap::new();
         // Preamble always at step 0 (first in layout)
-        step_labels.insert(0, PREAMBLE_NAME.to_string());
+        step_labels.insert(u16::from(StepAddr::PREAMBLE), PREAMBLE_NAME.to_string());
         for i in 0..entrypoints.len() {
             let ep = entrypoints.get(i);
             let name = strings.get(ep.name()).to_string();
-            step_labels.insert(ep.target(), name);
+            step_labels.insert(u16::from(ep.target()), name);
         }
 
         let mut node_kind_names = BTreeMap::new();

@@ -278,8 +278,8 @@ impl<'t> VM<'t> {
     ) -> Result<EffectLog<'t>, RuntimeError> {
         // Preamble address: where VM starts execution (preamble entry point).
         // Caller provides this, enabling different preamble types (root-match, recursive, etc.).
-        self.ip = preamble_addr;
-        self.trampoline_target = entrypoint.target();
+        self.ip = u16::from(preamble_addr);
+        self.trampoline_target = u16::from(entrypoint.target());
         tracer.trace_enter_preamble();
 
         loop {

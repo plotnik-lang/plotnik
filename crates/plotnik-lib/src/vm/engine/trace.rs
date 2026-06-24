@@ -250,7 +250,7 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
         let mut entrypoint_by_ip = BTreeMap::new();
         for i in 0..entrypoints.len() {
             let e = entrypoints.get(i);
-            entrypoint_by_ip.insert(e.target(), strings.get(e.name()).to_string());
+            entrypoint_by_ip.insert(u16::from(e.target()), strings.get(e.name()).to_string());
         }
 
         let step_width = width_for_count(header.transitions_count as usize);

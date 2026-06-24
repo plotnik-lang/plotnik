@@ -6,7 +6,7 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use crate::bytecode::{SECTION_ALIGN as CACHE_LINE, STEP_SIZE};
+use crate::bytecode::{SECTION_ALIGN as CACHE_LINE, STEP_SIZE, StepAddr};
 
 use crate::compiler::lower::ir::{InstructionIR, Label, LayoutMap};
 
@@ -104,7 +104,7 @@ impl BlockArena {
             let block_base_step = (block_idx * CACHE_LINE / STEP_SIZE) as u32;
             for placement in &block.placements {
                 let step = block_base_step + (placement.offset / STEP_SIZE as u8) as u32;
-                mapping.insert(placement.label, step as u16);
+                mapping.insert(placement.label, StepAddr::from(step as u16));
                 let step_end = step + (placement.size / STEP_SIZE as u8) as u32;
                 max_step_end = max_step_end.max(step_end);
             }

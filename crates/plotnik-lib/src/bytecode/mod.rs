@@ -26,7 +26,7 @@ pub mod type_system;
 pub use dump::dump;
 pub use entrypoint::Entrypoint;
 pub use ids::TypeId;
-pub use instructions::EncodeError;
+pub use instructions::{EncodeError, StepAddr};
 pub use module::{Module, ModuleError};
 pub use type_system::{Arity, PrimitiveType, TypeKind};
 
@@ -43,8 +43,7 @@ pub(crate) use format::{
 pub(crate) use header::Header;
 pub(crate) use ids::StringId;
 pub(crate) use instructions::{
-    Call, Match, MatchInstr, MatchPredicate, Return, StepAddr, StepId, Trampoline,
-    select_match_opcode,
+    Call, Match, MatchInstr, MatchPredicate, Return, StepId, Trampoline, select_match_opcode,
 };
 pub(crate) use module::{EntrypointsView, Instruction, StringsView, TypesView};
 pub(crate) use nav::Nav;

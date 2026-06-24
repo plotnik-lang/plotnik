@@ -121,11 +121,47 @@ impl MatchCounts {
     }
 }
 
-/// Step address in bytecode (raw u16).
+/// Step address in bytecode.
 ///
 /// Used for layout addresses, entrypoint targets, bootstrap parameter, etc.
 /// For decoded instruction successors (where 0 = terminal), use [`StepId`] instead.
-pub type StepAddr = u16;
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[repr(transparent)]
+pub struct StepAddr(u16);
+
+impl StepAddr {
+    pub const PREAMBLE: Self = Self(0);
+
+    #[inline]
+    pub const fn get(self) -> u16 {
+        self.0
+    }
+
+    #[inline]
+    pub fn to_le_bytes(self) -> [u8; 2] {
+        self.0.to_le_bytes()
+    }
+}
+
+impl From<u16> for StepAddr {
+    #[inline]
+    fn from(n: u16) -> Self {
+        Self(n)
+    }
+}
+
+impl From<StepAddr> for u16 {
+    #[inline]
+    fn from(v: StepAddr) -> Self {
+        v.0
+    }
+}
+
+impl std::fmt::Display for StepAddr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
 
 /// Successor step address in decoded instructions.
 ///
@@ -153,6 +189,14 @@ impl TryFrom<u16> for StepId {
     #[inline]
     fn try_from(n: u16) -> Result<Self, Self::Error> {
         NonZeroU16::new(n).map(Self).ok_or(ZeroIdError)
+    }
+}
+
+impl TryFrom<StepAddr> for StepId {
+    type Error = ZeroIdError;
+    #[inline]
+    fn try_from(addr: StepAddr) -> Result<Self, Self::Error> {
+        Self::try_from(u16::from(addr))
     }
 }
 impl std::fmt::Display for StepId {

@@ -173,7 +173,7 @@ pub fn width_for_count(count: usize) -> usize {
     if count <= 1 {
         1
     } else {
-        ((count - 1) as f64).log10().floor() as usize + 1
+        (count - 1).ilog10() as usize + 1
     }
 }
 

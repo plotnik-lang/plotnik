@@ -45,6 +45,7 @@
 use std::collections::HashMap;
 
 use super::{Instruction, Module, ModuleError};
+use crate::bytecode::StepAddr;
 use crate::bytecode::effects::EffectKind;
 
 /// Builder frames the materializer pushes. The root/result frame can be a
@@ -87,7 +88,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
 
     let mut defs: Vec<u16> = Vec::new();
     for i in 0..entrypoints.len() {
-        push_unique(&mut defs, entrypoints.get(i).target());
+        push_unique(&mut defs, u16::from(entrypoints.get(i).target()));
     }
 
     let mut summaries: DefSummaries = defs.iter().map(|&d| (d, KS_ANY)).collect();
@@ -139,18 +140,21 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     // frame, whose kind is attacker-controlled, and panic. Reject it instead of
     // dropping the constraint into a caller that does not exist.
     for i in 0..entrypoints.len() {
-        let target = entrypoints.get(i).target();
-        let preamble = analyze(module, &summaries, PREAMBLE_ENTRY, Some(target), true)?;
+        let target = u16::from(entrypoints.get(i).target());
+        let preamble = analyze(
+            module,
+            &summaries,
+            StepAddr::PREAMBLE.get(),
+            Some(target),
+            true,
+        )?;
         if preamble.entry_tos != KS_ANY {
-            return Err(ModuleError::EffectStackImbalance(PREAMBLE_ENTRY));
+            return Err(ModuleError::EffectStackImbalance(StepAddr::PREAMBLE.get()));
         }
     }
 
     Ok(())
 }
-
-/// The emitter lays the preamble first, so the VM always bootstraps here.
-const PREAMBLE_ENTRY: u16 = 0;
 
 struct Analysis {
     /// Caller-top kinds this body tolerates (intersection of every read).

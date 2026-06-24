@@ -78,10 +78,7 @@ pub(in crate::core::grammar) fn extract_tokens(
         extractor.extract_tokens_in_variable(false, variable)?;
     }
 
-    let mut lexical_variables = Vec::with_capacity(extractor.extracted_variables.len());
-    for variable in extractor.extracted_variables {
-        lexical_variables.push(variable);
-    }
+    let mut lexical_variables = extractor.extracted_variables;
 
     let (mut variables, mut symbol_replacer) = promote_extracted_tokens(
         grammar.variables,

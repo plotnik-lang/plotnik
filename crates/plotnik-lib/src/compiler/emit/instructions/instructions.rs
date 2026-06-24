@@ -23,7 +23,7 @@ pub fn emit_instructions(
             continue;
         };
 
-        let offset = step_id as usize * STEP_SIZE;
+        let offset = u16::from(step_id) as usize * STEP_SIZE;
         let resolved = resolve_instruction(instr, layout.step_addrs(), pool)?;
 
         let end = offset + resolved.len();

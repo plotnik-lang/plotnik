@@ -40,7 +40,7 @@ use arborium_tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 use libtest_mimic::{Arguments, Failed, Trial};
 use similar::TextDiff;
 
-use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
+use plotnik_lib::bytecode::{Module, StepAddr, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
     Colors, CompiledQuery, PrintTracer, QueryBuilder, RuntimeError, SourceMap, SourcePath,
@@ -404,7 +404,7 @@ fn run_vm(
         .colored(false)
         .build();
 
-    let result = vm.execute_with(module, 0, &entrypoint, &mut tracer);
+    let result = vm.execute_with(module, StepAddr::PREAMBLE, &entrypoint, &mut tracer);
     let trace = tracer.render();
     let output = match result {
         Ok(effects) => {
