@@ -56,32 +56,7 @@ fn lower_match(mut m: MatchIR, out: &mut Vec<InstructionIR>, next_label: &mut u3
         emit_effects_chain(entry, m.label, all_pre, out, next_label);
     }
 
-    let mut post_chains: Vec<PostChain> = Vec::new();
-
-    if m.neg_fields.len() > MAX_NEG_FIELDS {
-        let overflow: Vec<_> = m.neg_fields.drain(MAX_NEG_FIELDS..).collect();
-        post_chains.push(PostChain::NegFields(overflow));
-    }
-
-    if m.post_effects.len() > MAX_POST_EFFECTS {
-        let overflow: Vec<_> = m.post_effects.drain(MAX_POST_EFFECTS..).collect();
-        post_chains.push(PostChain::PostEffects(overflow));
-    }
-
-    // Successors share the 28-slot Match64 payload with the match's own retained
-    // pre/neg/post effects and predicate (`MatchIR::resolve` panics on a combined
-    // overflow). Budget the successor split against those other slots — not the bare
-    // 28 — so the kept successors plus the cascade entry appended below land exactly at
-    // the limit, never one over. (`other_slots` ≤ 7+7+7+2, so the budget stays ≥ 5.)
-    let predicate_slots = if m.predicate.is_some() { 2 } else { 0 };
-    let other_slots =
-        m.pre_effects.len() + m.neg_fields.len() + m.post_effects.len() + predicate_slots;
-    let succ_budget = MAX_MATCH_PAYLOAD_SLOTS - other_slots;
-    if m.successors.len() > succ_budget {
-        let overflow: Vec<_> = m.successors.drain(succ_budget - 1..).collect();
-        post_chains.push(PostChain::Successors(overflow));
-    }
-
+    let post_chains = drain_post_chains(&mut m);
     if post_chains.is_empty() {
         out.push(m.into());
         return;
@@ -112,6 +87,40 @@ fn lower_match(mut m: MatchIR, out: &mut Vec<InstructionIR>, next_label: &mut u3
 
     m.successors = current_succs;
     out.push(m.into());
+}
+
+fn drain_post_chains(m: &mut MatchIR) -> Vec<PostChain> {
+    let mut post_chains = Vec::new();
+
+    if m.neg_fields.len() > MAX_NEG_FIELDS {
+        let overflow = m.neg_fields.drain(MAX_NEG_FIELDS..).collect();
+        post_chains.push(PostChain::NegFields(overflow));
+    }
+
+    if m.post_effects.len() > MAX_POST_EFFECTS {
+        let overflow = m.post_effects.drain(MAX_POST_EFFECTS..).collect();
+        post_chains.push(PostChain::PostEffects(overflow));
+    }
+
+    let succ_budget = successor_budget(m);
+    if m.successors.len() > succ_budget {
+        let overflow = m.successors.drain(succ_budget - 1..).collect();
+        post_chains.push(PostChain::Successors(overflow));
+    }
+
+    post_chains
+}
+
+fn successor_budget(m: &MatchIR) -> usize {
+    // Successors share the 28-slot Match64 payload with the match's own retained
+    // pre/neg/post effects and predicate (`MatchIR::resolve` panics on a combined
+    // overflow). Budget the successor split against those other slots — not the bare
+    // 28 — so the kept successors plus the cascade entry appended below land exactly at
+    // the limit, never one over. (`other_slots` ≤ 7+7+7+2, so the budget stays ≥ 5.)
+    let predicate_slots = if m.predicate.is_some() { 2 } else { 0 };
+    let other_slots =
+        m.pre_effects.len() + m.neg_fields.len() + m.post_effects.len() + predicate_slots;
+    MAX_MATCH_PAYLOAD_SLOTS - other_slots
 }
 
 fn emit_effects_chain(
