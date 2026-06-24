@@ -11,7 +11,7 @@ use super::validation::Ident;
 impl Parser<'_, '_> {
     /// Type annotation: `::Type` (PascalCase)
     pub(crate) fn parse_type_annotation(&mut self) {
-        self.start_node(SyntaxKind::Type);
+        self.start_node(SyntaxKind::TypeAnnotation);
         self.expect(SyntaxKind::DoubleColon, "'::' for type annotation");
 
         if self.at(SyntaxKind::Id) {
@@ -34,7 +34,7 @@ impl Parser<'_, '_> {
             return;
         }
 
-        self.start_node(SyntaxKind::Type);
+        self.start_node(SyntaxKind::TypeAnnotation);
 
         let span = self.current_span();
         if let Some(report) = self.report_at(DiagnosticKind::InvalidTypeAnnotationSyntax, span) {

@@ -21,7 +21,7 @@ Root
               Underscore "_"
               ParenClose ")"
           CaptureToken "@left"
-          Type
+          TypeAnnotation
             DoubleColon "::"
             Id "Node"
         Capture
@@ -33,12 +33,12 @@ Root
               Underscore "_"
               ParenClose ")"
           CaptureToken "@right"
-          Type
+          TypeAnnotation
             DoubleColon "::"
             Id "Foo"
         ParenClose ")"
       CaptureToken "@expr"
-      Type
+      TypeAnnotation
         DoubleColon "::"
         Id "BinaryExpr"
 ==== ast ====

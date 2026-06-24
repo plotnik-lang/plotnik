@@ -21,7 +21,7 @@ Root
           ParenClose ")"
         BraceClose "}"
       CaptureToken "@seq"
-      Type
+      TypeAnnotation
         DoubleColon "::"
         Id "MySequence"
 ==== ast ====

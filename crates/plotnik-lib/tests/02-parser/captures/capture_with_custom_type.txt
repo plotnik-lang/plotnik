@@ -11,7 +11,7 @@ Root
         Id "function_declaration"
         ParenClose ")"
       CaptureToken "@fn"
-      Type
+      TypeAnnotation
         DoubleColon "::"
         Id "FunctionDecl"
 ==== ast ====

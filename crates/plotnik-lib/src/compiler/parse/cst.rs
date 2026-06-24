@@ -201,7 +201,7 @@ pub enum SyntaxKind {
     Str,
     Field,
     Capture,
-    Type,
+    TypeAnnotation,
     Quantifier,
     Seq,
     Alt,

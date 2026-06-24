@@ -23,7 +23,7 @@ Root
             ParenClose ")"
         BracketClose "]"
       CaptureToken "@value"
-      Type
+      TypeAnnotation
         DoubleColon "::"
         Id "Value"
 ==== ast ====
