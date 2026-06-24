@@ -29,9 +29,9 @@ pub(in crate::compiler) fn emit_unchecked(
 ) -> Result<Vec<u8>, EmitError> {
     let compile_result = lowered_ir.raw();
     let strings = intern_predicates(compile_result);
-    let (types, strings) = build_type_table(&input, strings)?;
+    let (types, mut strings) = build_type_table(&input, strings)?;
     let layout = compute_layout(compile_result)?;
-    let (tables, strings) = build_tables(&input, compile_result, &types, &layout, strings)?;
+    let tables = build_tables(&input, compile_result, &types, &layout, &mut strings)?;
     let regexes = build_regex_table(compile_result, &strings)?;
     let pool = ConstantPool::new(&types, &strings, &regexes);
     let transitions = encode(compile_result, &layout, pool)?;

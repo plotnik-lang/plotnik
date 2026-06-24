@@ -29,8 +29,8 @@ pub fn build_tables(
     ir: &CompileResult,
     types: &TypeTableBuilder,
     layout: &LayoutMap,
-    mut strings: StringTableBuilder,
-) -> Result<(WireTables, StringTableBuilder), EmitError> {
+    strings: &mut StringTableBuilder,
+) -> Result<WireTables, EmitError> {
     let mut node_kinds: Vec<NodeKindEntry> = Vec::new();
     for (node_kind, node_id) in input.grammar.kind_entries() {
         let sym = match node_kind {
@@ -74,14 +74,11 @@ pub fn build_tables(
         return Err(EmitError::TooManyEntrypoints(entrypoints.len()));
     }
 
-    Ok((
-        WireTables {
-            node_kinds,
-            fields,
-            entrypoints,
-        },
-        strings,
-    ))
+    Ok(WireTables {
+        node_kinds,
+        fields,
+        entrypoints,
+    })
 }
 
 /// Serialize every table into its section, then write the header and checksum.
