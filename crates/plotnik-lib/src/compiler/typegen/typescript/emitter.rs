@@ -24,6 +24,11 @@ pub struct Emitter<'a> {
     pub(super) output: String,
 }
 
+struct EntrypointTypes {
+    primary_names: HashMap<TypeId, String>,
+    aliases: Vec<(String, TypeId)>,
+}
+
 impl<'a> Emitter<'a> {
     pub fn new(module: &'a Module, config: Config) -> Self {
         Self {
@@ -47,9 +52,17 @@ impl<'a> Emitter<'a> {
     pub fn emit(mut self) -> String {
         self.assign_names();
 
-        let mut primary_names: HashMap<TypeId, String> = HashMap::new();
-        let mut aliases: Vec<(String, TypeId)> = Vec::new();
+        let entrypoint_types = self.entrypoint_types();
+        let to_emit = self.entrypoint_emit_set();
+        self.emit_named_types(&entrypoint_types.primary_names, to_emit);
+        self.emit_remaining_entrypoints(&entrypoint_types.primary_names);
+        self.emit_entrypoint_aliases(&entrypoint_types);
+        self.finish_output()
+    }
 
+    fn entrypoint_types(&self) -> EntrypointTypes {
+        let mut primary_names = HashMap::new();
+        let mut aliases = Vec::new();
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
             let name = self.strings.get(ep.name()).to_string();
@@ -64,13 +77,26 @@ impl<'a> Emitter<'a> {
                 }
             }
         }
+        EntrypointTypes {
+            primary_names,
+            aliases,
+        }
+    }
 
+    fn entrypoint_emit_set(&self) -> HashSet<TypeId> {
         let mut to_emit = HashSet::new();
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
             self.collect_emit_set(ep.result_type(), &mut to_emit);
         }
+        to_emit
+    }
 
+    fn emit_named_types(
+        &mut self,
+        primary_names: &HashMap<TypeId, String>,
+        to_emit: HashSet<TypeId>,
+    ) {
         for type_id in self.sort_topologically(to_emit) {
             if let Some(def_name) = primary_names.get(&type_id) {
                 self.emit_type_definition(def_name, type_id);
@@ -78,22 +104,28 @@ impl<'a> Emitter<'a> {
                 self.emit_supporting_type(type_id);
             }
         }
+    }
 
+    fn emit_remaining_entrypoints(&mut self, primary_names: &HashMap<TypeId, String>) {
         // Emit remaining entrypoints (primitives, arrays, optionals)
         // These are not in to_emit because collect_emit_set skips them
-        for (&type_id, name) in &primary_names {
+        for (&type_id, name) in primary_names {
             if self.emitted_types.contains(&type_id) {
                 continue;
             }
             self.emit_type_definition(name, type_id);
         }
+    }
 
-        for (alias_name, type_id) in aliases {
-            if let Some(primary_name) = primary_names.get(&type_id) {
-                self.emit_type_alias(&alias_name, primary_name);
+    fn emit_entrypoint_aliases(&mut self, entrypoint_types: &EntrypointTypes) {
+        for (alias_name, type_id) in &entrypoint_types.aliases {
+            if let Some(primary_name) = entrypoint_types.primary_names.get(type_id) {
+                self.emit_type_alias(alias_name, primary_name);
             }
         }
+    }
 
+    fn finish_output(mut self) -> String {
         self.output.truncate(self.output.trim_end().len());
         self.output.push('\n');
         self.output
