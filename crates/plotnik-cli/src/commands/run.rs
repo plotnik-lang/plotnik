@@ -3,7 +3,6 @@
 use std::path::PathBuf;
 
 use plotnik_lib::Colors;
-use plotnik_lib::bytecode::StepAddr;
 use plotnik_lib::{RuntimeError, VM, materialize_verified};
 
 use super::run_common::{self, ExecPlan, ExecRequest};
@@ -37,7 +36,7 @@ pub fn run(args: RunArgs) -> CliResult {
     })?;
 
     let vm = VM::builder(&source_code, &tree).build();
-    let effects = match vm.execute(&module, StepAddr::PREAMBLE, &entrypoint) {
+    let effects = match vm.execute(&module, &entrypoint) {
         Ok(effects) => effects,
         Err(RuntimeError::NoMatch) => {
             // Zero matches must never be silent

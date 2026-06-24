@@ -257,10 +257,9 @@ impl<'t> VM<'t> {
     pub fn execute(
         self,
         module: &Module,
-        preamble_addr: StepAddr,
         entrypoint: &Entrypoint,
     ) -> Result<EffectLog<'t>, RuntimeError> {
-        self.execute_with(module, preamble_addr, entrypoint, &mut NoopTracer)
+        self.execute_with(module, entrypoint, &mut NoopTracer)
     }
 
     /// Execute query with a tracer for debugging.
@@ -268,17 +267,13 @@ impl<'t> VM<'t> {
     /// The tracer is generic, so `NoopTracer` calls are optimized away
     /// while `PrintTracer` calls collect execution trace.
     ///
-    /// `preamble_addr` is the preamble entry point - caller decides which preamble to use.
     pub fn execute_with<T: Tracer>(
         mut self,
         module: &Module,
-        preamble_addr: StepAddr,
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> Result<EffectLog<'t>, RuntimeError> {
-        // Preamble address: where VM starts execution (preamble entry point).
-        // Caller provides this, enabling different preamble types (root-match, recursive, etc.).
-        self.ip = u16::from(preamble_addr);
+        self.ip = StepAddr::PREAMBLE.get();
         self.trampoline_target = u16::from(entrypoint.target());
         tracer.trace_enter_preamble();
 

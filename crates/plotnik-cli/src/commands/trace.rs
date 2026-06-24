@@ -3,7 +3,6 @@
 use std::path::PathBuf;
 
 use plotnik_lib::Colors;
-use plotnik_lib::bytecode::StepAddr;
 use plotnik_lib::{PrintTracer, RuntimeError, VM, Verbosity, materialize_verified};
 
 use super::run_common::{self, ExecPlan, ExecRequest};
@@ -47,7 +46,7 @@ pub fn run(args: TraceArgs) -> CliResult {
         .colored(args.color)
         .build();
 
-    let effects = match vm.execute_with(&module, StepAddr::PREAMBLE, &entrypoint, &mut tracer) {
+    let effects = match vm.execute_with(&module, &entrypoint, &mut tracer) {
         Ok(effects) => {
             tracer.print();
             effects
