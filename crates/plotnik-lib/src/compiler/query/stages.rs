@@ -185,6 +185,11 @@ pub struct Query {
     analysis: Option<QueryAnalysis>,
 }
 
+pub(crate) struct AnalyzedQuery {
+    parsed: QueryParsed,
+    analysis: QueryAnalysis,
+}
+
 pub(super) struct QueryAnalysis {
     pub(super) interner: Interner,
     pub(super) symbol_table: SymbolTable,
@@ -229,26 +234,13 @@ impl Query {
         self.analysis.as_ref()
     }
 
-    fn expect_analysis(&self) -> &QueryAnalysis {
-        self.analysis
-            .as_ref()
-            .expect("query analysis is only available after structural validation succeeds")
-    }
-
-    pub(crate) fn type_analysis(&self) -> &TypeAnalysis {
-        &self.expect_analysis().type_analysis
-    }
-
+    #[cfg(test)]
     pub(crate) fn symbol_table(&self) -> &SymbolTable {
-        &self.expect_analysis().symbol_table
-    }
-
-    pub(crate) fn interner(&self) -> &Interner {
-        &self.expect_analysis().interner
-    }
-
-    pub(crate) fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
-        &self.expect_analysis().dependency_analysis
+        &self
+            .analysis
+            .as_ref()
+            .expect("test query must be valid before inspecting symbols")
+            .symbol_table
     }
 
     pub fn source_map(&self) -> &SourceMap {
@@ -272,25 +264,87 @@ impl Query {
             .map(|name| name.text().to_string())
     }
 
-    pub(crate) fn link(mut self, grammar: &Grammar) -> GrammarBoundQuery {
+    fn into_analyzed(self) -> Result<AnalyzedQuery, Query> {
+        if self.parsed.diag.has_errors() {
+            return Err(self);
+        }
+
+        let Query { parsed, analysis } = self;
+        match analysis {
+            Some(analysis) => Ok(AnalyzedQuery { parsed, analysis }),
+            None => Err(Query {
+                parsed,
+                analysis: None,
+            }),
+        }
+    }
+
+    pub(crate) fn link(self, grammar: &Grammar) -> LinkOutcome {
+        let mut analyzed = match self.into_analyzed() {
+            Ok(analyzed) => analyzed,
+            Err(query) => return LinkOutcome::Invalid(query),
+        };
+
         let mut output = GrammarBindingBuilder::new();
-        let parsed = &mut self.parsed;
+        link::GrammarLinkCtx {
+            interner: &mut analyzed.analysis.interner,
+            grammar,
+            source_map: &analyzed.parsed.source_map,
+            ast_map: &analyzed.parsed.ast_map,
+            symbol_table: &analyzed.analysis.symbol_table,
+        }
+        .link(&mut output, &mut analyzed.parsed.diag);
 
-        if let Some(analysis) = &mut self.analysis {
-            link::GrammarLinkCtx {
-                interner: &mut analysis.interner,
-                grammar,
-                source_map: &parsed.source_map,
-                ast_map: &parsed.ast_map,
-                symbol_table: &analysis.symbol_table,
-            }
-            .link(&mut output, &mut parsed.diag);
+        if analyzed.parsed.diag.has_errors() {
+            return LinkOutcome::Invalid(analyzed.into_query());
         }
 
-        GrammarBoundQuery {
-            analyzed: self,
+        LinkOutcome::Linked(LinkedQuery {
+            analyzed,
             grammar: output.finish(),
+        })
+    }
+}
+
+impl AnalyzedQuery {
+    fn into_query(self) -> Query {
+        Query {
+            parsed: self.parsed,
+            analysis: Some(self.analysis),
         }
+    }
+
+    pub(crate) fn interner(&self) -> &Interner {
+        &self.analysis.interner
+    }
+
+    pub(crate) fn type_analysis(&self) -> &TypeAnalysis {
+        &self.analysis.type_analysis
+    }
+
+    pub(crate) fn symbol_table(&self) -> &SymbolTable {
+        &self.analysis.symbol_table
+    }
+
+    pub(crate) fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
+        &self.analysis.dependency_analysis
+    }
+
+    pub fn source_map(&self) -> &SourceMap {
+        self.parsed.source_map()
+    }
+
+    pub fn diagnostics(&self) -> &Diagnostics {
+        self.parsed.diagnostics()
+    }
+
+    pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.parsed
+            .ast_map
+            .values()
+            .flat_map(|root| root.defs())
+            .filter_map(|def| def.name())
+            .map(|name| name.text().to_string())
     }
 }
 
@@ -302,13 +356,20 @@ impl TryFrom<&str> for Query {
     }
 }
 
-pub(crate) struct GrammarBoundQuery {
-    analyzed: Query,
+pub(crate) type GrammarBoundQuery = LinkOutcome;
+
+pub(crate) enum LinkOutcome {
+    Linked(LinkedQuery),
+    Invalid(Query),
+}
+
+pub(crate) struct LinkedQuery {
+    analyzed: AnalyzedQuery,
     grammar: GrammarBinding,
 }
 
 pub struct CheckedQuery {
-    query: GrammarBoundQuery,
+    query: LinkOutcome,
     diagnostics: Diagnostics,
 }
 
@@ -375,41 +436,38 @@ impl CompiledQuery {
     }
 }
 
-impl GrammarBoundQuery {
+impl LinkOutcome {
+    #[cfg(test)]
     pub fn is_valid(&self) -> bool {
-        self.analyzed.is_valid()
+        matches!(self, LinkOutcome::Linked(_))
     }
 
+    #[cfg(test)]
     pub(crate) fn interner(&self) -> &Interner {
-        self.analyzed.interner()
-    }
-
-    pub(crate) fn type_analysis(&self) -> &TypeAnalysis {
-        self.analyzed.type_analysis()
-    }
-
-    pub(crate) fn symbol_table(&self) -> &SymbolTable {
-        self.analyzed.symbol_table()
-    }
-
-    pub(crate) fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
-        self.analyzed.dependency_analysis()
+        self.expect_linked().interner()
     }
 
     pub fn source_map(&self) -> &SourceMap {
-        self.analyzed.source_map()
+        match self {
+            LinkOutcome::Linked(query) => query.source_map(),
+            LinkOutcome::Invalid(query) => query.source_map(),
+        }
     }
 
     pub fn diagnostics(&self) -> &Diagnostics {
-        self.analyzed.diagnostics()
+        match self {
+            LinkOutcome::Linked(query) => query.diagnostics(),
+            LinkOutcome::Invalid(query) => query.diagnostics(),
+        }
     }
 
     pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
-        self.analyzed.definition_names()
+        self.definition_names_vec().into_iter()
     }
 
+    #[cfg(test)]
     pub(crate) fn grammar(&self) -> &GrammarBinding {
-        &self.grammar
+        self.expect_linked().grammar()
     }
 
     pub(crate) fn check(self) -> CheckedQuery {
@@ -464,11 +522,10 @@ impl GrammarBoundQuery {
 
     /// Emit bytecode. Returns `Err(EmitError::InvalidQuery)` if the query has errors.
     pub(crate) fn emit(&self) -> Result<Vec<u8>, EmitError> {
-        if !self.is_valid() {
-            return Err(EmitError::InvalidQuery);
+        match self {
+            LinkOutcome::Linked(query) => query.emit(),
+            LinkOutcome::Invalid(_) => Err(EmitError::InvalidQuery),
         }
-        let compile_result = self.compile();
-        crate::compiler::emit::emit(self.emit_input(), &compile_result)
     }
 
     /// Emit without the emitter's debug load self-check.
@@ -476,11 +533,10 @@ impl GrammarBoundQuery {
     /// `check_compile` loads the bytecode itself so malformed output is reported
     /// as a diagnostic instead of reaching the debug self-check panic.
     fn emit_unchecked(&self) -> Result<Vec<u8>, EmitError> {
-        if !self.is_valid() {
-            return Err(EmitError::InvalidQuery);
+        match self {
+            LinkOutcome::Linked(query) => query.emit_unchecked(),
+            LinkOutcome::Invalid(_) => Err(EmitError::InvalidQuery),
         }
-        let compile_result = self.compile();
-        crate::compiler::emit::emit_unchecked(self.emit_input(), &compile_result)
     }
 
     /// Full-pipeline dry run for `check`: emit bytecode and load it, reporting any
@@ -490,7 +546,11 @@ impl GrammarBoundQuery {
     /// Loads the bytecode itself, so it never reaches the emitter's debug
     /// self-check panic in debug or release.
     pub(crate) fn check_compile(&self) -> Diagnostics {
-        let mut diag = self.diagnostics().clone();
+        let Some(query) = self.linked() else {
+            return self.diagnostics().clone();
+        };
+
+        let mut diag = query.diagnostics().clone();
         if diag.has_errors() {
             return diag;
         }
@@ -521,6 +581,80 @@ impl GrammarBoundQuery {
         diag
     }
 
+    fn linked(&self) -> Option<&LinkedQuery> {
+        match self {
+            LinkOutcome::Linked(query) => Some(query),
+            LinkOutcome::Invalid(_) => None,
+        }
+    }
+
+    #[cfg(test)]
+    fn expect_linked(&self) -> &LinkedQuery {
+        self.linked()
+            .expect("linked query data is only available after link succeeds")
+    }
+
+    fn definition_names_vec(&self) -> Vec<String> {
+        match self {
+            LinkOutcome::Linked(query) => query.definition_names().collect(),
+            LinkOutcome::Invalid(query) => query.definition_names().collect(),
+        }
+    }
+
+    /// A coarse fallback span for emit/load failures, none of which carry a
+    /// source mapping. Points at the whole first source; the diagnostic's detail
+    /// carries the specifics. `None` when the query has no sources at all, so the
+    /// dry run is total even on an empty source map.
+    fn fallback_span(&self) -> Option<(SourceId, TextRange)> {
+        let source = self.source_map().iter().next()?;
+        let len = u32::try_from(source.content.len()).unwrap_or(u32::MAX);
+        Some((source.id, TextRange::up_to(len.into())))
+    }
+}
+
+impl LinkedQuery {
+    pub(crate) fn interner(&self) -> &Interner {
+        self.analyzed.interner()
+    }
+
+    pub(crate) fn type_analysis(&self) -> &TypeAnalysis {
+        self.analyzed.type_analysis()
+    }
+
+    pub(crate) fn symbol_table(&self) -> &SymbolTable {
+        self.analyzed.symbol_table()
+    }
+
+    pub(crate) fn dependency_analysis(&self) -> &dependencies::DependencyAnalysis {
+        self.analyzed.dependency_analysis()
+    }
+
+    pub fn source_map(&self) -> &SourceMap {
+        self.analyzed.source_map()
+    }
+
+    pub fn diagnostics(&self) -> &Diagnostics {
+        self.analyzed.diagnostics()
+    }
+
+    pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.analyzed.definition_names()
+    }
+
+    pub(crate) fn grammar(&self) -> &GrammarBinding {
+        &self.grammar
+    }
+
+    fn emit(&self) -> Result<Vec<u8>, EmitError> {
+        let compile_result = self.compile();
+        crate::compiler::emit::emit(self.emit_input(), &compile_result)
+    }
+
+    fn emit_unchecked(&self) -> Result<Vec<u8>, EmitError> {
+        let compile_result = self.compile();
+        crate::compiler::emit::emit_unchecked(self.emit_input(), &compile_result)
+    }
+
     fn compile(&self) -> crate::compiler::lower::ir::LoweredIr {
         lower_to_ir(LowerInput {
             interner: self.interner(),
@@ -538,15 +672,5 @@ impl GrammarBoundQuery {
             dependency_analysis: self.dependency_analysis(),
             grammar: self.grammar(),
         }
-    }
-
-    /// A coarse fallback span for emit/load failures, none of which carry a
-    /// source mapping. Points at the whole first source; the diagnostic's detail
-    /// carries the specifics. `None` when the query has no sources at all, so the
-    /// dry run is total even on an empty source map.
-    fn fallback_span(&self) -> Option<(SourceId, TextRange)> {
-        let source = self.source_map().iter().next()?;
-        let len = u32::try_from(source.content.len()).unwrap_or(u32::MAX);
-        Some((source.id, TextRange::up_to(len.into())))
     }
 }
