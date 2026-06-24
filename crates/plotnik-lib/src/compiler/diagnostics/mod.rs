@@ -33,4 +33,4 @@ pub enum Error {
 }
 
 /// Result type for query operations.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type QueryResult<T> = std::result::Result<T, Error>;

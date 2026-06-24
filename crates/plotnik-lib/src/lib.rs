@@ -39,7 +39,7 @@ pub use crate::core::Colors;
 pub use crate::compiler::{
     CheckedQuery, CompiledQuery, Query, QueryBuilder, SourceId, SourceMap, SourcePath,
 };
-pub use crate::compiler::{Diagnostics, EmitError, Error, PassResult, Result, Severity, Span};
+pub use crate::compiler::{Diagnostics, EmitError, Error, PassResult, QueryResult, Severity, Span};
 
 pub use crate::vm::{
     EffectLog, ExecLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,

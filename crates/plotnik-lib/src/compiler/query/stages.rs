@@ -58,23 +58,23 @@ impl QueryBuilder {
         self
     }
 
-    pub fn analyze(self) -> crate::compiler::Result<Query> {
+    pub fn analyze(self) -> crate::compiler::QueryResult<Query> {
         Ok(self.parse()?.analyze())
     }
 
-    pub fn check(self, grammar: &Grammar) -> crate::compiler::Result<CheckedQuery> {
+    pub fn check(self, grammar: &Grammar) -> crate::compiler::QueryResult<CheckedQuery> {
         Ok(self.link(grammar)?.check())
     }
 
-    pub fn compile(self, grammar: &Grammar) -> crate::compiler::Result<CompiledQuery> {
+    pub fn compile(self, grammar: &Grammar) -> crate::compiler::QueryResult<CompiledQuery> {
         Ok(self.link(grammar)?.compile_module())
     }
 
-    pub(crate) fn link(self, grammar: &Grammar) -> crate::compiler::Result<LinkOutcome> {
+    pub(crate) fn link(self, grammar: &Grammar) -> crate::compiler::QueryResult<LinkOutcome> {
         Ok(self.analyze()?.link(grammar))
     }
 
-    pub(crate) fn parse(self) -> crate::compiler::Result<QueryParsed> {
+    pub(crate) fn parse(self) -> crate::compiler::QueryResult<QueryParsed> {
         let mut ast = IndexMap::new();
         let mut diag = Diagnostics::new();
 
@@ -349,7 +349,7 @@ impl AnalyzedQuery {
 impl TryFrom<&str> for Query {
     type Error = crate::compiler::Error;
 
-    fn try_from(src: &str) -> crate::compiler::Result<Self> {
+    fn try_from(src: &str) -> crate::compiler::QueryResult<Self> {
         QueryBuilder::new(SourceMap::from_inline(src)).analyze()
     }
 }
