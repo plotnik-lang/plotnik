@@ -22,6 +22,7 @@ use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{
     Branch, CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
     SeqPattern, TokenPattern, UnionPattern, is_empty_group,
@@ -58,6 +59,12 @@ struct CaptureInner {
 struct ChildFlow {
     merged_fields: BTreeMap<Symbol, FieldInfo>,
     output_children: Vec<(TextRange, TypeId)>,
+}
+
+enum RefFlowBoundary {
+    Transparent,
+    RecursiveEnumValue,
+    RecursiveOpaque,
 }
 
 impl<'a, 'd> InferVisitor<'a, 'd> {
@@ -150,25 +157,35 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .def_id_for_sym(name_sym)
             .expect("a defined reference has a DefId");
 
-        // Recursive refs are opaque boundaries - they don't bubble captures.
-        // For enum alternations, return Value(Ref) since they always produce Enum output.
-        // For other definitions, return Void to avoid type errors in union alternation contexts.
-        if self.ctx.dependency_analysis.is_recursive_def(def_id) {
-            if self.body_is_enum(body) {
+        match self.ref_flow_boundary(def_id, body) {
+            RefFlowBoundary::RecursiveEnumValue => {
                 let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
-                return PatternResult::new(Arity::One, OutputFlow::Value(ref_type));
+                PatternResult::new(Arity::One, OutputFlow::Value(ref_type))
             }
-            return PatternResult::new(Arity::One, OutputFlow::Void);
+            RefFlowBoundary::RecursiveOpaque => PatternResult::new(Arity::One, OutputFlow::Void),
+            RefFlowBoundary::Transparent => {
+                // Non-recursive refs are transparent: return the target's precomputed
+                // result so the enclosing scope sees its fields/arity exactly as if the
+                // body were inlined here. SCC order guarantees it is already present.
+                self.ctx.type_ctx.def_memo(def_id).cloned().expect(
+                    "non-recursive reference target is inferred before the referrer (SCC order)",
+                )
+            }
+        }
+    }
+
+    fn ref_flow_boundary(&self, def_id: DefId, body: &Pattern) -> RefFlowBoundary {
+        if !self.ctx.dependency_analysis.is_recursive_def(def_id) {
+            return RefFlowBoundary::Transparent;
         }
 
-        // Non-recursive refs are transparent: return the target's precomputed
-        // result so the enclosing scope sees its fields/arity exactly as if the
-        // body were inlined here. SCC order guarantees it is already present.
-        self.ctx
-            .type_ctx
-            .def_memo(def_id)
-            .cloned()
-            .expect("non-recursive reference target is inferred before the referrer (SCC order)")
+        // Recursive refs are opaque boundaries - they don't bubble captures.
+        // Enum alternations are the exception because they always produce Enum output.
+        if self.body_is_enum(body) {
+            return RefFlowBoundary::RecursiveEnumValue;
+        }
+
+        RefFlowBoundary::RecursiveOpaque
     }
 
     /// An enum body always produces an Enum type (Value flow), so a recursive
