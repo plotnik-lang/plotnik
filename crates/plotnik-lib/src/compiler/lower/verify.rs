@@ -43,16 +43,16 @@ mod release_impl {
     #[inline(always)]
     pub fn run_verified(
         _name: &str,
-        result: &mut NfaGraph,
+        nfa: &mut NfaGraph,
         _ctx: &LowerInput,
         pass: impl FnOnce(&mut NfaGraph),
     ) {
-        pass(result);
+        pass(nfa);
     }
 
     /// No-op in release builds.
     #[inline(always)]
-    pub fn verify_constructed(_result: &NfaGraph, _ctx: &LowerInput) {}
+    pub fn verify_constructed(_nfa: &NfaGraph, _ctx: &LowerInput) {}
 }
 
 #[cfg(debug_assertions)]
@@ -526,17 +526,17 @@ mod debug_impl {
         Ok(())
     }
 
-    fn entries(result: &NfaGraph) -> Vec<(WalkRoot, Label)> {
-        let mut v = vec![(WalkRoot::Preamble, result.preamble_entry)];
-        for (&def_id, &label) in &result.def_entries {
+    fn entries(nfa: &NfaGraph) -> Vec<(WalkRoot, Label)> {
+        let mut v = vec![(WalkRoot::Preamble, nfa.preamble_entry)];
+        for (&def_id, &label) in &nfa.def_entries {
             v.push((WalkRoot::Def(def_id), label));
         }
         v
     }
 
-    fn snapshot(result: &NfaGraph, ctx: &LowerInput) -> PassSnapshot {
-        let walk = GraphWalk::new(&result.instructions, &result.def_entries, ctx);
-        let fingerprints = entries(result)
+    fn snapshot(nfa: &NfaGraph, ctx: &LowerInput) -> PassSnapshot {
+        let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
+        let fingerprints = entries(nfa)
             .into_iter()
             .map(|(key, entry)| {
                 let fp = walk.fingerprint(entry);
@@ -544,7 +544,7 @@ mod debug_impl {
             })
             .collect();
         PassSnapshot {
-            instructions: result.instructions.clone(),
+            instructions: nfa.instructions.clone(),
             fingerprints,
         }
     }
@@ -570,13 +570,13 @@ mod debug_impl {
         s
     }
 
-    fn verify_after_pass(name: &str, before: &PassSnapshot, result: &NfaGraph, ctx: &LowerInput) {
-        if let Err(e) = check_labels(&result.instructions) {
+    fn verify_after_pass(name: &str, before: &PassSnapshot, nfa: &NfaGraph, ctx: &LowerInput) {
+        if let Err(e) = check_labels(&nfa.instructions) {
             panic!("[verify] pass `{name}` produced malformed IR: {e}");
         }
 
-        let before_walk = GraphWalk::new(&before.instructions, &result.def_entries, ctx);
-        let after_walk = GraphWalk::new(&result.instructions, &result.def_entries, ctx);
+        let before_walk = GraphWalk::new(&before.instructions, &nfa.def_entries, ctx);
+        let after_walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
         for (key, entry, before_fp) in &before.fingerprints {
             let after_fp = after_walk.fingerprint(*entry);
             if *before_fp != after_fp {
@@ -594,25 +594,25 @@ mod debug_impl {
     /// instruction list structurally sound.
     pub fn run_verified(
         name: &str,
-        result: &mut NfaGraph,
+        nfa: &mut NfaGraph,
         ctx: &LowerInput,
         pass: impl FnOnce(&mut NfaGraph),
     ) {
-        let before = snapshot(result, ctx);
-        pass(result);
-        verify_after_pass(name, &before, result, ctx);
+        let before = snapshot(nfa, ctx);
+        pass(nfa);
+        verify_after_pass(name, &before, nfa, ctx);
     }
 
     /// Check the freshly-constructed IR before any pass runs: structural soundness
     /// plus balanced scope effects on every path. Passes preserve the fingerprint
     /// (which carries the full effect sequence), so a construction that balances
     /// here stays balanced through the pipeline.
-    pub fn verify_constructed(result: &NfaGraph, ctx: &LowerInput) {
-        if let Err(e) = check_labels(&result.instructions) {
+    pub fn verify_constructed(nfa: &NfaGraph, ctx: &LowerInput) {
+        if let Err(e) = check_labels(&nfa.instructions) {
             panic!("[verify] construction produced malformed IR: {e}");
         }
-        let walk = GraphWalk::new(&result.instructions, &result.def_entries, ctx);
-        for (key, entry) in entries(result) {
+        let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
+        for (key, entry) in entries(nfa) {
             if let Err(e) = walk.check_scopes(entry) {
                 panic!("[verify] construction produced unbalanced scope effects for {key:?}:\n{e}");
             }

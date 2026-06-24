@@ -31,16 +31,16 @@ pub(in crate::compiler) fn emit_unchecked(
     input: EmitInput<'_>,
     lowered_ir: &LoweredNfa,
 ) -> Result<Vec<u8>, EmitError> {
-    let compile_result = lowered_ir.raw();
-    let strings = seed_strings(compile_result)?;
+    let nfa = lowered_ir.raw();
+    let strings = seed_strings(nfa)?;
     let (types, strings) = build_types(&input, strings)?;
-    let layout = compute_layout(compile_result)?;
-    let mut pipeline = EmitPipeline::new(input, compile_result, strings, types, layout);
+    let layout = compute_layout(nfa)?;
+    let mut pipeline = EmitPipeline::new(input, nfa, strings, types, layout);
 
     let tables = pipeline.build_tables()?;
-    let regexes = build_regexes(compile_result, pipeline.strings())?;
+    let regexes = build_regexes(nfa, pipeline.strings())?;
     let pool = ConstantPool::new(pipeline.types(), pipeline.strings(), &regexes);
-    let transitions = emit_instructions(compile_result.instructions(), pipeline.layout(), pool)?;
+    let transitions = emit_instructions(nfa.instructions(), pipeline.layout(), pool)?;
 
     pipeline.write_module(pool, &tables, &transitions)
 }

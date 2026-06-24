@@ -656,13 +656,13 @@ impl LinkedQuery {
     }
 
     fn emit(&self) -> Result<Vec<u8>, EmitError> {
-        let compile_result = self.compile();
-        crate::compiler::emit::emit(self.emit_input(), &compile_result)
+        let nfa = self.compile();
+        crate::compiler::emit::emit(self.emit_input(), &nfa)
     }
 
     fn emit_unchecked(&self) -> Result<Vec<u8>, EmitError> {
-        let compile_result = self.compile();
-        crate::compiler::emit::emit_unchecked(self.emit_input(), &compile_result)
+        let nfa = self.compile();
+        crate::compiler::emit::emit_unchecked(self.emit_input(), &nfa)
     }
 
     fn compile(&self) -> crate::compiler::lower::ir::LoweredNfa {

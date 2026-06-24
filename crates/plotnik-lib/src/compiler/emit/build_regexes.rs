@@ -15,11 +15,11 @@ use crate::compiler::lower::ir::{InstructionIR, NfaGraph, PredicateValueIR};
 /// StringId from the finished string table. Reads the string table; interns
 /// nothing into it.
 pub fn build_regexes(
-    ir: &NfaGraph,
+    nfa: &NfaGraph,
     strings: &StringTableBuilder,
 ) -> Result<RegexTableBuilder, EmitError> {
     let mut regexes = RegexTableBuilder::new();
-    intern_regex_predicates(ir.instructions(), strings, &mut regexes)?;
+    intern_regex_predicates(nfa.instructions(), strings, &mut regexes)?;
     regexes.validate()?;
     Ok(regexes)
 }

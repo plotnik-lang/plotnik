@@ -8,23 +8,22 @@ use std::collections::HashSet;
 
 use crate::compiler::lower::ir::{Label, NfaGraph};
 
-pub fn remove_unreachable(result: &mut NfaGraph) {
-    let reachable = compute_reachable(result);
-    result
-        .instructions
+pub fn remove_unreachable(nfa: &mut NfaGraph) {
+    let reachable = compute_reachable(nfa);
+    nfa.instructions
         .retain(|instr| reachable.contains(&instr.label()));
 }
 
-fn compute_reachable(result: &NfaGraph) -> HashSet<Label> {
-    let successors: std::collections::BTreeMap<Label, Vec<Label>> = result
+fn compute_reachable(nfa: &NfaGraph) -> HashSet<Label> {
+    let successors: std::collections::BTreeMap<Label, Vec<Label>> = nfa
         .instructions
         .iter()
         .map(|instr| (instr.label(), instr.successors().to_vec()))
         .collect();
 
     let mut reachable = HashSet::new();
-    let mut queue: Vec<Label> = vec![result.preamble_entry];
-    queue.extend(result.def_entries.values().copied());
+    let mut queue: Vec<Label> = vec![nfa.preamble_entry];
+    queue.extend(nfa.def_entries.values().copied());
 
     while let Some(label) = queue.pop() {
         if !reachable.insert(label) {
