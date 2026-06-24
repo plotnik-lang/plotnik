@@ -50,13 +50,6 @@ impl<'t> EffectLog<'t> {
         self.0.len()
     }
 
-    /// Check if empty.
-    #[inline]
-    #[allow(dead_code)]
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
     /// Truncate to a saved watermark, rolling back effects on backtrack.
     #[inline]
     pub fn truncate(&mut self, watermark: usize) {
@@ -66,12 +59,6 @@ impl<'t> EffectLog<'t> {
     /// Get effects as slice.
     pub fn as_slice(&self) -> &[RuntimeEffect<'t>] {
         &self.0
-    }
-
-    /// Consume into vec.
-    #[allow(dead_code)]
-    pub fn into_vec(self) -> Vec<RuntimeEffect<'t>> {
-        self.0
     }
 }
 

@@ -123,20 +123,6 @@ impl CheckpointStack {
     pub fn max_frame_idx(&self) -> Option<u32> {
         self.max_frame_idx
     }
-
-    /// Check if empty.
-    #[inline]
-    #[allow(dead_code)]
-    pub fn is_empty(&self) -> bool {
-        self.stack.is_empty()
-    }
-
-    /// Get number of checkpoints.
-    #[inline]
-    #[allow(dead_code)]
-    pub fn len(&self) -> usize {
-        self.stack.len()
-    }
 }
 
 impl Default for CheckpointStack {

@@ -14,10 +14,6 @@ pub enum RuntimeError {
     #[error("no match found")]
     NoMatch,
 
-    #[error("invalid entrypoint: {0}")]
-    #[allow(dead_code)]
-    InvalidEntrypoint(String),
-
     #[error("module error: {0}")]
     Module(#[from] ModuleError),
 }
