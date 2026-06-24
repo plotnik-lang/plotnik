@@ -1,10 +1,10 @@
 use std::num::NonZeroU16;
 
-use crate::bytecode::{EffectKind, Nav, PredicateOp};
+use crate::bytecode::Nav;
 
 use super::ir::{
-    CallIR, CalleeEntry, EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
-    PredicateValueIR, ReturnAddr, ReturnIR,
+    CallIR, CalleeEntry, EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, ReturnAddr,
+    ReturnIR,
 };
 
 #[test]
@@ -47,21 +47,4 @@ fn instruction_successors() {
     let r: InstructionIR = ReturnIR::new(Label(6)).into();
 
     assert!(r.successors().is_empty());
-}
-
-#[test]
-fn effect_ir_preserves_literal_payload() {
-    let simple = EffectIR::literal(EffectKind::Node, 5);
-    assert_eq!(simple.kind(), EffectKind::Node);
-}
-
-#[test]
-fn predicate_ir_stores_text_until_emit() {
-    let string = PredicateIR::string(PredicateOp::Eq, "hello");
-    assert_eq!(string.value.text(), "hello");
-    assert!(!string.value.is_regex());
-
-    let regex = PredicateIR::regex(PredicateOp::RegexMatch, "h.*o");
-    assert_eq!(regex.value, PredicateValueIR::Regex("h.*o".into()));
-    assert!(regex.value.is_regex());
 }

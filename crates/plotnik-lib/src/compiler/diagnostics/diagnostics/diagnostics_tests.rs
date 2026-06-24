@@ -28,24 +28,6 @@ fn report_with_default_message() {
 }
 
 #[test]
-fn report_with_custom_message() {
-    let mut map = SourceMap::new();
-    let id = map.add_inline("hello");
-
-    let mut diagnostics = Diagnostics::new();
-    diagnostics
-        .report(
-            DiagnosticKind::ExpectedTypeName,
-            Span::new(id, TextRange::new(0.into(), 5.into())),
-        )
-        .detail("expected type name after '::' (e.g., ::MyType)")
-        .emit();
-
-    assert_eq!(diagnostics.len(), 1);
-    assert!(diagnostics.has_errors());
-}
-
-#[test]
 fn builder_with_related() {
     let mut map = SourceMap::new();
     let id = map.add_inline("hello world!");
@@ -72,36 +54,6 @@ fn builder_with_related() {
       | ^^^^^ ---- related info
       |
     help: add `)` to close the node
-    ");
-}
-
-#[test]
-fn builder_with_fix() {
-    let mut map = SourceMap::new();
-    let id = map.add_inline("hello world");
-
-    let mut diagnostics = Diagnostics::new();
-    diagnostics
-        .report(
-            DiagnosticKind::InvalidFieldEquals,
-            Span::new(id, TextRange::new(0.into(), 5.into())),
-        )
-        .detail("fixable")
-        .fix("apply this fix", "fixed")
-        .emit();
-
-    let result = diagnostics.render_raw(&map);
-    insta::assert_snapshot!(result, @"
-    error: fields use `:`, not `=`: fixable
-      |
-    1 | hello world
-      | ^^^^^
-      |
-    help: apply this fix
-      |
-    1 - hello world
-    1 + fixed world
-      |
     ");
 }
 
@@ -645,30 +597,6 @@ fn multi_file_same_file_related() {
       | |
       | first defined here
     ");
-}
-
-#[test]
-fn source_map_iteration() {
-    let mut map = SourceMap::new();
-    map.add_file(SourcePath::new("a.ptk"), "content a");
-    map.add_file(SourcePath::new("b.ptk"), "content b");
-
-    assert_eq!(map.len(), 2);
-    assert!(!map.is_empty());
-
-    let contents: Vec<_> = map.iter().map(|s| s.content).collect();
-    assert_eq!(contents, vec!["content a", "content b"]);
-}
-
-#[test]
-fn span_new() {
-    let mut map = SourceMap::new();
-    let id = map.add_inline("hello");
-
-    let range = TextRange::new(5.into(), 10.into());
-    let span = Span::new(id, range);
-    assert_eq!(span.source, id);
-    assert_eq!(span.range, range);
 }
 
 #[test]

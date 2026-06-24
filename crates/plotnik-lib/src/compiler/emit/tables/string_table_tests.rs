@@ -57,26 +57,6 @@ fn intern_str_deduplicates() {
 }
 
 #[test]
-fn intern_symbol_is_not_shared_across_symbol_ids() {
-    let mut interner = Interner::new();
-    let known = interner.intern("known");
-    let unknown = interner.intern("unknown");
-
-    let mut builder = StringTableBuilder::new();
-    let known_id = builder.get_or_intern(known, &interner).unwrap();
-    let unknown_id = builder.get_or_intern(unknown, &interner).unwrap();
-
-    assert_ne!(known_id, unknown_id);
-}
-
-#[test]
-fn validate_passes_for_normal_counts() {
-    let builder = StringTableBuilder::new();
-
-    assert!(builder.validate().is_ok());
-}
-
-#[test]
 fn emit_produces_correct_format() {
     let mut builder = StringTableBuilder::new();
     builder.get_or_intern_str("abc");

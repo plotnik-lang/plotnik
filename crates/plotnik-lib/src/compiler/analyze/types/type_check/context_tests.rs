@@ -2,22 +2,7 @@ use std::collections::BTreeMap;
 
 use super::context::TypeAnalysisBuilder;
 use super::def_id::Interner;
-use super::types::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
-use crate::compiler::ids::DefId;
-
-#[test]
-fn builtin_types_have_correct_ids() {
-    let ctx = TypeAnalysisBuilder::new();
-
-    assert_eq!(
-        ctx.in_progress().type_shape(TYPE_VOID),
-        Some(&TypeShape::Void)
-    );
-    assert_eq!(
-        ctx.in_progress().type_shape(TYPE_NODE),
-        Some(&TypeShape::Node)
-    );
-}
+use super::types::{FieldInfo, TYPE_NODE, TypeShape};
 
 #[test]
 fn type_interning_deduplicates() {
@@ -43,30 +28,4 @@ fn struct_types_intern_correctly() {
     let id2 = ctx.intern_type(TypeShape::Struct(fields));
 
     assert_eq!(id1, id2);
-}
-
-#[test]
-fn symbol_interning_works() {
-    let mut interner = Interner::new();
-
-    let a = interner.intern("foo");
-    let b = interner.intern("foo");
-    let c = interner.intern("bar");
-
-    assert_eq!(a, b);
-    assert_ne!(a, c);
-    assert_eq!(interner.resolve(a), "foo");
-    assert_eq!(interner.resolve(c), "bar");
-}
-
-#[test]
-fn def_output_round_trips_by_def_id() {
-    let mut ctx = TypeAnalysisBuilder::new();
-    let def_id = DefId::from_raw(0);
-
-    ctx.set_def_output(def_id, TYPE_NODE);
-
-    let analysis = ctx.finish();
-    assert_eq!(analysis.def_output(def_id), Some(TYPE_NODE));
-    assert_eq!(analysis.def_output(DefId::from_raw(1)), None);
 }

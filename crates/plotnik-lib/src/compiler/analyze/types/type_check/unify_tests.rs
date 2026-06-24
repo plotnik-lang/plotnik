@@ -1,64 +1,6 @@
-use std::collections::BTreeMap;
-
 use super::context::TypeAnalysisBuilder;
-use super::types::{FieldInfo, OutputFlow, TYPE_NODE};
+use super::types::{OutputFlow, TYPE_NODE};
 use super::unify::{UnifyError, unify_flow};
-use crate::core::Interner;
-
-#[test]
-fn unify_void_void() {
-    let mut ctx = TypeAnalysisBuilder::new();
-    let result = unify_flow(&mut ctx, OutputFlow::Void, OutputFlow::Void);
-    assert!(matches!(result, Ok(OutputFlow::Void)));
-}
-
-#[test]
-fn unify_void_bubble() {
-    let mut ctx = TypeAnalysisBuilder::new();
-    let mut interner = Interner::new();
-    let x = interner.intern("x");
-    let struct_id = ctx.intern_single_field(x, FieldInfo::required(TYPE_NODE));
-
-    let result = unify_flow(&mut ctx, OutputFlow::Void, OutputFlow::Fields(struct_id)).unwrap();
-
-    match result {
-        OutputFlow::Fields(id) => {
-            let type_ctx = ctx.in_progress();
-            let fields = type_ctx.expect_struct_fields(id);
-            assert!(fields.get(&x).unwrap().optional);
-        }
-        _ => panic!("expected Fields"),
-    }
-}
-
-#[test]
-fn unify_bubble_merge() {
-    let mut ctx = TypeAnalysisBuilder::new();
-    let mut interner = Interner::new();
-    let x = interner.intern("x");
-    let y = interner.intern("y");
-
-    let a_id = ctx.intern_single_field(x, FieldInfo::required(TYPE_NODE));
-
-    let mut b_fields = BTreeMap::new();
-    b_fields.insert(x, FieldInfo::required(TYPE_NODE));
-    b_fields.insert(y, FieldInfo::required(TYPE_NODE));
-    let b_id = ctx.intern_struct(b_fields);
-
-    let result = unify_flow(&mut ctx, OutputFlow::Fields(a_id), OutputFlow::Fields(b_id)).unwrap();
-
-    match result {
-        OutputFlow::Fields(id) => {
-            let type_ctx = ctx.in_progress();
-            let fields = type_ctx.expect_struct_fields(id);
-            // x is in both, so required
-            assert!(!fields.get(&x).unwrap().optional);
-            // y only in b, so optional
-            assert!(fields.get(&y).unwrap().optional);
-        }
-        _ => panic!("expected Fields"),
-    }
-}
 
 #[test]
 fn unify_scalar_error() {

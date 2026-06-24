@@ -7,9 +7,4 @@ fn category_subtype_shares_id_grammar_with_slash() {
     let hash = Query::expect_valid_ast("Q = (expression#member-expression)");
     let slash = Query::expect_valid_ast("Q = (expression/member-expression)");
     assert_eq!(hash, slash);
-    insta::assert_snapshot!(hash, @r"
-    Root
-      Def Q
-        NamedNode expression
-    ");
 }

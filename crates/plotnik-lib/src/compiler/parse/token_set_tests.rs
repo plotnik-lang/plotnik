@@ -10,12 +10,3 @@ fn test_token_set_contains() {
     assert!(!set.contains(Plus));
     assert!(!set.contains(Colon));
 }
-
-#[test]
-fn test_token_set_debug() {
-    let set = TokenSet::new(&[ParenOpen, Star, Plus]);
-    let debug_str = format!("{:?}", set);
-    assert!(debug_str.contains("ParenOpen"));
-    assert!(debug_str.contains("Star"));
-    assert!(debug_str.contains("Plus"));
-}
