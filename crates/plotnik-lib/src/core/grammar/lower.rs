@@ -48,11 +48,7 @@ impl LoweredGrammar {
             variables: raw
                 .rules
                 .iter()
-                .map(|(name, rule)| Variable {
-                    name: name.clone(),
-                    kind: VariableType::Named,
-                    rule: convert_rule(rule),
-                })
+                .map(|(name, rule)| Variable::named(name.clone(), convert_rule(rule)))
                 .collect(),
             extra_symbols: raw.extras.iter().map(convert_rule).collect(),
             expected_conflicts: raw.conflicts.clone(),

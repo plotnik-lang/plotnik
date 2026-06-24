@@ -384,21 +384,16 @@ impl TokenExtractor {
                     self.current_variable_name.clone(),
                 ))?;
             }
-            Variable {
-                name: string_value,
-                kind: VariableType::Anonymous,
-                rule,
-            }
+            Variable::anonymous(string_value, rule)
         } else {
             self.current_variable_token_count += 1;
-            Variable {
-                name: format!(
+            Variable::auxiliary(
+                format!(
                     "{}_token{}",
                     self.current_variable_name, self.current_variable_token_count
                 ),
-                kind: VariableType::Auxiliary,
                 rule,
-            }
+            )
         };
 
         self.extracted_variables.push(variable);

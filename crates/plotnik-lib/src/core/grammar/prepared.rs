@@ -17,6 +17,32 @@ pub struct Variable {
     pub rule: Rule,
 }
 
+impl Variable {
+    pub(in crate::core::grammar) fn anonymous(name: String, rule: Rule) -> Self {
+        Self {
+            name,
+            kind: VariableType::Anonymous,
+            rule,
+        }
+    }
+
+    pub(in crate::core::grammar) fn auxiliary(name: String, rule: Rule) -> Self {
+        Self {
+            name,
+            kind: VariableType::Auxiliary,
+            rule,
+        }
+    }
+
+    pub(in crate::core::grammar) fn named(name: String, rule: Rule) -> Self {
+        Self {
+            name,
+            kind: VariableType::Named,
+            rule,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PrecedenceEntry {
     Name(String),

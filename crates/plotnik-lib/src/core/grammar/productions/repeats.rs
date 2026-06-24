@@ -104,11 +104,10 @@ impl Expander {
                 );
                 self.existing_repeats
                     .insert(inner_rule.clone(), repeat_symbol);
-                self.auxiliary_variables.push(Variable {
-                    name: rule_name,
-                    kind: VariableType::Auxiliary,
-                    rule: Self::wrap_rule_in_binary_tree(repeat_symbol, inner_rule),
-                });
+                self.auxiliary_variables.push(Variable::auxiliary(
+                    rule_name,
+                    Self::wrap_rule_in_binary_tree(repeat_symbol, inner_rule),
+                ));
 
                 Rule::Symbol(repeat_symbol)
             }
