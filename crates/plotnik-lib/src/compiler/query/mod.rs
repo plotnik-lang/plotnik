@@ -9,5 +9,5 @@ mod printer_tests;
 #[cfg(test)]
 mod query_tests;
 
-pub(crate) use stages::GrammarBoundQuery;
+pub(crate) use stages::LinkOutcome;
 pub use stages::{CheckedQuery, CompiledQuery, Query, QueryBuilder};

@@ -70,7 +70,7 @@ impl QueryBuilder {
         Ok(self.link(grammar)?.compile_module())
     }
 
-    pub(crate) fn link(self, grammar: &Grammar) -> crate::compiler::Result<GrammarBoundQuery> {
+    pub(crate) fn link(self, grammar: &Grammar) -> crate::compiler::Result<LinkOutcome> {
         Ok(self.analyze()?.link(grammar))
     }
 
@@ -355,8 +355,6 @@ impl TryFrom<&str> for Query {
         QueryBuilder::new(SourceMap::from_inline(src)).analyze()
     }
 }
-
-pub(crate) type GrammarBoundQuery = LinkOutcome;
 
 pub(crate) enum LinkOutcome {
     Linked(LinkedQuery),

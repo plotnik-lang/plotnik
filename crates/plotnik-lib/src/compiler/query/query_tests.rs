@@ -6,7 +6,7 @@ use std::sync::LazyLock;
 use crate::compiler::SourceMap;
 use crate::compiler::diagnostics::DiagnosticKind;
 
-use super::{GrammarBoundQuery, Query, QueryBuilder};
+use super::{LinkOutcome, Query, QueryBuilder};
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
@@ -140,7 +140,7 @@ impl Query {
     }
 
     #[track_caller]
-    pub(crate) fn expect_valid_linking(src: &str) -> GrammarBoundQuery {
+    pub(crate) fn expect_valid_linking(src: &str) -> LinkOutcome {
         let query = Self::parse_and_validate(src).link(javascript());
         if !query.is_valid() {
             panic!(

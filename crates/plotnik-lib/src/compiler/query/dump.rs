@@ -1,6 +1,6 @@
 //! String dump methods for query inspection.
 
-use crate::compiler::query::{GrammarBoundQuery, Query};
+use crate::compiler::query::{LinkOutcome, Query};
 
 impl Query {
     pub fn dump_cst(&self) -> String {
@@ -35,7 +35,7 @@ impl Query {
     }
 }
 
-impl GrammarBoundQuery {
+impl LinkOutcome {
     #[cfg(test)]
     pub(crate) fn dump_diagnostics(&self) -> String {
         self.diagnostics().render(self.source_map())
