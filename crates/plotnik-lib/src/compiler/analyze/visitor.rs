@@ -102,29 +102,24 @@ pub fn walk_node_pattern<V: Visitor>(visitor: &mut V, node: &Located<NodePattern
     }
 }
 
-pub fn walk_union_pattern<V: Visitor>(visitor: &mut V, union: &Located<UnionPattern>) {
-    for branch in union.node().branches() {
-        if let Some(body) = branch.body() {
-            visitor.visit_pattern(&union.wrap(body));
-        }
-    }
+macro_rules! alternation_walker {
+    ($fn_name:ident, $ty:ty) => {
+        pub fn $fn_name<V: Visitor>(visitor: &mut V, alt: &Located<$ty>) {
+            for branch in alt.node().branches() {
+                if let Some(body) = branch.body() {
+                    visitor.visit_pattern(&alt.wrap(body));
+                }
+            }
 
-    for pattern in union.node().patterns() {
-        visitor.visit_pattern(&union.wrap(pattern));
-    }
+            for pattern in alt.node().patterns() {
+                visitor.visit_pattern(&alt.wrap(pattern));
+            }
+        }
+    };
 }
 
-pub fn walk_enum_pattern<V: Visitor>(visitor: &mut V, e: &Located<EnumPattern>) {
-    for branch in e.node().branches() {
-        if let Some(body) = branch.body() {
-            visitor.visit_pattern(&e.wrap(body));
-        }
-    }
-
-    for pattern in e.node().patterns() {
-        visitor.visit_pattern(&e.wrap(pattern));
-    }
-}
+alternation_walker!(walk_union_pattern, UnionPattern);
+alternation_walker!(walk_enum_pattern, EnumPattern);
 
 pub fn walk_seq_pattern<V: Visitor>(visitor: &mut V, seq: &Located<SeqPattern>) {
     for child in seq.node().children() {

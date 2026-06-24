@@ -454,15 +454,6 @@ impl NodePattern {
             .unwrap_or(false)
     }
 
-    pub fn children(&self) -> impl Iterator<Item = Pattern> + '_ {
-        self.0.children().filter_map(Pattern::cast)
-    }
-
-    /// Returns children interleaved with anchors, preserving order.
-    pub fn items(&self) -> impl Iterator<Item = SeqItem> + '_ {
-        self.0.children().filter_map(SeqItem::cast)
-    }
-
     /// Returns the predicate if present: `(identifier == "foo")`.
     pub fn predicate(&self) -> Option<NodePredicate> {
         self.0.children().find_map(NodePredicate::cast)
@@ -507,43 +498,33 @@ impl DefRef {
     }
 }
 
-impl UnionPattern {
-    pub fn syntax(&self) -> &SyntaxNode {
-        &self.0
-    }
+macro_rules! alternation_accessors {
+    ($($ty:ident),+ $(,)?) => {
+        $(
+            impl $ty {
+                pub fn syntax(&self) -> &SyntaxNode {
+                    &self.0
+                }
 
-    pub fn text_range(&self) -> TextRange {
-        self.0.text_range()
-    }
+                pub fn text_range(&self) -> TextRange {
+                    self.0.text_range()
+                }
 
-    pub fn branches(&self) -> impl Iterator<Item = Branch> + '_ {
-        self.0.children().filter_map(Branch::cast)
-    }
+                pub fn branches(&self) -> impl Iterator<Item = Branch> + '_ {
+                    self.0.children().filter_map(Branch::cast)
+                }
 
-    /// Bare (non-`Branch`-wrapped) patterns — only present on a malformed tree;
-    /// a well-formed alternation wraps every branch in `SyntaxKind::Branch`.
-    pub fn patterns(&self) -> impl Iterator<Item = Pattern> + '_ {
-        self.0.children().filter_map(Pattern::cast)
-    }
+                /// Bare (non-`Branch`-wrapped) patterns — only present on a malformed tree;
+                /// a well-formed alternation wraps every branch in `SyntaxKind::Branch`.
+                pub fn patterns(&self) -> impl Iterator<Item = Pattern> + '_ {
+                    self.0.children().filter_map(Pattern::cast)
+                }
+            }
+        )+
+    };
 }
 
-impl EnumPattern {
-    pub fn syntax(&self) -> &SyntaxNode {
-        &self.0
-    }
-
-    pub fn text_range(&self) -> TextRange {
-        self.0.text_range()
-    }
-
-    pub fn branches(&self) -> impl Iterator<Item = Branch> + '_ {
-        self.0.children().filter_map(Branch::cast)
-    }
-
-    pub fn patterns(&self) -> impl Iterator<Item = Pattern> + '_ {
-        self.0.children().filter_map(Pattern::cast)
-    }
-}
+alternation_accessors!(UnionPattern, EnumPattern);
 
 impl Branch {
     pub fn label(&self) -> Option<SyntaxToken> {
@@ -555,16 +536,24 @@ impl Branch {
     }
 }
 
-impl SeqPattern {
-    pub fn children(&self) -> impl Iterator<Item = Pattern> + '_ {
-        self.0.children().filter_map(Pattern::cast)
-    }
+macro_rules! sequence_accessors {
+    ($($ty:ident),+ $(,)?) => {
+        $(
+            impl $ty {
+                pub fn children(&self) -> impl Iterator<Item = Pattern> + '_ {
+                    self.0.children().filter_map(Pattern::cast)
+                }
 
-    /// Returns children interleaved with anchors, preserving order.
-    pub fn items(&self) -> impl Iterator<Item = SeqItem> + '_ {
-        self.0.children().filter_map(SeqItem::cast)
-    }
+                /// Returns children interleaved with anchors, preserving order.
+                pub fn items(&self) -> impl Iterator<Item = SeqItem> + '_ {
+                    self.0.children().filter_map(SeqItem::cast)
+                }
+            }
+        )+
+    };
 }
+
+sequence_accessors!(NodePattern, SeqPattern);
 
 impl CapturedPattern {
     /// Returns the capture token (@name or @_name).
