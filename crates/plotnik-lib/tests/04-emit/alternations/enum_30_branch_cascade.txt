@@ -1,6 +1,3 @@
----
-source: crates/plotnik-lib/src/compiler/compile/compile_tests.rs
----
 Q = [
     A0: (identifier) @x0   A1: (identifier) @x1   A2: (identifier) @x2
     A3: (identifier) @x3   A4: (identifier) @x4   A5: (identifier) @x5
@@ -13,7 +10,7 @@ Q = [
     A24: (identifier) @x24 A25: (identifier) @x25 A26: (identifier) @x26
     A27: (identifier) @x27 A28: (identifier) @x28 A29: (identifier) @x29
 ]
----
+==== bytecode ====
 [strings]
 S00 "Beauty will save the world"
 S01 "x0"

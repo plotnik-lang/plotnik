@@ -1,5 +1,3 @@
-use crate::bytecode::{Module, dump};
-use crate::core::Colors;
 use crate::core::grammar::{Grammar, raw::RawGrammar};
 use std::sync::LazyLock;
 
@@ -76,32 +74,6 @@ impl Query {
             );
         }
         query
-    }
-
-    #[track_caller]
-    pub fn expect_valid_bytecode(src: &str) -> String {
-        let query = Self::parse_and_validate(src).link(javascript());
-        if !query.is_valid() {
-            panic!(
-                "Expected valid linking, got error:\n{}",
-                query.dump_diagnostics()
-            );
-        }
-        let bytecode = query.emit().expect("bytecode emission should succeed");
-        let module = Module::load(&bytecode).expect("module loading should succeed");
-        dump(&module, Colors::OFF)
-    }
-
-    #[track_caller]
-    pub fn expect_valid_bytes(src: &str) -> Vec<u8> {
-        let query = Self::parse_and_validate(src).link(javascript());
-        if !query.is_valid() {
-            panic!(
-                "Expected valid linking, got error:\n{}",
-                query.dump_diagnostics()
-            );
-        }
-        query.emit().expect("bytecode emission should succeed")
     }
 
     #[track_caller]

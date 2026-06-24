@@ -1,4 +1,4 @@
-//! Test utilities and snapshot macros.
+//! Test utilities.
 
 use std::collections::{HashMap, HashSet};
 
@@ -34,16 +34,4 @@ pub fn colliding_node_kind_grammar() -> Grammar {
     .expect("collision grammar fixture");
 
     Grammar::from_raw(&raw).expect("collision grammar metadata")
-}
-
-/// Snapshot test for bytecode output.
-#[macro_export]
-macro_rules! shot_bytecode {
-    ($query:literal) => {{
-        let query = indoc::indoc!($query).trim();
-        let output = $crate::compiler::Query::expect_valid_bytecode(query);
-        insta::with_settings!({ omit_expression => true }, {
-            insta::assert_snapshot!(format!("{query}\n---\n{output}"));
-        });
-    }};
 }

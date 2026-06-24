@@ -19,13 +19,6 @@ pub(crate) mod query;
 #[cfg(test)]
 pub mod test_utils;
 
-// `compile_tests` drives the lowering pipeline end-to-end; kept under a `compile`
-// module path so its committed insta snapshots resolve unchanged.
-#[cfg(test)]
-mod compile {
-    mod compile_tests;
-}
-
 pub use crate::compiler::emit::tables::EmitError;
 pub use crate::compiler::diagnostics::source;
 

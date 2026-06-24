@@ -1,9 +1,6 @@
----
-source: crates/plotnik-lib/src/compiler/compile/compile_tests.rs
----
 Q = [(identifier) @a (number) @b (string) @c (binary_expression) @d
      (call_expression) @e (member_expression) @f (array) @g (object) @h]
----
+==== bytecode ====
 [strings]
 S00 "Beauty will save the world"
 S01 "a"
