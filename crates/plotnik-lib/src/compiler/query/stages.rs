@@ -117,10 +117,7 @@ impl QueryParsed {
             ast_map: &self.ast_map,
             diag: &mut self.diag,
         }) else {
-            return Query {
-                parsed: self,
-                analysis: None,
-            };
+            return Query::parsed_only(self);
         };
 
         let mut interner = Interner::new();
@@ -157,10 +154,7 @@ impl QueryParsed {
             dependency_analysis,
         };
 
-        Query {
-            parsed: self,
-            analysis: Some(analysis),
-        }
+        Query::analyzed(self, analysis)
     }
 
     pub(crate) fn source_map(&self) -> &SourceMap {
@@ -194,6 +188,20 @@ pub(super) struct QueryAnalysis {
 }
 
 impl Query {
+    fn analyzed(parsed: QueryParsed, analysis: QueryAnalysis) -> Self {
+        Self {
+            parsed,
+            analysis: Some(analysis),
+        }
+    }
+
+    fn parsed_only(parsed: QueryParsed) -> Self {
+        Self {
+            parsed,
+            analysis: None,
+        }
+    }
+
     pub fn is_valid(&self) -> bool {
         self.analysis.is_some() && !self.parsed.diag.has_errors()
     }
@@ -268,10 +276,7 @@ impl Query {
         let Query { parsed, analysis } = self;
         match analysis {
             Some(analysis) => Ok(AnalyzedQuery { parsed, analysis }),
-            None => Err(Query {
-                parsed,
-                analysis: None,
-            }),
+            None => Err(Query::parsed_only(parsed)),
         }
     }
 
@@ -304,10 +309,7 @@ impl Query {
 
 impl AnalyzedQuery {
     fn into_query(self) -> Query {
-        Query {
-            parsed: self.parsed,
-            analysis: Some(self.analysis),
-        }
+        Query::analyzed(self.parsed, self.analysis)
     }
 
     pub(crate) fn interner(&self) -> &Interner {
