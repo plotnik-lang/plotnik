@@ -26,8 +26,13 @@ pub use crate::core::colors;
 pub use crate::core::grammar;
 
 pub mod diagnostics {
-    pub use crate::compiler::diagnostics::report::*;
-    pub use crate::compiler::diagnostics::*;
+    pub use crate::compiler::diagnostics::report::{
+        DiagnosticBuilder, DiagnosticKind, Diagnostics, JsonDiagnostic, JsonFix, JsonPosition,
+        JsonRelated, JsonSpan, Severity,
+    };
+    pub use crate::compiler::diagnostics::{
+        Error, QueryResult, Source, SourceId, SourceKind, SourceMap, SourcePath, Span,
+    };
 }
 
 pub use crate::compiler::typegen::typescript::{
@@ -37,13 +42,17 @@ pub use crate::compiler::typegen::typescript::{
 pub use crate::core::Colors;
 
 pub use crate::compiler::{
-    CheckedQuery, CompiledQuery, Query, QueryBuilder, SourceId, SourceMap, SourcePath,
+    CheckedQuery, CompiledQuery, Query, QueryBuilder, Source, SourceId, SourceKind, SourceMap,
+    SourcePath,
 };
-pub use crate::compiler::{Diagnostics, EmitError, Error, QueryResult, Severity, Span};
+pub use crate::compiler::{
+    DiagnosticBuilder, DiagnosticKind, Diagnostics, Error, QueryResult, Severity, Span,
+};
 
 pub use crate::vm::{
-    EffectLog, ExecLimits, Materializer, NodeHandle, PrintTracer, RuntimeEffect, RuntimeError,
-    Tracer, VM, Value, ValueMaterializer, Verbosity, debug_verify_type, materialize_verified,
+    EffectLog, ExecLimits, Materializer, NodeHandle, NoopTracer, PrintTracer, PrintTracerBuilder,
+    RuntimeEffect, RuntimeError, Tracer, VM, VMBuilder, Value, ValueMaterializer, Verbosity,
+    debug_verify_type, materialize_verified,
 };
 
 /// Embed bytecode with 64-byte alignment (zero-copy loading).

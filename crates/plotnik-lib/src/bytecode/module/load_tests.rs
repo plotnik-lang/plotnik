@@ -38,11 +38,14 @@ fn javascript() -> &'static Grammar {
 fn emit_bytes(query_src: &str) -> Vec<u8> {
     let mut source_map = SourceMap::new();
     source_map.add_file(SourcePath::new("query.ptk"), query_src);
-    let query = QueryBuilder::new(source_map)
-        .link(javascript())
+    let compiled = QueryBuilder::new(source_map)
+        .compile(javascript())
         .expect("query parsing should not exhaust fuel");
-    assert!(query.is_valid(), "query should link: {query_src}");
-    query.emit().expect("bytecode emission should succeed")
+    assert!(compiled.is_valid(), "query should compile: {query_src}");
+    compiled
+        .bytecode()
+        .expect("compiled query has bytecode")
+        .to_vec()
 }
 
 /// Recompute the CRC32 the loader checks (over everything after the 64-byte

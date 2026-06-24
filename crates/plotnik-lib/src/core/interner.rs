@@ -15,20 +15,6 @@ use rustc_hash::FxBuildHasher;
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Symbol(u32);
 
-impl Symbol {
-    /// Raw index for serialization/debugging.
-    #[inline]
-    pub fn as_u32(self) -> u32 {
-        self.0
-    }
-
-    /// Create a Symbol from a raw index. Use only for deserialization.
-    #[inline]
-    pub fn from_raw(index: u32) -> Self {
-        Self(index)
-    }
-}
-
 impl PartialOrd for Symbol {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))

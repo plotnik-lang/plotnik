@@ -1,4 +1,4 @@
-use crate::core::{Interner, Symbol};
+use crate::core::Interner;
 
 #[test]
 fn intern_deduplicates() {
@@ -76,10 +76,4 @@ fn iter_yields_all_strings() {
 
     let items: Vec<_> = interner.iter().collect();
     assert_eq!(items, vec![(a, "alpha"), (b, "beta")]);
-}
-
-#[test]
-fn symbol_from_raw_roundtrip() {
-    let sym = Symbol::from_raw(42);
-    assert_eq!(sym.as_u32(), 42);
 }

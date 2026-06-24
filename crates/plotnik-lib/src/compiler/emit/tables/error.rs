@@ -6,7 +6,7 @@ use crate::bytecode::EncodeError;
 
 /// Error during bytecode emission.
 #[derive(Clone, Debug)]
-pub enum EmitError {
+pub(in crate::compiler) enum EmitError {
     /// Query has validation errors (must be valid before emitting).
     InvalidQuery,
     /// Too many strings (exceeds u16 max).

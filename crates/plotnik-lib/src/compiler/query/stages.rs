@@ -525,7 +525,7 @@ impl LinkOutcome {
     }
 
     /// Emit bytecode. Returns `Err(EmitError::InvalidQuery)` if the query has errors.
-    pub(crate) fn emit(&self) -> Result<Vec<u8>, EmitError> {
+    pub(in crate::compiler) fn emit(&self) -> Result<Vec<u8>, EmitError> {
         match self {
             LinkOutcome::Linked(query) => query.emit(),
             LinkOutcome::Invalid(_) => Err(EmitError::InvalidQuery),

@@ -19,10 +19,10 @@ pub(crate) mod query;
 #[cfg(test)]
 pub mod test_utils;
 
-pub use crate::compiler::emit::tables::EmitError;
 pub use crate::compiler::diagnostics::source;
 
 pub use crate::compiler::diagnostics::{
-    Diagnostics, Error, QueryResult, Severity, SourceId, SourceMap, SourcePath, Span,
+    DiagnosticBuilder, DiagnosticKind, Diagnostics, Error, QueryResult, Severity, Source, SourceId,
+    SourceKind, SourceMap, SourcePath, Span,
 };
 pub use query::{CheckedQuery, CompiledQuery, Query, QueryBuilder};

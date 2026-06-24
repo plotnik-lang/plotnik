@@ -7,7 +7,7 @@ pub mod span;
 #[cfg(test)]
 mod source_tests;
 
-pub use report::{DiagnosticKind, Diagnostics, Severity};
+pub use report::{DiagnosticBuilder, DiagnosticKind, Diagnostics, Severity};
 pub use source::{Source, SourceId, SourceKind, SourceMap, SourcePath};
 pub use span::Span;
 
