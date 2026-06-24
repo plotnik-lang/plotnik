@@ -5,7 +5,7 @@
 //! string table. The table storage and its read accessors live in
 //! `emit::tables`; this module owns the walk.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use crate::bytecode::{TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeNameEntry};
 
@@ -14,7 +14,7 @@ use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
 use crate::compiler::emit::tables::{EmitError, EmitInput, StringTableBuilder, TypeTableBuilder};
 use crate::compiler::ids::TypeId;
-use crate::core::Interner;
+use crate::core::{Interner, Symbol};
 
 /// Build the type table, interning type, member, and name strings into the
 /// shared string table. Threads the string table by value because it extends it.
@@ -146,23 +146,7 @@ fn emit_type_at_slot(
             unreachable!("builtins should be handled separately")
         }
 
-        TypeShape::Custom(sym) => {
-            // Custom type annotation: @x :: Identifier → type Identifier = Node
-            let bc_type_id = BytecodeTypeId(slot_index as u16);
-
-            let name = ctx.strings.get_or_intern(*sym, ctx.interner)?;
-            types.push_name(TypeNameEntry::new(name, bc_type_id));
-
-            // Custom types alias Node - look up Node's actual bytecode ID.
-            // Reaching a Custom type means it was in `ordered_types`, so
-            // `BuiltinUses::collect` marked Node used (`Custom(_) => usage.node =
-            // true`) and Phase 1 emitted it into `mapping`.
-            let node_bc_id = types
-                .lookup(TYPE_NODE)
-                .expect("Node must be mapped before a Custom alias that targets it is emitted");
-            types.set_type_def(slot_index, TypeDef::alias(node_bc_id));
-            Ok(())
-        }
+        TypeShape::Custom(sym) => emit_custom_alias(types, slot_index, *sym, ctx),
 
         TypeShape::Optional(inner) => {
             let inner_bc = types.resolve_type(*inner, ctx.type_ctx)?;
@@ -181,45 +165,9 @@ fn emit_type_at_slot(
             Ok(())
         }
 
-        TypeShape::Struct(fields) => {
-            // Resolve field types (this may create Optional wrappers at later indices)
-            let mut resolved_fields = Vec::with_capacity(fields.len());
-            for (field_sym, field_info) in fields {
-                let field_name = ctx.strings.get_or_intern(*field_sym, ctx.interner)?;
-                let field_type = resolve_field_type(types, field_info, ctx.type_ctx)?;
-                resolved_fields.push((field_name, field_type));
-            }
+        TypeShape::Struct(fields) => emit_struct_type(types, slot_index, fields, ctx),
 
-            let member_start = types.members_len();
-            for (field_name, field_type) in resolved_fields {
-                types.push_member(TypeMember::new(field_name, field_type));
-            }
-
-            let member_count =
-                u8::try_from(fields.len()).map_err(|_| EmitError::TooManyFields(fields.len()))?;
-            types.set_type_def(slot_index, TypeDef::for_struct(member_start, member_count));
-            Ok(())
-        }
-
-        TypeShape::Enum(variants) => {
-            // Resolve variant types (this may create types at later indices)
-            let mut resolved_variants = Vec::with_capacity(variants.len());
-            for (variant_sym, variant_type_id) in variants {
-                let variant_name = ctx.strings.get_or_intern(*variant_sym, ctx.interner)?;
-                let variant_type = types.resolve_type(*variant_type_id, ctx.type_ctx)?;
-                resolved_variants.push((variant_name, variant_type));
-            }
-
-            let member_start = types.members_len();
-            for (variant_name, variant_type) in resolved_variants {
-                types.push_member(TypeMember::new(variant_name, variant_type));
-            }
-
-            let member_count = u8::try_from(variants.len())
-                .map_err(|_| EmitError::TooManyVariants(variants.len()))?;
-            types.set_type_def(slot_index, TypeDef::for_enum(member_start, member_count));
-            Ok(())
-        }
+        TypeShape::Enum(variants) => emit_enum_type(types, slot_index, variants, ctx),
 
         TypeShape::Ref(def_id) => {
             let target = ctx.type_ctx.expect_def_output(*def_id);
@@ -228,6 +176,79 @@ fn emit_type_at_slot(
             Ok(())
         }
     }
+}
+
+fn emit_custom_alias(
+    types: &mut TypeTableBuilder,
+    slot_index: usize,
+    sym: Symbol,
+    ctx: &mut TypeEmitSlots,
+) -> Result<(), EmitError> {
+    // Custom type annotation: @x :: Identifier → type Identifier = Node
+    let bc_type_id = BytecodeTypeId(slot_index as u16);
+
+    let name = ctx.strings.get_or_intern(sym, ctx.interner)?;
+    types.push_name(TypeNameEntry::new(name, bc_type_id));
+
+    // Custom types alias Node - look up Node's actual bytecode ID.
+    // Reaching a Custom type means it was in `ordered_types`, so
+    // `BuiltinUses::collect` marked Node used (`Custom(_) => usage.node =
+    // true`) and Phase 1 emitted it into `mapping`.
+    let node_bc_id = types
+        .lookup(TYPE_NODE)
+        .expect("Node must be mapped before a Custom alias that targets it is emitted");
+    types.set_type_def(slot_index, TypeDef::alias(node_bc_id));
+    Ok(())
+}
+
+fn emit_struct_type(
+    types: &mut TypeTableBuilder,
+    slot_index: usize,
+    fields: &BTreeMap<Symbol, FieldInfo>,
+    ctx: &mut TypeEmitSlots,
+) -> Result<(), EmitError> {
+    // Resolve field types (this may create Optional wrappers at later indices)
+    let mut resolved_fields = Vec::with_capacity(fields.len());
+    for (field_sym, field_info) in fields {
+        let field_name = ctx.strings.get_or_intern(*field_sym, ctx.interner)?;
+        let field_type = resolve_field_type(types, field_info, ctx.type_ctx)?;
+        resolved_fields.push((field_name, field_type));
+    }
+
+    let member_start = types.members_len();
+    for (field_name, field_type) in resolved_fields {
+        types.push_member(TypeMember::new(field_name, field_type));
+    }
+
+    let member_count =
+        u8::try_from(fields.len()).map_err(|_| EmitError::TooManyFields(fields.len()))?;
+    types.set_type_def(slot_index, TypeDef::for_struct(member_start, member_count));
+    Ok(())
+}
+
+fn emit_enum_type(
+    types: &mut TypeTableBuilder,
+    slot_index: usize,
+    variants: &BTreeMap<Symbol, TypeId>,
+    ctx: &mut TypeEmitSlots,
+) -> Result<(), EmitError> {
+    // Resolve variant types (this may create types at later indices)
+    let mut resolved_variants = Vec::with_capacity(variants.len());
+    for (variant_sym, variant_type_id) in variants {
+        let variant_name = ctx.strings.get_or_intern(*variant_sym, ctx.interner)?;
+        let variant_type = types.resolve_type(*variant_type_id, ctx.type_ctx)?;
+        resolved_variants.push((variant_name, variant_type));
+    }
+
+    let member_start = types.members_len();
+    for (variant_name, variant_type) in resolved_variants {
+        types.push_member(TypeMember::new(variant_name, variant_type));
+    }
+
+    let member_count =
+        u8::try_from(variants.len()).map_err(|_| EmitError::TooManyVariants(variants.len()))?;
+    types.set_type_def(slot_index, TypeDef::for_enum(member_start, member_count));
+    Ok(())
 }
 
 fn resolve_field_type(
