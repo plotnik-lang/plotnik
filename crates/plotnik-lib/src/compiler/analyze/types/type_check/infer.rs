@@ -21,7 +21,7 @@ use super::unify::{UnifyError, unify_flows};
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::core::source::SourceId;
+use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::ast::{
     CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
     SeqPattern, TokenPattern, UnionPattern, is_empty_group,

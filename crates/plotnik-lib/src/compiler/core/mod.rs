@@ -1,10 +1,6 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub(crate) mod source;
-pub(crate) mod span;
-
 pub use crate::core::{Interner, Symbol};
-pub use span::Span;
 
 /// A lightweight handle to a named query definition.
 ///

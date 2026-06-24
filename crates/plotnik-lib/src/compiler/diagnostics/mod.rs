@@ -1,12 +1,12 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod source {
-    pub use crate::compiler::core::source::*;
-}
 pub mod diagnostics;
+pub mod source;
+pub mod span;
 
-pub use diagnostics::{DiagnosticKind, Diagnostics, Severity, Span};
+pub use diagnostics::{DiagnosticKind, Diagnostics, Severity};
 pub use source::{Source, SourceId, SourceKind, SourceMap};
+pub use span::Span;
 
 /// Result type for analysis passes that produce both output and diagnostics.
 pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;

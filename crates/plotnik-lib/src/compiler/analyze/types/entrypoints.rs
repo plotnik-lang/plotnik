@@ -7,7 +7,7 @@ use crate::core::{Interner, Symbol};
 use indexmap::IndexMap;
 
 use crate::compiler::parse::ast::Root;
-use crate::compiler::core::source::SourceId;
+use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 
 use super::type_check::TypeAnalysis;

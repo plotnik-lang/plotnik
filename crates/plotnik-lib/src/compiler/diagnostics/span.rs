@@ -1,6 +1,6 @@
 use rowan::TextRange;
 
-use crate::compiler::core::source::SourceId;
+use crate::compiler::diagnostics::source::SourceId;
 
 /// A location that knows which source it belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

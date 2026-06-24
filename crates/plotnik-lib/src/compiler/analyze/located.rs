@@ -6,8 +6,8 @@
 
 use rowan::TextRange;
 
-use crate::compiler::core::source::SourceId;
-use crate::compiler::core::span::Span;
+use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::diagnostics::span::Span;
 
 #[derive(Clone, Debug)]
 pub struct Located<T> {

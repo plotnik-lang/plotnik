@@ -17,7 +17,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::parse::ast::Root;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::parse::ast::{self, NodePattern, Pattern};
-use crate::compiler::core::source::{SourceId, SourceMap};
+use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::analyze::visitor::{Visitor, walk};
 use crate::compiler::parse::cst::{SyntaxKind, SyntaxToken};
 use crate::compiler::parse::ast::token_src;
