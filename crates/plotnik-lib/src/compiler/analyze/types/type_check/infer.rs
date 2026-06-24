@@ -20,12 +20,12 @@ use super::unify::unify_flows;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::compiler::diagnostics::diagnostics::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{
-    Branch, CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
-    SeqPattern, TokenPattern, UnionPattern, is_empty_group,
+    Branch, CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern,
+    Ref, SeqPattern, TokenPattern, UnionPattern, is_empty_group,
 };
 
 mod diagnostics;
@@ -43,6 +43,7 @@ pub struct InferCtx<'a, 'd> {
 /// Inference visitor for a single pass over the AST.
 pub struct InferVisitor<'a, 'd> {
     ctx: InferCtx<'a, 'd>,
+    source: SourceId,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -68,8 +69,12 @@ enum RefFlowBoundary {
 }
 
 impl<'a, 'd> InferVisitor<'a, 'd> {
-    pub fn new(ctx: InferCtx<'a, 'd>) -> Self {
-        Self { ctx }
+    pub fn new(ctx: InferCtx<'a, 'd>, source: SourceId) -> Self {
+        Self { ctx, source }
+    }
+
+    fn report(&mut self, kind: DiagnosticKind, range: TextRange) -> DiagnosticBuilder<'_> {
+        self.ctx.diag.report(self.source, kind, range)
     }
 
     /// Infer the PatternResult for an expression, caching the result.
@@ -112,10 +117,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// Named node: matches one position, bubbles up child captures or propagates output.
     fn infer_named_node(&mut self, node: &Located<NodePattern>) -> PatternResult {
         let children = node.node().children().map(|child| node.wrap(child));
-        let child_flow = self.collect_child_flow(node.source(), children);
+        let child_flow = self.collect_child_flow(children);
 
         let flow = self.compute_merged_flow(
-            node.source(),
             child_flow.merged_fields,
             child_flow.output_children,
             node.node().text_range(),
@@ -200,10 +204,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let children: Vec<Located<Pattern>> = seq.node().children().map(|c| seq.wrap(c)).collect();
 
         let arity = self.compute_sequence_arity(&children);
-        let child_flow = self.collect_child_flow(seq.source(), children.iter().cloned());
+        let child_flow = self.collect_child_flow(children.iter().cloned());
 
         let flow = self.compute_merged_flow(
-            seq.source(),
             child_flow.merged_fields,
             child_flow.output_children,
             seq.node().text_range(),
@@ -213,7 +216,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     fn collect_child_flow(
         &mut self,
-        source: SourceId,
         children: impl IntoIterator<Item = Located<Pattern>>,
     ) -> ChildFlow {
         let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
@@ -230,12 +232,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                         .in_progress()
                         .expect_struct_fields(*type_id)
                         .clone();
-                    self.merge_fields(
-                        source,
-                        &mut merged_fields,
-                        &fields,
-                        child.node().text_range(),
-                    );
+                    self.merge_fields(&mut merged_fields, &fields, child.node().text_range());
                 }
                 OutputFlow::Value(type_id) => {
                     if self
@@ -276,7 +273,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             // A BTreeMap would silently collapse duplicate labels, leaving the enum
             // with fewer variants than the emitter expects. Reject them instead.
             if variants.contains_key(&label_sym) {
-                self.report_duplicate_enum_label(e.source(), label.text_range(), label.text());
+                self.report_duplicate_enum_label(label.text_range(), label.text());
                 if let Some(body_info) = self.infer_enum_branch_body(e, &branch) {
                     combined_arity = combined_arity.combine(body_info.arity);
                 }
@@ -297,10 +294,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         PatternResult::new(combined_arity, OutputFlow::Value(enum_type))
     }
 
-    fn report_duplicate_enum_label(&mut self, source: SourceId, range: TextRange, label: &str) {
-        self.ctx
-            .diag
-            .report(source, DiagnosticKind::DuplicateAlternationLabel, range)
+    fn report_duplicate_enum_label(&mut self, range: TextRange, label: &str) {
+        self.report(DiagnosticKind::DuplicateAlternationLabel, range)
             .detail(label)
             .emit();
     }
@@ -334,7 +329,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let unified_flow = match unify_flows(self.ctx.type_ctx, flows) {
             Ok(flow) => flow,
             Err(err) => {
-                self.report_unify_error(union.source(), union.node().text_range(), &err);
+                self.report_unify_error(union.node().text_range(), &err);
                 OutputFlow::Void
             }
         };
@@ -593,12 +588,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let flow = match quantifier {
             QuantifierKind::Optional => self.make_flow_optional(inner_info.flow),
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                self.check_quantified_array_dimensionality(
-                    quant.source(),
-                    quant.node(),
-                    &inner_info,
-                    capture_mode,
-                );
+                self.check_quantified_array_dimensionality(quant.node(), &inner_info, capture_mode);
                 self.make_flow_array(inner_info.flow, inner.node(), quantifier.is_non_empty())
             }
         };
@@ -608,18 +598,17 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     fn check_quantified_array_dimensionality(
         &mut self,
-        source: SourceId,
         quant: &QuantifiedPattern,
         inner_info: &PatternResult,
         capture_mode: QuantifiedCaptureMode,
     ) {
-        let reported_scalar = self.check_multi_element_scalar(source, quant, inner_info);
+        let reported_scalar = self.check_multi_element_scalar(quant, inner_info);
         if reported_scalar {
             return;
         }
 
         if capture_mode == QuantifiedCaptureMode::Bare {
-            self.check_internal_capture_dimensionality(source, quant, inner_info);
+            self.check_internal_capture_dimensionality(quant, inner_info);
         }
     }
 
@@ -691,7 +680,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         // Validation: Fields cannot be assigned 'Many' arity values directly
         if value_info.arity == Arity::Many {
-            self.report_field_arity_error(field.source(), field.node(), value.node());
+            self.report_field_arity_error(field.node(), value.node());
         }
 
         PatternResult::new(Arity::One, value_info.flow)
@@ -777,13 +766,16 @@ impl<'a, 'd> InferencePass<'a, 'd> {
         // resolve to their precomputed results.
         let info = {
             let located_body = Located::new(source_id, body);
-            let mut visitor = InferVisitor::new(InferCtx {
-                type_ctx: &mut self.ctx,
-                interner: self.analysis.interner,
-                symbol_table: self.analysis.symbol_table,
-                dependency_analysis: self.analysis.dependency_analysis,
-                diag: &mut *self.analysis.diag,
-            });
+            let mut visitor = InferVisitor::new(
+                InferCtx {
+                    type_ctx: &mut self.ctx,
+                    interner: self.analysis.interner,
+                    symbol_table: self.analysis.symbol_table,
+                    dependency_analysis: self.analysis.dependency_analysis,
+                    diag: &mut *self.analysis.diag,
+                },
+                source_id,
+            );
             visitor.infer_pattern(&located_body)
         };
 

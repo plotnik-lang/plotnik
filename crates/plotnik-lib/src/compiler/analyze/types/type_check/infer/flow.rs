@@ -4,11 +4,10 @@ use std::collections::btree_map::Entry;
 use rowan::TextRange;
 
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
-use crate::compiler::diagnostics::source::SourceId;
 
-use super::InferVisitor;
 use super::super::def_id::Symbol;
 use super::super::types::{FieldInfo, OutputFlow, TYPE_VOID, TypeId};
+use super::InferVisitor;
 
 impl InferVisitor<'_, '_> {
     /// Fold `source` fields into `target` in place, reporting a diagnostic on any
@@ -16,7 +15,6 @@ impl InferVisitor<'_, '_> {
     /// duplicate captures identically.
     pub(super) fn merge_fields(
         &mut self,
-        source_id: SourceId,
         target: &mut BTreeMap<Symbol, FieldInfo>,
         source: &BTreeMap<Symbol, FieldInfo>,
         range: TextRange,
@@ -27,10 +25,9 @@ impl InferVisitor<'_, '_> {
                     e.insert(info);
                 }
                 Entry::Occupied(_) => {
-                    self.ctx
-                        .diag
-                        .report(source_id, DiagnosticKind::DuplicateCaptureInScope, range)
-                        .detail(self.ctx.interner.resolve(name))
+                    let field = self.ctx.interner.resolve(name).to_string();
+                    self.report(DiagnosticKind::DuplicateCaptureInScope, range)
+                        .detail(field)
                         .emit();
                 }
             }
@@ -54,7 +51,6 @@ impl InferVisitor<'_, '_> {
     /// - Bubbles, 1+ outputs -> Error (require capture)
     pub(super) fn compute_merged_flow(
         &mut self,
-        source: SourceId,
         merged_fields: BTreeMap<Symbol, FieldInfo>,
         output_children: Vec<(TextRange, TypeId)>,
         parent_range: TextRange,
@@ -65,7 +61,7 @@ impl InferVisitor<'_, '_> {
                 [] => OutputFlow::Void,
                 [(_, type_id)] => OutputFlow::Value(*type_id),
                 _ => {
-                    self.report_ambiguous_outputs(source, parent_range, &output_children);
+                    self.report_ambiguous_outputs(parent_range, &output_children);
                     OutputFlow::Void
                 }
             };
@@ -76,7 +72,7 @@ impl InferVisitor<'_, '_> {
             return OutputFlow::Fields(merged_type);
         }
 
-        self.report_uncaptured_output_with_captures(source, &output_children);
+        self.report_uncaptured_output_with_captures(&output_children);
         OutputFlow::Fields(merged_type)
     }
 }

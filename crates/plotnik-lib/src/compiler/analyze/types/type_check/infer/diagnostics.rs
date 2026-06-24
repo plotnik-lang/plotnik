@@ -9,34 +9,31 @@ use super::super::unify::UnifyError;
 use super::InferVisitor;
 
 impl InferVisitor<'_, '_> {
-    pub(super) fn report_field_arity_error(
-        &mut self,
-        source: SourceId,
-        field: &FieldPattern,
-        value: &Pattern,
-    ) {
+    pub(super) fn report_field_arity_error(&mut self, field: &FieldPattern, value: &Pattern) {
         let field_name = field
             .name()
             .map(|t| t.text().to_string())
             .unwrap_or_else(|| "field".to_string());
 
-        let mut builder = self.ctx.diag.report(
-            source,
-            DiagnosticKind::FieldSequenceValue,
-            value.text_range(),
-        );
-        builder = builder.detail(field_name);
+        let related = self.referenced_definition_range(value);
 
-        if let Pattern::Ref(r) = value
-            && let Some(name_tok) = r.name()
-        {
-            let name = name_tok.text();
-            if let Some((src, body)) = self.ctx.symbol_table.definition(name) {
-                builder = builder.related_to(src, body.text_range(), "defined here");
-            }
+        let mut builder = self
+            .report(DiagnosticKind::FieldSequenceValue, value.text_range())
+            .detail(field_name);
+        if let Some((src, range)) = related {
+            builder = builder.related_to(src, range, "defined here");
         }
 
         builder.emit();
+    }
+
+    fn referenced_definition_range(&self, value: &Pattern) -> Option<(SourceId, TextRange)> {
+        let Pattern::Ref(r) = value else {
+            return None;
+        };
+        let name = r.name()?;
+        let (source, body) = self.ctx.symbol_table.definition(name.text())?;
+        Some((source, body.text_range()))
     }
 
     /// Strict-dimensionality check 1: a multi-element pattern (`Arity::Many`)
@@ -46,7 +43,6 @@ impl InferVisitor<'_, '_> {
     /// the internal-capture check (the original short-circuit).
     pub(super) fn check_multi_element_scalar(
         &mut self,
-        source: SourceId,
         quant: &QuantifiedPattern,
         inner_info: &PatternResult,
     ) -> bool {
@@ -57,18 +53,15 @@ impl InferVisitor<'_, '_> {
         }
 
         let op = self.quantifier_operator(quant);
-        self.ctx
-            .diag
-            .report(
-                source,
-                DiagnosticKind::MultiElementScalarCapture,
-                quant.text_range(),
-            )
-            .detail(format!(
-                "sequence with `{}` matches multiple nodes but has no internal captures",
-                op
-            ))
-            .emit();
+        self.report(
+            DiagnosticKind::MultiElementScalarCapture,
+            quant.text_range(),
+        )
+        .detail(format!(
+            "sequence with `{}` matches multiple nodes but has no internal captures",
+            op
+        ))
+        .emit();
         true
     }
 
@@ -76,7 +69,6 @@ impl InferVisitor<'_, '_> {
     /// the quantifier. Skipped when inference runs in row-capture mode.
     pub(super) fn check_internal_capture_dimensionality(
         &mut self,
-        source: SourceId,
         quant: &QuantifiedPattern,
         inner_info: &PatternResult,
     ) {
@@ -97,35 +89,26 @@ impl InferVisitor<'_, '_> {
         let captures_str = capture_names.join(", ");
 
         let op = self.quantifier_operator(quant);
-        self.ctx
-            .diag
-            .report(
-                source,
-                DiagnosticKind::StrictDimensionalityViolation,
-                quant.text_range(),
-            )
-            .detail(format!(
-                "quantifier `{}` contains captures ({}) but has no struct capture",
-                op, captures_str
-            ))
-            .hint(format!("add a struct capture: `{{...}}{} @name`", op))
-            .emit();
+        self.report(
+            DiagnosticKind::StrictDimensionalityViolation,
+            quant.text_range(),
+        )
+        .detail(format!(
+            "quantifier `{}` contains captures ({}) but has no struct capture",
+            op, captures_str
+        ))
+        .hint(format!("add a struct capture: `{{...}}{} @name`", op))
+        .emit();
     }
 
     pub(super) fn report_ambiguous_outputs(
         &mut self,
-        source: SourceId,
         parent_range: TextRange,
         outputs: &[(TextRange, TypeId)],
     ) {
+        let source = self.source;
         let mut builder = self
-            .ctx
-            .diag
-            .report(
-                source,
-                DiagnosticKind::AmbiguousUncapturedOutputs,
-                parent_range,
-            )
+            .report(DiagnosticKind::AmbiguousUncapturedOutputs, parent_range)
             .detail(format!(
                 "{} expressions here produce a value but none is captured",
                 outputs.len()
@@ -138,23 +121,15 @@ impl InferVisitor<'_, '_> {
 
     pub(super) fn report_uncaptured_output_with_captures(
         &mut self,
-        source: SourceId,
         outputs: &[(TextRange, TypeId)],
     ) {
         for (range, _) in outputs {
-            self.ctx
-                .diag
-                .report(source, DiagnosticKind::UncapturedOutputWithCaptures, *range)
+            self.report(DiagnosticKind::UncapturedOutputWithCaptures, *range)
                 .emit();
         }
     }
 
-    pub(super) fn report_unify_error(
-        &mut self,
-        source: SourceId,
-        range: TextRange,
-        err: &UnifyError,
-    ) {
+    pub(super) fn report_unify_error(&mut self, range: TextRange, err: &UnifyError) {
         let (kind, msg, hint) = match err {
             UnifyError::ScalarInUnion => (
                 DiagnosticKind::IncompatibleTypes,
@@ -168,7 +143,7 @@ impl InferVisitor<'_, '_> {
             ),
         };
 
-        let mut builder = self.ctx.diag.report(source, kind, range).detail(msg);
+        let mut builder = self.report(kind, range).detail(msg);
         if let Some(h) = hint {
             builder = builder.hint(h);
         }
