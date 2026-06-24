@@ -1,6 +1,6 @@
 use rowan::TextRange;
 
-use super::{SourceId, Span};
+use super::Span;
 
 /// Diagnostic kinds ordered by priority (highest priority first).
 ///
@@ -436,9 +436,9 @@ pub struct Related {
 }
 
 impl Related {
-    pub fn new(source: SourceId, range: TextRange, message: impl Into<String>) -> Self {
+    pub fn new(span: Span, message: impl Into<String>) -> Self {
         Self {
-            span: Span::new(source, range),
+            span,
             message: message.into(),
         }
     }
@@ -447,10 +447,8 @@ impl Related {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Diagnostic {
     pub(crate) kind: DiagnosticKind,
-    /// Which source file this diagnostic belongs to.
-    pub(crate) source: SourceId,
     /// The range shown to the user (underlined in output).
-    pub(crate) range: TextRange,
+    pub(crate) span: Span,
     /// The range used for suppression logic. Errors within another error's
     /// suppression_range may be suppressed. Defaults to `range` but can be
     /// set to a parent context (e.g., enclosing tree span) for better cascading
@@ -464,12 +462,11 @@ pub(crate) struct Diagnostic {
 
 impl Diagnostic {
     /// New message with the kind's fallback text; `DiagnosticBuilder::detail` overrides it.
-    pub(crate) fn new(source: SourceId, kind: DiagnosticKind, range: TextRange) -> Self {
+    pub(crate) fn new(kind: DiagnosticKind, span: Span) -> Self {
         Self {
             kind,
-            source,
-            range,
-            suppression_range: range,
+            span,
+            suppression_range: span.range,
             message: kind.summary().to_string(),
             fix: None,
             related: Vec::new(),
@@ -496,8 +493,8 @@ impl std::fmt::Display for Diagnostic {
             f,
             "{} at {}..{}: {}",
             self.severity(),
-            u32::from(self.range.start()),
-            u32::from(self.range.end()),
+            u32::from(self.span.range.start()),
+            u32::from(self.span.range.end()),
             self.message
         )?;
         if let Some(fix) = &self.fix {

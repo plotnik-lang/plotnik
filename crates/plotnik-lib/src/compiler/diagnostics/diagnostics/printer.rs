@@ -41,11 +41,11 @@ impl<'q> DiagnosticsPrinter<'q> {
         };
 
         for (i, diag) in self.diagnostics.iter().enumerate() {
-            let primary_content = self.sources.content(diag.source);
-            let range = std::ops::Range::<usize>::from(diag.range);
+            let primary_content = self.sources.content(diag.span.source);
+            let range = std::ops::Range::<usize>::from(diag.span.range);
 
             let mut primary_snippet = Snippet::source(primary_content);
-            if let Some(name) = self.source_path(diag.source) {
+            if let Some(name) = self.source_path(diag.span.source) {
                 primary_snippet = primary_snippet.path(name);
             }
             primary_snippet = primary_snippet.annotation(AnnotationKind::Primary.span(range));
@@ -53,7 +53,7 @@ impl<'q> DiagnosticsPrinter<'q> {
             let mut cross_file_snippets = Vec::new();
 
             for related in &diag.related {
-                if related.span.source == diag.source {
+                if related.span.source == diag.span.source {
                     primary_snippet = primary_snippet.annotation(
                         AnnotationKind::Context
                             .span(related.span.range.into())
@@ -88,7 +88,7 @@ impl<'q> DiagnosticsPrinter<'q> {
                 report.push(
                     Level::HELP.secondary_title(&fix.description).element(
                         Snippet::source(primary_content)
-                            .patch(Patch::new(diag.range.into(), &fix.replacement)),
+                            .patch(Patch::new(diag.span.range.into(), &fix.replacement)),
                     ),
                 );
             }

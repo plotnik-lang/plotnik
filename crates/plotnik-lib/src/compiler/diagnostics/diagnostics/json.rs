@@ -7,11 +7,10 @@
 //! - `line`/`column`: 1-based; columns count Unicode scalar values
 //! - `offset`: byte offset into the source
 
-use rowan::TextRange;
 use serde::Serialize;
 
 use super::message::{DiagnosticKind, Severity};
-use super::{SourceId, SourceMap};
+use super::{SourceMap, message};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Diagnostic {
@@ -55,18 +54,18 @@ pub struct Fix {
 }
 
 impl Diagnostic {
-    pub(crate) fn from_diagnostic(msg: &super::message::Diagnostic, sources: &SourceMap) -> Self {
+    pub(crate) fn from_diagnostic(msg: &message::Diagnostic, sources: &SourceMap) -> Self {
         Self {
             code: msg.kind,
             severity: msg.severity(),
             message: msg.message.clone(),
-            span: json_span(sources, msg.source, msg.range),
+            span: json_span(sources, msg.span),
             related: msg
                 .related
                 .iter()
                 .map(|r| Related {
                     message: r.message.clone(),
-                    span: json_span(sources, r.span.source, r.span.range),
+                    span: json_span(sources, r.span),
                 })
                 .collect(),
             fix: msg.fix.as_ref().map(|f| Fix {
@@ -78,12 +77,12 @@ impl Diagnostic {
     }
 }
 
-fn json_span(sources: &SourceMap, source: SourceId, range: TextRange) -> Span {
-    let content = sources.content(source);
+fn json_span(sources: &SourceMap, span: super::Span) -> Span {
+    let content = sources.content(span.source);
     Span {
-        file: sources.kind(source).display_name().to_string(),
-        start: json_position(content, range.start().into()),
-        end: json_position(content, range.end().into()),
+        file: sources.kind(span.source).display_name().to_string(),
+        start: json_position(content, span.range.start().into()),
+        end: json_position(content, span.range.end().into()),
     }
 }
 

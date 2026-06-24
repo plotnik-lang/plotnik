@@ -45,14 +45,14 @@ impl Diagnostics {
         kind: DiagnosticKind,
         range: TextRange,
     ) -> DiagnosticBuilder<'_> {
-        DiagnosticBuilder {
-            diagnostics: self,
-            message: Diagnostic::new(source, kind, range),
-        }
+        self.report_span(kind, Span::new(source, range))
     }
 
     pub fn report_span(&mut self, kind: DiagnosticKind, span: Span) -> DiagnosticBuilder<'_> {
-        self.report(span.source, kind, span.range)
+        DiagnosticBuilder {
+            diagnostics: self,
+            message: Diagnostic::new(kind, span),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -103,7 +103,7 @@ impl Diagnostics {
             let has_root_in_source = self
                 .messages
                 .iter()
-                .any(|m| m.source == msg.source && !m.kind.is_cascade_consequence());
+                .any(|m| m.span.source == msg.span.source && !m.kind.is_cascade_consequence());
             if has_root_in_source {
                 suppressed[i] = true;
             }
@@ -118,7 +118,7 @@ impl Diagnostics {
 
                 // Rules 1/2/4 below all compare raw offsets, which are only
                 // meaningful within one source. Never suppress across files.
-                if a.source != b.source {
+                if a.span.source != b.span.source {
                     continue;
                 }
 
@@ -130,15 +130,15 @@ impl Diagnostics {
                 // Rule 1: Structural error containment
                 // Only unclosed delimiters can suppress distant errors, because they cause
                 // cascading parse failures throughout the tree
-                let contains = a.suppression_range.start() <= b.range.start()
-                    && b.range.end() <= a.suppression_range.end();
+                let contains = a.suppression_range.start() <= b.span.range.start()
+                    && b.span.range.end() <= a.suppression_range.end();
                 if contains && a.kind.is_structural_error() && a.kind.suppresses(&b.kind) {
                     suppressed[j] = true;
                     continue;
                 }
 
                 // Rule 2: Same start position
-                if a.range.start() == b.range.start() {
+                if a.span.range.start() == b.span.range.start() {
                     // Root cause errors (Expected*) suppress structural errors (Unclosed*)
                     // even though structural errors have higher enum priority. This is because
                     // ExpectedExpression is the actual mistake; UnclosedTree is a consequence.
@@ -156,7 +156,7 @@ impl Diagnostics {
                 // B is likely a consequence of A (e.g., `@x` where `@` is unexpected
                 // and `x` would be reported as bare identifier).
                 // Priority doesn't matter here - position determines causality.
-                if a.range.end() == b.range.start() {
+                if a.span.range.end() == b.span.range.start() {
                     suppressed[j] = true;
                 }
             }
@@ -169,7 +169,7 @@ impl Diagnostics {
             .filter(|(i, _)| !suppressed[*i])
             .map(|(_, m)| m)
             .collect();
-        result.sort_by_key(|m| (m.source, m.range.start()));
+        result.sort_by_key(|m| (m.span.source, m.span.range.start()));
         result
     }
 
@@ -220,18 +220,13 @@ impl<'d> DiagnosticBuilder<'d> {
         self
     }
 
-    pub fn related_to(
-        mut self,
-        source: SourceId,
-        range: TextRange,
-        msg: impl Into<String>,
-    ) -> Self {
-        self.message.related.push(Related::new(source, range, msg));
-        self
+    pub fn related_to(self, source: SourceId, range: TextRange, msg: impl Into<String>) -> Self {
+        self.related_span(Span::new(source, range), msg)
     }
 
-    pub fn related_span(self, span: Span, msg: impl Into<String>) -> Self {
-        self.related_to(span.source, span.range, msg)
+    pub fn related_span(mut self, span: Span, msg: impl Into<String>) -> Self {
+        self.message.related.push(Related::new(span, msg));
+        self
     }
 
     /// Set the suppression range for this diagnostic.
