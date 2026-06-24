@@ -31,7 +31,7 @@ pub(in crate::compiler) fn emit_unchecked(
     lowered_ir: &LoweredNfa,
 ) -> Result<Vec<u8>, EmitError> {
     let compile_result = lowered_ir.raw();
-    let strings = seed_string_table(compile_result);
+    let strings = seed_string_table(compile_result)?;
     let (types, strings) = build_type_table(&input, strings)?;
     let layout = compute_layout(compile_result)?;
     let mut pipeline = EmitPipeline::new(input, compile_result, strings, types, layout);
@@ -41,7 +41,7 @@ pub(in crate::compiler) fn emit_unchecked(
     let pool = ConstantPool::new(pipeline.types(), pipeline.strings(), &regexes);
     let transitions = emit_instructions(compile_result.instructions(), pipeline.layout(), pool)?;
 
-    Ok(pipeline.write_module(pool, &tables, &transitions))
+    pipeline.write_module(pool, &tables, &transitions)
 }
 
 /// Emit bytecode, asserting in debug/test builds that the loader accepts it.

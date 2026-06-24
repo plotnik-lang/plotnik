@@ -47,9 +47,9 @@ fn intern_different_symbols_returns_different_ids() {
 fn intern_str_deduplicates() {
     let mut builder = StringTableBuilder::new();
 
-    let id1 = builder.intern_str("test");
-    let id2 = builder.intern_str("test");
-    let id3 = builder.intern_str("other");
+    let id1 = builder.intern_str("test").unwrap();
+    let id2 = builder.intern_str("test").unwrap();
+    let id3 = builder.intern_str("other").unwrap();
 
     assert_eq!(id1, id2);
     assert_ne!(id1, id3);
@@ -59,8 +59,8 @@ fn intern_str_deduplicates() {
 #[test]
 fn emit_produces_correct_format() {
     let mut builder = StringTableBuilder::new();
-    builder.intern_str("abc");
-    builder.intern_str("defgh");
+    builder.intern_str("abc").unwrap();
+    builder.intern_str("defgh").unwrap();
 
     let (blob, table) = builder.emit();
 

@@ -24,7 +24,7 @@ struct RegexEntry {
 /// Builds the regex table from pre-compiled DFAs.
 ///
 /// Index 0 is unused (regex_id 0 means "no regex").
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RegexTableBuilder {
     /// Map from StringId to regex ID (for deduplication).
     lookup: HashMap<StringId, u16>,
@@ -51,11 +51,11 @@ impl RegexTableBuilder {
             return Ok(id);
         }
 
-        let id = self.entries.len() as u16;
-        if id == u16::MAX {
-            return Err(EmitError::TooManyRegexes(self.entries.len()));
+        if self.entries.len() >= EmitError::MAX_REGEXES {
+            return Err(EmitError::TooManyRegexes(self.entries.len() + 1));
         }
 
+        let id = self.entries.len() as u16;
         self.entries.push(Some(RegexEntry {
             string_id: pattern_string_id,
             dfa_bytes,
@@ -71,7 +71,7 @@ impl RegexTableBuilder {
 
     /// Validate that the regex count fits in u16.
     pub fn validate(&self) -> Result<(), EmitError> {
-        if self.entries.len() > 65535 {
+        if self.entries.len() > EmitError::MAX_REGEXES {
             return Err(EmitError::TooManyRegexes(self.entries.len()));
         }
         Ok(())
@@ -116,5 +116,11 @@ impl RegexTableBuilder {
         table.extend_from_slice(&(blob.len() as u32).to_le_bytes());
 
         (blob, table)
+    }
+}
+
+impl Default for RegexTableBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }

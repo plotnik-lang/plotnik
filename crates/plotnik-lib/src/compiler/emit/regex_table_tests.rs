@@ -96,3 +96,9 @@ fn empty_builder() {
     let builder = RegexTableBuilder::new();
     assert_eq!(builder.len(), 1); // just reserved slot
 }
+
+#[test]
+fn default_builder_preserves_reserved_slot() {
+    let builder = RegexTableBuilder::default();
+    assert_eq!(builder.len(), 1);
+}

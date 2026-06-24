@@ -80,13 +80,13 @@ fn build(
     ];
     for &(builtin_id, kind, used) in &builtin_types {
         if used {
-            types.push_mapped(builtin_id, TypeDef::builtin(kind));
+            types.push_mapped(builtin_id, TypeDef::builtin(kind))?;
         }
     }
 
     // Phase 2: Pre-assign wire TypeIds for custom types and reserve slots
     for &type_id in &ordered_types {
-        types.push_mapped(type_id, TypeDef::placeholder());
+        types.push_mapped(type_id, TypeDef::placeholder())?;
     }
 
     // Phase 3: Fill in custom type definitions
@@ -109,7 +109,7 @@ fn build(
         let bc_type_id = types
             .lookup(type_id)
             .expect("def result type must be mapped");
-        types.push_name(TypeNameEntry::new(name, bc_type_id));
+        types.push_name(TypeNameEntry::new(name, bc_type_id))?;
     }
 
     // Collect TypeNameEntry entries for explicit type annotations on struct captures,
@@ -122,7 +122,7 @@ fn build(
             .lookup(type_id)
             .expect("named type annotation must survive dead-type elimination");
         let name = ctx.strings.intern(name_sym, ctx.interner)?;
-        types.push_name(TypeNameEntry::new(name, bc_type_id));
+        types.push_name(TypeNameEntry::new(name, bc_type_id))?;
     }
 
     Ok(())
@@ -141,10 +141,12 @@ fn emit_type_at_slot(
 
         TypeShape::Custom(sym) => {
             // Custom type annotation: @x :: Identifier → type Identifier = Node
-            let bc_type_id = WireTypeId::from(slot_index as u16);
+            let bc_type_id = WireTypeId::from(
+                u16::try_from(slot_index).map_err(|_| EmitError::TooManyTypes(slot_index))?,
+            );
 
             let name = ctx.strings.intern(*sym, ctx.interner)?;
-            types.push_name(TypeNameEntry::new(name, bc_type_id));
+            types.push_name(TypeNameEntry::new(name, bc_type_id))?;
 
             // Custom types alias Node - look up Node's actual bytecode ID.
             // Reaching a Custom type means it was in `ordered_types`, so
@@ -183,13 +185,15 @@ fn emit_type_at_slot(
                 resolved_fields.push((field_name, field_type));
             }
 
-            let member_start = types.members_len();
+            let member_start = types.members_len()?;
             for (field_name, field_type) in resolved_fields {
-                types.push_member(TypeMember::new(field_name, field_type));
+                types.push_member(TypeMember::new(field_name, field_type))?;
             }
 
-            let member_count =
-                u8::try_from(fields.len()).map_err(|_| EmitError::TooManyFields(fields.len()))?;
+            if fields.len() > EmitError::MAX_FIELDS {
+                return Err(EmitError::TooManyFields(fields.len()));
+            }
+            let member_count = fields.len() as u8;
             types.fill_slot(slot_index, TypeDef::for_struct(member_start, member_count));
             Ok(())
         }
@@ -203,13 +207,15 @@ fn emit_type_at_slot(
                 resolved_variants.push((variant_name, variant_type));
             }
 
-            let member_start = types.members_len();
+            let member_start = types.members_len()?;
             for (variant_name, variant_type) in resolved_variants {
-                types.push_member(TypeMember::new(variant_name, variant_type));
+                types.push_member(TypeMember::new(variant_name, variant_type))?;
             }
 
-            let member_count = u8::try_from(variants.len())
-                .map_err(|_| EmitError::TooManyVariants(variants.len()))?;
+            if variants.len() > EmitError::MAX_VARIANTS {
+                return Err(EmitError::TooManyVariants(variants.len()));
+            }
+            let member_count = variants.len() as u8;
             types.fill_slot(slot_index, TypeDef::for_enum(member_start, member_count));
             Ok(())
         }

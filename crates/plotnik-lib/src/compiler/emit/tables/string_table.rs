@@ -57,25 +57,26 @@ impl StringTableBuilder {
             .try_resolve(sym)
             .ok_or(EmitError::StringNotFound(sym))?;
 
-        let id = StringId::try_from(self.strings.len() as u16).expect("string id must be non-zero");
-        let text: Rc<str> = Rc::from(text);
-        self.strings.push(Rc::clone(&text));
-        self.str_lookup.insert(text, id);
+        let id = self.intern_str(text)?;
         self.mapping.insert(sym, id);
         Ok(id)
     }
 
     /// Intern a string directly (for generated strings not in the query interner).
-    pub fn intern_str(&mut self, s: &str) -> StringId {
+    pub fn intern_str(&mut self, s: &str) -> Result<StringId, EmitError> {
         if let Some(&id) = self.str_lookup.get(s) {
-            return id;
+            return Ok(id);
+        }
+
+        if self.strings.len() >= EmitError::MAX_STRINGS {
+            return Err(EmitError::TooManyStrings(self.strings.len() + 1));
         }
 
         let id = StringId::try_from(self.strings.len() as u16).expect("string id must be non-zero");
         let s: Rc<str> = Rc::from(s);
         self.strings.push(Rc::clone(&s));
         self.str_lookup.insert(s, id);
-        id
+        Ok(id)
     }
 
     /// Number of interned strings.
@@ -85,9 +86,7 @@ impl StringTableBuilder {
 
     /// Validate that the string count fits in u16.
     pub fn validate(&self) -> Result<(), EmitError> {
-        // Max count is 65534 because the table needs count+1 entries.
-        // Index 0 is reserved for the easter egg, so we can have 65533 user strings.
-        if self.strings.len() > 65534 {
+        if self.strings.len() > EmitError::MAX_STRINGS {
             return Err(EmitError::TooManyStrings(self.strings.len()));
         }
         Ok(())

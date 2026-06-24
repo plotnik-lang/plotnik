@@ -96,13 +96,13 @@ impl<'a> EmitPipeline<'a> {
 
         self.strings.validate()?;
         self.types.validate()?;
-        if node_kinds.len() > u16::MAX as usize {
+        if node_kinds.len() > EmitError::MAX_NODE_KINDS {
             return Err(EmitError::TooManyNodeKinds(node_kinds.len()));
         }
-        if fields.len() > u16::MAX as usize {
+        if fields.len() > EmitError::MAX_NODE_FIELDS {
             return Err(EmitError::TooManyNodeFields(fields.len()));
         }
-        if entrypoints.len() > 65535 {
+        if entrypoints.len() > EmitError::MAX_ENTRYPOINTS {
             return Err(EmitError::TooManyEntrypoints(entrypoints.len()));
         }
 
@@ -119,7 +119,7 @@ impl<'a> EmitPipeline<'a> {
         pool: ConstantPool<'_>,
         tables: &ModuleTables,
         transitions: &[u8],
-    ) -> Vec<u8> {
+    ) -> Result<Vec<u8>, EmitError> {
         let (str_blob, str_table) = pool.emit_strings();
         let (regex_blob, regex_table) = pool.emit_regexes();
         let (type_defs_bytes, type_members_bytes, type_names_bytes) = pool.emit_types();
@@ -148,17 +148,62 @@ impl<'a> EmitPipeline<'a> {
 
         writer.finish_sections();
         let total_size = writer.len() as u32;
+        let str_table_count = checked_count(
+            pool.string_count(),
+            EmitError::MAX_STRINGS,
+            EmitError::TooManyStrings,
+        )?;
+        let node_types_count = checked_count(
+            tables.node_kinds.len(),
+            EmitError::MAX_NODE_KINDS,
+            EmitError::TooManyNodeKinds,
+        )?;
+        let node_fields_count = checked_count(
+            tables.fields.len(),
+            EmitError::MAX_NODE_FIELDS,
+            EmitError::TooManyNodeFields,
+        )?;
+        let regex_table_count = checked_count(
+            pool.regex_count(),
+            EmitError::MAX_REGEXES,
+            EmitError::TooManyRegexes,
+        )?;
+        let type_defs_count = checked_count(
+            pool.type_defs_count(),
+            EmitError::MAX_TYPES,
+            EmitError::TooManyTypes,
+        )?;
+        let type_members_count = checked_count(
+            pool.type_members_count(),
+            EmitError::MAX_TYPE_MEMBERS,
+            EmitError::TooManyTypeMembers,
+        )?;
+        let type_names_count = checked_count(
+            pool.type_names_count(),
+            EmitError::MAX_TYPE_NAMES,
+            EmitError::TooManyTypeNames,
+        )?;
+        let entrypoints_count = checked_count(
+            tables.entrypoints.len(),
+            EmitError::MAX_ENTRYPOINTS,
+            EmitError::TooManyEntrypoints,
+        )?;
+        let transitions_count = checked_count(
+            self.layout.total_steps() as usize,
+            EmitError::MAX_TRANSITIONS,
+            EmitError::TooManyTransitions,
+        )?;
 
         let mut header = Header {
-            str_table_count: pool.string_count() as u16,
-            node_types_count: tables.node_kinds.len() as u16,
-            node_fields_count: tables.fields.len() as u16,
-            regex_table_count: pool.regex_count() as u16,
-            type_defs_count: pool.type_defs_count() as u16,
-            type_members_count: pool.type_members_count() as u16,
-            type_names_count: pool.type_names_count() as u16,
-            entrypoints_count: tables.entrypoints.len() as u16,
-            transitions_count: self.layout.total_steps() as u16,
+            str_table_count,
+            node_types_count,
+            node_fields_count,
+            regex_table_count,
+            type_defs_count,
+            type_members_count,
+            type_names_count,
+            entrypoints_count,
+            transitions_count,
             str_blob_size: str_blob.len() as u32,
             regex_blob_size: regex_blob.len() as u32,
             total_size,
@@ -167,8 +212,19 @@ impl<'a> EmitPipeline<'a> {
         header.checksum = crc32fast::hash(writer.body());
         writer.write_header(&header);
 
-        writer.into_vec()
+        Ok(writer.into_vec())
     }
+}
+
+fn checked_count(
+    count: usize,
+    max: usize,
+    too_many: impl FnOnce(usize) -> EmitError,
+) -> Result<u16, EmitError> {
+    if count > max {
+        return Err(too_many(count));
+    }
+    Ok(count as u16)
 }
 
 struct SectionWriter {

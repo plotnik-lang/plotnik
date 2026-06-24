@@ -42,11 +42,19 @@ impl TypeTableBuilder {
 
     /// Map `query_id` to the next bytecode slot and push `def`; returns the id.
     /// Used to emit builtins and to reserve placeholder slots for custom types.
-    pub fn push_mapped(&mut self, query_id: TypeId, def: TypeDef) -> WireTypeId {
+    pub fn push_mapped(
+        &mut self,
+        query_id: TypeId,
+        def: TypeDef,
+    ) -> Result<WireTypeId, EmitError> {
+        if self.type_defs.len() >= EmitError::MAX_TYPES {
+            return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
+        }
+
         let bc_id = WireTypeId::from(self.type_defs.len() as u16);
         self.mapping.insert(query_id, bc_id);
         self.type_defs.push(def);
-        bc_id
+        Ok(bc_id)
     }
 
     /// Overwrite a previously reserved slot with its final definition.
@@ -55,16 +63,27 @@ impl TypeTableBuilder {
     }
 
     /// Member-table length, i.e. the base index for the next struct/enum's members.
-    pub fn members_len(&self) -> u16 {
-        self.type_members.len() as u16
+    pub fn members_len(&self) -> Result<u16, EmitError> {
+        u16::try_from(self.type_members.len())
+            .map_err(|_| EmitError::TooManyTypeMembers(self.type_members.len()))
     }
 
-    pub fn push_member(&mut self, member: TypeMember) {
+    pub fn push_member(&mut self, member: TypeMember) -> Result<(), EmitError> {
+        if self.type_members.len() >= EmitError::MAX_TYPE_MEMBERS {
+            return Err(EmitError::TooManyTypeMembers(self.type_members.len() + 1));
+        }
+
         self.type_members.push(member);
+        Ok(())
     }
 
-    pub fn push_name(&mut self, entry: TypeNameEntry) {
+    pub fn push_name(&mut self, entry: TypeNameEntry) -> Result<(), EmitError> {
+        if self.type_names.len() >= EmitError::MAX_TYPE_NAMES {
+            return Err(EmitError::TooManyTypeNames(self.type_names.len() + 1));
+        }
+
         self.type_names.push(entry);
+        Ok(())
     }
 
     /// Intern an `Optional(base_type)` wrapper, deduplicating by base type.
@@ -74,6 +93,10 @@ impl TypeTableBuilder {
     ) -> Result<WireTypeId, EmitError> {
         if let Some(&optional_id) = self.optional_wrappers.get(&base_type) {
             return Ok(optional_id);
+        }
+
+        if self.type_defs.len() >= EmitError::MAX_TYPES {
+            return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
         }
 
         let optional_id = WireTypeId::from(self.type_defs.len() as u16);
@@ -102,11 +125,14 @@ impl TypeTableBuilder {
 
     /// Validate that counts fit in u16.
     pub fn validate(&self) -> Result<(), EmitError> {
-        if self.type_defs.len() > 65535 {
+        if self.type_defs.len() > EmitError::MAX_TYPES {
             return Err(EmitError::TooManyTypes(self.type_defs.len()));
         }
-        if self.type_members.len() > 65535 {
+        if self.type_members.len() > EmitError::MAX_TYPE_MEMBERS {
             return Err(EmitError::TooManyTypeMembers(self.type_members.len()));
+        }
+        if self.type_names.len() > EmitError::MAX_TYPE_NAMES {
+            return Err(EmitError::TooManyTypeNames(self.type_names.len()));
         }
         Ok(())
     }

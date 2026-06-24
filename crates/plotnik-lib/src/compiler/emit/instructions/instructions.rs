@@ -95,7 +95,7 @@ fn resolve_match(
         predicate,
         successors,
     };
-    instr.encode().map_err(EmitError::from)
+    instr.encode().map_err(EmitError::Encode)
 }
 
 fn resolve_call(c: &CallIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
