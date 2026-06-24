@@ -14,7 +14,7 @@ mod type_table;
 #[cfg(test)]
 mod regex_table_tests;
 
-use crate::compiler::emit::instructions::encode;
+use crate::compiler::emit::instructions::emit_instructions;
 use crate::compiler::emit::layout::compute_layout;
 use crate::compiler::emit::module::EmitPipeline;
 use crate::compiler::emit::regex_table::build_regex_table;
@@ -39,7 +39,7 @@ pub(in crate::compiler) fn emit_unchecked(
     let tables = pipeline.build_tables()?;
     let regexes = build_regex_table(compile_result, pipeline.strings())?;
     let pool = ConstantPool::new(pipeline.types(), pipeline.strings(), &regexes);
-    let transitions = encode(compile_result, pipeline.layout(), pool)?;
+    let transitions = emit_instructions(compile_result.instructions(), pipeline.layout(), pool)?;
 
     Ok(pipeline.write_module(pool, &tables, &transitions))
 }

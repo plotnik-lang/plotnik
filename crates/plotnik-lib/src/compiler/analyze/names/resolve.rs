@@ -8,7 +8,6 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::shape::validation::ValidatedAst;
 use crate::compiler::analyze::visitor::Visitor;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
-use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{self, token_src};
 
 use super::symbol_table::{SymbolTable, SymbolTableBuilder};
@@ -61,7 +60,7 @@ impl Visitor for DefCollector<'_, '_, '_> {
             self.diag
                 .report(
                     DiagnosticKind::DuplicateDefinition,
-                    Span::new(def.source(), token.text_range()),
+                    def.span_of(token.text_range()),
                 )
                 .detail(name)
                 .emit();
@@ -90,7 +89,7 @@ impl Visitor for ReferenceValidator<'_, '_> {
         self.diag
             .report(
                 DiagnosticKind::UndefinedReference,
-                Span::new(r.source(), name_token.text_range()),
+                r.span_of(name_token.text_range()),
             )
             .detail(name)
             .emit();

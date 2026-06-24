@@ -8,7 +8,6 @@ use crate::compiler::analyze::visitor::{
     Visitor, walk_node_pattern, walk_seq_pattern, walk_union_pattern,
 };
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
-use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{NodePattern, SeqPattern, UnionPattern};
 
 pub fn validate_empty_constructs(input: ValidationInput) {
@@ -33,7 +32,7 @@ impl Visitor for EmptyConstructsValidator<'_> {
             self.diag
                 .report(
                     DiagnosticKind::EmptyTree,
-                    Span::new(node.source(), node.node().text_range()),
+                    node.span_of(node.node().text_range()),
                 )
                 .emit();
         }
@@ -45,7 +44,7 @@ impl Visitor for EmptyConstructsValidator<'_> {
             self.diag
                 .report(
                     DiagnosticKind::EmptySequence,
-                    Span::new(seq.source(), seq.node().text_range()),
+                    seq.span_of(seq.node().text_range()),
                 )
                 .emit();
         }
@@ -59,7 +58,7 @@ impl Visitor for EmptyConstructsValidator<'_> {
             self.diag
                 .report(
                     DiagnosticKind::EmptyAlternation,
-                    Span::new(union.source(), union.node().text_range()),
+                    union.span_of(union.node().text_range()),
                 )
                 .emit();
         }

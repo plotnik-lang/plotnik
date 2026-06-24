@@ -168,6 +168,14 @@ impl QueryParsed {
     pub(crate) fn ast_map(&self) -> &AstMap {
         &self.ast_map
     }
+
+    pub(crate) fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.ast_map
+            .values()
+            .flat_map(|root| root.defs())
+            .filter_map(|def| def.name())
+            .map(|name| name.text().to_string())
+    }
 }
 
 pub struct Query {
@@ -260,12 +268,7 @@ impl Query {
     }
 
     pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
-        self.parsed
-            .ast_map
-            .values()
-            .flat_map(|root| root.defs())
-            .filter_map(|def| def.name())
-            .map(|name| name.text().to_string())
+        self.parsed.definition_names()
     }
 
     fn into_analyzed(self) -> Result<AnalyzedQuery, Query> {
@@ -337,12 +340,7 @@ impl AnalyzedQuery {
     }
 
     pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
-        self.parsed
-            .ast_map
-            .values()
-            .flat_map(|root| root.defs())
-            .filter_map(|def| def.name())
-            .map(|name| name.text().to_string())
+        self.parsed.definition_names()
     }
 }
 

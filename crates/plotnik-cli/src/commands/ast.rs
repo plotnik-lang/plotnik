@@ -102,19 +102,9 @@ fn print_source_ast(args: &AstArgs, declared_lang: Option<&str>) -> CliResult {
 
 fn dump_tree(tree: &tree_sitter::Tree, source: &str, raw: bool) -> String {
     let mut out = String::new();
-    format_node(&mut out, tree.root_node(), source, 0, raw);
+    format_node_with_field(&mut out, tree.root_node(), None, source, 0, raw);
     out.push('\n');
     out
-}
-
-fn format_node(
-    out: &mut String,
-    node: tree_sitter::Node,
-    source: &str,
-    depth: usize,
-    include_anonymous: bool,
-) {
-    format_node_with_field(out, node, None, source, depth, include_anonymous);
 }
 
 fn format_node_with_field(
