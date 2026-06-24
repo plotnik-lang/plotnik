@@ -72,23 +72,20 @@ impl DumpContext {
         let mut step_labels = BTreeMap::new();
         // Preamble always at step 0 (first in layout)
         step_labels.insert(u16::from(StepAddr::PREAMBLE), PREAMBLE_NAME.to_string());
-        for i in 0..entrypoints.len() {
-            let ep = entrypoints.get(i);
+        for ep in entrypoints.iter() {
             let name = strings.get(ep.name()).to_string();
             step_labels.insert(u16::from(ep.target()), name);
         }
 
         let mut node_kind_names = BTreeMap::new();
-        for i in 0..node_types.len() {
-            let t = node_types.get(i);
+        for t in node_types.iter() {
             if let Ok(id) = NodeKindId::try_from(t.symbol) {
                 node_kind_names.insert(id, strings.get(t.name).to_string());
             }
         }
 
         let mut node_field_names = BTreeMap::new();
-        for i in 0..node_fields.len() {
-            let f = node_fields.get(i);
+        for f in node_fields.iter() {
             if let Ok(id) = NodeFieldId::try_from(f.symbol) {
                 node_field_names.insert(id, strings.get(f.name).to_string());
             }
@@ -179,9 +176,7 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
     writeln!(out, "{}[type_defs]{}", c.blue, c.reset).expect("writing to a String is infallible");
 
     // type_defs holds every type, builtins included.
-    for i in 0..types.defs_count() {
-        let def = types.def(i);
-
+    for (i, def) in types.iter().enumerate() {
         let (formatted, comment) = match def.decode() {
             TypeDefKind::Primitive(kind) => {
                 let name = match kind {
@@ -259,8 +254,7 @@ fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
 
     writeln!(out, "{}[type_members]{}", c.blue, c.reset)
         .expect("writing to a String is infallible");
-    for i in 0..types.members_count() {
-        let member = types.get_member(i);
+    for (i, member) in types.members().enumerate() {
         let name = strings.get(member.name_id);
         let type_name = format_type_name(member.type_id, module, ctx);
         writeln!(
@@ -285,8 +279,7 @@ fn dump_types_names(out: &mut String, module: &Module, ctx: &DumpContext) {
     let tw = ctx.type_width;
 
     writeln!(out, "{}[type_names]{}", c.blue, c.reset).expect("writing to a String is infallible");
-    for i in 0..types.names_count() {
-        let entry = types.get_name(i);
+    for (i, entry) in types.names().enumerate() {
         let name = strings.get(entry.name_id);
         writeln!(
             out,
@@ -314,8 +307,7 @@ fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> Stri
         return format!("<{}>", name);
     }
 
-    for i in 0..types.names_count() {
-        let entry = types.get_name(i);
+    for entry in types.names() {
         if entry.type_id == type_id {
             return strings.get(entry.name_id).to_string();
         }
@@ -334,9 +326,9 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
 
     writeln!(out, "{}[entrypoints]{}", c.blue, c.reset).expect("writing to a String is infallible");
 
-    let mut entries: Vec<_> = (0..entrypoints.len())
-        .map(|i| {
-            let ep = entrypoints.get(i);
+    let mut entries: Vec<_> = entrypoints
+        .iter()
+        .map(|ep| {
             let name = strings.get(ep.name());
             (name, ep.target(), u16::from(ep.result_type()))
         })

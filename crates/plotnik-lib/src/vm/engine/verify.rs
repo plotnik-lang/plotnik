@@ -307,9 +307,9 @@ fn panic_with_mismatch(
     let entrypoints = module.entrypoints();
     let strings = module.strings();
 
-    let type_name = (0..entrypoints.len())
-        .find_map(|i| {
-            let e = entrypoints.get(i);
+    let type_name = entrypoints
+        .iter()
+        .find_map(|e| {
             if e.result_type() == declared_type {
                 Some(strings.get(e.name()))
             } else {

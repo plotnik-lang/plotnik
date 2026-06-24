@@ -34,23 +34,30 @@ impl Emitter<'_> {
     pub(super) fn assign_generated_names(&mut self) {
         let mut contexts: HashMap<TypeId, NameHint> = HashMap::new();
 
-        for i in 0..self.entrypoints.len() {
-            let ep = self.entrypoints.get(i);
-            let entry_name = self.strings.get(ep.name());
+        let entrypoints: Vec<_> = self
+            .entrypoints
+            .iter()
+            .map(|ep| (ep.result_type(), self.strings.get(ep.name()).to_string()))
+            .collect();
+        for (type_id, entry_name) in entrypoints {
             self.collect_naming_contexts(
-                ep.result_type(),
-                &NameHint::entrypoint(entry_name),
+                type_id,
+                &NameHint::entrypoint(&entry_name),
                 &mut contexts,
             );
         }
 
-        for i in 0..self.types.defs_count() {
-            let type_id = TypeId::from(i as u16);
+        let type_defs: Vec<_> = self
+            .types
+            .iter()
+            .enumerate()
+            .map(|(i, type_def)| (TypeId::from(i as u16), type_def))
+            .collect();
+        for (type_id, type_def) in type_defs {
             if self.type_names.contains_key(&type_id) {
                 continue;
             }
 
-            let type_def = self.types.def(i);
             if !self.is_named_struct_or_enum(&type_def) {
                 continue;
             }

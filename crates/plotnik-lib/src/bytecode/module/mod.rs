@@ -349,9 +349,8 @@ impl<'a> GrammarTableView<'a, NodeKindEntry> {
         )
     }
 
-    /// Number of entries.
-    pub fn len(&self) -> usize {
-        self.count
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = NodeKindEntry> + '_ {
+        (0..self.count).map(|idx| self.get(idx))
     }
 }
 
@@ -366,9 +365,8 @@ impl<'a> GrammarTableView<'a, FieldEntry> {
         )
     }
 
-    /// Number of entries.
-    pub fn len(&self) -> usize {
-        self.count
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = FieldEntry> + '_ {
+        (0..self.count).map(|idx| self.get(idx))
     }
 }
 
@@ -432,6 +430,10 @@ impl<'a> TypesView<'a> {
         }
     }
 
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = TypeDef> + '_ {
+        (0..self.defs_count).map(|idx| self.def(idx))
+    }
+
     pub fn get_member(&self, idx: usize) -> TypeMember {
         assert!(idx < self.members_count, "type member index out of bounds");
         let offset = idx * TypeMember::SIZE;
@@ -440,6 +442,10 @@ impl<'a> TypesView<'a> {
                 .expect("type member name id must be non-zero"),
             TypeId::from(read_u16_le(self.members_bytes, offset + 2)),
         )
+    }
+
+    pub fn members(&self) -> impl ExactSizeIterator<Item = TypeMember> + '_ {
+        (0..self.members_count).map(|idx| self.get_member(idx))
     }
 
     /// A member's `type_id` without building the (`NonZero`) name `StringId`.
@@ -458,6 +464,10 @@ impl<'a> TypesView<'a> {
                 .expect("type name string id must be non-zero"),
             TypeId::from(read_u16_le(self.names_bytes, offset + 2)),
         )
+    }
+
+    pub fn names(&self) -> impl ExactSizeIterator<Item = TypeNameEntry> + '_ {
+        (0..self.names_count).map(|idx| self.get_name(idx))
     }
 
     /// A type name's target `type_id` without building the (`NonZero`) name
@@ -531,11 +541,13 @@ impl<'a> EntrypointsView<'a> {
         self.count
     }
 
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = Entrypoint> + '_ {
+        (0..self.count).map(|idx| self.get(idx))
+    }
+
     /// Find an entrypoint by name (requires StringsView for comparison).
     pub fn find_by_name(&self, name: &str, strings: &StringsView<'_>) -> Option<Entrypoint> {
-        (0..self.count)
-            .map(|i| self.get(i))
-            .find(|e| strings.get(e.name()) == name)
+        self.iter().find(|e| strings.get(e.name()) == name)
     }
 }
 

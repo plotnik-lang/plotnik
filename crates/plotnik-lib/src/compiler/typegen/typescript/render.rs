@@ -9,14 +9,12 @@ use super::Emitter;
 impl Emitter<'_> {
     pub(super) fn assign_names(&mut self) {
         // Entrypoint names are reserved first so generated names don't collide with them.
-        for i in 0..self.entrypoints.len() {
-            let ep = self.entrypoints.get(i);
+        for ep in self.entrypoints.iter() {
             let name = self.strings.get(ep.name());
             self.used_names.insert(to_pascal_case(name));
         }
 
-        for i in 0..self.types.names_count() {
-            let type_name = self.types.get_name(i);
+        for type_name in self.types.names() {
             let name = self.strings.get(type_name.name_id);
             self.type_names
                 .insert(type_name.type_id, to_pascal_case(name));

@@ -13,9 +13,9 @@ struct TypeDependencyGraph {
 
 impl Emitter<'_> {
     pub(super) fn mark_node_type_usage(&mut self) {
-        for i in 0..self.entrypoints.len() {
-            let ep = self.entrypoints.get(i);
-            self.visit_for_node_use(ep.result_type());
+        let result_types: Vec<_> = self.entrypoints.iter().map(|ep| ep.result_type()).collect();
+        for type_id in result_types {
+            self.visit_for_node_use(type_id);
         }
     }
 

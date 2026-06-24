@@ -87,8 +87,8 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     let entrypoints = module.entrypoints();
 
     let mut defs: Vec<u16> = Vec::new();
-    for i in 0..entrypoints.len() {
-        push_unique(&mut defs, u16::from(entrypoints.get(i).target()));
+    for entrypoint in entrypoints.iter() {
+        push_unique(&mut defs, u16::from(entrypoint.target()));
     }
 
     let mut summaries: DefSummaries = defs.iter().map(|&d| (d, KS_ANY)).collect();
@@ -139,8 +139,8 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     // frame. At runtime such a read would hit the materializer's result-type root
     // frame, whose kind is attacker-controlled, and panic. Reject it instead of
     // dropping the constraint into a caller that does not exist.
-    for i in 0..entrypoints.len() {
-        let target = u16::from(entrypoints.get(i).target());
+    for entrypoint in entrypoints.iter() {
+        let target = u16::from(entrypoint.target());
         let preamble = analyze(
             module,
             &summaries,

@@ -214,8 +214,7 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
         let entrypoints = self.module.entrypoints();
 
         let mut node_kind_names = BTreeMap::new();
-        for i in 0..node_types.len() {
-            let t = node_types.get(i);
+        for t in node_types.iter() {
             node_kind_names.insert(
                 NodeKindId::try_from(t.symbol).expect("node kind id must be non-zero"),
                 strings.get(t.name).to_string(),
@@ -223,16 +222,16 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
         }
 
         let mut node_field_names = BTreeMap::new();
-        for i in 0..node_fields.len() {
-            let f = node_fields.get(i);
+        for f in node_fields.iter() {
             node_field_names.insert(
                 NodeFieldId::try_from(f.symbol).expect("node field id must be non-zero"),
                 strings.get(f.name).to_string(),
             );
         }
 
-        let member_names: Vec<String> = (0..types.members_count())
-            .map(|i| strings.get(types.get_member(i).name_id).to_string())
+        let member_names: Vec<String> = types
+            .members()
+            .map(|member| strings.get(member.name_id).to_string())
             .collect();
 
         // Same index space as dump.rs — must stay aligned with StringTable layout.
@@ -248,8 +247,7 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
         }
 
         let mut entrypoint_by_ip = BTreeMap::new();
-        for i in 0..entrypoints.len() {
-            let e = entrypoints.get(i);
+        for e in entrypoints.iter() {
             entrypoint_by_ip.insert(u16::from(e.target()), strings.get(e.name()).to_string());
         }
 

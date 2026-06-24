@@ -63,8 +63,7 @@ impl<'a> Emitter<'a> {
     fn entrypoint_types(&self) -> EntrypointTypes {
         let mut primary_names = HashMap::new();
         let mut aliases = Vec::new();
-        for i in 0..self.entrypoints.len() {
-            let ep = self.entrypoints.get(i);
+        for ep in self.entrypoints.iter() {
             let name = self.strings.get(ep.name()).to_string();
             let type_id = ep.result_type();
 
@@ -85,8 +84,7 @@ impl<'a> Emitter<'a> {
 
     fn entrypoint_emit_set(&self) -> HashSet<TypeId> {
         let mut to_emit = HashSet::new();
-        for i in 0..self.entrypoints.len() {
-            let ep = self.entrypoints.get(i);
+        for ep in self.entrypoints.iter() {
             self.collect_emit_set(ep.result_type(), &mut to_emit);
         }
         to_emit
