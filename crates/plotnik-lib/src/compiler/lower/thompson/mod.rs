@@ -17,6 +17,7 @@
 //! - `scope`: Scope management for struct/array wrappers
 //! - `sequences`: Sequence and alternation compilation
 
+mod alternation;
 mod capture;
 mod compiler;
 mod emit;
