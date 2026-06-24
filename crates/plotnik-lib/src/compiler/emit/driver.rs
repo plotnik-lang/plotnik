@@ -8,8 +8,8 @@
 //! through them), and the rest only read it. Insertion order fixes StringIds, so
 //! the order of these calls matters.
 
-use crate::compiler::lower::ir::CompileResult;
 use crate::compiler::emit::tables::{EmitError, EmitInput};
+use crate::compiler::lower::ir::LoweredIr;
 
 use crate::compiler::emit::instructions::encode;
 use crate::compiler::emit::layout::compute_layout;
@@ -23,8 +23,9 @@ use crate::compiler::emit::types::build_type_table;
 /// case to surface as a diagnostic rather than the debug panic in [`emit`].
 pub fn emit_unchecked(
     input: EmitInput<'_>,
-    compile_result: &CompileResult,
+    lowered_ir: &LoweredIr,
 ) -> Result<Vec<u8>, EmitError> {
+    let compile_result = lowered_ir.raw();
     let strings = intern_predicates(compile_result);
     let (types, strings) = build_type_table(&input, strings)?;
     let layout = compute_layout(compile_result)?;
@@ -55,8 +56,8 @@ pub fn emit_unchecked(
 /// `check` deliberately bypasses this via [`emit_unchecked`]: it loads the
 /// bytecode itself and reports a rejection as a diagnostic, so it must never
 /// reach this panic, in debug or release.
-pub fn emit(input: EmitInput<'_>, compile_result: &CompileResult) -> Result<Vec<u8>, EmitError> {
-    let output = emit_unchecked(input, compile_result)?;
+pub fn emit(input: EmitInput<'_>, lowered_ir: &LoweredIr) -> Result<Vec<u8>, EmitError> {
+    let output = emit_unchecked(input, lowered_ir)?;
     #[cfg(debug_assertions)]
     if let Err(err) = crate::bytecode::Module::load(&output) {
         panic!("compiler emitted bytecode rejected by Module::load: {err:?}");

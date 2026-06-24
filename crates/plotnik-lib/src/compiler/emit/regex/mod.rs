@@ -22,7 +22,7 @@ pub fn build_regex_table(
     strings: &StringTableBuilder,
 ) -> Result<RegexTableBuilder, EmitError> {
     let mut regexes = RegexTableBuilder::new();
-    intern_regex_predicates(&ir.instructions, strings, &mut regexes)?;
+    intern_regex_predicates(ir.instructions(), strings, &mut regexes)?;
     regexes.validate()?;
     Ok(regexes)
 }

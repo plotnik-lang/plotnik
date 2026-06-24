@@ -10,7 +10,7 @@ use crate::compiler::lower::ir::{CompileResult, InstructionIR};
 /// reachable in the instruction stream. Later phases extend or read this table.
 pub fn intern_predicates(ir: &CompileResult) -> StringTableBuilder {
     let mut strings = StringTableBuilder::new();
-    intern_predicate_strings(&ir.instructions, &mut strings);
+    intern_predicate_strings(ir.instructions(), &mut strings);
     strings
 }
 

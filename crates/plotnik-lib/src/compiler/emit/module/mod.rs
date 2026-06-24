@@ -53,7 +53,7 @@ pub fn build_tables(
         let result_type = types.resolve_type(type_id, input.type_ctx)?;
 
         let target = ir
-            .def_entries
+            .def_entries()
             .get(&def_id)
             .and_then(|label| layout.step_addrs().get(label))
             .copied()

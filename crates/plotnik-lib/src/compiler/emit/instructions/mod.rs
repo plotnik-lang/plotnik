@@ -19,5 +19,5 @@ pub fn encode(
     strings: &StringTableBuilder,
     regexes: &RegexTableBuilder,
 ) -> Result<Vec<u8>, EmitError> {
-    emit_instructions(&ir.instructions, layout, types, strings, regexes)
+    emit_instructions(ir.instructions(), layout, types, strings, regexes)
 }

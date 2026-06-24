@@ -505,10 +505,44 @@ impl LayoutMap {
 /// Compiled query IR plus entry labels produced by the compile stage.
 #[derive(Clone, Debug)]
 pub struct CompileResult {
-    pub instructions: Vec<InstructionIR>,
+    pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
     /// Entry labels for each definition (in definition order).
-    pub def_entries: IndexMap<DefId, Label>,
+    pub(in crate::compiler::lower) def_entries: IndexMap<DefId, Label>,
     /// Entry label for the universal preamble.
     /// The preamble wraps any entrypoint: Struct -> Trampoline -> EndStruct -> Return
-    pub preamble_entry: Label,
+    pub(in crate::compiler::lower) preamble_entry: Label,
+}
+
+impl CompileResult {
+    pub(crate) fn instructions(&self) -> &[InstructionIR] {
+        &self.instructions
+    }
+
+    pub(crate) fn def_entries(&self) -> &IndexMap<DefId, Label> {
+        &self.def_entries
+    }
+
+    pub(crate) fn preamble_entry(&self) -> Label {
+        self.preamble_entry
+    }
+}
+
+/// Lowered IR admitted by the query pipeline for emission.
+///
+/// Raw [`CompileResult`] stays mutable inside `compiler::lower`; emission only
+/// receives this wrapper, so callers cannot hand an arbitrary pass-local IR bag to
+/// the bytecode writer.
+#[derive(Clone, Debug)]
+pub struct LoweredIr {
+    raw: CompileResult,
+}
+
+impl LoweredIr {
+    pub(in crate::compiler) fn new(raw: CompileResult) -> Self {
+        Self { raw }
+    }
+
+    pub(crate) fn raw(&self) -> &CompileResult {
+        &self.raw
+    }
 }

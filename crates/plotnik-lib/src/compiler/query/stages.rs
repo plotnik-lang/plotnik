@@ -13,7 +13,7 @@ use crate::compiler::lower::dead::remove_unreachable;
 use crate::compiler::lower::epsilon::eliminate_epsilons;
 use crate::compiler::lower::nav::collapse_up;
 use crate::compiler::lower::pack::lower;
-use crate::compiler::lower::thompson::verify::run_verified;
+use crate::compiler::lower::thompson::verify::{run_verified, verify_constructed};
 use crate::compiler::lower::thompson::{CompileCtx, Compiler};
 use crate::compiler::parse::{
     DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser, Root, SyntaxNode, lex,
@@ -526,7 +526,7 @@ impl GrammarBoundQuery {
         diag
     }
 
-    fn compile(&self) -> crate::compiler::lower::ir::CompileResult {
+    fn compile(&self) -> crate::compiler::lower::ir::LoweredIr {
         let ctx = CompileCtx {
             interner: self.interner(),
             type_ctx: self.type_analysis(),
@@ -539,7 +539,8 @@ impl GrammarBoundQuery {
         run_verified("remove_unreachable", &mut ir, &ctx, remove_unreachable);
         run_verified("collapse_up", &mut ir, &ctx, collapse_up);
         run_verified("lower", &mut ir, &ctx, lower);
-        ir
+        verify_constructed(&ir, &ctx);
+        crate::compiler::lower::ir::LoweredIr::new(ir)
     }
 
     fn emit_input(&self) -> EmitInput<'_> {
