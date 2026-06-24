@@ -2,11 +2,11 @@ use rowan::{Checkpoint, TextRange};
 
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 use crate::compiler::parse::Parser;
-use crate::compiler::parse::cst::token_sets::{
+use crate::compiler::parse::cst::SyntaxKind;
+use crate::compiler::parse::token_set::{
     ALT_RECOVERY_TOKENS, EXPR_FIRST_TOKENS, NODE_RECOVERY_TOKENS, PREDICATE_OPS, SEPARATORS,
-    SEQ_RECOVERY_TOKENS,
+    SEQ_RECOVERY_TOKENS, TokenSet,
 };
-use crate::compiler::parse::cst::{SyntaxKind, TokenSet};
 
 use super::utils::{starts_uppercase, to_pascal_case};
 

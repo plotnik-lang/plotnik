@@ -48,7 +48,7 @@ use crate::compiler::core::SymbolTable;
 use crate::compiler::parse::ast::{self, NodePattern, Pattern};
 use crate::compiler::core::source::{SourceId, SourceMap};
 use crate::compiler::analyze::visitor::{Visitor, walk};
-use crate::compiler::core::{SyntaxKind, SyntaxToken};
+use crate::compiler::parse::cst::{SyntaxKind, SyntaxToken};
 use crate::compiler::parse::ast::token_src;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics, Span};
 

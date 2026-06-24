@@ -3,7 +3,8 @@
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::ast::Root;
-use super::cst::{SyntaxKind, SyntaxNode, TokenSet};
+use super::cst::{SyntaxKind, SyntaxNode};
+use super::token_set::TokenSet;
 use super::lexer::{Token, token_text};
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;

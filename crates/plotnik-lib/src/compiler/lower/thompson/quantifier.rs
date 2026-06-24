@@ -5,7 +5,7 @@
 //! stay in one place.
 
 use crate::bytecode::Nav;
-use crate::compiler::core::SyntaxKind;
+use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::lower::ir::{EffectIR, Label};
 

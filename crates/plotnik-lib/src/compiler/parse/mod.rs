@@ -24,8 +24,9 @@
 pub use crate::compiler::diagnostics::Error;
 
 pub(crate) mod ast;
-mod cst;
+pub(crate) mod cst;
 mod lexer;
+mod token_set;
 
 mod core;
 mod grammar;
@@ -35,6 +36,8 @@ mod invariants;
 mod cst_tests;
 #[cfg(test)]
 mod lexer_fixture_tests;
+#[cfg(test)]
+mod token_set_tests;
 
 pub use cst::{SyntaxKind, SyntaxNode};
 

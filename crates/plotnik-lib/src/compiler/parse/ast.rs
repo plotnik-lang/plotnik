@@ -12,7 +12,7 @@
 //! When building data structures that need source-lifetime strings (e.g.,
 //! `SymbolTable<'q>`), use [`token_src`] instead of `token.text()`.
 
-use crate::compiler::core::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
+use crate::compiler::parse::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
 use crate::compiler::core::type_shape::QuantifierKind;
 use rowan::TextRange;
 

@@ -1,7 +1,7 @@
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 use crate::compiler::parse::Parser;
 use crate::compiler::parse::cst::SyntaxKind;
-use crate::compiler::parse::cst::token_sets::{EXPR_FIRST_TOKENS, QUANTIFIERS};
+use crate::compiler::parse::token_set::{EXPR_FIRST_TOKENS, QUANTIFIERS};
 
 /// Whether a parsed expression should absorb a trailing quantifier/capture suffix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

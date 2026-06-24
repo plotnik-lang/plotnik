@@ -3,7 +3,7 @@ use rowan::{Checkpoint, TextRange, TextSize};
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 use crate::compiler::parse::Parser;
 use crate::compiler::parse::cst::SyntaxKind;
-use crate::compiler::parse::cst::token_sets::QUANTIFIERS;
+use crate::compiler::parse::token_set::QUANTIFIERS;
 
 use super::utils::starts_uppercase;
 

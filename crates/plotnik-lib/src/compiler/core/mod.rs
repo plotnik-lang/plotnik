@@ -1,7 +1,6 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub(crate) mod capture_mechanism;
-pub(crate) mod cst;
 pub(crate) mod dependency_analysis;
 pub(crate) mod grammar_binding;
 pub(crate) mod source;
@@ -10,12 +9,8 @@ pub(crate) mod symbol_table;
 pub(crate) mod type_analysis;
 pub(crate) mod type_shape;
 
-#[cfg(test)]
-mod cst_tests;
-
 pub use crate::core::{Interner, Symbol};
 pub use capture_mechanism::CaptureMechanism;
-pub use cst::{SyntaxKind, SyntaxToken};
 pub use dependency_analysis::DependencyAnalysis;
 pub use grammar_binding::GrammarBinding;
 pub use span::Span;

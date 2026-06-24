@@ -229,7 +229,7 @@ pub fn is_down_nav(nav: Option<Nav>) -> bool {
 }
 
 /// Unwraps CapturedPattern wrappers before testing for a quantifier operator.
-fn quantifier_operator_kind(pattern: &Pattern) -> Option<crate::compiler::core::SyntaxKind> {
+fn quantifier_operator_kind(pattern: &Pattern) -> Option<crate::compiler::parse::cst::SyntaxKind> {
     let pattern = match pattern {
         Pattern::CapturedPattern(cap) => cap.inner()?,
         e => e.clone(),
@@ -242,7 +242,7 @@ fn quantifier_operator_kind(pattern: &Pattern) -> Option<crate::compiler::core::
 }
 
 pub fn is_skippable_quantifier(pattern: &Pattern) -> bool {
-    use crate::compiler::core::SyntaxKind;
+    use crate::compiler::parse::cst::SyntaxKind;
     quantifier_operator_kind(pattern).is_some_and(|k| {
         matches!(
             k,
