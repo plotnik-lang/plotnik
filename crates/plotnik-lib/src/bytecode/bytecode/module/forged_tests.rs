@@ -18,7 +18,7 @@
 
 use std::sync::LazyLock;
 
-use crate::compiler::{QueryBuilder, SourceMap};
+use crate::compiler::{QueryBuilder, SourceMap, SourcePath};
 use crate::core::grammar::{Grammar, raw::RawGrammar};
 
 use super::{Module, ModuleError};
@@ -36,7 +36,7 @@ fn javascript() -> &'static Grammar {
 
 fn emit_bytes(query_src: &str) -> Vec<u8> {
     let mut source_map = SourceMap::new();
-    source_map.add_file("query.ptk", query_src);
+    source_map.add_file(SourcePath::new("query.ptk"), query_src);
     let query = QueryBuilder::new(source_map)
         .link(javascript())
         .expect("query parsing should not exhaust fuel");

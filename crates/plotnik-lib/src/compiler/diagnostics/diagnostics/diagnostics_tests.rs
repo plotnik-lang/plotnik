@@ -1,5 +1,7 @@
 use rowan::TextRange;
 
+use crate::compiler::diagnostics::SourcePath;
+
 use super::*;
 
 #[test]
@@ -171,7 +173,7 @@ fn printer_empty_diagnostics() {
 #[test]
 fn printer_with_custom_path() {
     let mut map = SourceMap::new();
-    let id = map.add_file("test.pql", "hello world");
+    let id = map.add_file(SourcePath::new("test.pql"), "hello world");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -494,8 +496,8 @@ fn filtered_same_span_higher_priority_wins() {
 #[test]
 fn filtered_no_cross_file_containment_suppression() {
     let mut map = SourceMap::new();
-    let file_a = map.add_file("a.ptk", "01234567890123456789");
-    let file_b = map.add_file("b.ptk", "0123456789");
+    let file_a = map.add_file(SourcePath::new("a.ptk"), "01234567890123456789");
+    let file_b = map.add_file(SourcePath::new("b.ptk"), "0123456789");
 
     let mut diagnostics = Diagnostics::new();
     // File A: a structural error whose suppression range spans the whole file.
@@ -524,8 +526,8 @@ fn filtered_no_cross_file_containment_suppression() {
 #[test]
 fn filtered_no_cross_file_consequence_suppression() {
     let mut map = SourceMap::new();
-    let file_a = map.add_file("a.ptk", "01234567890123456789");
-    let file_b = map.add_file("b.ptk", "0123456789");
+    let file_a = map.add_file(SourcePath::new("a.ptk"), "01234567890123456789");
+    let file_b = map.add_file(SourcePath::new("b.ptk"), "0123456789");
 
     let mut diagnostics = Diagnostics::new();
     // File A: a consequence error, with no root diagnostic in its own source.
@@ -593,8 +595,8 @@ fn render_filtered() {
 #[test]
 fn multi_file_cross_file_related() {
     let mut map = SourceMap::new();
-    let file_a = map.add_file("a.ptk", "Foo = (bar)");
-    let file_b = map.add_file("b.ptk", "(Foo) @x");
+    let file_a = map.add_file(SourcePath::new("a.ptk"), "Foo = (bar)");
+    let file_b = map.add_file(SourcePath::new("b.ptk"), "(Foo) @x");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -627,7 +629,7 @@ fn multi_file_cross_file_related() {
 #[test]
 fn multi_file_same_file_related() {
     let mut map = SourceMap::new();
-    let file_a = map.add_file("main.ptk", "Foo = (bar) Foo = (baz)");
+    let file_a = map.add_file(SourcePath::new("main.ptk"), "Foo = (bar) Foo = (baz)");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
@@ -659,8 +661,8 @@ fn multi_file_same_file_related() {
 #[test]
 fn source_map_iteration() {
     let mut map = SourceMap::new();
-    map.add_file("a.ptk", "content a");
-    map.add_file("b.ptk", "content b");
+    map.add_file(SourcePath::new("a.ptk"), "content a");
+    map.add_file(SourcePath::new("b.ptk"), "content b");
 
     assert_eq!(map.len(), 2);
     assert!(!map.is_empty());
@@ -683,7 +685,7 @@ fn span_new() {
 #[test]
 fn render_json_full_shape() {
     let mut map = SourceMap::new();
-    let id = map.add_file("query.ptk", "(foo)\n(bar)");
+    let id = map.add_file(SourcePath::new("query.ptk"), "(foo)\n(bar)");
 
     let mut diagnostics = Diagnostics::new();
     diagnostics

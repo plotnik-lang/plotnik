@@ -5,7 +5,7 @@ pub mod source;
 pub mod span;
 
 pub use diagnostics::{DiagnosticKind, Diagnostics, Severity};
-pub use source::{Source, SourceId, SourceKind, SourceMap};
+pub use source::{Source, SourceId, SourceKind, SourceMap, SourcePath};
 pub use span::Span;
 
 /// Result type for analysis passes that produce both output and diagnostics.

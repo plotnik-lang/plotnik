@@ -20,6 +20,19 @@ pub enum SourceKind {
     File(String),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SourcePath<'a>(&'a str);
+
+impl<'a> SourcePath<'a> {
+    pub fn new(path: &'a str) -> Self {
+        Self(path)
+    }
+
+    pub fn as_str(self) -> &'a str {
+        self.0
+    }
+}
+
 impl SourceKind {
     pub fn display_name(&self) -> &str {
         match self {
@@ -63,8 +76,8 @@ impl SourceMap {
         self.push_entry(SourceKind::Stdin, content)
     }
 
-    pub fn add_file(&mut self, path: &str, content: &str) -> SourceId {
-        self.push_entry(SourceKind::File(path.to_owned()), content)
+    pub fn add_file(&mut self, path: SourcePath<'_>, content: &str) -> SourceId {
+        self.push_entry(SourceKind::File(path.as_str().to_owned()), content)
     }
 
     /// Convenience for single-source use cases (CLI, REPL, tests).

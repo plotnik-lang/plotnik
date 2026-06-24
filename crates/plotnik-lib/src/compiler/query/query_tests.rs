@@ -3,8 +3,8 @@ use crate::core::Colors;
 use crate::core::grammar::{Grammar, raw::RawGrammar};
 use std::sync::LazyLock;
 
-use crate::compiler::SourceMap;
 use crate::compiler::diagnostics::DiagnosticKind;
+use crate::compiler::{SourceMap, SourcePath};
 
 use super::{LinkOutcome, Query, QueryBuilder};
 
@@ -21,7 +21,7 @@ fn javascript() -> &'static Grammar {
 macro_rules! expect_invalid {
     ($($name:literal: $content:literal),+ $(,)?) => {{
         let mut source_map = SourceMap::new();
-        $(source_map.add_file($name, $content);)+
+        $(source_map.add_file(SourcePath::new($name), $content);)+
         let query = QueryBuilder::new(source_map).analyze().unwrap();
         if query.is_valid() {
             panic!("Expected invalid query, got valid");
@@ -353,8 +353,8 @@ fn multifile_link_field_error_in_referenced_body_spans_two_files() {
     // related note against b.ptk (the parent node). Each `Located` node carries its
     // own source, so the split survives crossing the reference between files.
     let mut source_map = SourceMap::new();
-    source_map.add_file("a.ptk", "Foo = name: (identifier)");
-    source_map.add_file("b.ptk", "Bar = (call_expression (Foo))");
+    source_map.add_file(SourcePath::new("a.ptk"), "Foo = name: (identifier)");
+    source_map.add_file(SourcePath::new("b.ptk"), "Bar = (call_expression (Foo))");
     let analyzed = QueryBuilder::new(source_map).analyze().unwrap();
     assert!(
         analyzed.is_valid(),

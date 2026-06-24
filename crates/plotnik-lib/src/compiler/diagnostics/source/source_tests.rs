@@ -1,4 +1,4 @@
-use super::{SourceId, SourceKind, SourceMap};
+use super::{SourceId, SourceKind, SourceMap, SourcePath};
 
 #[test]
 fn single_one_liner() {
@@ -22,7 +22,7 @@ fn stdin_source() {
 #[test]
 fn file_source() {
     let mut map = SourceMap::new();
-    let id = map.add_file("main.ptk", "Foo = (bar)");
+    let id = map.add_file(SourcePath::new("main.ptk"), "Foo = (bar)");
 
     assert_eq!(map.content(id), "Foo = (bar)");
     assert_eq!(map.kind(id), &SourceKind::File("main.ptk".to_owned()));
@@ -31,8 +31,8 @@ fn file_source() {
 #[test]
 fn multiple_sources() {
     let mut map = SourceMap::new();
-    let a = map.add_file("a.ptk", "content a");
-    let b = map.add_file("b.ptk", "content b");
+    let a = map.add_file(SourcePath::new("a.ptk"), "content a");
+    let b = map.add_file(SourcePath::new("b.ptk"), "content b");
     let c = map.add_inline("inline");
     let d = map.add_stdin("piped");
 
@@ -51,7 +51,7 @@ fn multiple_sources() {
 #[test]
 fn iteration() {
     let mut map = SourceMap::new();
-    map.add_file("a.ptk", "aaa");
+    map.add_file(SourcePath::new("a.ptk"), "aaa");
     map.add_inline("bbb");
 
     let items: Vec<_> = map.iter().collect();
@@ -67,7 +67,7 @@ fn iteration() {
 #[test]
 fn get_source() {
     let mut map = SourceMap::new();
-    let id = map.add_file("test.ptk", "hello");
+    let id = map.add_file(SourcePath::new("test.ptk"), "hello");
 
     let source = map.get(id);
     assert_eq!(source.id, id);

@@ -11,7 +11,7 @@ use crate::bytecode::{EncodeError, Module};
 use crate::core::grammar::{Grammar, raw::RawGrammar};
 
 use crate::compiler::query::QueryBuilder;
-use crate::compiler::{EmitError, SourceMap};
+use crate::compiler::{EmitError, SourceMap, SourcePath};
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
@@ -27,7 +27,7 @@ fn javascript() -> &'static Grammar {
 #[track_caller]
 fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
     let mut source_map = SourceMap::new();
-    source_map.add_file("query.ptk", src);
+    source_map.add_file(SourcePath::new("query.ptk"), src);
     let query = QueryBuilder::new(source_map)
         .link(javascript())
         .expect("query parses");

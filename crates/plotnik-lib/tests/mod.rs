@@ -43,8 +43,8 @@ use similar::TextDiff;
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    Colors, CompiledQuery, PrintTracer, QueryBuilder, RuntimeError, SourceMap, TypeScriptConfig,
-    VM, Verbosity, materialize_verified,
+    Colors, CompiledQuery, PrintTracer, QueryBuilder, RuntimeError, SourceMap, SourcePath,
+    TypeScriptConfig, VM, Verbosity, materialize_verified,
 };
 
 const FIXTURE_EXT: &str = "txt";
@@ -465,7 +465,7 @@ fn javascript_grammar() -> &'static Grammar {
 
 fn source_map(query: &str) -> SourceMap {
     let mut sm = SourceMap::new();
-    sm.add_file("query.ptk", query);
+    sm.add_file(SourcePath::new("query.ptk"), query);
     sm
 }
 

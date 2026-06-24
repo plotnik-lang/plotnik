@@ -1,11 +1,11 @@
 use crate::compiler::test_utils::colliding_node_kind_grammar;
-use crate::compiler::{Query, QueryBuilder, SourceMap};
+use crate::compiler::{Query, QueryBuilder, SourceMap, SourcePath};
 
 fn assert_links_colliding_node_types(files: &[(&str, &str)]) {
     let grammar = colliding_node_kind_grammar();
     let mut source_map = SourceMap::new();
     for (path, content) in files {
-        source_map.add_file(path, content);
+        source_map.add_file(SourcePath::new(path), content);
     }
 
     let query = QueryBuilder::new(source_map).analyze().unwrap();

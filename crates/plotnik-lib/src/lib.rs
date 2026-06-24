@@ -36,7 +36,9 @@ pub use crate::compiler::typegen::typescript::{
 
 pub use crate::core::Colors;
 
-pub use crate::compiler::{CheckedQuery, CompiledQuery, Query, QueryBuilder, SourceId, SourceMap};
+pub use crate::compiler::{
+    CheckedQuery, CompiledQuery, Query, QueryBuilder, SourceId, SourceMap, SourcePath,
+};
 pub use crate::compiler::{Diagnostics, EmitError, Error, PassResult, Result, Severity, Span};
 
 pub use crate::vm::{

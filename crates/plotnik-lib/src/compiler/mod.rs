@@ -30,6 +30,6 @@ pub use crate::compiler::emit::tables::EmitError;
 pub use crate::compiler::diagnostics::source;
 
 pub use crate::compiler::diagnostics::{
-    Diagnostics, Error, PassResult, Result, Severity, SourceId, SourceMap, Span,
+    Diagnostics, Error, PassResult, Result, Severity, SourceId, SourceMap, SourcePath, Span,
 };
 pub use query::{CheckedQuery, CompiledQuery, Query, QueryBuilder};
