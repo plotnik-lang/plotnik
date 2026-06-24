@@ -38,11 +38,28 @@ fn build(
     strings: &mut StringTableBuilder,
 ) -> Result<(), EmitError> {
     let type_ctx = input.type_ctx;
+    let ordered_types = collect_ordered_types(type_ctx);
+    let usage = scan_builtin_usage(type_ctx, &ordered_types);
 
-    // Collect custom types depth-first from definition result types. Every
-    // emitted effect's member ref names a type that one of these reaches, so
-    // this single walk also covers all effect-referenced types. Definition
-    // order fixes the emission order entrypoints rely on.
+    emit_builtins(types, &usage)?;
+    reserve_slots(types, &ordered_types)?;
+
+    let mut ctx = TypeEmitCtx {
+        type_ctx,
+        interner: input.interner,
+        strings,
+    };
+    fill_slots(types, &ordered_types, &usage, &mut ctx)?;
+    emit_type_names(types, &input, &mut ctx)?;
+
+    Ok(())
+}
+
+/// Collect custom types depth-first from definition result types. Every emitted
+/// effect's member ref names a type that one of these reaches, so this single
+/// walk also covers all effect-referenced types. Definition order fixes the
+/// emission order entrypoints rely on.
+fn collect_ordered_types(type_ctx: &TypeAnalysis) -> Vec<TypeId> {
     let mut collector = TypeCollector::new();
     for (_def_id, type_id) in type_ctx.iter_def_output() {
         collector.collect(type_id, type_ctx);
@@ -57,14 +74,16 @@ fn build(
 
         collector.out.push(type_id);
     }
-    let ordered_types = collector.out;
 
-    // Determine which builtins are actually used by scanning all types
+    collector.out
+}
+
+fn scan_builtin_usage(type_ctx: &TypeAnalysis, ordered_types: &[TypeId]) -> BuiltinUsage {
     let mut usage = BuiltinUsage::new();
-    for &type_id in &ordered_types {
+    for &type_id in ordered_types {
         usage.collect(type_id, type_ctx);
     }
-    // Also check entrypoint result types directly
+
     for (_def_id, type_id) in type_ctx.iter_def_output() {
         if type_id == TYPE_VOID {
             usage.uses_void = true;
@@ -73,7 +92,10 @@ fn build(
         }
     }
 
-    // Phase 1: Emit used builtins first (in order: Void, Node)
+    usage
+}
+
+fn emit_builtins(types: &mut TypeTableBuilder, usage: &BuiltinUsage) -> Result<(), EmitError> {
     let builtin_types = [
         (TYPE_VOID, TypeKind::Void, usage.uses_void),
         (TYPE_NODE, TypeKind::Node, usage.uses_node),
@@ -83,27 +105,37 @@ fn build(
             types.push_mapped(builtin_id, TypeDef::builtin(kind))?;
         }
     }
+    Ok(())
+}
 
-    // Phase 2: Pre-assign wire TypeIds for custom types and reserve slots
-    for &type_id in &ordered_types {
+fn reserve_slots(types: &mut TypeTableBuilder, ordered_types: &[TypeId]) -> Result<(), EmitError> {
+    for &type_id in ordered_types {
         types.push_mapped(type_id, TypeDef::placeholder())?;
     }
+    Ok(())
+}
 
-    // Phase 3: Fill in custom type definitions
-    // We need to calculate slot index as offset from where custom types start
-    let builtin_count = usage.uses_void as usize + usage.uses_node as usize;
-    let mut ctx = TypeEmitCtx {
-        type_ctx,
-        interner: input.interner,
-        strings,
-    };
+fn fill_slots(
+    types: &mut TypeTableBuilder,
+    ordered_types: &[TypeId],
+    usage: &BuiltinUsage,
+    ctx: &mut TypeEmitCtx,
+) -> Result<(), EmitError> {
+    let builtin_count = usage.builtin_count();
     for (i, &type_id) in ordered_types.iter().enumerate() {
         let slot_index = builtin_count + i;
-        let type_shape = type_ctx.expect_type_shape(type_id);
-        emit_type_at_slot(types, slot_index, type_shape, &mut ctx)?;
+        let type_shape = ctx.type_ctx.expect_type_shape(type_id);
+        emit_type_at_slot(types, slot_index, type_shape, ctx)?;
     }
+    Ok(())
+}
 
-    for (def_id, type_id) in type_ctx.iter_def_output() {
+fn emit_type_names(
+    types: &mut TypeTableBuilder,
+    input: &EmitInput<'_>,
+    ctx: &mut TypeEmitCtx,
+) -> Result<(), EmitError> {
+    for (def_id, type_id) in ctx.type_ctx.iter_def_output() {
         let name_sym = input.dependency_analysis.def_name_sym(def_id);
         let name = ctx.strings.intern(name_sym, ctx.interner)?;
         let bc_type_id = types
@@ -117,7 +149,7 @@ fn build(
     // A name only attaches to a non-suppressive capture's struct/enum, so the
     // type is reachable from a def result and must survive dead-type elimination;
     // a miss here is a compiler bug, not anything a query can trigger.
-    for (type_id, name_sym) in type_ctx.iter_type_aliases() {
+    for (type_id, name_sym) in ctx.type_ctx.iter_type_aliases() {
         let bc_type_id = types
             .lookup(type_id)
             .expect("named type annotation must survive dead-type elimination");
@@ -151,7 +183,7 @@ fn emit_type_at_slot(
             // Custom types alias Node - look up Node's actual bytecode ID.
             // Reaching a Custom type means it was in `ordered_types`, so
             // `BuiltinUsage::collect` marked Node used (`Custom(_) => usage.node =
-            // true`) and Phase 1 emitted it into `mapping`.
+            // true`) and `emit_builtins` mapped it before custom slots are filled.
             let node_bc_id = types
                 .lookup(TYPE_NODE)
                 .expect("Node must be mapped before a Custom alias that targets it is emitted");
@@ -321,6 +353,10 @@ impl BuiltinUsage {
             uses_node: false,
             seen: HashSet::new(),
         }
+    }
+
+    fn builtin_count(&self) -> usize {
+        self.uses_void as usize + self.uses_node as usize
     }
 
     fn collect(&mut self, type_id: TypeId, type_ctx: &TypeAnalysis) {
