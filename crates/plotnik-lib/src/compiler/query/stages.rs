@@ -368,6 +368,10 @@ pub struct CheckedQuery {
 }
 
 impl CheckedQuery {
+    fn new(query: LinkOutcome, diagnostics: Diagnostics) -> Self {
+        Self { query, diagnostics }
+    }
+
     pub fn is_valid(&self) -> bool {
         !self.diagnostics.has_errors()
     }
@@ -392,6 +396,14 @@ pub struct CompiledQuery {
 }
 
 impl CompiledQuery {
+    fn failed(query: LinkOutcome, diagnostics: Diagnostics) -> Self {
+        Self {
+            checked: CheckedQuery::new(query, diagnostics),
+            bytecode: None,
+            module: None,
+        }
+    }
+
     pub fn is_valid(&self) -> bool {
         self.module.is_some() && self.checked.is_valid()
     }
@@ -466,24 +478,14 @@ impl LinkOutcome {
 
     pub(crate) fn check(self) -> CheckedQuery {
         let diagnostics = self.check_compile();
-        CheckedQuery {
-            query: self,
-            diagnostics,
-        }
+        CheckedQuery::new(self, diagnostics)
     }
 
     pub(crate) fn compile_module(self) -> CompiledQuery {
         let mut diagnostics = self.check_compile();
 
         if diagnostics.has_errors() {
-            return CompiledQuery {
-                checked: CheckedQuery {
-                    query: self,
-                    diagnostics,
-                },
-                bytecode: None,
-                module: None,
-            };
+            return CompiledQuery::failed(self, diagnostics);
         }
 
         let bytes = match self.emit() {
@@ -496,14 +498,7 @@ impl LinkOutcome {
                         .emit();
                 }
 
-                return CompiledQuery {
-                    checked: CheckedQuery {
-                        query: self,
-                        diagnostics,
-                    },
-                    bytecode: None,
-                    module: None,
-                };
+                return CompiledQuery::failed(self, diagnostics);
             }
         };
 
@@ -517,22 +512,12 @@ impl LinkOutcome {
                         .emit();
                 }
 
-                return CompiledQuery {
-                    checked: CheckedQuery {
-                        query: self,
-                        diagnostics,
-                    },
-                    bytecode: None,
-                    module: None,
-                };
+                return CompiledQuery::failed(self, diagnostics);
             }
         };
 
         CompiledQuery {
-            checked: CheckedQuery {
-                query: self,
-                diagnostics,
-            },
+            checked: CheckedQuery::new(self, diagnostics),
             bytecode: Some(bytes),
             module: Some(module),
         }
