@@ -53,6 +53,15 @@ pub struct Fix {
     pub replacement: String,
 }
 
+impl From<&message::Fix> for Fix {
+    fn from(value: &message::Fix) -> Self {
+        Self {
+            description: value.description.clone(),
+            replacement: value.replacement.clone(),
+        }
+    }
+}
+
 impl Diagnostic {
     pub(crate) fn from_diagnostic(msg: &message::Diagnostic, sources: &SourceMap) -> Self {
         Self {
@@ -68,10 +77,7 @@ impl Diagnostic {
                     span: json_span(sources, r.span),
                 })
                 .collect(),
-            fix: msg.fix.as_ref().map(|f| Fix {
-                description: f.description.clone(),
-                replacement: f.replacement.clone(),
-            }),
+            fix: msg.fix.as_ref().map(Fix::from),
             hints: msg.hints.clone(),
         }
     }
