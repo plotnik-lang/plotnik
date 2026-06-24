@@ -22,7 +22,7 @@ use crate::compiler::core::DependencyAnalysis;
 use crate::compiler::analyze::Located;
 use crate::compiler::core::SymbolTable;
 use crate::compiler::core::source::SourceId;
-use crate::compiler::core::{
+use crate::compiler::parse::ast::{
     CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
     SeqPattern, TokenPattern, UnionPattern, is_empty_group,
 };

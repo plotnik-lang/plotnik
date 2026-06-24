@@ -7,7 +7,7 @@ use std::collections::HashSet;
 
 use crate::bytecode::Nav;
 use crate::compiler::core::SymbolTable;
-use crate::compiler::core::{Pattern, Ref, SeqItem};
+use crate::compiler::parse::ast::{Pattern, Ref, SeqItem};
 
 /// Classifies whether expressions may match anonymous nodes after syntactic wrappers.
 pub struct AnonymousClassifier<'a> {

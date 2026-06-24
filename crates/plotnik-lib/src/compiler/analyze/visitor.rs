@@ -19,7 +19,7 @@
 //! ```
 
 use crate::compiler::analyze::Located;
-use crate::compiler::core::ast::{
+use crate::compiler::parse::ast::{
     CapturedPattern, Def, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
     Root, SeqPattern, TokenPattern, UnionPattern,
 };

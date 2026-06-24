@@ -6,7 +6,7 @@ use crate::compiler::core::DependencyAnalysis;
 use crate::core::{Interner, Symbol};
 use indexmap::IndexMap;
 
-use crate::compiler::core::Root;
+use crate::compiler::parse::ast::Root;
 use crate::compiler::core::source::SourceId;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 

@@ -6,7 +6,7 @@
 
 use crate::bytecode::Nav;
 use crate::compiler::core::SyntaxKind;
-use crate::compiler::core::ast::{self, Pattern};
+use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::lower::ir::{EffectIR, Label};
 
 use super::Compiler;

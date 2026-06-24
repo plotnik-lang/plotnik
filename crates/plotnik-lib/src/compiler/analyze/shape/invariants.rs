@@ -2,7 +2,7 @@
 
 #![cfg_attr(coverage_nightly, coverage(off))]
 
-use crate::compiler::core::Branch;
+use crate::compiler::parse::ast::Branch;
 
 #[inline]
 pub fn ensure_both_branch_kinds<'a>(

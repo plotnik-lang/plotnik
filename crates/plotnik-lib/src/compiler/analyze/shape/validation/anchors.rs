@@ -10,7 +10,7 @@ use super::ValidationInput;
 use crate::compiler::analyze::Located;
 use crate::compiler::core::source::SourceId;
 use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_seq_pattern};
-use crate::compiler::core::{NodePattern, SeqItem, SeqPattern};
+use crate::compiler::parse::ast::{NodePattern, SeqItem, SeqPattern};
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 
 pub fn validate_anchors(input: ValidationInput) {

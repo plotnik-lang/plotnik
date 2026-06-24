@@ -9,7 +9,7 @@
 
 use indexmap::IndexMap;
 
-use crate::compiler::core::{ast, token_src};
+use crate::compiler::parse::ast::{self, token_src};
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 use crate::compiler::diagnostics::diagnostics::Diagnostics;
 

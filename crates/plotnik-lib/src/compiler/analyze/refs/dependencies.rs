@@ -12,7 +12,7 @@ use indexmap::{IndexMap, IndexSet};
 
 use crate::compiler::core::DefId;
 use crate::compiler::core::SymbolTable;
-use crate::compiler::core::{Pattern, Ref};
+use crate::compiler::parse::ast::{Pattern, Ref};
 
 pub use crate::compiler::core::DependencyAnalysis;
 

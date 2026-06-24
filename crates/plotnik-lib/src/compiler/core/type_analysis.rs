@@ -13,7 +13,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::compiler::core::ast::Pattern;
+use crate::compiler::parse::ast::Pattern;
 use crate::compiler::core::type_shape::{
     Arity, FieldInfo, PatternResult, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };

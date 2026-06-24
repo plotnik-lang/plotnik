@@ -1,6 +1,5 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub(crate) mod ast;
 pub(crate) mod capture_mechanism;
 pub(crate) mod cst;
 pub(crate) mod dependency_analysis;
@@ -15,11 +14,6 @@ pub(crate) mod type_shape;
 mod cst_tests;
 
 pub use crate::core::{Interner, Symbol};
-pub use ast::{
-    AltKind, Branch, CapturedPattern, Def, EnumPattern, FieldPattern, NodePattern, Pattern,
-    QuantifiedPattern, Ref, Root, SeqItem, SeqPattern, TokenPattern, UnionPattern, classify_alt,
-    is_empty_group, token_src,
-};
 pub use capture_mechanism::CaptureMechanism;
 pub use cst::{SyntaxKind, SyntaxToken};
 pub use dependency_analysis::DependencyAnalysis;

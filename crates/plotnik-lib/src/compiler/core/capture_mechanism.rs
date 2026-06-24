@@ -8,7 +8,7 @@
 //! lockstep.
 
 use crate::compiler::core::Interner;
-use crate::compiler::core::ast::{Pattern, is_empty_group};
+use crate::compiler::parse::ast::{Pattern, is_empty_group};
 use crate::compiler::core::dependency_analysis::DependencyAnalysis;
 use crate::compiler::core::type_analysis::TypeAnalysis;
 use crate::compiler::core::type_shape::{OutputFlow, QuantifierKind, TypeShape};

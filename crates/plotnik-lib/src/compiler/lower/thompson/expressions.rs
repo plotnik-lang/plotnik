@@ -11,7 +11,7 @@ use std::num::NonZeroU16;
 
 use crate::bytecode::Nav;
 use crate::compiler::core::TypeShape;
-use crate::compiler::core::ast::{self, Pattern};
+use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::lower::ir::{
     EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
 };

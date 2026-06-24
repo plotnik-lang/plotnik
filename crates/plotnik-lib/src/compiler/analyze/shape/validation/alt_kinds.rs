@@ -7,7 +7,8 @@
 
 use super::ValidationInput;
 use crate::compiler::analyze::shape::invariants::ensure_both_branch_kinds;
-use crate::compiler::core::{AltKind, Branch, SyntaxKind, classify_alt};
+use crate::compiler::core::SyntaxKind;
+use crate::compiler::parse::ast::{AltKind, Branch, classify_alt};
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 
 pub fn validate_alt_kinds(input: ValidationInput) {

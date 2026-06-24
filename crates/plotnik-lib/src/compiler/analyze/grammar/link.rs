@@ -43,12 +43,13 @@ impl GrammarBindingBuilder {
 
 use super::utils::find_similar;
 use crate::compiler::analyze::Located;
-use crate::compiler::core::Root;
+use crate::compiler::parse::ast::Root;
 use crate::compiler::core::SymbolTable;
-use crate::compiler::core::ast::{self, NodePattern, Pattern};
+use crate::compiler::parse::ast::{self, NodePattern, Pattern};
 use crate::compiler::core::source::{SourceId, SourceMap};
 use crate::compiler::analyze::visitor::{Visitor, walk};
-use crate::compiler::core::{SyntaxKind, SyntaxToken, token_src};
+use crate::compiler::core::{SyntaxKind, SyntaxToken};
+use crate::compiler::parse::ast::token_src;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics, Span};
 
 /// The threaded dependencies of the link pass. Decoupled from `Query` to allow

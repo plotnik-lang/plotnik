@@ -7,7 +7,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::visitor::{
     Visitor, walk_node_pattern, walk_seq_pattern, walk_union_pattern,
 };
-use crate::compiler::core::{NodePattern, SeqPattern, UnionPattern};
+use crate::compiler::parse::ast::{NodePattern, SeqPattern, UnionPattern};
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 
 pub fn validate_empty_constructs(input: ValidationInput) {

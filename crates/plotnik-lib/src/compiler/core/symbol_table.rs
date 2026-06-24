@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 
-use crate::compiler::core::ast;
+use crate::compiler::parse::ast;
 use crate::compiler::analyze::located::Located;
 use crate::compiler::core::source::SourceId;
 

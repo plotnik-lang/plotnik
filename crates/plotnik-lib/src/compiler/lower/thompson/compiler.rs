@@ -5,7 +5,7 @@ use crate::core::Interner;
 use indexmap::IndexMap;
 
 use crate::bytecode::Nav;
-use crate::compiler::core::Pattern;
+use crate::compiler::parse::ast::Pattern;
 use crate::compiler::core::SymbolTable;
 use crate::compiler::lower::ir::{InstructionIR, Label, ReturnIR, TrampolineIR};
 use crate::compiler::core::{DefId, TypeAnalysis};

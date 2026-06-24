@@ -12,7 +12,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::core::SymbolTable;
 use crate::compiler::core::source::SourceId;
 use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_pattern};
-use crate::compiler::core::{Def, NodePattern, Pattern, Ref, Root, SeqPattern, TokenPattern};
+use crate::compiler::parse::ast::{Def, NodePattern, Pattern, Ref, Root, SeqPattern, TokenPattern};
 use crate::compiler::diagnostics::diagnostics::Diagnostics;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Span};
 

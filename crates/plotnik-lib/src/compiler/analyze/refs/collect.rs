@@ -2,7 +2,7 @@
 
 use indexmap::IndexSet;
 
-use crate::compiler::core::ast::{self, Pattern};
+use crate::compiler::parse::ast::{self, Pattern};
 
 pub fn ref_nodes(pattern: &Pattern) -> impl Iterator<Item = ast::Ref> + '_ {
     pattern.syntax().descendants().filter_map(ast::Ref::cast)
