@@ -2,7 +2,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::compiler::core::{DependencyAnalysis, SymbolTable};
+use crate::compiler::analyze::names::SymbolTable;
+use crate::compiler::core::DependencyAnalysis;
 use crate::core::grammar::{Grammar, raw::RawGrammar};
 use indexmap::IndexMap;
 

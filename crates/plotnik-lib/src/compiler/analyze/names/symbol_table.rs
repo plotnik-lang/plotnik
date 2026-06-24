@@ -1,24 +1,95 @@
-//! Symbol table: name resolution and reference checking.
+//! Name-resolution registry and its builder.
 //!
-//! Two-pass approach:
-//! 1. Collect all `Name = pattern` definitions from all sources
-//! 2. Check that all `(UpperIdent)` references are defined
-//!
-//! The `SymbolTable` registry itself lives in `compiler::core`; this module
-//! owns the builder that fills it and the resolution/validation passes.
+//! `SymbolTable` is the immutable registry; `SymbolTableBuilder` is the mutable
+//! accumulator the name-resolution pass fills. The data and its builder live
+//! together; the pass that drives the builder lives in `resolve`.
 
 use indexmap::IndexMap;
 
-use crate::compiler::parse::ast::{self, token_src};
-use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
-use crate::compiler::diagnostics::diagnostics::Diagnostics;
-
-use crate::compiler::analyze::shape::validation::ValidatedAst;
-use crate::compiler::analyze::Located;
+use crate::compiler::parse::ast;
+use crate::compiler::analyze::located::Located;
 use crate::compiler::core::source::SourceId;
-use crate::compiler::analyze::visitor::Visitor;
 
-pub use crate::compiler::core::SymbolTable;
+/// Name-resolution registry: every named definition bound to its body AST and the
+/// source file that defines it.
+///
+/// Immutable once analysis produces it; the name-resolution pass builds one
+/// through its `SymbolTableBuilder`.
+#[derive(Clone, Debug)]
+pub struct SymbolTable {
+    table: IndexMap<String, ast::Pattern>,
+    files: IndexMap<String, SourceId>,
+}
+
+impl SymbolTable {
+    /// Freeze finished name-resolution data into the registry. The pass-owned
+    /// builder is the intended caller.
+    pub(in crate::compiler) fn new(
+        table: IndexMap<String, ast::Pattern>,
+        files: IndexMap<String, SourceId>,
+    ) -> Self {
+        assert_eq!(
+            table.len(),
+            files.len(),
+            "symbol-table body and source maps must have the same definitions",
+        );
+        assert!(
+            table.keys().all(|name| files.contains_key(name)),
+            "every symbol-table body must have a source file",
+        );
+        assert!(
+            files.keys().all(|name| table.contains_key(name)),
+            "every symbol-table source file must have a body",
+        );
+
+        Self { table, files }
+    }
+
+    /// Body of the definition named `name` — the question consumers ask most.
+    pub fn body(&self, name: &str) -> Option<&ast::Pattern> {
+        self.table.get(name)
+    }
+
+    /// Which file defines `name`.
+    pub fn source_id(&self, name: &str) -> Option<SourceId> {
+        self.files.get(name).copied()
+    }
+
+    /// A definition's body together with the file it lives in.
+    pub fn definition(&self, name: &str) -> Option<(SourceId, &ast::Pattern)> {
+        let pattern = self.table.get(name)?;
+        let source_id = self.files.get(name).copied()?;
+        Some((source_id, pattern))
+    }
+
+    /// A definition's body bound to the source it lives in, so a pass crossing a
+    /// reference into another workspace file carries the target's source with the node.
+    pub fn located_definition(&self, name: &str) -> Option<Located<ast::Pattern>> {
+        let (source_id, pattern) = self.definition(name)?;
+        Some(Located::new(source_id, pattern.clone()))
+    }
+
+    /// Whether `name` is defined, yielding the registry's own borrow of the
+    /// canonical name — a `&str` tied to the table, not to the caller's lookup string.
+    pub fn defined_name(&self, name: &str) -> Option<&str> {
+        self.table.get_key_value(name).map(|(k, _)| k.as_str())
+    }
+
+    /// The defined names, in definition order — the vertex set for dependency analysis.
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.table.keys().map(String::as_str)
+    }
+
+    /// Whether no definitions were resolved.
+    pub fn is_empty(&self) -> bool {
+        self.table.is_empty()
+    }
+
+    /// Number of resolved definitions.
+    pub fn count(&self) -> usize {
+        self.table.len()
+    }
+}
 
 /// Mutable accumulator for a [`SymbolTable`], owned by the name-resolution pass.
 #[derive(Default)]
@@ -48,91 +119,5 @@ impl SymbolTableBuilder {
     /// Freeze the accumulated definitions into an immutable [`SymbolTable`].
     pub fn finish(self) -> SymbolTable {
         SymbolTable::new(self.table, self.files)
-    }
-}
-
-pub fn resolve_names(validated: &ValidatedAst<'_>, diag: &mut Diagnostics) -> SymbolTable {
-    let mut builder = SymbolTableBuilder::new();
-
-    for (&source_id, ast) in validated.ast_map() {
-        let src = validated.source_map().content(source_id);
-        let mut resolver = ReferenceResolver {
-            src,
-            diag: &mut *diag,
-            builder: &mut builder,
-        };
-        resolver.visit(&Located::new(source_id, ast.clone()));
-    }
-
-    let symbol_table = builder.finish();
-
-    for (&source_id, ast) in validated.ast_map() {
-        let mut validator = ReferenceValidator {
-            diag: &mut *diag,
-            symbol_table: &symbol_table,
-        };
-        validator.visit(&Located::new(source_id, ast.clone()));
-    }
-
-    symbol_table
-}
-
-struct ReferenceResolver<'q, 'd, 'a> {
-    src: &'q str,
-    diag: &'d mut Diagnostics,
-    builder: &'a mut SymbolTableBuilder,
-}
-
-impl Visitor for ReferenceResolver<'_, '_, '_> {
-    fn visit_def(&mut self, def: &Located<ast::Def>) {
-        let Some(body) = def.node().body() else {
-            return;
-        };
-        // A nameless def is a parser-level error (MissingDefName); there is no name
-        // to resolve, so it never enters the table.
-        let Some(token) = def.node().name() else {
-            return;
-        };
-
-        let name = token_src(&token, self.src);
-        if self.builder.contains(name) {
-            self.diag
-                .report(
-                    def.source(),
-                    DiagnosticKind::DuplicateDefinition,
-                    token.text_range(),
-                )
-                .detail(name)
-                .emit();
-        } else {
-            self.builder.insert(name, def.source(), body);
-        }
-    }
-}
-
-struct ReferenceValidator<'d, 'a> {
-    diag: &'d mut Diagnostics,
-    symbol_table: &'a SymbolTable,
-}
-
-impl Visitor for ReferenceValidator<'_, '_> {
-    fn visit_ref(&mut self, r: &Located<ast::Ref>) {
-        let Some(name_token) = r.node().name() else {
-            return;
-        };
-        let name = name_token.text();
-
-        if self.symbol_table.defined_name(name).is_some() {
-            return;
-        }
-
-        self.diag
-            .report(
-                r.source(),
-                DiagnosticKind::UndefinedReference,
-                name_token.text_range(),
-            )
-            .detail(name)
-            .emit();
     }
 }

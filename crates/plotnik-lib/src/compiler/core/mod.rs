@@ -5,7 +5,6 @@ pub(crate) mod dependency_analysis;
 pub(crate) mod grammar_binding;
 pub(crate) mod source;
 pub(crate) mod span;
-pub(crate) mod symbol_table;
 pub(crate) mod type_analysis;
 pub(crate) mod type_shape;
 
@@ -14,7 +13,6 @@ pub use capture_mechanism::CaptureMechanism;
 pub use dependency_analysis::DependencyAnalysis;
 pub use grammar_binding::GrammarBinding;
 pub use span::Span;
-pub use symbol_table::SymbolTable;
 pub use type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
 pub use type_shape::TypeShape;
 

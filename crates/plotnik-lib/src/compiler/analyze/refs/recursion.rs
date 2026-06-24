@@ -9,7 +9,7 @@ use rowan::TextRange;
 
 use super::dependencies::{DependencyAnalysis, collect_refs};
 use crate::compiler::analyze::Located;
-use crate::compiler::core::SymbolTable;
+use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::core::source::SourceId;
 use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_pattern};
 use crate::compiler::parse::ast::{Def, NodePattern, Pattern, Ref, Root, SeqPattern, TokenPattern};

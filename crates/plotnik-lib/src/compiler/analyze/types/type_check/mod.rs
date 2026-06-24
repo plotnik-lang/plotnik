@@ -22,7 +22,7 @@ pub use def_id::Interner;
 pub use types::Arity;
 
 use crate::compiler::core::DependencyAnalysis;
-use crate::compiler::core::SymbolTable;
+use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::diagnostics::Diagnostics;
 
 /// Run type inference on all definitions.
