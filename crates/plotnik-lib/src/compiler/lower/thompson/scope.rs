@@ -11,7 +11,7 @@ use super::Compiler;
 use super::capture::{CaptureEffects, PatternCtx};
 
 #[derive(Clone, Copy, Debug)]
-pub struct StructScope(pub TypeId);
+pub struct Struct(pub TypeId);
 
 /// Where a captured expression's compiled scope continues.
 ///
@@ -57,7 +57,7 @@ pub(super) struct SplitExits {
 /// the scope-emitting helpers ([`Compiler::compile_struct_capture`] /
 /// [`Compiler::compile_array_capture`]) take a [`CaptureExits`], so a zero-match
 /// can `Split` to a skip path; the non-scope pass-throughs (`Node`/`Ref`/
-/// `SetAfter`) take a plain [`Label`] — they own no skip path, so a `Split` is
+/// `PendingValue`) take a plain [`Label`] — they own no skip path, so a `Split` is
 /// unrepresentable for them rather than silently collapsed via `match_exit`.
 pub(super) struct CaptureRequest<'a> {
     pub inner: &'a Pattern,
@@ -99,7 +99,7 @@ impl Compiler<'_> {
     }
 
     pub(super) fn with_scope<T>(&mut self, type_id: TypeId, f: impl FnOnce(&mut Self) -> T) -> T {
-        self.scope_stack.push(StructScope(type_id));
+        self.scope_stack.push(Struct(type_id));
         let result = f(self);
         self.scope_stack.pop();
         result
@@ -117,7 +117,7 @@ impl Compiler<'_> {
     }
 
     pub(super) fn lookup_member_in_scope(&self, capture_name: &str) -> Option<MemberRef> {
-        let StructScope(type_id) = *self.scope_stack.last()?;
+        let Struct(type_id) = *self.scope_stack.last()?;
         self.lookup_member(capture_name, type_id)
     }
 

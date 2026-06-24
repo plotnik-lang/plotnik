@@ -19,7 +19,7 @@ use super::type_check::TypeAnalysis;
 /// from `TypeAnalysis::iter_def_output()`. The AST is the source of truth for the
 /// original definition list, including definitions that never reached the symbol
 /// table.
-pub fn validate_entrypoints(
+pub fn check_entrypoints(
     ast_map: &IndexMap<SourceId, Root>,
     interner: &Interner,
     type_analysis: &TypeAnalysis,

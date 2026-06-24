@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use super::analysis::TypeAnalysisBuilder;
-use super::def_id::Interner;
-use super::types::{FieldInfo, TYPE_NODE, TypeShape};
+use super::strings::Interner;
+use super::shapes::{FieldInfo, TYPE_NODE, TypeShape};
 
 #[test]
 fn type_interning_deduplicates() {

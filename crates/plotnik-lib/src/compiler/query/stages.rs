@@ -7,7 +7,7 @@ use crate::compiler::analyze::names::{SymbolTable, resolve_names};
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
 use crate::compiler::analyze::shape::validation::{AstValidationInput, validate_ast};
 use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
-use crate::compiler::analyze::types::validate_entrypoints;
+use crate::compiler::analyze::types::check_entrypoints;
 use crate::compiler::emit::tables::{EmitError, EmitInput};
 use crate::compiler::lower::{LowerInput, lower_to_ir};
 use crate::compiler::parse::{
@@ -138,7 +138,7 @@ impl QueryParsed {
             &mut self.diag,
         );
         if !self.diag.has_errors() {
-            validate_entrypoints(
+            check_entrypoints(
                 validated.ast_map(),
                 &interner,
                 &type_analysis,

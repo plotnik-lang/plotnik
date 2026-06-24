@@ -5,7 +5,7 @@ use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{FieldPattern, Pattern, QuantifiedPattern};
 
-use super::super::types::{OutputFlow, PatternResult, TypeId};
+use super::super::shapes::{PatternFlow, PatternShape, TypeId};
 use super::super::unify::UnifyError;
 use super::InferVisitor;
 
@@ -45,10 +45,10 @@ impl InferVisitor<'_, '_> {
     pub(super) fn check_multi_element_scalar(
         &mut self,
         quant: &QuantifiedPattern,
-        inner_info: &PatternResult,
+        inner_info: &PatternShape,
     ) -> bool {
         let is_multi_element_scalar =
-            inner_info.arity == super::super::types::Arity::Many && inner_info.flow.is_void();
+            inner_info.arity == super::super::shapes::Arity::Many && inner_info.flow.is_void();
         if !is_multi_element_scalar {
             return false;
         }
@@ -71,9 +71,9 @@ impl InferVisitor<'_, '_> {
     pub(super) fn check_internal_capture_dimensionality(
         &mut self,
         quant: &QuantifiedPattern,
-        inner_info: &PatternResult,
+        inner_info: &PatternShape,
     ) {
-        let OutputFlow::Fields(type_id) = &inner_info.flow else {
+        let PatternFlow::Fields(type_id) = &inner_info.flow else {
             return;
         };
 

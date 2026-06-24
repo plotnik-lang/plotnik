@@ -14,7 +14,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::compiler::analyze::types::type_shape::{
-    Arity, FieldInfo, OutputFlow, PatternResult, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
+    Arity, FieldInfo, PatternFlow, PatternShape, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
@@ -36,7 +36,7 @@ pub struct TypeAnalysis {
     /// only after checking its type ids and every `Ref` target are consistent.
     def_output: BTreeMap<DefId, TypeId>,
 
-    pattern_result: HashMap<Pattern, PatternResult>,
+    pattern_result: HashMap<Pattern, PatternShape>,
 
     /// Explicit type aliases from annotations like `{...} @x :: TypeName`.
     /// Maps a struct/enum `TypeId` to the name it should have in generated code.
@@ -62,7 +62,7 @@ impl TypeAnalysis {
 
     /// Fields of the struct a `Fields` flow points to.
     ///
-    /// Every `OutputFlow::Fields` is constructed by interning a `Struct` (see the
+    /// Every `PatternFlow::Fields` is constructed by interning a `Struct` (see the
     /// `intern_struct`/`intern_single_field` calls at every `Fields` construction
     /// site), so a non-`Struct` id here is a broken type-system invariant, not a
     /// runtime condition the query can trigger. We surface it loudly instead of
@@ -90,11 +90,11 @@ impl TypeAnalysis {
         }
     }
 
-    pub fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternResult> {
+    pub fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternShape> {
         self.pattern_result.get(pattern)
     }
 
-    pub fn expect_pattern_result(&self, pattern: &Pattern) -> &PatternResult {
+    pub fn expect_pattern_result(&self, pattern: &Pattern) -> &PatternShape {
         self.pattern_result(pattern)
             .expect("admitted pattern must have an inferred result")
     }
@@ -189,13 +189,13 @@ impl TypeAnalysis {
         }
     }
 
-    fn assert_flow_well_formed(&self, flow: &OutputFlow) {
+    fn assert_flow_well_formed(&self, flow: &PatternFlow) {
         match flow {
-            OutputFlow::Void => {}
-            OutputFlow::Value(type_id) => {
+            PatternFlow::Void => {}
+            PatternFlow::Value(type_id) => {
                 self.assert_type_id_registered(*type_id, "value flow type id out of range");
             }
-            OutputFlow::Fields(type_id) => {
+            PatternFlow::Fields(type_id) => {
                 self.assert_type_id_registered(*type_id, "fields flow type id out of range");
                 assert!(
                     matches!(self.type_shape(*type_id), Some(TypeShape::Struct(_))),
@@ -223,18 +223,18 @@ pub struct TypeAnalysisBuilder {
     /// looks types up by `TypeId`, never by shape.
     intern_index: HashMap<TypeShape, TypeId>,
 
-    /// Each definition's full inferred `PatternResult`, keyed by `DefId`. Lets a
+    /// Each definition's full inferred `PatternShape`, keyed by `DefId`. Lets a
     /// non-recursive `Ref` return its target's result (arity + flow, fields
     /// intact for bubbling) without re-descending into the referenced body.
     /// Scratch: only the inference walk consults it.
-    def_memo: HashMap<DefId, PatternResult>,
+    def_memo: HashMap<DefId, PatternShape>,
 }
 
-pub(crate) struct InProgressTypeAnalysis<'a> {
+pub(crate) struct TypeAnalysisView<'a> {
     pub(super) analysis: &'a TypeAnalysis,
 }
 
-impl InProgressTypeAnalysis<'_> {
+impl TypeAnalysisView<'_> {
     pub(crate) fn type_shape(&self, id: TypeId) -> Option<&TypeShape> {
         self.analysis.type_shape(id)
     }
@@ -247,7 +247,7 @@ impl InProgressTypeAnalysis<'_> {
         self.analysis.is_structured_output(type_id)
     }
 
-    pub(crate) fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternResult> {
+    pub(crate) fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternShape> {
         self.analysis.pattern_result(pattern)
     }
 
@@ -294,8 +294,8 @@ impl TypeAnalysisBuilder {
 
     /// Restricted read-only view of the in-progress artifact. It exposes only
     /// accessors that are explicitly safe before [`finish`](Self::finish).
-    pub(crate) fn in_progress(&self) -> InProgressTypeAnalysis<'_> {
-        InProgressTypeAnalysis {
+    pub(crate) fn in_progress(&self) -> TypeAnalysisView<'_> {
+        TypeAnalysisView {
             analysis: &self.analysis,
         }
     }
@@ -320,7 +320,7 @@ impl TypeAnalysisBuilder {
         self.intern_type(TypeShape::Struct(BTreeMap::from([(name, info)])))
     }
 
-    pub fn record_pattern_result(&mut self, pattern: Pattern, info: PatternResult) {
+    pub fn record_pattern_result(&mut self, pattern: Pattern, info: PatternShape) {
         self.analysis.pattern_result.insert(pattern, info);
     }
 
@@ -330,11 +330,11 @@ impl TypeAnalysisBuilder {
 
     /// Record a definition's full inferred result, so non-recursive references
     /// can resolve to it instead of re-descending into the body.
-    pub fn record_def_memo(&mut self, def_id: DefId, info: PatternResult) {
+    pub fn record_def_memo(&mut self, def_id: DefId, info: PatternShape) {
         self.def_memo.insert(def_id, info);
     }
 
-    pub fn def_memo(&self, def_id: DefId) -> Option<&PatternResult> {
+    pub fn def_memo(&self, def_id: DefId) -> Option<&PatternShape> {
         self.def_memo.get(&def_id)
     }
 

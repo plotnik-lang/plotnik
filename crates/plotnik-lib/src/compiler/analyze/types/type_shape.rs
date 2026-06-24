@@ -2,7 +2,7 @@
 //!
 //! The type system tracks two orthogonal properties:
 //! - Arity: Whether an expression matches one or many node positions.
-//! - OutputFlow: What data flows through an expression.
+//! - PatternFlow: What data flows through an expression.
 
 use std::collections::BTreeMap;
 
@@ -74,7 +74,7 @@ impl FieldInfo {
 
 /// Data flow through an expression.
 #[derive(Clone, Debug)]
-pub enum OutputFlow {
+pub enum PatternFlow {
     /// Transparent, produces nothing.
     Void,
     /// Opaque single value that doesn't bubble (scope boundary).
@@ -83,7 +83,7 @@ pub enum OutputFlow {
     Fields(TypeId),
 }
 
-impl OutputFlow {
+impl PatternFlow {
     pub fn is_void(&self) -> bool {
         matches!(self, Self::Void)
     }
@@ -102,22 +102,22 @@ impl OutputFlow {
 
 /// Combined arity and type flow information for an expression.
 #[derive(Clone, Debug)]
-pub struct PatternResult {
+pub struct PatternShape {
     /// How many times this expression matches (one vs many).
     pub arity: Arity,
     /// What data flows through this expression.
-    pub flow: OutputFlow,
+    pub flow: PatternFlow,
 }
 
-impl PatternResult {
-    pub fn new(arity: Arity, flow: OutputFlow) -> Self {
+impl PatternShape {
+    pub fn new(arity: Arity, flow: PatternFlow) -> Self {
         Self { arity, flow }
     }
 
     pub fn void() -> Self {
         Self {
             arity: Arity::One,
-            flow: OutputFlow::Void,
+            flow: PatternFlow::Void,
         }
     }
 }

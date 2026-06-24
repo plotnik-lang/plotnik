@@ -4,10 +4,10 @@
 //! (for TypeScript emission) in a single traversal.
 
 mod analysis;
-mod capture_mechanism;
-mod def_id;
+mod capture_kind;
+mod strings;
 mod infer;
-pub(crate) mod types;
+pub(crate) mod shapes;
 mod unify;
 
 #[cfg(test)]
@@ -16,8 +16,8 @@ mod analysis_tests;
 mod unify_tests;
 
 pub use analysis::TypeAnalysis;
-pub use def_id::Interner;
-pub use types::Arity;
+pub use strings::Interner;
+pub use shapes::Arity;
 
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::names::SymbolTable;
@@ -33,11 +33,11 @@ pub fn infer_types(
     dependency_analysis: &DependencyAnalysis,
     diag: &mut Diagnostics,
 ) -> TypeAnalysis {
-    let analysis = infer::InferPassInput {
+    let analysis = infer::InferPassEnv {
         interner,
         symbol_table,
         dependency_analysis,
         diag,
     };
-    infer::InferencePass::new(analysis).run()
+    infer::InferPass::new(analysis).run()
 }

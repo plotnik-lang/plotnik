@@ -6,13 +6,13 @@
 use std::collections::HashSet;
 
 use crate::bytecode::{EffectKind, Nav};
-use crate::compiler::analyze::types::{CaptureMechanism, TypeAnalysis, TypeShape};
+use crate::compiler::analyze::types::{CaptureKind, TypeAnalysis, TypeShape};
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, Pattern};
 
 use super::Compiler;
-use super::scope::StructScope;
+use super::scope::Struct;
 
 /// Capture effects to attach to match instructions.
 ///
@@ -134,7 +134,7 @@ impl Compiler<'_> {
     pub(super) fn build_capture_effects(
         &self,
         cap: &ast::CapturedPattern,
-        mechanism: Option<CaptureMechanism>,
+        mechanism: Option<CaptureKind>,
     ) -> Vec<EffectIR> {
         let mut effects = Vec::with_capacity(2);
 
@@ -142,7 +142,7 @@ impl Compiler<'_> {
         // other mechanism (struct scope, pass-through ref/enum/forward, array)
         // produces its value via EndStruct/EndEnum/EndArr/Call, so the capture itself
         // emits no Node. A bare capture (`@x` with no inner) is a Node.
-        let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureMechanism::Node);
+        let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureKind::Node);
         if is_node_mechanism {
             effects.push(EffectIR::node());
         }
@@ -155,7 +155,7 @@ impl Compiler<'_> {
             // Suppressive/no-output contexts can compile inner captures under a
             // non-struct scope; they intentionally emit value effects without a Set.
             // Once a struct scope exists, though, a missing member is our bug.
-            if let Some(StructScope(type_id)) = self.scope_stack.last().copied()
+            if let Some(Struct(type_id)) = self.scope_stack.last().copied()
                 && self.ctx.type_ctx.struct_fields(type_id).is_some()
             {
                 let member_ref = self

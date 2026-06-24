@@ -5,8 +5,8 @@ use rowan::TextRange;
 
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 
-use super::super::def_id::Symbol;
-use super::super::types::{FieldInfo, OutputFlow, TYPE_VOID, TypeId};
+use super::super::strings::Symbol;
+use super::super::shapes::{FieldInfo, PatternFlow, TYPE_VOID, TypeId};
 use super::InferVisitor;
 
 impl InferVisitor<'_, '_> {
@@ -34,10 +34,10 @@ impl InferVisitor<'_, '_> {
         }
     }
 
-    pub(super) fn flow_to_type(&mut self, flow: &OutputFlow) -> TypeId {
+    pub(super) fn flow_to_type(&mut self, flow: &PatternFlow) -> TypeId {
         match flow {
-            OutputFlow::Void => TYPE_VOID,
-            OutputFlow::Value(t) | OutputFlow::Fields(t) => *t,
+            PatternFlow::Void => TYPE_VOID,
+            PatternFlow::Value(t) | PatternFlow::Fields(t) => *t,
         }
     }
 
@@ -54,25 +54,25 @@ impl InferVisitor<'_, '_> {
         merged_fields: BTreeMap<Symbol, FieldInfo>,
         output_children: Vec<(TextRange, TypeId)>,
         parent_range: TextRange,
-    ) -> OutputFlow {
+    ) -> PatternFlow {
         let has_bubble_fields = !merged_fields.is_empty();
         if !has_bubble_fields {
             return match output_children.as_slice() {
-                [] => OutputFlow::Void,
-                [(_, type_id)] => OutputFlow::Value(*type_id),
+                [] => PatternFlow::Void,
+                [(_, type_id)] => PatternFlow::Value(*type_id),
                 _ => {
                     self.report_ambiguous_outputs(parent_range, &output_children);
-                    OutputFlow::Void
+                    PatternFlow::Void
                 }
             };
         }
 
         let merged_type = self.ctx.type_ctx.intern_struct(merged_fields);
         if output_children.is_empty() {
-            return OutputFlow::Fields(merged_type);
+            return PatternFlow::Fields(merged_type);
         }
 
         self.report_uncaptured_output_with_captures(&output_children);
-        OutputFlow::Fields(merged_type)
+        PatternFlow::Fields(merged_type)
     }
 }

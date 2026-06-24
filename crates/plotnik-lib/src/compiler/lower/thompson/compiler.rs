@@ -9,7 +9,7 @@ use crate::compiler::lower::ir::{CompileResult, InstructionIR, Label, ReturnIR, 
 use crate::compiler::parse::ast::Pattern;
 
 use super::capture::PatternCtx;
-use super::scope::{CaptureExits, StructScope};
+use super::scope::{CaptureExits, Struct};
 
 /// Compiler state for Thompson construction.
 pub struct Compiler<'a> {
@@ -19,7 +19,7 @@ pub struct Compiler<'a> {
     pub(super) def_entries: IndexMap<DefId, Label>,
     /// Stack of active struct scopes for capture lookup.
     /// Innermost scope is at the end.
-    pub(super) scope_stack: Vec<StructScope>,
+    pub(super) scope_stack: Vec<Struct>,
 }
 
 impl<'a> Compiler<'a> {

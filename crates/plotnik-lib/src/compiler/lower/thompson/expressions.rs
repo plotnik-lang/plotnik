@@ -19,7 +19,7 @@ use crate::compiler::lower::ir::{
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
 
-use crate::compiler::analyze::types::CaptureMechanism;
+use crate::compiler::analyze::types::CaptureKind;
 
 use super::Compiler;
 use super::capture::{CaptureEffects, PatternCtx};
@@ -41,7 +41,7 @@ impl<'a> CaptureRequest<'a> {
         cap: &ast::CapturedPattern,
         inner: &'a Pattern,
         nav: Option<Nav>,
-        mechanism: CaptureMechanism,
+        mechanism: CaptureKind,
         outer_capture: CaptureEffects,
     ) -> Self {
         Self {
@@ -458,7 +458,7 @@ impl Compiler<'_> {
         // read it, so the declared type and the emitted effects can't disagree
         // (#420). `None` is a bare capture (`@x`), which captures the matched node.
         let mechanism = inner_opt.as_ref().map(|inner| {
-            self.ctx.type_ctx.capture_mechanism(
+            self.ctx.type_ctx.capture_kind(
                 inner,
                 self.ctx.dependency_analysis,
                 self.ctx.interner,
@@ -474,22 +474,22 @@ impl Compiler<'_> {
 
         match mechanism {
             // Array: Arr → quantifier (with Push) → EndArr+capture → exit(s).
-            CaptureMechanism::Array => self.compile_array_capture(req, exits),
+            CaptureKind::Array => self.compile_array_capture(req, exits),
 
             // Struct scope: Struct → inner → EndStruct+capture → exit(s) (also empty `{}`).
             // Without the wrapper the Set lands on the raw inner node and both the
             // struct scope and the inner Sets are lost (#470).
-            CaptureMechanism::StructScope => self.compile_struct_capture(req, exits),
+            CaptureKind::Struct => self.compile_struct_capture(req, exits),
 
-            // Node/Ref/SetAfter own no capture-site scope (their wrapper, if any, is
+            // Node/Ref/PendingValue own no capture-site scope (their wrapper, if any, is
             // part of the inner). With split exits all three fold the capture onto the
             // body and recurse, letting the inner optional/star own the skip/match
             // split; that context always enters with empty `pre`, so the per-mechanism
-            // single-exit handling (SetAfter's trailing Set, Node's bubble) is
+            // single-exit handling (PendingValue's trailing Set, Node's bubble) is
             // unnecessary there.
-            mechanism @ (CaptureMechanism::Node
-            | CaptureMechanism::Ref
-            | CaptureMechanism::SetAfter) => match exits {
+            mechanism @ (CaptureKind::Node
+            | CaptureKind::Ref
+            | CaptureKind::PendingValue) => match exits {
                 CaptureExits::Split {
                     match_exit,
                     skip_exit,
@@ -512,10 +512,10 @@ impl Compiler<'_> {
                     )
                 }
                 CaptureExits::Single(exit) => match mechanism {
-                    CaptureMechanism::SetAfter => self.compile_setafter_capture(req, exit),
-                    CaptureMechanism::Ref => self.compile_ref_capture(req, exit),
-                    CaptureMechanism::Node => self.compile_node_capture(req, exit),
-                    CaptureMechanism::Array | CaptureMechanism::StructScope => {
+                    CaptureKind::PendingValue => self.compile_setafter_capture(req, exit),
+                    CaptureKind::Ref => self.compile_ref_capture(req, exit),
+                    CaptureKind::Node => self.compile_node_capture(req, exit),
+                    CaptureKind::Array | CaptureKind::Struct => {
                         unreachable!("scope mechanisms are handled above in compile_captured")
                     }
                 },
@@ -523,7 +523,7 @@ impl Compiler<'_> {
         }
     }
 
-    /// Single-exit lowering for a `SetAfter` capture: the inner leaves the value
+    /// Single-exit lowering for a `PendingValue` capture: the inner leaves the value
     /// pending (enum alternation or a named node forwarding a structured child).
     fn compile_setafter_capture(&mut self, req: CaptureRequest<'_>, exit: Label) -> Label {
         let CaptureRequest {

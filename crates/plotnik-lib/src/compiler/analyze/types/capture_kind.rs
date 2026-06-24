@@ -8,21 +8,21 @@
 //! lockstep.
 
 use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::analyze::types::type_analysis::{InProgressTypeAnalysis, TypeAnalysis};
-use crate::compiler::analyze::types::type_shape::{OutputFlow, QuantifierKind, TypeShape};
+use crate::compiler::analyze::types::type_analysis::{TypeAnalysisView, TypeAnalysis};
+use crate::compiler::analyze::types::type_shape::{PatternFlow, QuantifierKind, TypeShape};
 use crate::compiler::parse::ast::{Pattern, is_empty_group};
 use crate::core::Interner;
 
 /// How a captured value is produced — the bridge between the inferred type and
 /// the emitted effects.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum CaptureMechanism {
+pub enum CaptureKind {
     /// The matched tree-sitter node itself (`Node` effect). If the inner has
     /// bubbling child captures, they set into the enclosing scope as siblings.
     Node,
     /// A fresh struct built from the inner sequence/alternation's bubbling
     /// captures (`Struct … EndStruct`).
-    StructScope,
+    Struct,
     /// A reference whose definition returns a structured type. The call site wraps
     /// the `Call`/`Return` (with an `Struct`/`EndStruct` scope when the definition
     /// returns a struct) and consumes the result — the capture emits no `Node`.
@@ -31,7 +31,7 @@ pub enum CaptureMechanism {
     /// alternation (`Enum … EndEnum`) or a named node forwarding a single
     /// structured output child. Emit the inner, then a trailing `Set`; the capture
     /// contributes no `Node` and no wrapper.
-    SetAfter,
+    PendingValue,
     /// An array collected by `*` or `+` (`Arr … Push … EndArr`).
     Array,
 }
@@ -44,12 +44,12 @@ impl TypeAnalysis {
     /// Reads the inner's admitted type info. Missing pattern or definition data is a
     /// compiler bug after [`TypeAnalysisBuilder::finish`](super::type_analysis::TypeAnalysisBuilder::finish),
     /// so this accessor is loud rather than recovering to `Node`.
-    pub fn capture_mechanism(
+    pub fn capture_kind(
         &self,
         inner: &Pattern,
         deps: &DependencyAnalysis,
         interner: &Interner,
-    ) -> CaptureMechanism {
+    ) -> CaptureKind {
         self.classify(inner, deps, interner, CaptureLookupMode::Admitted)
     }
 
@@ -59,7 +59,7 @@ impl TypeAnalysis {
         deps: &DependencyAnalysis,
         interner: &Interner,
         mode: CaptureLookupMode,
-    ) -> CaptureMechanism {
+    ) -> CaptureKind {
         // `field: x @cap` parses as `(field: x) @cap`; the field is only a navigation
         // constraint, so the value mechanism is that of `x`.
         let pattern = unwrap_field(inner);
@@ -68,13 +68,13 @@ impl TypeAnalysis {
             let kind = mode.quantifier_kind(quant);
             return match kind {
                 // `*` / `+` collect into an array regardless of element shape.
-                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureMechanism::Array,
+                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureKind::Array,
                 // `?` only adds optionality; the value mechanism is the inner's.
                 QuantifierKind::Optional => {
                     let Some(inner) = quant.inner() else {
                         return mode.recover(
                             "admitted optional quantifier must have an inner pattern",
-                            CaptureMechanism::Node,
+                            CaptureKind::Node,
                         );
                     };
                     self.classify(&inner, deps, interner, mode)
@@ -86,41 +86,41 @@ impl TypeAnalysis {
         // its own Call/Return (and Struct/EndStruct) scoping. A reference to a node/void
         // definition falls through to `Node` — its matched node is captured directly.
         if self.ref_structured(&pattern, deps, interner, mode) {
-            return CaptureMechanism::Ref;
+            return CaptureKind::Ref;
         }
 
         // An empty `{}` is an empty struct scope.
         if is_empty_group(&pattern) {
-            return CaptureMechanism::StructScope;
+            return CaptureKind::Struct;
         }
 
         // Everything else is decided by the inner's inferred data flow, so the type
         // and the emitted effects can't disagree.
         let Some(flow) = mode.pattern_flow(self, &pattern) else {
-            return CaptureMechanism::Node;
+            return CaptureKind::Node;
         };
 
         match flow {
             // Bubbling captures: a sequence/alternation wraps them in a fresh struct
             // scope; a named node instead captures its matched node and lets the
             // children bubble alongside as sibling fields.
-            OutputFlow::Fields(_) => {
+            PatternFlow::Fields(_) => {
                 // Only a union alternation flows `Fields` here; an enum flows `Value`
                 // and is handled below, so it must not appear in this arm.
                 if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Union(_)) {
-                    CaptureMechanism::StructScope
+                    CaptureKind::Struct
                 } else {
-                    CaptureMechanism::Node
+                    CaptureKind::Node
                 }
             }
             // A structured scalar is left pending by the inner itself — an enum
             // alternation (`Enum`/`EndEnum`) or a named node forwarding a structured
             // output child.
-            OutputFlow::Value(type_id) if self.is_structured_output(*type_id) => {
-                CaptureMechanism::SetAfter
+            PatternFlow::Value(type_id) if self.is_structured_output(*type_id) => {
+                CaptureKind::PendingValue
             }
             // Void, or a plain scalar node: the matched node is captured directly.
-            _ => CaptureMechanism::Node,
+            _ => CaptureKind::Node,
         }
     }
 
@@ -173,25 +173,25 @@ impl TypeAnalysis {
         // the reference's own transparently-inferred flow: a structured result either
         // bubbles its fields (struct) or is a structured scalar (enum/array).
         match self.pattern_result(pattern).map(|info| &info.flow) {
-            Some(OutputFlow::Fields(_)) => true,
-            Some(OutputFlow::Value(t)) => self.is_structured_output(*t),
+            Some(PatternFlow::Fields(_)) => true,
+            Some(PatternFlow::Value(t)) => self.is_structured_output(*t),
             _ => false,
         }
     }
 }
 
-impl InProgressTypeAnalysis<'_> {
+impl TypeAnalysisView<'_> {
     /// Classification used while inference is still constructing [`TypeAnalysis`].
     ///
     /// In-progress inference can legitimately ask before every definition output has
     /// been memoized, so this view keeps the conservative fallbacks off the frozen
     /// artifact's API.
-    pub(crate) fn capture_mechanism(
+    pub(crate) fn capture_kind(
         &self,
         inner: &Pattern,
         deps: &DependencyAnalysis,
         interner: &Interner,
-    ) -> CaptureMechanism {
+    ) -> CaptureKind {
         self.analysis
             .classify(inner, deps, interner, CaptureLookupMode::InProgress)
     }
@@ -233,7 +233,7 @@ impl CaptureLookupMode {
         self,
         analysis: &'a TypeAnalysis,
         pattern: &Pattern,
-    ) -> Option<&'a OutputFlow> {
+    ) -> Option<&'a PatternFlow> {
         match self {
             Self::Admitted => Some(&analysis.expect_pattern_result(pattern).flow),
             Self::InProgress => analysis.pattern_result(pattern).map(|info| &info.flow),
