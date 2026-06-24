@@ -12,7 +12,7 @@ use super::utils::find_similar;
 
 impl<'a, 'q> GrammarLinker<'a, 'q> {
     pub(super) fn resolve_symbols(&mut self, source: SourceId, root: &ast::Root) {
-        let mut resolver = SymbolResolver { linker: self };
+        let mut resolver = GrammarSymbolResolver { linker: self };
         resolver.visit(&Located::new(source, root.clone()));
     }
 
@@ -98,7 +98,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     /// Resolve a child/value `NodePattern` to its grammar id, mirroring node-context resolution
     /// but returning just the id. `None` for `(_)`, `ERROR`, `MISSING`, or an unresolved kind
     /// (the latter already reported by the resolution pass) — all of which carry no
-    /// admissibility signal and are conservatively accepted.
+    /// check signal and are conservatively accepted.
     pub(super) fn resolve_named_node_id(
         &self,
         located: &Located<NodePattern>,
@@ -119,11 +119,11 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     }
 }
 
-struct SymbolResolver<'l, 'a, 'q> {
+struct GrammarSymbolResolver<'l, 'a, 'q> {
     linker: &'l mut GrammarLinker<'a, 'q>,
 }
 
-impl Visitor for SymbolResolver<'_, '_, '_> {
+impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
     fn visit(&mut self, root: &Located<ast::Root>) {
         walk(self, root);
     }

@@ -36,7 +36,7 @@ pub struct PredicateInput<'q, 'd> {
 }
 
 /// Inputs for the whole AST validation stage.
-pub struct AstValidationInput<'q, 'd> {
+pub struct ShapeValidationInput<'q, 'd> {
     pub source_map: &'q SourceMap,
     pub ast_map: &'q IndexMap<SourceId, Root>,
     pub diag: &'d mut Diagnostics,
@@ -77,7 +77,7 @@ impl<'q> ValidatedAst<'q> {
     }
 }
 
-pub fn validate_ast<'q>(input: AstValidationInput<'q, '_>) -> Option<ValidatedAst<'q>> {
+pub fn validate_ast<'q>(input: ShapeValidationInput<'q, '_>) -> Option<ValidatedAst<'q>> {
     for source in input.source_map.iter() {
         let ast = input
             .ast_map

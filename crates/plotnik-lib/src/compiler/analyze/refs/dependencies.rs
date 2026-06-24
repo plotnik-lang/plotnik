@@ -20,7 +20,7 @@ pub fn analyze_dependencies(
     symbol_table: &SymbolTable,
     interner: &mut Interner,
 ) -> DependencyAnalysis {
-    let sccs = SccFinder::find(symbol_table);
+    let sccs = TarjanScc::find(symbol_table);
 
     // Tarjan runs `strongconnect` from every symbol-table key, so each def lands in
     // exactly one SCC. Type inference leans on this: a def missing from the partition
@@ -60,7 +60,7 @@ pub fn analyze_dependencies(
     DependencyAnalysis::new(sccs, def_ids_by_sym, def_names, recursive_defs)
 }
 
-struct SccFinder<'a> {
+struct TarjanScc<'a> {
     symbol_table: &'a SymbolTable,
     index: usize,
     stack: Vec<&'a str>,
@@ -70,7 +70,7 @@ struct SccFinder<'a> {
     sccs: Vec<Vec<&'a str>>,
 }
 
-impl<'a> SccFinder<'a> {
+impl<'a> TarjanScc<'a> {
     fn find(symbol_table: &'a SymbolTable) -> Vec<Vec<String>> {
         let mut finder = Self {
             symbol_table,
@@ -103,7 +103,7 @@ impl<'a> SccFinder<'a> {
         self.on_stack.insert(name);
 
         if let Some(body) = self.symbol_table.body(name) {
-            let refs = collect_refs(body, self.symbol_table);
+            let refs = collect_defined_refs(body, self.symbol_table);
             for ref_name in refs {
                 if !self.indices.contains_key(ref_name) {
                     self.strongconnect(ref_name);
@@ -146,7 +146,7 @@ impl<'a> SccFinder<'a> {
 /// Collect references to definitions within the symbol table.
 ///
 /// Returns only refs that point to defined names (filters out node kind references).
-pub(super) fn collect_refs<'a>(
+pub(super) fn collect_defined_refs<'a>(
     pattern: &Pattern,
     symbol_table: &'a SymbolTable,
 ) -> IndexSet<&'a str> {

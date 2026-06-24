@@ -13,7 +13,7 @@ use super::link::GrammarLinker;
 use super::utils::find_similar;
 
 impl<'a, 'q> GrammarLinker<'a, 'q> {
-    /// Walk the query, validating each node's own grammar constraints. See `GrammarCheckMode` for why
+    /// Walk the query, validating each node's own grammar constraints. See `AdmissibilityMode` for why
     /// `Deferred` positions skip their checks.
     ///
     /// The `Located` carries the source of the pattern being walked, so a reference
@@ -22,8 +22,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         &mut self,
         located: &Located<Pattern>,
         ctx: Option<ParentNode>,
-        mode: GrammarCheckMode,
-        walk: &mut RefCheckState,
+        mode: AdmissibilityMode,
+        walk: &mut AdmissibilityWalkState,
     ) {
         match located.node() {
             Pattern::NodePattern(node) => {
@@ -92,7 +92,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                     self.check_pattern_grammar(
                         &body_located,
                         ctx,
-                        GrammarCheckMode::Deferred,
+                        AdmissibilityMode::Deferred,
                         walk,
                     );
                 }
@@ -112,7 +112,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 let Some(inner) = q.inner() else { return };
                 // The body is optional/repeated — zero occurrences can satisfy it, so defer.
                 let inner_located = located.wrap(inner);
-                self.check_pattern_grammar(&inner_located, ctx, GrammarCheckMode::Deferred, walk);
+                self.check_pattern_grammar(&inner_located, ctx, AdmissibilityMode::Deferred, walk);
             }
             Pattern::DefRef(r) => {
                 let Some(name_token) = r.name() else { return };
@@ -169,8 +169,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         &mut self,
         located: &Located<ast::FieldPattern>,
         ctx: Option<&ParentNode>,
-        mode: GrammarCheckMode,
-        walk: &mut RefCheckState,
+        mode: AdmissibilityMode,
+        walk: &mut AdmissibilityWalkState,
     ) {
         let field = located.node();
         let Some(name_token) = field.name() else {
@@ -219,7 +219,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         &mut self,
         located: &Located<ast::NegatedField>,
         ctx: &ParentNode,
-        mode: GrammarCheckMode,
+        mode: AdmissibilityMode,
     ) {
         let neg = located.node();
         let Some(name_token) = neg.name() else {
@@ -632,14 +632,14 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 /// query), so the grammar checks must NOT fire there — doing so would reject queries that can
 /// match. Skipping a check can only miss a rejection, never reject a valid query.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) enum GrammarCheckMode {
+pub(super) enum AdmissibilityMode {
     Required,
     Deferred,
 }
 
-impl GrammarCheckMode {
+impl AdmissibilityMode {
     fn is_required(self) -> bool {
-        matches!(self, GrammarCheckMode::Required)
+        matches!(self, AdmissibilityMode::Required)
     }
 }
 
@@ -675,11 +675,11 @@ impl ParentNode {
 }
 
 #[derive(Default)]
-pub(super) struct RefCheckState {
+pub(super) struct AdmissibilityWalkState {
     /// Definitions currently on the recursion stack — guards against cycles.
     in_progress: HashSet<String>,
     /// Definitions already validated under a given context. A definition's
     /// validation depends only on `(name, ctx, mode)`, so caching it keeps shared
     /// references (e.g. diamond graphs) from being re-walked exponentially.
-    validated: HashSet<(String, Option<ParentNode>, GrammarCheckMode)>,
+    validated: HashSet<(String, Option<ParentNode>, AdmissibilityMode)>,
 }

@@ -1,7 +1,7 @@
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Span};
 use crate::core::{NodeFieldId, NodeKindId};
 
-use super::admissibility::{FieldRef, ParentNode};
+use super::check::{FieldRef, ParentNode};
 use super::link::GrammarLinker;
 use super::utils::find_similar;
 

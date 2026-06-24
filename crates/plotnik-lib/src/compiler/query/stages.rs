@@ -5,7 +5,7 @@ use crate::compiler::analyze::grammar::link;
 use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
-use crate::compiler::analyze::shape::validation::{AstValidationInput, validate_ast};
+use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate_ast};
 use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
 use crate::compiler::analyze::types::check_entrypoints;
 use crate::compiler::emit::tables::{EmitError, EmitInput};
@@ -112,7 +112,7 @@ pub(crate) struct QueryParsed {
 
 impl QueryParsed {
     pub(crate) fn analyze(mut self) -> Query {
-        let Some(validated) = validate_ast(AstValidationInput {
+        let Some(validated) = validate_ast(ShapeValidationInput {
             source_map: &self.source_map,
             ast_map: &self.ast_map,
             diag: &mut self.diag,
@@ -287,7 +287,7 @@ impl Query {
         };
 
         let mut output = GrammarBindingBuilder::new();
-        link::GrammarLinkCtx {
+        link::GrammarLinkInput {
             interner: &mut analyzed.analysis.interner,
             grammar,
             source_map: &analyzed.parsed.source_map,

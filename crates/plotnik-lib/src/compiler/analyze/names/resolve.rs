@@ -18,7 +18,7 @@ pub fn resolve_names(validated: &ValidatedAst<'_>, diag: &mut Diagnostics) -> Sy
 
     for (&source_id, ast) in validated.ast_map() {
         let src = validated.source_map().content(source_id);
-        let mut resolver = ReferenceResolver {
+        let mut resolver = DefCollector {
             src,
             diag: &mut *diag,
             builder: &mut builder,
@@ -39,13 +39,13 @@ pub fn resolve_names(validated: &ValidatedAst<'_>, diag: &mut Diagnostics) -> Sy
     symbol_table
 }
 
-struct ReferenceResolver<'q, 'd, 'a> {
+struct DefCollector<'q, 'd, 'a> {
     src: &'q str,
     diag: &'d mut Diagnostics,
     builder: &'a mut SymbolTableBuilder,
 }
 
-impl Visitor for ReferenceResolver<'_, '_, '_> {
+impl Visitor for DefCollector<'_, '_, '_> {
     fn visit_def(&mut self, def: &Located<ast::Def>) {
         let Some(body) = def.node().body() else {
             return;

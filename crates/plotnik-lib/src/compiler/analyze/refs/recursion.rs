@@ -7,7 +7,7 @@
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
 
-use super::dependencies::{DependencyAnalysis, collect_refs};
+use super::dependencies::{DependencyAnalysis, collect_defined_refs};
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_pattern};
@@ -37,29 +37,29 @@ struct RecursionValidator<'a, 'd> {
 }
 
 #[derive(Clone, Copy)]
-enum CycleKind {
-    NoEscape,
+enum RecursionFlaw {
+    Escapeless,
     Unguarded,
 }
 
-impl CycleKind {
-    fn search_mode(self) -> RefSearchMode {
+impl RecursionFlaw {
+    fn search_mode(self) -> CycleSearchScope {
         match self {
-            Self::NoEscape => RefSearchMode::Any,
-            Self::Unguarded => RefSearchMode::Unguarded,
+            Self::Escapeless => CycleSearchScope::All,
+            Self::Unguarded => CycleSearchScope::Unguarded,
         }
     }
 
     fn diagnostic_kind(self) -> DiagnosticKind {
         match self {
-            Self::NoEscape => DiagnosticKind::RecursionNoEscape,
+            Self::Escapeless => DiagnosticKind::RecursionNoEscape,
             Self::Unguarded => DiagnosticKind::DirectRecursion,
         }
     }
 
     fn self_reference_message(self, target: &str) -> String {
         match self {
-            Self::NoEscape => format!("{target} references itself"),
+            Self::Escapeless => format!("{target} references itself"),
             Self::Unguarded => "references itself".to_string(),
         }
     }
@@ -79,7 +79,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
                 .symbol_table
                 .body(name)
                 .expect("node in SCC must exist in symbol table");
-            if !collect_refs(body, self.symbol_table).contains(name.as_str()) {
+            if !collect_defined_refs(body, self.symbol_table).contains(name.as_str()) {
                 return;
             }
         }
@@ -93,7 +93,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
 
         if !has_escape {
             // Every cycle is an infinite loop — no escape path exists anywhere in the SCC.
-            let kind = CycleKind::NoEscape;
+            let kind = RecursionFlaw::Escapeless;
             if let Some(raw_chain) = self.find_cycle(scc, &scc_set, kind) {
                 let chain = self.format_chain(raw_chain, kind);
                 self.report_cycle(kind.diagnostic_kind(), scc, chain);
@@ -101,7 +101,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
             return;
         }
 
-        let kind = CycleKind::Unguarded;
+        let kind = RecursionFlaw::Unguarded;
         if let Some(raw_chain) = self.find_cycle(scc, &scc_set, kind) {
             let chain = self.format_chain(raw_chain, kind);
             self.report_cycle(kind.diagnostic_kind(), scc, chain);
@@ -113,7 +113,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         &self,
         nodes: &'b [String],
         domain: &IndexSet<&'b str>,
-        kind: CycleKind,
+        kind: RecursionFlaw,
     ) -> Option<Vec<(Span, &'b str)>> {
         let search_mode = kind.search_mode();
         let mut adj = IndexMap::new();
@@ -135,7 +135,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         CycleFinder::find(&node_strs, &adj)
     }
 
-    fn format_chain(&self, raw_chain: Vec<(Span, &str)>, kind: CycleKind) -> Vec<(Span, String)> {
+    fn format_chain(&self, raw_chain: Vec<(Span, &str)>, kind: RecursionFlaw) -> Vec<(Span, String)> {
         if raw_chain.len() == 1 {
             let (span, target) = &raw_chain[0];
             let msg = kind.self_reference_message(target);
@@ -335,13 +335,13 @@ fn pattern_consumes_input(pattern: &Pattern) -> bool {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum RefSearchMode {
-    Any,
+enum CycleSearchScope {
+    All,
     /// Not inside a `NodePattern`/`TokenPattern` (those consume input, so the cycle is guarded).
     Unguarded,
 }
 
-impl RefSearchMode {
+impl CycleSearchScope {
     fn find_ref_range(
         self,
         source: SourceId,
@@ -361,7 +361,7 @@ impl RefSearchMode {
 struct RefFinder<'a> {
     target: &'a str,
     found: Option<TextRange>,
-    mode: RefSearchMode,
+    mode: CycleSearchScope,
 }
 
 impl Visitor for RefFinder<'_> {
@@ -373,7 +373,7 @@ impl Visitor for RefFinder<'_> {
     }
 
     fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
-        if self.mode == RefSearchMode::Unguarded {
+        if self.mode == CycleSearchScope::Unguarded {
             return; // Guarded: stop recursion
         }
         walk_node_pattern(self, node);
@@ -402,7 +402,7 @@ impl Visitor for RefFinder<'_> {
             if self.found.is_some() {
                 return;
             }
-            if self.mode == RefSearchMode::Unguarded && pattern_consumes_input(child.node()) {
+            if self.mode == CycleSearchScope::Unguarded && pattern_consumes_input(child.node()) {
                 return;
             }
         }

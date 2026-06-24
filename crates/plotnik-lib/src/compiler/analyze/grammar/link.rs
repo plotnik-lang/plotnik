@@ -10,8 +10,8 @@ use crate::core::grammar::Grammar;
 use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId};
 use indexmap::IndexMap;
 
-use super::admissibility::{GrammarCheckMode, RefCheckState};
-use super::grammar_binding::GrammarBindingBuilder;
+use super::check::{AdmissibilityMode, AdmissibilityWalkState};
+use super::binding::GrammarBindingBuilder;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::diagnostics::Diagnostics;
@@ -20,7 +20,7 @@ use crate::compiler::parse::ast::Root;
 
 /// The threaded dependencies of the link pass. Decoupled from `Query` to allow
 /// testing without a full query context.
-pub struct GrammarLinkCtx<'a, 'q> {
+pub struct GrammarLinkInput<'a, 'q> {
     pub interner: &'a mut Interner,
     pub grammar: &'a Grammar,
     pub source_map: &'q SourceMap,
@@ -28,7 +28,7 @@ pub struct GrammarLinkCtx<'a, 'q> {
     pub symbol_table: &'a SymbolTable,
 }
 
-impl<'q> GrammarLinkCtx<'_, 'q> {
+impl<'q> GrammarLinkInput<'_, 'q> {
     pub(crate) fn link(self, output: &mut GrammarBindingBuilder, diagnostics: &mut Diagnostics) {
         // Local deduplication maps (not exposed in output)
         let mut node_kind_ids: HashMap<NodeKind<&'q str>, Option<NodeKindId>> = HashMap::new();
@@ -76,8 +76,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         for def in defs {
             let Some(body) = def.body() else { continue };
             let located = Located::new(source, body);
-            let mut walk = RefCheckState::default();
-            self.check_pattern_grammar(&located, None, GrammarCheckMode::Required, &mut walk);
+            let mut walk = AdmissibilityWalkState::default();
+            self.check_pattern_grammar(&located, None, AdmissibilityMode::Required, &mut walk);
         }
     }
 }
