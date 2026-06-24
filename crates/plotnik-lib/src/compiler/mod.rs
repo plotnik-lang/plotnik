@@ -1,4 +1,4 @@
-//! Plotnik compiler driver.
+//! Plotnik compiler pipeline.
 //!
 //! Orchestrates the parser, analysis, lowering, emission, and typegen modules
 //! into the `Query`/`QueryBuilder` pipeline. Pass internals stay under this
