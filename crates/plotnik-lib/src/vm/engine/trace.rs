@@ -372,7 +372,7 @@ impl<'s> PrintTracer<'s> {
 
     /// Format match content for instruction line (matches dump format exactly).
     ///
-    /// Order: [pre-effects] !neg_fields field: (type) predicate [post-effects]
+    /// Order: [pre-effects] -neg_fields field: (type) predicate [post-effects]
     fn format_match_content(&self, m: &Match<'_>) -> String {
         let mut parts = Vec::new();
 
@@ -385,7 +385,7 @@ impl<'s> PrintTracer<'s> {
         if !m.is_epsilon() {
             for field_id in m.neg_fields() {
                 let name = self.node_field_name(field_id);
-                parts.push(format!("!{name}"));
+                parts.push(format!("-{name}"));
             }
 
             let node_part = self.format_node_pattern(m);
