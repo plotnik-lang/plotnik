@@ -59,20 +59,24 @@ impl InferVisitor<'_, '_> {
         output_children: Vec<(TextRange, TypeId)>,
         parent_range: TextRange,
     ) -> OutputFlow {
-        let has_bubbles = !merged_fields.is_empty();
-
-        match (has_bubbles, output_children.len()) {
-            (false, 0) => OutputFlow::Void,
-            (false, 1) => OutputFlow::Value(output_children[0].1),
-            (false, _) => {
-                self.report_ambiguous_outputs(source, parent_range, &output_children);
-                OutputFlow::Void
-            }
-            (true, 0) => OutputFlow::Fields(self.ctx.type_ctx.intern_struct(merged_fields)),
-            (true, _) => {
-                self.report_uncaptured_output_with_captures(source, &output_children);
-                OutputFlow::Fields(self.ctx.type_ctx.intern_struct(merged_fields))
-            }
+        let has_bubble_fields = !merged_fields.is_empty();
+        if !has_bubble_fields {
+            return match output_children.as_slice() {
+                [] => OutputFlow::Void,
+                [(_, type_id)] => OutputFlow::Value(*type_id),
+                _ => {
+                    self.report_ambiguous_outputs(source, parent_range, &output_children);
+                    OutputFlow::Void
+                }
+            };
         }
+
+        let merged_type = self.ctx.type_ctx.intern_struct(merged_fields);
+        if output_children.is_empty() {
+            return OutputFlow::Fields(merged_type);
+        }
+
+        self.report_uncaptured_output_with_captures(source, &output_children);
+        OutputFlow::Fields(merged_type)
     }
 }
