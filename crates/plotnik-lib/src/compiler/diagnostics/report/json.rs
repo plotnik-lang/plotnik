@@ -68,13 +68,13 @@ impl Diagnostic {
             code: msg.kind,
             severity: msg.severity(),
             message: msg.message.clone(),
-            span: json_span(sources, msg.span),
+            span: wire_span(sources, msg.span),
             related: msg
                 .related
                 .iter()
                 .map(|r| Related {
                     message: r.message.clone(),
-                    span: json_span(sources, r.span),
+                    span: wire_span(sources, r.span),
                 })
                 .collect(),
             fix: msg.fix.as_ref().map(Fix::from),
@@ -83,16 +83,16 @@ impl Diagnostic {
     }
 }
 
-fn json_span(sources: &SourceMap, span: super::Span) -> Span {
+fn wire_span(sources: &SourceMap, span: super::Span) -> Span {
     let content = sources.content(span.source);
     Span {
         file: sources.kind(span.source).display_name().to_string(),
-        start: json_position(content, span.range.start().into()),
-        end: json_position(content, span.range.end().into()),
+        start: wire_position(content, span.range.start().into()),
+        end: wire_position(content, span.range.end().into()),
     }
 }
 
-fn json_position(content: &str, offset: usize) -> Position {
+fn wire_position(content: &str, offset: usize) -> Position {
     let prefix = &content[..offset];
     let line_start = prefix.rfind('\n').map_or(0, |i| i + 1);
     Position {

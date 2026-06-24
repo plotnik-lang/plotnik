@@ -21,7 +21,7 @@ pub use shapes::Arity;
 
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::diagnostics::diagnostics::Diagnostics;
+use crate::compiler::diagnostics::report::Diagnostics;
 
 /// Run type inference on all definitions.
 ///

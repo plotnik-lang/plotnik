@@ -17,10 +17,10 @@ pub struct Emitter<'a> {
     pub(super) type_names: HashMap<TypeId, String>,
     /// For collision avoidance when generating names.
     pub(super) used_names: BTreeSet<String>,
-    pub(super) node_reachable: bool,
+    pub(super) needs_node_type: bool,
     pub(super) emitted_types: HashSet<TypeId>,
-    /// Cycle guard for `mark_node_reachable`.
-    pub(super) node_scan_visited: HashSet<TypeId>,
+    /// Cycle guard for `mark_node_type_usage`.
+    pub(super) node_scan_seen: HashSet<TypeId>,
     pub(super) output: String,
 }
 
@@ -38,9 +38,9 @@ impl<'a> Emitter<'a> {
             config,
             type_names: HashMap::new(),
             used_names: BTreeSet::new(),
-            node_reachable: false,
+            needs_node_type: false,
             emitted_types: HashSet::new(),
-            node_scan_visited: HashSet::new(),
+            node_scan_seen: HashSet::new(),
             output: String::new(),
         }
     }

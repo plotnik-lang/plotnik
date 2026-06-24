@@ -140,7 +140,7 @@ fn invalid_three_way_mutual_recursion_across_files() {
 #[test]
 fn analysis_rejects_byte_oriented_regex() {
     let linked = Query::expect(r"Q = (identifier =~ /(?-u:\xFF)/) @x").link(javascript());
-    let diag = linked.check_compile();
+    let diag = linked.dry_run();
     assert!(diag.has_errors());
     let rendered = diag.render(linked.source_map());
     assert!(
@@ -150,36 +150,36 @@ fn analysis_rejects_byte_oriented_regex() {
 }
 
 #[test]
-fn check_compile_rejects_value_less_definition() {
+fn dry_run_rejects_value_less_definition() {
     let linked = Query::expect("Q = .").link(javascript());
-    let diag = linked.check_compile();
+    let diag = linked.dry_run();
     assert!(diag.has_errors());
     let rendered = diag.render(linked.source_map());
     assert!(rendered.contains("no entrypoint"), "{rendered}");
 }
 
 #[test]
-fn check_compile_accepts_valid_query() {
+fn dry_run_accepts_valid_query() {
     let linked = Query::parse_and_validate("Q = (identifier) @id").link(javascript());
-    assert!(!linked.check_compile().has_errors());
+    assert!(!linked.dry_run().has_errors());
 }
 
 #[test]
-fn check_compile_flags_dropped_value_less_def_among_valid() {
+fn dry_run_flags_dropped_value_less_def_among_valid() {
     let linked = Query::expect("Bad = .\nGood = (identifier) @id").link(javascript());
-    let diag = linked.check_compile();
+    let diag = linked.dry_run();
     assert!(diag.has_errors());
     let rendered = diag.render(linked.source_map());
     assert!(rendered.contains("no entrypoint"), "{rendered}");
 }
 
 #[test]
-fn check_compile_is_total_on_empty_source_map() {
+fn dry_run_is_total_on_empty_source_map() {
     // The dry run must never panic — even on a query with zero sources.
     let linked = QueryBuilder::new(SourceMap::new())
         .link(javascript())
         .unwrap();
-    assert!(!linked.check_compile().has_errors());
+    assert!(!linked.dry_run().has_errors());
 }
 
 #[test]

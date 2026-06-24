@@ -11,8 +11,8 @@ use super::dependencies::{DependencyAnalysis, collect_defined_refs};
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_pattern};
-use crate::compiler::diagnostics::diagnostics::Diagnostics;
-use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Span};
+use crate::compiler::diagnostics::report::Diagnostics;
+use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::ast::{Def, NodePattern, Pattern, DefRef, Root, SeqPattern, TokenPattern};
 

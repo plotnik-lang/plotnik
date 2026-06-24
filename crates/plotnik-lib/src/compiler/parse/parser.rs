@@ -8,7 +8,7 @@ use super::ast::Root;
 use super::cst::{SyntaxKind, SyntaxNode};
 use super::lexer::{Token, token_text};
 use super::token_set::TokenSet;
-use crate::compiler::diagnostics::diagnostics::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
+use crate::compiler::diagnostics::report::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::Error;

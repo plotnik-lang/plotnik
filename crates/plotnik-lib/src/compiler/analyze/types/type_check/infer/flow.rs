@@ -3,7 +3,7 @@ use std::collections::btree_map::Entry;
 
 use rowan::TextRange;
 
-use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
+use crate::compiler::diagnostics::report::DiagnosticKind;
 
 use super::super::strings::Symbol;
 use super::super::shapes::{FieldInfo, PatternFlow, TYPE_VOID, TypeId};

@@ -26,7 +26,7 @@ pub use crate::core::colors;
 pub use crate::core::grammar;
 
 pub mod diagnostics {
-    pub use crate::compiler::diagnostics::diagnostics::*;
+    pub use crate::compiler::diagnostics::report::*;
     pub use crate::compiler::diagnostics::*;
 }
 

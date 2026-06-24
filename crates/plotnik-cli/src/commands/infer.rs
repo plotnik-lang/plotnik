@@ -48,7 +48,7 @@ pub fn run(args: InferArgs) -> CliResult {
     };
     // Only use colors when outputting to stdout (not to file)
     let use_colors = args.color && args.output.is_none();
-    let config = TypeScriptConfig::builder()
+    let config = TypeScriptConfig::new()
         .export(args.export)
         .emit_node_interface(!args.no_node_type)
         .verbose_nodes(args.verbose_nodes)

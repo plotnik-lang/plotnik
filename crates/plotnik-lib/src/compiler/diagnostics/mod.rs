@@ -1,13 +1,13 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub mod diagnostics;
+pub mod report;
 pub mod source;
 pub mod span;
 
 #[cfg(test)]
 mod source_tests;
 
-pub use diagnostics::{DiagnosticKind, Diagnostics, Severity};
+pub use report::{DiagnosticKind, Diagnostics, Severity};
 pub use source::{Source, SourceId, SourceKind, SourceMap, SourcePath};
 pub use span::Span;
 

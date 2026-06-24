@@ -1,6 +1,6 @@
 //! Shared compile path for run, dump, and infer.
 //!
-//! All three funnel through `check_compile` — the same full-pipeline validation
+//! All three funnel through `dry_run` — the same full-pipeline validation
 //! `check` runs — so a query `check` rejects fails here too, as a rendered
 //! diagnostic rather than a panic on `Module::load`.
 
@@ -10,9 +10,9 @@ use plotnik_lib::{CompiledQuery, QueryBuilder, SourceMap};
 use crate::error::CliError;
 use crate::language_registry::Lang;
 
-/// Parse, analyze, link, validate (full `check_compile`), emit, load.
+/// Parse, analyze, link, validate (full `dry_run`), emit, load.
 ///
-/// `check_compile` already proves emit+load succeed, so the final load can only
+/// `dry_run` already proves emit+load succeed, so the final load can only
 /// fail on a genuine bug; it is surfaced as a clean error, never a panic.
 pub fn compile_query(
     sources: SourceMap,

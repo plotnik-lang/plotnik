@@ -383,7 +383,7 @@ fn render_compile(
 
 fn render_types(compiled: &CompiledQuery) -> String {
     compiled
-        .to_typescript(TypeScriptConfig::builder().emit_node_interface(false))
+        .to_typescript(TypeScriptConfig::new().emit_node_interface(false))
         .expect("valid query should compile to a module")
 }
 

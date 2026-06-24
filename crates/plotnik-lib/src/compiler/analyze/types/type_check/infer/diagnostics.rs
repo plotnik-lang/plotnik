@@ -1,6 +1,6 @@
 use rowan::TextRange;
 
-use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
+use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{FieldPattern, Pattern, QuantifiedPattern};

@@ -14,7 +14,7 @@ use super::check::{AdmissibilityMode, AdmissibilityWalkState};
 use super::binding::GrammarBindingBuilder;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::diagnostics::diagnostics::Diagnostics;
+use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::parse::ast::Root;
 

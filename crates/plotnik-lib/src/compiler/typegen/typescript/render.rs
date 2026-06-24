@@ -24,9 +24,9 @@ impl Emitter<'_> {
 
         self.assign_generated_names();
 
-        self.mark_node_reachable();
+        self.mark_node_type_usage();
 
-        if self.config.emit_node_interface && self.node_reachable {
+        if self.config.emit_node_interface && self.needs_node_type {
             self.emit_node_interface();
         }
     }

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::compiler::analyze::Located;
-use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Span};
+use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::parse::ast::token_src;
 use crate::compiler::parse::ast::{self, NodePattern, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;

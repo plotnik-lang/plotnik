@@ -12,7 +12,7 @@ struct TypeDependencyGraph {
 }
 
 impl Emitter<'_> {
-    pub(super) fn mark_node_reachable(&mut self) {
+    pub(super) fn mark_node_type_usage(&mut self) {
         for i in 0..self.entrypoints.len() {
             let ep = self.entrypoints.get(i);
             self.visit_for_node_use(ep.result_type());
@@ -20,7 +20,7 @@ impl Emitter<'_> {
     }
 
     fn visit_for_node_use(&mut self, type_id: TypeId) {
-        if !self.node_scan_visited.insert(type_id) {
+        if !self.node_scan_seen.insert(type_id) {
             return;
         }
 
@@ -30,14 +30,14 @@ impl Emitter<'_> {
 
         match type_def.decode() {
             TypeDefKind::Primitive(TypeKind::Node) => {
-                self.node_reachable = true;
+                self.needs_node_type = true;
             }
             TypeDefKind::Primitive(_) => {}
             TypeDefKind::Wrapper {
                 kind: TypeKind::Alias,
                 ..
             } => {
-                self.node_reachable = true;
+                self.needs_node_type = true;
             }
             TypeDefKind::Wrapper { inner, .. } => {
                 self.visit_for_node_use(inner);

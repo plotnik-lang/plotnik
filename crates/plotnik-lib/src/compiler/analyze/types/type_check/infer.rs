@@ -20,7 +20,7 @@ use super::unify::unify_flows;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::diagnostics::diagnostics::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
+use crate::compiler::diagnostics::report::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;

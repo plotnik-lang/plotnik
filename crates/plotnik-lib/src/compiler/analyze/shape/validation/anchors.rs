@@ -9,7 +9,7 @@
 use super::ValidationInput;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_seq_pattern};
-use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{NodePattern, SeqItem, SeqPattern};

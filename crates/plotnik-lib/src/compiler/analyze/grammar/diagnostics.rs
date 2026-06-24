@@ -1,4 +1,4 @@
-use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Span};
+use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::core::{NodeFieldId, NodeKindId};
 
 use super::check::{FieldRef, ParentNode};

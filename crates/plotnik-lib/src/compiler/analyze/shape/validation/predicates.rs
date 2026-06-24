@@ -12,7 +12,7 @@ use rowan::TextRange;
 use super::PredicateInput;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern};
-use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::NodePattern;

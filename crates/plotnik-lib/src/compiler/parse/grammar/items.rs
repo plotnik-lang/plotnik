@@ -1,6 +1,6 @@
 use rowan::TextRange;
 
-use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
+use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::parse::Parser;
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::parse::token_set::ROOT_PATTERN_FIRST_TOKENS;

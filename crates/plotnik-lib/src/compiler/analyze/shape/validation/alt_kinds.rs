@@ -7,7 +7,7 @@
 
 use super::ValidationInput;
 use crate::compiler::analyze::shape::invariants::ensure_both_branch_kinds;
-use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
+use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{AltKind, Branch, classify_alt};
 use crate::compiler::parse::cst::SyntaxKind;

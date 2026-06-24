@@ -35,7 +35,7 @@ impl Default for Config {
 
 impl Config {
     /// Create a new Config with default values.
-    pub fn builder() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 

@@ -147,7 +147,7 @@ impl QueryParsed {
             );
         }
 
-        let analysis = QueryAnalysis {
+        let analysis = Analysis {
             interner,
             symbol_table,
             type_analysis,
@@ -172,15 +172,15 @@ impl QueryParsed {
 
 pub struct Query {
     parsed: QueryParsed,
-    analysis: Option<QueryAnalysis>,
+    analysis: Option<Analysis>,
 }
 
 pub(crate) struct AnalyzedQuery {
     parsed: QueryParsed,
-    analysis: QueryAnalysis,
+    analysis: Analysis,
 }
 
-pub(super) struct QueryAnalysis {
+pub(super) struct Analysis {
     pub(super) interner: Interner,
     pub(super) symbol_table: SymbolTable,
     pub(super) type_analysis: TypeAnalysis,
@@ -188,7 +188,7 @@ pub(super) struct QueryAnalysis {
 }
 
 impl Query {
-    fn analyzed(parsed: QueryParsed, analysis: QueryAnalysis) -> Self {
+    fn analyzed(parsed: QueryParsed, analysis: Analysis) -> Self {
         Self {
             parsed,
             analysis: Some(analysis),
@@ -234,7 +234,7 @@ impl Query {
         None
     }
 
-    pub(super) fn analysis(&self) -> Option<&QueryAnalysis> {
+    pub(super) fn analysis(&self) -> Option<&Analysis> {
         self.analysis.as_ref()
     }
 
@@ -480,12 +480,12 @@ impl LinkOutcome {
     }
 
     pub(crate) fn check(self) -> CheckedQuery {
-        let diagnostics = self.check_compile();
+        let diagnostics = self.dry_run();
         CheckedQuery::new(self, diagnostics)
     }
 
     pub(crate) fn compile_module(self) -> CompiledQuery {
-        let mut diagnostics = self.check_compile();
+        let mut diagnostics = self.dry_run();
 
         if diagnostics.has_errors() {
             return CompiledQuery::failed(self, diagnostics);
@@ -536,7 +536,7 @@ impl LinkOutcome {
 
     /// Emit without the emitter's debug load self-check.
     ///
-    /// `check_compile` loads the bytecode itself so malformed output is reported
+    /// `dry_run` loads the bytecode itself so malformed output is reported
     /// as a diagnostic instead of reaching the debug self-check panic.
     fn emit_unchecked(&self) -> Result<Vec<u8>, EmitError> {
         match self {
@@ -551,7 +551,7 @@ impl LinkOutcome {
     ///
     /// Loads the bytecode itself, so it never reaches the emitter's debug
     /// self-check panic in debug or release.
-    pub(crate) fn check_compile(&self) -> Diagnostics {
+    pub(crate) fn dry_run(&self) -> Diagnostics {
         let Some(query) = self.linked() else {
             return self.diagnostics().clone();
         };
