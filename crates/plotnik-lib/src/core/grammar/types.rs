@@ -30,6 +30,22 @@ pub(super) struct NodeKindEntry {
     pub(super) terminal: bool,
 }
 
+impl NodeKindEntry {
+    pub(super) fn alias(id: u16, type_name: String, named: bool) -> Self {
+        Self {
+            id,
+            type_name,
+            named,
+            visible: true,
+            supertype: false,
+            // Aliases get fresh ids, so this value never reaches the aliased public
+            // id's per-kind accumulation. Token detection also checks node shape, so
+            // `false` is the safe default for alias-only public ids.
+            terminal: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(super) struct FieldEntry {
     pub(super) id: u16,

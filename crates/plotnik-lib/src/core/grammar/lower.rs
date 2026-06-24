@@ -377,18 +377,11 @@ pub(super) fn derive_symbols(
         .expect("tree-sitter symbol order includes end symbol")
         + 1;
     for (index, alias) in unique_aliases.iter().enumerate() {
-        symbols.push(NodeKindEntry {
-            id: first_alias_id + u16::try_from(index).expect("tree-sitter alias IDs fit in u16"),
-            type_name: public_node_kind(&alias.value),
-            named: alias.is_named,
-            visible: true,
-            supertype: false,
-            // Aliases get fresh ids here, so this `terminal` value never reaches the aliased public
-            // id's per-kind accumulation. `is_token` does not rely on it being accurate: it also
-            // checks the node shape (a kind with a children/fields slot is never a token), so
-            // `false` is a safe default.
-            terminal: false,
-        });
+        symbols.push(NodeKindEntry::alias(
+            first_alias_id + u16::try_from(index).expect("tree-sitter alias IDs fit in u16"),
+            public_node_kind(&alias.value),
+            alias.is_named,
+        ));
     }
 
     symbols
