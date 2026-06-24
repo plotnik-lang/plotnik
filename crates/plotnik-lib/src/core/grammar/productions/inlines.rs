@@ -62,6 +62,31 @@ struct ProductionStepId {
     step: usize,
 }
 
+impl ProductionStepId {
+    fn root(variable_index: usize, production_index: usize) -> Self {
+        Self {
+            variable: Some(variable_index),
+            production: production_index,
+            step: 0,
+        }
+    }
+
+    fn inlined_at(self, production_index: usize) -> Self {
+        Self {
+            variable: None,
+            production: production_index,
+            step: self.step,
+        }
+    }
+
+    fn advance(self) -> Self {
+        Self {
+            step: self.step + 1,
+            ..self
+        }
+    }
+}
+
 struct InlinedProductionMapBuilder {
     production_indices_by_step_id: FxHashMap<ProductionStepId, Vec<usize>>,
     productions: Vec<Production>,
@@ -72,11 +97,7 @@ impl InlinedProductionMapBuilder {
         let mut step_ids_to_process = Vec::new();
         for (variable_index, variable) in grammar.variables.iter().enumerate() {
             for production_index in 0..variable.productions.len() {
-                step_ids_to_process.push(ProductionStepId {
-                    variable: Some(variable_index),
-                    production: production_index,
-                    step: 0,
-                });
+                step_ids_to_process.push(ProductionStepId::root(variable_index, production_index));
                 while !step_ids_to_process.is_empty() {
                     let mut i = 0;
                     while i < step_ids_to_process.len() {
@@ -87,18 +108,10 @@ impl InlinedProductionMapBuilder {
                                     .inline_production_at_step(step_id, grammar)
                                     .iter()
                                     .copied()
-                                    .map(|production_index| ProductionStepId {
-                                        variable: None,
-                                        production: production_index,
-                                        step: step_id.step,
-                                    });
+                                    .map(|production_index| step_id.inlined_at(production_index));
                                 step_ids_to_process.splice(i..=i, inlined_step_ids);
                             } else {
-                                step_ids_to_process[i] = ProductionStepId {
-                                    variable: step_id.variable,
-                                    production: step_id.production,
-                                    step: step_id.step + 1,
-                                };
+                                step_ids_to_process[i] = step_id.advance();
                                 i += 1;
                             }
                         } else {
