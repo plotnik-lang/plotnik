@@ -599,13 +599,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         inner_info: &PatternShape,
         capture_mode: QuantifiedCaptureMode,
     ) {
-        let reported_scalar = self.check_multi_element_scalar(quant, inner_info);
+        let reported_scalar = self.report_multi_element_scalar(quant, inner_info);
         if reported_scalar {
             return;
         }
 
         if capture_mode == QuantifiedCaptureMode::Bare {
-            self.check_internal_capture_dimensionality(quant, inner_info);
+            self.report_internal_capture_dimensionality(quant, inner_info);
         }
     }
 
@@ -653,7 +653,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 PatternFlow::Value(array_type)
             }
             PatternFlow::Fields(struct_type) => {
-                // `check_internal_capture_dimensionality` already emitted an error for
+                // `report_internal_capture_dimensionality` already emitted an error for
                 // this case (Fields under * or + without a row capture). We still
                 // produce a plausible array type so downstream inference isn't poisoned
                 // by void.

@@ -18,7 +18,7 @@ pub(super) struct GrammarTables {
 #[derive(Debug, Clone)]
 pub(super) struct NodeKindEntry {
     pub(super) id: u16,
-    pub(super) type_name: String,
+    pub(super) kind_name: String,
     pub(super) named: bool,
     pub(super) visible: bool,
     pub(super) supertype: bool,
@@ -30,10 +30,10 @@ pub(super) struct NodeKindEntry {
 }
 
 impl NodeKindEntry {
-    pub(super) fn alias(id: u16, type_name: String, named: bool) -> Self {
+    pub(super) fn alias(id: u16, kind_name: String, named: bool) -> Self {
         Self {
             id,
-            type_name,
+            kind_name,
             named,
             visible: true,
             supertype: false,
@@ -146,7 +146,7 @@ impl Grammar {
 
         for symbol in tables.symbols {
             let node_id = node_kind_id(symbol.id);
-            node_names.insert(node_id, symbol.type_name.clone());
+            node_names.insert(node_id, symbol.kind_name.clone());
 
             all_terminal
                 .entry(node_id)
@@ -162,10 +162,10 @@ impl Grammar {
             }
 
             if symbol.named {
-                named_node_ids.entry(symbol.type_name).or_insert(node_id);
+                named_node_ids.entry(symbol.kind_name).or_insert(node_id);
             } else {
                 anonymous_node_ids
-                    .entry(symbol.type_name)
+                    .entry(symbol.kind_name)
                     .or_insert(node_id);
             }
         }
@@ -484,7 +484,7 @@ fn node_field_id(id: u16) -> NodeFieldId {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NodeShape {
     #[serde(rename = "type")]
-    pub(crate) type_name: String,
+    pub(crate) kind_name: String,
     pub(crate) named: bool,
     #[serde(default)]
     pub(crate) root: bool,
@@ -499,9 +499,9 @@ pub(crate) struct NodeShape {
 impl NodeShape {
     fn node_kind(&self) -> NodeKind<&str> {
         if self.named {
-            NodeKind::Named(self.type_name.as_str())
+            NodeKind::Named(self.kind_name.as_str())
         } else {
-            NodeKind::Anonymous(self.type_name.as_str())
+            NodeKind::Anonymous(self.kind_name.as_str())
         }
     }
 }
@@ -517,16 +517,16 @@ pub(crate) struct NodeSlot {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NodeKindRef {
     #[serde(rename = "type")]
-    pub(crate) type_name: String,
+    pub(crate) kind_name: String,
     pub(crate) named: bool,
 }
 
 impl NodeKindRef {
     fn node_kind(&self) -> NodeKind<&str> {
         if self.named {
-            NodeKind::Named(self.type_name.as_str())
+            NodeKind::Named(self.kind_name.as_str())
         } else {
-            NodeKind::Anonymous(self.type_name.as_str())
+            NodeKind::Anonymous(self.kind_name.as_str())
         }
     }
 }
@@ -656,15 +656,15 @@ where
     let mut fields = HashMap::new();
     for (field_name, slot) in &shape.fields {
         let field_id = field_id_for_name(field_name).ok_or_else(|| NodeShapeBuildError::Field {
-            node_kind: shape.type_name.clone(),
+            node_kind: shape.kind_name.clone(),
             field: field_name.clone(),
         })?;
 
         let valid_types = resolve_slot_types(slot, known_shapes, node_id_for_type, |kind_ref| {
             NodeShapeBuildError::FieldType {
-                node_kind: shape.type_name.clone(),
+                node_kind: shape.kind_name.clone(),
                 field: field_name.clone(),
-                kind: kind_ref.type_name.clone(),
+                kind: kind_ref.kind_name.clone(),
                 named: kind_ref.named,
             }
         })?;
@@ -696,8 +696,8 @@ where
             let valid_types =
                 resolve_slot_types(slot, known_shapes, node_id_for_type, |kind_ref| {
                     NodeShapeBuildError::ChildType {
-                        node_kind: shape.type_name.clone(),
-                        kind: kind_ref.type_name.clone(),
+                        node_kind: shape.kind_name.clone(),
+                        kind: kind_ref.kind_name.clone(),
                         named: kind_ref.named,
                     }
                 })?;

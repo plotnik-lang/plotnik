@@ -42,7 +42,7 @@ impl InferVisitor<'_, '_> {
     /// capture — you can't meaningfully capture multiple nodes per iteration as
     /// a scalar. Returns `true` when it reports, signalling the caller to skip
     /// the internal-capture check (the original short-circuit).
-    pub(super) fn check_multi_element_scalar(
+    pub(super) fn report_multi_element_scalar(
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
@@ -68,7 +68,7 @@ impl InferVisitor<'_, '_> {
 
     /// Strict-dimensionality check 2: internal captures require a row capture on
     /// the quantifier. Skipped when inference runs in row-capture mode.
-    pub(super) fn check_internal_capture_dimensionality(
+    pub(super) fn report_internal_capture_dimensionality(
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,

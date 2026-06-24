@@ -8,7 +8,7 @@ impl NodeShape {
     /// A named node kind: non-root, no fields, no children.
     fn named(name: &str) -> Self {
         Self {
-            type_name: name.to_string(),
+            kind_name: name.to_string(),
             named: true,
             root: false,
             extra: false,
@@ -106,7 +106,7 @@ fn child_slot(multiple: bool, required: bool) -> NodeSlot {
         multiple,
         required,
         types: vec![NodeKindRef {
-            type_name: "child".to_string(),
+            kind_name: "child".to_string(),
             named: true,
         }],
     }
@@ -115,7 +115,7 @@ fn child_slot(multiple: bool, required: bool) -> NodeSlot {
 fn named_symbol(id: u16, name: &str, terminal: bool) -> NodeKindEntry {
     NodeKindEntry {
         id,
-        type_name: name.to_string(),
+        kind_name: name.to_string(),
         named: true,
         visible: true,
         supertype: false,
@@ -128,7 +128,7 @@ fn slot_of(child: &str) -> NodeSlot {
         multiple: true,
         required: false,
         types: vec![NodeKindRef {
-            type_name: child.to_string(),
+            kind_name: child.to_string(),
             named: true,
         }],
     }

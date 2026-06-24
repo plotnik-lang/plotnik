@@ -320,8 +320,8 @@ impl TypeAnalysisBuilder {
         self.intern_type(TypeShape::Struct(BTreeMap::from([(name, info)])))
     }
 
-    pub fn record_pattern_result(&mut self, pattern: Pattern, info: PatternShape) {
-        self.analysis.pattern_result.insert(pattern, info);
+    pub fn record_pattern_result(&mut self, pattern: Pattern, shape: PatternShape) {
+        self.analysis.pattern_result.insert(pattern, shape);
     }
 
     pub fn record_def_output(&mut self, def_id: DefId, type_id: TypeId) {
@@ -330,8 +330,8 @@ impl TypeAnalysisBuilder {
 
     /// Record a definition's full inferred result, so non-recursive references
     /// can resolve to it instead of re-descending into the body.
-    pub fn record_def_memo(&mut self, def_id: DefId, info: PatternShape) {
-        self.def_memo.insert(def_id, info);
+    pub fn record_def_memo(&mut self, def_id: DefId, shape: PatternShape) {
+        self.def_memo.insert(def_id, shape);
     }
 
     pub fn def_memo(&self, def_id: DefId) -> Option<&PatternShape> {

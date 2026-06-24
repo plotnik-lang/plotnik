@@ -121,7 +121,7 @@ impl Default for SlotRecord {
 impl From<NodeKindRecord> for NodeKindRef {
     fn from(value: NodeKindRecord) -> Self {
         Self {
-            type_name: value.kind,
+            kind_name: value.kind,
             named: value.named,
         }
     }
@@ -140,7 +140,7 @@ impl From<SlotRecord> for NodeSlot {
 impl From<NodeShapeRecord> for NodeShape {
     fn from(value: NodeShapeRecord) -> Self {
         Self {
-            type_name: value.kind,
+            kind_name: value.kind,
             named: value.named,
             root: value.root,
             extra: value.extra,

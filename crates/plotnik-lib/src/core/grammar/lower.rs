@@ -346,7 +346,7 @@ pub(super) fn derive_symbols(
     let mut symbols = Vec::new();
     for symbol in &symbol_order {
         let public_id = symbol_ids[&symbol_map[symbol]];
-        let (type_name, kind) = default_aliases.get(symbol).map_or_else(
+        let (kind_name, kind) = default_aliases.get(symbol).map_or_else(
             || metadata_for_symbol(syntax_grammar, lexical_grammar, *symbol),
             |alias| (alias.value.as_str(), alias.kind()),
         );
@@ -358,7 +358,7 @@ pub(super) fn derive_symbols(
 
         symbols.push(NodeKindEntry {
             id: public_id,
-            type_name: public_node_kind(type_name),
+            kind_name: public_node_kind(kind_name),
             named: visibility.named,
             visible: visibility.visible,
             supertype: visibility.supertype,
