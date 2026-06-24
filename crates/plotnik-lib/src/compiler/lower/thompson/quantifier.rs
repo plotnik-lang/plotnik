@@ -72,10 +72,78 @@ impl ArrayContext {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum ArrayElementScopeOwner {
-    Iteration,
-    ArrayExit,
+#[derive(Clone)]
+enum ElementScope {
+    Standalone {
+        capture: CaptureEffects,
+    },
+    StructWrapped {
+        row_type_id: Option<TypeId>,
+        capture: CaptureEffects,
+    },
+    RowScopedByIteration {
+        row_type_id: Option<TypeId>,
+        capture: CaptureEffects,
+    },
+    RowScopedByArrayExit {
+        capture: CaptureEffects,
+    },
+}
+
+impl ElementScope {
+    fn for_iteration(
+        inner: &Pattern,
+        array_context: ArrayContext,
+        capture: CaptureEffects,
+        type_ctx: &crate::compiler::analyze::types::TypeAnalysis,
+    ) -> Self {
+        if !array_context.is_in_array() {
+            return Self::Standalone { capture };
+        }
+
+        let row_type_id = row_type_id(inner, type_ctx);
+        if needs_struct_wrapper(inner, type_ctx) {
+            return Self::StructWrapped {
+                row_type_id,
+                capture,
+            };
+        }
+
+        Self::RowScopedByIteration {
+            row_type_id,
+            capture,
+        }
+    }
+
+    fn by_array_exit(&self) -> Self {
+        match self {
+            Self::Standalone { capture } => Self::Standalone {
+                capture: capture.clone(),
+            },
+            Self::StructWrapped {
+                row_type_id,
+                capture,
+            } => Self::StructWrapped {
+                row_type_id: *row_type_id,
+                capture: capture.clone(),
+            },
+            Self::RowScopedByIteration { capture, .. } => Self::RowScopedByArrayExit {
+                capture: capture.clone(),
+            },
+            Self::RowScopedByArrayExit { capture } => Self::RowScopedByArrayExit {
+                capture: capture.clone(),
+            },
+        }
+    }
+
+    fn capture(&self) -> &CaptureEffects {
+        match self {
+            Self::Standalone { capture }
+            | Self::StructWrapped { capture, .. }
+            | Self::RowScopedByIteration { capture, .. }
+            | Self::RowScopedByArrayExit { capture } => capture,
+        }
+    }
 }
 
 /// Configuration for unified quantifier compilation.
@@ -460,24 +528,11 @@ impl Compiler<'_> {
 
         let match_exit = exits.match_exit();
 
-        let in_array_context = array_context.is_in_array();
-        let has_struct_wrapper = in_array_context && needs_struct_wrapper(inner, self.ctx.type_ctx);
-        let element_row_type_id = if in_array_context {
-            row_type_id(inner, self.ctx.type_ctx)
-        } else {
-            None
-        };
+        let element_scope =
+            ElementScope::for_iteration(inner, array_context, element_capture, self.ctx.type_ctx);
 
         let compile_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
-            this.compile_quantified_body(
-                inner,
-                exit,
-                nav,
-                element_capture.clone(),
-                element_row_type_id,
-                has_struct_wrapper,
-                ArrayElementScopeOwner::Iteration,
-            )
+            this.compile_quantified_body(inner, exit, nav, element_scope.clone())
         };
 
         let is_greedy = kind.is_greedy();
@@ -508,16 +563,9 @@ impl Compiler<'_> {
                     match_exit,
                     skip_exit,
                 } => {
+                    let split_scope = element_scope.by_array_exit();
                     let split_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
-                        this.compile_quantified_body(
-                            inner,
-                            exit,
-                            nav,
-                            element_capture.clone(),
-                            element_row_type_id,
-                            has_struct_wrapper,
-                            ArrayElementScopeOwner::ArrayExit,
-                        )
+                        this.compile_quantified_body(inner, exit, nav, split_scope.clone())
                     };
 
                     let loop_entry = self.fresh_label();
@@ -570,7 +618,8 @@ impl Compiler<'_> {
                 let skip_with_null = match exits {
                     CaptureExits::Split { skip_exit, .. } => skip_exit,
                     CaptureExits::Single(_) => {
-                        let null_exit = self.emit_null_for_skip_path(match_exit, &element_capture);
+                        let null_exit =
+                            self.emit_null_for_skip_path(match_exit, element_scope.capture());
                         self.emit_null_for_internal_captures(null_exit, inner)
                     }
                 };
@@ -594,35 +643,34 @@ impl Compiler<'_> {
         inner: &Pattern,
         exit: Label,
         nav: Nav,
-        element_capture: CaptureEffects,
-        element_row_type_id: Option<TypeId>,
-        has_struct_wrapper: bool,
-        scope_owner: ArrayElementScopeOwner,
+        element_scope: ElementScope,
     ) -> Label {
-        if has_struct_wrapper {
-            return self.compile_struct_for_array(inner, exit, Some(nav), element_row_type_id);
-        }
-
-        if scope_owner == ArrayElementScopeOwner::Iteration {
-            return self.compile_with_optional_scope(element_row_type_id, |this| {
+        match element_scope {
+            ElementScope::Standalone { capture }
+            | ElementScope::RowScopedByArrayExit { capture } => self.dispatch_pattern(
+                inner,
+                ExprCtx {
+                    exit,
+                    nav: Some(nav),
+                    capture,
+                },
+            ),
+            ElementScope::StructWrapped { row_type_id, .. } => {
+                self.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
+            }
+            ElementScope::RowScopedByIteration {
+                row_type_id,
+                capture,
+            } => self.compile_with_optional_scope(row_type_id, |this| {
                 this.dispatch_pattern(
                     inner,
                     ExprCtx {
                         exit,
                         nav: Some(nav),
-                        capture: element_capture,
+                        capture,
                     },
                 )
-            });
+            }),
         }
-
-        self.dispatch_pattern(
-            inner,
-            ExprCtx {
-                exit,
-                nav: Some(nav),
-                capture: element_capture,
-            },
-        )
     }
 }
