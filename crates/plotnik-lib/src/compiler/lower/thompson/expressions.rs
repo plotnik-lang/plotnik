@@ -295,47 +295,26 @@ impl Compiler<'_> {
         let node_field = self.resolve_field(field);
 
         if let Pattern::Ref(r) = &value {
-            return self.compile_ref(
-                r,
-                ExprCtx {
-                    exit,
-                    nav: nav_override,
-                    capture,
-                },
-                node_field,
-            );
+            let value_ctx = ExprCtx {
+                exit,
+                nav: nav_override,
+                capture,
+            };
+            return self.compile_ref(r, value_ctx, node_field);
         }
 
         // Alternations, sequences, and quantified patterns emit an epsilon entry and
         // cannot carry a field constraint directly — the field must go on a wrapper
         // that navigates first, then lets the epsilon branch under it.
-        let needs_wrapper = node_field.is_some()
-            && matches!(
-                &value,
-                Pattern::Union(_)
-                    | Pattern::Enum(_)
-                    | Pattern::SeqPattern(_)
-                    | Pattern::QuantifiedPattern(_)
-            );
-
-        if needs_wrapper {
-            let value_entry = self.dispatch_pattern(
-                &value,
-                ExprCtx {
-                    exit,
-                    nav: None,
-                    capture,
-                },
-            );
-
-            let entry = self.fresh_label();
-            self.instructions.push(
-                MatchIR::epsilon(entry, value_entry)
-                    .nav(nav_override.unwrap_or(Nav::Stay))
-                    .node_field(node_field)
-                    .into(),
-            );
-            return entry;
+        if let Some(field_id) = node_field
+            && Self::field_value_needs_wrapper(&value)
+        {
+            let value_ctx = ExprCtx {
+                exit,
+                nav: nav_override,
+                capture,
+            };
+            return self.compile_wrapped_field_value(&value, value_ctx, field_id);
         }
 
         let value_entry = self.dispatch_pattern(
@@ -347,6 +326,50 @@ impl Compiler<'_> {
             },
         );
 
+        self.attach_field_to_entry_or_wrap(value_entry, node_field)
+    }
+
+    fn field_value_needs_wrapper(value: &Pattern) -> bool {
+        matches!(
+            value,
+            Pattern::Union(_)
+                | Pattern::Enum(_)
+                | Pattern::SeqPattern(_)
+                | Pattern::QuantifiedPattern(_)
+        )
+    }
+
+    fn compile_wrapped_field_value(
+        &mut self,
+        value: &Pattern,
+        ctx: ExprCtx,
+        field_id: NonZeroU16,
+    ) -> Label {
+        let ExprCtx { exit, nav, capture } = ctx;
+        let value_entry = self.dispatch_pattern(
+            value,
+            ExprCtx {
+                exit,
+                nav: None,
+                capture,
+            },
+        );
+
+        let entry = self.fresh_label();
+        self.instructions.push(
+            MatchIR::epsilon(entry, value_entry)
+                .nav(nav.unwrap_or(Nav::Stay))
+                .node_field(Some(field_id))
+                .into(),
+        );
+        entry
+    }
+
+    fn attach_field_to_entry_or_wrap(
+        &mut self,
+        value_entry: Label,
+        node_field: Option<NonZeroU16>,
+    ) -> Label {
         if let Some(field_id) = node_field {
             if let Some(instr) = self
                 .instructions
