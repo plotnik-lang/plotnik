@@ -14,7 +14,7 @@ use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_pattern
 use crate::compiler::diagnostics::diagnostics::Diagnostics;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Span};
 use crate::compiler::diagnostics::source::SourceId;
-use crate::compiler::parse::ast::{Def, NodePattern, Pattern, Ref, Root, SeqPattern, TokenPattern};
+use crate::compiler::parse::ast::{Def, NodePattern, Pattern, DefRef, Root, SeqPattern, TokenPattern};
 
 pub fn validate_recursion(
     analysis: &DependencyAnalysis,
@@ -280,7 +280,7 @@ impl<'a, 'q> CycleFinder<'a, 'q> {
 
 fn pattern_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
     match pattern {
-        Pattern::Ref(r) => {
+        Pattern::DefRef(r) => {
             let Some(name_token) = r.name() else {
                 return true;
             };
@@ -317,7 +317,7 @@ fn pattern_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
 fn pattern_consumes_input(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::NodePattern(_) | Pattern::TokenPattern(_) => true,
-        Pattern::Ref(_) => false,
+        Pattern::DefRef(_) => false,
         Pattern::Union(_) | Pattern::Enum(_) => {
             pattern.children().iter().all(pattern_consumes_input)
         }
@@ -384,7 +384,7 @@ impl Visitor for RefFinder<'_> {
         // In Unguarded mode this also acts as a guard (stops recursion).
     }
 
-    fn visit_ref(&mut self, r: &Located<Ref>) {
+    fn visit_def_ref(&mut self, r: &Located<DefRef>) {
         if self.found.is_some() {
             return;
         }

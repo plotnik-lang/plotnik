@@ -12,7 +12,7 @@ use indexmap::{IndexMap, IndexSet};
 
 use crate::compiler::ids::DefId;
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::parse::ast::{Pattern, Ref};
+use crate::compiler::parse::ast::{DefRef, Pattern};
 
 pub use super::dependency_analysis::DependencyAnalysis;
 
@@ -152,7 +152,7 @@ pub(super) fn collect_refs<'a>(
 ) -> IndexSet<&'a str> {
     let mut refs = IndexSet::new();
     for descendant in pattern.syntax().descendants() {
-        let Some(r) = Ref::cast(descendant) else {
+        let Some(r) = DefRef::cast(descendant) else {
             continue;
         };
         let Some(name_tok) = r.name() else { continue };

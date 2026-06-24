@@ -28,14 +28,14 @@ pub(crate) mod cst;
 mod lexer;
 mod token_set;
 
-mod core;
 mod grammar;
 mod invariants;
+mod parser;
 
 #[cfg(test)]
 mod ast_tests;
 #[cfg(test)]
-mod core_tests;
+mod parser_tests;
 #[cfg(test)]
 mod cst_tests;
 #[cfg(test)]
@@ -47,6 +47,6 @@ pub use cst::{SyntaxKind, SyntaxNode};
 
 pub use ast::{Anchor, Branch, Def, NegatedField, Pattern, Root};
 
-pub use core::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser};
+pub use parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser};
 
 pub use lexer::lex;

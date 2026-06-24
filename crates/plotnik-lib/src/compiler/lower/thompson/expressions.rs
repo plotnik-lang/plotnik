@@ -197,7 +197,7 @@ impl Compiler<'_> {
     /// - Uncaptured ref: `Call → exit` (def's Sets go to parent scope)
     pub(super) fn compile_ref(
         &mut self,
-        r: &ast::Ref,
+        r: &ast::DefRef,
         ctx: PatternCtx,
         field_override: Option<NonZeroU16>,
     ) -> Label {
@@ -316,7 +316,7 @@ impl Compiler<'_> {
 
         let node_field = self.resolve_field(field);
 
-        if let Pattern::Ref(r) = &value {
+        if let Pattern::DefRef(r) = &value {
             let value_ctx = PatternCtx {
                 exit,
                 nav: nav_override,

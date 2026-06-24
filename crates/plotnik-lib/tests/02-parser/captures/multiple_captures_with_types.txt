@@ -9,14 +9,14 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Tree
+      NamedNode
         ParenOpen "("
         Id "binary"
         Capture
           Field
             Id "left"
             Colon ":"
-            Tree
+            NamedNode
               ParenOpen "("
               Underscore "_"
               ParenClose ")"
@@ -28,7 +28,7 @@ Root
           Field
             Id "right"
             Colon ":"
-            Tree
+            NamedNode
               ParenOpen "("
               Underscore "_"
               ParenClose ")"

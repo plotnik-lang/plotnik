@@ -7,12 +7,12 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "statement"
       Hash "#"
       Id "expression_statement"
-      Tree
+      NamedNode
         ParenOpen "("
         Id "expression"
         Hash "#"

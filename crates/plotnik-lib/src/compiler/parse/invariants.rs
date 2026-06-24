@@ -2,7 +2,7 @@
 
 #![cfg_attr(coverage_nightly, coverage(off))]
 
-use super::core::Parser;
+use super::parser::Parser;
 use super::cst::SyntaxKind;
 
 impl Parser<'_, '_> {

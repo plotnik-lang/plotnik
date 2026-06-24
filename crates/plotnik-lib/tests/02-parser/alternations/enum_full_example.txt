@@ -13,13 +13,13 @@ Root
   Def
     Id "Expression"
     Equals "="
-    Alt
+    Alternation
       BracketOpen "["
       Branch
         Id "Ident"
         Colon ":"
         Capture
-          Tree
+          NamedNode
             ParenOpen "("
             Id "identifier"
             ParenClose ")"
@@ -31,7 +31,7 @@ Root
         Id "Num"
         Colon ":"
         Capture
-          Tree
+          NamedNode
             ParenOpen "("
             Id "number"
             ParenClose ")"
@@ -43,7 +43,7 @@ Root
         Id "Str"
         Colon ":"
         Capture
-          Tree
+          NamedNode
             ParenOpen "("
             Id "string"
             ParenClose ")"
@@ -54,14 +54,14 @@ Root
       Branch
         Id "Binary"
         Colon ":"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "binary_expression"
           Capture
             Field
               Id "left"
               Colon ":"
-              Ref
+              DefRef
                 ParenOpen "("
                 Id "Expression"
                 ParenClose ")"
@@ -70,7 +70,7 @@ Root
             Field
               Id "right"
               Colon ":"
-              Ref
+              DefRef
                 ParenOpen "("
                 Id "Expression"
                 ParenClose ")"

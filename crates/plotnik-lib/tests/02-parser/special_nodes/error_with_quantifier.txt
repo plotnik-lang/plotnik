@@ -6,7 +6,7 @@ Root
     Id "Q"
     Equals "="
     Quantifier
-      Tree
+      NamedNode
         ParenOpen "("
         KwError "ERROR"
         ParenClose ")"

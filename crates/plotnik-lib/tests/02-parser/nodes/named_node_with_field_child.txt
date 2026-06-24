@@ -5,13 +5,13 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "function_definition"
       Field
         Id "name"
         Colon ":"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "identifier"
           ParenClose ")"

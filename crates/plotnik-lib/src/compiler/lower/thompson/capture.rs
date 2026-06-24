@@ -203,7 +203,7 @@ impl Compiler<'_> {
     /// the structured result (Enum/Struct/Array) pending for Set to consume.
     pub(super) fn is_ref_returning_structured(&self, pattern: &Pattern) -> bool {
         match pattern {
-            Pattern::Ref(_) => self.ctx.type_ctx.ref_returns_structured(
+            Pattern::DefRef(_) => self.ctx.type_ctx.ref_returns_structured(
                 pattern,
                 self.ctx.dependency_analysis,
                 self.ctx.interner,

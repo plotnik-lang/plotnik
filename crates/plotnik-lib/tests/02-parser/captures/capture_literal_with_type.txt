@@ -8,7 +8,7 @@ Root
     Capture
       Str
         DoubleQuote "\""
-        StrVal "return"
+        StringContent "return"
         DoubleQuote "\""
       CaptureToken "@kw"
       TypeAnnotation

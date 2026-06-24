@@ -9,19 +9,19 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Alt
+      Alternation
         BracketOpen "["
         Branch
           Id "Assign"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "assignment_expression"
             Capture
               Field
                 Id "left"
                 Colon ":"
-                Tree
+                NamedNode
                   ParenOpen "("
                   Id "identifier"
                   ParenClose ")"
@@ -30,14 +30,14 @@ Root
         Branch
           Id "Call"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "call_expression"
             Capture
               Field
                 Id "function"
                 Colon ":"
-                Tree
+                NamedNode
                   ParenOpen "("
                   Id "identifier"
                   ParenClose ")"

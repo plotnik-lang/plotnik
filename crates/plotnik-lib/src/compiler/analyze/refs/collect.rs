@@ -4,8 +4,8 @@ use indexmap::IndexSet;
 
 use crate::compiler::parse::ast::{self, Pattern};
 
-pub fn ref_nodes(pattern: &Pattern) -> impl Iterator<Item = ast::Ref> + '_ {
-    pattern.syntax().descendants().filter_map(ast::Ref::cast)
+pub fn ref_nodes(pattern: &Pattern) -> impl Iterator<Item = ast::DefRef> + '_ {
+    pattern.syntax().descendants().filter_map(ast::DefRef::cast)
 }
 
 pub fn ref_names(pattern: &Pattern) -> IndexSet<String> {

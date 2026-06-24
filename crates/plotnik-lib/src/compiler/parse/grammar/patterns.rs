@@ -101,17 +101,17 @@ impl Parser<'_, '_> {
 
         let kind = self.current();
         match kind {
-            SyntaxKind::ParenOpen => self.parse_tree(),
-            SyntaxKind::BracketOpen => self.parse_alt(),
-            SyntaxKind::BraceOpen => self.parse_seq(),
+            SyntaxKind::ParenOpen => self.parse_named_node(),
+            SyntaxKind::BracketOpen => self.parse_alternation(),
+            SyntaxKind::BraceOpen => self.parse_sequence(),
             SyntaxKind::Underscore => self.parse_wildcard(),
-            SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => self.parse_str(),
+            SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => self.parse_string_pattern(),
             SyntaxKind::UnterminatedString => {
                 self.error_and_bump(DiagnosticKind::UnclosedString);
             }
             SyntaxKind::Dot | SyntaxKind::DotBang => self.parse_anchor(),
             SyntaxKind::Negation | SyntaxKind::Minus => self.parse_negated_field(),
-            SyntaxKind::Id => self.parse_tree_or_field(),
+            SyntaxKind::Id => self.parse_id_or_field(),
             SyntaxKind::KwError | SyntaxKind::KwMissing => {
                 self.error_and_bump(DiagnosticKind::ErrorMissingOutsideParens);
             }

@@ -8,22 +8,22 @@ Root
   Def
     Id "Q"
     Equals "="
-    Seq
+    Sequence
       BraceOpen "{"
-      Alt
+      Alternation
         BracketOpen "["
         Branch
-          Tree
+          NamedNode
             ParenOpen "("
             Id "a"
             ParenClose ")"
         Branch
-          Tree
+          NamedNode
             ParenOpen "("
             Id "b"
             ParenClose ")"
         BracketClose "]"
-      Tree
+      NamedNode
         ParenOpen "("
         Id "c"
         ParenClose ")"

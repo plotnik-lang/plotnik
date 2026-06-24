@@ -145,7 +145,7 @@ impl<'a> Compiler<'a> {
             }
             Pattern::QuantifiedPattern(q) => self.compile_quantified(q, ctx),
             Pattern::FieldPattern(f) => self.compile_field(f, ctx),
-            Pattern::Ref(r) => self.compile_ref(r, ctx, None),
+            Pattern::DefRef(r) => self.compile_ref(r, ctx, None),
         }
     }
 }

@@ -6,17 +6,17 @@ Root
   Def
     Id "Expr"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "identifier"
       ParenClose ")"
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "call"
-      Ref
+      DefRef
         ParenOpen "("
         Id "Expr"
         ParenClose ")"

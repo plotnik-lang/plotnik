@@ -5,24 +5,24 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "tuple"
       Anchor
         Dot "."
-      Tree
+      NamedNode
         ParenOpen "("
         Id "a"
         ParenClose ")"
       Anchor
         Dot "."
-      Tree
+      NamedNode
         ParenOpen "("
         Id "b"
         ParenClose ")"
       Anchor
         Dot "."
-      Tree
+      NamedNode
         ParenOpen "("
         Id "c"
         ParenClose ")"

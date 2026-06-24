@@ -8,12 +8,12 @@ Root
   Def
     Id "Q"
     Equals "="
-    Alt
+    Alternation
       BracketOpen "["
       Branch
         Id "Single"
         Colon ":"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "statement"
           ParenClose ")"
@@ -21,7 +21,7 @@ Root
         Id "Multiple"
         Colon ":"
         Quantifier
-          Tree
+          NamedNode
             ParenOpen "("
             Id "statement"
             ParenClose ")"

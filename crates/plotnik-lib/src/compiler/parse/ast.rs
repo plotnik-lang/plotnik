@@ -74,11 +74,11 @@ macro_rules! define_pattern {
         impl Pattern {
             pub fn cast(node: SyntaxNode) -> Option<Self> {
                 let kind = node.kind();
-                // `UnionPattern` and `EnumPattern` both wrap `SyntaxKind::Alt`;
+                // `UnionPattern` and `EnumPattern` both wrap `SyntaxKind::Alternation`;
                 // branch labels decide which. This is the one syntactic boundary
                 // where the two concepts still meet — a mixed alternation recovers
                 // as a union (its `MixedAltBranches` diagnostic is raised separately).
-                if kind == SyntaxKind::Alt {
+                if kind == SyntaxKind::Alternation {
                     return Some(match classify_alt(&node) {
                         AltKind::Enum => Pattern::Enum(EnumPattern(node)),
                         AltKind::Union | AltKind::Mixed => Pattern::Union(UnionPattern(node)),
@@ -117,35 +117,35 @@ impl Pattern {
             Pattern::FieldPattern(f) => f.value().into_iter().collect(),
             Pattern::Union(u) => u.branches().filter_map(|b| b.body()).collect(),
             Pattern::Enum(e) => e.branches().filter_map(|b| b.body()).collect(),
-            Pattern::Ref(_) | Pattern::TokenPattern(_) => vec![],
+            Pattern::DefRef(_) | Pattern::TokenPattern(_) => vec![],
         }
     }
 }
 
 ast_node!(Root, Root);
 ast_node!(Def, Def);
-ast_node!(NodePattern, Tree);
-ast_node!(Ref, Ref);
-// `UnionPattern` and `EnumPattern` both refine `SyntaxKind::Alt`, told apart
+ast_node!(NodePattern, NamedNode);
+ast_node!(DefRef, DefRef);
+// `UnionPattern` and `EnumPattern` both refine `SyntaxKind::Alternation`, told apart
 // only by their branch labels. A kind-only `cast`/`can_cast` (as `ast_node!`
 // generates) could not distinguish them — it would wrap an enum alternation as
 // a union and vice versa — so they are defined by hand without one.
 // Classification happens exactly once, in `Pattern::cast` (via `classify_alt`),
 // which is their sole constructor.
 
-/// Union alternation `[a b]`. A refinement of `SyntaxKind::Alt`,
+/// Union alternation `[a b]`. A refinement of `SyntaxKind::Alternation`,
 /// constructed only by `Pattern::cast` when no branch carries a label (mixed
 /// alternations recover here too; their `MixedAltBranches` diagnostic is raised
 /// separately).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnionPattern(SyntaxNode);
 
-/// Enum alternation `[A: a B: b]`. A refinement of `SyntaxKind::Alt`,
+/// Enum alternation `[A: a B: b]`. A refinement of `SyntaxKind::Alternation`,
 /// constructed only by `Pattern::cast` when every branch carries a label.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EnumPattern(SyntaxNode);
 ast_node!(Branch, Branch);
-ast_node!(SeqPattern, Seq);
+ast_node!(SeqPattern, Sequence);
 ast_node!(CapturedPattern, Capture);
 ast_node!(TypeAnnotation, TypeAnnotation);
 ast_node!(QuantifiedPattern, Quantifier);
@@ -197,7 +197,7 @@ impl TokenPattern {
         if self.0.kind() == SyntaxKind::Wildcard {
             return None;
         }
-        find_token(&self.0, |k| k == SyntaxKind::StrVal)
+        find_token(&self.0, |k| k == SyntaxKind::StringContent)
     }
 
     pub fn is_any(&self) -> bool {
@@ -292,12 +292,12 @@ impl QuantifierKind {
 
 /// Syntactic quantifier greediness parsed from a quantifier token.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum QuantifierGreediness {
+pub enum Greediness {
     Greedy,
     NonGreedy,
 }
 
-impl QuantifierGreediness {
+impl Greediness {
     pub fn is_greedy(self) -> bool {
         matches!(self, Self::Greedy)
     }
@@ -307,11 +307,11 @@ impl QuantifierGreediness {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct QuantifierOperator {
     kind: QuantifierKind,
-    greediness: QuantifierGreediness,
+    greediness: Greediness,
 }
 
 impl QuantifierOperator {
-    pub fn new(kind: QuantifierKind, greediness: QuantifierGreediness) -> Self {
+    pub fn new(kind: QuantifierKind, greediness: Greediness) -> Self {
         Self { kind, greediness }
     }
 
@@ -327,22 +327,22 @@ impl QuantifierOperator {
 fn quantifier_operator_from_syntax_kind(kind: SyntaxKind) -> Option<QuantifierOperator> {
     Some(match kind {
         SyntaxKind::Question => {
-            QuantifierOperator::new(QuantifierKind::Optional, QuantifierGreediness::Greedy)
+            QuantifierOperator::new(QuantifierKind::Optional, Greediness::Greedy)
         }
         SyntaxKind::QuestionQuestion => {
-            QuantifierOperator::new(QuantifierKind::Optional, QuantifierGreediness::NonGreedy)
+            QuantifierOperator::new(QuantifierKind::Optional, Greediness::NonGreedy)
         }
         SyntaxKind::Star => {
-            QuantifierOperator::new(QuantifierKind::ZeroOrMore, QuantifierGreediness::Greedy)
+            QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::Greedy)
         }
         SyntaxKind::StarQuestion => {
-            QuantifierOperator::new(QuantifierKind::ZeroOrMore, QuantifierGreediness::NonGreedy)
+            QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::NonGreedy)
         }
         SyntaxKind::Plus => {
-            QuantifierOperator::new(QuantifierKind::OneOrMore, QuantifierGreediness::Greedy)
+            QuantifierOperator::new(QuantifierKind::OneOrMore, Greediness::Greedy)
         }
         SyntaxKind::PlusQuestion => {
-            QuantifierOperator::new(QuantifierKind::OneOrMore, QuantifierGreediness::NonGreedy)
+            QuantifierOperator::new(QuantifierKind::OneOrMore, Greediness::NonGreedy)
         }
         _ => return None,
     })
@@ -350,7 +350,7 @@ fn quantifier_operator_from_syntax_kind(kind: SyntaxKind) -> Option<QuantifierOp
 
 define_pattern!(
     NodePattern,
-    Ref,
+    DefRef,
     TokenPattern,
     SeqPattern,
     CapturedPattern,
@@ -438,7 +438,7 @@ impl NodePredicate {
     }
 
     pub fn string_value(&self) -> Option<SyntaxToken> {
-        find_token(&self.0, |k| k == SyntaxKind::StrVal)
+        find_token(&self.0, |k| k == SyntaxKind::StringContent)
     }
 
     pub fn regex(&self) -> Option<RegexLiteral> {
@@ -459,7 +459,7 @@ impl RegexLiteral {
     }
 }
 
-impl Ref {
+impl DefRef {
     pub fn name(&self) -> Option<SyntaxToken> {
         find_token(&self.0, |k| k == SyntaxKind::Id)
     }

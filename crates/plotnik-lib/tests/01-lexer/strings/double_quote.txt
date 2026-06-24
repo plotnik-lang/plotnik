@@ -1,8 +1,8 @@
 "hello" "world"
 ==== tokens ====
 DoubleQuote "\""
-StrVal "hello"
+StringContent "hello"
 DoubleQuote "\""
 DoubleQuote "\""
-StrVal "world"
+StringContent "world"
 DoubleQuote "\""

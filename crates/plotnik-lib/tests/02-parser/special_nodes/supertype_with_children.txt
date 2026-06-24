@@ -21,7 +21,7 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "expression"
       Slash "/"
@@ -30,7 +30,7 @@ Root
         Field
           Id "left"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Underscore "_"
             ParenClose ")"
@@ -39,7 +39,7 @@ Root
         Field
           Id "right"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Underscore "_"
             ParenClose ")"

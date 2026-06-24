@@ -13,13 +13,13 @@ Root
   Def
     Id "Test"
     Equals "="
-    Seq
+    Sequence
       ParenOpen "("
-      Tree
+      NamedNode
         ParenOpen "("
         Id "a"
         ParenClose ")"
-      Tree
+      NamedNode
         ParenOpen "("
         Id "b"
         ParenClose ")"

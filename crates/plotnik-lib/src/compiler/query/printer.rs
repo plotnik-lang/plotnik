@@ -299,7 +299,7 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
                 }
                 self.format_tree_children(n.syntax(), depth + 1)?;
             }
-            ast::Pattern::Ref(r) => {
+            ast::Pattern::DefRef(r) => {
                 let name = r.name().map(|t| t.text().to_string()).unwrap_or_default();
                 writeln!(self.w, "{}Ref{}{} {}", prefix, arity, span, name)?;
             }

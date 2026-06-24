@@ -20,7 +20,7 @@ pub fn validate_alt_kinds(input: ValidationInput) {
     } = input;
 
     for node in ast.syntax().descendants() {
-        if node.kind() != SyntaxKind::Alt || classify_alt(&node) != AltKind::Mixed {
+        if node.kind() != SyntaxKind::Alternation || classify_alt(&node) != AltKind::Mixed {
             continue;
         }
 

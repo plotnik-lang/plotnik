@@ -8,18 +8,18 @@ Root
   Def
     Id "Q"
     Equals "="
-    Seq
+    Sequence
       BraceOpen "{"
       Capture
         Quantifier
-          Tree
+          NamedNode
             ParenOpen "("
             Id "comment"
             ParenClose ")"
           Star "*"
         CaptureToken "@comments"
       Capture
-        Tree
+        NamedNode
           ParenOpen "("
           Id "function"
           ParenClose ")"

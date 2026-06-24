@@ -8,17 +8,17 @@ Root
   Def
     Id "Q"
     Equals "="
-    Alt
+    Alternation
       BracketOpen "["
       Branch
         Str
           DoubleQuote "\""
-          StrVal "true"
+          StringContent "true"
           DoubleQuote "\""
       Branch
         Str
           DoubleQuote "\""
-          StrVal "false"
+          StringContent "false"
           DoubleQuote "\""
       BracketClose "]"
 ==== ast ====

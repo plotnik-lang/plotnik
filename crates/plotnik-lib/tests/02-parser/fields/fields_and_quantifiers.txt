@@ -12,14 +12,14 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "node"
       Quantifier
         Field
           Id "foo"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "foo"
             ParenClose ")"
@@ -28,7 +28,7 @@ Root
         Field
           Id "foo"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "foo"
             ParenClose ")"
@@ -37,7 +37,7 @@ Root
         Field
           Id "bar"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "bar"
             ParenClose ")"
@@ -46,7 +46,7 @@ Root
         Field
           Id "bar"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "bar"
             ParenClose ")"
@@ -55,7 +55,7 @@ Root
         Field
           Id "baz"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "baz"
             ParenClose ")"
@@ -64,7 +64,7 @@ Root
         Field
           Id "baz"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "baz"
             ParenClose ")"

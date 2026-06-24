@@ -7,7 +7,7 @@ Root
     Equals "="
     Capture
       Quantifier
-        Tree
+        NamedNode
           ParenOpen "("
           Id "statement"
           ParenClose ")"

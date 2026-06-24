@@ -7,7 +7,7 @@ use std::collections::HashSet;
 
 use crate::bytecode::Nav;
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::parse::ast::{Pattern, Ref, SeqItem};
+use crate::compiler::parse::ast::{Pattern, DefRef, SeqItem};
 
 /// Classifies whether expressions may match anonymous nodes after syntactic wrappers.
 pub struct AnonymousClassifier<'a> {
@@ -61,12 +61,12 @@ impl<'a> AnonymousClassifier<'a> {
             Pattern::SeqPattern(seq) => seq
                 .children()
                 .any(|child| self.expr_may_match_anonymous_inner(&child, visited)),
-            Pattern::Ref(r) => self.ref_may_match_anonymous(r, visited),
+            Pattern::DefRef(r) => self.ref_may_match_anonymous(r, visited),
             Pattern::NodePattern(_) => false,
         }
     }
 
-    fn ref_may_match_anonymous(&self, r: &Ref, visited: &mut HashSet<String>) -> bool {
+    fn ref_may_match_anonymous(&self, r: &DefRef, visited: &mut HashSet<String>) -> bool {
         let Some(name_token) = r.name() else {
             return false;
         };

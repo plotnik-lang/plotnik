@@ -9,13 +9,13 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Alt
+      Alternation
         BracketOpen "["
         Branch
           Id "Base"
           Colon ":"
           Capture
-            Tree
+            NamedNode
               ParenOpen "("
               Id "identifier"
               ParenClose ")"
@@ -23,14 +23,14 @@ Root
         Branch
           Id "Access"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "member_expression"
             Capture
               Field
                 Id "object"
                 Colon ":"
-                Tree
+                NamedNode
                   ParenOpen "("
                   Underscore "_"
                   ParenClose ")"

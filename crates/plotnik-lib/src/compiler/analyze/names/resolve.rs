@@ -77,7 +77,7 @@ struct ReferenceValidator<'d, 'a> {
 }
 
 impl Visitor for ReferenceValidator<'_, '_> {
-    fn visit_ref(&mut self, r: &Located<ast::Ref>) {
+    fn visit_def_ref(&mut self, r: &Located<ast::DefRef>) {
         let Some(name_token) = r.node().name() else {
             return;
         };

@@ -12,14 +12,14 @@ impl Parser<'_, '_> {
     }
 
     /// `"if"` | `'+'`
-    pub(crate) fn parse_str(&mut self) {
+    pub(crate) fn parse_string_pattern(&mut self) {
         let start = self.current_span().start();
         self.start_node(SyntaxKind::Str);
 
         let open_quote = self.current();
         self.bump();
 
-        let has_content = self.at(SyntaxKind::StrVal);
+        let has_content = self.at(SyntaxKind::StringContent);
         if has_content {
             self.bump();
         }
@@ -27,7 +27,7 @@ impl Parser<'_, '_> {
         let closing = self.current();
         assert_eq!(
             closing, open_quote,
-            "parse_str: expected closing {:?} but found {:?} \
+            "parse_string_pattern: expected closing {:?} but found {:?} \
              (lexer should only produce quote tokens from complete strings)",
             open_quote, closing
         );
@@ -48,18 +48,18 @@ impl Parser<'_, '_> {
 
     /// Consume string tokens (quote + optional content + quote) without creating a node.
     /// Used for contexts where string appears as a raw value (supertype, MISSING arg).
-    pub(crate) fn bump_string_tokens(&mut self) {
+    pub(crate) fn skip_string_tokens(&mut self) {
         let open_quote = self.current();
         self.bump();
 
-        if self.at(SyntaxKind::StrVal) {
+        if self.at(SyntaxKind::StringContent) {
             self.bump();
         }
 
         let closing = self.current();
         assert_eq!(
             closing, open_quote,
-            "bump_string_tokens: expected closing {:?} but found {:?} \
+            "skip_string_tokens: expected closing {:?} but found {:?} \
              (lexer should only produce quote tokens from complete strings)",
             open_quote, closing
         );

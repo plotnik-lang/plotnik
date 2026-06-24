@@ -5,16 +5,16 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "a"
-      Tree
+      NamedNode
         ParenOpen "("
         Id "b"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "c"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "d"
             ParenClose ")"

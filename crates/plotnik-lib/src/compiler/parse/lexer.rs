@@ -146,7 +146,7 @@ fn split_string_literal(lexeme: Lexeme<'_>, tokens: &mut Vec<Token>) {
 
     if end - start > 2 {
         tokens.push(Token::new(
-            SyntaxKind::StrVal,
+            SyntaxKind::StringContent,
             range_to_text_range(start + 1..end - 1),
         ));
     }

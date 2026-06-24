@@ -14,11 +14,11 @@ use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::Error;
 
 #[derive(Debug)]
-pub struct ParseResult {
+pub struct ParsedRoot {
     ast: Root,
 }
 
-impl ParseResult {
+impl ParsedRoot {
     pub fn into_ast(self) -> Root {
         self.ast
     }
@@ -89,11 +89,11 @@ impl<'q, 'd> Parser<'q, 'd> {
         }
     }
 
-    pub fn parse(mut self) -> Result<ParseResult, Error> {
+    pub fn parse(mut self) -> Result<ParsedRoot, Error> {
         self.parse_root();
         let cst = self.finish()?;
         let root = Root::cast(SyntaxNode::new_root(cst)).expect("parser always produces Root");
-        Ok(ParseResult { ast: root })
+        Ok(ParsedRoot { ast: root })
     }
 
     fn finish(mut self) -> Result<GreenNode, Error> {

@@ -1,4 +1,4 @@
-use super::ast::{QuantifierGreediness, QuantifierKind, QuantifierOperator};
+use super::ast::{Greediness, QuantifierKind, QuantifierOperator};
 use crate::compiler::Query;
 
 #[test]
@@ -19,7 +19,7 @@ fn is_non_empty() {
 
 #[test]
 fn operator_tracks_arity_and_greediness() {
-    let op = QuantifierOperator::new(QuantifierKind::ZeroOrMore, QuantifierGreediness::NonGreedy);
+    let op = QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::NonGreedy);
 
     assert_eq!(op.kind(), QuantifierKind::ZeroOrMore);
     assert!(!op.is_greedy());

@@ -114,7 +114,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 let inner_located = located.wrap(inner);
                 self.check_pattern_grammar(&inner_located, ctx, GrammarCheckMode::Deferred, walk);
             }
-            Pattern::Ref(r) => {
+            Pattern::DefRef(r) => {
                 let Some(name_token) = r.name() else { return };
                 let name = name_token.text();
                 // Validation is a pure function of `(name, ctx, mode)`, so caching it
@@ -339,7 +339,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             | Pattern::Union(_)
             | Pattern::Enum(_)
             | Pattern::QuantifiedPattern(_)
-            | Pattern::Ref(_)
+            | Pattern::DefRef(_)
             | Pattern::FieldPattern(_) => {}
         }
     }
@@ -404,7 +404,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             Pattern::Union(_)
             | Pattern::Enum(_)
             | Pattern::QuantifiedPattern(_)
-            | Pattern::Ref(_)
+            | Pattern::DefRef(_)
             | Pattern::SeqPattern(_)
             | Pattern::FieldPattern(_) => {}
         }

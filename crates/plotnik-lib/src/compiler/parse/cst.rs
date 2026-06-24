@@ -105,7 +105,7 @@ pub enum SyntaxKind {
 
     DoubleQuote,
     SingleQuote,
-    StrVal,
+    StringContent,
 
     #[token("ERROR")]
     KwError,
@@ -196,15 +196,15 @@ pub enum SyntaxKind {
     Error,
 
     Root,
-    Tree,
-    Ref,
+    NamedNode,
+    DefRef,
     Str,
     Field,
     Capture,
     TypeAnnotation,
     Quantifier,
-    Seq,
-    Alt,
+    Sequence,
+    Alternation,
     Branch,
     Wildcard,
     Anchor,

@@ -25,8 +25,8 @@ use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{
-    Branch, CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern,
-    Ref, SeqPattern, TokenPattern, UnionPattern, is_empty_group,
+    Branch, CapturedPattern, DefRef, EnumPattern, FieldPattern, NodePattern, Pattern,
+    QuantifiedPattern, SeqPattern, TokenPattern, UnionPattern, is_empty_group,
 };
 
 mod diagnostics;
@@ -103,7 +103,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         match pattern.node() {
             Pattern::NodePattern(n) => self.infer_named_node(&pattern.wrap(n.clone())),
             Pattern::TokenPattern(n) => self.infer_anonymous_node(n),
-            Pattern::Ref(r) => self.infer_ref(r),
+            Pattern::DefRef(r) => self.infer_ref(r),
             Pattern::SeqPattern(s) => self.infer_seq_pattern(&pattern.wrap(s.clone())),
             Pattern::Union(u) => self.infer_union(&pattern.wrap(u.clone())),
             Pattern::Enum(e) => self.infer_enum(&pattern.wrap(e.clone())),
@@ -140,7 +140,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// SCC order (leaves first), so a non-recursive target is always computed before
     /// any referrer — the body is never re-walked, and its diagnostics stay attributed
     /// to its own definition's pass (and source).
-    fn infer_ref(&mut self, r: &Ref) -> PatternResult {
+    fn infer_ref(&mut self, r: &DefRef) -> PatternResult {
         let Some(name_tok) = r.name() else {
             return PatternResult::void();
         };
@@ -540,7 +540,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// If pattern is (or contains) a recursive Ref, return its Ref type.
     fn recursive_ref_type(&mut self, pattern: &Pattern) -> Option<TypeId> {
         match pattern {
-            Pattern::Ref(r) => {
+            Pattern::DefRef(r) => {
                 let name_tok = r.name()?;
                 let name = name_tok.text();
                 let sym = self.ctx.interner.intern(name);

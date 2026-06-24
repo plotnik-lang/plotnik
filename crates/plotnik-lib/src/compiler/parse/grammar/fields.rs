@@ -82,7 +82,7 @@ impl Parser<'_, '_> {
 
     /// Disambiguate `field: pattern` from bare identifier via LL(2) lookahead.
     /// Also handles `field = pattern` typo (should be `field: pattern`).
-    pub(crate) fn parse_tree_or_field(&mut self) {
+    pub(crate) fn parse_id_or_field(&mut self) {
         if self.next_is(SyntaxKind::Colon) {
             self.parse_field();
             return;

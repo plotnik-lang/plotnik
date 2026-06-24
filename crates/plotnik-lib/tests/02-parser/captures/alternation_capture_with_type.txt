@@ -9,15 +9,15 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Alt
+      Alternation
         BracketOpen "["
         Branch
-          Tree
+          NamedNode
             ParenOpen "("
             Id "identifier"
             ParenClose ")"
         Branch
-          Tree
+          NamedNode
             ParenOpen "("
             Id "number"
             ParenClose ")"

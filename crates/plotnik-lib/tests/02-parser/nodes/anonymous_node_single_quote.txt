@@ -5,12 +5,12 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "node"
       Str
         SingleQuote "'"
-        StrVal "if"
+        StringContent "if"
         SingleQuote "'"
       ParenClose ")"
 ==== ast ====

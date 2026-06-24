@@ -20,7 +20,7 @@
 
 use crate::compiler::analyze::Located;
 use crate::compiler::parse::ast::{
-    CapturedPattern, Def, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
+    CapturedPattern, Def, DefRef, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern,
     Root, SeqPattern, TokenPattern, UnionPattern,
 };
 
@@ -43,7 +43,7 @@ pub trait Visitor: Sized {
 
     fn visit_token_pattern(&mut self, _node: &Located<TokenPattern>) {}
 
-    fn visit_ref(&mut self, _ref: &Located<Ref>) {}
+    fn visit_def_ref(&mut self, _ref: &Located<DefRef>) {}
 
     fn visit_union_pattern(&mut self, union: &Located<UnionPattern>) {
         walk_union_pattern(self, union);
@@ -86,7 +86,7 @@ pub fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Located<Pattern>) {
     match pattern.node() {
         Pattern::NodePattern(n) => visitor.visit_node_pattern(&pattern.wrap(n.clone())),
         Pattern::TokenPattern(n) => visitor.visit_token_pattern(&pattern.wrap(n.clone())),
-        Pattern::Ref(r) => visitor.visit_ref(&pattern.wrap(r.clone())),
+        Pattern::DefRef(r) => visitor.visit_def_ref(&pattern.wrap(r.clone())),
         Pattern::Union(u) => visitor.visit_union_pattern(&pattern.wrap(u.clone())),
         Pattern::Enum(e) => visitor.visit_enum_pattern(&pattern.wrap(e.clone())),
         Pattern::SeqPattern(s) => visitor.visit_seq_pattern(&pattern.wrap(s.clone())),

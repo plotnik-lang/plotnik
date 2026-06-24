@@ -29,7 +29,7 @@ impl InferVisitor<'_, '_> {
     }
 
     fn referenced_definition_range(&self, value: &Pattern) -> Option<(SourceId, TextRange)> {
-        let Pattern::Ref(r) = value else {
+        let Pattern::DefRef(r) = value else {
             return None;
         };
         let name = r.name()?;

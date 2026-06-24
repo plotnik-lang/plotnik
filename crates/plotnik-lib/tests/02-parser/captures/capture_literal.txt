@@ -8,7 +8,7 @@ Root
     Capture
       Str
         DoubleQuote "\""
-        StrVal "foo"
+        StringContent "foo"
         DoubleQuote "\""
       CaptureToken "@keyword"
 ==== ast ====

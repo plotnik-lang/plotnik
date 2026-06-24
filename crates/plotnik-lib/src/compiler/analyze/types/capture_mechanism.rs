@@ -141,7 +141,7 @@ impl TypeAnalysis {
         interner: &Interner,
         mode: CaptureLookupMode,
     ) -> bool {
-        let Pattern::Ref(r) = pattern else {
+        let Pattern::DefRef(r) = pattern else {
             return false;
         };
         let Some(name) = r.name() else {

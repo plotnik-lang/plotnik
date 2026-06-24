@@ -9,18 +9,18 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "block"
-      Tree
+      NamedNode
         ParenOpen "("
         Id "statement"
         ParenClose ")"
-      Tree
+      NamedNode
         ParenOpen "("
         Id "statement"
         ParenClose ")"
-      Tree
+      NamedNode
         ParenOpen "("
         Id "statement"
         ParenClose ")"

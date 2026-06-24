@@ -18,12 +18,12 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "expression"
       Slash "/"
       DoubleQuote "\""
-      StrVal "()"
+      StringContent "()"
       DoubleQuote "\""
       ParenClose ")"
 ==== ast ====

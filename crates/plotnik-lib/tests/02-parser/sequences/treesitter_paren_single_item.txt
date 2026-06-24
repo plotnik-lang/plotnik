@@ -13,9 +13,9 @@ Root
   Def
     Id "Q"
     Equals "="
-    Seq
+    Sequence
       ParenOpen "("
-      Tree
+      NamedNode
         ParenOpen "("
         Id "expression_statement"
         ParenClose ")"

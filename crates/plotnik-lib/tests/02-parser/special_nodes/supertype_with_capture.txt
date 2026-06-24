@@ -19,7 +19,7 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Tree
+      NamedNode
         ParenOpen "("
         Id "expression"
         Slash "/"

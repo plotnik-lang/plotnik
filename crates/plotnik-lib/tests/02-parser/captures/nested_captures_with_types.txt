@@ -9,14 +9,14 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Tree
+      NamedNode
         ParenOpen "("
         Id "function"
         Capture
           Field
             Id "name"
             Colon ":"
-            Tree
+            NamedNode
               ParenOpen "("
               Id "identifier"
               ParenClose ")"
@@ -27,12 +27,12 @@ Root
         Field
           Id "body"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "block"
             Capture
               Quantifier
-                Tree
+                NamedNode
                   ParenOpen "("
                   Id "statement"
                   ParenClose ")"

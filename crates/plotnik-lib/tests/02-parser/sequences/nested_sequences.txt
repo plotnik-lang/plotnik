@@ -8,18 +8,18 @@ Root
   Def
     Id "Q"
     Equals "="
-    Seq
+    Sequence
       BraceOpen "{"
-      Seq
+      Sequence
         BraceOpen "{"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "a"
           ParenClose ")"
         BraceClose "}"
-      Seq
+      Sequence
         BraceOpen "{"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "b"
           ParenClose ")"

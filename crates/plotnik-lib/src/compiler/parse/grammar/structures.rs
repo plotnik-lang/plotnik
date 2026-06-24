@@ -10,7 +10,7 @@ use crate::compiler::parse::token_set::{
 
 use super::utils::{starts_uppercase, to_pascal_case};
 
-enum NodeHead<'q> {
+enum ParenHead<'q> {
     /// Concrete node kind: `(identifier ...)`.
     Concrete,
     /// PascalCase reference to a named definition: `(Name)`.
@@ -32,8 +32,8 @@ fn predicate_suggestion(name: &str) -> Option<&'static str> {
 impl<'q> Parser<'q, '_> {
     /// `(type ...)` | `(_ ...)` | `(ERROR)` | `(MISSING ...)` | `(RefName)`
     /// | `(pattern#subtype)` (native) | `(pattern/subtype)` (tree-sitter compat)
-    /// PascalCase without children → Ref; with children → error but parses as Tree.
-    pub(crate) fn parse_tree(&mut self) {
+    /// PascalCase without children → DefRef; with children → error but parses as Tree.
+    pub(crate) fn parse_named_node(&mut self) {
         let checkpoint = self.checkpoint();
         self.push_delimiter();
         let open_paren_span = self.current_span();
@@ -42,32 +42,32 @@ impl<'q> Parser<'q, '_> {
         let head = match self.current() {
             SyntaxKind::ParenClose => {
                 // Empty tree `()` - validation phase will report EmptyTree error
-                self.start_node_at(checkpoint, SyntaxKind::Tree);
-                NodeHead::Concrete
+                self.start_node_at(checkpoint, SyntaxKind::NamedNode);
+                ParenHead::Concrete
             }
             SyntaxKind::Underscore => {
-                self.start_node_at(checkpoint, SyntaxKind::Tree);
+                self.start_node_at(checkpoint, SyntaxKind::NamedNode);
                 self.bump();
-                NodeHead::Concrete
+                ParenHead::Concrete
             }
-            SyntaxKind::Id => self.parse_tree_ref_or_node(checkpoint),
+            SyntaxKind::Id => self.parse_id_ref_or_node(checkpoint),
             SyntaxKind::KwError => {
-                self.parse_tree_error(checkpoint);
+                self.parse_error_node(checkpoint);
                 return;
             }
             SyntaxKind::KwMissing => {
-                self.parse_tree_missing(checkpoint);
+                self.parse_missing_node(checkpoint);
                 return;
             }
             _ => {
                 if self.at_ts_predicate() {
-                    self.parse_tree_predicate(checkpoint);
+                    self.parse_node_predicate_error(checkpoint);
                     return;
                 }
                 // Tree-sitter style sequence: ((a) (b)) instead of {(a) (b)}
                 // Parse as Seq so it works correctly, but warn to encourage {} syntax
                 if self.at_ts(PATTERN_FIRST_TOKENS) {
-                    self.start_node_at(checkpoint, SyntaxKind::Seq);
+                    self.start_node_at(checkpoint, SyntaxKind::Sequence);
                     if let Some(report) = self.report_at(
                         DiagnosticKind::TreeSitterSequenceSyntaxDeprecated,
                         open_paren_span,
@@ -75,25 +75,25 @@ impl<'q> Parser<'q, '_> {
                         report.emit();
                     }
                 } else {
-                    self.start_node_at(checkpoint, SyntaxKind::Tree);
+                    self.start_node_at(checkpoint, SyntaxKind::NamedNode);
                 }
-                NodeHead::Concrete
+                ParenHead::Concrete
             }
         };
 
-        self.finish_tree_parsing(checkpoint, head);
+        self.finish_named_node_parsing(checkpoint, head);
     }
 
-    fn parse_tree_ref_or_node(&mut self, checkpoint: Checkpoint) -> NodeHead<'q> {
+    fn parse_id_ref_or_node(&mut self, checkpoint: Checkpoint) -> ParenHead<'q> {
         let name = self.current_text();
         let head_end = self.current_span().end();
         self.bump();
 
         let head = if starts_uppercase(name) {
-            NodeHead::DefRef(name)
+            ParenHead::DefRef(name)
         } else {
-            self.start_node_at(checkpoint, SyntaxKind::Tree);
-            NodeHead::Concrete
+            self.start_node_at(checkpoint, SyntaxKind::NamedNode);
+            ParenHead::Concrete
         };
 
         // A category separator binds only when tight against the node kind (tree-sitter
@@ -103,20 +103,20 @@ impl<'q> Parser<'q, '_> {
             && sep.span.start() == head_end
         {
             match head {
-                NodeHead::Concrete => {
+                ParenHead::Concrete => {
                     self.parse_concrete_category_refinement(sep.kind);
-                    NodeHead::Concrete
+                    ParenHead::Concrete
                 }
-                NodeHead::DefRef(_) => {
+                ParenHead::DefRef(_) => {
                     self.reject_ref_category_refinement(checkpoint, sep.kind);
-                    NodeHead::Concrete
+                    ParenHead::Concrete
                 }
             }
         } else {
             head
         };
 
-        if matches!(head, NodeHead::Concrete) && self.at_ts(PREDICATE_OPS) {
+        if matches!(head, ParenHead::Concrete) && self.at_ts(PREDICATE_OPS) {
             self.parse_node_predicate();
         }
 
@@ -153,7 +153,7 @@ impl<'q> Parser<'q, '_> {
     }
 
     fn reject_ref_category_refinement(&mut self, checkpoint: Checkpoint, sep: SyntaxKind) {
-        self.start_node_at(checkpoint, SyntaxKind::Tree);
+        self.start_node_at(checkpoint, SyntaxKind::NamedNode);
         if let Some(report) = self.report_current(DiagnosticKind::InvalidSupertypeSyntax) {
             report.emit();
         }
@@ -178,7 +178,7 @@ impl<'q> Parser<'q, '_> {
                 true
             }
             Some(SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote) if tight => {
-                self.bump_string_tokens();
+                self.skip_string_tokens();
                 true
             }
             _ => false,
@@ -241,7 +241,7 @@ impl<'q> Parser<'q, '_> {
     /// already consumed; swallow the predicate name and its arguments through the predicate's own
     /// closing `)` into one Error node, so the arguments don't cascade into bogus child
     /// diagnostics. Only call when [`at_ts_predicate`] holds.
-    fn parse_tree_predicate(&mut self, checkpoint: Checkpoint) {
+    fn parse_node_predicate_error(&mut self, checkpoint: Checkpoint) {
         self.start_node_at(checkpoint, SyntaxKind::Error);
         let (span, name) = self.consume_predicate_name();
         self.report_unsupported_predicate(span, name);
@@ -296,7 +296,7 @@ impl<'q> Parser<'q, '_> {
 
         match self.current() {
             SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => {
-                self.bump_string_tokens();
+                self.skip_string_tokens();
             }
             SyntaxKind::UnterminatedString => {
                 self.error_and_bump(DiagnosticKind::UnclosedString);
@@ -366,8 +366,8 @@ impl<'q> Parser<'q, '_> {
         self.finish_node();
     }
 
-    fn parse_tree_error(&mut self, checkpoint: Checkpoint) {
-        self.start_node_at(checkpoint, SyntaxKind::Tree);
+    fn parse_error_node(&mut self, checkpoint: Checkpoint) {
+        self.start_node_at(checkpoint, SyntaxKind::NamedNode);
         self.bump();
         if !self.at(SyntaxKind::ParenClose) {
             let children_start = self.current_span().start();
@@ -385,15 +385,15 @@ impl<'q> Parser<'q, '_> {
         self.finish_node();
     }
 
-    fn parse_tree_missing(&mut self, checkpoint: Checkpoint) {
-        self.start_node_at(checkpoint, SyntaxKind::Tree);
+    fn parse_missing_node(&mut self, checkpoint: Checkpoint) {
+        self.start_node_at(checkpoint, SyntaxKind::NamedNode);
         self.bump();
         match self.current() {
             SyntaxKind::Id => {
                 self.bump();
             }
             SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => {
-                self.bump_string_tokens();
+                self.skip_string_tokens();
             }
             SyntaxKind::ParenClose => {}
             _ => {
@@ -405,12 +405,12 @@ impl<'q> Parser<'q, '_> {
         self.finish_node();
     }
 
-    fn finish_tree_parsing(&mut self, checkpoint: Checkpoint, head: NodeHead<'q>) {
+    fn finish_named_node_parsing(&mut self, checkpoint: Checkpoint, head: ParenHead<'q>) {
         let has_children = !self.at(SyntaxKind::ParenClose);
 
         let what = match head {
-            NodeHead::DefRef(name) if has_children => {
-                self.start_node_at(checkpoint, SyntaxKind::Tree);
+            ParenHead::DefRef(name) if has_children => {
+                self.start_node_at(checkpoint, SyntaxKind::NamedNode);
                 let children_start = self.current_span().start();
                 self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY_TOKENS);
                 let children_end = self.last_non_trivia_end().unwrap_or(children_start);
@@ -423,11 +423,11 @@ impl<'q> Parser<'q, '_> {
                 }
                 "closing ')' for tree"
             }
-            NodeHead::DefRef(_) => {
-                self.start_node_at(checkpoint, SyntaxKind::Ref);
+            ParenHead::DefRef(_) => {
+                self.start_node_at(checkpoint, SyntaxKind::DefRef);
                 "closing ')' for reference"
             }
-            NodeHead::Concrete => {
+            ParenHead::Concrete => {
                 self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY_TOKENS);
                 "closing ')' for tree"
             }
@@ -480,20 +480,20 @@ impl<'q> Parser<'q, '_> {
     }
 
     /// Alternation/choice: `[expr1 expr2 ...]` or `[Label: pattern ...]`
-    pub(crate) fn parse_alt(&mut self) {
-        self.start_node(SyntaxKind::Alt);
+    pub(crate) fn parse_alternation(&mut self) {
+        self.start_node(SyntaxKind::Alternation);
         self.push_delimiter();
         self.assert_current(SyntaxKind::BracketOpen);
         self.bump();
 
-        self.parse_alt_children();
+        self.parse_alternation_children();
 
         self.pop_delimiter();
         self.expect(SyntaxKind::BracketClose, "closing ']' for alternation");
         self.finish_node();
     }
 
-    fn parse_alt_children(&mut self) {
+    fn parse_alternation_children(&mut self) {
         loop {
             if self.eof() {
                 self.error_unclosed_at_eof(DiagnosticKind::UnclosedAlternation, "alternation");
@@ -578,8 +578,8 @@ impl<'q> Parser<'q, '_> {
     }
 
     /// Sibling sequence: `{expr1 expr2 ...}`
-    pub(crate) fn parse_seq(&mut self) {
-        self.start_node(SyntaxKind::Seq);
+    pub(crate) fn parse_sequence(&mut self) {
+        self.start_node(SyntaxKind::Sequence);
         self.push_delimiter();
         self.assert_current(SyntaxKind::BraceOpen);
         self.bump();
