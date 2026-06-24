@@ -56,7 +56,6 @@ pub struct Checkpoint {
     pub(crate) max_frame_idx_below: Option<u32>,
 }
 
-#[allow(dead_code)] // Getters useful for debugging/tracing
 impl Checkpoint {
     /// Create a plain (branch alternative) checkpoint that resumes at `ip`.
     pub fn branch(state: CheckpointState, ip: u16) -> Self {
@@ -78,29 +77,6 @@ impl Checkpoint {
             call_resume: Some(call_resume),
             max_frame_idx_below: None,
         }
-    }
-
-    pub fn state(&self) -> CheckpointState {
-        self.state
-    }
-
-    pub fn descendant_index(&self) -> u32 {
-        self.state.descendant_index
-    }
-    pub fn effect_watermark(&self) -> usize {
-        self.state.effect_watermark
-    }
-    pub fn frame_index(&self) -> Option<u32> {
-        self.state.frame_index
-    }
-    pub fn recursion_depth(&self) -> u32 {
-        self.state.recursion_depth
-    }
-    pub fn ip(&self) -> u16 {
-        self.ip
-    }
-    pub fn suppress_depth(&self) -> u16 {
-        self.state.suppress_depth
     }
 }
 

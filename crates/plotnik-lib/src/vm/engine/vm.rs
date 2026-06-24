@@ -82,10 +82,6 @@ impl ExecLimits {
         self.recursion_limit = limit;
         self
     }
-
-    pub fn get_recursion_limit(&self) -> u32 {
-        self.recursion_limit
-    }
 }
 
 /// Virtual machine state for query execution.

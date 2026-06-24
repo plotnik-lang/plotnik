@@ -41,7 +41,7 @@ fn check_sequence(frames: &[Option<u32>]) {
     }
 
     while !live.is_empty() {
-        let popped = stack.pop().expect("non-empty").frame_index();
+        let popped = stack.pop().expect("non-empty").state.frame_index;
         let expected = live.pop().unwrap();
         assert_eq!(popped, expected, "pop returned the wrong checkpoint");
         assert_eq!(
