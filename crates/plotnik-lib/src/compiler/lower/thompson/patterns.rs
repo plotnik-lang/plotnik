@@ -214,8 +214,9 @@ impl NfaBuilder<'_> {
 
         let def_id = self
             .ctx
+            .analysis
             .dependency_analysis
-            .def_id_for_name(self.ctx.interner, name)
+            .def_id_for_name(self.ctx.analysis.interner, name)
             .expect("analyzed reference must resolve to a definition");
 
         // Inside the trust boundary: `def_id_for_name` only yields DefIds for
@@ -228,8 +229,12 @@ impl NfaBuilder<'_> {
             .expect("every analyzed DefId has a def_entries label");
         let callee = CalleeEntry(target);
 
-        let def_output_id = self.ctx.type_ctx.expect_def_output(def_id);
-        let def_output_shape = self.ctx.type_ctx.expect_type_shape(def_output_id);
+        let def_output_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let def_output_shape = self
+            .ctx
+            .analysis
+            .type_analysis
+            .expect_type_shape(def_output_id);
         let is_captured = !capture.post.is_empty();
         let lowering = self.ref_call_lowering(def_id, def_output_shape, is_captured);
 
@@ -300,7 +305,13 @@ impl NfaBuilder<'_> {
         // is the exception — inference forwards its enum value — so only the rest is
         // suppressed.
         let ref_returns_enum = matches!(def_output_shape, TypeShape::Enum(_));
-        if self.ctx.dependency_analysis.is_recursive_def(def_id) && !ref_returns_enum {
+        if self
+            .ctx
+            .analysis
+            .dependency_analysis
+            .is_recursive_def(def_id)
+            && !ref_returns_enum
+        {
             return RefLowering::SuppressedOpaqueRecursion;
         }
 
@@ -461,9 +472,11 @@ impl NfaBuilder<'_> {
         // read it, so the declared type and the emitted effects can't disagree
         // (#420). `None` is a bare capture (`@x`), which captures the matched node.
         let mechanism = inner_opt.as_ref().map(|inner| {
-            self.ctx
-                .type_ctx
-                .capture_kind(inner, self.ctx.dependency_analysis, self.ctx.interner)
+            self.ctx.analysis.type_analysis.capture_kind(
+                inner,
+                self.ctx.analysis.dependency_analysis,
+                self.ctx.analysis.interner,
+            )
         });
 
         let (Some(inner), Some(mechanism)) = (inner_opt, mechanism) else {
@@ -570,7 +583,8 @@ impl NfaBuilder<'_> {
     fn compile_node_capture(&mut self, req: CaptureRequest<'_>, exit: Label) -> Label {
         let inner_is_bubble = self
             .ctx
-            .type_ctx
+            .analysis
+            .type_analysis
             .expect_pattern_result(req.inner)
             .flow
             .has_fields();
@@ -671,10 +685,11 @@ impl NfaBuilder<'_> {
     pub(super) fn resolve_anonymous_node_kind(&mut self, text: &str) -> NodeKindConstraint {
         let sym = self
             .ctx
+            .analysis
             .interner
             .get(text)
             .expect("linked anonymous token must be interned");
-        NodeKindConstraint::Anonymous(Some(self.ctx.grammar.expect_anonymous_kind(sym)))
+        NodeKindConstraint::Anonymous(Some(self.ctx.analysis.grammar.expect_anonymous_kind(sym)))
     }
 
     /// Resolve a NodePattern to its node kind constraint.
@@ -700,10 +715,11 @@ impl NfaBuilder<'_> {
 
         let sym = self
             .ctx
+            .analysis
             .interner
             .get(type_name)
             .expect("linked named node kind must be interned");
-        NodeKindConstraint::Named(Some(self.ctx.grammar.expect_named_kind(sym)))
+        NodeKindConstraint::Named(Some(self.ctx.analysis.grammar.expect_named_kind(sym)))
     }
 
     /// Resolve a field pattern to its grammar `NodeFieldId`.
@@ -719,10 +735,11 @@ impl NfaBuilder<'_> {
     pub(super) fn resolve_field_by_name(&mut self, field_name: &str) -> NodeFieldId {
         let sym = self
             .ctx
+            .analysis
             .interner
             .get(field_name)
             .expect("linked field name must be interned");
-        self.ctx.grammar.expect_field(sym)
+        self.ctx.analysis.grammar.expect_field(sym)
     }
 
     pub(super) fn collect_neg_fields(&mut self, node: &ast::NodePattern) -> Vec<NodeFieldId> {

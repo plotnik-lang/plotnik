@@ -15,20 +15,21 @@ pub(in crate::compiler) mod tables;
 #[cfg(test)]
 mod build_regexes_tests;
 
+use crate::compiler::AnalysisInput;
 use crate::compiler::emit::build_regexes::build_regexes;
 use crate::compiler::emit::build_types::build_types;
 use crate::compiler::emit::instructions::emit_instructions;
 use crate::compiler::emit::layout::compute_layout;
 use crate::compiler::emit::module::EmitPipeline;
 use crate::compiler::emit::seed_strings::seed_strings;
-use crate::compiler::emit::tables::{ConstantPool, EmitError, EmitInput};
+use crate::compiler::emit::tables::{ConstantPool, EmitError};
 use crate::compiler::lower::ir::LoweredNfa;
 
 /// Emit bytecode without the debug load self-check. Used by callers that load
 /// the bytecode themselves (e.g. `check`'s dry run) and want a malformed-bytecode
 /// case to surface as a diagnostic rather than the debug panic in [`emit`].
 pub(in crate::compiler) fn emit_unchecked(
-    input: EmitInput<'_>,
+    input: AnalysisInput<'_>,
     lowered_ir: &LoweredNfa,
 ) -> Result<Vec<u8>, EmitError> {
     let nfa = lowered_ir.raw();
@@ -59,7 +60,7 @@ pub(in crate::compiler) fn emit_unchecked(
 /// bytecode itself and reports a rejection as a diagnostic, so it must never
 /// reach this panic, in debug or release.
 pub(in crate::compiler) fn emit(
-    input: EmitInput<'_>,
+    input: AnalysisInput<'_>,
     lowered_ir: &LoweredNfa,
 ) -> Result<Vec<u8>, EmitError> {
     let output = emit_unchecked(input, lowered_ir)?;

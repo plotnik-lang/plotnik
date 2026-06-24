@@ -107,9 +107,9 @@ impl NfaBuilder<'_> {
 
     /// Returns a `MemberRef` keyed by (struct_type, relative_index).
     pub(super) fn lookup_member(&self, capture_name: &str, type_id: TypeId) -> Option<MemberRef> {
-        let fields = self.ctx.type_ctx.struct_fields(type_id)?;
+        let fields = self.ctx.analysis.type_analysis.struct_fields(type_id)?;
         for (relative_index, (&field_sym, _)) in fields.iter().enumerate() {
-            if self.ctx.interner.resolve(field_sym) == capture_name {
+            if self.ctx.analysis.interner.resolve(field_sym) == capture_name {
                 return Some(MemberRef::new(type_id, relative_index as u16));
             }
         }
@@ -148,7 +148,8 @@ impl NfaBuilder<'_> {
         // The struct scope's type drives the inner captures' Set member resolution.
         let scope_type_id = self
             .ctx
-            .type_ctx
+            .analysis
+            .type_analysis
             .expect_pattern_result(inner)
             .flow
             .type_id();

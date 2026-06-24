@@ -195,11 +195,13 @@ impl NfaBuilder<'_> {
 
         let union_type_id = self
             .ctx
-            .type_ctx
+            .analysis
+            .type_analysis
             .expect_pattern_result(&Pattern::Union(union.clone()))
             .flow
             .type_id();
-        let merged_fields = union_type_id.map(|id| self.ctx.type_ctx.expect_struct_fields(id));
+        let merged_fields =
+            union_type_id.map(|id| self.ctx.analysis.type_analysis.expect_struct_fields(id));
 
         let search_nav = resumable_search_nav(first_nav);
         let branch_search = AltSearchNav(search_nav);
@@ -223,25 +225,29 @@ impl NfaBuilder<'_> {
             let null_effects: Vec<EffectIR> = if let Some(fields) = merged_fields {
                 let provided: HashSet<Symbol> = self
                     .ctx
-                    .type_ctx
+                    .analysis
+                    .type_analysis
                     .expect_pattern_result(&body)
                     .flow
                     .type_id()
-                    .map(|id| self.ctx.type_ctx.expect_struct_fields(id))
+                    .map(|id| self.ctx.analysis.type_analysis.expect_struct_fields(id))
                     .map(|f| f.keys().copied().collect())
                     .unwrap_or_default();
                 fields
                     .iter()
                     .filter(|(sym, _)| !provided.contains(*sym))
                     .flat_map(|(sym, field_info)| {
-                        let name = self.ctx.interner.resolve(*sym);
+                        let name = self.ctx.analysis.interner.resolve(*sym);
                         let member_ref = self
                             .lookup_member_in_scope(name)
                             .expect("union bubbling field must resolve in enclosing scope");
                         let set = EffectIR::with_member(EffectKind::Set, member_ref);
                         let is_required_list = !field_info.optional
                             && matches!(
-                                self.ctx.type_ctx.expect_type_shape(field_info.type_id),
+                                self.ctx
+                                    .analysis
+                                    .type_analysis
+                                    .expect_type_shape(field_info.type_id),
                                 TypeShape::Array { .. }
                             );
                         if is_required_list {
@@ -309,14 +315,20 @@ impl NfaBuilder<'_> {
 
         let enum_type_id = self
             .ctx
-            .type_ctx
+            .analysis
+            .type_analysis
             .expect_pattern_result(&Pattern::Enum(e.clone()))
             .flow
             .type_id()
             .expect("an analyzed enum must produce an enum type");
 
         // BTreeMap order gives stable variant indices independent of AST iteration order.
-        let TypeShape::Enum(variants) = self.ctx.type_ctx.expect_type_shape(enum_type_id) else {
+        let TypeShape::Enum(variants) = self
+            .ctx
+            .analysis
+            .type_analysis
+            .expect_type_shape(enum_type_id)
+        else {
             panic!("an analyzed enum must produce an enum type");
         };
         let variant_info: BTreeMap<Symbol, (u16, TypeId)> = variants
@@ -343,6 +355,7 @@ impl NfaBuilder<'_> {
             let label = branch.label().expect("enum branch must have label");
             let (variant_idx, payload_type_id) = self
                 .ctx
+                .analysis
                 .interner
                 .get(label.text())
                 .and_then(|sym| variant_info.get(&sym))

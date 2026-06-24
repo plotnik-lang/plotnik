@@ -9,16 +9,17 @@ use std::collections::HashSet;
 
 use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeNameEntry};
 
+use crate::compiler::AnalysisInput;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
-use crate::compiler::emit::tables::{EmitError, EmitInput, StringTableBuilder, TypeTableBuilder};
+use crate::compiler::emit::tables::{EmitError, StringTableBuilder, TypeTableBuilder};
 use crate::compiler::ids::TypeId;
 use crate::core::Interner;
 
 /// Build the type table, interning type, member, and name strings into the
 /// shared string table. Threads the string table by value because it extends it.
 pub fn build_types(
-    input: &EmitInput<'_>,
+    input: &AnalysisInput<'_>,
     mut strings: StringTableBuilder,
 ) -> Result<(TypeTableBuilder, StringTableBuilder), EmitError> {
     let mut types = TypeTableBuilder::new();
@@ -34,18 +35,18 @@ pub fn build_types(
 /// emitted first, then custom types in definition order, depth-first.
 fn build(
     types: &mut TypeTableBuilder,
-    input: EmitInput<'_>,
+    input: AnalysisInput<'_>,
     strings: &mut StringTableBuilder,
 ) -> Result<(), EmitError> {
-    let type_ctx = input.type_ctx;
-    let ordered_types = collect_ordered_types(type_ctx);
-    let usage = scan_builtin_usage(type_ctx, &ordered_types);
+    let type_analysis = input.type_analysis;
+    let ordered_types = collect_ordered_types(type_analysis);
+    let usage = scan_builtin_usage(type_analysis, &ordered_types);
 
     emit_builtins(types, &usage)?;
     reserve_slots(types, &ordered_types)?;
 
     let mut ctx = TypeEmitCtx {
-        type_ctx,
+        type_analysis,
         interner: input.interner,
         strings,
     };
@@ -124,7 +125,7 @@ fn fill_slots(
     let builtin_count = usage.builtin_count();
     for (i, &type_id) in ordered_types.iter().enumerate() {
         let slot_index = builtin_count + i;
-        let type_shape = ctx.type_ctx.expect_type_shape(type_id);
+        let type_shape = ctx.type_analysis.expect_type_shape(type_id);
         emit_type_at_slot(types, slot_index, type_shape, ctx)?;
     }
     Ok(())
@@ -132,10 +133,10 @@ fn fill_slots(
 
 fn emit_type_names(
     types: &mut TypeTableBuilder,
-    input: &EmitInput<'_>,
+    input: &AnalysisInput<'_>,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
-    for (def_id, type_id) in ctx.type_ctx.iter_def_output() {
+    for (def_id, type_id) in ctx.type_analysis.iter_def_output() {
         let name_sym = input.dependency_analysis.def_name_sym(def_id);
         let name = ctx.strings.intern(name_sym, ctx.interner)?;
         let bc_type_id = types
@@ -149,7 +150,7 @@ fn emit_type_names(
     // A name only attaches to a non-suppressive capture's struct/enum, so the
     // type is reachable from a def result and must survive dead-type elimination;
     // a miss here is a compiler bug, not anything a query can trigger.
-    for (type_id, name_sym) in ctx.type_ctx.iter_type_aliases() {
+    for (type_id, name_sym) in ctx.type_analysis.iter_type_aliases() {
         let bc_type_id = types
             .lookup(type_id)
             .expect("named type annotation must survive dead-type elimination");
@@ -192,13 +193,13 @@ fn emit_type_at_slot(
         }
 
         TypeShape::Optional(inner) => {
-            let inner_bc = types.resolve_type(*inner, ctx.type_ctx)?;
+            let inner_bc = types.resolve_type(*inner, ctx.type_analysis)?;
             types.fill_slot(slot_index, TypeDef::optional(inner_bc));
             Ok(())
         }
 
         TypeShape::Array { element, non_empty } => {
-            let element_bc = types.resolve_type(*element, ctx.type_ctx)?;
+            let element_bc = types.resolve_type(*element, ctx.type_analysis)?;
             let def = if *non_empty {
                 TypeDef::array_plus(element_bc)
             } else {
@@ -213,7 +214,7 @@ fn emit_type_at_slot(
             let mut resolved_fields = Vec::with_capacity(fields.len());
             for (field_sym, field_info) in fields {
                 let field_name = ctx.strings.intern(*field_sym, ctx.interner)?;
-                let field_type = resolve_field_type(types, field_info, ctx.type_ctx)?;
+                let field_type = resolve_field_type(types, field_info, ctx.type_analysis)?;
                 resolved_fields.push((field_name, field_type));
             }
 
@@ -235,7 +236,7 @@ fn emit_type_at_slot(
             let mut resolved_variants = Vec::with_capacity(variants.len());
             for (variant_sym, variant_type_id) in variants {
                 let variant_name = ctx.strings.intern(*variant_sym, ctx.interner)?;
-                let variant_type = types.resolve_type(*variant_type_id, ctx.type_ctx)?;
+                let variant_type = types.resolve_type(*variant_type_id, ctx.type_analysis)?;
                 resolved_variants.push((variant_name, variant_type));
             }
 
@@ -253,8 +254,8 @@ fn emit_type_at_slot(
         }
 
         TypeShape::Ref(def_id) => {
-            let target = ctx.type_ctx.expect_def_output(*def_id);
-            let alias = types.resolve_type(target, ctx.type_ctx)?;
+            let target = ctx.type_analysis.expect_def_output(*def_id);
+            let alias = types.resolve_type(target, ctx.type_analysis)?;
             types.fill_slot(slot_index, TypeDef::alias(alias));
             Ok(())
         }
@@ -289,7 +290,7 @@ fn source_is_optional(type_ctx: &TypeAnalysis, type_id: TypeId) -> bool {
 }
 
 struct TypeEmitCtx<'a> {
-    type_ctx: &'a TypeAnalysis,
+    type_analysis: &'a TypeAnalysis,
     interner: &'a Interner,
     strings: &'a mut StringTableBuilder,
 }

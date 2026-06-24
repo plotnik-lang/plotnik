@@ -171,25 +171,27 @@ mod debug_impl {
             match &m.node_kind {
                 NodeKindConstraint::Any => ops.push(SemanticOp::MatchAny),
                 NodeKindConstraint::Named(id) => {
-                    let name = id.and_then(|i| ctx.grammar.kind_name(i, ctx.interner));
+                    let name =
+                        id.and_then(|i| ctx.analysis.grammar.kind_name(i, ctx.analysis.interner));
                     ops.push(SemanticOp::MatchNamed(name));
                 }
                 NodeKindConstraint::Anonymous(id) => {
-                    let name = id.and_then(|i| ctx.grammar.kind_name(i, ctx.interner));
+                    let name =
+                        id.and_then(|i| ctx.analysis.grammar.kind_name(i, ctx.analysis.interner));
                     ops.push(SemanticOp::MatchAnon(name));
                 }
             }
         }
 
         if let Some(f) = m.node_field {
-            let name = ctx.grammar.field_name(f, ctx.interner);
+            let name = ctx.analysis.grammar.field_name(f, ctx.analysis.interner);
             ops.push(SemanticOp::Field(
                 name.unwrap_or_else(|| format!("field#{f}")),
             ));
         }
 
         for &f in &m.neg_fields {
-            let name = ctx.grammar.field_name(f, ctx.interner);
+            let name = ctx.analysis.grammar.field_name(f, ctx.analysis.interner);
             ops.push(SemanticOp::NegField(
                 name.unwrap_or_else(|| format!("field#{f}")),
             ));

@@ -156,7 +156,12 @@ impl NfaBuilder<'_> {
             // non-struct scope; they intentionally emit value effects without a Set.
             // Once a struct scope exists, though, a missing member is our bug.
             if let Some(Struct(type_id)) = self.scope_stack.last().copied()
-                && self.ctx.type_ctx.struct_fields(type_id).is_some()
+                && self
+                    .ctx
+                    .analysis
+                    .type_analysis
+                    .struct_fields(type_id)
+                    .is_some()
             {
                 let member_ref = self
                     .lookup_member(capture_name, type_id)
@@ -188,12 +193,16 @@ impl NfaBuilder<'_> {
 
         // Check the actual inferred type, not syntax. Compile runs after the type
         // analysis is frozen, so every pattern it visits has a recorded result.
-        let info = self.ctx.type_ctx.expect_pattern_result(&inner);
+        let info = self
+            .ctx
+            .analysis
+            .type_analysis
+            .expect_pattern_result(&inner);
 
         !info
             .flow
             .type_id()
-            .map(|id| self.ctx.type_ctx.expect_type_shape(id))
+            .map(|id| self.ctx.analysis.type_analysis.expect_type_shape(id))
             .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)))
     }
 
@@ -203,10 +212,10 @@ impl NfaBuilder<'_> {
     /// the structured result (Enum/Struct/Array) pending for Set to consume.
     pub(super) fn is_ref_returning_structured(&self, pattern: &Pattern) -> bool {
         match pattern {
-            Pattern::DefRef(_) => self.ctx.type_ctx.ref_returns_structured(
+            Pattern::DefRef(_) => self.ctx.analysis.type_analysis.ref_returns_structured(
                 pattern,
-                self.ctx.dependency_analysis,
-                self.ctx.interner,
+                self.ctx.analysis.dependency_analysis,
+                self.ctx.analysis.interner,
             ),
             Pattern::QuantifiedPattern(q) => q
                 .inner()

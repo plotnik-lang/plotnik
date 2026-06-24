@@ -40,12 +40,12 @@ impl<'a> NfaBuilder<'a> {
         // This wraps any entrypoint to create the top-level scope.
         let preamble_entry = compiler.emit_preamble();
 
-        for (def_id, _) in ctx.type_ctx.iter_def_output() {
+        for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
             let label = compiler.fresh_label();
             compiler.def_entries.insert(def_id, label);
         }
 
-        for (def_id, _) in ctx.type_ctx.iter_def_output() {
+        for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
             compiler.compile_def(def_id);
         }
 
@@ -82,8 +82,8 @@ impl<'a> NfaBuilder<'a> {
     }
 
     fn compile_def(&mut self, def_id: DefId) {
-        let name_sym = self.ctx.dependency_analysis.def_name_sym(def_id);
-        let name = self.ctx.interner.resolve(name_sym);
+        let name_sym = self.ctx.analysis.dependency_analysis.def_name_sym(def_id);
+        let name = self.ctx.analysis.interner.resolve(name_sym);
 
         let body = self
             .ctx
@@ -106,7 +106,7 @@ impl<'a> NfaBuilder<'a> {
         // Definitions are compiled in normalized form: body -> Return
         // No Struct/EndStruct wrapper - that's the caller's responsibility (call-site scoping).
         // We still use with_scope for member index lookup during compilation.
-        let type_id = self.ctx.type_ctx.expect_def_output(def_id);
+        let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
         let body_entry = self.with_scope(type_id, |this| {
             this.compile_pattern(body, return_label, body_nav)
         });

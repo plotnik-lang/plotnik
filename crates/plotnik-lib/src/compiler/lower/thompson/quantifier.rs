@@ -540,8 +540,12 @@ impl NfaBuilder<'_> {
 
         let match_exit = exits.match_exit();
 
-        let element_scope =
-            IterationScope::for_iteration(inner, array_context, element_capture, self.ctx.type_ctx);
+        let element_scope = IterationScope::for_iteration(
+            inner,
+            array_context,
+            element_capture,
+            self.ctx.analysis.type_analysis,
+        );
 
         let compile_body = |this: &mut Self, target: ExitNav| -> Label {
             this.compile_quantified_body(inner, target, element_scope.clone())

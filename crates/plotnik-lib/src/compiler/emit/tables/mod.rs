@@ -1,8 +1,8 @@
 //! Shared bytecode-emission data types.
 //!
 //! The emit phases each live in a sibling `compiler::emit` module; this one owns
-//! the data they produce and thread across phase boundaries: the emit error and
-//! input, and the string, type, and regex tables. The tables carry their
+//! the data they produce and thread across phase boundaries: the emit error plus
+//! the string, type, and regex tables. The tables carry their
 //! construction *state* and serialization, but no algorithm that walks the IR
 //! and no regex engine — those belong to the phase modules. Each table is a
 //! cross-phase accumulator (no single phase owns its full lifecycle), so it
@@ -10,7 +10,6 @@
 
 mod constant_pool;
 mod error;
-mod input;
 mod regex_id;
 mod regex_table;
 mod string_table;
@@ -23,7 +22,6 @@ mod string_table_tests;
 
 pub(in crate::compiler::emit) use constant_pool::ConstantPool;
 pub(in crate::compiler) use error::EmitError;
-pub use input::EmitInput;
 pub(in crate::compiler) use regex_id::RegexId;
 pub use regex_table::RegexTableBuilder;
 pub use string_table::StringTableBuilder;

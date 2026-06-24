@@ -10,9 +10,10 @@ use crate::bytecode::{
     Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SymbolNameEntry,
 };
 
+use crate::compiler::AnalysisInput;
 use crate::compiler::emit::layout_map::LayoutMap;
 use crate::compiler::emit::tables::{
-    ConstantPool, EmitError, EmitInput, StringTableBuilder, TypeTableBuilder,
+    ConstantPool, EmitError, StringTableBuilder, TypeTableBuilder,
 };
 use crate::compiler::lower::ir::NfaGraph;
 
@@ -25,7 +26,7 @@ pub struct ModuleTables {
 }
 
 pub(in crate::compiler::emit) struct EmitPipeline<'a> {
-    input: EmitInput<'a>,
+    input: AnalysisInput<'a>,
     ir: &'a NfaGraph,
     strings: StringTableBuilder,
     types: TypeTableBuilder,
@@ -34,7 +35,7 @@ pub(in crate::compiler::emit) struct EmitPipeline<'a> {
 
 impl<'a> EmitPipeline<'a> {
     pub(in crate::compiler::emit) fn new(
-        input: EmitInput<'a>,
+        input: AnalysisInput<'a>,
         ir: &'a NfaGraph,
         strings: StringTableBuilder,
         types: TypeTableBuilder,
@@ -81,10 +82,10 @@ impl<'a> EmitPipeline<'a> {
         }
 
         let mut entrypoints: Vec<Entrypoint> = Vec::new();
-        for (def_id, type_id) in self.input.type_ctx.iter_def_output() {
+        for (def_id, type_id) in self.input.type_analysis.iter_def_output() {
             let name_sym = self.input.dependency_analysis.def_name_sym(def_id);
             let name = self.strings.intern(name_sym, self.input.interner)?;
-            let result_type = self.types.resolve_type(type_id, self.input.type_ctx)?;
+            let result_type = self.types.resolve_type(type_id, self.input.type_analysis)?;
 
             let target = self
                 .ir

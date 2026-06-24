@@ -1,6 +1,7 @@
 use indexmap::IndexMap;
 use rowan::TextRange;
 
+use crate::compiler::AnalysisInput;
 use crate::compiler::analyze::grammar::link;
 use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
@@ -8,7 +9,7 @@ use crate::compiler::analyze::refs::{dependencies, validate_recursion};
 use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate_ast};
 use crate::compiler::analyze::types::check_entrypoints;
 use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
-use crate::compiler::emit::tables::{EmitError, EmitInput};
+use crate::compiler::emit::tables::EmitError;
 use crate::compiler::lower::{LowerInput, lower_to_nfa};
 use crate::compiler::parse::{
     DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser, Root, SyntaxNode, lex,
@@ -657,28 +658,25 @@ impl LinkedQuery {
 
     fn emit(&self) -> Result<Vec<u8>, EmitError> {
         let nfa = self.compile();
-        crate::compiler::emit::emit(self.emit_input(), &nfa)
+        crate::compiler::emit::emit(self.analysis_input(), &nfa)
     }
 
     fn emit_unchecked(&self) -> Result<Vec<u8>, EmitError> {
         let nfa = self.compile();
-        crate::compiler::emit::emit_unchecked(self.emit_input(), &nfa)
+        crate::compiler::emit::emit_unchecked(self.analysis_input(), &nfa)
     }
 
     fn compile(&self) -> crate::compiler::lower::ir::LoweredNfa {
         lower_to_nfa(LowerInput {
-            interner: self.interner(),
-            type_ctx: self.type_analysis(),
+            analysis: self.analysis_input(),
             symbol_table: self.symbol_table(),
-            grammar: self.grammar(),
-            dependency_analysis: self.dependency_analysis(),
         })
     }
 
-    fn emit_input(&self) -> EmitInput<'_> {
-        EmitInput {
+    fn analysis_input(&self) -> AnalysisInput<'_> {
+        AnalysisInput {
             interner: self.interner(),
-            type_ctx: self.type_analysis(),
+            type_analysis: self.type_analysis(),
             dependency_analysis: self.dependency_analysis(),
             grammar: self.grammar(),
         }
