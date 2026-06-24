@@ -146,6 +146,18 @@ impl ElementScope {
     }
 }
 
+#[derive(Clone, Copy)]
+struct ExitNav {
+    exit: Label,
+    nav: Nav,
+}
+
+impl ExitNav {
+    fn new(exit: Label, nav: Nav) -> Self {
+        Self { exit, nav }
+    }
+}
+
 /// Configuration for unified quantifier compilation.
 pub(super) struct QuantifierConfig<'a> {
     pub inner: &'a Pattern,
@@ -471,14 +483,14 @@ impl Compiler<'_> {
         &mut self,
         nav: Nav,
         exit: Label,
-        compile_body: impl Fn(&mut Self, Nav, Label) -> Label,
+        compile_body: impl Fn(&mut Self, ExitNav) -> Label,
     ) -> Label {
         match quantifier_search_nav(nav) {
             Some(search) => {
-                let body = compile_body(self, Nav::StayExact, exit);
+                let body = compile_body(self, ExitNav::new(exit, Nav::StayExact));
                 self.emit_position_search(search, body)
             }
-            None => compile_body(self, nav, exit),
+            None => compile_body(self, ExitNav::new(exit, nav)),
         }
     }
 
@@ -495,11 +507,11 @@ impl Compiler<'_> {
         &mut self,
         first_nav: Nav,
         loop_entry: Label,
-        compile_body: impl Fn(&mut Self, Nav, Label) -> Label,
+        compile_body: impl Fn(&mut Self, ExitNav) -> Label,
     ) -> (Label, Label) {
         let repeat_nav = first_nav.sibling_continuation();
         if let Some(first_search) = quantifier_search_nav(first_nav) {
-            let body = compile_body(self, Nav::StayExact, loop_entry);
+            let body = compile_body(self, ExitNav::new(loop_entry, Nav::StayExact));
             // Invariant guarded by `quantifier_tests::search_nav_repeats_as_search`.
             let repeat_search =
                 quantifier_search_nav(repeat_nav).expect("a search nav repeats as a search");
@@ -509,8 +521,8 @@ impl Compiler<'_> {
             )
         } else {
             (
-                compile_body(self, first_nav, loop_entry),
-                compile_body(self, repeat_nav, loop_entry),
+                compile_body(self, ExitNav::new(loop_entry, first_nav)),
+                compile_body(self, ExitNav::new(loop_entry, repeat_nav)),
             )
         }
     }
@@ -531,8 +543,8 @@ impl Compiler<'_> {
         let element_scope =
             ElementScope::for_iteration(inner, array_context, element_capture, self.ctx.type_ctx);
 
-        let compile_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
-            this.compile_quantified_body(inner, exit, nav, element_scope.clone())
+        let compile_body = |this: &mut Self, target: ExitNav| -> Label {
+            this.compile_quantified_body(inner, target, element_scope.clone())
         };
 
         let greediness = Greediness::from(kind);
@@ -564,8 +576,8 @@ impl Compiler<'_> {
                     skip_exit,
                 } => {
                     let split_scope = element_scope.by_array_exit();
-                    let split_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
-                        this.compile_quantified_body(inner, exit, nav, split_scope.clone())
+                    let split_body = |this: &mut Self, target: ExitNav| -> Label {
+                        this.compile_quantified_body(inner, target, split_scope.clone())
                     };
 
                     let loop_entry = self.fresh_label();
@@ -641,10 +653,10 @@ impl Compiler<'_> {
     fn compile_quantified_body(
         &mut self,
         inner: &Pattern,
-        exit: Label,
-        nav: Nav,
+        target: ExitNav,
         element_scope: ElementScope,
     ) -> Label {
+        let ExitNav { exit, nav } = target;
         match element_scope {
             ElementScope::Standalone { capture }
             | ElementScope::RowScopedByArrayExit { capture } => self.dispatch_pattern(
