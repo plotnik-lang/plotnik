@@ -2,7 +2,7 @@ use std::num::NonZeroU16;
 
 use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::lower::ir::{CallIR, CalleeEntry, EffectIR, Label, MatchIR, ReturnAddr};
-use crate::compiler::parse::ast::Pattern;
+use crate::compiler::parse::ast::{Pattern, QuantifierOperator};
 
 use super::Compiler;
 use super::capture::CaptureEffects;
@@ -14,6 +14,32 @@ use super::capture::CaptureEffects;
 pub(super) struct BranchTargets {
     pub prefer: Label,
     pub other: Label,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum Greediness {
+    Greedy,
+    NonGreedy,
+}
+
+impl From<QuantifierOperator> for Greediness {
+    fn from(operator: QuantifierOperator) -> Self {
+        if operator.is_greedy() {
+            return Self::Greedy;
+        }
+
+        Self::NonGreedy
+    }
+}
+
+impl Greediness {
+    fn successors(self, targets: BranchTargets) -> Vec<Label> {
+        let BranchTargets { prefer, other } = targets;
+        match self {
+            Self::Greedy => vec![prefer, other],
+            Self::NonGreedy => vec![other, prefer],
+        }
+    }
 }
 
 impl Compiler<'_> {
@@ -153,9 +179,13 @@ impl Compiler<'_> {
 
     /// Emit an epsilon branch preferring `targets.prefer` when greedy,
     /// `targets.other` when non-greedy.
-    pub(super) fn emit_branch_epsilon(&mut self, targets: BranchTargets, is_greedy: bool) -> Label {
+    pub(super) fn emit_branch_epsilon(
+        &mut self,
+        targets: BranchTargets,
+        greediness: Greediness,
+    ) -> Label {
         let entry = self.fresh_label();
-        self.emit_branch_epsilon_at(entry, targets, is_greedy);
+        self.emit_branch_epsilon_at(entry, targets, greediness);
         entry
     }
 
@@ -163,15 +193,9 @@ impl Compiler<'_> {
         &mut self,
         label: Label,
         targets: BranchTargets,
-        is_greedy: bool,
+        greediness: Greediness,
     ) {
-        let BranchTargets { prefer, other } = targets;
-        let successors = if is_greedy {
-            vec![prefer, other]
-        } else {
-            vec![other, prefer]
-        };
-        self.emit_epsilon(label, successors);
+        self.emit_epsilon(label, greediness.successors(targets));
     }
 
     /// Emit a resumable sibling search around a `body` that matches exactly at
@@ -209,7 +233,7 @@ impl Compiler<'_> {
                 prefer: body,
                 other: retry,
             },
-            true,
+            Greediness::Greedy,
         );
 
         let navigate = self.fresh_label();

@@ -11,7 +11,7 @@ use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOpera
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx, needs_struct_wrapper, row_type_id};
-use super::emit::BranchTargets;
+use super::emit::{BranchTargets, Greediness};
 use super::navigation::resumable_search_nav;
 use super::scope::{CaptureExits, CaptureRequest, EndScopeEffects, SplitExits};
 
@@ -535,7 +535,7 @@ impl Compiler<'_> {
             this.compile_quantified_body(inner, exit, nav, element_scope.clone())
         };
 
-        let is_greedy = kind.is_greedy();
+        let greediness = Greediness::from(kind);
         let first_nav_mode = first_nav.unwrap_or(Nav::Down);
 
         match kind.kind() {
@@ -552,7 +552,7 @@ impl Compiler<'_> {
                         prefer: repeat_iterate,
                         other: match_exit,
                     },
-                    is_greedy,
+                    greediness,
                 );
 
                 first_iterate
@@ -578,7 +578,7 @@ impl Compiler<'_> {
                             prefer: repeat_iterate,
                             other: match_exit,
                         },
-                        is_greedy,
+                        greediness,
                     );
 
                     // zero-match backtracks to the entry epsilon's checkpoint, restoring
@@ -588,7 +588,7 @@ impl Compiler<'_> {
                             prefer: first_iterate,
                             other: skip_exit,
                         },
-                        is_greedy,
+                        greediness,
                     )
                 }
                 CaptureExits::Single(_) => {
@@ -602,14 +602,14 @@ impl Compiler<'_> {
                             prefer: repeat_iterate,
                             other: match_exit,
                         },
-                        is_greedy,
+                        greediness,
                     );
                     self.emit_branch_epsilon(
                         BranchTargets {
                             prefer: first_iterate,
                             other: match_exit,
                         },
-                        is_greedy,
+                        greediness,
                     )
                 }
             },
@@ -632,7 +632,7 @@ impl Compiler<'_> {
                         prefer: iterate,
                         other: skip_with_null,
                     },
-                    is_greedy,
+                    greediness,
                 )
             }
         }
