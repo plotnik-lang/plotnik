@@ -1,4 +1,7 @@
-//! Transition instruction emission.
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+
+//! Instruction-encoding emission phase: resolve each instruction into its
+//! transition bytes.
 
 use std::collections::BTreeMap;
 
