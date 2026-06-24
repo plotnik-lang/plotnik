@@ -5,9 +5,8 @@
 //! stay in one place.
 
 use crate::bytecode::Nav;
-use crate::compiler::parse::cst::SyntaxKind;
-use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::lower::ir::{EffectIR, Label};
+use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOperator};
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx, needs_struct_wrapper, row_type_id};
@@ -32,36 +31,6 @@ pub(super) fn quantifier_search_nav(nav: Nav) -> Option<Nav> {
     }
 }
 
-/// Quantifier operator classification.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum QuantifierKind {
-    Optional,
-    OptionalNonGreedy,
-    Star,
-    StarNonGreedy,
-    Plus,
-    PlusNonGreedy,
-}
-
-impl QuantifierKind {
-    pub fn from_syntax(kind: SyntaxKind) -> Option<Self> {
-        match kind {
-            SyntaxKind::Question => Some(Self::Optional),
-            SyntaxKind::QuestionQuestion => Some(Self::OptionalNonGreedy),
-            SyntaxKind::Star => Some(Self::Star),
-            SyntaxKind::StarQuestion => Some(Self::StarNonGreedy),
-            SyntaxKind::Plus => Some(Self::Plus),
-            SyntaxKind::PlusQuestion => Some(Self::PlusNonGreedy),
-            _ => None,
-        }
-    }
-
-    /// Returns true if this is a greedy quantifier.
-    pub fn is_greedy(self) -> bool {
-        matches!(self, Self::Optional | Self::Star | Self::Plus)
-    }
-}
-
 /// Result of parsing a quantified expression.
 enum QuantifierForm {
     /// No inner expression found.
@@ -71,7 +40,7 @@ enum QuantifierForm {
     /// Valid quantified expression with inner and kind.
     Quantified {
         inner: Pattern,
-        kind: QuantifierKind,
+        kind: QuantifierOperator,
     },
 }
 
@@ -80,11 +49,7 @@ fn classify_quantifier(quant: &ast::QuantifiedPattern) -> QuantifierForm {
         return QuantifierForm::Empty;
     };
 
-    let Some(op) = quant.operator() else {
-        return QuantifierForm::Plain(inner);
-    };
-
-    match QuantifierKind::from_syntax(op.kind()) {
+    match quant.quantifier_operator() {
         Some(kind) => QuantifierForm::Quantified { inner, kind },
         None => QuantifierForm::Plain(inner),
     }
@@ -108,7 +73,7 @@ impl ArrayContext {
 /// Configuration for unified quantifier compilation.
 pub(super) struct QuantifierConfig<'a> {
     pub inner: &'a Pattern,
-    pub kind: QuantifierKind,
+    pub kind: QuantifierOperator,
     /// Navigation for the first iteration.
     pub first_nav: Option<Nav>,
     pub array_context: ArrayContext,
@@ -524,8 +489,8 @@ impl Compiler<'_> {
         let is_greedy = kind.is_greedy();
         let first_nav_mode = first_nav.unwrap_or(Nav::Down);
 
-        match kind {
-            QuantifierKind::Plus | QuantifierKind::PlusNonGreedy => {
+        match kind.kind() {
+            QuantifierKind::OneOrMore => {
                 // Plus: must match at least once. The first iteration has no exit
                 // fallback, so a total failure backtracks to the caller.
                 let loop_entry = self.fresh_label();
@@ -544,7 +509,7 @@ impl Compiler<'_> {
                 first_iterate
             }
 
-            QuantifierKind::Star | QuantifierKind::StarNonGreedy => match exits {
+            QuantifierKind::ZeroOrMore => match exits {
                 CaptureExits::Split {
                     match_exit,
                     skip_exit,
@@ -619,7 +584,7 @@ impl Compiler<'_> {
                 }
             },
 
-            QuantifierKind::Optional | QuantifierKind::OptionalNonGreedy => {
+            QuantifierKind::Optional => {
                 let skip_with_null = match exits {
                     CaptureExits::Split { skip_exit, .. } => skip_exit,
                     CaptureExits::Single(_) => {

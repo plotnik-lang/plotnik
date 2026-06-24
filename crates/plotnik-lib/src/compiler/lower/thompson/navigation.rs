@@ -194,7 +194,7 @@ pub fn compute_nav_modes(
 /// search. This is the single ownership rule that replaced the old
 /// per-form classification.
 pub fn expr_owns_iteration(pattern: &Pattern) -> bool {
-    quantifier_operator_kind(pattern).is_some()
+    quantifier_kind(pattern).is_some()
 }
 
 /// Extract the navigation if a *match-once* item under it owns a resumable
@@ -228,8 +228,8 @@ pub fn is_down_nav(nav: Option<Nav>) -> bool {
     )
 }
 
-/// Unwraps CapturedPattern wrappers before testing for a quantifier operator.
-fn quantifier_operator_kind(pattern: &Pattern) -> Option<crate::compiler::parse::cst::SyntaxKind> {
+/// Unwraps CapturedPattern wrappers before testing for quantifier arity.
+fn quantifier_kind(pattern: &Pattern) -> Option<crate::compiler::parse::ast::QuantifierKind> {
     let pattern = match pattern {
         Pattern::CapturedPattern(cap) => cap.inner()?,
         e => e.clone(),
@@ -238,18 +238,11 @@ fn quantifier_operator_kind(pattern: &Pattern) -> Option<crate::compiler::parse:
     let Pattern::QuantifiedPattern(q) = &pattern else {
         return None;
     };
-    Some(q.operator()?.kind())
+    q.quantifier_kind()
 }
 
 pub fn is_skippable_quantifier(pattern: &Pattern) -> bool {
-    use crate::compiler::parse::cst::SyntaxKind;
-    quantifier_operator_kind(pattern).is_some_and(|k| {
-        matches!(
-            k,
-            SyntaxKind::Question
-                | SyntaxKind::QuestionQuestion
-                | SyntaxKind::Star
-                | SyntaxKind::StarQuestion
-        )
-    })
+    use crate::compiler::parse::ast::QuantifierKind;
+    quantifier_kind(pattern)
+        .is_some_and(|kind| matches!(kind, QuantifierKind::Optional | QuantifierKind::ZeroOrMore))
 }

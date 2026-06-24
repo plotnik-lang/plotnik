@@ -290,6 +290,64 @@ impl QuantifierKind {
     }
 }
 
+/// Syntactic quantifier greediness parsed from a quantifier token.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum QuantifierGreediness {
+    Greedy,
+    NonGreedy,
+}
+
+impl QuantifierGreediness {
+    pub fn is_greedy(self) -> bool {
+        matches!(self, Self::Greedy)
+    }
+}
+
+/// Syntactic quantifier operator parsed from `?`, `*`, `+`, and non-greedy twins.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct QuantifierOperator {
+    kind: QuantifierKind,
+    greediness: QuantifierGreediness,
+}
+
+impl QuantifierOperator {
+    pub fn new(kind: QuantifierKind, greediness: QuantifierGreediness) -> Self {
+        Self { kind, greediness }
+    }
+
+    pub fn kind(self) -> QuantifierKind {
+        self.kind
+    }
+
+    pub fn is_greedy(self) -> bool {
+        self.greediness.is_greedy()
+    }
+}
+
+fn quantifier_operator_from_syntax_kind(kind: SyntaxKind) -> Option<QuantifierOperator> {
+    Some(match kind {
+        SyntaxKind::Question => {
+            QuantifierOperator::new(QuantifierKind::Optional, QuantifierGreediness::Greedy)
+        }
+        SyntaxKind::QuestionQuestion => {
+            QuantifierOperator::new(QuantifierKind::Optional, QuantifierGreediness::NonGreedy)
+        }
+        SyntaxKind::Star => {
+            QuantifierOperator::new(QuantifierKind::ZeroOrMore, QuantifierGreediness::Greedy)
+        }
+        SyntaxKind::StarQuestion => {
+            QuantifierOperator::new(QuantifierKind::ZeroOrMore, QuantifierGreediness::NonGreedy)
+        }
+        SyntaxKind::Plus => {
+            QuantifierOperator::new(QuantifierKind::OneOrMore, QuantifierGreediness::Greedy)
+        }
+        SyntaxKind::PlusQuestion => {
+            QuantifierOperator::new(QuantifierKind::OneOrMore, QuantifierGreediness::NonGreedy)
+        }
+        _ => return None,
+    })
+}
+
 define_pattern!(
     NodePattern,
     Ref,
@@ -519,12 +577,13 @@ impl QuantifiedPattern {
     /// malformed quantifier with no operator — the parser guarantees a valid
     /// `QuantifiedPattern` carries one.
     pub fn quantifier_kind(&self) -> Option<QuantifierKind> {
-        Some(match self.operator()?.kind() {
-            SyntaxKind::Question | SyntaxKind::QuestionQuestion => QuantifierKind::Optional,
-            SyntaxKind::Star | SyntaxKind::StarQuestion => QuantifierKind::ZeroOrMore,
-            SyntaxKind::Plus | SyntaxKind::PlusQuestion => QuantifierKind::OneOrMore,
-            _ => return None,
-        })
+        self.quantifier_operator().map(QuantifierOperator::kind)
+    }
+
+    /// Classify the quantifier operator into arity plus greediness. `None` only
+    /// for a malformed quantifier with no operator.
+    pub fn quantifier_operator(&self) -> Option<QuantifierOperator> {
+        quantifier_operator_from_syntax_kind(self.operator()?.kind())
     }
 
     /// Whether the quantifier repeats (`*`/`+`, greedy or not) — i.e. collects an
@@ -539,17 +598,10 @@ impl QuantifiedPattern {
 
     /// Returns true if quantifier allows zero matches (?, *, ??, *?).
     pub fn is_optional(&self) -> bool {
-        self.operator()
-            .map(|op| {
-                matches!(
-                    op.kind(),
-                    SyntaxKind::Question
-                        | SyntaxKind::Star
-                        | SyntaxKind::QuestionQuestion
-                        | SyntaxKind::StarQuestion
-                )
-            })
-            .unwrap_or(false)
+        matches!(
+            self.quantifier_kind(),
+            Some(QuantifierKind::Optional | QuantifierKind::ZeroOrMore)
+        )
     }
 }
 
