@@ -116,6 +116,7 @@ fn merge_fields(
     mut b: BTreeMap<Symbol, FieldInfo>,
 ) -> Result<BTreeMap<Symbol, FieldInfo>, UnifyError> {
     let mut result = BTreeMap::new();
+    let mut absent_fields = Vec::new();
 
     for (key, a_info) in a {
         if let Some(b_info) = b.remove(&key) {
@@ -123,12 +124,13 @@ fn merge_fields(
             let optional = a_info.optional || b_info.optional;
             result.insert(key, FieldInfo { type_id, optional });
         } else {
-            result.insert(key, relax_for_absence(ctx, a_info));
+            absent_fields.push((key, a_info));
         }
     }
 
-    for (key, b_info) in b {
-        result.insert(key, relax_for_absence(ctx, b_info));
+    absent_fields.extend(b);
+    for (key, info) in absent_fields {
+        result.insert(key, relax_for_absence(ctx, info));
     }
 
     Ok(result)
