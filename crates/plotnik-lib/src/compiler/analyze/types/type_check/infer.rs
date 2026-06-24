@@ -210,13 +210,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn infer_seq_pattern(&mut self, seq: &Located<SeqPattern>) -> PatternResult {
         let children: Vec<Located<Pattern>> = seq.node().children().map(|c| seq.wrap(c)).collect();
 
-        let arity = match children.len() {
-            0 | 1 => children
-                .first()
-                .map(|c| self.infer_pattern(c).arity)
-                .unwrap_or(Arity::One),
-            _ => Arity::Many,
-        };
+        let arity = self.compute_sequence_arity(&children);
 
         let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
         let mut output_children: Vec<(TextRange, TypeId)> = Vec::new();
@@ -260,6 +254,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             seq.node().text_range(),
         );
         PatternResult::new(arity, flow)
+    }
+
+    fn compute_sequence_arity(&mut self, children: &[Located<Pattern>]) -> Arity {
+        match children {
+            [] => Arity::One,
+            [child] => self.infer_pattern(child).arity,
+            _ => Arity::Many,
+        }
     }
 
     fn infer_enum(&mut self, e: &Located<EnumPattern>) -> PatternResult {
