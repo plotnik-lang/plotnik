@@ -3,9 +3,9 @@ use std::num::NonZeroU16;
 use crate::core::{Interner, NodeKind};
 use indexmap::IndexMap;
 
-use crate::compiler::lower::ir::NodeKindConstraint;
-use crate::compiler::analyze::grammar::GrammarBinding;
+use crate::compiler::analyze::grammar::GrammarBindingBuilder;
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
+use crate::compiler::lower::ir::NodeKindConstraint;
 use crate::compiler::test_utils::{empty_dependency_analysis, empty_symbol_table};
 
 use crate::compiler::lower::thompson::{CompileCtx, Compiler};
@@ -22,8 +22,11 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
     ]);
     let type_ctx = TypeAnalysisBuilder::new().finish();
     let symbol_table = empty_symbol_table();
-    let node_fields = IndexMap::new();
-    let grammar = GrammarBinding::new(node_kinds, node_fields);
+    let mut grammar_builder = GrammarBindingBuilder::new();
+    for (kind, id) in node_kinds {
+        grammar_builder.insert_node_kind_id(kind, id);
+    }
+    let grammar = grammar_builder.finish();
     let dependency_analysis = empty_dependency_analysis();
     let ctx = CompileCtx {
         interner: &interner,
@@ -38,4 +41,46 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
         compiler.resolve_anonymous_node_kind("number"),
         NodeKindConstraint::Anonymous(Some(anonymous_id))
     );
+}
+
+#[test]
+#[should_panic(expected = "linked anonymous token kind must be bound")]
+fn resolve_anonymous_node_kind_requires_linked_binding() {
+    let mut interner = Interner::new();
+    interner.intern("number");
+    let type_ctx = TypeAnalysisBuilder::new().finish();
+    let symbol_table = empty_symbol_table();
+    let grammar = GrammarBindingBuilder::new().finish();
+    let dependency_analysis = empty_dependency_analysis();
+    let ctx = CompileCtx {
+        interner: &interner,
+        type_ctx: &type_ctx,
+        symbol_table: &symbol_table,
+        grammar: &grammar,
+        dependency_analysis: &dependency_analysis,
+    };
+    let mut compiler = Compiler::new(&ctx);
+
+    compiler.resolve_anonymous_node_kind("number");
+}
+
+#[test]
+#[should_panic(expected = "linked field name must be bound")]
+fn resolve_field_by_name_requires_linked_binding() {
+    let mut interner = Interner::new();
+    interner.intern("name");
+    let type_ctx = TypeAnalysisBuilder::new().finish();
+    let symbol_table = empty_symbol_table();
+    let grammar = GrammarBindingBuilder::new().finish();
+    let dependency_analysis = empty_dependency_analysis();
+    let ctx = CompileCtx {
+        interner: &interner,
+        type_ctx: &type_ctx,
+        symbol_table: &symbol_table,
+        grammar: &grammar,
+        dependency_analysis: &dependency_analysis,
+    };
+    let mut compiler = Compiler::new(&ctx);
+
+    compiler.resolve_field_by_name("name");
 }

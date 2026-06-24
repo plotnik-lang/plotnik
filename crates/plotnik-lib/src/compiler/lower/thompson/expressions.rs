@@ -11,10 +11,11 @@ use std::num::NonZeroU16;
 
 use crate::bytecode::Nav;
 use crate::compiler::analyze::types::TypeShape;
-use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::lower::ir::{
     EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
 };
+use crate::compiler::parse::ast::{self, Pattern};
+use crate::compiler::parse::cst::SyntaxKind;
 
 use crate::compiler::analyze::types::CaptureMechanism;
 
@@ -622,16 +623,12 @@ impl Compiler<'_> {
     }
 
     pub(super) fn resolve_anonymous_node_kind(&mut self, text: &str) -> NodeKindConstraint {
-        let Some(sym) = self.ctx.interner.get(text) else {
-            return NodeKindConstraint::Anonymous(None);
-        };
-        self.ctx
-            .grammar
-            .resolve_anonymous_kind(sym)
-            .and_then(|id| NonZeroU16::new(id.get()))
-            .map_or(NodeKindConstraint::Anonymous(None), |id| {
-                NodeKindConstraint::Anonymous(Some(id))
-            })
+        let sym = self
+            .ctx
+            .interner
+            .get(text)
+            .expect("linked anonymous token must be interned");
+        NodeKindConstraint::Anonymous(Some(self.ctx.grammar.expect_anonymous_kind(sym)))
     }
 
     /// Resolve a NodePattern to its node kind constraint.
@@ -644,47 +641,52 @@ impl Compiler<'_> {
             return NodeKindConstraint::Named(None);
         }
 
-        let Some(type_token) = node.kind_token() else {
+        let type_token = node
+            .kind_token()
+            .expect("validated node pattern must have a kind token");
+        if matches!(
+            type_token.kind(),
+            SyntaxKind::KwError | SyntaxKind::KwMissing
+        ) {
             return NodeKindConstraint::Named(None);
-        };
+        }
         let type_name = type_token.text();
 
-        let Some(sym) = self.ctx.interner.get(type_name) else {
-            return NodeKindConstraint::Named(None);
-        };
-        self.ctx
-            .grammar
-            .resolve_named_kind(sym)
-            .and_then(|id| NonZeroU16::new(id.get()))
-            .map_or(NodeKindConstraint::Named(None), |id| {
-                NodeKindConstraint::Named(Some(id))
-            })
+        let sym = self
+            .ctx
+            .interner
+            .get(type_name)
+            .expect("linked named node kind must be interned");
+        NodeKindConstraint::Named(Some(self.ctx.grammar.expect_named_kind(sym)))
     }
 
     /// Resolve a field expression to its grammar `NodeFieldId`.
     pub(super) fn resolve_field(&mut self, field: &ast::FieldPattern) -> Option<NonZeroU16> {
-        let name_token = field.name()?;
+        let name_token = field
+            .name()
+            .expect("validated field pattern must have a field name");
         let field_name = name_token.text();
-        self.resolve_field_by_name(field_name)
+        Some(self.resolve_field_by_name(field_name))
     }
 
     /// Resolve a field name to its grammar `NodeFieldId`.
-    ///
-    /// An unknown field is left unconstrained (`None`).
-    pub(super) fn resolve_field_by_name(&mut self, field_name: &str) -> Option<NonZeroU16> {
-        self.ctx
+    pub(super) fn resolve_field_by_name(&mut self, field_name: &str) -> NonZeroU16 {
+        let sym = self
+            .ctx
             .interner
             .get(field_name)
-            .and_then(|sym| self.ctx.grammar.resolve_field(sym))
-            .and_then(|id| NonZeroU16::new(id.get()))
+            .expect("linked field name must be interned");
+        self.ctx.grammar.expect_field(sym)
     }
 
     pub(super) fn collect_neg_fields(&mut self, node: &ast::NodePattern) -> Vec<u16> {
         node.syntax()
             .children()
             .filter_map(ast::NegatedField::cast)
-            .filter_map(|nf| {
-                let name = nf.name()?;
+            .map(|nf| {
+                let name = nf
+                    .name()
+                    .expect("validated negated field must have a field name");
                 self.resolve_field_by_name(name.text())
             })
             .map(|id| id.get())

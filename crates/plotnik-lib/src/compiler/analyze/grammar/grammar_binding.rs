@@ -20,8 +20,9 @@ pub struct GrammarBinding {
 
 impl GrammarBinding {
     /// Freeze finished resolution tables into the binding. The link pass's builder
-    /// is the intended caller.
-    pub fn new(
+    /// is the only constructor; callers that already have admitted compiler state
+    /// should use the expecting accessors below.
+    fn new(
         node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
         node_field_ids: IndexMap<Symbol, NodeFieldId>,
     ) -> Self {
@@ -37,14 +38,35 @@ impl GrammarBinding {
         self.node_kind_ids.get(&NodeKind::Named(sym)).copied()
     }
 
+    /// Grammar id for a named kind referenced by an admitted query.
+    ///
+    /// Missing here means analysis/link and lower disagree about trusted state; widening to a
+    /// wildcard would compile the wrong query.
+    pub(crate) fn expect_named_kind(&self, sym: Symbol) -> NodeKindId {
+        self.resolve_named_kind(sym)
+            .expect("linked named node kind must be bound")
+    }
+
     /// Grammar id bound to an anonymous (literal-token) node kind.
     pub fn resolve_anonymous_kind(&self, sym: Symbol) -> Option<NodeKindId> {
         self.node_kind_ids.get(&NodeKind::Anonymous(sym)).copied()
     }
 
+    /// Grammar id for a literal token referenced by an admitted query.
+    pub(crate) fn expect_anonymous_kind(&self, sym: Symbol) -> NodeKindId {
+        self.resolve_anonymous_kind(sym)
+            .expect("linked anonymous token kind must be bound")
+    }
+
     /// Grammar id bound to a field name.
     pub fn resolve_field(&self, sym: Symbol) -> Option<NodeFieldId> {
         self.node_field_ids.get(&sym).copied()
+    }
+
+    /// Grammar id for a field referenced by an admitted query.
+    pub(crate) fn expect_field(&self, sym: Symbol) -> NodeFieldId {
+        self.resolve_field(sym)
+            .expect("linked field name must be bound")
     }
 
     /// Name of a bound node-kind id — reverse lookup for trace/debug rendering.
