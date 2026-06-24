@@ -21,7 +21,7 @@ mod cursor_tests;
 
 pub use effect::{EffectLog, RuntimeEffect};
 pub use error::RuntimeError;
-pub use materializer::{Materializer, ValueMaterializer, materialize_verified};
+pub use materializer::{ValueMaterializer, materialize_verified};
 pub use trace::{NoopTracer, PrintTracer, PrintTracerBuilder, Tracer, Verbosity};
 pub use value::{NodeHandle, Value};
 pub use verify::debug_verify_type;

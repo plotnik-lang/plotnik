@@ -50,9 +50,9 @@ pub use crate::compiler::{
 };
 
 pub use crate::vm::{
-    EffectLog, ExecLimits, Materializer, NodeHandle, NoopTracer, PrintTracer, PrintTracerBuilder,
-    RuntimeEffect, RuntimeError, Tracer, VM, VMBuilder, Value, ValueMaterializer, Verbosity,
-    debug_verify_type, materialize_verified,
+    EffectLog, ExecLimits, NodeHandle, NoopTracer, PrintTracer, PrintTracerBuilder, RuntimeEffect,
+    RuntimeError, Tracer, VM, VMBuilder, Value, ValueMaterializer, Verbosity, debug_verify_type,
+    materialize_verified,
 };
 
 /// Embed bytecode with 64-byte alignment (zero-copy loading).

@@ -1,4 +1,4 @@
-//! Materializer transforms effect logs into output values.
+//! Materializes VM effect logs into output values.
 
 use crate::bytecode::{Entrypoint, Module, StringsView, TypeDefKind, TypeId, TypeKind, TypesView};
 use crate::core::Colors;
@@ -6,12 +6,6 @@ use crate::core::Colors;
 use super::effect::RuntimeEffect;
 use super::value::{NodeHandle, Value};
 use super::verify::debug_verify_type;
-
-pub trait Materializer<'t> {
-    type Output;
-
-    fn materialize(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Self::Output;
-}
 
 pub struct ValueMaterializer<'a> {
     source: &'a str,
@@ -118,10 +112,8 @@ impl ValueAccumulator {
     }
 }
 
-impl<'t> Materializer<'t> for ValueMaterializer<'_> {
-    type Output = Value;
-
-    fn materialize(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Value {
+impl ValueMaterializer<'_> {
+    pub fn materialize<'t>(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Value {
         let mut stack: Vec<ValueAccumulator> = vec![];
 
         let result_builder = self.accumulator_for_type(result_type);
