@@ -293,31 +293,16 @@ impl TypeCollector {
 
         self.seen.insert(type_id);
 
+        for child_id in type_shape.child_type_ids() {
+            self.collect(child_id, type_ctx);
+        }
+
         match type_shape {
-            TypeShape::Struct(fields) => {
-                for field_info in fields.values() {
-                    self.collect(field_info.type_id, type_ctx);
-                }
-                self.out.push(type_id);
-            }
-            TypeShape::Enum(variants) => {
-                for &variant_type_id in variants.values() {
-                    self.collect(variant_type_id, type_ctx);
-                }
-                self.out.push(type_id);
-            }
-            TypeShape::Array { element, .. } => {
-                self.collect(*element, type_ctx);
-                self.out.push(type_id);
-            }
-            TypeShape::Optional(inner) => {
-                self.collect(*inner, type_ctx);
-                self.out.push(type_id);
-            }
-            TypeShape::Custom(_) => {
-                // Custom types alias Node, no children to collect
-                self.out.push(type_id);
-            }
+            TypeShape::Struct(_)
+            | TypeShape::Enum(_)
+            | TypeShape::Array { .. }
+            | TypeShape::Optional(_)
+            | TypeShape::Custom(_) => self.out.push(type_id),
             _ => {}
         }
     }
@@ -349,25 +334,14 @@ impl BuiltinUsage {
             TypeShape::Void => self.uses_void = true,
             TypeShape::Node => self.uses_node = true,
             TypeShape::Custom(_) => self.uses_node = true, // Custom types alias Node
-            TypeShape::Struct(fields) => {
-                for field_info in fields.values() {
-                    self.collect(field_info.type_id, type_ctx);
-                }
-            }
-            TypeShape::Enum(variants) => {
-                for &variant_type_id in variants.values() {
-                    self.collect(variant_type_id, type_ctx);
-                }
-            }
-            TypeShape::Array { element, .. } => {
-                self.collect(*element, type_ctx);
-            }
-            TypeShape::Optional(inner) => {
-                self.collect(*inner, type_ctx);
-            }
             TypeShape::Ref(def_id) => {
                 let target_id = type_ctx.expect_def_output(*def_id);
                 self.collect(target_id, type_ctx);
+            }
+            _ => {
+                for child_id in type_shape.child_type_ids() {
+                    self.collect(child_id, type_ctx);
+                }
             }
         }
     }

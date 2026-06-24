@@ -43,6 +43,59 @@ pub enum TypeShape {
     Ref(DefId),
 }
 
+type FieldTypeIds<'a> = std::iter::Map<
+    std::collections::btree_map::Values<'a, Symbol, FieldInfo>,
+    fn(&FieldInfo) -> TypeId,
+>;
+type VariantTypeIds<'a> =
+    std::iter::Copied<std::collections::btree_map::Values<'a, Symbol, TypeId>>;
+
+pub struct TypeShapeChildIds<'a>(TypeShapeChildIdsInner<'a>);
+
+enum TypeShapeChildIdsInner<'a> {
+    Fields(FieldTypeIds<'a>),
+    Variants(VariantTypeIds<'a>),
+    One(std::option::IntoIter<TypeId>),
+    Empty(std::iter::Empty<TypeId>),
+}
+
+impl Iterator for TypeShapeChildIds<'_> {
+    type Item = TypeId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.0 {
+            TypeShapeChildIdsInner::Fields(ids) => ids.next(),
+            TypeShapeChildIdsInner::Variants(ids) => ids.next(),
+            TypeShapeChildIdsInner::One(id) => id.next(),
+            TypeShapeChildIdsInner::Empty(ids) => ids.next(),
+        }
+    }
+}
+
+impl TypeShape {
+    pub fn child_type_ids(&self) -> TypeShapeChildIds<'_> {
+        let inner = match self {
+            Self::Struct(fields) => TypeShapeChildIdsInner::Fields(
+                fields
+                    .values()
+                    .map(field_type_id as fn(&FieldInfo) -> TypeId),
+            ),
+            Self::Enum(variants) => TypeShapeChildIdsInner::Variants(variants.values().copied()),
+            Self::Array { element, .. } | Self::Optional(element) => {
+                TypeShapeChildIdsInner::One(Some(*element).into_iter())
+            }
+            Self::Void | Self::Node | Self::Custom(_) | Self::Ref(_) => {
+                TypeShapeChildIdsInner::Empty(std::iter::empty())
+            }
+        };
+        TypeShapeChildIds(inner)
+    }
+}
+
+fn field_type_id(field: &FieldInfo) -> TypeId {
+    field.type_id
+}
+
 /// Field information within a struct type.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct FieldInfo {

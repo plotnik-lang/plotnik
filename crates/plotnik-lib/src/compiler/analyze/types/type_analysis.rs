@@ -80,12 +80,9 @@ impl TypeAnalysis {
     pub fn is_structured_output(&self, type_id: TypeId) -> bool {
         match self.type_shape(type_id) {
             Some(TypeShape::Enum(_) | TypeShape::Struct(_) | TypeShape::Ref(_)) => true,
-            Some(TypeShape::Array { element, .. }) => {
-                *element != TYPE_NODE && self.is_structured_output(*element)
-            }
-            Some(TypeShape::Optional(inner)) => {
-                *inner != TYPE_NODE && self.is_structured_output(*inner)
-            }
+            Some(shape @ (TypeShape::Array { .. } | TypeShape::Optional(_))) => shape
+                .child_type_ids()
+                .any(|id| id != TYPE_NODE && self.is_structured_output(id)),
             _ => false,
         }
     }
@@ -148,31 +145,15 @@ impl TypeAnalysis {
         );
 
         for shape in &self.types {
-            match shape {
-                TypeShape::Struct(fields) => {
-                    for info in fields.values() {
-                        self.assert_type_id_registered(
-                            info.type_id,
-                            "struct field type id out of range",
-                        );
-                    }
-                }
-                TypeShape::Enum(variants) => {
-                    for &id in variants.values() {
-                        self.assert_type_id_registered(id, "enum variant type id out of range");
-                    }
-                }
-                TypeShape::Array { element, .. } => {
-                    self.assert_type_id_registered(*element, "array element type id out of range");
-                }
-                TypeShape::Optional(inner) => {
-                    self.assert_type_id_registered(*inner, "optional inner type id out of range");
-                }
-                TypeShape::Ref(def_id) => assert!(
+            for child_id in shape.child_type_ids() {
+                self.assert_type_id_registered(child_id, "child type id out of range");
+            }
+
+            if let TypeShape::Ref(def_id) = shape {
+                assert!(
                     self.def_output.contains_key(def_id),
                     "every Ref target must have an inferred output type",
-                ),
-                TypeShape::Void | TypeShape::Node | TypeShape::Custom(_) => {}
+                );
             }
         }
 
