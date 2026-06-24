@@ -9,7 +9,6 @@ use std::collections::HashSet;
 
 use crate::bytecode::{TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeNameEntry};
 
-use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
 use crate::compiler::emit::tables::{EmitError, EmitInput, StringTableBuilder, TypeTableBuilder};
@@ -23,13 +22,7 @@ pub fn build_type_table(
     mut strings: StringTableBuilder,
 ) -> Result<(TypeTableBuilder, StringTableBuilder), EmitError> {
     let mut types = TypeTableBuilder::new();
-    build(
-        &mut types,
-        input.type_ctx,
-        input.dependency_analysis,
-        input.interner,
-        &mut strings,
-    )?;
+    build(&mut types, *input, &mut strings)?;
     Ok((types, strings))
 }
 
@@ -41,11 +34,11 @@ pub fn build_type_table(
 /// emitted first, then custom types in definition order, depth-first.
 fn build(
     types: &mut TypeTableBuilder,
-    type_ctx: &TypeAnalysis,
-    dependency_analysis: &DependencyAnalysis,
-    interner: &Interner,
+    input: EmitInput<'_>,
     strings: &mut StringTableBuilder,
 ) -> Result<(), EmitError> {
+    let type_ctx = input.type_ctx;
+
     // Collect custom types depth-first from definition result types. Every
     // emitted effect's member ref names a type that one of these reaches, so
     // this single walk also covers all effect-referenced types. Definition
@@ -101,7 +94,7 @@ fn build(
     let builtin_count = usage.uses_void as usize + usage.uses_node as usize;
     let mut ctx = TypeEmitSlots {
         type_ctx,
-        interner,
+        interner: input.interner,
         strings,
     };
     for (i, &type_id) in ordered_types.iter().enumerate() {
@@ -111,7 +104,7 @@ fn build(
     }
 
     for (def_id, type_id) in type_ctx.iter_def_output() {
-        let name_sym = dependency_analysis.def_name_sym(def_id);
+        let name_sym = input.dependency_analysis.def_name_sym(def_id);
         let name = ctx.strings.get_or_intern(name_sym, ctx.interner)?;
         let bc_type_id = types
             .lookup(type_id)
