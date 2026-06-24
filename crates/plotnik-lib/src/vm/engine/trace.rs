@@ -393,13 +393,13 @@ impl<'s> PrintTracer<'s> {
                 parts.push(node_part);
             }
 
-            if let Some((op, is_regex, value_ref)) = m.predicate() {
-                let op = PredicateOp::from_byte(op);
-                let value = if is_regex {
-                    let pattern = &self.regex_patterns[value_ref as usize];
+            if let Some(predicate) = m.predicate() {
+                let op = PredicateOp::from_byte(predicate.op);
+                let value = if predicate.is_regex {
+                    let pattern = &self.regex_patterns[predicate.value_ref as usize];
                     format!("/{}/", pattern)
                 } else {
-                    let s = &self.all_strings[value_ref as usize];
+                    let s = &self.all_strings[predicate.value_ref as usize];
                     format!("{:?}", s)
                 };
                 parts.push(format!("{} {}", op.as_str(), value));

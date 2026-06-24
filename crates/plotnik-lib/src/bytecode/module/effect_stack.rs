@@ -217,7 +217,7 @@ fn analyze(
                 }
             }
             Instruction::Call(c) => {
-                let target = u16::from(c.target());
+                let target = u16::from(c.target);
                 discovered.push(target);
                 apply_call(
                     summaries,
@@ -228,7 +228,7 @@ fn analyze(
                     final_check,
                     step,
                 )?;
-                work.push((u16::from(c.next()), stack, suppress));
+                work.push((u16::from(c.next), stack, suppress));
             }
             Instruction::Trampoline(t) => {
                 // The trampoline's callee is the entrypoint bound by the caller;

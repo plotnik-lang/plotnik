@@ -459,12 +459,8 @@ impl<'a> Match<'a> {
         )
     }
 
-    /// Get predicate data if present: (op, is_regex, value_ref).
-    ///
-    /// - `op`: operator (see [`crate::bytecode::predicate_op::PredicateOp`])
-    /// - `is_regex`: true if value_ref is a RegexTable index, false if StringTable index
-    /// - `value_ref`: index into the appropriate table
-    pub fn predicate(&self) -> Option<(u8, bool, u16)> {
+    /// Get predicate data if present.
+    pub fn predicate(&self) -> Option<MatchPredicate> {
         if !self.has_predicate() {
             return None;
         }
@@ -477,7 +473,11 @@ impl<'a> Match<'a> {
             self.bytes[offset + PAYLOAD_SLOT_SIZE + 1],
         ]);
 
-        Some((op, is_regex, value_ref))
+        Some(MatchPredicate {
+            op,
+            is_regex,
+            value_ref,
+        })
     }
 
     #[inline]
@@ -533,7 +533,7 @@ impl<'a> Match<'a> {
             pre_effects: self.pre_effects().collect(),
             neg_fields: self.neg_fields().collect(),
             post_effects: self.post_effects().collect(),
-            predicate: self.predicate().map(MatchPredicate::from_tuple),
+            predicate: self.predicate(),
             successors: self.successors().collect(),
         }
     }
@@ -541,7 +541,6 @@ impl<'a> Match<'a> {
 
 /// Predicate filter carried by an extended Match (text comparison).
 ///
-/// Mirrors the tuple returned by [`Match::predicate`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct MatchPredicate {
     /// Operator byte (see [`crate::bytecode::predicate_op::PredicateOp`]).
@@ -559,14 +558,6 @@ impl MatchPredicate {
     const REGEX_FLAG: u16 = 1 << 8;
     /// Bits above the operator and regex flag are reserved-zero.
     const RESERVED_MASK: u16 = !(Self::OP_MASK | Self::REGEX_FLAG);
-
-    fn from_tuple((op, is_regex, value_ref): (u8, bool, u16)) -> Self {
-        Self {
-            op,
-            is_regex,
-            value_ref,
-        }
-    }
 
     /// Pack the op/flags word — the predicate's first payload slot.
     fn pack_op_flags(self) -> u16 {
@@ -782,19 +773,6 @@ impl Call {
         bytes[4..6].copy_from_slice(&u16::from(self.next).to_le_bytes());
         bytes[6..8].copy_from_slice(&u16::from(self.target).to_le_bytes());
         bytes
-    }
-
-    pub fn nav(&self) -> Nav {
-        self.nav
-    }
-    pub fn node_field(&self) -> Option<NodeFieldId> {
-        self.node_field
-    }
-    pub fn next(&self) -> StepId {
-        self.next
-    }
-    pub fn target(&self) -> StepId {
-        self.target
     }
 }
 

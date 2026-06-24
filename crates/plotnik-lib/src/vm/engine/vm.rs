@@ -441,8 +441,13 @@ impl<'t> VM<'t> {
             }
         }
 
-        if let Some((op, is_regex, value_ref)) = m.predicate()
-            && !self.evaluate_predicate(op, is_regex, value_ref, module)
+        if let Some(predicate) = m.predicate()
+            && !self.evaluate_predicate(
+                predicate.op,
+                predicate.is_regex,
+                predicate.value_ref,
+                module,
+            )
         {
             return false;
         }

@@ -481,14 +481,17 @@ impl DumpFormatter<'_> {
                 parts.push(node_part);
             }
 
-            if let Some((op, is_regex, value_ref)) = m.predicate() {
-                let op = PredicateOp::from_byte(op);
-                let value = if is_regex {
-                    let string_id = self.module.regexes().pattern_string_id(value_ref as usize);
+            if let Some(predicate) = m.predicate() {
+                let op = PredicateOp::from_byte(predicate.op);
+                let value = if predicate.is_regex {
+                    let string_id = self
+                        .module
+                        .regexes()
+                        .pattern_string_id(predicate.value_ref as usize);
                     let pattern = &ctx.all_strings[u16::from(string_id) as usize];
                     format!("/{}/", pattern)
                 } else {
-                    let s = &ctx.all_strings[value_ref as usize];
+                    let s = &ctx.all_strings[predicate.value_ref as usize];
                     format!("{:?}", s)
                 };
                 parts.push(format!("{} {}", op.as_str(), value));
@@ -565,7 +568,7 @@ impl DumpFormatter<'_> {
     fn format_call(&self, step: u16, call: &Call) -> String {
         let c = &self.ctx.colors;
         let builder = LineBuilder::new(self.step_width);
-        let symbol = nav_symbol(call.nav());
+        let symbol = nav_symbol(call.nav);
         let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = self.step_width);
 
         // Format field constraint if present
