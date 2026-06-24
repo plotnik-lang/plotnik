@@ -183,7 +183,7 @@ impl Grammar {
             |node_kind| resolve_node_id(&named_node_ids, &anonymous_node_ids, node_kind),
             |name| field_ids.get(name).copied(),
         )
-        .map_err(format_node_shape_error)?;
+        .map_err(|error| error.to_string())?;
 
         let mut subtypes = HashMap::new();
         for shape in &tables.node_shapes {
@@ -479,10 +479,6 @@ fn resolve_node_id(
 
 fn node_field_id(id: u16) -> NodeFieldId {
     NodeFieldId::try_from(id).expect("lowered field symbol id must be non-zero in production grammar")
-}
-
-fn format_node_shape_error(error: NodeShapeBuildError) -> String {
-    error.to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

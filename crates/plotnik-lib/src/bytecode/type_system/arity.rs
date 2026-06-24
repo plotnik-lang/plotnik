@@ -18,11 +18,4 @@ impl Arity {
         Self::Many
     }
 
-    pub fn is_one(self) -> bool {
-        self == Self::One
-    }
-
-    pub fn is_many(self) -> bool {
-        self == Self::Many
-    }
 }

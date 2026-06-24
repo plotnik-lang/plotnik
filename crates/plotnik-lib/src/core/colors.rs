@@ -44,8 +44,4 @@ impl Colors {
     pub fn new(enabled: bool) -> Self {
         if enabled { Self::ON } else { Self::OFF }
     }
-
-    pub fn is_enabled(&self) -> bool {
-        !self.blue.is_empty()
-    }
 }

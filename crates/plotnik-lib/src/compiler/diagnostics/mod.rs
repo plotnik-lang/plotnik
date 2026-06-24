@@ -11,9 +11,6 @@ pub use report::{DiagnosticKind, Diagnostics, Severity};
 pub use source::{Source, SourceId, SourceKind, SourceMap, SourcePath};
 pub use span::Span;
 
-/// Result type for analysis passes that produce both output and diagnostics.
-pub type PassResult<T> = std::result::Result<(T, Diagnostics), Error>;
-
 /// Errors that can occur during query parsing.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
