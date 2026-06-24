@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use crate::bytecode::predicate_op::PredicateOp;
-use crate::core::Colors;
+use crate::core::{Colors, NodeFieldId, NodeKindId};
 
 use super::format::{
     LineBuilder, PREAMBLE_NAME, Symbol, format_effect, nav_symbol, width_for_count,
@@ -41,9 +41,9 @@ struct DumpContext {
     /// Maps step ID to entrypoint name for labeling.
     step_labels: BTreeMap<u16, String>,
     /// Maps node kind ID to name.
-    node_kind_names: BTreeMap<u16, String>,
+    node_kind_names: BTreeMap<NodeKindId, String>,
     /// Maps node field ID to name.
-    node_field_names: BTreeMap<u16, String>,
+    node_field_names: BTreeMap<NodeFieldId, String>,
     /// All strings (for predicate values, regex patterns, etc).
     all_strings: Vec<String>,
     /// Width for string indices (S#).
@@ -80,13 +80,17 @@ impl DumpContext {
         let mut node_kind_names = BTreeMap::new();
         for i in 0..node_types.len() {
             let t = node_types.get(i);
-            node_kind_names.insert(t.symbol, strings.get(t.name).to_string());
+            if let Ok(id) = NodeKindId::try_from(t.symbol) {
+                node_kind_names.insert(id, strings.get(t.name).to_string());
+            }
         }
 
         let mut node_field_names = BTreeMap::new();
         for i in 0..node_fields.len() {
             let f = node_fields.get(i);
-            node_field_names.insert(f.symbol, strings.get(f.name).to_string());
+            if let Ok(id) = NodeFieldId::try_from(f.symbol) {
+                node_field_names.insert(id, strings.get(f.name).to_string());
+            }
         }
 
         let str_count = header.str_table_count as usize;
@@ -116,14 +120,14 @@ impl DumpContext {
     }
 
     fn label_for(&self, step: StepId) -> Option<&str> {
-        self.step_labels.get(&step.as_u16()).map(|s| s.as_str())
+        self.step_labels.get(&u16::from(step)).map(|s| s.as_str())
     }
 
-    fn node_kind_name(&self, id: u16) -> Option<&str> {
+    fn node_kind_name(&self, id: NodeKindId) -> Option<&str> {
         self.node_kind_names.get(&id).map(|s| s.as_str())
     }
 
-    fn node_field_name(&self, id: u16) -> Option<&str> {
+    fn node_field_name(&self, id: NodeFieldId) -> Option<&str> {
         self.node_field_names.get(&id).map(|s| s.as_str())
     }
 }
@@ -157,7 +161,7 @@ fn dump_regexes(out: &mut String, module: &Module, ctx: &DumpContext) {
     writeln!(out, "{}[regex]{}", c.blue, c.reset).expect("writing to a String is infallible");
     for i in 1..count {
         let string_id = regexes.pattern_string_id(i);
-        let pattern = &ctx.all_strings[string_id.as_u16() as usize];
+        let pattern = &ctx.all_strings[u16::from(string_id) as usize];
         writeln!(out, "R{i:0w$} {}/{pattern}/{}", c.green, c.reset)
             .expect("writing to a String is infallible");
     }
@@ -188,10 +192,10 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
             }
             TypeDefKind::Wrapper { kind, inner } => {
                 let formatted = match kind {
-                    TypeKind::Optional => format!("Optional(T{:0tw$})", inner.0),
-                    TypeKind::ArrayZeroOrMore => format!("ArrayStar(T{:0tw$})", inner.0),
-                    TypeKind::ArrayOneOrMore => format!("ArrayPlus(T{:0tw$})", inner.0),
-                    TypeKind::Alias => format!("Alias(T{:0tw$})", inner.0),
+                    TypeKind::Optional => format!("Optional(T{:0tw$})", u16::from(inner)),
+                    TypeKind::ArrayZeroOrMore => format!("ArrayStar(T{:0tw$})", u16::from(inner)),
+                    TypeKind::ArrayOneOrMore => format!("ArrayPlus(T{:0tw$})", u16::from(inner)),
+                    TypeKind::Alias => format!("Alias(T{:0tw$})", u16::from(inner)),
                     _ => unreachable!(),
                 };
                 let comment = match kind {
@@ -261,7 +265,7 @@ fn dump_types_members(out: &mut String, module: &Module, ctx: &DumpContext) {
         writeln!(
             out,
             "M{i:0mw$}: S{:0sw$} → T{:0tw$}  {}; {name}: {type_name}{}",
-            member.name_id.0, member.type_id.0, c.dim, c.reset
+            u16::from(member.name_id), u16::from(member.type_id), c.dim, c.reset
         )
         .expect("writing to a String is infallible");
     }
@@ -283,7 +287,7 @@ fn dump_types_names(out: &mut String, module: &Module, ctx: &DumpContext) {
         writeln!(
             out,
             "N{i:0nw$}: S{:0sw$} → T{:0tw$}  {}; {}{name}{}",
-            entry.name_id.0, entry.type_id.0, c.dim, c.blue, c.reset
+            u16::from(entry.name_id), u16::from(entry.type_id), c.dim, c.blue, c.reset
         )
         .expect("writing to a String is infallible");
     }
@@ -310,7 +314,7 @@ fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> Stri
     }
 
     let tw = ctx.type_width;
-    format!("T{:0tw$}", type_id.0)
+    format!("T{:0tw$}", u16::from(type_id))
 }
 
 fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
@@ -326,7 +330,7 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
         .map(|i| {
             let ep = entrypoints.get(i);
             let name = strings.get(ep.name());
-            (name, ep.target(), ep.result_type().0)
+            (name, ep.target(), u16::from(ep.result_type()))
         })
         .collect();
     entries.sort_by_key(|(name, _, _)| *name);
@@ -480,7 +484,7 @@ impl DumpFormatter<'_> {
                 let op = PredicateOp::from_byte(op);
                 let value = if is_regex {
                     let string_id = self.module.regexes().pattern_string_id(value_ref as usize);
-                    let pattern = &ctx.all_strings[string_id.as_u16() as usize];
+                    let pattern = &ctx.all_strings[u16::from(string_id) as usize];
                     format!("/{}/", pattern)
                 } else {
                     let s = &ctx.all_strings[value_ref as usize];
@@ -505,9 +509,9 @@ impl DumpFormatter<'_> {
 
         if let Some(field_id) = m.node_field {
             let name = ctx
-                .node_field_name(field_id.get())
+                .node_field_name(field_id)
                 .map(String::from)
-                .unwrap_or_else(|| format!("field#{}", field_id.get()));
+                .unwrap_or_else(|| format!("field#{field_id}"));
             result.push_str(&name);
             result.push_str(": ");
         }
@@ -521,9 +525,9 @@ impl DumpFormatter<'_> {
             }
             NodeKindConstraint::Named(Some(type_id)) => {
                 let name = ctx
-                    .node_kind_name(type_id.get())
+                    .node_kind_name(type_id)
                     .map(String::from)
-                    .unwrap_or_else(|| format!("node#{}", type_id.get()));
+                    .unwrap_or_else(|| format!("node#{type_id}"));
                 result.push('(');
                 result.push_str(&name);
                 result.push(')');
@@ -534,9 +538,9 @@ impl DumpFormatter<'_> {
             }
             NodeKindConstraint::Anonymous(Some(type_id)) => {
                 let name = ctx
-                    .node_kind_name(type_id.get())
+                    .node_kind_name(type_id)
                     .map(String::from)
-                    .unwrap_or_else(|| format!("anon#{}", type_id.get()));
+                    .unwrap_or_else(|| format!("anon#{type_id}"));
                 result.push('"');
                 result.push_str(&name);
                 result.push('"');
@@ -567,9 +571,9 @@ impl DumpFormatter<'_> {
         let field_part = if let Some(field_id) = call.node_field {
             let name = self
                 .ctx
-                .node_field_name(field_id.get())
+                .node_field_name(field_id)
                 .map(String::from)
-                .unwrap_or_else(|| format!("field#{}", field_id.get()));
+                .unwrap_or_else(|| format!("field#{field_id}"));
             format!("{name}: ")
         } else {
             String::new()
@@ -579,14 +583,14 @@ impl DumpFormatter<'_> {
             .ctx
             .label_for(call.target)
             .map(String::from)
-            .unwrap_or_else(|| format!("@{:0w$}", call.target.0, w = self.step_width));
+            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.step_width));
         // Definition name in call is blue
         let content = format!("{field_part}({}{}{})", c.blue, target_name, c.reset);
         // Format as "target : return" with numeric IDs
         let successors = format!(
             "{:0w$} : {:0w$}",
-            call.target.as_u16(),
-            call.next.as_u16(),
+            u16::from(call.target),
+            u16::from(call.next),
             w = self.step_width
         );
 
@@ -614,7 +618,7 @@ impl DumpFormatter<'_> {
             sw = self.step_width
         );
         let content = "Trampoline";
-        let successors = format!("{:0w$}", t.next.as_u16(), w = self.step_width);
+        let successors = format!("{:0w$}", u16::from(t.next), w = self.step_width);
         let base = format!("{prefix}{content}");
         builder.pad_successors(base, &successors)
     }
@@ -624,7 +628,7 @@ impl DumpFormatter<'_> {
         if let Some(label) = self.ctx.label_for(step) {
             format!("▶({}{}{})", c.blue, label, c.reset)
         } else {
-            format!("{:0w$}", step.as_u16(), w = self.step_width)
+            format!("{:0w$}", u16::from(step), w = self.step_width)
         }
     }
 }

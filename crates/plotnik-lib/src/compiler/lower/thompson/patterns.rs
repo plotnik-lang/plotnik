@@ -7,8 +7,6 @@
 //! - Field constraints: `name: pattern`
 //! - Captured patterns: `@name`, `pattern @name`
 
-use std::num::NonZeroU16;
-
 use crate::bytecode::{Nav, PredicateOp};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
@@ -16,6 +14,7 @@ use crate::compiler::lower::ir::{
     CalleeEntry, EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
     ReturnAddr,
 };
+use crate::core::NodeFieldId;
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
 
@@ -203,7 +202,7 @@ impl NfaBuilder<'_> {
         &mut self,
         r: &ast::DefRef,
         ctx: PatternCtx,
-        field_override: Option<NonZeroU16>,
+        field_override: Option<NodeFieldId>,
     ) -> Label {
         let PatternCtx {
             exit,
@@ -369,7 +368,7 @@ impl NfaBuilder<'_> {
         &mut self,
         value: &Pattern,
         ctx: PatternCtx,
-        field_id: NonZeroU16,
+        field_id: NodeFieldId,
     ) -> Label {
         let PatternCtx { exit, nav, capture } = ctx;
         let value_entry = self.dispatch_pattern(
@@ -394,7 +393,7 @@ impl NfaBuilder<'_> {
     fn attach_field_to_entry_or_wrap(
         &mut self,
         value_entry: Label,
-        node_field: Option<NonZeroU16>,
+        node_field: Option<NodeFieldId>,
     ) -> Label {
         if let Some(field_id) = node_field {
             if let Some(instr) = self
@@ -708,7 +707,7 @@ impl NfaBuilder<'_> {
     }
 
     /// Resolve a field pattern to its grammar `NodeFieldId`.
-    pub(super) fn resolve_field(&mut self, field: &ast::FieldPattern) -> Option<NonZeroU16> {
+    pub(super) fn resolve_field(&mut self, field: &ast::FieldPattern) -> Option<NodeFieldId> {
         let name_token = field
             .name()
             .expect("validated field pattern must have a field name");
@@ -717,7 +716,7 @@ impl NfaBuilder<'_> {
     }
 
     /// Resolve a field name to its grammar `NodeFieldId`.
-    pub(super) fn resolve_field_by_name(&mut self, field_name: &str) -> NonZeroU16 {
+    pub(super) fn resolve_field_by_name(&mut self, field_name: &str) -> NodeFieldId {
         let sym = self
             .ctx
             .interner
@@ -726,7 +725,7 @@ impl NfaBuilder<'_> {
         self.ctx.grammar.expect_field(sym)
     }
 
-    pub(super) fn collect_neg_fields(&mut self, node: &ast::NodePattern) -> Vec<u16> {
+    pub(super) fn collect_neg_fields(&mut self, node: &ast::NodePattern) -> Vec<NodeFieldId> {
         node.syntax()
             .children()
             .filter_map(ast::NegatedField::cast)
@@ -736,7 +735,6 @@ impl NfaBuilder<'_> {
                     .expect("validated negated field must have a field name");
                 self.resolve_field_by_name(name.text())
             })
-            .map(|id| id.get())
             .collect()
     }
 

@@ -7,6 +7,8 @@ use crate::bytecode::{
     PredicateOp, StepAddr, Trampoline,
 };
 
+use crate::core::NodeFieldId;
+
 use super::checkpoint::{CallResume, Checkpoint, CheckpointStack, CheckpointState};
 use super::cursor::{CursorWrapper, SkipPolicy};
 use super::effect::{EffectLog, RuntimeEffect};
@@ -427,7 +429,7 @@ impl<'t> VM<'t> {
                 }
             }
             NodeKindConstraint::Named(Some(expected)) => {
-                if !node.is_named() || node.kind_id() != expected.get() {
+                if !node.is_named() || node.kind_id() != u16::from(expected) {
                     tracer.trace_match_failure(node);
                     return false;
                 }
@@ -439,7 +441,7 @@ impl<'t> VM<'t> {
                 }
             }
             NodeKindConstraint::Anonymous(Some(expected)) => {
-                if node.is_named() || node.kind_id() != expected.get() {
+                if node.is_named() || node.kind_id() != u16::from(expected) {
                     tracer.trace_match_failure(node);
                     return false;
                 }
@@ -454,7 +456,7 @@ impl<'t> VM<'t> {
         }
 
         for field_id in m.neg_fields() {
-            if node.child_by_field_id(field_id).is_some() {
+            if node.child_by_field_id(u16::from(field_id)).is_some() {
                 return false;
             }
         }
@@ -480,11 +482,11 @@ impl<'t> VM<'t> {
         // Push checkpoints for alternate branches (in reverse order)
         for i in (1..m.succ_count()).rev() {
             self.checkpoints
-                .push(self.branch_checkpoint(m.successor(i).as_u16()));
+                .push(self.branch_checkpoint(u16::from(m.successor(i))));
             tracer.trace_checkpoint_created(self.ip);
         }
 
-        self.ip = m.successor(0).as_u16();
+        self.ip = u16::from(m.successor(0));
         Ok(())
     }
 
@@ -507,8 +509,8 @@ impl<'t> VM<'t> {
             && policy != SkipPolicy::Exact
         {
             let resume = CallResume {
-                target: c.target.as_u16(),
-                next: c.next.as_u16(),
+                target: u16::from(c.target),
+                next: u16::from(c.next),
                 field: c.node_field,
                 policy,
             };
@@ -517,7 +519,7 @@ impl<'t> VM<'t> {
             tracer.trace_checkpoint_created(self.ip);
         }
 
-        self.enter_callee(c.target.as_u16(), c.next.as_u16(), tracer);
+        self.enter_callee(u16::from(c.target), u16::from(c.next), tracer);
         Ok(())
     }
 
@@ -550,7 +552,7 @@ impl<'t> VM<'t> {
         // Trampoline doesn't navigate - it's always at root, cursor stays at root
         let saved_depth = self.cursor.depth();
         tracer.trace_call(self.trampoline_target);
-        self.frames.push(t.next.as_u16(), saved_depth);
+        self.frames.push(u16::from(t.next), saved_depth);
         self.recursion_depth += 1;
         debug_assert_eq!(
             self.recursion_depth,
@@ -567,7 +569,7 @@ impl<'t> VM<'t> {
     fn navigate_to_field_with_policy<T: Tracer>(
         &mut self,
         nav: Nav,
-        field: Option<std::num::NonZeroU16>,
+        field: Option<NodeFieldId>,
         tracer: &mut T,
     ) -> Result<Option<SkipPolicy>, Signal> {
         if nav == Nav::Stay || nav == Nav::StayExact {
@@ -598,7 +600,7 @@ impl<'t> VM<'t> {
 
     fn check_field<T: Tracer>(
         &mut self,
-        field: Option<std::num::NonZeroU16>,
+        field: Option<NodeFieldId>,
         tracer: &mut T,
     ) -> Result<(), Signal> {
         let Some(field_id) = field else {

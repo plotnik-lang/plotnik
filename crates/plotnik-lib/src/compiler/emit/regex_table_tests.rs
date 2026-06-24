@@ -10,8 +10,8 @@ use super::regex_table::intern;
 fn intern_and_lookup() {
     let mut builder = RegexTableBuilder::new();
 
-    let str1 = StringId::new(1);
-    let str2 = StringId::new(2);
+    let str1 = StringId::try_from(1).unwrap();
+    let str2 = StringId::try_from(2).unwrap();
 
     let id1 = intern(&mut builder, "foo", str1).unwrap();
     let id2 = intern(&mut builder, "bar", str2).unwrap();
@@ -23,14 +23,14 @@ fn intern_and_lookup() {
 
     assert_eq!(builder.lookup(str1), Some(1));
     assert_eq!(builder.lookup(str2), Some(2));
-    assert_eq!(builder.lookup(StringId::new(99)), None);
+    assert_eq!(builder.lookup(StringId::try_from(99).unwrap()), None);
 }
 
 #[test]
 fn emit_and_deserialize() {
     let mut builder = RegexTableBuilder::new();
-    intern(&mut builder, "hello", StringId::new(1)).unwrap();
-    intern(&mut builder, "world", StringId::new(2)).unwrap();
+    intern(&mut builder, "hello", StringId::try_from(1).unwrap()).unwrap();
+    intern(&mut builder, "world", StringId::try_from(2).unwrap()).unwrap();
 
     let (blob, table) = builder.emit();
 
@@ -67,7 +67,7 @@ fn emit_and_deserialize() {
 fn escaped_slash_pattern() {
     let mut builder = RegexTableBuilder::new();
     // Pattern "a\/b" should match literal "a/b"
-    let id = intern(&mut builder, r"a\/b", StringId::new(1)).unwrap();
+    let id = intern(&mut builder, r"a\/b", StringId::try_from(1).unwrap()).unwrap();
     assert_eq!(id, 1);
 
     let (blob, table) = builder.emit();

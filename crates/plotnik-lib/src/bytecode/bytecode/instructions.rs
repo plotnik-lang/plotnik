@@ -5,6 +5,8 @@
 
 use std::num::NonZeroU16;
 
+use crate::core::{NodeFieldId, ZeroIdError};
+
 #[cfg(test)]
 use super::constants::SECTION_ALIGN;
 use super::constants::{
@@ -130,19 +132,32 @@ pub type StepAddr = u16;
 /// Uses NonZeroU16 because raw 0 means "terminal" (no successor).
 /// This type is only for decoded instruction successors - use raw `u16`
 /// for addresses in layout, entrypoints, and VM internals.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
-pub struct StepId(pub NonZeroU16);
+pub struct StepId(NonZeroU16);
 
-impl StepId {
+impl From<NonZeroU16> for StepId {
     #[inline]
-    pub fn new(n: u16) -> Self {
-        Self(NonZeroU16::new(n).expect("StepId cannot be 0"))
+    fn from(n: NonZeroU16) -> Self { Self(n) }
+}
+impl From<StepId> for NonZeroU16 {
+    #[inline]
+    fn from(v: StepId) -> Self { v.0 }
+}
+impl From<StepId> for u16 {
+    #[inline]
+    fn from(v: StepId) -> Self { v.0.get() }
+}
+impl TryFrom<u16> for StepId {
+    type Error = ZeroIdError;
+    #[inline]
+    fn try_from(n: u16) -> Result<Self, Self::Error> {
+        NonZeroU16::new(n).map(Self).ok_or(ZeroIdError)
     }
-
-    #[inline]
-    pub fn as_u16(self) -> u16 {
-        self.0.get()
+}
+impl std::fmt::Display for StepId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.get())
     }
 }
 
@@ -233,7 +248,7 @@ pub struct Match<'a> {
     /// Node kind constraint (Any = wildcard, Named/Anonymous for specific checks).
     pub node_kind: NodeKindConstraint,
     /// Field constraint (None = wildcard).
-    pub node_field: Option<NonZeroU16>,
+    pub node_field: Option<NodeFieldId>,
     layout: MatchLayout,
 }
 
@@ -275,7 +290,7 @@ impl<'a> Match<'a> {
         let nav = Nav::from_byte(bytes[1]);
         let node_val = u16::from_le_bytes([bytes[2], bytes[3]]);
         let node_kind = NodeKindConstraint::from_bytes(node_class, node_val);
-        let node_field = NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]]));
+        let node_field = NonZeroU16::new(u16::from_le_bytes([bytes[4], bytes[5]])).map(NodeFieldId::from);
 
         let layout = if opcode == Opcode::Match8 {
             let next = u16::from_le_bytes([bytes[6], bytes[7]]);
@@ -341,14 +356,14 @@ impl<'a> Match<'a> {
             MatchLayout::Match8 { next } => {
                 debug_assert!(idx == 0);
                 debug_assert!(next != 0, "terminal has no successors");
-                StepId::new(next)
+                StepId::try_from(next).expect("step id must be non-zero")
             }
             MatchLayout::Extended { .. } => {
                 let offset = self.succ_offset() + idx * PAYLOAD_SLOT_SIZE;
-                StepId::new(u16::from_le_bytes([
+                StepId::try_from(u16::from_le_bytes([
                     self.bytes[offset],
                     self.bytes[offset + 1],
-                ]))
+                ])).expect("step id must be non-zero")
             }
         }
     }
@@ -365,11 +380,12 @@ impl<'a> Match<'a> {
 
     /// Iterate over negated fields (must NOT be present on matched node).
     #[inline]
-    pub fn neg_fields(&self) -> impl Iterator<Item = u16> + '_ {
+    pub fn neg_fields(&self) -> impl Iterator<Item = NodeFieldId> + '_ {
         let start = MATCH_PAYLOAD_START + self.pre_count() * PAYLOAD_SLOT_SIZE;
         (0..self.neg_count()).map(move |i| {
             let offset = start + i * PAYLOAD_SLOT_SIZE;
-            u16::from_le_bytes([self.bytes[offset], self.bytes[offset + 1]])
+            let raw = u16::from_le_bytes([self.bytes[offset], self.bytes[offset + 1]]);
+            NodeFieldId::try_from(raw).expect("neg field id must be non-zero")
         })
     }
 
@@ -535,9 +551,9 @@ impl MatchPredicate {
 pub struct MatchInstr {
     pub nav: Nav,
     pub node_kind: NodeKindConstraint,
-    pub node_field: Option<NonZeroU16>,
+    pub node_field: Option<NodeFieldId>,
     pub pre_effects: Vec<Effect>,
-    pub neg_fields: Vec<u16>,
+    pub neg_fields: Vec<NodeFieldId>,
     pub post_effects: Vec<Effect>,
     pub predicate: Option<MatchPredicate>,
     pub successors: Vec<StepId>,
@@ -577,7 +593,7 @@ impl MatchInstr {
         }
 
         let (node_class, node_val) = self.node_kind.to_bytes();
-        let node_field_val = self.node_field.map_or(0, |n| n.get());
+        let node_field_val = self.node_field.map_or(0, u16::from);
 
         let can_use_match8 = self.pre_effects.is_empty()
             && self.neg_fields.is_empty()
@@ -591,7 +607,7 @@ impl MatchInstr {
             bytes[1] = self.nav.to_byte();
             bytes[2..4].copy_from_slice(&node_val.to_le_bytes());
             bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
-            let next = self.successors.first().map_or(0, |s| s.as_u16());
+            let next = self.successors.first().map_or(0, |s| u16::from(*s));
             bytes[6..8].copy_from_slice(&next.to_le_bytes());
             return Ok(bytes);
         }
@@ -645,7 +661,7 @@ impl MatchInstr {
             put(&mut bytes, effect.to_bytes());
         }
         for &field in &self.neg_fields {
-            put(&mut bytes, field.to_le_bytes());
+            put(&mut bytes, u16::from(field).to_le_bytes());
         }
         for effect in &self.post_effects {
             put(&mut bytes, effect.to_bytes());
@@ -655,7 +671,7 @@ impl MatchInstr {
             put(&mut bytes, pred.value_ref.to_le_bytes());
         }
         for succ in &self.successors {
-            put(&mut bytes, succ.as_u16().to_le_bytes());
+            put(&mut bytes, u16::from(*succ).to_le_bytes());
         }
 
         Ok(bytes)
@@ -670,7 +686,7 @@ pub struct Call {
     /// Navigation to apply before jumping to target.
     pub nav: Nav,
     /// Field constraint (None = no constraint).
-    pub node_field: Option<NonZeroU16>,
+    pub node_field: Option<NodeFieldId>,
     /// Return address (current segment).
     pub next: StepId,
     /// Callee entry point (target segment from type_id).
@@ -678,7 +694,7 @@ pub struct Call {
 }
 
 impl Call {
-    pub fn new(nav: Nav, node_field: Option<NonZeroU16>, next: StepId, target: StepId) -> Self {
+    pub fn new(nav: Nav, node_field: Option<NodeFieldId>, next: StepId, target: StepId) -> Self {
         Self {
             segment: 0,
             nav,
@@ -705,9 +721,9 @@ impl Call {
         Self {
             segment,
             nav: Nav::from_byte(bytes[1]),
-            node_field: NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]])),
-            next: StepId::new(u16::from_le_bytes([bytes[4], bytes[5]])),
-            target: StepId::new(u16::from_le_bytes([bytes[6], bytes[7]])),
+            node_field: NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]])).map(NodeFieldId::from),
+            next: StepId::try_from(u16::from_le_bytes([bytes[4], bytes[5]])).expect("step id must be non-zero"),
+            target: StepId::try_from(u16::from_le_bytes([bytes[6], bytes[7]])).expect("step id must be non-zero"),
         }
     }
 
@@ -718,16 +734,16 @@ impl Call {
         let mut bytes = [0u8; 8];
         bytes[0] = header_byte::pack(self.segment, 0, Opcode::Call);
         bytes[1] = self.nav.to_byte();
-        bytes[2..4].copy_from_slice(&self.node_field.map_or(0, |v| v.get()).to_le_bytes());
-        bytes[4..6].copy_from_slice(&self.next.as_u16().to_le_bytes());
-        bytes[6..8].copy_from_slice(&self.target.as_u16().to_le_bytes());
+        bytes[2..4].copy_from_slice(&self.node_field.map_or(0, u16::from).to_le_bytes());
+        bytes[4..6].copy_from_slice(&u16::from(self.next).to_le_bytes());
+        bytes[6..8].copy_from_slice(&u16::from(self.target).to_le_bytes());
         bytes
     }
 
     pub fn nav(&self) -> Nav {
         self.nav
     }
-    pub fn node_field(&self) -> Option<NonZeroU16> {
+    pub fn node_field(&self) -> Option<NodeFieldId> {
         self.node_field
     }
     pub fn next(&self) -> StepId {
@@ -818,7 +834,7 @@ impl Trampoline {
 
         Self {
             segment,
-            next: StepId::new(u16::from_le_bytes([bytes[2], bytes[3]])),
+            next: StepId::try_from(u16::from_le_bytes([bytes[2], bytes[3]])).expect("step id must be non-zero"),
         }
     }
 
@@ -829,7 +845,7 @@ impl Trampoline {
         let mut bytes = [0u8; 8];
         bytes[0] = header_byte::pack(self.segment, 0, Opcode::Trampoline);
         // bytes[1] is padding
-        bytes[2..4].copy_from_slice(&self.next.as_u16().to_le_bytes());
+        bytes[2..4].copy_from_slice(&u16::from(self.next).to_le_bytes());
         // bytes[4..8] are reserved/padding
         bytes
     }

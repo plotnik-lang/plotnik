@@ -8,7 +8,6 @@
 //! resolution or alignment regression surfaces on whichever grammar trips it.
 
 use std::collections::HashSet;
-use std::num::NonZeroU16;
 
 use crate::language_registry::{self, Lang, all, from_name};
 
@@ -180,7 +179,7 @@ fn compare_lang(lang: &Lang) -> CheckResult {
         } else {
             production.resolve_anonymous_node(name)
         }
-        .map(NonZeroU16::get);
+        .map(u16::from);
         let reference_id = non_zero_id(reference.id_for_node_kind(name, named));
 
         push_node_difference(&mut differences, key, production_id, reference_id);
@@ -196,7 +195,7 @@ fn compare_lang(lang: &Lang) -> CheckResult {
         push_field_difference(
             &mut differences,
             name.to_string(),
-            production.resolve_field(name).map(NonZeroU16::get),
+            production.resolve_field(name).map(u16::from),
             Some(id),
         );
     }
@@ -209,7 +208,7 @@ fn compare_lang(lang: &Lang) -> CheckResult {
         if !seen_nodes.contains(&key) {
             differences.push(Difference::Node {
                 key,
-                production: production.resolve_named_node(name).map(NonZeroU16::get),
+                production: production.resolve_named_node(name).map(u16::from),
                 reference: None,
             });
         }
@@ -223,7 +222,7 @@ fn compare_lang(lang: &Lang) -> CheckResult {
         if !seen_nodes.contains(&key) {
             differences.push(Difference::Node {
                 key,
-                production: production.resolve_anonymous_node(name).map(NonZeroU16::get),
+                production: production.resolve_anonymous_node(name).map(u16::from),
                 reference: None,
             });
         }
@@ -233,7 +232,7 @@ fn compare_lang(lang: &Lang) -> CheckResult {
         if !seen_fields.contains(name) {
             differences.push(Difference::Field {
                 name: name.to_string(),
-                production: production.resolve_field(name).map(NonZeroU16::get),
+                production: production.resolve_field(name).map(u16::from),
                 reference: None,
             });
         }

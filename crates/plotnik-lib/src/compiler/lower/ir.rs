@@ -6,12 +6,12 @@
 //! absolute member index at emit time.
 
 use std::collections::BTreeMap;
-use std::num::NonZeroU16;
 
 use crate::bytecode::{EffectKind, Nav, PredicateOp, StepAddr, select_match_opcode};
 use indexmap::IndexMap;
 
 use crate::compiler::ids::{DefId, TypeId};
+use crate::core::NodeFieldId;
 
 /// Node kind constraint for Match instructions.
 ///
@@ -259,11 +259,11 @@ pub struct MatchIR {
     /// Node kind constraint (Any = wildcard, Named/Anonymous for specific checks).
     pub node_kind: NodeKindConstraint,
     /// Field constraint (None = wildcard).
-    pub node_field: Option<NonZeroU16>,
+    pub node_field: Option<NodeFieldId>,
     /// Effects to execute before match attempt.
     pub pre_effects: Vec<EffectIR>,
     /// Fields that must NOT be present on the node.
-    pub neg_fields: Vec<u16>,
+    pub neg_fields: Vec<NodeFieldId>,
     /// Effects to execute after successful match.
     pub post_effects: Vec<EffectIR>,
     /// Predicate for node text filtering (None = no text check).
@@ -303,7 +303,7 @@ impl MatchIR {
         self
     }
 
-    pub fn node_field(mut self, f: impl Into<Option<NonZeroU16>>) -> Self {
+    pub fn node_field(mut self, f: impl Into<Option<NodeFieldId>>) -> Self {
         self.node_field = f.into();
         self
     }
@@ -318,7 +318,7 @@ impl MatchIR {
         self
     }
 
-    pub fn neg_fields(mut self, fields: impl IntoIterator<Item = u16>) -> Self {
+    pub fn neg_fields(mut self, fields: impl IntoIterator<Item = NodeFieldId>) -> Self {
         self.neg_fields.extend(fields);
         self
     }
@@ -392,7 +392,7 @@ pub struct CallIR {
     /// Navigation to apply before jumping to target.
     pub nav: Nav,
     /// Field constraint (None = no constraint).
-    pub node_field: Option<NonZeroU16>,
+    pub node_field: Option<NodeFieldId>,
     /// Return address (where to continue after callee returns).
     pub next: Label,
     /// Callee entry point.
@@ -416,7 +416,7 @@ impl CallIR {
         self
     }
 
-    pub fn node_field(mut self, f: impl Into<Option<NonZeroU16>>) -> Self {
+    pub fn node_field(mut self, f: impl Into<Option<NodeFieldId>>) -> Self {
         self.node_field = f.into();
         self
     }

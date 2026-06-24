@@ -65,18 +65,18 @@ impl Emitter<'_> {
         let mut queue: BinaryHeap<u16> = deps
             .iter()
             .filter(|(_, d)| d.is_empty())
-            .map(|(&tid, _)| tid.0)
+            .map(|(&tid, _)| u16::from(tid))
             .collect();
 
         while let Some(raw) = queue.pop() {
-            let tid = TypeId(raw);
+            let tid = TypeId::from(raw);
             result.push(tid);
             if let Some(dependents) = rdeps.get(&tid) {
                 for &dependent in dependents {
                     if let Some(dep_set) = deps.get_mut(&dependent) {
                         dep_set.remove(&tid);
                         if dep_set.is_empty() {
-                            queue.push(dependent.0);
+                            queue.push(u16::from(dependent));
                         }
                     }
                 }

@@ -1,10 +1,8 @@
-use std::num::NonZeroU16;
-
 use super::types::{
     Grammar, GrammarTables, NodeKindEntry, NodeKindRef, NodeShape, NodeShapeBuildError, NodeSlot,
     build_node_constraints,
 };
-use crate::core::{NodeKind, NodeKindId};
+use crate::core::{NodeFieldId, NodeKind, NodeKindId};
 
 impl NodeShape {
     /// A named node kind: non-root, no fields, no children.
@@ -41,15 +39,15 @@ impl NodeShape {
 
 fn node_id_for_type(node_kind: NodeKind<&str>) -> Option<NodeKindId> {
     match node_kind {
-        NodeKind::Named("root") => NonZeroU16::new(1),
-        NodeKind::Named("child") => NonZeroU16::new(2),
+        NodeKind::Named("root") => NodeKindId::try_from(1).ok(),
+        NodeKind::Named("child") => NodeKindId::try_from(2).ok(),
         _ => None,
     }
 }
 
-fn field_id_for_name(field: &str) -> Option<NonZeroU16> {
+fn field_id_for_name(field: &str) -> Option<NodeFieldId> {
     match field {
-        "body" => NonZeroU16::new(1),
+        "body" => NodeFieldId::try_from(1).ok(),
         _ => None,
     }
 }
@@ -66,7 +64,7 @@ fn builds_node_constraints_from_node_shapes() {
         build_node_constraints(&shapes, node_id_for_type, field_id_for_name)
             .expect("node shapes should resolve");
 
-    assert_eq!(root_node_kind, NonZeroU16::new(1));
+    assert_eq!(root_node_kind, NodeKindId::try_from(1).ok());
     assert_eq!(node_constraints.len(), 1);
 }
 
@@ -97,7 +95,7 @@ fn skips_known_abstract_child_shapes() {
     let (node_constraints, _, _) =
         build_node_constraints(&shapes, node_id_for_type, field_id_for_name)
             .expect("known abstract shapes should not be runtime node ids");
-    let root_id = NonZeroU16::new(1).unwrap();
+    let root_id = NodeKindId::try_from(1).unwrap();
 
     let children = node_constraints[&root_id].children.as_ref().unwrap();
     assert_eq!(children.valid_types, &[]);

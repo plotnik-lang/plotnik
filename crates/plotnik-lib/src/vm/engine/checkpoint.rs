@@ -4,7 +4,7 @@
 //! a checkpoint for each alternative. On failure, it restores the
 //! most recent checkpoint and continues.
 
-use std::num::NonZeroU16;
+use crate::core::NodeFieldId;
 
 use super::cursor::SkipPolicy;
 
@@ -19,7 +19,7 @@ pub struct CallResume {
     /// Return address after the callee (raw step index).
     pub(crate) next: u16,
     /// Field constraint the next candidate must satisfy, if any.
-    pub(crate) field: Option<NonZeroU16>,
+    pub(crate) field: Option<NodeFieldId>,
     /// How to advance to the next candidate.
     pub(crate) policy: SkipPolicy,
 }

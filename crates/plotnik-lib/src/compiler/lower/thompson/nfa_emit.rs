@@ -1,7 +1,6 @@
-use std::num::NonZeroU16;
-
 use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::lower::ir::{CallIR, CalleeEntry, EffectIR, Label, MatchIR, ReturnAddr};
+use crate::core::NodeFieldId;
 use crate::compiler::parse::ast::{Pattern, QuantifierOperator};
 
 use super::NfaBuilder;
@@ -46,7 +45,7 @@ impl NfaBuilder<'_> {
     pub(super) fn emit_call(
         &mut self,
         nav: Nav,
-        node_field: Option<NonZeroU16>,
+        node_field: Option<NodeFieldId>,
         return_addr: ReturnAddr,
         callee: CalleeEntry,
     ) -> Label {

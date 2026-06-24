@@ -1,4 +1,5 @@
 use crate::bytecode::{EffectKind, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, Nav};
+use crate::core::NodeFieldId;
 
 use super::lower::pack_instructions;
 use crate::compiler::lower::ir::NfaGraph;
@@ -92,7 +93,7 @@ fn lower_neg_fields_overflow() {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
-                .neg_fields(0..10)
+                .neg_fields((1u16..=10).map(|n| NodeFieldId::try_from(n).unwrap()))
                 .next(Label(1))
                 .into(),
         ],
@@ -234,7 +235,7 @@ fn lower_combined_overflow() {
                 .nav(Nav::Down)
                 .pre_effects((0..10).map(make_effect))
                 .post_effects((0..10).map(make_effect))
-                .neg_fields(0..10)
+                .neg_fields((1u16..=10).map(|n| NodeFieldId::try_from(n).unwrap()))
                 .next(Label(1))
                 .into(),
         ],

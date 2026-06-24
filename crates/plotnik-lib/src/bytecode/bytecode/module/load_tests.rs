@@ -93,7 +93,7 @@ fn find_predicate_off(bytes: &[u8]) -> usize {
 #[test]
 fn forged_invalid_entrypoint_name_is_rejected() {
     // `0` is the reserved easter-egg index (never a real reference) and `u16::MAX`
-    // is past the table; both must yield a clean error, not panic in StringId::new.
+    // is past the table; both must yield a clean error, not panic during StringId decoding.
     for forged in [0u16, u16::MAX] {
         let mut bytes = emit_bytes(r#"Top = (identifier) @id"#);
         let ep_off = Module::load(&bytes)
@@ -446,7 +446,7 @@ fn forged_oob_member_operand_is_rejected() {
 
 #[test]
 fn forged_zero_successor_is_rejected() {
-    // `0` decodes through `StepId::new`, which panics; `0` is the terminal marker
+    // `0` decodes through `StepId`, which panics; `0` is the terminal marker
     // only for the `Match8` fast path, never an extended successor slot.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let succ_off = first_ext_successor(&bytes);
@@ -478,7 +478,7 @@ fn forged_out_of_range_successor_is_rejected() {
 #[test]
 fn forged_regex_pattern_string_id_is_rejected() {
     // A regex entry's `string_id` is display metadata that `dump`/`trace` resolve
-    // through the panicking `pattern_string_id` (StringId::new) and then index the
+    // through the panicking `pattern_string_id` (StringId construction) and then index the
     // string blob; `0` (reserved) and an out-of-range id must be rejected at load.
     for forged in [0u16, u16::MAX] {
         let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);

@@ -318,7 +318,7 @@ pub struct StringsView<'a> {
 
 impl<'a> StringsView<'a> {
     pub fn get(&self, id: StringId) -> &'a str {
-        self.at(id.as_u16() as usize)
+        self.at(u16::from(id) as usize)
     }
 
     /// Get a string by raw index (for iteration/dumps, including easter egg at 0).
@@ -344,7 +344,8 @@ impl<'a> GrammarTableView<'a, NodeKindEntry> {
         let offset = idx * NodeKindEntry::SIZE;
         NodeKindEntry::new(
             read_u16_le(self.bytes, offset),
-            StringId::new(read_u16_le(self.bytes, offset + 2)),
+            StringId::try_from(read_u16_le(self.bytes, offset + 2))
+                .expect("node kind name id must be non-zero"),
         )
     }
 
@@ -360,7 +361,8 @@ impl<'a> GrammarTableView<'a, FieldEntry> {
         let offset = idx * FieldEntry::SIZE;
         FieldEntry::new(
             read_u16_le(self.bytes, offset),
-            StringId::new(read_u16_le(self.bytes, offset + 2)),
+            StringId::try_from(read_u16_le(self.bytes, offset + 2))
+                .expect("field name id must be non-zero"),
         )
     }
 
@@ -395,7 +397,7 @@ impl<'a> RegexView<'a> {
     pub fn pattern_string_id(&self, idx: usize) -> super::StringId {
         let entry_offset = idx * Self::ENTRY_SIZE;
         let string_id = read_u16_le(self.table, entry_offset);
-        super::StringId::new(string_id)
+        super::StringId::try_from(string_id).expect("regex pattern string id must be non-zero")
     }
 }
 
@@ -422,7 +424,7 @@ impl<'a> TypesView<'a> {
     }
 
     pub fn get(&self, id: TypeId) -> Option<TypeDef> {
-        let idx = id.0 as usize;
+        let idx = u16::from(id) as usize;
         if idx < self.defs_count {
             Some(self.def(idx))
         } else {
@@ -434,8 +436,9 @@ impl<'a> TypesView<'a> {
         assert!(idx < self.members_count, "type member index out of bounds");
         let offset = idx * TypeMember::SIZE;
         TypeMember::new(
-            StringId::new(read_u16_le(self.members_bytes, offset)),
-            TypeId(read_u16_le(self.members_bytes, offset + 2)),
+            StringId::try_from(read_u16_le(self.members_bytes, offset))
+                .expect("type member name id must be non-zero"),
+            TypeId::from(read_u16_le(self.members_bytes, offset + 2)),
         )
     }
 
@@ -444,15 +447,16 @@ impl<'a> TypesView<'a> {
     /// validator before `validate_string_ids` rejects it.
     pub(crate) fn member_type_id(&self, idx: usize) -> TypeId {
         assert!(idx < self.members_count, "type member index out of bounds");
-        TypeId(read_u16_le(self.members_bytes, idx * TypeMember::SIZE + 2))
+        TypeId::from(read_u16_le(self.members_bytes, idx * TypeMember::SIZE + 2))
     }
 
     pub fn get_name(&self, idx: usize) -> TypeNameEntry {
         assert!(idx < self.names_count, "type name index out of bounds");
         let offset = idx * TypeNameEntry::SIZE;
         TypeNameEntry::new(
-            StringId::new(read_u16_le(self.names_bytes, offset)),
-            TypeId(read_u16_le(self.names_bytes, offset + 2)),
+            StringId::try_from(read_u16_le(self.names_bytes, offset))
+                .expect("type name string id must be non-zero"),
+            TypeId::from(read_u16_le(self.names_bytes, offset + 2)),
         )
     }
 
@@ -460,7 +464,7 @@ impl<'a> TypesView<'a> {
     /// `StringId` — same boundary reason as [`member_type_id`](Self::member_type_id).
     pub(crate) fn name_type_id(&self, idx: usize) -> TypeId {
         assert!(idx < self.names_count, "type name index out of bounds");
-        TypeId(read_u16_le(self.names_bytes, idx * TypeNameEntry::SIZE + 2))
+        TypeId::from(read_u16_le(self.names_bytes, idx * TypeNameEntry::SIZE + 2))
     }
 
     /// Number of type definitions.

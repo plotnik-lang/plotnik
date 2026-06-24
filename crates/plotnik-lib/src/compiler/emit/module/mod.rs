@@ -68,13 +68,13 @@ impl<'a> EmitPipeline<'a> {
                 NodeKind::Named(sym) | NodeKind::Anonymous(sym) => sym,
             };
             let name = self.strings.intern(sym, self.input.interner)?;
-            node_kinds.push(NodeKindEntry::new(node_id.get(), name));
+            node_kinds.push(NodeKindEntry::new(u16::from(node_id), name));
         }
 
         let mut fields: Vec<FieldEntry> = Vec::new();
         for (sym, field_id) in self.input.grammar.field_entries() {
             let name = self.strings.intern(sym, self.input.interner)?;
-            fields.push(FieldEntry::new(field_id.get(), name));
+            fields.push(FieldEntry::new(u16::from(field_id), name));
         }
 
         let mut entrypoints: Vec<Entrypoint> = Vec::new();
@@ -223,7 +223,7 @@ fn emit_node_kinds(symbols: &[NodeKindEntry]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(symbols.len() * NodeKindEntry::SIZE);
     for sym in symbols {
         bytes.extend_from_slice(&sym.symbol.to_le_bytes());
-        bytes.extend_from_slice(&sym.name.as_u16().to_le_bytes());
+        bytes.extend_from_slice(&u16::from(sym.name).to_le_bytes());
     }
     bytes
 }
@@ -232,7 +232,7 @@ fn emit_fields(symbols: &[FieldEntry]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(symbols.len() * FieldEntry::SIZE);
     for sym in symbols {
         bytes.extend_from_slice(&sym.symbol.to_le_bytes());
-        bytes.extend_from_slice(&sym.name.as_u16().to_le_bytes());
+        bytes.extend_from_slice(&u16::from(sym.name).to_le_bytes());
     }
     bytes
 }
@@ -240,9 +240,9 @@ fn emit_fields(symbols: &[FieldEntry]) -> Vec<u8> {
 fn emit_entrypoints(entrypoints: &[Entrypoint]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(entrypoints.len() * Entrypoint::SIZE);
     for ep in entrypoints {
-        bytes.extend_from_slice(&ep.name().as_u16().to_le_bytes());
+        bytes.extend_from_slice(&u16::from(ep.name()).to_le_bytes());
         bytes.extend_from_slice(&ep.target().to_le_bytes());
-        bytes.extend_from_slice(&ep.result_type().0.to_le_bytes());
+        bytes.extend_from_slice(&u16::from(ep.result_type()).to_le_bytes());
         bytes.extend_from_slice(&0u16.to_le_bytes()); // _pad is always 0
     }
     bytes

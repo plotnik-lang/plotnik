@@ -57,7 +57,7 @@ impl StringTableBuilder {
             .try_resolve(sym)
             .ok_or(EmitError::StringNotFound(sym))?;
 
-        let id = StringId::new(self.strings.len() as u16);
+        let id = StringId::try_from(self.strings.len() as u16).expect("string id must be non-zero");
         let text: Rc<str> = Rc::from(text);
         self.strings.push(Rc::clone(&text));
         self.str_lookup.insert(text, id);
@@ -71,7 +71,7 @@ impl StringTableBuilder {
             return id;
         }
 
-        let id = StringId::new(self.strings.len() as u16);
+        let id = StringId::try_from(self.strings.len() as u16).expect("string id must be non-zero");
         let s: Rc<str> = Rc::from(s);
         self.strings.push(Rc::clone(&s));
         self.str_lookup.insert(s, id);

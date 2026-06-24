@@ -45,7 +45,7 @@ impl Emitter<'_> {
         }
 
         for i in 0..self.types.defs_count() {
-            let type_id = TypeId(i as u16);
+            let type_id = TypeId::from(i as u16);
             if self.type_names.contains_key(&type_id) {
                 continue;
             }

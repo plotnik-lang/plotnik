@@ -43,7 +43,7 @@ impl TypeTableBuilder {
     /// Map `query_id` to the next bytecode slot and push `def`; returns the id.
     /// Used to emit builtins and to reserve placeholder slots for custom types.
     pub fn push_mapped(&mut self, query_id: TypeId, def: TypeDef) -> WireTypeId {
-        let bc_id = WireTypeId(self.type_defs.len() as u16);
+        let bc_id = WireTypeId::from(self.type_defs.len() as u16);
         self.mapping.insert(query_id, bc_id);
         self.type_defs.push(def);
         bc_id
@@ -76,7 +76,7 @@ impl TypeTableBuilder {
             return Ok(optional_id);
         }
 
-        let optional_id = WireTypeId(self.type_defs.len() as u16);
+        let optional_id = WireTypeId::from(self.type_defs.len() as u16);
         self.type_defs.push(TypeDef::optional(base_type));
         self.optional_wrappers.insert(base_type, optional_id);
         Ok(optional_id)
@@ -121,7 +121,7 @@ impl TypeTableBuilder {
     /// Fields/variants are at indices [base..base+count).
     pub fn member_base(&self, type_id: TypeId) -> Option<u16> {
         let bc_type_id = self.mapping.get(&type_id)?;
-        let type_def = self.type_defs.get(bc_type_id.0 as usize)?;
+        let type_def = self.type_defs.get(u16::from(*bc_type_id) as usize)?;
         match type_def.decode() {
             TypeDefKind::Struct { member_start, .. } | TypeDefKind::Enum { member_start, .. } => {
                 Some(member_start)

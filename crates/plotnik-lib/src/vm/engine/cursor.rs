@@ -3,11 +3,10 @@
 //! The wrapper handles the search loop and skip policies defined
 //! in docs/tree-navigation.md.
 
-use std::num::NonZeroU16;
-
 use arborium_tree_sitter::{Node, TreeCursor};
 
 use crate::bytecode::Nav;
+use crate::core::NodeFieldId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SkipPolicy {
@@ -68,8 +67,8 @@ impl<'t> CursorWrapper<'t> {
     }
 
     #[inline]
-    pub fn field_id(&self) -> Option<NonZeroU16> {
-        self.cursor.field_id()
+    pub fn field_id(&self) -> Option<NodeFieldId> {
+        self.cursor.field_id().map(NodeFieldId::from)
     }
 
     /// Get current tree depth (root is 0).

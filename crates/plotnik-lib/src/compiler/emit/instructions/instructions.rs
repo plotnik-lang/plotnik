@@ -71,7 +71,7 @@ fn resolve_match(
             pool.lookup_regex(string_id)
                 .expect("regex predicate must be interned")
         } else {
-            string_id.as_u16()
+            u16::from(string_id)
         };
         MatchPredicate {
             op: pred.op_byte(),
@@ -82,7 +82,7 @@ fn resolve_match(
     let successors = m
         .successors
         .iter()
-        .map(|&l| StepId::new(l.resolve(map)))
+        .map(|&l| StepId::try_from(l.resolve(map)).expect("step id must be non-zero"))
         .collect();
 
     let instr = MatchInstr {
@@ -102,14 +102,14 @@ fn resolve_call(c: &CallIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
     Call::new(
         c.nav,
         c.node_field,
-        StepId::new(c.next.resolve(map)),
-        StepId::new(c.target.resolve(map)),
+        StepId::try_from(c.next.resolve(map)).expect("step id must be non-zero"),
+        StepId::try_from(c.target.resolve(map)).expect("step id must be non-zero"),
     )
     .to_bytes()
 }
 
 fn resolve_trampoline(t: &TrampolineIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
-    Trampoline::new(StepId::new(t.next.resolve(map))).to_bytes()
+    Trampoline::new(StepId::try_from(t.next.resolve(map)).expect("step id must be non-zero")).to_bytes()
 }
 
 fn resolve_effect(effect: &EffectIR, pool: ConstantPool<'_>) -> Effect {

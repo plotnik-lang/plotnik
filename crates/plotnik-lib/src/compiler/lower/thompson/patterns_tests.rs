@@ -1,6 +1,4 @@
-use std::num::NonZeroU16;
-
-use crate::core::{Interner, NodeKind};
+use crate::core::{Interner, NodeKind, NodeKindId};
 use indexmap::IndexMap;
 
 use crate::compiler::analyze::grammar::GrammarBindingBuilder;
@@ -15,8 +13,8 @@ use super::NfaBuilder;
 fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
     let mut interner = Interner::new();
     let number = interner.intern("number");
-    let named_id = NonZeroU16::new(1).unwrap();
-    let anonymous_id = NonZeroU16::new(2).unwrap();
+    let named_id = NodeKindId::try_from(1u16).unwrap();
+    let anonymous_id = NodeKindId::try_from(2u16).unwrap();
     let node_kinds = IndexMap::from([
         (NodeKind::Named(number), named_id),
         (NodeKind::Anonymous(number), anonymous_id),

@@ -4,6 +4,8 @@
 
 use std::num::NonZeroU16;
 
+use crate::core::NodeKindId;
+
 /// Node kind constraint for Match instructions.
 ///
 /// Distinguishes between named nodes (`(identifier)`), anonymous nodes (`"text"`),
@@ -23,11 +25,11 @@ pub enum NodeKindConstraint {
     /// Named node constraint (`(_)` or `(identifier)`).
     /// - `None` = any named node (check `is_named()`)
     /// - `Some(id)` = specific named kind (check `is_named()` and `kind_id()`)
-    Named(Option<NonZeroU16>),
+    Named(Option<NodeKindId>),
     /// Anonymous node constraint (`"text"` literals).
     /// - `None` = any anonymous node (check `!is_named()`)
     /// - `Some(id)` = specific anonymous kind (check `!is_named()` and `kind_id()`)
-    Anonymous(Option<NonZeroU16>),
+    Anonymous(Option<NodeKindId>),
 }
 
 impl NodeKindConstraint {
@@ -38,8 +40,8 @@ impl NodeKindConstraint {
     pub fn to_bytes(self) -> (u8, u16) {
         match self {
             Self::Any => (0b00, 0),
-            Self::Named(opt) => (0b01, opt.map(|n| n.get()).unwrap_or(0)),
-            Self::Anonymous(opt) => (0b10, opt.map(|n| n.get()).unwrap_or(0)),
+            Self::Named(opt) => (0b01, opt.map_or(0, u16::from)),
+            Self::Anonymous(opt) => (0b10, opt.map_or(0, u16::from)),
         }
     }
 
@@ -54,13 +56,13 @@ impl NodeKindConstraint {
     pub fn try_from_bytes(node_class: u8, node_val: u16) -> Option<Self> {
         match node_class {
             0b00 => Some(Self::Any),
-            0b01 => Some(Self::Named(NonZeroU16::new(node_val))),
-            0b10 => Some(Self::Anonymous(NonZeroU16::new(node_val))),
+            0b01 => Some(Self::Named(NonZeroU16::new(node_val).map(NodeKindId::from))),
+            0b10 => Some(Self::Anonymous(NonZeroU16::new(node_val).map(NodeKindId::from))),
             _ => None,
         }
     }
 
-    pub fn kind_id(&self) -> Option<NonZeroU16> {
+    pub fn kind_id(&self) -> Option<NodeKindId> {
         match self {
             Self::Any => None,
             Self::Named(opt) | Self::Anonymous(opt) => *opt,

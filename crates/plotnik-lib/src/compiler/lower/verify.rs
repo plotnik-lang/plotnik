@@ -60,7 +60,6 @@ mod debug_impl {
     use std::collections::hash_map::DefaultHasher;
     use std::collections::{HashMap, HashSet};
     use std::hash::{Hash, Hasher};
-    use std::num::NonZeroU16;
 
     use crate::bytecode::{EffectKind, Nav};
     use indexmap::IndexMap;
@@ -190,7 +189,7 @@ mod debug_impl {
         }
 
         for &f in &m.neg_fields {
-            let name = NonZeroU16::new(f).and_then(|id| ctx.grammar.field_name(id, ctx.interner));
+            let name = ctx.grammar.field_name(f, ctx.interner);
             ops.push(SemanticOp::NegField(
                 name.unwrap_or_else(|| format!("field#{f}")),
             ));

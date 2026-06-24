@@ -354,7 +354,7 @@ impl Module {
                     }
                 }
                 TypeDefKind::Wrapper { inner, .. } => {
-                    if raw_count != 0 || inner.0 >= type_defs {
+                    if raw_count != 0 || u16::from(inner) >= type_defs {
                         return Err(invalid());
                     }
                 }
@@ -372,7 +372,7 @@ impl Module {
                     }
                     let start = member_start as usize;
                     if (start..start + member_count as usize)
-                        .any(|m| types.member_type_id(m).0 >= type_defs)
+                        .any(|m| u16::from(types.member_type_id(m)) >= type_defs)
                     {
                         return Err(invalid());
                     }
@@ -388,7 +388,7 @@ impl Module {
         let types = self.types();
         let type_defs = self.header.type_defs_count;
         for i in 0..types.names_count() {
-            if types.name_type_id(i).0 >= type_defs {
+            if u16::from(types.name_type_id(i)) >= type_defs {
                 return Err(ModuleError::InvalidTypeName(i));
             }
         }
@@ -420,7 +420,7 @@ impl Module {
                 return Err(invalid());
             }
 
-            if ep.result_type().0 >= type_defs {
+            if u16::from(ep.result_type()) >= type_defs {
                 return Err(invalid());
             }
 
@@ -446,7 +446,7 @@ impl Module {
         let n = self.header.str_table_count;
 
         // Read the raw `u16` rather than the typed accessor: a required `StringId`
-        // is a `NonZeroU16`, so `StringId::new(0)` on a forged zero would panic
+        // is a `NonZeroU16`, so building one from a forged zero would panic
         // here in the validator itself, defeating the purpose. A valid required id
         // is a real, non-easter-egg entry: `1..str_table_count`. Section bounds are
         // already proven by `validate_section_bounds`, so the reads stay in range.
@@ -522,7 +522,7 @@ impl Module {
     /// per-opcode decoders, the effect/predicate iterators, and the materializer
     /// all build `NonZero`/enum values and index tables straight from
     /// instruction bytes. Each is a panic site on crafted input — `Opcode`,
-    /// `Nav`, `NodeKindConstraint`, `EffectKind`, and `StepId::new` decoding, plus
+    /// `Nav`, `NodeKindConstraint`, `EffectKind`, and `StepId` decoding, plus
     /// `get_member` / `at` table lookups. This walk rejects every such
     /// input up front, reading only through checked slicing so it never panics
     /// itself.
@@ -782,7 +782,7 @@ impl Module {
             + if has_predicate { PREDICATE_SIZE } else { 0 };
         for i in 0..succ {
             let next = read_u16(succ_off + i * PAYLOAD_SLOT_SIZE)?;
-            // An extended successor decodes through `StepId::new`, which panics
+            // An extended successor decodes through `StepId`, which panics
             // on zero; `0` is the terminal marker only for the `Match8` slot.
             if next == 0 {
                 return Err(ModuleError::MalformedTransitions);

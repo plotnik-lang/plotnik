@@ -141,7 +141,7 @@ fn emit_type_at_slot(
 
         TypeShape::Custom(sym) => {
             // Custom type annotation: @x :: Identifier → type Identifier = Node
-            let bc_type_id = WireTypeId(slot_index as u16);
+            let bc_type_id = WireTypeId::from(slot_index as u16);
 
             let name = ctx.strings.intern(*sym, ctx.interner)?;
             types.push_name(TypeNameEntry::new(name, bc_type_id));

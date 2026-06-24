@@ -208,12 +208,12 @@ fn analyze(
                     require_neutral(&stack, suppress, step)?;
                 } else {
                     for succ in m.successors() {
-                        work.push((succ.as_u16(), stack.clone(), suppress));
+                        work.push((u16::from(succ), stack.clone(), suppress));
                     }
                 }
             }
             Instruction::Call(c) => {
-                let target = c.target().as_u16();
+                let target = u16::from(c.target());
                 discovered.push(target);
                 apply_call(
                     summaries,
@@ -224,7 +224,7 @@ fn analyze(
                     final_check,
                     step,
                 )?;
-                work.push((c.next().as_u16(), stack, suppress));
+                work.push((u16::from(c.next()), stack, suppress));
             }
             Instruction::Trampoline(t) => {
                 // The trampoline's callee is the entrypoint bound by the caller;
@@ -240,7 +240,7 @@ fn analyze(
                     final_check,
                     step,
                 )?;
-                work.push((t.next().as_u16(), stack, suppress));
+                work.push((u16::from(t.next()), stack, suppress));
             }
         }
     }

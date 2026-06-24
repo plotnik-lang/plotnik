@@ -58,7 +58,7 @@ impl<'a> TypeVerifier<'a> {
         let Some(type_def) = self.types.get(declared) else {
             self.errors.push(format_error(
                 &self.path,
-                &format!("unknown type id {}", declared.0),
+                &format!("unknown type id {declared}"),
             ));
             return;
         };

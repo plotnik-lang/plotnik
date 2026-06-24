@@ -1,6 +1,7 @@
 use std::num::NonZeroU16;
 
 use crate::bytecode::Nav;
+use crate::core::NodeKindId;
 
 use super::ir::{
     CallIR, CalleeEntry, EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, ReturnAddr,
@@ -11,7 +12,7 @@ use super::ir::{
 fn match_ir_size_match8() {
     let m = MatchIR::terminal(Label(0))
         .nav(Nav::Down)
-        .node_kind(NodeKindConstraint::Named(NonZeroU16::new(10)))
+        .node_kind(NodeKindConstraint::Named(NonZeroU16::new(10).map(NodeKindId::from)))
         .next(Label(1));
 
     assert_eq!(m.size(), 8);
@@ -21,7 +22,7 @@ fn match_ir_size_match8() {
 fn match_ir_size_extended() {
     let m = MatchIR::terminal(Label(0))
         .nav(Nav::Down)
-        .node_kind(NodeKindConstraint::Named(NonZeroU16::new(10)))
+        .node_kind(NodeKindConstraint::Named(NonZeroU16::new(10).map(NodeKindId::from)))
         .pre_effect(EffectIR::start_struct())
         .post_effect(EffectIR::node())
         .next(Label(1));

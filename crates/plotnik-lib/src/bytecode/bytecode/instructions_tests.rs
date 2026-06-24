@@ -4,6 +4,8 @@ use std::num::NonZeroU16;
 
 use proptest::prelude::*;
 
+use crate::core::{NodeFieldId, NodeKindId};
+
 use super::effects::{Effect, EffectKind};
 use super::instructions::{
     Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepId, Trampoline,
@@ -89,9 +91,9 @@ fn align_to_section_works() {
 fn call_roundtrip() {
     let c = Call::new(
         Nav::Down,
-        NonZeroU16::new(42),
-        StepId::new(100),
-        StepId::new(500),
+        NonZeroU16::new(42).map(NodeFieldId::from),
+        StepId::try_from(100).expect("step id must be non-zero"),
+        StepId::try_from(500).expect("step id must be non-zero"),
     );
 
     let bytes = c.to_bytes();
@@ -110,7 +112,7 @@ fn return_roundtrip() {
 
 #[test]
 fn trampoline_roundtrip() {
-    let t = Trampoline::new(StepId::new(7));
+    let t = Trampoline::new(StepId::try_from(7).expect("step id must be non-zero"));
 
     let bytes = t.to_bytes();
     let decoded = Trampoline::from_bytes(bytes);
@@ -121,7 +123,7 @@ fn trampoline_roundtrip() {
 fn encode_rejects_effect_payload_overflow() {
     let instr = MatchInstr {
         post_effects: vec![Effect::new(EffectKind::Set, 0x400)],
-        successors: vec![StepId::new(1)],
+        successors: vec![StepId::try_from(1).expect("step id must be non-zero")],
         ..Default::default()
     };
 
@@ -134,7 +136,7 @@ fn encode_rejects_effect_payload_overflow() {
 #[test]
 fn encode_rejects_too_many_successors() {
     let instr = MatchInstr {
-        successors: (1u16..=32).map(StepId::new).collect(),
+        successors: (1u16..=32).map(|n| StepId::try_from(n).unwrap()).collect(),
         ..Default::default()
     };
 
@@ -145,7 +147,7 @@ fn encode_rejects_too_many_successors() {
 fn encode_rejects_oversized_payload() {
     // 29 successors is under the 31 cap, but 29 slots exceeds Match64's 28.
     let instr = MatchInstr {
-        successors: (1u16..=29).map(StepId::new).collect(),
+        successors: (1u16..=29).map(|n| StepId::try_from(n).unwrap()).collect(),
         ..Default::default()
     };
 
@@ -176,9 +178,9 @@ fn arb_node_type() -> impl Strategy<Value = NodeKindConstraint> {
     prop_oneof![
         Just(NodeKindConstraint::Any),
         Just(NodeKindConstraint::Named(None)),
-        (1u16..=u16::MAX).prop_map(|n| NodeKindConstraint::Named(NonZeroU16::new(n))),
+        (1u16..=u16::MAX).prop_map(|n| NodeKindConstraint::Named(NonZeroU16::new(n).map(NodeKindId::from))),
         Just(NodeKindConstraint::Anonymous(None)),
-        (1u16..=u16::MAX).prop_map(|n| NodeKindConstraint::Anonymous(NonZeroU16::new(n))),
+        (1u16..=u16::MAX).prop_map(|n| NodeKindConstraint::Anonymous(NonZeroU16::new(n).map(NodeKindId::from))),
     ]
 }
 
@@ -214,12 +216,12 @@ fn arb_match_instr() -> impl Strategy<Value = MatchInstr> {
     (
         arb_nav(),
         arb_node_type(),
-        prop::option::of((1u16..=u16::MAX).prop_map(|n| NonZeroU16::new(n).unwrap())),
+        prop::option::of((1u16..=u16::MAX).prop_map(|n| NodeFieldId::try_from(n).unwrap())),
         prop::collection::vec(arb_effect(), 0..=7),
-        prop::collection::vec(any::<u16>(), 0..=7),
+        prop::collection::vec((1u16..=u16::MAX).prop_map(|n| NodeFieldId::try_from(n).unwrap()), 0..=7),
         prop::collection::vec(arb_effect(), 0..=7),
         prop::option::of(arb_predicate()),
-        prop::collection::vec((1u16..=u16::MAX).prop_map(StepId::new), 0..=5),
+        prop::collection::vec((1u16..=u16::MAX).prop_map(|n| StepId::try_from(n).unwrap()), 0..=5),
     )
         .prop_map(
             |(

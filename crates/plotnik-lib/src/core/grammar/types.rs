@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::num::NonZeroU16;
 use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
@@ -461,7 +460,7 @@ impl Grammar {
 }
 
 fn node_kind_id(id: u16) -> NodeKindId {
-    NonZeroU16::new(id).expect("lowered node symbol id must be non-zero in production grammar")
+    NodeKindId::try_from(id).expect("lowered node symbol id must be non-zero in production grammar")
 }
 
 /// Resolve a node kind to its id via the public name maps. Equivalent to the former
@@ -479,7 +478,7 @@ fn resolve_node_id(
 }
 
 fn node_field_id(id: u16) -> NodeFieldId {
-    NonZeroU16::new(id).expect("lowered field symbol id must be non-zero in production grammar")
+    NodeFieldId::try_from(id).expect("lowered field symbol id must be non-zero in production grammar")
 }
 
 fn format_node_shape_error(error: NodeShapeBuildError) -> String {

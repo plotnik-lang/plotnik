@@ -70,7 +70,7 @@ impl TypeDef {
     /// Create a wrapper type (Optional, ArrayStar, ArrayPlus).
     pub fn wrapper(kind: TypeKind, inner: TypeId) -> Self {
         Self {
-            payload: inner.0,
+            payload: u16::from(inner),
             count: 0,
             kind: kind as u8,
         }
@@ -158,7 +158,7 @@ impl TypeDef {
             | TypeKind::ArrayOneOrMore
             | TypeKind::Alias => TypeDefKind::Wrapper {
                 kind,
-                inner: TypeId(self.payload),
+                inner: TypeId::from(self.payload),
             },
             TypeKind::Struct => TypeDefKind::Struct {
                 member_start: self.payload,
@@ -197,8 +197,8 @@ impl TypeNameEntry {
 
     pub fn to_bytes(&self) -> [u8; 4] {
         let mut bytes = [0u8; 4];
-        bytes[0..2].copy_from_slice(&self.name_id.as_u16().to_le_bytes());
-        bytes[2..4].copy_from_slice(&self.type_id.0.to_le_bytes());
+        bytes[0..2].copy_from_slice(&u16::from(self.name_id).to_le_bytes());
+        bytes[2..4].copy_from_slice(&u16::from(self.type_id).to_le_bytes());
         bytes
     }
 }
@@ -225,8 +225,8 @@ impl TypeMember {
 
     pub fn to_bytes(&self) -> [u8; 4] {
         let mut bytes = [0u8; 4];
-        bytes[0..2].copy_from_slice(&self.name_id.as_u16().to_le_bytes());
-        bytes[2..4].copy_from_slice(&self.type_id.0.to_le_bytes());
+        bytes[0..2].copy_from_slice(&u16::from(self.name_id).to_le_bytes());
+        bytes[2..4].copy_from_slice(&u16::from(self.type_id).to_le_bytes());
         bytes
     }
 }

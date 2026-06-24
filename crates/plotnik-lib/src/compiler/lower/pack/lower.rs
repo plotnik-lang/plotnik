@@ -8,6 +8,7 @@
 //! - successors > 28 → cascading epsilon branches
 
 use crate::bytecode::{MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS};
+use crate::core::NodeFieldId;
 
 use crate::compiler::lower::ir::{NfaGraph, EffectIR, InstructionIR, Label, MatchIR};
 
@@ -15,7 +16,7 @@ const MAX_POST_EFFECTS: usize = 7;
 const MAX_NEG_FIELDS: usize = 7;
 
 enum PostChain {
-    NegFields(Vec<u16>),
+    NegFields(Vec<NodeFieldId>),
     PostEffects(Vec<EffectIR>),
     Successors(Vec<Label>),
 }
@@ -135,7 +136,7 @@ impl Emitter {
         &mut self,
         entry: Label,
         final_succs: Vec<Label>,
-        mut neg_fields: Vec<u16>,
+        mut neg_fields: Vec<NodeFieldId>,
     ) {
         if neg_fields.len() <= MAX_NEG_FIELDS {
             let mut m = MatchIR::terminal(entry).neg_fields(neg_fields);

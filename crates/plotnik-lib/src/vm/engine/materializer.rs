@@ -47,7 +47,7 @@ impl<'a> ValueMaterializer<'a> {
         let def = self
             .types
             .get(type_id)
-            .unwrap_or_else(|| panic!("unknown type_id {}", type_id.0));
+            .unwrap_or_else(|| panic!("unknown type_id {type_id}"));
 
         match def.decode() {
             TypeDefKind::Struct { member_count, .. } => {

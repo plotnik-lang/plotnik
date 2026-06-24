@@ -33,9 +33,10 @@ impl Entrypoint {
 
     pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
         Self {
-            name: StringId::new(u16::from_le_bytes([bytes[0], bytes[1]])),
+            name: StringId::try_from(u16::from_le_bytes([bytes[0], bytes[1]]))
+                .expect("entrypoint name id must be non-zero"),
             target: u16::from_le_bytes([bytes[2], bytes[3]]),
-            result_type: TypeId(u16::from_le_bytes([bytes[4], bytes[5]])),
+            result_type: TypeId::from(u16::from_le_bytes([bytes[4], bytes[5]])),
             _pad: 0,
         }
     }

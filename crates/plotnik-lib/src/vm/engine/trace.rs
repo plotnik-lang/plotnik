@@ -19,8 +19,6 @@
 //! `NoopTracer` ignores these calls (optimized away), while `PrintTracer`
 //! maintains parallel state for display purposes.
 
-use std::num::NonZeroU16;
-
 use arborium_tree_sitter::Node;
 
 use crate::bytecode::{
@@ -28,7 +26,7 @@ use crate::bytecode::{
     PredicateOp, SECTION_ALIGN, STEP_SIZE, Symbol, cols, format_effect, nav_symbol, trace,
     truncate_text, width_for_count,
 };
-use crate::core::Colors;
+use crate::core::{Colors, NodeFieldId, NodeKindId};
 
 use super::effect::RuntimeEffect;
 
@@ -79,7 +77,7 @@ pub trait Tracer {
     fn trace_match_failure(&mut self, node: Node<'_>);
 
     /// Called after field check succeeds.
-    fn trace_field_success(&mut self, field_id: NonZeroU16);
+    fn trace_field_success(&mut self, field_id: NodeFieldId);
 
     /// Called after field check fails.
     fn trace_field_failure(&mut self, node: Node<'_>);
@@ -133,7 +131,7 @@ impl Tracer for NoopTracer {
     fn trace_match_failure(&mut self, _node: Node<'_>) {}
 
     #[inline(always)]
-    fn trace_field_success(&mut self, _field_id: NonZeroU16) {}
+    fn trace_field_success(&mut self, _field_id: NodeFieldId) {}
 
     #[inline(always)]
     fn trace_field_failure(&mut self, _node: Node<'_>) {}
@@ -173,8 +171,8 @@ pub struct PrintTracer<'s> {
     pub(crate) verbosity: Verbosity,
     pub(crate) lines: Vec<String>,
     pub(crate) builder: LineBuilder,
-    pub(crate) node_kind_names: BTreeMap<u16, String>,
-    pub(crate) node_field_names: BTreeMap<u16, String>,
+    pub(crate) node_kind_names: BTreeMap<NodeKindId, String>,
+    pub(crate) node_field_names: BTreeMap<NodeFieldId, String>,
     pub(crate) member_names: Vec<String>,
     pub(crate) all_strings: Vec<String>,
     pub(crate) regex_patterns: Vec<String>,
@@ -230,13 +228,19 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
         let mut node_kind_names = BTreeMap::new();
         for i in 0..node_types.len() {
             let t = node_types.get(i);
-            node_kind_names.insert(t.symbol, strings.get(t.name).to_string());
+            node_kind_names.insert(
+                NodeKindId::try_from(t.symbol).expect("node kind id must be non-zero"),
+                strings.get(t.name).to_string(),
+            );
         }
 
         let mut node_field_names = BTreeMap::new();
         for i in 0..node_fields.len() {
             let f = node_fields.get(i);
-            node_field_names.insert(f.symbol, strings.get(f.name).to_string());
+            node_field_names.insert(
+                NodeFieldId::try_from(f.symbol).expect("node field id must be non-zero"),
+                strings.get(f.name).to_string(),
+            );
         }
 
         let member_names: Vec<String> = (0..types.members_count())
@@ -290,11 +294,11 @@ impl<'s> PrintTracer<'s> {
         PrintTracerBuilder::new(source, module)
     }
 
-    fn node_kind_name(&self, id: u16) -> &str {
+    fn node_kind_name(&self, id: NodeKindId) -> &str {
         self.node_kind_names.get(&id).map_or("?", |s| s.as_str())
     }
 
-    fn node_field_name(&self, id: u16) -> &str {
+    fn node_field_name(&self, id: NodeFieldId) -> &str {
         self.node_field_names.get(&id).map_or("?", |s| s.as_str())
     }
 
@@ -427,7 +431,7 @@ impl<'s> PrintTracer<'s> {
         let mut result = String::new();
 
         if let Some(f) = m.node_field {
-            result.push_str(self.node_field_name(f.get()));
+            result.push_str(self.node_field_name(f));
             result.push_str(": ");
         }
 
@@ -440,7 +444,7 @@ impl<'s> PrintTracer<'s> {
             }
             NodeKindConstraint::Named(Some(t)) => {
                 result.push('(');
-                result.push_str(self.node_kind_name(t.get()));
+                result.push_str(self.node_kind_name(t));
                 result.push(')');
             }
             NodeKindConstraint::Anonymous(None) => {
@@ -448,7 +452,7 @@ impl<'s> PrintTracer<'s> {
             }
             NodeKindConstraint::Anonymous(Some(t)) => {
                 result.push('"');
-                result.push_str(self.node_kind_name(t.get()));
+                result.push_str(self.node_kind_name(t));
                 result.push('"');
             }
         }
@@ -558,9 +562,9 @@ impl Tracer for PrintTracer<'_> {
                 self.add_instruction(ip, symbol, &content, &successors);
             }
             Instruction::Call(c) => {
-                let name = self.entrypoint_name(c.target.as_u16());
+                let name = self.entrypoint_name(u16::from(c.target));
                 let content = self.format_def_ref(name);
-                let successors = format!("{:02} : {:02}", c.target.as_u16(), c.next.as_u16());
+                let successors = format!("{:02} : {:02}", u16::from(c.target), u16::from(c.next));
                 self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
             }
             Instruction::Return(_) => {
@@ -568,7 +572,7 @@ impl Tracer for PrintTracer<'_> {
             }
             Instruction::Trampoline(t) => {
                 let content = "Trampoline";
-                let successors = format!("{:02}", t.next.as_u16());
+                let successors = format!("{:02}", u16::from(t.next));
                 self.add_instruction(ip, Symbol::EMPTY, content, &successors);
             }
         }
@@ -631,12 +635,12 @@ impl Tracer for PrintTracer<'_> {
         }
     }
 
-    fn trace_field_success(&mut self, field_id: NonZeroU16) {
+    fn trace_field_success(&mut self, field_id: NodeFieldId) {
         if self.verbosity == Verbosity::Default {
             return;
         }
 
-        let name = self.node_field_name(field_id.get());
+        let name = self.node_field_name(field_id);
         self.add_subline(trace::MATCH_SUCCESS, &format!("{}:", name));
     }
 
@@ -740,11 +744,11 @@ fn format_match_successors(m: &Match<'_>) -> String {
     if m.is_terminal() {
         "◼".to_string()
     } else if m.succ_count() == 1 {
-        format!("{:02}", m.successor(0).as_u16())
+        format!("{:02}", u16::from(m.successor(0)))
     } else {
         let succs: Vec<_> = m
             .successors()
-            .map(|s| format!("{:02}", s.as_u16()))
+            .map(|s| format!("{:02}", u16::from(s)))
             .collect();
         succs.join(", ")
     }

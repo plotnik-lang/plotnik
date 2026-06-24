@@ -98,7 +98,7 @@ impl RegexTableBuilder {
             let (string_id, offset) = if let Some(e) = entry {
                 blob.extend_from_slice(&e.dfa_bytes);
                 (
-                    e.string_id.as_u16(),
+                    u16::from(e.string_id),
                     (blob.len() - e.dfa_bytes.len()) as u32,
                 )
             } else {

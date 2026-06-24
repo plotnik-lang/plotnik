@@ -1,4 +1,4 @@
-use std::num::NonZeroU16;
+use crate::core::NodeKindId;
 
 use super::node_kind_constraint::NodeKindConstraint;
 
@@ -20,7 +20,7 @@ fn roundtrip_named_wildcard() {
 
 #[test]
 fn roundtrip_named_specific() {
-    let orig = NodeKindConstraint::Named(NonZeroU16::new(42));
+    let orig = NodeKindConstraint::Named(NodeKindId::try_from(42).ok());
     let (kind, type_val) = orig.to_bytes();
     let decoded = NodeKindConstraint::from_bytes(kind, type_val);
     assert_eq!(decoded, orig);
@@ -36,7 +36,7 @@ fn roundtrip_anonymous_wildcard() {
 
 #[test]
 fn roundtrip_anonymous_specific() {
-    let orig = NodeKindConstraint::Anonymous(NonZeroU16::new(100));
+    let orig = NodeKindConstraint::Anonymous(NodeKindId::try_from(100).ok());
     let (kind, type_val) = orig.to_bytes();
     let decoded = NodeKindConstraint::from_bytes(kind, type_val);
     assert_eq!(decoded, orig);
@@ -47,13 +47,13 @@ fn type_id_extraction() {
     assert_eq!(NodeKindConstraint::Any.kind_id(), None);
     assert_eq!(NodeKindConstraint::Named(None).kind_id(), None);
     assert_eq!(
-        NodeKindConstraint::Named(NonZeroU16::new(5)).kind_id(),
-        NonZeroU16::new(5)
+        NodeKindConstraint::Named(NodeKindId::try_from(5).ok()).kind_id(),
+        NodeKindId::try_from(5).ok()
     );
     assert_eq!(NodeKindConstraint::Anonymous(None).kind_id(), None);
     assert_eq!(
-        NodeKindConstraint::Anonymous(NonZeroU16::new(7)).kind_id(),
-        NonZeroU16::new(7)
+        NodeKindConstraint::Anonymous(NodeKindId::try_from(7).ok()).kind_id(),
+        NodeKindId::try_from(7).ok()
     );
 }
 
