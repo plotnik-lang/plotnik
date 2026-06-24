@@ -4,11 +4,11 @@ use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::core::Interner;
 
-/// Shared state for lower construction, cleanup passes, and verification.
-pub(in crate::compiler::lower) struct CompileCtx<'a> {
-    pub(in crate::compiler::lower) interner: &'a Interner,
-    pub(in crate::compiler::lower) type_ctx: &'a TypeAnalysis,
-    pub(in crate::compiler::lower) symbol_table: &'a SymbolTable,
-    pub(in crate::compiler::lower) grammar: &'a GrammarBinding,
-    pub(in crate::compiler::lower) dependency_analysis: &'a DependencyAnalysis,
+/// Inputs and shared read-only state for the lowering pipeline.
+pub(crate) struct LowerInput<'a> {
+    pub(crate) interner: &'a Interner,
+    pub(crate) type_ctx: &'a TypeAnalysis,
+    pub(crate) symbol_table: &'a SymbolTable,
+    pub(crate) grammar: &'a GrammarBinding,
+    pub(crate) dependency_analysis: &'a DependencyAnalysis,
 }

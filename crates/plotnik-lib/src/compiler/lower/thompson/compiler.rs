@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 
 use crate::bytecode::Nav;
 use crate::compiler::ids::DefId;
-use crate::compiler::lower::context::CompileCtx;
+use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::{CompileResult, InstructionIR, Label, ReturnIR, TrampolineIR};
 use crate::compiler::parse::ast::Pattern;
 
@@ -13,7 +13,7 @@ use super::scope::{CaptureExits, StructScope};
 
 /// Compiler state for Thompson construction.
 pub struct Compiler<'a> {
-    pub(super) ctx: &'a CompileCtx<'a>,
+    pub(super) ctx: &'a LowerInput<'a>,
     pub(super) instructions: Vec<InstructionIR>,
     pub(crate) next_label_id: u32,
     pub(super) def_entries: IndexMap<DefId, Label>,
@@ -23,7 +23,7 @@ pub struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub(in crate::compiler::lower) fn new(ctx: &'a CompileCtx<'a>) -> Self {
+    pub(in crate::compiler::lower) fn new(ctx: &'a LowerInput<'a>) -> Self {
         Self {
             ctx,
             instructions: Vec::new(),
@@ -33,7 +33,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub(in crate::compiler::lower) fn build_ir(ctx: &'a CompileCtx<'a>) -> CompileResult {
+    pub(in crate::compiler::lower) fn build_ir(ctx: &'a LowerInput<'a>) -> CompileResult {
         let mut compiler = Compiler::new(ctx);
 
         // Emit universal preamble first: Struct -> Trampoline -> EndStruct -> Return

@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 
 use crate::compiler::analyze::grammar::GrammarBindingBuilder;
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
-use crate::compiler::lower::context::CompileCtx;
+use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::NodeKindConstraint;
 use crate::compiler::test_utils::{empty_dependency_analysis, empty_symbol_table};
 
@@ -29,7 +29,7 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
     }
     let grammar = grammar_builder.finish();
     let dependency_analysis = empty_dependency_analysis();
-    let ctx = CompileCtx {
+    let ctx = LowerInput {
         interner: &interner,
         type_ctx: &type_ctx,
         symbol_table: &symbol_table,
@@ -53,7 +53,7 @@ fn resolve_anonymous_node_kind_requires_linked_binding() {
     let symbol_table = empty_symbol_table();
     let grammar = GrammarBindingBuilder::new().finish();
     let dependency_analysis = empty_dependency_analysis();
-    let ctx = CompileCtx {
+    let ctx = LowerInput {
         interner: &interner,
         type_ctx: &type_ctx,
         symbol_table: &symbol_table,
@@ -74,7 +74,7 @@ fn resolve_field_by_name_requires_linked_binding() {
     let symbol_table = empty_symbol_table();
     let grammar = GrammarBindingBuilder::new().finish();
     let dependency_analysis = empty_dependency_analysis();
-    let ctx = CompileCtx {
+    let ctx = LowerInput {
         interner: &interner,
         type_ctx: &type_ctx,
         symbol_table: &symbol_table,

@@ -36,7 +36,7 @@ pub use release_impl::{run_verified, verify_constructed};
 
 #[cfg(not(debug_assertions))]
 mod release_impl {
-    use crate::compiler::lower::context::CompileCtx;
+    use crate::compiler::lower::LowerInput;
     use crate::compiler::lower::ir::CompileResult;
 
     /// Run a pass. Verification is compiled out in release builds.
@@ -44,7 +44,7 @@ mod release_impl {
     pub fn run_verified(
         _name: &str,
         result: &mut CompileResult,
-        _ctx: &CompileCtx,
+        _ctx: &LowerInput,
         pass: impl FnOnce(&mut CompileResult),
     ) {
         pass(result);
@@ -52,7 +52,7 @@ mod release_impl {
 
     /// No-op in release builds.
     #[inline(always)]
-    pub fn verify_constructed(_result: &CompileResult, _ctx: &CompileCtx) {}
+    pub fn verify_constructed(_result: &CompileResult, _ctx: &LowerInput) {}
 }
 
 #[cfg(debug_assertions)]
@@ -66,7 +66,7 @@ mod debug_impl {
     use indexmap::IndexMap;
 
     use crate::compiler::ids::DefId;
-    use crate::compiler::lower::context::CompileCtx;
+    use crate::compiler::lower::LowerInput;
     use crate::compiler::lower::ir::{
         CompileResult, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR,
     };
@@ -142,7 +142,7 @@ mod debug_impl {
     }
 
     /// Collect the ordered ops a single match contributes.
-    fn collect_match_ops(m: &MatchIR, ctx: &CompileCtx) -> Vec<SemanticOp> {
+    fn collect_match_ops(m: &MatchIR, ctx: &LowerInput) -> Vec<SemanticOp> {
         let mut ops = Vec::new();
 
         // Member names aren't resolved at the IR fingerprint stage (that needs the
@@ -265,7 +265,7 @@ mod debug_impl {
         label: Label,
         instr_map: &std::collections::HashMap<Label, &InstructionIR>,
         label_to_def: &std::collections::HashMap<Label, DefId>,
-        ctx: &CompileCtx,
+        ctx: &LowerInput,
     ) -> WalkStep {
         let Some(&instr) = instr_map.get(&label) else {
             return WalkStep {
@@ -326,7 +326,7 @@ mod debug_impl {
         entry: Label,
         instr_map: &std::collections::HashMap<Label, &InstructionIR>,
         label_to_def: &std::collections::HashMap<Label, DefId>,
-        ctx: &CompileCtx,
+        ctx: &LowerInput,
         max_paths: usize,
         mut on_path: impl FnMut(Path),
     ) -> bool {
@@ -398,7 +398,7 @@ mod debug_impl {
         instructions: &[InstructionIR],
         entry: Label,
         def_entries: &IndexMap<DefId, Label>,
-        ctx: &CompileCtx,
+        ctx: &LowerInput,
     ) -> Fingerprint {
         let instr_map = build_instr_map(instructions);
         let label_to_def = label_to_def_map(def_entries);
@@ -413,7 +413,7 @@ mod debug_impl {
         instructions: &[InstructionIR],
         entry: Label,
         def_entries: &IndexMap<DefId, Label>,
-        ctx: &CompileCtx,
+        ctx: &LowerInput,
         max: usize,
     ) -> Vec<Path> {
         let instr_map = build_instr_map(instructions);
@@ -489,7 +489,7 @@ mod debug_impl {
         instructions: &[InstructionIR],
         entry: Label,
         def_entries: &IndexMap<DefId, Label>,
-        ctx: &CompileCtx,
+        ctx: &LowerInput,
     ) -> Result<(), String> {
         let instr_map = build_instr_map(instructions);
         let label_to_def = label_to_def_map(def_entries);
@@ -552,7 +552,7 @@ mod debug_impl {
         v
     }
 
-    fn snapshot(result: &CompileResult, ctx: &CompileCtx) -> Vec<(WalkRoot, Label, Fingerprint)> {
+    fn snapshot(result: &CompileResult, ctx: &LowerInput) -> Vec<(WalkRoot, Label, Fingerprint)> {
         entries(result)
             .into_iter()
             .map(|(key, entry)| {
@@ -588,7 +588,7 @@ mod debug_impl {
         before_instrs: &[InstructionIR],
         before: &[(WalkRoot, Label, Fingerprint)],
         result: &CompileResult,
-        ctx: &CompileCtx,
+        ctx: &LowerInput,
     ) {
         if let Err(e) = check_labels(&result.instructions) {
             panic!("[verify] pass `{name}` produced malformed IR: {e}");
@@ -620,7 +620,7 @@ mod debug_impl {
     pub fn run_verified(
         name: &str,
         result: &mut CompileResult,
-        ctx: &CompileCtx,
+        ctx: &LowerInput,
         pass: impl FnOnce(&mut CompileResult),
     ) {
         let before_instrs = result.instructions.clone();
@@ -633,7 +633,7 @@ mod debug_impl {
     /// plus balanced scope effects on every path. Passes preserve the fingerprint
     /// (which carries the full effect sequence), so a construction that balances
     /// here stays balanced through the pipeline.
-    pub fn verify_constructed(result: &CompileResult, ctx: &CompileCtx) {
+    pub fn verify_constructed(result: &CompileResult, ctx: &LowerInput) {
         if let Err(e) = check_labels(&result.instructions) {
             panic!("[verify] construction produced malformed IR: {e}");
         }
