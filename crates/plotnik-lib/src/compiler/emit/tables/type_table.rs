@@ -50,7 +50,7 @@ impl TypeTableBuilder {
     }
 
     /// Overwrite a previously reserved slot with its final definition.
-    pub fn set_type_def(&mut self, slot_index: usize, def: TypeDef) {
+    pub fn fill_slot(&mut self, slot_index: usize, def: TypeDef) {
         self.type_defs[slot_index] = def;
     }
 
@@ -68,7 +68,7 @@ impl TypeTableBuilder {
     }
 
     /// Intern an `Optional(base_type)` wrapper, deduplicating by base type.
-    pub fn get_or_create_optional(
+    pub fn intern_optional(
         &mut self,
         base_type: BytecodeTypeId,
     ) -> Result<BytecodeTypeId, EmitError> {
@@ -119,7 +119,7 @@ impl TypeTableBuilder {
     ///
     /// For Struct and Enum types, returns the starting index in the TypeMembers table.
     /// Fields/variants are at indices [base..base+count).
-    pub fn get_member_base(&self, type_id: TypeId) -> Option<u16> {
+    pub fn member_base(&self, type_id: TypeId) -> Option<u16> {
         let bc_type_id = self.mapping.get(&type_id)?;
         let type_def = self.type_defs.get(bc_type_id.0 as usize)?;
         match type_def.decode() {

@@ -105,7 +105,7 @@ fn build(
 
     for (def_id, type_id) in type_ctx.iter_def_output() {
         let name_sym = input.dependency_analysis.def_name_sym(def_id);
-        let name = ctx.strings.get_or_intern(name_sym, ctx.interner)?;
+        let name = ctx.strings.intern(name_sym, ctx.interner)?;
         let bc_type_id = types
             .lookup(type_id)
             .expect("def result type must be mapped");
@@ -121,7 +121,7 @@ fn build(
         let bc_type_id = types
             .lookup(type_id)
             .expect("named type annotation must survive dead-type elimination");
-        let name = ctx.strings.get_or_intern(name_sym, ctx.interner)?;
+        let name = ctx.strings.intern(name_sym, ctx.interner)?;
         types.push_name(TypeNameEntry::new(name, bc_type_id));
     }
 
@@ -143,7 +143,7 @@ fn emit_type_at_slot(
             // Custom type annotation: @x :: Identifier → type Identifier = Node
             let bc_type_id = BytecodeTypeId(slot_index as u16);
 
-            let name = ctx.strings.get_or_intern(*sym, ctx.interner)?;
+            let name = ctx.strings.intern(*sym, ctx.interner)?;
             types.push_name(TypeNameEntry::new(name, bc_type_id));
 
             // Custom types alias Node - look up Node's actual bytecode ID.
@@ -153,13 +153,13 @@ fn emit_type_at_slot(
             let node_bc_id = types
                 .lookup(TYPE_NODE)
                 .expect("Node must be mapped before a Custom alias that targets it is emitted");
-            types.set_type_def(slot_index, TypeDef::alias(node_bc_id));
+            types.fill_slot(slot_index, TypeDef::alias(node_bc_id));
             Ok(())
         }
 
         TypeShape::Optional(inner) => {
             let inner_bc = types.resolve_type(*inner, ctx.type_ctx)?;
-            types.set_type_def(slot_index, TypeDef::optional(inner_bc));
+            types.fill_slot(slot_index, TypeDef::optional(inner_bc));
             Ok(())
         }
 
@@ -170,7 +170,7 @@ fn emit_type_at_slot(
             } else {
                 TypeDef::array_star(element_bc)
             };
-            types.set_type_def(slot_index, def);
+            types.fill_slot(slot_index, def);
             Ok(())
         }
 
@@ -178,7 +178,7 @@ fn emit_type_at_slot(
             // Resolve field types (this may create Optional wrappers at later indices)
             let mut resolved_fields = Vec::with_capacity(fields.len());
             for (field_sym, field_info) in fields {
-                let field_name = ctx.strings.get_or_intern(*field_sym, ctx.interner)?;
+                let field_name = ctx.strings.intern(*field_sym, ctx.interner)?;
                 let field_type = resolve_field_type(types, field_info, ctx.type_ctx)?;
                 resolved_fields.push((field_name, field_type));
             }
@@ -190,7 +190,7 @@ fn emit_type_at_slot(
 
             let member_count =
                 u8::try_from(fields.len()).map_err(|_| EmitError::TooManyFields(fields.len()))?;
-            types.set_type_def(slot_index, TypeDef::for_struct(member_start, member_count));
+            types.fill_slot(slot_index, TypeDef::for_struct(member_start, member_count));
             Ok(())
         }
 
@@ -198,7 +198,7 @@ fn emit_type_at_slot(
             // Resolve variant types (this may create types at later indices)
             let mut resolved_variants = Vec::with_capacity(variants.len());
             for (variant_sym, variant_type_id) in variants {
-                let variant_name = ctx.strings.get_or_intern(*variant_sym, ctx.interner)?;
+                let variant_name = ctx.strings.intern(*variant_sym, ctx.interner)?;
                 let variant_type = types.resolve_type(*variant_type_id, ctx.type_ctx)?;
                 resolved_variants.push((variant_name, variant_type));
             }
@@ -210,14 +210,14 @@ fn emit_type_at_slot(
 
             let member_count = u8::try_from(variants.len())
                 .map_err(|_| EmitError::TooManyVariants(variants.len()))?;
-            types.set_type_def(slot_index, TypeDef::for_enum(member_start, member_count));
+            types.fill_slot(slot_index, TypeDef::for_enum(member_start, member_count));
             Ok(())
         }
 
         TypeShape::Ref(def_id) => {
             let target = ctx.type_ctx.expect_def_output(*def_id);
             let alias = types.resolve_type(target, ctx.type_ctx)?;
-            types.set_type_def(slot_index, TypeDef::alias(alias));
+            types.fill_slot(slot_index, TypeDef::alias(alias));
             Ok(())
         }
     }
@@ -236,7 +236,7 @@ fn resolve_field_type(
     // `Optional(Optional(T))`: one skip path emits one `Null`, so the field is a
     // single `| null`.
     if field_info.optional && !source_is_optional(type_ctx, field_info.type_id) {
-        types.get_or_create_optional(base_type)
+        types.intern_optional(base_type)
     } else {
         Ok(base_type)
     }

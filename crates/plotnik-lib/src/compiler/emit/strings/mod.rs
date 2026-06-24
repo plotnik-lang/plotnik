@@ -19,7 +19,7 @@ fn intern_predicate_strings(instructions: &[InstructionIR], strings: &mut String
         if let InstructionIR::Match(m) = instr
             && let Some(pred) = &m.predicate
         {
-            strings.get_or_intern_str(pred.value.text());
+            strings.intern_str(pred.value.text());
         }
     }
 }

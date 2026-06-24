@@ -34,7 +34,7 @@ impl<'a> ConstantPool<'a> {
     }
 
     pub(in crate::compiler::emit) fn member_base(self, type_id: TypeId) -> Option<u16> {
-        self.types.get_member_base(type_id)
+        self.types.member_base(type_id)
     }
 
     pub(in crate::compiler::emit) fn emit_strings(self) -> (Vec<u8>, Vec<u8>) {

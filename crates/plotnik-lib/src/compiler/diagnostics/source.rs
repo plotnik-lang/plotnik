@@ -116,7 +116,7 @@ impl SourceMap {
         self.entries.is_empty()
     }
 
-    pub fn get(&self, id: SourceId) -> Source<'_> {
+    pub fn source(&self, id: SourceId) -> Source<'_> {
         let entry = self.entries.get(id.0 as usize).expect("invalid SourceId");
         Source {
             id,

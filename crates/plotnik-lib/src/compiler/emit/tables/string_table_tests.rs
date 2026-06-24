@@ -21,8 +21,8 @@ fn intern_symbol_twice_returns_same_id() {
 
     let mut builder = StringTableBuilder::new();
 
-    let id1 = builder.get_or_intern(sym, &interner).unwrap();
-    let id2 = builder.get_or_intern(sym, &interner).unwrap();
+    let id1 = builder.intern(sym, &interner).unwrap();
+    let id2 = builder.intern(sym, &interner).unwrap();
 
     assert_eq!(id1, id2);
     assert_eq!(builder.len(), 2); // easter egg + "hello"
@@ -36,8 +36,8 @@ fn intern_different_symbols_returns_different_ids() {
 
     let mut builder = StringTableBuilder::new();
 
-    let id1 = builder.get_or_intern(sym1, &interner).unwrap();
-    let id2 = builder.get_or_intern(sym2, &interner).unwrap();
+    let id1 = builder.intern(sym1, &interner).unwrap();
+    let id2 = builder.intern(sym2, &interner).unwrap();
 
     assert_ne!(id1, id2);
     assert_eq!(builder.len(), 3); // easter egg + "hello" + "world"
@@ -47,9 +47,9 @@ fn intern_different_symbols_returns_different_ids() {
 fn intern_str_deduplicates() {
     let mut builder = StringTableBuilder::new();
 
-    let id1 = builder.get_or_intern_str("test");
-    let id2 = builder.get_or_intern_str("test");
-    let id3 = builder.get_or_intern_str("other");
+    let id1 = builder.intern_str("test");
+    let id2 = builder.intern_str("test");
+    let id3 = builder.intern_str("other");
 
     assert_eq!(id1, id2);
     assert_ne!(id1, id3);
@@ -59,8 +59,8 @@ fn intern_str_deduplicates() {
 #[test]
 fn emit_produces_correct_format() {
     let mut builder = StringTableBuilder::new();
-    builder.get_or_intern_str("abc");
-    builder.get_or_intern_str("defgh");
+    builder.intern_str("abc");
+    builder.intern_str("defgh");
 
     let (blob, table) = builder.emit();
 
@@ -93,7 +93,7 @@ fn string_not_found_error_for_unknown_symbol() {
     let other_interner = Interner::new();
 
     let mut builder = StringTableBuilder::new();
-    let result = builder.get_or_intern(sym, &other_interner);
+    let result = builder.intern(sym, &other_interner);
 
     assert!(result.is_err());
 }

@@ -67,20 +67,20 @@ impl<'a> EmitPipeline<'a> {
             let sym = match node_kind {
                 NodeKind::Named(sym) | NodeKind::Anonymous(sym) => sym,
             };
-            let name = self.strings.get_or_intern(sym, self.input.interner)?;
+            let name = self.strings.intern(sym, self.input.interner)?;
             node_kinds.push(NodeKindEntry::new(node_id.get(), name));
         }
 
         let mut fields: Vec<FieldEntry> = Vec::new();
         for (sym, field_id) in self.input.grammar.field_entries() {
-            let name = self.strings.get_or_intern(sym, self.input.interner)?;
+            let name = self.strings.intern(sym, self.input.interner)?;
             fields.push(FieldEntry::new(field_id.get(), name));
         }
 
         let mut entrypoints: Vec<Entrypoint> = Vec::new();
         for (def_id, type_id) in self.input.type_ctx.iter_def_output() {
             let name_sym = self.input.dependency_analysis.def_name_sym(def_id);
-            let name = self.strings.get_or_intern(name_sym, self.input.interner)?;
+            let name = self.strings.intern(name_sym, self.input.interner)?;
             let result_type = self.types.resolve_type(type_id, self.input.type_ctx)?;
 
             let target = self

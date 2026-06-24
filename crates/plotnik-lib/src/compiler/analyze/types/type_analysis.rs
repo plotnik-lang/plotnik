@@ -324,13 +324,13 @@ impl TypeAnalysisBuilder {
         self.analysis.pattern_result.insert(pattern, info);
     }
 
-    pub fn set_def_output(&mut self, def_id: DefId, type_id: TypeId) {
+    pub fn record_def_output(&mut self, def_id: DefId, type_id: TypeId) {
         self.analysis.def_output.insert(def_id, type_id);
     }
 
     /// Record a definition's full inferred result, so non-recursive references
     /// can resolve to it instead of re-descending into the body.
-    pub fn set_def_memo(&mut self, def_id: DefId, info: PatternResult) {
+    pub fn record_def_memo(&mut self, def_id: DefId, info: PatternResult) {
         self.def_memo.insert(def_id, info);
     }
 
@@ -339,7 +339,7 @@ impl TypeAnalysisBuilder {
     }
 
     /// Associate an explicit alias with a type (from `@x :: TypeName` on struct captures).
-    pub fn set_type_alias(&mut self, type_id: TypeId, name: Symbol) {
+    pub fn define_type_alias(&mut self, type_id: TypeId, name: Symbol) {
         self.analysis.type_aliases.insert(type_id, name);
     }
 }

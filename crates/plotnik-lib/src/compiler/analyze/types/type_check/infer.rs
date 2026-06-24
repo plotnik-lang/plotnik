@@ -411,7 +411,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn annotate_named(&mut self, type_id: TypeId, name: Symbol) -> TypeId {
         match self.ctx.type_ctx.in_progress().type_shape(type_id).cloned() {
             Some(TypeShape::Struct(_) | TypeShape::Enum(_)) => {
-                self.ctx.type_ctx.set_type_alias(type_id, name);
+                self.ctx.type_ctx.define_type_alias(type_id, name);
                 type_id
             }
             Some(TypeShape::Array { element, non_empty }) => {
@@ -783,9 +783,9 @@ impl<'a, 'd> InferencePass<'a, 'd> {
             .dependency_analysis
             .def_id_for_name(self.analysis.interner, def_name)
             .expect("an analyzed definition has a DefId");
-        self.ctx.set_def_memo(def_id, info.clone());
+        self.ctx.record_def_memo(def_id, info.clone());
         let type_id = self.flow_to_type_id(&info.flow);
-        self.ctx.set_def_output(def_id, type_id);
+        self.ctx.record_def_output(def_id, type_id);
     }
 
     fn flow_to_type_id(&mut self, flow: &OutputFlow) -> TypeId {

@@ -41,7 +41,7 @@ pub struct CalleeEntry(pub Label);
 /// Symbolic reference to a struct field or enum variant.
 ///
 /// Resolved to an absolute member index at emit time: the parent type's member
-/// base (`get_member_base`) plus `relative_index`. The parent type is a scope or
+/// base (`member_base`) plus `relative_index`. The parent type is a scope or
 /// enum that an entrypoint result reaches, so it is always present in the emitted
 /// type table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

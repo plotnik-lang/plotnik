@@ -65,11 +65,11 @@ fn iteration() {
 }
 
 #[test]
-fn get_source() {
+fn source() {
     let mut map = SourceMap::new();
     let id = map.add_file(SourcePath::new("test.ptk"), "hello");
 
-    let source = map.get(id);
+    let source = map.source(id);
     assert_eq!(source.id, id);
     assert_eq!(source.kind, &SourceKind::File("test.ptk".to_owned()));
     assert_eq!(source.content, "hello");
