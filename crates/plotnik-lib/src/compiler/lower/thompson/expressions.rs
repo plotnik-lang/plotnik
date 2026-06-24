@@ -11,6 +11,7 @@ use std::num::NonZeroU16;
 
 use crate::bytecode::{Nav, PredicateOp};
 use crate::compiler::analyze::types::TypeShape;
+use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
     EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
 };
@@ -24,6 +25,14 @@ use super::capture::{CaptureEffects, ExprCtx};
 use super::navigation::check_trailing_anchor;
 use super::scope::{CaptureExits, CaptureRequest, SplitExits};
 use super::sequences::SeqItemsCtx;
+
+#[derive(Clone, Copy)]
+enum RefCallLowering {
+    ScopedCapture,
+    CapturedValue,
+    SuppressedOpaqueRecursion,
+    PlainCall,
+}
 
 impl Compiler<'_> {
     pub(super) fn compile_node_pattern(&mut self, node: &ast::NodePattern, ctx: ExprCtx) -> Label {
@@ -198,50 +207,45 @@ impl Compiler<'_> {
 
         let def_output_id = self.ctx.type_ctx.expect_def_output(def_id);
         let def_output_shape = self.ctx.type_ctx.expect_type_shape(def_output_id);
-        let ref_returns_struct = matches!(def_output_shape, TypeShape::Struct(_));
-
         let is_captured = !capture.post.is_empty();
-        let needs_scope = is_captured && ref_returns_struct;
-
-        // An uncaptured recursive reference is opaque: inference types it Void, so
-        // its captures must not bubble into the parent scope. Enum recursion
-        // is the exception — inference forwards its enum value — so only the rest is
-        // suppressed.
-        let ref_returns_enum = matches!(def_output_shape, TypeShape::Enum(_));
-        let suppress_opaque_recursion = !is_captured
-            && self.ctx.dependency_analysis.is_recursive_def(def_id)
-            && !ref_returns_enum;
+        let lowering = self.ref_call_lowering(def_id, def_output_shape, is_captured);
 
         let nav = nav_override.unwrap_or(Nav::Stay);
 
         // Call instructions don't have pre_effects, so emit epsilon if needed
-        let call_entry = if needs_scope {
-            // Struct isolates the definition's internal captures before the Set.
-            let set_step = self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
-            let struct_close_step = self.emit_struct_close_step(set_step);
-            let call_label = self.emit_call(nav, field_override, struct_close_step, target);
-            self.emit_struct_step(call_label)
-        } else if is_captured {
-            let return_addr =
-                self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
-            self.emit_call(nav, field_override, return_addr, target)
-        } else if suppress_opaque_recursion {
-            // Suppress bracket keeps the structural match but discards all effects,
-            // matching the Void that inference assigns to uncaptured opaque recursion.
-            let suppress_end = self.emit_effects_epsilon(
-                exit,
-                vec![EffectIR::suppress_end()],
-                CaptureEffects::default(),
-            );
-            let call_label = self.emit_call(nav, field_override, suppress_end, target);
-            self.emit_effects_epsilon(
-                call_label,
-                vec![EffectIR::suppress_begin()],
-                CaptureEffects::default(),
-            )
-        } else {
-            // Uncaptured ref: just Call → exit (def's Sets go to parent scope)
-            self.emit_call(nav, field_override, exit, target)
+        let call_entry = match lowering {
+            RefCallLowering::ScopedCapture => {
+                // Struct isolates the definition's internal captures before the Set.
+                let set_step =
+                    self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
+                let struct_close_step = self.emit_struct_close_step(set_step);
+                let call_label = self.emit_call(nav, field_override, struct_close_step, target);
+                self.emit_struct_step(call_label)
+            }
+            RefCallLowering::CapturedValue => {
+                let return_addr =
+                    self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
+                self.emit_call(nav, field_override, return_addr, target)
+            }
+            RefCallLowering::SuppressedOpaqueRecursion => {
+                // Suppress bracket keeps the structural match but discards all effects,
+                // matching the Void that inference assigns to uncaptured opaque recursion.
+                let suppress_end = self.emit_effects_epsilon(
+                    exit,
+                    vec![EffectIR::suppress_end()],
+                    CaptureEffects::default(),
+                );
+                let call_label = self.emit_call(nav, field_override, suppress_end, target);
+                self.emit_effects_epsilon(
+                    call_label,
+                    vec![EffectIR::suppress_begin()],
+                    CaptureEffects::default(),
+                )
+            }
+            RefCallLowering::PlainCall => {
+                // Uncaptured ref: just Call → exit (def's Sets go to parent scope)
+                self.emit_call(nav, field_override, exit, target)
+            }
         };
 
         if capture.pre.is_empty() {
@@ -250,6 +254,32 @@ impl Compiler<'_> {
 
         // Wrap with pre-effects epsilon (e.g., Enum for enum alternations)
         self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
+    }
+
+    fn ref_call_lowering(
+        &self,
+        def_id: DefId,
+        def_output_shape: &TypeShape,
+        is_captured: bool,
+    ) -> RefCallLowering {
+        if is_captured {
+            if matches!(def_output_shape, TypeShape::Struct(_)) {
+                return RefCallLowering::ScopedCapture;
+            }
+
+            return RefCallLowering::CapturedValue;
+        }
+
+        // An uncaptured recursive reference is opaque: inference types it Void, so
+        // its captures must not bubble into the parent scope. Enum recursion
+        // is the exception — inference forwards its enum value — so only the rest is
+        // suppressed.
+        let ref_returns_enum = matches!(def_output_shape, TypeShape::Enum(_));
+        if self.ctx.dependency_analysis.is_recursive_def(def_id) && !ref_returns_enum {
+            return RefCallLowering::SuppressedOpaqueRecursion;
+        }
+
+        RefCallLowering::PlainCall
     }
 
     pub(super) fn compile_field(&mut self, field: &ast::FieldPattern, ctx: ExprCtx) -> Label {
