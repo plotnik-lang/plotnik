@@ -55,48 +55,6 @@ impl Query {
         query
     }
 
-    /// Parse and validate syntax only (no semantic analysis).
-    /// Use this for pure parser/grammar tests.
-    #[track_caller]
-    fn parse_syntax_only(src: &str) -> Self {
-        use crate::compiler::diagnostics::DiagnosticKind::*;
-        let source_map = SourceMap::from_inline(src);
-        let query = QueryBuilder::new(source_map).analyze().unwrap();
-        let diag = query.diagnostics();
-        let has_parse_error = diag.kinds().any(|kind| {
-            matches!(
-                kind,
-                UnclosedTree
-                    | UnclosedSequence
-                    | UnclosedAlternation
-                    | UnclosedRegex
-                    | UnclosedString
-                    | ExpectedExpression
-                    | ExpectedTypeName
-                    | ExpectedFieldName
-                    | ExpectedSubtype
-                    | ExpectedPredicateValue
-                    | EmptyTree
-                    | EmptyAnonymousNode
-                    | EmptySequence
-                    | EmptyAlternation
-                    | BareIdentifier
-                    | InvalidSeparator
-                    | QuantifiedAnchor
-                    | CapturedAnchor
-                    | UnexpectedToken
-            )
-        });
-
-        if has_parse_error {
-            panic!(
-                "Expected valid syntax, got parse error:\n{}",
-                query.dump_diagnostics()
-            );
-        }
-        query
-    }
-
     #[track_caller]
     pub fn expect(src: &str) -> Self {
         let source_map = SourceMap::from_inline(src);
@@ -104,39 +62,8 @@ impl Query {
     }
 
     #[track_caller]
-    pub fn expect_valid(src: &str) -> Self {
-        Self::parse_and_validate(src)
-    }
-
-    #[track_caller]
-    pub fn expect_valid_cst(src: &str) -> String {
-        Self::parse_and_validate(src).dump_cst()
-    }
-
-    /// Parse-only CST dump (for pure parser tests, no semantic validation).
-    #[track_caller]
-    pub fn parse_cst(src: &str) -> String {
-        Self::parse_syntax_only(src).dump_cst()
-    }
-
-    #[track_caller]
-    pub fn expect_valid_cst_full(src: &str) -> String {
-        Self::parse_and_validate(src).dump_cst_full()
-    }
-
-    #[track_caller]
     pub fn expect_valid_ast(src: &str) -> String {
         Self::parse_and_validate(src).dump_ast()
-    }
-
-    #[track_caller]
-    pub fn expect_valid_arities(src: &str) -> String {
-        Self::parse_and_validate(src).dump_with_arities()
-    }
-
-    #[track_caller]
-    pub fn expect_valid_symbols(src: &str) -> String {
-        Self::parse_and_validate(src).dump_symbols()
     }
 
     #[track_caller]
@@ -149,33 +76,6 @@ impl Query {
             );
         }
         query
-    }
-
-    #[track_caller]
-    pub fn expect_invalid_linking(src: &str) -> String {
-        let query = Self::parse_and_validate(src).link(javascript());
-        if query.is_valid() {
-            panic!("Expected failed linking, got valid");
-        }
-        query.dump_diagnostics()
-    }
-
-    #[track_caller]
-    pub fn expect_valid_types(src: &str) -> String {
-        let query = Self::parse_and_validate(src).link(javascript());
-        if !query.is_valid() {
-            panic!(
-                "Expected valid types, got error:\n{}",
-                query.dump_diagnostics()
-            );
-        }
-
-        let bytecode = query.emit().expect("bytecode emission should succeed");
-        let module = Module::load(&bytecode).expect("module loading should succeed");
-        crate::compiler::typegen::typescript::emit(
-            &module,
-            crate::compiler::typegen::typescript::Config::default(),
-        )
     }
 
     #[track_caller]
@@ -212,40 +112,6 @@ impl Query {
             panic!("Expected invalid query, got valid:\n{}", query.dump_cst());
         }
         query.dump_diagnostics()
-    }
-
-    #[track_caller]
-    pub fn expect_warning(src: &str) -> String {
-        let source_map = SourceMap::from_inline(src);
-        let query = QueryBuilder::new(source_map).analyze().unwrap();
-
-        if !query.is_valid() {
-            panic!(
-                "Expected valid query with warning, got error:\n{}",
-                query.dump_diagnostics()
-            );
-        }
-
-        if !query.diagnostics().has_warnings() {
-            panic!("Expected warning, got none:\n{}", query.dump_cst());
-        }
-
-        query.dump_diagnostics()
-    }
-
-    #[track_caller]
-    pub fn expect_cst_with_warnings(src: &str) -> String {
-        let source_map = SourceMap::from_inline(src);
-        let query = QueryBuilder::new(source_map).analyze().unwrap();
-
-        if !query.is_valid() {
-            panic!(
-                "Expected valid query (warnings ok), got error:\n{}",
-                query.dump_diagnostics()
-            );
-        }
-
-        query.dump_cst()
     }
 }
 

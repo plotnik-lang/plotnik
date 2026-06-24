@@ -20,16 +20,6 @@ impl Query {
     }
 
     #[cfg(test)]
-    pub(crate) fn dump_cst_full(&self) -> String {
-        self.dump_cst_with_trivia(true)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn dump_with_arities(&self) -> String {
-        self.printer().with_arities(true).dump()
-    }
-
-    #[cfg(test)]
     pub(crate) fn dump_diagnostics(&self) -> String {
         self.diagnostics().render(self.source_map())
     }
