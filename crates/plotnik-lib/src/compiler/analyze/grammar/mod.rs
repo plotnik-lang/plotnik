@@ -10,3 +10,6 @@ mod resolve;
 mod utils;
 
 pub use grammar_binding::{GrammarBinding, GrammarBindingBuilder};
+
+#[cfg(test)]
+mod link_tests;

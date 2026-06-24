@@ -24,3 +24,6 @@ pub fn compute_layout(ir: &CompileResult) -> Result<LayoutMap, EmitError> {
     }
     Ok(layout)
 }
+
+#[cfg(test)]
+mod cache_aligned_tests;

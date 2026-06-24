@@ -3,7 +3,11 @@ mod message;
 mod printer;
 
 #[cfg(test)]
-mod diagnostics_tests;
+mod json_tests;
+#[cfg(test)]
+mod message_tests;
+#[cfg(test)]
+mod printer_tests;
 
 use rowan::TextRange;
 

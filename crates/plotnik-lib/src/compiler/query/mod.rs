@@ -7,7 +7,7 @@ mod stages;
 #[cfg(test)]
 mod printer_tests;
 #[cfg(test)]
-mod query_tests;
+mod stages_tests;
 
 pub(crate) use stages::LinkOutcome;
 pub use stages::{CheckedQuery, CompiledQuery, Query, QueryBuilder};

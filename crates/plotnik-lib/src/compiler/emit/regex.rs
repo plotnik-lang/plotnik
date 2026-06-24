@@ -11,9 +11,6 @@ use crate::bytecode::StringId;
 use crate::compiler::lower::ir::{CompileResult, InstructionIR, PredicateValueIR};
 use crate::compiler::emit::tables::{EmitError, RegexTableBuilder, StringTableBuilder};
 
-#[cfg(test)]
-mod regex_table_tests;
-
 /// Compile every regex predicate into the regex table, resolving each pattern's
 /// StringId from the finished string table. Reads the string table; interns
 /// nothing into it.
@@ -48,7 +45,7 @@ fn intern_regex_predicates(
 
 /// Compile `pattern` to a sparse DFA and store it under `string_id`, returning
 /// its regex ID. Deduplicates by StringId, so a repeated pattern compiles once.
-fn intern(
+pub(super) fn intern(
     regexes: &mut RegexTableBuilder,
     pattern: &str,
     string_id: StringId,

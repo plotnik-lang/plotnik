@@ -1,14 +1,12 @@
+//! Tests for diagnostic rendering (`DiagnosticsPrinter`) and the `Diagnostics`
+//! collection that feeds it: report building, multi-span and multi-file layout,
+//! suppression filtering (`live`), and the rendered text output.
+
 use rowan::TextRange;
 
 use crate::compiler::diagnostics::SourcePath;
 
 use super::*;
-
-#[test]
-fn severity_display() {
-    insta::assert_snapshot!(format!("{}", Severity::Error), @"error");
-    insta::assert_snapshot!(format!("{}", Severity::Warning), @"warning");
-}
 
 #[test]
 fn report_with_default_message() {
@@ -270,80 +268,6 @@ fn diagnostics_collection_methods() {
 }
 
 #[test]
-fn diagnostic_kind_default_severity() {
-    assert_eq!(DiagnosticKind::UnclosedTree.severity(), Severity::Error);
-    assert_eq!(DiagnosticKind::MissingDefName.severity(), Severity::Error);
-}
-
-#[test]
-fn diagnostic_kind_suppression_order() {
-    // Higher priority (earlier in enum) suppresses lower priority (later in enum)
-    assert!(DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::MissingDefName));
-    assert!(DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UndefinedReference));
-    assert!(DiagnosticKind::ExpectedExpression.suppresses(&DiagnosticKind::MissingDefName));
-
-    // Same kind doesn't suppress itself
-    assert!(!DiagnosticKind::UnclosedTree.suppresses(&DiagnosticKind::UnclosedTree));
-
-    // Lower priority doesn't suppress higher priority
-    assert!(!DiagnosticKind::MissingDefName.suppresses(&DiagnosticKind::UnclosedTree));
-}
-
-#[test]
-fn diagnostic_kind_fallback_messages() {
-    assert_eq!(
-        DiagnosticKind::UnclosedTree.summary(),
-        "missing closing `)`"
-    );
-    assert_eq!(
-        DiagnosticKind::UnclosedSequence.summary(),
-        "missing closing `}`"
-    );
-    assert_eq!(
-        DiagnosticKind::UnclosedAlternation.summary(),
-        "missing closing `]`"
-    );
-    assert_eq!(
-        DiagnosticKind::ExpectedExpression.summary(),
-        "expected an expression"
-    );
-}
-
-#[test]
-fn diagnostic_kind_custom_messages() {
-    // Detail replaces the whole message
-    assert_eq!(DiagnosticKind::UnexpectedToken.template(), "{}");
-    // Detail is interpolated into a template
-    assert_eq!(
-        DiagnosticKind::UndefinedReference.template(),
-        "`{}` is not defined"
-    );
-    // Default: fallback message plus detail
-    assert_eq!(
-        DiagnosticKind::DuplicateCaptureInScope.template(),
-        "capture `@{}` already defined in this scope"
-    );
-}
-
-#[test]
-fn diagnostic_kind_message_rendering() {
-    // No custom message → fallback
-    assert_eq!(
-        DiagnosticKind::UnclosedTree.render(None),
-        "missing closing `)`"
-    );
-    // With custom message → template applied
-    assert_eq!(
-        DiagnosticKind::UnexpectedToken.render(Some("expected `)`")),
-        "expected `)`"
-    );
-    assert_eq!(
-        DiagnosticKind::UndefinedReference.render(Some("Foo")),
-        "`Foo` is not defined"
-    );
-}
-
-#[test]
 fn filtered_no_suppression_disjoint_spans() {
     let mut map = SourceMap::new();
     let id = map.add_inline("0123456789012345");
@@ -597,117 +521,4 @@ fn multi_file_same_file_related() {
       | |
       | first defined here
     ");
-}
-
-#[test]
-fn render_json_full_shape() {
-    let mut map = SourceMap::new();
-    let id = map.add_file(SourcePath::new("query.ptk"), "(foo)\n(bar)");
-
-    let mut diagnostics = Diagnostics::new();
-    diagnostics
-        .report(
-            DiagnosticKind::UnknownNodeKind,
-            Span::new(id, TextRange::new(7.into(), 10.into())),
-        )
-        .detail("bar")
-        .related_to(
-            Span::new(id, TextRange::new(1.into(), 4.into())),
-            "first seen here",
-        )
-        .fix("replace with `baz`", "baz")
-        .hint("check the grammar")
-        .emit();
-
-    let json: serde_json::Value = serde_json::from_str(&diagnostics.render_json(&map)).unwrap();
-
-    insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap(), @r#"
-    [
-      {
-        "code": "unknown_node_kind",
-        "fix": {
-          "description": "replace with `baz`",
-          "replacement": "baz"
-        },
-        "hints": [
-          "check the grammar"
-        ],
-        "message": "`bar` is not a valid node kind",
-        "related": [
-          {
-            "message": "first seen here",
-            "span": {
-              "end": {
-                "column": 5,
-                "line": 1,
-                "offset": 4
-              },
-              "file": "query.ptk",
-              "start": {
-                "column": 2,
-                "line": 1,
-                "offset": 1
-              }
-            }
-          }
-        ],
-        "severity": "error",
-        "span": {
-          "end": {
-            "column": 5,
-            "line": 2,
-            "offset": 10
-          },
-          "file": "query.ptk",
-          "start": {
-            "column": 2,
-            "line": 2,
-            "offset": 7
-          }
-        }
-      }
-    ]
-    "#);
-}
-
-#[test]
-fn render_json_minimal_omits_empty_fields() {
-    let mut map = SourceMap::new();
-    let id = map.add_inline("(foo");
-
-    let mut diagnostics = Diagnostics::new();
-    diagnostics
-        .report(
-            DiagnosticKind::UnclosedTree,
-            Span::new(id, TextRange::new(0.into(), 4.into())),
-        )
-        .emit();
-
-    let json: serde_json::Value = serde_json::from_str(&diagnostics.render_json(&map)).unwrap();
-
-    insta::assert_snapshot!(serde_json::to_string_pretty(&json).unwrap(), @r#"
-    [
-      {
-        "code": "unclosed_tree",
-        "hints": [
-          "add `)` to close the node"
-        ],
-        "message": "missing closing `)`",
-        "severity": "error",
-        "span": {
-          "end": {
-            "column": 5,
-            "line": 1,
-            "offset": 4
-          },
-          "file": "<query>",
-          "start": {
-            "column": 1,
-            "line": 1,
-            "offset": 0
-          }
-        }
-      }
-    ]
-    "#);
 }

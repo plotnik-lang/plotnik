@@ -11,6 +11,9 @@ mod strings;
 pub(in crate::compiler) mod tables;
 mod types;
 
+#[cfg(test)]
+mod regex_tests;
+
 use crate::compiler::emit::instructions::encode;
 use crate::compiler::emit::layout::compute_layout;
 use crate::compiler::emit::module::EmitPipeline;
@@ -65,8 +68,3 @@ pub(in crate::compiler) fn emit(
     }
     Ok(output)
 }
-
-#[cfg(test)]
-mod capacity_tests;
-#[cfg(test)]
-mod layout_tests;

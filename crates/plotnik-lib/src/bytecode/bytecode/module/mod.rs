@@ -536,6 +536,4 @@ impl<'a> EntrypointsView<'a> {
 }
 
 #[cfg(test)]
-mod forged_tests;
-#[cfg(test)]
-mod module_tests;
+mod load_tests;

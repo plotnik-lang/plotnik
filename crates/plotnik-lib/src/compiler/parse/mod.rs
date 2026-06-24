@@ -33,15 +33,13 @@ mod grammar;
 mod invariants;
 
 #[cfg(test)]
-mod ast_integration_tests;
+mod ast_tests;
 #[cfg(test)]
-mod ast_quantifier_tests;
+mod core_tests;
 #[cfg(test)]
 mod cst_tests;
 #[cfg(test)]
-mod lexer_fixture_tests;
-#[cfg(test)]
-mod recovery_tests;
+mod lexer_tests;
 #[cfg(test)]
 mod token_set_tests;
 

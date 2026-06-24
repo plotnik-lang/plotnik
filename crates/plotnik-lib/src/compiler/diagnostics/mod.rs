@@ -4,6 +4,9 @@ pub mod diagnostics;
 pub mod source;
 pub mod span;
 
+#[cfg(test)]
+mod source_tests;
+
 pub use diagnostics::{DiagnosticKind, Diagnostics, Severity};
 pub use source::{Source, SourceId, SourceKind, SourceMap, SourcePath};
 pub use span::Span;

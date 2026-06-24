@@ -4,7 +4,7 @@ use regex_automata::dfa::Automaton;
 
 use crate::compiler::emit::tables::RegexTableBuilder;
 
-use super::intern;
+use super::regex::intern;
 
 #[test]
 fn intern_and_lookup() {

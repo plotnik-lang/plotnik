@@ -1,6 +1,6 @@
 #[test]
 fn total_steps_past_u16_does_not_wrap() {
-    use super::layout::CacheAligned;
+    use super::CacheAligned;
     use crate::compiler::lower::ir::{InstructionIR, Label, MatchIR};
 
     // 70_000 independent terminal matches pack 8-per-block into 70_000 steps,

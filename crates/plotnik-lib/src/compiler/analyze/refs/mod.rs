@@ -9,3 +9,6 @@ mod recursion;
 
 pub use dependency_analysis::DependencyAnalysis;
 pub use recursion::validate_recursion;
+
+#[cfg(test)]
+mod collect_tests;
