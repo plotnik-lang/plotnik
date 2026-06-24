@@ -166,12 +166,6 @@ impl<'t> VM<'t> {
         VMBuilder::new(source, tree)
     }
 
-    /// Create a new VM for execution.
-    #[deprecated(note = "Use VM::builder(source, tree).build() instead")]
-    pub fn new(source: &'t str, tree: &'t Tree, limits: ExecLimits) -> Self {
-        Self::builder(source, tree).limits(limits).build()
-    }
-
     /// Snapshot the VM state a checkpoint restores on backtrack.
     fn checkpoint_state(&self) -> CheckpointState {
         CheckpointState {
