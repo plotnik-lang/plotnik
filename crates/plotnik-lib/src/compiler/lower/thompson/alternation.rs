@@ -21,6 +21,20 @@ use super::navigation::{
 #[derive(Clone, Copy)]
 struct AltSearchNav(Option<Nav>);
 
+struct BranchRouting {
+    branch_named: Vec<bool>,
+    named_exit: Option<Label>,
+}
+
+impl BranchRouting {
+    fn branch_exit(&self, branch_idx: usize, default_exit: Label) -> Label {
+        match self.named_exit {
+            Some(skip) if self.branch_named[branch_idx] => skip,
+            _ => default_exit,
+        }
+    }
+}
+
 fn exact_nav_for_alt_branch(first_nav: Option<Nav>, search_nav: AltSearchNav) -> Option<Nav> {
     if search_nav.0.is_some() {
         return Some(Nav::StayExact);
@@ -116,7 +130,7 @@ impl Compiler<'_> {
         branches: &[ast::Branch],
         exit: Label,
         classifier: &AnonymousClassifier,
-    ) -> (Vec<bool>, Option<Label>) {
+    ) -> BranchRouting {
         let branch_named: Vec<bool> = branches
             .iter()
             .map(|b| {
@@ -132,7 +146,10 @@ impl Compiler<'_> {
             .then(|| self.clone_named_follower_skip_entry(exit))
             .flatten();
 
-        (branch_named, named_exit)
+        BranchRouting {
+            branch_named,
+            named_exit,
+        }
     }
 
     /// A resumable search nav (`Down`/`Next`/`Stay`) gets one position-search retry
@@ -186,7 +203,7 @@ impl Compiler<'_> {
         let search_nav = resumable_search_nav(first_nav);
         let branch_search = AltSearchNav(search_nav);
         let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
-        let (branch_named, named_exit) = self.alt_branch_routing(&branches, exit, &classifier);
+        let branch_routing = self.alt_branch_routing(&branches, exit, &classifier);
 
         let mut successors = Vec::new();
         for (branch_idx, branch) in branches.iter().enumerate() {
@@ -194,10 +211,7 @@ impl Compiler<'_> {
                 continue;
             };
 
-            let branch_exit = match named_exit {
-                Some(skip) if branch_named[branch_idx] => skip,
-                _ => exit,
-            };
+            let branch_exit = branch_routing.branch_exit(branch_idx, exit);
 
             // Inject a default for every merged field this branch does not itself
             // produce, so the output shape stays stable. "Produces" means a top-level
@@ -313,7 +327,7 @@ impl Compiler<'_> {
         let search_nav = resumable_search_nav(first_nav);
         let branch_search = AltSearchNav(search_nav);
         let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
-        let (branch_named, named_exit) = self.alt_branch_routing(&branches, exit, &classifier);
+        let branch_routing = self.alt_branch_routing(&branches, exit, &classifier);
 
         let mut successors = Vec::new();
         for (branch_idx, branch) in branches.iter().enumerate() {
@@ -321,10 +335,7 @@ impl Compiler<'_> {
                 continue;
             };
 
-            let branch_exit = match named_exit {
-                Some(skip) if branch_named[branch_idx] => skip,
-                _ => exit,
-            };
+            let branch_exit = branch_routing.branch_exit(branch_idx, exit);
 
             let branch_nav = nav_for_alt_branch(first_nav, branch_search, &body, &classifier);
 
