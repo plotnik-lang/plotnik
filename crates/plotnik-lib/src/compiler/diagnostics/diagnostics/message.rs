@@ -157,107 +157,101 @@ impl DiagnosticKind {
     /// Default hint for this kind, automatically included in diagnostics.
     /// Call sites can add additional hints for context-specific information.
     pub fn hint(&self) -> Option<&'static str> {
-        match self {
-            Self::ExpectedSubtype => Some("e.g., `expression#binary_expression`"),
-            Self::ExpectedTypeName => Some("e.g., `::MyType`"),
-            Self::ExpectedFieldName => Some("e.g., `-value`"),
-            Self::EmptyTree => Some("use `(_)` to match any named node, or `_` for any node"),
+        let text = match self {
+            Self::ExpectedSubtype => "e.g., `expression#binary_expression`",
+            Self::ExpectedTypeName => "e.g., `::MyType`",
+            Self::ExpectedFieldName => "e.g., `-value`",
+            Self::EmptyTree => "use `(_)` to match any named node, or `_` for any node",
             Self::EmptyAnonymousNode => {
-                Some("anonymous nodes match literal tokens, like `\"+\"` or `\";\"`")
+                "anonymous nodes match literal tokens, like `\"+\"` or `\";\"`"
             }
-            Self::EmptySequence => Some("sequences must contain at least one expression"),
-            Self::EmptyAlternation => Some("alternations must contain at least one branch"),
-            Self::ErrorMissingOutsideParens => Some("write `(ERROR)` or `(MISSING \";\")`"),
+            Self::EmptySequence => "sequences must contain at least one expression",
+            Self::EmptyAlternation => "alternations must contain at least one branch",
+            Self::ErrorMissingOutsideParens => "write `(ERROR)` or `(MISSING \";\")`",
             Self::CaptureWithoutTarget => {
-                Some("captures attach to the pattern before them: `(node) @name`")
+                "captures attach to the pattern before them: `(node) @name`"
             }
-            Self::CaptureNameInvalid => Some("captures become fields in the output"),
-            Self::DefNameInvalid => Some("definitions become types in the output"),
-            Self::BranchLabelInvalid => {
-                Some("branch labels become variants of an enum in the output")
-            }
-            Self::FieldNameInvalid => Some("fields come from the grammar and are snake_case"),
+            Self::CaptureNameInvalid => "captures become fields in the output",
+            Self::DefNameInvalid => "definitions become types in the output",
+            Self::BranchLabelInvalid => "branch labels become variants of an enum in the output",
+            Self::FieldNameInvalid => "fields come from the grammar and are snake_case",
             Self::TreeSitterSequenceSyntaxDeprecated => {
-                Some("use `{(a) (b)}` to match a sequence of siblings")
+                "use `{(a) (b)}` to match a sequence of siblings"
             }
-            Self::NegationSyntaxDeprecated => Some("use `-field` instead of `!field`"),
+            Self::NegationSyntaxDeprecated => "use `-field` instead of `!field`",
             Self::SupertypeSlashDeprecated => {
-                Some("use `supertype#subtype` instead of `supertype/subtype`")
+                "use `supertype#subtype` instead of `supertype/subtype`"
             }
-            Self::MixedAltBranches => {
-                Some("use all labels for an enum, or none for a merged struct")
-            }
+            Self::MixedAltBranches => "use all labels for an enum, or none for a merged struct",
             Self::DuplicateAlternationLabel => {
-                Some("each branch label must be unique within an alternation")
+                "each branch label must be unique within an alternation"
             }
             Self::RecursionNoEscape => {
-                Some("add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`")
+                "add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`"
             }
-            Self::DirectRecursion => {
-                Some("recursive references must consume input before recursing")
-            }
-            Self::AnchorWithoutContext => Some("wrap in a named node: `(parent . (child))`"),
-            Self::AnchorInAlternation => Some("use `[{(a) . (b)} (c)]` to anchor within a branch"),
+            Self::DirectRecursion => "recursive references must consume input before recursing",
+            Self::AnchorWithoutContext => "wrap in a named node: `(parent . (child))`",
+            Self::AnchorInAlternation => "use `[{(a) . (b)} (c)]` to anchor within a branch",
             Self::QuantifiedAnchor | Self::CapturedAnchor => {
-                Some("anchors constrain position and produce no value")
+                "anchors constrain position and produce no value"
             }
-            Self::UncapturedOutputWithCaptures => Some("add `@name` to capture the output"),
+            Self::UncapturedOutputWithCaptures => "add `@name` to capture the output",
             Self::AmbiguousUncapturedOutputs => {
-                Some("capture each expression explicitly: `(X) @x (Y) @y`")
+                "capture each expression explicitly: `(X) @x (Y) @y`"
             }
-            Self::MultiElementScalarCapture => {
-                Some("add internal captures: `{(a) @a (b) @b}* @items`")
-            }
-            Self::UnclosedTree => Some("add `)` to close the node"),
-            Self::UnclosedSequence => Some("add `}` to close the sequence"),
-            Self::UnclosedAlternation => Some("add `]` to close the alternation"),
+            Self::MultiElementScalarCapture => "add internal captures: `{(a) @a (b) @b}* @items`",
+            Self::UnclosedTree => "add `)` to close the node",
+            Self::UnclosedSequence => "add `}` to close the sequence",
+            Self::UnclosedAlternation => "add `]` to close the alternation",
             Self::UnclosedString => {
-                Some("anonymous nodes match literal tokens; close the quote: `\"foo\"`")
+                "anonymous nodes match literal tokens; close the quote: `\"foo\"`"
             }
-            Self::ExpectedExpression => Some(
-                "an expression is a node `(kind)`, anonymous node `\"text\"`, sequence `{...}`, or alternation `[...]`",
-            ),
+            Self::ExpectedExpression => {
+                "an expression is a node `(kind)`, anonymous node `\"text\"`, sequence `{...}`, or alternation `[...]`"
+            }
             Self::ExpectedPredicateValue => {
-                Some("e.g., `(identifier == \"foo\")` or `(identifier =~ /foo/)`")
+                "e.g., `(identifier == \"foo\")` or `(identifier =~ /foo/)`"
             }
-            Self::FieldSequenceValue => Some(
-                "a field holds a single child node; match one pattern, or move the sequence outside the field",
-            ),
+            Self::FieldSequenceValue => {
+                "a field holds a single child node; match one pattern, or move the sequence outside the field"
+            }
             Self::UndefinedReference => {
-                Some("`(Name)` uses a definition; define `Name = ...` or check the spelling")
+                "`(Name)` uses a definition; define `Name = ...` or check the spelling"
             }
             Self::DuplicateCaptureInScope => {
-                Some("rename one capture, or use an enum if they are mutually exclusive branches")
+                "rename one capture, or use an enum if they are mutually exclusive branches"
             }
-            Self::PredicateOnNonLeaf => Some(
-                "predicates match text content; apply them to a leaf node or an anonymous node like `\"foo\"`",
-            ),
-            Self::EmptyRegex => Some(
-                "put a pattern between the slashes, e.g. `=~ /^foo/`, or use a string predicate like `== \"foo\"`",
-            ),
-            Self::RegexBackreference => Some(
-                "the regex engine is linear-time and cannot match backreferences; rewrite without `\\1`",
-            ),
-            Self::RegexLookaround => Some(
-                "the regex engine cannot match lookaround; match the surrounding context with the query pattern instead",
-            ),
-            Self::RegexNamedCapture => Some(
-                "regex captures are inert in plotnik; capture nodes with `@name` outside the regex",
-            ),
-            Self::InvalidSupertypeSyntax => Some(
-                "supertypes refine node kinds, not references: write `(supertype#subtype)` or just `(RefName)`",
-            ),
-            Self::ErrorTakesNoArguments => Some(
-                "`(ERROR)` matches any error node as a leaf; use `(MISSING \"x\")` to match a missing token",
-            ),
-            Self::RefCannotHaveChildren => Some(
-                "a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children",
-            ),
-            Self::NoEntrypoints => Some(
-                "every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing",
-            ),
-            _ => None,
-        }
+            Self::PredicateOnNonLeaf => {
+                "predicates match text content; apply them to a leaf node or an anonymous node like `\"foo\"`"
+            }
+            Self::EmptyRegex => {
+                "put a pattern between the slashes, e.g. `=~ /^foo/`, or use a string predicate like `== \"foo\"`"
+            }
+            Self::RegexBackreference => {
+                "the regex engine is linear-time and cannot match backreferences; rewrite without `\\1`"
+            }
+            Self::RegexLookaround => {
+                "the regex engine cannot match lookaround; match the surrounding context with the query pattern instead"
+            }
+            Self::RegexNamedCapture => {
+                "regex captures are inert in plotnik; capture nodes with `@name` outside the regex"
+            }
+            Self::InvalidSupertypeSyntax => {
+                "supertypes refine node kinds, not references: write `(supertype#subtype)` or just `(RefName)`"
+            }
+            Self::ErrorTakesNoArguments => {
+                "`(ERROR)` matches any error node as a leaf; use `(MISSING \"x\")` to match a missing token"
+            }
+            Self::RefCannotHaveChildren => {
+                "a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children"
+            }
+            Self::NoEntrypoints => {
+                "every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing"
+            }
+            _ => return None,
+        };
+
+        Some(text)
     }
 
     pub fn summary(&self) -> &'static str {
