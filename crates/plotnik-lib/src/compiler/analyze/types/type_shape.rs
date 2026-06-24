@@ -53,17 +53,14 @@ pub struct FieldInfo {
 }
 
 impl FieldInfo {
+    pub fn with_optional(type_id: TypeId, optional: bool) -> Self {
+        Self { type_id, optional }
+    }
+
     pub fn required(type_id: TypeId) -> Self {
         Self {
             type_id,
             optional: false,
-        }
-    }
-
-    pub fn optional(type_id: TypeId) -> Self {
-        Self {
-            type_id,
-            optional: true,
         }
     }
 

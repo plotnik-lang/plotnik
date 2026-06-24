@@ -122,7 +122,7 @@ fn merge_fields(
         if let Some(b_info) = b.remove(&key) {
             let type_id = unify_type_ids(a_info.type_id, b_info.type_id, key)?;
             let optional = a_info.optional || b_info.optional;
-            result.insert(key, FieldInfo { type_id, optional });
+            result.insert(key, FieldInfo::with_optional(type_id, optional));
         } else {
             absent_fields.push((key, a_info));
         }

@@ -461,11 +461,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     ) -> FieldInfo {
         let captured_type = annotation.map_or(base, |name| self.annotate_named(base, name));
 
-        if is_optional {
-            FieldInfo::optional(captured_type)
-        } else {
-            FieldInfo::required(captured_type)
-        }
+        FieldInfo::with_optional(captured_type, is_optional)
     }
 
     fn captured_field_flow(
