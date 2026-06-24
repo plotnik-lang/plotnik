@@ -1,7 +1,8 @@
 //! The emit driver: sequences the per-phase `emit-*` passes into a module.
 //!
-//! Each phase lives in its own module and depends only on `compiler::core`; this
-//! driver is the one place that depends on them all and fixes their order. The string
+//! Each phase lives in its own module, reading the analysis artifacts and the
+//! shared `emit::tables`; this driver is the one place that depends on them all
+//! and fixes their order. The string
 //! table is the cross-phase accumulator — `intern_predicates` creates it,
 //! `build_type_table` and `build_tables` extend it (so it is threaded by value
 //! through them), and the rest only read it. Insertion order fixes StringIds, so
