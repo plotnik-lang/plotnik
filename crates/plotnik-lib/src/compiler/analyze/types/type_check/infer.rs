@@ -4,7 +4,6 @@
 //! Reports diagnostics for type errors like strict dimensionality violations.
 
 use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
 
 use crate::core::Interner;
 use rowan::TextRange;
@@ -16,7 +15,7 @@ use super::types::{
     Arity, FieldInfo, OutputFlow, PatternResult, QuantifierKind, TYPE_NODE, TYPE_VOID, TypeId,
     TypeShape,
 };
-use super::unify::{UnifyError, unify_flows};
+use super::unify::unify_flows;
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
@@ -27,6 +26,9 @@ use crate::compiler::parse::ast::{
     CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
     SeqPattern, TokenPattern, UnionPattern, is_empty_group,
 };
+
+mod diagnostics;
+mod flow;
 
 /// Shared state for a single inference pass over the AST.
 pub struct InferCtx<'a, 'd> {
@@ -222,32 +224,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             seq.node().text_range(),
         );
         PatternResult::new(arity, flow)
-    }
-
-    /// Fold `source` fields into `target` in place, reporting a diagnostic on any
-    /// name collision. Shared by sequences and named nodes so both paths reject
-    /// duplicate captures identically.
-    fn merge_fields(
-        &mut self,
-        source_id: SourceId,
-        target: &mut BTreeMap<Symbol, FieldInfo>,
-        source: &BTreeMap<Symbol, FieldInfo>,
-        range: TextRange,
-    ) {
-        for (&name, &info) in source {
-            match target.entry(name) {
-                Entry::Vacant(e) => {
-                    e.insert(info);
-                }
-                Entry::Occupied(_) => {
-                    self.ctx
-                        .diag
-                        .report(source_id, DiagnosticKind::DuplicateCaptureInScope, range)
-                        .detail(self.ctx.interner.resolve(name))
-                        .emit();
-                }
-            }
-        }
     }
 
     fn infer_enum(&mut self, e: &Located<EnumPattern>) -> PatternResult {
@@ -636,114 +612,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         PatternResult::new(Arity::One, value_info.flow)
     }
 
-    fn report_field_arity_error(
-        &mut self,
-        source: SourceId,
-        field: &FieldPattern,
-        value: &Pattern,
-    ) {
-        let field_name = field
-            .name()
-            .map(|t| t.text().to_string())
-            .unwrap_or_else(|| "field".to_string());
-
-        let mut builder = self.ctx.diag.report(
-            source,
-            DiagnosticKind::FieldSequenceValue,
-            value.text_range(),
-        );
-        builder = builder.detail(field_name);
-
-        if let Pattern::Ref(r) = value
-            && let Some(name_tok) = r.name()
-        {
-            let name = name_tok.text();
-            if let Some((src, body)) = self.ctx.symbol_table.definition(name) {
-                builder = builder.related_to(src, body.text_range(), "defined here");
-            }
-        }
-
-        builder.emit();
-    }
-
-    /// Strict-dimensionality check 1: a multi-element pattern (`Arity::Many`)
-    /// without captures can't become a scalar array. Applies even under a row
-    /// capture — you can't meaningfully capture multiple nodes per iteration as
-    /// a scalar. Returns `true` when it reports, signalling the caller to skip
-    /// the internal-capture check (the original short-circuit).
-    fn check_multi_element_scalar(
-        &mut self,
-        source: SourceId,
-        quant: &QuantifiedPattern,
-        inner_info: &PatternResult,
-    ) -> bool {
-        if !(inner_info.arity == Arity::Many && inner_info.flow.is_void()) {
-            return false;
-        }
-
-        let op = self.quantifier_operator(quant);
-        self.ctx
-            .diag
-            .report(
-                source,
-                DiagnosticKind::MultiElementScalarCapture,
-                quant.text_range(),
-            )
-            .detail(format!(
-                "sequence with `{}` matches multiple nodes but has no internal captures",
-                op
-            ))
-            .emit();
-        true
-    }
-
-    /// Strict-dimensionality check 2: internal captures require a row capture on
-    /// the quantifier. Skipped when the quantifier already sits under a row
-    /// capture (see `infer_quantified_pattern_as_row`).
-    fn check_internal_capture_dimensionality(
-        &mut self,
-        source: SourceId,
-        quant: &QuantifiedPattern,
-        inner_info: &PatternResult,
-    ) {
-        let OutputFlow::Fields(type_id) = &inner_info.flow else {
-            return;
-        };
-
-        let fields = self.ctx.type_ctx.expect_struct_fields(*type_id);
-        if fields.is_empty() {
-            return;
-        }
-
-        let capture_names: Vec<_> = fields
-            .keys()
-            .map(|s| format!("`@{}`", self.ctx.interner.resolve(*s)))
-            .collect();
-        let captures_str = capture_names.join(", ");
-
-        let op = self.quantifier_operator(quant);
-        self.ctx
-            .diag
-            .report(
-                source,
-                DiagnosticKind::StrictDimensionalityViolation,
-                quant.text_range(),
-            )
-            .detail(format!(
-                "quantifier `{}` contains captures ({}) but has no struct capture",
-                op, captures_str
-            ))
-            .hint(format!("add a struct capture: `{{...}}{} @name`", op))
-            .emit();
-    }
-
-    fn quantifier_operator(&self, quant: &QuantifiedPattern) -> String {
-        quant
-            .operator()
-            .map(|t| t.text().to_string())
-            .unwrap_or_else(|| "*".to_string())
-    }
-
     fn quantifier_kind(&self, quant: &QuantifiedPattern) -> QuantifierKind {
         // Shared with `TypeAnalysis::capture_mechanism` and `compile`'s implicit-array gate so the
         // three never disagree on a quantifier's arity. A malformed operator-less
@@ -753,102 +621,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .unwrap_or(QuantifierKind::ZeroOrMore)
     }
 
-    fn flow_to_type(&mut self, flow: &OutputFlow) -> TypeId {
-        match flow {
-            OutputFlow::Void => TYPE_VOID,
-            OutputFlow::Value(t) | OutputFlow::Fields(t) => *t,
-        }
-    }
-
-    /// Compute flow from merged bubble fields and output-producing children.
-    ///
-    /// Rules:
-    /// - No bubbles, 0 outputs → Void
-    /// - No bubbles, 1 output → Forward output (propagate)
-    /// - No bubbles, 2+ outputs → Error (ambiguous)
-    /// - Bubbles, 0 outputs → Fields(struct)
-    /// - Bubbles, 1+ outputs → Error (require capture)
-    fn compute_merged_flow(
-        &mut self,
-        source: SourceId,
-        merged_fields: BTreeMap<Symbol, FieldInfo>,
-        output_children: Vec<(TextRange, TypeId)>,
-        parent_range: TextRange,
-    ) -> OutputFlow {
-        let has_bubbles = !merged_fields.is_empty();
-
-        match (has_bubbles, output_children.len()) {
-            (false, 0) => OutputFlow::Void,
-            (false, 1) => OutputFlow::Value(output_children[0].1),
-            (false, _) => {
-                self.report_ambiguous_outputs(source, parent_range, &output_children);
-                OutputFlow::Void
-            }
-            (true, 0) => OutputFlow::Fields(self.ctx.type_ctx.intern_struct(merged_fields)),
-            (true, _) => {
-                self.report_uncaptured_output_with_captures(source, &output_children);
-                OutputFlow::Fields(self.ctx.type_ctx.intern_struct(merged_fields))
-            }
-        }
-    }
-
-    fn report_ambiguous_outputs(
-        &mut self,
-        source: SourceId,
-        parent_range: TextRange,
-        outputs: &[(TextRange, TypeId)],
-    ) {
-        let mut builder = self
-            .ctx
-            .diag
-            .report(
-                source,
-                DiagnosticKind::AmbiguousUncapturedOutputs,
-                parent_range,
-            )
-            .detail(format!(
-                "{} expressions here produce a value but none is captured",
-                outputs.len()
-            ));
-        for (range, _) in outputs {
-            builder = builder.related_to(source, *range, "produces a value");
-        }
-        builder.emit();
-    }
-
-    fn report_uncaptured_output_with_captures(
-        &mut self,
-        source: SourceId,
-        outputs: &[(TextRange, TypeId)],
-    ) {
-        for (range, _) in outputs {
-            self.ctx
-                .diag
-                .report(source, DiagnosticKind::UncapturedOutputWithCaptures, *range)
-                .emit();
-        }
-    }
-
-    fn report_unify_error(&mut self, source: SourceId, range: TextRange, err: &UnifyError) {
-        let (kind, msg, hint) = match err {
-            UnifyError::ScalarInUnion => (
-                DiagnosticKind::IncompatibleTypes,
-                "a branch produces a value but this is a union alternation".to_string(),
-                Some("give every branch a branch label for an enum, e.g. `[A: ... B: ...]`"),
-            ),
-            UnifyError::IncompatibleTypes { field } => (
-                DiagnosticKind::IncompatibleCaptureTypes,
-                self.ctx.interner.resolve(*field).to_string(),
-                Some("make every branch produce the same type, or label the branches for an enum"),
-            ),
-        };
-
-        let mut builder = self.ctx.diag.report(source, kind, range).detail(msg);
-        if let Some(h) = hint {
-            builder = builder.hint(h);
-        }
-        builder.emit();
-    }
 }
 
 pub(super) struct InferPassInput<'a, 'd> {
