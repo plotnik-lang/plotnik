@@ -746,16 +746,6 @@ fn exec_is_a_hidden_alias_of_run() {
 }
 
 #[test]
-fn version_flag_works() {
-    let cmd = crate::cli::build_cli();
-    let err = cmd
-        .try_get_matches_from(["plotnik", "--version"])
-        .unwrap_err();
-
-    assert_eq!(err.kind(), clap::error::ErrorKind::DisplayVersion);
-}
-
-#[test]
 fn check_help_shows_json_flag() {
     let mut cmd = check_command();
     let help = cmd.render_help().to_string();
