@@ -54,7 +54,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// The walk only ever descends through one definition's body (a finite AST
     /// tree); references resolve to precomputed results rather than re-entering.
     pub fn infer_pattern(&mut self, pattern: &Located<Pattern>) -> PatternResult {
-        if let Some(info) = self.ctx.type_ctx.pattern_result(pattern.node()) {
+        if let Some(info) = self
+            .ctx
+            .type_ctx
+            .in_progress()
+            .pattern_result(pattern.node())
+        {
             return info.clone();
         }
 
@@ -92,7 +97,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
             match &child_info.flow {
                 OutputFlow::Fields(type_id) => {
-                    let fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
+                    let fields = self
+                        .ctx
+                        .type_ctx
+                        .in_progress()
+                        .expect_struct_fields(*type_id)
+                        .clone();
                     self.merge_fields(
                         node.source(),
                         &mut merged_fields,
@@ -101,7 +111,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     );
                 }
                 OutputFlow::Value(type_id) => {
-                    if self.ctx.type_ctx.is_structured_output(*type_id) {
+                    if self
+                        .ctx
+                        .type_ctx
+                        .in_progress()
+                        .is_structured_output(*type_id)
+                    {
                         output_children.push((child.node().text_range(), *type_id));
                     }
                 }
@@ -200,7 +215,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
             match &child_info.flow {
                 OutputFlow::Fields(type_id) => {
-                    let fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
+                    let fields = self
+                        .ctx
+                        .type_ctx
+                        .in_progress()
+                        .expect_struct_fields(*type_id)
+                        .clone();
                     self.merge_fields(
                         seq.source(),
                         &mut merged_fields,
@@ -209,7 +229,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     );
                 }
                 OutputFlow::Value(type_id) => {
-                    if self.ctx.type_ctx.is_structured_output(*type_id) {
+                    if self
+                        .ctx
+                        .type_ctx
+                        .in_progress()
+                        .is_structured_output(*type_id)
+                    {
                         output_children.push((child.node().text_range(), *type_id));
                     }
                 }
@@ -347,11 +372,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // mechanism owns the inner's fields, so they must not also bubble. Sharing
         // the classifier with emission keeps the declared type and the effects in
         // lockstep.
-        let mechanism = self
-            .ctx
-            .type_ctx
-            .in_progress()
-            .capture_mechanism(inner.node(), self.ctx.dependency_analysis, self.ctx.interner);
+        let mechanism = self.ctx.type_ctx.in_progress().capture_mechanism(
+            inner.node(),
+            self.ctx.dependency_analysis,
+            self.ctx.interner,
+        );
         let should_merge_fields = mechanism == CaptureMechanism::Node
             && matches!(&inner_info.flow, OutputFlow::Fields(_));
 
@@ -374,7 +399,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             let OutputFlow::Fields(type_id) = &inner_info.flow else {
                 unreachable!()
             };
-            let mut fields = self.ctx.type_ctx.expect_struct_fields(*type_id).clone();
+            let mut fields = self
+                .ctx
+                .type_ctx
+                .in_progress()
+                .expect_struct_fields(*type_id)
+                .clone();
             fields.insert(capture_name, field_info);
 
             PatternResult::new(
@@ -396,7 +426,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// `:: TypeName` — name a structured capture (struct/enum) or alias a node.
     /// Recurses into arrays and optionals so the name lands on the element.
     fn annotate_named(&mut self, type_id: TypeId, name: Symbol) -> TypeId {
-        match self.ctx.type_ctx.type_shape(type_id).cloned() {
+        match self.ctx.type_ctx.in_progress().type_shape(type_id).cloned() {
             Some(TypeShape::Struct(_) | TypeShape::Enum(_)) => {
                 self.ctx.type_ctx.set_type_alias(type_id, name);
                 type_id
@@ -549,6 +579,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 let optional_fields: BTreeMap<_, _> = self
                     .ctx
                     .type_ctx
+                    .in_progress()
                     .expect_struct_fields(type_id)
                     .iter()
                     .map(|(&k, &v)| (k, v.make_optional()))
@@ -620,7 +651,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .quantifier_kind()
             .unwrap_or(QuantifierKind::ZeroOrMore)
     }
-
 }
 
 pub(super) struct InferPassInput<'a, 'd> {
@@ -675,7 +705,7 @@ impl<'a, 'd> InferencePass<'a, 'd> {
                 .def_id_for_name(self.analysis.interner, name)
                 .expect("dependency analysis must assign every definition a DefId");
             assert!(
-                self.ctx.def_output(def_id).is_some(),
+                self.ctx.in_progress().def_output(def_id).is_some(),
                 "dependency analysis must schedule every definition before type analysis",
             );
         }

@@ -52,14 +52,14 @@ pub fn unify_flow(
 
         // Void ∪ Fields -> Fields (every field is absent in the Void branch)
         (OutputFlow::Void, OutputFlow::Fields(id)) | (OutputFlow::Fields(id), OutputFlow::Void) => {
-            let fields = ctx.expect_struct_fields(id).clone();
+            let fields = ctx.in_progress().expect_struct_fields(id).clone();
             let relaxed = relax_all_for_absence(ctx, fields);
             Ok(OutputFlow::Fields(ctx.intern_struct(relaxed)))
         }
 
         (OutputFlow::Fields(a_id), OutputFlow::Fields(b_id)) => {
-            let a_fields = ctx.expect_struct_fields(a_id).clone();
-            let b_fields = ctx.expect_struct_fields(b_id).clone();
+            let a_fields = ctx.in_progress().expect_struct_fields(a_id).clone();
+            let b_fields = ctx.in_progress().expect_struct_fields(b_id).clone();
 
             let merged = merge_fields(ctx, a_fields, b_fields)?;
             Ok(OutputFlow::Fields(ctx.intern_struct(merged)))
@@ -82,7 +82,7 @@ pub fn unify_flow(
 /// which keeps inference in lockstep with what the emitter writes.
 fn relax_for_absence(ctx: &mut TypeAnalysisBuilder, info: FieldInfo) -> FieldInfo {
     if !info.optional
-        && let Some(TypeShape::Array { element, .. }) = ctx.type_shape(info.type_id)
+        && let Some(TypeShape::Array { element, .. }) = ctx.in_progress().type_shape(info.type_id)
     {
         let element = *element;
         let array = ctx.intern_type(TypeShape::Array {

@@ -4,9 +4,9 @@ use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::ast::{FieldPattern, Pattern, QuantifiedPattern};
 
-use super::InferVisitor;
 use super::super::types::{OutputFlow, PatternResult, TypeId};
 use super::super::unify::UnifyError;
+use super::InferVisitor;
 
 impl InferVisitor<'_, '_> {
     pub(super) fn report_field_arity_error(
@@ -83,7 +83,8 @@ impl InferVisitor<'_, '_> {
             return;
         };
 
-        let fields = self.ctx.type_ctx.expect_struct_fields(*type_id);
+        let type_ctx = self.ctx.type_ctx.in_progress();
+        let fields = type_ctx.expect_struct_fields(*type_id);
         if fields.is_empty() {
             return;
         }

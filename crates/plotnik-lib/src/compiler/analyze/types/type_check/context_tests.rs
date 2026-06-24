@@ -9,8 +9,14 @@ use crate::compiler::ids::DefId;
 fn builtin_types_have_correct_ids() {
     let ctx = TypeAnalysisBuilder::new();
 
-    assert_eq!(ctx.type_shape(TYPE_VOID), Some(&TypeShape::Void));
-    assert_eq!(ctx.type_shape(TYPE_NODE), Some(&TypeShape::Node));
+    assert_eq!(
+        ctx.in_progress().type_shape(TYPE_VOID),
+        Some(&TypeShape::Void)
+    );
+    assert_eq!(
+        ctx.in_progress().type_shape(TYPE_NODE),
+        Some(&TypeShape::Node)
+    );
 }
 
 #[test]

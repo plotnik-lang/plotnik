@@ -234,6 +234,28 @@ pub(crate) struct InProgressTypeAnalysis<'a> {
     pub(super) analysis: &'a TypeAnalysis,
 }
 
+impl InProgressTypeAnalysis<'_> {
+    pub(crate) fn type_shape(&self, id: TypeId) -> Option<&TypeShape> {
+        self.analysis.type_shape(id)
+    }
+
+    pub(crate) fn expect_struct_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
+        self.analysis.expect_struct_fields(id)
+    }
+
+    pub(crate) fn is_structured_output(&self, type_id: TypeId) -> bool {
+        self.analysis.is_structured_output(type_id)
+    }
+
+    pub(crate) fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternResult> {
+        self.analysis.pattern_result(pattern)
+    }
+
+    pub(crate) fn def_output(&self, def_id: DefId) -> Option<TypeId> {
+        self.analysis.def_output(def_id)
+    }
+}
+
 impl Default for TypeAnalysisBuilder {
     fn default() -> Self {
         Self::new()
@@ -319,25 +341,5 @@ impl TypeAnalysisBuilder {
     /// Associate an explicit alias with a type (from `@x :: TypeName` on struct captures).
     pub fn set_type_alias(&mut self, type_id: TypeId, name: Symbol) {
         self.analysis.type_aliases.insert(type_id, name);
-    }
-
-    pub fn type_shape(&self, id: TypeId) -> Option<&TypeShape> {
-        self.analysis.type_shape(id)
-    }
-
-    pub fn expect_struct_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
-        self.analysis.expect_struct_fields(id)
-    }
-
-    pub fn is_structured_output(&self, type_id: TypeId) -> bool {
-        self.analysis.is_structured_output(type_id)
-    }
-
-    pub fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternResult> {
-        self.analysis.pattern_result(pattern)
-    }
-
-    pub fn def_output(&self, def_id: DefId) -> Option<TypeId> {
-        self.analysis.def_output(def_id)
     }
 }
