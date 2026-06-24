@@ -1,31 +1,15 @@
 //! Core compiler state and entry points.
 
-use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::analyze::grammar::GrammarBinding;
-use crate::core::Interner;
 use indexmap::IndexMap;
 
 use crate::bytecode::Nav;
-use crate::compiler::parse::ast::Pattern;
-use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::lower::ir::{InstructionIR, Label, ReturnIR, TrampolineIR};
-use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::ids::DefId;
+use crate::compiler::lower::context::CompileCtx;
+use crate::compiler::lower::ir::{CompileResult, InstructionIR, Label, ReturnIR, TrampolineIR};
+use crate::compiler::parse::ast::Pattern;
 
 use super::capture::ExprCtx;
 use super::scope::{CaptureExits, StructScope};
-use super::verify::verify_constructed;
-use crate::compiler::lower::thompson::CompileResult;
-
-/// Compilation context bundling all shared compilation state.
-///
-pub struct CompileCtx<'a> {
-    pub interner: &'a Interner,
-    pub type_ctx: &'a TypeAnalysis,
-    pub symbol_table: &'a SymbolTable,
-    pub grammar: &'a GrammarBinding,
-    pub dependency_analysis: &'a DependencyAnalysis,
-}
 
 /// Compiler state for Thompson construction.
 pub struct Compiler<'a> {
@@ -39,7 +23,7 @@ pub struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(ctx: &'a CompileCtx<'a>) -> Self {
+    pub(in crate::compiler::lower) fn new(ctx: &'a CompileCtx<'a>) -> Self {
         Self {
             ctx,
             instructions: Vec::new(),
@@ -49,7 +33,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn build_ir(ctx: &'a CompileCtx<'a>) -> CompileResult {
+    pub(in crate::compiler::lower) fn build_ir(ctx: &'a CompileCtx<'a>) -> CompileResult {
         let mut compiler = Compiler::new(ctx);
 
         // Emit universal preamble first: Struct -> Trampoline -> EndStruct -> Return
@@ -65,15 +49,11 @@ impl<'a> Compiler<'a> {
             compiler.compile_def(def_id);
         }
 
-        let result = CompileResult {
+        CompileResult {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
             preamble_entry,
-        };
-
-        verify_constructed(&result, ctx);
-
-        result
+        }
     }
 
     /// Emit the universal preamble: Struct -> Trampoline -> EndStruct -> Return

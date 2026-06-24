@@ -24,7 +24,6 @@ mod navigation;
 mod quantifier;
 mod scope;
 mod sequences;
-pub mod verify;
 
 #[cfg(test)]
 mod capture_tests;
@@ -33,5 +32,4 @@ mod expressions_tests;
 #[cfg(test)]
 mod quantifier_tests;
 
-pub use crate::compiler::lower::ir::CompileResult;
-pub use compiler::{CompileCtx, Compiler};
+pub(in crate::compiler::lower) use compiler::Compiler;

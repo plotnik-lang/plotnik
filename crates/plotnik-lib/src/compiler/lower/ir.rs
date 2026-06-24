@@ -538,7 +538,7 @@ pub struct LoweredIr {
 }
 
 impl LoweredIr {
-    pub(in crate::compiler) fn new(raw: CompileResult) -> Self {
+    pub(super) fn new(raw: CompileResult) -> Self {
         Self { raw }
     }
 

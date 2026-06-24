@@ -5,10 +5,11 @@ use indexmap::IndexMap;
 
 use crate::compiler::analyze::grammar::GrammarBindingBuilder;
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
+use crate::compiler::lower::context::CompileCtx;
 use crate::compiler::lower::ir::NodeKindConstraint;
 use crate::compiler::test_utils::{empty_dependency_analysis, empty_symbol_table};
 
-use crate::compiler::lower::thompson::{CompileCtx, Compiler};
+use super::Compiler;
 
 #[test]
 fn resolve_anonymous_node_kind_uses_anonymous_namespace() {

@@ -36,9 +36,8 @@ pub use release_impl::{run_verified, verify_constructed};
 
 #[cfg(not(debug_assertions))]
 mod release_impl {
-    use crate::compiler::lower::thompson::CompileResult;
-
-    use super::super::compiler::CompileCtx;
+    use crate::compiler::lower::context::CompileCtx;
+    use crate::compiler::lower::ir::CompileResult;
 
     /// Run a pass. Verification is compiled out in release builds.
     #[inline(always)]
@@ -67,12 +66,10 @@ mod debug_impl {
     use indexmap::IndexMap;
 
     use crate::compiler::ids::DefId;
+    use crate::compiler::lower::context::CompileCtx;
     use crate::compiler::lower::ir::{
-        InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR,
+        CompileResult, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR,
     };
-    use crate::compiler::lower::thompson::CompileResult;
-
-    use super::super::compiler::CompileCtx;
 
     /// Max completed paths recorded per fingerprint. This counts root-to-leaf
     /// walks, a *semantic* quantity (laser-vision makes it invariant to epsilon
