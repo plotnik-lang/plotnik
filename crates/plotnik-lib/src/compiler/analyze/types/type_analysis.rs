@@ -13,11 +13,11 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::compiler::parse::ast::Pattern;
 use crate::compiler::analyze::types::type_shape::{
-    Arity, FieldInfo, PatternResult, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
+    Arity, FieldInfo, OutputFlow, PatternResult, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::ids::DefId;
+use crate::compiler::parse::ast::Pattern;
 use crate::core::Symbol;
 
 /// Frozen registry of inferred types and per-definition / per-pattern results.
@@ -48,6 +48,11 @@ impl TypeAnalysis {
         self.types.get(id.0 as usize)
     }
 
+    pub fn expect_type_shape(&self, id: TypeId) -> &TypeShape {
+        self.type_shape(id)
+            .expect("admitted type id must reference a registered type")
+    }
+
     pub fn struct_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, FieldInfo>> {
         match self.type_shape(id)? {
             TypeShape::Struct(fields) => Some(fields),
@@ -63,8 +68,10 @@ impl TypeAnalysis {
     /// runtime condition the query can trigger. We surface it loudly instead of
     /// fabricating an empty struct that would silently mistype the output.
     pub fn expect_struct_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
-        self.struct_fields(id)
-            .expect("Fields flow must point to a Struct type")
+        match self.expect_type_shape(id) {
+            TypeShape::Struct(fields) => fields,
+            _ => panic!("Fields flow must point to a Struct type"),
+        }
     }
 
     /// Whether a type is a meaningful structured output (enum/struct/ref, or an
@@ -87,12 +94,22 @@ impl TypeAnalysis {
         self.pattern_result.get(pattern)
     }
 
+    pub fn expect_pattern_result(&self, pattern: &Pattern) -> &PatternResult {
+        self.pattern_result(pattern)
+            .expect("admitted pattern must have an inferred result")
+    }
+
     pub fn arity(&self, pattern: &Pattern) -> Option<Arity> {
         self.pattern_result.get(pattern).map(|info| info.arity)
     }
 
     pub fn def_output(&self, def_id: DefId) -> Option<TypeId> {
         self.def_output.get(&def_id).copied()
+    }
+
+    pub fn expect_def_output(&self, def_id: DefId) -> TypeId {
+        self.def_output(def_id)
+            .expect("admitted definition must have an inferred output type")
     }
 
     /// Follow a `Ref` chain to the underlying materialized type; non-ref types
@@ -102,9 +119,7 @@ impl TypeAnalysis {
         let Some(TypeShape::Ref(def_id)) = self.type_shape(type_id) else {
             return type_id;
         };
-        let target = self
-            .def_output(*def_id)
-            .expect("ref target def type must exist");
+        let target = self.expect_def_output(*def_id);
         self.resolve_underlying_type_id(target)
     }
 
@@ -123,9 +138,6 @@ impl TypeAnalysis {
     /// failure here is a type-inference bug, not a query condition, so we assert
     /// loudly — the same discipline `DependencyAnalysis::new` follows.
     fn assert_well_formed(&self) {
-        let count = self.types.len() as u32;
-        let in_range = |id: TypeId| id.0 < count;
-
         assert!(
             matches!(self.type_shape(TYPE_VOID), Some(TypeShape::Void)),
             "TYPE_VOID must be interned at its canonical id",
@@ -139,19 +151,22 @@ impl TypeAnalysis {
             match shape {
                 TypeShape::Struct(fields) => {
                     for info in fields.values() {
-                        assert!(in_range(info.type_id), "struct field type id out of range");
+                        self.assert_type_id_registered(
+                            info.type_id,
+                            "struct field type id out of range",
+                        );
                     }
                 }
                 TypeShape::Enum(variants) => {
                     for &id in variants.values() {
-                        assert!(in_range(id), "enum variant type id out of range");
+                        self.assert_type_id_registered(id, "enum variant type id out of range");
                     }
                 }
                 TypeShape::Array { element, .. } => {
-                    assert!(in_range(*element), "array element type id out of range");
+                    self.assert_type_id_registered(*element, "array element type id out of range");
                 }
                 TypeShape::Optional(inner) => {
-                    assert!(in_range(*inner), "optional inner type id out of range");
+                    self.assert_type_id_registered(*inner, "optional inner type id out of range");
                 }
                 TypeShape::Ref(def_id) => assert!(
                     self.def_output.contains_key(def_id),
@@ -162,8 +177,36 @@ impl TypeAnalysis {
         }
 
         for &type_id in self.def_output.values() {
-            assert!(in_range(type_id), "def output type id out of range");
+            self.assert_type_id_registered(type_id, "def output type id out of range");
         }
+
+        for info in self.pattern_result.values() {
+            self.assert_flow_well_formed(&info.flow);
+        }
+
+        for &type_id in self.type_aliases.keys() {
+            self.assert_type_id_registered(type_id, "type alias type id out of range");
+        }
+    }
+
+    fn assert_flow_well_formed(&self, flow: &OutputFlow) {
+        match flow {
+            OutputFlow::Void => {}
+            OutputFlow::Value(type_id) => {
+                self.assert_type_id_registered(*type_id, "value flow type id out of range");
+            }
+            OutputFlow::Fields(type_id) => {
+                self.assert_type_id_registered(*type_id, "fields flow type id out of range");
+                assert!(
+                    matches!(self.type_shape(*type_id), Some(TypeShape::Struct(_))),
+                    "Fields flow must point to a Struct type",
+                );
+            }
+        }
+    }
+
+    fn assert_type_id_registered(&self, type_id: TypeId, message: &str) {
+        assert!(self.type_shape(type_id).is_some(), "{message}");
     }
 }
 

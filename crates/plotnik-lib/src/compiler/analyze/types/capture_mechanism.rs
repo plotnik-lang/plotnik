@@ -105,16 +105,12 @@ impl TypeAnalysis {
 
         // Everything else is decided by the inner's inferred data flow, so the type
         // and the emitted effects can't disagree.
-        let flow = match self.pattern_result(&pattern).map(|info| &info.flow) {
-            Some(flow) => flow,
-            None => {
-                return match mode {
-                    CaptureLookupMode::Admitted => {
-                        panic!("admitted captured pattern must have a pattern result")
-                    }
-                    CaptureLookupMode::InProgress => CaptureMechanism::Node,
-                };
-            }
+        let flow = match mode {
+            CaptureLookupMode::Admitted => &self.expect_pattern_result(&pattern).flow,
+            CaptureLookupMode::InProgress => match self.pattern_result(&pattern) {
+                Some(info) => &info.flow,
+                None => return CaptureMechanism::Node,
+            },
         };
 
         match flow {
@@ -186,15 +182,19 @@ impl TypeAnalysis {
 
         // After inference the definition's registered output type is authoritative;
         // this is the path emission always takes.
+        if matches!(mode, CaptureLookupMode::Admitted) {
+            let output_type = self.expect_def_output(def_id);
+            return matches!(
+                self.expect_type_shape(output_type),
+                TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. }
+            );
+        }
+
         if let Some(output_type) = self.def_output(def_id) {
             return matches!(
                 self.type_shape(output_type),
                 Some(TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. })
             );
-        }
-
-        if matches!(mode, CaptureLookupMode::Admitted) {
-            panic!("admitted reference target must have an output type");
         }
 
         // During inference a leaf definition may not be registered yet — the visitor
@@ -221,8 +221,12 @@ impl InProgressTypeAnalysis<'_> {
         deps: &DependencyAnalysis,
         interner: &Interner,
     ) -> CaptureMechanism {
-        self.analysis
-            .capture_mechanism_with_mode(inner, deps, interner, CaptureLookupMode::InProgress)
+        self.analysis.capture_mechanism_with_mode(
+            inner,
+            deps,
+            interner,
+            CaptureLookupMode::InProgress,
+        )
     }
 }
 

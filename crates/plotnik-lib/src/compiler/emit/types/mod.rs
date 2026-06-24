@@ -9,12 +9,12 @@ use std::collections::HashSet;
 
 use crate::bytecode::{TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeNameEntry};
 
-use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
-use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::types::TypeAnalysis;
+use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
+use crate::compiler::emit::tables::{EmitError, EmitInput, StringTableBuilder, TypeTableBuilder};
 use crate::compiler::ids::TypeId;
 use crate::core::Interner;
-use crate::compiler::emit::tables::{EmitError, EmitInput, StringTableBuilder, TypeTableBuilder};
 
 /// Build the type table, interning type, member, and name strings into the
 /// shared string table. Threads the string table by value because it extends it.
@@ -54,7 +54,7 @@ fn build(
     for (_def_id, type_id) in type_ctx.iter_def_output() {
         collector.collect(type_id, type_ctx);
 
-        if !matches!(type_ctx.type_shape(type_id), Some(TypeShape::Ref(_))) {
+        if !matches!(type_ctx.expect_type_shape(type_id), TypeShape::Ref(_)) {
             continue;
         }
 
@@ -106,9 +106,7 @@ fn build(
     };
     for (i, &type_id) in ordered_types.iter().enumerate() {
         let slot_index = builtin_count + i;
-        let type_shape = type_ctx
-            .type_shape(type_id)
-            .expect("collected type must exist");
+        let type_shape = type_ctx.expect_type_shape(type_id);
         emit_type_at_slot(types, slot_index, type_shape, &mut ctx)?;
     }
 
@@ -224,10 +222,7 @@ fn emit_type_at_slot(
         }
 
         TypeShape::Ref(def_id) => {
-            let target = ctx
-                .type_ctx
-                .def_output(*def_id)
-                .expect("alias def target must exist");
+            let target = ctx.type_ctx.expect_def_output(*def_id);
             let alias = types.resolve_type(target, ctx.type_ctx)?;
             types.set_type_def(slot_index, TypeDef::alias(alias));
             Ok(())
@@ -257,8 +252,8 @@ fn resolve_field_type(
 fn source_is_optional(type_ctx: &TypeAnalysis, type_id: TypeId) -> bool {
     let underlying = type_ctx.resolve_underlying_type_id(type_id);
     matches!(
-        type_ctx.type_shape(underlying),
-        Some(TypeShape::Optional(_))
+        type_ctx.expect_type_shape(underlying),
+        TypeShape::Optional(_)
     )
 }
 
@@ -289,14 +284,11 @@ impl TypeCollector {
             return;
         }
 
-        let Some(type_shape) = type_ctx.type_shape(type_id) else {
-            return;
-        };
+        let type_shape = type_ctx.expect_type_shape(type_id);
 
         if let TypeShape::Ref(def_id) = type_shape {
-            if let Some(target_id) = type_ctx.def_output(*def_id) {
-                self.collect(target_id, type_ctx);
-            }
+            let target_id = type_ctx.expect_def_output(*def_id);
+            self.collect(target_id, type_ctx);
             return;
         }
 
@@ -352,9 +344,7 @@ impl BuiltinUses {
             return;
         }
 
-        let Some(type_shape) = type_ctx.type_shape(type_id) else {
-            return;
-        };
+        let type_shape = type_ctx.expect_type_shape(type_id);
 
         match type_shape {
             TypeShape::Void => self.uses_void = true,
@@ -377,9 +367,8 @@ impl BuiltinUses {
                 self.collect(*inner, type_ctx);
             }
             TypeShape::Ref(def_id) => {
-                if let Some(target_id) = type_ctx.def_output(*def_id) {
-                    self.collect(target_id, type_ctx);
-                }
+                let target_id = type_ctx.expect_def_output(*def_id);
+                self.collect(target_id, type_ctx);
             }
         }
     }

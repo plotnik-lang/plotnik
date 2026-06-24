@@ -188,16 +188,12 @@ impl Compiler<'_> {
 
         // Check the actual inferred type, not syntax. Compile runs after the type
         // analysis is frozen, so every pattern it visits has a recorded result.
-        let info = self
-            .ctx
-            .type_ctx
-            .pattern_result(&inner)
-            .expect("an analyzed quantifier inner has a pattern result");
+        let info = self.ctx.type_ctx.expect_pattern_result(&inner);
 
         !info
             .flow
             .type_id()
-            .and_then(|id| self.ctx.type_ctx.type_shape(id))
+            .map(|id| self.ctx.type_ctx.expect_type_shape(id))
             .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)))
     }
 
@@ -251,9 +247,7 @@ impl Compiler<'_> {
 ///
 /// Enums use Enum/EndEnum instead (handled separately).
 pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
-    let info = type_ctx
-        .pattern_result(inner)
-        .expect("an analyzed quantifier inner has a pattern result");
+    let info = type_ctx.expect_pattern_result(inner);
 
     // Must be a bubble (fields flow to parent scope)
     if !info.flow.has_fields() {
@@ -262,15 +256,11 @@ pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
 
     info.flow
         .type_id()
-        .and_then(|id| type_ctx.type_shape(id))
+        .map(|id| type_ctx.expect_type_shape(id))
         .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)))
 }
 
 /// Get row type ID for array element scoping.
 pub fn row_type_id(inner: &Pattern, type_ctx: &TypeAnalysis) -> Option<TypeId> {
-    type_ctx
-        .pattern_result(inner)
-        .expect("an analyzed quantifier inner has a pattern result")
-        .flow
-        .type_id()
+    type_ctx.expect_pattern_result(inner).flow.type_id()
 }

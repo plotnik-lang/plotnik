@@ -196,10 +196,9 @@ impl Compiler<'_> {
             .get(&def_id)
             .expect("every analyzed DefId has a def_entries label");
 
-        let def_output_id = self.ctx.type_ctx.def_output(def_id);
-        let ref_returns_struct = def_output_id
-            .and_then(|tid| self.ctx.type_ctx.type_shape(tid))
-            .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)));
+        let def_output_id = self.ctx.type_ctx.expect_def_output(def_id);
+        let def_output_shape = self.ctx.type_ctx.expect_type_shape(def_output_id);
+        let ref_returns_struct = matches!(def_output_shape, TypeShape::Struct(_));
 
         let is_captured = !capture.post.is_empty();
         let needs_scope = is_captured && ref_returns_struct;
@@ -208,9 +207,7 @@ impl Compiler<'_> {
         // its captures must not bubble into the parent scope. Enum recursion
         // is the exception — inference forwards its enum value — so only the rest is
         // suppressed.
-        let ref_returns_enum = def_output_id
-            .and_then(|tid| self.ctx.type_ctx.type_shape(tid))
-            .is_some_and(|shape| matches!(shape, TypeShape::Enum(_)));
+        let ref_returns_enum = matches!(def_output_shape, TypeShape::Enum(_));
         let suppress_opaque_recursion = !is_captured
             && self.ctx.dependency_analysis.is_recursive_def(def_id)
             && !ref_returns_enum;
@@ -520,8 +517,7 @@ impl Compiler<'_> {
         let inner_is_bubble = self
             .ctx
             .type_ctx
-            .pattern_result(inner)
-            .expect("an analyzed capture inner has a pattern result")
+            .expect_pattern_result(inner)
             .flow
             .has_fields();
         if inner_is_bubble {

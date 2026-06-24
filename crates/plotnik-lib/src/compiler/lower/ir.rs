@@ -126,11 +126,6 @@ impl EffectIR {
         Self::literal(EffectKind::StructClose, 0)
     }
 
-    /// Begin enum scope.
-    pub fn start_enum() -> Self {
-        Self::literal(EffectKind::EnumOpen, 0)
-    }
-
     /// End enum scope.
     pub fn end_enum() -> Self {
         Self::literal(EffectKind::EnumClose, 0)

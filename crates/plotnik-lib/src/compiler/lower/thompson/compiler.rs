@@ -106,13 +106,10 @@ impl<'a> Compiler<'a> {
         // Definitions are compiled in normalized form: body -> Return
         // No Struct/EndStruct wrapper - that's the caller's responsibility (call-site scoping).
         // We still use with_scope for member index lookup during compilation.
-        let body_entry = if let Some(type_id) = self.ctx.type_ctx.def_output(def_id) {
-            self.with_scope(type_id, |this| {
-                this.compile_pattern(body, return_label, body_nav)
-            })
-        } else {
-            self.compile_pattern(body, return_label, body_nav)
-        };
+        let type_id = self.ctx.type_ctx.expect_def_output(def_id);
+        let body_entry = self.with_scope(type_id, |this| {
+            this.compile_pattern(body, return_label, body_nav)
+        });
 
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);

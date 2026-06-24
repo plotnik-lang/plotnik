@@ -7,7 +7,10 @@ use crate::compiler::lower::ir::{EffectIR, MemberRef};
 fn nest_scope_preserves_outer_and_nests_inner() {
     let outer = CaptureEffects::new(vec![EffectIR::start_struct()], vec![EffectIR::end_struct()]);
 
-    let result = outer.nest_scope(EffectIR::start_enum(), EffectIR::end_enum());
+    let result = outer.nest_scope(
+        EffectIR::with_member(EffectKind::EnumOpen, MemberRef::new(TypeId(0), 0)),
+        EffectIR::end_enum(),
+    );
 
     assert_eq!(result.pre.len(), 2);
     assert_eq!(result.pre[0].kind(), EffectKind::StructOpen);

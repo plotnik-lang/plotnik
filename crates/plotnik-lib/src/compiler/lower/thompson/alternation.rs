@@ -178,11 +178,10 @@ impl Compiler<'_> {
         let union_type_id = self
             .ctx
             .type_ctx
-            .pattern_result(&Pattern::Union(union.clone()))
-            .expect("an analyzed union has a pattern result")
+            .expect_pattern_result(&Pattern::Union(union.clone()))
             .flow
             .type_id();
-        let merged_fields = union_type_id.and_then(|id| self.ctx.type_ctx.struct_fields(id));
+        let merged_fields = union_type_id.map(|id| self.ctx.type_ctx.expect_struct_fields(id));
 
         let search_nav = resumable_search_nav(first_nav);
         let branch_search = AltSearchNav(search_nav);
@@ -210,11 +209,10 @@ impl Compiler<'_> {
                 let provided: HashSet<Symbol> = self
                     .ctx
                     .type_ctx
-                    .pattern_result(&body)
-                    .expect("an analyzed branch body has a pattern result")
+                    .expect_pattern_result(&body)
                     .flow
                     .type_id()
-                    .and_then(|id| self.ctx.type_ctx.struct_fields(id))
+                    .map(|id| self.ctx.type_ctx.expect_struct_fields(id))
                     .map(|f| f.keys().copied().collect())
                     .unwrap_or_default();
                 fields
@@ -228,8 +226,8 @@ impl Compiler<'_> {
                         let set = EffectIR::with_member(EffectKind::Set, member_ref);
                         let is_required_list = !field_info.optional
                             && matches!(
-                                self.ctx.type_ctx.type_shape(field_info.type_id),
-                                Some(TypeShape::Array { .. })
+                                self.ctx.type_ctx.expect_type_shape(field_info.type_id),
+                                TypeShape::Array { .. }
                             );
                         if is_required_list {
                             vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
@@ -297,21 +295,20 @@ impl Compiler<'_> {
         let enum_type_id = self
             .ctx
             .type_ctx
-            .pattern_result(&Pattern::Enum(e.clone()))
-            .expect("an analyzed enum has a pattern result")
+            .expect_pattern_result(&Pattern::Enum(e.clone()))
             .flow
-            .type_id();
-        let enum_type_shape = enum_type_id.and_then(|id| self.ctx.type_ctx.type_shape(id));
+            .type_id()
+            .expect("an analyzed enum must produce an enum type");
 
         // BTreeMap order gives stable variant indices independent of AST iteration order.
-        let variant_info: BTreeMap<Symbol, (u16, TypeId)> = match enum_type_shape {
-            Some(TypeShape::Enum(variants)) => variants
-                .iter()
-                .enumerate()
-                .map(|(idx, (&sym, &type_id))| (sym, (idx as u16, type_id)))
-                .collect(),
-            _ => BTreeMap::new(),
+        let TypeShape::Enum(variants) = self.ctx.type_ctx.expect_type_shape(enum_type_id) else {
+            panic!("an analyzed enum must produce an enum type");
         };
+        let variant_info: BTreeMap<Symbol, (u16, TypeId)> = variants
+            .iter()
+            .enumerate()
+            .map(|(idx, (&sym, &type_id))| (sym, (idx as u16, type_id)))
+            .collect();
 
         let search_nav = resumable_search_nav(first_nav);
         let branch_search = AltSearchNav(search_nav);
@@ -340,11 +337,10 @@ impl Compiler<'_> {
                 .map(|&(idx, type_id)| (idx, type_id))
                 .expect("variant must exist for enum branch");
 
-            let e_effect = if let Some(type_id) = enum_type_id {
-                EffectIR::with_member(EffectKind::EnumOpen, MemberRef::new(type_id, variant_idx))
-            } else {
-                EffectIR::start_enum()
-            };
+            let e_effect = EffectIR::with_member(
+                EffectKind::EnumOpen,
+                MemberRef::new(enum_type_id, variant_idx),
+            );
 
             let body_entry = self.with_scope(payload_type_id, |this| {
                 if is_skippable_quantifier(&body) {

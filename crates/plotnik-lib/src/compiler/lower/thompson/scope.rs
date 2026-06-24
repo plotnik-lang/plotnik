@@ -3,9 +3,9 @@
 //! Handles StructOpen/StructClose and Arr/EndArr wrapper emission for struct and array captures.
 
 use crate::bytecode::Nav;
-use crate::compiler::parse::ast::Pattern;
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label, MatchIR, MemberRef};
+use crate::compiler::parse::ast::Pattern;
 
 use super::Compiler;
 use super::capture::{CaptureEffects, ExprCtx};
@@ -149,8 +149,7 @@ impl Compiler<'_> {
         let scope_type_id = self
             .ctx
             .type_ctx
-            .pattern_result(inner)
-            .expect("an analyzed scope inner has a pattern result")
+            .expect_pattern_result(inner)
             .flow
             .type_id();
 
@@ -373,5 +372,4 @@ impl Compiler<'_> {
         );
         label
     }
-
 }
