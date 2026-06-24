@@ -13,7 +13,7 @@ mod types;
 
 use crate::compiler::emit::instructions::encode;
 use crate::compiler::emit::layout::compute_layout;
-use crate::compiler::emit::module::{build_tables, write_module};
+use crate::compiler::emit::module::EmitPipeline;
 use crate::compiler::emit::regex::build_regex_table;
 use crate::compiler::emit::strings::intern_predicates;
 use crate::compiler::emit::tables::{ConstantPool, EmitError, EmitInput};
@@ -29,14 +29,16 @@ pub(in crate::compiler) fn emit_unchecked(
 ) -> Result<Vec<u8>, EmitError> {
     let compile_result = lowered_ir.raw();
     let strings = intern_predicates(compile_result);
-    let (types, mut strings) = build_type_table(&input, strings)?;
+    let (types, strings) = build_type_table(&input, strings)?;
     let layout = compute_layout(compile_result)?;
-    let tables = build_tables(&input, compile_result, &types, &layout, &mut strings)?;
-    let regexes = build_regex_table(compile_result, &strings)?;
-    let pool = ConstantPool::new(&types, &strings, &regexes);
-    let transitions = encode(compile_result, &layout, pool)?;
+    let mut pipeline = EmitPipeline::new(input, compile_result, strings, types, layout);
 
-    Ok(write_module(pool, &layout, &tables, &transitions))
+    let tables = pipeline.build_tables()?;
+    let regexes = build_regex_table(compile_result, pipeline.strings())?;
+    let pool = ConstantPool::new(pipeline.types(), pipeline.strings(), &regexes);
+    let transitions = encode(compile_result, pipeline.layout(), pool)?;
+
+    Ok(pipeline.write_module(pool, &tables, &transitions))
 }
 
 /// Emit bytecode, asserting in debug/test builds that the loader accepts it.
