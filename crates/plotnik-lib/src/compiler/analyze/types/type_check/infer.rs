@@ -55,6 +55,11 @@ struct CaptureInner {
     makes_field_optional: bool,
 }
 
+struct ChildFlow {
+    merged_fields: BTreeMap<Symbol, FieldInfo>,
+    output_children: Vec<(TextRange, TypeId)>,
+}
+
 impl<'a, 'd> InferVisitor<'a, 'd> {
     pub fn new(ctx: InferCtx<'a, 'd>) -> Self {
         Self { ctx }
@@ -99,46 +104,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     /// Named node: matches one position, bubbles up child captures or propagates output.
     fn infer_named_node(&mut self, node: &Located<NodePattern>) -> PatternResult {
-        let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
-        let mut output_children: Vec<(TextRange, TypeId)> = Vec::new();
-
-        for child in node.node().children() {
-            let child = node.wrap(child);
-            let child_info = self.infer_pattern(&child);
-
-            match &child_info.flow {
-                OutputFlow::Fields(type_id) => {
-                    let fields = self
-                        .ctx
-                        .type_ctx
-                        .in_progress()
-                        .expect_struct_fields(*type_id)
-                        .clone();
-                    self.merge_fields(
-                        node.source(),
-                        &mut merged_fields,
-                        &fields,
-                        child.node().text_range(),
-                    );
-                }
-                OutputFlow::Value(type_id) => {
-                    if self
-                        .ctx
-                        .type_ctx
-                        .in_progress()
-                        .is_structured_output(*type_id)
-                    {
-                        output_children.push((child.node().text_range(), *type_id));
-                    }
-                }
-                OutputFlow::Void => {}
-            }
-        }
+        let children = node.node().children().map(|child| node.wrap(child));
+        let child_flow = self.collect_child_flow(node.source(), children);
 
         let flow = self.compute_merged_flow(
             node.source(),
-            merged_fields,
-            output_children,
+            child_flow.merged_fields,
+            child_flow.output_children,
             node.node().text_range(),
         );
         PatternResult::new(Arity::One, flow)
@@ -211,12 +183,27 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let children: Vec<Located<Pattern>> = seq.node().children().map(|c| seq.wrap(c)).collect();
 
         let arity = self.compute_sequence_arity(&children);
+        let child_flow = self.collect_child_flow(seq.source(), children.iter().cloned());
 
+        let flow = self.compute_merged_flow(
+            seq.source(),
+            child_flow.merged_fields,
+            child_flow.output_children,
+            seq.node().text_range(),
+        );
+        PatternResult::new(arity, flow)
+    }
+
+    fn collect_child_flow(
+        &mut self,
+        source: SourceId,
+        children: impl IntoIterator<Item = Located<Pattern>>,
+    ) -> ChildFlow {
         let mut merged_fields: BTreeMap<Symbol, FieldInfo> = BTreeMap::new();
         let mut output_children: Vec<(TextRange, TypeId)> = Vec::new();
 
-        for child in &children {
-            let child_info = self.infer_pattern(child);
+        for child in children {
+            let child_info = self.infer_pattern(&child);
 
             match &child_info.flow {
                 OutputFlow::Fields(type_id) => {
@@ -227,7 +214,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                         .expect_struct_fields(*type_id)
                         .clone();
                     self.merge_fields(
-                        seq.source(),
+                        source,
                         &mut merged_fields,
                         &fields,
                         child.node().text_range(),
@@ -247,13 +234,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
         }
 
-        let flow = self.compute_merged_flow(
-            seq.source(),
+        ChildFlow {
             merged_fields,
             output_children,
-            seq.node().text_range(),
-        );
-        PatternResult::new(arity, flow)
+        }
     }
 
     fn compute_sequence_arity(&mut self, children: &[Located<Pattern>]) -> Arity {
