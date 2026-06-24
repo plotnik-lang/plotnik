@@ -61,6 +61,32 @@ pub struct NodeShapeRecord {
     subtypes: Option<Vec<NodeKindRecord>>,
 }
 
+impl NodeShapeRecord {
+    fn bare(kind: String, named: bool, extra: bool) -> Self {
+        Self {
+            kind,
+            named,
+            root: false,
+            extra,
+            fields: None,
+            children: None,
+            subtypes: None,
+        }
+    }
+
+    fn concrete(kind: String, named: bool, root: bool, extra: bool) -> Self {
+        Self {
+            kind,
+            named,
+            root,
+            extra,
+            fields: Some(BTreeMap::new()),
+            children: None,
+            subtypes: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeKindRecord {
     #[serde(rename = "type")]
@@ -476,14 +502,12 @@ pub fn generate_node_shapes_json(
         if syntax_grammar.supertype_symbols.contains(&symbol) {
             let node_shape_json = node_shapes_json
                 .entry(variable.name.clone())
-                .or_insert_with(|| NodeShapeRecord {
-                    kind: variable.name.clone(),
-                    named: true,
-                    root: false,
-                    extra: extra_names.contains(variable.name.as_str()),
-                    fields: None,
-                    children: None,
-                    subtypes: None,
+                .or_insert_with(|| {
+                    NodeShapeRecord::bare(
+                        variable.name.clone(),
+                        true,
+                        extra_names.contains(variable.name.as_str()),
+                    )
                 });
             let mut subtypes = info
                 .children
@@ -522,15 +546,12 @@ pub fn generate_node_shapes_json(
                 let mut node_kind_existed = true;
                 let node_shape_json = node_shapes_json.entry(kind.clone()).or_insert_with(|| {
                     node_kind_existed = false;
-                    NodeShapeRecord {
-                        kind: kind.clone(),
-                        named: is_named,
-                        root: i == START_RULE_INDEX,
-                        extra: extra_names.contains(kind.as_str()),
-                        fields: Some(BTreeMap::new()),
-                        children: None,
-                        subtypes: None,
-                    }
+                    NodeShapeRecord::concrete(
+                        kind.clone(),
+                        is_named,
+                        i == START_RULE_INDEX,
+                        extra_names.contains(kind.as_str()),
+                    )
                 });
 
                 let fields_json = node_shape_json.fields.get_or_insert_with(BTreeMap::new);
@@ -783,14 +804,8 @@ fn add_token_node_shape(
             let node_shape_json =
                 node_shapes_json
                     .entry(name.to_string())
-                    .or_insert_with(|| NodeShapeRecord {
-                        kind: name.to_string(),
-                        named: true,
-                        root: false,
-                        extra: extra_names.contains(name),
-                        fields: None,
-                        children: None,
-                        subtypes: None,
+                    .or_insert_with(|| {
+                        NodeShapeRecord::bare(name.to_string(), true, extra_names.contains(name))
                     });
             if let Some(children) = &mut node_shape_json.children {
                 children.required = false;
@@ -801,15 +816,11 @@ fn add_token_node_shape(
                 }
             }
         }
-        VariableType::Anonymous => anonymous_node_shapes.push(NodeShapeRecord {
-            kind: name.to_string(),
-            named: false,
-            root: false,
-            extra: extra_names.contains(name),
-            fields: None,
-            children: None,
-            subtypes: None,
-        }),
+        VariableType::Anonymous => anonymous_node_shapes.push(NodeShapeRecord::bare(
+            name.to_string(),
+            false,
+            extra_names.contains(name),
+        )),
         _ => {}
     }
 }
