@@ -1,7 +1,7 @@
 use crate::core::{Interner, NodeKind, NodeKindId};
 use indexmap::IndexMap;
 
-use crate::compiler::AnalysisInput;
+use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::grammar::GrammarBindingBuilder;
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
 use crate::compiler::lower::LowerInput;
@@ -29,7 +29,7 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
     let grammar = grammar_builder.finish();
     let dependency_analysis = empty_dependency_analysis();
     let ctx = LowerInput {
-        analysis: AnalysisInput {
+        analysis: AnalysisArtifacts {
             interner: &interner,
             type_analysis: &type_ctx,
             dependency_analysis: &dependency_analysis,
@@ -55,7 +55,7 @@ fn resolve_anonymous_node_kind_requires_linked_binding() {
     let grammar = GrammarBindingBuilder::new().finish();
     let dependency_analysis = empty_dependency_analysis();
     let ctx = LowerInput {
-        analysis: AnalysisInput {
+        analysis: AnalysisArtifacts {
             interner: &interner,
             type_analysis: &type_ctx,
             dependency_analysis: &dependency_analysis,
@@ -78,7 +78,7 @@ fn resolve_field_by_name_requires_linked_binding() {
     let grammar = GrammarBindingBuilder::new().finish();
     let dependency_analysis = empty_dependency_analysis();
     let ctx = LowerInput {
-        analysis: AnalysisInput {
+        analysis: AnalysisArtifacts {
             interner: &interner,
             type_analysis: &type_ctx,
             dependency_analysis: &dependency_analysis,

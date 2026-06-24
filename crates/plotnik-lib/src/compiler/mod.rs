@@ -11,7 +11,6 @@ mod ids;
 pub(crate) mod parse;
 pub(crate) mod typegen;
 
-mod analysis_input;
 mod analyze;
 mod lower;
 
@@ -26,5 +25,4 @@ pub use crate::compiler::diagnostics::{
     DiagnosticBuilder, DiagnosticKind, Diagnostics, Error, QueryResult, Severity, Source, SourceId,
     SourceKind, SourceMap, SourcePath, Span,
 };
-pub(crate) use analysis_input::AnalysisInput;
 pub use query::{CheckedQuery, CompiledQuery, Query, QueryBuilder};

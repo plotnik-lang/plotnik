@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use rowan::TextRange;
 
-use crate::compiler::AnalysisInput;
+use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::grammar::link;
 use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
@@ -673,8 +673,8 @@ impl LinkedQuery {
         })
     }
 
-    fn analysis_input(&self) -> AnalysisInput<'_> {
-        AnalysisInput {
+    fn analysis_input(&self) -> AnalysisArtifacts<'_> {
+        AnalysisArtifacts {
             interner: self.interner(),
             type_analysis: self.type_analysis(),
             dependency_analysis: self.dependency_analysis(),

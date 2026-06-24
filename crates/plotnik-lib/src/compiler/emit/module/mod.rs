@@ -10,7 +10,7 @@ use crate::bytecode::{
     Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SymbolNameEntry,
 };
 
-use crate::compiler::AnalysisInput;
+use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::emit::layout_map::LayoutMap;
 use crate::compiler::emit::tables::{
     ConstantPool, EmitError, StringTableBuilder, TypeTableBuilder,
@@ -26,7 +26,7 @@ pub struct ModuleTables {
 }
 
 pub(in crate::compiler::emit) struct EmitPipeline<'a> {
-    input: AnalysisInput<'a>,
+    input: AnalysisArtifacts<'a>,
     ir: &'a NfaGraph,
     strings: StringTableBuilder,
     types: TypeTableBuilder,
@@ -35,7 +35,7 @@ pub(in crate::compiler::emit) struct EmitPipeline<'a> {
 
 impl<'a> EmitPipeline<'a> {
     pub(in crate::compiler::emit) fn new(
-        input: AnalysisInput<'a>,
+        input: AnalysisArtifacts<'a>,
         ir: &'a NfaGraph,
         strings: StringTableBuilder,
         types: TypeTableBuilder,

@@ -14,7 +14,7 @@ use crate::compiler::lower::ir::{InstructionIR, NfaGraph, PredicateValueIR};
 /// Compile every regex predicate into the regex table, resolving each pattern's
 /// StringId from the finished string table. Reads the string table; interns
 /// nothing into it.
-pub fn build_regexes(
+pub fn build_regex_table(
     nfa: &NfaGraph,
     strings: &StringTableBuilder,
 ) -> Result<RegexTableBuilder, EmitError> {

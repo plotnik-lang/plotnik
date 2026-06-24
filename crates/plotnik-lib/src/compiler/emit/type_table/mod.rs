@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeNameEntry};
 
-use crate::compiler::AnalysisInput;
+use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
 use crate::compiler::emit::tables::{EmitError, StringTableBuilder, TypeTableBuilder};
@@ -18,8 +18,8 @@ use crate::core::Interner;
 
 /// Build the type table, interning type, member, and name strings into the
 /// shared string table. Threads the string table by value because it extends it.
-pub fn build_types(
-    input: &AnalysisInput<'_>,
+pub fn build_type_table(
+    input: &AnalysisArtifacts<'_>,
     mut strings: StringTableBuilder,
 ) -> Result<(TypeTableBuilder, StringTableBuilder), EmitError> {
     let mut types = TypeTableBuilder::new();
@@ -35,7 +35,7 @@ pub fn build_types(
 /// emitted first, then custom types in definition order, depth-first.
 fn build(
     types: &mut TypeTableBuilder,
-    input: AnalysisInput<'_>,
+    input: AnalysisArtifacts<'_>,
     strings: &mut StringTableBuilder,
 ) -> Result<(), EmitError> {
     let type_analysis = input.type_analysis;
@@ -133,7 +133,7 @@ fn fill_slots(
 
 fn emit_type_names(
     types: &mut TypeTableBuilder,
-    input: &AnalysisInput<'_>,
+    input: &AnalysisArtifacts<'_>,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
     for (def_id, type_id) in ctx.type_analysis.iter_def_output() {

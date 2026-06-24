@@ -3,7 +3,7 @@
 //! Owns the bytecode-level type tables (defs, members, names) and the query →
 //! bytecode id mapping, plus the primitive push/resolve operations the type-emit
 //! phase drives. The walk that decides reachability, ordering, and how each
-//! inferred shape lowers lives in `compiler::emit::build_types`.
+//! inferred shape lowers lives in `compiler::emit::type_table`.
 
 use std::collections::HashMap;
 
