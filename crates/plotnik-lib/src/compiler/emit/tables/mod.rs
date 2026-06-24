@@ -8,6 +8,7 @@
 //! cross-phase accumulator (no single phase owns its full lifecycle), so it
 //! lives here at the emit root rather than inside one phase.
 
+mod constant_pool;
 mod context;
 mod error;
 mod regex_table;
@@ -19,6 +20,7 @@ mod string_table_tests;
 #[cfg(test)]
 mod type_table_tests;
 
+pub(in crate::compiler::emit) use constant_pool::ConstantPool;
 pub use context::EmitInput;
 pub use error::EmitError;
 pub use regex_table::RegexTableBuilder;

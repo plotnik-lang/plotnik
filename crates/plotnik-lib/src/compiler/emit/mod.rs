@@ -16,7 +16,7 @@ use crate::compiler::emit::layout::compute_layout;
 use crate::compiler::emit::module::{build_tables, write_module};
 use crate::compiler::emit::regex::build_regex_table;
 use crate::compiler::emit::strings::intern_predicates;
-use crate::compiler::emit::tables::{EmitError, EmitInput};
+use crate::compiler::emit::tables::{ConstantPool, EmitError, EmitInput};
 use crate::compiler::emit::types::build_type_table;
 use crate::compiler::lower::ir::LoweredIr;
 
@@ -33,16 +33,10 @@ pub(in crate::compiler) fn emit_unchecked(
     let layout = compute_layout(compile_result)?;
     let (tables, strings) = build_tables(&input, compile_result, &types, &layout, strings)?;
     let regexes = build_regex_table(compile_result, &strings)?;
-    let transitions = encode(compile_result, &layout, &types, &strings, &regexes)?;
+    let pool = ConstantPool::new(&types, &strings, &regexes);
+    let transitions = encode(compile_result, &layout, pool)?;
 
-    Ok(write_module(
-        &strings,
-        &types,
-        &regexes,
-        &layout,
-        &tables,
-        &transitions,
-    ))
+    Ok(write_module(pool, &layout, &tables, &transitions))
 }
 
 /// Emit bytecode, asserting in debug/test builds that the loader accepts it.

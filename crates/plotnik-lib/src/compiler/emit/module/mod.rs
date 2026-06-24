@@ -8,10 +8,10 @@ use crate::core::NodeKind;
 
 use crate::bytecode::{Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN};
 
-use crate::compiler::lower::ir::{CompileResult, LayoutMap};
 use crate::compiler::emit::tables::{
-    EmitError, EmitInput, RegexTableBuilder, StringTableBuilder, TypeTableBuilder,
+    ConstantPool, EmitError, EmitInput, StringTableBuilder, TypeTableBuilder,
 };
+use crate::compiler::lower::ir::{CompileResult, LayoutMap};
 
 /// The node-kind, field, and entrypoint wire tables. Built together because all
 /// three intern their names into the one string table.
@@ -86,16 +86,14 @@ pub fn build_tables(
 
 /// Serialize every table into its section, then write the header and checksum.
 pub fn write_module(
-    strings: &StringTableBuilder,
-    types: &TypeTableBuilder,
-    regexes: &RegexTableBuilder,
+    pool: ConstantPool<'_>,
     layout: &LayoutMap,
     tables: &WireTables,
     transitions: &[u8],
 ) -> Vec<u8> {
-    let (str_blob, str_table) = strings.emit();
-    let (regex_blob, regex_table) = regexes.emit();
-    let (type_defs_bytes, type_members_bytes, type_names_bytes) = types.emit();
+    let (str_blob, str_table) = pool.emit_strings();
+    let (regex_blob, regex_table) = pool.emit_regexes();
+    let (type_defs_bytes, type_members_bytes, type_names_bytes) = pool.emit_types();
 
     let node_types_bytes = emit_node_kinds(&tables.node_kinds);
     let node_fields_bytes = emit_fields(&tables.fields);
@@ -123,13 +121,13 @@ pub fn write_module(
     let total_size = output.len() as u32;
 
     let mut header = Header {
-        str_table_count: strings.len() as u16,
+        str_table_count: pool.string_count() as u16,
         node_types_count: tables.node_kinds.len() as u16,
         node_fields_count: tables.fields.len() as u16,
-        regex_table_count: regexes.len() as u16,
-        type_defs_count: types.type_defs_count() as u16,
-        type_members_count: types.type_members_count() as u16,
-        type_names_count: types.type_names_count() as u16,
+        regex_table_count: pool.regex_count() as u16,
+        type_defs_count: pool.type_defs_count() as u16,
+        type_members_count: pool.type_members_count() as u16,
+        type_names_count: pool.type_names_count() as u16,
         entrypoints_count: tables.entrypoints.len() as u16,
         transitions_count: layout.total_steps() as u16,
         str_blob_size: str_blob.len() as u32,
