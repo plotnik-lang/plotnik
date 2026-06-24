@@ -35,6 +35,24 @@ enum RefCallLowering {
     PlainCall,
 }
 
+impl<'a> CaptureRequest<'a> {
+    fn build(
+        compiler: &Compiler<'_>,
+        cap: &ast::CapturedPattern,
+        inner: &'a Pattern,
+        nav: Option<Nav>,
+        mechanism: CaptureMechanism,
+        outer_capture: CaptureEffects,
+    ) -> Self {
+        Self {
+            inner,
+            nav,
+            capture_effects: compiler.build_capture_effects(cap, Some(mechanism)),
+            outer_capture,
+        }
+    }
+}
+
 impl Compiler<'_> {
     pub(super) fn compile_node_pattern(&mut self, node: &ast::NodePattern, ctx: ExprCtx) -> Label {
         let ExprCtx {
@@ -447,34 +465,21 @@ impl Compiler<'_> {
             )
         });
 
-        let capture_effects = self.build_capture_effects(cap, mechanism);
-
         let (Some(inner), Some(mechanism)) = (inner_opt, mechanism) else {
+            let capture_effects = self.build_capture_effects(cap, mechanism);
             return self.emit_effects_epsilon(exits.match_exit(), capture_effects, outer_capture);
         };
 
+        let req = CaptureRequest::build(self, cap, &inner, nav_override, mechanism, outer_capture);
+
         match mechanism {
             // Array: Arr → quantifier (with Push) → EndArr+capture → exit(s).
-            CaptureMechanism::Array => self.compile_scoped_capture(
-                CaptureMechanism::Array,
-                &inner,
-                nav_override,
-                capture_effects,
-                outer_capture,
-                exits,
-            ),
+            CaptureMechanism::Array => self.compile_array_capture(req, exits),
 
             // Struct scope: Struct → inner → EndStruct+capture → exit(s) (also empty `{}`).
             // Without the wrapper the Set lands on the raw inner node and both the
             // struct scope and the inner Sets are lost (#470).
-            CaptureMechanism::StructScope => self.compile_scoped_capture(
-                CaptureMechanism::StructScope,
-                &inner,
-                nav_override,
-                capture_effects,
-                outer_capture,
-                exits,
-            ),
+            CaptureMechanism::StructScope => self.compile_struct_capture(req, exits),
 
             // Node/Ref/SetAfter own no capture-site scope (their wrapper, if any, is
             // part of the inner). With split exits all three fold the capture onto the
@@ -489,59 +494,32 @@ impl Compiler<'_> {
                     match_exit,
                     skip_exit,
                 } => {
+                    let CaptureRequest {
+                        inner,
+                        nav,
+                        capture_effects,
+                        outer_capture,
+                    } = req;
                     let combined = outer_capture.with_post_values(capture_effects);
                     self.compile_skippable_with_exits(
-                        &inner,
+                        inner,
                         SplitExits {
                             match_exit,
                             skip_exit,
                         },
-                        nav_override,
+                        nav,
                         combined,
                     )
                 }
-                CaptureExits::Single(exit) => {
-                    let req = CaptureRequest {
-                        inner: &inner,
-                        nav: nav_override,
-                        capture_effects,
-                        outer_capture,
-                    };
-                    match mechanism {
-                        CaptureMechanism::SetAfter => self.compile_setafter_capture(req, exit),
-                        CaptureMechanism::Ref => self.compile_ref_capture(req, exit),
-                        CaptureMechanism::Node => self.compile_node_capture(req, exit),
-                        CaptureMechanism::Array | CaptureMechanism::StructScope => {
-                            unreachable!("scope mechanisms are handled above in compile_captured")
-                        }
+                CaptureExits::Single(exit) => match mechanism {
+                    CaptureMechanism::SetAfter => self.compile_setafter_capture(req, exit),
+                    CaptureMechanism::Ref => self.compile_ref_capture(req, exit),
+                    CaptureMechanism::Node => self.compile_node_capture(req, exit),
+                    CaptureMechanism::Array | CaptureMechanism::StructScope => {
+                        unreachable!("scope mechanisms are handled above in compile_captured")
                     }
-                }
+                },
             },
-        }
-    }
-
-    fn compile_scoped_capture(
-        &mut self,
-        mechanism: CaptureMechanism,
-        inner: &Pattern,
-        nav: Option<Nav>,
-        capture_effects: Vec<EffectIR>,
-        outer_capture: CaptureEffects,
-        exits: CaptureExits,
-    ) -> Label {
-        let req = CaptureRequest {
-            inner,
-            nav,
-            capture_effects,
-            outer_capture,
-        };
-
-        match mechanism {
-            CaptureMechanism::Array => self.compile_array_capture(req, exits),
-            CaptureMechanism::StructScope => self.compile_struct_capture(req, exits),
-            CaptureMechanism::Node | CaptureMechanism::Ref | CaptureMechanism::SetAfter => {
-                unreachable!("non-scope capture mechanism passed to compile_scoped_capture")
-            }
         }
     }
 
