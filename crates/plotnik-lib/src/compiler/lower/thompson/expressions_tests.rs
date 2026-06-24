@@ -9,7 +9,7 @@ use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::NodeKindConstraint;
 use crate::compiler::test_utils::{empty_dependency_analysis, empty_symbol_table};
 
-use super::Compiler;
+use super::NfaBuilder;
 
 #[test]
 fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
@@ -36,7 +36,7 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
         grammar: &grammar,
         dependency_analysis: &dependency_analysis,
     };
-    let mut compiler = Compiler::new(&ctx);
+    let mut compiler = NfaBuilder::new(&ctx);
 
     assert_eq!(
         compiler.resolve_anonymous_node_kind("number"),
@@ -60,7 +60,7 @@ fn resolve_anonymous_node_kind_requires_linked_binding() {
         grammar: &grammar,
         dependency_analysis: &dependency_analysis,
     };
-    let mut compiler = Compiler::new(&ctx);
+    let mut compiler = NfaBuilder::new(&ctx);
 
     compiler.resolve_anonymous_node_kind("number");
 }
@@ -81,7 +81,7 @@ fn resolve_field_by_name_requires_linked_binding() {
         grammar: &grammar,
         dependency_analysis: &dependency_analysis,
     };
-    let mut compiler = Compiler::new(&ctx);
+    let mut compiler = NfaBuilder::new(&ctx);
 
     compiler.resolve_field_by_name("name");
 }

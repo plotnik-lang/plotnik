@@ -11,7 +11,7 @@ use crate::bytecode::{Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry
 use crate::compiler::emit::tables::{
     ConstantPool, EmitError, EmitInput, StringTableBuilder, TypeTableBuilder,
 };
-use crate::compiler::lower::ir::{CompileResult, LayoutMap};
+use crate::compiler::lower::ir::{NfaGraph, LayoutMap};
 
 /// The node-kind, field, and entrypoint wire tables. Built together because all
 /// three intern their names into the one string table.
@@ -23,7 +23,7 @@ pub struct WireTables {
 
 pub(in crate::compiler::emit) struct EmitPipeline<'a> {
     input: EmitInput<'a>,
-    ir: &'a CompileResult,
+    ir: &'a NfaGraph,
     strings: StringTableBuilder,
     types: TypeTableBuilder,
     layout: LayoutMap,
@@ -32,7 +32,7 @@ pub(in crate::compiler::emit) struct EmitPipeline<'a> {
 impl<'a> EmitPipeline<'a> {
     pub(in crate::compiler::emit) fn new(
         input: EmitInput<'a>,
-        ir: &'a CompileResult,
+        ir: &'a NfaGraph,
         strings: StringTableBuilder,
         types: TypeTableBuilder,
         layout: LayoutMap,

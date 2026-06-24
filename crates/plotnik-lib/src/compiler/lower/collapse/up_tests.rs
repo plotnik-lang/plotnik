@@ -2,14 +2,14 @@
 
 use crate::bytecode::Nav;
 
-use super::collapse_up::collapse_up;
-use crate::compiler::lower::ir::CompileResult;
+use super::up::collapse_up;
+use crate::compiler::lower::ir::NfaGraph;
 use crate::compiler::lower::ir::{InstructionIR, Label, MatchIR};
 
 #[test]
 fn collapse_up_single_mode() {
     // Up(1) → Up(1) → exit should become Up(2) → exit
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Up(1))
@@ -39,7 +39,7 @@ fn collapse_up_single_mode() {
 #[test]
 fn collapse_up_chain_of_three() {
     // Up(1) → Up(2) → Up(3) should become Up(6)
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Up(1))
@@ -72,7 +72,7 @@ fn collapse_up_chain_of_three() {
 #[test]
 fn collapse_up_mixed_modes_no_merge() {
     // Up(1) → UpSkipTrivia(1) should NOT merge (different modes)
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Up(1))
@@ -96,7 +96,7 @@ fn collapse_up_mixed_modes_no_merge() {
 #[test]
 fn collapse_up_skip_trivia_same_mode() {
     // UpSkipTrivia(1) → UpSkipTrivia(1) should merge
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::UpSkipTrivia(1))
@@ -125,7 +125,7 @@ fn collapse_up_skip_trivia_same_mode() {
 #[test]
 fn collapse_up_skip_extras_same_mode() {
     // UpSkipExtras(1) → UpSkipExtras(1) should merge
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::UpSkipExtras(1))
@@ -154,7 +154,7 @@ fn collapse_up_skip_extras_same_mode() {
 #[test]
 fn collapse_up_exact_same_mode() {
     // UpExact(1) → UpExact(1) should merge
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::UpExact(1))
@@ -186,7 +186,7 @@ fn collapse_up_with_effects_no_merge() {
     use crate::bytecode::EffectKind;
     use crate::compiler::lower::ir::EffectIR;
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Up(1))
@@ -211,7 +211,7 @@ fn collapse_up_with_effects_no_merge() {
 #[test]
 fn collapse_up_merges_up_to_max() {
     // (MAX - 3) → Up(3) sums to exactly Nav::MAX_UP_LEVEL, so the merge is allowed.
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Up(Nav::MAX_UP_LEVEL - 3))
@@ -241,7 +241,7 @@ fn collapse_up_merges_up_to_max() {
 fn collapse_up_refuses_merge_exceeding_max() {
     // A maxed-out ascent plus more would exceed Nav::MAX_UP_LEVEL. Capping would
     // silently drop upward movement, so the merge is refused and both steps remain.
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Up(Nav::MAX_UP_LEVEL))
@@ -270,7 +270,7 @@ fn collapse_up_refuses_merge_exceeding_max() {
 #[test]
 fn collapse_up_branching_no_merge() {
     // Up(1) with multiple successors should NOT merge
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Up(1))
@@ -316,7 +316,7 @@ fn collapse_up_deep_chain_splits_without_dangling() {
         .collect();
     instructions.push(MatchIR::terminal(Label(DEPTH)).into());
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: Default::default(),
         preamble_entry: Label(0),
@@ -364,7 +364,7 @@ fn assert_constraint_chain_splits(make: fn(u8) -> Nav) {
         .collect();
     instructions.push(MatchIR::terminal(Label(DEPTH)).into());
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: Default::default(),
         preamble_entry: Label(0),
@@ -419,7 +419,7 @@ fn collapse_up_exact_deep_chain_splits() {
 #[test]
 fn collapse_up_no_up_unchanged() {
     // Non-Up instructions should pass through unchanged
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Down)

@@ -37,22 +37,22 @@ pub use release_impl::{run_verified, verify_constructed};
 #[cfg(not(debug_assertions))]
 mod release_impl {
     use crate::compiler::lower::LowerInput;
-    use crate::compiler::lower::ir::CompileResult;
+    use crate::compiler::lower::ir::NfaGraph;
 
     /// Run a pass. Verification is compiled out in release builds.
     #[inline(always)]
     pub fn run_verified(
         _name: &str,
-        result: &mut CompileResult,
+        result: &mut NfaGraph,
         _ctx: &LowerInput,
-        pass: impl FnOnce(&mut CompileResult),
+        pass: impl FnOnce(&mut NfaGraph),
     ) {
         pass(result);
     }
 
     /// No-op in release builds.
     #[inline(always)]
-    pub fn verify_constructed(_result: &CompileResult, _ctx: &LowerInput) {}
+    pub fn verify_constructed(_result: &NfaGraph, _ctx: &LowerInput) {}
 }
 
 #[cfg(debug_assertions)]
@@ -68,7 +68,7 @@ mod debug_impl {
     use crate::compiler::ids::DefId;
     use crate::compiler::lower::LowerInput;
     use crate::compiler::lower::ir::{
-        CompileResult, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR,
+        NfaGraph, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateValueIR,
     };
 
     /// Max completed paths recorded per fingerprint. This counts root-to-leaf
@@ -527,7 +527,7 @@ mod debug_impl {
         Ok(())
     }
 
-    fn entries(result: &CompileResult) -> Vec<(WalkRoot, Label)> {
+    fn entries(result: &NfaGraph) -> Vec<(WalkRoot, Label)> {
         let mut v = vec![(WalkRoot::Preamble, result.preamble_entry)];
         for (&def_id, &label) in &result.def_entries {
             v.push((WalkRoot::Def(def_id), label));
@@ -535,7 +535,7 @@ mod debug_impl {
         v
     }
 
-    fn snapshot(result: &CompileResult, ctx: &LowerInput) -> PassSnapshot {
+    fn snapshot(result: &NfaGraph, ctx: &LowerInput) -> PassSnapshot {
         let walk = GraphWalk::new(&result.instructions, &result.def_entries, ctx);
         let fingerprints = entries(result)
             .into_iter()
@@ -574,7 +574,7 @@ mod debug_impl {
     fn verify_after_pass(
         name: &str,
         before: &PassSnapshot,
-        result: &CompileResult,
+        result: &NfaGraph,
         ctx: &LowerInput,
     ) {
         if let Err(e) = check_labels(&result.instructions) {
@@ -600,9 +600,9 @@ mod debug_impl {
     /// instruction list structurally sound.
     pub fn run_verified(
         name: &str,
-        result: &mut CompileResult,
+        result: &mut NfaGraph,
         ctx: &LowerInput,
-        pass: impl FnOnce(&mut CompileResult),
+        pass: impl FnOnce(&mut NfaGraph),
     ) {
         let before = snapshot(result, ctx);
         pass(result);
@@ -613,7 +613,7 @@ mod debug_impl {
     /// plus balanced scope effects on every path. Passes preserve the fingerprint
     /// (which carries the full effect sequence), so a construction that balances
     /// here stays balanced through the pipeline.
-    pub fn verify_constructed(result: &CompileResult, ctx: &LowerInput) {
+    pub fn verify_constructed(result: &NfaGraph, ctx: &LowerInput) {
         if let Err(e) = check_labels(&result.instructions) {
             panic!("[verify] construction produced malformed IR: {e}");
         }

@@ -7,7 +7,7 @@ use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label, MatchIR, MemberRef};
 use crate::compiler::parse::ast::Pattern;
 
-use super::Compiler;
+use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
 
 #[derive(Clone, Copy, Debug)]
@@ -54,8 +54,8 @@ pub(super) struct SplitExits {
 
 /// The per-capture inputs shared by every capture lowering. The continuation is
 /// not among them: it is a sibling argument whose type encodes the capability —
-/// the scope-emitting helpers ([`Compiler::compile_struct_capture`] /
-/// [`Compiler::compile_array_capture`]) take a [`CaptureExits`], so a zero-match
+/// the scope-emitting helpers ([`NfaBuilder::compile_struct_capture`] /
+/// [`NfaBuilder::compile_array_capture`]) take a [`CaptureExits`], so a zero-match
 /// can `Split` to a skip path; the non-scope pass-throughs (`Node`/`Ref`/
 /// `PendingValue`) take a plain [`Label`] — they own no skip path, so a `Split` is
 /// unrepresentable for them rather than silently collapsed via `match_exit`.
@@ -70,12 +70,12 @@ pub(super) struct CaptureRequest<'a> {
 /// capture's own value effects first, then the enclosing scope's. Bundled so the
 /// two same-type slices can't be transposed at a call site.
 #[derive(Clone, Copy)]
-pub(super) struct EndScopeEffects<'a> {
+pub(super) struct ScopeCloseEffects<'a> {
     pub capture: &'a [EffectIR],
     pub outer: &'a [EffectIR],
 }
 
-impl EndScopeEffects<'_> {
+impl ScopeCloseEffects<'_> {
     pub(super) fn none() -> Self {
         Self {
             capture: &[],
@@ -84,7 +84,7 @@ impl EndScopeEffects<'_> {
     }
 }
 
-impl Compiler<'_> {
+impl NfaBuilder<'_> {
     /// Avoids the repeated `if let Some(type_id) = type_id { with_scope } else { f }` pattern.
     pub(super) fn compile_with_optional_scope<T>(
         &mut self,
@@ -153,7 +153,7 @@ impl Compiler<'_> {
             .flow
             .type_id();
 
-        let end_effects = EndScopeEffects {
+        let end_effects = ScopeCloseEffects {
             capture: &capture_effects,
             outer: &outer_capture.post,
         };
@@ -263,7 +263,7 @@ impl Compiler<'_> {
         struct_step
     }
 
-    pub(super) fn emit_endarr_step(&mut self, effects: EndScopeEffects<'_>, exit: Label) -> Label {
+    pub(super) fn emit_endarr_step(&mut self, effects: ScopeCloseEffects<'_>, exit: Label) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, exit)
@@ -282,7 +282,7 @@ impl Compiler<'_> {
 
     /// Emit a struct-close epsilon step (no capture or outer effects).
     pub(super) fn emit_struct_close_step(&mut self, successor: Label) -> Label {
-        self.emit_struct_close_step_with_effects(EndScopeEffects::none(), successor)
+        self.emit_struct_close_step_with_effects(ScopeCloseEffects::none(), successor)
     }
 
     /// Emit a struct-close epsilon step carrying capture + outer effects.
@@ -292,7 +292,7 @@ impl Compiler<'_> {
     /// on each exit.
     pub(super) fn emit_struct_close_step_with_effects(
         &mut self,
-        effects: EndScopeEffects<'_>,
+        effects: ScopeCloseEffects<'_>,
         exit: Label,
     ) -> Label {
         let label = self.fresh_label();

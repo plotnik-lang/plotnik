@@ -507,7 +507,7 @@ impl LayoutMap {
 
 /// Compiled query IR plus entry labels produced by the compile stage.
 #[derive(Clone, Debug)]
-pub struct CompileResult {
+pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
     /// Entry labels for each definition (in definition order).
     pub(in crate::compiler::lower) def_entries: IndexMap<DefId, Label>,
@@ -516,7 +516,7 @@ pub struct CompileResult {
     pub(in crate::compiler::lower) preamble_entry: Label,
 }
 
-impl CompileResult {
+impl NfaGraph {
     pub(crate) fn instructions(&self) -> &[InstructionIR] {
         &self.instructions
     }
@@ -532,20 +532,20 @@ impl CompileResult {
 
 /// Lowered IR admitted by the query pipeline for emission.
 ///
-/// Raw [`CompileResult`] stays mutable inside `compiler::lower`; emission only
+/// Raw [`NfaGraph`] stays mutable inside `compiler::lower`; emission only
 /// receives this wrapper, so callers cannot hand an arbitrary pass-local IR bag to
 /// the bytecode writer.
 #[derive(Clone, Debug)]
-pub struct LoweredIr {
-    raw: CompileResult,
+pub struct LoweredNfa {
+    raw: NfaGraph,
 }
 
-impl LoweredIr {
-    pub(super) fn new(raw: CompileResult) -> Self {
+impl LoweredNfa {
+    pub(super) fn new(raw: NfaGraph) -> Self {
         Self { raw }
     }
 
-    pub(crate) fn raw(&self) -> &CompileResult {
+    pub(crate) fn raw(&self) -> &NfaGraph {
         &self.raw
     }
 }

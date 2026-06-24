@@ -11,7 +11,7 @@ use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, Pattern};
 
-use super::Compiler;
+use super::NfaBuilder;
 use super::scope::Struct;
 
 /// Capture effects to attach to match instructions.
@@ -125,7 +125,7 @@ impl PatternCtx {
     }
 }
 
-impl Compiler<'_> {
+impl NfaBuilder<'_> {
     /// Build capture effects (Node + Set) for a capture whose inner was
     /// classified as `mechanism` (or `None` for a bare `@x`).
     ///

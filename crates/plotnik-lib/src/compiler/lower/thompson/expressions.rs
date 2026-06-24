@@ -21,14 +21,14 @@ use crate::compiler::parse::cst::SyntaxKind;
 
 use crate::compiler::analyze::types::CaptureKind;
 
-use super::Compiler;
+use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::check_trailing_anchor;
 use super::scope::{CaptureExits, CaptureRequest, SplitExits};
 use super::sequences::SeqItemsCtx;
 
 #[derive(Clone, Copy)]
-enum RefCallLowering {
+enum RefLowering {
     ScopedCapture,
     CapturedValue,
     SuppressedOpaqueRecursion,
@@ -37,7 +37,7 @@ enum RefCallLowering {
 
 impl<'a> CaptureRequest<'a> {
     fn build(
-        compiler: &Compiler<'_>,
+        compiler: &NfaBuilder<'_>,
         cap: &ast::CapturedPattern,
         inner: &'a Pattern,
         nav: Option<Nav>,
@@ -53,7 +53,7 @@ impl<'a> CaptureRequest<'a> {
     }
 }
 
-impl Compiler<'_> {
+impl NfaBuilder<'_> {
     pub(super) fn compile_node_pattern(&mut self, node: &ast::NodePattern, ctx: PatternCtx) -> Label {
         let PatternCtx {
             exit,
@@ -234,7 +234,7 @@ impl Compiler<'_> {
 
         // Call instructions don't have pre_effects, so emit epsilon if needed
         let call_entry = match lowering {
-            RefCallLowering::ScopedCapture => {
+            RefLowering::ScopedCapture => {
                 // Struct isolates the definition's internal captures before the Set.
                 let set_step =
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
@@ -243,12 +243,12 @@ impl Compiler<'_> {
                     self.emit_call(nav, field_override, ReturnAddr(struct_close_step), callee);
                 self.emit_struct_step(call_label)
             }
-            RefCallLowering::CapturedValue => {
+            RefLowering::CapturedValue => {
                 let return_addr =
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
                 self.emit_call(nav, field_override, ReturnAddr(return_addr), callee)
             }
-            RefCallLowering::SuppressedOpaqueRecursion => {
+            RefLowering::SuppressedOpaqueRecursion => {
                 // Suppress bracket keeps the structural match but discards all effects,
                 // matching the Void that inference assigns to uncaptured opaque recursion.
                 let suppress_end = self.emit_effects_epsilon(
@@ -264,7 +264,7 @@ impl Compiler<'_> {
                     CaptureEffects::default(),
                 )
             }
-            RefCallLowering::PlainCall => {
+            RefLowering::PlainCall => {
                 // Uncaptured ref: just Call → exit (def's Sets go to parent scope)
                 self.emit_call(nav, field_override, ReturnAddr(exit), callee)
             }
@@ -283,13 +283,13 @@ impl Compiler<'_> {
         def_id: DefId,
         def_output_shape: &TypeShape,
         is_captured: bool,
-    ) -> RefCallLowering {
+    ) -> RefLowering {
         if is_captured {
             if matches!(def_output_shape, TypeShape::Struct(_)) {
-                return RefCallLowering::ScopedCapture;
+                return RefLowering::ScopedCapture;
             }
 
-            return RefCallLowering::CapturedValue;
+            return RefLowering::CapturedValue;
         }
 
         // An uncaptured recursive reference is opaque: inference types it Void, so
@@ -298,10 +298,10 @@ impl Compiler<'_> {
         // suppressed.
         let ref_returns_enum = matches!(def_output_shape, TypeShape::Enum(_));
         if self.ctx.dependency_analysis.is_recursive_def(def_id) && !ref_returns_enum {
-            return RefCallLowering::SuppressedOpaqueRecursion;
+            return RefLowering::SuppressedOpaqueRecursion;
         }
 
-        RefCallLowering::PlainCall
+        RefLowering::PlainCall
     }
 
     pub(super) fn compile_field(&mut self, field: &ast::FieldPattern, ctx: PatternCtx) -> Label {

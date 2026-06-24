@@ -8,10 +8,10 @@ mod cache_aligned;
 pub use cache_aligned::CacheAligned;
 
 use crate::compiler::emit::tables::EmitError;
-use crate::compiler::lower::ir::{CompileResult, Label, LayoutMap};
+use crate::compiler::lower::ir::{NfaGraph, Label, LayoutMap};
 
 /// Assign a cache-aligned step address to every label.
-pub fn compute_layout(ir: &CompileResult) -> Result<LayoutMap, EmitError> {
+pub fn compute_layout(ir: &NfaGraph) -> Result<LayoutMap, EmitError> {
     // Preamble entry FIRST ensures it gets the lowest address (step 0).
     let mut entry_labels: Vec<Label> = vec![ir.preamble_entry()];
     entry_labels.extend(ir.def_entries().values().copied());

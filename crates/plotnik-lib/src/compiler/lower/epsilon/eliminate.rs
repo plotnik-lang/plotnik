@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::bytecode::EffectKind;
 
-use crate::compiler::lower::ir::{CompileResult, EffectIR, InstructionIR, Label, MatchIR};
+use crate::compiler::lower::ir::{NfaGraph, EffectIR, InstructionIR, Label, MatchIR};
 
 fn build_label_to_index(instructions: &[InstructionIR]) -> HashMap<Label, usize> {
     instructions
@@ -38,12 +38,12 @@ fn build_predecessor_map(instructions: &[InstructionIR]) -> HashMap<Label, Vec<L
 ///
 /// Bundles the `(instructions, idx)` clump every lookup threads, so a label is
 /// always resolved against the index built for that exact list.
-struct InstrTable<'a> {
+struct InstrIndex<'a> {
     instructions: &'a [InstructionIR],
     idx: &'a HashMap<Label, usize>,
 }
 
-impl<'a> InstrTable<'a> {
+impl<'a> InstrIndex<'a> {
     fn new(instructions: &'a [InstructionIR], idx: &'a HashMap<Label, usize>) -> Self {
         Self { instructions, idx }
     }
@@ -89,12 +89,12 @@ impl<'a> InstrTable<'a> {
     }
 }
 
-struct InstrTableMut<'a> {
+struct InstrIndexMut<'a> {
     instructions: &'a mut [InstructionIR],
     idx: &'a HashMap<Label, usize>,
 }
 
-impl<'a> InstrTableMut<'a> {
+impl<'a> InstrIndexMut<'a> {
     fn new(instructions: &'a mut [InstructionIR], idx: &'a HashMap<Label, usize>) -> Self {
         Self { instructions, idx }
     }
@@ -163,7 +163,7 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
 
         let succ_label = eps.successors[0];
 
-        let Some(succ) = InstrTable::new(instructions, &idx).match_at(succ_label) else {
+        let Some(succ) = InstrIndex::new(instructions, &idx).match_at(succ_label) else {
             continue;
         };
         if succ.is_epsilon() {
@@ -191,7 +191,7 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
         let eps_pre = eps.pre_effects.clone();
         let eps_post = eps.post_effects.clone();
 
-        let mut view = InstrTableMut::new(instructions, &idx);
+        let mut view = InstrIndexMut::new(instructions, &idx);
 
         let succ = view
             .match_at_mut(succ_label)
@@ -218,7 +218,7 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
 /// Each instruction looks through epsilon chains to find reachable targets:
 /// - Single-successor instructions can absorb effects
 /// - Multi-successor instructions follow effectless chains only
-fn laser_vision(result: &mut CompileResult) -> bool {
+fn laser_vision(result: &mut NfaGraph) -> bool {
     let mut changed = false;
     let idx = build_label_to_index(&result.instructions);
 
@@ -226,7 +226,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
     let mut entry_remaps: HashMap<Label, Label> = HashMap::new();
     for entry in result.def_entries.values_mut() {
         if let Some((target, effects)) =
-            InstrTable::new(&result.instructions, &idx).see_through(*entry)
+            InstrIndex::new(&result.instructions, &idx).see_through(*entry)
             && effects.is_empty()
             && target != *entry
         {
@@ -245,7 +245,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
     }
 
     if let Some((target, effects)) =
-        InstrTable::new(&result.instructions, &idx).see_through(result.preamble_entry)
+        InstrIndex::new(&result.instructions, &idx).see_through(result.preamble_entry)
         && effects.is_empty()
         && target != result.preamble_entry
     {
@@ -265,7 +265,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
 
         for (j, &succ) in m.successors.iter().enumerate() {
             let Some((target, effects)) =
-                InstrTable::new(&result.instructions, &idx).see_through(succ)
+                InstrIndex::new(&result.instructions, &idx).see_through(succ)
             else {
                 continue;
             };
@@ -308,7 +308,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
         };
 
         let Some(next) = next_label else { continue };
-        let Some((target, effects)) = InstrTable::new(&result.instructions, &idx).see_through(next)
+        let Some((target, effects)) = InstrIndex::new(&result.instructions, &idx).see_through(next)
         else {
             continue;
         };
@@ -335,7 +335,7 @@ fn laser_vision(result: &mut CompileResult) -> bool {
 /// After:   a → [d, e, f, x]
 ///
 /// The epsilon becomes unreachable and is eliminated during layout.
-fn expand_branching_epsilons(result: &mut CompileResult) -> bool {
+fn expand_branching_epsilons(result: &mut NfaGraph) -> bool {
     let idx = build_label_to_index(&result.instructions);
     let preds = build_predecessor_map(&result.instructions);
     let mut changed = false;
@@ -381,7 +381,7 @@ fn expand_branching_epsilons(result: &mut CompileResult) -> bool {
 ///
 /// Runs the migrate/expand/laser-vision phases to a fixed point. Semantic
 /// preservation is asserted by the caller via `verify::run_verified` (debug only).
-pub fn eliminate_epsilons(result: &mut CompileResult) {
+pub fn eliminate_epsilons(result: &mut NfaGraph) {
     loop {
         let a = forward_migrate(&mut result.instructions);
         let b = expand_branching_epsilons(result);
@@ -393,5 +393,5 @@ pub fn eliminate_epsilons(result: &mut CompileResult) {
 }
 
 #[cfg(test)]
-#[path = "epsilon_elim_tests.rs"]
-mod epsilon_elim_tests;
+#[path = "eliminate_tests.rs"]
+mod eliminate_tests;

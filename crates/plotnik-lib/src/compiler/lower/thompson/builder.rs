@@ -5,14 +5,14 @@ use indexmap::IndexMap;
 use crate::bytecode::Nav;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
-use crate::compiler::lower::ir::{CompileResult, InstructionIR, Label, ReturnIR, TrampolineIR};
+use crate::compiler::lower::ir::{NfaGraph, InstructionIR, Label, ReturnIR, TrampolineIR};
 use crate::compiler::parse::ast::Pattern;
 
 use super::capture::PatternCtx;
 use super::scope::{CaptureExits, Struct};
 
-/// Compiler state for Thompson construction.
-pub struct Compiler<'a> {
+/// NfaBuilder state for Thompson construction.
+pub struct NfaBuilder<'a> {
     pub(super) ctx: &'a LowerInput<'a>,
     pub(super) instructions: Vec<InstructionIR>,
     pub(crate) next_label_id: u32,
@@ -22,7 +22,7 @@ pub struct Compiler<'a> {
     pub(super) scope_stack: Vec<Struct>,
 }
 
-impl<'a> Compiler<'a> {
+impl<'a> NfaBuilder<'a> {
     pub(in crate::compiler::lower) fn new(ctx: &'a LowerInput<'a>) -> Self {
         Self {
             ctx,
@@ -33,8 +33,8 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub(in crate::compiler::lower) fn build_ir(ctx: &'a LowerInput<'a>) -> CompileResult {
-        let mut compiler = Compiler::new(ctx);
+    pub(in crate::compiler::lower) fn build_ir(ctx: &'a LowerInput<'a>) -> NfaGraph {
+        let mut compiler = NfaBuilder::new(ctx);
 
         // Emit universal preamble first: Struct -> Trampoline -> EndStruct -> Return
         // This wraps any entrypoint to create the top-level scope.
@@ -49,7 +49,7 @@ impl<'a> Compiler<'a> {
             compiler.compile_def(def_id);
         }
 
-        CompileResult {
+        NfaGraph {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
             preamble_entry,

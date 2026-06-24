@@ -7,4 +7,4 @@ mod lower;
 #[cfg(test)]
 mod lower_tests;
 
-pub use lower::lower;
+pub use lower::pack_instructions;

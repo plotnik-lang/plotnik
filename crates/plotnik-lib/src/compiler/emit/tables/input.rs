@@ -7,7 +7,7 @@ use crate::compiler::analyze::grammar::GrammarBinding;
 use crate::compiler::analyze::types::TypeAnalysis;
 
 /// The analysis artifacts every emit phase reads. The compiled IR
-/// (`CompileResult`) and the in-flight string table are threaded separately —
+/// (`NfaGraph`) and the in-flight string table are threaded separately —
 /// the IR because it is produced by a different stage, the string table because
 /// phases extend it.
 #[derive(Clone, Copy)]

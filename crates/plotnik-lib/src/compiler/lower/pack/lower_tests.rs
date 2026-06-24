@@ -1,7 +1,7 @@
 use crate::bytecode::{EffectKind, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, Nav};
 
 use super::lower::lower;
-use crate::compiler::lower::ir::CompileResult;
+use crate::compiler::lower::ir::NfaGraph;
 use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR};
 
 const MAX_POST_EFFECTS: usize = 7;
@@ -13,7 +13,7 @@ fn make_effect(_idx: u16) -> EffectIR {
 
 #[test]
 fn lower_no_overflow_unchanged() {
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .pre_effects((0..3).map(make_effect))
@@ -24,14 +24,14 @@ fn lower_no_overflow_unchanged() {
         preamble_entry: Label(0),
     };
 
-    lower(&mut result);
+    pack_instructions(&mut result);
 
     assert_eq!(result.instructions.len(), 1);
 }
 
 #[test]
 fn lower_pre_effects_overflow() {
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
@@ -43,7 +43,7 @@ fn lower_pre_effects_overflow() {
         preamble_entry: Label(0),
     };
 
-    lower(&mut result);
+    pack_instructions(&mut result);
 
     assert!(result.instructions.len() >= 2);
 
@@ -58,7 +58,7 @@ fn lower_pre_effects_overflow() {
 
 #[test]
 fn lower_post_effects_overflow() {
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
@@ -70,7 +70,7 @@ fn lower_post_effects_overflow() {
         preamble_entry: Label(0),
     };
 
-    lower(&mut result);
+    pack_instructions(&mut result);
 
     assert!(result.instructions.len() >= 2);
 
@@ -88,7 +88,7 @@ fn lower_post_effects_overflow() {
 
 #[test]
 fn lower_neg_fields_overflow() {
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
@@ -100,7 +100,7 @@ fn lower_neg_fields_overflow() {
         preamble_entry: Label(0),
     };
 
-    lower(&mut result);
+    pack_instructions(&mut result);
 
     assert!(result.instructions.len() >= 2);
 
@@ -119,13 +119,13 @@ fn lower_neg_fields_overflow() {
 #[test]
 fn lower_successors_overflow() {
     let succs: Vec<_> = (1..=35).map(Label).collect();
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![MatchIR::terminal(Label(0)).successors(succs).into()],
         def_entries: Default::default(),
         preamble_entry: Label(0),
     };
 
-    lower(&mut result);
+    pack_instructions(&mut result);
 
     assert!(result.instructions.len() >= 2);
 
@@ -144,13 +144,13 @@ fn lower_successors_overflow() {
 #[test]
 fn lower_successors_overflow_preserves_all_successors() {
     let succs: Vec<_> = (1..=35).map(Label).collect();
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![MatchIR::terminal(Label(0)).successors(succs.clone()).into()],
         def_entries: Default::default(),
         preamble_entry: Label(0),
     };
 
-    lower(&mut result);
+    pack_instructions(&mut result);
 
     // The cascade must append, not replace: every original successor stays reachable
     // from the entry, and in priority order.
@@ -180,7 +180,7 @@ fn lower_successors_with_payload_respect_combined_limit() {
     // every instruction within the combined limit, or `MatchIR::resolve` later panics
     // with "instruction too large". Regression for #421.
     let succs: Vec<_> = (1..=27).map(Label).collect();
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
@@ -192,7 +192,7 @@ fn lower_successors_with_payload_respect_combined_limit() {
         preamble_entry: Label(0),
     };
 
-    lower(&mut result);
+    pack_instructions(&mut result);
 
     for instr in &result.instructions {
         if let InstructionIR::Match(m) = instr {
@@ -228,7 +228,7 @@ fn lower_successors_with_payload_respect_combined_limit() {
 
 #[test]
 fn lower_combined_overflow() {
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))
                 .nav(Nav::Down)
@@ -242,7 +242,7 @@ fn lower_combined_overflow() {
         preamble_entry: Label(0),
     };
 
-    lower(&mut result);
+    pack_instructions(&mut result);
 
     for instr in &result.instructions {
         if let InstructionIR::Match(m) = instr {

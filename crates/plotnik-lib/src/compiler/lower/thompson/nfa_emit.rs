@@ -4,7 +4,7 @@ use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::lower::ir::{CallIR, CalleeEntry, EffectIR, Label, MatchIR, ReturnAddr};
 use crate::compiler::parse::ast::{Pattern, QuantifierOperator};
 
-use super::Compiler;
+use super::NfaBuilder;
 use super::capture::CaptureEffects;
 
 /// `prefer` is tried first when greedy, `other` first when non-greedy. Bundled
@@ -42,7 +42,7 @@ impl Greediness {
     }
 }
 
-impl Compiler<'_> {
+impl NfaBuilder<'_> {
     pub(super) fn emit_call(
         &mut self,
         nav: Nav,

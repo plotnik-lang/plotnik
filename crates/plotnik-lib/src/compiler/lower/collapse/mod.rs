@@ -2,9 +2,9 @@
 
 //! Up-navigation collapse: merge consecutive `Up` moves in the compiled IR.
 
-mod collapse_up;
+mod up;
 
 #[cfg(test)]
-mod collapse_up_tests;
+mod up_tests;
 
-pub use collapse_up::collapse_up;
+pub use up::collapse_up;

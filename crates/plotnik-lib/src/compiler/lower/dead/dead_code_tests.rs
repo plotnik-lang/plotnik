@@ -16,7 +16,7 @@ fn removes_unreachable_instructions() {
         MatchIR::terminal(Label(2)).nav(Nav::Down).into(), // unreachable
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: {
             let mut m = IndexMap::new();
@@ -49,7 +49,7 @@ fn keeps_all_when_all_reachable() {
         MatchIR::terminal(Label(2)).nav(Nav::Down).into(),
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: {
             let mut m = IndexMap::new();
@@ -76,7 +76,7 @@ fn handles_branching() {
         MatchIR::terminal(Label(2)).nav(Nav::Down).into(),
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: {
             let mut m = IndexMap::new();

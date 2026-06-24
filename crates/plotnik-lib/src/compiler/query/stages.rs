@@ -9,7 +9,7 @@ use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate
 use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
 use crate::compiler::analyze::types::check_entrypoints;
 use crate::compiler::emit::tables::{EmitError, EmitInput};
-use crate::compiler::lower::{LowerInput, lower_to_ir};
+use crate::compiler::lower::{LowerInput, lower_to_nfa};
 use crate::compiler::parse::{
     DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser, Root, SyntaxNode, lex,
 };
@@ -661,8 +661,8 @@ impl LinkedQuery {
         crate::compiler::emit::emit_unchecked(self.emit_input(), &compile_result)
     }
 
-    fn compile(&self) -> crate::compiler::lower::ir::LoweredIr {
-        lower_to_ir(LowerInput {
+    fn compile(&self) -> crate::compiler::lower::ir::LoweredNfa {
+        lower_to_nfa(LowerInput {
             interner: self.interner(),
             type_ctx: self.type_analysis(),
             symbol_table: self.symbol_table(),

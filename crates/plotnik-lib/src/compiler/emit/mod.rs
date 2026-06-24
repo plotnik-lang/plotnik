@@ -21,14 +21,14 @@ use crate::compiler::emit::regex::build_regex_table;
 use crate::compiler::emit::strings::intern_predicates;
 use crate::compiler::emit::tables::{ConstantPool, EmitError, EmitInput};
 use crate::compiler::emit::types::build_type_table;
-use crate::compiler::lower::ir::LoweredIr;
+use crate::compiler::lower::ir::LoweredNfa;
 
 /// Emit bytecode without the debug load self-check. Used by callers that load
 /// the bytecode themselves (e.g. `check`'s dry run) and want a malformed-bytecode
 /// case to surface as a diagnostic rather than the debug panic in [`emit`].
 pub(in crate::compiler) fn emit_unchecked(
     input: EmitInput<'_>,
-    lowered_ir: &LoweredIr,
+    lowered_ir: &LoweredNfa,
 ) -> Result<Vec<u8>, EmitError> {
     let compile_result = lowered_ir.raw();
     let strings = intern_predicates(compile_result);
@@ -59,7 +59,7 @@ pub(in crate::compiler) fn emit_unchecked(
 /// reach this panic, in debug or release.
 pub(in crate::compiler) fn emit(
     input: EmitInput<'_>,
-    lowered_ir: &LoweredIr,
+    lowered_ir: &LoweredNfa,
 ) -> Result<Vec<u8>, EmitError> {
     let output = emit_unchecked(input, lowered_ir)?;
     #[cfg(debug_assertions)]

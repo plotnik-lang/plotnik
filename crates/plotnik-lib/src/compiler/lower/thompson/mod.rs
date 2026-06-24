@@ -19,7 +19,7 @@
 
 mod alternation;
 mod capture;
-mod compiler;
+mod builder;
 mod expressions;
 mod navigation;
 mod nfa_emit;
@@ -34,4 +34,4 @@ mod expressions_tests;
 #[cfg(test)]
 mod quantifier_tests;
 
-pub(in crate::compiler::lower) use compiler::Compiler;
+pub(in crate::compiler::lower) use builder::NfaBuilder;

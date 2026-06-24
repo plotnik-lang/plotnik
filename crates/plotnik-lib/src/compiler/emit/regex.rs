@@ -8,14 +8,14 @@
 use regex_automata::dfa::dense;
 
 use crate::bytecode::StringId;
-use crate::compiler::lower::ir::{CompileResult, InstructionIR, PredicateValueIR};
+use crate::compiler::lower::ir::{NfaGraph, InstructionIR, PredicateValueIR};
 use crate::compiler::emit::tables::{EmitError, RegexTableBuilder, StringTableBuilder};
 
 /// Compile every regex predicate into the regex table, resolving each pattern's
 /// StringId from the finished string table. Reads the string table; interns
 /// nothing into it.
 pub fn build_regex_table(
-    ir: &CompileResult,
+    ir: &NfaGraph,
     strings: &StringTableBuilder,
 ) -> Result<RegexTableBuilder, EmitError> {
     let mut regexes = RegexTableBuilder::new();

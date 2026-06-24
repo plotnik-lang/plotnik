@@ -2,6 +2,6 @@
 
 //! Epsilon-transition elimination over the compiled IR.
 
-mod epsilon_elim;
+mod eliminate;
 
-pub use epsilon_elim::eliminate_epsilons;
+pub use eliminate::eliminate_epsilons;

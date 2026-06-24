@@ -7,7 +7,7 @@ use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MemberRef, Node
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::core::Symbol;
 
-use super::Compiler;
+use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::{
     AnonymousClassifier, expr_owns_iteration, is_skippable_quantifier, resumable_search_nav,
@@ -74,7 +74,7 @@ fn nav_for_alt_branch(
     })
 }
 
-impl Compiler<'_> {
+impl NfaBuilder<'_> {
     /// Clone a soft-anchor follower into a named-node-only retry entry.
     ///
     /// Sequence lowering has already compiled the follower after the alternation's

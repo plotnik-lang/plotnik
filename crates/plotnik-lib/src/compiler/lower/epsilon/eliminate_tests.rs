@@ -46,7 +46,7 @@ fn see_through_effectless_chain() {
     ];
     let idx = build_label_to_index(&instructions);
 
-    let (target, effects) = InstrTable::new(&instructions, &idx)
+    let (target, effects) = InstrIndex::new(&instructions, &idx)
         .see_through(Label(0))
         .unwrap();
     assert_eq!(target, Label(2));
@@ -63,7 +63,7 @@ fn see_through_with_effects() {
     ];
     let idx = build_label_to_index(&instructions);
 
-    let (target, effects) = InstrTable::new(&instructions, &idx)
+    let (target, effects) = InstrIndex::new(&instructions, &idx)
         .see_through(Label(0))
         .unwrap();
     assert_eq!(target, Label(2));
@@ -82,14 +82,14 @@ fn see_through_blocked_by_branch() {
     let idx = build_label_to_index(&instructions);
 
     // Can see through 0 to 1, but 1 is branching
-    let (target, effects) = InstrTable::new(&instructions, &idx)
+    let (target, effects) = InstrIndex::new(&instructions, &idx)
         .see_through(Label(0))
         .unwrap();
     assert_eq!(target, Label(1)); // Stops at branching epsilon
     assert!(effects.is_empty());
 
     // Starting from branching epsilon returns itself
-    let (target, effects) = InstrTable::new(&instructions, &idx)
+    let (target, effects) = InstrIndex::new(&instructions, &idx)
         .see_through(Label(1))
         .unwrap();
     assert_eq!(target, Label(1));
@@ -148,7 +148,7 @@ fn laser_vision_single_succ_absorbs_effects() {
         make_match(2, Nav::Next, vec![]),
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
         preamble_entry: Label(0),
@@ -176,7 +176,7 @@ fn laser_vision_multi_succ_effectless_only() {
         make_match(3, Nav::Next, vec![]),
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
         preamble_entry: Label(0),
@@ -208,7 +208,7 @@ fn combined_forward_then_laser() {
         make_match(3, Nav::Next, vec![]),
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
         preamble_entry: Label(0),
@@ -248,7 +248,7 @@ fn entry_point_resolution() {
         make_match(2, Nav::Down, vec![]),
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: {
             let mut m = indexmap::IndexMap::new();
@@ -276,7 +276,7 @@ fn branching_epsilon_preserved_by_laser_vision() {
         make_match(3, Nav::Next, vec![]),
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
         preamble_entry: Label(0),
@@ -303,7 +303,7 @@ fn expand_branching_epsilon() {
         make_match(3, Nav::Next, vec![]),
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
         preamble_entry: Label(0),
@@ -333,7 +333,7 @@ fn expand_branching_multiple_predecessors() {
         make_match(4, Nav::Down, vec![1]),
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
         preamble_entry: Label(0),
@@ -367,7 +367,7 @@ fn expand_branching_preserves_other_successors() {
         make_match(4, Nav::Next, vec![]),
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
         preamble_entry: Label(0),
@@ -393,7 +393,7 @@ fn expand_blocked_by_effects() {
         make_match(3, Nav::Next, vec![]),
     ];
 
-    let mut result = CompileResult {
+    let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
         preamble_entry: Label(0),

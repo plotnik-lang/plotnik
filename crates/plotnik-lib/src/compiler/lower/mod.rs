@@ -1,16 +1,16 @@
 use crate::compiler::lower::dead::remove_unreachable;
 use crate::compiler::lower::epsilon::eliminate_epsilons;
-use crate::compiler::lower::ir::LoweredIr;
-use crate::compiler::lower::nav::collapse_up;
-use crate::compiler::lower::pack::lower;
-use crate::compiler::lower::thompson::Compiler;
+use crate::compiler::lower::ir::LoweredNfa;
+use crate::compiler::lower::collapse::collapse_up;
+use crate::compiler::lower::pack::pack_instructions;
+use crate::compiler::lower::thompson::NfaBuilder;
 use crate::compiler::lower::verify::{run_verified, verify_constructed};
 
 mod input;
 pub mod dead;
 pub mod epsilon;
 pub mod ir;
-pub mod nav;
+pub mod collapse;
 pub mod pack;
 pub mod thompson;
 mod verify;
@@ -20,14 +20,14 @@ mod ir_tests;
 
 pub(crate) use input::LowerInput;
 
-pub(crate) fn lower_to_ir(input: LowerInput<'_>) -> LoweredIr {
-    let mut ir = Compiler::build_ir(&input);
+pub(crate) fn lower_to_nfa(input: LowerInput<'_>) -> LoweredNfa {
+    let mut ir = NfaBuilder::build_ir(&input);
     verify_constructed(&ir, &input);
     run_verified("eliminate_epsilons", &mut ir, &input, eliminate_epsilons);
     run_verified("remove_unreachable", &mut ir, &input, remove_unreachable);
     run_verified("collapse_up", &mut ir, &input, collapse_up);
-    run_verified("lower", &mut ir, &input, lower);
+    run_verified("pack_instructions", &mut ir, &input, pack_instructions);
     verify_constructed(&ir, &input);
 
-    LoweredIr::new(ir)
+    LoweredNfa::new(ir)
 }

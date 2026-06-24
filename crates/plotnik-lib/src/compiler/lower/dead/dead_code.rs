@@ -6,16 +6,16 @@
 
 use std::collections::HashSet;
 
-use crate::compiler::lower::ir::{CompileResult, Label};
+use crate::compiler::lower::ir::{NfaGraph, Label};
 
-pub fn remove_unreachable(result: &mut CompileResult) {
+pub fn remove_unreachable(result: &mut NfaGraph) {
     let reachable = compute_reachable(result);
     result
         .instructions
         .retain(|instr| reachable.contains(&instr.label()));
 }
 
-fn compute_reachable(result: &CompileResult) -> HashSet<Label> {
+fn compute_reachable(result: &NfaGraph) -> HashSet<Label> {
     let successors: std::collections::BTreeMap<Label, Vec<Label>> = result
         .instructions
         .iter()
@@ -39,5 +39,5 @@ fn compute_reachable(result: &CompileResult) -> HashSet<Label> {
 }
 
 #[cfg(test)]
-#[path = "dce_tests.rs"]
-mod dce_tests;
+#[path = "dead_code_tests.rs"]
+mod dead_code_tests;

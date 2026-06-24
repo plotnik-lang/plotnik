@@ -9,11 +9,11 @@ use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOperator};
 
-use super::Compiler;
+use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx, needs_struct_wrapper, row_type_id};
 use super::nfa_emit::{BranchTargets, Greediness};
 use super::navigation::resumable_search_nav;
-use super::scope::{CaptureExits, CaptureRequest, EndScopeEffects, SplitExits};
+use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SplitExits};
 
 /// The nav under which a quantifier iteration runs a resumable position search,
 /// or `None` for a bounded anchor that matches a single candidate directly.
@@ -73,7 +73,7 @@ impl ArrayContext {
 }
 
 #[derive(Clone)]
-enum ElementScope {
+enum IterationScope {
     Standalone {
         capture: CaptureEffects,
     },
@@ -90,7 +90,7 @@ enum ElementScope {
     },
 }
 
-impl ElementScope {
+impl IterationScope {
     fn for_iteration(
         inner: &Pattern,
         array_context: ArrayContext,
@@ -171,7 +171,7 @@ pub(super) struct QuantifierConfig<'a> {
     pub exits: CaptureExits,
 }
 
-impl Compiler<'_> {
+impl NfaBuilder<'_> {
     /// Compile a quantified expression with capture effects (passed to body).
     pub(super) fn compile_quantified(
         &mut self,
@@ -382,7 +382,7 @@ impl Compiler<'_> {
                 vec![EffectIR::push()]
             });
 
-        let end_effects = EndScopeEffects {
+        let end_effects = ScopeCloseEffects {
             capture: &capture_effects,
             outer: &outer_capture.post,
         };
@@ -541,7 +541,7 @@ impl Compiler<'_> {
         let match_exit = exits.match_exit();
 
         let element_scope =
-            ElementScope::for_iteration(inner, array_context, element_capture, self.ctx.type_ctx);
+            IterationScope::for_iteration(inner, array_context, element_capture, self.ctx.type_ctx);
 
         let compile_body = |this: &mut Self, target: ExitNav| -> Label {
             this.compile_quantified_body(inner, target, element_scope.clone())
@@ -654,12 +654,12 @@ impl Compiler<'_> {
         &mut self,
         inner: &Pattern,
         target: ExitNav,
-        element_scope: ElementScope,
+        element_scope: IterationScope,
     ) -> Label {
         let ExitNav { exit, nav } = target;
         match element_scope {
-            ElementScope::Standalone { capture }
-            | ElementScope::RowScopedByArrayExit { capture } => self.dispatch_pattern(
+            IterationScope::Standalone { capture }
+            | IterationScope::RowScopedByArrayExit { capture } => self.dispatch_pattern(
                 inner,
                 PatternCtx {
                     exit,
@@ -667,10 +667,10 @@ impl Compiler<'_> {
                     capture,
                 },
             ),
-            ElementScope::StructWrapped { row_type_id, .. } => {
+            IterationScope::StructWrapped { row_type_id, .. } => {
                 self.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
             }
-            ElementScope::RowScopedByIteration {
+            IterationScope::RowScopedByIteration {
                 row_type_id,
                 capture,
             } => self.compile_with_optional_scope(row_type_id, |this| {

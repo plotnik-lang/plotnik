@@ -8,12 +8,12 @@ mod instructions;
 pub use instructions::emit_instructions;
 
 use crate::compiler::emit::tables::{ConstantPool, EmitError};
-use crate::compiler::lower::ir::{CompileResult, LayoutMap};
+use crate::compiler::lower::ir::{NfaGraph, LayoutMap};
 
 /// Encode each instruction into transition bytes. Fans in layout, types,
 /// strings, and regexes; mints nothing.
 pub fn encode(
-    ir: &CompileResult,
+    ir: &NfaGraph,
     layout: &LayoutMap,
     pool: ConstantPool<'_>,
 ) -> Result<Vec<u8>, EmitError> {

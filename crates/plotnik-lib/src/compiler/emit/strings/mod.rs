@@ -4,11 +4,11 @@
 //! stream references.
 
 use crate::compiler::emit::tables::StringTableBuilder;
-use crate::compiler::lower::ir::{CompileResult, InstructionIR};
+use crate::compiler::lower::ir::{NfaGraph, InstructionIR};
 
 /// The sole creator of the string table — seeds it from the predicate strings
 /// reachable in the instruction stream. Later phases extend or read this table.
-pub fn intern_predicates(ir: &CompileResult) -> StringTableBuilder {
+pub fn intern_predicates(ir: &NfaGraph) -> StringTableBuilder {
     let mut strings = StringTableBuilder::new();
     intern_predicate_strings(ir.instructions(), &mut strings);
     strings

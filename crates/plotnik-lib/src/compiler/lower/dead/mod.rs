@@ -2,6 +2,6 @@
 
 //! Dead-code elimination: remove unreachable steps from the compiled IR.
 
-mod dce;
+mod dead_code;
 
-pub use dce::remove_unreachable;
+pub use dead_code::remove_unreachable;

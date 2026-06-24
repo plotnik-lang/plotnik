@@ -19,9 +19,9 @@ use std::collections::{HashMap, HashSet};
 
 use crate::bytecode::Nav;
 
-use crate::compiler::lower::ir::{CompileResult, InstructionIR, Label, MatchIR, NodeKindConstraint};
+use crate::compiler::lower::ir::{NfaGraph, InstructionIR, Label, MatchIR, NodeKindConstraint};
 
-pub fn collapse_up(result: &mut CompileResult) {
+pub fn collapse_up(result: &mut NfaGraph) {
     let label_to_idx: HashMap<Label, usize> = result
         .instructions
         .iter()

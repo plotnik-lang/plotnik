@@ -7,7 +7,7 @@ use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, SeqItem};
 
-use super::Compiler;
+use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::{
     compute_nav_modes, expr_owns_iteration, is_down_nav, is_skippable_quantifier,
@@ -84,7 +84,7 @@ pub(super) struct SeqItemsCtx<'a> {
     pub(super) skip_exit: Option<Label>,
 }
 
-impl Compiler<'_> {
+impl NfaBuilder<'_> {
     pub(super) fn compile_seq(&mut self, seq: &ast::SeqPattern, ctx: PatternCtx) -> Label {
         let PatternCtx {
             exit,
