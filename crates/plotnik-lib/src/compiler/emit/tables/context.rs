@@ -2,7 +2,8 @@
 
 use crate::core::Interner;
 
-use crate::compiler::core::{DependencyAnalysis, GrammarBinding, TypeAnalysis};
+use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::core::{GrammarBinding, TypeAnalysis};
 
 /// The analysis artifacts every emit phase reads. The compiled IR
 /// (`CompileResult`) and the in-flight string table are threaded separately —

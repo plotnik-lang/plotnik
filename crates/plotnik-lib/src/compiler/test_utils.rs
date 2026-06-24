@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::core::DependencyAnalysis;
+use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::core::grammar::{Grammar, raw::RawGrammar};
 use indexmap::IndexMap;
 

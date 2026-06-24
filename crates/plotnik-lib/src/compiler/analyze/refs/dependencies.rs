@@ -14,7 +14,7 @@ use crate::compiler::core::DefId;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::parse::ast::{Pattern, Ref};
 
-pub use crate::compiler::core::DependencyAnalysis;
+pub use super::dependency_analysis::DependencyAnalysis;
 
 pub fn analyze_dependencies(
     symbol_table: &SymbolTable,

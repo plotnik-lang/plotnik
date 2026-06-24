@@ -1,6 +1,7 @@
 //! Core compiler state and entry points.
 
-use crate::compiler::core::{DependencyAnalysis, GrammarBinding};
+use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::core::GrammarBinding;
 use crate::core::Interner;
 use indexmap::IndexMap;
 

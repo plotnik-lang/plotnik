@@ -1,7 +1,6 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub(crate) mod capture_mechanism;
-pub(crate) mod dependency_analysis;
 pub(crate) mod grammar_binding;
 pub(crate) mod source;
 pub(crate) mod span;
@@ -10,7 +9,6 @@ pub(crate) mod type_shape;
 
 pub use crate::core::{Interner, Symbol};
 pub use capture_mechanism::CaptureMechanism;
-pub use dependency_analysis::DependencyAnalysis;
 pub use grammar_binding::GrammarBinding;
 pub use span::Span;
 pub use type_analysis::{TypeAnalysis, TypeAnalysisBuilder};

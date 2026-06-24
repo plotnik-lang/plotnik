@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use crate::compiler::core::DependencyAnalysis;
+use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::core::{Interner, Symbol};
 use indexmap::IndexMap;
 

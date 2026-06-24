@@ -21,7 +21,7 @@ pub use context::TypeAnalysis;
 pub use def_id::Interner;
 pub use types::Arity;
 
-use crate::compiler::core::DependencyAnalysis;
+use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::diagnostics::Diagnostics;
 
