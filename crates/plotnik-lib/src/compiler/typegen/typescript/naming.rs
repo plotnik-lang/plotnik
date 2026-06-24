@@ -14,6 +14,22 @@ pub(super) struct NameHint {
     pub member_name: Option<String>,
 }
 
+impl NameHint {
+    fn entrypoint(entry_name: &str) -> Self {
+        Self {
+            entry_name: entry_name.to_string(),
+            member_name: None,
+        }
+    }
+
+    fn field(&self, member_name: &str) -> Self {
+        Self {
+            entry_name: self.entry_name.clone(),
+            member_name: Some(member_name.to_string()),
+        }
+    }
+}
+
 impl Emitter<'_> {
     pub(super) fn assign_generated_names(&mut self) {
         let mut contexts: HashMap<TypeId, NameHint> = HashMap::new();
@@ -23,10 +39,7 @@ impl Emitter<'_> {
             let entry_name = self.strings.get(ep.name());
             self.collect_naming_contexts(
                 ep.result_type(),
-                &NameHint {
-                    entry_name: entry_name.to_string(),
-                    member_name: None,
-                },
+                &NameHint::entrypoint(entry_name),
                 &mut contexts,
             );
         }
@@ -79,10 +92,7 @@ impl Emitter<'_> {
                 for member in self.types.members_of(&type_def) {
                     let member_name = self.strings.get(member.name_id);
                     let (inner_type, _) = self.types.unwrap_optional(member.type_id);
-                    let field_ctx = NameHint {
-                        entry_name: ctx.entry_name.clone(),
-                        member_name: Some(member_name.to_string()),
-                    };
+                    let field_ctx = ctx.field(member_name);
                     self.collect_naming_contexts(inner_type, &field_ctx, contexts);
                 }
             }
