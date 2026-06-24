@@ -18,15 +18,15 @@ use super::types::{
 };
 use super::unify::{UnifyError, unify_flows};
 
-use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
+use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::ast::{
     CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
     SeqPattern, TokenPattern, UnionPattern, is_empty_group,
 };
-use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 
 /// Shared state for a single inference pass over the AST.
 pub struct InferCtx<'a, 'd> {
@@ -371,11 +371,15 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // mechanism owns the inner's fields, so they must not also bubble. Sharing
         // the classifier with emission keeps the declared type and the effects in
         // lockstep.
-        let mechanism = self.ctx.type_ctx.analysis().capture_mechanism(
-            inner.node(),
-            self.ctx.dependency_analysis,
-            self.ctx.interner,
-        );
+        let mechanism = self
+            .ctx
+            .type_ctx
+            .analysis()
+            .capture_mechanism_during_inference(
+                inner.node(),
+                self.ctx.dependency_analysis,
+                self.ctx.interner,
+            );
         let should_merge_fields = mechanism == CaptureMechanism::Node
             && matches!(&inner_info.flow, OutputFlow::Fields(_));
 

@@ -6,12 +6,13 @@
 use std::collections::HashSet;
 
 use crate::bytecode::{EffectKind, Nav};
-use crate::compiler::parse::ast::{self, Pattern};
-use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::analyze::types::{CaptureMechanism, TypeAnalysis, TypeShape};
 use crate::compiler::ids::TypeId;
+use crate::compiler::lower::ir::{EffectIR, Label};
+use crate::compiler::parse::ast::{self, Pattern};
 
 use super::Compiler;
+use super::scope::StructScope;
 
 /// Capture effects to attach to match instructions.
 ///
@@ -151,8 +152,15 @@ impl Compiler<'_> {
         // so all fields (including nested bubble captures) reference the same root struct.
         if let Some(name_token) = cap.name() {
             let capture_name = &name_token.text()[1..];
-            let member_ref = self.lookup_member_in_scope(capture_name);
-            if let Some(member_ref) = member_ref {
+            // Suppressive/no-output contexts can compile inner captures under a
+            // non-struct scope; they intentionally emit value effects without a Set.
+            // Once a struct scope exists, though, a missing member is our bug.
+            if let Some(StructScope(type_id)) = self.scope_stack.last().copied()
+                && self.ctx.type_ctx.struct_fields(type_id).is_some()
+            {
+                let member_ref = self
+                    .lookup_member(capture_name, type_id)
+                    .expect("captured field must resolve in the current scope");
                 effects.push(EffectIR::with_member(EffectKind::Set, member_ref));
             }
         }

@@ -7,11 +7,11 @@
 //! reading the inner expression's already-inferred type, so both sides stay in
 //! lockstep.
 
-use crate::core::Interner;
-use crate::compiler::parse::ast::{Pattern, is_empty_group};
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{OutputFlow, QuantifierKind, TypeShape};
+use crate::compiler::parse::ast::{Pattern, is_empty_group};
+use crate::core::Interner;
 
 /// How a captured value is produced — the bridge between the inferred type and
 /// the emitted effects.
@@ -41,38 +41,73 @@ pub enum CaptureMechanism {
 impl TypeAnalysis {
     /// Classify the value mechanism of a captured inner expression.
     ///
-    /// Reads the inner's cached type info, so it is valid both during bottom-up
-    /// inference (a capture's inner is inferred before the capture itself) and
-    /// during emission (all type info is available).
+    /// Reads the inner's admitted type info. Missing pattern or definition data is a
+    /// compiler bug after [`TypeAnalysisBuilder::finish`](super::type_analysis::TypeAnalysisBuilder::finish),
+    /// so this accessor is loud rather than recovering to `Node`.
     pub fn capture_mechanism(
         &self,
         inner: &Pattern,
         deps: &DependencyAnalysis,
         interner: &Interner,
     ) -> CaptureMechanism {
+        self.capture_mechanism_with_mode(inner, deps, interner, CaptureLookupMode::Admitted)
+    }
+
+    /// Classification used while inference is still constructing [`TypeAnalysis`].
+    ///
+    /// In-progress inference can legitimately ask before every definition output has
+    /// been memoized, so this path keeps the old conservative fallbacks.
+    pub(crate) fn capture_mechanism_during_inference(
+        &self,
+        inner: &Pattern,
+        deps: &DependencyAnalysis,
+        interner: &Interner,
+    ) -> CaptureMechanism {
+        self.capture_mechanism_with_mode(inner, deps, interner, CaptureLookupMode::InProgress)
+    }
+
+    fn capture_mechanism_with_mode(
+        &self,
+        inner: &Pattern,
+        deps: &DependencyAnalysis,
+        interner: &Interner,
+        mode: CaptureLookupMode,
+    ) -> CaptureMechanism {
         // `field: x @cap` parses as `(field: x) @cap`; the field is only a navigation
         // constraint, so the value mechanism is that of `x`.
         let pattern = unwrap_field(inner);
 
         if let Pattern::QuantifiedPattern(quant) = &pattern {
-            return match quant.quantifier_kind() {
+            let kind = match mode {
+                CaptureLookupMode::Admitted => quant
+                    .quantifier_kind()
+                    .expect("admitted quantified pattern must have a quantifier operator"),
+                CaptureLookupMode::InProgress => quant
+                    .quantifier_kind()
+                    .unwrap_or(QuantifierKind::ZeroOrMore),
+            };
+            return match kind {
                 // `*` / `+` collect into an array regardless of element shape.
-                Some(QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore) => {
-                    CaptureMechanism::Array
-                }
+                QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureMechanism::Array,
                 // `?` only adds optionality; the value mechanism is the inner's.
-                Some(QuantifierKind::Optional) => quant
-                    .inner()
-                    .map(|i| self.capture_mechanism(&i, deps, interner))
-                    .unwrap_or(CaptureMechanism::Node),
-                None => CaptureMechanism::Array,
+                QuantifierKind::Optional => {
+                    let Some(inner) = quant.inner() else {
+                        return match mode {
+                            CaptureLookupMode::Admitted => {
+                                panic!("admitted optional quantifier must have an inner pattern")
+                            }
+                            CaptureLookupMode::InProgress => CaptureMechanism::Node,
+                        };
+                    };
+                    self.capture_mechanism_with_mode(&inner, deps, interner, mode)
+                }
             };
         }
 
         // A reference whose definition returns a structured type: the call site does
         // its own Call/Return (and Struct/EndStruct) scoping. A reference to a node/void
         // definition falls through to `Node` — its matched node is captured directly.
-        if self.ref_returns_structured(&pattern, deps, interner) {
+        if self.ref_returns_structured_with_mode(&pattern, deps, interner, mode) {
             return CaptureMechanism::Ref;
         }
 
@@ -83,11 +118,23 @@ impl TypeAnalysis {
 
         // Everything else is decided by the inner's inferred data flow, so the type
         // and the emitted effects can't disagree.
-        match self.pattern_result(&pattern).map(|info| &info.flow) {
+        let flow = match self.pattern_result(&pattern).map(|info| &info.flow) {
+            Some(flow) => flow,
+            None => {
+                return match mode {
+                    CaptureLookupMode::Admitted => {
+                        panic!("admitted captured pattern must have a pattern result")
+                    }
+                    CaptureLookupMode::InProgress => CaptureMechanism::Node,
+                };
+            }
+        };
+
+        match flow {
             // Bubbling captures: a sequence/alternation wraps them in a fresh struct
             // scope; a named node instead captures its matched node and lets the
             // children bubble alongside as sibling fields.
-            Some(OutputFlow::Fields(_)) => {
+            OutputFlow::Fields(_) => {
                 // Only a union alternation flows `Fields` here; an enum flows `Value`
                 // and is handled below, so it must not appear in this arm.
                 if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Union(_)) {
@@ -99,7 +146,7 @@ impl TypeAnalysis {
             // A structured scalar is left pending by the inner itself — an enum
             // alternation (`Enum`/`EndEnum`) or a named node forwarding a structured
             // output child.
-            Some(OutputFlow::Value(type_id)) if self.is_structured_output(*type_id) => {
+            OutputFlow::Value(type_id) if self.is_structured_output(*type_id) => {
                 CaptureMechanism::SetAfter
             }
             // Void, or a plain scalar node: the matched node is captured directly.
@@ -114,14 +161,40 @@ impl TypeAnalysis {
         deps: &DependencyAnalysis,
         interner: &Interner,
     ) -> bool {
+        self.ref_returns_structured_with_mode(pattern, deps, interner, CaptureLookupMode::Admitted)
+    }
+
+    fn ref_returns_structured_with_mode(
+        &self,
+        pattern: &Pattern,
+        deps: &DependencyAnalysis,
+        interner: &Interner,
+        mode: CaptureLookupMode,
+    ) -> bool {
         let Pattern::Ref(r) = pattern else {
             return false;
         };
-        let Some(name) = r.name() else {
-            return false;
+        let name = match r.name() {
+            Some(name) => name,
+            None => {
+                return match mode {
+                    CaptureLookupMode::Admitted => {
+                        panic!("admitted reference pattern must have a name")
+                    }
+                    CaptureLookupMode::InProgress => false,
+                };
+            }
         };
-        let Some(def_id) = deps.def_id_for_name(interner, name.text()) else {
-            return false;
+        let def_id = match deps.def_id_for_name(interner, name.text()) {
+            Some(def_id) => def_id,
+            None => {
+                return match mode {
+                    CaptureLookupMode::Admitted => {
+                        panic!("admitted reference must resolve to a definition")
+                    }
+                    CaptureLookupMode::InProgress => false,
+                };
+            }
         };
 
         // After inference the definition's registered output type is authoritative;
@@ -131,6 +204,10 @@ impl TypeAnalysis {
                 self.type_shape(output_type),
                 Some(TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. })
             );
+        }
+
+        if matches!(mode, CaptureLookupMode::Admitted) {
+            panic!("admitted reference target must have an output type");
         }
 
         // During inference a leaf definition may not be registered yet — the visitor
@@ -143,6 +220,12 @@ impl TypeAnalysis {
             _ => false,
         }
     }
+}
+
+#[derive(Clone, Copy)]
+enum CaptureLookupMode {
+    Admitted,
+    InProgress,
 }
 
 /// Look through a `field: x` wrapper to the value it constrains.
