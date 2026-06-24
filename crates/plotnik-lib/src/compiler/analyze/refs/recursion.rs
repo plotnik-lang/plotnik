@@ -305,12 +305,10 @@ fn pattern_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
         }
         Pattern::Union(_) | Pattern::Enum(_) => pattern
             .children()
-            .iter()
-            .any(|c| pattern_has_escape(c, scc_names)),
+            .any(|c| pattern_has_escape(&c, scc_names)),
         Pattern::SeqPattern(_) => pattern
             .children()
-            .iter()
-            .all(|c| pattern_has_escape(c, scc_names)),
+            .all(|c| pattern_has_escape(&c, scc_names)),
         Pattern::QuantifiedPattern(q) => {
             if q.is_optional() {
                 return true;
@@ -320,8 +318,7 @@ fn pattern_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
         }
         Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => pattern
             .children()
-            .iter()
-            .all(|c| pattern_has_escape(c, scc_names)),
+            .all(|c| pattern_has_escape(&c, scc_names)),
         Pattern::TokenPattern(_) => true,
     }
 }
@@ -331,9 +328,9 @@ fn pattern_consumes_input(pattern: &Pattern) -> bool {
         Pattern::NodePattern(_) | Pattern::TokenPattern(_) => true,
         Pattern::DefRef(_) => false,
         Pattern::Union(_) | Pattern::Enum(_) => {
-            pattern.children().iter().all(pattern_consumes_input)
+            pattern.children().all(|c| pattern_consumes_input(&c))
         }
-        Pattern::SeqPattern(_) => pattern.children().iter().any(pattern_consumes_input),
+        Pattern::SeqPattern(_) => pattern.children().any(|c| pattern_consumes_input(&c)),
         Pattern::QuantifiedPattern(q) => {
             !q.is_optional()
                 && pattern_consumes_input(
@@ -341,7 +338,7 @@ fn pattern_consumes_input(pattern: &Pattern) -> bool {
                 )
         }
         Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => {
-            pattern.children().iter().all(pattern_consumes_input)
+            pattern.children().all(|c| pattern_consumes_input(&c))
         }
     }
 }

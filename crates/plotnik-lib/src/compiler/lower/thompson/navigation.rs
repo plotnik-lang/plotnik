@@ -56,8 +56,7 @@ impl<'a> AnonymousClassifier<'a> {
                 .is_some_and(|value| self.pattern_may_match_anonymous_inner(value, visited)),
             Pattern::Union(_) | Pattern::Enum(_) => pattern
                 .children()
-                .iter()
-                .any(|body| self.pattern_may_match_anonymous_inner(body, visited)),
+                .any(|body| self.pattern_may_match_anonymous_inner(&body, visited)),
             Pattern::SeqPattern(seq) => seq
                 .children()
                 .any(|child| self.pattern_may_match_anonymous_inner(&child, visited)),

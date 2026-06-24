@@ -12,7 +12,7 @@
 //! When building data structures that need source-lifetime strings (e.g.,
 //! `SymbolTable<'q>`), use [`token_src`] instead of `token.text()`.
 
-use crate::compiler::parse::cst::{SyntaxKind, SyntaxNode, SyntaxToken};
+use crate::compiler::parse::cst::{QueryLang, SyntaxKind, SyntaxNode, SyntaxToken};
 use rowan::TextRange;
 
 /// Extracts token text with source lifetime.
@@ -108,18 +108,64 @@ macro_rules! define_pattern {
 }
 
 impl Pattern {
-    pub fn children(&self) -> Vec<Pattern> {
+    pub fn children(&self) -> impl Iterator<Item = Pattern> + '_ {
         match self {
-            Pattern::NodePattern(n) => n.children().collect(),
-            Pattern::SeqPattern(s) => s.children().collect(),
-            Pattern::CapturedPattern(c) => c.inner().into_iter().collect(),
-            Pattern::QuantifiedPattern(q) => q.inner().into_iter().collect(),
-            Pattern::FieldPattern(f) => f.value().into_iter().collect(),
-            Pattern::Union(u) => u.branches().filter_map(|b| b.body()).collect(),
-            Pattern::Enum(e) => e.branches().filter_map(|b| b.body()).collect(),
-            Pattern::DefRef(_) | Pattern::TokenPattern(_) => vec![],
+            Pattern::NodePattern(n) => {
+                PatternChildren::Direct(n.syntax().children().filter_map(Pattern::cast))
+            }
+            Pattern::SeqPattern(s) => {
+                PatternChildren::Direct(s.syntax().children().filter_map(Pattern::cast))
+            }
+            Pattern::CapturedPattern(c) => PatternChildren::Optional(c.inner().into_iter()),
+            Pattern::QuantifiedPattern(q) => PatternChildren::Optional(q.inner().into_iter()),
+            Pattern::FieldPattern(f) => PatternChildren::Optional(f.value().into_iter()),
+            Pattern::Union(u) => PatternChildren::BranchBodies(
+                u.syntax()
+                    .children()
+                    .filter_map(Branch::cast as fn(SyntaxNode) -> Option<Branch>)
+                    .filter_map(branch_body as fn(Branch) -> Option<Pattern>),
+            ),
+            Pattern::Enum(e) => PatternChildren::BranchBodies(
+                e.syntax()
+                    .children()
+                    .filter_map(Branch::cast as fn(SyntaxNode) -> Option<Branch>)
+                    .filter_map(branch_body as fn(Branch) -> Option<Pattern>),
+            ),
+            Pattern::DefRef(_) | Pattern::TokenPattern(_) => {
+                PatternChildren::Empty(std::iter::empty())
+            }
         }
     }
+}
+
+type DirectPatternChildren =
+    std::iter::FilterMap<rowan::SyntaxNodeChildren<QueryLang>, fn(SyntaxNode) -> Option<Pattern>>;
+type BranchChildren =
+    std::iter::FilterMap<rowan::SyntaxNodeChildren<QueryLang>, fn(SyntaxNode) -> Option<Branch>>;
+type BranchBodyChildren = std::iter::FilterMap<BranchChildren, fn(Branch) -> Option<Pattern>>;
+
+enum PatternChildren {
+    Direct(DirectPatternChildren),
+    Optional(std::option::IntoIter<Pattern>),
+    BranchBodies(BranchBodyChildren),
+    Empty(std::iter::Empty<Pattern>),
+}
+
+impl Iterator for PatternChildren {
+    type Item = Pattern;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Direct(children) => children.next(),
+            Self::Optional(child) => child.next(),
+            Self::BranchBodies(children) => children.next(),
+            Self::Empty(children) => children.next(),
+        }
+    }
+}
+
+fn branch_body(branch: Branch) -> Option<Pattern> {
+    branch.body()
 }
 
 ast_node!(Root, Root);
