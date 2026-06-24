@@ -380,47 +380,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let should_merge_fields = mechanism == CaptureMechanism::Node
             && matches!(&inner_info.flow, OutputFlow::Fields(_));
 
-        // The capture's base type, before its `:: …` annotation is applied.
-        let base = if should_merge_fields {
-            // Named node with bubbling children: the capture takes the matched node,
-            // and the children bubble up alongside it.
-            self.recursive_ref_type(inner.node()).unwrap_or(TYPE_NODE)
-        } else {
-            self.determine_captured_base_type(inner.node(), &inner_info)
-        };
-        let captured_type = annotation.map_or(base, |name| self.annotate_named(base, name));
-        let field_info = if is_optional {
-            FieldInfo::optional(captured_type)
-        } else {
-            FieldInfo::required(captured_type)
-        };
+        let base = self.captured_base_type(inner.node(), &inner_info, should_merge_fields);
+        let field_info = self.captured_field_info(base, annotation, is_optional);
+        let flow =
+            self.captured_field_flow(capture_name, field_info, &inner_info, should_merge_fields);
 
-        if should_merge_fields {
-            let OutputFlow::Fields(type_id) = &inner_info.flow else {
-                unreachable!()
-            };
-            let mut fields = self
-                .ctx
-                .type_ctx
-                .in_progress()
-                .expect_struct_fields(*type_id)
-                .clone();
-            fields.insert(capture_name, field_info);
-
-            PatternResult::new(
-                inner_info.arity,
-                OutputFlow::Fields(self.ctx.type_ctx.intern_struct(fields)),
-            )
-        } else {
-            PatternResult::new(
-                inner_info.arity,
-                OutputFlow::Fields(
-                    self.ctx
-                        .type_ctx
-                        .intern_single_field(capture_name, field_info),
-                ),
-            )
-        }
+        PatternResult::new(inner_info.arity, flow)
     }
 
     /// `:: TypeName` — name a structured capture (struct/enum) or alias a node.
@@ -452,6 +417,66 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         cap.type_annotation()
             .and_then(|t| t.name())
             .map(|n| self.ctx.interner.intern(n.text()))
+    }
+
+    /// The capture's base type, before its `:: TypeName` annotation is applied.
+    fn captured_base_type(
+        &mut self,
+        inner: &Pattern,
+        inner_info: &PatternResult,
+        should_merge_fields: bool,
+    ) -> TypeId {
+        if should_merge_fields {
+            // Named node with bubbling children: the capture takes the matched node,
+            // and the children bubble up alongside it.
+            return self.recursive_ref_type(inner).unwrap_or(TYPE_NODE);
+        }
+
+        self.determine_captured_base_type(inner, inner_info)
+    }
+
+    fn captured_field_info(
+        &mut self,
+        base: TypeId,
+        annotation: Option<Symbol>,
+        is_optional: bool,
+    ) -> FieldInfo {
+        let captured_type = annotation.map_or(base, |name| self.annotate_named(base, name));
+
+        if is_optional {
+            FieldInfo::optional(captured_type)
+        } else {
+            FieldInfo::required(captured_type)
+        }
+    }
+
+    fn captured_field_flow(
+        &mut self,
+        capture_name: Symbol,
+        field_info: FieldInfo,
+        inner_info: &PatternResult,
+        should_merge_fields: bool,
+    ) -> OutputFlow {
+        if !should_merge_fields {
+            return OutputFlow::Fields(
+                self.ctx
+                    .type_ctx
+                    .intern_single_field(capture_name, field_info),
+            );
+        }
+
+        let OutputFlow::Fields(type_id) = &inner_info.flow else {
+            unreachable!("node captures only merge field flow");
+        };
+        let mut fields = self
+            .ctx
+            .type_ctx
+            .in_progress()
+            .expect_struct_fields(*type_id)
+            .clone();
+        fields.insert(capture_name, field_info);
+
+        OutputFlow::Fields(self.ctx.type_ctx.intern_struct(fields))
     }
 
     /// Logic for how quantifier on the inner expression affects the capture field.
