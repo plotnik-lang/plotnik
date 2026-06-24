@@ -19,11 +19,6 @@ pub(crate) mod query;
 #[cfg(test)]
 pub mod test_utils;
 
-#[cfg(test)]
-mod analyze_tests;
-#[cfg(test)]
-mod parser_tests;
-
 // `compile_tests` drives the lowering pipeline end-to-end; kept under a `compile`
 // module path so its committed insta snapshots resolve unchanged.
 #[cfg(test)]

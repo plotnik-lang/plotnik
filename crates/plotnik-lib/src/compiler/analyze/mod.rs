@@ -7,3 +7,8 @@ pub mod types;
 pub mod visitor;
 
 pub use located::Located;
+
+#[cfg(test)]
+mod link_tests;
+#[cfg(test)]
+mod refs_tests;
