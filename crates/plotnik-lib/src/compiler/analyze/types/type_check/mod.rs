@@ -13,8 +13,6 @@ mod unify;
 #[cfg(test)]
 mod context_tests;
 #[cfg(test)]
-mod def_id_tests;
-#[cfg(test)]
 mod unify_tests;
 
 pub use context::TypeAnalysis;

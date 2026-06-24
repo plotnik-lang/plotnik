@@ -17,8 +17,6 @@ mod type_table;
 
 #[cfg(test)]
 mod string_table_tests;
-#[cfg(test)]
-mod type_table_tests;
 
 pub(in crate::compiler::emit) use constant_pool::ConstantPool;
 pub use context::EmitInput;

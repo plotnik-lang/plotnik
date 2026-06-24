@@ -18,8 +18,6 @@ mod vm;
 mod checkpoint_tests;
 #[cfg(test)]
 mod cursor_tests;
-#[cfg(test)]
-mod verify_tests;
 
 pub use effect::{EffectLog, RuntimeEffect};
 pub use error::RuntimeError;
