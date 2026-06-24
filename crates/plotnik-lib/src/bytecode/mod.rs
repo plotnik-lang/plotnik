@@ -1,26 +1,75 @@
 //! Bytecode format and runtime types for Plotnik.
 //!
-//! Public bytecode facade for compiled Plotnik queries.
+//! Public bytecode facade for compiled Plotnik queries. Implements the binary
+//! format specified in `docs/binary-format/`.
 
 #![allow(clippy::comparison_chain)]
 
-mod bytecode;
+mod aligned_vec;
+mod constants;
 mod dfa;
-#[cfg(test)]
-mod dfa_tests;
+mod dump;
+mod effects;
+mod entrypoint;
+mod format;
+mod header;
+mod ids;
+mod instructions;
+mod module;
+mod nav;
+mod node_kind_constraint;
 mod predicate_op;
+mod sections;
+mod type_meta;
 pub mod type_system;
 
-pub use bytecode::{EncodeError, Entrypoint, Module, ModuleError, TypeId, dump};
+pub use dump::dump;
+pub use entrypoint::Entrypoint;
+pub use ids::TypeId;
+pub use instructions::EncodeError;
+pub use module::{Module, ModuleError};
 pub use type_system::{Arity, PrimitiveType, TypeKind};
 
-pub(crate) use bytecode::{
-    Call, Effect, EffectKind, EntrypointsView, FieldEntry, HEADER_SIZE, Header, Instruction,
-    LineBuilder, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, Match, MatchInstr, MatchPredicate, Nav,
-    NodeKindConstraint, NodeKindEntry, PREAMBLE_NAME, REGEX_TABLE_ENTRY_SIZE, Return,
-    SECTION_ALIGN, STEP_SIZE, StepAddr, StepId, StringId, StringsView, Symbol, Trampoline, TypeDef,
-    TypeDefKind, TypeMember, TypeNameEntry, TypesView, cols, format_effect, nav_symbol,
-    select_match_opcode, trace, truncate_text, width_for_count,
+pub(crate) use constants::{
+    HEADER_SIZE, MAGIC, MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS, REGEX_TABLE_ENTRY_SIZE,
+    SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE, VERSION,
 };
 pub(crate) use dfa::deserialize_dfa;
+pub(crate) use effects::{Effect, EffectKind};
+pub(crate) use format::{
+    LineBuilder, PREAMBLE_NAME, Symbol, cols, format_effect, nav_symbol, trace, truncate_text,
+    width_for_count,
+};
+pub(crate) use header::Header;
+pub(crate) use ids::StringId;
+pub(crate) use instructions::{
+    Call, Match, MatchInstr, MatchPredicate, Return, StepAddr, StepId, Trampoline,
+    select_match_opcode,
+};
+pub(crate) use module::{EntrypointsView, Instruction, StringsView, TypesView};
+pub(crate) use nav::Nav;
+pub(crate) use node_kind_constraint::NodeKindConstraint;
 pub(crate) use predicate_op::PredicateOp;
+pub(crate) use sections::{FieldEntry, NodeKindEntry};
+pub(crate) use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
+
+#[cfg(test)]
+mod aligned_vec_tests;
+#[cfg(test)]
+mod dfa_tests;
+#[cfg(test)]
+mod effects_tests;
+#[cfg(test)]
+mod entrypoint_tests;
+#[cfg(test)]
+mod format_tests;
+#[cfg(test)]
+mod header_tests;
+#[cfg(test)]
+mod instructions_tests;
+#[cfg(test)]
+mod nav_tests;
+#[cfg(test)]
+mod node_kind_constraint_tests;
+#[cfg(test)]
+mod type_meta_tests;

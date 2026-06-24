@@ -22,9 +22,9 @@ use crate::compiler::{QueryBuilder, SourceMap, SourcePath};
 use crate::core::grammar::{Grammar, raw::RawGrammar};
 
 use super::{ByteStorage, Module, ModuleError};
-use crate::bytecode::bytecode::effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectKind};
-use crate::bytecode::bytecode::type_meta::TypeDefKind;
-use crate::bytecode::bytecode::{Header, STEP_SIZE};
+use crate::bytecode::effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectKind};
+use crate::bytecode::type_meta::TypeDefKind;
+use crate::bytecode::{Header, STEP_SIZE};
 
 fn javascript() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {

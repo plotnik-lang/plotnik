@@ -45,7 +45,7 @@
 use std::collections::HashMap;
 
 use super::{Instruction, Module, ModuleError};
-use crate::bytecode::bytecode::effects::EffectKind;
+use crate::bytecode::effects::EffectKind;
 
 /// Builder frames the materializer pushes. The root/result frame can be a
 /// scalar, but the walk starts at the always-`StructOpen` preamble, so only these three

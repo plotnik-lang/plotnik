@@ -96,8 +96,8 @@ Format: `R<id> /<pattern>/`
 
 ## Files
 
-- `crates/plotnik-lib/src/bytecode/bytecode/dump.rs` — Dump formatting logic
-- `crates/plotnik-lib/src/bytecode/bytecode/format.rs` — Shared formatting utilities
+- `crates/plotnik-lib/src/bytecode/dump.rs` — Dump formatting logic
+- `crates/plotnik-lib/src/bytecode/format.rs` — Shared formatting utilities
 
 ## Instruction Format
 
