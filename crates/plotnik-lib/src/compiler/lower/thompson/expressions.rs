@@ -13,7 +13,8 @@ use crate::bytecode::{Nav, PredicateOp};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
-    EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
+    CalleeEntry, EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
+    ReturnAddr,
 };
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
@@ -204,6 +205,7 @@ impl Compiler<'_> {
             .def_entries
             .get(&def_id)
             .expect("every analyzed DefId has a def_entries label");
+        let callee = CalleeEntry(target);
 
         let def_output_id = self.ctx.type_ctx.expect_def_output(def_id);
         let def_output_shape = self.ctx.type_ctx.expect_type_shape(def_output_id);
@@ -219,13 +221,14 @@ impl Compiler<'_> {
                 let set_step =
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
                 let struct_close_step = self.emit_struct_close_step(set_step);
-                let call_label = self.emit_call(nav, field_override, struct_close_step, target);
+                let call_label =
+                    self.emit_call(nav, field_override, ReturnAddr(struct_close_step), callee);
                 self.emit_struct_step(call_label)
             }
             RefCallLowering::CapturedValue => {
                 let return_addr =
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
-                self.emit_call(nav, field_override, return_addr, target)
+                self.emit_call(nav, field_override, ReturnAddr(return_addr), callee)
             }
             RefCallLowering::SuppressedOpaqueRecursion => {
                 // Suppress bracket keeps the structural match but discards all effects,
@@ -235,7 +238,8 @@ impl Compiler<'_> {
                     vec![EffectIR::suppress_end()],
                     CaptureEffects::default(),
                 );
-                let call_label = self.emit_call(nav, field_override, suppress_end, target);
+                let call_label =
+                    self.emit_call(nav, field_override, ReturnAddr(suppress_end), callee);
                 self.emit_effects_epsilon(
                     call_label,
                     vec![EffectIR::suppress_begin()],
@@ -244,7 +248,7 @@ impl Compiler<'_> {
             }
             RefCallLowering::PlainCall => {
                 // Uncaptured ref: just Call → exit (def's Sets go to parent scope)
-                self.emit_call(nav, field_override, exit, target)
+                self.emit_call(nav, field_override, ReturnAddr(exit), callee)
             }
         };
 

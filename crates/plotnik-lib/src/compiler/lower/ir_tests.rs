@@ -3,8 +3,8 @@ use std::num::NonZeroU16;
 use crate::bytecode::{EffectKind, Nav, PredicateOp};
 
 use super::ir::{
-    CallIR, EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
-    PredicateValueIR, ReturnIR,
+    CallIR, CalleeEntry, EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
+    PredicateValueIR, ReturnAddr, ReturnIR,
 };
 
 #[test]
@@ -38,7 +38,7 @@ fn instruction_successors() {
 
     assert_eq!(m.successors(), vec![Label(1), Label(2)]);
 
-    let c: InstructionIR = CallIR::new(Label(3), Label(5), Label(4))
+    let c: InstructionIR = CallIR::new(Label(3), ReturnAddr(Label(4)), CalleeEntry(Label(5)))
         .nav(Nav::Down)
         .into();
 

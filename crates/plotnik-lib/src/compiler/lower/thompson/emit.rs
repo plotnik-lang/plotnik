@@ -1,7 +1,7 @@
 use std::num::NonZeroU16;
 
 use crate::bytecode::{EffectKind, Nav};
-use crate::compiler::lower::ir::{CallIR, EffectIR, Label, MatchIR};
+use crate::compiler::lower::ir::{CallIR, CalleeEntry, EffectIR, Label, MatchIR, ReturnAddr};
 use crate::compiler::parse::ast::Pattern;
 
 use super::Compiler;
@@ -21,12 +21,12 @@ impl Compiler<'_> {
         &mut self,
         nav: Nav,
         node_field: Option<NonZeroU16>,
-        next: Label,
-        target: Label,
+        return_addr: ReturnAddr,
+        callee: CalleeEntry,
     ) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
-            CallIR::new(label, target, next)
+            CallIR::new(label, return_addr, callee)
                 .nav(nav)
                 .node_field(node_field)
                 .into(),

@@ -30,6 +30,14 @@ impl Label {
     }
 }
 
+/// Label to continue at after a callee returns.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReturnAddr(pub Label);
+
+/// Label where a callee definition starts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CalleeEntry(pub Label);
+
 /// Symbolic reference to a struct field or enum variant.
 ///
 /// Resolved to an absolute member index at emit time: the parent type's member
@@ -393,13 +401,13 @@ pub struct CallIR {
 
 impl CallIR {
     /// Create a call instruction with default nav (Stay) and no field constraint.
-    pub fn new(label: Label, target: Label, next: Label) -> Self {
+    pub fn new(label: Label, return_addr: ReturnAddr, callee: CalleeEntry) -> Self {
         Self {
             label,
             nav: Nav::Stay,
             node_field: None,
-            next,
-            target,
+            next: return_addr.0,
+            target: callee.0,
         }
     }
 
