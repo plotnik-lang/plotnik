@@ -3,25 +3,25 @@
 //! The pipeline runs as per-phase modules under `compiler::emit`; the data they
 //! share lives in `tables`. This module fixes the phase order.
 
+mod build_regexes;
+mod build_types;
 mod instructions;
 mod layout;
 mod layout_map;
 mod module;
-mod regex_table;
-mod string_table;
+mod seed_strings;
 pub(in crate::compiler) mod tables;
-mod type_table;
 
 #[cfg(test)]
-mod regex_table_tests;
+mod build_regexes_tests;
 
+use crate::compiler::emit::build_regexes::build_regexes;
+use crate::compiler::emit::build_types::build_types;
 use crate::compiler::emit::instructions::emit_instructions;
 use crate::compiler::emit::layout::compute_layout;
 use crate::compiler::emit::module::EmitPipeline;
-use crate::compiler::emit::regex_table::build_regex_table;
-use crate::compiler::emit::string_table::seed_string_table;
+use crate::compiler::emit::seed_strings::seed_strings;
 use crate::compiler::emit::tables::{ConstantPool, EmitError, EmitInput};
-use crate::compiler::emit::type_table::build_type_table;
 use crate::compiler::lower::ir::LoweredNfa;
 
 /// Emit bytecode without the debug load self-check. Used by callers that load
@@ -32,13 +32,13 @@ pub(in crate::compiler) fn emit_unchecked(
     lowered_ir: &LoweredNfa,
 ) -> Result<Vec<u8>, EmitError> {
     let compile_result = lowered_ir.raw();
-    let strings = seed_string_table(compile_result)?;
-    let (types, strings) = build_type_table(&input, strings)?;
+    let strings = seed_strings(compile_result)?;
+    let (types, strings) = build_types(&input, strings)?;
     let layout = compute_layout(compile_result)?;
     let mut pipeline = EmitPipeline::new(input, compile_result, strings, types, layout);
 
     let tables = pipeline.build_tables()?;
-    let regexes = build_regex_table(compile_result, pipeline.strings())?;
+    let regexes = build_regexes(compile_result, pipeline.strings())?;
     let pool = ConstantPool::new(pipeline.types(), pipeline.strings(), &regexes);
     let transitions = emit_instructions(compile_result.instructions(), pipeline.layout(), pool)?;
 

@@ -17,7 +17,7 @@ use crate::core::Interner;
 
 /// Build the type table, interning type, member, and name strings into the
 /// shared string table. Threads the string table by value because it extends it.
-pub fn build_type_table(
+pub fn build_types(
     input: &EmitInput<'_>,
     mut strings: StringTableBuilder,
 ) -> Result<(TypeTableBuilder, StringTableBuilder), EmitError> {
