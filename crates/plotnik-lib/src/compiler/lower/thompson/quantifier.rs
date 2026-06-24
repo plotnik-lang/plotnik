@@ -5,6 +5,7 @@
 //! stay in one place.
 
 use crate::bytecode::Nav;
+use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOperator};
 
@@ -69,6 +70,12 @@ impl ArrayContext {
     fn is_in_array(self) -> bool {
         matches!(self, ArrayContext::InArray)
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ArrayElementScopeOwner {
+    Iteration,
+    ArrayExit,
 }
 
 /// Configuration for unified quantifier compilation.
@@ -462,29 +469,15 @@ impl Compiler<'_> {
         };
 
         let compile_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
-            if has_struct_wrapper {
-                this.compile_struct_for_array(inner, exit, Some(nav), element_row_type_id)
-            } else if in_array_context {
-                this.compile_with_optional_scope(element_row_type_id, |t| {
-                    t.dispatch_pattern(
-                        inner,
-                        ExprCtx {
-                            exit,
-                            nav: Some(nav),
-                            capture: element_capture.clone(),
-                        },
-                    )
-                })
-            } else {
-                this.dispatch_pattern(
-                    inner,
-                    ExprCtx {
-                        exit,
-                        nav: Some(nav),
-                        capture: element_capture.clone(),
-                    },
-                )
-            }
+            this.compile_quantified_body(
+                inner,
+                exit,
+                nav,
+                element_capture.clone(),
+                element_row_type_id,
+                has_struct_wrapper,
+                ArrayElementScopeOwner::Iteration,
+            )
         };
 
         let is_greedy = kind.is_greedy();
@@ -515,28 +508,16 @@ impl Compiler<'_> {
                     match_exit,
                     skip_exit,
                 } => {
-                    // The split-exit star's body deliberately omits the array-context
-                    // `compile_with_optional_scope` wrap that `compile_body` applies:
-                    // its element scope is owned by the EndArr step on each exit, not
-                    // per-iteration. Use a dedicated body closure to keep that intact.
                     let split_body = |this: &mut Self, nav: Nav, exit: Label| -> Label {
-                        if has_struct_wrapper {
-                            this.compile_struct_for_array(
-                                inner,
-                                exit,
-                                Some(nav),
-                                element_row_type_id,
-                            )
-                        } else {
-                            this.dispatch_pattern(
-                                inner,
-                                ExprCtx {
-                                    exit,
-                                    nav: Some(nav),
-                                    capture: element_capture.clone(),
-                                },
-                            )
-                        }
+                        this.compile_quantified_body(
+                            inner,
+                            exit,
+                            nav,
+                            element_capture.clone(),
+                            element_row_type_id,
+                            has_struct_wrapper,
+                            ArrayElementScopeOwner::ArrayExit,
+                        )
                     };
 
                     let loop_entry = self.fresh_label();
@@ -606,5 +587,42 @@ impl Compiler<'_> {
                 )
             }
         }
+    }
+
+    fn compile_quantified_body(
+        &mut self,
+        inner: &Pattern,
+        exit: Label,
+        nav: Nav,
+        element_capture: CaptureEffects,
+        element_row_type_id: Option<TypeId>,
+        has_struct_wrapper: bool,
+        scope_owner: ArrayElementScopeOwner,
+    ) -> Label {
+        if has_struct_wrapper {
+            return self.compile_struct_for_array(inner, exit, Some(nav), element_row_type_id);
+        }
+
+        if scope_owner == ArrayElementScopeOwner::Iteration {
+            return self.compile_with_optional_scope(element_row_type_id, |this| {
+                this.dispatch_pattern(
+                    inner,
+                    ExprCtx {
+                        exit,
+                        nav: Some(nav),
+                        capture: element_capture,
+                    },
+                )
+            });
+        }
+
+        self.dispatch_pattern(
+            inner,
+            ExprCtx {
+                exit,
+                nav: Some(nav),
+                capture: element_capture,
+            },
+        )
     }
 }
