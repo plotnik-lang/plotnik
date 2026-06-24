@@ -7,7 +7,7 @@
 
 use std::collections::HashSet;
 
-use crate::bytecode::{TypeDef, TypeId as BytecodeTypeId, TypeKind, TypeMember, TypeNameEntry};
+use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeNameEntry};
 
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
@@ -60,7 +60,7 @@ fn build(
     let ordered_types = collector.out;
 
     // Determine which builtins are actually used by scanning all types
-    let mut usage = BuiltinUses::new();
+    let mut usage = BuiltinUsage::new();
     for &type_id in &ordered_types {
         usage.collect(type_id, type_ctx);
     }
@@ -84,7 +84,7 @@ fn build(
         }
     }
 
-    // Phase 2: Pre-assign BytecodeTypeIds for custom types and reserve slots
+    // Phase 2: Pre-assign wire TypeIds for custom types and reserve slots
     for &type_id in &ordered_types {
         types.push_mapped(type_id, TypeDef::placeholder());
     }
@@ -92,7 +92,7 @@ fn build(
     // Phase 3: Fill in custom type definitions
     // We need to calculate slot index as offset from where custom types start
     let builtin_count = usage.uses_void as usize + usage.uses_node as usize;
-    let mut ctx = TypeEmitSlots {
+    let mut ctx = TypeEmitCtx {
         type_ctx,
         interner: input.interner,
         strings,
@@ -132,7 +132,7 @@ fn emit_type_at_slot(
     types: &mut TypeTableBuilder,
     slot_index: usize,
     type_shape: &TypeShape,
-    ctx: &mut TypeEmitSlots,
+    ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
     match type_shape {
         TypeShape::Void | TypeShape::Node => {
@@ -141,14 +141,14 @@ fn emit_type_at_slot(
 
         TypeShape::Custom(sym) => {
             // Custom type annotation: @x :: Identifier → type Identifier = Node
-            let bc_type_id = BytecodeTypeId(slot_index as u16);
+            let bc_type_id = WireTypeId(slot_index as u16);
 
             let name = ctx.strings.intern(*sym, ctx.interner)?;
             types.push_name(TypeNameEntry::new(name, bc_type_id));
 
             // Custom types alias Node - look up Node's actual bytecode ID.
             // Reaching a Custom type means it was in `ordered_types`, so
-            // `BuiltinUses::collect` marked Node used (`Custom(_) => usage.node =
+            // `BuiltinUsage::collect` marked Node used (`Custom(_) => usage.node =
             // true`) and Phase 1 emitted it into `mapping`.
             let node_bc_id = types
                 .lookup(TYPE_NODE)
@@ -227,7 +227,7 @@ fn resolve_field_type(
     types: &mut TypeTableBuilder,
     field_info: &FieldInfo,
     type_ctx: &TypeAnalysis,
-) -> Result<BytecodeTypeId, EmitError> {
+) -> Result<WireTypeId, EmitError> {
     let base_type = types.resolve_type(field_info.type_id, type_ctx)?;
 
     // `Optional` is idempotent. A captured optional whose base already carries
@@ -250,7 +250,7 @@ fn source_is_optional(type_ctx: &TypeAnalysis, type_id: TypeId) -> bool {
     )
 }
 
-struct TypeEmitSlots<'a> {
+struct TypeEmitCtx<'a> {
     type_ctx: &'a TypeAnalysis,
     interner: &'a Interner,
     strings: &'a mut StringTableBuilder,
@@ -317,13 +317,13 @@ impl TypeCollector {
     }
 }
 
-struct BuiltinUses {
+struct BuiltinUsage {
     uses_void: bool,
     uses_node: bool,
     seen: HashSet<TypeId>,
 }
 
-impl BuiltinUses {
+impl BuiltinUsage {
     fn new() -> Self {
         Self {
             uses_void: false,

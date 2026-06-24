@@ -8,7 +8,7 @@ use crate::compiler::lower::ir::{NfaGraph, InstructionIR};
 
 /// The sole creator of the string table — seeds it from the predicate strings
 /// reachable in the instruction stream. Later phases extend or read this table.
-pub fn intern_predicates(ir: &NfaGraph) -> StringTableBuilder {
+pub fn seed_string_table(ir: &NfaGraph) -> StringTableBuilder {
     let mut strings = StringTableBuilder::new();
     intern_predicate_strings(ir.instructions(), &mut strings);
     strings

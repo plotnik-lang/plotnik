@@ -248,14 +248,14 @@ impl CacheAligned {
 /// threading `ir`/`refs` between free functions.
 struct LayoutBuilder<'a> {
     label_to_instr: &'a BTreeMap<Label, &'a InstructionIR>,
-    ir: BlockArena,
+    arena: BlockArena,
 }
 
 impl<'a> LayoutBuilder<'a> {
     fn new(label_to_instr: &'a BTreeMap<Label, &'a InstructionIR>) -> Self {
         Self {
             label_to_instr,
-            ir: BlockArena::new(),
+            arena: BlockArena::new(),
         }
     }
 
@@ -267,19 +267,19 @@ impl<'a> LayoutBuilder<'a> {
                 };
                 let size = instr.size() as u8;
 
-                if self.ir.blocks.is_empty()
+                if self.arena.blocks.is_empty()
                     || !self
-                        .ir
+                        .arena
                         .blocks
                         .last()
                         .expect("blocks is non-empty by the guard above")
                         .can_fit(size)
                 {
-                    self.ir.blocks.push(Block::new());
+                    self.arena.blocks.push(Block::new());
                 }
-                let block_idx = self.ir.blocks.len() - 1;
+                let block_idx = self.arena.blocks.len() - 1;
 
-                self.ir.place(label, block_idx, size);
+                self.arena.place(label, block_idx, size);
             }
         }
     }
@@ -287,12 +287,12 @@ impl<'a> LayoutBuilder<'a> {
     fn block_refs(&self) -> BlockEdges {
         let mut refs = BlockEdges::new();
 
-        for (&label, &block_idx) in &self.ir.label_to_block {
+        for (&label, &block_idx) in &self.arena.label_to_block {
             let Some(instr) = self.label_to_instr.get(&label) else {
                 continue;
             };
             for &succ in instr.successors() {
-                if let Some(&succ_block) = self.ir.label_to_block.get(&succ)
+                if let Some(&succ_block) = self.arena.label_to_block.get(&succ)
                     && succ_block != block_idx
                 {
                     refs.add_edge(block_idx, succ_block);
@@ -312,13 +312,13 @@ impl<'a> LayoutBuilder<'a> {
 
         let mut candidates: Vec<(Label, usize, usize)> = Vec::new();
 
-        for (&label, &block_idx) in &self.ir.label_to_block {
+        for (&label, &block_idx) in &self.arena.label_to_block {
             let Some(instr) = self.label_to_instr.get(&label) else {
                 continue;
             };
 
             for &succ in instr.successors() {
-                if let Some(&succ_block) = self.ir.label_to_block.get(&succ)
+                if let Some(&succ_block) = self.arena.label_to_block.get(&succ)
                     && succ_block > block_idx
                 {
                     candidates.push((succ, succ_block, block_idx));
@@ -329,7 +329,7 @@ impl<'a> LayoutBuilder<'a> {
         candidates.sort_by_key(|(_, succ_block, _)| std::cmp::Reverse(*succ_block));
 
         for (succ_label, _succ_block, pred_block) in candidates {
-            let Some(&current_block) = self.ir.label_to_block.get(&succ_label) else {
+            let Some(&current_block) = self.arena.label_to_block.get(&succ_label) else {
                 continue;
             };
 
@@ -343,7 +343,7 @@ impl<'a> LayoutBuilder<'a> {
                 .map(|c| block_score(pred_block, c, &refs))
                 .collect();
             let best = (0..current_block)
-                .filter(|&c| self.ir.blocks[c].can_fit(size))
+                .filter(|&c| self.arena.blocks[c].can_fit(size))
                 .max_by(|&a, &b| {
                     scores[a]
                         .partial_cmp(&scores[b])
@@ -351,13 +351,13 @@ impl<'a> LayoutBuilder<'a> {
                 });
 
             if let Some(candidate) = best {
-                self.ir.move_to(succ_label, candidate, size);
+                self.arena.move_to(succ_label, candidate, size);
             }
         }
     }
 
     fn finish(self) -> LayoutMap {
-        self.ir.finalize()
+        self.arena.finalize()
     }
 }
 

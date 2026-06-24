@@ -6,21 +6,21 @@
 mod instructions;
 mod layout;
 mod module;
-mod regex;
-mod strings;
+mod regex_table;
+mod string_table;
 pub(in crate::compiler) mod tables;
-mod types;
+mod type_table;
 
 #[cfg(test)]
-mod regex_tests;
+mod regex_table_tests;
 
 use crate::compiler::emit::instructions::encode;
 use crate::compiler::emit::layout::compute_layout;
 use crate::compiler::emit::module::EmitPipeline;
-use crate::compiler::emit::regex::build_regex_table;
-use crate::compiler::emit::strings::intern_predicates;
+use crate::compiler::emit::regex_table::build_regex_table;
+use crate::compiler::emit::string_table::seed_string_table;
 use crate::compiler::emit::tables::{ConstantPool, EmitError, EmitInput};
-use crate::compiler::emit::types::build_type_table;
+use crate::compiler::emit::type_table::build_type_table;
 use crate::compiler::lower::ir::LoweredNfa;
 
 /// Emit bytecode without the debug load self-check. Used by callers that load
@@ -31,7 +31,7 @@ pub(in crate::compiler) fn emit_unchecked(
     lowered_ir: &LoweredNfa,
 ) -> Result<Vec<u8>, EmitError> {
     let compile_result = lowered_ir.raw();
-    let strings = intern_predicates(compile_result);
+    let strings = seed_string_table(compile_result);
     let (types, strings) = build_type_table(&input, strings)?;
     let layout = compute_layout(compile_result)?;
     let mut pipeline = EmitPipeline::new(input, compile_result, strings, types, layout);

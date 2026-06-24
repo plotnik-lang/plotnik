@@ -15,7 +15,7 @@ use crate::compiler::lower::ir::{NfaGraph, LayoutMap};
 
 /// The node-kind, field, and entrypoint wire tables. Built together because all
 /// three intern their names into the one string table.
-pub struct WireTables {
+pub struct ModuleTables {
     node_kinds: Vec<NodeKindEntry>,
     fields: Vec<FieldEntry>,
     entrypoints: Vec<Entrypoint>,
@@ -61,7 +61,7 @@ impl<'a> EmitPipeline<'a> {
     /// Assemble the node-kind, field, and entrypoint tables, interning the last
     /// names into the string table. As the final string-table writer, this is where
     /// the string, type, and table capacities are sealed.
-    pub(in crate::compiler::emit) fn build_tables(&mut self) -> Result<WireTables, EmitError> {
+    pub(in crate::compiler::emit) fn build_tables(&mut self) -> Result<ModuleTables, EmitError> {
         let mut node_kinds: Vec<NodeKindEntry> = Vec::new();
         for (node_kind, node_id) in self.input.grammar.kind_entries() {
             let sym = match node_kind {
@@ -106,7 +106,7 @@ impl<'a> EmitPipeline<'a> {
             return Err(EmitError::TooManyEntrypoints(entrypoints.len()));
         }
 
-        Ok(WireTables {
+        Ok(ModuleTables {
             node_kinds,
             fields,
             entrypoints,
@@ -117,7 +117,7 @@ impl<'a> EmitPipeline<'a> {
     pub(in crate::compiler::emit) fn write_module(
         &self,
         pool: ConstantPool<'_>,
-        tables: &WireTables,
+        tables: &ModuleTables,
         transitions: &[u8],
     ) -> Vec<u8> {
         let (str_blob, str_table) = pool.emit_strings();

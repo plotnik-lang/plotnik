@@ -3,22 +3,22 @@
 //! Owns the bytecode-level type tables (defs, members, names) and the query →
 //! bytecode id mapping, plus the primitive push/resolve operations the type-emit
 //! phase drives. The walk that decides reachability, ordering, and how each
-//! inferred shape lowers lives in `compiler::emit::types`.
+//! inferred shape lowers lives in `compiler::emit::type_table`.
 
 use std::collections::HashMap;
 
-use crate::bytecode::{TypeDef, TypeDefKind, TypeId as BytecodeTypeId, TypeMember, TypeNameEntry};
+use crate::bytecode::{TypeDef, TypeDefKind, TypeId as WireTypeId, TypeMember, TypeNameEntry};
 
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::ids::TypeId;
 
 use super::error::EmitError;
 
-/// Holds the type metadata, mapping query TypeIds to bytecode BytecodeTypeIds.
+/// Holds the type metadata, mapping query TypeIds to wire TypeIds.
 #[derive(Debug)]
 pub struct TypeTableBuilder {
-    /// Map from query TypeId to bytecode BytecodeTypeId.
-    mapping: HashMap<TypeId, BytecodeTypeId>,
+    /// Map from query TypeId to bytecode WireTypeId.
+    mapping: HashMap<TypeId, WireTypeId>,
     /// Type definitions (4 bytes each).
     type_defs: Vec<TypeDef>,
     /// Type members for structs/enums (4 bytes each).
@@ -26,7 +26,7 @@ pub struct TypeTableBuilder {
     /// Type names for named types (4 bytes each).
     type_names: Vec<TypeNameEntry>,
     /// Cache for dynamically created Optional wrappers: base_type -> Optional(base_type)
-    optional_wrappers: HashMap<BytecodeTypeId, BytecodeTypeId>,
+    optional_wrappers: HashMap<WireTypeId, WireTypeId>,
 }
 
 impl TypeTableBuilder {
@@ -42,8 +42,8 @@ impl TypeTableBuilder {
 
     /// Map `query_id` to the next bytecode slot and push `def`; returns the id.
     /// Used to emit builtins and to reserve placeholder slots for custom types.
-    pub fn push_mapped(&mut self, query_id: TypeId, def: TypeDef) -> BytecodeTypeId {
-        let bc_id = BytecodeTypeId(self.type_defs.len() as u16);
+    pub fn push_mapped(&mut self, query_id: TypeId, def: TypeDef) -> WireTypeId {
+        let bc_id = WireTypeId(self.type_defs.len() as u16);
         self.mapping.insert(query_id, bc_id);
         self.type_defs.push(def);
         bc_id
@@ -70,19 +70,19 @@ impl TypeTableBuilder {
     /// Intern an `Optional(base_type)` wrapper, deduplicating by base type.
     pub fn intern_optional(
         &mut self,
-        base_type: BytecodeTypeId,
-    ) -> Result<BytecodeTypeId, EmitError> {
+        base_type: WireTypeId,
+    ) -> Result<WireTypeId, EmitError> {
         if let Some(&optional_id) = self.optional_wrappers.get(&base_type) {
             return Ok(optional_id);
         }
 
-        let optional_id = BytecodeTypeId(self.type_defs.len() as u16);
+        let optional_id = WireTypeId(self.type_defs.len() as u16);
         self.type_defs.push(TypeDef::optional(base_type));
         self.optional_wrappers.insert(base_type, optional_id);
         Ok(optional_id)
     }
 
-    /// Resolve a query TypeId to its underlying bytecode BytecodeTypeId.
+    /// Resolve a query TypeId to its underlying bytecode WireTypeId.
     ///
     /// Ref types are emitted as aliases only when they are definition results. In
     /// every materialized position, follow the reference chain to the actual shape.
@@ -90,7 +90,7 @@ impl TypeTableBuilder {
         &self,
         type_id: TypeId,
         type_ctx: &TypeAnalysis,
-    ) -> Result<BytecodeTypeId, EmitError> {
+    ) -> Result<WireTypeId, EmitError> {
         let type_id = type_ctx.resolve_underlying_type_id(type_id);
         let bc_id = self
             .mapping
@@ -111,7 +111,7 @@ impl TypeTableBuilder {
         Ok(())
     }
 
-    pub fn lookup(&self, type_id: TypeId) -> Option<BytecodeTypeId> {
+    pub fn lookup(&self, type_id: TypeId) -> Option<WireTypeId> {
         self.mapping.get(&type_id).copied()
     }
 
