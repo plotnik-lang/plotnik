@@ -53,6 +53,24 @@ fn is_scope_close_effect(e: &EffectIR) -> bool {
     )
 }
 
+struct SequencePostEffects {
+    item_post: Vec<EffectIR>,
+    exit_post: Vec<EffectIR>,
+}
+
+fn split_sequence_post_effects(post: Vec<EffectIR>) -> SequencePostEffects {
+    let mut item_post = post;
+    let exit_post = match item_post.iter().position(is_scope_close_effect) {
+        Some(split) => item_post.split_off(split),
+        None => vec![],
+    };
+
+    SequencePostEffects {
+        item_post,
+        exit_post,
+    }
+}
+
 /// Parameters threaded through sequence-item compilation.
 ///
 /// `skip_exit`, when present, redirects the skip path of a skippable first item
@@ -170,19 +188,18 @@ impl Compiler<'_> {
 
         // Build chain in reverse: last expression exits to `exit`, each prior exits to next.
         let mut current_exit = exit;
-        let last_post = match last_is_skippable
-            .then(|| capture.post.iter().position(is_scope_close_effect))
-            .flatten()
-        {
-            Some(split) => {
+        let last_post = if last_is_skippable {
+            let post_effects = split_sequence_post_effects(capture.post);
+            if !post_effects.exit_post.is_empty() {
                 current_exit = self.emit_effects_epsilon(
                     current_exit,
-                    capture.post[split..].to_vec(),
+                    post_effects.exit_post,
                     CaptureEffects::default(),
                 );
-                capture.post[..split].to_vec()
             }
-            None => capture.post,
+            post_effects.item_post
+        } else {
+            capture.post
         };
         let count = nav_modes.len();
         // Seed the reverse walk so the last expression sees a trailing anchor as
@@ -289,18 +306,11 @@ impl Compiler<'_> {
         // matched_node and the item's skip null injection, so an epsilon would capture
         // the wrong node or miss matched_node on the skip path. Split positionally so a
         // close and its consumer (e.g. `[EndEnum, Push]`) stay together and in order.
-        let (post_keep, post_close): (Vec<_>, Vec<_>) =
-            match capture.post.iter().position(is_scope_close_effect) {
-                Some(split) => (
-                    capture.post[..split].to_vec(),
-                    capture.post[split..].to_vec(),
-                ),
-                None => (capture.post, vec![]),
-            };
-        let exit = if post_close.is_empty() {
+        let post_effects = split_sequence_post_effects(capture.post);
+        let exit = if post_effects.exit_post.is_empty() {
             exit
         } else {
-            self.emit_effects_epsilon(exit, post_close, CaptureEffects::default())
+            self.emit_effects_epsilon(exit, post_effects.exit_post, CaptureEffects::default())
         };
 
         // Compile the continuation with both navigations, or use exit if there is none.
@@ -322,11 +332,11 @@ impl Compiler<'_> {
             (
                 caller_skip_exit.unwrap_or(exit),
                 exit,
-                CaptureEffects::new_post(post_keep),
+                CaptureEffects::new_post(post_effects.item_post),
             )
         } else {
             // The follower is the last item; `post_keep` rides its continuation.
-            let cont = CaptureEffects::new_post(post_keep);
+            let cont = CaptureEffects::new_post(post_effects.item_post);
             let skip_rest = &items[first_pattern_idx + 1..];
             let skip = self.compile_seq_items(SeqItemsCtx {
                 items: skip_rest,
