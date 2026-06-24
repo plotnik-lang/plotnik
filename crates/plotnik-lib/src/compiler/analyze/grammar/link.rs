@@ -7,40 +7,11 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::core::grammar::Grammar;
-use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
+use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId};
 use indexmap::IndexMap;
 use rowan::TextRange;
 
-pub use crate::compiler::core::GrammarBinding;
-
-/// Mutable accumulator for a [`GrammarBinding`], owned by the link pass.
-#[derive(Default)]
-pub struct GrammarBindingBuilder {
-    node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
-    node_field_ids: IndexMap<Symbol, NodeFieldId>,
-}
-
-impl GrammarBindingBuilder {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Record the first NodeKindId seen for a node kind, keeping the existing entry.
-    pub(crate) fn insert_node_kind_id(&mut self, key: NodeKind<Symbol>, id: NodeKindId) {
-        self.node_kind_ids.entry(key).or_insert(id);
-    }
-
-    /// Record the first NodeFieldId seen for a field, keeping the existing entry.
-    pub(crate) fn insert_node_field_id(&mut self, sym: Symbol, id: NodeFieldId) {
-        self.node_field_ids.entry(sym).or_insert(id);
-    }
-
-    /// Freeze the accumulated resolution tables into an immutable [`GrammarBinding`].
-    pub fn finish(self) -> GrammarBinding {
-        GrammarBinding::new(self.node_kind_ids, self.node_field_ids)
-    }
-}
-
+use super::grammar_binding::GrammarBindingBuilder;
 use super::utils::find_similar;
 use crate::compiler::analyze::Located;
 use crate::compiler::parse::ast::Root;

@@ -2,6 +2,7 @@ use indexmap::IndexMap;
 use rowan::TextRange;
 
 use crate::compiler::analyze::grammar::link;
+use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
 use crate::compiler::analyze::shape::validation::{AstValidationInput, validate_ast};
@@ -277,7 +278,7 @@ impl Query {
     }
 
     pub(crate) fn link(mut self, grammar: &Grammar) -> GrammarBoundQuery {
-        let mut output = link::GrammarBindingBuilder::new();
+        let mut output = GrammarBindingBuilder::new();
         let parsed = &mut self.parsed;
 
         if let Some(analysis) = &mut self.analysis {
@@ -308,7 +309,7 @@ impl TryFrom<&str> for Query {
 
 pub(crate) struct GrammarBoundQuery {
     analyzed: Query,
-    grammar: link::GrammarBinding,
+    grammar: GrammarBinding,
 }
 
 pub struct CheckedQuery {
@@ -412,7 +413,7 @@ impl GrammarBoundQuery {
         self.analyzed.definition_names()
     }
 
-    pub(crate) fn grammar(&self) -> &link::GrammarBinding {
+    pub(crate) fn grammar(&self) -> &GrammarBinding {
         &self.grammar
     }
 

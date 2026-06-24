@@ -1,4 +1,8 @@
-//! Grammar binding: the link pass's resolution table.
+//! Grammar binding: the link pass's resolution table and its builder.
+//!
+//! `GrammarBinding` is the immutable table; `GrammarBindingBuilder` is the
+//! accumulator the link pass fills. The data and its builder live together; the
+//! link pass that drives the builder lives in `link`.
 
 use indexmap::IndexMap;
 
@@ -7,8 +11,7 @@ use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 /// Resolution table produced by the link pass: the query's node-kind and field
 /// symbols bound to the target grammar's ids, in both directions.
 ///
-/// Immutable once linking produces it; build one with `GrammarBindingBuilder`
-/// (owned by the link pass).
+/// Immutable once linking produces it; build one with `GrammarBindingBuilder`.
 #[derive(Clone, Debug, Default)]
 pub struct GrammarBinding {
     node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
@@ -74,5 +77,33 @@ impl GrammarBinding {
     /// Every field binding, in resolution order — the emit field table.
     pub fn field_entries(&self) -> impl ExactSizeIterator<Item = (Symbol, NodeFieldId)> + '_ {
         self.node_field_ids.iter().map(|(&sym, &id)| (sym, id))
+    }
+}
+
+/// Mutable accumulator for a [`GrammarBinding`], owned by the link pass.
+#[derive(Default)]
+pub struct GrammarBindingBuilder {
+    node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
+    node_field_ids: IndexMap<Symbol, NodeFieldId>,
+}
+
+impl GrammarBindingBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record the first NodeKindId seen for a node kind, keeping the existing entry.
+    pub(crate) fn insert_node_kind_id(&mut self, key: NodeKind<Symbol>, id: NodeKindId) {
+        self.node_kind_ids.entry(key).or_insert(id);
+    }
+
+    /// Record the first NodeFieldId seen for a field, keeping the existing entry.
+    pub(crate) fn insert_node_field_id(&mut self, sym: Symbol, id: NodeFieldId) {
+        self.node_field_ids.entry(sym).or_insert(id);
+    }
+
+    /// Freeze the accumulated resolution tables into an immutable [`GrammarBinding`].
+    pub fn finish(self) -> GrammarBinding {
+        GrammarBinding::new(self.node_kind_ids, self.node_field_ids)
     }
 }
