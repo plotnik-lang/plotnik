@@ -99,14 +99,15 @@ impl Parser<'_, '_> {
         // Bare identifiers are not valid expressions; patterns require parentheses
         let span = self.current_span();
         let text = self.current_text();
-        let mut report = self
-            .diagnostics
-            .report(self.source_id, DiagnosticKind::BareIdentifier, span)
-            .fix("wrap in parentheses", format!("({})", text));
-        if starts_uppercase(text) {
-            report = report.detail("references must be parenthesized");
+        let replacement = format!("({text})");
+        let is_ref = starts_uppercase(text);
+        if let Some(mut report) = self.report_at(DiagnosticKind::BareIdentifier, span) {
+            report = report.fix("wrap in parentheses", replacement);
+            if is_ref {
+                report = report.detail("references must be parenthesized");
+            }
+            report.emit();
         }
-        report.emit();
         self.bump_as_error();
     }
 

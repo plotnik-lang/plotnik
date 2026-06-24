@@ -27,10 +27,10 @@ impl Parser<'_, '_> {
                 let end = self.last_non_trivia_end().unwrap_or(start);
                 let span = TextRange::new(start, end);
                 let def_text = &self.source[usize::from(start)..usize::from(end)];
-                self.diagnostics
-                    .report(self.source_id, DiagnosticKind::MissingDefName, span)
-                    .hint(format!("give it a name like `Name = {}`", def_text.trim()))
-                    .emit();
+                let hint = format!("give it a name like `Name = {}`", def_text.trim());
+                if let Some(report) = self.report_at(DiagnosticKind::MissingDefName, span) {
+                    report.hint(hint).emit();
+                }
             }
         }
 

@@ -1,12 +1,14 @@
 //! Parser state machine and low-level operations.
 
+use std::collections::HashSet;
+
 use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::ast::Root;
 use super::cst::{SyntaxKind, SyntaxNode};
-use super::token_set::TokenSet;
 use super::lexer::{Token, token_text};
-use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use super::token_set::TokenSet;
+use crate::compiler::diagnostics::diagnostics::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::Error;
 
@@ -51,7 +53,7 @@ pub struct Parser<'q, 'd> {
     pub(super) builder: GreenNodeBuilder<'static>,
     pub(super) diagnostics: &'d mut Diagnostics,
     pub(super) depth: u32,
-    pub(super) last_diagnostic_pos: Option<TextSize>,
+    pub(super) reported_diagnostic_starts: HashSet<TextSize>,
     delimiter_stack: Vec<OpenDelimiter>,
     pub(super) stall_guard: std::cell::Cell<u32>,
     pub(crate) fuel_remaining: u32,
@@ -77,7 +79,7 @@ impl<'q, 'd> Parser<'q, 'd> {
             builder: GreenNodeBuilder::new(),
             diagnostics,
             depth: 0,
-            last_diagnostic_pos: None,
+            reported_diagnostic_starts: HashSet::new(),
             delimiter_stack: Vec::with_capacity(8),
             stall_guard: std::cell::Cell::new(MAX_STALL_LOOKAHEADS),
             fuel_remaining: config.fuel,
@@ -268,11 +270,7 @@ impl<'q, 'd> Parser<'q, 'd> {
     }
 
     fn should_report(&mut self, pos: TextSize) -> bool {
-        if self.last_diagnostic_pos == Some(pos) {
-            return false;
-        }
-        self.last_diagnostic_pos = Some(pos);
-        true
+        self.reported_diagnostic_starts.insert(pos)
     }
 
     pub(super) fn bump_as_error(&mut self) {
@@ -283,58 +281,53 @@ impl<'q, 'd> Parser<'q, 'd> {
         }
     }
 
-    fn error_ranges(&mut self) -> Option<(TextRange, TextRange)> {
-        let range = self.current_span();
+    pub(super) fn report_at(
+        &mut self,
+        kind: DiagnosticKind,
+        range: TextRange,
+    ) -> Option<DiagnosticBuilder<'_>> {
         if !self.should_report(range.start()) {
             return None;
         }
         let suppression = self.current_suppression_span();
-        Some((range, suppression))
+        Some(
+            self.diagnostics
+                .report(self.source_id, kind, range)
+                .suppression_range(suppression),
+        )
+    }
+
+    pub(super) fn report_current(&mut self, kind: DiagnosticKind) -> Option<DiagnosticBuilder<'_>> {
+        let range = self.current_span();
+        self.report_at(kind, range)
     }
 
     pub(super) fn error(&mut self, kind: DiagnosticKind) {
-        let Some((range, suppression)) = self.error_ranges() else {
-            return;
-        };
-        self.diagnostics
-            .report(self.source_id, kind, range)
-            .suppression_range(suppression)
-            .emit();
+        if let Some(report) = self.report_current(kind) {
+            report.emit();
+        }
     }
 
     pub(super) fn error_msg(&mut self, kind: DiagnosticKind, message: impl Into<String>) {
-        let Some((range, suppression)) = self.error_ranges() else {
+        let Some(report) = self.report_current(kind) else {
             return;
         };
-        self.diagnostics
-            .report(self.source_id, kind, range)
-            .detail(message)
-            .suppression_range(suppression)
-            .emit();
+        report.detail(message).emit();
     }
 
     pub(super) fn error_with_hint(&mut self, kind: DiagnosticKind, hint: impl Into<String>) {
-        let Some((range, suppression)) = self.error_ranges() else {
+        let Some(report) = self.report_current(kind) else {
             return;
         };
-        self.diagnostics
-            .report(self.source_id, kind, range)
-            .hint(hint)
-            .suppression_range(suppression)
-            .emit();
+        report.hint(hint).emit();
     }
 
     /// Emit a diagnostic over an explicit range, deduped by start like `error`.
     /// For diagnostics whose span covers a run already consumed by the caller.
     pub(super) fn error_at(&mut self, kind: DiagnosticKind, range: TextRange) {
-        if !self.should_report(range.start()) {
-            return;
+        if let Some(report) = self.report_at(kind, range) {
+            report.emit();
         }
-        let suppression = self.current_suppression_span();
-        self.diagnostics
-            .report(self.source_id, kind, range)
-            .suppression_range(suppression)
-            .emit();
     }
 
     /// Like [`Self::error_at`], but with an explicit hint overriding the diagnostic default.
@@ -344,15 +337,10 @@ impl<'q, 'd> Parser<'q, 'd> {
         range: TextRange,
         hint: impl Into<String>,
     ) {
-        if !self.should_report(range.start()) {
+        let Some(report) = self.report_at(kind, range) else {
             return;
-        }
-        let suppression = self.current_suppression_span();
-        self.diagnostics
-            .report(self.source_id, kind, range)
-            .hint(hint)
-            .suppression_range(suppression)
-            .emit();
+        };
+        report.hint(hint).emit();
     }
 
     pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind) {
@@ -377,12 +365,8 @@ impl<'q, 'd> Parser<'q, 'd> {
         fix_description: impl Into<String>,
         fix_replacement: impl Into<String>,
     ) {
-        if let Some((range, suppression)) = self.error_ranges() {
-            self.diagnostics
-                .report(self.source_id, kind, range)
-                .suppression_range(suppression)
-                .fix(fix_description, fix_replacement)
-                .emit();
+        if let Some(report) = self.report_current(kind) {
+            report.fix(fix_description, fix_replacement).emit();
         }
         self.bump_as_error();
     }
@@ -430,13 +414,12 @@ impl<'q, 'd> Parser<'q, 'd> {
         }
         // Use full range for easier downstream error suppression
         let full_range = TextRange::new(open.span.start(), current.end());
-        self.diagnostics
-            .report(self.source_id, kind, full_range)
-            .related_to(
-                self.source_id,
-                open.span,
-                format!("{construct} started here"),
-            )
+        let source_id = self.source_id;
+        let Some(report) = self.report_at(kind, full_range) else {
+            return;
+        };
+        report
+            .related_to(source_id, open.span, format!("{construct} started here"))
             .emit();
     }
 
@@ -457,12 +440,9 @@ impl<'q, 'd> Parser<'q, 'd> {
         fix_description: impl Into<String>,
         fix_replacement: impl Into<String>,
     ) {
-        if !self.should_report(range.start()) {
+        let Some(report) = self.report_at(kind, range) else {
             return;
-        }
-        self.diagnostics
-            .report(self.source_id, kind, range)
-            .fix(fix_description, fix_replacement)
-            .emit();
+        };
+        report.fix(fix_description, fix_replacement).emit();
     }
 }

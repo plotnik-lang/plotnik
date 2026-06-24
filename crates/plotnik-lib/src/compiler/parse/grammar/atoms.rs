@@ -37,13 +37,10 @@ impl Parser<'_, '_> {
         self.finish_node();
 
         if !has_content {
-            self.diagnostics
-                .report(
-                    self.source_id,
-                    DiagnosticKind::EmptyAnonymousNode,
-                    TextRange::new(start, end),
-                )
-                .emit();
+            self.error_at(
+                DiagnosticKind::EmptyAnonymousNode,
+                TextRange::new(start, end),
+            );
         }
     }
 

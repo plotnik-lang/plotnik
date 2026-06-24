@@ -68,13 +68,10 @@ impl<'q> Parser<'q, '_> {
                 // Parse as Seq so it works correctly, but warn to encourage {} syntax
                 if self.at_ts(EXPR_FIRST_TOKENS) {
                     self.start_node_at(checkpoint, SyntaxKind::Seq);
-                    self.diagnostics
-                        .report(
-                            self.source_id,
-                            DiagnosticKind::TreeSitterSequenceSyntaxDeprecated,
-                            open_paren_span,
-                        )
-                        .emit();
+                    self.error_at(
+                        DiagnosticKind::TreeSitterSequenceSyntaxDeprecated,
+                        open_paren_span,
+                    );
                 } else {
                     self.start_node_at(checkpoint, SyntaxKind::Tree);
                 }
@@ -346,14 +343,11 @@ impl<'q> Parser<'q, '_> {
             self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY_TOKENS);
             let children_end = self.last_non_trivia_end().unwrap_or(children_start);
             let children_span = TextRange::new(children_start, children_end);
-            self.diagnostics
-                .report(
-                    self.source_id,
-                    DiagnosticKind::ErrorTakesNoArguments,
-                    children_span,
-                )
-                .fix("remove the children", "")
-                .emit();
+            if let Some(report) =
+                self.report_at(DiagnosticKind::ErrorTakesNoArguments, children_span)
+            {
+                report.fix("remove the children", "").emit();
+            }
         }
         self.pop_delimiter();
         self.expect(SyntaxKind::ParenClose, "closing ')' for (ERROR)");
@@ -391,15 +385,11 @@ impl<'q> Parser<'q, '_> {
                 let children_end = self.last_non_trivia_end().unwrap_or(children_start);
                 let children_span = TextRange::new(children_start, children_end);
 
-                self.diagnostics
-                    .report(
-                        self.source_id,
-                        DiagnosticKind::RefCannotHaveChildren,
-                        children_span,
-                    )
-                    .detail(name)
-                    .fix("remove the children", "")
-                    .emit();
+                if let Some(report) =
+                    self.report_at(DiagnosticKind::RefCannotHaveChildren, children_span)
+                {
+                    report.detail(name).fix("remove the children", "").emit();
+                }
                 "closing ')' for tree"
             }
             NodeHead::DefRef(_) => {
