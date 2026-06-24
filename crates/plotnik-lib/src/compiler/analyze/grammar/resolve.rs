@@ -1,6 +1,6 @@
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::visitor::{Visitor, walk};
-use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
+use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Span};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::ast::token_src;
 use crate::compiler::parse::ast::{self, NodePattern};
@@ -48,10 +48,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
             let mut builder = self
                 .diag
-                .report(
-                    located.source(),
+                .report_span(
                     DiagnosticKind::UnknownNodeKind,
-                    type_token.text_range(),
+                    located.span_of(type_token.text_range()),
                 )
                 .detail(type_name);
 
@@ -84,10 +83,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         let mut builder = self
             .diag
-            .report(
-                source,
+            .report_span(
                 DiagnosticKind::UnknownField,
-                name_token.text_range(),
+                Span::new(source, name_token.text_range()),
             )
             .detail(field_name);
 
@@ -174,10 +172,9 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
 
         self.linker
             .diag
-            .report(
-                home,
+            .report_span(
                 DiagnosticKind::UnknownNodeKind,
-                value_token.text_range(),
+                node.span_of(value_token.text_range()),
             )
             .detail(value)
             .emit();

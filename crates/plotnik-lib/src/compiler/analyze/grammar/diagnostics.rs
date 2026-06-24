@@ -18,13 +18,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         let mut builder = self
             .diag
-            .report(span.source, DiagnosticKind::FieldNotOnNodeKind, span.range)
+            .report_span(DiagnosticKind::FieldNotOnNodeKind, span)
             .detail(field_name)
-            .related_to(
-                parent_span.source,
-                parent_span.range,
-                format!("on `{}`", parent_name),
-            );
+            .related_span(parent_span, format!("on `{}`", parent_name));
 
         if valid_fields.is_empty() {
             builder = builder.hint(format!("`{}` has no fields", parent_name));
@@ -58,13 +54,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         let hint = self.child_hint(ctx.id(), &parent_name);
 
         self.diag
-            .report(span.source, DiagnosticKind::InvalidChildType, span.range)
+            .report_span(DiagnosticKind::InvalidChildType, span)
             .detail(child_name)
-            .related_to(
-                parent_span.source,
-                parent_span.range,
-                format!("on `{}`", parent_name),
-            )
+            .related_span(parent_span, format!("on `{}`", parent_name))
             .hint(hint)
             .emit();
     }
@@ -74,13 +66,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         let parent_span = ctx.span();
 
         self.diag
-            .report(span.source, DiagnosticKind::ChildUnderLeafToken, span.range)
+            .report_span(DiagnosticKind::ChildUnderLeafToken, span)
             .detail(&parent_name)
-            .related_to(
-                parent_span.source,
-                parent_span.range,
-                format!("`{}`", parent_name),
-            )
+            .related_span(parent_span, format!("`{}`", parent_name))
             .hint(format!(
                 "a leaf token's content is its text — match it directly `({0})` or by value `({0} == \"foo\")`",
                 parent_name
@@ -142,17 +130,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     ) {
         let hint = self.field_value_hint(ctx.id(), field.id, field.name);
         self.diag
-            .report(
-                span.source,
-                DiagnosticKind::InvalidFieldChildType,
-                span.range,
-            )
+            .report_span(DiagnosticKind::InvalidFieldChildType, span)
             .detail(message)
-            .related_to(
-                field.span.source,
-                field.span.range,
-                format!("field `{}`", field.name),
-            )
+            .related_span(field.span, format!("field `{}`", field.name))
             .hint(hint)
             .emit();
     }

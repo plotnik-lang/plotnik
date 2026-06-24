@@ -17,8 +17,8 @@ use printer::DiagnosticsPrinter;
 
 use message::{Diagnostic, Fix, Related};
 
-pub use crate::compiler::diagnostics::span::Span;
 pub use crate::compiler::diagnostics::source::{SourceId, SourceMap};
+pub use crate::compiler::diagnostics::span::Span;
 
 #[derive(Debug, Clone, Default)]
 pub struct Diagnostics {
@@ -49,6 +49,10 @@ impl Diagnostics {
             diagnostics: self,
             message: Diagnostic::new(source, kind, range),
         }
+    }
+
+    pub fn report_span(&mut self, kind: DiagnosticKind, span: Span) -> DiagnosticBuilder<'_> {
+        self.report(span.source, kind, span.range)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -224,6 +228,10 @@ impl<'d> DiagnosticBuilder<'d> {
     ) -> Self {
         self.message.related.push(Related::new(source, range, msg));
         self
+    }
+
+    pub fn related_span(self, span: Span, msg: impl Into<String>) -> Self {
+        self.related_to(span.source, span.range, msg)
     }
 
     /// Set the suppression range for this diagnostic.

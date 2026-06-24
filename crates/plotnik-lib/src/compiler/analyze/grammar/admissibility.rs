@@ -44,10 +44,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                         || !self.grammar.fields_for_node_kind(ctx.id()).is_empty())
                 {
                     self.diag
-                        .report(
-                            located.source(),
+                        .report_span(
                             DiagnosticKind::PredicateOnNonLeaf,
-                            pred.syntax().text_range(),
+                            located.span_of(pred.syntax().text_range()),
                         )
                         .emit();
                 }
@@ -260,17 +259,12 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         let parent_name = ctx.name(self.grammar);
         let parent_span = ctx.span();
         self.diag
-            .report(
-                located.source(),
+            .report_span(
                 DiagnosticKind::NegatedRequiredField,
-                name_token.text_range(),
+                located.span_of(name_token.text_range()),
             )
             .detail(field_name)
-            .related_to(
-                parent_span.source,
-                parent_span.range,
-                format!("on `{}`", parent_name),
-            )
+            .related_span(parent_span, format!("on `{}`", parent_name))
             .hint(format!(
                 "`-{0}` requires `{0}` to be absent, but every `{1}` has one — drop `-{0}`",
                 field_name, parent_name
@@ -571,10 +565,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             let suggestion = find_similar(sub_name, &all_types, max_dist).map(str::to_string);
             let mut builder = self
                 .diag
-                .report(
-                    located.source(),
+                .report_span(
                     DiagnosticKind::UnknownNodeKind,
-                    sub_token.text_range(),
+                    located.span_of(sub_token.text_range()),
                 )
                 .detail(sub_name);
             if let Some(similar) = suggestion {
@@ -614,18 +607,16 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         let mut builder = self
             .diag
-            .report(
-                located.source(),
+            .report_span(
                 DiagnosticKind::InvalidSubtype,
-                sub_token.text_range(),
+                located.span_of(sub_token.text_range()),
             )
             .detail(format!(
                 "`{}` is not a subtype of `{}`",
                 sub_name, super_name
             ))
-            .related_to(
-                located.source(),
-                super_token.text_range(),
+            .related_span(
+                located.span_of(super_token.text_range()),
                 format!("base type `{}`", super_name),
             );
         if let Some(hint) = kinds_hint {
