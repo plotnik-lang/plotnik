@@ -148,12 +148,3 @@ pub fn no_result_arg() -> Arg {
         .action(ArgAction::SetTrue)
         .help("Skip materialization, show effects only")
 }
-
-pub fn fuel_arg() -> Arg {
-    Arg::new("fuel")
-        .long("fuel")
-        .value_name("N")
-        .default_value("1000000")
-        .value_parser(value_parser!(u32))
-        .help("Execution fuel limit")
-}

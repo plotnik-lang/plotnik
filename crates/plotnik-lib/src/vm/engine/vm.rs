@@ -14,6 +14,7 @@ use super::cursor::{CursorWrapper, SkipPolicy};
 use super::effect::{EffectLog, RuntimeEffect};
 use super::error::{ControlFlow, RuntimeError, Signal};
 use super::frame::FrameArena;
+use super::limits::{ResolvedRuntimeLimits, RuntimeLimitSpec};
 use super::trace::{NoopTracer, Tracer};
 
 /// Tracks the node matched by the most recent `Match`, which node-valued
@@ -48,40 +49,6 @@ impl<'t> MatchedNode<'t> {
     }
 }
 
-/// Runtime limits for query execution.
-#[derive(Clone, Copy, Debug)]
-pub struct ExecLimits {
-    /// Maximum total steps (default: 1,000,000).
-    pub(crate) step_budget: u32,
-    /// Maximum call depth (default: 1,024).
-    pub(crate) recursion_limit: u32,
-}
-
-impl Default for ExecLimits {
-    fn default() -> Self {
-        Self {
-            step_budget: 1_000_000,
-            recursion_limit: 1024,
-        }
-    }
-}
-
-impl ExecLimits {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn step_budget(mut self, fuel: u32) -> Self {
-        self.step_budget = fuel;
-        self
-    }
-
-    pub fn recursion_limit(mut self, limit: u32) -> Self {
-        self.recursion_limit = limit;
-        self
-    }
-}
-
 /// Virtual machine state for query execution.
 pub struct VM<'t> {
     pub(crate) cursor: CursorWrapper<'t>,
@@ -92,13 +59,18 @@ pub struct VM<'t> {
     pub(crate) effects: EffectLog<'t>,
     matched_node: MatchedNode<'t>,
 
-    pub(crate) steps_remaining: u32,
+    pub(crate) steps_used: u64,
     pub(crate) recursion_depth: u32,
-    pub(crate) limits: ExecLimits,
+    pub(crate) limits: ResolvedRuntimeLimits,
 
-    /// Suppression depth counter. When > 0, effects are suppressed (not emitted to log).
-    /// Incremented by SuppressBegin, decremented by SuppressEnd.
-    pub(crate) suppress_depth: u16,
+    /// Suppression nesting on the active match path: when `> 0`, effects are
+    /// suppressed (not emitted to the log). `SuppressBegin` increments,
+    /// `SuppressEnd` decrements. Each open scope lives inside an active call frame,
+    /// so it is bounded by call-nesting depth (`recursion_depth`) times a per-query
+    /// constant — and call depth is itself capped by the `u32`-indexed frame arena.
+    /// A `u16` was far too narrow (deep `@_` recursion overflowed it at 65_536);
+    /// `u64` cannot overflow before the frame arena does.
+    pub(crate) suppress_depth: u64,
 
     /// Target address for Trampoline instruction.
     /// Set from entrypoint before execution; Trampoline jumps to this address.
@@ -111,7 +83,7 @@ pub struct VM<'t> {
 pub struct VMBuilder<'t> {
     source: &'t str,
     tree: &'t Tree,
-    limits: ExecLimits,
+    spec: RuntimeLimitSpec,
 }
 
 impl<'t> VMBuilder<'t> {
@@ -119,26 +91,21 @@ impl<'t> VMBuilder<'t> {
         Self {
             source,
             tree,
-            limits: ExecLimits::default(),
+            spec: RuntimeLimitSpec::default(),
         }
     }
 
-    pub fn limits(mut self, limits: ExecLimits) -> Self {
-        self.limits = limits;
+    /// Set the runtime limit policy. `Auto` limits are sized from the source
+    /// tree's node count when [`Self::build`] resolves them.
+    pub fn limits(mut self, spec: RuntimeLimitSpec) -> Self {
+        self.spec = spec;
         self
     }
 
-    pub fn step_budget(mut self, fuel: u32) -> Self {
-        self.limits = self.limits.step_budget(fuel);
-        self
-    }
-
-    pub fn recursion_limit(mut self, limit: u32) -> Self {
-        self.limits = self.limits.recursion_limit(limit);
-        self
-    }
-
+    /// Build the VM, resolving `Auto` limits against the source's node count.
     pub fn build(self) -> VM<'t> {
+        let source_nodes =
+            u32::try_from(self.tree.root_node().descendant_count()).unwrap_or(u32::MAX);
         VM {
             cursor: CursorWrapper::new(self.tree.walk()),
             ip: 0,
@@ -146,9 +113,9 @@ impl<'t> VMBuilder<'t> {
             checkpoints: CheckpointStack::new(),
             effects: EffectLog::new(),
             matched_node: MatchedNode::default(),
-            steps_remaining: self.limits.step_budget,
+            steps_used: 0,
             recursion_depth: 0,
-            limits: self.limits,
+            limits: self.spec.resolve(source_nodes),
             suppress_depth: 0,
             trampoline_target: 0,
             source: self.source,
@@ -208,7 +175,7 @@ impl<'t> VM<'t> {
             ip: _,                // resumed separately by `backtrack` (cp.ip / call_resume)
             checkpoints: _,       // the stack this checkpoint was just popped from
             matched_node: _,      // intentionally not snapshotted (#383)
-            steps_remaining: _,   // monotonic fuel, never rewound on backtrack
+            steps_used: _,        // monotonic step counter, never rewound on backtrack
             limits: _,            // immutable execution config
             trampoline_target: _, // set once before the run, never mutated
             source: _,            // immutable input text
@@ -250,6 +217,15 @@ impl<'t> VM<'t> {
         Checkpoint::call_retry(self.checkpoint_state(), call_ip, resume)
     }
 
+    /// Live bytes across the three growable runtime arenas (frame, checkpoint,
+    /// and effect heaps) — the quantity the memory ceiling bounds. A sum of
+    /// element-count × element-size; it never allocates.
+    fn heap_bytes(&self) -> u64 {
+        self.frames.byte_footprint()
+            + self.checkpoints.byte_footprint()
+            + self.effects.byte_footprint()
+    }
+
     /// Execute query from entrypoint, returning effect log.
     ///
     /// This is a convenience method that uses `NoopTracer`, which gets
@@ -278,10 +254,23 @@ impl<'t> VM<'t> {
         tracer.trace_enter_preamble();
 
         loop {
-            if self.steps_remaining == 0 {
-                return Err(RuntimeError::ExecFuelExhausted(self.limits.step_budget));
+            // Step ceiling: bound total work. `None` opts out (Unbounded).
+            if let Some(max) = self.limits.max_steps
+                && self.steps_used >= max
+            {
+                return Err(RuntimeError::StepLimitExceeded(max));
             }
-            self.steps_remaining -= 1;
+            self.steps_used += 1;
+
+            // Memory ceiling: bound the live runtime heap, sampled once per
+            // dispatch. Per-step growth is bounded, so this catches blowup
+            // promptly. `None` opts out (Unbounded).
+            if let Some(max) = self.limits.max_memory {
+                let used = self.heap_bytes();
+                if used > max {
+                    return Err(RuntimeError::MemoryLimitExceeded { used, limit: max });
+                }
+            }
 
             // Fetch and dispatch. The IP must address a validated instruction
             // start; a violation localizes a bad jump to the step that wrote `ip`,
@@ -475,16 +464,7 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn check_recursion_limit(&self) -> Result<(), Signal> {
-        if self.recursion_depth >= self.limits.recursion_limit {
-            return Err(RuntimeError::RecursionLimitExceeded(self.recursion_depth).into());
-        }
-        Ok(())
-    }
-
     fn exec_call<T: Tracer>(&mut self, c: Call, tracer: &mut T) -> Result<(), Signal> {
-        self.check_recursion_limit()?;
-
         let skip_policy = self.navigate_to_field_with_policy(c.nav, c.node_field, tracer)?;
 
         // A searchable nav leaves a retry checkpoint so the callee can be
@@ -532,8 +512,6 @@ impl<'t> VM<'t> {
     /// Trampoline is like Call, but the target comes from VM context (`trampoline_target`)
     /// rather than being encoded in the instruction. Used for universal entry preamble.
     fn exec_trampoline<T: Tracer>(&mut self, t: Trampoline, tracer: &mut T) -> Result<(), Signal> {
-        self.check_recursion_limit()?;
-
         // Trampoline doesn't navigate - it's always at root, cursor stays at root
         let saved_depth = self.cursor.depth();
         tracer.trace_call(self.trampoline_target);
@@ -643,40 +621,49 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
+    // Loops rather than self-recurses: a run of contiguous call-retry checkpoints
+    // with exhausted siblings (or failed field constraints) is unwound here in one
+    // call. The depth of that run is set by the source-tree shape and is decoupled
+    // from call depth, so tail-recursion would let untrusted source abort the
+    // process on the native stack (Rust does not guarantee TCO). The `continue`
+    // paths pop without re-pushing, so the checkpoint stack strictly shrinks until
+    // a resume succeeds or it empties — the loop always terminates.
     fn backtrack<T: Tracer>(&mut self, tracer: &mut T) -> Signal {
-        let Some(cp) = self.checkpoints.pop() else {
-            return RuntimeError::NoMatch.into();
-        };
-        tracer.trace_backtrack();
-        self.restore_checkpoint_state(cp.state);
+        loop {
+            let Some(cp) = self.checkpoints.pop() else {
+                return RuntimeError::NoMatch.into();
+            };
+            tracer.trace_backtrack();
+            self.restore_checkpoint_state(cp.state);
 
-        let Some(resume) = cp.call_resume else {
-            self.ip = cp.ip;
-            return ControlFlow::Backtracked.into();
-        };
+            let Some(resume) = cp.call_resume else {
+                self.ip = cp.ip;
+                return ControlFlow::Backtracked.into();
+            };
 
-        // Call retry: advance to the next candidate, then re-enter the callee.
-        // If siblings are exhausted, keep backtracking to an earlier checkpoint.
-        if !self.cursor.continue_search(resume.policy) {
-            return self.backtrack(tracer);
-        }
-        tracer.trace_nav(Nav::Down.sibling_continuation(), self.cursor.node());
-
-        // Enforce the field constraint at the new candidate. A mismatch ends
-        // this Call's search, exactly like the navigate-time field check.
-        if let Some(field_id) = resume.field {
-            if self.cursor.field_id() != Some(field_id) {
-                tracer.trace_field_failure(self.cursor.node());
-                return self.backtrack(tracer);
+            // Call retry: advance to the next candidate, then re-enter the callee.
+            // If siblings are exhausted, keep backtracking to an earlier checkpoint.
+            if !self.cursor.continue_search(resume.policy) {
+                continue;
             }
-            tracer.trace_field_success(field_id);
-        }
+            tracer.trace_nav(Nav::Down.sibling_continuation(), self.cursor.node());
 
-        self.checkpoints
-            .push(self.call_retry_checkpoint(cp.ip, resume));
-        tracer.trace_checkpoint_created(cp.ip);
-        self.enter_callee(resume.target, resume.next, tracer);
-        ControlFlow::Backtracked.into()
+            // Enforce the field constraint at the new candidate. A mismatch ends
+            // this Call's search, exactly like the navigate-time field check.
+            if let Some(field_id) = resume.field {
+                if self.cursor.field_id() != Some(field_id) {
+                    tracer.trace_field_failure(self.cursor.node());
+                    continue;
+                }
+                tracer.trace_field_success(field_id);
+            }
+
+            self.checkpoints
+                .push(self.call_retry_checkpoint(cp.ip, resume));
+            tracer.trace_checkpoint_created(cp.ip);
+            self.enter_callee(resume.target, resume.next, tracer);
+            return ControlFlow::Backtracked.into();
+        }
     }
 
     fn advance_or_backtrack<T: Tracer>(

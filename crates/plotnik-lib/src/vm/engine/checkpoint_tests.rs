@@ -105,3 +105,20 @@ fn interleaved_push_pop() {
         assert_eq!(stack.max_frame_idx(), brute_force_max(&live));
     }
 }
+
+/// Regression: the suppression counter must outrange `u16`. Deep `@_` recursion
+/// increments `VM::suppress_depth` once per open scope and overflowed the former
+/// `u16` at 65_536 — a panic in debug, a silent wrap in release — on valid input.
+/// A checkpoint snapshots that counter, so this field is type-locked to the VM's;
+/// pinning a value past `u16::MAX` here fails to compile if either narrows again.
+#[test]
+fn suppress_depth_outranges_u16() {
+    let state = CheckpointState {
+        descendant_index: 0,
+        effect_watermark: 0,
+        frame_index: None,
+        recursion_depth: 0,
+        suppress_depth: u16::MAX as u64 + 1,
+    };
+    assert_eq!(state.suppress_depth, 65_536);
+}

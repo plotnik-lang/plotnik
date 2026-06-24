@@ -49,6 +49,20 @@ impl<'t> EffectLog<'t> {
         self.0.len()
     }
 
+    /// Live heap bytes: occupied element count × element size. Spare `Vec`
+    /// capacity is not counted — this measures live data, not the allocation.
+    #[inline]
+    pub fn byte_footprint(&self) -> u64 {
+        (self.0.len() * std::mem::size_of::<RuntimeEffect<'t>>()) as u64
+    }
+
+    /// Check if empty.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Truncate to a saved watermark, rolling back effects on backtrack.
     #[inline]
     pub fn truncate(&mut self, watermark: usize) {

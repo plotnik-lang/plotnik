@@ -55,3 +55,8 @@ tempfile = "=3.27.0"
 name = "snapshots"
 path = "tests/mod.rs"
 harness = false
+
+# Property safety net: arbitrary query/source never panics or aborts the pipeline.
+[[test]]
+name = "fuzz_no_panic"
+path = "tests/fuzz_no_panic.rs"

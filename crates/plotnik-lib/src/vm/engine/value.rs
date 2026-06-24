@@ -68,6 +68,39 @@ pub enum Value {
     },
 }
 
+impl Drop for Value {
+    fn drop(&mut self) {
+        // A captured-recursive query nests values as deep as the match, which can
+        // exceed any native-stack budget — so the derived recursive drop could
+        // overflow. Dismantle level by level instead: move each node's children
+        // onto a heap worklist, so every node drops only after it is childless and
+        // its own drop is a leaf.
+        let mut worklist: Vec<Value> = Vec::new();
+        take_children(self, &mut worklist);
+        while let Some(mut value) = worklist.pop() {
+            take_children(&mut value, &mut worklist);
+        }
+    }
+}
+
+/// Move `value`'s direct child values onto `worklist`, leaving `value` childless.
+fn take_children(value: &mut Value, worklist: &mut Vec<Value>) {
+    match value {
+        Value::Array(items) => worklist.append(items),
+        Value::Struct(fields) => worklist.extend(fields.drain(..).map(|(_, v)| v)),
+        Value::Enum { data, .. } => {
+            if let Some(boxed) = data.take() {
+                worklist.push(*boxed);
+            }
+        }
+        Value::Null | Value::Node(_) => {}
+    }
+}
+
+// This recursive impl is not on the deep-output path — output goes through the
+// iterative `Value::format`. If a serde-based output path is ever added, give it a
+// depth guard or an iterative serializer first; a captured-recursive query can nest
+// values past the native stack.
 impl Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -131,25 +164,36 @@ struct FormatCtx<'a> {
     pretty: bool,
 }
 
+/// One emission for the iterative formatter's work stack.
+enum Step<'a> {
+    /// Render a value: a leaf writes directly, a composite pushes its expansion.
+    Value(&'a Value, usize),
+    /// Write a borrowed slice verbatim. Color codes are `'static`; struct keys and
+    /// enum tags borrow the value.
+    Str(&'a str),
+    /// Write a struct field key `"key":` (colored, escaped, trailing space in pretty).
+    Key(&'a str),
+    /// Pretty-mode line break followed by `n` indent spaces.
+    Line(usize),
+}
+
+/// Format a value as colored JSON without native recursion.
+///
+/// Output depth tracks source depth for captured-recursive queries, and a high or
+/// `Unbounded` depth limit lets it exceed any native-stack budget — so the walk
+/// uses an explicit work stack. Emission is byte-identical to the equivalent
+/// recursive printer; the `06-vm` golden fixtures pin that.
 fn format_value(ctx: &mut FormatCtx<'_>, value: &Value, indent: usize) {
-    match value {
-        Value::Null => {
-            let c = ctx.colors;
-            ctx.out.push_str(c.dim);
-            ctx.out.push_str("null");
-            ctx.out.push_str(c.reset);
-        }
-        Value::Node(h) => {
-            format_node_handle(ctx, h, indent);
-        }
-        Value::Array(arr) => {
-            format_array(ctx, arr, indent);
-        }
-        Value::Struct(fields) => {
-            format_struct(ctx, fields, indent);
-        }
-        Value::Enum { tag, data } => {
-            format_enum(ctx, tag, data, indent);
+    let mut stack = vec![Step::Value(value, indent)];
+    while let Some(step) = stack.pop() {
+        match step {
+            Step::Str(s) => ctx.out.push_str(s),
+            Step::Line(n) => {
+                ctx.out.push('\n');
+                push_indent(ctx.out, n);
+            }
+            Step::Key(key) => emit_key(ctx, key),
+            Step::Value(value, indent) => emit_value(ctx, value, indent, &mut stack),
         }
     }
 }
@@ -243,168 +287,156 @@ fn format_node_handle(ctx: &mut FormatCtx<'_>, h: &NodeHandle, indent: usize) {
     out.push_str(c.reset);
 }
 
-fn format_array(ctx: &mut FormatCtx<'_>, arr: &[Value], indent: usize) {
+/// Write a value's own tokens, deferring any nested values onto `stack`. A leaf
+/// writes fully; a composite writes its opener and queues children + closer so the
+/// nesting is driven by the stack rather than the native call stack.
+fn emit_value<'a>(
+    ctx: &mut FormatCtx<'_>,
+    value: &'a Value,
+    indent: usize,
+    stack: &mut Vec<Step<'a>>,
+) {
     let c = ctx.colors;
-    let pretty = ctx.pretty;
-    ctx.out.push_str(c.dim);
-    ctx.out.push('[');
-    ctx.out.push_str(c.reset);
-
-    if arr.is_empty() {
-        ctx.out.push_str(c.dim);
-        ctx.out.push(']');
-        ctx.out.push_str(c.reset);
-        return;
-    }
-
-    let elem_indent = if pretty { indent + 2 } else { 0 };
-
-    for (i, item) in arr.iter().enumerate() {
-        if i > 0 {
+    match value {
+        Value::Null => {
             ctx.out.push_str(c.dim);
-            ctx.out.push(',');
+            ctx.out.push_str("null");
             ctx.out.push_str(c.reset);
         }
-
-        if pretty {
-            ctx.out.push('\n');
-            push_indent(ctx.out, elem_indent);
-        }
-
-        format_value(ctx, item, elem_indent);
-    }
-
-    if pretty {
-        ctx.out.push('\n');
-        push_indent(ctx.out, indent);
-    }
-
-    ctx.out.push_str(c.dim);
-    ctx.out.push(']');
-    ctx.out.push_str(c.reset);
-}
-
-fn format_struct(ctx: &mut FormatCtx<'_>, fields: &[(String, Value)], indent: usize) {
-    let c = ctx.colors;
-    let pretty = ctx.pretty;
-    ctx.out.push_str(c.dim);
-    ctx.out.push('{');
-    ctx.out.push_str(c.reset);
-
-    if fields.is_empty() {
-        ctx.out.push_str(c.dim);
-        ctx.out.push('}');
-        ctx.out.push_str(c.reset);
-        return;
-    }
-
-    let field_indent = if pretty { indent + 2 } else { 0 };
-
-    for (i, (key, value)) in fields.iter().enumerate() {
-        if i > 0 {
+        Value::Node(h) => format_node_handle(ctx, h, indent),
+        Value::Array(arr) => {
             ctx.out.push_str(c.dim);
-            ctx.out.push(',');
+            ctx.out.push('[');
             ctx.out.push_str(c.reset);
+            if arr.is_empty() {
+                ctx.out.push_str(c.dim);
+                ctx.out.push(']');
+                ctx.out.push_str(c.reset);
+                return;
+            }
+            let elem_indent = if ctx.pretty { indent + 2 } else { 0 };
+            let mut deferred = Vec::with_capacity(arr.len() * 3 + 3);
+            for (i, item) in arr.iter().enumerate() {
+                if i > 0 {
+                    deferred.push(Step::Str(c.dim));
+                    deferred.push(Step::Str(","));
+                    deferred.push(Step::Str(c.reset));
+                }
+                if ctx.pretty {
+                    deferred.push(Step::Line(elem_indent));
+                }
+                deferred.push(Step::Value(item, elem_indent));
+            }
+            if ctx.pretty {
+                deferred.push(Step::Line(indent));
+            }
+            deferred.push(Step::Str(c.dim));
+            deferred.push(Step::Str("]"));
+            deferred.push(Step::Str(c.reset));
+            stack.extend(deferred.into_iter().rev());
         }
-
-        if pretty {
-            ctx.out.push('\n');
-            push_indent(ctx.out, field_indent);
+        Value::Struct(fields) => {
+            ctx.out.push_str(c.dim);
+            ctx.out.push('{');
+            ctx.out.push_str(c.reset);
+            if fields.is_empty() {
+                ctx.out.push_str(c.dim);
+                ctx.out.push('}');
+                ctx.out.push_str(c.reset);
+                return;
+            }
+            let field_indent = if ctx.pretty { indent + 2 } else { 0 };
+            let mut deferred = Vec::with_capacity(fields.len() * 4 + 3);
+            for (i, (key, value)) in fields.iter().enumerate() {
+                if i > 0 {
+                    deferred.push(Step::Str(c.dim));
+                    deferred.push(Step::Str(","));
+                    deferred.push(Step::Str(c.reset));
+                }
+                if ctx.pretty {
+                    deferred.push(Step::Line(field_indent));
+                }
+                deferred.push(Step::Key(key));
+                deferred.push(Step::Value(value, field_indent));
+            }
+            if ctx.pretty {
+                deferred.push(Step::Line(indent));
+            }
+            deferred.push(Step::Str(c.dim));
+            deferred.push(Step::Str("}"));
+            deferred.push(Step::Str(c.reset));
+            stack.extend(deferred.into_iter().rev());
         }
+        Value::Enum { tag, data } => {
+            ctx.out.push_str(c.dim);
+            ctx.out.push('{');
+            ctx.out.push_str(c.reset);
+            let field_indent = if ctx.pretty { indent + 2 } else { 0 };
+            if ctx.pretty {
+                ctx.out.push('\n');
+                push_indent(ctx.out, field_indent);
+            }
+            ctx.out.push_str(c.blue);
+            ctx.out.push_str("\"$tag\"");
+            ctx.out.push_str(c.reset);
+            ctx.out.push_str(c.dim);
+            ctx.out.push(':');
+            ctx.out.push_str(c.reset);
+            if ctx.pretty {
+                ctx.out.push(' ');
+            }
+            ctx.out.push_str(c.green);
+            ctx.out.push('"');
+            escape_json_into(ctx.out, tag);
+            ctx.out.push('"');
+            ctx.out.push_str(c.reset);
 
-        ctx.out.push_str(c.blue);
-        ctx.out.push('"');
-        escape_json_into(ctx.out, key);
-        ctx.out.push('"');
-        ctx.out.push_str(c.reset);
-
-        ctx.out.push_str(c.dim);
-        ctx.out.push(':');
-        ctx.out.push_str(c.reset);
-
-        if pretty {
-            ctx.out.push(' ');
+            // Only the `$data` payload nests; the tag above is a leaf written in full.
+            let mut deferred = Vec::new();
+            if let Some(d) = data.as_deref() {
+                ctx.out.push_str(c.dim);
+                ctx.out.push(',');
+                ctx.out.push_str(c.reset);
+                if ctx.pretty {
+                    ctx.out.push('\n');
+                    push_indent(ctx.out, field_indent);
+                }
+                ctx.out.push_str(c.blue);
+                ctx.out.push_str("\"$data\"");
+                ctx.out.push_str(c.reset);
+                ctx.out.push_str(c.dim);
+                ctx.out.push(':');
+                ctx.out.push_str(c.reset);
+                if ctx.pretty {
+                    ctx.out.push(' ');
+                }
+                deferred.push(Step::Value(d, field_indent));
+            }
+            if ctx.pretty {
+                deferred.push(Step::Line(indent));
+            }
+            deferred.push(Step::Str(c.dim));
+            deferred.push(Step::Str("}"));
+            deferred.push(Step::Str(c.reset));
+            stack.extend(deferred.into_iter().rev());
         }
-
-        format_value(ctx, value, field_indent);
     }
-
-    if pretty {
-        ctx.out.push('\n');
-        push_indent(ctx.out, indent);
-    }
-
-    ctx.out.push_str(c.dim);
-    ctx.out.push('}');
-    ctx.out.push_str(c.reset);
 }
 
-fn format_enum(ctx: &mut FormatCtx<'_>, tag: &str, data: &Option<Box<Value>>, indent: usize) {
+/// Write a struct field key `"key":` (colored, escaped, trailing space in pretty).
+fn emit_key(ctx: &mut FormatCtx<'_>, key: &str) {
     let c = ctx.colors;
-    let pretty = ctx.pretty;
-    ctx.out.push_str(c.dim);
-    ctx.out.push('{');
-    ctx.out.push_str(c.reset);
-
-    let field_indent = if pretty { indent + 2 } else { 0 };
-
-    if pretty {
-        ctx.out.push('\n');
-        push_indent(ctx.out, field_indent);
-    }
-
     ctx.out.push_str(c.blue);
-    ctx.out.push_str("\"$tag\"");
+    ctx.out.push('"');
+    escape_json_into(ctx.out, key);
+    ctx.out.push('"');
     ctx.out.push_str(c.reset);
-
     ctx.out.push_str(c.dim);
     ctx.out.push(':');
     ctx.out.push_str(c.reset);
-
-    if pretty {
+    if ctx.pretty {
         ctx.out.push(' ');
     }
-
-    ctx.out.push_str(c.green);
-    ctx.out.push('"');
-    escape_json_into(ctx.out, tag);
-    ctx.out.push('"');
-    ctx.out.push_str(c.reset);
-
-    // Void payloads have no $data field.
-    if let Some(d) = data {
-        ctx.out.push_str(c.dim);
-        ctx.out.push(',');
-        ctx.out.push_str(c.reset);
-
-        if pretty {
-            ctx.out.push('\n');
-            push_indent(ctx.out, field_indent);
-        }
-
-        ctx.out.push_str(c.blue);
-        ctx.out.push_str("\"$data\"");
-        ctx.out.push_str(c.reset);
-
-        ctx.out.push_str(c.dim);
-        ctx.out.push(':');
-        ctx.out.push_str(c.reset);
-
-        if pretty {
-            ctx.out.push(' ');
-        }
-
-        format_value(ctx, d, field_indent);
-    }
-
-    if pretty {
-        ctx.out.push('\n');
-        push_indent(ctx.out, indent);
-    }
-
-    ctx.out.push_str(c.dim);
-    ctx.out.push('}');
-    ctx.out.push_str(c.reset);
 }
 
 /// Escape `s` as a JSON string body, appending to `out`.

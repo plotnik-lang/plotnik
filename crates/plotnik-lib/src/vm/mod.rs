@@ -8,7 +8,7 @@
 mod engine;
 
 pub use engine::{
-    EffectLog, ExecLimits, NodeHandle, NoopTracer, PrintTracer, PrintTracerBuilder, RuntimeEffect,
-    RuntimeError, Tracer, VM, VMBuilder, Value, ValueMaterializer, Verbosity, debug_verify_type,
-    materialize_verified,
+    EffectLog, Limit, NodeHandle, NoopTracer, PrintTracer, PrintTracerBuilder,
+    ResolvedRuntimeLimits, RuntimeEffect, RuntimeError, RuntimeLimitSpec, Tracer, VM, VMBuilder,
+    Value, ValueMaterializer, Verbosity, debug_verify_type, materialize_verified,
 };

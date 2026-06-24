@@ -262,7 +262,8 @@ cargo run -p plotnik -- run -q 'Q = (identifier) @id' app.ts
 cargo run -p plotnik -- run -q 'Q = (identifier) @id' -s 'let x' -l javascript
 ```
 
-Options: `--compact`, `--entry <NAME>`
+Options: `--compact`, `--entry <NAME>`, `--max-steps <auto|unbounded|N>`,
+`--max-memory <auto|unbounded|SIZE>`, `--limits <auto|unbounded>`
 
 ## trace
 
@@ -282,7 +283,9 @@ cargo run -p plotnik -- trace -q 'Q = (identifier) @id' app.ts
 cargo run -p plotnik -- trace query.ptk app.ts --no-result -vv
 ```
 
-Options: `-v` (verbose), `-vv` (very verbose), `--no-result`, `--fuel <N>`
+Options: `-v` (verbose), `-vv` (very verbose), `--no-result`,
+`--max-steps <auto|unbounded|N>`, `--max-memory <auto|unbounded|SIZE>`,
+`--limits <auto|unbounded>`
 
 ## lang
 

@@ -420,7 +420,7 @@ fn run_vm(
             value.format(false, Colors::new(false))
         }
         Err(RuntimeError::NoMatch) => "<no match>".to_string(),
-        // A no-match is a real outcome worth pinning; fuel/recursion exhaustion is
+        // A no-match is a real outcome worth pinning; step/memory exhaustion is
         // not — fail the trial rather than accept a resource limit as golden output.
         Err(err) => return Err(format!("VM run failed for `{entry}`: {err}")),
     };

@@ -5,11 +5,14 @@ use crate::bytecode::ModuleError;
 /// Errors during VM execution.
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
-    #[error("execution fuel exhausted after {0} steps")]
-    ExecFuelExhausted(u32),
+    #[error("exceeded the step limit of {0} steps")]
+    StepLimitExceeded(u64),
 
-    #[error("recursion limit exceeded (depth {0})")]
-    RecursionLimitExceeded(u32),
+    /// `used` is the live-heap measurement at the trip point; because the arenas
+    /// grow geometrically it can overshoot `limit` by up to a doubling, so it is
+    /// reported alongside the ceiling to make the limit tunable.
+    #[error("exceeded the memory limit of {limit} bytes (used {used} bytes)")]
+    MemoryLimitExceeded { used: u64, limit: u64 },
 
     #[error("no match found")]
     NoMatch,

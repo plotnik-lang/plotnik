@@ -37,8 +37,8 @@ pub(crate) struct CheckpointState {
     pub(crate) frame_index: Option<u32>,
     /// Recursion depth at checkpoint.
     pub(crate) recursion_depth: u32,
-    /// Suppression depth at checkpoint.
-    pub(crate) suppress_depth: u16,
+    /// Suppression depth at checkpoint (see `VM::suppress_depth` for its bound).
+    pub(crate) suppress_depth: u64,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -122,6 +122,26 @@ impl CheckpointStack {
     #[inline]
     pub fn max_frame_idx(&self) -> Option<u32> {
         self.max_frame_idx
+    }
+
+    /// Check if empty.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+    }
+
+    /// Get number of checkpoints.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn len(&self) -> usize {
+        self.stack.len()
+    }
+
+    /// Live heap bytes: checkpoint count × checkpoint size.
+    #[inline]
+    pub fn byte_footprint(&self) -> u64 {
+        (self.stack.len() * std::mem::size_of::<Checkpoint>()) as u64
     }
 }
 
