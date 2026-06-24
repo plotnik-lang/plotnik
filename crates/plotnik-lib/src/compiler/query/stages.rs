@@ -474,43 +474,67 @@ impl LinkOutcome {
 
     pub(crate) fn compile_module(self) -> CompiledQuery {
         let mut diagnostics = self.check_compile();
-        let mut bytecode = None;
-        let mut module = None;
 
-        if !diagnostics.has_errors() {
-            match self.emit() {
-                Ok(bytes) => match Module::load(&bytes) {
-                    Ok(loaded) => {
-                        module = Some(loaded);
-                        bytecode = Some(bytes);
-                    }
-                    Err(err) => {
-                        if let Some((source, range)) = self.fallback_span() {
-                            diagnostics
-                                .report(source, DiagnosticKind::BytecodeRejected, range)
-                                .detail(err.to_string())
-                                .emit();
-                        }
-                    }
+        if diagnostics.has_errors() {
+            return CompiledQuery {
+                checked: CheckedQuery {
+                    query: self,
+                    diagnostics,
                 },
-                Err(err) => {
-                    if let Some((source, range)) = self.fallback_span() {
-                        diagnostics
-                            .report(source, DiagnosticKind::EmitFailed, range)
-                            .detail(err.to_string())
-                            .emit();
-                    }
-                }
-            }
+                bytecode: None,
+                module: None,
+            };
         }
+
+        let bytes = match self.emit() {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                if let Some((source, range)) = self.fallback_span() {
+                    diagnostics
+                        .report(source, DiagnosticKind::EmitFailed, range)
+                        .detail(err.to_string())
+                        .emit();
+                }
+
+                return CompiledQuery {
+                    checked: CheckedQuery {
+                        query: self,
+                        diagnostics,
+                    },
+                    bytecode: None,
+                    module: None,
+                };
+            }
+        };
+
+        let module = match Module::load(&bytes) {
+            Ok(loaded) => loaded,
+            Err(err) => {
+                if let Some((source, range)) = self.fallback_span() {
+                    diagnostics
+                        .report(source, DiagnosticKind::BytecodeRejected, range)
+                        .detail(err.to_string())
+                        .emit();
+                }
+
+                return CompiledQuery {
+                    checked: CheckedQuery {
+                        query: self,
+                        diagnostics,
+                    },
+                    bytecode: None,
+                    module: None,
+                };
+            }
+        };
 
         CompiledQuery {
             checked: CheckedQuery {
                 query: self,
                 diagnostics,
             },
-            bytecode,
-            module,
+            bytecode: Some(bytes),
+            module: Some(module),
         }
     }
 
