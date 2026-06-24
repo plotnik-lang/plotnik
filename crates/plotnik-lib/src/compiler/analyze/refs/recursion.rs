@@ -302,9 +302,8 @@ fn pattern_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
             if q.is_optional() {
                 return true;
             }
-            q.inner()
-                .map(|inner| pattern_has_escape(&inner, scc_names))
-                .unwrap_or(true)
+            let inner = q.inner().expect("quantified pattern has inner after parse");
+            pattern_has_escape(&inner, scc_names)
         }
         Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => pattern
             .children()
@@ -324,9 +323,9 @@ fn pattern_consumes_input(pattern: &Pattern) -> bool {
         Pattern::SeqPattern(_) => pattern.children().iter().any(pattern_consumes_input),
         Pattern::QuantifiedPattern(q) => {
             !q.is_optional()
-                && q.inner()
-                    .map(|i| pattern_consumes_input(&i))
-                    .unwrap_or(false)
+                && pattern_consumes_input(
+                    &q.inner().expect("quantified pattern has inner after parse"),
+                )
         }
         Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => {
             pattern.children().iter().all(pattern_consumes_input)

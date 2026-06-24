@@ -368,7 +368,9 @@ impl MatchIR {
             + predicate_slots
             + self.successors.len();
 
-        select_match_opcode(slots).map(|op| op.size()).unwrap_or(64)
+        select_match_opcode(slots)
+            .expect("instruction fits a match opcode")
+            .size()
     }
 
     /// Check if this is an epsilon transition (no node interaction).

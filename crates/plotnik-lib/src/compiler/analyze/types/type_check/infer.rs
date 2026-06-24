@@ -685,11 +685,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     fn quantifier_kind(&self, quant: &QuantifiedPattern) -> QuantifierKind {
         // Shared with `TypeAnalysis::capture_kind` and `compile`'s implicit-array gate so the
-        // three never disagree on a quantifier's arity. A malformed operator-less
-        // quantifier can't reach inference, so the fallback is unreachable in practice.
+        // three never disagree on a quantifier's arity.
         quant
             .quantifier_kind()
-            .unwrap_or(QuantifierKind::ZeroOrMore)
+            .expect("quantifier kind resolved before inference")
     }
 }
 

@@ -56,7 +56,7 @@ pub fn run(args: InferArgs) -> CliResult {
         .colored(use_colors);
     let output = compiled
         .to_typescript(config)
-        .ok_or_else(|| CliError::fatal("compile produced no module"))?;
+        .expect("dry_run guarantees a module");
 
     if let Some(ref path) = args.output {
         fs::write(path, &output)

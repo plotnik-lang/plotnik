@@ -18,7 +18,7 @@ pub enum PredicateOp {
 impl PredicateOp {
     /// Decode from bytecode representation, panicking on an unknown byte.
     pub fn from_byte(b: u8) -> Self {
-        Self::try_from_byte(b).unwrap_or_else(|| panic!("invalid predicate op byte: {b}"))
+        Self::try_from_byte(b).expect("invalid predicate op byte")
     }
 
     /// Non-panicking decode, for validating an untrusted instruction stream at

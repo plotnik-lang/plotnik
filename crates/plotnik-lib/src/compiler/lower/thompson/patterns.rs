@@ -750,10 +750,13 @@ impl NfaBuilder<'_> {
         }
 
         if let Some(regex) = pred.regex() {
-            // Get pattern text by stripping `/` delimiters from CST text
             let text: String = regex.syntax().text().into();
-            let without_prefix = text.strip_prefix('/').unwrap_or(&text);
-            let pattern = without_prefix.strip_suffix('/').unwrap_or(without_prefix);
+            let without_prefix = text
+                .strip_prefix('/')
+                .expect("regex token is '/'-delimited after parse");
+            let pattern = without_prefix
+                .strip_suffix('/')
+                .expect("regex token is '/'-delimited after parse");
             return Some(PredicateIR::regex(op, pattern));
         }
 
