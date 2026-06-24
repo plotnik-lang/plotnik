@@ -37,12 +37,11 @@ impl<'q> Parser<'q, '_> {
         let name = ident.text();
         if name.contains(['.', '-']) || name.chars().any(|c| c.is_ascii_uppercase()) {
             let suggested = to_snake_case(&name.replace(['.', '-'], "_"));
-            self.error_with_fix(
-                DiagnosticKind::CaptureNameInvalid,
-                ident.span(),
-                format!("use `@{suggested}`"),
-                format!("@{suggested}"),
-            );
+            if let Some(report) = self.report_at(DiagnosticKind::CaptureNameInvalid, ident.span()) {
+                report
+                    .fix(format!("use `@{suggested}`"), format!("@{suggested}"))
+                    .emit();
+            }
         }
     }
 
@@ -51,12 +50,9 @@ impl<'q> Parser<'q, '_> {
         let name = ident.text();
         if !starts_uppercase(name) || name.contains(['_', '-', '.']) {
             let suggested = to_pascal_case(name);
-            self.error_with_fix(
-                DiagnosticKind::DefNameInvalid,
-                ident.span(),
-                format!("use `{suggested}`"),
-                suggested,
-            );
+            if let Some(report) = self.report_at(DiagnosticKind::DefNameInvalid, ident.span()) {
+                report.fix(format!("use `{suggested}`"), suggested).emit();
+            }
         }
     }
 
@@ -66,12 +62,9 @@ impl<'q> Parser<'q, '_> {
         let name = ident.text();
         if name.contains(['_', '-', '.']) {
             let suggested = to_pascal_case(name);
-            self.error_with_fix(
-                DiagnosticKind::BranchLabelInvalid,
-                ident.span(),
-                format!("use `{suggested}`"),
-                suggested,
-            );
+            if let Some(report) = self.report_at(DiagnosticKind::BranchLabelInvalid, ident.span()) {
+                report.fix(format!("use `{suggested}`"), suggested).emit();
+            }
         }
     }
 
@@ -80,12 +73,9 @@ impl<'q> Parser<'q, '_> {
         let name = ident.text();
         if name.contains(['.', '-']) || starts_uppercase(name) {
             let suggested = to_snake_case(&name.replace(['.', '-'], "_"));
-            self.error_with_fix(
-                DiagnosticKind::FieldNameInvalid,
-                ident.span(),
-                format!("use `{suggested}`"),
-                suggested,
-            );
+            if let Some(report) = self.report_at(DiagnosticKind::FieldNameInvalid, ident.span()) {
+                report.fix(format!("use `{suggested}`"), suggested).emit();
+            }
         }
     }
 
@@ -94,12 +84,9 @@ impl<'q> Parser<'q, '_> {
         let name = ident.text();
         if name.contains(['.', '-']) || !starts_uppercase(name) {
             let suggested = to_pascal_case(name);
-            self.error_with_fix(
-                DiagnosticKind::TypeNameInvalid,
-                ident.span(),
-                format!("use `::{suggested}`"),
-                suggested,
-            );
+            if let Some(report) = self.report_at(DiagnosticKind::TypeNameInvalid, ident.span()) {
+                report.fix(format!("use `::{suggested}`"), suggested).emit();
+            }
         }
     }
 }

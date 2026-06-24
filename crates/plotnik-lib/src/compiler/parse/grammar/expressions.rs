@@ -29,10 +29,9 @@ impl Parser<'_, '_> {
             return false;
         }
 
-        self.error_and_bump_with_hint(
-            DiagnosticKind::UnexpectedToken,
-            "try `(node)`, `[a b]`, `{a b}`, `\"literal\"`, or `_`",
-        );
+        self.report_current_and_bump(DiagnosticKind::UnexpectedToken, |report| {
+            report.hint("try `(node)`, `[a b]`, `{a b}`, `\"literal\"`, or `_`")
+        });
         false
     }
 
@@ -66,7 +65,9 @@ impl Parser<'_, '_> {
             return;
         }
 
-        self.error(DiagnosticKind::ExpectedExpression);
+        if let Some(report) = self.report_current(DiagnosticKind::ExpectedExpression) {
+            report.emit();
+        }
     }
 
     pub(crate) fn parse_pattern(&mut self) {
@@ -134,20 +135,16 @@ impl Parser<'_, '_> {
     fn reject_anchor_suffixes(&mut self) {
         loop {
             if self.at_ts(QUANTIFIERS) {
-                self.error_and_bump_with_fix(
-                    DiagnosticKind::QuantifiedAnchor,
-                    "remove the quantifier",
-                    "",
-                );
+                self.report_current_and_bump(DiagnosticKind::QuantifiedAnchor, |report| {
+                    report.fix("remove the quantifier", "")
+                });
             } else if matches!(
                 self.current(),
                 SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture
             ) {
-                self.error_and_bump_with_fix(
-                    DiagnosticKind::CapturedAnchor,
-                    "remove the capture",
-                    "",
-                );
+                self.report_current_and_bump(DiagnosticKind::CapturedAnchor, |report| {
+                    report.fix("remove the capture", "")
+                });
             } else {
                 return;
             }

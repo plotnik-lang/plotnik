@@ -256,10 +256,9 @@ impl<'q, 'd> Parser<'q, 'd> {
         if self.eat_token(kind) {
             return true;
         }
-        self.error_msg(
-            DiagnosticKind::UnexpectedToken,
-            format!("expected {}", what),
-        );
+        if let Some(report) = self.report_current(DiagnosticKind::UnexpectedToken) {
+            report.detail(format!("expected {}", what)).emit();
+        }
         false
     }
 
@@ -303,71 +302,20 @@ impl<'q, 'd> Parser<'q, 'd> {
         self.report_at(kind, range)
     }
 
-    pub(super) fn error(&mut self, kind: DiagnosticKind) {
-        if let Some(report) = self.report_current(kind) {
-            report.emit();
-        }
-    }
-
-    pub(super) fn error_msg(&mut self, kind: DiagnosticKind, message: impl Into<String>) {
-        let Some(report) = self.report_current(kind) else {
-            return;
-        };
-        report.detail(message).emit();
-    }
-
-    pub(super) fn error_with_hint(&mut self, kind: DiagnosticKind, hint: impl Into<String>) {
-        let Some(report) = self.report_current(kind) else {
-            return;
-        };
-        report.hint(hint).emit();
-    }
-
-    /// Emit a diagnostic over an explicit range, deduped by start like `error`.
-    /// For diagnostics whose span covers a run already consumed by the caller.
-    pub(super) fn error_at(&mut self, kind: DiagnosticKind, range: TextRange) {
-        if let Some(report) = self.report_at(kind, range) {
-            report.emit();
-        }
-    }
-
-    /// Like [`Self::error_at`], but with an explicit hint overriding the diagnostic default.
-    pub(super) fn error_at_with_hint(
-        &mut self,
-        kind: DiagnosticKind,
-        range: TextRange,
-        hint: impl Into<String>,
-    ) {
-        let Some(report) = self.report_at(kind, range) else {
-            return;
-        };
-        report.hint(hint).emit();
-    }
-
     pub(super) fn error_and_bump(&mut self, kind: DiagnosticKind) {
-        self.error(kind);
+        if let Some(report) = self.report_current(kind) {
+            report.emit();
+        }
         self.bump_as_error();
     }
 
-    pub(super) fn error_and_bump_with_hint(
+    pub(super) fn report_current_and_bump(
         &mut self,
         kind: DiagnosticKind,
-        hint: impl Into<String>,
-    ) {
-        self.error_with_hint(kind, hint);
-        self.bump_as_error();
-    }
-
-    /// Like [`Self::error_and_bump`], but attaches a machine-applicable fix over the
-    /// offending token before consuming it.
-    pub(super) fn error_and_bump_with_fix(
-        &mut self,
-        kind: DiagnosticKind,
-        fix_description: impl Into<String>,
-        fix_replacement: impl Into<String>,
+        f: impl FnOnce(DiagnosticBuilder<'_>) -> DiagnosticBuilder<'_>,
     ) {
         if let Some(report) = self.report_current(kind) {
-            report.fix(fix_description, fix_replacement).emit();
+            f(report).emit();
         }
         self.bump_as_error();
     }
@@ -433,20 +381,5 @@ impl<'q, 'd> Parser<'q, 'd> {
             .rev()
             .find(|t| !t.kind.is_trivia())
             .map(|t| t.span.end())
-    }
-
-    /// Report a diagnostic with a suggested replacement for `range`.
-    /// The replacement must be valid as a verbatim substitute for the range's text.
-    pub(super) fn error_with_fix(
-        &mut self,
-        kind: DiagnosticKind,
-        range: TextRange,
-        fix_description: impl Into<String>,
-        fix_replacement: impl Into<String>,
-    ) {
-        let Some(report) = self.report_at(kind, range) else {
-            return;
-        };
-        report.fix(fix_description, fix_replacement).emit();
     }
 }

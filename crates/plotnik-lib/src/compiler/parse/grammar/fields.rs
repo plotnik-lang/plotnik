@@ -17,8 +17,12 @@ impl Parser<'_, '_> {
         if self.at(SyntaxKind::Id) {
             let ident = self.bump_ident();
             self.validate_type_name(ident);
-        } else {
-            self.error(DiagnosticKind::ExpectedTypeName);
+            self.finish_node();
+            return;
+        }
+
+        if let Some(report) = self.report_current(DiagnosticKind::ExpectedTypeName) {
+            report.emit();
         }
 
         self.finish_node();
@@ -33,12 +37,9 @@ impl Parser<'_, '_> {
         self.start_node(SyntaxKind::Type);
 
         let span = self.current_span();
-        self.error_with_fix(
-            DiagnosticKind::InvalidTypeAnnotationSyntax,
-            span,
-            "use `::`",
-            "::",
-        );
+        if let Some(report) = self.report_at(DiagnosticKind::InvalidTypeAnnotationSyntax, span) {
+            report.fix("use `::`", "::").emit();
+        }
 
         self.bump();
 
@@ -58,19 +59,18 @@ impl Parser<'_, '_> {
 
         if self.at(SyntaxKind::Negation) {
             let span = self.current_span();
-            self.error_with_fix(
-                DiagnosticKind::NegationSyntaxDeprecated,
-                span,
-                "use `-`",
-                "-",
-            );
+            if let Some(report) = self.report_at(DiagnosticKind::NegationSyntaxDeprecated, span) {
+                report.fix("use `-`", "-").emit();
+            }
             self.bump();
         } else {
             self.expect(SyntaxKind::Minus, "'-' for negated field");
         }
 
         if !self.at(SyntaxKind::Id) {
-            self.error(DiagnosticKind::ExpectedFieldName);
+            if let Some(report) = self.report_current(DiagnosticKind::ExpectedFieldName) {
+                report.emit();
+            }
             self.finish_node();
             return;
         }
@@ -132,7 +132,9 @@ impl Parser<'_, '_> {
 
         self.bump();
         let span = self.current_span();
-        self.error_with_fix(DiagnosticKind::InvalidFieldEquals, span, "use `:`", ":");
+        if let Some(report) = self.report_at(DiagnosticKind::InvalidFieldEquals, span) {
+            report.fix("use `:`", ":").emit();
+        }
         self.bump();
 
         self.parse_required_pattern_no_suffix();

@@ -68,10 +68,12 @@ impl<'q> Parser<'q, '_> {
                 // Parse as Seq so it works correctly, but warn to encourage {} syntax
                 if self.at_ts(EXPR_FIRST_TOKENS) {
                     self.start_node_at(checkpoint, SyntaxKind::Seq);
-                    self.error_at(
+                    if let Some(report) = self.report_at(
                         DiagnosticKind::TreeSitterSequenceSyntaxDeprecated,
                         open_paren_span,
-                    );
+                    ) {
+                        report.emit();
+                    }
                 } else {
                     self.start_node_at(checkpoint, SyntaxKind::Tree);
                 }
@@ -138,26 +140,31 @@ impl<'q> Parser<'q, '_> {
         }
 
         if has_subtype {
-            self.error_with_fix(
-                DiagnosticKind::SupertypeSlashDeprecated,
-                sep_span,
-                "use `#`",
-                "#",
-            );
-        } else {
-            self.error(DiagnosticKind::ExpectedSubtype);
+            if let Some(report) = self.report_at(DiagnosticKind::SupertypeSlashDeprecated, sep_span)
+            {
+                report.fix("use `#`", "#").emit();
+            }
+            return;
+        }
+
+        if let Some(report) = self.report_current(DiagnosticKind::ExpectedSubtype) {
+            report.emit();
         }
     }
 
     fn reject_ref_category_refinement(&mut self, checkpoint: Checkpoint, sep: SyntaxKind) {
         self.start_node_at(checkpoint, SyntaxKind::Tree);
-        self.error(DiagnosticKind::InvalidSupertypeSyntax);
+        if let Some(report) = self.report_current(DiagnosticKind::InvalidSupertypeSyntax) {
+            report.emit();
+        }
 
         let sep_span = self.current_span();
         let has_subtype = self.consume_category_refinement_subtype(sep_span);
 
         if sep == SyntaxKind::Slash && !has_subtype {
-            self.error(DiagnosticKind::ExpectedSubtype);
+            if let Some(report) = self.report_current(DiagnosticKind::ExpectedSubtype) {
+                report.emit();
+            }
         }
     }
 
@@ -271,9 +278,13 @@ impl<'q> Parser<'q, '_> {
     /// for the ones with a real equivalent. `#set!`/`#is?`/`#any-of?` have none, so they get
     /// the bare "not supported" message rather than a misleading suggestion.
     fn report_unsupported_predicate(&mut self, span: TextRange, name: &str) {
+        let Some(report) = self.report_at(DiagnosticKind::UnsupportedPredicate, span) else {
+            return;
+        };
+
         match predicate_suggestion(name) {
-            Some(hint) => self.error_at_with_hint(DiagnosticKind::UnsupportedPredicate, span, hint),
-            None => self.error_at(DiagnosticKind::UnsupportedPredicate, span),
+            Some(hint) => report.hint(hint).emit(),
+            None => report.emit(),
         }
     }
 
@@ -300,7 +311,9 @@ impl<'q> Parser<'q, '_> {
                 self.parse_regex_literal();
             }
             _ => {
-                self.error(DiagnosticKind::ExpectedPredicateValue);
+                if let Some(report) = self.report_current(DiagnosticKind::ExpectedPredicateValue) {
+                    report.emit();
+                }
             }
         }
 
@@ -345,7 +358,9 @@ impl<'q> Parser<'q, '_> {
         if found_close {
             self.bump(); // closing '/'
         } else {
-            self.error(DiagnosticKind::UnclosedRegex);
+            if let Some(report) = self.report_current(DiagnosticKind::UnclosedRegex) {
+                report.emit();
+            }
         }
 
         self.finish_node();
@@ -458,10 +473,9 @@ impl<'q> Parser<'q, '_> {
             if self.at_ts(recovery) {
                 break;
             }
-            self.error_and_bump_with_hint(
-                DiagnosticKind::UnexpectedToken,
-                "expected a child node, or `)` to close",
-            );
+            self.report_current_and_bump(DiagnosticKind::UnexpectedToken, |report| {
+                report.hint("expected a child node, or `)` to close")
+            });
         }
     }
 
@@ -523,10 +537,9 @@ impl<'q> Parser<'q, '_> {
             if self.at_ts(ALT_RECOVERY_TOKENS) {
                 break;
             }
-            self.error_and_bump_with_hint(
-                DiagnosticKind::UnexpectedToken,
-                "expected a branch, or `]` to close",
-            );
+            self.report_current_and_bump(DiagnosticKind::UnexpectedToken, |report| {
+                report.hint("expected a branch, or `]` to close")
+            });
         }
     }
 
@@ -552,12 +565,9 @@ impl<'q> Parser<'q, '_> {
         let label_text = self.current_text();
         let pascal = to_pascal_case(label_text);
 
-        self.error_with_fix(
-            DiagnosticKind::BranchLabelInvalid,
-            span,
-            format!("use `{}`", pascal),
-            pascal,
-        );
+        if let Some(report) = self.report_at(DiagnosticKind::BranchLabelInvalid, span) {
+            report.fix(format!("use `{}`", pascal), pascal).emit();
+        }
 
         self.bump();
         self.expect(SyntaxKind::Colon, "':' after branch label");
@@ -593,12 +603,9 @@ impl<'q> Parser<'q, '_> {
                 kind
             ),
         };
-        self.error_with_fix(
-            DiagnosticKind::InvalidSeparator,
-            span,
-            format!("remove the `{}`", char_name),
-            "",
-        );
+        if let Some(report) = self.report_at(DiagnosticKind::InvalidSeparator, span) {
+            report.fix(format!("remove the `{}`", char_name), "").emit();
+        }
         self.bump_as_error();
     }
 }
