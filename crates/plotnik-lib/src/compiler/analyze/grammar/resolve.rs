@@ -48,7 +48,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
             let mut builder = self
                 .diag
-                .report_span(
+                .report(
                     DiagnosticKind::UnknownNodeKind,
                     located.span_of(type_token.text_range()),
                 )
@@ -83,7 +83,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         let mut builder = self
             .diag
-            .report_span(
+            .report(
                 DiagnosticKind::UnknownField,
                 Span::new(source, name_token.text_range()),
             )
@@ -172,7 +172,7 @@ impl Visitor for SymbolResolver<'_, '_, '_> {
 
         self.linker
             .diag
-            .report_span(
+            .report(
                 DiagnosticKind::UnknownNodeKind,
                 node.span_of(value_token.text_range()),
             )

@@ -2,6 +2,7 @@ use rowan::TextRange;
 
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
 use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{FieldPattern, Pattern, QuantifiedPattern};
 
 use super::super::types::{OutputFlow, PatternResult, TypeId};
@@ -21,7 +22,7 @@ impl InferVisitor<'_, '_> {
             .report(DiagnosticKind::FieldSequenceValue, value.text_range())
             .detail(field_name);
         if let Some((src, range)) = related {
-            builder = builder.related_to(src, range, "defined here");
+            builder = builder.related_to(Span::new(src, range), "defined here");
         }
 
         builder.emit();
@@ -114,7 +115,7 @@ impl InferVisitor<'_, '_> {
                 outputs.len()
             ));
         for (range, _) in outputs {
-            builder = builder.related_to(source, *range, "produces a value");
+            builder = builder.related_to(Span::new(source, *range), "produces a value");
         }
         builder.emit();
     }

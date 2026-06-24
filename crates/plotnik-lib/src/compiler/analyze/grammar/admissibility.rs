@@ -44,7 +44,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                         || !self.grammar.fields_for_node_kind(ctx.id()).is_empty())
                 {
                     self.diag
-                        .report_span(
+                        .report(
                             DiagnosticKind::PredicateOnNonLeaf,
                             located.span_of(pred.syntax().text_range()),
                         )
@@ -259,12 +259,12 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         let parent_name = ctx.name(self.grammar);
         let parent_span = ctx.span();
         self.diag
-            .report_span(
+            .report(
                 DiagnosticKind::NegatedRequiredField,
                 located.span_of(name_token.text_range()),
             )
             .detail(field_name)
-            .related_span(parent_span, format!("on `{}`", parent_name))
+            .related_to(parent_span, format!("on `{}`", parent_name))
             .hint(format!(
                 "`-{0}` requires `{0}` to be absent, but every `{1}` has one — drop `-{0}`",
                 field_name, parent_name
@@ -565,7 +565,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             let suggestion = find_similar(sub_name, &all_types, max_dist).map(str::to_string);
             let mut builder = self
                 .diag
-                .report_span(
+                .report(
                     DiagnosticKind::UnknownNodeKind,
                     located.span_of(sub_token.text_range()),
                 )
@@ -607,7 +607,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         let mut builder = self
             .diag
-            .report_span(
+            .report(
                 DiagnosticKind::InvalidSubtype,
                 located.span_of(sub_token.text_range()),
             )
@@ -615,7 +615,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 "`{}` is not a subtype of `{}`",
                 sub_name, super_name
             ))
-            .related_span(
+            .related_to(
                 located.span_of(super_token.text_range()),
                 format!("base type `{}`", super_name),
             );

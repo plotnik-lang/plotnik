@@ -22,6 +22,7 @@ use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{
     Branch, CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern,
@@ -74,7 +75,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     fn report(&mut self, kind: DiagnosticKind, range: TextRange) -> DiagnosticBuilder<'_> {
-        self.ctx.diag.report(self.source, kind, range)
+        self.ctx.diag.report(kind, Span::new(self.source, range))
     }
 
     /// Infer the PatternResult for an expression, caching the result.

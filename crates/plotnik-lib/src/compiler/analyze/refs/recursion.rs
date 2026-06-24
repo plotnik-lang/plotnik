@@ -169,14 +169,14 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
             None
         };
 
-        let mut builder = self.diag.report(primary.source, kind, primary.range);
+        let mut builder = self.diag.report(kind, primary);
 
         for (span, msg) in chain {
-            builder = builder.related_to(span.source, span.range, msg);
+            builder = builder.related_to(span, msg);
         }
 
         if let Some((span, msg)) = related_def {
-            builder = builder.related_to(span.source, span.range, msg);
+            builder = builder.related_to(span, msg);
         }
 
         builder.emit();

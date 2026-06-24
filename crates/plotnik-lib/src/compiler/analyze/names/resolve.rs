@@ -8,6 +8,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::shape::validation::ValidatedAst;
 use crate::compiler::analyze::visitor::Visitor;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{self, token_src};
 
 use super::symbol_table::{SymbolTable, SymbolTableBuilder};
@@ -59,9 +60,8 @@ impl Visitor for ReferenceResolver<'_, '_, '_> {
         if self.builder.contains(name) {
             self.diag
                 .report(
-                    def.source(),
                     DiagnosticKind::DuplicateDefinition,
-                    token.text_range(),
+                    Span::new(def.source(), token.text_range()),
                 )
                 .detail(name)
                 .emit();
@@ -89,9 +89,8 @@ impl Visitor for ReferenceValidator<'_, '_> {
 
         self.diag
             .report(
-                r.source(),
                 DiagnosticKind::UndefinedReference,
-                name_token.text_range(),
+                Span::new(r.source(), name_token.text_range()),
             )
             .detail(name)
             .emit();

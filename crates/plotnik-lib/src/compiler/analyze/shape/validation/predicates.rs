@@ -14,6 +14,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern};
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::NodePattern;
 
 pub fn validate_predicates(input: PredicateInput) {
@@ -73,7 +74,10 @@ impl PredicateValidator<'_, '_> {
     fn validate_regex(&mut self, regex: RegexLiteral<'_>) {
         if regex.pattern.is_empty() {
             self.diag
-                .report(self.source_id, DiagnosticKind::EmptyRegex, regex.range)
+                .report(
+                    DiagnosticKind::EmptyRegex,
+                    Span::new(self.source_id, regex.range),
+                )
                 .emit();
             return;
         }
@@ -89,21 +93,26 @@ impl PredicateValidator<'_, '_> {
             Err(e) => {
                 let span = regex.map_span(e.span());
                 let report = match e.kind() {
-                    ast::ErrorKind::UnsupportedBackreference => {
-                        self.diag
-                            .report(self.source_id, DiagnosticKind::RegexBackreference, span)
-                    }
+                    ast::ErrorKind::UnsupportedBackreference => self.diag.report(
+                        DiagnosticKind::RegexBackreference,
+                        Span::new(self.source_id, span),
+                    ),
                     ast::ErrorKind::UnsupportedLookAround => {
                         // Skip the opening `(` - point at `?=` / `?!` / `?<=` / `?<!`
                         use rowan::TextSize;
                         let adjusted =
                             TextRange::new(span.start() + TextSize::from(1u32), span.end());
-                        self.diag
-                            .report(self.source_id, DiagnosticKind::RegexLookaround, adjusted)
+                        self.diag.report(
+                            DiagnosticKind::RegexLookaround,
+                            Span::new(self.source_id, adjusted),
+                        )
                     }
                     _ => self
                         .diag
-                        .report(self.source_id, DiagnosticKind::RegexSyntaxError, span)
+                        .report(
+                            DiagnosticKind::RegexSyntaxError,
+                            Span::new(self.source_id, span),
+                        )
                         .detail(format!("{}", e.kind())),
                 };
                 report.emit();
@@ -121,7 +130,10 @@ impl PredicateValidator<'_, '_> {
             // The span covers `?P<name>` / `?<name>` (the `(` is excluded), so deleting it
             // turns `(?P<name>foo)` into a plain group `(foo)`.
             self.diag
-                .report(self.source_id, DiagnosticKind::RegexNamedCapture, span)
+                .report(
+                    DiagnosticKind::RegexNamedCapture,
+                    Span::new(self.source_id, span),
+                )
                 .fix("remove the named-capture marker", "")
                 .emit();
         }
@@ -137,7 +149,10 @@ impl PredicateValidator<'_, '_> {
 
         let span = regex.map_span(error.span());
         self.diag
-            .report(self.source_id, DiagnosticKind::RegexSyntaxError, span)
+            .report(
+                DiagnosticKind::RegexSyntaxError,
+                Span::new(self.source_id, span),
+            )
             .detail(error.kind().to_string())
             .emit();
     }

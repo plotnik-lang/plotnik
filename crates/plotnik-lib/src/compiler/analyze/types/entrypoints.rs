@@ -6,9 +6,10 @@ use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::core::{Interner, Symbol};
 use indexmap::IndexMap;
 
-use crate::compiler::parse::ast::Root;
-use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::diagnostics::span::Span;
+use crate::compiler::parse::ast::Root;
 
 use super::type_check::TypeAnalysis;
 
@@ -37,8 +38,11 @@ pub fn validate_entrypoints(
                 .get(name.text())
                 .is_some_and(|sym| typed.contains(&sym));
             if !has_entrypoint {
-                diag.report(*source_id, DiagnosticKind::NoEntrypoints, name.text_range())
-                    .emit();
+                diag.report(
+                    DiagnosticKind::NoEntrypoints,
+                    Span::new(*source_id, name.text_range()),
+                )
+                .emit();
             }
         }
     }

@@ -10,6 +10,7 @@ use super::lexer::{Token, token_text};
 use super::token_set::TokenSet;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::Error;
 
 #[derive(Debug)]
@@ -292,7 +293,7 @@ impl<'q, 'd> Parser<'q, 'd> {
         let suppression = self.current_suppression_span();
         Some(
             self.diagnostics
-                .report(self.source_id, kind, range)
+                .report(kind, Span::new(self.source_id, range))
                 .suppression_range(suppression),
         )
     }
@@ -419,7 +420,10 @@ impl<'q, 'd> Parser<'q, 'd> {
             return;
         };
         report
-            .related_to(source_id, open.span, format!("{construct} started here"))
+            .related_to(
+                Span::new(source_id, open.span),
+                format!("{construct} started here"),
+            )
             .emit();
     }
 

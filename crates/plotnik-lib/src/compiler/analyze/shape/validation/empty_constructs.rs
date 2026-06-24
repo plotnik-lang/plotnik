@@ -7,8 +7,9 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::visitor::{
     Visitor, walk_node_pattern, walk_seq_pattern, walk_union_pattern,
 };
-use crate::compiler::parse::ast::{NodePattern, SeqPattern, UnionPattern};
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::compiler::diagnostics::span::Span;
+use crate::compiler::parse::ast::{NodePattern, SeqPattern, UnionPattern};
 
 pub fn validate_empty_constructs(input: ValidationInput) {
     let ValidationInput {
@@ -31,9 +32,8 @@ impl Visitor for EmptyConstructsValidator<'_> {
         if node.node().syntax().children().next().is_none() && node.node().kind_token().is_none() {
             self.diag
                 .report(
-                    node.source(),
                     DiagnosticKind::EmptyTree,
-                    node.node().text_range(),
+                    Span::new(node.source(), node.node().text_range()),
                 )
                 .emit();
         }
@@ -44,9 +44,8 @@ impl Visitor for EmptyConstructsValidator<'_> {
         if seq.node().children().next().is_none() {
             self.diag
                 .report(
-                    seq.source(),
                     DiagnosticKind::EmptySequence,
-                    seq.node().text_range(),
+                    Span::new(seq.source(), seq.node().text_range()),
                 )
                 .emit();
         }
@@ -59,9 +58,8 @@ impl Visitor for EmptyConstructsValidator<'_> {
         if union.node().branches().next().is_none() {
             self.diag
                 .report(
-                    union.source(),
                     DiagnosticKind::EmptyAlternation,
-                    union.node().text_range(),
+                    Span::new(union.source(), union.node().text_range()),
                 )
                 .emit();
         }

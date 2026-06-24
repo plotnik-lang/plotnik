@@ -8,10 +8,11 @@
 
 use super::ValidationInput;
 use crate::compiler::analyze::Located;
-use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_seq_pattern};
-use crate::compiler::parse::ast::{NodePattern, SeqItem, SeqPattern};
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
+use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::diagnostics::span::Span;
+use crate::compiler::parse::ast::{NodePattern, SeqItem, SeqPattern};
 
 pub fn validate_anchors(input: ValidationInput) {
     let ValidationInput {
@@ -63,9 +64,8 @@ impl AnchorValidator<'_> {
                 if is_boundary && !self.in_named_node {
                     self.diag
                         .report(
-                            source,
                             DiagnosticKind::AnchorWithoutContext,
-                            anchor.text_range(),
+                            Span::new(source, anchor.text_range()),
                         )
                         .emit();
                 }

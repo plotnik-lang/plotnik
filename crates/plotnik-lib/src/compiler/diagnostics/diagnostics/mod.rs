@@ -39,16 +39,7 @@ impl Diagnostics {
     }
 
     /// Uses the kind's default message; call `.detail()` on the builder to override.
-    pub fn report(
-        &mut self,
-        source: SourceId,
-        kind: DiagnosticKind,
-        range: TextRange,
-    ) -> DiagnosticBuilder<'_> {
-        self.report_span(kind, Span::new(source, range))
-    }
-
-    pub fn report_span(&mut self, kind: DiagnosticKind, span: Span) -> DiagnosticBuilder<'_> {
+    pub fn report(&mut self, kind: DiagnosticKind, span: Span) -> DiagnosticBuilder<'_> {
         DiagnosticBuilder {
             diagnostics: self,
             message: Diagnostic::new(kind, span),
@@ -220,11 +211,7 @@ impl<'d> DiagnosticBuilder<'d> {
         self
     }
 
-    pub fn related_to(self, source: SourceId, range: TextRange, msg: impl Into<String>) -> Self {
-        self.related_span(Span::new(source, range), msg)
-    }
-
-    pub fn related_span(mut self, span: Span, msg: impl Into<String>) -> Self {
+    pub fn related_to(mut self, span: Span, msg: impl Into<String>) -> Self {
         self.message.related.push(Related::new(span, msg));
         self
     }

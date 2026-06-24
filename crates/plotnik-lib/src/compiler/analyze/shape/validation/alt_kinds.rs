@@ -7,9 +7,10 @@
 
 use super::ValidationInput;
 use crate::compiler::analyze::shape::invariants::ensure_both_branch_kinds;
-use crate::compiler::parse::cst::SyntaxKind;
-use crate::compiler::parse::ast::{AltKind, Branch, classify_alt};
 use crate::compiler::diagnostics::diagnostics::DiagnosticKind;
+use crate::compiler::diagnostics::span::Span;
+use crate::compiler::parse::ast::{AltKind, Branch, classify_alt};
+use crate::compiler::parse::cst::SyntaxKind;
 
 pub fn validate_alt_kinds(input: ValidationInput) {
     let ValidationInput {
@@ -34,11 +35,10 @@ pub fn validate_alt_kinds(input: ValidationInput) {
             .text_range();
 
         diag.report(
-            source_id,
             DiagnosticKind::MixedAltBranches,
-            union_branch.text_range(),
+            Span::new(source_id, union_branch.text_range()),
         )
-        .related_to(source_id, enum_range, "enum branch here")
+        .related_to(Span::new(source_id, enum_range), "enum branch here")
         .emit();
     }
 }

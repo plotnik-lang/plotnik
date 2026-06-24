@@ -18,9 +18,8 @@ fn report_with_default_message() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::ExpectedTypeName,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(id, TextRange::new(0.into(), 5.into())),
         )
         .emit();
 
@@ -36,9 +35,8 @@ fn report_with_custom_message() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::ExpectedTypeName,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(id, TextRange::new(0.into(), 5.into())),
         )
         .detail("expected type name after '::' (e.g., ::MyType)")
         .emit();
@@ -55,12 +53,14 @@ fn builder_with_related() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UnclosedTree,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(id, TextRange::new(0.into(), 5.into())),
         )
         .detail("primary")
-        .related_to(id, TextRange::new(6.into(), 10.into()), "related info")
+        .related_to(
+            Span::new(id, TextRange::new(6.into(), 10.into())),
+            "related info",
+        )
         .emit();
 
     assert_eq!(diagnostics.len(), 1);
@@ -83,9 +83,8 @@ fn builder_with_fix() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::InvalidFieldEquals,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(id, TextRange::new(0.into(), 5.into())),
         )
         .detail("fixable")
         .fix("apply this fix", "fixed")
@@ -114,13 +113,18 @@ fn builder_with_all_options() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UnclosedTree,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(id, TextRange::new(0.into(), 5.into())),
         )
         .detail("main error")
-        .related_to(id, TextRange::new(6.into(), 11.into()), "see also")
-        .related_to(id, TextRange::new(12.into(), 17.into()), "and here")
+        .related_to(
+            Span::new(id, TextRange::new(6.into(), 11.into())),
+            "see also",
+        )
+        .related_to(
+            Span::new(id, TextRange::new(12.into(), 17.into())),
+            "and here",
+        )
         .fix("try this", "HELLO")
         .emit();
 
@@ -150,9 +154,8 @@ fn printer_colored() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::EmptyTree,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(id, TextRange::new(0.into(), 5.into())),
         )
         .detail("test")
         .emit();
@@ -178,9 +181,8 @@ fn printer_with_custom_path() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UndefinedReference,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(id, TextRange::new(0.into(), 5.into())),
         )
         .detail("test error")
         .emit();
@@ -205,9 +207,8 @@ fn printer_zero_width_span() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::ExpectedExpression,
-            TextRange::empty(0.into()),
+            Span::new(id, TextRange::empty(0.into())),
         )
         .detail("zero width error")
         .emit();
@@ -231,12 +232,14 @@ fn printer_related_zero_width() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UnclosedTree,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(id, TextRange::new(0.into(), 5.into())),
         )
         .detail("primary")
-        .related_to(id, TextRange::empty(6.into()), "zero width related")
+        .related_to(
+            Span::new(id, TextRange::empty(6.into())),
+            "zero width related",
+        )
         .emit();
 
     let result = diagnostics.render_raw(&map);
@@ -258,17 +261,15 @@ fn printer_multiple_diagnostics() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UnclosedTree,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(id, TextRange::new(0.into(), 5.into())),
         )
         .detail("first error")
         .emit();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UndefinedReference,
-            TextRange::new(6.into(), 10.into()),
+            Span::new(id, TextRange::new(6.into(), 10.into())),
         )
         .detail("second error")
         .emit();
@@ -298,13 +299,15 @@ fn diagnostics_collection_methods() {
 
     let mut diagnostics = Diagnostics::new();
     diagnostics
-        .report(id, DiagnosticKind::UnclosedTree, TextRange::empty(0.into()))
+        .report(
+            DiagnosticKind::UnclosedTree,
+            Span::new(id, TextRange::empty(0.into())),
+        )
         .emit();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UndefinedReference,
-            TextRange::empty(1.into()),
+            Span::new(id, TextRange::empty(1.into())),
         )
         .emit();
 
@@ -396,16 +399,14 @@ fn filtered_no_suppression_disjoint_spans() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UnclosedTree,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(id, TextRange::new(0.into(), 5.into())),
         )
         .emit();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UndefinedReference,
-            TextRange::new(10.into(), 15.into()),
+            Span::new(id, TextRange::new(10.into(), 15.into())),
         )
         .emit();
 
@@ -422,16 +423,14 @@ fn filtered_suppresses_lower_priority_contained() {
     // Higher priority error (UnclosedTree) contains lower priority (MissingDefName)
     diagnostics
         .report(
-            id,
             DiagnosticKind::UnclosedTree,
-            TextRange::new(0.into(), 20.into()),
+            Span::new(id, TextRange::new(0.into(), 20.into())),
         )
         .emit();
     diagnostics
         .report(
-            id,
             DiagnosticKind::MissingDefName,
-            TextRange::new(5.into(), 15.into()),
+            Span::new(id, TextRange::new(5.into(), 15.into())),
         )
         .emit();
 
@@ -449,16 +448,14 @@ fn filtered_consequence_suppressed_by_structural() {
     // Consequence error (MissingDefName) suppressed when structural error (UnclosedTree) exists
     diagnostics
         .report(
-            id,
             DiagnosticKind::MissingDefName,
-            TextRange::new(0.into(), 20.into()),
+            Span::new(id, TextRange::new(0.into(), 20.into())),
         )
         .emit();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UnclosedTree,
-            TextRange::new(5.into(), 15.into()),
+            Span::new(id, TextRange::new(5.into(), 15.into())),
         )
         .emit();
 
@@ -475,16 +472,14 @@ fn filtered_same_span_higher_priority_wins() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UnclosedTree,
-            TextRange::new(0.into(), 10.into()),
+            Span::new(id, TextRange::new(0.into(), 10.into())),
         )
         .emit();
     diagnostics
         .report(
-            id,
             DiagnosticKind::MissingDefName,
-            TextRange::new(0.into(), 10.into()),
+            Span::new(id, TextRange::new(0.into(), 10.into())),
         )
         .emit();
 
@@ -503,18 +498,16 @@ fn filtered_no_cross_file_containment_suppression() {
     // File A: a structural error whose suppression range spans the whole file.
     diagnostics
         .report(
-            file_a,
             DiagnosticKind::UnclosedTree,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(file_a, TextRange::new(0.into(), 5.into())),
         )
         .suppression_range(TextRange::new(0.into(), 20.into()))
         .emit();
     // File B: a real error at an offset that numerically falls inside A's range.
     diagnostics
         .report(
-            file_b,
             DiagnosticKind::UndefinedReference,
-            TextRange::new(5.into(), 10.into()),
+            Span::new(file_b, TextRange::new(5.into(), 10.into())),
         )
         .emit();
 
@@ -533,17 +526,15 @@ fn filtered_no_cross_file_consequence_suppression() {
     // File A: a consequence error, with no root diagnostic in its own source.
     diagnostics
         .report(
-            file_a,
             DiagnosticKind::MissingDefName,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(file_a, TextRange::new(0.into(), 5.into())),
         )
         .emit();
     // File B: a root diagnostic, in a different source.
     diagnostics
         .report(
-            file_b,
             DiagnosticKind::UndefinedReference,
-            TextRange::new(0.into(), 5.into()),
+            Span::new(file_b, TextRange::new(0.into(), 5.into())),
         )
         .emit();
 
@@ -572,17 +563,15 @@ fn render_filtered() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UnclosedTree,
-            TextRange::new(0.into(), 20.into()),
+            Span::new(id, TextRange::new(0.into(), 20.into())),
         )
         .detail("unclosed tree")
         .emit();
     diagnostics
         .report(
-            id,
             DiagnosticKind::MissingDefName,
-            TextRange::new(5.into(), 15.into()),
+            Span::new(id, TextRange::new(5.into(), 15.into())),
         )
         .detail("unnamed def")
         .emit();
@@ -601,12 +590,14 @@ fn multi_file_cross_file_related() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            file_b,
             DiagnosticKind::UndefinedReference,
-            TextRange::new(1.into(), 4.into()),
+            Span::new(file_b, TextRange::new(1.into(), 4.into())),
         )
         .detail("Foo")
-        .related_to(file_a, TextRange::new(0.into(), 3.into()), "defined here")
+        .related_to(
+            Span::new(file_a, TextRange::new(0.into(), 3.into())),
+            "defined here",
+        )
         .emit();
 
     let result = diagnostics.render_raw(&map);
@@ -634,14 +625,12 @@ fn multi_file_same_file_related() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            file_a,
             DiagnosticKind::DuplicateDefinition,
-            TextRange::new(12.into(), 15.into()),
+            Span::new(file_a, TextRange::new(12.into(), 15.into())),
         )
         .detail("Foo")
         .related_to(
-            file_a,
-            TextRange::new(0.into(), 3.into()),
+            Span::new(file_a, TextRange::new(0.into(), 3.into())),
             "first defined here",
         )
         .emit();
@@ -690,12 +679,14 @@ fn render_json_full_shape() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UnknownNodeKind,
-            TextRange::new(7.into(), 10.into()),
+            Span::new(id, TextRange::new(7.into(), 10.into())),
         )
         .detail("bar")
-        .related_to(id, TextRange::new(1.into(), 4.into()), "first seen here")
+        .related_to(
+            Span::new(id, TextRange::new(1.into(), 4.into())),
+            "first seen here",
+        )
         .fix("replace with `baz`", "baz")
         .hint("check the grammar")
         .emit();
@@ -759,9 +750,8 @@ fn render_json_minimal_omits_empty_fields() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            id,
             DiagnosticKind::UnclosedTree,
-            TextRange::new(0.into(), 4.into()),
+            Span::new(id, TextRange::new(0.into(), 4.into())),
         )
         .emit();
 

@@ -18,7 +18,7 @@ use crate::core::grammar::Grammar;
 
 use crate::bytecode::Module;
 use crate::compiler::Diagnostics;
-use crate::compiler::diagnostics::DiagnosticKind;
+use crate::compiler::diagnostics::{DiagnosticKind, Span};
 use crate::compiler::source::{SourceId, SourceMap};
 
 pub(crate) type AstMap = IndexMap<SourceId, Root>;
@@ -491,7 +491,7 @@ impl LinkOutcome {
             Err(err) => {
                 if let Some((source, range)) = self.fallback_span() {
                     diagnostics
-                        .report(source, DiagnosticKind::EmitFailed, range)
+                        .report(DiagnosticKind::EmitFailed, Span::new(source, range))
                         .detail(err.to_string())
                         .emit();
                 }
@@ -512,7 +512,7 @@ impl LinkOutcome {
             Err(err) => {
                 if let Some((source, range)) = self.fallback_span() {
                     diagnostics
-                        .report(source, DiagnosticKind::BytecodeRejected, range)
+                        .report(DiagnosticKind::BytecodeRejected, Span::new(source, range))
                         .detail(err.to_string())
                         .emit();
                 }
@@ -577,7 +577,7 @@ impl LinkOutcome {
             Ok(bytes) => bytes,
             Err(err) => {
                 if let Some((source, range)) = self.fallback_span() {
-                    diag.report(source, DiagnosticKind::EmitFailed, range)
+                    diag.report(DiagnosticKind::EmitFailed, Span::new(source, range))
                         .detail(err.to_string())
                         .emit();
                 }
@@ -589,7 +589,7 @@ impl LinkOutcome {
             Ok(_) => {}
             Err(err) => {
                 if let Some((source, range)) = self.fallback_span() {
-                    diag.report(source, DiagnosticKind::BytecodeRejected, range)
+                    diag.report(DiagnosticKind::BytecodeRejected, Span::new(source, range))
                         .detail(err.to_string())
                         .emit();
                 }
