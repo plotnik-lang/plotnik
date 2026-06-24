@@ -8,7 +8,7 @@
 //! lockstep.
 
 use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
+use crate::compiler::analyze::types::type_analysis::{InProgressTypeAnalysis, TypeAnalysis};
 use crate::compiler::analyze::types::type_shape::{OutputFlow, QuantifierKind, TypeShape};
 use crate::compiler::parse::ast::{Pattern, is_empty_group};
 use crate::core::Interner;
@@ -51,19 +51,6 @@ impl TypeAnalysis {
         interner: &Interner,
     ) -> CaptureMechanism {
         self.capture_mechanism_with_mode(inner, deps, interner, CaptureLookupMode::Admitted)
-    }
-
-    /// Classification used while inference is still constructing [`TypeAnalysis`].
-    ///
-    /// In-progress inference can legitimately ask before every definition output has
-    /// been memoized, so this path keeps the old conservative fallbacks.
-    pub(crate) fn capture_mechanism_during_inference(
-        &self,
-        inner: &Pattern,
-        deps: &DependencyAnalysis,
-        interner: &Interner,
-    ) -> CaptureMechanism {
-        self.capture_mechanism_with_mode(inner, deps, interner, CaptureLookupMode::InProgress)
     }
 
     fn capture_mechanism_with_mode(
@@ -219,6 +206,23 @@ impl TypeAnalysis {
             Some(OutputFlow::Value(t)) => self.is_structured_output(*t),
             _ => false,
         }
+    }
+}
+
+impl InProgressTypeAnalysis<'_> {
+    /// Classification used while inference is still constructing [`TypeAnalysis`].
+    ///
+    /// In-progress inference can legitimately ask before every definition output has
+    /// been memoized, so this view keeps the conservative fallbacks off the frozen
+    /// artifact's API.
+    pub(crate) fn capture_mechanism(
+        &self,
+        inner: &Pattern,
+        deps: &DependencyAnalysis,
+        interner: &Interner,
+    ) -> CaptureMechanism {
+        self.analysis
+            .capture_mechanism_with_mode(inner, deps, interner, CaptureLookupMode::InProgress)
     }
 }
 

@@ -187,6 +187,10 @@ pub struct TypeAnalysisBuilder {
     def_memo: HashMap<DefId, PatternResult>,
 }
 
+pub(crate) struct InProgressTypeAnalysis<'a> {
+    pub(super) analysis: &'a TypeAnalysis,
+}
+
 impl Default for TypeAnalysisBuilder {
     fn default() -> Self {
         Self::new()
@@ -223,11 +227,12 @@ impl TypeAnalysisBuilder {
         self.analysis
     }
 
-    /// Read-only view of the in-progress artifact, for the shared accessors
-    /// ([`TypeAnalysis::capture_mechanism`], [`TypeAnalysis::ref_returns_structured`])
-    /// that also run against the frozen result during emission.
-    pub fn analysis(&self) -> &TypeAnalysis {
-        &self.analysis
+    /// Restricted read-only view of the in-progress artifact. It exposes only
+    /// accessors that are explicitly safe before [`finish`](Self::finish).
+    pub(crate) fn in_progress(&self) -> InProgressTypeAnalysis<'_> {
+        InProgressTypeAnalysis {
+            analysis: &self.analysis,
+        }
     }
 
     /// Intern a type shape, deduplicating by structural equality.

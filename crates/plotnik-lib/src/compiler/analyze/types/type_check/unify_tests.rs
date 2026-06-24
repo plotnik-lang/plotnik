@@ -23,7 +23,7 @@ fn unify_void_bubble() {
 
     match result {
         OutputFlow::Fields(id) => {
-            let fields = ctx.analysis().struct_fields(id).unwrap();
+            let fields = ctx.expect_struct_fields(id);
             assert!(fields.get(&x).unwrap().optional);
         }
         _ => panic!("expected Fields"),
@@ -48,7 +48,7 @@ fn unify_bubble_merge() {
 
     match result {
         OutputFlow::Fields(id) => {
-            let fields = ctx.analysis().struct_fields(id).unwrap();
+            let fields = ctx.expect_struct_fields(id);
             // x is in both, so required
             assert!(!fields.get(&x).unwrap().optional);
             // y only in b, so optional

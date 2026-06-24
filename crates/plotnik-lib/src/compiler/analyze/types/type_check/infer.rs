@@ -374,12 +374,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let mechanism = self
             .ctx
             .type_ctx
-            .analysis()
-            .capture_mechanism_during_inference(
-                inner.node(),
-                self.ctx.dependency_analysis,
-                self.ctx.interner,
-            );
+            .in_progress()
+            .capture_mechanism(inner.node(), self.ctx.dependency_analysis, self.ctx.interner);
         let should_merge_fields = mechanism == CaptureMechanism::Node
             && matches!(&inner_info.flow, OutputFlow::Fields(_));
 
