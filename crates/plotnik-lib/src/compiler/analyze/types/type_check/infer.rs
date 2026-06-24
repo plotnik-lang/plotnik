@@ -23,7 +23,7 @@ use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::ast::{
-    CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
+    Branch, CapturedPattern, EnumPattern, FieldPattern, NodePattern, Pattern, QuantifiedPattern, Ref,
     SeqPattern, TokenPattern, UnionPattern, is_empty_group,
 };
 
@@ -268,35 +268,41 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             // A BTreeMap would silently collapse duplicate labels, leaving the enum
             // with fewer variants than the emitter expects. Reject them instead.
             if variants.contains_key(&label_sym) {
-                self.ctx
-                    .diag
-                    .report(
-                        e.source(),
-                        DiagnosticKind::DuplicateAlternationLabel,
-                        label.text_range(),
-                    )
-                    .detail(label.text())
-                    .emit();
-                if let Some(body) = branch.body() {
-                    let body_info = self.infer_pattern(&e.wrap(body));
+                self.report_duplicate_enum_label(e.source(), label.text_range(), label.text());
+                if let Some(body_info) = self.infer_enum_branch_body(e, &branch) {
                     combined_arity = combined_arity.combine(body_info.arity);
                 }
                 continue;
             }
 
-            let Some(body) = branch.body() else {
+            let Some(body_info) = self.infer_enum_branch_body(e, &branch) else {
                 // Empty variant -> Void (no payload)
                 variants.insert(label_sym, TYPE_VOID);
                 continue;
             };
 
-            let body_info = self.infer_pattern(&e.wrap(body));
             combined_arity = combined_arity.combine(body_info.arity);
             variants.insert(label_sym, self.flow_to_type(&body_info.flow));
         }
 
         let enum_type = self.ctx.type_ctx.intern_type(TypeShape::Enum(variants));
         PatternResult::new(combined_arity, OutputFlow::Value(enum_type))
+    }
+
+    fn report_duplicate_enum_label(&mut self, source: SourceId, range: TextRange, label: &str) {
+        self.ctx
+            .diag
+            .report(source, DiagnosticKind::DuplicateAlternationLabel, range)
+            .detail(label)
+            .emit();
+    }
+
+    fn infer_enum_branch_body(
+        &mut self,
+        e: &Located<EnumPattern>,
+        branch: &Branch,
+    ) -> Option<PatternResult> {
+        branch.body().map(|body| self.infer_pattern(&e.wrap(body)))
     }
 
     fn infer_union(&mut self, union: &Located<UnionPattern>) -> PatternResult {
