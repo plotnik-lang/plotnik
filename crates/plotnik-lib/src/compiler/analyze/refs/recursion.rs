@@ -10,11 +10,11 @@ use rowan::TextRange;
 use super::dependencies::{DependencyAnalysis, collect_refs};
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::analyze::visitor::{Visitor, walk_node_pattern, walk_pattern};
-use crate::compiler::parse::ast::{Def, NodePattern, Pattern, Ref, Root, SeqPattern, TokenPattern};
 use crate::compiler::diagnostics::diagnostics::Diagnostics;
 use crate::compiler::diagnostics::diagnostics::{DiagnosticKind, Span};
+use crate::compiler::diagnostics::source::SourceId;
+use crate::compiler::parse::ast::{Def, NodePattern, Pattern, Ref, Root, SeqPattern, TokenPattern};
 
 pub fn validate_recursion(
     analysis: &DependencyAnalysis,
@@ -34,6 +34,35 @@ struct RecursionValidator<'a, 'd> {
     ast_map: &'a IndexMap<SourceId, Root>,
     symbol_table: &'a SymbolTable,
     diag: &'d mut Diagnostics,
+}
+
+#[derive(Clone, Copy)]
+enum CycleKind {
+    NoEscape,
+    Unguarded,
+}
+
+impl CycleKind {
+    fn search_mode(self) -> RefSearchMode {
+        match self {
+            Self::NoEscape => RefSearchMode::Any,
+            Self::Unguarded => RefSearchMode::Unguarded,
+        }
+    }
+
+    fn diagnostic_kind(self) -> DiagnosticKind {
+        match self {
+            Self::NoEscape => DiagnosticKind::RecursionNoEscape,
+            Self::Unguarded => DiagnosticKind::DirectRecursion,
+        }
+    }
+
+    fn self_reference_message(self, target: &str) -> String {
+        match self {
+            Self::NoEscape => format!("{target} references itself"),
+            Self::Unguarded => "references itself".to_string(),
+        }
+    }
 }
 
 impl<'a, 'd> RecursionValidator<'a, 'd> {
@@ -64,35 +93,37 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
 
         if !has_escape {
             // Every cycle is an infinite loop — no escape path exists anywhere in the SCC.
-            if let Some(raw_chain) = self.find_cycle(scc, &scc_set, find_ref_range) {
-                let chain = self.format_chain(raw_chain, false);
-                self.report_cycle(DiagnosticKind::RecursionNoEscape, scc, chain);
+            let kind = CycleKind::NoEscape;
+            if let Some(raw_chain) = self.find_cycle(scc, &scc_set, kind) {
+                let chain = self.format_chain(raw_chain, kind);
+                self.report_cycle(kind.diagnostic_kind(), scc, chain);
             }
             return;
         }
 
-        if let Some(raw_chain) = self.find_cycle(scc, &scc_set, find_unguarded_ref_range) {
-            let chain = self.format_chain(raw_chain, true);
-            self.report_cycle(DiagnosticKind::DirectRecursion, scc, chain);
+        let kind = CycleKind::Unguarded;
+        if let Some(raw_chain) = self.find_cycle(scc, &scc_set, kind) {
+            let chain = self.format_chain(raw_chain, kind);
+            self.report_cycle(kind.diagnostic_kind(), scc, chain);
         }
     }
 
     /// Finds a cycle within the given set of nodes (SCC).
-    /// `get_edge_location` returns the range of a reference from `pattern` to `target`;
-    /// the range is paired with `pattern`'s source into the edge's `Span`.
     fn find_cycle<'b>(
         &self,
         nodes: &'b [String],
         domain: &IndexSet<&'b str>,
-        get_edge_location: impl Fn(SourceId, &Pattern, &str) -> Option<TextRange>,
+        kind: CycleKind,
     ) -> Option<Vec<(Span, &'b str)>> {
+        let search_mode = kind.search_mode();
         let mut adj = IndexMap::new();
         for name in nodes {
             if let Some((source_id, body)) = self.symbol_table.definition(name) {
                 let neighbors = domain
                     .iter()
                     .filter_map(|target| {
-                        get_edge_location(source_id, body, target)
+                        search_mode
+                            .find_ref_range(source_id, body, target)
                             .map(|range| (*target, Span::new(source_id, range)))
                     })
                     .collect::<Vec<_>>();
@@ -104,18 +135,10 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         CycleFinder::find(&node_strs, &adj)
     }
 
-    fn format_chain(
-        &self,
-        raw_chain: Vec<(Span, &str)>,
-        is_unguarded: bool,
-    ) -> Vec<(Span, String)> {
+    fn format_chain(&self, raw_chain: Vec<(Span, &str)>, kind: CycleKind) -> Vec<(Span, String)> {
         if raw_chain.len() == 1 {
             let (span, target) = &raw_chain[0];
-            let msg = if is_unguarded {
-                "references itself".to_string()
-            } else {
-                format!("{} references itself", target)
-            };
+            let msg = kind.self_reference_message(target);
             return vec![(*span, msg)];
         }
 
@@ -318,6 +341,23 @@ enum RefSearchMode {
     Unguarded,
 }
 
+impl RefSearchMode {
+    fn find_ref_range(
+        self,
+        source: SourceId,
+        pattern: &Pattern,
+        target: &str,
+    ) -> Option<TextRange> {
+        let mut visitor = RefFinder {
+            target,
+            found: None,
+            mode: self,
+        };
+        visitor.visit_pattern(&Located::new(source, pattern.clone()));
+        visitor.found
+    }
+}
+
 struct RefFinder<'a> {
     target: &'a str,
     found: Option<TextRange>,
@@ -367,28 +407,4 @@ impl Visitor for RefFinder<'_> {
             }
         }
     }
-}
-
-fn find_ref_range(source: SourceId, pattern: &Pattern, target: &str) -> Option<TextRange> {
-    let mut visitor = RefFinder {
-        target,
-        found: None,
-        mode: RefSearchMode::Any,
-    };
-    visitor.visit_pattern(&Located::new(source, pattern.clone()));
-    visitor.found
-}
-
-fn find_unguarded_ref_range(
-    source: SourceId,
-    pattern: &Pattern,
-    target: &str,
-) -> Option<TextRange> {
-    let mut visitor = RefFinder {
-        target,
-        found: None,
-        mode: RefSearchMode::Unguarded,
-    };
-    visitor.visit_pattern(&Located::new(source, pattern.clone()));
-    visitor.found
 }
