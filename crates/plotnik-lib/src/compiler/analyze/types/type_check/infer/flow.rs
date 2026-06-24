@@ -6,7 +6,7 @@ use rowan::TextRange;
 use crate::compiler::diagnostics::report::DiagnosticKind;
 
 use super::super::strings::Symbol;
-use super::super::shapes::{FieldInfo, PatternFlow, TYPE_VOID, TypeId};
+use super::super::shapes::{FieldInfo, PatternFlow, TypeId};
 use super::InferVisitor;
 
 impl InferVisitor<'_, '_> {
@@ -31,13 +31,6 @@ impl InferVisitor<'_, '_> {
                         .emit();
                 }
             }
-        }
-    }
-
-    pub(super) fn flow_to_type(&mut self, flow: &PatternFlow) -> TypeId {
-        match flow {
-            PatternFlow::Void => TYPE_VOID,
-            PatternFlow::Value(t) | PatternFlow::Fields(t) => *t,
         }
     }
 

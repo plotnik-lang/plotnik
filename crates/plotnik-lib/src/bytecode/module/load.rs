@@ -79,6 +79,13 @@ fn align_up_u64(value: u64, align: u64) -> u64 {
     (value + align - 1) & !(align - 1)
 }
 
+fn read_transition_u16(storage: &[u8], off: usize) -> Result<u16, ModuleError> {
+    storage
+        .get(off..off + 2)
+        .map(|b| u16::from_le_bytes([b[0], b[1]]))
+        .ok_or(ModuleError::MalformedTransitions)
+}
+
 impl Module {
     pub(super) fn from_storage(storage: ByteStorage) -> Result<Self, ModuleError> {
         if storage.len() < HEADER_SIZE {
@@ -556,12 +563,6 @@ impl Module {
                 .copied()
                 .ok_or(ModuleError::MalformedTransitions)
         };
-        let read_u16 = |off: usize| {
-            storage
-                .get(off..off + 2)
-                .map(|b| u16::from_le_bytes([b[0], b[1]]))
-                .ok_or(ModuleError::MalformedTransitions)
-        };
         // A reserved padding run inside an instruction slot must be all zero.
         let check_zero = |off: usize, len: usize| match storage.get(off..off + len) {
             Some(run) if run.iter().all(|&b| b == 0) => Ok(()),
@@ -605,7 +606,7 @@ impl Module {
                     check_zero(instr_off + 1, 7)?;
                 }
                 Opcode::Trampoline => {
-                    let next = read_u16(instr_off + 2)?;
+                    let next = read_transition_u16(storage, instr_off + 2)?;
                     if next == 0 {
                         return Err(ModuleError::MalformedTransitions);
                     }
@@ -620,8 +621,8 @@ impl Module {
                     if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
                         return Err(ModuleError::MalformedTransitions);
                     }
-                    let next = read_u16(instr_off + 4)?;
-                    let target = read_u16(instr_off + 6)?;
+                    let next = read_transition_u16(storage, instr_off + 4)?;
+                    let target = read_transition_u16(storage, instr_off + 6)?;
                     if next == 0 || target == 0 {
                         return Err(ModuleError::MalformedTransitions);
                     }
@@ -631,8 +632,11 @@ impl Module {
                 _ => {
                     // A Match variant (`Match8` or extended).
                     let node_kind = header_byte::node_class_bits(header);
-                    if NodeKindConstraint::try_from_bytes(node_kind, read_u16(instr_off + 2)?)
-                        .is_none()
+                    if NodeKindConstraint::try_from_bytes(
+                        node_kind,
+                        read_transition_u16(storage, instr_off + 2)?,
+                    )
+                    .is_none()
                     {
                         return Err(ModuleError::MalformedTransitions);
                     }
@@ -642,7 +646,7 @@ impl Module {
 
                     if opcode == Opcode::Match8 {
                         // bytes 6-7 hold the single successor; `0` means terminal.
-                        let next = read_u16(instr_off + 6)?;
+                        let next = read_transition_u16(storage, instr_off + 6)?;
                         if next != 0 {
                             targets.push(next);
                         }
@@ -683,14 +687,8 @@ impl Module {
         targets: &mut Vec<u16>,
     ) -> Result<(), ModuleError> {
         let storage: &[u8] = &self.storage;
-        let read_u16 = |off: usize| {
-            storage
-                .get(off..off + 2)
-                .map(|b| u16::from_le_bytes([b[0], b[1]]))
-                .ok_or(ModuleError::MalformedTransitions)
-        };
 
-        let counts = read_u16(instr_off + 6)?;
+        let counts = read_transition_u16(storage, instr_off + 6)?;
         // Bit 0 of the counts word is reserved (docs/binary-format/06-transitions.md);
         // the decoder never reads it, so a forged set bit would load unnoticed.
         if MatchCounts::reserved_bit_set(counts) {
@@ -781,7 +779,7 @@ impl Module {
             + (pre + neg + post) * PAYLOAD_SLOT_SIZE
             + if has_predicate { PREDICATE_SIZE } else { 0 };
         for i in 0..succ {
-            let next = read_u16(succ_off + i * PAYLOAD_SLOT_SIZE)?;
+            let next = read_transition_u16(storage, succ_off + i * PAYLOAD_SLOT_SIZE)?;
             // An extended successor decodes through `StepId`, which panics
             // on zero; `0` is the terminal marker only for the `Match8` slot.
             if next == 0 {

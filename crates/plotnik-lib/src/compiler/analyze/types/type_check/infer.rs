@@ -69,6 +69,13 @@ enum RefFlowBoundary {
     RecursiveOpaque,
 }
 
+fn flow_to_type(flow: &PatternFlow) -> TypeId {
+    match flow {
+        PatternFlow::Void => TYPE_VOID,
+        PatternFlow::Value(t) | PatternFlow::Fields(t) => *t,
+    }
+}
+
 impl<'a, 'd> InferVisitor<'a, 'd> {
     pub fn new(ctx: InferState<'a, 'd>, source: SourceId) -> Self {
         Self { ctx, source }
@@ -288,7 +295,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             };
 
             combined_arity = combined_arity.combine(body_info.arity);
-            variants.insert(label_sym, self.flow_to_type(&body_info.flow));
+            variants.insert(label_sym, flow_to_type(&body_info.flow));
         }
 
         let enum_type = self.ctx.type_ctx.intern_type(TypeShape::Enum(variants));
@@ -783,14 +790,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
             .def_id_for_name(self.analysis.interner, def_name)
             .expect("an analyzed definition has a DefId");
         self.ctx.record_def_memo(def_id, info.clone());
-        let type_id = self.flow_to_type_id(&info.flow);
+        let type_id = flow_to_type(&info.flow);
         self.ctx.record_def_output(def_id, type_id);
-    }
-
-    fn flow_to_type_id(&mut self, flow: &PatternFlow) -> TypeId {
-        match flow {
-            PatternFlow::Void => TYPE_VOID,
-            PatternFlow::Value(id) | PatternFlow::Fields(id) => *id,
-        }
     }
 }
