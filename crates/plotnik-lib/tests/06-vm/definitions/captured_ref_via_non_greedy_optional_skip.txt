@@ -2,6 +2,14 @@ A = (identifier)??
 Q = (A) @x
 ==== input ====
 foo
+==== types ====
+export interface Q {
+  x: Node;
+}
+
+export type A = undefined;
+==== output ====
+<no match>
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -44,12 +52,6 @@ Q:
   13   !   (identifier)                     12
   14  ─‣─  _                                13, 14
   16   !   _                                13, 14
-==== types ====
-export interface Q {
-  x: Node;
-}
-
-export type A = undefined;
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -73,5 +75,3 @@ Q:
        ○   program
   16  ❮❮❮ 
   14       _                                13, 14
-==== output ====
-<no match>

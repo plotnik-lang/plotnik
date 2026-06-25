@@ -1,6 +1,12 @@
 Q = (program (expression_statement (identifier =~ /^foo/) @id))
 ==== input ====
 barfoo;
+==== types ====
+export interface Q {
+  id: Node;
+}
+==== output ====
+<no match>
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -40,10 +46,6 @@ Q:
   08  └‣─  (identifier) =~ /^foo/ [Node Set(M0)]  11
   11  ─‣┘² _                                12
   12                                        ▶
-==== types ====
-export interface Q {
-  id: Node;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -57,5 +59,3 @@ Q:
        ●   expression_statement
   08       (identifier) =~ /^foo/ [Node Set(M0)]  11
        ○   ;
-==== output ====
-<no match>

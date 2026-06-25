@@ -9,6 +9,13 @@ Q = (program
 )
 ==== input ====
 a + f() + b
+==== types ====
+export interface Q {
+  left: Node;
+  right: Node;
+}
+==== output ====
+<no match>
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -52,11 +59,6 @@ Q:
   15  ...  
   16   !   (identifier) [Node Set(M0)]      11
   18  ─‣─  _                                16, 18
-==== types ====
-export interface Q {
-  left: Node;
-  right: Node;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -87,5 +89,3 @@ Q:
   11       (identifier) [Node Set(M1)]      13
   18  ❮❮❮ 
   18       _                                16, 18
-==== output ====
-<no match>

@@ -1,6 +1,20 @@
 Q = [A:(identifier)?@id]
 ==== input ====
 let x
+==== types ====
+export interface QA {
+  $tag: "A";
+  $data: { id: Node | null };
+}
+
+export type Q = QA;
+==== output ====
+{
+  "$tag": "A",
+  "$data": {
+    "id": null
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -41,13 +55,6 @@ Q:
   15  ...  
   16  ─‣─  _                                13, 16
   18   !   _                                13, 16
-==== types ====
-export interface QA {
-  $tag: "A";
-  $data: { id: Node | null };
-}
-
-export type Q = QA;
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -70,5 +77,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"$tag":"A","$data":{"id":null}}

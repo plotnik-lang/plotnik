@@ -11,7 +11,7 @@
 //! | `03-analyze` | symbols                                    |
 //! | `04-emit`    | bytecode                                   |
 //! | `05-typegen` | types                                      |
-//! | `06-vm`      | bytecode, types, trace, output (requires input) |
+//! | `06-vm`      | types, output, bytecode, trace (requires input) |
 //!
 //! `==== diagnostics ====` renders whenever the query produces warnings or errors.
 //! Errors are terminal for the compile stages (bytecode/types/trace/output are
@@ -241,7 +241,7 @@ fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
         "03" => Some(&["diagnostics", "symbols"]),
         "04" => Some(&["diagnostics", "bytecode"]),
         "05" => Some(&["diagnostics", "types"]),
-        "06" => Some(&["diagnostics", "bytecode", "types", "trace", "output"]),
+        "06" => Some(&["types", "diagnostics", "output", "bytecode", "trace"]),
         _ => None,
     }
 }
@@ -343,12 +343,14 @@ fn render_compile(
         ));
         return Ok(out);
     }
-    if diagnostics.has_warnings() {
-        out.push((
-            "diagnostics".into(),
+    // Errors return early above, so any diagnostics here are warnings. Each stage
+    // slots them into its own section order rather than forcing them to the top.
+    let diag = diagnostics.has_warnings().then(|| {
+        (
+            "diagnostics".to_string(),
             diagnostics.render(compiled.source_map()),
-        ));
-    }
+        )
+    });
 
     let module = compiled
         .module()
@@ -356,12 +358,16 @@ fn render_compile(
 
     match kind {
         Compile::Bytecode => {
-            out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))))
-        }
-        Compile::Types => out.push(("types".into(), render_types(&compiled))),
-        Compile::Vm => {
+            out.extend(diag);
             out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))));
+        }
+        Compile::Types => {
+            out.extend(diag);
             out.push(("types".into(), render_types(&compiled)));
+        }
+        // Human-first: the type contract, then warnings, then the result, and only
+        // then the VM internals — bytecode followed by the trace that indexes it.
+        Compile::Vm => {
             let input = input.ok_or_else(|| {
                 "06-vm fixtures require an `==== input ====` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
             })?;
@@ -370,8 +376,11 @@ fn render_compile(
                 .last()
                 .expect("a valid query has at least one named definition");
             let (trace, output) = run_vm(&lang, module, &entry, &input.text)?;
-            out.push(("trace".into(), trace));
+            out.push(("types".into(), render_types(&compiled)));
+            out.extend(diag);
             out.push(("output".into(), output));
+            out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))));
+            out.push(("trace".into(), trace));
         }
     }
     Ok(out)
@@ -413,7 +422,7 @@ fn run_vm(
                 effects.as_slice(),
                 Colors::new(false),
             );
-            value.format(false, Colors::new(false))
+            value.format(true, Colors::new(false))
         }
         Err(RuntimeError::NoMatch) => "<no match>".to_string(),
         // A no-match is a real outcome worth pinning; step/memory exhaustion is

@@ -2,6 +2,38 @@ Q = (program [A: (comment)? @c]* @items)
 ==== input ====
 // c
 x;
+==== types ====
+export interface QItemsA {
+  $tag: "A";
+  $data: { c: Node | null };
+}
+
+export type QItems = QItemsA;
+
+export interface Q {
+  items: QItems[];
+}
+==== output ====
+{
+  "items": [
+    {
+      "$tag": "A",
+      "$data": {
+        "c": {
+          "kind": "comment",
+          "text": "// c",
+          "span": [0, 4]
+        }
+      }
+    },
+    {
+      "$tag": "A",
+      "$data": {
+        "c": null
+      }
+    }
+  ]
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -56,17 +88,6 @@ Q:
   30  └‣─  _                                26, 28
   32  ─‣─  _                                26, 32
   34  ─‣─  _                                26, 32
-==== types ====
-export interface QItemsA {
-  $tag: "A";
-  $data: { c: Node | null };
-}
-
-export type QItems = QItemsA;
-
-export interface Q {
-  items: QItems[];
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -107,5 +128,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"items":[{"$tag":"A","$data":{"c":{"kind":"comment","text":"// c","span":[0, 4]}}},{"$tag":"A","$data":{"c":null}}]}

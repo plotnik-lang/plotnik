@@ -1,6 +1,24 @@
 Q = (program (expression_statement {(identifier) @id}? @outer))
 ==== input ====
 a;
+==== types ====
+export interface QOuter {
+  id: Node | null;
+}
+
+export interface Q {
+  outer: QOuter | null;
+}
+==== output ====
+{
+  "outer": {
+    "id": {
+      "kind": "identifier",
+      "text": "a",
+      "span": [0, 1]
+    }
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -47,14 +65,6 @@ Q:
   18  -ε-  [Null Set(M0)]                   16
   20  ─‣─  _                                10, 20
   22  └‣─  _                                10, 20
-==== types ====
-export interface QOuter {
-  id: Node | null;
-}
-
-export interface Q {
-  outer: QOuter | null;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -80,5 +90,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"outer":{"id":{"kind":"identifier","text":"a","span":[0, 1]}}}

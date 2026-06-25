@@ -1,6 +1,24 @@
 Q = (program (function_declaration name: (identifier) @name) @fn)
 ==== input ====
 function foo() {}
+==== types ====
+export interface Q {
+  fn: Node;
+  name: Node;
+}
+==== output ====
+{
+  "fn": {
+    "kind": "function_declaration",
+    "text": "function foo() {}",
+    "span": [0, 17]
+  },
+  "name": {
+    "kind": "identifier",
+    "text": "foo",
+    "span": [9, 12]
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -39,11 +57,6 @@ Q:
   10  └‣─  name: (identifier) [Node Set(M1)]  12
   12  ─‣┘² _                                13
   13                                        ▶
-==== types ====
-export interface Q {
-  fn: Node;
-  name: Node;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -65,5 +78,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"fn":{"kind":"function_declaration","text":"function foo() {}","span":[0, 17]},"name":{"kind":"identifier","text":"foo","span":[9, 12]}}

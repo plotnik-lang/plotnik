@@ -1,6 +1,17 @@
 Q = (program [Tag: ((expression_statement) @a) @x])
 ==== input ====
 a;
+==== types ====
+export interface QTag {
+  $tag: "Tag";
+  $data: { x: Struct };
+}
+
+export type Q = QTag;
+
+export interface Struct {
+  a: Node;
+}
 ==== diagnostics ====
 warning: parenthesized sequences are tree-sitter syntax
  --> query.ptk:1:20
@@ -9,6 +20,19 @@ warning: parenthesized sequences are tree-sitter syntax
   |                    ^
   |
 help: use `{(a) (b)}` to match a sequence of siblings
+==== output ====
+{
+  "$tag": "Tag",
+  "$data": {
+    "x": {
+      "a": {
+        "kind": "expression_statement",
+        "text": "a;",
+        "span": [0, 2]
+      }
+    }
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -51,17 +75,6 @@ Q:
   13  ─‣┘  [StructClose Set(M1) EnumClose] _  15
   15                                        ▶
   16  ─‣─  _                                10, 16
-==== types ====
-export interface QTag {
-  $tag: "Tag";
-  $data: { x: Struct };
-}
-
-export type Q = QTag;
-
-export interface Struct {
-  a: Node;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -82,5 +95,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"$tag":"Tag","$data":{"x":{"a":{"kind":"expression_statement","text":"a;","span":[0, 2]}}}}

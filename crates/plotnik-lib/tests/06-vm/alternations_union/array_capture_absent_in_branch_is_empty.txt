@@ -6,6 +6,20 @@ Q = (program
 )
 ==== input ====
 foo;
+==== types ====
+export interface Q {
+  s: Node | null;
+  vs: Node[];
+}
+==== output ====
+{
+  "vs": [],
+  "s": {
+    "kind": "expression_statement",
+    "text": "foo;",
+    "span": [0, 4]
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -55,11 +69,6 @@ Q:
   24   !   [Null Set(M1)] (lexical_declaration)  16
   26   !   [ArrayOpen ArrayClose Set(M0)] (expression_statement) [Node Set(M1)]  15
   29  ─‣─  _                                24, 26, 29
-==== types ====
-export interface Q {
-  s: Node | null;
-  vs: Node[];
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -83,5 +92,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"vs":[],"s":{"kind":"expression_statement","text":"foo;","span":[0, 4]}}

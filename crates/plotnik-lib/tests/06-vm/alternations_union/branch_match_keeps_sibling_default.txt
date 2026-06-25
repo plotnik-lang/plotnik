@@ -1,6 +1,20 @@
 Q = (program (expression_statement [(identifier) @a (number)? @b]))
 ==== input ====
 x;
+==== types ====
+export interface Q {
+  a: Node | null;
+  b: Node | null;
+}
+==== output ====
+{
+  "b": null,
+  "a": {
+    "kind": "identifier",
+    "text": "x",
+    "span": [0, 1]
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -47,11 +61,6 @@ Q:
   22  -ε-  [Null Set(M0)]                   20, 14
   24  ─‣─  _                                11, 22, 24
   26  ─‣┘² _                                10
-==== types ====
-export interface Q {
-  a: Node | null;
-  b: Node | null;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -74,5 +83,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"b":null,"a":{"kind":"identifier","text":"x","span":[0, 1]}}

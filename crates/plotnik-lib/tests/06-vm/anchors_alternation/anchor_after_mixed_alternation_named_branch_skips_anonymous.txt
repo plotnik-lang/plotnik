@@ -12,6 +12,24 @@ Q = (program
 )
 ==== input ====
 a + /* c */ b
+==== types ====
+export interface Q {
+  left: Node | null;
+  right: Node;
+}
+==== output ====
+{
+  "left": {
+    "kind": "identifier",
+    "text": "a",
+    "span": [0, 1]
+  },
+  "right": {
+    "kind": "identifier",
+    "text": "b",
+    "span": [12, 13]
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -58,11 +76,6 @@ Q:
   18   !   [Null Set(M0)] ";"               12
   20  ─‣─  _                                16, 18, 20
   22  ─‣┘³ _                                11
-==== types ====
-export interface Q {
-  left: Node | null;
-  right: Node;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -91,5 +104,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"left":{"kind":"identifier","text":"a","span":[0, 1]},"right":{"kind":"identifier","text":"b","span":[12, 13]}}

@@ -2,6 +2,22 @@ Other = (program (function_declaration) @fn)
 Q = (program (expression_statement (identifier) @name))
 ==== input ====
 foo;
+==== types ====
+export interface Q {
+  name: Node;
+}
+
+export interface Other {
+  fn: Node;
+}
+==== output ====
+{
+  "name": {
+    "kind": "identifier",
+    "text": "foo",
+    "span": [0, 3]
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -50,14 +66,6 @@ Q:
   13  └‣─  (expression_statement)           14
   14  └‣─  (identifier) [Node Set(M1)]      07
   16                                        ▶
-==== types ====
-export interface Q {
-  name: Node;
-}
-
-export interface Other {
-  fn: Node;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -78,5 +86,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"name":{"kind":"identifier","text":"foo","span":[0, 3]}}

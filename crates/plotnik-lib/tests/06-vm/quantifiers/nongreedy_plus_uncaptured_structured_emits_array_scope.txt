@@ -7,6 +7,23 @@ Q = (program
 )
 ==== input ====
 a; b; debugger;
+==== types ====
+export interface AX {
+  $tag: "X";
+}
+
+export type A = AX;
+
+export type Q = [A, ...A[]];
+==== output ====
+[
+  {
+    "$tag": "X"
+  },
+  {
+    "$tag": "X"
+  }
+]
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -56,14 +73,6 @@ Q:
   20  ─‣─  _                                19, 20
   22  ─‣─  _                                19, 22
   24  ─‣─  _                                19, 22
-==== types ====
-export interface AX {
-  $tag: "X";
-}
-
-export type A = AX;
-
-export type Q = [A, ...A[]];
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -111,5 +120,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-[{"$tag":"X"},{"$tag":"X"}]

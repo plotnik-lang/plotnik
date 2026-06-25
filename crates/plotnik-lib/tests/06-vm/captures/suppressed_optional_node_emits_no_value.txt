@@ -1,6 +1,10 @@
 Q = (program (expression_statement)? @_)
 ==== input ====
 a;
+==== types ====
+export type Q = undefined;
+==== output ====
+null
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -36,8 +40,6 @@ Q:
   14  -ε-  [SuppressEnd]                    13
   16  ─‣─  _                                10, 16
   18  └‣─  _                                10, 16
-==== types ====
-export type Q = undefined;
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -59,5 +61,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-null

@@ -8,6 +8,26 @@ Q = (program
 )
 ==== input ====
 foo
+==== types ====
+export interface QRow {
+  x: Node;
+}
+
+export interface Q {
+  row: QRow | null;
+  x: Node | null;
+}
+==== output ====
+{
+  "x": null,
+  "row": {
+    "x": {
+      "kind": "identifier",
+      "text": "foo",
+      "span": [0, 3]
+    }
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -54,15 +74,6 @@ Q:
   15  ...  
   16   !   [Null Set(M1) StructOpen] (identifier) [Node Set(M0) StructClose Set(M2)]  14
   19  ─‣─  _                                11, 16, 19
-==== types ====
-export interface QRow {
-  x: Node;
-}
-
-export interface Q {
-  row: QRow | null;
-  x: Node | null;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -88,5 +99,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"x":null,"row":{"x":{"kind":"identifier","text":"foo","span":[0, 3]}}}

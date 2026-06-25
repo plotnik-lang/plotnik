@@ -1,6 +1,12 @@
 Q = (program (expression_statement (array (array (array (number) @n .) .) .)))
 ==== input ====
 [[[1]], x]
+==== types ====
+export interface Q {
+  n: Node;
+}
+==== output ====
+<no match>
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -47,10 +53,6 @@ Q:
   23   !   (array)                          24
   24  └‣─  _                                20, 21
   26  ─‣─  _                                23, 26
-==== types ====
-export interface Q {
-  n: Node;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -123,5 +125,3 @@ Q:
        ○   ]
   26  ❮❮❮ 
   26       _                                23, 26
-==== output ====
-<no match>

@@ -2,6 +2,24 @@ Name = (identifier) @text
 Q = (program (function_declaration name: (Name) @fn))
 ==== input ====
 function foo(){}
+==== types ====
+export interface Name {
+  text: Node;
+}
+
+export interface Q {
+  fn: Name;
+}
+==== output ====
+{
+  "fn": {
+    "text": {
+      "kind": "identifier",
+      "text": "foo",
+      "span": [9, 12]
+    }
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -50,14 +68,6 @@ Q:
   15  -ε-                                   16
   16  ─‣┘² [Set(M1)] _                      18
   18                                        ▶
-==== types ====
-export interface Name {
-  text: Node;
-}
-
-export interface Q {
-  fn: Name;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -87,5 +97,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"fn":{"text":{"kind":"identifier","text":"foo","span":[9, 12]}}}

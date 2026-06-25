@@ -2,6 +2,20 @@ A = (lexical_declaration)
 Q = (program (A) @a)
 ==== input ====
 let x;
+==== types ====
+export interface Q {
+  a: Node;
+}
+
+export type A = undefined;
+==== output ====
+{
+  "a": {
+    "kind": "lexical_declaration",
+    "text": "let x;",
+    "span": [0, 6]
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -44,12 +58,6 @@ Q:
   10  -ε-  [Node Set(M0)]                   12
   12  ─‣┘  _                                13
   13                                        ▶
-==== types ====
-export interface Q {
-  a: Node;
-}
-
-export type A = undefined;
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -76,5 +84,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"a":{"kind":"lexical_declaration","text":"let x;","span":[0, 6]}}

@@ -1,6 +1,10 @@
 Q = (program (comment)? (comment)? (comment)?)
 ==== input ====
 // c
+==== types ====
+export type Q = undefined;
+==== output ====
+null
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -49,8 +53,6 @@ Q:
   38   !   (comment)                        36, 29, 15
   40  ─‣─  _                                38, 40
   42  └‣─  _                                38, 40
-==== types ====
-export type Q = undefined;
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -75,5 +77,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-null
