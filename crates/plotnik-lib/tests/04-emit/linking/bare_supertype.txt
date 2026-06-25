@@ -6,4 +6,4 @@ error: `expression` is a supertype, not a node kind
 1 | Q = (expression)
   |      ^^^^^^^^^^
   |
-help: use `(expression#)` instead
+help: use `(expression#)` instead, but it's not supported yet

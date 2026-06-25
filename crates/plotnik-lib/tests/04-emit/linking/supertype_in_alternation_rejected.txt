@@ -3,7 +3,7 @@ Q = [
   (identifier)
 ]
 ==== diagnostics ====
-error: supertype matching is written `expression#`, but it is not supported yet
+error: matching the `expression#` supertype is not supported yet
  --> query.ptk:2:4
   |
 2 |   (expression#statement_block)

@@ -563,15 +563,19 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 .report(DiagnosticKind::UnsupportedSupertype, span)
                 .detail(name.as_str());
             if !subtypes.is_empty() {
-                builder =
-                    builder.hint(format!("subtypes of `{name}`: {}", format_list(&subtypes, 8)));
+                builder = builder.hint(format!(
+                    "subtypes of `{name}`: {}",
+                    format_list(&subtypes, 8)
+                ));
             }
             builder.emit();
         } else {
             self.diag
                 .report(DiagnosticKind::BareSupertype, span)
                 .detail(name.as_str())
-                .hint(format!("use `({name}#)` instead"))
+                .hint(format!(
+                    "use `({name}#)` instead, but it's not supported yet"
+                ))
                 .emit();
         }
         true

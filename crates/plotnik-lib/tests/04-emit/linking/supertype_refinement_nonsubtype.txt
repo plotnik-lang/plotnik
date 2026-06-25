@@ -1,6 +1,6 @@
 Q = (expression#statement_block)
 ==== diagnostics ====
-error: supertype matching is written `expression#`, but it is not supported yet
+error: matching the `expression#` supertype is not supported yet
  --> query.ptk:1:6
   |
 1 | Q = (expression#statement_block)

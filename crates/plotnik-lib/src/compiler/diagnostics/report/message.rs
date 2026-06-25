@@ -336,7 +336,7 @@ impl DiagnosticKind {
             Self::FieldNotOnNodeKind => "field not valid on this node kind",
             Self::InvalidFieldChildType => "node kind not valid for this field",
             Self::InvalidChildType => "node kind not valid as child",
-            Self::UnsupportedSupertype => "supertype matching is not supported yet",
+            Self::UnsupportedSupertype => "matching a supertype is not supported yet",
             Self::BareSupertype => "supertype must be written with `#`",
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
             Self::NegatedRequiredField => "this field is always present",
@@ -378,7 +378,7 @@ impl DiagnosticKind {
             Self::InvalidFieldChildType => "{}".to_string(),
             Self::InvalidChildType => "`{}` cannot be a child of this node".to_string(),
             Self::UnsupportedSupertype => {
-                "supertype matching is written `{}#`, but it is not supported yet".to_string()
+                "matching the `{}#` supertype is not supported yet".to_string()
             }
             Self::BareSupertype => "`{}` is a supertype, not a node kind".to_string(),
             Self::ChildUnderLeafToken => "`{}` is a leaf token — it has no child nodes".to_string(),
