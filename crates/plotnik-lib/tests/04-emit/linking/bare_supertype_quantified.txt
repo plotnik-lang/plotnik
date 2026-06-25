@@ -1,0 +1,9 @@
+Q = (program (statement)* @s)
+==== diagnostics ====
+error: `statement` is a supertype, not a node kind
+ --> query.ptk:1:15
+  |
+1 | Q = (program (statement)* @s)
+  |               ^^^^^^^^^
+  |
+help: use `(statement#)` instead, but it's not supported yet

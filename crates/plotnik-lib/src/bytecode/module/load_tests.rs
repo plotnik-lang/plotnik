@@ -943,7 +943,7 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
     // A wrapper/alias TypeDef holds its inner TypeId in `data` (bytes 0-1 of the
     // 4-byte entry); it must address a real def or `unwrap_optional` / the array
     // element lookup resolves a type out of range.
-    let mut bytes = emit_bytes(r#"Top = (program (statement)* @stmts)"#);
+    let mut bytes = emit_bytes(r#"Top = (program (expression_statement)* @stmts)"#);
     let (defs_off, type_defs, wrapper_idx) = {
         let m = Module::load(&bytes).expect("module loads before tampering");
         let types = m.types();
@@ -1000,7 +1000,7 @@ fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
 fn forged_nonzero_wrapper_typedef_count_is_rejected() {
     // A wrapper/alias TypeDef uses `data` for its inner id but reserves `count`
     // (byte 2) as zero. A non-zero count must be rejected.
-    let mut bytes = emit_bytes(r#"Top = (program (statement)* @stmts)"#);
+    let mut bytes = emit_bytes(r#"Top = (program (expression_statement)* @stmts)"#);
     let (defs_off, wrapper_idx) = {
         let m = Module::load(&bytes).expect("module loads before tampering");
         let types = m.types();

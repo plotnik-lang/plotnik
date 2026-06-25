@@ -433,19 +433,15 @@ impl NodePattern {
         })
     }
 
-    /// For a `#subtype` (or deprecated `/subtype`) refinement, returns the subtype kind
-    /// token: `(expression#statement_block)` → `statement_block`. Returns `None` for a bare
-    /// category `(expression#)`, a plain node, or a string subtype (`#"x"`) — the last of
-    /// which structural validation conservatively skips.
-    pub fn subtype(&self) -> Option<SyntaxToken> {
-        let mut tokens = self
-            .0
+    /// True when the node carries a supertype marker — `#`, or the deprecated `/` — whether or
+    /// not a subtype follows it. Both `(expression#)` and `(expression#binary_expression)` are
+    /// true; a plain `(expression)` is false. Distinguishes an explicit supertype match from a
+    /// bare node that happens to name a supertype.
+    pub fn has_supertype_marker(&self) -> bool {
+        self.0
             .children_with_tokens()
-            .filter_map(|it| it.into_token());
-        tokens
-            .by_ref()
-            .find(|t| matches!(t.kind(), SyntaxKind::Hash | SyntaxKind::Slash))?;
-        tokens.find(|t| t.kind() == SyntaxKind::Id)
+            .filter_map(|it| it.into_token())
+            .any(|t| matches!(t.kind(), SyntaxKind::Hash | SyntaxKind::Slash))
     }
 
     pub fn is_any(&self) -> bool {

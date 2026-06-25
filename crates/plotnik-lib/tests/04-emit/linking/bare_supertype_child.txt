@@ -1,0 +1,9 @@
+Q = (decorator (expression))
+==== diagnostics ====
+error: `expression` is a supertype, not a node kind
+ --> query.ptk:1:17
+  |
+1 | Q = (decorator (expression))
+  |                 ^^^^^^^^^^
+  |
+help: use `(expression#)` instead, but it's not supported yet

@@ -10,7 +10,6 @@ use crate::core::{NodeFieldId, NodeKind, NodeKindId};
 
 use super::diagnostics::format_list;
 use super::link::GrammarLinker;
-use super::utils::find_similar;
 
 impl<'a, 'q> GrammarLinker<'a, 'q> {
     /// Walk the query, validating each node's own grammar constraints. See `AdmissibilityMode` for why
@@ -28,12 +27,12 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         match located.node() {
             Pattern::NodePattern(node) => {
                 let located_node = located.wrap(node.clone());
-                let child_ctx = self.resolve_node_context(&located_node);
-
-                // A `#subtype` refinement must denote a satisfiable kind of its base type.
-                if mode.is_required() {
-                    self.validate_subtype(&located_node);
+                // The VM only matches concrete tree-sitter node kinds today. Stop here so
+                // this unsupported supertype does not become context for child checks.
+                if self.reject_supertype_match(&located_node) {
+                    return;
                 }
+                let child_ctx = self.resolve_node_context(&located_node);
 
                 // Predicates are only valid on leaf nodes. Skipped under a disjunction/option,
                 // where this position need not match for the query to.
@@ -529,99 +528,57 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         !types.is_empty() && types.iter().all(|&id| self.grammar.is_anonymous_node(id))
     }
 
-    /// Whether two kinds can denote the same concrete node — i.e. their subtype closures (each
-    /// including the kind itself) intersect. Even sibling supertypes can share a concrete member,
-    /// so a non-empty overlap is what makes a `(super#sub)` refinement satisfiable.
-    fn subtypes_overlap(&self, a: NodeKindId, b: NodeKindId) -> bool {
-        let a_members = self.kind_with_subtypes(a);
-        let b_members = self.kind_with_subtypes(b);
-        !a_members.is_disjoint(&b_members)
-    }
-
-    /// A `(supertype#subtype)` refinement must be satisfiable — its base and refinement subtype
-    /// closures must overlap.
-    fn validate_subtype(&mut self, located: &Located<NodePattern>) {
+    /// Reject supertype patterns before lowering can emit a concrete-kind match that never fires.
+    /// Bare `(expression)` gets a syntax-oriented diagnostic; marked `(expression#...)` gets the
+    /// unsupported-feature diagnostic.
+    /// Returns whether the node was rejected.
+    fn reject_supertype_match(&mut self, located: &Located<NodePattern>) -> bool {
         let node = located.node();
-        let Some(sub_token) = node.subtype() else {
-            return;
+        let Some(kind_token) = node.kind_token() else {
+            return false;
         };
-        let Some(super_token) = node.kind_token() else {
-            return;
+        let Some(id) = self.resolve_named_node_id(located) else {
+            return false;
         };
-        if matches!(
-            super_token.kind(),
-            SyntaxKind::Underscore | SyntaxKind::KwError | SyntaxKind::KwMissing
-        ) {
-            return;
-        }
-        let Some(super_id) = self.resolve_named_node_id(located) else {
-            return;
-        };
-
-        let sub_name = sub_token.text();
-        let Some(sub_id) = self.grammar.resolve_named_node(sub_name) else {
-            let all_types = self.grammar.all_named_node_kinds();
-            let suggestion = find_similar(sub_name, &all_types).map(str::to_string);
-            let mut builder = self
-                .diag
-                .report(
-                    DiagnosticKind::UnknownNodeKind,
-                    located.span_of(sub_token.text_range()),
-                )
-                .detail(sub_name);
-            if let Some(similar) = suggestion {
-                builder = builder.fix(format!("did you mean `{}`?", similar), similar);
-            }
-            builder.emit();
-            return;
-        };
-
-        // Refining a concrete kind is meaningless, but accept it. For a supertype base, the
-        // refinement is impossible only when no concrete node can be both — i.e. when the two
-        // subtype closures are disjoint. Testing `sub ∈ subtypes(super)` alone over-rejects when
-        // `sub` is itself a supertype that overlaps `super` (e.g. C# `preproc_if` is both a
-        // `statement` and a `declaration`, so `(statement#declaration)` can match).
-        if !self.grammar.is_supertype(super_id) || self.subtypes_overlap(super_id, sub_id) {
-            return;
+        if !self.grammar.is_supertype(id) {
+            return false;
         }
 
-        let super_name = self
+        let name = self
             .grammar
-            .node_kind(super_id)
+            .node_kind(id)
             .expect("resolved supertype must have a name")
             .to_string();
-        let kinds = self
-            .grammar
-            .subtypes(super_id)
-            .iter()
-            .filter_map(|&id| self.grammar.node_kind(id))
-            .collect::<Vec<_>>();
-        let kinds_hint = (!kinds.is_empty()).then(|| {
-            format!(
-                "subtypes of `{}` include: {}",
-                super_name,
-                format_list(&kinds, 8)
-            )
-        });
+        let span = located.span_of(kind_token.text_range());
 
-        let mut builder = self
-            .diag
-            .report(
-                DiagnosticKind::InvalidSubtype,
-                located.span_of(sub_token.text_range()),
-            )
-            .detail(format!(
-                "`{}` is not a subtype of `{}`",
-                sub_name, super_name
-            ))
-            .related_to(
-                located.span_of(super_token.text_range()),
-                format!("base type `{}`", super_name),
-            );
-        if let Some(hint) = kinds_hint {
-            builder = builder.hint(hint);
+        if node.has_supertype_marker() {
+            let subtypes = self
+                .grammar
+                .subtypes(id)
+                .iter()
+                .filter_map(|&sub| self.grammar.node_kind(sub))
+                .collect::<Vec<_>>();
+            let mut builder = self
+                .diag
+                .report(DiagnosticKind::UnsupportedSupertype, span)
+                .detail(name.as_str());
+            if !subtypes.is_empty() {
+                builder = builder.hint(format!(
+                    "subtypes of `{name}`: {}",
+                    format_list(&subtypes, 8)
+                ));
+            }
+            builder.emit();
+        } else {
+            self.diag
+                .report(DiagnosticKind::BareSupertype, span)
+                .detail(name.as_str())
+                .hint(format!(
+                    "use `({name}#)` instead, but it's not supported yet"
+                ))
+                .emit();
         }
-        builder.emit();
+        true
     }
 }
 
