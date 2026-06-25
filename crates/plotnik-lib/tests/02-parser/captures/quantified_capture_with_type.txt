@@ -7,13 +7,13 @@ Root
     Equals "="
     Capture
       Quantifier
-        Tree
+        NamedNode
           ParenOpen "("
           Id "statement"
           ParenClose ")"
         Plus "+"
       CaptureToken "@stmts"
-      Type
+      TypeAnnotation
         DoubleColon "::"
         Id "Statement"
 ==== ast ====

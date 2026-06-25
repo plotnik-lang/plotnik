@@ -1,5 +1,5 @@
 'it\'s'
 ==== tokens ====
 SingleQuote "'"
-StrVal "it\\'s"
+StringContent "it\\'s"
 SingleQuote "'"

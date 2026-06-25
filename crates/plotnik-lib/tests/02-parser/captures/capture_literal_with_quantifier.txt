@@ -9,7 +9,7 @@ Root
       Quantifier
         Str
           DoubleQuote "\""
-          StrVal ","
+          StringContent ","
           DoubleQuote "\""
         Star "*"
       CaptureToken "@commas"

@@ -5,7 +5,7 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       KwMissing "MISSING"
       Id "identifier"

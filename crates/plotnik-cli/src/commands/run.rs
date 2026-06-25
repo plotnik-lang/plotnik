@@ -2,8 +2,7 @@
 
 use std::path::PathBuf;
 
-use plotnik_lib::engine::{RuntimeError, VM, materialize_verified};
-use plotnik_lib::{Colors, RuntimeLimitSpec};
+use plotnik_lib::{Colors, RuntimeError, RuntimeLimitSpec, VM, materialize_verified};
 
 use super::run_common::{self, ExecPlan, ExecRequest};
 use super::runtime_report::render_runtime_error;
@@ -39,7 +38,7 @@ pub fn run(args: RunArgs) -> CliResult {
     })?;
 
     let vm = VM::builder(&source_code, &tree).limits(args.limits).build();
-    let effects = match vm.execute(&module, 0, &entrypoint) {
+    let effects = match vm.execute(&module, &entrypoint) {
         Ok(effects) => effects,
         Err(RuntimeError::NoMatch) => {
             // Zero matches must never be silent

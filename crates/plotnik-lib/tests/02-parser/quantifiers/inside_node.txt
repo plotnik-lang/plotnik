@@ -5,11 +5,11 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "block"
       Quantifier
-        Tree
+        NamedNode
           ParenOpen "("
           Id "statement"
           ParenClose ")"

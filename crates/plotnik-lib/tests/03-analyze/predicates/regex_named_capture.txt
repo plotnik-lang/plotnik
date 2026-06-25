@@ -13,4 +13,3 @@ help: remove the named-capture marker
   |
 help: regex captures are inert in plotnik; capture nodes with `@name` outside the regex
 ==== symbols ====
-Q

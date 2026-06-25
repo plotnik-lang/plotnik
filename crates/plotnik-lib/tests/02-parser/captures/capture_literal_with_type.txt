@@ -8,10 +8,10 @@ Root
     Capture
       Str
         DoubleQuote "\""
-        StrVal "return"
+        StringContent "return"
         DoubleQuote "\""
       CaptureToken "@kw"
-      Type
+      TypeAnnotation
         DoubleColon "::"
         Id "Foo"
 ==== ast ====

@@ -11,24 +11,24 @@ Root
   Def
     Id "NestedCall"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "call_expression"
       Field
         Id "function"
         Colon ":"
-        Alt
+        Alternation
           BracketOpen "["
           Branch
             Capture
-              Tree
+              NamedNode
                 ParenOpen "("
                 Id "identifier"
                 ParenClose ")"
               CaptureToken "@name"
           Branch
             Capture
-              Ref
+              DefRef
                 ParenOpen "("
                 Id "NestedCall"
                 ParenClose ")"
@@ -37,7 +37,7 @@ Root
       Field
         Id "arguments"
         Colon ":"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "arguments"
           ParenClose ")"

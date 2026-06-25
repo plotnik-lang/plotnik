@@ -8,4 +8,3 @@ error: lookahead/lookbehind is not supported in regex
   |
 help: the regex engine cannot match lookaround; match the surrounding context with the query pattern instead
 ==== symbols ====
-Q

@@ -5,11 +5,11 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "dotted_name"
       Capture
-        Tree
+        NamedNode
           ParenOpen "("
           Id "identifier"
           ParenClose ")"
@@ -17,7 +17,7 @@ Root
       Anchor
         Dot "."
       Capture
-        Tree
+        NamedNode
           ParenOpen "("
           Id "identifier"
           ParenClose ")"

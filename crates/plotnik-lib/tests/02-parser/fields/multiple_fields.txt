@@ -8,20 +8,20 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "assignment"
       Field
         Id "left"
         Colon ":"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "identifier"
           ParenClose ")"
       Field
         Id "right"
         Colon ":"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "expression"
           ParenClose ")"

@@ -284,7 +284,7 @@ impl TraceOpts {
 
 impl From<TraceOpts> for TraceArgs {
     fn from(p: TraceOpts) -> Self {
-        use plotnik_lib::engine::Verbosity;
+        use plotnik_lib::Verbosity;
 
         let verbosity = match p.verbose {
             0 => Verbosity::Default,

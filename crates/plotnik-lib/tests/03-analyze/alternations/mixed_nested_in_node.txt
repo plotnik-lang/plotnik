@@ -15,4 +15,3 @@ error: cannot mix enum and union branches
   |
 help: use all labels for an enum, or none for a merged struct
 ==== symbols ====
-Q

@@ -17,11 +17,21 @@ autotests = false
 workspace = true
 
 [dependencies]
-plotnik-bytecode.workspace = true
-plotnik-compiler = { path = "../plotnik-compiler", version = "0.3.3", default-features = false }
-plotnik-core.workspace = true
-plotnik-vm.workspace = true
+annotate-snippets = "0.12.9"
+arborium-tree-sitter = "2.18.0"
+bitflags = "2"
+crc32fast = "1.4"
+indexmap = { version = "2", features = ["serde"] }
+log = "0.4"
+logos = "0.16.0"
+regex-automata = { version = "0.4", features = ["dfa-search"] }
+regex-syntax = "0.8"
+rowan = "0.16.1"
+rustc-hash = "2"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+thiserror = "2.0.17"
+topological-sort = "0.2"
 
 [features]
 default = []
@@ -45,12 +55,6 @@ tempfile = "=3.27.0"
 name = "snapshots"
 path = "tests/mod.rs"
 harness = false
-
-# Stack-safety regression for VM backtracking. Standard libtest harness, so it must
-# be declared by hand too (autotests = false suppresses autodiscovery).
-[[test]]
-name = "stack_safety"
-path = "tests/stack_safety.rs"
 
 # Property safety net: arbitrary query/source never panics or aborts the pipeline.
 [[test]]

@@ -23,9 +23,8 @@ use proptest::prelude::*;
 use proptest::sample::select;
 
 use plotnik_lib::bytecode::Module;
-use plotnik_lib::emit::emit;
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
-use plotnik_lib::{Colors, QueryBuilder, SourceMap, VM, materialize_verified};
+use plotnik_lib::{Colors, QueryBuilder, VM, materialize_verified};
 
 /// Queries known to compile, spanning the shapes whose runtime paths matter:
 /// a root match, a leaf match, an alternation, a scalar quantifier, a row
@@ -53,14 +52,13 @@ fn javascript_grammar() -> &'static Grammar {
 /// Compile a query without ever panicking: `None` if it does not parse, link
 /// cleanly, or emit. Mirrors the production `run` path (validity gate + `emit`).
 fn try_compile(query: &str) -> Option<Vec<u8>> {
-    let mut sm = SourceMap::new();
-    sm.add_file("q.ptk", query);
-    let parsed = QueryBuilder::new(sm).parse().ok()?;
-    let linked = parsed.analyze().link(javascript_grammar());
-    if !linked.is_valid() {
+    let compiled = QueryBuilder::from_inline(query)
+        .compile(javascript_grammar())
+        .ok()?;
+    if !compiled.is_valid() {
         return None;
     }
-    emit(&linked).ok()
+    compiled.bytecode().map(|bytes| bytes.to_vec())
 }
 
 fn parse_js(source: &str) -> Tree {
@@ -75,13 +73,19 @@ fn parse_js(source: &str) -> Tree {
 /// here fails the property.
 fn exercise_pipeline(module: &Module, source: &str) {
     let tree = parse_js(source);
-    let entrypoints = module.entrypoints();
-    for i in 0..entrypoints.len() {
-        let entry = entrypoints.get(i);
+    for i in 0..module.entrypoint_count() {
+        let entry = module
+            .entrypoint_at(i)
+            .expect("entrypoint_count bounds entrypoint_at");
         let vm = VM::builder(source, &tree).build();
-        if let Ok(effects) = vm.execute(module, 0, &entry) {
-            let value =
-                materialize_verified(source, module, &entry, effects.as_slice(), Colors::new(false));
+        if let Ok(effects) = vm.execute(module, &entry) {
+            let value = materialize_verified(
+                source,
+                module,
+                &entry,
+                effects.as_slice(),
+                Colors::new(false),
+            );
             let _ = value.format(false, Colors::new(false));
         }
     }

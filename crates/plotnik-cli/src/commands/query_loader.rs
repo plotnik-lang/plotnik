@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 
-use plotnik_lib::SourceMap;
+use plotnik_lib::{SourceMap, SourcePath};
 
 use crate::cli::shebang::{ShebangDecl, parse_shebang};
 use crate::error::CliError;
@@ -55,7 +55,8 @@ fn load_file(path: &Path) -> Result<QuerySources, CliError> {
     let content = read_file(path)?;
     let shebang = extract_shebang(&content, &path.display().to_string())?;
     let mut sources = SourceMap::new();
-    sources.add_file(&path.to_string_lossy(), &content);
+    let source_path = path.to_string_lossy();
+    sources.add_file(SourcePath::new(&source_path), &content);
     Ok(QuerySources { sources, shebang })
 }
 
@@ -110,7 +111,8 @@ fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
             &display,
         )?;
 
-        sources.add_file(&path.to_string_lossy(), &content);
+        let source_path = path.to_string_lossy();
+        sources.add_file(SourcePath::new(&source_path), &content);
     }
 
     Ok(QuerySources { sources, shebang })
@@ -119,7 +121,7 @@ fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
 /// Normalize aliases (`ts` → `typescript`) so workspace agreement isn't
 /// fooled by spelling. Unknown names stay raw; resolution errors surface later.
 fn normalize_lang_alias(raw: &str) -> String {
-    plotnik::language_registry::from_name(raw)
+    crate::language_registry::from_name(raw)
         .map(|l| l.name().to_string())
         .unwrap_or_else(|| raw.to_string())
 }

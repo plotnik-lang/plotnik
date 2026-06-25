@@ -9,42 +9,42 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Tree
+      NamedNode
         ParenOpen "("
         Id "function"
         Capture
           Field
             Id "name"
             Colon ":"
-            Tree
+            NamedNode
               ParenOpen "("
               Id "identifier"
               ParenClose ")"
           CaptureToken "@name"
-          Type
+          TypeAnnotation
             DoubleColon "::"
             Id "Foo"
         Field
           Id "body"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "block"
             Capture
               Quantifier
-                Tree
+                NamedNode
                   ParenOpen "("
                   Id "statement"
                   ParenClose ")"
                 Star "*"
               CaptureToken "@body_stmts"
-              Type
+              TypeAnnotation
                 DoubleColon "::"
                 Id "Statement"
             ParenClose ")"
         ParenClose ")"
       CaptureToken "@func"
-      Type
+      TypeAnnotation
         DoubleColon "::"
         Id "Function"
 ==== ast ====

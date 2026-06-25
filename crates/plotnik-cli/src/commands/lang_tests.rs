@@ -1,7 +1,7 @@
-use plotnik_core::grammar::raw::{RawGrammar, RawRule};
+use plotnik_lib::grammar::raw::{RawGrammar, RawRule};
 
 use super::lang::GrammarPrinter;
-use plotnik::language_registry::{self, Lang};
+use crate::language_registry::{self, Lang};
 
 fn smoke_test(lang: &Lang, source: &str, expected_root: &str) {
     let tree = lang.parse_source(source);
@@ -68,58 +68,4 @@ fn grammar_dump_renders_synthetic_raw_grammar() {
     assert!(output.contains("extras = [\n  (comment)\n]\n\n"));
     assert!(output.contains("program = {\n  body: (statement)?\n}\n\n"));
     assert!(output.contains("statement = \"let\"\n\n"));
-}
-
-#[test]
-fn lang_info_has_aliases() {
-    let langs = language_registry::all();
-    assert!(!langs.is_empty());
-
-    for lang in &langs {
-        assert!(!lang.name().is_empty(), "name should not be empty");
-        assert!(
-            !lang.aliases().is_empty(),
-            "aliases should not be empty for {}",
-            lang.name()
-        );
-    }
-}
-
-#[test]
-fn lang_from_name_canonical() {
-    let langs = language_registry::all();
-
-    for lang in &langs {
-        let resolved = language_registry::from_name(lang.name());
-        assert!(
-            resolved.is_some(),
-            "canonical name '{}' should resolve",
-            lang.name()
-        );
-    }
-}
-
-#[test]
-fn lang_from_name_aliases() {
-    let langs = language_registry::all();
-
-    for lang in &langs {
-        for alias in lang.aliases() {
-            let resolved = language_registry::from_name(alias);
-            assert!(resolved.is_some(), "alias '{}' should resolve", alias);
-        }
-    }
-}
-
-#[test]
-fn lang_extensions_are_exposed() {
-    let langs = language_registry::all();
-
-    for lang in &langs {
-        assert!(
-            !lang.extensions().is_empty(),
-            "extensions should not be empty for {}",
-            lang.name()
-        );
-    }
 }

@@ -1,6 +1,5 @@
-use plotnik::language_registry::{self, Lang};
-
 use crate::error::CliError;
+use crate::language_registry::{self, Lang};
 
 /// Resolve a language name or alias, with typo suggestions on failure.
 pub fn resolve_lang_name(name: &str) -> Result<&'static Lang, CliError> {
@@ -28,8 +27,7 @@ pub fn reconcile_lang(
             .map(Some),
         (Some(explicit_name), Some(declared_name)) => {
             let explicit_lang = resolve_lang_name(explicit_name)?;
-            let declared_lang =
-                resolve_lang_name(declared_name).map_err(wrap_shebang_error)?;
+            let declared_lang = resolve_lang_name(declared_name).map_err(wrap_shebang_error)?;
             if !std::ptr::eq(explicit_lang, declared_lang) {
                 return Err(CliError::fatal(format!(
                     "-l {} conflicts with the shebang declaration '{}'",

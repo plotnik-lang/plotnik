@@ -3,6 +3,6 @@
 ParenOpen "("
 KwMissing "MISSING"
 DoubleQuote "\""
-StrVal ";"
+StringContent ";"
 DoubleQuote "\""
 ParenClose ")"

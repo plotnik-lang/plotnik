@@ -9,24 +9,24 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "if"
       Field
         Id "condition"
         Colon ":"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "expr"
           ParenClose ")"
-      Tree
+      NamedNode
         ParenOpen "("
         Id "then_block"
         ParenClose ")"
       Field
         Id "else"
         Colon ":"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "else_block"
           ParenClose ")"

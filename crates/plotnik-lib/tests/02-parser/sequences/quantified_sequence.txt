@@ -10,16 +10,16 @@ Root
     Equals "="
     Capture
       Quantifier
-        Seq
+        Sequence
           BraceOpen "{"
           Capture
-            Tree
+            NamedNode
               ParenOpen "("
               Id "a"
               ParenClose ")"
             CaptureToken "@a"
           Capture
-            Tree
+            NamedNode
               ParenOpen "("
               Id "b"
               ParenClose ")"

@@ -12,9 +12,6 @@ pub mod runtime_report;
 pub mod trace;
 
 #[cfg(test)]
-mod abi_compat_tests;
-
-#[cfg(test)]
 mod check_tests;
 
 #[cfg(test)]

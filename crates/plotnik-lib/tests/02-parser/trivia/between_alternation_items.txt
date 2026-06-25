@@ -10,19 +10,19 @@ Root
     Whitespace " "
     Equals "="
     Whitespace " "
-    Alt
+    Alternation
       BracketOpen "["
       Newline "\n"
       Whitespace "    "
       Branch
-        Tree
+        NamedNode
           ParenOpen "("
           Id "a"
           ParenClose ")"
       Newline "\n"
       Whitespace "    "
       Branch
-        Tree
+        NamedNode
           ParenOpen "("
           Id "b"
           ParenClose ")"

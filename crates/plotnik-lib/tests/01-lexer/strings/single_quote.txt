@@ -1,5 +1,5 @@
 'hello'
 ==== tokens ====
 SingleQuote "'"
-StrVal "hello"
+StringContent "hello"
 SingleQuote "'"

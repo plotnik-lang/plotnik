@@ -8,7 +8,7 @@ Root
     Equals "="
     Whitespace " "
     Capture
-      Tree
+      NamedNode
         ParenOpen "("
         Id "identifier"
         ParenClose ")"

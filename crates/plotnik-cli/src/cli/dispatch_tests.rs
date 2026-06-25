@@ -159,8 +159,14 @@ fn check_accepts_run_flags() {
 #[test]
 fn check_accepts_trace_flags() {
     let cmd = check_command();
-    let result =
-        cmd.try_get_matches_from(["check", "query.ptk", "--max-steps", "500", "-vv", "--no-result"]);
+    let result = cmd.try_get_matches_from([
+        "check",
+        "query.ptk",
+        "--max-steps",
+        "500",
+        "-vv",
+        "--no-result",
+    ]);
     assert!(
         result.is_ok(),
         "check should accept trace flags: {:?}",
@@ -193,8 +199,14 @@ fn infer_accepts_run_flags() {
 #[test]
 fn infer_accepts_trace_flags() {
     let cmd = infer_command();
-    let result =
-        cmd.try_get_matches_from(["infer", "query.ptk", "--max-steps", "500", "-vv", "--no-result"]);
+    let result = cmd.try_get_matches_from([
+        "infer",
+        "query.ptk",
+        "--max-steps",
+        "500",
+        "-vv",
+        "--no-result",
+    ]);
     assert!(
         result.is_ok(),
         "infer should accept trace flags: {:?}",
@@ -765,16 +777,6 @@ fn exec_is_a_hidden_alias_of_run() {
 
     let m = result.unwrap();
     assert_eq!(m.subcommand_name(), Some("run"));
-}
-
-#[test]
-fn version_flag_works() {
-    let cmd = crate::cli::build_cli();
-    let err = cmd
-        .try_get_matches_from(["plotnik", "--version"])
-        .unwrap_err();
-
-    assert_eq!(err.kind(), clap::error::ErrorKind::DisplayVersion);
 }
 
 #[test]

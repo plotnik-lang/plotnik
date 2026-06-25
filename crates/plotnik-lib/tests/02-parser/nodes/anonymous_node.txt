@@ -7,7 +7,7 @@ Root
     Equals "="
     Str
       DoubleQuote "\""
-      StrVal "if"
+      StringContent "if"
       DoubleQuote "\""
 ==== ast ====
 # query.ptk

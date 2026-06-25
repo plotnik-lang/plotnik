@@ -1,6 +1,10 @@
 mod cli;
 mod commands;
 mod error;
+mod language_registry;
+
+#[cfg(test)]
+mod language_registry_tests;
 
 use std::io;
 use std::process::ExitCode;
@@ -8,8 +12,8 @@ use std::process::ExitCode;
 use clap::ArgMatches;
 
 use cli::{
-    AstOpts, CheckOpts, DumpOpts, InferOpts, LangDumpOpts, RunOpts, TraceOpts,
-    build_cli, route_default_subcommand,
+    AstOpts, CheckOpts, DumpOpts, InferOpts, LangDumpOpts, RunOpts, TraceOpts, build_cli,
+    route_default_subcommand,
 };
 use error::CliResult;
 

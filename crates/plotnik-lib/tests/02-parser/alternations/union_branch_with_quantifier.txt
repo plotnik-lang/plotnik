@@ -8,17 +8,17 @@ Root
   Def
     Id "Q"
     Equals "="
-    Alt
+    Alternation
       BracketOpen "["
       Branch
-        Tree
+        NamedNode
           ParenOpen "("
           Id "identifier"
           ParenClose ")"
       Branch
         Capture
           Quantifier
-            Tree
+            NamedNode
               ParenOpen "("
               Id "string"
               ParenClose ")"

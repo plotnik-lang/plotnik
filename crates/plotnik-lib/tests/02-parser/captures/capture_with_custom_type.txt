@@ -6,12 +6,12 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Tree
+      NamedNode
         ParenOpen "("
         Id "function_declaration"
         ParenClose ")"
       CaptureToken "@fn"
-      Type
+      TypeAnnotation
         DoubleColon "::"
         Id "FunctionDecl"
 ==== ast ====

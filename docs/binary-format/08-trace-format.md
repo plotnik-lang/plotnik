@@ -428,4 +428,4 @@ For the complete table of connector symbols, see [07-dump-format.md](07-dump-for
 ## Files
 
 - `crates/plotnik-cli/src/commands/trace.rs` — Command implementation
-- `crates/plotnik-lib/src/engine/trace.rs` — Tracer trait and PrintTracer
+- `crates/plotnik-lib/src/vm/engine/trace.rs` — Tracer trait and PrintTracer

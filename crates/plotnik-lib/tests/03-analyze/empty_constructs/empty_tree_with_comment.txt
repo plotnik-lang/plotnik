@@ -8,4 +8,3 @@ error: empty `()` matches nothing
   |
 help: use `(_)` to match any named node, or `_` for any node
 ==== symbols ====
-Q

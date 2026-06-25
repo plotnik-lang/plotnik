@@ -31,7 +31,7 @@ Sections appear in fixed order, each starting on a 64-byte boundary:
 | 2   | [RegexBlob]   | 1           | `regex_blob_size`       |
 | 3   | [StringTable] | 4           | `str_table_count + 1`   |
 | 4   | [RegexTable]  | 8           | `regex_table_count + 1` |
-| 5   | [NodeTypes]   | 4           | `node_types_count`      |
+| 5   | [NodeKinds]   | 4           | `node_kinds_count`      |
 | 6   | [NodeFields]  | 4           | `node_fields_count`     |
 | 7   | [TypeDefs]    | 4           | `type_defs_count`       |
 | 8   | [TypeMembers] | 4           | `type_members_count`    |
@@ -43,7 +43,7 @@ Sections appear in fixed order, each starting on a 64-byte boundary:
 [StringTable]: 02-strings.md
 [RegexBlob]: 03-symbols.md#1-regex
 [RegexTable]: 03-symbols.md#1-regex
-[NodeTypes]: 03-symbols.md
+[NodeKinds]: 03-symbols.md
 [NodeFields]: 03-symbols.md
 [TypeDefs]: 04-types.md
 [TypeMembers]: 04-types.md
@@ -83,7 +83,7 @@ struct Header {
     // Bytes 24-41: Element counts (9 × u16) — order matches section order
     str_table_count: u16,
     regex_table_count: u16,
-    node_types_count: u16,
+    node_kinds_count: u16,
     node_fields_count: u16,
     type_defs_count: u16,
     type_members_count: u16,

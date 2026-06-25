@@ -13,15 +13,15 @@ Root
   Def
     Id "Literal"
     Equals "="
-    Alt
+    Alternation
       BracketOpen "["
       Branch
-        Tree
+        NamedNode
           ParenOpen "("
           Id "number"
           ParenClose ")"
       Branch
-        Tree
+        NamedNode
           ParenOpen "("
           Id "string"
           ParenClose ")"
@@ -29,15 +29,15 @@ Root
   Def
     Id "Expr"
     Equals "="
-    Alt
+    Alternation
       BracketOpen "["
       Branch
-        Tree
+        NamedNode
           ParenOpen "("
           Id "identifier"
           ParenClose ")"
       Branch
-        Ref
+        DefRef
           ParenOpen "("
           Id "Literal"
           ParenClose ")"

@@ -7,7 +7,6 @@
 //!
 //! | dir          | sections                                   |
 //! | ------------ | ------------------------------------------ |
-//! | `01-lexer`   | tokens                                     |
 //! | `02-parser`  | cst, ast                                   |
 //! | `03-analyze` | symbols                                    |
 //! | `04-emit`    | bytecode                                   |
@@ -43,11 +42,9 @@ use similar::TextDiff;
 
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
-use plotnik_lib::parser::dump_tokens;
-use plotnik_lib::query::GrammarBoundQuery;
-use plotnik_lib::typegen::typescript;
 use plotnik_lib::{
-    Colors, PrintTracer, QueryBuilder, RuntimeError, SourceMap, VM, Verbosity, materialize_verified,
+    Colors, CompiledQuery, PrintTracer, QueryBuilder, RuntimeError, SourceMap, SourcePath,
+    TypeScriptConfig, VM, Verbosity, materialize_verified,
 };
 
 const FIXTURE_EXT: &str = "txt";
@@ -94,7 +91,11 @@ fn discover(root: &Path) -> Vec<Fixture> {
 
 fn is_stage_dir(name: &str) -> bool {
     let bytes = name.as_bytes();
-    bytes.len() >= 3 && bytes[0].is_ascii_digit() && bytes[1].is_ascii_digit() && bytes[2] == b'-'
+    bytes.len() >= 3
+        && bytes[0].is_ascii_digit()
+        && bytes[1].is_ascii_digit()
+        && bytes[2] == b'-'
+        && !name.starts_with("01-")
 }
 
 fn walk(dir: &Path, stage: &str, root: &Path, out: &mut Vec<Fixture>) {
@@ -236,7 +237,6 @@ fn validate_generated_headers(stage: &str, sections: &[(&str, Vec<&str>)]) -> Re
 
 fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
     match stage.split('-').next().unwrap_or("") {
-        "01" => Some(&["tokens"]),
         "02" => Some(&["diagnostics", "cst", "ast"]),
         "03" => Some(&["diagnostics", "symbols"]),
         "04" => Some(&["diagnostics", "bytecode"]),
@@ -254,15 +254,7 @@ fn parse_section_header(line: &str) -> Option<&str> {
         || inner.starts_with("input.")
         || matches!(
             inner,
-            "tokens"
-                | "cst"
-                | "ast"
-                | "symbols"
-                | "bytecode"
-                | "types"
-                | "trace"
-                | "output"
-                | "diagnostics"
+            "cst" | "ast" | "symbols" | "bytecode" | "types" | "trace" | "output" | "diagnostics"
         );
     known.then_some(inner)
 }
@@ -274,7 +266,6 @@ fn render(
     input: Option<&Input>,
 ) -> Result<Vec<(String, String)>, String> {
     match stage.split('-').next().unwrap_or("") {
-        "01" => Ok(vec![("tokens".into(), dump_tokens(query))]),
         // The `trivia` folder pins how whitespace/comments attach to the CST, so it
         // renders the trivia-inclusive CST; every other parser fixture omits trivia.
         "02" => Ok(render_frontend(
@@ -298,9 +289,8 @@ enum Front {
 
 fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
     let analyzed = QueryBuilder::new(source_map(query))
-        .parse()
-        .expect("query parsing should not exhaust fuel")
-        .analyze();
+        .analyze()
+        .expect("query parsing should not exhaust fuel");
     let diagnostics = analyzed.diagnostics();
     let has_errors = diagnostics.has_errors();
 
@@ -314,18 +304,15 @@ fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
     match kind {
         // Parser recovery fixtures pin diagnostics only; a half-built error CST is noise.
         Front::Parser { trivia } if !has_errors => {
-            let cst = analyzed.printer().cst(true).with_trivia(trivia).dump();
+            let cst = analyzed.dump_cst_with_trivia(trivia);
             out.push(("cst".into(), cst));
-            out.push(("ast".into(), analyzed.printer().dump()));
+            out.push(("ast".into(), analyzed.dump_ast()));
         }
         Front::Parser { .. } => {}
         // The symbol table is meaningful even with unresolved refs, so it renders
         // alongside any error diagnostics rather than being suppressed.
         Front::Analyze => {
-            out.push((
-                "symbols".into(),
-                analyzed.printer().definitions_only(true).dump(),
-            ));
+            out.push(("symbols".into(), analyzed.dump_symbols()));
         }
     }
     out
@@ -343,48 +330,46 @@ fn render_compile(
     kind: Compile,
 ) -> Result<Vec<(String, String)>, String> {
     let lang = Lang::resolve(input.and_then(|i| i.ext.as_deref()))?;
-    let linked = QueryBuilder::new(source_map(query))
-        .parse()
-        .expect("query parsing should not exhaust fuel")
-        .analyze()
-        .link(lang.grammar);
-    let diagnostics = linked.diagnostics();
+    let compiled = QueryBuilder::new(source_map(query))
+        .compile(lang.grammar)
+        .expect("query parsing should not exhaust fuel");
+    let diagnostics = compiled.diagnostics();
 
     let mut out = Vec::new();
     if diagnostics.has_errors() {
         out.push((
             "diagnostics".into(),
-            diagnostics.render(linked.source_map()),
+            diagnostics.render(compiled.source_map()),
         ));
         return Ok(out);
     }
     if diagnostics.has_warnings() {
         out.push((
             "diagnostics".into(),
-            diagnostics.render(linked.source_map()),
+            diagnostics.render(compiled.source_map()),
         ));
     }
 
-    let bytes = linked.emit().expect("valid query should emit");
-    let module = Module::load(&bytes).expect("emitted bytecode should load");
+    let module = compiled
+        .module()
+        .expect("valid query should compile to a module");
 
     match kind {
-        Compile::Bytecode => out.push((
-            "bytecode".into(),
-            dump_bytecode(&module, Colors::new(false)),
-        )),
-        Compile::Types => out.push(("types".into(), render_types(&module))),
+        Compile::Bytecode => {
+            out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))))
+        }
+        Compile::Types => out.push(("types".into(), render_types(&compiled))),
         Compile::Vm => {
-            out.push((
-                "bytecode".into(),
-                dump_bytecode(&module, Colors::new(false)),
-            ));
-            out.push(("types".into(), render_types(&module)));
+            out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))));
+            out.push(("types".into(), render_types(&compiled)));
             let input = input.ok_or_else(|| {
                 "06-vm fixtures require an `==== input ====` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
             })?;
-            let entry = last_def_name(&linked);
-            let (trace, output) = run_vm(&lang, &module, &entry, &input.text)?;
+            let entry = compiled
+                .definition_names()
+                .last()
+                .expect("a valid query has at least one named definition");
+            let (trace, output) = run_vm(&lang, module, &entry, &input.text)?;
             out.push(("trace".into(), trace));
             out.push(("output".into(), output));
         }
@@ -392,20 +377,10 @@ fn render_compile(
     Ok(out)
 }
 
-fn render_types(module: &Module) -> String {
-    typescript::emit(module, typescript::Config::builder().emit_node_interface(false))
-}
-
-/// VM fixtures run the source-last named definition. Entrypoints in the module
-/// are ordered by dependency (SCC), not source, so resolve that definition by name.
-fn last_def_name(query: &GrammarBoundQuery) -> String {
-    query
-        .ast_map()
-        .values()
-        .last()
-        .and_then(|root| root.defs().filter_map(|def| def.name()).last())
-        .map(|name| name.text().to_string())
-        .expect("a valid query has at least one named definition")
+fn render_types(compiled: &CompiledQuery) -> String {
+    compiled
+        .to_typescript(TypeScriptConfig::new().emit_node_interface(false))
+        .expect("valid query should compile to a module")
 }
 
 fn run_vm(
@@ -416,8 +391,7 @@ fn run_vm(
 ) -> Result<(String, String), String> {
     let tree = lang.parse(source);
     let entrypoint = module
-        .entrypoints()
-        .find_by_name(entry, &module.strings())
+        .entrypoint(entry)
         .expect("every named definition is an entrypoint");
 
     let vm = VM::builder(source, &tree).build();
@@ -426,7 +400,7 @@ fn run_vm(
         .colored(false)
         .build();
 
-    let result = vm.execute_with(module, 0, &entrypoint, &mut tracer);
+    let result = vm.execute_with(module, &entrypoint, &mut tracer);
     let trace = tracer.render();
     let output = match result {
         Ok(effects) => {
@@ -487,7 +461,7 @@ fn javascript_grammar() -> &'static Grammar {
 
 fn source_map(query: &str) -> SourceMap {
     let mut sm = SourceMap::new();
-    sm.add_file("query.ptk", query);
+    sm.add_file(SourcePath::new("query.ptk"), query);
     sm
 }
 

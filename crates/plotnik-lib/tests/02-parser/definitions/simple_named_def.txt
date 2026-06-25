@@ -5,7 +5,7 @@ Root
   Def
     Id "Expr"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "identifier"
       ParenClose ")"

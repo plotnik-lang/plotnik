@@ -6,11 +6,11 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Tree
+      NamedNode
         ParenOpen "("
         KwMissing "MISSING"
         DoubleQuote "\""
-        StrVal ";"
+        StringContent ";"
         DoubleQuote "\""
         ParenClose ")"
       CaptureToken "@missing_semi"

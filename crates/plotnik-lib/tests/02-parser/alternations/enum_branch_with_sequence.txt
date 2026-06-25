@@ -11,18 +11,18 @@ Root
   Def
     Id "Q"
     Equals "="
-    Alt
+    Alternation
       BracketOpen "["
       Branch
         Id "Pair"
         Colon ":"
-        Seq
+        Sequence
           BraceOpen "{"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "key"
             ParenClose ")"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "value"
             ParenClose ")"
@@ -30,7 +30,7 @@ Root
       Branch
         Id "Single"
         Colon ":"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "value"
           ParenClose ")"

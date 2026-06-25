@@ -10,22 +10,22 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "expr"
-      Alt
+      Alternation
         BracketOpen "["
         Branch
           Id "Binary"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "binary_expression"
             ParenClose ")"
         Branch
           Id "Unary"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "unary_expression"
             ParenClose ")"

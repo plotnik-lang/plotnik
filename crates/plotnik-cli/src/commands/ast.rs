@@ -61,9 +61,8 @@ fn print_query_ast(args: &AstArgs) -> Result<Option<String>, CliError> {
     reconcile_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref())?;
 
     let query = QueryBuilder::new(loaded.sources)
-        .parse()
-        .map_err(|e| CliError::fatal(e.to_string()))?
-        .analyze();
+        .analyze()
+        .map_err(|e| CliError::fatal(e.to_string()))?;
 
     if query.diagnostics().has_errors() || query.diagnostics().has_warnings() {
         eprint!(
@@ -74,7 +73,11 @@ fn print_query_ast(args: &AstArgs) -> Result<Option<String>, CliError> {
         );
     }
 
-    let output = query.printer().cst(args.raw).with_trivia(args.raw).dump();
+    let output = if args.raw {
+        query.dump_cst_with_trivia(true)
+    } else {
+        query.dump_ast()
+    };
     print!("{}", output);
 
     Ok(loaded.shebang.lang)

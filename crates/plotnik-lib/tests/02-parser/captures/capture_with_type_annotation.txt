@@ -6,12 +6,12 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Tree
+      NamedNode
         ParenOpen "("
         Id "identifier"
         ParenClose ")"
       CaptureToken "@name"
-      Type
+      TypeAnnotation
         DoubleColon "::"
         Id "Foo"
 ==== ast ====

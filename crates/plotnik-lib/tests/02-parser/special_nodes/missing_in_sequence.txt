@@ -8,16 +8,16 @@ Root
   Def
     Id "Q"
     Equals "="
-    Seq
+    Sequence
       BraceOpen "{"
-      Tree
+      NamedNode
         ParenOpen "("
         KwMissing "MISSING"
         DoubleQuote "\""
-        StrVal ";"
+        StringContent ";"
         DoubleQuote "\""
         ParenClose ")"
-      Tree
+      NamedNode
         ParenOpen "("
         Id "identifier"
         ParenClose ")"

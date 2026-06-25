@@ -9,36 +9,36 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Tree
+      NamedNode
         ParenOpen "("
         Id "binary"
         Capture
           Field
             Id "left"
             Colon ":"
-            Tree
+            NamedNode
               ParenOpen "("
               Underscore "_"
               ParenClose ")"
           CaptureToken "@left"
-          Type
+          TypeAnnotation
             DoubleColon "::"
             Id "Node"
         Capture
           Field
             Id "right"
             Colon ":"
-            Tree
+            NamedNode
               ParenOpen "("
               Underscore "_"
               ParenClose ")"
           CaptureToken "@right"
-          Type
+          TypeAnnotation
             DoubleColon "::"
             Id "Foo"
         ParenClose ")"
       CaptureToken "@expr"
-      Type
+      TypeAnnotation
         DoubleColon "::"
         Id "BinaryExpr"
 ==== ast ====

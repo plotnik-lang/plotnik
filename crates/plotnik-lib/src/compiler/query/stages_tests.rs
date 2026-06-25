@@ -1,0 +1,265 @@
+use crate::core::grammar::{Grammar, raw::RawGrammar};
+use std::sync::LazyLock;
+
+use crate::compiler::diagnostics::DiagnosticKind;
+use crate::compiler::{SourceMap, SourcePath};
+
+use super::{LinkOutcome, Query, QueryBuilder};
+
+fn javascript() -> &'static Grammar {
+    static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
+        let raw = RawGrammar::from_json(include_str!(env!("PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON")))
+            .expect("javascript grammar fixture");
+        Grammar::from_raw(&raw).expect("javascript grammar metadata")
+    });
+
+    &GRAMMAR
+}
+
+macro_rules! expect_invalid {
+    ($($name:literal: $content:literal),+ $(,)?) => {{
+        let mut source_map = SourceMap::new();
+        $(source_map.add_file(SourcePath::new($name), $content);)+
+        let query = QueryBuilder::new(source_map).analyze().unwrap();
+        if query.is_valid() {
+            panic!("Expected invalid query, got valid");
+        }
+        query.dump_diagnostics()
+    }};
+}
+
+#[test]
+fn structural_validation_failure_stops_later_analysis() {
+    let query = Query::expect("Q = {. (Missing)}");
+
+    assert!(!query.is_valid());
+    let kinds: Vec<_> = query.diagnostics().kinds().collect();
+    assert!(kinds.contains(&DiagnosticKind::AnchorWithoutContext));
+    assert!(!kinds.contains(&DiagnosticKind::UndefinedReference));
+    assert_eq!(query.dump_symbols(), "");
+}
+
+impl Query {
+    #[track_caller]
+    fn parse_and_validate(src: &str) -> Self {
+        let source_map = SourceMap::from_inline(src);
+        let query = QueryBuilder::new(source_map).analyze().unwrap();
+        if !query.is_valid() {
+            panic!(
+                "Expected valid query, got error:\n{}",
+                query.dump_diagnostics()
+            );
+        }
+        query
+    }
+
+    #[track_caller]
+    pub fn expect(src: &str) -> Self {
+        let source_map = SourceMap::from_inline(src);
+        QueryBuilder::new(source_map).analyze().unwrap()
+    }
+
+    #[track_caller]
+    pub fn expect_valid_ast(src: &str) -> String {
+        Self::parse_and_validate(src).dump_ast()
+    }
+
+    #[track_caller]
+    pub(crate) fn expect_valid_linking(src: &str) -> LinkOutcome {
+        let query = Self::parse_and_validate(src).link(javascript());
+        if !query.is_valid() {
+            panic!(
+                "Expected valid linking, got error:\n{}",
+                query.dump_diagnostics()
+            );
+        }
+        query
+    }
+
+    #[track_caller]
+    pub fn expect_invalid(src: &str) -> String {
+        let source_map = SourceMap::from_inline(src);
+        let query = QueryBuilder::new(source_map).analyze().unwrap();
+        if query.is_valid() {
+            panic!("Expected invalid query, got valid:\n{}", query.dump_cst());
+        }
+        query.dump_diagnostics()
+    }
+}
+
+#[test]
+fn parse_errors_do_not_admit_analysis() {
+    let query = Query::expect("Q = (identifier");
+
+    assert!(!query.is_valid());
+    assert!(query.analysis().is_none());
+    assert!(query.dump_cst().contains("Root"));
+}
+
+#[test]
+fn structural_validation_errors_do_not_admit_analysis() {
+    let query = Query::expect("Q = {. (identifier)}");
+
+    assert!(!query.is_valid());
+    assert!(query.analysis().is_none());
+    assert!(query.dump_cst().contains("Root"));
+}
+
+#[test]
+fn invalid_three_way_mutual_recursion_across_files() {
+    let res = expect_invalid! {
+        "a.ptk": "A = (a (B))",
+        "b.ptk": "B = (b (C))",
+        "c.ptk": "C = (c (A))",
+    };
+
+    insta::assert_snapshot!(res, @r"
+    error: infinite recursion: no escape path
+     --> c.ptk:1:9
+      |
+    1 | C = (c (A))
+      | -       ^
+      | |       |
+      | |       references A
+      | C is defined here
+      |
+     ::: a.ptk:1:9
+      |
+    1 | A = (a (B))
+      |         - references B
+      |
+     ::: b.ptk:1:9
+      |
+    1 | B = (b (C))
+      |         - references C (completing cycle)
+      |
+    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
+    ");
+}
+
+#[test]
+fn analysis_rejects_byte_oriented_regex() {
+    let linked = Query::expect(r"Q = (identifier =~ /(?-u:\xFF)/) @x").link(javascript());
+    let diag = linked.dry_run();
+    assert!(diag.has_errors());
+    let rendered = diag.render(linked.source_map());
+    assert!(
+        rendered.contains("pattern can match invalid UTF-8"),
+        "{rendered}"
+    );
+}
+
+#[test]
+fn dry_run_rejects_value_less_definition() {
+    let linked = Query::expect("Q = .").link(javascript());
+    let diag = linked.dry_run();
+    assert!(diag.has_errors());
+    let rendered = diag.render(linked.source_map());
+    assert!(rendered.contains("no entrypoint"), "{rendered}");
+}
+
+#[test]
+fn dry_run_accepts_valid_query() {
+    let linked = Query::parse_and_validate("Q = (identifier) @id").link(javascript());
+    assert!(!linked.dry_run().has_errors());
+}
+
+#[test]
+fn dry_run_flags_dropped_value_less_def_among_valid() {
+    let linked = Query::expect("Bad = .\nGood = (identifier) @id").link(javascript());
+    let diag = linked.dry_run();
+    assert!(diag.has_errors());
+    let rendered = diag.render(linked.source_map());
+    assert!(rendered.contains("no entrypoint"), "{rendered}");
+}
+
+#[test]
+fn dry_run_is_total_on_empty_source_map() {
+    // The dry run must never panic — even on a query with zero sources.
+    let linked = QueryBuilder::new(SourceMap::new())
+        .link(javascript())
+        .unwrap();
+    assert!(!linked.dry_run().has_errors());
+}
+
+#[test]
+fn multifile_link_field_error_in_referenced_body_spans_two_files() {
+    // `Foo`'s body is a bare field — valid on its own (no parent to validate it
+    // against). Only when `Bar` places `(Foo)` under `call_expression` does the
+    // field-on-node-kind check fire, while validation has crossed into a.ptk. The
+    // primary span must resolve against a.ptk (where `name:` is written) and the
+    // related note against b.ptk (the parent node). Each `Located` node carries its
+    // own source, so the split survives crossing the reference between files.
+    let mut source_map = SourceMap::new();
+    source_map.add_file(SourcePath::new("a.ptk"), "Foo = name: (identifier)");
+    source_map.add_file(SourcePath::new("b.ptk"), "Bar = (call_expression (Foo))");
+    let analyzed = QueryBuilder::new(source_map).analyze().unwrap();
+    assert!(
+        analyzed.is_valid(),
+        "expected analysis to pass:\n{}",
+        analyzed.dump_diagnostics()
+    );
+    let linked = analyzed.link(javascript());
+    assert!(!linked.is_valid(), "expected linking to fail");
+    let res = linked.dump_diagnostics();
+
+    insta::assert_snapshot!(res, @"
+    error: field `name` is not valid on this node kind
+     --> a.ptk:1:7
+      |
+    1 | Foo = name: (identifier)
+      |       ^^^^
+      |
+     ::: b.ptk:1:8
+      |
+    1 | Bar = (call_expression (Foo))
+      |        --------------- on `call_expression`
+      |
+    help: valid fields for `call_expression`: `arguments`, `function`, `optional_chain`
+    ");
+}
+
+#[test]
+fn multifile_ref_to_body_with_internal_error_attributes_to_defining_file() {
+    // The duplicate-capture error lives inside `Foo`'s body in a.ptk; b.ptk only
+    // references `Foo`. Inference no longer descends across the reference, so the
+    // error is emitted by `Foo`'s own pass and must resolve against a.ptk — never
+    // b.ptk, whose offsets don't even reach that far.
+    let res = expect_invalid! {
+        "a.ptk": "Foo = (program (identifier) @x (identifier) @x)",
+        "b.ptk": "Bar = (Foo)",
+    };
+
+    insta::assert_snapshot!(res, @"
+    error: capture `@x` already defined in this scope
+     --> a.ptk:1:32
+      |
+    1 | Foo = (program (identifier) @x (identifier) @x)
+      |                                ^^^^^^^^^^^^^^^
+      |
+    help: rename one capture, or use an enum if they are mutually exclusive branches
+    ");
+}
+
+#[test]
+fn multifile_field_with_ref_to_seq_error() {
+    let res = expect_invalid! {
+        "defs.ptk": "X = {(a) (b)}",
+        "main.ptk": "Q = (call name: (X))",
+    };
+
+    insta::assert_snapshot!(res, @"
+    error: field `name` cannot match a sequence
+     --> main.ptk:1:17
+      |
+    1 | Q = (call name: (X))
+      |                 ^^^
+      |
+     ::: defs.ptk:1:5
+      |
+    1 | X = {(a) (b)}
+      |     --------- defined here
+      |
+    help: a field holds a single child node; match one pattern, or move the sequence outside the field
+    ");
+}

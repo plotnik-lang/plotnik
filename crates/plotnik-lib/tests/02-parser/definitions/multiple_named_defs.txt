@@ -6,14 +6,14 @@ Root
   Def
     Id "Expr"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "expression"
       ParenClose ")"
   Def
     Id "Stmt"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "statement"
       ParenClose ")"

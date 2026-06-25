@@ -2,9 +2,8 @@
 
 use std::path::PathBuf;
 
-use plotnik_lib::Colors;
-use plotnik_lib::engine::{
-    PrintTracer, RuntimeError, RuntimeLimitSpec, VM, Verbosity, materialize_verified,
+use plotnik_lib::{
+    Colors, PrintTracer, RuntimeError, RuntimeLimitSpec, VM, Verbosity, materialize_verified,
 };
 
 use super::run_common::{self, ExecPlan, ExecRequest};
@@ -48,7 +47,7 @@ pub fn run(args: TraceArgs) -> CliResult {
         .colored(args.color)
         .build();
 
-    let effects = match vm.execute_with(&module, 0, &entrypoint, &mut tracer) {
+    let effects = match vm.execute_with(&module, &entrypoint, &mut tracer) {
         Ok(effects) => {
             tracer.print();
             effects

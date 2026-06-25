@@ -12,4 +12,3 @@ error: anchors cannot appear directly in alternations
   |
 help: use `[{(a) . (b)} (c)]` to anchor within a branch
 ==== symbols ====
-Q

@@ -8,19 +8,19 @@ Root
   Def
     Id "Q"
     Equals "="
-    Alt
+    Alternation
       BracketOpen "["
       Branch
         Id "Ident"
         Colon ":"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "identifier"
           ParenClose ")"
       Branch
         Id "Num"
         Colon ":"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "number"
           ParenClose ")"

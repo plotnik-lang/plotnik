@@ -1,4 +1,4 @@
-use plotnik_lib::engine::RuntimeError;
+use plotnik_lib::RuntimeError;
 
 use super::runtime_report::render_runtime_error;
 

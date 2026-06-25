@@ -16,31 +16,43 @@
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub use plotnik_core::colors;
-pub use plotnik_core::grammar;
+pub mod bytecode;
+mod compiler;
+mod core;
+mod vm;
 
-pub use plotnik_bytecode as bytecode;
-pub use plotnik_bytecode::type_system;
+pub use crate::bytecode::type_system;
+pub use crate::core::colors;
+pub use crate::core::grammar;
 
-pub use plotnik_compiler::analyze;
-pub use plotnik_compiler::compile;
-pub use plotnik_compiler::diagnostics;
-pub use plotnik_compiler::emit;
-pub use plotnik_compiler::parser;
-pub use plotnik_compiler::query;
-pub use plotnik_compiler::typegen;
+pub mod diagnostics {
+    pub use crate::compiler::diagnostics::report::{
+        DiagnosticBuilder, DiagnosticKind, Diagnostics, JsonDiagnostic, JsonFix, JsonPosition,
+        JsonRelated, JsonSpan, Severity,
+    };
+    pub use crate::compiler::diagnostics::{
+        Error, QueryResult, Source, SourceId, SourceKind, SourceMap, SourcePath, Span,
+    };
+}
 
-pub use plotnik_vm::engine;
+pub use crate::compiler::typegen::typescript::{
+    Config as TypeScriptConfig, VoidType as TypeScriptVoidType,
+};
 
-pub use plotnik_core::Colors;
+pub use crate::core::Colors;
 
-pub use plotnik_compiler::{Diagnostics, Error, PassResult, Result, Severity, Span};
-pub use plotnik_compiler::{Query, QueryBuilder, SourceId, SourceMap};
+pub use crate::compiler::{
+    CheckedQuery, CompiledQuery, Query, QueryBuilder, Source, SourceId, SourceKind, SourceMap,
+    SourcePath,
+};
+pub use crate::compiler::{
+    DiagnosticBuilder, DiagnosticKind, Diagnostics, Error, QueryResult, Severity, Span,
+};
 
-pub use plotnik_vm::{
-    EffectLog, Limit, Materializer, NodeHandle, PrintTracer, ResolvedRuntimeLimits, RuntimeEffect,
-    RuntimeError, RuntimeLimitSpec, Tracer, VM, Value, ValueMaterializer, Verbosity,
-    debug_verify_type, materialize_verified,
+pub use crate::vm::{
+    EffectLog, Limit, NodeHandle, NoopTracer, PrintTracer, PrintTracerBuilder,
+    ResolvedRuntimeLimits, RuntimeEffect, RuntimeError, RuntimeLimitSpec, Tracer, VM, VMBuilder,
+    Value, ValueMaterializer, Verbosity, debug_verify_type, materialize_verified,
 };
 
 /// Embed bytecode with 64-byte alignment (zero-copy loading).

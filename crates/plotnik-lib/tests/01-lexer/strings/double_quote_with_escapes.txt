@@ -1,8 +1,8 @@
 "hello\nworld" "tab\there"
 ==== tokens ====
 DoubleQuote "\""
-StrVal "hello\\nworld"
+StringContent "hello\\nworld"
 DoubleQuote "\""
 DoubleQuote "\""
-StrVal "tab\\there"
+StringContent "tab\\there"
 DoubleQuote "\""

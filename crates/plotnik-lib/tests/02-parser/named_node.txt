@@ -5,14 +5,14 @@ Root
   Def
     Id "Q"
     Equals "="
-    Tree
+    NamedNode
       ParenOpen "("
       Id "function_declaration"
       Capture
         Field
           Id "name"
           Colon ":"
-          Tree
+          NamedNode
             ParenOpen "("
             Id "identifier"
             ParenClose ")"

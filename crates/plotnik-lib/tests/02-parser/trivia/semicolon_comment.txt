@@ -10,7 +10,7 @@ Root
     Whitespace " "
     Equals "="
     Whitespace " "
-    Tree
+    NamedNode
       ParenOpen "("
       Id "identifier"
       ParenClose ")"

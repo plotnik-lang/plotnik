@@ -2,9 +2,9 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use plotnik_lib::typegen::typescript;
+use plotnik_lib::{TypeScriptConfig, TypeScriptVoidType};
 
-use super::compile::compile_module;
+use super::compile::compile_query;
 use super::lang_resolver::require_lang;
 use super::query_loader::load_query;
 use crate::error::{CliError, CliResult};
@@ -40,21 +40,23 @@ pub fn run(args: InferArgs) -> CliResult {
         "infer",
     )?;
 
-    let module = compile_module(loaded.sources, lang, args.color)?;
+    let compiled = compile_query(loaded.sources, lang, args.color)?;
 
     let void_type = match args.void_type.as_deref() {
-        Some("null") => typescript::VoidType::Null,
-        _ => typescript::VoidType::Undefined,
+        Some("null") => TypeScriptVoidType::Null,
+        _ => TypeScriptVoidType::Undefined,
     };
     // Only use colors when outputting to stdout (not to file)
     let use_colors = args.color && args.output.is_none();
-    let config = typescript::Config::builder()
+    let config = TypeScriptConfig::new()
         .export(args.export)
         .emit_node_interface(!args.no_node_type)
         .verbose_nodes(args.verbose_nodes)
         .void_type(void_type)
         .colored(use_colors);
-    let output = typescript::emit(&module, config);
+    let output = compiled
+        .to_typescript(config)
+        .expect("dry_run guarantees a module");
 
     if let Some(ref path) = args.output {
         fs::write(path, &output)

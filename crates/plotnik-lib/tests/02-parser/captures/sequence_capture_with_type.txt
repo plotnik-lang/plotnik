@@ -9,19 +9,19 @@ Root
     Id "Q"
     Equals "="
     Capture
-      Seq
+      Sequence
         BraceOpen "{"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "a"
           ParenClose ")"
-        Tree
+        NamedNode
           ParenOpen "("
           Id "b"
           ParenClose ")"
         BraceClose "}"
       CaptureToken "@seq"
-      Type
+      TypeAnnotation
         DoubleColon "::"
         Id "MySequence"
 ==== ast ====

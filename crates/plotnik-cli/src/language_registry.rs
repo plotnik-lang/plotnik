@@ -3,12 +3,13 @@ use std::sync::OnceLock;
 
 use arborium_tree_sitter::{Language, Parser, Tree};
 use flate2::read::GzDecoder;
-use plotnik_core::grammar::{Grammar, raw::RawGrammar};
+use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 
 #[derive(Debug)]
 pub struct Lang {
     name: &'static str,
     aliases: &'static [&'static str],
+    #[allow(dead_code)]
     extensions: &'static [&'static str],
     ts_language: Language,
     raw_json_gz: &'static [u8],
@@ -44,6 +45,7 @@ impl Lang {
         self.aliases
     }
 
+    #[allow(dead_code)]
     pub fn extensions(&self) -> &[&'static str] {
         self.extensions
     }
@@ -61,6 +63,7 @@ impl Lang {
         })
     }
 
+    #[cfg(test)]
     pub fn ts_language(&self) -> &Language {
         &self.ts_language
     }

@@ -7,7 +7,7 @@
 //! `E-limit-*` code; other variants fall back to their `Display`. `NoMatch` is a
 //! domain answer the callers handle (exit 1), not a failure rendered here.
 
-use plotnik_lib::engine::RuntimeError;
+use plotnik_lib::RuntimeError;
 
 /// Render a runtime error for stderr, or as a one-line JSON object when `json`.
 pub fn render_runtime_error(error: &RuntimeError, json: bool) -> String {

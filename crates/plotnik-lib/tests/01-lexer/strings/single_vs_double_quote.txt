@@ -1,8 +1,8 @@
 'single' "double"
 ==== tokens ====
 SingleQuote "'"
-StrVal "single"
+StringContent "single"
 SingleQuote "'"
 DoubleQuote "\""
-StrVal "double"
+StringContent "double"
 DoubleQuote "\""
