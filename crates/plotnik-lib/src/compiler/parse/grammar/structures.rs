@@ -123,8 +123,9 @@ impl<'q> Parser<'q, '_> {
         head
     }
 
-    /// Parse a category separator and its optional subtype, recorded in the CST but ignored
-    /// downstream (no subtype matching yet). Two surface forms, both tight-binding:
+    /// Parse a category separator and its optional subtype. The CST keeps the marker so later
+    /// stages can reject unsupported supertype matching cleanly. Two surface forms, both
+    /// tight-binding:
     ///
     /// - `#` — native category syntax. `(name#)` is a bare category; `(name#sub)` refines it.
     /// - `/` — tree-sitter compatibility. Always needs a subtype; warns toward `#`.

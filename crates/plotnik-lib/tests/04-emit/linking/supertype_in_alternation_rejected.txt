@@ -1,0 +1,13 @@
+Q = [
+  (expression#statement_block)
+  (identifier)
+]
+==== diagnostics ====
+error: supertype matching is written `expression#`, but it is not supported yet
+ --> query.ptk:2:4
+  |
+2 |   (expression#statement_block)
+  |    ^^^^^^^^^^
+  |
+help: match the concrete subtypes with an alternation, e.g. `[(a) (b)]`
+help: subtypes of `expression`: `assignment_expression`, `augmented_assignment_expression`, `await_expression`, `binary_expression`, `jsx_element`, `jsx_self_closing_element`, `new_expression`, `primary_expression`, ... (4 more)

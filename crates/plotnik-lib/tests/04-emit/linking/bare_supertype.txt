@@ -1,0 +1,9 @@
+Q = (expression)
+==== diagnostics ====
+error: `expression` is a supertype, not a node kind
+ --> query.ptk:1:6
+  |
+1 | Q = (expression)
+  |      ^^^^^^^^^^
+  |
+help: use `(expression#)` instead

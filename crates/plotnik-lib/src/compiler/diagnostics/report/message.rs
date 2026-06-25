@@ -89,7 +89,8 @@ pub enum DiagnosticKind {
     FieldNotOnNodeKind,
     InvalidFieldChildType,
     InvalidChildType,
-    InvalidSubtype,
+    UnsupportedSupertype,
+    BareSupertype,
     ChildUnderLeafToken,
     NegatedRequiredField,
 
@@ -248,6 +249,9 @@ impl DiagnosticKind {
             Self::NoEntrypoints => {
                 "every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing"
             }
+            Self::UnsupportedSupertype => {
+                "match the concrete subtypes with an alternation, e.g. `[(a) (b)]`"
+            }
             _ => return None,
         };
 
@@ -332,7 +336,8 @@ impl DiagnosticKind {
             Self::FieldNotOnNodeKind => "field not valid on this node kind",
             Self::InvalidFieldChildType => "node kind not valid for this field",
             Self::InvalidChildType => "node kind not valid as child",
-            Self::InvalidSubtype => "node kind is not a subtype of this kind",
+            Self::UnsupportedSupertype => "supertype matching is not supported yet",
+            Self::BareSupertype => "supertype must be written with `#`",
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
             Self::NegatedRequiredField => "this field is always present",
             Self::MissingDefName => "definition must be named",
@@ -372,7 +377,10 @@ impl DiagnosticKind {
             Self::FieldNotOnNodeKind => "field `{}` is not valid on this node kind".to_string(),
             Self::InvalidFieldChildType => "{}".to_string(),
             Self::InvalidChildType => "`{}` cannot be a child of this node".to_string(),
-            Self::InvalidSubtype => "{}".to_string(),
+            Self::UnsupportedSupertype => {
+                "supertype matching is written `{}#`, but it is not supported yet".to_string()
+            }
+            Self::BareSupertype => "`{}` is a supertype, not a node kind".to_string(),
             Self::ChildUnderLeafToken => "`{}` is a leaf token — it has no child nodes".to_string(),
             Self::NegatedRequiredField => "`-{}` can never match".to_string(),
             Self::MixedAltBranches => "cannot mix enum and union branches: {}".to_string(),
