@@ -666,7 +666,7 @@ impl ParentNode {
         self.span
     }
 
-    pub(super) fn name<'a>(self, grammar: &'a Grammar) -> &'a str {
+    pub(super) fn name(self, grammar: &Grammar) -> &str {
         grammar
             .node_kind(self.id)
             .expect("validated parent node must have a name")

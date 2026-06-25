@@ -355,16 +355,12 @@ fn render_compile(
         .expect("valid query should compile to a module");
 
     match kind {
-        Compile::Bytecode => out.push((
-            "bytecode".into(),
-            dump_bytecode(&module, Colors::new(false)),
-        )),
+        Compile::Bytecode => {
+            out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))))
+        }
         Compile::Types => out.push(("types".into(), render_types(&compiled))),
         Compile::Vm => {
-            out.push((
-                "bytecode".into(),
-                dump_bytecode(&module, Colors::new(false)),
-            ));
+            out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))));
             out.push(("types".into(), render_types(&compiled)));
             let input = input.ok_or_else(|| {
                 "06-vm fixtures require an `==== input ====` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
@@ -373,7 +369,7 @@ fn render_compile(
                 .definition_names()
                 .last()
                 .expect("a valid query has at least one named definition");
-            let (trace, output) = run_vm(&lang, &module, &entry, &input.text)?;
+            let (trace, output) = run_vm(&lang, module, &entry, &input.text)?;
             out.push(("trace".into(), trace));
             out.push(("output".into(), output));
         }

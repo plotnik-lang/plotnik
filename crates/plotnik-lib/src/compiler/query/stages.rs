@@ -273,6 +273,7 @@ impl Query {
         self.parsed.definition_names()
     }
 
+    #[allow(clippy::result_large_err)]
     fn into_analyzed(self) -> Result<AnalyzedQuery, Query> {
         if self.parsed.diag.has_errors() {
             return Err(self);

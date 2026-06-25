@@ -72,9 +72,6 @@ jobs:
       - name: No-default-features langs
         run: cargo clippy -p plotnik --no-default-features -- -D warnings
 
-      - name: No-default-features compiler
-        run: cargo check -p plotnik-compiler --no-default-features
-
       - name: Single non-default language
         run: cargo check -p plotnik --no-default-features --features lang-styx
 

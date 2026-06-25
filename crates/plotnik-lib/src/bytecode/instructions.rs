@@ -533,7 +533,7 @@ impl<'a> Match<'a> {
     /// Collect this borrowed view into an owned, encodable [`MatchInstr`].
     ///
     /// Lets the decoder be re-encoded for roundtrip testing.
-    pub fn to_instr(&self) -> MatchInstr {
+    pub fn to_instr(self) -> MatchInstr {
         MatchInstr {
             nav: self.nav,
             node_kind: self.node_kind,
@@ -776,7 +776,7 @@ impl Call {
     /// Encode to 8-byte bytecode.
     ///
     /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
-    pub fn to_bytes(&self) -> [u8; 8] {
+    pub fn to_bytes(self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
         bytes[0] = header_byte::pack(self.segment, 0, Opcode::Call);
         bytes[1] = self.nav.to_byte();
@@ -819,7 +819,7 @@ impl Return {
     /// Encode to 8-byte bytecode.
     ///
     /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
-    pub fn to_bytes(&self) -> [u8; 8] {
+    pub fn to_bytes(self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
         bytes[0] = header_byte::pack(self.segment, 0, Opcode::Return);
         // bytes[1..8] are reserved/padding
@@ -875,7 +875,7 @@ impl Trampoline {
     /// Encode to 8-byte bytecode.
     ///
     /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
-    pub fn to_bytes(&self) -> [u8; 8] {
+    pub fn to_bytes(self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
         bytes[0] = header_byte::pack(self.segment, 0, Opcode::Trampoline);
         // bytes[1] is padding

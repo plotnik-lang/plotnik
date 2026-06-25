@@ -161,10 +161,11 @@ impl<'q> Parser<'q, '_> {
         let sep_span = self.current_span();
         let has_subtype = self.consume_category_refinement_subtype(sep_span);
 
-        if sep == SyntaxKind::Slash && !has_subtype {
-            if let Some(report) = self.report_current(DiagnosticKind::ExpectedSubtype) {
-                report.emit();
-            }
+        if sep == SyntaxKind::Slash
+            && !has_subtype
+            && let Some(report) = self.report_current(DiagnosticKind::ExpectedSubtype)
+        {
+            report.emit();
         }
     }
 

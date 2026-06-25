@@ -162,7 +162,7 @@ impl Header {
         }
     }
 
-    pub fn to_bytes(&self) -> [u8; HEADER_SIZE] {
+    pub fn to_bytes(self) -> [u8; HEADER_SIZE] {
         let mut bytes = [0u8; HEADER_SIZE];
         bytes[0..4].copy_from_slice(&self.magic);
         bytes[4..8].copy_from_slice(&self.version.to_le_bytes());

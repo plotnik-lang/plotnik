@@ -121,7 +121,7 @@ impl TypeDef {
         }
     }
 
-    pub fn to_bytes(&self) -> [u8; 4] {
+    pub fn to_bytes(self) -> [u8; 4] {
         let mut bytes = [0u8; 4];
         bytes[0..2].copy_from_slice(&self.payload.to_le_bytes());
         bytes[2] = self.count;
@@ -195,7 +195,7 @@ impl TypeNameEntry {
         Self { name_id, type_id }
     }
 
-    pub fn to_bytes(&self) -> [u8; 4] {
+    pub fn to_bytes(self) -> [u8; 4] {
         let mut bytes = [0u8; 4];
         bytes[0..2].copy_from_slice(&u16::from(self.name_id).to_le_bytes());
         bytes[2..4].copy_from_slice(&u16::from(self.type_id).to_le_bytes());
@@ -223,7 +223,7 @@ impl TypeMember {
         Self { name_id, type_id }
     }
 
-    pub fn to_bytes(&self) -> [u8; 4] {
+    pub fn to_bytes(self) -> [u8; 4] {
         let mut bytes = [0u8; 4];
         bytes[0..2].copy_from_slice(&u16::from(self.name_id).to_le_bytes());
         bytes[2..4].copy_from_slice(&u16::from(self.type_id).to_le_bytes());

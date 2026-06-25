@@ -36,13 +36,13 @@ impl Parser<'_, '_> {
 
         self.finish_node();
 
-        if !has_content {
-            if let Some(report) = self.report_at(
+        if !has_content
+            && let Some(report) = self.report_at(
                 DiagnosticKind::EmptyAnonymousNode,
                 TextRange::new(start, end),
-            ) {
-                report.emit();
-            }
+            )
+        {
+            report.emit();
         }
     }
 

@@ -1,4 +1,5 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+#![allow(clippy::module_inception)]
 
 //! Instruction-encoding emission phase: resolve each instruction into its
 //! transition bytes.
