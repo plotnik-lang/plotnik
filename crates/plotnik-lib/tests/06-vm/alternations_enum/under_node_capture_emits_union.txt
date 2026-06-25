@@ -8,6 +8,35 @@ Q = (program
 )
 ==== input ====
 foo
+==== types ====
+export interface QeA {
+  $tag: "A";
+  $data: { a: Node };
+}
+
+export interface QeB {
+  $tag: "B";
+  $data: { b: Node };
+}
+
+export type Qe = QeA | QeB;
+
+export interface Q {
+  e: Qe;
+}
+==== output ====
+{
+  "e": {
+    "$tag": "A",
+    "$data": {
+      "a": {
+        "kind": "identifier",
+        "text": "foo",
+        "span": [0, 3]
+      }
+    }
+  }
+}
 ==== bytecode ====
 [strings]
 S00 "Beauty will save the world"
@@ -58,22 +87,6 @@ Q:
   14  ─‣┘² [Set(M4)] _                      10
   16   !   [EnumOpen(M3)] (number) [Node Set(M1) EnumClose]  14
   19  ─‣─  _                                11, 16, 19
-==== types ====
-export interface QeA {
-  $tag: "A";
-  $data: { a: Node };
-}
-
-export interface QeB {
-  $tag: "B";
-  $data: { b: Node };
-}
-
-export type Qe = QeA | QeB;
-
-export interface Q {
-  e: Qe;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -96,5 +109,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"e":{"$tag":"A","$data":{"a":{"kind":"identifier","text":"foo","span":[0, 3]}}}}

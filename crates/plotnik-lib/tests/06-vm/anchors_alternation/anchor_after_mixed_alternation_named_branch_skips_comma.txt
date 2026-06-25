@@ -14,6 +14,24 @@ Q = (program
 )
 ==== input ====
 f(a, b)
+==== types ====
+export interface Q {
+  x: Node | null;
+  y: Node;
+}
+==== output ====
+{
+  "x": {
+    "kind": "identifier",
+    "text": "a",
+    "span": [2, 3]
+  },
+  "y": {
+    "kind": "identifier",
+    "text": "b",
+    "span": [5, 6]
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -62,11 +80,6 @@ Q:
   18   !   (identifier) [Node Set(M0)]      16
   20   !   [Null Set(M0)] ";"               13
   22  ─‣─  _                                18, 20, 22
-==== types ====
-export interface Q {
-  x: Node | null;
-  y: Node;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -105,5 +118,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"x":{"kind":"identifier","text":"a","span":[2, 3]},"y":{"kind":"identifier","text":"b","span":[5, 6]}}

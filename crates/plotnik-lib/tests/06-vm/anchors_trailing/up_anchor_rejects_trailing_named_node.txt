@@ -1,6 +1,10 @@
 Q = (program (expression_statement (identifier == "a")) .)
 ==== input ====
 a; b;
+==== types ====
+export type Q = undefined;
+==== output ====
+<no match>
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -38,8 +42,6 @@ Q:
   14                                        ▶
   15   !   (expression_statement)           10
   16  ─‣─  _                                15, 16
-==== types ====
-export type Q = undefined;
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -67,5 +69,3 @@ Q:
        ○   ;
   16  ❮❮❮ 
   16       _                                15, 16
-==== output ====
-<no match>

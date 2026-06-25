@@ -1,6 +1,21 @@
 Q = (program [A: (identifier) @a]? @e)
 ==== input ====
 let x
+==== types ====
+export interface QeA {
+  $tag: "A";
+  $data: { a: Node };
+}
+
+export type Qe = QeA;
+
+export interface Q {
+  e: Qe | null;
+}
+==== output ====
+{
+  "e": null
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -45,17 +60,6 @@ Q:
   15  ...  
   16  ─‣─  _                                08, 16
   18  └‣─  _                                08, 16
-==== types ====
-export interface QeA {
-  $tag: "A";
-  $data: { a: Node };
-}
-
-export type Qe = QeA;
-
-export interface Q {
-  e: Qe | null;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -78,5 +82,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"e":null}

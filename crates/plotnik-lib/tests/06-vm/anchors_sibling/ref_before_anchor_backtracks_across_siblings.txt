@@ -11,6 +11,20 @@ Q = (program
 )
 ==== input ====
 [1, 2, "x"]
+==== types ====
+export interface Q {
+  s: Node;
+}
+
+export type Comma = undefined;
+==== output ====
+{
+  "s": {
+    "kind": "string",
+    "text": "\"x\"",
+    "span": [7, 10]
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -60,12 +74,6 @@ Q:
   16                                        ▶
   17   !   (Comma)                          06 : 13
   18  ─‣─  _                                17, 18
-==== types ====
-export interface Q {
-  s: Node;
-}
-
-export type Comma = undefined;
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -142,5 +150,3 @@ Comma:
   05   ◀   (Comma)                          
 
 Comma:
-==== output ====
-{"s":{"kind":"string","text":"\"x\"","span":[7, 10]}}

@@ -3,6 +3,29 @@ Nested = (call_expression function: [(identifier) @name (Nested) @inner])
 Q = (program (expression_statement (Nested) @top))
 ==== input ====
 a()();
+==== types ====
+export interface Nested {
+  inner: Nested | null;
+  name: Node | null;
+}
+
+export interface Q {
+  top: Nested;
+}
+==== output ====
+{
+  "top": {
+    "name": null,
+    "inner": {
+      "inner": null,
+      "name": {
+        "kind": "identifier",
+        "text": "a",
+        "span": [0, 1]
+      }
+    }
+  }
+}
 ==== bytecode ====
 [strings]
 S00 "Beauty will save the world"
@@ -65,15 +88,6 @@ Q:
   29  -ε-  [StructOpen]                     28
   31  ...  
   32  -ε-  [Null Set(M0)]                   29
-==== types ====
-export interface Nested {
-  inner: Nested | null;
-  name: Node | null;
-}
-
-export interface Q {
-  top: Nested;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -129,5 +143,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"top":{"name":null,"inner":{"inner":null,"name":{"kind":"identifier","text":"a","span":[0, 1]}}}}

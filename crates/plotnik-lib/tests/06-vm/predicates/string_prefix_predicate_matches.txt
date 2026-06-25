@@ -1,6 +1,18 @@
 Q = (program (expression_statement (identifier ^= "foo") @id))
 ==== input ====
 foobar;
+==== types ====
+export interface Q {
+  id: Node;
+}
+==== output ====
+{
+  "id": {
+    "kind": "identifier",
+    "text": "foobar",
+    "span": [0, 6]
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -37,10 +49,6 @@ Q:
   08  └‣─  (identifier) ^= "foo" [Node Set(M0)]  11
   11  ─‣┘² _                                12
   12                                        ▶
-==== types ====
-export interface Q {
-  id: Node;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -61,5 +69,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"id":{"kind":"identifier","text":"foobar","span":[0, 6]}}

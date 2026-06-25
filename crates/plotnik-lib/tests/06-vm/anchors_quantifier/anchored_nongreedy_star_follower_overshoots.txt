@@ -9,6 +9,14 @@ Q = (program
 )
 ==== input ====
 bar; debugger; foo;
+==== types ====
+export interface Q {
+  a: Node | null;
+  b: Node[];
+  c: Node;
+}
+==== output ====
+<no match>
 ==== bytecode ====
 [strings]
 S00 "Beauty will save the world"
@@ -72,12 +80,6 @@ Q:
   44   !   (lexical_declaration) [Node Set(M0)]  40
   46  ─‣─  _                                44, 46
   48  └‣─  _                                44, 46
-==== types ====
-export interface Q {
-  a: Node | null;
-  b: Node[];
-  c: Node;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -114,5 +116,3 @@ Q:
   29  ❮❮❮ 
   25       (debugger_statement) [Node Push]  21, 27
        ○   expression_statement
-==== output ====
-<no match>

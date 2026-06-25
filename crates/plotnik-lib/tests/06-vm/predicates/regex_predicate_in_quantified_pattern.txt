@@ -1,6 +1,33 @@
 Q = (program (expression_statement (identifier =~ /^x/) @id)* @rows)
 ==== input ====
 x1; ax; x3;
+==== types ====
+export interface QRows {
+  id: Node;
+}
+
+export interface Q {
+  rows: QRows[];
+}
+==== output ====
+{
+  "rows": [
+    {
+      "id": {
+        "kind": "identifier",
+        "text": "x1",
+        "span": [0, 2]
+      }
+    },
+    {
+      "id": {
+        "kind": "identifier",
+        "text": "x3",
+        "span": [8, 10]
+      }
+    }
+  ]
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -54,14 +81,6 @@ Q:
   26  └‣─  _                                21, 24
   28  ─‣─  _                                21, 28
   30  ─‣─  _                                21, 28
-==== types ====
-export interface QRows {
-  id: Node;
-}
-
-export interface Q {
-  rows: QRows[];
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -107,5 +126,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"rows":[{"id":{"kind":"identifier","text":"x1","span":[0, 2]}},{"id":{"kind":"identifier","text":"x3","span":[8, 10]}}]}

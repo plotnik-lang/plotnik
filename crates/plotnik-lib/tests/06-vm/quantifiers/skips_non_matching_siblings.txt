@@ -1,6 +1,25 @@
 Q = (program (lexical_declaration)* @decls)
 ==== input ====
 let a; foo; let b;
+==== types ====
+export interface Q {
+  decls: Node[];
+}
+==== output ====
+{
+  "decls": [
+    {
+      "kind": "lexical_declaration",
+      "text": "let a;",
+      "span": [0, 6]
+    },
+    {
+      "kind": "lexical_declaration",
+      "text": "let b;",
+      "span": [12, 18]
+    }
+  ]
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -43,10 +62,6 @@ Q:
   20  ─‣─  _                                13, 20
   22  ─‣─  _                                13, 20
   24  ─‣┘  [ArrayClose Set(M0)] _           10
-==== types ====
-export interface Q {
-  decls: Node[];
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -79,5 +94,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"decls":[{"kind":"lexical_declaration","text":"let a;","span":[0, 6]},{"kind":"lexical_declaration","text":"let b;","span":[12, 18]}]}

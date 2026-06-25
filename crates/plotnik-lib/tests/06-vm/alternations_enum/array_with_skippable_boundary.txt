@@ -10,6 +10,42 @@ Q = (program
 )
 ==== input ====
 a; b;
+==== types ====
+export interface QItemsTag {
+  $tag: "Tag";
+  $data: { a: Node };
+}
+
+export type QItems = QItemsTag;
+
+export interface Q {
+  items: QItems[];
+}
+==== output ====
+{
+  "items": [
+    {
+      "$tag": "Tag",
+      "$data": {
+        "a": {
+          "kind": "expression_statement",
+          "text": "a;",
+          "span": [0, 2]
+        }
+      }
+    },
+    {
+      "$tag": "Tag",
+      "$data": {
+        "a": {
+          "kind": "expression_statement",
+          "text": "b;",
+          "span": [3, 5]
+        }
+      }
+    }
+  ]
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -65,17 +101,6 @@ Q:
   31  ...  
   32  ─‣─  _                                24, 32
   34  ─‣─  _                                24, 32
-==== types ====
-export interface QItemsTag {
-  $tag: "Tag";
-  $data: { a: Node };
-}
-
-export type QItems = QItemsTag;
-
-export interface Q {
-  items: QItems[];
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -115,5 +140,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"items":[{"$tag":"Tag","$data":{"a":{"kind":"expression_statement","text":"a;","span":[0, 2]}}},{"$tag":"Tag","$data":{"a":{"kind":"expression_statement","text":"b;","span":[3, 5]}}}]}

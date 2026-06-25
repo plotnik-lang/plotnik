@@ -6,6 +6,19 @@ Q = (program
 )
 ==== input ====
 a;
+==== types ====
+export interface QGrp {
+  a: Node;
+}
+
+export interface Qw {
+  b: Node | null;
+  grp: QGrp | null;
+}
+
+export interface Q {
+  w: Qw;
+}
 ==== diagnostics ====
 warning: parenthesized sequences are tree-sitter syntax
  --> query.ptk:3:5
@@ -22,6 +35,19 @@ warning: parenthesized sequences are tree-sitter syntax
   |     ^
   |
 help: use `{(a) (b)}` to match a sequence of siblings
+==== output ====
+{
+  "w": {
+    "b": null,
+    "grp": {
+      "a": {
+        "kind": "expression_statement",
+        "text": "a;",
+        "span": [0, 2]
+      }
+    }
+  }
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
@@ -70,19 +96,6 @@ Q:
   14  ─‣┘  [StructClose Set(M3)] _          10
   16   !   [Null Set(M1)] (comment) [Node Set(M2)]  14
   19  ─‣─  _                                11, 16, 19
-==== types ====
-export interface QGrp {
-  a: Node;
-}
-
-export interface Qw {
-  b: Node | null;
-  grp: QGrp | null;
-}
-
-export interface Q {
-  w: Qw;
-}
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -103,5 +116,3 @@ Q:
 _StructWrap:
   03  -ε-  [StructClose]                    05
   05   ◀   _StructWrap                      ◼
-==== output ====
-{"w":{"b":null,"grp":{"a":{"kind":"expression_statement","text":"a;","span":[0, 2]}}}}
