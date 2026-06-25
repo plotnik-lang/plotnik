@@ -343,8 +343,6 @@ fn render_compile(
         ));
         return Ok(out);
     }
-    // Errors return early above, so any diagnostics here are warnings. Each stage
-    // slots them into its own section order rather than forcing them to the top.
     let diag = diagnostics.has_warnings().then(|| {
         (
             "diagnostics".to_string(),
@@ -365,8 +363,6 @@ fn render_compile(
             out.extend(diag);
             out.push(("types".into(), render_types(&compiled)));
         }
-        // Human-first: the type contract, then warnings, then the result, and only
-        // then the VM internals — bytecode followed by the trace that indexes it.
         Compile::Vm => {
             let input = input.ok_or_else(|| {
                 "06-vm fixtures require an `==== input ====` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
