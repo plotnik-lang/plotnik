@@ -309,11 +309,29 @@ pub fn completions_command() -> Command {
 
 fn lang_dump_command() -> Command {
     Command::new("dump")
-        .about("Dump grammar in Plotnik-like syntax")
+        .about("Dump grammar tree shapes in query-flavored notation")
         .arg(
             clap::Arg::new("lang")
                 .help("Language name or alias")
                 .required(true)
                 .index(1),
+        )
+        .arg(
+            clap::Arg::new("no-legend")
+                .long("no-legend")
+                .help("Omit the legend header")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            clap::Arg::new("json")
+                .long("json")
+                .help("Emit the raw grammar.json instead of tree shapes")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            clap::Arg::new("width")
+                .long("width")
+                .help("Fold groups inline up to this column width (0 = always break)")
+                .value_parser(clap::value_parser!(usize)),
         )
 }
