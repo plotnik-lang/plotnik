@@ -64,7 +64,7 @@ fn dispatch(matches: &ArgMatches) -> CliResult {
             Some(("list", _)) => commands::lang::run_list(),
             Some(("dump", sub_m)) => {
                 let params = LangDumpOpts::from_matches(sub_m);
-                commands::lang::run_dump(&params.lang)
+                commands::lang::run_dump(&params.lang, params.legend, params.json, params.width)
             }
             _ => unreachable!("clap should have caught this"),
         },

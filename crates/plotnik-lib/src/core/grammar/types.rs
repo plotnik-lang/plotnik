@@ -7,6 +7,7 @@ use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
 
 use super::json::GrammarError;
 use super::raw::RawGrammar;
+use super::render::TreeGrammar;
 use super::structure::StructureTable;
 
 pub(super) struct GrammarTables {
@@ -74,6 +75,10 @@ pub struct Grammar {
     all_anonymous_node_kinds: Vec<String>,
     all_field_names: Vec<String>,
     structure: StructureTable,
+    /// Tree-shape rendering model for `lang dump` and diagnostics. Populated only
+    /// on the `from_raw` path (the pipeline data it taps does not survive into
+    /// `GrammarTables`); empty otherwise.
+    tree: TreeGrammar,
 }
 
 impl Grammar {
@@ -101,6 +106,14 @@ impl Grammar {
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
         let (syntax_grammar, lexical_grammar) = extract_tokens(resolved_grammar)
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+        // Tap the pipeline here: nested Seq/Choice/Repeat structure is intact and
+        // tokens are split out, but `expand_repeats`/`flatten` (which consume these
+        // grammars below) would render them unusable as documentation. Lower the
+        // shapes now, in place, so the grammars never have to be cloned; the
+        // closure-dependent bits are attached from `node_shapes` further down.
+        let rule_order: Vec<String> = raw.rules.keys().cloned().collect();
+        let (mut tree, tree_aliases) =
+            super::render::lower(raw.name.clone(), &rule_order, &syntax_grammar, &lexical_grammar);
         let syntax_grammar = expand_repeats(syntax_grammar);
         let mut syntax_grammar = flatten_grammar(syntax_grammar)
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
@@ -119,6 +132,9 @@ impl Grammar {
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
         let node_shapes = node_shapes::generate_node_shapes(grammar_ctx, &variable_summaries)
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
+
+        super::render::attach_node_shapes(&mut tree, &node_shapes, &tree_aliases);
+
         let tables = GrammarTables {
             node_shapes,
             symbols: derive_symbols(&syntax_grammar, &lexical_grammar, &inlines, &aliases),
@@ -129,6 +145,7 @@ impl Grammar {
             Self::from_tables(raw.name.clone(), tables).map_err(GrammarError::Analysis)?;
         let structure = StructureTable::build(grammar_ctx, &grammar);
         grammar.structure = structure;
+        grammar.tree = tree;
         Ok(grammar)
     }
 
@@ -269,6 +286,7 @@ impl Grammar {
             // Populated only on the `from_raw` path: `GrammarTables` has already
             // discarded the flattened productions the table distills.
             structure: StructureTable::default(),
+            tree: TreeGrammar::default(),
         })
     }
 
@@ -284,6 +302,12 @@ impl Grammar {
     /// so only the `from_raw` path can populate it.
     pub fn structure(&self) -> &StructureTable {
         &self.structure
+    }
+
+    /// Tree-shape rendering model for `lang dump` and diagnostics. Empty for
+    /// grammars built directly from metadata rather than through `from_raw`.
+    pub fn tree(&self) -> &TreeGrammar {
+        &self.tree
     }
 
     pub fn resolve_named_node(&self, kind: &str) -> Option<NodeKindId> {

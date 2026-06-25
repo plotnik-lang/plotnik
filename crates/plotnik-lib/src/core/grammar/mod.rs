@@ -7,6 +7,7 @@ mod node_shapes;
 mod prepared;
 mod productions;
 pub mod raw;
+mod render;
 mod rules;
 mod structure;
 mod symbols;
@@ -25,5 +26,8 @@ mod structure_tests;
 mod types_tests;
 
 pub use json::GrammarError;
+pub use render::{
+    Body, DEFAULT_WIDTH, Def, DefKind, DumpOptions, NodeRef, Quant, Shape, TokenText, TreeGrammar,
+};
 pub use structure::{SkeletonStep, SkeletonVariable, StepTarget, StructureTable, VarId};
 pub use types::Grammar;

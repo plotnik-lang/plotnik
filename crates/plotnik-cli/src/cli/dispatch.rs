@@ -310,6 +310,9 @@ impl From<TraceOpts> for TraceArgs {
 
 pub struct LangDumpOpts {
     pub lang: String,
+    pub legend: bool,
+    pub json: bool,
+    pub width: Option<usize>,
 }
 
 impl LangDumpOpts {
@@ -319,6 +322,9 @@ impl LangDumpOpts {
                 .get_one::<String>("lang")
                 .cloned()
                 .expect("clap guarantees `lang` is present"),
+            legend: !m.get_flag("no-legend"),
+            json: m.get_flag("json"),
+            width: m.get_one::<usize>("width").copied(),
         }
     }
 }

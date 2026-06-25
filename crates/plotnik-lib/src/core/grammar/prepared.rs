@@ -49,7 +49,7 @@ pub enum PrecedenceEntry {
     Symbol(String),
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ReservedWordSet<T> {
     pub name: String,
     pub reserved_words: Vec<T>,
@@ -95,7 +95,7 @@ pub struct InternedGrammar {
     pub reserved_word_sets: Vec<ReservedWordSet<Rule>>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExtractedSyntaxGrammar {
     pub variables: Vec<Variable>,
     pub extra_symbols: Vec<Symbol>,
@@ -106,7 +106,7 @@ pub struct ExtractedSyntaxGrammar {
     pub reserved_word_sets: Vec<ReservedWordSet<Symbol>>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExtractedLexicalGrammar {
     pub variables: Vec<Variable>,
     pub separators: Vec<Rule>,

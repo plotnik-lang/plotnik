@@ -1,0 +1,57 @@
+---
+source: crates/plotnik-cli/src/commands/lang_tests.rs
+expression: dump
+---
+; json — how its trees are shaped, to help write plotnik queries
+;
+; A description in query-flavored notation, NOT a runnable query. The
+; building blocks below are real query syntax you reuse; the rest names
+; structure the grammar has that a query does not write literally.
+;
+; Definitions:
+;   name = {...}     node shape — how a `name` node is built from children
+;   name# = a | b    category   — `name` is any of a, b, … (tree-sitter supertype)
+;   name = /regex/   token      — a leaf; the regex is its text, not children
+;   name = external  external   — a leaf scanned by the grammar's native code
+;
+; Query building blocks (reuse these when writing a query):
+;   (child)   named node     "text"  anonymous node (token)
+;   field: p  field           ? * +  quantifiers
+;   {...}     sequence        [...]   choice (one of)
+;
+; Description-only marks (name structure; not written in a query):
+;   (name#)   here stands a node of category `name` (any of its members)
+;   _name     a hidden rule — its children show here; not a matchable node
+;   /regex/   inline token text
+;
+; Extras (comments, whitespace) may appear between any two siblings.
+
+extras = [ (comment) /\s/ ]
+
+value# = array | false | null | number | object | string | true
+
+document = (value#)*  ; root
+
+object = { "{" { (pair) { "," (pair) }* }? "}" }
+
+pair = { key: (string) ":" value: (value#) }
+
+array = { "[" { (value#) { "," (value#) }* }? "]" }
+
+string = [ { "\"" "\"" } { "\"" _string_content "\"" } ]
+
+_string_content = [ (string_content) (escape_sequence) ]+
+
+string_content = /[^\\"\n]+/
+
+escape_sequence = /\\(\"|\\|\/|b|f|n|r|t|u)/
+
+number = /-?(0|[1-9](\d+)?)\.(\d+)?((e|E)-?\d+)?|-?(0|[1-9](\d+)?)((e|E)-?\d+)?/
+
+true = "true"
+
+false = "false"
+
+null = "null"
+
+comment = /\/\/.*|\/\*[^*]*\*+([^\/*][^*]*\*+)*\//  ; extra
