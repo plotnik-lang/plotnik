@@ -1908,8 +1908,10 @@ name = "plotnik-lib"
 version = "0.3.3"
 dependencies = [
  "annotate-snippets",
+ "arborium-dart",
  "arborium-javascript",
  "arborium-tree-sitter",
+ "arborium-typescript",
  "bitflags",
  "cargo_metadata",
  "crc32fast",
