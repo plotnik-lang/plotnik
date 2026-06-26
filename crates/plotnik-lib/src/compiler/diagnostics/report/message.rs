@@ -94,6 +94,7 @@ pub enum DiagnosticKind {
     ChildUnderLeafToken,
     NegatedRequiredField,
     UnsatisfiablePattern,
+    QueryTooComplex,
 
     MissingDefName,
 
@@ -342,6 +343,7 @@ impl DiagnosticKind {
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
             Self::NegatedRequiredField => "this field is always present",
             Self::UnsatisfiablePattern => "pattern can never match",
+            Self::QueryTooComplex => "query too complex to compile",
             Self::MissingDefName => "definition must be named",
             Self::EmitFailed => "bytecode emission failed",
             Self::BytecodeRejected => "query compiles to invalid bytecode",

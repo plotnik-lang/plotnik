@@ -99,8 +99,14 @@ pub(super) struct ChildAutomaton {
     negated_fields: Vec<NodeFieldId>,
     /// Set when the query side could not be represented finitely (a sibling-recursive
     /// definition splicing siblings). The engine treats it as satisfiable — sound,
-    /// since we then never reject.
+    /// since we then never reject. This is *model incompleteness*, not a resource limit:
+    /// the query may well be valid, so we must not reject it.
     indeterminate: bool,
+    /// Set when construction hit a resource ceiling — too many states (an exponentially
+    /// widening expansion) or too-deep recursion. Unlike `indeterminate`, this is the
+    /// query asking for more than we will spend, so it is *rejected* with a clear
+    /// "too complex" diagnostic rather than waved through.
+    too_complex: bool,
 }
 
 impl ChildAutomaton {
@@ -119,6 +125,12 @@ impl ChildAutomaton {
 
     pub(super) fn is_indeterminate(&self) -> bool {
         self.indeterminate
+    }
+
+    /// Whether construction bailed on a resource ceiling (state cap or depth), meaning
+    /// the query must be rejected as too complex to compile.
+    pub(super) fn is_too_complex(&self) -> bool {
+        self.too_complex
     }
 
     pub(super) fn gap(&self, state: State) -> GapClass {
@@ -189,13 +201,17 @@ pub(super) fn build(
     ctx: AutomatonContext<'_>,
     table: &mut PatternTable,
     relax: bool,
+    max_depth: u32,
 ) -> ChildAutomaton {
     let mut builder = Builder {
         ctx,
         table,
         states: Vec::new(),
         indeterminate: false,
+        too_complex: false,
         ref_stack: Vec::new(),
+        max_depth,
+        depth: 0,
     };
     let start = builder.new_state(GapClass::Any);
     let items: Vec<SeqItem> = node.node().items().collect();
@@ -211,6 +227,7 @@ pub(super) fn build(
 
     let mut states = builder.states;
     let indeterminate = builder.indeterminate;
+    let too_complex = builder.too_complex;
     if relax {
         for state in &mut states {
             state.gap = GapClass::Any;
@@ -222,6 +239,7 @@ pub(super) fn build(
         accept,
         negated_fields: negated_fields(node, ctx),
         indeterminate,
+        too_complex,
     }
 }
 
@@ -241,9 +259,20 @@ struct Builder<'a, 'b> {
     table: &'b mut PatternTable,
     states: Vec<StateData>,
     indeterminate: bool,
+    /// Set when a resource ceiling (state cap or recursion depth) is hit — the query is
+    /// rejected as too complex, not accepted.
+    too_complex: bool,
     /// Definition names currently being inlined, to catch sibling-recursive refs
     /// that would splice siblings without bound.
     ref_stack: Vec<String>,
+    /// The structural-depth ceiling — the parser's own `max_depth`. Inlining a long
+    /// chain of references (`A = {(B)}`, `B = {(C)}`, …) expands the tree past any
+    /// nesting the parser admitted, and the recursion that builds it is native; left
+    /// unbounded it overflows the stack. Capping construction at the depth the parser
+    /// already survived keeps the two in lockstep — if it parsed, it builds.
+    max_depth: u32,
+    /// Current [`Self::emit_pattern`] recursion depth, checked against `max_depth`.
+    depth: u32,
 }
 
 /// The context one query position is lowered under. `source` is the file its text
@@ -290,8 +319,23 @@ impl Descent {
     }
 }
 
+/// Upper bound on one automaton's states. A definition that splices siblings into
+/// itself through ever-widening expansions (`A = [(B)(B)]`, `B = [(C)(C)]`, …) demands
+/// exponentially many states; rather than chase that to an OOM, construction stops and
+/// flags the query too complex to compile — a clean rejection, not a silent accept.
+/// Far above any real pattern's width, which is a few hundred children at most. This is
+/// the heap counterpart to the depth cap: depth guards the stack, the state cap guards
+/// the heap, and both reject rather than spend unboundedly.
+const STATE_CAP: usize = 20_000;
+
 impl Builder<'_, '_> {
     fn new_state(&mut self, gap: GapClass) -> State {
+        if self.states.len() >= STATE_CAP {
+            // Stop growing the automaton and short-circuit the solve (`indeterminate`),
+            // but record that we bailed on a resource ceiling so the query is rejected.
+            self.indeterminate = true;
+            self.too_complex = true;
+        }
         let id = self.states.len() as State;
         self.states.push(StateData::new(gap));
         id
@@ -335,10 +379,31 @@ impl Builder<'_, '_> {
         cur
     }
 
+    /// Emit one item between `from` and the returned exit state, counting recursion
+    /// depth. Every descent funnels through here, so one check bounds the whole walk:
+    /// outrunning `max_depth` means the inlined expansion is deeper than any tree the
+    /// parser would admit, so we stop and flag the query too complex (rejected). An
+    /// already-bailing build — whether from depth, the state cap, or a sibling-recursive
+    /// reference — short-circuits without doing more work.
+    fn emit_pattern(&mut self, pattern: &Pattern, descent: Descent, from: State) -> State {
+        if self.indeterminate {
+            return from;
+        }
+        if self.depth >= self.max_depth {
+            self.indeterminate = true;
+            self.too_complex = true;
+            return from;
+        }
+        self.depth += 1;
+        let exit = self.emit_pattern_inner(pattern, descent, from);
+        self.depth -= 1;
+        exit
+    }
+
     /// Emit one item between `from` and the returned exit state. The gap *before* this
     /// item is already stamped on `from`; `descent` carries the source and the field label
     /// the matcher this item builds must bind.
-    fn emit_pattern(&mut self, pattern: &Pattern, descent: Descent, from: State) -> State {
+    fn emit_pattern_inner(&mut self, pattern: &Pattern, descent: Descent, from: State) -> State {
         match pattern {
             Pattern::CapturedPattern(cap) => match cap.inner() {
                 Some(inner) => self.emit_pattern(&inner, descent, from),

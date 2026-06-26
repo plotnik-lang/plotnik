@@ -11,6 +11,7 @@ mod satisfy;
 mod utils;
 
 pub use binding::{GrammarBinding, GrammarBindingBuilder};
+pub use satisfy::DEFAULT_SATISFY_STEP_BUDGET;
 
 #[cfg(test)]
 mod link_tests;

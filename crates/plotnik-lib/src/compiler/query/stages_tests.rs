@@ -242,6 +242,30 @@ fn multifile_ref_to_body_with_internal_error_attributes_to_defining_file() {
 }
 
 #[test]
+fn deep_reference_chain_hits_recursion_limit() {
+    // `A0 = (A1)`, `A1 = (A2)`, … is flat at every definition, so the parser's nesting
+    // cap never sees it — but dependency analysis recurses one frame per link, and a
+    // chain longer than `max_depth` would overflow the native stack. It is rejected with
+    // the same recursion-limit error deep nesting raises, on every platform.
+    let depth = 100;
+    let mut src = String::new();
+    for i in 0..depth {
+        src.push_str(&format!("A{i} = (A{})\n", i + 1));
+    }
+    src.push_str(&format!("A{depth} = (identifier)\n"));
+
+    let result = QueryBuilder::from_inline(&src)
+        .with_parse_max_depth(50)
+        .analyze();
+
+    match result {
+        Err(crate::compiler::Error::RecursionLimitExceeded) => {}
+        Err(other) => panic!("expected RecursionLimitExceeded, got {other:?}"),
+        Ok(_) => panic!("expected RecursionLimitExceeded, but analysis succeeded"),
+    }
+}
+
+#[test]
 fn deeply_referenced_alternation_compiles_in_linear_time() {
     // Each level is an alternation naming the previous definition twice, so the inlined
     // form doubles per level — 2^40 nodes. The anchor classifier (run during lowering)
@@ -259,6 +283,46 @@ fn deeply_referenced_alternation_compiles_in_linear_time() {
     assert!(
         !linked.dry_run().has_errors(),
         "alternation DAG must lower cleanly",
+    );
+}
+
+#[test]
+fn satisfy_step_budget_rejects_and_is_tunable() {
+    // A wide child list drives the satisfiability solve's quadratic fixed point. Under a
+    // deliberately tiny budget it trips and the query is rejected as too complex; under
+    // the default it compiles — so the knob fails closed yet stays out of the way.
+    let mut src = String::from("Q = (program");
+    for i in 0..60 {
+        src.push_str(&format!(" (expression_statement) @c{i}"));
+    }
+    src.push(')');
+
+    let build = |budget: Option<u64>| {
+        let mut source_map = SourceMap::new();
+        source_map.add_file(SourcePath::new("q.ptk"), &src);
+        let mut builder = QueryBuilder::new(source_map);
+        if let Some(budget) = budget {
+            builder = builder.with_satisfy_step_budget(budget);
+        }
+        builder.analyze().unwrap().link(javascript())
+    };
+
+    let tight = build(Some(100));
+    assert!(!tight.is_valid(), "a 100-step budget must reject this list");
+    assert!(
+        tight
+            .diagnostics()
+            .kinds()
+            .any(|k| k == DiagnosticKind::QueryTooComplex),
+        "expected QueryTooComplex:\n{}",
+        tight.dump_diagnostics(),
+    );
+
+    let relaxed = build(None);
+    assert!(
+        relaxed.is_valid(),
+        "the default budget must admit it:\n{}",
+        relaxed.dump_diagnostics(),
     );
 }
 

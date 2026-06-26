@@ -67,6 +67,21 @@ pub(super) fn report_wildcard(node: &Located<NodePattern>, diag: &mut Diagnostic
         .emit();
 }
 
+/// Reject a query whose satisfiability analysis hit a resource ceiling — too many
+/// automaton states (an exponentially widening expansion) or a too-deep inlined
+/// reference. This is a resource limit, *not* an impossibility claim: the query may be
+/// perfectly valid, just larger than the compiler will spend on it. We point at the
+/// definition under analysis when the ceiling tripped.
+pub(super) fn report_too_complex(body: &Located<Pattern>, diag: &mut Diagnostics) {
+    let span = Span::new(body.source(), body.node().syntax().text_range());
+    diag.report(DiagnosticKind::QueryTooComplex, span)
+        .hint(
+            "simplify the pattern — deeply nested or repeatedly-referenced alternations \
+             can expand exponentially",
+        )
+        .emit();
+}
+
 /// A single-valued field the culprit binds more than once, with the repeat count. Such a
 /// field can hold one child, so binding it twice is impossible whatever else matches —
 /// the first such field in source order, named for the message.
@@ -156,7 +171,12 @@ fn locate(
 /// satisfier keeps the relaxed automata out of the real run's memo. If this matches
 /// while the strict solve did not, the anchors are provably the only obstacle.
 fn relaxing_anchors_satisfies(satisfier: &Satisfier, culprit: &Culprit) -> bool {
-    let mut relaxed = Satisfier::new(satisfier.context(), true);
+    let mut relaxed = Satisfier::new(
+        satisfier.context(),
+        true,
+        satisfier.max_depth(),
+        satisfier.step_budget(),
+    );
     relaxed.satisfiable(&culprit.node, culprit.kind)
 }
 

@@ -26,6 +26,10 @@ pub struct GrammarLinkInput<'a, 'q> {
     pub source_map: &'q SourceMap,
     pub ast_map: &'q IndexMap<SourceId, Root>,
     pub symbol_table: &'a SymbolTable,
+    /// The parser's `max_depth`, reused to bound Stage B automaton construction.
+    pub max_depth: u32,
+    /// Work ceiling for the Stage B satisfiability solve.
+    pub satisfy_step_budget: u64,
 }
 
 impl<'q> GrammarLinkInput<'_, 'q> {
@@ -58,6 +62,8 @@ impl<'q> GrammarLinkInput<'_, 'q> {
                     symbol_table: self.symbol_table,
                     source_map: self.source_map,
                     ast_map: self.ast_map,
+                    max_depth: self.max_depth,
+                    satisfy_step_budget: self.satisfy_step_budget,
                 },
                 diagnostics,
             );

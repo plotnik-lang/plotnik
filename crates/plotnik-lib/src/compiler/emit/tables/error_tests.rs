@@ -39,9 +39,11 @@ fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
 #[test]
 fn struct_field_count_overflow_is_emit_error() {
     // 300 captures inside one node → a struct with 300 fields, past the u8 limit.
+    // A concrete child kind (over `(_)`) keeps the satisfiability solve linear here —
+    // the field *count* is what this exercises, not how the children are matched.
     let mut query = String::from("Q = (program");
     for i in 0..300 {
-        write!(query, " (_) @c{i}").unwrap();
+        write!(query, " (expression_statement) @c{i}").unwrap();
     }
     query.push(')');
 
@@ -76,7 +78,9 @@ fn effect_member_payload_overflow_is_emit_error() {
     for def in 0..5 {
         write!(query, "D{def} = (program").unwrap();
         for field in 0..250 {
-            write!(query, " (_) @d{def}_f{field}").unwrap();
+            // Concrete child kind: keeps each definition's satisfiability solve linear
+            // (the wide member count is the point, not wildcard matching).
+            write!(query, " (expression_statement) @d{def}_f{field}").unwrap();
         }
         query.push_str(")\n");
     }

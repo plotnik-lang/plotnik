@@ -10,8 +10,15 @@
 //! They are computed as a least fixed point by a demand-driven worklist: every key
 //! starts at bottom (`SAT`→`false`, `THREAD`→∅); recomputing a key records which keys
 //! it read, and a key is re-queued only when one of its reads changes. Termination
-//! comes from the finite domains and monotonicity (Knaster–Tarski) — there is no
-//! step budget and no give-up path, so every query gets a definite verdict.
+//! comes from the finite domains and monotonicity (Knaster–Tarski).
+//!
+//! The domains are finite but not small: a wide query child list yields an automaton
+//! with as many states, and threading the grammar through it is quadratic in that
+//! width. So the solve carries a step budget; once the per-state work exceeds it the
+//! solve gives up, every pending verdict reads as *accept* (the sound default), and
+//! the pass rejects the whole query as too complex rather than spend unbounded time.
+//! The budget bounds work, not wall-clock, so the cut-off is the same on every
+//! machine — a slow host merely takes proportionally longer to reach it.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -90,6 +97,8 @@ struct Frozen<'a> {
     extras: Vec<NodeKindId>,
     named_extras: Vec<NodeKindId>,
     relax: bool,
+    /// Structural-depth ceiling for automaton construction — the parser's `max_depth`.
+    max_depth: u32,
 }
 
 impl<'a> Frozen<'a> {
@@ -241,6 +250,16 @@ enum Edge {
     Last,
 }
 
+/// Default ceiling on solve work before the query is declared too complex. Charged
+/// once per visited state in the two quadratic inner loops (`closure` and a `Visible`
+/// `thread_step`), so it caps the dominant cost. The widest real fixture settles in a
+/// few thousand steps, so this leaves roughly three orders of magnitude of headroom,
+/// while a child list past about a thousand wide — quadratic at ~2n² steps — trips it
+/// in a fraction of a second rather than running for tens. Tunable per query via
+/// [`QueryBuilder::with_satisfy_step_budget`](crate::QueryBuilder::with_satisfy_step_budget)
+/// for the rare case that legitimately needs a wider one.
+pub const DEFAULT_SATISFY_STEP_BUDGET: u64 = 2_000_000;
+
 /// The mutable fixed-point state: memo tables, reverse dependencies, and the worklist.
 #[derive(Default)]
 struct Solve {
@@ -252,6 +271,12 @@ struct Solve {
     current: Option<Key>,
     queue: VecDeque<Key>,
     queued: HashSet<Key>,
+    /// State-visits charged so far, the ceiling they may reach, and whether they
+    /// crossed it. Once `exhausted`, the solve stops doing work and every verdict
+    /// reads as accept.
+    steps: u64,
+    budget: u64,
+    exhausted: bool,
 }
 
 pub(super) struct Satisfier<'a> {
@@ -260,7 +285,12 @@ pub(super) struct Satisfier<'a> {
 }
 
 impl<'a> Satisfier<'a> {
-    pub(super) fn new(ctx: AutomatonContext<'a>, relax: bool) -> Self {
+    pub(super) fn new(
+        ctx: AutomatonContext<'a>,
+        relax: bool,
+        max_depth: u32,
+        step_budget: u64,
+    ) -> Self {
         let (extras, named_extras) = extra_kinds(ctx.grammar);
         Self {
             frozen: Frozen {
@@ -271,8 +301,12 @@ impl<'a> Satisfier<'a> {
                 extras,
                 named_extras,
                 relax,
+                max_depth,
             },
-            solve: Solve::default(),
+            solve: Solve {
+                budget: step_budget,
+                ..Solve::default()
+            },
         }
     }
 
@@ -280,6 +314,11 @@ impl<'a> Satisfier<'a> {
     /// Errs toward `true` (accept) whenever the question cannot be decided, so a
     /// rejection is always sound.
     pub(super) fn satisfiable(&mut self, node: &Located<NodePattern>, kind: NodeKindId) -> bool {
+        // Already over budget on an earlier node: accept here too and let the pass
+        // reject the whole query, rather than start a fresh solve we cannot finish.
+        if self.solve.exhausted {
+            return true;
+        }
         let p = self.frozen.table.intern(node.clone());
         self.build_pending();
 
@@ -292,6 +331,11 @@ impl<'a> Satisfier<'a> {
             self.solve.seed(Key::Sat((p, producer)));
         }
         self.run();
+        // A solve that ran out of budget left its memo partly converged; its `false`s
+        // are not sound rejections, so accept and defer to the too-complex check.
+        if self.solve.exhausted {
+            return true;
+        }
         producers
             .iter()
             .any(|&producer| self.solve.sat_value((p, producer)))
@@ -313,14 +357,24 @@ impl<'a> Satisfier<'a> {
         while self.frozen.automata.len() < self.frozen.table.len() {
             let index = self.frozen.automata.len();
             let node = self.frozen.table.node_at(index).clone();
-            let automaton =
-                automaton::build(&node, self.frozen.ctx, &mut self.frozen.table, self.frozen.relax);
+            let automaton = automaton::build(
+                &node,
+                self.frozen.ctx,
+                &mut self.frozen.table,
+                self.frozen.relax,
+                self.frozen.max_depth,
+            );
             self.frozen.automata.push(automaton);
         }
     }
 
     fn run(&mut self) {
         while let Some(key) = self.solve.dequeue() {
+            // Budget spent: stop draining. The verdict is no longer trusted — the
+            // caller accepts and the pass rejects the query as too complex.
+            if self.solve.exhausted {
+                break;
+            }
             if self.solve.recompute(&self.frozen, key) {
                 self.solve.requeue_dependents(key);
             }
@@ -329,6 +383,26 @@ impl<'a> Satisfier<'a> {
 
     pub(super) fn context(&self) -> AutomatonContext<'a> {
         self.frozen.ctx
+    }
+
+    /// The structural-depth ceiling threaded into construction — so a secondary probe
+    /// (the relaxed-anchor diagnostic) bounds its own build the same way.
+    pub(super) fn max_depth(&self) -> u32 {
+        self.frozen.max_depth
+    }
+
+    /// The solve's work ceiling — so a secondary probe (the relaxed-anchor diagnostic)
+    /// runs under the same budget as the primary solve.
+    pub(super) fn step_budget(&self) -> u64 {
+        self.solve.budget
+    }
+
+    /// Whether a resource ceiling tripped: an automaton bailed on construction (state
+    /// cap or recursion depth), or the solve ran past its step budget. Either way the
+    /// query is rejected as too complex, rather than judged on an automaton we declined
+    /// to finish or a fixed point we declined to reach.
+    pub(super) fn is_too_complex(&self) -> bool {
+        self.solve.exhausted || self.frozen.automata.iter().any(|a| a.is_too_complex())
     }
 
     /// The kinds a node of `kind` can begin with — for a leading-anchor diagnostic.
@@ -345,6 +419,16 @@ impl<'a> Satisfier<'a> {
 impl Solve {
     fn sat_value(&self, key: SatKey) -> bool {
         self.sat.get(&key).copied().unwrap_or(false)
+    }
+
+    /// Charge one unit of state-visiting work, latching `exhausted` once the budget is
+    /// spent. Called in the hot per-state loops so total work — not any single key — is
+    /// what the bound governs.
+    fn charge(&mut self) {
+        self.steps = self.steps.saturating_add(1);
+        if self.steps > self.budget {
+            self.exhausted = true;
+        }
     }
 
     fn seed(&mut self, key: Key) {
@@ -520,6 +604,7 @@ impl Solve {
                 let extra = frozen.ctx.grammar.is_extra(kind);
                 let mut next = StateSet::default();
                 for q in current.iter() {
+                    self.charge();
                     // The state's *effective* gap (tightest erasure path that reaches it),
                     // so a strict anchor erased into this position still forbids the skip.
                     if gaps[q as usize].admits(anonymous, extra) {
@@ -587,6 +672,7 @@ impl Solve {
             stack.push(q);
         }
         while let Some(q) = stack.pop() {
+            self.charge();
             let gq = gaps[q as usize];
             for &to in automaton.eps_edges(q) {
                 let candidate = gq.tighten(automaton.gap(to));

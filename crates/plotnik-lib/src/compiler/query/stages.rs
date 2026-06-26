@@ -3,7 +3,9 @@ use rowan::TextRange;
 
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::grammar::link;
-use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
+use crate::compiler::analyze::grammar::{
+    DEFAULT_SATISFY_STEP_BUDGET, GrammarBinding, GrammarBindingBuilder,
+};
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
 use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate_ast};
@@ -27,6 +29,7 @@ pub(crate) type AstMap = IndexMap<SourceId, Root>;
 struct QueryConfig {
     pub parse_fuel: u32,
     pub parse_max_depth: u32,
+    pub satisfy_step_budget: u64,
 }
 
 pub struct QueryBuilder {
@@ -39,6 +42,7 @@ impl QueryBuilder {
         let config = QueryConfig {
             parse_fuel: DEFAULT_FUEL,
             parse_max_depth: DEFAULT_MAX_DEPTH,
+            satisfy_step_budget: DEFAULT_SATISFY_STEP_BUDGET,
         };
 
         Self { source_map, config }
@@ -59,8 +63,17 @@ impl QueryBuilder {
         self
     }
 
+    /// Override the satisfiability solve's work ceiling. Raise it for a query that
+    /// legitimately needs a wide child list the default rejects as too complex; the
+    /// default protects against an adversarial one driving the quadratic solve for an
+    /// unbounded stretch.
+    pub fn with_satisfy_step_budget(mut self, budget: u64) -> Self {
+        self.config.satisfy_step_budget = budget;
+        self
+    }
+
     pub fn analyze(self) -> crate::compiler::QueryResult<Query> {
-        Ok(self.parse()?.analyze())
+        self.parse()?.analyze()
     }
 
     pub fn check(self, grammar: &Grammar) -> crate::compiler::QueryResult<CheckedQuery> {
@@ -100,6 +113,8 @@ impl QueryBuilder {
             source_map: self.source_map,
             diag,
             ast_map: ast,
+            max_depth: self.config.parse_max_depth,
+            satisfy_step_budget: self.config.satisfy_step_budget,
         })
     }
 }
@@ -109,22 +124,31 @@ pub(crate) struct QueryParsed {
     source_map: SourceMap,
     ast_map: AstMap,
     diag: Diagnostics,
+    /// The structural-depth ceiling parsing ran under, carried forward so Stage B can
+    /// bound automaton construction by the same budget the parser already enforced.
+    max_depth: u32,
+    /// The satisfiability solve's work ceiling, carried forward to Stage B.
+    satisfy_step_budget: u64,
 }
 
 impl QueryParsed {
-    pub(crate) fn analyze(mut self) -> Query {
+    pub(crate) fn analyze(mut self) -> crate::compiler::QueryResult<Query> {
         let Some(validated) = validate_ast(ShapeValidationInput {
             source_map: &self.source_map,
             ast_map: &self.ast_map,
             diag: &mut self.diag,
         }) else {
-            return Query::parsed_only(self);
+            return Ok(Query::parsed_only(self));
         };
 
         let mut interner = Interner::new();
         let symbol_table = resolve_names(&validated, &mut self.diag);
 
-        let dependency_analysis = dependencies::analyze_dependencies(&symbol_table, &mut interner);
+        // A reference chain deeper than the structural ceiling is rejected here (the
+        // dependency graph's recursion would otherwise overflow), the same fatal
+        // recursion-limit outcome the parser produces for over-deep nesting.
+        let dependency_analysis =
+            dependencies::analyze_dependencies(&symbol_table, &mut interner, self.max_depth)?;
         validate_recursion(
             &dependency_analysis,
             validated.ast_map(),
@@ -156,7 +180,7 @@ impl QueryParsed {
             dependency_analysis,
         };
 
-        Query::analyzed(self, analysis)
+        Ok(Query::analyzed(self, analysis))
     }
 
     pub(crate) fn source_map(&self) -> &SourceMap {
@@ -299,6 +323,8 @@ impl Query {
             source_map: &analyzed.parsed.source_map,
             ast_map: &analyzed.parsed.ast_map,
             symbol_table: &analyzed.analysis.symbol_table,
+            max_depth: analyzed.parsed.max_depth,
+            satisfy_step_budget: analyzed.parsed.satisfy_step_budget,
         }
         .link(&mut output, &mut analyzed.parsed.diag);
 

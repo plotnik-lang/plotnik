@@ -20,6 +20,8 @@ mod diagnose;
 mod engine;
 mod state_set;
 
+pub use engine::DEFAULT_SATISFY_STEP_BUDGET;
+
 #[cfg(test)]
 mod state_set_tests;
 
@@ -43,6 +45,12 @@ pub(super) struct SatisfyInput<'a> {
     pub(super) symbol_table: &'a SymbolTable,
     pub(super) source_map: &'a SourceMap,
     pub(super) ast_map: &'a IndexMap<SourceId, Root>,
+    /// The query's structural-depth ceiling (the parser's `max_depth`), reused to bound
+    /// automaton construction so an inlining chain cannot outrun the native stack.
+    pub(super) max_depth: u32,
+    /// Work ceiling for the satisfiability solve — a wide child list drives a quadratic
+    /// fixed point, so past this many state-visits the query is rejected as too complex.
+    pub(super) satisfy_step_budget: u64,
 }
 
 /// Run the satisfiability pass over every definition, reporting impossible patterns.
@@ -59,7 +67,7 @@ pub(super) fn check(input: SatisfyInput<'_>, diag: &mut Diagnostics) {
         source_map: input.source_map,
     };
 
-    let mut satisfier = Satisfier::new(ctx, false);
+    let mut satisfier = Satisfier::new(ctx, false, input.max_depth, input.satisfy_step_budget);
     let mut reporter = Reporter {
         satisfier: &mut satisfier,
         diag,
@@ -72,7 +80,15 @@ pub(super) fn check(input: SatisfyInput<'_>, diag: &mut Diagnostics) {
     for (&source, root) in input.ast_map {
         for def in root.defs() {
             if let Some(body) = def.body() {
-                reporter.walk(&Located::new(source, body), Mode::Required);
+                let located = Located::new(source, body);
+                reporter.walk(&located, Mode::Required);
+                // A resource ceiling tripped mid-construction: the verdicts that follow
+                // would rest on an automaton we declined to finish, so stop and reject
+                // the whole query as too complex rather than report anything dubious.
+                if reporter.satisfier.is_too_complex() {
+                    diagnose::report_too_complex(&located, reporter.diag);
+                    return;
+                }
             }
         }
     }
