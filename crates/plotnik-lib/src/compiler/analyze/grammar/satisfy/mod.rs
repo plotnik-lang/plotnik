@@ -6,7 +6,8 @@
 //! slip through. This pass closes that gap: it threads the grammar's productions
 //! through a per-query-node child automaton (`automaton.rs`) under a least fixed
 //! point (`engine.rs`), and rejects a query node exactly when no tree the grammar can
-//! produce realizes its children.
+//! produce realizes its children. `diagnose.rs` turns a failure into a message that
+//! points at the deepest culprit and explains the obstacle.
 //!
 //! The contract is **sound rejection**: every rejection is truly impossible; whenever
 //! the question cannot be decided, the pass accepts. A false rejection is the one
@@ -15,19 +16,18 @@
 //! failure cannot be excused by a sibling branch or zero repetitions.
 
 mod automaton;
+mod diagnose;
 mod engine;
 mod state_set;
 
 #[cfg(test)]
 mod state_set_tests;
 
-use std::collections::HashSet;
-
 use indexmap::IndexMap;
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
+use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::parse::ast::{NodePattern, Pattern, Root, token_src};
 use crate::compiler::parse::cst::SyntaxKind;
@@ -58,25 +58,37 @@ pub(super) fn check(input: SatisfyInput<'_>, diag: &mut Diagnostics) {
         symbol_table: input.symbol_table,
         source_map: input.source_map,
     };
-    let mut satisfier = Satisfier::new(ctx, false);
-    let mut pass = Pass {
-        ctx,
-        satisfier: &mut satisfier,
-        diag,
-        visiting: HashSet::new(),
-    };
 
+    // A definition is matchable in its own right, so each body roots a Required goal
+    // (the same stance Stage A takes). References are not followed here: a node used
+    // as a whole child is judged by the engine in context, and a definition reached
+    // through a reference is itself walked when the loop reaches its own definition.
+    let mut goals = Vec::new();
     for (&source, root) in input.ast_map {
         for def in root.defs() {
             let Some(body) = def.body() else { continue };
-            pass.walk(&Located::new(source, body), Mode::Required);
+            collect_goals(&Located::new(source, body), Mode::Required, ctx, &mut goals);
+        }
+    }
+
+    let mut satisfier = Satisfier::new(ctx, false);
+    for goal in &goals {
+        if !satisfier.satisfiable(&goal.node, goal.kind) {
+            diagnose::report(&mut satisfier, &goal.node, goal.kind, diag);
         }
     }
 }
 
+/// A concrete-kind node pattern that must match, paired with its resolved kind.
+struct Goal {
+    node: Located<NodePattern>,
+    kind: NodeKindId,
+}
+
 /// Whether a position must participate in every match. A position turns `Deferred`
-/// once the walk descends into an alternation branch or a quantified body — there a
-/// failure is excused, so reporting it would reject a query that can match.
+/// once the walk descends into an alternation branch or a `?`/`*` body — there a
+/// failure is excused, so reporting it would reject a query that can match. A `+`
+/// body keeps the mode: it must match at least once.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Required,
@@ -89,127 +101,79 @@ impl Mode {
     }
 }
 
-struct Pass<'a, 's, 'd> {
-    ctx: AutomatonContext<'a>,
-    satisfier: &'s mut Satisfier<'a>,
-    diag: &'d mut Diagnostics,
-    /// Definition names on the current goal-walk stack, to break reference cycles.
-    visiting: HashSet<String>,
+/// Collect the concrete-kind node patterns at `Required` positions reachable from
+/// `located` without crossing into another node's child list. The walk descends
+/// through the always-present wrappers (capture, field, sequence) and the
+/// disjunctive ones (alternation, quantifier, lowering them to `Deferred`), but
+/// stops at each node pattern — its subtree is judged whole by the engine.
+fn collect_goals(
+    located: &Located<Pattern>,
+    mode: Mode,
+    ctx: AutomatonContext<'_>,
+    out: &mut Vec<Goal>,
+) {
+    match located.node() {
+        Pattern::NodePattern(node) => {
+            if !mode.is_required() {
+                return;
+            }
+            let located_node = located.wrap(node.clone());
+            if let Some(kind) = root_kind(ctx, &located_node) {
+                out.push(Goal {
+                    node: located_node,
+                    kind,
+                });
+            }
+        }
+        // An anonymous literal at a goal position matches some token of the grammar.
+        Pattern::TokenPattern(_) => {}
+        Pattern::CapturedPattern(cap) => {
+            if let Some(inner) = cap.inner() {
+                collect_goals(&located.wrap(inner), mode, ctx, out);
+            }
+        }
+        Pattern::FieldPattern(field) => {
+            if let Some(value) = field.value() {
+                collect_goals(&located.wrap(value), mode, ctx, out);
+            }
+        }
+        Pattern::SeqPattern(seq) => {
+            for child in seq.children() {
+                collect_goals(&located.wrap(child), mode, ctx, out);
+            }
+        }
+        Pattern::QuantifiedPattern(q) => {
+            let Some(inner) = q.inner() else { return };
+            // `?`/`*` admit zero matches, so the body need not hold; `+` needs it once.
+            let inner_mode = if q.is_optional() { Mode::Deferred } else { mode };
+            collect_goals(&located.wrap(inner), inner_mode, ctx, out);
+        }
+        Pattern::Union(_) | Pattern::Enum(_) => {
+            for branch in located.node().children() {
+                collect_goals(&located.wrap(branch), Mode::Deferred, ctx, out);
+            }
+        }
+        // A reference's target is walked when the loop reaches its own definition.
+        Pattern::DefRef(_) => {}
+    }
 }
 
-impl Pass<'_, '_, '_> {
-    /// Walk a pattern, returning whether it is satisfiable and reporting an impossible
-    /// concrete node at a `Required` position. The walk stops at each node pattern —
-    /// its whole subtree is judged by the engine, not re-walked here.
-    fn walk(&mut self, located: &Located<Pattern>, mode: Mode) -> bool {
-        match located.node() {
-            Pattern::NodePattern(node) => {
-                let located_node = located.wrap(node.clone());
-                let satisfiable = self.node_satisfiable(&located_node);
-                if !satisfiable && mode.is_required() {
-                    self.report(&located_node);
-                }
-                satisfiable
-            }
-            // An anonymous literal at a goal position matches some token of the
-            // grammar; structural impossibility never originates here.
-            Pattern::TokenPattern(_) => true,
-            Pattern::CapturedPattern(cap) => match cap.inner() {
-                Some(inner) => self.walk(&located.wrap(inner), mode),
-                None => true,
-            },
-            Pattern::FieldPattern(field) => match field.value() {
-                Some(value) => self.walk(&located.wrap(value), mode),
-                None => true,
-            },
-            Pattern::SeqPattern(seq) => {
-                // Siblings of a sequence all participate, so each keeps the mode.
-                let mut satisfiable = true;
-                for child in seq.children() {
-                    satisfiable &= self.walk(&located.wrap(child), mode);
-                }
-                satisfiable
-            }
-            Pattern::QuantifiedPattern(q) => {
-                let Some(inner) = q.inner() else {
-                    return true;
-                };
-                // `?`/`*` admit zero matches, so the body is deferred and the whole is
-                // satisfiable regardless; `+` needs the body once, so it stays in mode.
-                if q.is_optional() {
-                    self.walk(&located.wrap(inner), Mode::Deferred);
-                    true
-                } else {
-                    self.walk(&located.wrap(inner), mode)
-                }
-            }
-            Pattern::Union(_) | Pattern::Enum(_) => {
-                // A branch is excused by its siblings, so each is deferred; the
-                // alternation is satisfiable if any branch is. Reporting the
-                // all-branches-impossible case is left to a later graft.
-                let mut any = false;
-                for branch in located.node().children() {
-                    any |= self.walk(&located.wrap(branch), Mode::Deferred);
-                }
-                any
-            }
-            Pattern::DefRef(def_ref) => {
-                let Some(name_token) = def_ref.name() else {
-                    return true;
-                };
-                let name = name_token.text();
-                // A reference cycle in the goal walk is judged by the engine's fixed
-                // point, not here; cut it and accept.
-                if !self.visiting.insert(name.to_string()) {
-                    return true;
-                }
-                let result = match self.ctx.symbol_table.located_definition(name) {
-                    Some(target) => self.walk(&target, mode),
-                    None => true,
-                };
-                self.visiting.remove(name);
-                result
-            }
-        }
+/// The concrete named kind a node pattern roots a goal at, or `None` when the
+/// position should be skipped (wildcard, supertype, error keyword, unresolved).
+fn root_kind(ctx: AutomatonContext<'_>, located: &Located<NodePattern>) -> Option<NodeKindId> {
+    let node = located.node();
+    if node.is_any() {
+        return None;
     }
-
-    fn node_satisfiable(&mut self, located: &Located<NodePattern>) -> bool {
-        match self.root_kind(located) {
-            Some(kind) => self.satisfier.satisfiable(located, kind),
-            // Wildcards, supertypes (pre-rejected), and `ERROR`/`MISSING` carry no
-            // decidable structural goal — accept.
-            None => true,
-        }
+    let type_token = node.kind_token()?;
+    if matches!(type_token.kind(), SyntaxKind::KwError | SyntaxKind::KwMissing) {
+        return None;
     }
-
-    /// The concrete named kind a node pattern roots a goal at, or `None` when the
-    /// position should be skipped (wildcard, supertype, error keyword, unresolved).
-    fn root_kind(&self, located: &Located<NodePattern>) -> Option<NodeKindId> {
-        let node = located.node();
-        if node.is_any() {
-            return None;
-        }
-        let type_token = node.kind_token()?;
-        if matches!(type_token.kind(), SyntaxKind::KwError | SyntaxKind::KwMissing) {
-            return None;
-        }
-        let text = token_src(&type_token, self.ctx.content(located.source()));
-        let id = self.ctx.grammar.resolve_named_node(text)?;
-        // Query supertypes are rejected by Stage A; if one reaches here, skip it.
-        if self.ctx.grammar.is_supertype(id) {
-            return None;
-        }
-        Some(id)
+    let text = token_src(&type_token, ctx.content(located.source()));
+    let id = ctx.grammar.resolve_named_node(text)?;
+    // Query supertypes are rejected by Stage A; if one reaches here, skip it.
+    if ctx.grammar.is_supertype(id) {
+        return None;
     }
-
-    fn report(&mut self, located: &Located<NodePattern>) {
-        let span = located
-            .node()
-            .kind_token()
-            .map(|token| located.span_of(token.text_range()))
-            .unwrap_or_else(|| located.span_of(located.node().text_range()));
-        self.diag
-            .report(DiagnosticKind::UnsatisfiablePattern, span)
-            .emit();
-    }
+    Some(id)
 }

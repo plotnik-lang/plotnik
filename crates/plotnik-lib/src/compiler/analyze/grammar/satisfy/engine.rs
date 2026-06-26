@@ -144,6 +144,62 @@ impl<'a> Frozen<'a> {
             KindConstraint::AnyNode | KindConstraint::Unconstrained => self.extras.clone(),
         }
     }
+
+    /// The kinds that can be the first (or last) child of a node of `kind`: the
+    /// leading (trailing) visible step of each production, descending through hidden
+    /// frontiers. Best-effort for diagnostics — it may under-list past a nullable
+    /// hidden rule, so messages phrase it positively ("begins with …"), never "never".
+    fn edge_child_kinds(&self, kind: NodeKindId, edge: Edge) -> Vec<NodeKindId> {
+        let mut out = Vec::new();
+        let mut visited = HashSet::new();
+        for &producer in self.producers_of(kind) {
+            if let Producer::Var(var) = producer {
+                self.edge_kinds_of_var(var, edge, &mut out, &mut visited);
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
+    fn edge_kinds_of_var(
+        &self,
+        var: VarId,
+        edge: Edge,
+        out: &mut Vec<NodeKindId>,
+        visited: &mut HashSet<VarId>,
+    ) {
+        if !visited.insert(var) {
+            return;
+        }
+        for production in &self.variable(var).productions {
+            let mut steps: Vec<&SkeletonStep> = production.iter().collect();
+            if matches!(edge, Edge::Last) {
+                steps.reverse();
+            }
+            for step in steps {
+                match self.classify(step) {
+                    StepClass::Visible { kind, .. } => {
+                        out.push(kind);
+                        break;
+                    }
+                    StepClass::HiddenSubtree(h) => {
+                        self.edge_kinds_of_var(h, edge, out, visited);
+                        break;
+                    }
+                    // A hidden token surfaces nothing — the edge child is further along.
+                    StepClass::HiddenLeaf => {}
+                }
+            }
+        }
+    }
+}
+
+/// Which end of a node's child sequence [`Frozen::edge_child_kinds`] asks about.
+#[derive(Clone, Copy)]
+enum Edge {
+    First,
+    Last,
 }
 
 /// The mutable fixed-point state: memo tables, reverse dependencies, and the worklist.
@@ -220,6 +276,20 @@ impl<'a> Satisfier<'a> {
                 self.solve.requeue_dependents(key);
             }
         }
+    }
+
+    pub(super) fn context(&self) -> AutomatonContext<'a> {
+        self.frozen.ctx
+    }
+
+    /// The kinds a node of `kind` can begin with — for a leading-anchor diagnostic.
+    pub(super) fn first_child_kinds(&self, kind: NodeKindId) -> Vec<NodeKindId> {
+        self.frozen.edge_child_kinds(kind, Edge::First)
+    }
+
+    /// The kinds a node of `kind` can end with — for a trailing-anchor diagnostic.
+    pub(super) fn last_child_kinds(&self, kind: NodeKindId) -> Vec<NodeKindId> {
+        self.frozen.edge_child_kinds(kind, Edge::Last)
     }
 }
 

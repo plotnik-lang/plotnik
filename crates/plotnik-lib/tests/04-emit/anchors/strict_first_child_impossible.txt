@@ -1,7 +1,9 @@
 Q = (function_declaration .! (identifier))
 ==== diagnostics ====
-error: pattern can never match
+error: with strict adjacency (`.!`), the first child of `function_declaration` must be `identifier`, but `function_declaration` begins with `"async"` or `"function"`
  --> query.ptk:1:6
   |
 1 | Q = (function_declaration .! (identifier))
   |      ^^^^^^^^^^^^^^^^^^^^
+  |
+help: `.!` allows nothing between — not even anonymous tokens or comments; the soft anchor `.` skips those: `(function_declaration . (identifier))`
