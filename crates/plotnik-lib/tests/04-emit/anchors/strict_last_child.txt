@@ -1,9 +1,9 @@
-Q = (array (identifier) .!)
+Q = (binary_expression (identifier) .!)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
 S1 "Q"
-S2 "array"
+S2 "binary_expression"
 S3 "identifier"
 
 [type_defs]
@@ -25,7 +25,7 @@ _StructWrap:
   05                                        ▶
 
 Q:
-  06   !   (array)                          08
+  06   !   (binary_expression)              08
   07  ...  
   08  └‣─  _                                10, 13
   10   !   (identifier)                     11

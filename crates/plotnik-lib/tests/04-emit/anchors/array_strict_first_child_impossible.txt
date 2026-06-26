@@ -1,0 +1,7 @@
+Q = (array .! (identifier))
+==== diagnostics ====
+error: pattern can never match
+ --> query.ptk:1:6
+  |
+1 | Q = (array .! (identifier))
+  |      ^^^^^

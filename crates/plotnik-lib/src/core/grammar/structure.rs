@@ -58,7 +58,7 @@ use super::prepared::{ProductionStep, VariableType};
 use super::types::Grammar;
 
 /// Index of a syntax variable, aligned with [`StructureTable::variables`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct VarId(u32);
 
 impl VarId {
@@ -161,6 +161,16 @@ impl StructureTable {
 
     pub fn variable(&self, id: VarId) -> Option<&SkeletonVariable> {
         self.variables.get(id.index())
+    }
+
+    /// Each variable paired with its [`VarId`]. The id is otherwise unconstructible
+    /// outside this module, so this is how a consumer keys facts (producers,
+    /// first-sets) by the variable a step descends into.
+    pub fn iter(&self) -> impl Iterator<Item = (VarId, &SkeletonVariable)> {
+        self.variables
+            .iter()
+            .enumerate()
+            .map(|(index, variable)| (VarId(index as u32), variable))
     }
 }
 

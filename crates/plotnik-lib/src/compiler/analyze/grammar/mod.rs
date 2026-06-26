@@ -7,6 +7,7 @@ mod check;
 mod diagnostics;
 pub mod link;
 mod resolve;
+mod satisfy;
 mod utils;
 
 pub use binding::{GrammarBinding, GrammarBindingBuilder};

@@ -1,4 +1,4 @@
-Q = (program
+Q = (expression_statement
   [
     (identifier)
     (number)
@@ -9,7 +9,7 @@ Q = (program
 S0 "Beauty will save the world"
 S1 "x"
 S2 "Q"
-S3 "program"
+S3 "expression_statement"
 S4 "identifier"
 S5 "number"
 
@@ -34,7 +34,7 @@ _StructWrap:
   05                                        ▶
 
 Q:
-  06   !   (program)                        08
+  06   !   (expression_statement)           08
   07  ─‣┘  _                                10
   08  └‣─  _                                11, 13, 16
   10                                        ▶

@@ -93,6 +93,7 @@ pub enum DiagnosticKind {
     BareSupertype,
     ChildUnderLeafToken,
     NegatedRequiredField,
+    UnsatisfiablePattern,
 
     MissingDefName,
 
@@ -340,6 +341,7 @@ impl DiagnosticKind {
             Self::BareSupertype => "supertype must be written with `#`",
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
             Self::NegatedRequiredField => "this field is always present",
+            Self::UnsatisfiablePattern => "pattern can never match",
             Self::MissingDefName => "definition must be named",
             Self::EmitFailed => "bytecode emission failed",
             Self::BytecodeRejected => "query compiles to invalid bytecode",
@@ -383,6 +385,8 @@ impl DiagnosticKind {
             Self::BareSupertype => "`{}` is a supertype, not a node kind".to_string(),
             Self::ChildUnderLeafToken => "`{}` is a leaf token — it has no child nodes".to_string(),
             Self::NegatedRequiredField => "`-{}` can never match".to_string(),
+            // The detail, when present, is the crafted message; bare emits use the summary.
+            Self::UnsatisfiablePattern => "{}".to_string(),
             Self::MixedAltBranches => "cannot mix enum and union branches: {}".to_string(),
             Self::DuplicateAlternationLabel => {
                 "branch label `{}` is already used in this alternation".to_string()

@@ -47,6 +47,21 @@ impl<'q> GrammarLinkInput<'_, 'q> {
             };
             linker.link(source_id, root);
         }
+
+        // Stage B (sequence/anchor/arity) runs only on a query the structural pass
+        // left clean: it adds rejections those checks cannot see, and gating keeps it
+        // from piling onto an impossibility Stage A already pinned precisely.
+        if !diagnostics.has_errors() {
+            super::satisfy::check(
+                super::satisfy::SatisfyInput {
+                    grammar: self.grammar,
+                    symbol_table: self.symbol_table,
+                    source_map: self.source_map,
+                    ast_map: self.ast_map,
+                },
+                diagnostics,
+            );
+        }
     }
 }
 

@@ -3,7 +3,7 @@ A = [
   Y: (number) @y
 ]
 
-Q = (program (A))
+Q = (expression_statement (A))
 ==== types ====
 export interface AX {
   $tag: "X";

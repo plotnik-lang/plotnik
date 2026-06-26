@@ -405,6 +405,14 @@ impl Grammar {
         self.extra_node_kinds.contains(&node_kind_id)
     }
 
+    /// The visible extra kinds (comments and the like) the parser may insert between
+    /// siblings at any level. Most are lexical tokens, so they are absent from the
+    /// syntax-variable structure; sequence validation enumerates them here to model
+    /// optional extras a query child may match.
+    pub fn extra_node_kinds(&self) -> &[NodeKindId] {
+        &self.extra_node_kinds
+    }
+
     pub fn has_field(&self, node_kind_id: NodeKindId, node_field_id: NodeFieldId) -> bool {
         self.node_constraints
             .get(&node_kind_id)
