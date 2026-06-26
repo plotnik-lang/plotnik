@@ -472,6 +472,12 @@ impl Solve {
                 producer,
             } => {
                 let effective = field.or(inherited);
+                // The query asserts this field absent (`-field`); a production binding it
+                // gives the node a forbidden child, so this whole path is dead — it can be
+                // neither consumed nor skipped past.
+                if automaton.negates(effective) {
+                    return StateSet::default();
+                }
                 let anonymous = frozen.ctx.grammar.is_anonymous_node(kind);
                 let extra = frozen.ctx.grammar.is_extra(kind);
                 let mut next = StateSet::default();

@@ -94,6 +94,9 @@ pub(super) struct ChildAutomaton {
     states: Vec<StateData>,
     start: State,
     accept: State,
+    /// Fields the query asserts absent (`-field`). A production step that binds one
+    /// would give the node a child the query forbids, so threading kills that path.
+    negated_fields: Vec<NodeFieldId>,
     /// Set when the query side could not be represented finitely (a sibling-recursive
     /// definition splicing siblings). The engine treats it as satisfiable — sound,
     /// since we then never reject.
@@ -107,6 +110,11 @@ impl ChildAutomaton {
 
     pub(super) fn accept(&self) -> State {
         self.accept
+    }
+
+    /// Whether the query forbids `field` on this node via `-field`.
+    pub(super) fn negates(&self, field: Option<NodeFieldId>) -> bool {
+        field.is_some_and(|f| self.negated_fields.contains(&f))
     }
 
     pub(super) fn is_indeterminate(&self) -> bool {
@@ -208,8 +216,20 @@ pub(super) fn build(
         states,
         start,
         accept,
+        negated_fields: negated_fields(node, ctx),
         indeterminate,
     }
+}
+
+/// The fields a node pattern asserts absent through `-field` items, resolved to ids.
+fn negated_fields(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -> Vec<NodeFieldId> {
+    node.node()
+        .syntax()
+        .children()
+        .filter_map(ast::NegatedField::cast)
+        .filter_map(|neg| neg.name())
+        .filter_map(|name| ctx.grammar.resolve_field(name.text()))
+        .collect()
 }
 
 struct Builder<'a, 'b> {
