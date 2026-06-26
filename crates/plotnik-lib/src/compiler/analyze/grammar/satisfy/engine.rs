@@ -145,6 +145,17 @@ impl<'a> Frozen<'a> {
         }
     }
 
+    /// Whether the matcher's kind admits at least one extra kind. The childless fast
+    /// path of [`Satisfier::can_consume_extra`] — answered without materializing the
+    /// admitted-extra list, which matters on wide wildcard child lists.
+    fn admits_any_extra(&self, constraint: KindConstraint) -> bool {
+        match constraint {
+            KindConstraint::Exact(id) => self.ctx.grammar.is_extra(id),
+            KindConstraint::AnyNamed => !self.named_extras.is_empty(),
+            KindConstraint::AnyNode | KindConstraint::Unconstrained => !self.extras.is_empty(),
+        }
+    }
+
     /// Extra kinds a child matcher could consume. Only kinds the matcher admits — a
     /// `(comment)` admits the `comment` extra, a `(_)` any named extra, `_` any extra.
     fn extras_admitted_by(&self, constraint: KindConstraint) -> Vec<NodeKindId> {
@@ -527,24 +538,28 @@ impl Solve {
     /// since the parser may insert an extra anywhere. Extras are optional, so the
     /// closure only grows the reachable set.
     fn closure(&mut self, frozen: &Frozen, automaton: &ChildAutomaton, set: &StateSet) -> StateSet {
-        let mut result = eps_closure(automaton, set);
-        loop {
-            let mut grew = false;
-            for q in result.iter().collect::<Vec<_>>() {
-                for (matcher, to) in automaton.pattern_edges(q) {
-                    if result.contains(*to) {
-                        continue;
-                    }
-                    if self.can_consume_extra(frozen, matcher) && result.insert(*to) {
-                        grew = true;
-                    }
+        // Reachability over epsilon edges plus extra-consumable pattern edges (a query
+        // child matching an inserted extra advances without a production step). A single
+        // worklist pass settles each reached state once — O(states + edges) — where the
+        // old re-scan-until-stable loop was quadratic on wide child lists.
+        let mut result = set.clone();
+        let mut stack: Vec<State> = result.iter().collect();
+        while let Some(q) = stack.pop() {
+            for &to in automaton.eps_edges(q) {
+                if result.insert(to) {
+                    stack.push(to);
                 }
             }
-            if !grew {
-                return result;
+            for (matcher, to) in automaton.pattern_edges(q) {
+                if !result.contains(*to)
+                    && self.can_consume_extra(frozen, matcher)
+                    && result.insert(*to)
+                {
+                    stack.push(*to);
+                }
             }
-            result = eps_closure(automaton, &result);
         }
+        result
     }
 
     fn can_consume_extra(&mut self, frozen: &Frozen, matcher: &ChildMatcher) -> bool {
@@ -553,15 +568,18 @@ impl Solve {
         if matcher.field.is_some() {
             return false;
         }
+        let Some(child) = matcher.child else {
+            // Childless matcher: it consumes an extra iff it admits any extra kind. No
+            // subtree to realize, so answer in O(1) without building the admitted list —
+            // the hot path on wide wildcard child lists.
+            return frozen.admits_any_extra(matcher.kind);
+        };
         for extra in frozen.extras_admitted_by(matcher.kind) {
-            let realized = match matcher.child {
-                None => true,
-                Some(child) => frozen
-                    .producers_of(extra)
-                    .to_vec()
-                    .into_iter()
-                    .any(|producer| self.get_sat((child, producer))),
-            };
+            let realized = frozen
+                .producers_of(extra)
+                .to_vec()
+                .into_iter()
+                .any(|producer| self.get_sat((child, producer)));
             if realized {
                 return true;
             }
