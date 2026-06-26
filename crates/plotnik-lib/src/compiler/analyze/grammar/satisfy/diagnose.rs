@@ -107,8 +107,10 @@ fn emit_repeated_field_failure(
     diag: &mut Diagnostics,
 ) {
     let kind_name = render_kind(ctx, culprit.kind);
-    let detail =
-        format!("a {kind_name} has one `{field}`, but this pattern binds `{field}` {count} times");
+    let article = indefinite_article(&kind_name);
+    let detail = format!(
+        "{article} {kind_name} has one `{field}`, but this pattern binds `{field}` {count} times"
+    );
     diag.report(DiagnosticKind::UnsatisfiablePattern, kind_span(&culprit.node))
         .detail(detail)
         .hint(format!("keep a single `{field}:` child"))
@@ -189,7 +191,8 @@ fn emit_anchor_failure(satisfier: &Satisfier, culprit: &Culprit, diag: &mut Diag
         ),
         None => format!(
             "{demand}, no {kind_name} places this child {boundary}; \
-             a {kind_name} {} {}",
+             {} {kind_name} {} {}",
+            indefinite_article(&kind_name),
             boundary_verb(boundary),
             render_kind_list(ctx, &allowed, "no fixed kind"),
         ),
@@ -369,6 +372,19 @@ fn render_kind(ctx: AutomatonContext<'_>, kind: NodeKindId) -> String {
         Some(name) if ctx.grammar.is_anonymous_node(kind) => format!("`\"{name}\"`"),
         Some(name) => format!("`{name}`"),
         None => "an unknown kind".to_string(),
+    }
+}
+
+/// "a" or "an" for a rendered kind like `` `array` `` — chosen on the first letter
+/// inside the quoting, so a vowel-initial kind (`an array`) reads naturally.
+fn indefinite_article(rendered_kind: &str) -> &'static str {
+    match rendered_kind
+        .chars()
+        .find(|c| c.is_ascii_alphabetic())
+        .map(|c| c.to_ascii_lowercase())
+    {
+        Some('a' | 'e' | 'i' | 'o' | 'u') => "an",
+        _ => "a",
     }
 }
 
