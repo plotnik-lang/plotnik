@@ -242,6 +242,27 @@ fn multifile_ref_to_body_with_internal_error_attributes_to_defining_file() {
 }
 
 #[test]
+fn deeply_referenced_alternation_compiles_in_linear_time() {
+    // Each level is an alternation naming the previous definition twice, so the inlined
+    // form doubles per level — 2^40 nodes. The anchor classifier (run during lowering)
+    // walks alternation branches, so without memoization it would never finish. Memoized,
+    // each definition is classified once and the whole pipeline stays linear; this test
+    // completing at all is the regression guard.
+    let depth = 40;
+    let mut src = format!("Top = (A{depth})\nA1 = [(identifier) (identifier)]\n");
+    for i in 2..=depth {
+        src.push_str(&format!("A{i} = [(A{p}) (A{p})]\n", p = i - 1));
+    }
+
+    let linked = Query::parse_and_validate(&src).link(javascript());
+    assert!(linked.is_valid(), "{}", linked.dump_diagnostics());
+    assert!(
+        !linked.dry_run().has_errors(),
+        "alternation DAG must lower cleanly",
+    );
+}
+
+#[test]
 fn multifile_field_with_ref_to_seq_error() {
     let res = expect_invalid! {
         "defs.ptk": "X = {(a) (b)}",

@@ -9,7 +9,8 @@
 //! `admits` truth table mirrors the VM's skip policy (`vm/engine/cursor.rs`) by
 //! construction.
 
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 
 use crate::bytecode::Nav;
 use crate::compiler::analyze::names::SymbolTable;
@@ -106,6 +107,11 @@ impl GapClass {
 /// Classifies whether patterns may match anonymous nodes after syntactic wrappers.
 pub struct AnonymousClassifier<'a> {
     symbol_table: &'a SymbolTable,
+    /// Memoizes each definition's result so a reference-heavy DAG — an alternation
+    /// referenced twice per level, say — is walked once per definition, not once per
+    /// path: the difference between linear and exponential. Only path-independent
+    /// results are stored; see [`AnonymousClassifier::classify_ref`].
+    cache: RefCell<HashMap<String, bool>>,
 }
 
 fn pattern_has_direct_alt_branch_nav(pattern: &Pattern) -> bool {
@@ -121,61 +127,84 @@ fn pattern_has_direct_alt_branch_nav(pattern: &Pattern) -> bool {
 
 impl<'a> AnonymousClassifier<'a> {
     pub fn new(symbol_table: &'a SymbolTable) -> Self {
-        Self { symbol_table }
+        Self {
+            symbol_table,
+            cache: RefCell::new(HashMap::new()),
+        }
     }
 
     pub fn pattern_may_match_anonymous(&self, pattern: Option<&Pattern>) -> bool {
         let mut visited = HashSet::new();
-        pattern.is_some_and(|pattern| self.pattern_may_match_anonymous_inner(pattern, &mut visited))
+        pattern.is_some_and(|pattern| self.classify(pattern, &mut visited).0)
     }
 
-    fn pattern_may_match_anonymous_inner(
-        &self,
-        pattern: &Pattern,
-        visited: &mut HashSet<String>,
-    ) -> bool {
+    /// Returns `(may_match, cut)`. `cut` is true when the walk broke a reference cycle:
+    /// the answer then hinged on which names were already on the stack, so a `false`
+    /// carrying it is not safe to memoize.
+    fn classify(&self, pattern: &Pattern, visited: &mut HashSet<String>) -> (bool, bool) {
         match pattern {
-            Pattern::TokenPattern(_) => true,
-            Pattern::CapturedPattern(cap) => cap
-                .inner()
-                .as_ref()
-                .is_some_and(|inner| self.pattern_may_match_anonymous_inner(inner, visited)),
-            Pattern::QuantifiedPattern(q) => q
-                .inner()
-                .as_ref()
-                .is_some_and(|inner| self.pattern_may_match_anonymous_inner(inner, visited)),
-            Pattern::FieldPattern(field) => field
-                .value()
-                .as_ref()
-                .is_some_and(|value| self.pattern_may_match_anonymous_inner(value, visited)),
-            Pattern::Union(_) | Pattern::Enum(_) => pattern
-                .children()
-                .any(|body| self.pattern_may_match_anonymous_inner(&body, visited)),
-            Pattern::SeqPattern(seq) => seq
-                .children()
-                .any(|child| self.pattern_may_match_anonymous_inner(&child, visited)),
-            Pattern::DefRef(r) => self.ref_may_match_anonymous(r, visited),
-            Pattern::NodePattern(_) => false,
+            Pattern::TokenPattern(_) => (true, false),
+            Pattern::NodePattern(_) => (false, false),
+            Pattern::CapturedPattern(cap) => self.classify_opt(cap.inner().as_ref(), visited),
+            Pattern::QuantifiedPattern(q) => self.classify_opt(q.inner().as_ref(), visited),
+            Pattern::FieldPattern(field) => self.classify_opt(field.value().as_ref(), visited),
+            Pattern::Union(_) | Pattern::Enum(_) => self.classify_any(pattern.children(), visited),
+            Pattern::SeqPattern(seq) => self.classify_any(seq.children(), visited),
+            Pattern::DefRef(r) => self.classify_ref(r, visited),
         }
     }
 
-    fn ref_may_match_anonymous(&self, r: &DefRef, visited: &mut HashSet<String>) -> bool {
+    fn classify_opt(&self, pattern: Option<&Pattern>, visited: &mut HashSet<String>) -> (bool, bool) {
+        pattern.map_or((false, false), |p| self.classify(p, visited))
+    }
+
+    /// OR over children: any branch that may match anonymous makes the whole pattern.
+    /// A `true` short-circuits (and is always sound to cache); an all-`false` answer
+    /// inherits a cut from any branch, since a cut branch might have masked a `true`.
+    fn classify_any(
+        &self,
+        children: impl Iterator<Item = Pattern>,
+        visited: &mut HashSet<String>,
+    ) -> (bool, bool) {
+        let mut cut = false;
+        for child in children {
+            let (result, child_cut) = self.classify(&child, visited);
+            if result {
+                return (true, false);
+            }
+            cut |= child_cut;
+        }
+        (false, cut)
+    }
+
+    fn classify_ref(&self, r: &DefRef, visited: &mut HashSet<String>) -> (bool, bool) {
         let Some(name_token) = r.name() else {
-            return false;
+            return (false, false);
         };
         let name = name_token.text();
 
-        if !visited.insert(name.to_owned()) {
-            return false;
+        if let Some(&cached) = self.cache.borrow().get(name) {
+            return (cached, false);
+        }
+        if visited.contains(name) {
+            // A reference cycle: going around it again adds nothing, but this `false`
+            // holds only with the current ancestors on the stack, so flag it uncacheable.
+            return (false, true);
         }
 
-        let result = self
+        visited.insert(name.to_owned());
+        let (result, cut) = self
             .symbol_table
             .body(name)
-            .is_some_and(|body| self.pattern_may_match_anonymous_inner(body, visited));
-
+            .map_or((false, false), |body| self.classify(body, visited));
         visited.remove(name);
-        result
+
+        // A `true` is genuine no matter what was cut; a cut-free `false` is path-
+        // independent. Either is sound to reuse for every later reference to this name.
+        if result || !cut {
+            self.cache.borrow_mut().insert(name.to_owned(), result);
+        }
+        (result, cut)
     }
 }
 
