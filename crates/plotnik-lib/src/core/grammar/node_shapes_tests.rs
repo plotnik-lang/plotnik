@@ -1,6 +1,73 @@
 use super::{Grammar, raw::RawGrammar};
 
 #[test]
+fn valid_child_types_reach_through_hidden_frontier() {
+    // `module`'s only child is the hidden `_statement`, which fans out through another
+    // hidden rule (`_simple_statements`) and a supertype (`_simple_statement`) to the
+    // concrete `pass_statement` — the shape python's `(module (pass_statement))` exercises.
+    // The node-shape summary flattened that chain to nothing, falsely rejecting the bare
+    // child; deriving children from the structural skeleton reaches it.
+    let json = r##"{
+        "name": "pylike",
+        "rules": {
+            "module": { "type": "REPEAT1", "content": { "type": "SYMBOL", "name": "_statement" } },
+            "_statement": { "type": "CHOICE", "members": [
+                { "type": "SYMBOL", "name": "_simple_statements" },
+                { "type": "SYMBOL", "name": "_compound_statement" }
+            ]},
+            "_simple_statements": { "type": "SEQ", "members": [
+                { "type": "SYMBOL", "name": "_simple_statement" },
+                { "type": "REPEAT", "content": { "type": "SEQ", "members": [
+                    { "type": "STRING", "value": ";" },
+                    { "type": "SYMBOL", "name": "_simple_statement" }
+                ]}},
+                { "type": "SYMBOL", "name": "_newline" }
+            ]},
+            "_simple_statement": { "type": "CHOICE", "members": [
+                { "type": "SYMBOL", "name": "pass_statement" },
+                { "type": "SYMBOL", "name": "expression_statement" }
+            ]},
+            "_compound_statement": { "type": "CHOICE", "members": [
+                { "type": "SYMBOL", "name": "if_statement" }
+            ]},
+            "pass_statement": { "type": "STRING", "value": "pass" },
+            "expression_statement": { "type": "SYMBOL", "name": "identifier" },
+            "if_statement": { "type": "SEQ", "members": [
+                { "type": "STRING", "value": "if" }, { "type": "SYMBOL", "name": "identifier" }
+            ]},
+            "identifier": { "type": "PATTERN", "value": "[a-z]+" }
+        },
+        "extras": [],
+        "externals": [{ "type": "SYMBOL", "name": "_newline" }],
+        "inline": ["_simple_statement", "_compound_statement"],
+        "supertypes": ["_simple_statement", "_compound_statement"]
+    }"##;
+    let grammar = Grammar::from_raw(&RawGrammar::from_json(json).unwrap()).unwrap();
+    let module = grammar.resolve_named_node("module").unwrap();
+    let pass = grammar.resolve_named_node("pass_statement").unwrap();
+
+    let children = grammar.valid_child_types(module);
+    assert!(
+        !children.is_empty(),
+        "module lost its children across the hidden frontier"
+    );
+
+    // `pass_statement` is admissible: it is a (transitive) subtype of one of module's
+    // children, exactly as `admissible_set` expands them during checking.
+    let reaches_pass = children
+        .iter()
+        .any(|&c| c == pass || grammar.collect_subtypes(c).contains(&pass));
+    assert!(
+        reaches_pass,
+        "pass_statement must be admissible under module, got {:?}",
+        children
+            .iter()
+            .filter_map(|&id| grammar.node_kind(id))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn derives_root_fields_children_and_extras() {
     let json = r##"{
         "name": "test",

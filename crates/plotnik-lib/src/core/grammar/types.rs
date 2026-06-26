@@ -8,7 +8,7 @@ use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
 use super::json::GrammarError;
 use super::raw::RawGrammar;
 use super::render::TreeGrammar;
-use super::structure::StructureTable;
+use super::structure::{StructureTable, VarId};
 
 pub(super) struct GrammarTables {
     pub(super) node_shapes: Vec<NodeShape>,
@@ -75,6 +75,13 @@ pub struct Grammar {
     all_anonymous_node_kinds: Vec<String>,
     all_field_names: Vec<String>,
     structure: StructureTable,
+    /// Named, unlabeled child kinds reachable under each node, derived from
+    /// [`structure`](Self::structure) — the same faithful model Stage B threads. It
+    /// descends hidden frontiers the node-shape summary flattens away, so a child
+    /// reachable only through a hidden rule is still listed. Backs
+    /// [`valid_child_types`](Self::valid_child_types) on the `from_raw` path; empty for
+    /// metadata-only grammars, which fall back to the node-shape constraints.
+    child_kinds: HashMap<NodeKindId, Vec<NodeKindId>>,
     /// Tree-shape rendering model for `lang dump` and diagnostics. Populated only
     /// on the `from_raw` path (the pipeline data it taps does not survive into
     /// `GrammarTables`); empty otherwise.
@@ -145,6 +152,7 @@ impl Grammar {
             Self::from_tables(raw.name.clone(), tables).map_err(GrammarError::Analysis)?;
         let structure = StructureTable::build(grammar_ctx, &grammar);
         grammar.structure = structure;
+        grammar.child_kinds = compute_child_kinds(&grammar);
         grammar.tree = tree;
         Ok(grammar)
     }
@@ -286,6 +294,7 @@ impl Grammar {
             // Populated only on the `from_raw` path: `GrammarTables` has already
             // discarded the flattened productions the table distills.
             structure: StructureTable::default(),
+            child_kinds: HashMap::new(),
             tree: TreeGrammar::default(),
         })
     }
@@ -454,6 +463,18 @@ impl Grammar {
     }
 
     pub fn valid_child_types(&self, node_kind_id: NodeKindId) -> &[NodeKindId] {
+        // Prefer the faithful, structure-derived reachability (the `from_raw` path). It
+        // descends the hidden frontiers the node-shape summary flattens away, so a child
+        // reachable only through a hidden rule — e.g. python `(module (match_statement))`,
+        // routed through the hidden `_statement` chain — is still admitted. A metadata-only
+        // grammar has no structure, so fall back to the node-shape constraints.
+        if !self.structure.variables().is_empty() {
+            return self
+                .child_kinds
+                .get(&node_kind_id)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
+        }
         self.children_constraints(node_kind_id)
             .map(|children| children.valid_types.as_slice())
             .unwrap_or(&[])
@@ -512,6 +533,87 @@ fn resolve_node_id(
 fn node_field_id(id: u16) -> NodeFieldId {
     NodeFieldId::try_from(id)
         .expect("lowered field symbol id must be non-zero in production grammar")
+}
+
+/// Named, unlabeled child kinds reachable under each node kind, derived from the
+/// structural skeleton — the single child-reachability model the grammar checker reasons
+/// over, so Stage A and Stage B cannot disagree. The node-shape summary's flattening
+/// drops children reachable only through a chain of hidden rules; descending `structure`
+/// instead keeps them.
+fn compute_child_kinds(grammar: &Grammar) -> HashMap<NodeKindId, Vec<NodeKindId>> {
+    // Each kind's producers: the variable named for it, plus every step occurrence that
+    // surfaces it (aliases included), whose body is the variable that builds it. Mirrors
+    // the satisfiability engine's producer index so both pass over the same model.
+    let mut producers: HashMap<NodeKindId, Vec<VarId>> = HashMap::new();
+    for (var_id, variable) in grammar.structure.iter() {
+        if let Some(id) = variable.id {
+            producers.entry(id).or_default().push(var_id);
+        }
+        for production in &variable.productions {
+            for step in production {
+                if let (Some(id), Some(body)) = (step.target.id, step.target.body) {
+                    producers.entry(id).or_default().push(body);
+                }
+            }
+        }
+    }
+
+    let mut child_kinds = HashMap::with_capacity(producers.len());
+    for (&kind, producer_vars) in &producers {
+        let mut kinds = Vec::new();
+        let mut seen_kinds = HashSet::new();
+        let mut seen_vars = HashSet::new();
+        for &producer in producer_vars {
+            collect_child_kinds(grammar, producer, &mut kinds, &mut seen_kinds, &mut seen_vars);
+        }
+        // Sort by public name so diagnostics that list these read in a stable, legible
+        // order (the node-shape summary listed them alphabetically too).
+        kinds.sort_unstable_by(|a, b| grammar.node_kind(*a).cmp(&grammar.node_kind(*b)));
+        child_kinds.insert(kind, kinds);
+    }
+    child_kinds
+}
+
+/// Accumulate `var`'s named, unlabeled child kinds into `out`, descending through hidden
+/// frontiers. `seen_vars` cuts reference cycles; `seen_kinds` dedups across paths.
+fn collect_child_kinds(
+    grammar: &Grammar,
+    var: VarId,
+    out: &mut Vec<NodeKindId>,
+    seen_kinds: &mut HashSet<NodeKindId>,
+    seen_vars: &mut HashSet<VarId>,
+) {
+    if !seen_vars.insert(var) {
+        return;
+    }
+    let Some(variable) = grammar.structure.variable(var) else {
+        return;
+    };
+    for production in &variable.productions {
+        for step in production {
+            // A fielded step is a *labeled* child, surfaced through the field tables.
+            if step.field.is_some() {
+                continue;
+            }
+            match (step.target.id, step.target.body) {
+                // Surfaces under a public id (a concrete kind, an alias, or a supertype):
+                // record it. Supertypes are kept whole — `admissible_set` expands them to
+                // their subtypes — matching what the node-shape summary listed.
+                (Some(id), _) => {
+                    if !grammar.is_anonymous_node(id) && seen_kinds.insert(id) {
+                        out.push(id);
+                    }
+                }
+                // No public id of its own: a hidden rule spliced into the parent, so its
+                // own children surface here in its place. Descend through it.
+                (None, Some(body)) => {
+                    collect_child_kinds(grammar, body, out, seen_kinds, seen_vars)
+                }
+                // A hidden token surfaces nothing.
+                (None, None) => {}
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
