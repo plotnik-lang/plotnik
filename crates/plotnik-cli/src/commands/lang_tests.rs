@@ -116,10 +116,13 @@ fn dump_folds_short_groups_inline() {
 #[test]
 #[cfg(feature = "lang-json")]
 fn dump_width_zero_always_breaks() {
-    let dump = language_registry::json().grammar().tree().dump(&DumpOptions {
-        legend: false,
-        width: 0,
-    });
+    let dump = language_registry::json()
+        .grammar()
+        .tree()
+        .dump(&DumpOptions {
+            legend: false,
+            width: 0,
+        });
     // The object body opens but its children are pushed onto their own lines.
     assert!(dump.contains("object = {\n"));
     assert!(!dump.contains(r#"object = { "{""#));

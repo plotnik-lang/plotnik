@@ -37,8 +37,14 @@ fn from_nav_projects_skip_suffix() {
     assert_eq!(GapClass::from_nav(Nav::Down), Some(GapClass::Any));
     assert_eq!(GapClass::from_nav(Nav::Up(1)), Some(GapClass::Any));
 
-    assert_eq!(GapClass::from_nav(Nav::NextSkip), Some(GapClass::AnonAndExtras));
-    assert_eq!(GapClass::from_nav(Nav::DownSkip), Some(GapClass::AnonAndExtras));
+    assert_eq!(
+        GapClass::from_nav(Nav::NextSkip),
+        Some(GapClass::AnonAndExtras)
+    );
+    assert_eq!(
+        GapClass::from_nav(Nav::DownSkip),
+        Some(GapClass::AnonAndExtras)
+    );
     // `UpSkipTrivia` is the broad skip despite its name (mirrors `is_trivia`).
     assert_eq!(
         GapClass::from_nav(Nav::UpSkipTrivia(1)),

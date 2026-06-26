@@ -237,7 +237,11 @@ impl<'a> LowerCtx<'a> {
             let hidden = variable.kind == VariableType::Hidden || self.inlines.contains(&symbol);
             return Some(Def {
                 name: rule_name.to_string(),
-                kind: if hidden { DefKind::Hidden } else { DefKind::Node },
+                kind: if hidden {
+                    DefKind::Hidden
+                } else {
+                    DefKind::Node
+                },
                 extra: false,
                 root: false,
                 body: Body::Pattern(self.lower_shape(&variable.rule)),

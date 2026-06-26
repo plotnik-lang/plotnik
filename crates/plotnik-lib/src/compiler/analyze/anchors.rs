@@ -154,7 +154,11 @@ impl<'a> AnonymousClassifier<'a> {
         }
     }
 
-    fn classify_opt(&self, pattern: Option<&Pattern>, visited: &mut HashSet<String>) -> (bool, bool) {
+    fn classify_opt(
+        &self,
+        pattern: Option<&Pattern>,
+        visited: &mut HashSet<String>,
+    ) -> (bool, bool) {
         pattern.map_or((false, false), |p| self.classify(p, visited))
     }
 

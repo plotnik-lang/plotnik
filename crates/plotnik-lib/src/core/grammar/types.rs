@@ -119,8 +119,12 @@ impl Grammar {
         // shapes now, in place, so the grammars never have to be cloned; the
         // closure-dependent bits are attached from `node_shapes` further down.
         let rule_order: Vec<String> = raw.rules.keys().cloned().collect();
-        let (mut tree, tree_aliases) =
-            super::render::lower(raw.name.clone(), &rule_order, &syntax_grammar, &lexical_grammar);
+        let (mut tree, tree_aliases) = super::render::lower(
+            raw.name.clone(),
+            &rule_order,
+            &syntax_grammar,
+            &lexical_grammar,
+        );
         let syntax_grammar = expand_repeats(syntax_grammar);
         let mut syntax_grammar = flatten_grammar(syntax_grammar)
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
@@ -564,7 +568,13 @@ fn compute_child_kinds(grammar: &Grammar) -> HashMap<NodeKindId, Vec<NodeKindId>
         let mut seen_kinds = HashSet::new();
         let mut seen_vars = HashSet::new();
         for &producer in producer_vars {
-            collect_child_kinds(grammar, producer, &mut kinds, &mut seen_kinds, &mut seen_vars);
+            collect_child_kinds(
+                grammar,
+                producer,
+                &mut kinds,
+                &mut seen_kinds,
+                &mut seen_vars,
+            );
         }
         // Sort by public name so diagnostics that list these read in a stable, legible
         // order (the node-shape summary listed them alphabetically too).

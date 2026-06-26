@@ -155,7 +155,11 @@ impl Reporter<'_, '_> {
             }
             Pattern::QuantifiedPattern(q) => {
                 if let Some(inner) = q.inner() {
-                    let inner_mode = if q.is_optional() { Mode::Deferred } else { mode };
+                    let inner_mode = if q.is_optional() {
+                        Mode::Deferred
+                    } else {
+                        mode
+                    };
                     self.walk(&located.wrap(inner), inner_mode);
                 }
             }
@@ -272,7 +276,11 @@ fn collect_goals(
         Pattern::QuantifiedPattern(q) => {
             let Some(inner) = q.inner() else { return };
             // `?`/`*` admit zero matches, so the body need not hold; `+` needs it once.
-            let inner_mode = if q.is_optional() { Mode::Deferred } else { mode };
+            let inner_mode = if q.is_optional() {
+                Mode::Deferred
+            } else {
+                mode
+            };
             collect_goals(&located.wrap(inner), inner_mode, ctx, out);
         }
         Pattern::Union(_) | Pattern::Enum(_) => {
@@ -293,7 +301,10 @@ fn root_kind(ctx: AutomatonContext<'_>, located: &Located<NodePattern>) -> Optio
         return None;
     }
     let type_token = node.kind_token()?;
-    if matches!(type_token.kind(), SyntaxKind::KwError | SyntaxKind::KwMissing) {
+    if matches!(
+        type_token.kind(),
+        SyntaxKind::KwError | SyntaxKind::KwMissing
+    ) {
         return None;
     }
     let text = token_src(&type_token, ctx.content(located.source()));

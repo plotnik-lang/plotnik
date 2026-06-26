@@ -126,10 +126,13 @@ fn emit_repeated_field_failure(
     let detail = format!(
         "{article} {kind_name} has one `{field}`, but this pattern binds `{field}` {count} times"
     );
-    diag.report(DiagnosticKind::UnsatisfiablePattern, kind_span(&culprit.node))
-        .detail(detail)
-        .hint(format!("keep a single `{field}:` child"))
-        .emit();
+    diag.report(
+        DiagnosticKind::UnsatisfiablePattern,
+        kind_span(&culprit.node),
+    )
+    .detail(detail)
+    .hint(format!("keep a single `{field}:` child"))
+    .emit();
 }
 
 /// The node a diagnostic points at, plus its resolved kind.
@@ -190,9 +193,17 @@ fn emit_anchor_failure(satisfier: &Satisfier, culprit: &Culprit, diag: &mut Diag
     // A leading anchor pins the first child; a trailing one the last. The two read
     // differently, so each gets its own message naming the boundary the grammar fixes.
     let (boundary, allowed, wanted) = if leads_with_anchor(node) {
-        ("first", satisfier.first_child_kinds(culprit.kind), first_pattern_label(&culprit.node, ctx))
+        (
+            "first",
+            satisfier.first_child_kinds(culprit.kind),
+            first_pattern_label(&culprit.node, ctx),
+        )
     } else if ends_with_anchor(node) {
-        ("last", satisfier.last_child_kinds(culprit.kind), last_pattern_label(&culprit.node, ctx))
+        (
+            "last",
+            satisfier.last_child_kinds(culprit.kind),
+            last_pattern_label(&culprit.node, ctx),
+        )
     } else {
         return emit_interior_anchor_failure(ctx, culprit, strict, diag);
     };
@@ -234,10 +245,13 @@ fn emit_interior_anchor_failure(
 ) {
     let kind_name = render_kind(ctx, culprit.kind);
     let detail = format!("no {kind_name} places these children in this adjacency");
-    diag.report(DiagnosticKind::UnsatisfiablePattern, kind_span(&culprit.node))
-        .detail(detail)
-        .hint(anchor_fix_hint(&culprit.node, ctx, strict))
-        .emit();
+    diag.report(
+        DiagnosticKind::UnsatisfiablePattern,
+        kind_span(&culprit.node),
+    )
+    .detail(detail)
+    .hint(anchor_fix_hint(&culprit.node, ctx, strict))
+    .emit();
 }
 
 /// The child kinds or their order are the obstacle (the anchors, if any, are not).
@@ -245,7 +259,10 @@ fn emit_arrangement_failure(ctx: AutomatonContext<'_>, culprit: &Culprit, diag: 
     let kind_name = render_kind(ctx, culprit.kind);
     let detail = format!("the grammar builds no {kind_name} with these children");
     let mut builder = diag
-        .report(DiagnosticKind::UnsatisfiablePattern, kind_span(&culprit.node))
+        .report(
+            DiagnosticKind::UnsatisfiablePattern,
+            kind_span(&culprit.node),
+        )
         .detail(detail);
     if let Some(allows) = describe_allowed_children(ctx, culprit.kind, &kind_name) {
         builder = builder.hint(allows);
@@ -334,7 +351,11 @@ fn strictest_anchor(node: &NodePattern) -> bool {
 }
 
 fn boundary_verb(boundary: &str) -> &'static str {
-    if boundary == "first" { "begins with" } else { "ends with" }
+    if boundary == "first" {
+        "begins with"
+    } else {
+        "ends with"
+    }
 }
 
 /// The label of the first/last child pattern (`identifier`, `"+"`), for "must be …".

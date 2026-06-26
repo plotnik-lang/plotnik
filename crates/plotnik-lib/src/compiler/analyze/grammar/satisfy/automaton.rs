@@ -209,7 +209,9 @@ pub(super) fn build(
 
     let (has_trailing, trailing_nav) = check_trailing_anchor(&items, ctx.symbol_table);
     let trailing_gap = if has_trailing {
-        trailing_nav.and_then(GapClass::from_nav).unwrap_or(GapClass::Any)
+        trailing_nav
+            .and_then(GapClass::from_nav)
+            .unwrap_or(GapClass::Any)
     } else {
         GapClass::Any
     };
@@ -356,7 +358,10 @@ impl Builder<'_, '_> {
             // strict anchor leak through the boundary.
             let gap = match (first, first_gap) {
                 (true, Some(g)) => g,
-                _ => satisfiability_gap(nav.and_then(GapClass::from_nav).unwrap_or(GapClass::Any), pattern),
+                _ => satisfiability_gap(
+                    nav.and_then(GapClass::from_nav).unwrap_or(GapClass::Any),
+                    pattern,
+                ),
             };
             self.states[cur as usize].gap = gap;
             cur = self.emit_pattern(pattern, descent.bare(), cur);
@@ -433,7 +438,12 @@ impl Builder<'_, '_> {
         to
     }
 
-    fn emit_quantifier(&mut self, q: &ast::QuantifiedPattern, descent: Descent, from: State) -> State {
+    fn emit_quantifier(
+        &mut self,
+        q: &ast::QuantifiedPattern,
+        descent: Descent,
+        from: State,
+    ) -> State {
         let Some(inner) = q.inner() else {
             return from;
         };
@@ -497,7 +507,9 @@ impl Builder<'_, '_> {
                 child: None,
                 field: None,
             };
-            self.states[from as usize].pattern_edges.push((any_sibling, from));
+            self.states[from as usize]
+                .pattern_edges
+                .push((any_sibling, from));
             return from;
         }
         let Some(target) = self.ctx.symbol_table.located_definition(name) else {
@@ -522,11 +534,10 @@ impl Builder<'_, '_> {
 
     fn node_matcher(&mut self, node: &NodePattern, descent: Descent) -> ChildMatcher {
         let kind = self.node_kind(node, descent.source);
-        let child = node
-            .items()
-            .next()
-            .is_some()
-            .then(|| self.table.intern(Located::new(descent.source, node.clone())));
+        let child = node.items().next().is_some().then(|| {
+            self.table
+                .intern(Located::new(descent.source, node.clone()))
+        });
         ChildMatcher {
             kind,
             child,
@@ -551,7 +562,10 @@ impl Builder<'_, '_> {
         };
         // ERROR/MISSING are always considered matchable; structural validation does
         // not reason about error trees.
-        if matches!(type_token.kind(), SyntaxKind::KwError | SyntaxKind::KwMissing) {
+        if matches!(
+            type_token.kind(),
+            SyntaxKind::KwError | SyntaxKind::KwMissing
+        ) {
             return KindConstraint::Unconstrained;
         }
         let text = token_src(&type_token, self.ctx.content(source));

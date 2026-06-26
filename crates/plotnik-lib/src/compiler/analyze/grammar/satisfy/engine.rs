@@ -45,7 +45,10 @@ impl Producer {
     /// token. Keying `SAT` by the step's own `body` — never "any variable producing
     /// this kind" — is what makes nesting alias-correct.
     fn of_step(step: &SkeletonStep) -> Self {
-        step.target.body.map(Producer::Var).unwrap_or(Producer::Leaf)
+        step.target
+            .body
+            .map(Producer::Var)
+            .unwrap_or(Producer::Leaf)
     }
 }
 
@@ -147,8 +150,7 @@ impl<'a> Frozen<'a> {
         let grammar = self.ctx.grammar;
         match constraint {
             KindConstraint::Exact(id) => {
-                id == k
-                    || (grammar.is_supertype(k) && grammar.collect_subtypes(k).contains(&id))
+                id == k || (grammar.is_supertype(k) && grammar.collect_subtypes(k).contains(&id))
             }
             KindConstraint::AnyNamed => !grammar.is_anonymous_node(k),
             KindConstraint::AnyNode | KindConstraint::Unconstrained => true,
@@ -173,7 +175,9 @@ impl<'a> Frozen<'a> {
         self.producers
             .keys()
             .copied()
-            .filter(|&k| !self.ctx.grammar.is_anonymous_node(k) && !self.ctx.grammar.is_supertype(k))
+            .filter(|&k| {
+                !self.ctx.grammar.is_anonymous_node(k) && !self.ctx.grammar.is_supertype(k)
+            })
             .collect()
     }
 
@@ -435,7 +439,8 @@ impl Solve {
         let fresh = match key {
             Key::Sat(k) => !self.sat.contains_key(&k) && self.sat.insert(k, false).is_none(),
             Key::Thread(k) => {
-                !self.thread.contains_key(&k) && self.thread.insert(k, StateSet::default()).is_none()
+                !self.thread.contains_key(&k)
+                    && self.thread.insert(k, StateSet::default()).is_none()
             }
         };
         if fresh {

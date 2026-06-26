@@ -34,9 +34,7 @@ impl StateSet {
 
     pub(super) fn contains(&self, state: State) -> bool {
         let (word, bit) = Self::position(state);
-        self.words
-            .get(word)
-            .is_some_and(|w| w & (1u64 << bit) != 0)
+        self.words.get(word).is_some_and(|w| w & (1u64 << bit) != 0)
     }
 
     /// Union `other` into `self`, returning whether `self` grew.

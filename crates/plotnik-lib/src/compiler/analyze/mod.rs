@@ -1,5 +1,5 @@
-mod artifacts;
 pub mod anchors;
+mod artifacts;
 pub mod grammar;
 pub mod located;
 pub mod names;
