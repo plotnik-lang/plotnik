@@ -59,22 +59,126 @@ pub(super) fn check(input: SatisfyInput<'_>, diag: &mut Diagnostics) {
         source_map: input.source_map,
     };
 
-    // A definition is matchable in its own right, so each body roots a Required goal
-    // (the same stance Stage A takes). References are not followed here: a node used
-    // as a whole child is judged by the engine in context, and a definition reached
-    // through a reference is itself walked when the loop reaches its own definition.
-    let mut goals = Vec::new();
+    let mut satisfier = Satisfier::new(ctx, false);
+    let mut reporter = Reporter {
+        satisfier: &mut satisfier,
+        diag,
+    };
+
+    // Each definition body must be matchable in its own right — Stage A's stance — so it
+    // is walked at the `Required` mode. References are not followed: a node used as a
+    // whole child is judged by the engine in context, and a referenced definition is
+    // walked when the loop reaches its own entry.
     for (&source, root) in input.ast_map {
         for def in root.defs() {
-            let Some(body) = def.body() else { continue };
-            collect_goals(&Located::new(source, body), Mode::Required, ctx, &mut goals);
+            if let Some(body) = def.body() {
+                reporter.walk(&Located::new(source, body), Mode::Required);
+            }
+        }
+    }
+}
+
+/// Walks definition bodies reporting impossible patterns: a concrete-kind node at a
+/// required position the grammar can never build, and — when *no* branch of a required
+/// alternation can match — each of those branches with its own reason. Holds the solver
+/// and the diagnostic sink, so the recursion threads only the position and its mode.
+struct Reporter<'a, 'q> {
+    satisfier: &'a mut Satisfier<'q>,
+    diag: &'a mut Diagnostics,
+}
+
+impl Reporter<'_, '_> {
+    /// Report what is impossible under `located` at `mode`. The descent crosses the
+    /// always-present wrappers, lowers into the disjunctive ones (alternation branch,
+    /// `?`/`*` body) as `Deferred` since a failure there is excused, and stops at each
+    /// node pattern, whose interior the engine judges whole.
+    fn walk(&mut self, located: &Located<Pattern>, mode: Mode) {
+        match located.node() {
+            Pattern::NodePattern(node) => {
+                let node = located.wrap(node.clone());
+                if mode.is_required()
+                    && let Some(kind) = root_kind(self.satisfier.context(), &node)
+                    && !self.satisfier.satisfiable(&node, kind)
+                {
+                    diagnose::report(self.satisfier, &node, kind, self.diag);
+                }
+            }
+            Pattern::Union(_) | Pattern::Enum(_) => {
+                let branches: Vec<Pattern> = located.node().children().collect();
+                // A branch failing is normally excused by its siblings; but when every
+                // branch is impossible the alternation is too, so promote them — each is
+                // then reported with the reason it cannot match.
+                let dead = mode.is_required()
+                    && !branches.is_empty()
+                    && branches
+                        .iter()
+                        .all(|branch| self.impossible(&located.wrap(branch.clone())));
+                let branch_mode = if dead { Mode::Required } else { Mode::Deferred };
+                for branch in &branches {
+                    self.walk(&located.wrap(branch.clone()), branch_mode);
+                }
+            }
+            Pattern::CapturedPattern(cap) => {
+                if let Some(inner) = cap.inner() {
+                    self.walk(&located.wrap(inner), mode);
+                }
+            }
+            Pattern::FieldPattern(field) => {
+                if let Some(value) = field.value() {
+                    self.walk(&located.wrap(value), mode);
+                }
+            }
+            Pattern::SeqPattern(seq) => {
+                for child in seq.children() {
+                    self.walk(&located.wrap(child), mode);
+                }
+            }
+            Pattern::QuantifiedPattern(q) => {
+                if let Some(inner) = q.inner() {
+                    let inner_mode = if q.is_optional() { Mode::Deferred } else { mode };
+                    self.walk(&located.wrap(inner), inner_mode);
+                }
+            }
+            // A token always matches; a reference is walked at its own definition.
+            Pattern::TokenPattern(_) | Pattern::DefRef(_) => {}
         }
     }
 
-    let mut satisfier = Satisfier::new(ctx, false);
-    for goal in &goals {
-        if !satisfier.satisfiable(&goal.node, goal.kind) {
-            diagnose::report(&mut satisfier, &goal.node, goal.kind, diag);
+    /// Whether `located` provably cannot match any grammar tree — the sound under-side
+    /// of satisfiability that decides an alternation is dead. An alternation is
+    /// impossible only when every branch is; a sequence when any item is; a node when
+    /// the solver says so; tokens, references, and optional bodies stay matchable.
+    fn impossible(&mut self, located: &Located<Pattern>) -> bool {
+        match located.node() {
+            Pattern::NodePattern(node) => {
+                let node = located.wrap(node.clone());
+                match root_kind(self.satisfier.context(), &node) {
+                    Some(kind) => !self.satisfier.satisfiable(&node, kind),
+                    None => false,
+                }
+            }
+            Pattern::Union(_) | Pattern::Enum(_) => {
+                let branches: Vec<Pattern> = located.node().children().collect();
+                !branches.is_empty()
+                    && branches
+                        .iter()
+                        .all(|branch| self.impossible(&located.wrap(branch.clone())))
+            }
+            Pattern::CapturedPattern(cap) => cap
+                .inner()
+                .is_some_and(|inner| self.impossible(&located.wrap(inner))),
+            Pattern::FieldPattern(field) => field
+                .value()
+                .is_some_and(|value| self.impossible(&located.wrap(value))),
+            Pattern::SeqPattern(seq) => seq
+                .children()
+                .any(|child| self.impossible(&located.wrap(child))),
+            Pattern::QuantifiedPattern(q) => {
+                !q.is_optional()
+                    && q.inner()
+                        .is_some_and(|inner| self.impossible(&located.wrap(inner)))
+            }
+            Pattern::TokenPattern(_) | Pattern::DefRef(_) => false,
         }
     }
 }
