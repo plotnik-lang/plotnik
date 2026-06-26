@@ -58,9 +58,18 @@ impl StateSet {
     }
 
     pub(super) fn iter(&self) -> impl Iterator<Item = State> + '_ {
+        // Walk set bits directly via `trailing_zeros` (O(popcount)) rather than testing
+        // all 64 bits of every word — `iter` is the satisfiability solver's hot frame.
         self.words.iter().enumerate().flat_map(|(word, &bits)| {
-            (0..u64::BITS).filter_map(move |bit| {
-                (bits & (1u64 << bit) != 0).then_some((word as u32) * u64::BITS + bit)
+            let base = word as u32 * u64::BITS;
+            let mut rest = bits;
+            std::iter::from_fn(move || {
+                if rest == 0 {
+                    return None;
+                }
+                let bit = rest.trailing_zeros();
+                rest &= rest - 1;
+                Some(base + bit)
             })
         })
     }
