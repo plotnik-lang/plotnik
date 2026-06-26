@@ -1,0 +1,10 @@
+Q = (object [(pair -key) (pair -value)] @x)
+==== diagnostics ====
+error: the grammar builds no `object` with these children
+ --> query.ptk:1:6
+  |
+1 | Q = (object [(pair -key) (pair -value)] @x)
+  |      ^^^^^^
+  |
+help: `object` allows children `method_definition`, `pair`, `shorthand_property_identifier` or `spread_element`
+help: each child is admissible here on its own — it is their combination or order the grammar never produces

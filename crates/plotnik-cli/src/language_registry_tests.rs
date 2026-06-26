@@ -338,3 +338,178 @@ fn abi_compat_all_languages() {
         }
     }
 }
+
+/// Soundness regression for grammar verification: the grammar must admit every
+/// `(parent, field, value)` and `(parent, child)` that a real parse actually produces —
+/// the "never reject the possible" half of the contract. Each snippet exercises a
+/// transparency path the node-shape summary alone drops:
+///
+/// - lua `chunk.local_declaration` — a field applied to a *supertype member* (`declaration`)
+///   that surfaces on the enclosing node;
+/// - go `var_spec.type: (slice_type)` — a field value typed by the *inlined* supertype `_type`;
+/// - java `field_declaration.type: (integral_type)` — a value reached through a *kept*
+///   supertype (`_unannotated_type`) whose own member is an inlined sub-supertype;
+/// - python `module → match_statement` — a child reached through a hidden `_statement` chain.
+///
+/// Asserting against the real tree is stronger than comparing the two grammar views, since the
+/// parser is the ground truth for what can appear.
+#[test]
+fn grammar_admits_every_field_and_child_in_real_trees() {
+    const SNIPPETS: &[(&str, &str)] = &[
+        ("lua", "local function f() end\nlocal x = 1\n"),
+        (
+            "go",
+            "package p\nvar x []int\nvar y map[string]int\nfunc g() T { return a }\n",
+        ),
+        ("java", "class A { int x = 1; void m() { return; } }"),
+        ("rust", "fn f() -> T { let x: U = a; }"),
+        ("python", "match x:\n    case 1:\n        pass\n"),
+        ("typescript", "function f(a: number): void { return; }"),
+    ];
+
+    let mut checked = 0usize;
+    let mut violations = Vec::new();
+    for (lang_name, source) in SNIPPETS {
+        let Some(lang) = from_name(lang_name) else {
+            continue;
+        };
+        let tree = lang.parse_source(source);
+        assert!(
+            !tree.root_node().has_error(),
+            "{lang_name} snippet must parse cleanly for the regression to be meaningful"
+        );
+        check_real_tree_admissibility(
+            lang.grammar(),
+            tree.root_node(),
+            lang_name,
+            &mut checked,
+            &mut violations,
+        );
+    }
+
+    assert!(
+        checked > 0,
+        "regression checked nothing — no bug languages compiled in?"
+    );
+    assert!(
+        violations.is_empty(),
+        "grammar rejects a field/child that appears in a real parse tree:\n  {}",
+        violations.join("\n  ")
+    );
+}
+
+/// Walk `node`'s real children, asserting the grammar admits each one where it appears:
+/// a fielded child against its field, a bare named child against its parent. Mirrors the
+/// admissibility the linker applies (`check.rs`), expanding each declared supertype to its
+/// concrete members via `collect_subtypes` before comparing.
+fn check_real_tree_admissibility(
+    grammar: &plotnik_lib::grammar::Grammar,
+    node: arborium_tree_sitter::Node<'_>,
+    lang: &str,
+    checked: &mut usize,
+    violations: &mut Vec<String>,
+) {
+    // `declared` lists kinds, possibly supertypes; `value` is the concrete kind in the real
+    // tree. Admissible iff it is listed, or a member of a listed supertype.
+    let admits = |declared: &[_], value| {
+        declared.contains(&value)
+            || declared
+                .iter()
+                .any(|&seed| grammar.collect_subtypes(seed).contains(&value))
+    };
+
+    let parent_kind = node.kind();
+    let parent_id = grammar.resolve_named_node(parent_kind);
+    let mut cursor = node.walk();
+    if cursor.goto_first_child() {
+        loop {
+            let child = cursor.node();
+            if child.is_named()
+                && let Some(parent) = parent_id
+                && let Some(value) = grammar.resolve_named_node(child.kind())
+            {
+                *checked += 1;
+                match cursor.field_name() {
+                    Some(field_name) => {
+                        if let Some(field) = grammar.resolve_field(field_name) {
+                            if !grammar.has_field(parent, field) {
+                                violations.push(format!(
+                                    "[{lang}] `{parent_kind}` lacks field `{field_name}` (real value `{}`)",
+                                    child.kind()
+                                ));
+                            } else if !admits(grammar.valid_field_types(parent, field), value) {
+                                violations.push(format!(
+                                    "[{lang}] `{parent_kind}.{field_name}` rejects real value `{}`",
+                                    child.kind()
+                                ));
+                            }
+                        }
+                    }
+                    None => {
+                        if !admits(grammar.valid_child_types(parent), value)
+                            && !grammar.is_extra(value)
+                        {
+                            violations.push(format!(
+                                "[{lang}] `{parent_kind}` rejects real child `{}`",
+                                child.kind()
+                            ));
+                        }
+                    }
+                }
+            }
+            check_real_tree_admissibility(grammar, child, lang, checked, violations);
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+}
+
+/// Names the exact field/value pairs the three supertype mechanisms used to reject, each
+/// recoverable only because field admissibility now treats supertypes and hidden rules as
+/// transparent (see `core::grammar::types::Reachability`):
+///
+/// - lua: `local_declaration` is a field on a member of the `declaration` supertype, so it
+///   surfaces on the enclosing `chunk`;
+/// - go: `var_spec.type` is typed by the inlined supertype `_type`, whose concrete members
+///   the node-shape summary drops;
+/// - java: `field_declaration.type` is the kept supertype `_unannotated_type`, which reaches
+///   `integral_type` only through an inlined sub-supertype (the `collect_subtypes` splice).
+#[test]
+fn admits_field_values_reached_through_supertypes() {
+    let cases = [
+        ("lua", "chunk", "local_declaration", "function_declaration"),
+        ("lua", "chunk", "local_declaration", "variable_declaration"),
+        ("go", "var_spec", "type", "slice_type"),
+        ("go", "var_spec", "type", "map_type"),
+        ("java", "field_declaration", "type", "integral_type"),
+    ];
+    for (lang_name, parent, field, value) in cases {
+        let lang =
+            from_name(lang_name).unwrap_or_else(|| panic!("{lang_name} must be compiled in"));
+        let grammar = lang.grammar();
+        let parent_id = grammar
+            .resolve_named_node(parent)
+            .unwrap_or_else(|| panic!("{lang_name}: no node kind `{parent}`"));
+        let field_id = grammar
+            .resolve_field(field)
+            .unwrap_or_else(|| panic!("{lang_name}: no field `{field}`"));
+        let value_id = grammar
+            .resolve_named_node(value)
+            .unwrap_or_else(|| panic!("{lang_name}: no node kind `{value}`"));
+
+        assert!(
+            grammar.has_field(parent_id, field_id),
+            "{lang_name}: `{parent}` must have field `{field}`"
+        );
+        let declared = grammar.valid_field_types(parent_id, field_id);
+        let admissible = declared.contains(&value_id)
+            || declared
+                .iter()
+                .any(|&seed| grammar.collect_subtypes(seed).contains(&value_id));
+        assert!(
+            admissible,
+            "{lang_name}: `{parent}.{field}` must admit `{value}`"
+        );
+    }
+}

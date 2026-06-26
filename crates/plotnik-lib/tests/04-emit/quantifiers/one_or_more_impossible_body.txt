@@ -1,10 +1,11 @@
 Q = (function_declaration (program))+ @fns
 ==== diagnostics ====
-error: the grammar builds no `function_declaration` with these children
- --> query.ptk:1:6
+error: `program` cannot be a child of this node
+ --> query.ptk:1:28
   |
 1 | Q = (function_declaration (program))+ @fns
-  |      ^^^^^^^^^^^^^^^^^^^^
+  |      --------------------  ^^^^^^^
+  |      |
+  |      on `function_declaration`
   |
-help: `function_declaration` allows fields `body`, `name` or `parameters`
-help: each child is admissible here on its own — it is their combination or order the grammar never produces
+help: `function_declaration` has no unlabeled children — its children are fields: `body: (statement_block)`, `name: (identifier)`, `parameters: (formal_parameters)`

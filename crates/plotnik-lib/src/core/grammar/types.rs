@@ -8,7 +8,7 @@ use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
 use super::json::GrammarError;
 use super::raw::RawGrammar;
 use super::render::TreeGrammar;
-use super::structure::{StructureTable, VarId};
+use super::structure::{StepTarget, StructureTable, VarId};
 
 pub(super) struct GrammarTables {
     pub(super) node_shapes: Vec<NodeShape>,
@@ -70,18 +70,26 @@ pub struct Grammar {
     token_node_ids: HashSet<NodeKindId>,
     /// Public node ids that name anonymous (literal-token) kinds.
     anonymous_node_id_set: HashSet<NodeKindId>,
+    /// Per-node field-name index backing [`fields_for_node_kind`](Self::fields_for_node_kind):
+    /// the node-shape summary for a metadata-only grammar, the [`Reachability`] union (summary ∪
+    /// structural recovery) on the `from_raw` path. Pre-grouped so the lookup is O(fields-on-node)
+    /// rather than a scan of every `(node, field)` key in `field_kinds`.
     fields_by_node: HashMap<NodeKindId, Vec<String>>,
     all_named_node_kinds: Vec<String>,
     all_anonymous_node_kinds: Vec<String>,
     all_field_names: Vec<String>,
     structure: StructureTable,
-    /// Named, unlabeled child kinds reachable under each node, derived from
-    /// [`structure`](Self::structure) — the same faithful model Stage B threads. It
-    /// descends hidden frontiers the node-shape summary flattens away, so a child
-    /// reachable only through a hidden rule is still listed. Backs
+    /// Named, unlabeled child kinds reachable under each node — the [`Reachability`] union of
+    /// the node-shape summary and the structural recovery. Backs
     /// [`valid_child_types`](Self::valid_child_types) on the `from_raw` path; empty for
     /// metadata-only grammars, which fall back to the node-shape constraints.
     child_kinds: HashMap<NodeKindId, Vec<NodeKindId>>,
+    /// Labeled field-value kinds reachable under each `(node, field)` — the [`Reachability`]
+    /// union of the node-shape summary and the structural recovery. Backs
+    /// [`valid_field_types`](Self::valid_field_types), [`has_field`](Self::has_field), and
+    /// [`fields_for_node_kind`](Self::fields_for_node_kind) on the `from_raw` path; empty for
+    /// metadata-only grammars, which fall back to the node-shape constraints.
+    field_kinds: HashMap<(NodeKindId, NodeFieldId), Vec<NodeKindId>>,
     /// Tree-shape rendering model for `lang dump` and diagnostics. Populated only
     /// on the `from_raw` path (the pipeline data it taps does not survive into
     /// `GrammarTables`); empty otherwise.
@@ -156,7 +164,10 @@ impl Grammar {
             Self::from_tables(raw.name.clone(), tables).map_err(GrammarError::Analysis)?;
         let structure = StructureTable::build(grammar_ctx, &grammar);
         grammar.structure = structure;
-        grammar.child_kinds = compute_child_kinds(&grammar);
+        let reachability = Reachability::compute(&grammar);
+        grammar.child_kinds = reachability.children;
+        grammar.field_kinds = reachability.fields;
+        grammar.fields_by_node = reachability.fields_by_node;
         grammar.tree = tree;
         Ok(grammar)
     }
@@ -214,24 +225,19 @@ impl Grammar {
         )
         .map_err(|error| error.to_string())?;
 
+        let resolver =
+            SubtypeResolver::new(&tables.node_shapes, &named_node_ids, &anonymous_node_ids);
         let mut subtypes = HashMap::new();
         for shape in &tables.node_shapes {
-            let Some(shape_subtypes) = &shape.subtypes else {
+            if shape.subtypes.is_none() {
                 continue;
-            };
+            }
             let Some(supertype) =
                 resolve_node_id(&named_node_ids, &anonymous_node_ids, shape.node_kind())
             else {
                 continue;
             };
-
-            let resolved = shape_subtypes
-                .iter()
-                .filter_map(|subtype| {
-                    resolve_node_id(&named_node_ids, &anonymous_node_ids, subtype.node_kind())
-                })
-                .collect::<Vec<_>>();
-            subtypes.insert(supertype, resolved);
+            subtypes.insert(supertype, resolver.members(shape.node_kind()));
         }
 
         let mut fields_by_node = HashMap::new();
@@ -299,6 +305,7 @@ impl Grammar {
             // discarded the flattened productions the table distills.
             structure: StructureTable::default(),
             child_kinds: HashMap::new(),
+            field_kinds: HashMap::new(),
             tree: TreeGrammar::default(),
         })
     }
@@ -364,6 +371,10 @@ impl Grammar {
     }
 
     pub fn fields_for_node_kind(&self, node_kind_id: NodeKindId) -> Vec<&str> {
+        // `fields_by_node` already holds the faithful, name-sorted field set — the union on the
+        // `from_raw` path (so a field reaching this node only through a supertype member, lua
+        // `chunk.local_declaration`, is listed), the summary for a metadata-only grammar. Reading
+        // the index is O(fields-on-node); the former scan of every `field_kinds` key was not.
         self.fields_by_node
             .get(&node_kind_id)
             .map(|fields| fields.iter().map(String::as_str).collect())
@@ -427,6 +438,16 @@ impl Grammar {
     }
 
     pub fn has_field(&self, node_kind_id: NodeKindId, node_field_id: NodeFieldId) -> bool {
+        // On the `from_raw` path the faithful field set is `field_kinds` (the summary ∪
+        // structural-recovery union, see [`Reachability`]): a field applied to a supertype
+        // member (lua `chunk.local_declaration`) surfaces on the enclosing node at runtime,
+        // but the summary alone flattens supertypes away and drops it. Metadata-only grammars
+        // fall back to the summary.
+        if !self.structure.variables().is_empty() {
+            return self
+                .field_kinds
+                .contains_key(&(node_kind_id, node_field_id));
+        }
         self.node_constraints
             .get(&node_kind_id)
             .is_some_and(|constraints| constraints.fields.contains_key(&node_field_id))
@@ -446,6 +467,18 @@ impl Grammar {
         node_kind_id: NodeKindId,
         node_field_id: NodeFieldId,
     ) -> &[NodeKindId] {
+        // On the `from_raw` path, `field_kinds` is the union of the node-shape summary and
+        // the structural recovery (see [`Reachability`]): the faithful value set, listing
+        // concrete members a query may write even when the field is typed by an inlined
+        // supertype (go's `_type`). A metadata-only grammar has no structure, so fall back to
+        // the summary.
+        if !self.structure.variables().is_empty() {
+            return self
+                .field_kinds
+                .get(&(node_kind_id, node_field_id))
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
+        }
         self.field_constraints(node_kind_id, node_field_id)
             .map(|field| field.valid_types.as_slice())
             .unwrap_or(&[])
@@ -467,11 +500,11 @@ impl Grammar {
     }
 
     pub fn valid_child_types(&self, node_kind_id: NodeKindId) -> &[NodeKindId] {
-        // Prefer the faithful, structure-derived reachability (the `from_raw` path). It
-        // descends the hidden frontiers the node-shape summary flattens away, so a child
-        // reachable only through a hidden rule — e.g. python `(module (match_statement))`,
-        // routed through the hidden `_statement` chain — is still admitted. A metadata-only
-        // grammar has no structure, so fall back to the node-shape constraints.
+        // On the `from_raw` path, `child_kinds` is the union of the node-shape summary and
+        // the structural recovery (see [`Reachability`]): the faithful child set, admitting a
+        // child reachable only through a hidden rule — e.g. python `(module (match_statement))`,
+        // routed through the hidden `_statement` chain. A metadata-only grammar has no
+        // structure, so fall back to the node-shape constraints.
         if !self.structure.variables().is_empty() {
             return self
                 .child_kinds
@@ -539,89 +572,321 @@ fn node_field_id(id: u16) -> NodeFieldId {
         .expect("lowered field symbol id must be non-zero in production grammar")
 }
 
-/// Named, unlabeled child kinds reachable under each node kind, derived from the
-/// structural skeleton — the single child-reachability model the grammar checker reasons
-/// over, so Stage A and Stage B cannot disagree. The node-shape summary's flattening
-/// drops children reachable only through a chain of hidden rules; descending `structure`
-/// instead keeps them.
-fn compute_child_kinds(grammar: &Grammar) -> HashMap<NodeKindId, Vec<NodeKindId>> {
-    // Each kind's producers: the variable named for it, plus every step occurrence that
-    // surfaces it (aliases included), whose body is the variable that builds it. Mirrors
-    // the satisfiability engine's producer index so both pass over the same model.
+/// Insertion-ordered set of node kinds: dedups while keeping first-seen order, so derived
+/// reachability lists are deterministic. [`into_sorted`](Self::into_sorted) reorders by
+/// public name for legible diagnostics.
+#[derive(Default)]
+struct KindSet {
+    kinds: Vec<NodeKindId>,
+    seen: HashSet<NodeKindId>,
+}
+
+impl KindSet {
+    fn insert(&mut self, id: NodeKindId) {
+        if self.seen.insert(id) {
+            self.kinds.push(id);
+        }
+    }
+
+    fn into_vec(self) -> Vec<NodeKindId> {
+        self.kinds
+    }
+
+    fn into_sorted(mut self, grammar: &Grammar) -> Vec<NodeKindId> {
+        self.kinds
+            .sort_unstable_by(|a, b| grammar.node_kind(*a).cmp(&grammar.node_kind(*b)));
+        self.kinds
+    }
+}
+
+/// Expands a supertype to the concrete member ids it stands for, splicing any *inlined*
+/// supertype member — one tree-sitter gives no public id (go's `_type`) — through to its
+/// own members. Without the splice those members are lost, so [`Grammar::collect_subtypes`]
+/// under-reports and a field or child typed by a supertype that reaches members through one
+/// rejects a legitimate concrete value (java `field_declaration.type: (integral_type)`). A
+/// kept (id-bearing) sub-supertype is returned as its id; the transitive `collect_subtypes`
+/// closure expands it through its own map entry.
+struct SubtypeResolver<'a> {
+    shapes_by_kind: HashMap<NodeKind<&'a str>, &'a NodeShape>,
+    named_node_ids: &'a HashMap<String, NodeKindId>,
+    anonymous_node_ids: &'a HashMap<String, NodeKindId>,
+}
+
+impl<'a> SubtypeResolver<'a> {
+    fn new(
+        node_shapes: &'a [NodeShape],
+        named_node_ids: &'a HashMap<String, NodeKindId>,
+        anonymous_node_ids: &'a HashMap<String, NodeKindId>,
+    ) -> Self {
+        Self {
+            shapes_by_kind: node_shapes
+                .iter()
+                .map(|shape| (shape.node_kind(), shape))
+                .collect(),
+            named_node_ids,
+            anonymous_node_ids,
+        }
+    }
+
+    fn members(&self, supertype: NodeKind<&'a str>) -> Vec<NodeKindId> {
+        let mut members = KindSet::default();
+        self.collect(supertype, &mut members, &mut HashSet::new());
+        members.into_vec()
+    }
+
+    fn collect(
+        &self,
+        kind: NodeKind<&'a str>,
+        out: &mut KindSet,
+        visiting: &mut HashSet<NodeKind<&'a str>>,
+    ) {
+        if !visiting.insert(kind) {
+            return;
+        }
+        let Some(shape) = self.shapes_by_kind.get(&kind) else {
+            return;
+        };
+        let Some(subtypes) = &shape.subtypes else {
+            return;
+        };
+        for subtype in subtypes {
+            let subtype_kind = subtype.node_kind();
+            match resolve_node_id(self.named_node_ids, self.anonymous_node_ids, subtype_kind) {
+                Some(id) => out.insert(id),
+                None => self.collect(subtype_kind, out, visiting),
+            }
+        }
+    }
+}
+
+/// Index each public node kind to the structural variables that build it: the variable
+/// named for it, plus every step occurrence (aliases included) that surfaces it, whose body
+/// is the variable that builds it. Mirrors the satisfiability engine's producer index, so
+/// both passes reason over the same model.
+fn structure_producers(grammar: &Grammar) -> HashMap<NodeKindId, Vec<VarId>> {
     let mut producers: HashMap<NodeKindId, Vec<VarId>> = HashMap::new();
     for (var_id, variable) in grammar.structure.iter() {
         if let Some(id) = variable.id {
             producers.entry(id).or_default().push(var_id);
         }
-        for production in &variable.productions {
-            for step in production {
-                if let (Some(id), Some(body)) = (step.target.id, step.target.body) {
-                    producers.entry(id).or_default().push(body);
+        for step in variable.productions.iter().flatten() {
+            if let (Some(id), Some(body)) = (step.target.id, step.target.body) {
+                producers.entry(id).or_default().push(body);
+            }
+        }
+    }
+    producers
+}
+
+/// Child- and field-kind reachability for every node kind — the single child/field model the
+/// grammar checker reasons over, so Stage A and Stage B cannot disagree.
+///
+/// It is the **union of two derivations of the same grammar, each sound but lossy in a
+/// different place**, so neither alone never-rejects-the-possible:
+///
+/// - The **node-shape summary** applies tree-sitter's full field/child resolution — including
+///   bubbling a sibling field out of a hidden field-value rule (gleam `let.assign`, carried by
+///   the hidden `_pattern` that is `let`'s `pattern` value) — but flattens supertypes away.
+/// - The **structural skeleton** *points* (a step records a public id and/or a descent body);
+///   descending it recovers what the summary drops by expanding **transparent** positions,
+///   whose contents tree-sitter surfaces on the enclosing concrete node:
+///   - an *id-less inlined rule* is fully transparent: its children and fields both surface on
+///     the parent (python `(module (match_statement))`, via the hidden `_statement` chain);
+///   - a *supertype* is inlined at runtime, so a field on one of its members surfaces on the
+///     parent (lua `chunk.local_declaration`). Its children are already covered by recording
+///     the supertype id and expanding it via `collect_subtypes`, so it is descended for member
+///     fields alone;
+///   - an *inlined-supertype field value* surfaces concrete kinds the summary never resolved
+///     (go `var_spec.type: (slice_type)`, typed by the inlined `_type`).
+///
+/// Their union over-approximates possibility — sound, since over-listing only widens
+/// admissibility (a tolerated false accept), never rejects a valid query.
+struct Reachability {
+    children: HashMap<NodeKindId, Vec<NodeKindId>>,
+    fields: HashMap<(NodeKindId, NodeFieldId), Vec<NodeKindId>>,
+    /// The `fields` keys grouped by node into a name-sorted per-node index, so
+    /// [`Grammar::fields_for_node_kind`] is a single map lookup rather than a scan of every key.
+    fields_by_node: HashMap<NodeKindId, Vec<String>>,
+}
+
+impl Reachability {
+    fn compute(grammar: &Grammar) -> Self {
+        let mut builder = ReachabilityBuilder {
+            grammar,
+            children: HashMap::new(),
+            fields: HashMap::new(),
+        };
+        builder.seed_from_summary();
+        for (kind, producers) in structure_producers(grammar) {
+            for producer in producers {
+                builder.collect_node(kind, producer, &mut HashSet::new());
+            }
+        }
+        builder.finish()
+    }
+}
+
+struct ReachabilityBuilder<'g> {
+    grammar: &'g Grammar,
+    children: HashMap<NodeKindId, KindSet>,
+    fields: HashMap<(NodeKindId, NodeFieldId), KindSet>,
+}
+
+impl ReachabilityBuilder<'_> {
+    /// Baseline of the union: every child and field the node-shape summary already resolved,
+    /// so the structural pass can only widen the result, never list fewer than the summary.
+    fn seed_from_summary(&mut self) {
+        for (&node, constraints) in &self.grammar.node_constraints {
+            if let Some(children) = &constraints.children {
+                let set = self.children.entry(node).or_default();
+                for &id in &children.valid_types {
+                    set.insert(id);
+                }
+            }
+            for (&field, field_constraints) in &constraints.fields {
+                let set = self.fields.entry((node, field)).or_default();
+                for &id in &field_constraints.valid_types {
+                    set.insert(id);
                 }
             }
         }
     }
 
-    let mut child_kinds = HashMap::with_capacity(producers.len());
-    for (&kind, producer_vars) in &producers {
-        let mut kinds = Vec::new();
-        let mut seen_kinds = HashSet::new();
-        let mut seen_vars = HashSet::new();
-        for &producer in producer_vars {
-            collect_child_kinds(
-                grammar,
-                producer,
-                &mut kinds,
-                &mut seen_kinds,
-                &mut seen_vars,
-            );
+    fn finish(self) -> Reachability {
+        let grammar = self.grammar;
+        let children = self
+            .children
+            .into_iter()
+            .map(|(kind, set)| (kind, set.into_sorted(grammar)))
+            .collect();
+        let fields: HashMap<(NodeKindId, NodeFieldId), Vec<NodeKindId>> = self
+            .fields
+            .into_iter()
+            .map(|(key, set)| (key, set.into_sorted(grammar)))
+            .collect();
+        let mut fields_by_node: HashMap<NodeKindId, Vec<String>> = HashMap::new();
+        for &(node, field) in fields.keys() {
+            if let Some(name) = grammar.field_name(field) {
+                fields_by_node
+                    .entry(node)
+                    .or_default()
+                    .push(name.to_string());
+            }
         }
-        // Sort by public name so diagnostics that list these read in a stable, legible
-        // order (the node-shape summary listed them alphabetically too).
-        kinds.sort_unstable_by(|a, b| grammar.node_kind(*a).cmp(&grammar.node_kind(*b)));
-        child_kinds.insert(kind, kinds);
+        for names in fields_by_node.values_mut() {
+            names.sort_unstable();
+        }
+        Reachability {
+            children,
+            fields,
+            fields_by_node,
+        }
     }
-    child_kinds
+
+    /// Record the children and fields that surface directly on `node`, descending fully
+    /// transparent id-less inlined rules (whose children and fields both surface here).
+    fn collect_node(&mut self, node: NodeKindId, var: VarId, seen: &mut HashSet<VarId>) {
+        if !seen.insert(var) {
+            return;
+        }
+        let Some(variable) = self.grammar.structure.variable(var) else {
+            return;
+        };
+        for step in variable.productions.iter().flatten() {
+            if let Some(field) = step.field {
+                self.collect_field_value(node, field, step.target);
+                continue;
+            }
+            match (step.target.id, step.target.body) {
+                (Some(id), body) => {
+                    if !self.grammar.is_anonymous_node(id) {
+                        self.children.entry(node).or_default().insert(id);
+                    }
+                    // A supertype is transparent for fields: its members may carry fields
+                    // that surface on `node`. Descend it for those alone — its children are
+                    // already covered by the id recorded above and expanded downstream.
+                    if self.grammar.is_supertype(id)
+                        && let Some(body) = body
+                    {
+                        self.collect_transparent_fields(node, body, &mut HashSet::new());
+                    }
+                }
+                (None, Some(body)) => self.collect_node(node, body, seen),
+                (None, None) => {}
+            }
+        }
+    }
+
+    /// Collect, into `node`'s field set, fields that surface on it through a transparent
+    /// subtree — a supertype or id-less inlined rule entered without crossing into a
+    /// concrete child. A concrete child is opaque: its own fields stay with it, so it is not
+    /// descended.
+    fn collect_transparent_fields(
+        &mut self,
+        node: NodeKindId,
+        var: VarId,
+        seen: &mut HashSet<VarId>,
+    ) {
+        if !seen.insert(var) {
+            return;
+        }
+        let Some(variable) = self.grammar.structure.variable(var) else {
+            return;
+        };
+        for step in variable.productions.iter().flatten() {
+            if let Some(field) = step.field {
+                self.collect_field_value(node, field, step.target);
+                continue;
+            }
+            match (step.target.id, step.target.body) {
+                (Some(id), Some(body)) if self.grammar.is_supertype(id) => {
+                    self.collect_transparent_fields(node, body, seen)
+                }
+                (None, Some(body)) => self.collect_transparent_fields(node, body, seen),
+                _ => {}
+            }
+        }
+    }
+
+    /// Record the kinds a fielded step's value can take. A value under a public id —
+    /// concrete kind, alias, or kept supertype — is recorded whole; a kept supertype is
+    /// expanded downstream by `collect_subtypes`. An id-less inlined value (go's `_type`) is
+    /// transparent: descend it to the concrete kinds it stands for. Anonymous kinds are kept
+    /// — a field value may be a literal token (`operator: "+"`).
+    fn collect_field_value(&mut self, node: NodeKindId, field: NodeFieldId, target: StepTarget) {
+        let value = self.fields.entry((node, field)).or_default();
+        match (target.id, target.body) {
+            (Some(id), _) => value.insert(id),
+            (None, Some(body)) => {
+                collect_value_frontier(self.grammar, body, value, &mut HashSet::new())
+            }
+            (None, None) => {}
+        }
+    }
 }
 
-/// Accumulate `var`'s named, unlabeled child kinds into `out`, descending through hidden
-/// frontiers. `seen_vars` cuts reference cycles; `seen_kinds` dedups across paths.
-fn collect_child_kinds(
+/// Descend an id-less inlined field value to the concrete kinds it can surface as. Keeps
+/// anonymous kinds (a field value may be a token) and ignores labels — a label inside an
+/// inlined value still names a candidate value kind, and over-listing only widens
+/// admissibility, never narrows it. A kept supertype within is recorded by id (expanded
+/// downstream).
+fn collect_value_frontier(
     grammar: &Grammar,
     var: VarId,
-    out: &mut Vec<NodeKindId>,
-    seen_kinds: &mut HashSet<NodeKindId>,
-    seen_vars: &mut HashSet<VarId>,
+    out: &mut KindSet,
+    seen: &mut HashSet<VarId>,
 ) {
-    if !seen_vars.insert(var) {
+    if !seen.insert(var) {
         return;
     }
     let Some(variable) = grammar.structure.variable(var) else {
         return;
     };
-    for production in &variable.productions {
-        for step in production {
-            // A fielded step is a *labeled* child, surfaced through the field tables.
-            if step.field.is_some() {
-                continue;
-            }
-            match (step.target.id, step.target.body) {
-                // Surfaces under a public id (a concrete kind, an alias, or a supertype):
-                // record it. Supertypes are kept whole — `admissible_set` expands them to
-                // their subtypes — matching what the node-shape summary listed.
-                (Some(id), _) => {
-                    if !grammar.is_anonymous_node(id) && seen_kinds.insert(id) {
-                        out.push(id);
-                    }
-                }
-                // No public id of its own: a hidden rule spliced into the parent, so its
-                // own children surface here in its place. Descend through it.
-                (None, Some(body)) => {
-                    collect_child_kinds(grammar, body, out, seen_kinds, seen_vars)
-                }
-                // A hidden token surfaces nothing.
-                (None, None) => {}
-            }
+    for step in variable.productions.iter().flatten() {
+        match (step.target.id, step.target.body) {
+            (Some(id), _) => out.insert(id),
+            (None, Some(body)) => collect_value_frontier(grammar, body, out, seen),
+            (None, None) => {}
         }
     }
 }

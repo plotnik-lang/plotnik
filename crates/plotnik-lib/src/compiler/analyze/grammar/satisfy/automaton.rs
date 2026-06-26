@@ -233,6 +233,15 @@ pub(super) fn build(
     }
 }
 
+/// Whether the node pattern asserts a field absent (`-field`). A negation has no
+/// `items()`, yet it is a child-list constraint the automaton must encode, so the
+/// interning decision tests for it alongside `items()`.
+fn has_negated_field(node: &NodePattern) -> bool {
+    node.syntax()
+        .children()
+        .any(|child| ast::NegatedField::cast(child).is_some())
+}
+
 /// The fields a node pattern asserts absent through `-field` items, resolved to ids.
 fn negated_fields(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -> Vec<NodeFieldId> {
     node.node()
@@ -534,7 +543,12 @@ impl Builder<'_, '_> {
 
     fn node_matcher(&mut self, node: &NodePattern, descent: Descent) -> ChildMatcher {
         let kind = self.node_kind(node, descent.source);
-        let child = node.items().next().is_some().then(|| {
+        // Intern (build a child automaton for) the node whenever it constrains its
+        // children at all: a child list, or a `-field` negation. A `-field` has no
+        // `items()`, so testing items alone would treat `(pair -key)` as a bare `(pair)`
+        // and silently drop the negation — letting it match any `pair`.
+        let constrains_children = node.items().next().is_some() || has_negated_field(node);
+        let child = constrains_children.then(|| {
             self.table
                 .intern(Located::new(descent.source, node.clone()))
         });

@@ -109,9 +109,16 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             }
             Pattern::QuantifiedPattern(q) => {
                 let Some(inner) = q.inner() else { return };
-                // The body is optional/repeated — zero occurrences can satisfy it, so defer.
+                // `?`/`*` admit zero matches, so the body need not hold — defer it. `+`
+                // requires the body at least once, so it keeps the current mode: an
+                // impossible `+` body makes the whole `+` impossible. Mirrors Stage B's walk.
+                let inner_mode = if q.is_optional() {
+                    AdmissibilityMode::Deferred
+                } else {
+                    mode
+                };
                 let inner_located = located.wrap(inner);
-                self.check_pattern_grammar(&inner_located, ctx, AdmissibilityMode::Deferred, walk);
+                self.check_pattern_grammar(&inner_located, ctx, inner_mode, walk);
             }
             Pattern::DefRef(r) => {
                 let Some(name_token) = r.name() else { return };
