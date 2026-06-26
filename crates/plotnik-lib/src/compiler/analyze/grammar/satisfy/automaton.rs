@@ -195,7 +195,7 @@ pub(super) fn build(
     };
     let start = builder.new_state(GapClass::Any);
     let items: Vec<SeqItem> = node.node().items().collect();
-    let accept = builder.emit_items(&items, Descent::root(node.source()), true, start);
+    let accept = builder.emit_items(&items, Descent::root(node.source()), true, None, start);
 
     let (has_trailing, trailing_nav) = check_trailing_anchor(&items, ctx.symbol_table);
     let trailing_gap = if has_trailing {
@@ -302,11 +302,13 @@ impl Builder<'_, '_> {
         items: &[SeqItem],
         descent: Descent,
         inside_node: bool,
+        first_gap: Option<GapClass>,
         entry: State,
     ) -> State {
         let navs = compute_nav_modes(items, inside_node, self.ctx.symbol_table);
         let mut navs = navs.into_iter();
         let mut cur = entry;
+        let mut first = true;
         for item in items {
             let SeqItem::Pattern(pattern) = item else {
                 continue;
@@ -314,9 +316,17 @@ impl Builder<'_, '_> {
             let (_, nav) = navs
                 .next()
                 .expect("compute_nav_modes yields one entry per pattern item");
-            let gap = nav.and_then(GapClass::from_nav).unwrap_or(GapClass::Any);
-            self.states[cur as usize].gap = satisfiability_gap(gap, pattern);
+            // A sequence spliced under an outer anchor (a `{…}` group, a referenced
+            // body) inherits that anchor's gap on its first child: the outer level
+            // already chose it, so recomputing here would drop the adjacency and let a
+            // strict anchor leak through the boundary.
+            let gap = match (first, first_gap) {
+                (true, Some(g)) => g,
+                _ => satisfiability_gap(nav.and_then(GapClass::from_nav).unwrap_or(GapClass::Any), pattern),
+            };
+            self.states[cur as usize].gap = gap;
             cur = self.emit_pattern(pattern, descent.bare(), cur);
+            first = false;
         }
         cur
     }
@@ -353,7 +363,11 @@ impl Builder<'_, '_> {
             // forbids `field: {…}`), so the field does not carry into its items.
             Pattern::SeqPattern(seq) => {
                 let items: Vec<SeqItem> = seq.items().collect();
-                self.emit_items(&items, descent, false, from)
+                // The group sits at one child position whose gap `from` already carries;
+                // thread it as the first child's gap so an enclosing anchor survives the
+                // `{…}` boundary instead of being recomputed away.
+                let first_gap = Some(self.states[from as usize].gap);
+                self.emit_items(&items, descent, false, first_gap, from)
             }
             Pattern::DefRef(def_ref) => self.emit_def_ref(def_ref, descent, from),
         }
