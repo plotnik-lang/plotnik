@@ -1,0 +1,42 @@
+Q = [(function_declaration (program)) @fn (identifier) @id]
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "fn"
+S2 "id"
+S3 "Q"
+S4 "function_declaration"
+S5 "program"
+S6 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { fn, id }
+T2 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T2  ; fn: T2
+M1: S2 → T2  ; id: T2
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06  -ε-                                   11, 16
+  08  └‣─  (program)                        09
+  09  ─‣┘  _                                10
+  10                                        ▶
+  11   !   [Null Set(M1)] (function_declaration) [Node Set(M0)]  08
+  14  ...  
+  15  ...  
+  16   !   [Null Set(M0)] (identifier) [Node Set(M1)]  10
