@@ -65,9 +65,10 @@ fn diamond_reference_graph_links() {
         ));
     }
     // Leaf is uncaptured: the two sibling references inline it transparently, so a
-    // capturing leaf would (correctly) collide as a duplicate capture in scope. The
-    // diamond shape — and the memoization it stresses — is unchanged.
-    input.push_str(&format!("D{depth} = (identifier)\n"));
+    // capturing leaf would (correctly) collide as a duplicate capture in scope. It is
+    // a `statement_block` so every level nests a valid block child and the whole chain
+    // stays satisfiable — a bare `(identifier)` is no statement and would be rejected.
+    input.push_str(&format!("D{depth} = (statement_block)\n"));
 
     Query::expect_valid_linking(&input);
 }

@@ -46,13 +46,15 @@ const STACK_SIZE: usize = 256 * 1024;
 /// - `Top` anchors at the program root and descends to the unary chain. The root
 ///   preamble matches once (no tree-wide search), so the work stays linear in
 ///   `DEPTH` rather than quadratic.
-/// - `Rec`'s escape branch matches `statement_block`, which never appears inside a
-///   unary chain. Trying it fails and *consumes* the branch checkpoint at every
-///   level, so the descent leaves only call-retry checkpoints — a contiguous run
-///   that backtrack pops without re-entering. At the leaf `identifier`, both
-///   branches fail and the whole run unwinds at once.
+/// - `Rec`'s escape branch matches `number` — a real expression, so the pattern is
+///   matchable in principle (the grammar checker admits it) yet one that never
+///   appears in a chain of `!` operators over an identifier. Trying it fails and
+///   *consumes* the branch checkpoint at every level, so the descent leaves only
+///   call-retry checkpoints — a contiguous run that backtrack pops without
+///   re-entering. At the leaf `identifier`, both branches fail and the whole run
+///   unwinds at once.
 const QUERY: &str = "\
-Rec = [Leaf: (statement_block) Deep: (unary_expression (Rec))]
+Rec = [Leaf: (number) Deep: (unary_expression (Rec))]
 Top = (program (expression_statement (Rec)))";
 
 /// Counts the longest run of consecutive `trace_backtrack` calls uninterrupted by
