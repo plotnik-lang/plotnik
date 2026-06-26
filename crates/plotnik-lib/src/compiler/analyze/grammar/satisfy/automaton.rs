@@ -97,15 +97,10 @@ pub(super) struct ChildAutomaton {
     /// Fields the query asserts absent (`-field`). A production step that binds one
     /// would give the node a child the query forbids, so threading kills that path.
     negated_fields: Vec<NodeFieldId>,
-    /// Set when the query side could not be represented finitely (a sibling-recursive
-    /// definition splicing siblings). The engine treats it as satisfiable — sound,
-    /// since we then never reject. This is *model incompleteness*, not a resource limit:
-    /// the query may well be valid, so we must not reject it.
-    indeterminate: bool,
     /// Set when construction hit a resource ceiling — too many states (an exponentially
-    /// widening expansion) or too-deep recursion. Unlike `indeterminate`, this is the
-    /// query asking for more than we will spend, so it is *rejected* with a clear
-    /// "too complex" diagnostic rather than waved through.
+    /// widening expansion) or too-deep recursion. This is the query asking for more than
+    /// we will spend, so it is *rejected* with a clear "too complex" diagnostic rather
+    /// than judged on an automaton we declined to finish.
     too_complex: bool,
 }
 
@@ -121,10 +116,6 @@ impl ChildAutomaton {
     /// Whether the query forbids `field` on this node via `-field`.
     pub(super) fn negates(&self, field: Option<NodeFieldId>) -> bool {
         field.is_some_and(|f| self.negated_fields.contains(&f))
-    }
-
-    pub(super) fn is_indeterminate(&self) -> bool {
-        self.indeterminate
     }
 
     /// Whether construction bailed on a resource ceiling (state cap or depth), meaning
@@ -207,7 +198,6 @@ pub(super) fn build(
         ctx,
         table,
         states: Vec::new(),
-        indeterminate: false,
         too_complex: false,
         ref_stack: Vec::new(),
         max_depth,
@@ -226,7 +216,6 @@ pub(super) fn build(
     builder.states[accept as usize].gap = trailing_gap;
 
     let mut states = builder.states;
-    let indeterminate = builder.indeterminate;
     let too_complex = builder.too_complex;
     if relax {
         for state in &mut states {
@@ -238,7 +227,6 @@ pub(super) fn build(
         start,
         accept,
         negated_fields: negated_fields(node, ctx),
-        indeterminate,
         too_complex,
     }
 }
@@ -258,9 +246,8 @@ struct Builder<'a, 'b> {
     ctx: AutomatonContext<'a>,
     table: &'b mut PatternTable,
     states: Vec<StateData>,
-    indeterminate: bool,
     /// Set when a resource ceiling (state cap or recursion depth) is hit — the query is
-    /// rejected as too complex, not accepted.
+    /// rejected as too complex, not accepted. Construction short-circuits once it is set.
     too_complex: bool,
     /// Definition names currently being inlined, to catch sibling-recursive refs
     /// that would splice siblings without bound.
@@ -331,9 +318,8 @@ const STATE_CAP: usize = 20_000;
 impl Builder<'_, '_> {
     fn new_state(&mut self, gap: GapClass) -> State {
         if self.states.len() >= STATE_CAP {
-            // Stop growing the automaton and short-circuit the solve (`indeterminate`),
-            // but record that we bailed on a resource ceiling so the query is rejected.
-            self.indeterminate = true;
+            // Stop growing the automaton: record that we bailed on a resource ceiling so the
+            // query is rejected as too complex rather than judged on a half-built automaton.
             self.too_complex = true;
         }
         let id = self.states.len() as State;
@@ -383,14 +369,13 @@ impl Builder<'_, '_> {
     /// depth. Every descent funnels through here, so one check bounds the whole walk:
     /// outrunning `max_depth` means the inlined expansion is deeper than any tree the
     /// parser would admit, so we stop and flag the query too complex (rejected). An
-    /// already-bailing build — whether from depth, the state cap, or a sibling-recursive
-    /// reference — short-circuits without doing more work.
+    /// already-bailing build — from depth or the state cap — short-circuits without doing
+    /// more work.
     fn emit_pattern(&mut self, pattern: &Pattern, descent: Descent, from: State) -> State {
-        if self.indeterminate {
+        if self.too_complex {
             return from;
         }
         if self.depth >= self.max_depth {
-            self.indeterminate = true;
             self.too_complex = true;
             return from;
         }
@@ -500,10 +485,19 @@ impl Builder<'_, '_> {
             return self.emit_single(unconstrained_matcher(descent.field), from);
         };
         let name = name_token.text();
-        // A reference that splices siblings into the parent (`Seq = {(a) (Seq)}`) makes
-        // the child language non-regular; abandon finite construction and accept.
+        // A reference that splices siblings into the parent (`Seq = {(a) (Seq)}`) makes the
+        // child language non-regular, so it cannot inline finitely. Rather than abandon the
+        // whole automaton — which would erase the constraints the non-recursive prefix
+        // already imposed, e.g. a leading anchor — over-approximate just the recursive tail:
+        // a self-loop consuming any remaining sibling. The accepted language only grows
+        // (rejection stays sound), while the first-child / anchor constraints still bind.
         if self.ref_stack.iter().any(|n| n == name) {
-            self.indeterminate = true;
+            let any_sibling = ChildMatcher {
+                kind: KindConstraint::AnyNode,
+                child: None,
+                field: None,
+            };
+            self.states[from as usize].pattern_edges.push((any_sibling, from));
             return from;
         }
         let Some(target) = self.ctx.symbol_table.located_definition(name) else {

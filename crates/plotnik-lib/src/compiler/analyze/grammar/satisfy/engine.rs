@@ -511,7 +511,9 @@ impl Solve {
 
     fn compute_sat(&mut self, frozen: &Frozen, (p, producer): SatKey) -> bool {
         let automaton = frozen.automaton(p);
-        if automaton.is_indeterminate() {
+        // A construction that bailed on a resource ceiling left a half-built automaton; its
+        // verdicts are not sound, so accept and let the pass reject the query as too complex.
+        if automaton.is_too_complex() {
             return true;
         }
         let start = StateSet::singleton(automaton.start());

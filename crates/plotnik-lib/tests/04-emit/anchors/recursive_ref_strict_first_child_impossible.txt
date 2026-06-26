@@ -1,0 +1,10 @@
+Seq = [{(identifier)} {(identifier) (Seq)}]
+Q = (array .! (Seq))
+==== diagnostics ====
+error: with strict adjacency (`.!`), no `array` places this child first; an `array` begins with `"["`
+ --> query.ptk:2:6
+  |
+2 | Q = (array .! (Seq))
+  |      ^^^^^
+  |
+help: `.!` allows nothing between — not even anonymous tokens or comments; the soft anchor `.` skips those: `(array . (Seq))`
