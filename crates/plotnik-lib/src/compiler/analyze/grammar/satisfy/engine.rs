@@ -156,6 +156,17 @@ impl<'a> Frozen<'a> {
         }
     }
 
+    /// The concrete named kinds a wildcard parent could be: every named, non-supertype
+    /// kind the grammar can build. A wildcard with children is satisfiable iff one of
+    /// these takes those children — a token can never be a parent, so it is excluded.
+    fn parent_candidate_kinds(&self) -> Vec<NodeKindId> {
+        self.producers
+            .keys()
+            .copied()
+            .filter(|&k| !self.ctx.grammar.is_anonymous_node(k) && !self.ctx.grammar.is_supertype(k))
+            .collect()
+    }
+
     /// Extra kinds a child matcher could consume. Only kinds the matcher admits — a
     /// `(comment)` admits the `comment` extra, a `(_)` any named extra, `_` any extra.
     fn extras_admitted_by(&self, constraint: KindConstraint) -> Vec<NodeKindId> {
@@ -283,6 +294,16 @@ impl<'a> Satisfier<'a> {
         producers
             .iter()
             .any(|&producer| self.solve.sat_value((p, producer)))
+    }
+
+    /// Whether some named node the grammar builds can have `node`'s children — the
+    /// satisfiability question for a wildcard parent `(_ …)`, which fixes no kind of its
+    /// own. Accept on the first candidate that works; only an impossible wildcard pays
+    /// for ruling every candidate out, and only a wildcard *with* a child list reaches
+    /// here at all.
+    pub(super) fn wildcard_satisfiable(&mut self, node: &Located<NodePattern>) -> bool {
+        let candidates = self.frozen.parent_candidate_kinds();
+        candidates.iter().any(|&kind| self.satisfiable(node, kind))
     }
 
     /// Build every automaton interned so far (transitively reaching all child

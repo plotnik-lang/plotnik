@@ -96,11 +96,15 @@ impl Reporter<'_, '_> {
         match located.node() {
             Pattern::NodePattern(node) => {
                 let node = located.wrap(node.clone());
-                if mode.is_required()
-                    && let Some(kind) = root_kind(self.satisfier.context(), &node)
-                    && !self.satisfier.satisfiable(&node, kind)
-                {
-                    diagnose::report(self.satisfier, &node, kind, self.diag);
+                if !mode.is_required() {
+                    return;
+                }
+                if let Some(kind) = root_kind(self.satisfier.context(), &node) {
+                    if !self.satisfier.satisfiable(&node, kind) {
+                        diagnose::report(self.satisfier, &node, kind, self.diag);
+                    }
+                } else if is_wildcard_parent(&node) && !self.satisfier.wildcard_satisfiable(&node) {
+                    diagnose::report_wildcard(&node, self.diag);
                 }
             }
             Pattern::Union(_) | Pattern::Enum(_) => {
@@ -154,6 +158,9 @@ impl Reporter<'_, '_> {
                 let node = located.wrap(node.clone());
                 match root_kind(self.satisfier.context(), &node) {
                     Some(kind) => !self.satisfier.satisfiable(&node, kind),
+                    None if is_wildcard_parent(&node) => {
+                        !self.satisfier.wildcard_satisfiable(&node)
+                    }
                     None => false,
                 }
             }
@@ -280,4 +287,12 @@ fn root_kind(ctx: AutomatonContext<'_>, located: &Located<NodePattern>) -> Optio
         return None;
     }
     Some(id)
+}
+
+/// A wildcard parent (`(_ …)` / `_ …`) that constrains children. It fixes no kind of
+/// its own — so `root_kind` returns `None` — yet a child list still makes it possibly
+/// impossible: satisfiability then asks whether *any* node kind takes those children.
+/// A bare `(_)` constrains nothing and is always matchable, so it is excluded.
+fn is_wildcard_parent(node: &Located<NodePattern>) -> bool {
+    node.node().is_any() && node.node().items().next().is_some()
 }

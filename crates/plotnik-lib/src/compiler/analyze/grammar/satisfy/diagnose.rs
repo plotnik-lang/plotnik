@@ -54,6 +54,19 @@ pub(super) fn report(
     }
 }
 
+/// Report an impossible wildcard parent `(_ …)`: no kind the grammar builds takes the
+/// children it constrains. A wildcard fixes no kind of its own, so there is no single
+/// node to blame — the obstacle is that no production anywhere realizes this child list.
+pub(super) fn report_wildcard(node: &Located<NodePattern>, diag: &mut Diagnostics) {
+    diag.report(DiagnosticKind::UnsatisfiablePattern, kind_span(node))
+        .detail("no node the grammar builds takes these children".to_string())
+        .hint(
+            "`(_)` and `_` match any node, but no node kind admits this combination of \
+             children in this order",
+        )
+        .emit();
+}
+
 /// A single-valued field the culprit binds more than once, with the repeat count. Such a
 /// field can hold one child, so binding it twice is impossible whatever else matches —
 /// the first such field in source order, named for the message.
