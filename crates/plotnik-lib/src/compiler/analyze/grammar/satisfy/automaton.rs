@@ -23,8 +23,8 @@ use crate::compiler::parse::ast::{
     self, NodePattern, Pattern, QuantifierKind, SeqItem, TokenPattern, token_src,
 };
 use crate::compiler::parse::cst::SyntaxKind;
-use crate::core::NodeKindId;
 use crate::core::grammar::Grammar;
+use crate::core::{NodeFieldId, NodeKindId};
 
 /// A query node pattern interned to a dense id, keyed by source location so a
 /// definition reached from many sites — or a recursive one — collapses to one id.
@@ -63,6 +63,11 @@ pub(super) struct ChildMatcher {
     /// `None` when the child is childless (a bare node, token, or wildcard) and
     /// matching its kind is the whole constraint.
     pub(super) child: Option<PatternId>,
+    /// The field the matched child must bind, when the query wrote `field: …`. The
+    /// engine enforces it only against a node's *direct* children, where the grammar's
+    /// step field is authoritative; a field surfacing through a hidden rule is left
+    /// unconstrained (its inner-vs-outer label is ambiguous), so a rejection is sound.
+    pub(super) field: Option<NodeFieldId>,
 }
 
 #[derive(Debug)]
@@ -182,7 +187,7 @@ pub(super) fn build(
     };
     let start = builder.new_state(GapClass::Any);
     let items: Vec<SeqItem> = node.node().items().collect();
-    let accept = builder.emit_items(&items, node.source(), true, start);
+    let accept = builder.emit_items(&items, Descent::root(node.source()), true, start);
 
     let (has_trailing, trailing_nav) = check_trailing_anchor(&items, ctx.symbol_table);
     let trailing_gap = if has_trailing {
@@ -217,6 +222,50 @@ struct Builder<'a, 'b> {
     ref_stack: Vec<String>,
 }
 
+/// The context one query position is lowered under. `source` is the file its text
+/// lives in — it changes when a reference inlines a definition from elsewhere — and
+/// `field` is the label in force from an enclosing `field: …`, which the matcher this
+/// position builds must bind. Both ride the descent together, transformed only through
+/// the named transitions below so the lowering reads as "lower this position here".
+#[derive(Clone, Copy)]
+struct Descent {
+    source: SourceId,
+    field: Option<NodeFieldId>,
+}
+
+impl Descent {
+    fn root(source: SourceId) -> Self {
+        Self {
+            source,
+            field: None,
+        }
+    }
+
+    /// Strip the field label: the items of a sibling sequence each take their own, so
+    /// a field never carries across a `{…}` onto the positions inside it.
+    fn bare(self) -> Self {
+        Self {
+            field: None,
+            ..self
+        }
+    }
+
+    /// Enter a `field: …`. The innermost label wins, so an absent or unresolved inner
+    /// field leaves the inherited one in force.
+    fn under(self, field: Option<NodeFieldId>) -> Self {
+        match field {
+            Some(_) => Self { field, ..self },
+            None => self,
+        }
+    }
+
+    /// Cross into a referenced definition: its text lives in `source`, but the label
+    /// the reference site asked for still binds the target node.
+    fn into_ref(self, source: SourceId) -> Self {
+        Self { source, ..self }
+    }
+}
+
 impl Builder<'_, '_> {
     fn new_state(&mut self, gap: GapClass) -> State {
         let id = self.states.len() as State;
@@ -226,11 +275,12 @@ impl Builder<'_, '_> {
 
     /// Thread a flat item list (a node's children, or an inlined sequence) onto the
     /// spine starting at `entry`, stamping each pattern's leading gap from the shared
-    /// nav computation. Returns the exit state.
+    /// nav computation. Returns the exit state. Each item descends field-fresh — a
+    /// sibling's label comes only from its own `field: …`, never the list's context.
     fn emit_items(
         &mut self,
         items: &[SeqItem],
-        source: SourceId,
+        descent: Descent,
         inside_node: bool,
         entry: State,
     ) -> State {
@@ -246,40 +296,46 @@ impl Builder<'_, '_> {
                 .expect("compute_nav_modes yields one entry per pattern item");
             let gap = nav.and_then(GapClass::from_nav).unwrap_or(GapClass::Any);
             self.states[cur as usize].gap = satisfiability_gap(gap, pattern);
-            cur = self.emit_pattern(pattern, source, cur);
+            cur = self.emit_pattern(pattern, descent.bare(), cur);
         }
         cur
     }
 
-    /// Emit one item between `from` and the returned exit state. The gap *before*
-    /// this item is already stamped on `from`.
-    fn emit_pattern(&mut self, pattern: &Pattern, source: SourceId, from: State) -> State {
+    /// Emit one item between `from` and the returned exit state. The gap *before* this
+    /// item is already stamped on `from`; `descent` carries the source and the field label
+    /// the matcher this item builds must bind.
+    fn emit_pattern(&mut self, pattern: &Pattern, descent: Descent, from: State) -> State {
         match pattern {
             Pattern::CapturedPattern(cap) => match cap.inner() {
-                Some(inner) => self.emit_pattern(&inner, source, from),
+                Some(inner) => self.emit_pattern(&inner, descent, from),
                 None => from,
             },
             Pattern::NodePattern(node) => {
-                let matcher = self.node_matcher(node, source);
+                let matcher = self.node_matcher(node, descent);
                 self.emit_single(matcher, from)
             }
             Pattern::TokenPattern(token) => {
-                let matcher = self.token_matcher(token, source);
+                let matcher = self.token_matcher(token, descent);
                 self.emit_single(matcher, from)
             }
-            Pattern::FieldPattern(field) => match field.value() {
-                // The field constraint is ignored until field threading lands; the
-                // value is what occupies the child position.
-                Some(value) => self.emit_pattern(&value, source, from),
-                None => from,
-            },
-            Pattern::QuantifiedPattern(q) => self.emit_quantifier(q, source, from),
-            Pattern::Union(_) | Pattern::Enum(_) => self.emit_alternation(pattern, source, from),
+            Pattern::FieldPattern(field_pattern) => {
+                let field = field_pattern
+                    .name()
+                    .and_then(|name| self.ctx.grammar.resolve_field(name.text()));
+                match field_pattern.value() {
+                    Some(value) => self.emit_pattern(&value, descent.under(field), from),
+                    None => from,
+                }
+            }
+            Pattern::QuantifiedPattern(q) => self.emit_quantifier(q, descent, from),
+            Pattern::Union(_) | Pattern::Enum(_) => self.emit_alternation(pattern, descent, from),
+            // A sequence is several siblings, never a single field value (the grammar
+            // forbids `field: {…}`), so the field does not carry into its items.
             Pattern::SeqPattern(seq) => {
                 let items: Vec<SeqItem> = seq.items().collect();
-                self.emit_items(&items, source, false, from)
+                self.emit_items(&items, descent, false, from)
             }
-            Pattern::DefRef(def_ref) => self.emit_def_ref(def_ref, from),
+            Pattern::DefRef(def_ref) => self.emit_def_ref(def_ref, descent, from),
         }
     }
 
@@ -289,12 +345,7 @@ impl Builder<'_, '_> {
         to
     }
 
-    fn emit_quantifier(
-        &mut self,
-        q: &ast::QuantifiedPattern,
-        source: SourceId,
-        from: State,
-    ) -> State {
+    fn emit_quantifier(&mut self, q: &ast::QuantifiedPattern, descent: Descent, from: State) -> State {
         let Some(inner) = q.inner() else {
             return from;
         };
@@ -304,35 +355,35 @@ impl Builder<'_, '_> {
         let kind = q.quantifier_kind();
         match kind {
             Some(QuantifierKind::Optional) => {
-                let to = self.emit_pattern(&inner, source, from);
+                let to = self.emit_pattern(&inner, descent, from);
                 self.states[from as usize].eps_edges.push(to);
                 to
             }
             Some(QuantifierKind::ZeroOrMore) => {
-                let body_exit = self.emit_pattern(&inner, source, from);
+                let body_exit = self.emit_pattern(&inner, descent, from);
                 self.states[body_exit as usize].eps_edges.push(from);
                 let to = self.new_state(GapClass::Any);
                 self.states[from as usize].eps_edges.push(to);
                 to
             }
             Some(QuantifierKind::OneOrMore) => {
-                let body_exit = self.emit_pattern(&inner, source, from);
+                let body_exit = self.emit_pattern(&inner, descent, from);
                 self.states[body_exit as usize].eps_edges.push(from);
                 let to = self.new_state(GapClass::Any);
                 self.states[body_exit as usize].eps_edges.push(to);
                 to
             }
             // A malformed quantifier with no operator imposes nothing.
-            None => self.emit_pattern(&inner, source, from),
+            None => self.emit_pattern(&inner, descent, from),
         }
     }
 
-    fn emit_alternation(&mut self, alt: &Pattern, source: SourceId, from: State) -> State {
+    fn emit_alternation(&mut self, alt: &Pattern, descent: Descent, from: State) -> State {
         let to = self.new_state(GapClass::Any);
         let mut had_branch = false;
         for branch in alt.children() {
             had_branch = true;
-            let branch_exit = self.emit_pattern(&branch, source, from);
+            let branch_exit = self.emit_pattern(&branch, descent, from);
             self.states[branch_exit as usize].eps_edges.push(to);
         }
         if !had_branch {
@@ -341,9 +392,9 @@ impl Builder<'_, '_> {
         to
     }
 
-    fn emit_def_ref(&mut self, def_ref: &ast::DefRef, from: State) -> State {
+    fn emit_def_ref(&mut self, def_ref: &ast::DefRef, descent: Descent, from: State) -> State {
         let Some(name_token) = def_ref.name() else {
-            return self.emit_single(unconstrained_matcher(), from);
+            return self.emit_single(unconstrained_matcher(descent.field), from);
         };
         let name = name_token.text();
         // A reference that splices siblings into the parent (`Seq = {(a) (Seq)}`) makes
@@ -353,39 +404,44 @@ impl Builder<'_, '_> {
             return from;
         }
         let Some(target) = self.ctx.symbol_table.located_definition(name) else {
-            return self.emit_single(unconstrained_matcher(), from);
+            return self.emit_single(unconstrained_matcher(descent.field), from);
         };
-        let target_source = target.source();
+        let descent = descent.into_ref(target.source());
 
         // A reference to a single node is an atomic child: one matcher whose body is
         // the referenced node, so its own structure is checked against the producer.
         if let Pattern::NodePattern(node) = target.node() {
-            let matcher = self.node_matcher(node, target_source);
+            let matcher = self.node_matcher(node, descent);
             return self.emit_single(matcher, from);
         }
 
         // Otherwise the reference's body inlines its structure (an alternation of
         // kinds, a grouped sequence) directly into this position.
         self.ref_stack.push(name.to_string());
-        let exit = self.emit_pattern(target.node(), target_source, from);
+        let exit = self.emit_pattern(target.node(), descent, from);
         self.ref_stack.pop();
         exit
     }
 
-    fn node_matcher(&mut self, node: &NodePattern, source: SourceId) -> ChildMatcher {
-        let kind = self.node_kind(node, source);
+    fn node_matcher(&mut self, node: &NodePattern, descent: Descent) -> ChildMatcher {
+        let kind = self.node_kind(node, descent.source);
         let child = node
             .items()
             .next()
             .is_some()
-            .then(|| self.table.intern(Located::new(source, node.clone())));
-        ChildMatcher { kind, child }
+            .then(|| self.table.intern(Located::new(descent.source, node.clone())));
+        ChildMatcher {
+            kind,
+            child,
+            field: descent.field,
+        }
     }
 
-    fn token_matcher(&self, token: &TokenPattern, source: SourceId) -> ChildMatcher {
+    fn token_matcher(&self, token: &TokenPattern, descent: Descent) -> ChildMatcher {
         ChildMatcher {
-            kind: self.token_kind(token, source),
+            kind: self.token_kind(token, descent.source),
             child: None,
+            field: descent.field,
         }
     }
 
@@ -424,10 +480,11 @@ impl Builder<'_, '_> {
     }
 }
 
-fn unconstrained_matcher() -> ChildMatcher {
+fn unconstrained_matcher(field: Option<NodeFieldId>) -> ChildMatcher {
     ChildMatcher {
         kind: KindConstraint::Unconstrained,
         child: None,
+        field,
     }
 }
 

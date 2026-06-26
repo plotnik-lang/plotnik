@@ -20,7 +20,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics, Span};
 use crate::compiler::parse::ast::{NodePattern, Pattern, SeqItem};
 use crate::compiler::parse::cst::SyntaxNode;
-use crate::core::NodeKindId;
+use crate::core::{NodeFieldId, NodeKindId};
 
 use super::automaton::AutomatonContext;
 use super::engine::Satisfier;
@@ -37,6 +37,13 @@ pub(super) fn report(
     let culprit = locate(satisfier, node.clone(), kind, &mut visited);
 
     let ctx = satisfier.context();
+
+    // A single-valued field bound more than once is the whole obstacle on its own —
+    // a sharper thing to say than a vague "combination the grammar never produces".
+    if let Some((field, count)) = repeated_single_field(ctx, &culprit) {
+        return emit_repeated_field_failure(ctx, &culprit, &field, count, diag);
+    }
+
     let anchors_to_blame =
         has_anchor(culprit.node.node()) && relaxing_anchors_satisfies(satisfier, &culprit);
 
@@ -45,6 +52,54 @@ pub(super) fn report(
     } else {
         emit_arrangement_failure(ctx, &culprit, diag);
     }
+}
+
+/// A single-valued field the culprit binds more than once, with the repeat count. Such a
+/// field can hold one child, so binding it twice is impossible whatever else matches —
+/// the first such field in source order, named for the message.
+fn repeated_single_field(ctx: AutomatonContext<'_>, culprit: &Culprit) -> Option<(String, usize)> {
+    let grammar = ctx.grammar;
+    // First-seen order, so the message blames the field the reader meets first.
+    let mut counts: Vec<(NodeFieldId, usize)> = Vec::new();
+    for child in culprit.node.node().children() {
+        let Pattern::FieldPattern(field) = child else {
+            continue;
+        };
+        let Some(name) = field.name() else { continue };
+        let Some(id) = grammar.resolve_field(name.text()) else {
+            continue;
+        };
+        match counts.iter_mut().find(|(seen, _)| *seen == id) {
+            Some((_, count)) => *count += 1,
+            None => counts.push((id, 1)),
+        }
+    }
+
+    counts.into_iter().find_map(|(id, count)| {
+        let single = grammar
+            .field_cardinality(culprit.kind, id)
+            .is_some_and(|cardinality| !cardinality.is_multiple());
+        if count < 2 || !single {
+            return None;
+        }
+        Some((grammar.field_name(id)?.to_string(), count))
+    })
+}
+
+fn emit_repeated_field_failure(
+    ctx: AutomatonContext<'_>,
+    culprit: &Culprit,
+    field: &str,
+    count: usize,
+    diag: &mut Diagnostics,
+) {
+    let kind_name = render_kind(ctx, culprit.kind);
+    let detail =
+        format!("a {kind_name} has one `{field}`, but this pattern binds `{field}` {count} times");
+    diag.report(DiagnosticKind::UnsatisfiablePattern, kind_span(&culprit.node))
+        .detail(detail)
+        .hint(format!("keep a single `{field}:` child"))
+        .emit();
 }
 
 /// The node a diagnostic points at, plus its resolved kind.

@@ -1,0 +1,10 @@
+Q = (binary_expression right: (_) left: (_))
+==== diagnostics ====
+error: the grammar builds no `binary_expression` with these children
+ --> query.ptk:1:6
+  |
+1 | Q = (binary_expression right: (_) left: (_))
+  |      ^^^^^^^^^^^^^^^^^
+  |
+help: `binary_expression` allows fields `left`, `operator` or `right`
+help: each child is admissible here on its own — it is their combination or order the grammar never produces

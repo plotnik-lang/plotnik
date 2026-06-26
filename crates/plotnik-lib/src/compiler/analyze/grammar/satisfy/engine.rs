@@ -17,8 +17,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::compiler::analyze::Located;
 use crate::compiler::parse::ast::NodePattern;
-use crate::core::NodeKindId;
 use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, VarId};
+use crate::core::{NodeFieldId, NodeKindId};
 
 use super::automaton::{
     self, AutomatonContext, ChildAutomaton, ChildMatcher, KindConstraint, PatternId, State,
@@ -43,16 +43,31 @@ impl Producer {
 
 /// How a production step participates in threading.
 enum StepClass {
-    /// A real child surfacing under `kind`, built by `producer`.
-    Visible { kind: NodeKindId, producer: Producer },
+    /// A real child surfacing under `kind`, built by `producer`, bound to `field` when
+    /// the grammar labels it. A label on this step overrides any pushed down from a
+    /// hidden ancestor (the innermost label is the one the runtime attaches).
+    Visible {
+        kind: NodeKindId,
+        field: Option<NodeFieldId>,
+        producer: Producer,
+    },
     /// A child spliced in without an id of its own: thread through its frontier.
     HiddenSubtree(VarId),
     /// A hidden token: present in the production, absent from the tree.
     HiddenLeaf,
 }
 
+/// Whether a matcher demanding field `want` accepts a child whose runtime label is
+/// `have`. A bare matcher (`want` is `None`) imposes no field constraint.
+fn field_ok(want: Option<NodeFieldId>, have: Option<NodeFieldId>) -> bool {
+    want.is_none() || want == have
+}
+
 type SatKey = (PatternId, Producer);
-type ThreadKey = (PatternId, VarId, State);
+/// `(query node, hidden variable, automaton state, inherited field)`. The inherited
+/// field is part of the key: the same frontier entered under different labels admits
+/// different `field:` matchers, so the memo must keep them apart.
+type ThreadKey = (PatternId, VarId, State, Option<NodeFieldId>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Key {
@@ -106,6 +121,7 @@ impl<'a> Frozen<'a> {
             },
             (Some(kind), _) => StepClass::Visible {
                 kind,
+                field: step.field,
                 producer: Producer::of_step(step),
             },
             (None, Some(var)) => StepClass::HiddenSubtree(var),
@@ -387,38 +403,41 @@ impl Solve {
             // A token has no children, not even extras: it realizes `p` only if `p`
             // accepts the empty child sequence.
             Producer::Leaf => eps_closure(automaton, &start).contains(accept),
-            // Some production of the variable threads `A_p` from start to accept.
+            // Some production of the variable threads `A_p` from start to accept. These
+            // are the node's own children, so no field is inherited from above.
             Producer::Var(v) => {
                 let production_count = frozen.variable(v).productions.len();
                 (0..production_count).any(|i| {
                     let production = &frozen.variable(v).productions[i];
-                    self.thread_production(frozen, p, production, &start)
+                    self.thread_production(frozen, p, production, &start, None)
                         .contains(accept)
                 })
             }
         }
     }
 
-    fn compute_thread(&mut self, frozen: &Frozen, (p, h, q): ThreadKey) -> StateSet {
+    fn compute_thread(&mut self, frozen: &Frozen, (p, h, q, inherited): ThreadKey) -> StateSet {
         let start = StateSet::singleton(q);
         let mut reached = StateSet::default();
         let production_count = frozen.variable(h).productions.len();
         for i in 0..production_count {
             let production = &frozen.variable(h).productions[i];
-            let states = self.thread_production(frozen, p, production, &start);
+            let states = self.thread_production(frozen, p, production, &start, inherited);
             reached.union_with(&states);
         }
         reached
     }
 
     /// Thread one production's steps, left to right, through `A_p` from `start`,
-    /// returning the reachable state set.
+    /// returning the reachable state set. `inherited` is the field a hidden ancestor
+    /// step pushed onto this frontier — `None` for a node's own children.
     fn thread_production(
         &mut self,
         frozen: &Frozen,
         p: PatternId,
         production: &[SkeletonStep],
         start: &StateSet,
+        inherited: Option<NodeFieldId>,
     ) -> StateSet {
         let automaton = frozen.automaton(p);
         let mut current = self.closure(frozen, automaton, start);
@@ -427,7 +446,7 @@ impl Solve {
             if current.is_empty() {
                 break;
             }
-            current = self.thread_step(frozen, p, &current, step);
+            current = self.thread_step(frozen, p, &current, step, inherited);
             let automaton = frozen.automaton(p);
             current = self.closure(frozen, automaton, &current);
         }
@@ -440,12 +459,19 @@ impl Solve {
         p: PatternId,
         current: &StateSet,
         step: &SkeletonStep,
+        inherited: Option<NodeFieldId>,
     ) -> StateSet {
         let automaton = frozen.automaton(p);
         match frozen.classify(step) {
-            // A real child of kind `kind`. Each current state either skips it through
-            // a gap self-loop, or consumes it through a matching edge.
-            StepClass::Visible { kind, producer } => {
+            // A real child of kind `kind`. Each current state either skips it through a
+            // gap self-loop, or consumes it through an edge whose kind and field both
+            // admit the step. The step's own label wins over an inherited one.
+            StepClass::Visible {
+                kind,
+                field,
+                producer,
+            } => {
+                let effective = field.or(inherited);
                 let anonymous = frozen.ctx.grammar.is_anonymous_node(kind);
                 let extra = frozen.ctx.grammar.is_extra(kind);
                 let mut next = StateSet::default();
@@ -455,6 +481,7 @@ impl Solve {
                     }
                     for (matcher, to) in automaton.pattern_edges(q) {
                         if frozen.kind_ok(matcher.kind, kind)
+                            && field_ok(matcher.field, effective)
                             && self.child_sat(frozen, matcher, producer)
                         {
                             next.insert(*to);
@@ -463,11 +490,14 @@ impl Solve {
                 }
                 next
             }
-            // Splice the hidden variable's visible frontier in.
+            // Splice the hidden variable's visible frontier in, pushing down the label it
+            // inherits: this step's own field if it has one, otherwise the one already
+            // inherited (a plain supertype link never relabels what it carries).
             StepClass::HiddenSubtree(h) => {
+                let pushed = step.field.or(inherited);
                 let mut next = StateSet::default();
                 for q in current.iter() {
-                    let reached = self.get_thread((p, h, q));
+                    let reached = self.get_thread((p, h, q, pushed));
                     next.union_with(&reached);
                 }
                 next
@@ -512,6 +542,11 @@ impl Solve {
     }
 
     fn can_consume_extra(&mut self, frozen: &Frozen, matcher: &ChildMatcher) -> bool {
+        // Extras are inserted unfielded, so a `field:` matcher can never be one — letting
+        // it "consume" an extra here would skip its field constraint.
+        if matcher.field.is_some() {
+            return false;
+        }
         for extra in frozen.extras_admitted_by(matcher.kind) {
             let realized = match matcher.child {
                 None => true,
