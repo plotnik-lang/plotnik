@@ -125,6 +125,10 @@ impl ChildAutomaton {
         self.states[state as usize].gap
     }
 
+    pub(super) fn state_count(&self) -> usize {
+        self.states.len()
+    }
+
     pub(super) fn pattern_edges(&self, state: State) -> &[(ChildMatcher, State)] {
         &self.states[state as usize].pattern_edges
     }

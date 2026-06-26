@@ -16,6 +16,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::compiler::analyze::Located;
+use crate::compiler::analyze::anchors::GapClass;
 use crate::compiler::parse::ast::NodePattern;
 use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
@@ -472,15 +473,19 @@ impl Solve {
         inherited: Option<NodeFieldId>,
     ) -> StateSet {
         let automaton = frozen.automaton(p);
-        let mut current = self.closure(frozen, automaton, start);
+        // Effective skip gap per state, recomputed by each `closure` and read by the next
+        // `thread_step`. Sized once to the automaton; states outside the live frontier are
+        // never read, so stale entries between rounds do not matter.
+        let mut gaps = vec![GapClass::Any; automaton.state_count()];
+        let mut current = self.closure(frozen, automaton, start, &mut gaps);
         for step in production {
             // A dead frontier stays dead; the rest of the production cannot revive it.
             if current.is_empty() {
                 break;
             }
-            current = self.thread_step(frozen, p, &current, step, inherited);
+            current = self.thread_step(frozen, p, &current, &gaps, step, inherited);
             let automaton = frozen.automaton(p);
-            current = self.closure(frozen, automaton, &current);
+            current = self.closure(frozen, automaton, &current, &mut gaps);
         }
         current
     }
@@ -490,6 +495,7 @@ impl Solve {
         frozen: &Frozen,
         p: PatternId,
         current: &StateSet,
+        gaps: &[GapClass],
         step: &SkeletonStep,
         inherited: Option<NodeFieldId>,
     ) -> StateSet {
@@ -514,7 +520,9 @@ impl Solve {
                 let extra = frozen.ctx.grammar.is_extra(kind);
                 let mut next = StateSet::default();
                 for q in current.iter() {
-                    if automaton.gap(q).admits(anonymous, extra) {
+                    // The state's *effective* gap (tightest erasure path that reaches it),
+                    // so a strict anchor erased into this position still forbids the skip.
+                    if gaps[q as usize].admits(anonymous, extra) {
                         next.insert(q);
                     }
                     for (matcher, to) in automaton.pattern_edges(q) {
@@ -558,25 +566,40 @@ impl Solve {
     /// extra kind (a `(comment)`) may advance the automaton without a production step,
     /// since the parser may insert an extra anywhere. Extras are optional, so the
     /// closure only grows the reachable set.
-    fn closure(&mut self, frozen: &Frozen, automaton: &ChildAutomaton, set: &StateSet) -> StateSet {
+    fn closure(
+        &mut self,
+        frozen: &Frozen,
+        automaton: &ChildAutomaton,
+        set: &StateSet,
+        gaps: &mut [GapClass],
+    ) -> StateSet {
         // Reachability over epsilon edges plus extra-consumable pattern edges (a query
-        // child matching an inserted extra advances without a production step). A single
-        // worklist pass settles each reached state once — O(states + edges) — where the
-        // old re-scan-until-stable loop was quadratic on wide child lists.
+        // child matching an inserted extra advances without a production step). Alongside
+        // membership, carry each state's effective skip gap: tightest *along* a path
+        // (every erased step bounds what may be skipped after it), loosest *across* paths
+        // (a skip is open if any path opens it). So a strict anchor survives erasure — a
+        // state reached only by erasing optionals under `.!` cannot then skip what the
+        // anchor forbids — while a state also reachable by consuming keeps its own gap.
         let mut result = set.clone();
-        let mut stack: Vec<State> = result.iter().collect();
+        let mut stack: Vec<State> = Vec::new();
+        for q in result.iter() {
+            gaps[q as usize] = automaton.gap(q);
+            stack.push(q);
+        }
         while let Some(q) = stack.pop() {
+            let gq = gaps[q as usize];
             for &to in automaton.eps_edges(q) {
-                if result.insert(to) {
+                let candidate = gq.tighten(automaton.gap(to));
+                if relax_into(gaps, &mut result, to, candidate) {
                     stack.push(to);
                 }
             }
             for (matcher, to) in automaton.pattern_edges(q) {
-                if !result.contains(*to)
-                    && self.can_consume_extra(frozen, matcher)
-                    && result.insert(*to)
-                {
-                    stack.push(*to);
+                if self.can_consume_extra(frozen, matcher) {
+                    let candidate = gq.tighten(automaton.gap(*to));
+                    if relax_into(gaps, &mut result, *to, candidate) {
+                        stack.push(*to);
+                    }
                 }
             }
         }
@@ -607,6 +630,27 @@ impl Solve {
         }
         false
     }
+}
+
+/// Add `to` to the closure under effective gap `candidate`, returning whether it must be
+/// (re)visited — newly reached, or reached by a more permissive path that loosened its
+/// gap (so its successors must see the wider skip permission).
+fn relax_into(
+    gaps: &mut [GapClass],
+    result: &mut StateSet,
+    to: State,
+    candidate: GapClass,
+) -> bool {
+    if result.insert(to) {
+        gaps[to as usize] = candidate;
+        return true;
+    }
+    let loosened = gaps[to as usize].loosen(candidate);
+    if loosened != gaps[to as usize] {
+        gaps[to as usize] = loosened;
+        return true;
+    }
+    false
 }
 
 /// Pure epsilon closure: no memo reads, so it needs neither the solver nor `Frozen`.

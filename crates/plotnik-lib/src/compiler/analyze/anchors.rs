@@ -52,6 +52,38 @@ impl GapClass {
         }
     }
 
+    /// Rank by permissiveness. The classes nest — `Nothing ⊂ ExtrasOnly ⊂
+    /// AnonAndExtras ⊂ Any` — so a total order captures their intersection and union
+    /// exactly, which is what [`tighten`](Self::tighten)/[`loosen`](Self::loosen) need.
+    fn permissiveness(self) -> u8 {
+        match self {
+            Self::Nothing => 0,
+            Self::ExtrasOnly => 1,
+            Self::AnonAndExtras => 2,
+            Self::Any => 3,
+        }
+    }
+
+    /// The more restrictive of two gaps — their intersection. The skip permission of one
+    /// path is bounded by the tightest gap on it.
+    pub fn tighten(self, other: Self) -> Self {
+        if self.permissiveness() <= other.permissiveness() {
+            self
+        } else {
+            other
+        }
+    }
+
+    /// The more permissive of two gaps — their union. A state reachable by several paths
+    /// admits a skip if any path does.
+    pub fn loosen(self, other: Self) -> Self {
+        if self.permissiveness() >= other.permissiveness() {
+            self
+        } else {
+            other
+        }
+    }
+
     /// Project a codegen [`Nav`] onto the gap it opens, or `None` for navs that
     /// drive no sibling gap (pure control flow, or a `Stay` that does not move).
     ///
