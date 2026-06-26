@@ -1,0 +1,11 @@
+Q = (list_literal "]" "[")
+==== input.dart ====
+==== diagnostics ====
+error: the grammar builds no `list_literal` with these children
+ --> query.ptk:1:6
+  |
+1 | Q = (list_literal "]" "[")
+  |      ^^^^^^^^^^^^
+  |
+help: `list_literal` allows children `_literal`, `additive_expression`, `assignment_expression`, `bitwise_and_expression`, `bitwise_or_expression`, `bitwise_xor_expression`, `cascade_section`, `conditional_expression`, …
+help: each child is admissible here on its own — it is their combination or order the grammar never produces

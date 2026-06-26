@@ -1,0 +1,38 @@
+Q = (list_literal (list_literal) @outer (list_literal) @inner)
+==== input.dart ====
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "outer"
+S2 "inner"
+S3 "Q"
+S4 "list_literal"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { outer, inner }
+
+[type_members]
+M0: S1 → T0  ; outer: <Node>
+M1: S2 → T0  ; inner: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06   !   (list_literal)                   08
+  07  ...  
+  08  └‣─  (list_literal) [Node Set(M0)]    10
+  10  ─‣─  (list_literal) [Node Set(M1)]    12
+  12  ─‣┘  _                                13
+  13                                        ▶
