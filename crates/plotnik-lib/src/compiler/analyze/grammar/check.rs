@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::compiler::analyze::Located;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
@@ -50,8 +50,6 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                         .emit();
                 }
 
-                let admissible = child_ctx.as_ref().map(|ctx| self.admissible_set(ctx.id()));
-
                 for child in node.children() {
                     if let Pattern::FieldPattern(f) = &child {
                         let located_field = located.wrap(f.clone());
@@ -64,9 +62,9 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                     } else {
                         let child_located = located.wrap(child);
                         if participation.is_required()
-                            && let (Some(ctx), Some(adm)) =
-                                (child_ctx.as_ref(), admissible.as_ref())
+                            && let Some(ctx) = child_ctx.as_ref()
                         {
+                            let adm = walk.admissible_set(self.grammar, ctx.id());
                             self.check_bare_child(&child_located, ctx, adm);
                         }
                         self.check_pattern_grammar(&child_located, child_ctx, participation, walk);
@@ -214,7 +212,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         // The field value's kind must be admissible for this field. Skipped under a
         // disjunction/option, where the field constraint need not hold for the query to match.
         if participation.is_required() {
-            self.check_field_value(&value_located, ctx, &field_ref);
+            self.check_field_value(&value_located, ctx, &field_ref, walk);
         }
         self.check_pattern_grammar(&value_located, Some(*ctx), participation, walk);
     }
@@ -274,28 +272,6 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 field_name, parent_name
             ))
             .emit();
-    }
-
-    /// All child kinds (named children and field values) the grammar can place under `parent`,
-    /// expanded through supertype subtyping in both directions. A bare child is admissible iff
-    /// it lands in this set (or is an extra / a supertype overlapping it).
-    fn admissible_set(&self, parent: NodeKindId) -> HashSet<NodeKindId> {
-        let mut seeds = self.grammar.valid_child_types(parent).to_vec();
-        for &field_id in self.grammar.field_ids_for_node_kind(parent) {
-            seeds.extend_from_slice(self.grammar.valid_field_types(parent, field_id));
-        }
-
-        let mut admissible = HashSet::new();
-        for seed in seeds {
-            admissible.extend(self.kind_with_subtypes(seed));
-        }
-        admissible
-    }
-
-    fn kind_with_subtypes(&self, kind: NodeKindId) -> HashSet<NodeKindId> {
-        let mut kinds = self.grammar.collect_subtypes(kind);
-        kinds.insert(kind);
-        kinds
     }
 
     /// Whether a concrete child kind can occupy a bare child position whose parent admits
@@ -394,18 +370,19 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         located: &Located<Pattern>,
         ctx: &ParentNode,
         field: &FieldRef,
+        walk: &mut AdmissibilityWalkState,
     ) {
         match located.node() {
             Pattern::CapturedPattern(cap) => {
                 if let Some(inner) = cap.inner() {
-                    self.check_field_value(&located.wrap(inner), ctx, field);
+                    self.check_field_value(&located.wrap(inner), ctx, field, walk);
                 }
             }
             Pattern::NodePattern(node) => {
-                self.check_field_named_value(&located.wrap(node.clone()), ctx, field);
+                self.check_field_named_value(&located.wrap(node.clone()), ctx, field, walk);
             }
             Pattern::TokenPattern(anon) => {
-                self.check_field_anon_value(&located.wrap(anon.clone()), ctx, field);
+                self.check_field_anon_value(&located.wrap(anon.clone()), ctx, field, walk);
             }
             // Alternations, quantifiers, and references are not checked here; a field value
             // can't be a sequence (rejected earlier as `FieldSequenceValue`).
@@ -423,6 +400,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         located: &Located<NodePattern>,
         ctx: &ParentNode,
         field: &FieldRef,
+        walk: &mut AdmissibilityWalkState,
     ) {
         let node = located.node();
         if node.is_any() {
@@ -447,7 +425,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             return;
         };
 
-        if self.field_admissible(value_id, ctx.id(), field.id) {
+        let admissible = walk.field_admissible_set(self.grammar, ctx.id(), field.id);
+        if self.field_admissible(value_id, admissible) {
             return;
         }
 
@@ -469,6 +448,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         located: &Located<ast::TokenPattern>,
         ctx: &ParentNode,
         field: &FieldRef,
+        walk: &mut AdmissibilityWalkState,
     ) {
         let anon = located.node();
         // The bare `_` matches any node, anonymous tokens included, so it always fits.
@@ -483,8 +463,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             return;
         };
 
-        if self
-            .field_admissible_set(ctx.id(), field.id)
+        if walk
+            .field_admissible_set(self.grammar, ctx.id(), field.id)
             .contains(&value_id)
         {
             return;
@@ -500,26 +480,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         );
     }
 
-    fn field_admissible_set(
-        &self,
-        parent: NodeKindId,
-        field_id: NodeFieldId,
-    ) -> HashSet<NodeKindId> {
-        let mut admissible = HashSet::new();
-        for &seed in self.grammar.valid_field_types(parent, field_id) {
-            admissible.insert(seed);
-            admissible.extend(self.grammar.collect_subtypes(seed));
-        }
-        admissible
-    }
-
-    fn field_admissible(
-        &self,
-        value: NodeKindId,
-        parent: NodeKindId,
-        field_id: NodeFieldId,
-    ) -> bool {
-        let admissible = self.field_admissible_set(parent, field_id);
+    fn field_admissible(&self, value: NodeKindId, admissible: &HashSet<NodeKindId>) -> bool {
         admissible.contains(&value)
             || (self.grammar.is_supertype(value)
                 && self
@@ -630,4 +591,58 @@ pub(super) struct AdmissibilityWalkState {
     /// validation depends only on `(name, ctx, participation)`, so caching it keeps shared
     /// references (e.g. diamond graphs) from being re-walked exponentially.
     validated: HashSet<(String, Option<ParentNode>, Participation)>,
+    /// Expanded bare-child admissibility sets by parent node kind.
+    admissible_by_parent: HashMap<NodeKindId, HashSet<NodeKindId>>,
+    /// Expanded field-value admissibility sets by `(parent, field)`.
+    admissible_by_field: HashMap<(NodeKindId, NodeFieldId), HashSet<NodeKindId>>,
+}
+
+impl AdmissibilityWalkState {
+    /// All child kinds (named children and field values) the grammar can place under `parent`,
+    /// expanded through supertype subtyping. A bare child is admissible iff it lands in this
+    /// set (or is an extra / a supertype overlapping it).
+    fn admissible_set(&mut self, grammar: &Grammar, parent: NodeKindId) -> &HashSet<NodeKindId> {
+        if !self.admissible_by_parent.contains_key(&parent) {
+            let seeds = grammar.valid_child_types(parent).iter().copied().chain(
+                grammar
+                    .field_ids_for_node_kind(parent)
+                    .iter()
+                    .flat_map(|&field| grammar.valid_field_types(parent, field).iter().copied()),
+            );
+            self.admissible_by_parent
+                .insert(parent, expanded_types(grammar, seeds));
+        }
+        self.admissible_by_parent
+            .get(&parent)
+            .expect("just inserted admissible parent set")
+    }
+
+    fn field_admissible_set(
+        &mut self,
+        grammar: &Grammar,
+        parent: NodeKindId,
+        field: NodeFieldId,
+    ) -> &HashSet<NodeKindId> {
+        let key = (parent, field);
+        if !self.admissible_by_field.contains_key(&key) {
+            let seeds = grammar.valid_field_types(parent, field).iter().copied();
+            self.admissible_by_field
+                .insert(key, expanded_types(grammar, seeds));
+        }
+        self.admissible_by_field
+            .get(&key)
+            .expect("just inserted admissible field set")
+    }
+}
+
+fn expanded_types(
+    grammar: &Grammar,
+    seeds: impl IntoIterator<Item = NodeKindId>,
+) -> HashSet<NodeKindId> {
+    let mut admissible = HashSet::new();
+    for seed in seeds {
+        admissible.insert(seed);
+        admissible.extend(grammar.collect_subtypes(seed));
+    }
+    admissible
 }
