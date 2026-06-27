@@ -89,7 +89,7 @@ fn preset_sets_the_baseline_for_both() {
 
 #[test]
 fn per_field_override_beats_preset_regardless_of_order() {
-    // The plan's canonical case: unbounded everywhere except steps.
+    // The canonical case: unbounded runtime limits except steps.
     let forward = spec_from(&["--limits", "unbounded", "--max-steps", "5"]);
     let reversed = spec_from(&["--max-steps", "5", "--limits", "unbounded"]);
     for spec in [forward, reversed] {

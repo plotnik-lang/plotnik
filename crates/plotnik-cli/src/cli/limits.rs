@@ -3,11 +3,11 @@
 //! Three knobs feed one [`RuntimeLimitSpec`]:
 //!   - `--max-steps  <auto|unbounded|N>`     work ceiling
 //!   - `--max-memory <auto|unbounded|SIZE>`  live-heap ceiling (binary units)
-//!   - `--limits     <auto|unbounded>`       preset baseline for every resource
+//!   - `--limits     <auto|unbounded>`       preset baseline for both runtime resources
 //!
 //! Precedence is order-independent: `--limits` sets the baseline and an explicit
 //! `--max-*` overrides that one resource. So `--limits unbounded --max-steps 5`
-//! means "unbounded except steps = 5", regardless of flag order.
+//! means "unbounded runtime limits except steps = 5", regardless of flag order.
 
 use clap::{Arg, ArgMatches};
 use plotnik_lib::{Limit, RuntimeLimitSpec};
@@ -33,7 +33,7 @@ pub fn limits_preset_arg() -> Arg {
         .long("limits")
         .value_name("PRESET")
         .value_parser(["auto", "unbounded"])
-        .help("Limit preset for every resource: 'auto' (default) or 'unbounded'")
+        .help("Runtime limit preset: 'auto' (default) or 'unbounded'")
 }
 
 /// Combine the `--limits` preset baseline with per-resource `--max-*` overrides.
