@@ -158,27 +158,13 @@ impl Reporter<'_, '_> {
                 if !participation.is_required() {
                     return WalkOutcome::Continue;
                 }
-                if let Some(kind) = root_kind(self.solver.context(), &node) {
-                    if !self.solver.satisfiable(&node, kind) {
-                        return diagnose::report(
-                            self.solver,
-                            &node,
-                            kind,
-                            self.diag,
-                            &mut self.anchor_probes,
-                        )
-                        .into();
-                    }
-                } else if is_wildcard_parent(&node) && !self.solver.wildcard_satisfiable(&node) {
-                    return diagnose::report_wildcard(
-                        self.solver,
-                        &node,
-                        self.diag,
-                        &mut self.anchor_probes,
-                    )
-                    .into();
+                let Some(goal) = Goal::from_node(self.solver.context(), node) else {
+                    return WalkOutcome::Continue;
+                };
+                if !goal.is_impossible(self.solver) {
+                    return WalkOutcome::Continue;
                 }
-                WalkOutcome::Continue
+                diagnose::report_goal(self.solver, goal, self.diag, &mut self.anchor_probes).into()
             }
             Pattern::Union(_) | Pattern::Enum(_) => {
                 // A branch failing is normally excused by its siblings; but when every
@@ -240,11 +226,8 @@ impl Reporter<'_, '_> {
         match located.node() {
             Pattern::NodePattern(node) => {
                 let node = located.wrap(node.clone());
-                match root_kind(self.solver.context(), &node) {
-                    Some(kind) => !self.solver.satisfiable(&node, kind),
-                    None if is_wildcard_parent(&node) => !self.solver.wildcard_satisfiable(&node),
-                    None => false,
-                }
+                Goal::from_node(self.solver.context(), node)
+                    .is_some_and(|goal| goal.is_impossible(self.solver))
             }
             Pattern::Union(_) | Pattern::Enum(_) => self.all_branches_impossible(located),
             Pattern::CapturedPattern(cap) => cap
@@ -289,9 +272,23 @@ enum Goal {
 }
 
 impl Goal {
+    fn from_node(ctx: AutomatonContext<'_>, node: Located<NodePattern>) -> Option<Self> {
+        if let Some(kind) = root_kind(ctx, &node) {
+            return Some(Self::Concrete { node, kind });
+        }
+        is_wildcard_parent(&node).then_some(Self::Wildcard { node })
+    }
+
     fn node(&self) -> &Located<NodePattern> {
         match self {
             Self::Concrete { node, .. } | Self::Wildcard { node } => node,
+        }
+    }
+
+    fn is_impossible(&self, solver: &mut SatisfiabilitySolver<'_>) -> bool {
+        match self {
+            Self::Concrete { node, kind } => !solver.satisfiable(node, *kind),
+            Self::Wildcard { node } => !solver.wildcard_satisfiable(node),
         }
     }
 }
@@ -314,13 +311,8 @@ fn collect_goals(
                 return;
             }
             let located_node = located.wrap(node.clone());
-            if let Some(kind) = root_kind(ctx, &located_node) {
-                out.push(Goal::Concrete {
-                    node: located_node,
-                    kind,
-                });
-            } else if is_wildcard_parent(&located_node) {
-                out.push(Goal::Wildcard { node: located_node });
+            if let Some(goal) = Goal::from_node(ctx, located_node) {
+                out.push(goal);
             }
         }
         // An anonymous literal at a goal position matches some token of the grammar.

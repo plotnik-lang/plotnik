@@ -38,34 +38,14 @@ impl ReportOutcome {
 }
 
 /// Emit the impossibility diagnostic for a failed root goal.
-pub(super) fn report(
+pub(super) fn report_goal(
     solver: &mut SatisfiabilitySolver,
-    node: &Located<NodePattern>,
-    kind: NodeKindId,
+    goal: Goal,
     diag: &mut Diagnostics,
     anchor_probes: &mut AnchorProbes<'_>,
 ) -> ReportOutcome {
     let mut visited = HashSet::new();
-    let culprit = locate(
-        solver,
-        Goal::Concrete {
-            node: node.clone(),
-            kind,
-        },
-        &mut visited,
-    );
-    report_culprit(solver, culprit, diag, anchor_probes)
-}
-
-/// Emit the impossibility diagnostic for a failed wildcard-parent goal.
-pub(super) fn report_wildcard(
-    solver: &mut SatisfiabilitySolver,
-    node: &Located<NodePattern>,
-    diag: &mut Diagnostics,
-    anchor_probes: &mut AnchorProbes<'_>,
-) -> ReportOutcome {
-    let mut visited = HashSet::new();
-    let culprit = locate(solver, Goal::Wildcard { node: node.clone() }, &mut visited);
+    let culprit = locate(solver, goal, &mut visited);
     report_culprit(solver, culprit, diag, anchor_probes)
 }
 
@@ -233,19 +213,12 @@ fn locate(
     }
 
     for child in children {
-        if goal_is_impossible(solver, &child) {
+        if child.is_impossible(solver) {
             return locate(solver, child, visited);
         }
     }
 
     goal
-}
-
-fn goal_is_impossible(solver: &mut SatisfiabilitySolver, goal: &Goal) -> bool {
-    match goal {
-        Goal::Concrete { node, kind } => !solver.satisfiable(node, *kind),
-        Goal::Wildcard { node } => !solver.wildcard_satisfiable(node),
-    }
 }
 
 enum AnchorProbe {
