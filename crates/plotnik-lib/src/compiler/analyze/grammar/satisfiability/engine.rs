@@ -200,6 +200,22 @@ impl<'a> Frozen<'a> {
             .unwrap_or(&[])
     }
 
+    fn build_automaton(
+        &mut self,
+        node: &Located<NodePattern>,
+        remaining_budget: u64,
+    ) -> ChildAutomaton {
+        automaton::build(
+            node,
+            self.ctx,
+            &mut self.table,
+            &self.anchor_semantics,
+            self.anchor_mode,
+            self.max_depth,
+            remaining_budget,
+        )
+    }
+
     /// Classify a step for threading. A supertype is erased in the tree — tree-sitter
     /// never emits a node of the supertype's kind, only one of its subtypes — so a
     /// step surfacing a supertype is threaded through its body, not matched as a node.
@@ -500,15 +516,7 @@ impl<'a> SatisfiabilitySolver<'a> {
 
             let index = self.frozen.automata.len();
             let node = self.frozen.table.node_at(index).clone();
-            let automaton = automaton::build(
-                &node,
-                self.frozen.ctx,
-                &mut self.frozen.table,
-                &self.frozen.anchor_semantics,
-                self.frozen.anchor_mode,
-                self.frozen.max_depth,
-                remaining_budget,
-            );
+            let automaton = self.frozen.build_automaton(&node, remaining_budget);
             self.solve.spend(automaton.state_count() as u64);
             self.frozen.automata.push(automaton);
         }
