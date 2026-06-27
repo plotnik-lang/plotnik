@@ -56,11 +56,11 @@ pub(super) enum KindConstraint {
 }
 
 /// A pattern-edge label: the kind it accepts and the child whose own structure the
-/// matched grammar producer must in turn realize.
+/// matched grammar realizer must in turn realize.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct ChildMatcher {
     pub(super) kind: KindConstraint,
-    /// The child node whose child structure the grammar producer must realize, or
+    /// The child node whose child structure the grammar realizer must realize, or
     /// `None` when the child is childless (a bare node, token, or wildcard) and
     /// matching its kind is the whole constraint.
     pub(super) child: Option<PatternId>,
@@ -572,7 +572,7 @@ impl Builder<'_, '_> {
         let descent = descent.into_ref(target.source());
 
         // A reference to a single node is an atomic child: one matcher whose body is
-        // the referenced node, so its own structure is checked against the producer.
+        // the referenced node, so its own structure is checked against the realizer.
         if let Pattern::NodePattern(node) = target.node() {
             let matcher = self.node_matcher(node, descent);
             return self.emit_single(matcher, from);

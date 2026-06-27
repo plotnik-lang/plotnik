@@ -2,8 +2,8 @@
 //!
 //! Two mutually-recursive judgments over finite, monotone domains:
 //!
-//! - `SAT(p, producer)` — a node built from grammar `producer` (a token `Leaf`, or a
-//!   non-terminal `Var`) can realize the child structure query node `p` demands.
+//! - `SAT(p, realizer)` — a grammar `realizer` (a token `Leaf`, or a non-terminal
+//!   `Var`) can realize the child structure query node `p` demands.
 //! - `THREAD(p, h, q)` — the visible frontier of hidden variable `h`, spliced into
 //!   `p`'s child list, drives `A_p` from state `q` to the returned set of states.
 //!
@@ -36,34 +36,34 @@ use super::automaton::{
 };
 use super::state_set::StateSet;
 
-/// What builds a grammar node: a token (no children) or a non-terminal variable.
+/// The grammar body that realizes a matched node's child structure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(super) enum Producer {
+pub(super) enum NodeRealizer {
     Leaf,
     Var(VarId),
 }
 
-impl Producer {
-    /// The producer a visible step descends into: its own variable, or `Leaf` for a
-    /// token. Keying `SAT` by the step's own `body` — never "any variable producing
+impl NodeRealizer {
+    /// The realizer a visible step descends into: its own variable, or `Leaf` for a
+    /// token. Keying `SAT` by the step's own `body` — never "any variable realizing
     /// this kind" — is what makes nesting alias-correct.
     fn of_step(step: &SkeletonStep) -> Self {
         step.target
             .body
-            .map(Producer::Var)
-            .unwrap_or(Producer::Leaf)
+            .map(NodeRealizer::Var)
+            .unwrap_or(NodeRealizer::Leaf)
     }
 }
 
 /// How a production step participates in threading.
 enum StepClass {
-    /// A real child surfacing under `kind`, built by `producer`, bound to `field` when
+    /// A real child surfacing under `kind`, built by `realizer`, bound to `field` when
     /// the grammar labels it. A label on this step overrides any pushed down from a
     /// hidden ancestor (the innermost label is the one the runtime attaches).
     Visible {
         kind: NodeKindId,
         field: Option<NodeFieldId>,
-        producer: Producer,
+        realizer: NodeRealizer,
     },
     /// A child spliced in without an id of its own: thread through its frontier.
     HiddenSubtree(VarId),
@@ -77,7 +77,7 @@ fn field_ok(want: Option<NodeFieldId>, have: Option<NodeFieldId>) -> bool {
     want.is_none() || want == have
 }
 
-type SatKey = (PatternId, Producer);
+type SatKey = (PatternId, NodeRealizer);
 /// `(query node, hidden variable, automaton state, inherited field)`. The inherited
 /// field is part of the key: the same frontier entered under different labels admits
 /// different `field:` matchers, so the memo must keep them apart.
@@ -96,9 +96,9 @@ struct Frozen<'a> {
     ctx: AutomatonContext<'a>,
     automata: Vec<ChildAutomaton>,
     table: automaton::PatternTable,
-    /// Kind → the producers that can build a node of that kind: the variable named
-    /// for it, plus every aliased step occurrence surfacing it.
-    producers: HashMap<NodeKindId, Vec<Producer>>,
+    /// Kind → realizers that may surface that tree kind: the variable named for it,
+    /// plus every aliased step occurrence surfacing it.
+    realizers_by_kind: HashMap<NodeKindId, Vec<NodeRealizer>>,
     /// Supertype kind → sorted transitive concrete members. Built once so hot
     /// matcher checks do not allocate a subtype closure per candidate child.
     supertype_members: HashMap<NodeKindId, Vec<NodeKindId>>,
@@ -123,8 +123,11 @@ impl<'a> Frozen<'a> {
             .expect("a VarId from the grammar structure always resolves")
     }
 
-    fn producers_of(&self, kind: NodeKindId) -> &[Producer] {
-        self.producers.get(&kind).map(Vec::as_slice).unwrap_or(&[])
+    fn realizers_of(&self, kind: NodeKindId) -> &[NodeRealizer] {
+        self.realizers_by_kind
+            .get(&kind)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
     }
 
     /// Classify a step for threading. A supertype is erased in the tree — tree-sitter
@@ -141,7 +144,7 @@ impl<'a> Frozen<'a> {
             (Some(kind), _) => StepClass::Visible {
                 kind,
                 field: step.field,
-                producer: Producer::of_step(step),
+                realizer: NodeRealizer::of_step(step),
             },
             (None, Some(var)) => StepClass::HiddenSubtree(var),
             (None, None) => StepClass::HiddenLeaf,
@@ -183,7 +186,7 @@ impl<'a> Frozen<'a> {
     /// these takes those children — a token can never be a parent, so it is excluded.
     fn parent_candidate_kinds(&self) -> Vec<NodeKindId> {
         let mut candidates: Vec<NodeKindId> = self
-            .producers
+            .realizers_by_kind
             .keys()
             .copied()
             .filter(|&k| {
@@ -219,8 +222,8 @@ impl<'a> Frozen<'a> {
     fn edge_child_kinds(&self, kind: NodeKindId, edge: Edge) -> Vec<NodeKindId> {
         let mut out = Vec::new();
         let mut visited = HashSet::new();
-        for &producer in self.producers_of(kind) {
-            if let Producer::Var(var) = producer {
+        for &realizer in self.realizers_of(kind) {
+            if let NodeRealizer::Var(var) = realizer {
                 self.edge_kinds_of_var(var, edge, &mut out, &mut visited);
             }
         }
@@ -340,14 +343,14 @@ impl<'a> SatisfiabilitySolver<'a> {
         step_budget: u64,
     ) -> Self {
         let (extras, named_extras) = extra_kinds(ctx.grammar);
-        let producers = build_producers(ctx.grammar);
-        let supertype_members = build_supertype_members(ctx.grammar, &producers);
+        let realizers_by_kind = build_realizers_by_kind(ctx.grammar);
+        let supertype_members = build_supertype_members(ctx.grammar, &realizers_by_kind);
         Self {
             frozen: Frozen {
                 ctx,
                 automata: Vec::new(),
                 table: automaton::PatternTable::default(),
-                producers,
+                realizers_by_kind,
                 supertype_members,
                 extras,
                 named_extras,
@@ -373,13 +376,13 @@ impl<'a> SatisfiabilitySolver<'a> {
         let p = self.frozen.table.intern(node.clone());
         self.build_pending();
 
-        let producers = self.frozen.producers_of(kind).to_vec();
-        if producers.is_empty() {
-            // No producer of this kind — we cannot reason about it, so accept.
+        let realizers = self.frozen.realizers_of(kind).to_vec();
+        if realizers.is_empty() {
+            // No realizer of this kind — we cannot reason about it, so accept.
             return true;
         }
-        for &producer in &producers {
-            self.solve.seed(Key::Sat((p, producer)));
+        for &realizer in &realizers {
+            self.solve.seed(Key::Sat((p, realizer)));
         }
         self.run();
         // A solve that ran out of budget left its memo partly converged; its `false`s
@@ -387,9 +390,9 @@ impl<'a> SatisfiabilitySolver<'a> {
         if self.solve.exhausted {
             return true;
         }
-        producers
+        realizers
             .iter()
-            .any(|&producer| self.solve.sat_value((p, producer)))
+            .any(|&realizer| self.solve.sat_value((p, realizer)))
     }
 
     /// Whether some named node the grammar builds can have `node`'s children — the
@@ -549,7 +552,7 @@ impl Solve {
         changed
     }
 
-    fn compute_sat(&mut self, frozen: &Frozen, (p, producer): SatKey) -> bool {
+    fn compute_sat(&mut self, frozen: &Frozen, (p, realizer): SatKey) -> bool {
         let automaton = frozen.automaton(p);
         // A construction that bailed on a resource ceiling left a half-built automaton; its
         // verdicts are not sound, so accept and let the pass reject the query as too complex.
@@ -558,13 +561,13 @@ impl Solve {
         }
         let start = StateSet::singleton(automaton.start());
         let accept = automaton.accept();
-        match producer {
+        match realizer {
             // A token has no children, not even extras: it realizes `p` only if `p`
             // accepts the empty child sequence.
-            Producer::Leaf => eps_closure(automaton, &start).contains(accept),
+            NodeRealizer::Leaf => eps_closure(automaton, &start).contains(accept),
             // Some production of the variable threads `A_p` from start to accept. These
             // are the node's own children, so no field is inherited from above.
-            Producer::Var(v) => {
+            NodeRealizer::Var(v) => {
                 let production_count = frozen.variable(v).productions.len();
                 (0..production_count).any(|i| {
                     let production = &frozen.variable(v).productions[i];
@@ -633,7 +636,7 @@ impl Solve {
             StepClass::Visible {
                 kind,
                 field,
-                producer,
+                realizer,
             } => {
                 let effective = field.or(inherited);
                 // The query asserts this field absent (`-field`); a production binding it
@@ -655,7 +658,7 @@ impl Solve {
                     for (matcher, to) in automaton.pattern_edges(q) {
                         if frozen.kind_ok(matcher.kind, kind)
                             && field_ok(matcher.field, effective)
-                            && self.child_sat(frozen, matcher, producer)
+                            && self.child_sat(frozen, matcher, realizer)
                         {
                             next.insert(*to);
                         }
@@ -680,12 +683,17 @@ impl Solve {
         }
     }
 
-    /// Whether the matched child's own structure is realized by `producer` — trivially
+    /// Whether the matched child's own structure is realized by `realizer` — trivially
     /// true when the child is childless.
-    fn child_sat(&mut self, _frozen: &Frozen, matcher: &ChildMatcher, producer: Producer) -> bool {
+    fn child_sat(
+        &mut self,
+        _frozen: &Frozen,
+        matcher: &ChildMatcher,
+        realizer: NodeRealizer,
+    ) -> bool {
         match matcher.child {
             None => true,
-            Some(child) => self.get_sat((child, producer)),
+            Some(child) => self.get_sat((child, realizer)),
         }
     }
 
@@ -754,10 +762,10 @@ impl Solve {
         };
         frozen.extras_admitted_by(matcher.kind).any(|extra| {
             frozen
-                .producers_of(extra)
+                .realizers_of(extra)
                 .iter()
                 .copied()
-                .any(|producer| self.get_sat((child, producer)))
+                .any(|realizer| self.get_sat((child, realizer)))
         })
     }
 }
@@ -797,37 +805,37 @@ fn eps_closure(automaton: &ChildAutomaton, set: &StateSet) -> StateSet {
     result
 }
 
-/// Index every kind to the producers that can build it: the variable named for the
+/// Index every kind to the realizers that can realize it: the variable named for the
 /// kind, and every step occurrence that surfaces it (aliases included).
-fn build_producers(grammar: &Grammar) -> HashMap<NodeKindId, Vec<Producer>> {
-    let mut producers: HashMap<NodeKindId, Vec<Producer>> = HashMap::new();
-    let push = |map: &mut HashMap<NodeKindId, Vec<Producer>>, kind, producer| {
+fn build_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<NodeRealizer>> {
+    let mut realizers_by_kind: HashMap<NodeKindId, Vec<NodeRealizer>> = HashMap::new();
+    let push = |map: &mut HashMap<NodeKindId, Vec<NodeRealizer>>, kind, realizer| {
         let entry = map.entry(kind).or_default();
-        if !entry.contains(&producer) {
-            entry.push(producer);
+        if !entry.contains(&realizer) {
+            entry.push(realizer);
         }
     };
     for (var_id, variable) in grammar.structure().iter() {
         if let Some(kind) = variable.id {
-            push(&mut producers, kind, Producer::Var(var_id));
+            push(&mut realizers_by_kind, kind, NodeRealizer::Var(var_id));
         }
         for production in &variable.productions {
             for step in production {
                 if let Some(kind) = step.target.id {
-                    push(&mut producers, kind, Producer::of_step(step));
+                    push(&mut realizers_by_kind, kind, NodeRealizer::of_step(step));
                 }
             }
         }
     }
-    producers
+    realizers_by_kind
 }
 
 fn build_supertype_members(
     grammar: &Grammar,
-    producers: &HashMap<NodeKindId, Vec<Producer>>,
+    realizers_by_kind: &HashMap<NodeKindId, Vec<NodeRealizer>>,
 ) -> HashMap<NodeKindId, Vec<NodeKindId>> {
     let mut members = HashMap::new();
-    for &kind in producers.keys() {
+    for &kind in realizers_by_kind.keys() {
         if !grammar.is_supertype(kind) {
             continue;
         }
