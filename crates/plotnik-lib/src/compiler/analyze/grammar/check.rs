@@ -307,6 +307,12 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     /// `adm`. The parent is already known to be a non-leaf here.
     fn admissible_child(&self, child: NodeKindId, adm: &HashSet<NodeKindId>) -> bool {
         adm.contains(&child)
+            // Tolerated over-acceptance: an extra (a comment) is admitted under *any*
+            // parent, even a lexically sealed node like `string` that never holds one, so
+            // `(string (comment))` slips through. Proving a position sealed is a lexer-level
+            // question (token longest-match/precedence), not the `IMMEDIATE_TOKEN` fact it
+            // resembles — closing delimiters are non-immediate in nearly every grammar — and
+            // our metadata-only model can't answer it. Sound: this only widens admissibility.
             || self.grammar.is_extra(child)
             || (self.grammar.is_supertype(child)
                 && self

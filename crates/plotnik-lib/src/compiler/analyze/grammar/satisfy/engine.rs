@@ -699,6 +699,12 @@ impl Solve {
         result
     }
 
+    /// Whether a query child matching an extra kind may advance the automaton without a
+    /// production step — the satisfiability mirror of `check.rs`'s extras rescue, and the
+    /// same tolerated over-acceptance: an extra is consumable in *any* gap, including
+    /// lexically sealed nodes (`(string (comment))`). Proving a gap sealed needs lexer-level
+    /// longest-match reasoning our model lacks (not the `IMMEDIATE_TOKEN` fact it looks
+    /// like), so we admit and stay sound — extra consumption only grows the reachable set.
     fn can_consume_extra(&mut self, frozen: &Frozen, matcher: &ChildMatcher) -> bool {
         // Extras are inserted unfielded, so a `field:` matcher can never be one — letting
         // it "consume" an extra here would skip its field constraint.
