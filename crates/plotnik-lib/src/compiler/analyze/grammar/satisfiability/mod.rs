@@ -44,6 +44,7 @@ use crate::compiler::parse::cst::SyntaxKind;
 use crate::core::NodeKindId;
 use crate::core::grammar::Grammar;
 
+use super::participation::Participation;
 use automaton::AutomatonContext;
 use engine::SatisfiabilitySolver;
 
@@ -83,14 +84,14 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
     };
 
     // Each definition body must be matchable in its own right — the structural check's
-    // stance — so it is walked at the `Required` mode. References are not followed: a node
+    // stance — so it is walked as `Required`. References are not followed: a node
     // used as a whole child is judged by the engine in context, and a referenced
     // definition is walked when the loop reaches its own entry.
     for (&source, root) in input.ast_map {
         for def in root.defs() {
             if let Some(body) = def.body() {
                 let located = Located::new(source, body);
-                reporter.walk(&located, Mode::Required);
+                reporter.walk(&located, Participation::Required);
                 // A resource ceiling tripped mid-construction: the verdicts that follow
                 // would rest on an automaton we declined to finish, so stop and reject
                 // the whole query as too complex rather than report anything dubious.
@@ -106,22 +107,23 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
 /// Walks definition bodies reporting impossible patterns: a concrete-kind node at a
 /// required position the grammar can never build, and — when *no* branch of a required
 /// alternation can match — each of those branches with its own reason. Holds the solver
-/// and the diagnostic sink, so the recursion threads only the position and its mode.
+/// and the diagnostic sink, so the recursion threads only the position and its
+/// participation.
 struct Reporter<'a, 'q> {
     solver: &'a mut SatisfiabilitySolver<'q>,
     diag: &'a mut Diagnostics,
 }
 
 impl Reporter<'_, '_> {
-    /// Report what is impossible under `located` at `mode`. The descent crosses the
-    /// always-present wrappers, lowers into the disjunctive ones (alternation branch,
-    /// `?`/`*` body) as `Deferred` since a failure there is excused, and stops at each
-    /// node pattern, whose interior the engine judges whole.
-    fn walk(&mut self, located: &Located<Pattern>, mode: Mode) {
+    /// Report what is impossible under `located` at `participation`. The descent
+    /// crosses always-present wrappers, lowers into disjunctive branches and `?`/`*`
+    /// bodies as `Deferred`, and stops at each node pattern, whose interior the
+    /// engine judges whole.
+    fn walk(&mut self, located: &Located<Pattern>, participation: Participation) {
         match located.node() {
             Pattern::NodePattern(node) => {
                 let node = located.wrap(node.clone());
-                if !mode.is_required() {
+                if !participation.is_required() {
                     return;
                 }
                 if let Some(kind) = root_kind(self.solver.context(), &node) {
@@ -137,39 +139,39 @@ impl Reporter<'_, '_> {
                 // A branch failing is normally excused by its siblings; but when every
                 // branch is impossible the alternation is too, so promote them — each is
                 // then reported with the reason it cannot match.
-                let dead = mode.is_required()
+                let dead = participation.is_required()
                     && !branches.is_empty()
                     && branches
                         .iter()
                         .all(|branch| self.impossible(&located.wrap(branch.clone())));
-                let branch_mode = if dead { Mode::Required } else { Mode::Deferred };
+                let branch_participation = if dead {
+                    Participation::Required
+                } else {
+                    participation.inside_disjunction_branch()
+                };
                 for branch in &branches {
-                    self.walk(&located.wrap(branch.clone()), branch_mode);
+                    self.walk(&located.wrap(branch.clone()), branch_participation);
                 }
             }
             Pattern::CapturedPattern(cap) => {
                 if let Some(inner) = cap.inner() {
-                    self.walk(&located.wrap(inner), mode);
+                    self.walk(&located.wrap(inner), participation);
                 }
             }
             Pattern::FieldPattern(field) => {
                 if let Some(value) = field.value() {
-                    self.walk(&located.wrap(value), mode);
+                    self.walk(&located.wrap(value), participation);
                 }
             }
             Pattern::SeqPattern(seq) => {
                 for child in seq.children() {
-                    self.walk(&located.wrap(child), mode);
+                    self.walk(&located.wrap(child), participation);
                 }
             }
             Pattern::QuantifiedPattern(q) => {
                 if let Some(inner) = q.inner() {
-                    let inner_mode = if q.is_optional() {
-                        Mode::Deferred
-                    } else {
-                        mode
-                    };
-                    self.walk(&located.wrap(inner), inner_mode);
+                    let inner_participation = participation.inside_quantifier_body(q);
+                    self.walk(&located.wrap(inner), inner_participation);
                 }
             }
             // A token always matches; a reference is walked at its own definition.
@@ -224,22 +226,6 @@ struct Goal {
     kind: NodeKindId,
 }
 
-/// Whether a position must participate in every match. A position turns `Deferred`
-/// once the walk descends into an alternation branch or a `?`/`*` body — there a
-/// failure is excused, so reporting it would reject a query that can match. A `+`
-/// body keeps the mode: it must match at least once.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Mode {
-    Required,
-    Deferred,
-}
-
-impl Mode {
-    fn is_required(self) -> bool {
-        matches!(self, Mode::Required)
-    }
-}
-
 /// Collect the concrete-kind node patterns at `Required` positions reachable from
 /// `located` without crossing into another node's child list. The walk descends
 /// through the always-present wrappers (capture, field, sequence) and the
@@ -247,13 +233,13 @@ impl Mode {
 /// stops at each node pattern — its subtree is judged whole by the engine.
 fn collect_goals(
     located: &Located<Pattern>,
-    mode: Mode,
+    participation: Participation,
     ctx: AutomatonContext<'_>,
     out: &mut Vec<Goal>,
 ) {
     match located.node() {
         Pattern::NodePattern(node) => {
-            if !mode.is_required() {
+            if !participation.is_required() {
                 return;
             }
             let located_node = located.wrap(node.clone());
@@ -268,32 +254,32 @@ fn collect_goals(
         Pattern::TokenPattern(_) => {}
         Pattern::CapturedPattern(cap) => {
             if let Some(inner) = cap.inner() {
-                collect_goals(&located.wrap(inner), mode, ctx, out);
+                collect_goals(&located.wrap(inner), participation, ctx, out);
             }
         }
         Pattern::FieldPattern(field) => {
             if let Some(value) = field.value() {
-                collect_goals(&located.wrap(value), mode, ctx, out);
+                collect_goals(&located.wrap(value), participation, ctx, out);
             }
         }
         Pattern::SeqPattern(seq) => {
             for child in seq.children() {
-                collect_goals(&located.wrap(child), mode, ctx, out);
+                collect_goals(&located.wrap(child), participation, ctx, out);
             }
         }
         Pattern::QuantifiedPattern(q) => {
             let Some(inner) = q.inner() else { return };
-            // `?`/`*` admit zero matches, so the body need not hold; `+` needs it once.
-            let inner_mode = if q.is_optional() {
-                Mode::Deferred
-            } else {
-                mode
-            };
-            collect_goals(&located.wrap(inner), inner_mode, ctx, out);
+            let inner_participation = participation.inside_quantifier_body(q);
+            collect_goals(&located.wrap(inner), inner_participation, ctx, out);
         }
         Pattern::Union(_) | Pattern::Enum(_) => {
             for branch in located.node().children() {
-                collect_goals(&located.wrap(branch), Mode::Deferred, ctx, out);
+                collect_goals(
+                    &located.wrap(branch),
+                    participation.inside_disjunction_branch(),
+                    ctx,
+                    out,
+                );
             }
         }
         // A reference's target is walked when the loop reaches its own definition.

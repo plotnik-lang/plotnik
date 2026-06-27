@@ -10,10 +10,11 @@ use crate::core::{NodeFieldId, NodeKind, NodeKindId};
 
 use super::diagnostics::format_list;
 use super::link::GrammarLinker;
+use super::participation::Participation;
 
 impl<'a, 'q> GrammarLinker<'a, 'q> {
-    /// Walk the query, validating each node's own grammar constraints. See `AdmissibilityMode` for why
-    /// `Deferred` positions skip their checks.
+    /// Walk the query, validating each node's own grammar constraints. See
+    /// [`Participation`] for why deferred positions skip their checks.
     ///
     /// The `Located` carries the source of the pattern being walked, so a reference
     /// into another workspace file is validated against the target's own source.
@@ -21,7 +22,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         &mut self,
         located: &Located<Pattern>,
         ctx: Option<ParentNode>,
-        mode: AdmissibilityMode,
+        participation: Participation,
         walk: &mut AdmissibilityWalkState,
     ) {
         match located.node() {
@@ -36,7 +37,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
                 // Predicates are only valid on leaf nodes. Skipped under a disjunction/option,
                 // where this position need not match for the query to.
-                if mode.is_required()
+                if participation.is_required()
                     && let Some(pred) = node.predicate()
                     && let Some(ctx) = &child_ctx
                     && (!self.grammar.valid_child_types(ctx.id()).is_empty()
@@ -55,16 +56,21 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 for child in node.children() {
                     if let Pattern::FieldPattern(f) = &child {
                         let located_field = located.wrap(f.clone());
-                        self.validate_field_pattern(&located_field, child_ctx.as_ref(), mode, walk);
+                        self.validate_field_pattern(
+                            &located_field,
+                            child_ctx.as_ref(),
+                            participation,
+                            walk,
+                        );
                     } else {
                         let child_located = located.wrap(child);
-                        if mode.is_required()
+                        if participation.is_required()
                             && let (Some(ctx), Some(adm)) =
                                 (child_ctx.as_ref(), admissible.as_ref())
                         {
                             self.check_bare_child(&child_located, ctx, adm);
                         }
-                        self.check_pattern_grammar(&child_located, child_ctx, mode, walk);
+                        self.check_pattern_grammar(&child_located, child_ctx, participation, walk);
                     }
                 }
 
@@ -72,7 +78,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                     for child in node.syntax().children() {
                         if let Some(neg) = ast::NegatedField::cast(child) {
                             let located_neg = located.wrap(neg);
-                            self.validate_negated_field(&located_neg, &ctx, mode);
+                            self.validate_negated_field(&located_neg, &ctx, participation);
                         }
                     }
                 }
@@ -82,7 +88,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 // Normally handled by the parent NodePattern; reached only on a bare field
                 // at root or inside a seq without a named-node parent.
                 let located_field = located.wrap(f.clone());
-                self.validate_field_pattern(&located_field, ctx.as_ref(), mode, walk);
+                self.validate_field_pattern(&located_field, ctx.as_ref(), participation, walk);
             }
             Pattern::Union(_) | Pattern::Enum(_) => {
                 // A branch is disjunctive — none is guaranteed to match, so defer its contents.
@@ -91,7 +97,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                     self.check_pattern_grammar(
                         &body_located,
                         ctx,
-                        AdmissibilityMode::Deferred,
+                        participation.inside_disjunction_branch(),
                         walk,
                     );
                 }
@@ -99,38 +105,30 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             Pattern::SeqPattern(seq) => {
                 for child in seq.children() {
                     let child_located = located.wrap(child);
-                    self.check_pattern_grammar(&child_located, ctx, mode, walk);
+                    self.check_pattern_grammar(&child_located, ctx, participation, walk);
                 }
             }
             Pattern::CapturedPattern(cap) => {
                 let Some(inner) = cap.inner() else { return };
                 let inner_located = located.wrap(inner);
-                self.check_pattern_grammar(&inner_located, ctx, mode, walk);
+                self.check_pattern_grammar(&inner_located, ctx, participation, walk);
             }
             Pattern::QuantifiedPattern(q) => {
                 let Some(inner) = q.inner() else { return };
-                // `?`/`*` admit zero matches, so the body need not hold — defer it. `+`
-                // requires the body at least once, so it keeps the current mode: an
-                // impossible `+` body makes the whole `+` impossible.
-                // Mirrors the satisfiability walk.
-                let inner_mode = if q.is_optional() {
-                    AdmissibilityMode::Deferred
-                } else {
-                    mode
-                };
+                let inner_participation = participation.inside_quantifier_body(q);
                 let inner_located = located.wrap(inner);
-                self.check_pattern_grammar(&inner_located, ctx, inner_mode, walk);
+                self.check_pattern_grammar(&inner_located, ctx, inner_participation, walk);
             }
             Pattern::DefRef(r) => {
                 let Some(name_token) = r.name() else { return };
                 let name = name_token.text();
-                // Validation is a pure function of `(name, ctx, mode)`, so caching it
+                // Validation is a pure function of `(name, ctx, participation)`, so caching it
                 // collapses diamond-shaped reference graphs that would otherwise be re-walked
-                // 2^depth times. `mode` is part of the key: a definition reached both inside
-                // and outside an alternation/quantifier must still be checked in its immediate
-                // context even after the deferred reach cached it. Cut cycles are never cached:
-                // they return below without reaching the `validated.insert`.
-                let key = (name.to_string(), ctx, mode);
+                // 2^depth times. `participation` is part of the key: a definition reached
+                // both inside and outside an alternation/quantifier must still be checked in
+                // its immediate context even after the deferred reach cached it. Cut cycles
+                // are never cached: they return below without reaching the `validated.insert`.
+                let key = (name.to_string(), ctx, participation);
                 if walk.validated.contains(&key) {
                     return;
                 }
@@ -144,7 +142,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 // The referenced definition may live in another workspace file; the
                 // target carries its own source, so its body is validated against the
                 // right content.
-                self.check_pattern_grammar(&target, ctx, mode, walk);
+                self.check_pattern_grammar(&target, ctx, participation, walk);
                 walk.in_progress.remove(name);
                 walk.validated.insert(key);
             }
@@ -176,7 +174,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         &mut self,
         located: &Located<ast::FieldPattern>,
         ctx: Option<&ParentNode>,
-        mode: AdmissibilityMode,
+        participation: Participation,
         walk: &mut AdmissibilityWalkState,
     ) {
         let field = located.node();
@@ -196,7 +194,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         if !self.grammar.has_field(ctx.id(), field_id) {
             // A field absent from this kind can never match here, but a sibling branch or zero
             // repetitions can — so skip when deferred.
-            if mode.is_required() {
+            if participation.is_required() {
                 self.emit_field_not_on_node(
                     located.span_of(name_token.text_range()),
                     name_token.text(),
@@ -216,17 +214,17 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         let value_located = located.wrap(value);
         // The field value's kind must be admissible for this field. Skipped under a
         // disjunction/option, where the field constraint need not hold for the query to match.
-        if mode.is_required() {
+        if participation.is_required() {
             self.check_field_value(&value_located, ctx, &field_ref);
         }
-        self.check_pattern_grammar(&value_located, Some(*ctx), mode, walk);
+        self.check_pattern_grammar(&value_located, Some(*ctx), participation, walk);
     }
 
     fn validate_negated_field(
         &mut self,
         located: &Located<ast::NegatedField>,
         ctx: &ParentNode,
-        mode: AdmissibilityMode,
+        participation: Participation,
     ) {
         let neg = located.node();
         let Some(name_token) = neg.name() else {
@@ -239,7 +237,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         };
 
         if !self.grammar.has_field(ctx.id(), field_id) {
-            if mode.is_required() {
+            if participation.is_required() {
                 self.emit_field_not_on_node(
                     located.span_of(name_token.text_range()),
                     field_name,
@@ -251,7 +249,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         // A required field is present in every production, so asserting its absence can never
         // match. Skipped under a disjunction/option, where the negation need not hold.
-        if !mode.is_required() {
+        if !participation.is_required() {
             return;
         }
 
@@ -596,23 +594,6 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     }
 }
 
-/// Whether structural checks must fire at this position. Set to `Deferred` once the
-/// walk descends into an alternation branch or a quantified body: inside those, nothing is
-/// guaranteed to participate in a match (a sibling branch or zero repetitions can satisfy the
-/// query), so the grammar checks must NOT fire there — doing so would reject queries that can
-/// match. Skipping a check can only miss a rejection, never reject a valid query.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) enum AdmissibilityMode {
-    Required,
-    Deferred,
-}
-
-impl AdmissibilityMode {
-    fn is_required(self) -> bool {
-        matches!(self, AdmissibilityMode::Required)
-    }
-}
-
 pub(super) struct FieldRef<'a> {
     pub(super) id: NodeFieldId,
     pub(super) name: &'a str,
@@ -649,7 +630,7 @@ pub(super) struct AdmissibilityWalkState {
     /// Definitions currently on the recursion stack — guards against cycles.
     in_progress: HashSet<String>,
     /// Definitions already validated under a given context. A definition's
-    /// validation depends only on `(name, ctx, mode)`, so caching it keeps shared
+    /// validation depends only on `(name, ctx, participation)`, so caching it keeps shared
     /// references (e.g. diamond graphs) from being re-walked exponentially.
-    validated: HashSet<(String, Option<ParentNode>, AdmissibilityMode)>,
+    validated: HashSet<(String, Option<ParentNode>, Participation)>,
 }

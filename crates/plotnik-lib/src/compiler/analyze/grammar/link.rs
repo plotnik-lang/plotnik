@@ -11,7 +11,8 @@ use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId};
 use indexmap::IndexMap;
 
 use super::binding::GrammarBindingBuilder;
-use super::check::{AdmissibilityMode, AdmissibilityWalkState};
+use super::check::AdmissibilityWalkState;
+use super::participation::Participation;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::report::Diagnostics;
@@ -98,7 +99,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             let Some(body) = def.body() else { continue };
             let located = Located::new(source, body);
             let mut walk = AdmissibilityWalkState::default();
-            self.check_pattern_grammar(&located, None, AdmissibilityMode::Required, &mut walk);
+            self.check_pattern_grammar(&located, None, Participation::Required, &mut walk);
         }
     }
 }

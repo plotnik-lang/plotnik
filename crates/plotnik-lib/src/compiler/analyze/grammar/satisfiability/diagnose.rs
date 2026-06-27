@@ -24,7 +24,7 @@ use crate::core::{NodeFieldId, NodeKindId};
 
 use super::automaton::AutomatonContext;
 use super::engine::SatisfiabilitySolver;
-use super::{Mode, collect_goals, root_kind};
+use super::{Participation, collect_goals, root_kind};
 
 /// Emit the impossibility diagnostic for a failed root goal.
 pub(super) fn report(
@@ -170,7 +170,12 @@ fn locate(
     let ctx = solver.context();
     let mut children = Vec::new();
     for child in node.node().children() {
-        collect_goals(&node.wrap(child), Mode::Required, ctx, &mut children);
+        collect_goals(
+            &node.wrap(child),
+            Participation::Required,
+            ctx,
+            &mut children,
+        );
     }
 
     for child in children {

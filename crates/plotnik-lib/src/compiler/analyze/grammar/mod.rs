@@ -6,6 +6,7 @@ pub mod binding;
 mod check;
 mod diagnostics;
 pub mod link;
+mod participation;
 mod resolve;
 mod satisfiability;
 mod utils;
