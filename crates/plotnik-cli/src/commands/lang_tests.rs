@@ -1,7 +1,23 @@
+#[cfg(any(
+    feature = "lang-devicetree",
+    feature = "lang-json",
+    feature = "lang-ocaml",
+    feature = "lang-rust"
+))]
 use plotnik_lib::grammar::DumpOptions;
 
-use crate::language_registry::{self, Lang};
+#[cfg(any(
+    feature = "lang-devicetree",
+    feature = "lang-javascript",
+    feature = "lang-json",
+    feature = "lang-ocaml",
+    feature = "lang-rust"
+))]
+use crate::language_registry;
+#[cfg(feature = "lang-javascript")]
+use crate::language_registry::Lang;
 
+#[cfg(feature = "lang-javascript")]
 fn smoke_test(lang: &Lang, source: &str, expected_root: &str) {
     let tree = lang.parse_source(source);
     let root = tree.root_node();

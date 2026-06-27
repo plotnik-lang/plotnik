@@ -324,7 +324,10 @@ fn format_id(id: Option<u16>) -> String {
 #[test]
 fn abi_compat_all_languages() {
     let langs = language_registry::all();
-    assert!(!langs.is_empty(), "no languages registered");
+    if langs.is_empty() {
+        assert!(!cfg!(feature = "all-languages"), "no languages registered");
+        return;
+    }
 
     for lang in langs {
         let result = compare_lang(lang);
@@ -354,6 +357,14 @@ fn abi_compat_all_languages() {
 /// Asserting against the real tree is stronger than comparing the two grammar views, since the
 /// parser is the ground truth for what can appear.
 #[test]
+#[cfg(any(
+    feature = "lang-lua",
+    feature = "lang-go",
+    feature = "lang-java",
+    feature = "lang-rust",
+    feature = "lang-python",
+    feature = "lang-typescript"
+))]
 fn grammar_admits_every_field_and_child_in_real_trees() {
     const SNIPPETS: &[(&str, &str)] = &[
         ("lua", "local function f() end\nlocal x = 1\n"),
@@ -402,6 +413,14 @@ fn grammar_admits_every_field_and_child_in_real_trees() {
 /// a fielded child against its field, a bare named child against its parent. Mirrors the
 /// admissibility the linker applies (`check.rs`), expanding each declared supertype to its
 /// concrete members via `collect_subtypes` before comparing.
+#[cfg(any(
+    feature = "lang-lua",
+    feature = "lang-go",
+    feature = "lang-java",
+    feature = "lang-rust",
+    feature = "lang-python",
+    feature = "lang-typescript"
+))]
 fn check_real_tree_admissibility(
     grammar: &plotnik_lib::grammar::Grammar,
     node: arborium_tree_sitter::Node<'_>,
@@ -476,6 +495,7 @@ fn check_real_tree_admissibility(
 /// - java: `field_declaration.type` is the kept supertype `_unannotated_type`, which reaches
 ///   `integral_type` only through an inlined sub-supertype (the `collect_subtypes` splice).
 #[test]
+#[cfg(any(feature = "lang-lua", feature = "lang-go", feature = "lang-java"))]
 fn admits_field_values_reached_through_supertypes() {
     let cases = [
         ("lua", "chunk", "local_declaration", "function_declaration"),
@@ -484,9 +504,12 @@ fn admits_field_values_reached_through_supertypes() {
         ("go", "var_spec", "type", "map_type"),
         ("java", "field_declaration", "type", "integral_type"),
     ];
+    let mut checked = 0usize;
     for (lang_name, parent, field, value) in cases {
-        let lang =
-            from_name(lang_name).unwrap_or_else(|| panic!("{lang_name} must be compiled in"));
+        let Some(lang) = from_name(lang_name) else {
+            continue;
+        };
+        checked += 1;
         let grammar = lang.grammar();
         let parent_id = grammar
             .resolve_named_node(parent)
@@ -512,4 +535,8 @@ fn admits_field_values_reached_through_supertypes() {
             "{lang_name}: `{parent}.{field}` must admit `{value}`"
         );
     }
+    assert!(
+        checked > 0,
+        "regression checked nothing — no bug languages compiled in?"
+    );
 }
