@@ -407,13 +407,16 @@ impl Grammar {
         self.admissibility.has_field(node_kind_id, node_field_id)
     }
 
+    /// Cardinality when the field came from the node-shape summary. Fields recovered
+    /// only through structural reachability are still admissible, but their exact
+    /// cardinality is unknown.
     pub fn field_cardinality(
         &self,
         node_kind_id: NodeKindId,
         node_field_id: NodeFieldId,
     ) -> Option<Cardinality> {
-        self.field_constraints(node_kind_id, node_field_id)
-            .map(|field| field.cardinality)
+        self.admissibility
+            .field_cardinality(node_kind_id, node_field_id)
     }
 
     pub fn valid_field_types(
@@ -446,16 +449,6 @@ impl Grammar {
 
     pub fn is_valid_child_type(&self, node_kind_id: NodeKindId, child: NodeKindId) -> bool {
         self.valid_child_types(node_kind_id).contains(&child)
-    }
-
-    fn field_constraints(
-        &self,
-        node_kind_id: NodeKindId,
-        field_id: NodeFieldId,
-    ) -> Option<&FieldConstraints> {
-        self.node_constraints_for(node_kind_id)
-            .fields
-            .get(&field_id)
     }
 
     fn children_constraints(&self, node_kind_id: NodeKindId) -> Option<&ChildrenConstraints> {
@@ -529,11 +522,19 @@ impl KindSet {
 #[derive(Debug, Clone)]
 struct AdmissibilityIndex {
     children: HashMap<NodeKindId, Vec<NodeKindId>>,
-    fields: HashMap<(NodeKindId, NodeFieldId), Vec<NodeKindId>>,
+    fields: HashMap<(NodeKindId, NodeFieldId), AdmissibleField>,
     /// Per-node field-name index backing [`Grammar::fields_for_node_kind`],
     /// pre-grouped so the lookup is O(fields-on-node) rather than a scan of every
     /// `(node, field)` key.
     fields_by_node: HashMap<NodeKindId, Vec<String>>,
+}
+
+#[derive(Debug, Clone)]
+struct AdmissibleField {
+    valid_types: Vec<NodeKindId>,
+    /// Summary-derived cardinality, or `None` when the field exists only because
+    /// structural reachability recovered it.
+    cardinality: Option<Cardinality>,
 }
 
 impl AdmissibilityIndex {
@@ -552,7 +553,13 @@ impl AdmissibilityIndex {
 
             let mut node_fields = Vec::new();
             for (&field, field_constraints) in &constraints.fields {
-                fields.insert((node, field), field_constraints.valid_types.clone());
+                fields.insert(
+                    (node, field),
+                    AdmissibleField {
+                        valid_types: field_constraints.valid_types.clone(),
+                        cardinality: Some(field_constraints.cardinality),
+                    },
+                );
                 if let Some(name) = field_names.get(&field) {
                     node_fields.push(name.clone());
                 }
@@ -596,8 +603,18 @@ impl AdmissibilityIndex {
     ) -> &[NodeKindId] {
         self.fields
             .get(&(node_kind_id, node_field_id))
-            .map(Vec::as_slice)
+            .map(|field| field.valid_types.as_slice())
             .unwrap_or(&[])
+    }
+
+    fn field_cardinality(
+        &self,
+        node_kind_id: NodeKindId,
+        node_field_id: NodeFieldId,
+    ) -> Option<Cardinality> {
+        self.fields
+            .get(&(node_kind_id, node_field_id))
+            .and_then(|field| field.cardinality)
     }
 
     fn valid_child_types(&self, node_kind_id: NodeKindId) -> &[NodeKindId] {
@@ -713,7 +730,7 @@ fn variable_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<VarI
 /// admissibility (a tolerated false accept), never rejects a valid query.
 struct Reachability {
     children: HashMap<NodeKindId, Vec<NodeKindId>>,
-    fields: HashMap<(NodeKindId, NodeFieldId), Vec<NodeKindId>>,
+    fields: HashMap<(NodeKindId, NodeFieldId), AdmissibleField>,
     /// The `fields` keys grouped by node into a name-sorted per-node index, so
     /// [`Grammar::fields_for_node_kind`] is a single map lookup rather than a scan of every key.
     fields_by_node: HashMap<NodeKindId, Vec<String>>,
@@ -739,7 +756,13 @@ impl Reachability {
 struct ReachabilityBuilder<'g> {
     grammar: &'g Grammar,
     children: HashMap<NodeKindId, KindSet>,
-    fields: HashMap<(NodeKindId, NodeFieldId), KindSet>,
+    fields: HashMap<(NodeKindId, NodeFieldId), FieldReachability>,
+}
+
+#[derive(Default)]
+struct FieldReachability {
+    types: KindSet,
+    cardinality: Option<Cardinality>,
 }
 
 impl ReachabilityBuilder<'_> {
@@ -754,9 +777,10 @@ impl ReachabilityBuilder<'_> {
                 }
             }
             for (&field, field_constraints) in &constraints.fields {
-                let set = self.fields.entry((node, field)).or_default();
+                let reachable = self.fields.entry((node, field)).or_default();
+                reachable.cardinality = Some(field_constraints.cardinality);
                 for &id in &field_constraints.valid_types {
-                    set.insert(id);
+                    reachable.types.insert(id);
                 }
             }
         }
@@ -769,10 +793,18 @@ impl ReachabilityBuilder<'_> {
             .into_iter()
             .map(|(kind, set)| (kind, set.into_sorted(grammar)))
             .collect();
-        let fields: HashMap<(NodeKindId, NodeFieldId), Vec<NodeKindId>> = self
+        let fields: HashMap<(NodeKindId, NodeFieldId), AdmissibleField> = self
             .fields
             .into_iter()
-            .map(|(key, set)| (key, set.into_sorted(grammar)))
+            .map(|(key, field)| {
+                (
+                    key,
+                    AdmissibleField {
+                        valid_types: field.types.into_sorted(grammar),
+                        cardinality: field.cardinality,
+                    },
+                )
+            })
             .collect();
         let mut fields_by_node: HashMap<NodeKindId, Vec<String>> = HashMap::new();
         for &(node, field) in fields.keys() {
@@ -860,7 +892,7 @@ impl ReachabilityBuilder<'_> {
     /// transparent: descend it to the concrete kinds it stands for. Anonymous kinds are kept
     /// — a field value may be a literal token (`operator: "+"`).
     fn collect_field_value(&mut self, node: NodeKindId, field: NodeFieldId, target: StepTarget) {
-        let value = self.fields.entry((node, field)).or_default();
+        let value = &mut self.fields.entry((node, field)).or_default().types;
         match (target.id, target.body) {
             (Some(id), _) => value.insert(id),
             (None, Some(body)) => {
