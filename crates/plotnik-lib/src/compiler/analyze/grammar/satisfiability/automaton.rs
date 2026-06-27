@@ -147,6 +147,16 @@ pub(super) struct ChildAutomaton {
 }
 
 impl ChildAutomaton {
+    fn too_complex(negated_fields: Vec<NodeFieldId>) -> Self {
+        Self {
+            states: vec![StateData::new(GapClass::Any)],
+            start: 0,
+            accept: 0,
+            negated_fields,
+            too_complex: true,
+        }
+    }
+
     pub(super) fn start(&self) -> State {
         self.start
     }
@@ -267,28 +277,18 @@ pub(super) fn build<'a>(
     automaton_max_depth: u32,
     state_budget: u64,
 ) -> ChildAutomaton {
+    let negated_fields = negated_fields(node, ctx);
     if state_budget == 0 {
-        return ChildAutomaton {
-            states: vec![StateData::new(GapClass::Any)],
-            start: 0,
-            accept: 0,
-            negated_fields: negated_fields(node, ctx),
-            too_complex: true,
-        };
+        return ChildAutomaton::too_complex(negated_fields);
     }
 
-    let mut builder = Builder {
+    let mut builder = Builder::new(
         ctx,
         table,
         anchor_semantics,
-        states: Vec::new(),
         state_budget,
-        states_built: 0,
-        too_complex: false,
-        ref_stack: Vec::new(),
-        max_depth: automaton_max_depth,
-        depth: 0,
-    };
+        automaton_max_depth,
+    );
     let start = builder.new_state(GapClass::Any);
     let items = ItemList::node_children(node.node());
     let accept = builder.emit_items(&items, Descent::root(node.source()), start);
@@ -305,20 +305,7 @@ pub(super) fn build<'a>(
     };
     builder.states[accept as usize].gap = trailing_gap;
 
-    let mut states = builder.states;
-    let too_complex = builder.too_complex;
-    if anchor_mode.relaxes() {
-        for state in &mut states {
-            state.gap = GapClass::Any;
-        }
-    }
-    ChildAutomaton {
-        states,
-        start,
-        accept,
-        negated_fields: negated_fields(node, ctx),
-        too_complex,
-    }
+    builder.finish(start, accept, negated_fields, anchor_mode)
 }
 
 /// The fields a node pattern asserts absent through `-field` items, resolved to ids.
@@ -439,7 +426,50 @@ impl Descent {
 /// the heap, and both reject rather than spend unboundedly.
 const STATE_CAP: usize = 20_000;
 
-impl Builder<'_, '_> {
+impl<'a, 'b> Builder<'a, 'b> {
+    fn new(
+        ctx: AutomatonContext<'a>,
+        table: &'b mut PatternTable,
+        anchor_semantics: &'b AnchorSemantics<'a>,
+        state_budget: u64,
+        max_depth: u32,
+    ) -> Self {
+        Self {
+            ctx,
+            table,
+            anchor_semantics,
+            states: Vec::new(),
+            state_budget,
+            states_built: 0,
+            too_complex: false,
+            ref_stack: Vec::new(),
+            max_depth,
+            depth: 0,
+        }
+    }
+
+    fn finish(
+        self,
+        start: State,
+        accept: State,
+        negated_fields: Vec<NodeFieldId>,
+        anchor_mode: AnchorMode,
+    ) -> ChildAutomaton {
+        let mut states = self.states;
+        if anchor_mode.relaxes() {
+            for state in &mut states {
+                state.gap = GapClass::Any;
+            }
+        }
+        ChildAutomaton {
+            states,
+            start,
+            accept,
+            negated_fields,
+            too_complex: self.too_complex,
+        }
+    }
+
     fn new_state(&mut self, gap: GapClass) -> State {
         if self.too_complex
             || self.states.len() >= STATE_CAP
