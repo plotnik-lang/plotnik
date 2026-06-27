@@ -264,13 +264,26 @@ pub(super) fn build(
     table: &mut PatternTable,
     anchor_mode: AnchorMode,
     max_depth: u32,
+    state_budget: u64,
 ) -> ChildAutomaton {
+    if state_budget == 0 {
+        return ChildAutomaton {
+            states: vec![StateData::new(GapClass::Any)],
+            start: 0,
+            accept: 0,
+            negated_fields: negated_fields(node, ctx),
+            too_complex: true,
+        };
+    }
+
     let anchor_semantics = AnchorSemantics::new(ctx.symbol_table);
     let mut builder = Builder {
         ctx,
         table,
         anchor_semantics: &anchor_semantics,
         states: Vec::new(),
+        state_budget,
+        states_built: 0,
         too_complex: false,
         ref_stack: Vec::new(),
         max_depth,
@@ -328,6 +341,10 @@ struct Builder<'a, 'b> {
     table: &'b mut PatternTable,
     anchor_semantics: &'b AnchorSemantics<'a>,
     states: Vec<StateData>,
+    /// Remaining query budget this automaton may spend on state allocation.
+    state_budget: u64,
+    /// State allocations charged so far while building this automaton.
+    states_built: u64,
     /// Set when a resource ceiling (state cap or recursion depth) is hit — the query is
     /// rejected as too complex, not accepted. Construction short-circuits once it is set.
     too_complex: bool,
@@ -426,14 +443,28 @@ const STATE_CAP: usize = 20_000;
 
 impl Builder<'_, '_> {
     fn new_state(&mut self, gap: GapClass) -> State {
-        if self.states.len() >= STATE_CAP {
+        if self.too_complex
+            || self.states.len() >= STATE_CAP
+            || self.states_built >= self.state_budget
+        {
             // Stop growing the automaton: record that we bailed on a resource ceiling so the
             // query is rejected as too complex rather than judged on a half-built automaton.
             self.too_complex = true;
+            return self.last_state();
         }
         let id = self.states.len() as State;
         self.states.push(StateData::new(gap));
+        self.states_built += 1;
         id
+    }
+
+    fn last_state(&self) -> State {
+        let last = self
+            .states
+            .len()
+            .checked_sub(1)
+            .expect("automaton construction always allocates the start state before bailing");
+        last as State
     }
 
     /// Thread a flat item list (a node's children, or an inlined sequence) onto the

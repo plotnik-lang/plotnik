@@ -287,8 +287,8 @@ fn deeply_referenced_alternation_compiles_in_linear_time() {
 
 #[test]
 fn satisfiability_step_budget_rejects_and_is_tunable() {
-    // A wide child list drives the satisfiability solve's quadratic fixed point. Under a
-    // deliberately tiny budget it trips and the query is rejected as too complex; under
+    // A wide child list drives satisfiability construction and the solve's quadratic fixed point.
+    // Under a deliberately tiny budget it trips and the query is rejected as too complex; under
     // the default it compiles — so the knob fails closed yet stays out of the way.
     let mut src = String::from("Q = (program");
     for i in 0..60 {
@@ -322,6 +322,27 @@ fn satisfiability_step_budget_rejects_and_is_tunable() {
         relaxed.is_valid(),
         "the default budget must admit it:\n{}",
         relaxed.dump_diagnostics(),
+    );
+}
+
+#[test]
+fn satisfiability_budget_counts_automaton_construction() {
+    let linked = QueryBuilder::new(SourceMap::from_inline(
+        "Q = (program (expression_statement))",
+    ))
+    .with_satisfiability_step_budget(1)
+    .analyze()
+    .unwrap()
+    .link(javascript());
+
+    assert!(!linked.is_valid());
+    assert!(
+        linked
+            .diagnostics()
+            .kinds()
+            .any(|kind| kind == DiagnosticKind::QueryTooComplex),
+        "expected QueryTooComplex:\n{}",
+        linked.dump_diagnostics(),
     );
 }
 

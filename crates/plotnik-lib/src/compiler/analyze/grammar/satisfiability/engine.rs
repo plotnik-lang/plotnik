@@ -352,12 +352,13 @@ impl ExtraCandidates<'_> {
     }
 }
 
-/// Default ceiling on solve work before the query is declared too complex. Charged in
-/// the two quadratic inner loops (`closure` and a `Visible` `thread_step`) for state
-/// visits and pattern-edge scans, so it caps the dominant cost. The widest real
-/// fixture settles in a few thousand steps, leaving roughly three orders of magnitude
-/// of headroom, while a child list past about a thousand wide trips it in a fraction
-/// of a second rather than running for tens. Tunable per query via
+/// Default ceiling on satisfiability work before the query is declared too complex.
+/// Charged for automaton state allocation and in the two quadratic solve loops
+/// (`closure` and a `Visible` `thread_step`) for state visits and pattern-edge scans,
+/// so it caps the dominant costs. The widest real fixture settles in a few thousand
+/// steps, leaving roughly three orders of magnitude of headroom, while a child list
+/// past about a thousand wide trips it in a fraction of a second rather than running
+/// for tens. Tunable per query via
 /// [`QueryBuilder::with_satisfiability_step_budget`](crate::QueryBuilder::with_satisfiability_step_budget)
 /// for the rare case that legitimately needs a wider one.
 pub const DEFAULT_SATISFIABILITY_STEP_BUDGET: u64 = 2_000_000;
@@ -489,6 +490,12 @@ impl<'a> SatisfiabilitySolver<'a> {
     /// patterns), so the solve phase reads a frozen automaton set.
     fn build_pending(&mut self) {
         while self.frozen.automata.len() < self.frozen.table.len() {
+            let remaining_budget = self.solve.remaining_budget();
+            if remaining_budget == 0 {
+                self.solve.exhausted = true;
+                break;
+            }
+
             let index = self.frozen.automata.len();
             let node = self.frozen.table.node_at(index).clone();
             let automaton = automaton::build(
@@ -497,7 +504,9 @@ impl<'a> SatisfiabilitySolver<'a> {
                 &mut self.frozen.table,
                 self.frozen.anchor_mode,
                 self.frozen.max_depth,
+                remaining_budget,
             );
+            self.solve.spend(automaton.state_count() as u64);
             self.frozen.automata.push(automaton);
         }
     }
@@ -546,6 +555,13 @@ impl Solve {
     fn absorb_probe_budget(&mut self, probe: &Self) {
         self.steps = self.steps.saturating_add(probe.steps);
         if probe.exhausted || self.steps > self.budget {
+            self.exhausted = true;
+        }
+    }
+
+    fn spend(&mut self, steps: u64) {
+        self.steps = self.steps.saturating_add(steps);
+        if self.steps > self.budget {
             self.exhausted = true;
         }
     }
