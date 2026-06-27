@@ -49,8 +49,9 @@ pub(super) enum KindConstraint {
     AnyNamed,
     /// `_` — any node, named or anonymous.
     AnyNode,
-    /// A kind the checker could not pin (unresolved literal, `ERROR`/`MISSING`).
-    /// It never narrows: matching anything keeps rejection sound.
+    /// A syntax form the checker intentionally does not pin (`ERROR`/`MISSING`, or
+    /// parser recovery without a token). It never narrows: matching anything keeps
+    /// rejection sound.
     Unconstrained,
 }
 
@@ -283,8 +284,12 @@ fn negated_fields(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -> Vec
         .syntax()
         .children()
         .filter_map(ast::NegatedField::cast)
-        .filter_map(|neg| neg.name())
-        .filter_map(|name| ctx.grammar.resolve_field(name.text()))
+        .map(|neg| {
+            let name = neg
+                .name()
+                .expect("admitted negated field must have a field name");
+            checked_field(ctx, name.text())
+        })
         .collect()
 }
 
@@ -336,12 +341,11 @@ impl Descent {
         }
     }
 
-    /// Enter a `field: …`. The innermost label wins, so an absent or unresolved inner
-    /// field leaves the inherited one in force.
-    fn under(self, field: Option<NodeFieldId>) -> Self {
-        match field {
-            Some(_) => Self { field, ..self },
-            None => self,
+    /// Enter a `field: …`. The innermost label wins.
+    fn under_field(self, field: NodeFieldId) -> Self {
+        Self {
+            field: Some(field),
+            ..self
         }
     }
 
@@ -451,15 +455,13 @@ impl Builder<'_, '_> {
                 let matcher = self.token_matcher(token, descent);
                 self.emit_single(matcher, from)
             }
-            Pattern::FieldPattern(field_pattern) => {
-                let field = field_pattern
-                    .name()
-                    .and_then(|name| self.ctx.grammar.resolve_field(name.text()));
-                match field_pattern.value() {
-                    Some(value) => self.emit_pattern(&value, descent.under(field), from),
-                    None => from,
+            Pattern::FieldPattern(field_pattern) => match field_pattern.value() {
+                Some(value) => {
+                    let field = self.field_id(field_pattern);
+                    self.emit_pattern(&value, descent.under_field(field), from)
                 }
-            }
+                None => from,
+            },
             Pattern::QuantifiedPattern(q) => self.emit_quantifier(q, descent, from),
             Pattern::Union(_) | Pattern::Enum(_) => self.emit_alternation(pattern, descent, from),
             // A sequence is several siblings, never a single field value (the grammar
@@ -562,9 +564,11 @@ impl Builder<'_, '_> {
                 .push((any_sibling, from));
             return from;
         }
-        let Some(target) = self.ctx.symbol_table.located_definition(name) else {
-            return self.emit_single(unconstrained_matcher(descent.field), from);
-        };
+        let target = self
+            .ctx
+            .symbol_table
+            .located_definition(name)
+            .expect("admitted definition reference must resolve");
         let descent = descent.into_ref(target.source());
 
         // A reference to a single node is an atomic child: one matcher whose body is
@@ -608,6 +612,13 @@ impl Builder<'_, '_> {
         }
     }
 
+    fn field_id(&self, field_pattern: &ast::FieldPattern) -> NodeFieldId {
+        let name = field_pattern
+            .name()
+            .expect("admitted field pattern must have a field name");
+        checked_field(self.ctx, name.text())
+    }
+
     fn node_kind(&self, node: &NodePattern, source: SourceId) -> KindConstraint {
         if node.is_any() {
             return KindConstraint::AnyNamed;
@@ -624,11 +635,7 @@ impl Builder<'_, '_> {
             return KindConstraint::Unconstrained;
         }
         let text = token_src(&type_token, self.ctx.content(source));
-        match self.ctx.grammar.resolve_named_node(text) {
-            Some(id) => KindConstraint::Exact(id),
-            // The resolution pass already reported the unknown kind; accept here.
-            None => KindConstraint::Unconstrained,
-        }
+        KindConstraint::Exact(checked_named_node(self.ctx, text))
     }
 
     fn token_kind(&self, token: &TokenPattern, source: SourceId) -> KindConstraint {
@@ -639,11 +646,26 @@ impl Builder<'_, '_> {
             return KindConstraint::Unconstrained;
         };
         let text = token_src(&value_token, self.ctx.content(source));
-        match self.ctx.grammar.resolve_anonymous_node(text) {
-            Some(id) => KindConstraint::Exact(id),
-            None => KindConstraint::Unconstrained,
-        }
+        KindConstraint::Exact(checked_anonymous_node(self.ctx, text))
     }
+}
+
+fn checked_field(ctx: AutomatonContext<'_>, name: &str) -> NodeFieldId {
+    ctx.grammar
+        .resolve_field(name)
+        .expect("admitted field name must resolve")
+}
+
+fn checked_named_node(ctx: AutomatonContext<'_>, name: &str) -> NodeKindId {
+    ctx.grammar
+        .resolve_named_node(name)
+        .expect("admitted named node kind must resolve")
+}
+
+fn checked_anonymous_node(ctx: AutomatonContext<'_>, text: &str) -> NodeKindId {
+    ctx.grammar
+        .resolve_anonymous_node(text)
+        .expect("admitted anonymous token kind must resolve")
 }
 
 fn unconstrained_matcher(field: Option<NodeFieldId>) -> ChildMatcher {
