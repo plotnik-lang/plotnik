@@ -759,8 +759,7 @@ impl Solve {
                 if automaton.negates(effective) {
                     return StateSet::default();
                 }
-                let anonymous = thread.frozen.ctx.grammar.is_anonymous_node(kind);
-                let extra = thread.frozen.ctx.grammar.is_extra(kind);
+                let node_class = thread.frozen.ctx.grammar.node_class(kind);
                 let mut next = StateSet::default();
                 for q in current.iter() {
                     if !self.charge() {
@@ -768,7 +767,7 @@ impl Solve {
                     }
                     // The state's *effective* gap (tightest erasure path that reaches it),
                     // so a strict anchor erased into this position still forbids the skip.
-                    if thread.gaps[q as usize].admits(anonymous, extra) {
+                    if thread.gaps[q as usize].admits(node_class) {
                         next.insert(q);
                     }
                     for (matcher, to) in automaton.pattern_edges(q) {

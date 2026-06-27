@@ -1,4 +1,5 @@
 use crate::bytecode::Nav;
+use crate::core::NodeClass;
 
 use super::anchors::GapClass;
 
@@ -6,29 +7,29 @@ use super::anchors::GapClass;
 fn admits_mirrors_vm_skip_policy() {
     // (anonymous, extra) axes are independent; the four kinds of node are
     // named-structural, anonymous-token, named-extra, anonymous-extra.
-    let named = (false, false);
-    let anon = (true, false);
-    let named_extra = (false, true);
-    let anon_extra = (true, true);
+    let named = NodeClass::from_grammar(false, false);
+    let anon = NodeClass::from_grammar(true, false);
+    let named_extra = NodeClass::from_grammar(false, true);
+    let anon_extra = NodeClass::from_grammar(true, true);
 
     // Any skips everything, even a named structural sibling.
-    assert!(GapClass::Any.admits(named.0, named.1));
-    assert!(GapClass::Any.admits(anon.0, anon.1));
+    assert!(GapClass::Any.admits(named));
+    assert!(GapClass::Any.admits(anon));
 
     // Broad skip = the VM's `is_trivia` = anonymous || extra.
-    assert!(!GapClass::AnonymousAndExtras.admits(named.0, named.1));
-    assert!(GapClass::AnonymousAndExtras.admits(anon.0, anon.1));
-    assert!(GapClass::AnonymousAndExtras.admits(named_extra.0, named_extra.1));
-    assert!(GapClass::AnonymousAndExtras.admits(anon_extra.0, anon_extra.1));
+    assert!(!GapClass::AnonymousAndExtras.admits(named));
+    assert!(GapClass::AnonymousAndExtras.admits(anon));
+    assert!(GapClass::AnonymousAndExtras.admits(named_extra));
+    assert!(GapClass::AnonymousAndExtras.admits(anon_extra));
 
     // Narrow skip = extras only.
-    assert!(!GapClass::ExtrasOnly.admits(named.0, named.1));
-    assert!(!GapClass::ExtrasOnly.admits(anon.0, anon.1));
-    assert!(GapClass::ExtrasOnly.admits(named_extra.0, named_extra.1));
+    assert!(!GapClass::ExtrasOnly.admits(named));
+    assert!(!GapClass::ExtrasOnly.admits(anon));
+    assert!(GapClass::ExtrasOnly.admits(named_extra));
 
     // Strict admits nothing.
-    assert!(!GapClass::Nothing.admits(anon.0, anon.1));
-    assert!(!GapClass::Nothing.admits(named_extra.0, named_extra.1));
+    assert!(!GapClass::Nothing.admits(anon));
+    assert!(!GapClass::Nothing.admits(named_extra));
 }
 
 #[test]

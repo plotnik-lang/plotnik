@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
+use crate::core::{Cardinality, NodeClass, NodeFieldId, NodeKind, NodeKindId};
 
 use super::admissibility::{AdmissibilityIndex, KindSet, Reachability};
 use super::json::GrammarError;
@@ -404,6 +404,13 @@ impl Grammar {
 
     pub fn is_extra(&self, node_kind_id: NodeKindId) -> bool {
         self.extra_node_kinds.contains(&node_kind_id)
+    }
+
+    pub(crate) fn node_class(&self, node_kind_id: NodeKindId) -> NodeClass {
+        NodeClass::from_grammar(
+            self.is_anonymous_node(node_kind_id),
+            self.is_extra(node_kind_id),
+        )
     }
 
     /// The visible extra kinds (comments and the like) the parser may insert between

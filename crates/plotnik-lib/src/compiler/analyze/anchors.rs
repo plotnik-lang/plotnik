@@ -6,8 +6,7 @@
 //! the reverse). So the nav computation lives here, in `analyze`, where both may
 //! depend on it, and codegen re-exports it rather than forking it. [`GapClass`]
 //! projects those navs onto the skip classes the checker reasons over; its
-//! `admits` truth table mirrors the VM's skip policy (`vm/engine/cursor.rs`) by
-//! construction.
+//! `admits` method delegates to the same core skip class the VM uses.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -15,6 +14,7 @@ use std::collections::{HashMap, HashSet};
 use crate::bytecode::Nav;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::parse::ast::{DefRef, Pattern, SeqItem};
+use crate::core::{NodeClass, SkipClass};
 
 /// What a gap between two query patterns may skip over, projected from the same
 /// [`Nav`] codegen emits so the checker and the VM cannot drift.
@@ -37,16 +37,18 @@ pub enum GapClass {
 }
 
 impl GapClass {
-    /// Whether a node carrying these class bits may be skipped across this gap.
-    /// This is the VM's skip policy, by construction (`cursor.rs`'s `is_trivia` is
-    /// `anonymous || extra`, `SkipExtras` is `extra`).
-    pub fn admits(self, anonymous: bool, extra: bool) -> bool {
+    pub(crate) fn skip_class(self) -> SkipClass {
         match self {
-            Self::Any => true,
-            Self::AnonymousAndExtras => anonymous || extra,
-            Self::ExtrasOnly => extra,
-            Self::Nothing => false,
+            Self::Any => SkipClass::Any,
+            Self::AnonymousAndExtras => SkipClass::Trivia,
+            Self::ExtrasOnly => SkipClass::Extras,
+            Self::Nothing => SkipClass::Exact,
         }
+    }
+
+    /// Whether a node may be skipped across this gap.
+    pub(crate) fn admits(self, node: NodeClass) -> bool {
+        self.skip_class().admits(node)
     }
 
     /// Rank by permissiveness. The classes nest — `Nothing ⊂ ExtrasOnly ⊂
