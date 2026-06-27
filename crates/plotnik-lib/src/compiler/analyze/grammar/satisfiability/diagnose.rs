@@ -26,13 +26,24 @@ use super::automaton::AutomatonContext;
 use super::engine::SatisfiabilitySolver;
 use super::{Participation, collect_goals, root_kind};
 
+pub(super) enum ReportOutcome {
+    Emitted,
+    TooComplex,
+}
+
+impl ReportOutcome {
+    pub(super) fn is_too_complex(&self) -> bool {
+        matches!(self, Self::TooComplex)
+    }
+}
+
 /// Emit the impossibility diagnostic for a failed root goal.
 pub(super) fn report(
     solver: &mut SatisfiabilitySolver,
     node: &Located<NodePattern>,
     kind: NodeKindId,
     diag: &mut Diagnostics,
-) {
+) -> ReportOutcome {
     let mut visited = HashSet::new();
     let culprit = locate(solver, node.clone(), kind, &mut visited);
 
@@ -41,7 +52,8 @@ pub(super) fn report(
     // A single-valued field bound more than once is the whole obstacle on its own —
     // a sharper thing to say than a vague "combination the grammar never produces".
     if let Some((field, count)) = repeated_single_field(ctx, &culprit) {
-        return emit_repeated_field_failure(ctx, &culprit, &field, count, diag);
+        emit_repeated_field_failure(ctx, &culprit, &field, count, diag);
+        return ReportOutcome::Emitted;
     }
 
     let anchor_probe = if has_anchor(culprit.node.node()) {
@@ -53,8 +65,12 @@ pub(super) fn report(
     match anchor_probe {
         AnchorProbe::Matches => emit_anchor_failure(solver, &culprit, diag),
         AnchorProbe::DoesNotMatch => emit_arrangement_failure(ctx, &culprit, diag),
-        AnchorProbe::TooComplex => report_node_too_complex(&culprit.node, diag),
+        AnchorProbe::TooComplex => {
+            report_node_too_complex(&culprit.node, diag);
+            return ReportOutcome::TooComplex;
+        }
     }
+    ReportOutcome::Emitted
 }
 
 /// Report an impossible wildcard parent `(_ …)`: no kind the grammar builds takes the

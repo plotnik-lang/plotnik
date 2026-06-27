@@ -329,7 +329,12 @@ fn satisfiability_step_budget_rejects_and_is_tunable() {
 #[test]
 fn relaxed_anchor_probe_budget_reports_too_complex() {
     let mut source_map = SourceMap::new();
-    source_map.add_file(SourcePath::new("q.ptk"), "Q = (array .! (identifier))");
+    source_map.add_file(
+        SourcePath::new("q.ptk"),
+        "Q0 = (array .! (identifier))\n\
+         Q1 = (array .! (identifier))\n\
+         Q2 = (array .! (identifier))",
+    );
 
     let linked = QueryBuilder::new(source_map)
         .with_satisfiability_step_budget(2)
@@ -341,6 +346,15 @@ fn relaxed_anchor_probe_budget_reports_too_complex() {
     assert!(
         kinds.contains(&DiagnosticKind::QueryTooComplex),
         "expected QueryTooComplex:\n{}",
+        linked.dump_diagnostics(),
+    );
+    assert_eq!(
+        kinds
+            .iter()
+            .filter(|&&kind| kind == DiagnosticKind::QueryTooComplex)
+            .count(),
+        1,
+        "diagnostic probe exhaustion must stop the pass:\n{}",
         linked.dump_diagnostics(),
     );
     assert!(

@@ -91,7 +91,9 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
         for def in root.defs() {
             if let Some(body) = def.body() {
                 let located = Located::new(source, body);
-                reporter.walk(&located, Participation::Required);
+                if reporter.walk(&located, Participation::Required) {
+                    return;
+                }
                 // A resource ceiling tripped mid-construction: the verdicts that follow
                 // would rest on an automaton we declined to finish, so stop and reject
                 // the whole query as too complex rather than report anything dubious.
@@ -119,20 +121,24 @@ impl Reporter<'_, '_> {
     /// crosses always-present wrappers, lowers into disjunctive branches and `?`/`*`
     /// bodies as `Deferred`, and stops at each node pattern, whose interior the
     /// engine judges whole.
-    fn walk(&mut self, located: &Located<Pattern>, participation: Participation) {
+    /// Returns `true` when diagnostic refinement already emitted `QueryTooComplex`;
+    /// callers must then stop rather than spending fresh probe budgets on later nodes.
+    fn walk(&mut self, located: &Located<Pattern>, participation: Participation) -> bool {
         match located.node() {
             Pattern::NodePattern(node) => {
                 let node = located.wrap(node.clone());
                 if !participation.is_required() {
-                    return;
+                    return false;
                 }
                 if let Some(kind) = root_kind(self.solver.context(), &node) {
                     if !self.solver.satisfiable(&node, kind) {
-                        diagnose::report(self.solver, &node, kind, self.diag);
+                        return diagnose::report(self.solver, &node, kind, self.diag)
+                            .is_too_complex();
                     }
                 } else if is_wildcard_parent(&node) && !self.solver.wildcard_satisfiable(&node) {
                     diagnose::report_wildcard(&node, self.diag);
                 }
+                false
             }
             Pattern::Union(_) | Pattern::Enum(_) => {
                 let branches: Vec<Pattern> = located.node().children().collect();
@@ -150,32 +156,41 @@ impl Reporter<'_, '_> {
                     participation.inside_disjunction_branch()
                 };
                 for branch in &branches {
-                    self.walk(&located.wrap(branch.clone()), branch_participation);
+                    if self.walk(&located.wrap(branch.clone()), branch_participation) {
+                        return true;
+                    }
                 }
+                false
             }
             Pattern::CapturedPattern(cap) => {
                 if let Some(inner) = cap.inner() {
-                    self.walk(&located.wrap(inner), participation);
+                    return self.walk(&located.wrap(inner), participation);
                 }
+                false
             }
             Pattern::FieldPattern(field) => {
                 if let Some(value) = field.value() {
-                    self.walk(&located.wrap(value), participation);
+                    return self.walk(&located.wrap(value), participation);
                 }
+                false
             }
             Pattern::SeqPattern(seq) => {
                 for child in seq.children() {
-                    self.walk(&located.wrap(child), participation);
+                    if self.walk(&located.wrap(child), participation) {
+                        return true;
+                    }
                 }
+                false
             }
             Pattern::QuantifiedPattern(q) => {
                 if let Some(inner) = q.inner() {
                     let inner_participation = participation.inside_quantifier_body(q);
-                    self.walk(&located.wrap(inner), inner_participation);
+                    return self.walk(&located.wrap(inner), inner_participation);
                 }
+                false
             }
             // A token always matches; a reference is walked at its own definition.
-            Pattern::TokenPattern(_) | Pattern::DefRef(_) => {}
+            Pattern::TokenPattern(_) | Pattern::DefRef(_) => false,
         }
     }
 
