@@ -57,9 +57,9 @@ impl NodeRealizer {
 
 /// How a production step participates in threading.
 enum StepClass {
-    /// A real child surfacing under `kind`, built by `realizer`, bound to `field` when
-    /// the grammar labels it. A label on this step overrides any pushed down from a
-    /// hidden ancestor (the innermost label is the one the runtime attaches).
+    /// A real child surfacing under `kind`, realized by `realizer`, bound to `field`
+    /// when the grammar labels it. A label on this step overrides any pushed down
+    /// from a hidden ancestor (the innermost label is the one the runtime attaches).
     Visible {
         kind: NodeKindId,
         field: Option<NodeFieldId>,
@@ -190,7 +190,7 @@ impl<'a> Frozen<'a> {
     }
 
     /// The concrete named kinds a wildcard parent could be: every named, non-supertype
-    /// kind the grammar can build. A wildcard with children is satisfiable iff one of
+    /// kind the grammar can surface. A wildcard with children is satisfiable iff one of
     /// these takes those children — a token can never be a parent, so it is excluded.
     fn parent_candidate_kinds(&self) -> &[NodeKindId] {
         &self.parent_candidate_kinds
@@ -365,7 +365,7 @@ impl<'a> SatisfiabilitySolver<'a> {
         }
     }
 
-    /// Whether the grammar can build a node of `kind` whose children realize `node`.
+    /// Whether some realizer of grammar kind `kind` can realize `node`'s child structure.
     /// Errs toward `true` (accept) whenever the question cannot be decided, so a
     /// rejection is always sound.
     pub(super) fn satisfiable(&mut self, node: &Located<NodePattern>, kind: NodeKindId) -> bool {
@@ -396,7 +396,7 @@ impl<'a> SatisfiabilitySolver<'a> {
             .any(|&realizer| self.solve.sat_value((p, realizer)))
     }
 
-    /// Whether some named node the grammar builds can have `node`'s children — the
+    /// Whether some named kind the grammar surfaces can have `node`'s children — the
     /// satisfiability question for a wildcard parent `(_ …)`, which fixes no kind of its
     /// own. Accept on the first candidate that works; only an impossible wildcard pays
     /// for ruling every candidate out, and only a wildcard *with* a child list reaches
