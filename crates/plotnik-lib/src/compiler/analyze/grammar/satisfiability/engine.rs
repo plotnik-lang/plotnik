@@ -377,12 +377,13 @@ impl<'a> SatisfiabilitySolver<'a> {
         let p = self.frozen.table.intern(node.clone());
         self.build_pending();
 
-        let realizers = self.frozen.realizers_of(kind).to_vec();
-        if realizers.is_empty() {
+        let realizer_count = self.frozen.realizers_of(kind).len();
+        if realizer_count == 0 {
             // No realizer of this kind — we cannot reason about it, so accept.
             return true;
         }
-        for &realizer in &realizers {
+        for index in 0..realizer_count {
+            let realizer = self.frozen.realizers_of(kind)[index];
             self.solve.seed(Key::Sat((p, realizer)));
         }
         self.run();
@@ -391,9 +392,13 @@ impl<'a> SatisfiabilitySolver<'a> {
         if self.solve.exhausted {
             return true;
         }
-        realizers
-            .iter()
-            .any(|&realizer| self.solve.sat_value((p, realizer)))
+        for index in 0..realizer_count {
+            let realizer = self.frozen.realizers_of(kind)[index];
+            if self.solve.sat_value((p, realizer)) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Whether some named kind the grammar surfaces can have `node`'s children — the
