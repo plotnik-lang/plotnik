@@ -24,9 +24,6 @@ use crate::compiler::parse::ast::{DefRef, Pattern, SeqItem};
 /// comment, say). The two are independent — a named comment is `(false, true)`, an
 /// anonymous brace `(true, false)`. A broad skip clears `anonymous || extra` (the
 /// VM's `is_trivia`); a narrow skip clears only `extra`.
-// The grammar satisfiability checker (`analyze/grammar/satisfy`) is the
-// consumer; it lands on top of this shared truth, so the type is dead until then.
-#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GapClass {
     /// No anchor: any node may sit in the gap (the VM's `SkipPolicy::Any`).
@@ -39,7 +36,6 @@ pub enum GapClass {
     Nothing,
 }
 
-#[allow(dead_code)]
 impl GapClass {
     /// Whether a node carrying these class bits may be skipped across this gap.
     /// This is the VM's skip policy, by construction (`cursor.rs`'s `is_trivia` is

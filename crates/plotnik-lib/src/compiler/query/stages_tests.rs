@@ -327,6 +327,30 @@ fn satisfy_step_budget_rejects_and_is_tunable() {
 }
 
 #[test]
+fn relaxed_anchor_probe_budget_reports_too_complex() {
+    let mut source_map = SourceMap::new();
+    source_map.add_file(SourcePath::new("q.ptk"), "Q = (array .! (identifier))");
+
+    let linked = QueryBuilder::new(source_map)
+        .with_satisfy_step_budget(2)
+        .analyze()
+        .unwrap()
+        .link(javascript());
+
+    let kinds: Vec<_> = linked.diagnostics().kinds().collect();
+    assert!(
+        kinds.contains(&DiagnosticKind::QueryTooComplex),
+        "expected QueryTooComplex:\n{}",
+        linked.dump_diagnostics(),
+    );
+    assert!(
+        !kinds.contains(&DiagnosticKind::UnsatisfiablePattern),
+        "resource exhaustion must not masquerade as unsatisfiable:\n{}",
+        linked.dump_diagnostics(),
+    );
+}
+
+#[test]
 fn multifile_field_with_ref_to_seq_error() {
     let res = expect_invalid! {
         "defs.ptk": "X = {(a) (b)}",

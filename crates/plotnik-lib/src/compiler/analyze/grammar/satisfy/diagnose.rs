@@ -44,13 +44,16 @@ pub(super) fn report(
         return emit_repeated_field_failure(ctx, &culprit, &field, count, diag);
     }
 
-    let anchors_to_blame =
-        has_anchor(culprit.node.node()) && relaxing_anchors_satisfies(satisfier, &culprit);
-
-    if anchors_to_blame {
-        emit_anchor_failure(satisfier, &culprit, diag);
+    let anchor_probe = if has_anchor(culprit.node.node()) {
+        relaxing_anchors(satisfier, &culprit)
     } else {
-        emit_arrangement_failure(ctx, &culprit, diag);
+        AnchorProbe::DoesNotMatch
+    };
+
+    match anchor_probe {
+        AnchorProbe::Matches => emit_anchor_failure(satisfier, &culprit, diag),
+        AnchorProbe::DoesNotMatch => emit_arrangement_failure(ctx, &culprit, diag),
+        AnchorProbe::TooComplex => report_node_too_complex(&culprit.node, diag),
     }
 }
 
@@ -74,6 +77,15 @@ pub(super) fn report_wildcard(node: &Located<NodePattern>, diag: &mut Diagnostic
 /// definition under analysis when the ceiling tripped.
 pub(super) fn report_too_complex(body: &Located<Pattern>, diag: &mut Diagnostics) {
     let span = Span::new(body.source(), body.node().syntax().text_range());
+    emit_too_complex(span, diag);
+}
+
+fn report_node_too_complex(node: &Located<NodePattern>, diag: &mut Diagnostics) {
+    let span = Span::new(node.source(), node.node().syntax().text_range());
+    emit_too_complex(span, diag);
+}
+
+fn emit_too_complex(span: Span, diag: &mut Diagnostics) {
     diag.report(DiagnosticKind::QueryTooComplex, span)
         .hint(
             "simplify the pattern — deeply nested or repeatedly-referenced alternations \
@@ -170,17 +182,26 @@ fn locate(
     Culprit { node, kind }
 }
 
+enum AnchorProbe {
+    Matches,
+    DoesNotMatch,
+    TooComplex,
+}
+
 /// Re-solve the culprit with every gap widened to "any node may intervene". A fresh
 /// satisfier keeps the relaxed automata out of the real run's memo. If this matches
 /// while the strict solve did not, the anchors are provably the only obstacle.
-fn relaxing_anchors_satisfies(satisfier: &Satisfier, culprit: &Culprit) -> bool {
-    let mut relaxed = Satisfier::new(
-        satisfier.context(),
-        true,
-        satisfier.max_depth(),
-        satisfier.step_budget(),
-    );
-    relaxed.satisfiable(&culprit.node, culprit.kind)
+fn relaxing_anchors(satisfier: &Satisfier, culprit: &Culprit) -> AnchorProbe {
+    let mut relaxed = satisfier.relaxing_anchors();
+    let matches = relaxed.satisfiable(&culprit.node, culprit.kind);
+    if relaxed.is_too_complex() {
+        return AnchorProbe::TooComplex;
+    }
+    if matches {
+        AnchorProbe::Matches
+    } else {
+        AnchorProbe::DoesNotMatch
+    }
 }
 
 fn emit_anchor_failure(satisfier: &Satisfier, culprit: &Culprit, diag: &mut Diagnostics) {

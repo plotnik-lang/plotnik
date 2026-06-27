@@ -75,7 +75,7 @@ pub(super) fn check(input: SatisfyInput<'_>, diag: &mut Diagnostics) {
         source_map: input.source_map,
     };
 
-    let mut satisfier = Satisfier::new(ctx, false, input.max_depth, input.satisfy_step_budget);
+    let mut satisfier = Satisfier::checking(ctx, input.max_depth, input.satisfy_step_budget);
     let mut reporter = Reporter {
         satisfier: &mut satisfier,
         diag,

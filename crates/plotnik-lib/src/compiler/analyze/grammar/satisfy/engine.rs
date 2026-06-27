@@ -29,7 +29,8 @@ use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
 
 use super::automaton::{
-    self, AutomatonContext, ChildAutomaton, ChildMatcher, KindConstraint, PatternId, State,
+    self, AnchorMode, AutomatonContext, ChildAutomaton, ChildMatcher, KindConstraint, PatternId,
+    State,
 };
 use super::state_set::StateSet;
 
@@ -99,7 +100,7 @@ struct Frozen<'a> {
     /// Visible extra kinds (comments), and the named subset, for extra-consumption.
     extras: Vec<NodeKindId>,
     named_extras: Vec<NodeKindId>,
-    relax: bool,
+    anchor_mode: AnchorMode,
     /// Structural-depth ceiling for automaton construction — the parser's `max_depth`.
     max_depth: u32,
 }
@@ -289,9 +290,22 @@ pub(super) struct Satisfier<'a> {
 }
 
 impl<'a> Satisfier<'a> {
-    pub(super) fn new(
+    pub(super) fn checking(ctx: AutomatonContext<'a>, max_depth: u32, step_budget: u64) -> Self {
+        Self::with_anchor_mode(ctx, AnchorMode::Enforce, max_depth, step_budget)
+    }
+
+    pub(super) fn relaxing_anchors(&self) -> Self {
+        Self::with_anchor_mode(
+            self.frozen.ctx,
+            AnchorMode::Relax,
+            self.frozen.max_depth,
+            self.solve.budget,
+        )
+    }
+
+    fn with_anchor_mode(
         ctx: AutomatonContext<'a>,
-        relax: bool,
+        anchor_mode: AnchorMode,
         max_depth: u32,
         step_budget: u64,
     ) -> Self {
@@ -304,7 +318,7 @@ impl<'a> Satisfier<'a> {
                 producers: build_producers(ctx.grammar),
                 extras,
                 named_extras,
-                relax,
+                anchor_mode,
                 max_depth,
             },
             solve: Solve {
@@ -365,7 +379,7 @@ impl<'a> Satisfier<'a> {
                 &node,
                 self.frozen.ctx,
                 &mut self.frozen.table,
-                self.frozen.relax,
+                self.frozen.anchor_mode,
                 self.frozen.max_depth,
             );
             self.frozen.automata.push(automaton);
@@ -387,18 +401,6 @@ impl<'a> Satisfier<'a> {
 
     pub(super) fn context(&self) -> AutomatonContext<'a> {
         self.frozen.ctx
-    }
-
-    /// The structural-depth ceiling threaded into construction — so a secondary probe
-    /// (the relaxed-anchor diagnostic) bounds its own build the same way.
-    pub(super) fn max_depth(&self) -> u32 {
-        self.frozen.max_depth
-    }
-
-    /// The solve's work ceiling — so a secondary probe (the relaxed-anchor diagnostic)
-    /// runs under the same budget as the primary solve.
-    pub(super) fn step_budget(&self) -> u64 {
-        self.solve.budget
     }
 
     /// Whether a resource ceiling tripped: an automaton bailed on construction (state

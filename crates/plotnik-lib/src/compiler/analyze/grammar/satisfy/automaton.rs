@@ -155,6 +155,35 @@ impl<'a> AutomatonContext<'a> {
     }
 }
 
+/// Whether construction should preserve query anchors or widen every gap for the
+/// diagnostic probe that asks "would this match without the anchors?"
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum AnchorMode {
+    Enforce,
+    Relax,
+}
+
+impl AnchorMode {
+    fn relaxes(self) -> bool {
+        matches!(self, Self::Relax)
+    }
+}
+
+/// The sibling context for anchor navigation. Boundary anchors only become `Down`
+/// navs inside a node's own child list; a spliced `{...}` sequence inherits its
+/// outer gap instead.
+#[derive(Clone, Copy)]
+enum NavContext {
+    NodeChildren,
+    SplicedSequence,
+}
+
+impl NavContext {
+    fn is_inside_node(self) -> bool {
+        matches!(self, Self::NodeChildren)
+    }
+}
+
 /// Interns query node patterns to [`PatternId`]s. Keyed by `(source, range)` so the
 /// same definition body interns once however many references reach it.
 #[derive(Default)]
@@ -185,13 +214,13 @@ impl PatternTable {
 }
 
 /// Builds `A_p` from a node pattern, interning child node patterns into `table`.
-/// `relax` widens every gap to [`GapClass::Any`] — the diagnostic probe uses it to
-/// ask whether the anchors alone are the obstacle.
+/// [`AnchorMode::Relax`] widens every gap to [`GapClass::Any`] so the diagnostic
+/// probe can ask whether anchors alone are the obstacle.
 pub(super) fn build(
     node: &Located<NodePattern>,
     ctx: AutomatonContext<'_>,
     table: &mut PatternTable,
-    relax: bool,
+    anchor_mode: AnchorMode,
     max_depth: u32,
 ) -> ChildAutomaton {
     let mut builder = Builder {
@@ -205,7 +234,13 @@ pub(super) fn build(
     };
     let start = builder.new_state(GapClass::Any);
     let items: Vec<SeqItem> = node.node().items().collect();
-    let accept = builder.emit_items(&items, Descent::root(node.source()), true, None, start);
+    let accept = builder.emit_items(
+        &items,
+        Descent::root(node.source()),
+        NavContext::NodeChildren,
+        None,
+        start,
+    );
 
     let (has_trailing, trailing_nav) = check_trailing_anchor(&items, ctx.symbol_table);
     let trailing_gap = if has_trailing {
@@ -219,7 +254,7 @@ pub(super) fn build(
 
     let mut states = builder.states;
     let too_complex = builder.too_complex;
-    if relax {
+    if anchor_mode.relaxes() {
         for state in &mut states {
             state.gap = GapClass::Any;
         }
@@ -346,11 +381,11 @@ impl Builder<'_, '_> {
         &mut self,
         items: &[SeqItem],
         descent: Descent,
-        inside_node: bool,
+        nav_context: NavContext,
         first_gap: Option<GapClass>,
         entry: State,
     ) -> State {
-        let navs = compute_nav_modes(items, inside_node, self.ctx.symbol_table);
+        let navs = compute_nav_modes(items, nav_context.is_inside_node(), self.ctx.symbol_table);
         let mut navs = navs.into_iter();
         let mut cur = entry;
         let mut first = true;
@@ -435,7 +470,13 @@ impl Builder<'_, '_> {
                 // thread it as the first child's gap so an enclosing anchor survives the
                 // `{…}` boundary instead of being recomputed away.
                 let first_gap = Some(self.states[from as usize].gap);
-                self.emit_items(&items, descent, false, first_gap, from)
+                self.emit_items(
+                    &items,
+                    descent,
+                    NavContext::SplicedSequence,
+                    first_gap,
+                    from,
+                )
             }
             Pattern::DefRef(def_ref) => self.emit_def_ref(def_ref, descent, from),
         }
