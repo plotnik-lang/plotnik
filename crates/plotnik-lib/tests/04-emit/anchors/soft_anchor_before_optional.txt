@@ -1,37 +1,9 @@
 Q = (array . ";"? (identifier) @id)
-==== bytecode ====
-[strings]
-S0 "Beauty will save the world"
-S1 "id"
-S2 "Q"
-S3 "array"
-S4 ";"
-S5 "identifier"
-
-[type_defs]
-T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-
-[type_members]
-M0: S1 → T0  ; id: <Node>
-
-[type_names]
-N0: S2 → T1  ; Q
-
-[entrypoints]
-Q = 06 :: T1
-
-[transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
-Q:
-  06   !   (array)                          13, 09
-  08                                        ▶
-  09  └◦─  (identifier) [Node Set(M0)]      14
-  11  ─‣─  (identifier) [Node Set(M0)]      14
-  13  └◦─  ";"                              11
-  14  ─‣┘  _                                08
+==== diagnostics ====
+error: after the soft anchor (`.`), no `array` places this child first; an `array` begins with `"["`
+ --> query.ptk:1:6
+  |
+1 | Q = (array . ";"? (identifier) @id)
+  |      ^^^^^
+  |
+help: `.` skips anonymous tokens and extras but never another named node; drop the anchor to match these children in any positions

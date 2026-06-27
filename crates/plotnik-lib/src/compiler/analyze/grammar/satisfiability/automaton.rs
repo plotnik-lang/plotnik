@@ -676,23 +676,25 @@ fn unconstrained_matcher(field: Option<NodeFieldId>) -> ChildMatcher {
     }
 }
 
-/// Widen a narrow skip to the broad one for any non-anonymous-token position. After
-/// an alternation the VM computes per-branch navs, so a named branch may skip an
-/// anonymous token the conservative whole-pattern nav would not; the checker reasons
-/// over all branches at once and so takes the most permissive gap. Strict (`Nothing`)
-/// is never widened — it is the user's adjacency demand.
+/// Widen a narrow skip to the broad one for direct alternation positions. The VM
+/// computes per-branch navs there, so a named branch may skip an anonymous token
+/// the conservative whole-pattern nav would not; the checker reasons over all
+/// branches at once and so takes the most permissive gap. Strict (`Nothing`) is
+/// never widened — it is the user's adjacency demand.
 fn satisfiability_gap(gap: GapClass, pattern: &Pattern) -> GapClass {
-    if gap == GapClass::ExtrasOnly && !is_plain_anonymous(pattern) {
+    if gap == GapClass::ExtrasOnly && has_direct_alt_branch_nav(pattern) {
         GapClass::AnonAndExtras
     } else {
         gap
     }
 }
 
-fn is_plain_anonymous(pattern: &Pattern) -> bool {
+fn has_direct_alt_branch_nav(pattern: &Pattern) -> bool {
     match pattern {
-        Pattern::TokenPattern(token) => !token.is_any(),
-        Pattern::CapturedPattern(cap) => cap.inner().as_ref().is_some_and(is_plain_anonymous),
+        Pattern::Union(_) | Pattern::Enum(_) => true,
+        Pattern::CapturedPattern(cap) => {
+            cap.inner().as_ref().is_some_and(has_direct_alt_branch_nav)
+        }
         _ => false,
     }
 }
