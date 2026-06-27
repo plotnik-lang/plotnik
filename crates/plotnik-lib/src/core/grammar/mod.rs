@@ -31,5 +31,6 @@ pub use prepared::VariableType;
 pub use render::{
     Body, DEFAULT_WIDTH, Def, DefKind, DumpOptions, NodeRef, Quant, Shape, TokenText, TreeGrammar,
 };
+pub(crate) use structure::SurfaceRealizer;
 pub use structure::{SkeletonStep, SkeletonVariable, StepTarget, StructureTable, VarId};
 pub use types::Grammar;

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::compiler::analyze::grammar::satisfiability::automaton::KindConstraint;
 use crate::core::NodeKindId;
-use crate::core::grammar::{Grammar, SkeletonStep, VarId};
+use crate::core::grammar::{Grammar, SkeletonStep, SurfaceRealizer, VarId};
 
 /// The grammar body that realizes a matched node's child structure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -16,10 +16,15 @@ impl NodeRealizer {
     /// token. Keying `SAT` by the step's own `body` — never "any variable realizing
     /// this kind" — is what makes nesting alias-correct.
     pub(super) fn of_step(step: &SkeletonStep) -> Self {
-        step.target
-            .body
-            .map(NodeRealizer::Var)
-            .unwrap_or(NodeRealizer::Leaf)
+        Self::of_body(step.target.body)
+    }
+
+    fn of_surface(surface: SurfaceRealizer) -> Self {
+        Self::of_body(surface.body)
+    }
+
+    fn of_body(body: Option<VarId>) -> Self {
+        body.map(NodeRealizer::Var).unwrap_or(NodeRealizer::Leaf)
     }
 }
 
@@ -114,15 +119,7 @@ fn build_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<NodeRea
         .surface_realizers_by_kind()
         .into_iter()
         .map(|(kind, surfaces)| {
-            let realizers = surfaces
-                .into_iter()
-                .map(|surface| {
-                    surface
-                        .body
-                        .map(NodeRealizer::Var)
-                        .unwrap_or(NodeRealizer::Leaf)
-                })
-                .collect();
+            let realizers = surfaces.into_iter().map(NodeRealizer::of_surface).collect();
             (kind, realizers)
         })
         .collect()
