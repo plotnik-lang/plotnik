@@ -105,6 +105,8 @@ struct Frozen<'a> {
     /// Kind → realizers that may surface that tree kind: the variable named for it,
     /// plus every aliased step occurrence surfacing it.
     realizers_by_kind: HashMap<NodeKindId, Vec<NodeRealizer>>,
+    /// Concrete named, non-supertype kinds a wildcard parent could be.
+    parent_candidate_kinds: Vec<NodeKindId>,
     /// Supertype kind → sorted transitive concrete members. Built once so hot
     /// matcher checks do not allocate a subtype closure per candidate child.
     supertype_members: HashMap<NodeKindId, Vec<NodeKindId>>,
@@ -190,17 +192,8 @@ impl<'a> Frozen<'a> {
     /// The concrete named kinds a wildcard parent could be: every named, non-supertype
     /// kind the grammar can build. A wildcard with children is satisfiable iff one of
     /// these takes those children — a token can never be a parent, so it is excluded.
-    fn parent_candidate_kinds(&self) -> Vec<NodeKindId> {
-        let mut candidates: Vec<NodeKindId> = self
-            .realizers_by_kind
-            .keys()
-            .copied()
-            .filter(|&k| {
-                !self.ctx.grammar.is_anonymous_node(k) && !self.ctx.grammar.is_supertype(k)
-            })
-            .collect();
-        candidates.sort_unstable();
-        candidates
+    fn parent_candidate_kinds(&self) -> &[NodeKindId] {
+        &self.parent_candidate_kinds
     }
 
     /// Extra kinds a child matcher could consume. Only kinds the matcher admits — a
@@ -350,6 +343,7 @@ impl<'a> SatisfiabilitySolver<'a> {
     ) -> Self {
         let (extras, named_extras) = extra_kinds(ctx.grammar);
         let realizers_by_kind = build_realizers_by_kind(ctx.grammar);
+        let parent_candidate_kinds = build_parent_candidate_kinds(ctx.grammar, &realizers_by_kind);
         let supertype_members = build_supertype_members(ctx.grammar, &realizers_by_kind);
         Self {
             frozen: Frozen {
@@ -357,6 +351,7 @@ impl<'a> SatisfiabilitySolver<'a> {
                 automata: Vec::new(),
                 table: automaton::PatternTable::default(),
                 realizers_by_kind,
+                parent_candidate_kinds,
                 supertype_members,
                 extras,
                 named_extras,
@@ -407,8 +402,13 @@ impl<'a> SatisfiabilitySolver<'a> {
     /// for ruling every candidate out, and only a wildcard *with* a child list reaches
     /// here at all.
     pub(super) fn wildcard_satisfiable(&mut self, node: &Located<NodePattern>) -> bool {
-        let candidates = self.frozen.parent_candidate_kinds();
-        candidates.iter().any(|&kind| self.satisfiable(node, kind))
+        for index in 0..self.frozen.parent_candidate_kinds().len() {
+            let kind = self.frozen.parent_candidate_kinds()[index];
+            if self.satisfiable(node, kind) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Build every automaton interned so far (transitively reaching all child
@@ -876,6 +876,19 @@ fn build_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<NodeRea
         }
     }
     realizers_by_kind
+}
+
+fn build_parent_candidate_kinds(
+    grammar: &Grammar,
+    realizers_by_kind: &HashMap<NodeKindId, Vec<NodeRealizer>>,
+) -> Vec<NodeKindId> {
+    let mut candidates: Vec<NodeKindId> = realizers_by_kind
+        .keys()
+        .copied()
+        .filter(|&kind| !grammar.is_anonymous_node(kind) && !grammar.is_supertype(kind))
+        .collect();
+    candidates.sort_unstable();
+    candidates
 }
 
 fn build_supertype_members(
