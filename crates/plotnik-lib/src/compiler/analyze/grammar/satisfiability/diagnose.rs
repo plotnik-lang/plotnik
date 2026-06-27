@@ -46,6 +46,10 @@ pub(super) fn report(
 ) -> ReportOutcome {
     let mut visited = HashSet::new();
     let culprit = locate(solver, node.clone(), kind, &mut visited);
+    if solver.is_too_complex() {
+        report_node_too_complex(&culprit.node, diag);
+        return ReportOutcome::TooComplex;
+    }
 
     let ctx = solver.context();
 
