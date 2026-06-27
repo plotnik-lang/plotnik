@@ -71,7 +71,7 @@ Q:
   10                                        ▶
   11   !   [Null Set(M2)] (number) [Node Set(M1)]  14
   14  ─‣┘² _                                10
-  15  ...  
+  15  ...
   16   !   [Null Set(M1) StructOpen] (identifier) [Node Set(M0) StructClose Set(M2)]  14
   19  ─‣─  _                                11, 16, 19
 ==== trace ====

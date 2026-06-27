@@ -45,7 +45,7 @@ _StructWrap:
 
 Q:
   06   !   (pair)                           08
-  07  ...  
+  07  ...
   08  └‣─  key: _                           11, 14
   10                                        ▶
   11   !   [EnumOpen(M1)] (identifier) [Node Set(M0) EnumClose]  16

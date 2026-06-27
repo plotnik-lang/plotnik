@@ -41,7 +41,7 @@ _StructWrap:
 
 Inner:
   06   !   (call_expression)                08
-  07  ...  
+  07  ...
   08  └‣─  (identifier) [Node Set(M0)]      10
   10  ─‣┘  _                                11
   11                                        ▶
@@ -54,12 +54,12 @@ Outer:
   18                                        ▶
   19  -ε-  [ArrayClose Set(M2)]             18
   21  -ε-  [StructClose Push]               40, 15
-  23  ...  
+  23  ...
   24  -ε-  [Set(M1)]                        21
   26  -ε-  [StructClose]                    24
   28   !   (Inner)                          06 : 26
   29  -ε-  [StructOpen]                     28
-  31  ...  
+  31  ...
   32  -ε-  [StructOpen]                     29
   34  ─‣─  _                                32, 34
   36  └‣─  _                                32, 34

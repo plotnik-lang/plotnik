@@ -89,7 +89,7 @@ _StructWrap:
 
 Q:
   06   !   (program)                        08
-  07  ...  
+  07  ...
   08  └‣─  [StructOpen] _                   11, 16, 19
   10                                        ▶
   11   !   [Null Set(M2) StructOpen] (expression_statement) [Node Set(M0) StructClose Set(M1)]  14

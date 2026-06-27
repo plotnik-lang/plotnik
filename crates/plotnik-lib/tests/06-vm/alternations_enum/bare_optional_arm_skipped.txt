@@ -52,7 +52,7 @@ Q:
   09  -ε-  [EnumClose]                      08
   11  -ε-  [Null Set(M0)]                   09
   13   !   (identifier) [Node Set(M0) EnumClose]  08
-  15  ...  
+  15  ...
   16  ─‣─  _                                13, 16
   18   !   _                                13, 16
 ==== trace ====

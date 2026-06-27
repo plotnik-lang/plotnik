@@ -70,7 +70,7 @@ Q:
   26   !   (arguments)                      18
   27  ─‣─  _                                26, 27
   29  └‣─  _                                26, 27
-  31  ...  
+  31  ...
   32   !   [Null Set(M1)] (call_expression)  29, 11
   34   !   [Null Set(M0)] (identifier) [Node Set(M1)]  15
   37  ─‣─  _                                32, 34, 37

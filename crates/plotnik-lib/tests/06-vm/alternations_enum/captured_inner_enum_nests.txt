@@ -70,7 +70,7 @@ _StructWrap:
 
 Q:
   06   !   (program)                        08
-  07  ...  
+  07  ...
   08  └‣─  _                                10, 16
   10   !   [EnumOpen(M3) EnumOpen(M1)] (expression_statement) [Node Set(M0) EnumClose]  13
   13  ─‣┘  [Set(M2) EnumClose] _            15

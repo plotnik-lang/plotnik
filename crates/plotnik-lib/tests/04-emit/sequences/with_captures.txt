@@ -37,7 +37,7 @@ _StructWrap:
 
 Q:
   06   !   (array)                          08
-  07  ...  
+  07  ...
   08  └‣─  (identifier) [Node Set(M0)]      10
   10  ─‣─  (number) [Node Set(M1)]          12
   12  ─‣┘  _                                13

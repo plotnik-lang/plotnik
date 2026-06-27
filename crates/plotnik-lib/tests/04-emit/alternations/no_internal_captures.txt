@@ -40,5 +40,5 @@ Q:
   10                                        ▶
   11   !   (identifier) [Node Set(M0)]      07
   13   !   (number) [Node Set(M0)]          07
-  15  ...  
+  15  ...
   16  ─‣─  _                                11, 13, 16
