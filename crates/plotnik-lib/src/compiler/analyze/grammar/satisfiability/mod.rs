@@ -170,7 +170,13 @@ impl Reporter<'_, '_> {
                         .into();
                     }
                 } else if is_wildcard_parent(&node) && !self.solver.wildcard_satisfiable(&node) {
-                    diagnose::report_wildcard(&node, self.diag);
+                    return diagnose::report_wildcard(
+                        self.solver,
+                        &node,
+                        self.diag,
+                        &mut self.anchor_probes,
+                    )
+                    .into();
                 }
                 WalkOutcome::Continue
             }
@@ -271,17 +277,31 @@ impl Reporter<'_, '_> {
     }
 }
 
-/// A concrete-kind node pattern that must match, paired with its resolved kind.
-struct Goal {
-    node: Located<NodePattern>,
-    kind: NodeKindId,
+/// A required node-position satisfiability goal.
+enum Goal {
+    Concrete {
+        node: Located<NodePattern>,
+        kind: NodeKindId,
+    },
+    Wildcard {
+        node: Located<NodePattern>,
+    },
 }
 
-/// Collect the concrete-kind node patterns at `Required` positions reachable from
+impl Goal {
+    fn node(&self) -> &Located<NodePattern> {
+        match self {
+            Self::Concrete { node, .. } | Self::Wildcard { node } => node,
+        }
+    }
+}
+
+/// Collect the node patterns at `Required` positions reachable from
 /// `located` without crossing into another node's child list. The walk descends
 /// through the always-present wrappers (capture, field, sequence) and the
 /// disjunctive ones (alternation, quantifier, lowering them to `Deferred`), but
-/// stops at each node pattern — its subtree is judged whole by the engine.
+/// stops at each concrete or child-constraining wildcard node pattern — its subtree
+/// is judged whole by the engine.
 fn collect_goals(
     located: &Located<Pattern>,
     participation: Participation,
@@ -295,10 +315,12 @@ fn collect_goals(
             }
             let located_node = located.wrap(node.clone());
             if let Some(kind) = root_kind(ctx, &located_node) {
-                out.push(Goal {
+                out.push(Goal::Concrete {
                     node: located_node,
                     kind,
                 });
+            } else if is_wildcard_parent(&located_node) {
+                out.push(Goal::Wildcard { node: located_node });
             }
         }
         // An anonymous literal at a goal position matches some token of the grammar.

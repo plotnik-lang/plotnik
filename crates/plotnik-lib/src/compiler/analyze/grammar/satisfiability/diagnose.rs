@@ -24,7 +24,7 @@ use crate::core::{NodeFieldId, NodeKindId};
 
 use super::automaton::AutomatonContext;
 use super::engine::SatisfiabilitySolver;
-use super::{Participation, collect_goals, root_kind};
+use super::{Goal, Participation, collect_goals, root_kind};
 
 pub(super) enum ReportOutcome {
     Emitted,
@@ -46,42 +46,80 @@ pub(super) fn report(
     anchor_probes: &mut AnchorProbes<'_>,
 ) -> ReportOutcome {
     let mut visited = HashSet::new();
-    let culprit = locate(solver, node.clone(), kind, &mut visited);
+    let culprit = locate(
+        solver,
+        Goal::Concrete {
+            node: node.clone(),
+            kind,
+        },
+        &mut visited,
+    );
+    report_culprit(solver, culprit, diag, anchor_probes)
+}
+
+/// Emit the impossibility diagnostic for a failed wildcard-parent goal.
+pub(super) fn report_wildcard(
+    solver: &mut SatisfiabilitySolver,
+    node: &Located<NodePattern>,
+    diag: &mut Diagnostics,
+    anchor_probes: &mut AnchorProbes<'_>,
+) -> ReportOutcome {
+    let mut visited = HashSet::new();
+    let culprit = locate(solver, Goal::Wildcard { node: node.clone() }, &mut visited);
+    report_culprit(solver, culprit, diag, anchor_probes)
+}
+
+fn report_culprit(
+    solver: &mut SatisfiabilitySolver,
+    culprit: Goal,
+    diag: &mut Diagnostics,
+    anchor_probes: &mut AnchorProbes<'_>,
+) -> ReportOutcome {
     if solver.is_too_complex() {
-        report_node_too_complex(&culprit.node, diag);
+        report_node_too_complex(culprit.node(), diag);
         return ReportOutcome::Stop;
     }
 
     let ctx = solver.context();
 
+    let (culprit_node, culprit_kind) = match culprit {
+        Goal::Concrete { node, kind } => (node, kind),
+        Goal::Wildcard { node } => {
+            emit_wildcard_failure(&node, diag);
+            return ReportOutcome::Emitted;
+        }
+    };
+
     // A single-valued field bound more than once is the whole obstacle on its own —
     // a sharper thing to say than a vague "combination the grammar never produces".
-    if let Some((field, count)) = repeated_single_field(ctx, &culprit) {
-        emit_repeated_field_failure(ctx, &culprit, &field, count, diag);
+    if let Some((field, count)) = repeated_single_field(ctx, &culprit_node, culprit_kind) {
+        emit_repeated_field_failure(ctx, &culprit_node, culprit_kind, &field, count, diag);
         return ReportOutcome::Emitted;
     }
 
-    let anchor_probe = if has_anchor(culprit.node.node()) {
-        anchor_probes.relax(&culprit)
+    let anchor_probe = if has_anchor(culprit_node.node()) {
+        anchor_probes.relax(&culprit_node, culprit_kind)
     } else {
         AnchorProbe::DoesNotMatch
     };
 
     match anchor_probe {
-        AnchorProbe::Matches => emit_anchor_failure(solver, &culprit, diag),
-        AnchorProbe::DoesNotMatch => emit_arrangement_failure(ctx, &culprit, diag),
+        AnchorProbe::Matches => emit_anchor_failure(solver, &culprit_node, culprit_kind, diag),
+        AnchorProbe::DoesNotMatch => {
+            emit_arrangement_failure(ctx, &culprit_node, culprit_kind, diag)
+        }
         AnchorProbe::Inconclusive => {
-            emit_generic_failure(ctx, &culprit, diag);
+            emit_generic_failure(ctx, &culprit_node, culprit_kind, diag);
             return ReportOutcome::Stop;
         }
     }
     ReportOutcome::Emitted
 }
 
-/// Report an impossible wildcard parent `(_ …)`: no kind the grammar builds takes the
+/// Emit an impossible wildcard parent `(_ …)`: no kind the grammar builds takes the
 /// children it constrains. A wildcard fixes no kind of its own, so there is no single
 /// node to blame — the obstacle is that no production anywhere realizes this child list.
-pub(super) fn report_wildcard(node: &Located<NodePattern>, diag: &mut Diagnostics) {
+fn emit_wildcard_failure(node: &Located<NodePattern>, diag: &mut Diagnostics) {
     diag.report(DiagnosticKind::UnsatisfiablePattern, kind_span(node))
         .detail("no node the grammar builds takes these children".to_string())
         .hint(
@@ -118,11 +156,15 @@ fn emit_too_complex(span: Span, diag: &mut Diagnostics) {
 /// A single-valued field the culprit binds more than once, with the repeat count. Such a
 /// field can hold one child, so binding it twice is impossible whatever else matches —
 /// the first such field in source order, named for the message.
-fn repeated_single_field(ctx: AutomatonContext<'_>, culprit: &Culprit) -> Option<(String, usize)> {
+fn repeated_single_field(
+    ctx: AutomatonContext<'_>,
+    node: &Located<NodePattern>,
+    kind: NodeKindId,
+) -> Option<(String, usize)> {
     let grammar = ctx.grammar;
     // First-seen order, so the message blames the field the reader meets first.
     let mut counts: Vec<(NodeFieldId, usize)> = Vec::new();
-    for child in culprit.node.node().children() {
+    for child in node.node().children() {
         let Pattern::FieldPattern(field) = child else {
             continue;
         };
@@ -138,7 +180,7 @@ fn repeated_single_field(ctx: AutomatonContext<'_>, culprit: &Culprit) -> Option
 
     counts.into_iter().find_map(|(id, count)| {
         let single = grammar
-            .field_cardinality(culprit.kind, id)
+            .field_cardinality(kind, id)
             .is_some_and(|cardinality| !cardinality.is_multiple());
         if count < 2 || !single {
             return None;
@@ -149,29 +191,21 @@ fn repeated_single_field(ctx: AutomatonContext<'_>, culprit: &Culprit) -> Option
 
 fn emit_repeated_field_failure(
     ctx: AutomatonContext<'_>,
-    culprit: &Culprit,
+    node: &Located<NodePattern>,
+    kind: NodeKindId,
     field: &str,
     count: usize,
     diag: &mut Diagnostics,
 ) {
-    let kind_name = render_kind(ctx, culprit.kind);
+    let kind_name = render_kind(ctx, kind);
     let article = indefinite_article(&kind_name);
     let detail = format!(
         "{article} {kind_name} has one `{field}`, but this pattern binds `{field}` {count} times"
     );
-    diag.report(
-        DiagnosticKind::UnsatisfiablePattern,
-        kind_span(&culprit.node),
-    )
-    .detail(detail)
-    .hint(format!("keep a single `{field}:` child"))
-    .emit();
-}
-
-/// The node a diagnostic points at, plus its resolved kind.
-struct Culprit {
-    node: Located<NodePattern>,
-    kind: NodeKindId,
+    diag.report(DiagnosticKind::UnsatisfiablePattern, kind_span(node))
+        .detail(detail)
+        .hint(format!("keep a single `{field}:` child"))
+        .emit();
 }
 
 /// Walk down from an unsatisfiable node to the deepest node whose children are each
@@ -179,20 +213,19 @@ struct Culprit {
 /// what the grammar rejects.
 fn locate(
     solver: &mut SatisfiabilitySolver,
-    node: Located<NodePattern>,
-    kind: NodeKindId,
+    goal: Goal,
     visited: &mut HashSet<SyntaxNode>,
-) -> Culprit {
-    if !visited.insert(node.node().syntax().clone()) {
+) -> Goal {
+    if !visited.insert(goal.node().node().syntax().clone()) {
         // A recursive definition folded back onto a node already being blamed.
-        return Culprit { node, kind };
+        return goal;
     }
 
     let ctx = solver.context();
     let mut children = Vec::new();
-    for child in node.node().children() {
+    for child in goal.node().node().children() {
         collect_goals(
-            &node.wrap(child),
+            &goal.node().wrap(child),
             Participation::Required,
             ctx,
             &mut children,
@@ -200,12 +233,19 @@ fn locate(
     }
 
     for child in children {
-        if !solver.satisfiable(&child.node, child.kind) {
-            return locate(solver, child.node, child.kind, visited);
+        if goal_is_impossible(solver, &child) {
+            return locate(solver, child, visited);
         }
     }
 
-    Culprit { node, kind }
+    goal
+}
+
+fn goal_is_impossible(solver: &mut SatisfiabilitySolver, goal: &Goal) -> bool {
+    match goal {
+        Goal::Concrete { node, kind } => !solver.satisfiable(node, *kind),
+        Goal::Wildcard { node } => !solver.wildcard_satisfiable(node),
+    }
 }
 
 enum AnchorProbe {
@@ -229,12 +269,12 @@ impl<'a> AnchorProbes<'a> {
         }
     }
 
-    fn relax(&mut self, culprit: &Culprit) -> AnchorProbe {
+    fn relax(&mut self, node: &Located<NodePattern>, kind: NodeKindId) -> AnchorProbe {
         if self.solver.is_too_complex() || self.solver.remaining_budget() == 0 {
             return AnchorProbe::Inconclusive;
         }
 
-        let matches = self.solver.satisfiable(&culprit.node, culprit.kind);
+        let matches = self.solver.satisfiable(node, kind);
         if self.solver.is_too_complex() {
             return AnchorProbe::Inconclusive;
         }
@@ -246,22 +286,27 @@ impl<'a> AnchorProbes<'a> {
     }
 }
 
-fn emit_anchor_failure(solver: &SatisfiabilitySolver, culprit: &Culprit, diag: &mut Diagnostics) {
+fn emit_anchor_failure(
+    solver: &SatisfiabilitySolver,
+    node: &Located<NodePattern>,
+    kind: NodeKindId,
+    diag: &mut Diagnostics,
+) {
     let ctx = solver.context();
-    let node = culprit.node.node();
-    let kind_name = render_kind(ctx, culprit.kind);
-    let span = kind_span(&culprit.node);
-    let strict = strictest_anchor(node);
+    let node_pattern = node.node();
+    let kind_name = render_kind(ctx, kind);
+    let span = kind_span(node);
+    let strict = strictest_anchor(node_pattern);
 
     // A leading anchor pins the first child; a trailing one the last. The two read
     // differently, so each gets its own message naming the boundary the grammar fixes.
-    let Some(boundary) = Boundary::of(node) else {
-        return emit_interior_anchor_failure(ctx, culprit, strict, diag);
+    let Some(boundary) = Boundary::of(node_pattern) else {
+        return emit_interior_anchor_failure(ctx, node, kind, strict, diag);
     };
     let boundary_name = boundary.name();
     let boundary_verb = boundary.verb();
-    let allowed = boundary.child_kinds(solver, culprit.kind);
-    let wanted = boundary.pattern_label(&culprit.node, ctx);
+    let allowed = boundary.child_kinds(solver, kind);
+    let wanted = boundary.pattern_label(node, ctx);
 
     let demand = if strict {
         "with strict adjacency (`.!`)"
@@ -287,39 +332,39 @@ fn emit_anchor_failure(solver: &SatisfiabilitySolver, culprit: &Culprit, diag: &
     let mut builder = diag
         .report(DiagnosticKind::UnsatisfiablePattern, span)
         .detail(detail);
-    builder = builder.hint(anchor_fix_hint(&culprit.node, ctx, strict));
+    builder = builder.hint(anchor_fix_hint(node, ctx, strict));
     builder.emit();
 }
 
 /// An anchor between two children — neither end is pinned, so explain the adjacency.
 fn emit_interior_anchor_failure(
     ctx: AutomatonContext<'_>,
-    culprit: &Culprit,
+    node: &Located<NodePattern>,
+    kind: NodeKindId,
     strict: bool,
     diag: &mut Diagnostics,
 ) {
-    let kind_name = render_kind(ctx, culprit.kind);
+    let kind_name = render_kind(ctx, kind);
     let detail = format!("no {kind_name} places these children in this adjacency");
-    diag.report(
-        DiagnosticKind::UnsatisfiablePattern,
-        kind_span(&culprit.node),
-    )
-    .detail(detail)
-    .hint(anchor_fix_hint(&culprit.node, ctx, strict))
-    .emit();
+    diag.report(DiagnosticKind::UnsatisfiablePattern, kind_span(node))
+        .detail(detail)
+        .hint(anchor_fix_hint(node, ctx, strict))
+        .emit();
 }
 
 /// The child kinds or their order are the obstacle (the anchors, if any, are not).
-fn emit_arrangement_failure(ctx: AutomatonContext<'_>, culprit: &Culprit, diag: &mut Diagnostics) {
-    let kind_name = render_kind(ctx, culprit.kind);
+fn emit_arrangement_failure(
+    ctx: AutomatonContext<'_>,
+    node: &Located<NodePattern>,
+    kind: NodeKindId,
+    diag: &mut Diagnostics,
+) {
+    let kind_name = render_kind(ctx, kind);
     let detail = format!("the grammar builds no {kind_name} with these children");
     let mut builder = diag
-        .report(
-            DiagnosticKind::UnsatisfiablePattern,
-            kind_span(&culprit.node),
-        )
+        .report(DiagnosticKind::UnsatisfiablePattern, kind_span(node))
         .detail(detail);
-    if let Some(allows) = describe_allowed_children(ctx, culprit.kind, &kind_name) {
+    if let Some(allows) = describe_allowed_children(ctx, kind, &kind_name) {
         builder = builder.hint(allows);
     }
     builder = builder.hint(
@@ -332,16 +377,18 @@ fn emit_arrangement_failure(ctx: AutomatonContext<'_>, culprit: &Culprit, diag: 
 /// The primary solve proved the node impossible, but diagnostic refinement ran out
 /// before it could distinguish anchors from child order. Keep the verdict precise
 /// without pretending to know the specific obstacle.
-fn emit_generic_failure(ctx: AutomatonContext<'_>, culprit: &Culprit, diag: &mut Diagnostics) {
-    let kind_name = render_kind(ctx, culprit.kind);
+fn emit_generic_failure(
+    ctx: AutomatonContext<'_>,
+    node: &Located<NodePattern>,
+    kind: NodeKindId,
+    diag: &mut Diagnostics,
+) {
+    let kind_name = render_kind(ctx, kind);
     let detail = format!("the grammar builds no {kind_name} matching this child structure");
-    diag.report(
-        DiagnosticKind::UnsatisfiablePattern,
-        kind_span(&culprit.node),
-    )
-    .detail(detail)
-    .hint("adjust the children, anchors, or order to match a shape this grammar produces")
-    .emit();
+    diag.report(DiagnosticKind::UnsatisfiablePattern, kind_span(node))
+        .detail(detail)
+        .hint("adjust the children, anchors, or order to match a shape this grammar produces")
+        .emit();
 }
 
 /// A help line listing what a node of `kind` does allow: its named child kinds and
