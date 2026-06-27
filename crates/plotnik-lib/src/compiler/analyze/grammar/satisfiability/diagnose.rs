@@ -28,12 +28,12 @@ use super::{Participation, collect_goals, root_kind};
 
 pub(super) enum ReportOutcome {
     Emitted,
-    TooComplex,
+    Stop,
 }
 
 impl ReportOutcome {
-    pub(super) fn is_too_complex(&self) -> bool {
-        matches!(self, Self::TooComplex)
+    pub(super) fn should_stop(&self) -> bool {
+        matches!(self, Self::Stop)
     }
 }
 
@@ -43,12 +43,13 @@ pub(super) fn report(
     node: &Located<NodePattern>,
     kind: NodeKindId,
     diag: &mut Diagnostics,
+    anchor_probe_budget: &mut u64,
 ) -> ReportOutcome {
     let mut visited = HashSet::new();
     let culprit = locate(solver, node.clone(), kind, &mut visited);
     if solver.is_too_complex() {
         report_node_too_complex(&culprit.node, diag);
-        return ReportOutcome::TooComplex;
+        return ReportOutcome::Stop;
     }
 
     let ctx = solver.context();
@@ -61,7 +62,7 @@ pub(super) fn report(
     }
 
     let anchor_probe = if has_anchor(culprit.node.node()) {
-        relaxing_anchors(solver, &culprit)
+        relaxing_anchors(solver, &culprit, anchor_probe_budget)
     } else {
         AnchorProbe::DoesNotMatch
     };
@@ -69,9 +70,9 @@ pub(super) fn report(
     match anchor_probe {
         AnchorProbe::Matches => emit_anchor_failure(solver, &culprit, diag),
         AnchorProbe::DoesNotMatch => emit_arrangement_failure(ctx, &culprit, diag),
-        AnchorProbe::TooComplex => {
-            report_node_too_complex(&culprit.node, diag);
-            return ReportOutcome::TooComplex;
+        AnchorProbe::Inconclusive => {
+            emit_generic_failure(ctx, &culprit, diag);
+            return ReportOutcome::Stop;
         }
     }
     ReportOutcome::Emitted
@@ -210,20 +211,30 @@ fn locate(
 enum AnchorProbe {
     Matches,
     DoesNotMatch,
-    TooComplex,
+    Inconclusive,
 }
 
 /// Re-solve the culprit with every gap widened to "any node may intervene". A fresh
-/// solver keeps the relaxed automata out of the real run's memo, but still spends
-/// from the real run's remaining budget. If this matches while the strict solve did
-/// not, the anchors are provably the only obstacle.
-fn relaxing_anchors(solver: &mut SatisfiabilitySolver, culprit: &Culprit) -> AnchorProbe {
-    let mut relaxed = solver.relaxing_anchors();
+/// solver keeps the relaxed automata out of the real run's memo and spends from the
+/// reporter-owned diagnostic budget, not the primary proof budget. If the probe runs
+/// out, the proof remains a proven unsatisfiable pattern; only the explanation becomes
+/// less specific.
+fn relaxing_anchors(
+    solver: &SatisfiabilitySolver,
+    culprit: &Culprit,
+    anchor_probe_budget: &mut u64,
+) -> AnchorProbe {
+    let budget = (*anchor_probe_budget).min(solver.remaining_budget());
+    if budget == 0 {
+        return AnchorProbe::Inconclusive;
+    }
+
+    let mut relaxed = solver.relaxing_anchors(budget);
     let matches = relaxed.satisfiable(&culprit.node, culprit.kind);
     let too_complex = relaxed.is_too_complex();
-    solver.absorb_probe_budget(&relaxed);
+    *anchor_probe_budget = anchor_probe_budget.saturating_sub(relaxed.steps_spent());
     if too_complex {
-        return AnchorProbe::TooComplex;
+        return AnchorProbe::Inconclusive;
     }
     if matches {
         AnchorProbe::Matches
@@ -313,6 +324,21 @@ fn emit_arrangement_failure(ctx: AutomatonContext<'_>, culprit: &Culprit, diag: 
          the grammar never produces",
     );
     builder.emit();
+}
+
+/// The primary solve proved the node impossible, but diagnostic refinement ran out
+/// before it could distinguish anchors from child order. Keep the verdict precise
+/// without pretending to know the specific obstacle.
+fn emit_generic_failure(ctx: AutomatonContext<'_>, culprit: &Culprit, diag: &mut Diagnostics) {
+    let kind_name = render_kind(ctx, culprit.kind);
+    let detail = format!("the grammar builds no {kind_name} matching this child structure");
+    diag.report(
+        DiagnosticKind::UnsatisfiablePattern,
+        kind_span(&culprit.node),
+    )
+    .detail(detail)
+    .hint("adjust the children, anchors, or order to match a shape this grammar produces")
+    .emit();
 }
 
 /// A help line listing what a node of `kind` does allow: its named child kinds and

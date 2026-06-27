@@ -399,18 +399,22 @@ impl<'a> SatisfiabilitySolver<'a> {
         )
     }
 
-    pub(super) fn relaxing_anchors(&self) -> Self {
+    pub(super) fn relaxing_anchors(&self, step_budget: u64) -> Self {
         Self::with_anchor_mode(
             self.frozen.ctx,
             AnchorMode::Relax,
             self.frozen.max_depth,
-            self.solve.remaining_budget(),
+            step_budget,
             Arc::clone(&self.frozen.facts),
         )
     }
 
-    pub(super) fn absorb_probe_budget(&mut self, probe: &Self) {
-        self.solve.absorb_probe_budget(&probe.solve);
+    pub(super) fn remaining_budget(&self) -> u64 {
+        self.solve.remaining_budget()
+    }
+
+    pub(super) fn steps_spent(&self) -> u64 {
+        self.solve.steps
     }
 
     fn with_anchor_mode(
@@ -553,13 +557,6 @@ impl<'a> SatisfiabilitySolver<'a> {
 impl Solve {
     fn remaining_budget(&self) -> u64 {
         self.budget.saturating_sub(self.steps)
-    }
-
-    fn absorb_probe_budget(&mut self, probe: &Self) {
-        self.steps = self.steps.saturating_add(probe.steps);
-        if probe.exhausted || self.steps > self.budget {
-            self.exhausted = true;
-        }
     }
 
     fn spend(&mut self, steps: u64) {

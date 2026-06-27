@@ -81,6 +81,7 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
     let mut reporter = Reporter {
         solver: &mut solver,
         diag,
+        anchor_probe_budget: input.satisfiability_step_budget,
     };
 
     // Each definition body must be matchable in its own right — the structural check's
@@ -93,7 +94,7 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
                 let located = Located::new(source, body);
                 if reporter
                     .walk(&located, Participation::Required)
-                    .is_too_complex()
+                    .should_stop()
                 {
                     return;
                 }
@@ -117,24 +118,25 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
 struct Reporter<'a, 'q> {
     solver: &'a mut SatisfiabilitySolver<'q>,
     diag: &'a mut Diagnostics,
+    anchor_probe_budget: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum WalkOutcome {
     Continue,
-    TooComplex,
+    Stop,
 }
 
 impl WalkOutcome {
-    fn is_too_complex(self) -> bool {
-        matches!(self, Self::TooComplex)
+    fn should_stop(self) -> bool {
+        matches!(self, Self::Stop)
     }
 }
 
 impl From<diagnose::ReportOutcome> for WalkOutcome {
     fn from(outcome: diagnose::ReportOutcome) -> Self {
-        if outcome.is_too_complex() {
-            Self::TooComplex
+        if outcome.should_stop() {
+            Self::Stop
         } else {
             Self::Continue
         }
@@ -146,8 +148,8 @@ impl Reporter<'_, '_> {
     /// crosses always-present wrappers, lowers into disjunctive branches and `?`/`*`
     /// bodies as `Deferred`, and stops at each node pattern, whose interior the
     /// engine judges whole.
-    /// Returns `TooComplex` when diagnostic refinement already emitted `QueryTooComplex`;
-    /// callers must then stop rather than spending fresh probe budgets on later nodes.
+    /// Returns `Stop` when reporting already emitted a terminal diagnostic; callers
+    /// must then stop rather than spending fresh probe budgets on later nodes.
     fn walk(&mut self, located: &Located<Pattern>, participation: Participation) -> WalkOutcome {
         match located.node() {
             Pattern::NodePattern(node) => {
@@ -157,7 +159,14 @@ impl Reporter<'_, '_> {
                 }
                 if let Some(kind) = root_kind(self.solver.context(), &node) {
                     if !self.solver.satisfiable(&node, kind) {
-                        return diagnose::report(self.solver, &node, kind, self.diag).into();
+                        return diagnose::report(
+                            self.solver,
+                            &node,
+                            kind,
+                            self.diag,
+                            &mut self.anchor_probe_budget,
+                        )
+                        .into();
                     }
                 } else if is_wildcard_parent(&node) && !self.solver.wildcard_satisfiable(&node) {
                     diagnose::report_wildcard(&node, self.diag);
@@ -208,7 +217,7 @@ impl Reporter<'_, '_> {
     ) -> WalkOutcome {
         for child in located.node().children() {
             let outcome = self.walk(&located.wrap(child), participation);
-            if outcome.is_too_complex() {
+            if outcome.should_stop() {
                 return outcome;
             }
         }

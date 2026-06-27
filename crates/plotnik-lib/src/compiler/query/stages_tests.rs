@@ -347,7 +347,7 @@ fn satisfiability_budget_counts_automaton_construction() {
 }
 
 #[test]
-fn relaxed_anchor_probe_budget_reports_too_complex() {
+fn primary_satisfiability_budget_exhaustion_reports_too_complex_once() {
     let mut source_map = SourceMap::new();
     source_map.add_file(
         SourcePath::new("q.ptk"),
@@ -376,7 +376,7 @@ fn relaxed_anchor_probe_budget_reports_too_complex() {
             .filter(|&&kind| kind == DiagnosticKind::QueryTooComplex)
             .count(),
         1,
-        "diagnostic probe exhaustion must stop the pass:\n{}",
+        "primary budget exhaustion must stop the pass:\n{}",
         linked.dump_diagnostics(),
     );
     assert!(
@@ -387,7 +387,7 @@ fn relaxed_anchor_probe_budget_reports_too_complex() {
 }
 
 #[test]
-fn relaxed_anchor_probes_share_step_budget() {
+fn exhausted_anchor_probe_budget_keeps_unsatisfiable_verdict() {
     let mut source_map = SourceMap::new();
     source_map.add_file(
         SourcePath::new("q.ptk"),
@@ -409,10 +409,19 @@ fn relaxed_anchor_probes_share_step_budget() {
         kinds,
         vec![
             DiagnosticKind::UnsatisfiablePattern,
-            DiagnosticKind::QueryTooComplex
+            DiagnosticKind::UnsatisfiablePattern
         ],
-        "relaxed anchor probes must spend from the primary budget:\n{}",
+        "diagnostic probes must not replace a proven rejection:\n{}",
         linked.dump_diagnostics(),
+    );
+    let diagnostics = linked.dump_diagnostics();
+    assert!(
+        diagnostics.contains("matching this child structure"),
+        "exhausted anchor probes should fall back to a generic unsatisfiable diagnostic:\n{diagnostics}",
+    );
+    assert!(
+        !kinds.contains(&DiagnosticKind::QueryTooComplex),
+        "diagnostic probe exhaustion must not masquerade as query complexity:\n{diagnostics}",
     );
 }
 
