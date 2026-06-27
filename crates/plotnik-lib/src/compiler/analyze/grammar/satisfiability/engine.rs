@@ -35,7 +35,7 @@ use crate::core::{NodeFieldId, NodeKindId};
 use super::automaton::{
     self, AutomatonContext, ChildAutomaton, ChildMatcher, KindConstraint, PatternId, State,
 };
-use super::facts::{ExtraCandidates, GrammarFacts, NodeRealizer};
+use super::facts::{GrammarFacts, NodeRealizer};
 use super::state_set::StateSet;
 
 /// How a production step participates in threading.
@@ -234,10 +234,14 @@ impl<'a> Frozen<'a> {
         self.facts.parent_candidate_kinds()
     }
 
-    /// Extra kinds a child matcher could consume. Only kinds the matcher admits — a
-    /// `(comment)` admits the `comment` extra, a `(_)` any named extra, `_` any extra.
-    fn extras_admitted_by(&self, constraint: KindConstraint) -> ExtraCandidates<'_> {
-        self.facts.extras_admitted_by(self.ctx.grammar, constraint)
+    /// Whether any extra kind admitted by `constraint` satisfies `predicate`.
+    fn any_extra_admitted_by(
+        &self,
+        constraint: KindConstraint,
+        predicate: impl FnMut(NodeKindId) -> bool,
+    ) -> bool {
+        self.facts
+            .any_extra_admitted_by(self.ctx.grammar, constraint, predicate)
     }
 
     /// The kinds that can be the first (or last) child of a node of `kind`: the
@@ -842,7 +846,7 @@ impl Solve {
             // the hot path on wide wildcard child lists.
             return frozen.admits_any_extra(matcher.kind);
         };
-        frozen.extras_admitted_by(matcher.kind).any(|extra| {
+        frozen.any_extra_admitted_by(matcher.kind, |extra| {
             frozen
                 .realizers_of(extra)
                 .iter()

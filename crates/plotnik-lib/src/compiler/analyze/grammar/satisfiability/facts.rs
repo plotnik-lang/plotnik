@@ -67,39 +67,18 @@ impl GrammarFacts {
         }
     }
 
-    pub(super) fn extras_admitted_by(
+    pub(super) fn any_extra_admitted_by(
         &self,
         grammar: &Grammar,
         constraint: KindConstraint,
-    ) -> ExtraCandidates<'_> {
+        mut predicate: impl FnMut(NodeKindId) -> bool,
+    ) -> bool {
         match constraint {
-            KindConstraint::Exact(id) => {
-                if grammar.is_extra(id) {
-                    ExtraCandidates::One(id)
-                } else {
-                    ExtraCandidates::None
-                }
-            }
-            KindConstraint::AnyNamed => ExtraCandidates::Many(&self.named_extras),
+            KindConstraint::Exact(id) => grammar.is_extra(id) && predicate(id),
+            KindConstraint::AnyNamed => self.named_extras.iter().copied().any(predicate),
             KindConstraint::AnyNode | KindConstraint::Unconstrained => {
-                ExtraCandidates::Many(&self.extras)
+                self.extras.iter().copied().any(predicate)
             }
-        }
-    }
-}
-
-pub(super) enum ExtraCandidates<'a> {
-    None,
-    One(NodeKindId),
-    Many(&'a [NodeKindId]),
-}
-
-impl ExtraCandidates<'_> {
-    pub(super) fn any(self, mut predicate: impl FnMut(NodeKindId) -> bool) -> bool {
-        match self {
-            Self::None => false,
-            Self::One(kind) => predicate(kind),
-            Self::Many(kinds) => kinds.iter().copied().any(predicate),
         }
     }
 }
