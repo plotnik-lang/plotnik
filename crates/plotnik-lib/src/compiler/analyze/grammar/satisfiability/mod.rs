@@ -26,6 +26,7 @@
 mod automaton;
 mod diagnose;
 mod engine;
+mod facts;
 mod state_set;
 
 pub use engine::DEFAULT_SATISFIABILITY_STEP_BUDGET;

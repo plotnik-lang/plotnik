@@ -29,33 +29,15 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
 use crate::compiler::limits::SatisfiabilityLimits;
 use crate::compiler::parse::ast::NodePattern;
-use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, VarId};
+use crate::core::grammar::{SkeletonStep, SkeletonVariable, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
 
 use super::automaton::{
     self, AnchorMode, AutomatonContext, ChildAutomaton, ChildMatcher, KindConstraint, PatternId,
     State,
 };
+use super::facts::{ExtraCandidates, GrammarFacts, NodeRealizer};
 use super::state_set::StateSet;
-
-/// The grammar body that realizes a matched node's child structure.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(super) enum NodeRealizer {
-    Leaf,
-    Var(VarId),
-}
-
-impl NodeRealizer {
-    /// The realizer a visible step descends into: its own variable, or `Leaf` for a
-    /// token. Keying `SAT` by the step's own `body` — never "any variable realizing
-    /// this kind" — is what makes nesting alias-correct.
-    fn of_step(step: &SkeletonStep) -> Self {
-        step.target
-            .body
-            .map(NodeRealizer::Var)
-            .unwrap_or(NodeRealizer::Leaf)
-    }
-}
 
 /// How a production step participates in threading.
 enum StepClass {
@@ -138,34 +120,6 @@ enum Key {
     Thread(ThreadKey),
 }
 
-/// Grammar-wide indexes reused by the primary solve and diagnostic probes. They
-/// are independent of anchor mode and query automata, so relaxed probes can share
-/// them instead of rebuilding the same maps for every reported culprit.
-struct GrammarFacts {
-    /// Kind → realizers that may surface that tree kind: the variable named for it,
-    /// plus every aliased step occurrence surfacing it.
-    realizers_by_kind: HashMap<NodeKindId, Vec<NodeRealizer>>,
-    /// Concrete named, non-supertype kinds a wildcard parent could be.
-    parent_candidate_kinds: Vec<NodeKindId>,
-    /// Visible extra kinds (comments), and the named subset, for extra-consumption.
-    extras: Vec<NodeKindId>,
-    named_extras: Vec<NodeKindId>,
-}
-
-impl GrammarFacts {
-    fn from_grammar(grammar: &Grammar) -> Self {
-        let (extras, named_extras) = extra_kinds(grammar);
-        let realizers_by_kind = build_realizers_by_kind(grammar);
-        let parent_candidate_kinds = build_parent_candidate_kinds(grammar, &realizers_by_kind);
-        Self {
-            realizers_by_kind,
-            parent_candidate_kinds,
-            extras,
-            named_extras,
-        }
-    }
-}
-
 /// Data fixed once the automata are built; only `solve` mutates around it. Splitting
 /// it from the mutable solve state lets the worklist hold `&Frozen` and `&mut Solve`
 /// at once (disjoint borrows) while threading.
@@ -194,11 +148,7 @@ impl<'a> Frozen<'a> {
     }
 
     fn realizers_of(&self, kind: NodeKindId) -> &[NodeRealizer] {
-        self.facts
-            .realizers_by_kind
-            .get(&kind)
-            .map(Vec::as_slice)
-            .unwrap_or(&[])
+        self.facts.realizers_of(kind)
     }
 
     fn build_automaton(
@@ -253,38 +203,20 @@ impl<'a> Frozen<'a> {
     /// path of [`SatisfiabilitySolver::can_consume_extra`] — answered without materializing the
     /// admitted-extra list, which matters on wide wildcard child lists.
     fn admits_any_extra(&self, constraint: KindConstraint) -> bool {
-        match constraint {
-            KindConstraint::Exact(id) => self.ctx.grammar.is_extra(id),
-            KindConstraint::AnyNamed => !self.facts.named_extras.is_empty(),
-            KindConstraint::AnyNode | KindConstraint::Unconstrained => {
-                !self.facts.extras.is_empty()
-            }
-        }
+        self.facts.admits_any_extra(self.ctx.grammar, constraint)
     }
 
     /// The concrete named kinds a wildcard parent could be: every named, non-supertype
     /// kind the grammar can surface. A wildcard with children is satisfiable iff one of
     /// these takes those children — a token can never be a parent, so it is excluded.
     fn parent_candidate_kinds(&self) -> &[NodeKindId] {
-        &self.facts.parent_candidate_kinds
+        self.facts.parent_candidate_kinds()
     }
 
     /// Extra kinds a child matcher could consume. Only kinds the matcher admits — a
     /// `(comment)` admits the `comment` extra, a `(_)` any named extra, `_` any extra.
     fn extras_admitted_by(&self, constraint: KindConstraint) -> ExtraCandidates<'_> {
-        match constraint {
-            KindConstraint::Exact(id) => {
-                if self.ctx.grammar.is_extra(id) {
-                    ExtraCandidates::One(id)
-                } else {
-                    ExtraCandidates::None
-                }
-            }
-            KindConstraint::AnyNamed => ExtraCandidates::Many(&self.facts.named_extras),
-            KindConstraint::AnyNode | KindConstraint::Unconstrained => {
-                ExtraCandidates::Many(&self.facts.extras)
-            }
-        }
+        self.facts.extras_admitted_by(self.ctx.grammar, constraint)
     }
 
     /// The kinds that can be the first (or last) child of a node of `kind`: the
@@ -351,22 +283,6 @@ impl<'a> Frozen<'a> {
 enum Edge {
     First,
     Last,
-}
-
-enum ExtraCandidates<'a> {
-    None,
-    One(NodeKindId),
-    Many(&'a [NodeKindId]),
-}
-
-impl ExtraCandidates<'_> {
-    fn any(self, mut predicate: impl FnMut(NodeKindId) -> bool) -> bool {
-        match self {
-            Self::None => false,
-            Self::One(kind) => predicate(kind),
-            Self::Many(kinds) => kinds.iter().copied().any(predicate),
-        }
-    }
 }
 
 /// Default ceiling on satisfiability work before the query is declared too complex.
@@ -943,51 +859,4 @@ fn eps_closure(automaton: &ChildAutomaton, set: &StateSet) -> StateSet {
 /// between productions do not matter.
 fn gap_scratch(frozen: &Frozen, p: PatternId) -> Vec<GapClass> {
     vec![GapClass::Any; frozen.automaton(p).state_count()]
-}
-
-/// Index every kind to the realizers that can realize it: the variable named for the
-/// kind, and every step occurrence that surfaces it (aliases included).
-fn build_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<NodeRealizer>> {
-    grammar
-        .structure()
-        .surface_realizers_by_kind()
-        .into_iter()
-        .map(|(kind, surfaces)| {
-            let realizers = surfaces
-                .into_iter()
-                .map(|surface| {
-                    surface
-                        .body
-                        .map(NodeRealizer::Var)
-                        .unwrap_or(NodeRealizer::Leaf)
-                })
-                .collect();
-            (kind, realizers)
-        })
-        .collect()
-}
-
-fn build_parent_candidate_kinds(
-    grammar: &Grammar,
-    realizers_by_kind: &HashMap<NodeKindId, Vec<NodeRealizer>>,
-) -> Vec<NodeKindId> {
-    let mut candidates: Vec<NodeKindId> = realizers_by_kind
-        .keys()
-        .copied()
-        .filter(|&kind| !grammar.is_anonymous_node(kind) && !grammar.is_supertype(kind))
-        .collect();
-    candidates.sort_unstable();
-    candidates
-}
-
-fn extra_kinds(grammar: &Grammar) -> (Vec<NodeKindId>, Vec<NodeKindId>) {
-    // Extras are mostly lexical tokens (comments), so they live in the grammar's
-    // extra set, not the syntax-variable structure.
-    let extras = grammar.extra_node_kinds().to_vec();
-    let named = extras
-        .iter()
-        .copied()
-        .filter(|&kind| !grammar.is_anonymous_node(kind))
-        .collect();
-    (extras, named)
 }
