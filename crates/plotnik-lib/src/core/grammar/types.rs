@@ -8,7 +8,7 @@ use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
 use super::json::GrammarError;
 use super::raw::RawGrammar;
 use super::render::TreeGrammar;
-use super::structure::{StepTarget, StructureTable, VarId};
+use super::structure::{SkeletonVariable, StepTarget, StructureTable, VarId};
 
 pub(super) struct GrammarTables {
     pub(super) node_shapes: Vec<NodeShape>,
@@ -790,9 +790,7 @@ impl ReachabilityBuilder<'_> {
         if !seen.insert(var) {
             return;
         }
-        let Some(variable) = self.grammar.structure.variable(var) else {
-            return;
-        };
+        let variable = structure_variable(self.grammar, var);
         for step in variable.productions.iter().flatten() {
             if let Some(field) = step.field {
                 self.collect_field_value(node, field, step.target);
@@ -831,9 +829,7 @@ impl ReachabilityBuilder<'_> {
         if !seen.insert(var) {
             return;
         }
-        let Some(variable) = self.grammar.structure.variable(var) else {
-            return;
-        };
+        let variable = structure_variable(self.grammar, var);
         for step in variable.productions.iter().flatten() {
             if let Some(field) = step.field {
                 self.collect_field_value(node, field, step.target);
@@ -880,9 +876,7 @@ fn collect_value_frontier(
     if !seen.insert(var) {
         return;
     }
-    let Some(variable) = grammar.structure.variable(var) else {
-        return;
-    };
+    let variable = structure_variable(grammar, var);
     for step in variable.productions.iter().flatten() {
         match (step.target.id, step.target.body) {
             (Some(id), _) => out.insert(id),
@@ -890,6 +884,13 @@ fn collect_value_frontier(
             (None, None) => {}
         }
     }
+}
+
+fn structure_variable(grammar: &Grammar, var: VarId) -> &SkeletonVariable {
+    grammar
+        .structure
+        .variable(var)
+        .expect("VarId from StructureTable must resolve")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
