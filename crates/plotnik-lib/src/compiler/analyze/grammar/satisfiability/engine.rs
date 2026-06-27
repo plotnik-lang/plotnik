@@ -29,7 +29,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
 use crate::compiler::limits::SatisfiabilityLimits;
 use crate::compiler::parse::ast::NodePattern;
-use crate::core::grammar::{SkeletonStep, SkeletonVariable, VarId};
+use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
 
 use super::automaton::{
@@ -49,6 +49,31 @@ enum StepClass {
     HiddenSubtree(HiddenStep),
     /// A hidden token: present in the production, absent from the tree.
     HiddenLeaf,
+}
+
+impl StepClass {
+    /// Classify a step for threading. A supertype is erased in the tree — tree-sitter
+    /// never emits a node of the supertype's kind, only one of its subtypes — so a
+    /// step surfacing a supertype is threaded through its body, not matched as a node.
+    /// Keying the descent off the step's own `body` is what keeps aliased nodes
+    /// structurally distinct from their namesakes.
+    fn of(step: &SkeletonStep, grammar: &Grammar) -> Self {
+        if let Some(kind) = step.target.visible_kind(grammar) {
+            return StepClass::Visible(VisibleStep {
+                kind,
+                field: step.field,
+                realizer: NodeRealizer::of_step(step),
+            });
+        }
+        if let Some(var) = step.target.transparent_body(grammar) {
+            StepClass::HiddenSubtree(HiddenStep {
+                var,
+                field: step.field,
+            })
+        } else {
+            StepClass::HiddenLeaf
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -188,29 +213,6 @@ impl<'a> Frozen<'a> {
         )
     }
 
-    /// Classify a step for threading. A supertype is erased in the tree — tree-sitter
-    /// never emits a node of the supertype's kind, only one of its subtypes — so a
-    /// step surfacing a supertype is threaded through its body, not matched as a node.
-    /// Keying the descent off the step's own `body` is what keeps aliased nodes
-    /// structurally distinct from their namesakes.
-    fn classify(&self, step: &SkeletonStep) -> StepClass {
-        if let Some(kind) = step.target.visible_kind(self.ctx.grammar) {
-            return StepClass::Visible(VisibleStep {
-                kind,
-                field: step.field,
-                realizer: NodeRealizer::of_step(step),
-            });
-        }
-        if let Some(var) = step.target.transparent_body(self.ctx.grammar) {
-            StepClass::HiddenSubtree(HiddenStep {
-                var,
-                field: step.field,
-            })
-        } else {
-            StepClass::HiddenLeaf
-        }
-    }
-
     /// Whether a child-position kind constraint admits visible grammar kind `k`.
     /// Query supertypes are rejected before this pass runs, and grammar supertype
     /// steps are classified as hidden frontiers before matching.
@@ -286,7 +288,7 @@ impl<'a> Frozen<'a> {
         visited: &mut HashSet<VarId>,
     ) {
         for step in steps {
-            match self.classify(step) {
+            match StepClass::of(step, self.ctx.grammar) {
                 StepClass::Visible(visible) => {
                     out.push(visible.kind);
                     break;
@@ -681,7 +683,7 @@ impl Solve {
         current: &StateSet,
         step: &SkeletonStep,
     ) -> StateSet {
-        match thread.frozen.classify(step) {
+        match StepClass::of(step, thread.frozen.ctx.grammar) {
             // A real child of kind `kind`. Each current state either skips it through a
             // gap self-loop, or consumes it through an edge whose kind and field both
             // admit the step. The step's own label wins over an inherited one.
