@@ -8,8 +8,8 @@
 //! demands. Quantifiers become loops, alternations become parallel branches, and a
 //! nested sequence inlines its items — no collapsing, so arity is exact.
 //!
-//! The construction reuses `compute_nav_modes` / `check_trailing_anchor` verbatim,
-//! so the gap classes the checker reasons over are the same navs codegen emits.
+//! The construction reuses `AnchorSemantics` verbatim, so the gap classes the checker
+//! reasons over are the same navs codegen emits.
 
 use std::collections::HashMap;
 
@@ -17,7 +17,7 @@ use rowan::TextRange;
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{
-    GapClass, check_trailing_anchor, compute_nav_modes, has_direct_alternation_branch_nav,
+    AnchorSemantics, GapClass, has_direct_alternation_branch_nav,
 };
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
@@ -265,9 +265,11 @@ pub(super) fn build(
     anchor_mode: AnchorMode,
     max_depth: u32,
 ) -> ChildAutomaton {
+    let anchor_semantics = AnchorSemantics::new(ctx.symbol_table);
     let mut builder = Builder {
         ctx,
         table,
+        anchor_semantics: &anchor_semantics,
         states: Vec::new(),
         too_complex: false,
         ref_stack: Vec::new(),
@@ -278,7 +280,9 @@ pub(super) fn build(
     let items = ItemList::node_children(node.node());
     let accept = builder.emit_items(&items, Descent::root(node.source()), start);
 
-    let (has_trailing, trailing_nav) = check_trailing_anchor(items.as_slice(), ctx.symbol_table);
+    let (has_trailing, trailing_nav) = builder
+        .anchor_semantics
+        .check_trailing_anchor(items.as_slice());
     let trailing_gap = if has_trailing {
         trailing_nav
             .and_then(GapClass::from_nav)
@@ -322,6 +326,7 @@ fn negated_fields(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -> Vec
 struct Builder<'a, 'b> {
     ctx: AutomatonContext<'a>,
     table: &'b mut PatternTable,
+    anchor_semantics: &'b AnchorSemantics<'a>,
     states: Vec<StateData>,
     /// Set when a resource ceiling (state cap or recursion depth) is hit — the query is
     /// rejected as too complex, not accepted. Construction short-circuits once it is set.
@@ -436,11 +441,9 @@ impl Builder<'_, '_> {
     /// nav computation. Returns the exit state. Each item descends field-fresh — a
     /// sibling's label comes only from its own `field: …`, never the list's context.
     fn emit_items(&mut self, items: &ItemList, descent: Descent, entry: State) -> State {
-        let navs = compute_nav_modes(
-            items.as_slice(),
-            items.nav_context.is_inside_node(),
-            self.ctx.symbol_table,
-        );
+        let navs = self
+            .anchor_semantics
+            .compute_nav_modes(items.as_slice(), items.nav_context.is_inside_node());
         let mut navs = navs.into_iter();
         let mut cur = entry;
         let mut first = true;

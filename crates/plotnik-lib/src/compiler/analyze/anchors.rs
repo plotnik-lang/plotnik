@@ -111,6 +111,16 @@ pub struct AnonymousClassifier<'a> {
     cache: RefCell<HashMap<String, bool>>,
 }
 
+/// Computes anchor-derived navigation with one anonymous-pattern cache.
+///
+/// A node body needs both leading-gap navs and trailing-anchor navs; building those
+/// through separate free functions used to create separate classifiers and re-walk
+/// the same referenced definitions. Keep the classifier here so one construction pass
+/// pays that cost once.
+pub struct AnchorSemantics<'a> {
+    classifier: AnonymousClassifier<'a>,
+}
+
 /// Whether this pattern's immediate branches compile branch-local entry navs.
 ///
 /// A soft anchor before such a pattern is decided by each branch, not by the
@@ -213,99 +223,106 @@ impl<'a> AnonymousClassifier<'a> {
     }
 }
 
-/// Check for trailing anchor in items, descending into a sole-child sequence if needed.
-pub fn check_trailing_anchor(items: &[SeqItem], symbol_table: &SymbolTable) -> (bool, Option<Nav>) {
-    if let Some(SeqItem::Anchor(anchor)) = items.last() {
-        if anchor.is_strict() {
-            return (true, Some(Nav::UpExact(1)));
+impl<'a> AnchorSemantics<'a> {
+    pub fn new(symbol_table: &'a SymbolTable) -> Self {
+        Self {
+            classifier: AnonymousClassifier::new(symbol_table),
         }
-
-        let prev_pattern = items.iter().rev().skip(1).find_map(|item| {
-            if let SeqItem::Pattern(e) = item {
-                Some(e)
-            } else {
-                None
-            }
-        });
-
-        let classifier = AnonymousClassifier::new(symbol_table);
-        let nav = if classifier.pattern_may_match_anonymous(prev_pattern) {
-            Nav::UpSkipExtras(1)
-        } else {
-            Nav::UpSkipTrivia(1)
-        };
-        return (true, Some(nav));
     }
 
-    if items.len() == 1
-        && let Some(SeqItem::Pattern(Pattern::SeqPattern(seq))) = items.first()
-    {
-        let seq_items: Vec<_> = seq.items().collect();
-        return check_trailing_anchor(&seq_items, symbol_table);
-    }
-
-    (false, None)
-}
-
-pub fn compute_nav_modes(
-    items: &[SeqItem],
-    is_inside_node: bool,
-    symbol_table: &SymbolTable,
-) -> Vec<(usize, Option<Nav>)> {
-    let mut result = Vec::new();
-    let mut pending_anchor_strict = None;
-    let mut prev_is_anonymous = false;
-    let mut is_first_pattern = true;
-    let classifier = AnonymousClassifier::new(symbol_table);
-
-    for (idx, item) in items.iter().enumerate() {
-        match item {
-            SeqItem::Anchor(anchor) => {
-                pending_anchor_strict = Some(anchor.is_strict());
+    /// Check for trailing anchor in items, descending into a sole-child sequence if needed.
+    pub fn check_trailing_anchor(&self, items: &[SeqItem]) -> (bool, Option<Nav>) {
+        if let Some(SeqItem::Anchor(anchor)) = items.last() {
+            if anchor.is_strict() {
+                return (true, Some(Nav::UpExact(1)));
             }
-            SeqItem::Pattern(pattern) => {
-                let current_is_anonymous = classifier.pattern_may_match_anonymous(Some(pattern));
-                // Alternation branches compile their own entry nav, so the branch body—not
-                // the whole alternation—decides whether soft anchors use extras-only nav.
-                let current_is_anonymous_for_anchor = if has_direct_alternation_branch_nav(pattern)
-                {
-                    false
-                } else {
-                    current_is_anonymous
-                };
-                let nav = if let Some(is_exact) = pending_anchor_strict {
-                    if is_first_pattern && is_inside_node {
-                        Some(if is_exact {
-                            Nav::DownExact
-                        } else if current_is_anonymous_for_anchor {
-                            Nav::DownSkipExtras
-                        } else {
-                            Nav::DownSkip
-                        })
-                    } else if !is_first_pattern {
-                        Some(if is_exact {
-                            Nav::NextExact
-                        } else if prev_is_anonymous || current_is_anonymous_for_anchor {
-                            Nav::NextSkipExtras
-                        } else {
-                            Nav::NextSkip
-                        })
-                    } else {
-                        None
-                    }
-                } else if !is_first_pattern {
-                    Some(Nav::Next)
+
+            let prev_pattern = items.iter().rev().skip(1).find_map(|item| {
+                if let SeqItem::Pattern(e) = item {
+                    Some(e)
                 } else {
                     None
-                };
+                }
+            });
 
-                result.push((idx, nav));
-                pending_anchor_strict = None;
-                prev_is_anonymous = current_is_anonymous;
-                is_first_pattern = false;
-            }
+            let nav = if self.classifier.pattern_may_match_anonymous(prev_pattern) {
+                Nav::UpSkipExtras(1)
+            } else {
+                Nav::UpSkipTrivia(1)
+            };
+            return (true, Some(nav));
         }
+
+        if items.len() == 1
+            && let Some(SeqItem::Pattern(Pattern::SeqPattern(seq))) = items.first()
+        {
+            let seq_items: Vec<_> = seq.items().collect();
+            return self.check_trailing_anchor(&seq_items);
+        }
+
+        (false, None)
     }
 
-    result
+    pub fn compute_nav_modes(
+        &self,
+        items: &[SeqItem],
+        is_inside_node: bool,
+    ) -> Vec<(usize, Option<Nav>)> {
+        let mut result = Vec::new();
+        let mut pending_anchor_strict = None;
+        let mut prev_is_anonymous = false;
+        let mut is_first_pattern = true;
+
+        for (idx, item) in items.iter().enumerate() {
+            match item {
+                SeqItem::Anchor(anchor) => {
+                    pending_anchor_strict = Some(anchor.is_strict());
+                }
+                SeqItem::Pattern(pattern) => {
+                    let current_is_anonymous =
+                        self.classifier.pattern_may_match_anonymous(Some(pattern));
+                    // Alternation branches compile their own entry nav, so the branch body—not
+                    // the whole alternation—decides whether soft anchors use extras-only nav.
+                    let current_is_anonymous_for_anchor =
+                        if has_direct_alternation_branch_nav(pattern) {
+                            false
+                        } else {
+                            current_is_anonymous
+                        };
+                    let nav = if let Some(is_exact) = pending_anchor_strict {
+                        if is_first_pattern && is_inside_node {
+                            Some(if is_exact {
+                                Nav::DownExact
+                            } else if current_is_anonymous_for_anchor {
+                                Nav::DownSkipExtras
+                            } else {
+                                Nav::DownSkip
+                            })
+                        } else if !is_first_pattern {
+                            Some(if is_exact {
+                                Nav::NextExact
+                            } else if prev_is_anonymous || current_is_anonymous_for_anchor {
+                                Nav::NextSkipExtras
+                            } else {
+                                Nav::NextSkip
+                            })
+                        } else {
+                            None
+                        }
+                    } else if !is_first_pattern {
+                        Some(Nav::Next)
+                    } else {
+                        None
+                    };
+
+                    result.push((idx, nav));
+                    pending_anchor_strict = None;
+                    prev_is_anonymous = current_is_anonymous;
+                    is_first_pattern = false;
+                }
+            }
+        }
+
+        result
+    }
 }
