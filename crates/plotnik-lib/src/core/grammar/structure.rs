@@ -6,8 +6,8 @@
 //! facts — *what it matches* (a public id) and *what it descends into* (a
 //! variable) — built from the same [`GrammarContext`] and reusing `node_shapes`'
 //! symbol resolution and `lower`'s public-name normalization so the views cannot
-//! drift. It is the substrate for sequence/anchor impossibility (#444) and
-//! first-set analysis.
+//! drift. It is the substrate for sequence/anchor satisfiability and first-set
+//! analysis.
 //!
 //! # Assumptions
 //!
@@ -44,8 +44,10 @@
 //!   every shipped grammar; if it ever trips, the classifier has a new gap.
 //! - **Built only via `from_raw`, eagerly and owned.** The flattened grammar is gone
 //!   by `from_metadata`, so a metadata-only `Grammar` has an empty table. The table
-//!   is built for every grammar even with no consumer yet, and `Grammar` clones
-//!   deep-copy it; both are provisional, to revisit when a consumer lands.
+//!   is built eagerly because reachability and satisfiability both consume it, and
+//!   `Grammar` clones deep-copy it; if clone cost shows up, share this owned table.
+
+use std::collections::HashMap;
 
 use crate::core::{NodeFieldId, NodeKindId};
 
@@ -58,7 +60,7 @@ use super::prepared::{ProductionStep, VariableType};
 use super::types::Grammar;
 
 /// Index of a syntax variable, aligned with [`StructureTable::variables`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct VarId(u32);
 
 impl VarId {
@@ -89,12 +91,95 @@ pub struct StepTarget {
     pub body: Option<VarId>,
 }
 
+impl StepTarget {
+    /// Variable whose children/fields surface through this step without crossing into
+    /// a concrete child: id-less inlined rules and kept supertypes.
+    pub(crate) fn transparent_body(self, grammar: &Grammar) -> Option<VarId> {
+        match (self.id, self.body) {
+            (Some(id), Some(body)) if grammar.is_supertype(id) => Some(body),
+            (None, Some(body)) => Some(body),
+            _ => None,
+        }
+    }
+
+    /// Id-less field values stand for the frontier of their body. A target with an id
+    /// is already the value kind to record, even if it also descends into a body.
+    pub(crate) fn idless_value_body(self) -> Option<VarId> {
+        if self.id.is_none() { self.body } else { None }
+    }
+}
+
 /// One production step: the node it matches, and the field it binds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SkeletonStep {
     pub target: StepTarget,
     /// Field this step binds to, if any.
     pub field: Option<NodeFieldId>,
+}
+
+impl SkeletonStep {
+    pub(crate) fn admissibility(self, grammar: &Grammar) -> AdmissibilityStep {
+        if let Some(field) = self.field {
+            return AdmissibilityStep::Field {
+                field,
+                value: self.field_value(),
+            };
+        }
+        if let Some(kind) = self.target.id {
+            return AdmissibilityStep::Child {
+                kind,
+                transparent_fields: self.target.transparent_body(grammar),
+            };
+        }
+        if let Some(body) = self.target.transparent_body(grammar) {
+            AdmissibilityStep::Transparent { body }
+        } else {
+            AdmissibilityStep::HiddenLeaf
+        }
+    }
+
+    pub(crate) fn field_value(self) -> FieldValueProjection {
+        if let Some(kind) = self.target.id {
+            return FieldValueProjection::Kind(kind);
+        }
+        if let Some(body) = self.target.idless_value_body() {
+            FieldValueProjection::Frontier(body)
+        } else {
+            FieldValueProjection::Empty
+        }
+    }
+
+    fn surface_realizer(self) -> Option<SurfaceRealizer> {
+        self.target
+            .id
+            .map(|kind| SurfaceRealizer::new(kind, self.target.body))
+    }
+}
+
+/// How a skeleton step widens the structural admissibility model.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AdmissibilityStep {
+    Field {
+        field: NodeFieldId,
+        value: FieldValueProjection,
+    },
+    Child {
+        kind: NodeKindId,
+        /// Supertype members may expose fields on the enclosing node.
+        transparent_fields: Option<VarId>,
+    },
+    Transparent {
+        body: VarId,
+    },
+    HiddenLeaf,
+}
+
+/// The value side of a fielded step or an id-less value frontier.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FieldValueProjection {
+    Kind(NodeKindId),
+    Frontier(VarId),
+    Empty,
 }
 
 /// A grammar variable reduced to its productions.
@@ -111,6 +196,20 @@ pub struct SkeletonVariable {
     pub kind: VariableType,
     /// One inner `Vec` per production, each an ordered list of steps.
     pub productions: Vec<Vec<SkeletonStep>>,
+}
+
+/// A public kind the skeleton can surface, and the variable it descends into when
+/// it is not a leaf token.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SurfaceRealizer {
+    pub(crate) kind: NodeKindId,
+    pub(crate) body: Option<VarId>,
+}
+
+impl SurfaceRealizer {
+    fn new(kind: NodeKindId, body: Option<VarId>) -> Self {
+        Self { kind, body }
+    }
 }
 
 /// Ordered structural skeleton of every syntax variable in the grammar.
@@ -161,6 +260,48 @@ impl StructureTable {
 
     pub fn variable(&self, id: VarId) -> Option<&SkeletonVariable> {
         self.variables.get(id.index())
+    }
+
+    /// Each variable paired with its [`VarId`]. The id is otherwise unconstructible
+    /// outside this module, so this is how a consumer keys facts (realizers,
+    /// first-sets) by the variable a step descends into.
+    pub fn iter(&self) -> impl Iterator<Item = (VarId, &SkeletonVariable)> {
+        self.variables
+            .iter()
+            .enumerate()
+            .map(|(index, variable)| (VarId(index as u32), variable))
+    }
+
+    /// Every public kind the skeleton can surface, paired with the variable it
+    /// descends into. Includes a variable's own public id and every surfaced
+    /// production step (aliases included), so reachability and satisfiability share
+    /// one traversal of the ordered grammar model.
+    fn surface_realizers(&self) -> impl Iterator<Item = SurfaceRealizer> + '_ {
+        self.iter().flat_map(|(var_id, variable)| {
+            let own_id = variable
+                .id
+                .map(|kind| SurfaceRealizer::new(kind, Some(var_id)));
+            let step_ids = variable
+                .productions
+                .iter()
+                .flatten()
+                .filter_map(|step| step.surface_realizer());
+            own_id.into_iter().chain(step_ids)
+        })
+    }
+
+    /// Every surfaced kind grouped to the distinct realizers that can stand behind
+    /// it. This is the shared index for consumers that need to descend from a
+    /// public kind back into the ordered skeleton.
+    pub(crate) fn surface_realizers_by_kind(&self) -> HashMap<NodeKindId, Vec<SurfaceRealizer>> {
+        let mut by_kind: HashMap<NodeKindId, Vec<SurfaceRealizer>> = HashMap::new();
+        for realizer in self.surface_realizers() {
+            let entry = by_kind.entry(realizer.kind).or_default();
+            if !entry.contains(&realizer) {
+                entry.push(realizer);
+            }
+        }
+        by_kind
     }
 }
 
