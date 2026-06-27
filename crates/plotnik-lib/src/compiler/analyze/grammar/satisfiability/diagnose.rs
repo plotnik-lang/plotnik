@@ -17,8 +17,9 @@
 use std::collections::HashSet;
 
 use crate::compiler::analyze::Located;
+use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics, Span};
-use crate::compiler::parse::ast::{NodePattern, Pattern, SeqItem};
+use crate::compiler::parse::ast::{self, NodePattern, Pattern, SeqItem};
 use crate::compiler::parse::cst::SyntaxNode;
 use crate::core::{NodeFieldId, NodeKindId};
 
@@ -84,6 +85,16 @@ fn report_culprit(
             return ReportOutcome::Emitted;
         }
     };
+
+    if let Some(conflict) = negated_matched_field(ctx, &culprit) {
+        emit_negated_field_conflict(ctx, &culprit, conflict, diag);
+        return ReportOutcome::Emitted;
+    }
+
+    if let Some(field) = negated_required_field(ctx, &culprit) {
+        emit_negated_required_field(ctx, &culprit, field, diag);
+        return ReportOutcome::Emitted;
+    }
 
     // A single-valued field bound more than once is the whole obstacle on its own —
     // a sharper thing to say than a vague "combination the grammar never produces".
@@ -218,6 +229,155 @@ fn emit_repeated_field_failure(
     diag.report(DiagnosticKind::UnsatisfiablePattern, culprit.span())
         .detail(detail)
         .hint(format!("keep a single `{field}:` child"))
+        .emit();
+}
+
+#[derive(Clone)]
+struct NegatedFieldUse {
+    id: NodeFieldId,
+    name: String,
+    span: Span,
+}
+
+struct NegatedFieldConflict {
+    field: NegatedFieldUse,
+    matched_span: Span,
+}
+
+fn negated_fields(ctx: AutomatonContext<'_>, culprit: &ConcreteCulprit) -> Vec<NegatedFieldUse> {
+    culprit
+        .node
+        .node()
+        .syntax()
+        .children()
+        .filter_map(ast::NegatedField::cast)
+        .filter_map(|negated| {
+            let name = negated
+                .name()
+                .expect("admitted negated field must have a field name");
+            Some(NegatedFieldUse {
+                id: ctx.grammar.resolve_field(name.text())?,
+                name: name.text().to_string(),
+                span: culprit.node.span_of(name.text_range()),
+            })
+        })
+        .collect()
+}
+
+fn negated_matched_field(
+    ctx: AutomatonContext<'_>,
+    culprit: &ConcreteCulprit,
+) -> Option<NegatedFieldConflict> {
+    for field in negated_fields(ctx, culprit) {
+        let matched_span = culprit.node.node().children().find_map(|child| {
+            let located = culprit.node.wrap(child);
+            pattern_matches_field(ctx, culprit.kind, &located, field.id)
+                .then(|| pattern_span(&located))
+        });
+        if let Some(matched_span) = matched_span {
+            return Some(NegatedFieldConflict {
+                field,
+                matched_span,
+            });
+        }
+    }
+    None
+}
+
+fn negated_required_field(
+    ctx: AutomatonContext<'_>,
+    culprit: &ConcreteCulprit,
+) -> Option<NegatedFieldUse> {
+    negated_fields(ctx, culprit).into_iter().find(|field| {
+        ctx.grammar
+            .field_cardinality(culprit.kind, field.id)
+            .is_some_and(|cardinality| cardinality.is_required())
+    })
+}
+
+fn pattern_matches_field(
+    ctx: AutomatonContext<'_>,
+    parent: NodeKindId,
+    pattern: &Located<Pattern>,
+    field: NodeFieldId,
+) -> bool {
+    match pattern.node() {
+        Pattern::FieldPattern(field_pattern) => {
+            field_pattern
+                .name()
+                .and_then(|name| ctx.grammar.resolve_field(name.text()))
+                == Some(field)
+        }
+        Pattern::CapturedPattern(cap) => cap
+            .inner()
+            .is_some_and(|inner| pattern_matches_field(ctx, parent, &pattern.wrap(inner), field)),
+        Pattern::QuantifiedPattern(q) => {
+            !q.is_optional()
+                && q.inner().is_some_and(|inner| {
+                    pattern_matches_field(ctx, parent, &pattern.wrap(inner), field)
+                })
+        }
+        Pattern::NodePattern(node) => {
+            let located = pattern.wrap(node.clone());
+            root_kind(ctx, &located)
+                .is_some_and(|kind| field_value_admits(ctx, parent, field, kind))
+        }
+        Pattern::DefRef(def_ref) => match Goal::from_def_ref(ctx, def_ref) {
+            Some(Goal::Concrete { kind, .. }) => field_value_admits(ctx, parent, field, kind),
+            _ => false,
+        },
+        Pattern::TokenPattern(_)
+        | Pattern::SeqPattern(_)
+        | Pattern::Union(_)
+        | Pattern::Enum(_) => false,
+    }
+}
+
+fn field_value_admits(
+    ctx: AutomatonContext<'_>,
+    parent: NodeKindId,
+    field: NodeFieldId,
+    value: NodeKindId,
+) -> bool {
+    let grammar = ctx.grammar;
+    grammar
+        .valid_field_types(parent, field)
+        .iter()
+        .any(|&declared| declared == value || grammar.collect_subtypes(declared).contains(&value))
+}
+
+fn emit_negated_field_conflict(
+    ctx: AutomatonContext<'_>,
+    culprit: &ConcreteCulprit,
+    conflict: NegatedFieldConflict,
+    diag: &mut Diagnostics,
+) {
+    let kind_name = culprit.kind_name(ctx);
+    let field = conflict.field.name;
+    let detail = format!(
+        "`-{field}` requires `{field}` to be absent, but this {kind_name} pattern also matches `{field}`"
+    );
+    diag.report(DiagnosticKind::UnsatisfiablePattern, conflict.field.span)
+        .detail(detail)
+        .related_to(conflict.matched_span, format!("matches `{field}` here"))
+        .hint(format!("drop `-{field}` or remove the `{field}` child"))
+        .emit();
+}
+
+fn emit_negated_required_field(
+    ctx: AutomatonContext<'_>,
+    culprit: &ConcreteCulprit,
+    field: NegatedFieldUse,
+    diag: &mut Diagnostics,
+) {
+    let kind_name = culprit.kind_name(ctx);
+    diag.report(DiagnosticKind::NegatedRequiredField, field.span)
+        .detail(field.name.clone())
+        .related_to(culprit.span(), format!("on {kind_name}"))
+        .hint(format!(
+            "`-{0}` requires `{0}` to be absent, but every {1} has one — drop `-{0}`",
+            field.name, kind_name
+        ))
         .emit();
 }
 
@@ -362,6 +522,11 @@ fn emit_arrangement_failure(
     culprit: &ConcreteCulprit,
     diag: &mut Diagnostics,
 ) {
+    if let Some(order) = order_diagnosis(ctx, culprit) {
+        emit_order_failure(ctx, culprit, order, diag);
+        return;
+    }
+
     let kind_name = culprit.kind_name(ctx);
     let detail = format!("the grammar builds no {kind_name} with these children");
     let mut builder = diag
@@ -375,6 +540,175 @@ fn emit_arrangement_failure(
          the grammar never produces",
     );
     builder.emit();
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ChildDemand {
+    Field(NodeFieldId),
+    Kind(NodeKindId),
+}
+
+#[derive(Clone, Debug)]
+struct QueryChild {
+    demand: ChildDemand,
+    span: Span,
+}
+
+struct OrderDiagnosis {
+    before: QueryChild,
+    after: QueryChild,
+}
+
+fn order_diagnosis(ctx: AutomatonContext<'_>, culprit: &ConcreteCulprit) -> Option<OrderDiagnosis> {
+    let query = query_child_demands(ctx, &culprit.node);
+    if query.len() < 2 {
+        return None;
+    }
+
+    let mut diagnosis = None;
+    for production in grammar_child_orders(ctx, culprit.kind) {
+        let positions: Option<Vec<_>> = query
+            .iter()
+            .map(|child| production.iter().position(|demand| demand == &child.demand))
+            .collect();
+        let Some(positions) = positions else {
+            continue;
+        };
+        let mut inverted = None;
+        for i in 0..query.len() {
+            for j in i + 1..query.len() {
+                if positions[i] > positions[j] {
+                    inverted = Some((i, j));
+                    break;
+                }
+            }
+            if inverted.is_some() {
+                break;
+            }
+        }
+        let Some((i, j)) = inverted else {
+            return None;
+        };
+        if diagnosis.is_none() {
+            diagnosis = Some(OrderDiagnosis {
+                before: query[j].clone(),
+                after: query[i].clone(),
+            });
+        }
+    }
+    diagnosis
+}
+
+fn query_child_demands(ctx: AutomatonContext<'_>, node: &Located<NodePattern>) -> Vec<QueryChild> {
+    node.node()
+        .children()
+        .filter_map(|child| {
+            let located = node.wrap(child);
+            query_demand(ctx, &located).map(|demand| QueryChild {
+                demand,
+                span: pattern_span(&located),
+            })
+        })
+        .collect()
+}
+
+fn query_demand(ctx: AutomatonContext<'_>, pattern: &Located<Pattern>) -> Option<ChildDemand> {
+    match pattern.node() {
+        Pattern::FieldPattern(field) => field
+            .name()
+            .and_then(|name| ctx.grammar.resolve_field(name.text()))
+            .map(ChildDemand::Field),
+        Pattern::CapturedPattern(cap) => cap
+            .inner()
+            .and_then(|inner| query_demand(ctx, &pattern.wrap(inner))),
+        Pattern::NodePattern(node) => {
+            if node.is_any() {
+                return None;
+            }
+            root_kind(ctx, &pattern.wrap(node.clone())).map(ChildDemand::Kind)
+        }
+        Pattern::TokenPattern(token) => {
+            if token.is_any() {
+                return None;
+            }
+            token
+                .value()
+                .and_then(|value| ctx.grammar.resolve_anonymous_node(value.text()))
+                .map(ChildDemand::Kind)
+        }
+        Pattern::DefRef(def_ref) => match Goal::from_def_ref(ctx, def_ref) {
+            Some(Goal::Concrete { kind, .. }) => Some(ChildDemand::Kind(kind)),
+            _ => None,
+        },
+        Pattern::QuantifiedPattern(q) => q
+            .inner()
+            .and_then(|inner| query_demand(ctx, &pattern.wrap(inner))),
+        Pattern::SeqPattern(_) | Pattern::Union(_) | Pattern::Enum(_) => None,
+    }
+}
+
+fn grammar_child_orders(ctx: AutomatonContext<'_>, kind: NodeKindId) -> Vec<Vec<ChildDemand>> {
+    let realizers_by_kind = ctx.grammar.structure().surface_realizers_by_kind();
+    let Some(realizers) = realizers_by_kind.get(&kind) else {
+        return Vec::new();
+    };
+
+    let mut orders = Vec::new();
+    for realizer in realizers {
+        let Some(body) = realizer.body else {
+            continue;
+        };
+        let Some(variable) = ctx.grammar.structure().variable(body) else {
+            continue;
+        };
+        for production in &variable.productions {
+            let order: Vec<_> = production
+                .iter()
+                .filter_map(|step| {
+                    step.field
+                        .map(ChildDemand::Field)
+                        .or_else(|| step.target.visible_kind(ctx.grammar).map(ChildDemand::Kind))
+                })
+                .collect();
+            if !order.is_empty() {
+                orders.push(order);
+            }
+        }
+    }
+    orders
+}
+
+fn emit_order_failure(
+    ctx: AutomatonContext<'_>,
+    culprit: &ConcreteCulprit,
+    order: OrderDiagnosis,
+    diag: &mut Diagnostics,
+) {
+    let kind_name = culprit.kind_name(ctx);
+    let before = order.before.demand.label(ctx);
+    let after = order.after.demand.label(ctx);
+    let detail = format!("the grammar places {before} before {after} in {kind_name}");
+    diag.report(DiagnosticKind::UnsatisfiablePattern, order.after.span)
+        .detail(detail)
+        .related_to(
+            order.before.span,
+            format!("{before} must come before {after}"),
+        )
+        .related_to(culprit.span(), format!("inside {kind_name}"))
+        .hint(format!("write {before} before {after}"))
+        .emit();
+}
+
+impl ChildDemand {
+    fn label(self, ctx: AutomatonContext<'_>) -> String {
+        match self {
+            Self::Field(field) => match ctx.grammar.field_name(field) {
+                Some(name) => format!("`{name}:`"),
+                None => "`<unknown field>:`".to_string(),
+            },
+            Self::Kind(kind) => render_kind(ctx, kind),
+        }
+    }
 }
 
 /// The primary solve proved the node impossible, but diagnostic refinement ran out
@@ -436,6 +770,12 @@ fn anchor_fix_hint(node: &Located<NodePattern>, ctx: AutomatonContext<'_>, stric
                 .to_string(),
         }
     } else {
+        if soft_anchor_skips_extras_only(node, ctx) {
+            return "here `.` skips extras only because one side can match an anonymous token; \
+                    use `(_)` for a named node, or drop the anchor to match these children \
+                    in any positions"
+                .to_string();
+        }
         "`.` skips anonymous tokens and extras but never another named node; \
          drop the anchor to match these children in any positions"
             .to_string()
@@ -448,6 +788,20 @@ fn relaxed_anchor_text(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -
     let text = ctx.content(node.source());
     let slice = text.get(usize::from(range.start())..usize::from(range.end()))?;
     slice.contains(".!").then(|| slice.replace(".!", "."))
+}
+
+fn soft_anchor_skips_extras_only(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -> bool {
+    let items: Vec<_> = node.node().items().collect();
+    let semantics = AnchorSemantics::new(ctx.symbol_table);
+    semantics
+        .compute_nav_modes(&items, true)
+        .into_iter()
+        .any(|(_, nav)| nav.and_then(GapClass::from_nav) == Some(GapClass::ExtrasOnly))
+        || semantics
+            .check_trailing_anchor(&items)
+            .1
+            .and_then(GapClass::from_nav)
+            == Some(GapClass::ExtrasOnly)
 }
 
 fn has_anchor(node: &NodePattern) -> bool {
@@ -539,6 +893,10 @@ fn pattern_label(located: &Located<Pattern>, ctx: AutomatonContext<'_>) -> Optio
         }
         _ => None,
     }
+}
+
+fn pattern_span(pattern: &Located<Pattern>) -> Span {
+    pattern.span_of(pattern.node().text_range())
 }
 
 /// The span of a node pattern's kind token, falling back to the whole node.

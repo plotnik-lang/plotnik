@@ -16,6 +16,7 @@
 use std::thread;
 
 use arborium_tree_sitter::{Language as TsLanguage, Node, Parser as TsParser, Tree};
+use indoc::indoc;
 
 use crate::bytecode::{EffectKind, Instruction, Module, Nav};
 use crate::compiler::test_utils::javascript_grammar;
@@ -52,9 +53,10 @@ const STACK_SIZE: usize = 256 * 1024;
 ///   call-retry checkpoints — a contiguous run that backtrack pops without
 ///   re-entering. At the leaf `identifier`, both branches fail and the whole run
 ///   unwinds at once.
-const QUERY: &str = "\
-Rec = [Leaf: (number) Deep: (unary_expression (Rec))]
-Top = (program (expression_statement (Rec)))";
+const QUERY: &str = indoc! {"
+    Rec = [Leaf: (number) Deep: (unary_expression (Rec))]
+    Top = (program (expression_statement (Rec)))
+"};
 
 /// Counts the longest run of consecutive `trace_backtrack` calls uninterrupted by
 /// any other trace event — i.e. the deepest single `backtrack` unwind.

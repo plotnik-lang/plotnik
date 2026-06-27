@@ -152,6 +152,16 @@ macro_rules! define_langs {
                 )*
             ]
         }
+
+        #[cfg(test)]
+        pub fn enabled_language_names() -> Vec<&'static str> {
+            vec![
+                $(
+                    #[cfg(feature = $feature)]
+                    $name,
+                )*
+            ]
+        }
     };
 }
 

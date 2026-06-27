@@ -54,18 +54,19 @@ impl<'q> GrammarLinkInput<'_, 'q> {
         // The satisfiability check (sequence/anchor/arity) runs only on a query the
         // structural check left clean: it adds rejections those checks cannot see, and
         // gating keeps it from piling onto an impossibility already pinned precisely.
-        if !diagnostics.has_errors() {
-            super::satisfiability::check(
-                super::satisfiability::SatisfiabilityInput {
-                    grammar: self.grammar,
-                    symbol_table: self.symbol_table,
-                    source_map: self.source_map,
-                    ast_map: self.ast_map,
-                    limits: self.satisfiability_limits,
-                },
-                diagnostics,
-            );
+        if diagnostics.has_errors() {
+            return;
         }
+        super::satisfiability::check(
+            super::satisfiability::SatisfiabilityInput {
+                grammar: self.grammar,
+                symbol_table: self.symbol_table,
+                source_map: self.source_map,
+                ast_map: self.ast_map,
+                limits: self.satisfiability_limits,
+            },
+            diagnostics,
+        );
     }
 }
 

@@ -88,21 +88,22 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
     // definition is walked when the loop reaches its own entry.
     for (&source, root) in input.ast_map {
         for def in root.defs() {
-            if let Some(body) = def.body() {
-                let located = Located::new(source, body);
-                if reporter
-                    .walk(&located, Participation::Required)
-                    .should_stop()
-                {
-                    return;
-                }
-                // A resource ceiling tripped mid-construction: the verdicts that follow
-                // would rest on an automaton we declined to finish, so stop and reject
-                // the whole query as too complex rather than report anything dubious.
-                if reporter.solver.is_too_complex() {
-                    diagnose::report_too_complex(&located, reporter.diag);
-                    return;
-                }
+            let Some(body) = def.body() else {
+                continue;
+            };
+            let located = Located::new(source, body);
+            if reporter
+                .walk(&located, Participation::Required)
+                .should_stop()
+            {
+                return;
+            }
+            // A resource ceiling tripped mid-construction: the verdicts that follow
+            // would rest on an automaton we declined to finish, so stop and reject
+            // the whole query as too complex rather than report anything dubious.
+            if reporter.solver.is_too_complex() {
+                diagnose::report_too_complex(&located, reporter.diag);
+                return;
             }
         }
     }
@@ -156,11 +157,14 @@ impl Reporter<'_, '_> {
                 if !participation.is_required() {
                     return WalkOutcome::Continue;
                 }
-                let Some(goal) = Goal::from_node(self.solver.context(), node) else {
+                let Some(goal) = Goal::from_node(self.solver.context(), node.clone()) else {
                     return WalkOutcome::Continue;
                 };
                 if !goal.is_impossible(self.solver) {
                     return WalkOutcome::Continue;
+                }
+                if let Some(outcome) = self.report_dead_child_alternation(&node) {
+                    return outcome;
                 }
                 diagnose::report_goal(
                     self.solver,
@@ -220,6 +224,38 @@ impl Reporter<'_, '_> {
             }
         }
         WalkOutcome::Continue
+    }
+
+    fn report_dead_child_alternation(
+        &mut self,
+        node: &Located<NodePattern>,
+    ) -> Option<WalkOutcome> {
+        for child in node.node().children() {
+            let located = node.wrap(child);
+            let Some(alternation) = self.dead_alternation_child(located) else {
+                continue;
+            };
+            return Some(self.walk(&alternation, Participation::Required));
+        }
+        None
+    }
+
+    fn dead_alternation_child(&mut self, located: Located<Pattern>) -> Option<Located<Pattern>> {
+        if matches!(located.node(), Pattern::Union(_) | Pattern::Enum(_)) {
+            return self.all_branches_impossible(&located).then_some(located);
+        }
+        match located.node() {
+            Pattern::CapturedPattern(cap) => cap
+                .inner()
+                .and_then(|inner| self.dead_alternation_child(located.wrap(inner))),
+            Pattern::FieldPattern(field) => field
+                .value()
+                .and_then(|value| self.dead_alternation_child(located.wrap(value))),
+            Pattern::QuantifiedPattern(q) if !q.is_optional() => q
+                .inner()
+                .and_then(|inner| self.dead_alternation_child(located.wrap(inner))),
+            _ => None,
+        }
     }
 
     /// Whether `located` provably cannot match any grammar tree — the cautious counterpart

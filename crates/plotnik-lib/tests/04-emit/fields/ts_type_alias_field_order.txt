@@ -1,11 +1,12 @@
 Q = (type_alias_declaration type_parameters: (type_parameters) @tp name: (type_identifier) @name)
 ==== input.ts ====
 ==== diagnostics ====
-error: the grammar builds no `type_alias_declaration` with these children
- --> query.ptk:1:6
+error: the grammar places `name:` before `type_parameters:` in `type_alias_declaration`
+ --> query.ptk:1:29
   |
 1 | Q = (type_alias_declaration type_parameters: (type_parameters) @tp name: (type_identifier) @name)
-  |      ^^^^^^^^^^^^^^^^^^^^^^
+  |      ---------------------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ----------------------------- `name:` must come before `type_parameters:`
+  |      |
+  |      inside `type_alias_declaration`
   |
-help: `type_alias_declaration` allows fields `name`, `type_parameters` or `value`
-help: each child is admissible here on its own — it is their combination or order the grammar never produces
+help: write `name:` before `type_parameters:`

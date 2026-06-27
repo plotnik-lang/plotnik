@@ -2,7 +2,7 @@ use super::types::{
     FieldEntry, Grammar, GrammarTables, NodeKindEntry, NodeKindRef, NodeShape, NodeShapeBuildError,
     NodeSlot, build_node_constraints,
 };
-use crate::core::{NodeFieldId, NodeKind, NodeKindId};
+use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
 
 impl NodeShape {
     /// A named node kind: non-root, no fields, no children.
@@ -56,8 +56,8 @@ fn field_id_for_name(field: &str) -> Option<NodeFieldId> {
 fn builds_node_constraints_from_node_shapes() {
     let shapes = vec![
         NodeShape::root("root")
-            .with_field("body", child_slot(false, true))
-            .with_children(child_slot(true, false)),
+            .with_field("body", child_slot(Cardinality::ExactlyOne))
+            .with_children(child_slot(Cardinality::ZeroOrMore)),
     ];
 
     let (node_constraints, _, root_node_kind) =
@@ -101,10 +101,10 @@ fn skips_known_abstract_child_shapes() {
     assert_eq!(children.valid_types, &[]);
 }
 
-fn child_slot(multiple: bool, required: bool) -> NodeSlot {
+fn child_slot(cardinality: Cardinality) -> NodeSlot {
     NodeSlot {
-        multiple,
-        required,
+        multiple: cardinality.is_multiple(),
+        required: cardinality.is_required(),
         types: vec![NodeKindRef {
             kind_name: "child".to_string(),
             named: true,
@@ -218,7 +218,7 @@ fn declared_child_structure_uses_exact_node_shape() {
     let metadata = GrammarTables {
         node_shapes: vec![
             NodeShape::root("root").with_children(slot_of("fielded")),
-            NodeShape::named("fielded").with_field("body", child_slot(false, false)),
+            NodeShape::named("fielded").with_field("body", child_slot(Cardinality::Optional)),
             NodeShape::named("abstract_only").with_children(slot_of("_abstract")),
             NodeShape::named("_abstract"),
             NodeShape::named("leaf"),

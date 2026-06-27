@@ -1,10 +1,9 @@
 Q = (new_expression -arguments (arguments))
 ==== diagnostics ====
-error: the grammar builds no `new_expression` with these children
- --> query.ptk:1:6
+error: `-arguments` requires `arguments` to be absent, but this `new_expression` pattern also matches `arguments`
+ --> query.ptk:1:22
   |
 1 | Q = (new_expression -arguments (arguments))
-  |      ^^^^^^^^^^^^^^
+  |                      ^^^^^^^^^ ----------- matches `arguments` here
   |
-help: `new_expression` allows fields `arguments` or `constructor`
-help: each child is admissible here on its own — it is their combination or order the grammar never produces
+help: drop `-arguments` or remove the `arguments` child

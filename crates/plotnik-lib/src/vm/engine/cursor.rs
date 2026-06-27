@@ -106,7 +106,10 @@ impl<'t> CursorWrapper<'t> {
 
     #[inline]
     fn node_class(node: &Node<'_>) -> NodeClass {
-        NodeClass::from_runtime(node.is_named(), node.is_extra())
+        NodeClass {
+            anonymous: !node.is_named(),
+            extra: node.is_extra(),
+        }
     }
 
     #[inline]

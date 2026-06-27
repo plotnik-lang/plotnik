@@ -407,10 +407,10 @@ impl Grammar {
     }
 
     pub(crate) fn node_class(&self, node_kind_id: NodeKindId) -> NodeClass {
-        NodeClass::from_grammar(
-            self.is_anonymous_node(node_kind_id),
-            self.is_extra(node_kind_id),
-        )
+        NodeClass {
+            anonymous: self.is_anonymous_node(node_kind_id),
+            extra: self.is_extra(node_kind_id),
+        }
     }
 
     /// The visible extra kinds (comments and the like) the parser may insert between

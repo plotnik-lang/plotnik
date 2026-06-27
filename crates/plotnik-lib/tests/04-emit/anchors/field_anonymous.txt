@@ -6,4 +6,4 @@ error: no `pair` places these children in this adjacency
 1 | Q = (pair key: (property_identifier) . value: _)
   |      ^^^^
   |
-help: `.` skips anonymous tokens and extras but never another named node; drop the anchor to match these children in any positions
+help: here `.` skips extras only because one side can match an anonymous token; use `(_)` for a named node, or drop the anchor to match these children in any positions

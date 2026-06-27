@@ -334,9 +334,23 @@ fn format_id(id: Option<u16>) -> String {
 #[test]
 fn abi_compat_all_languages() {
     let langs = language_registry::all();
-    if langs.is_empty() {
+    let expected = language_registry::enabled_language_names();
+    if expected.is_empty() {
         #[cfg(feature = "all-languages")]
         panic!("no languages registered");
+    }
+
+    let registered = langs.iter().map(|lang| lang.name()).collect::<HashSet<_>>();
+    assert_eq!(
+        registered.len(),
+        expected.len(),
+        "enabled language feature count must match registered languages"
+    );
+    for name in expected {
+        assert!(
+            registered.contains(name),
+            "enabled language `{name}` was not registered"
+        );
     }
 
     for lang in langs {
@@ -468,46 +482,47 @@ fn check_real_tree_admissibility(
     let parent_kind = node.kind();
     let parent_id = grammar.resolve_named_node(parent_kind);
     let mut cursor = node.walk();
-    if cursor.goto_first_child() {
-        loop {
-            let child = cursor.node();
-            if child.is_named()
-                && let Some(parent) = parent_id
-                && let Some(value) = grammar.resolve_named_node(child.kind())
-            {
-                *checked += 1;
-                match cursor.field_name() {
-                    Some(field_name) => {
-                        if let Some(field) = grammar.resolve_field(field_name) {
-                            if !grammar.has_field(parent, field) {
-                                violations.push(format!(
-                                    "[{lang}] `{parent_kind}` lacks field `{field_name}` (real value `{}`)",
-                                    child.kind()
-                                ));
-                            } else if !admits(grammar.valid_field_types(parent, field), value) {
-                                violations.push(format!(
-                                    "[{lang}] `{parent_kind}.{field_name}` rejects real value `{}`",
-                                    child.kind()
-                                ));
-                            }
-                        }
-                    }
-                    None => {
-                        if !admits(grammar.valid_child_types(parent), value)
-                            && !grammar.is_extra(value)
-                        {
+    if !cursor.goto_first_child() {
+        return;
+    }
+
+    loop {
+        let child = cursor.node();
+        if child.is_named()
+            && let Some(parent) = parent_id
+            && let Some(value) = grammar.resolve_named_node(child.kind())
+        {
+            *checked += 1;
+            match cursor.field_name() {
+                Some(field_name) => {
+                    if let Some(field) = grammar.resolve_field(field_name) {
+                        if !grammar.has_field(parent, field) {
                             violations.push(format!(
-                                "[{lang}] `{parent_kind}` rejects real child `{}`",
+                                "[{lang}] `{parent_kind}` lacks field `{field_name}` (real value `{}`)",
+                                child.kind()
+                            ));
+                        } else if !admits(grammar.valid_field_types(parent, field), value) {
+                            violations.push(format!(
+                                "[{lang}] `{parent_kind}.{field_name}` rejects real value `{}`",
                                 child.kind()
                             ));
                         }
                     }
                 }
+                None => {
+                    if !admits(grammar.valid_child_types(parent), value) && !grammar.is_extra(value)
+                    {
+                        violations.push(format!(
+                            "[{lang}] `{parent_kind}` rejects real child `{}`",
+                            child.kind()
+                        ));
+                    }
+                }
             }
-            check_real_tree_admissibility(grammar, child, lang, checked, violations);
-            if !cursor.goto_next_sibling() {
-                break;
-            }
+        }
+        check_real_tree_admissibility(grammar, child, lang, checked, violations);
+        if !cursor.goto_next_sibling() {
+            break;
         }
     }
 }

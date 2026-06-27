@@ -7,10 +7,22 @@ use super::anchors::GapClass;
 fn admits_mirrors_vm_skip_policy() {
     // (anonymous, extra) axes are independent; the four kinds of node are
     // named-structural, anonymous-token, named-extra, anonymous-extra.
-    let named = NodeClass::from_grammar(false, false);
-    let anon = NodeClass::from_grammar(true, false);
-    let named_extra = NodeClass::from_grammar(false, true);
-    let anon_extra = NodeClass::from_grammar(true, true);
+    let named = NodeClass {
+        anonymous: false,
+        extra: false,
+    };
+    let anon = NodeClass {
+        anonymous: true,
+        extra: false,
+    };
+    let named_extra = NodeClass {
+        anonymous: false,
+        extra: true,
+    };
+    let anon_extra = NodeClass {
+        anonymous: true,
+        extra: true,
+    };
 
     // Any skips everything, even a named structural sibling.
     assert!(GapClass::Any.admits(named));

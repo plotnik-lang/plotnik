@@ -25,21 +25,8 @@ pub use interner::{Interner, Symbol};
 /// the call site that constructs the value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct NodeClass {
-    anonymous: bool,
-    extra: bool,
-}
-
-impl NodeClass {
-    pub(crate) fn from_runtime(named: bool, extra: bool) -> Self {
-        Self {
-            anonymous: !named,
-            extra,
-        }
-    }
-
-    pub(crate) fn from_grammar(anonymous: bool, extra: bool) -> Self {
-        Self { anonymous, extra }
-    }
+    pub(crate) anonymous: bool,
+    pub(crate) extra: bool,
 }
 
 /// What kind of sibling may be skipped while searching for the next match.
