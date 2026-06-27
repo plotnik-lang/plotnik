@@ -473,8 +473,8 @@ impl<'a> SatisfiabilitySolver<'a> {
     /// Whether some named kind the grammar surfaces can have `node`'s children — the
     /// satisfiability question for a wildcard parent `(_ …)`, which fixes no kind of its
     /// own. Accept on the first candidate that works; only an impossible wildcard pays
-    /// for ruling every candidate out, and only a wildcard *with* a child list reaches
-    /// here at all.
+    /// for ruling every candidate out, and only a wildcard with child-structure
+    /// constraints reaches here at all.
     pub(super) fn wildcard_satisfiable(&mut self, node: &Located<NodePattern>) -> bool {
         for index in 0..self.frozen.parent_candidate_kinds().len() {
             let kind = self.frozen.parent_candidate_kinds()[index];

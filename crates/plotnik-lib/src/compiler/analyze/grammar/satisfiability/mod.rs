@@ -39,7 +39,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
-use crate::compiler::parse::ast::{NodePattern, Pattern, Root, token_src};
+use crate::compiler::parse::ast::{self, NodePattern, Pattern, Root, token_src};
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::core::NodeKindId;
 use crate::core::grammar::Grammar;
@@ -352,9 +352,18 @@ fn root_kind(ctx: AutomatonContext<'_>, located: &Located<NodePattern>) -> Optio
 }
 
 /// A wildcard parent (`(_ …)` / `_ …`) that constrains children. It fixes no kind of
-/// its own — so `root_kind` returns `None` — yet a child list still makes it possibly
-/// impossible: satisfiability then asks whether *any* node kind takes those children.
-/// A bare `(_)` constrains nothing and is always matchable, so it is excluded.
+/// its own — so `root_kind` returns `None` — yet child-structure constraints still
+/// make it possibly impossible: satisfiability then asks whether *any* node kind can
+/// realize them. A bare `(_)` constrains nothing and is always matchable, so it is
+/// excluded.
 fn is_wildcard_parent(node: &Located<NodePattern>) -> bool {
-    node.node().is_any() && node.node().items().next().is_some()
+    node.node().is_any() && node_constrains_children(node.node())
+}
+
+fn node_constrains_children(node: &NodePattern) -> bool {
+    node.items().next().is_some()
+        || node
+            .syntax()
+            .children()
+            .any(|child| ast::NegatedField::cast(child).is_some())
 }
