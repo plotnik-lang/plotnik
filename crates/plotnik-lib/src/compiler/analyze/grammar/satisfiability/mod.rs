@@ -174,13 +174,7 @@ impl Reporter<'_, '_> {
                 } else {
                     participation.inside_disjunction_branch()
                 };
-                for branch in located.node().children() {
-                    let outcome = self.walk(&located.wrap(branch), branch_participation);
-                    if outcome.is_too_complex() {
-                        return outcome;
-                    }
-                }
-                WalkOutcome::Continue
+                self.walk_children(located, branch_participation)
             }
             Pattern::CapturedPattern(cap) => {
                 if let Some(inner) = cap.inner() {
@@ -194,15 +188,7 @@ impl Reporter<'_, '_> {
                 }
                 WalkOutcome::Continue
             }
-            Pattern::SeqPattern(seq) => {
-                for child in seq.children() {
-                    let outcome = self.walk(&located.wrap(child), participation);
-                    if outcome.is_too_complex() {
-                        return outcome;
-                    }
-                }
-                WalkOutcome::Continue
-            }
+            Pattern::SeqPattern(_) => self.walk_children(located, participation),
             Pattern::QuantifiedPattern(q) => {
                 if let Some(inner) = q.inner() {
                     let inner_participation = participation.inside_quantifier_body(q);
@@ -213,6 +199,20 @@ impl Reporter<'_, '_> {
             // A token always matches; a reference is walked at its own definition.
             Pattern::TokenPattern(_) | Pattern::DefRef(_) => WalkOutcome::Continue,
         }
+    }
+
+    fn walk_children(
+        &mut self,
+        located: &Located<Pattern>,
+        participation: Participation,
+    ) -> WalkOutcome {
+        for child in located.node().children() {
+            let outcome = self.walk(&located.wrap(child), participation);
+            if outcome.is_too_complex() {
+                return outcome;
+            }
+        }
+        WalkOutcome::Continue
     }
 
     /// Whether `located` provably cannot match any grammar tree — the cautious counterpart
