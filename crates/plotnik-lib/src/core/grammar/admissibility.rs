@@ -286,22 +286,15 @@ impl ReachabilityBuilder<'_> {
                 self.collect_field_value(node, field, step.target);
                 continue;
             }
-            match (step.target.id, step.target.body) {
-                (Some(id), body) => {
-                    if !self.grammar.is_anonymous_node(id) {
-                        self.children.entry(node).or_default().insert(id);
-                    }
-                    // A supertype is transparent for fields: its members may carry fields
-                    // that surface on `node`. Descend it for those alone — its children are
-                    // already covered by the id recorded above and expanded downstream.
-                    if self.grammar.is_supertype(id)
-                        && let Some(body) = body
-                    {
-                        self.collect_transparent_fields(node, body, &mut HashSet::new());
-                    }
+            if let Some(id) = step.target.id {
+                if !self.grammar.is_anonymous_node(id) {
+                    self.children.entry(node).or_default().insert(id);
                 }
-                (None, Some(body)) => self.collect_node(node, body, seen),
-                (None, None) => {}
+                if let Some(body) = step.target.transparent_body(self.grammar) {
+                    self.collect_transparent_fields(node, body, &mut HashSet::new());
+                }
+            } else if let Some(body) = step.target.transparent_body(self.grammar) {
+                self.collect_node(node, body, seen);
             }
         }
     }
@@ -325,12 +318,8 @@ impl ReachabilityBuilder<'_> {
                 self.collect_field_value(node, field, step.target);
                 continue;
             }
-            match (step.target.id, step.target.body) {
-                (Some(id), Some(body)) if self.grammar.is_supertype(id) => {
-                    self.collect_transparent_fields(node, body, seen)
-                }
-                (None, Some(body)) => self.collect_transparent_fields(node, body, seen),
-                _ => {}
+            if let Some(body) = step.target.transparent_body(self.grammar) {
+                self.collect_transparent_fields(node, body, seen);
             }
         }
     }
@@ -342,12 +331,10 @@ impl ReachabilityBuilder<'_> {
     /// — a field value may be a literal token (`operator: "+"`).
     fn collect_field_value(&mut self, node: NodeKindId, field: NodeFieldId, target: StepTarget) {
         let value = &mut self.fields.entry((node, field)).or_default().types;
-        match (target.id, target.body) {
-            (Some(id), _) => value.insert(id),
-            (None, Some(body)) => {
-                collect_value_frontier(self.grammar, body, value, &mut HashSet::new())
-            }
-            (None, None) => {}
+        if let Some(id) = target.id {
+            value.insert(id);
+        } else if let Some(body) = target.idless_value_body() {
+            collect_value_frontier(self.grammar, body, value, &mut HashSet::new());
         }
     }
 }
@@ -385,10 +372,10 @@ fn collect_value_frontier(
     }
     let variable = structure_variable(grammar, var);
     for step in variable.productions.iter().flatten() {
-        match (step.target.id, step.target.body) {
-            (Some(id), _) => out.insert(id),
-            (None, Some(body)) => collect_value_frontier(grammar, body, out, seen),
-            (None, None) => {}
+        if let Some(id) = step.target.id {
+            out.insert(id);
+        } else if let Some(body) = step.target.idless_value_body() {
+            collect_value_frontier(grammar, body, out, seen);
         }
     }
 }

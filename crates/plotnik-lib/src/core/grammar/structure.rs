@@ -91,6 +91,30 @@ pub struct StepTarget {
     pub body: Option<VarId>,
 }
 
+impl StepTarget {
+    /// Public concrete kind this step surfaces as a child. Supertypes are not concrete
+    /// CST nodes, so consumers that need runtime-visible steps must descend through them.
+    pub(crate) fn visible_kind(self, grammar: &Grammar) -> Option<NodeKindId> {
+        self.id.filter(|&id| !grammar.is_supertype(id))
+    }
+
+    /// Variable whose children/fields surface through this step without crossing into
+    /// a concrete child: id-less inlined rules and kept supertypes.
+    pub(crate) fn transparent_body(self, grammar: &Grammar) -> Option<VarId> {
+        match (self.id, self.body) {
+            (Some(id), Some(body)) if grammar.is_supertype(id) => Some(body),
+            (None, Some(body)) => Some(body),
+            _ => None,
+        }
+    }
+
+    /// Id-less field values stand for the frontier of their body. A target with an id
+    /// is already the value kind to record, even if it also descends into a body.
+    pub(crate) fn idless_value_body(self) -> Option<VarId> {
+        if self.id.is_none() { self.body } else { None }
+    }
+}
+
 /// One production step: the node it matches, and the field it binds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SkeletonStep {

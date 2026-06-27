@@ -223,18 +223,17 @@ impl<'a> Frozen<'a> {
     /// Keying the descent off the step's own `body` is what keeps aliased nodes
     /// structurally distinct from their namesakes.
     fn classify(&self, step: &SkeletonStep) -> StepClass {
-        match (step.target.id, step.target.body) {
-            (Some(id), body) if self.ctx.grammar.is_supertype(id) => match body {
-                Some(var) => StepClass::HiddenSubtree(var),
-                None => StepClass::HiddenLeaf,
-            },
-            (Some(kind), _) => StepClass::Visible {
+        if let Some(kind) = step.target.visible_kind(self.ctx.grammar) {
+            return StepClass::Visible {
                 kind,
                 field: step.field,
                 realizer: NodeRealizer::of_step(step),
-            },
-            (None, Some(var)) => StepClass::HiddenSubtree(var),
-            (None, None) => StepClass::HiddenLeaf,
+            };
+        }
+        if let Some(var) = step.target.transparent_body(self.ctx.grammar) {
+            StepClass::HiddenSubtree(var)
+        } else {
+            StepClass::HiddenLeaf
         }
     }
 
