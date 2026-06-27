@@ -22,6 +22,8 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use indexmap::IndexSet;
+
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::GapClass;
 use crate::compiler::parse::ast::NodePattern;
@@ -173,13 +175,16 @@ impl<'a> Frozen<'a> {
     /// kind the grammar can build. A wildcard with children is satisfiable iff one of
     /// these takes those children — a token can never be a parent, so it is excluded.
     fn parent_candidate_kinds(&self) -> Vec<NodeKindId> {
-        self.producers
+        let mut candidates: Vec<NodeKindId> = self
+            .producers
             .keys()
             .copied()
             .filter(|&k| {
                 !self.ctx.grammar.is_anonymous_node(k) && !self.ctx.grammar.is_supertype(k)
             })
-            .collect()
+            .collect();
+        candidates.sort_unstable();
+        candidates
     }
 
     /// Extra kinds a child matcher could consume. Only kinds the matcher admits — a
@@ -271,7 +276,7 @@ struct Solve {
     sat: HashMap<SatKey, bool>,
     thread: HashMap<ThreadKey, StateSet>,
     /// `dependents[k]` are the keys that read `k` — re-queued when `k` changes.
-    dependents: HashMap<Key, HashSet<Key>>,
+    dependents: HashMap<Key, IndexSet<Key>>,
     /// The key currently being recomputed, so reads attribute to it.
     current: Option<Key>,
     queue: VecDeque<Key>,
