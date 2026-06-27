@@ -46,7 +46,7 @@ enum StepClass {
     /// from a hidden ancestor (the innermost label is the one the runtime attaches).
     Visible(VisibleStep),
     /// A child spliced in without an id of its own: thread through its frontier.
-    HiddenSubtree(VarId),
+    HiddenSubtree(HiddenStep),
     /// A hidden token: present in the production, absent from the tree.
     HiddenLeaf,
 }
@@ -60,6 +60,18 @@ struct VisibleStep {
 
 impl VisibleStep {
     fn effective_field(self, inherited: Option<NodeFieldId>) -> Option<NodeFieldId> {
+        self.field.or(inherited)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct HiddenStep {
+    var: VarId,
+    field: Option<NodeFieldId>,
+}
+
+impl HiddenStep {
+    fn pushed_field(self, inherited: Option<NodeFieldId>) -> Option<NodeFieldId> {
         self.field.or(inherited)
     }
 }
@@ -190,7 +202,10 @@ impl<'a> Frozen<'a> {
             });
         }
         if let Some(var) = step.target.transparent_body(self.ctx.grammar) {
-            StepClass::HiddenSubtree(var)
+            StepClass::HiddenSubtree(HiddenStep {
+                var,
+                field: step.field,
+            })
         } else {
             StepClass::HiddenLeaf
         }
@@ -276,8 +291,8 @@ impl<'a> Frozen<'a> {
                     out.push(visible.kind);
                     break;
                 }
-                StepClass::HiddenSubtree(h) => {
-                    self.edge_kinds_of_var(h, edge, out, visited);
+                StepClass::HiddenSubtree(hidden) => {
+                    self.edge_kinds_of_var(hidden.var, edge, out, visited);
                     break;
                 }
                 // A hidden token surfaces nothing — the edge child is further along.
@@ -674,21 +689,28 @@ impl Solve {
             // Splice the hidden variable's visible frontier in, pushing down the label it
             // inherits: this step's own field if it has one, otherwise the one already
             // inherited (a plain supertype link never relabels what it carries).
-            StepClass::HiddenSubtree(h) => {
-                let pushed = step.field.or(thread.inherited_field);
-                let mut next = StateSet::default();
-                for q in current.iter() {
-                    if !self.charge() {
-                        break;
-                    }
-                    let reached = self.get_thread(thread.hidden_key(h, q, pushed));
-                    next.union_with(&reached);
-                }
-                next
-            }
+            StepClass::HiddenSubtree(hidden) => self.thread_hidden_subtree(thread, current, hidden),
             // A hidden token surfaces nothing and consumes nothing.
             StepClass::HiddenLeaf => current.clone(),
         }
+    }
+
+    fn thread_hidden_subtree(
+        &mut self,
+        thread: &ProductionThread<'_, '_, '_>,
+        current: &StateSet,
+        hidden: HiddenStep,
+    ) -> StateSet {
+        let pushed = hidden.pushed_field(thread.inherited_field);
+        let mut next = StateSet::default();
+        for q in current.iter() {
+            if !self.charge() {
+                break;
+            }
+            let reached = self.get_thread(thread.hidden_key(hidden.var, q, pushed));
+            next.union_with(&reached);
+        }
+        next
     }
 
     fn thread_visible_step(
