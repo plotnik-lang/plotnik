@@ -72,6 +72,44 @@ pub(super) struct ChildMatcher {
     pub(super) field: Option<NodeFieldId>,
 }
 
+impl ChildMatcher {
+    fn any_sibling() -> Self {
+        Self {
+            kind: KindConstraint::AnyNode,
+            nested_pattern: None,
+            field: None,
+        }
+    }
+
+    fn node(
+        kind: KindConstraint,
+        nested_pattern: Option<PatternId>,
+        field: Option<NodeFieldId>,
+    ) -> Self {
+        Self {
+            kind,
+            nested_pattern,
+            field,
+        }
+    }
+
+    fn token(kind: KindConstraint, field: Option<NodeFieldId>) -> Self {
+        Self {
+            kind,
+            nested_pattern: None,
+            field,
+        }
+    }
+
+    fn unconstrained(field: Option<NodeFieldId>) -> Self {
+        Self {
+            kind: KindConstraint::Unconstrained,
+            nested_pattern: None,
+            field,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct StateData {
     /// The gap self-loop: nodes a production may skip here without leaving the state.
@@ -557,7 +595,7 @@ impl Builder<'_, '_> {
 
     fn emit_def_ref(&mut self, def_ref: &ast::DefRef, descent: Descent, from: State) -> State {
         let Some(name_token) = def_ref.name() else {
-            return self.emit_single(unconstrained_matcher(descent.field), from);
+            return self.emit_single(ChildMatcher::unconstrained(descent.field), from);
         };
         let name = name_token.text();
         // A reference that splices siblings into the parent (`Seq = {(a) (Seq)}`) makes the
@@ -567,14 +605,9 @@ impl Builder<'_, '_> {
         // a self-loop consuming any remaining sibling. The accepted language only grows
         // (rejection stays sound), while the first-child / anchor constraints still bind.
         if self.ref_stack.iter().any(|n| n == name) {
-            let any_sibling = ChildMatcher {
-                kind: KindConstraint::AnyNode,
-                nested_pattern: None,
-                field: None,
-            };
             self.states[from as usize]
                 .pattern_edges
-                .push((any_sibling, from));
+                .push((ChildMatcher::any_sibling(), from));
             return from;
         }
         let target = self
@@ -610,19 +643,11 @@ impl Builder<'_, '_> {
             self.table
                 .intern(Located::new(descent.source, node.clone()))
         });
-        ChildMatcher {
-            kind,
-            nested_pattern,
-            field: descent.field,
-        }
+        ChildMatcher::node(kind, nested_pattern, descent.field)
     }
 
     fn token_matcher(&self, token: &TokenPattern, descent: Descent) -> ChildMatcher {
-        ChildMatcher {
-            kind: self.token_kind(token, descent.source),
-            nested_pattern: None,
-            field: descent.field,
-        }
+        ChildMatcher::token(self.token_kind(token, descent.source), descent.field)
     }
 
     fn field_id(&self, field_pattern: &ast::FieldPattern) -> NodeFieldId {
@@ -679,14 +704,6 @@ fn checked_anonymous_node(ctx: AutomatonContext<'_>, text: &str) -> NodeKindId {
     ctx.grammar
         .resolve_anonymous_node(text)
         .expect("admitted anonymous token kind must resolve")
-}
-
-fn unconstrained_matcher(field: Option<NodeFieldId>) -> ChildMatcher {
-    ChildMatcher {
-        kind: KindConstraint::Unconstrained,
-        nested_pattern: None,
-        field,
-    }
 }
 
 /// Widen a narrow skip to the broad one for direct alternation positions. The VM
