@@ -6,8 +6,8 @@
 //! facts — *what it matches* (a public id) and *what it descends into* (a
 //! variable) — built from the same [`GrammarContext`] and reusing `node_shapes`'
 //! symbol resolution and `lower`'s public-name normalization so the views cannot
-//! drift. It is the substrate for sequence/anchor impossibility (#444) and
-//! first-set analysis.
+//! drift. It is the substrate for sequence/anchor satisfiability and first-set
+//! analysis.
 //!
 //! # Assumptions
 //!
