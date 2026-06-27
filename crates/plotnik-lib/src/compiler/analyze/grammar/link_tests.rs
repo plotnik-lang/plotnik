@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use crate::compiler::test_utils::colliding_node_kind_grammar;
 use crate::compiler::{Query, QueryBuilder, SourceMap, SourcePath};
 
@@ -59,15 +61,18 @@ fn diamond_reference_graph_links() {
     let depth = 30;
     let mut input = String::new();
     for i in 0..depth {
-        input.push_str(&format!(
-            "D{i} = (statement_block (D{next}) (D{next}))\n",
+        writeln!(
+            input,
+            "D{i} = (statement_block (D{next}) (D{next}))",
             next = i + 1
-        ));
+        )
+        .unwrap();
     }
     // Leaf is uncaptured: the two sibling references inline it transparently, so a
-    // capturing leaf would (correctly) collide as a duplicate capture in scope. The
-    // diamond shape — and the memoization it stresses — is unchanged.
-    input.push_str(&format!("D{depth} = (identifier)\n"));
+    // capturing leaf would (correctly) collide as a duplicate capture in scope. It is
+    // a `statement_block` so every level nests a valid block child and the whole chain
+    // stays satisfiable — a bare `(identifier)` is no statement and would be rejected.
+    writeln!(input, "D{depth} = (statement_block)").unwrap();
 
     Query::expect_valid_linking(&input);
 }

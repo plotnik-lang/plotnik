@@ -11,7 +11,9 @@ use crate::core::Interner;
 use indexmap::{IndexMap, IndexSet};
 
 use crate::compiler::analyze::names::SymbolTable;
+use crate::compiler::diagnostics::Error;
 use crate::compiler::ids::DefId;
+use crate::compiler::limits::ReferenceLimits;
 use crate::compiler::parse::ast::{DefRef, Pattern};
 
 use super::dependency_analysis::DefInfo;
@@ -20,8 +22,14 @@ pub use super::dependency_analysis::DependencyAnalysis;
 pub fn analyze_dependencies(
     symbol_table: &SymbolTable,
     interner: &mut Interner,
-) -> DependencyAnalysis {
-    let sccs = TarjanScc::find(symbol_table);
+    limits: ReferenceLimits,
+) -> Result<DependencyAnalysis, Error> {
+    // `strongconnect` recurses one frame per edge it follows. A chain like
+    // `A = (B)`, `B = (C)`, … is flat source, so the parser cannot bound it; this
+    // analysis owns the corresponding stack ceiling.
+    let Some(sccs) = TarjanScc::find(symbol_table, limits.max_depth) else {
+        return Err(Error::RecursionLimitExceeded);
+    };
 
     // Tarjan runs `strongconnect` from every symbol-table key, so each def lands in
     // exactly one SCC. Type inference leans on this: a def missing from the partition
@@ -65,7 +73,12 @@ pub fn analyze_dependencies(
         scc_ids_by_def.push(scc_ids);
     }
 
-    DependencyAnalysis::new(scc_ids_by_def, def_ids_by_sym, defs, recursive_defs)
+    Ok(DependencyAnalysis::new(
+        scc_ids_by_def,
+        def_ids_by_sym,
+        defs,
+        recursive_defs,
+    ))
 }
 
 struct TarjanScc<'a> {
@@ -76,10 +89,17 @@ struct TarjanScc<'a> {
     indices: IndexMap<&'a str, usize>,
     lowlinks: IndexMap<&'a str, usize>,
     sccs: Vec<Vec<&'a str>>,
+    /// Recursion ceiling and current depth: an acyclic reference chain deeper than
+    /// this would overflow the native stack, so we stop and flag it instead.
+    max_depth: u32,
+    depth: u32,
+    depth_exceeded: bool,
 }
 
 impl<'a> TarjanScc<'a> {
-    fn find(symbol_table: &'a SymbolTable) -> Vec<Vec<String>> {
+    /// Returns the SCCs, or `None` if an acyclic reference chain ran past `max_depth`
+    /// (the caller rejects the query rather than risk a stack overflow).
+    fn find(symbol_table: &'a SymbolTable, max_depth: u32) -> Option<Vec<Vec<String>>> {
         let mut finder = Self {
             symbol_table,
             index: 0,
@@ -88,22 +108,39 @@ impl<'a> TarjanScc<'a> {
             indices: IndexMap::new(),
             lowlinks: IndexMap::new(),
             sccs: Vec::new(),
+            max_depth,
+            depth: 0,
+            depth_exceeded: false,
         };
 
         for name in symbol_table.names() {
             if !finder.indices.contains_key(name as &str) {
                 finder.strongconnect(name);
+                if finder.depth_exceeded {
+                    return None;
+                }
             }
         }
 
-        finder
-            .sccs
-            .into_iter()
-            .map(|scc| scc.into_iter().map(String::from).collect())
-            .collect()
+        Some(
+            finder
+                .sccs
+                .into_iter()
+                .map(|scc| scc.into_iter().map(String::from).collect())
+                .collect(),
+        )
     }
 
     fn strongconnect(&mut self, name: &'a str) {
+        // One frame per edge followed; stop before the chain outruns the stack. The
+        // partial state left behind is discarded — `find` returns `None` and the query
+        // is rejected — so we need not unwind it cleanly, only avoid recursing further.
+        if self.depth >= self.max_depth {
+            self.depth_exceeded = true;
+            return;
+        }
+        self.depth += 1;
+
         self.indices.insert(name, self.index);
         self.lowlinks.insert(name, self.index);
         self.index += 1;
@@ -115,6 +152,10 @@ impl<'a> TarjanScc<'a> {
             for ref_name in refs {
                 if !self.indices.contains_key(ref_name) {
                     self.strongconnect(ref_name);
+                    if self.depth_exceeded {
+                        self.depth -= 1;
+                        return;
+                    }
                     let ref_lowlink = self.lowlinks[ref_name];
                     let my_lowlink = self
                         .lowlinks
@@ -148,6 +189,8 @@ impl<'a> TarjanScc<'a> {
             }
             self.sccs.push(scc);
         }
+
+        self.depth -= 1;
     }
 }
 

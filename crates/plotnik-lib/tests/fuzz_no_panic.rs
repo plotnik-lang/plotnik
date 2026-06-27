@@ -19,12 +19,15 @@
 use std::sync::LazyLock;
 
 use arborium_tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
+use indoc::indoc;
 use proptest::prelude::*;
 use proptest::sample::select;
 
 use plotnik_lib::bytecode::Module;
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{Colors, QueryBuilder, VM, materialize_verified};
+
+mod support;
 
 /// Queries known to compile, spanning the shapes whose runtime paths matter:
 /// a root match, a leaf match, an alternation, a scalar quantifier, a row
@@ -36,14 +39,25 @@ const TEMPLATES: &[&str] = &[
     "Q = [(identifier) @a (number) @b]",
     "Q = (program (_)* @items)",
     "Q = (program (expression_statement (_) @stmt)* @rows)",
-    "Rec = [Leaf: (statement_block) Deep: (unary_expression (Rec))]\nTop = (program (Rec))",
-    "Sup = [Deep: (unary_expression argument: (Sup) @_) Leaf: (identifier) @_]\nSupTop = (program (expression_statement (Sup)))",
+    indoc!(
+        "
+        Rec = [Leaf: (statement_block) Deep: (unary_expression (Rec))]
+        Top = (program (Rec))
+    "
+    ),
+    indoc!(
+        "
+        Sup = [Deep: (unary_expression argument: (Sup) @_) Leaf: (identifier) @_]
+        SupTop = (program (expression_statement (Sup)))
+    "
+    ),
 ];
 
 fn javascript_grammar() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw = RawGrammar::from_json(include_str!(env!("PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON")))
-            .expect("javascript grammar fixture");
+        let raw =
+            RawGrammar::from_json(&support::load_arborium_grammar_json("arborium-javascript"))
+                .expect("javascript grammar fixture");
         Grammar::from_raw(&raw).expect("javascript grammar metadata")
     });
     &GRAMMAR

@@ -5,23 +5,13 @@
 //! and that a truncated or corrupted module is rejected by `Module::load`.
 
 use std::fmt::Write as _;
-use std::sync::LazyLock;
 
 use crate::bytecode::{EncodeError, Module};
-use crate::core::grammar::{Grammar, raw::RawGrammar};
 
 use super::EmitError;
 use crate::compiler::query::QueryBuilder;
+use crate::compiler::test_utils::javascript_grammar as javascript;
 use crate::compiler::{SourceMap, SourcePath};
-
-fn javascript() -> &'static Grammar {
-    static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw = RawGrammar::from_json(include_str!(env!("PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON")))
-            .expect("javascript grammar fixture");
-        Grammar::from_raw(&raw).expect("javascript grammar metadata")
-    });
-    &GRAMMAR
-}
 
 /// Link `src` (which must be valid — capacity limits live at emit, not link) and
 /// return the emission result.
@@ -39,9 +29,11 @@ fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
 #[test]
 fn struct_field_count_overflow_is_emit_error() {
     // 300 captures inside one node → a struct with 300 fields, past the u8 limit.
+    // A concrete child kind (over `(_)`) keeps the satisfiability solve linear here —
+    // the field *count* is what this exercises, not how the children are matched.
     let mut query = String::from("Q = (program");
     for i in 0..300 {
-        write!(query, " (_) @c{i}").unwrap();
+        write!(query, " (expression_statement) @c{i}").unwrap();
     }
     query.push(')');
 
@@ -51,10 +43,12 @@ fn struct_field_count_overflow_is_emit_error() {
 
 #[test]
 fn enum_variant_count_overflow_is_emit_error() {
-    // 256 enum branches → an enum with 256 variants, past the u8 limit.
+    // 256 enum branches → an enum with 256 variants, past the u8 limit. Each branch
+    // is `(_)` so every variant is a valid program child and the query is matchable —
+    // an enum of `(identifier)` would be rejected (a program holds no bare identifier).
     let mut query = String::from("Q = (program [");
     for i in 0..256 {
-        write!(query, " L{i}: (identifier) @v{i}").unwrap();
+        write!(query, " L{i}: (_) @v{i}").unwrap();
     }
     query.push_str("])");
 
@@ -74,9 +68,11 @@ fn effect_member_payload_overflow_is_emit_error() {
     for def in 0..5 {
         write!(query, "D{def} = (program").unwrap();
         for field in 0..250 {
-            write!(query, " (_) @d{def}_f{field}").unwrap();
+            // Concrete child kind: keeps each definition's satisfiability solve linear
+            // (the wide member count is the point, not wildcard matching).
+            write!(query, " (expression_statement) @d{def}_f{field}").unwrap();
         }
-        query.push_str(")\n");
+        writeln!(query, ")").unwrap();
     }
 
     let err = try_emit(&query).expect_err("> 1023 members must not encode");

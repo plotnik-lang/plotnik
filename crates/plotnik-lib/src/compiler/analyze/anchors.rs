@@ -4,7 +4,9 @@
 //! (`analyze/grammar/satisfiability`) must agree on exactly what an anchor lets a gap
 //! skip — if they drift, the checker rejects what the VM would have matched (or
 //! the reverse). So the nav computation lives here, in `analyze`, where both may
-//! depend on it, and codegen re-exports it rather than forking it.
+//! depend on it, and codegen re-exports it rather than forking it. [`GapClass`]
+//! projects those navs onto the skip classes the checker reasons over; its
+//! `admits` method delegates to the same core skip class the VM uses.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -12,6 +14,94 @@ use std::collections::{HashMap, HashSet};
 use crate::bytecode::Nav;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::parse::ast::{DefRef, Pattern, SeqItem};
+use crate::core::{NodeClass, SkipClass};
+
+/// What a gap between two query patterns may skip over, projected from the same
+/// [`Nav`] codegen emits so the checker and the VM cannot drift.
+///
+/// The axes mirror the VM exactly (`vm/engine/cursor.rs`): a node is *anonymous*
+/// when it is not named and *extra* when the parser marked it as an extra (a
+/// comment, say). The two are independent — a named comment is `(false, true)`, an
+/// anonymous brace `(true, false)`. A broad skip clears `anonymous || extra` (the
+/// VM's `is_trivia`); a narrow skip clears only `extra`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GapClass {
+    /// No anchor: any node may sit in the gap (the VM's `SkipPolicy::Any`).
+    Any,
+    /// Soft `.` with both operands named: skip anonymous tokens and extras.
+    AnonymousAndExtras,
+    /// Soft `.` with an anonymous operand: skip extras only.
+    ExtrasOnly,
+    /// Strict `.!`: nothing may intervene.
+    Nothing,
+}
+
+impl GapClass {
+    pub(crate) fn skip_class(self) -> SkipClass {
+        match self {
+            Self::Any => SkipClass::Any,
+            Self::AnonymousAndExtras => SkipClass::Trivia,
+            Self::ExtrasOnly => SkipClass::Extras,
+            Self::Nothing => SkipClass::Exact,
+        }
+    }
+
+    /// Whether a node may be skipped across this gap.
+    pub(crate) fn admits(self, node: NodeClass) -> bool {
+        self.skip_class().admits(node)
+    }
+
+    /// Rank by permissiveness. The classes nest — `Nothing ⊂ ExtrasOnly ⊂
+    /// AnonymousAndExtras ⊂ Any` — so a total order captures their intersection and
+    /// union exactly, which is what [`tighten`](Self::tighten)/[`loosen`](Self::loosen)
+    /// need.
+    fn permissiveness(self) -> u8 {
+        match self {
+            Self::Nothing => 0,
+            Self::ExtrasOnly => 1,
+            Self::AnonymousAndExtras => 2,
+            Self::Any => 3,
+        }
+    }
+
+    /// The more restrictive of two gaps — their intersection. The skip permission of one
+    /// path is bounded by the tightest gap on it.
+    pub fn tighten(self, other: Self) -> Self {
+        if self.permissiveness() <= other.permissiveness() {
+            self
+        } else {
+            other
+        }
+    }
+
+    /// The more permissive of two gaps — their union. A state reachable by several paths
+    /// admits a skip if any path does.
+    pub fn loosen(self, other: Self) -> Self {
+        if self.permissiveness() >= other.permissiveness() {
+            self
+        } else {
+            other
+        }
+    }
+
+    /// Project a codegen [`Nav`] onto the gap it opens, or `None` for navs that
+    /// drive no sibling gap (pure control flow, or a `Stay` that does not move).
+    ///
+    /// The skip suffix is what carries: a plain `Next`/`Down`/`Up` skips anything,
+    /// a `*Skip`/`UpSkipTrivia` is a broad skip, a `*SkipExtras`/`UpSkipExtras` a
+    /// narrow one, an `*Exact` skips nothing. `UpSkipTrivia` is the broad skip
+    /// despite its name — it mirrors `is_trivia`, not `is_extra` (see `cursor.rs`).
+    pub fn from_nav(nav: Nav) -> Option<Self> {
+        let class = match nav {
+            Nav::Next | Nav::Down | Nav::Up(_) => Self::Any,
+            Nav::NextSkip | Nav::DownSkip | Nav::UpSkipTrivia(_) => Self::AnonymousAndExtras,
+            Nav::NextSkipExtras | Nav::DownSkipExtras | Nav::UpSkipExtras(_) => Self::ExtrasOnly,
+            Nav::NextExact | Nav::DownExact | Nav::UpExact(_) => Self::Nothing,
+            Nav::Epsilon | Nav::Stay | Nav::StayExact => return None,
+        };
+        Some(class)
+    }
+}
 
 /// Classifies whether patterns may match anonymous nodes after syntactic wrappers.
 pub struct AnonymousClassifier<'a> {

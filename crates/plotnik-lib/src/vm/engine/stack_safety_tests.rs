@@ -13,14 +13,14 @@
 //!   2. the run happens on a deliberately tiny (256 KiB) thread stack, so the
 //!      pre-fix recursive version would abort the test binary here.
 
-use std::sync::LazyLock;
 use std::thread;
 
 use arborium_tree_sitter::{Language as TsLanguage, Node, Parser as TsParser, Tree};
+use indoc::indoc;
 
 use crate::bytecode::{EffectKind, Instruction, Module, Nav};
+use crate::compiler::test_utils::javascript_grammar;
 use crate::core::{Colors, NodeFieldId};
-use crate::grammar::{Grammar, raw::RawGrammar};
 use crate::{
     Limit, QueryBuilder, RuntimeEffect, RuntimeError, RuntimeLimitSpec, Tracer, VM, Value,
 };
@@ -46,14 +46,17 @@ const STACK_SIZE: usize = 256 * 1024;
 /// - `Top` anchors at the program root and descends to the unary chain. The root
 ///   preamble matches once (no tree-wide search), so the work stays linear in
 ///   `DEPTH` rather than quadratic.
-/// - `Rec`'s escape branch matches `statement_block`, which never appears inside a
-///   unary chain. Trying it fails and *consumes* the branch checkpoint at every
-///   level, so the descent leaves only call-retry checkpoints — a contiguous run
-///   that backtrack pops without re-entering. At the leaf `identifier`, both
-///   branches fail and the whole run unwinds at once.
-const QUERY: &str = "\
-Rec = [Leaf: (statement_block) Deep: (unary_expression (Rec))]
-Top = (program (expression_statement (Rec)))";
+/// - `Rec`'s escape branch matches `number` — a real expression, so the pattern is
+///   matchable in principle (the grammar checker admits it) yet one that never
+///   appears in a chain of `!` operators over an identifier. Trying it fails and
+///   *consumes* the branch checkpoint at every level, so the descent leaves only
+///   call-retry checkpoints — a contiguous run that backtrack pops without
+///   re-entering. At the leaf `identifier`, both branches fail and the whole run
+///   unwinds at once.
+const QUERY: &str = indoc! {"
+    Rec = [Leaf: (number) Deep: (unary_expression (Rec))]
+    Top = (program (expression_statement (Rec)))
+"};
 
 /// Counts the longest run of consecutive `trace_backtrack` calls uninterrupted by
 /// any other trace event — i.e. the deepest single `backtrack` unwind.
@@ -121,15 +124,6 @@ impl Tracer for DepthProbe {
     fn trace_enter_preamble(&mut self) {
         self.boundary();
     }
-}
-
-fn javascript_grammar() -> &'static Grammar {
-    static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw = RawGrammar::from_json(include_str!(env!("PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON")))
-            .expect("javascript grammar fixture");
-        Grammar::from_raw(&raw).expect("javascript grammar metadata")
-    });
-    &GRAMMAR
 }
 
 fn compile(query: &str) -> Module {

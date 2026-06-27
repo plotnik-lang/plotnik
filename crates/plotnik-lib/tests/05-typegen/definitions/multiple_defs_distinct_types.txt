@@ -2,7 +2,7 @@ Name = (identifier) @name
 Value = (number) @value
 
 Both = (pair
-  (identifier) @key
+  (property_identifier) @key
   (number) @val
 )
 ==== types ====

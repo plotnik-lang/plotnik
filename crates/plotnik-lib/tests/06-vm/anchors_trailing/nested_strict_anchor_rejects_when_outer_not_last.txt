@@ -1,98 +1,11 @@
-Q = (program (function_declaration body: (statement_block (return_statement (identifier) @id .!) .!)))
+Q = (program (expression_statement (array (array (number) @n .!) .!)))
 ==== input ====
-function f(){ return x }
-==== types ====
-export interface Q {
-  id: Node;
-}
-==== output ====
-<no match>
-==== bytecode ====
-[strings]
-S0 "Beauty will save the world"
-S1 "id"
-S2 "Q"
-S3 "program"
-S4 "function_declaration"
-S5 "statement_block"
-S6 "return_statement"
-S7 "identifier"
-S8 "body"
-
-[type_defs]
-T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-
-[type_members]
-M0: S1 → T0  ; id: <Node>
-
-[type_names]
-N0: S2 → T1  ; Q
-
-[entrypoints]
-Q = 06 :: T1
-
-[transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
-Q:
-  06   !   (program)                        07
-  07  └‣─  (function_declaration)           08
-  08  └‣─  body: (statement_block)          09
-  09  └‣─  _                                20, 21
-  11   !   (identifier) [Node Set(M0)]      13
-  13  !─┘² _                                14
-  14  ─‣┘² _                                15
-  15                                        ▶
-  16  ─‣─  _                                11, 16
-  18  └‣─  _                                11, 16
-  20   !   (return_statement)               18
-  21  ─‣─  _                                20, 21
-==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
-Q:
-  06       (program)                        07
-       ●   program
-  07       (function_declaration)           08
-       ●   function_declaration
-  08       body: (statement_block)          09
-       ○   function
-       ○   identifier
-       ○   formal_parameters
-       ●   statement_block
-  09       _                                20, 21
-       ●   {
-  20       (return_statement)               18
-       ○   {
-  09  ❮❮❮ 
-  21       _                                20, 21
-       ●   return_statement
-  20       (return_statement)               18
-       ●   return_statement
-  18       _                                11, 16
-       ●   return
-  11       (identifier) [Node Set(M0)]      13
-       ○   return
-  18  ❮❮❮ 
-  16       _                                11, 16
-       ●   identifier
-  11       (identifier) [Node Set(M0)]      13
-       ●   identifier
-  13       _                                14
-  16  ❮❮❮ 
-  16       _                                11, 16
-  21  ❮❮❮ 
-  21       _                                20, 21
-       ●   }
-  20       (return_statement)               18
-       ○   }
-  21  ❮❮❮ 
-  21       _                                20, 21
+[[1], x]
+==== diagnostics ====
+error: with strict adjacency (`.!`), the last child of `array` must be `number`, but `array` ends with `"]"`
+ --> query.ptk:1:44
+  |
+1 | Q = (program (expression_statement (array (array (number) @n .!) .!)))
+  |                                            ^^^^^
+  |
+help: `.!` allows nothing between — not even anonymous tokens or comments; the soft anchor `.` skips those: `(array (number) @n .)`

@@ -8,6 +8,7 @@
 
 pub(crate) mod diagnostics;
 mod ids;
+pub(crate) mod limits;
 pub(crate) mod parse;
 pub(crate) mod typegen;
 

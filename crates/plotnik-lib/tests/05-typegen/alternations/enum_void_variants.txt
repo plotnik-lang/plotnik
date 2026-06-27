@@ -4,7 +4,7 @@ A = [
 ]
 
 Q = (program
-  (A) @a
+  (expression_statement (A) @a)
   (debugger_statement) @name
 )
 ==== types ====

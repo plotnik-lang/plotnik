@@ -1,20 +1,11 @@
-use crate::core::grammar::{Grammar, raw::RawGrammar};
-use std::sync::LazyLock;
+use crate::compiler::test_utils::javascript_grammar as javascript;
+use indoc::indoc;
+use std::fmt::Write as _;
 
 use crate::compiler::diagnostics::DiagnosticKind;
 use crate::compiler::{SourceMap, SourcePath};
 
 use super::{LinkOutcome, Query, QueryBuilder};
-
-fn javascript() -> &'static Grammar {
-    static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw = RawGrammar::from_json(include_str!(env!("PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON")))
-            .expect("javascript grammar fixture");
-        Grammar::from_raw(&raw).expect("javascript grammar metadata")
-    });
-
-    &GRAMMAR
-}
 
 macro_rules! expect_invalid {
     ($($name:literal: $content:literal),+ $(,)?) => {{
@@ -166,7 +157,13 @@ fn dry_run_accepts_valid_query() {
 
 #[test]
 fn dry_run_flags_dropped_value_less_def_among_valid() {
-    let linked = Query::expect("Bad = .\nGood = (identifier) @id").link(javascript());
+    let linked = Query::expect(indoc!(
+        "
+        Bad = .
+        Good = (identifier) @id
+    "
+    ))
+    .link(javascript());
     let diag = linked.dry_run();
     assert!(diag.has_errors());
     let rendered = diag.render(linked.source_map());
@@ -239,6 +236,192 @@ fn multifile_ref_to_body_with_internal_error_attributes_to_defining_file() {
       |
     help: rename one capture, or use an enum if they are mutually exclusive branches
     ");
+}
+
+#[test]
+fn deep_reference_chain_hits_recursion_limit() {
+    // `A0 = (A1)`, `A1 = (A2)`, … is flat at every definition, so dependency analysis
+    // owns its own stack ceiling, and an over-deep chain gets the same fatal
+    // recursion-limit error as over-deep source nesting.
+    let depth = 100;
+    let mut src = String::new();
+    for i in 0..depth {
+        writeln!(src, "A{i} = (A{})", i + 1).unwrap();
+    }
+    writeln!(src, "A{depth} = (identifier)").unwrap();
+
+    let result = QueryBuilder::from_inline(&src)
+        .with_reference_max_depth(50)
+        .analyze();
+
+    match result {
+        Err(crate::compiler::Error::RecursionLimitExceeded) => {}
+        Err(other) => panic!("expected RecursionLimitExceeded, got {other:?}"),
+        Ok(_) => panic!("expected RecursionLimitExceeded, but analysis succeeded"),
+    }
+}
+
+#[test]
+fn deeply_referenced_alternation_compiles_in_linear_time() {
+    // Each level is an alternation naming the previous definition twice, so the inlined
+    // form doubles per level — 2^40 nodes. The anchor classifier (run during lowering)
+    // walks alternation branches, so without memoization it would never finish. Memoized,
+    // each definition is classified once and the whole pipeline stays linear; this test
+    // completing at all is the regression guard.
+    let depth = 40;
+    let mut src = String::new();
+    writeln!(src, "Top = (A{depth})").unwrap();
+    writeln!(src, "A1 = [(identifier) (identifier)]").unwrap();
+    for i in 2..=depth {
+        writeln!(src, "A{i} = [(A{p}) (A{p})]", p = i - 1).unwrap();
+    }
+
+    let linked = Query::parse_and_validate(&src).link(javascript());
+    assert!(linked.is_valid(), "{}", linked.dump_diagnostics());
+    assert!(
+        !linked.dry_run().has_errors(),
+        "alternation DAG must lower cleanly",
+    );
+}
+
+#[test]
+fn satisfiability_step_budget_rejects_and_is_tunable() {
+    // A wide child list drives satisfiability construction and the solve's quadratic fixed point.
+    // Under a deliberately tiny budget it trips and the query is rejected as too complex; under
+    // the default it compiles — so the knob fails closed yet stays out of the way.
+    let mut src = String::from("Q = (program");
+    for i in 0..60 {
+        src.push_str(&format!(" (expression_statement) @c{i}"));
+    }
+    src.push(')');
+
+    let build = |budget: Option<u64>| {
+        let mut source_map = SourceMap::new();
+        source_map.add_file(SourcePath::new("q.ptk"), &src);
+        let mut builder = QueryBuilder::new(source_map);
+        if let Some(budget) = budget {
+            builder = builder.with_satisfiability_step_budget(budget);
+        }
+        builder.analyze().unwrap().link(javascript())
+    };
+
+    let tight = build(Some(100));
+    assert!(!tight.is_valid(), "a 100-step budget must reject this list");
+    assert!(
+        tight
+            .diagnostics()
+            .kinds()
+            .any(|k| k == DiagnosticKind::QueryTooComplex),
+        "expected QueryTooComplex:\n{}",
+        tight.dump_diagnostics(),
+    );
+
+    let relaxed = build(None);
+    assert!(
+        relaxed.is_valid(),
+        "the default budget must admit it:\n{}",
+        relaxed.dump_diagnostics(),
+    );
+}
+
+#[test]
+fn satisfiability_budget_counts_automaton_construction() {
+    let linked = QueryBuilder::new(SourceMap::from_inline(
+        "Q = (program (expression_statement))",
+    ))
+    .with_satisfiability_step_budget(1)
+    .analyze()
+    .unwrap()
+    .link(javascript());
+
+    assert!(!linked.is_valid());
+    assert!(
+        linked
+            .diagnostics()
+            .kinds()
+            .any(|kind| kind == DiagnosticKind::QueryTooComplex),
+        "expected QueryTooComplex:\n{}",
+        linked.dump_diagnostics(),
+    );
+}
+
+#[test]
+fn primary_satisfiability_budget_exhaustion_reports_too_complex_once() {
+    let mut source_map = SourceMap::new();
+    source_map.add_file(
+        SourcePath::new("q.ptk"),
+        indoc! {"
+            Q0 = (array .! (identifier))
+            Q1 = (array .! (identifier))
+            Q2 = (array .! (identifier))
+        "},
+    );
+
+    let linked = QueryBuilder::new(source_map)
+        .with_satisfiability_step_budget(2)
+        .analyze()
+        .unwrap()
+        .link(javascript());
+
+    let kinds: Vec<_> = linked.diagnostics().kinds().collect();
+    assert!(
+        kinds.contains(&DiagnosticKind::QueryTooComplex),
+        "expected QueryTooComplex:\n{}",
+        linked.dump_diagnostics(),
+    );
+    assert_eq!(
+        kinds
+            .iter()
+            .filter(|&&kind| kind == DiagnosticKind::QueryTooComplex)
+            .count(),
+        1,
+        "primary budget exhaustion must stop the pass:\n{}",
+        linked.dump_diagnostics(),
+    );
+    assert!(
+        !kinds.contains(&DiagnosticKind::UnsatisfiablePattern),
+        "resource exhaustion must not masquerade as unsatisfiable:\n{}",
+        linked.dump_diagnostics(),
+    );
+}
+
+#[test]
+fn exhausted_anchor_probe_budget_keeps_unsatisfiable_verdict() {
+    let mut source_map = SourceMap::new();
+    source_map.add_file(
+        SourcePath::new("q.ptk"),
+        indoc! {"
+            Q0 = (array .! (identifier))
+            Q1 = (array .! (identifier))
+            Q2 = (array .! (identifier))
+        "},
+    );
+
+    let linked = QueryBuilder::new(source_map)
+        .with_satisfiability_step_budget(2_000)
+        .analyze()
+        .unwrap()
+        .link(javascript());
+
+    let kinds: Vec<_> = linked.diagnostics().kinds().collect();
+    assert_eq!(
+        kinds,
+        vec![
+            DiagnosticKind::UnsatisfiablePattern,
+            DiagnosticKind::UnsatisfiablePattern
+        ],
+        "diagnostic probes must not replace a proven rejection:\n{}",
+        linked.dump_diagnostics(),
+    );
+    let diagnostics = linked.dump_diagnostics();
+    assert!(
+        diagnostics.contains("matching this child structure"),
+        "exhausted anchor probes should fall back to a generic unsatisfiable diagnostic:\n{diagnostics}",
+    );
+    assert!(
+        !kinds.contains(&DiagnosticKind::QueryTooComplex),
+        "diagnostic probe exhaustion must not masquerade as query complexity:\n{diagnostics}",
+    );
 }
 
 #[test]

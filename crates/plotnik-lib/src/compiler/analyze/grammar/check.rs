@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::compiler::analyze::Located;
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
@@ -10,10 +10,11 @@ use crate::core::{NodeFieldId, NodeKind, NodeKindId};
 
 use super::diagnostics::format_list;
 use super::link::GrammarLinker;
+use super::participation::Participation;
 
 impl<'a, 'q> GrammarLinker<'a, 'q> {
-    /// Walk the query, validating each node's own grammar constraints. See `AdmissibilityMode` for why
-    /// `Deferred` positions skip their checks.
+    /// Walk the query, validating each node's own grammar constraints. See
+    /// [`Participation`] for why deferred positions skip their checks.
     ///
     /// The `Located` carries the source of the pattern being walked, so a reference
     /// into another workspace file is validated against the target's own source.
@@ -21,7 +22,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         &mut self,
         located: &Located<Pattern>,
         ctx: Option<ParentNode>,
-        mode: AdmissibilityMode,
+        participation: Participation,
         walk: &mut AdmissibilityWalkState,
     ) {
         match located.node() {
@@ -36,11 +37,10 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
                 // Predicates are only valid on leaf nodes. Skipped under a disjunction/option,
                 // where this position need not match for the query to.
-                if mode.is_required()
+                if participation.is_required()
                     && let Some(pred) = node.predicate()
                     && let Some(ctx) = &child_ctx
-                    && (!self.grammar.valid_child_types(ctx.id()).is_empty()
-                        || !self.grammar.fields_for_node_kind(ctx.id()).is_empty())
+                    && self.grammar.has_declared_child_structure(ctx.id())
                 {
                     self.diag
                         .report(
@@ -50,21 +50,24 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                         .emit();
                 }
 
-                let admissible = child_ctx.as_ref().map(|ctx| self.admissible_set(ctx.id()));
-
                 for child in node.children() {
                     if let Pattern::FieldPattern(f) = &child {
                         let located_field = located.wrap(f.clone());
-                        self.validate_field_pattern(&located_field, child_ctx.as_ref(), mode, walk);
+                        self.validate_field_pattern(
+                            &located_field,
+                            child_ctx.as_ref(),
+                            participation,
+                            walk,
+                        );
                     } else {
                         let child_located = located.wrap(child);
-                        if mode.is_required()
-                            && let (Some(ctx), Some(adm)) =
-                                (child_ctx.as_ref(), admissible.as_ref())
+                        if participation.is_required()
+                            && let Some(ctx) = child_ctx.as_ref()
                         {
+                            let adm = walk.admissible_set(self.grammar, ctx.id());
                             self.check_bare_child(&child_located, ctx, adm);
                         }
-                        self.check_pattern_grammar(&child_located, child_ctx, mode, walk);
+                        self.check_pattern_grammar(&child_located, child_ctx, participation, walk);
                     }
                 }
 
@@ -72,7 +75,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                     for child in node.syntax().children() {
                         if let Some(neg) = ast::NegatedField::cast(child) {
                             let located_neg = located.wrap(neg);
-                            self.validate_negated_field(&located_neg, &ctx, mode);
+                            self.validate_negated_field(&located_neg, &ctx, participation);
                         }
                     }
                 }
@@ -82,7 +85,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 // Normally handled by the parent NodePattern; reached only on a bare field
                 // at root or inside a seq without a named-node parent.
                 let located_field = located.wrap(f.clone());
-                self.validate_field_pattern(&located_field, ctx.as_ref(), mode, walk);
+                self.validate_field_pattern(&located_field, ctx.as_ref(), participation, walk);
             }
             Pattern::Union(_) | Pattern::Enum(_) => {
                 // A branch is disjunctive — none is guaranteed to match, so defer its contents.
@@ -91,7 +94,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                     self.check_pattern_grammar(
                         &body_located,
                         ctx,
-                        AdmissibilityMode::Deferred,
+                        participation.inside_disjunction_branch(),
                         walk,
                     );
                 }
@@ -99,30 +102,30 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             Pattern::SeqPattern(seq) => {
                 for child in seq.children() {
                     let child_located = located.wrap(child);
-                    self.check_pattern_grammar(&child_located, ctx, mode, walk);
+                    self.check_pattern_grammar(&child_located, ctx, participation, walk);
                 }
             }
             Pattern::CapturedPattern(cap) => {
                 let Some(inner) = cap.inner() else { return };
                 let inner_located = located.wrap(inner);
-                self.check_pattern_grammar(&inner_located, ctx, mode, walk);
+                self.check_pattern_grammar(&inner_located, ctx, participation, walk);
             }
             Pattern::QuantifiedPattern(q) => {
                 let Some(inner) = q.inner() else { return };
-                // The body is optional/repeated — zero occurrences can satisfy it, so defer.
+                let inner_participation = participation.inside_quantifier_body(q);
                 let inner_located = located.wrap(inner);
-                self.check_pattern_grammar(&inner_located, ctx, AdmissibilityMode::Deferred, walk);
+                self.check_pattern_grammar(&inner_located, ctx, inner_participation, walk);
             }
             Pattern::DefRef(r) => {
                 let Some(name_token) = r.name() else { return };
                 let name = name_token.text();
-                // Validation is a pure function of `(name, ctx, mode)`, so caching it
+                // Validation is a pure function of `(name, ctx, participation)`, so caching it
                 // collapses diamond-shaped reference graphs that would otherwise be re-walked
-                // 2^depth times. `mode` is part of the key: a definition reached both inside
-                // and outside an alternation/quantifier must still be checked in its immediate
-                // context even after the deferred reach cached it. Cut cycles are never cached:
-                // they return below without reaching the `validated.insert`.
-                let key = (name.to_string(), ctx, mode);
+                // 2^depth times. `participation` is part of the key: a definition reached
+                // both inside and outside an alternation/quantifier must still be checked in
+                // its immediate context even after the deferred reach cached it. Cut cycles
+                // are never cached: they return below without reaching the `validated.insert`.
+                let key = (name.to_string(), ctx, participation);
                 if walk.validated.contains(&key) {
                     return;
                 }
@@ -136,7 +139,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 // The referenced definition may live in another workspace file; the
                 // target carries its own source, so its body is validated against the
                 // right content.
-                self.check_pattern_grammar(&target, ctx, mode, walk);
+                self.check_pattern_grammar(&target, ctx, participation, walk);
                 walk.in_progress.remove(name);
                 walk.validated.insert(key);
             }
@@ -168,7 +171,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         &mut self,
         located: &Located<ast::FieldPattern>,
         ctx: Option<&ParentNode>,
-        mode: AdmissibilityMode,
+        participation: Participation,
         walk: &mut AdmissibilityWalkState,
     ) {
         let field = located.node();
@@ -188,7 +191,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         if !self.grammar.has_field(ctx.id(), field_id) {
             // A field absent from this kind can never match here, but a sibling branch or zero
             // repetitions can — so skip when deferred.
-            if mode.is_required() {
+            if participation.is_required() {
                 self.emit_field_not_on_node(
                     located.span_of(name_token.text_range()),
                     name_token.text(),
@@ -208,17 +211,17 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         let value_located = located.wrap(value);
         // The field value's kind must be admissible for this field. Skipped under a
         // disjunction/option, where the field constraint need not hold for the query to match.
-        if mode.is_required() {
-            self.check_field_value(&value_located, ctx, &field_ref);
+        if participation.is_required() {
+            self.check_field_value(&value_located, ctx, &field_ref, walk);
         }
-        self.check_pattern_grammar(&value_located, Some(*ctx), mode, walk);
+        self.check_pattern_grammar(&value_located, Some(*ctx), participation, walk);
     }
 
     fn validate_negated_field(
         &mut self,
         located: &Located<ast::NegatedField>,
         ctx: &ParentNode,
-        mode: AdmissibilityMode,
+        participation: Participation,
     ) {
         let neg = located.node();
         let Some(name_token) = neg.name() else {
@@ -231,7 +234,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         };
 
         if !self.grammar.has_field(ctx.id(), field_id) {
-            if mode.is_required() {
+            if participation.is_required() {
                 self.emit_field_not_on_node(
                     located.span_of(name_token.text_range()),
                     field_name,
@@ -243,7 +246,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
 
         // A required field is present in every production, so asserting its absence can never
         // match. Skipped under a disjunction/option, where the negation need not hold.
-        if !mode.is_required() {
+        if !participation.is_required() {
             return;
         }
 
@@ -271,34 +274,16 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             .emit();
     }
 
-    /// All child kinds (named children and field values) the grammar can place under `parent`,
-    /// expanded through supertype subtyping in both directions. A bare child is admissible iff
-    /// it lands in this set (or is an extra / a supertype overlapping it).
-    fn admissible_set(&self, parent: NodeKindId) -> HashSet<NodeKindId> {
-        let mut seeds = self.grammar.valid_child_types(parent).to_vec();
-        for field_name in self.grammar.fields_for_node_kind(parent) {
-            if let Some(field_id) = self.grammar.resolve_field(field_name) {
-                seeds.extend_from_slice(self.grammar.valid_field_types(parent, field_id));
-            }
-        }
-
-        let mut admissible = HashSet::new();
-        for seed in seeds {
-            admissible.extend(self.kind_with_subtypes(seed));
-        }
-        admissible
-    }
-
-    fn kind_with_subtypes(&self, kind: NodeKindId) -> HashSet<NodeKindId> {
-        let mut kinds = self.grammar.collect_subtypes(kind);
-        kinds.insert(kind);
-        kinds
-    }
-
     /// Whether a concrete child kind can occupy a bare child position whose parent admits
     /// `adm`. The parent is already known to be a non-leaf here.
     fn admissible_child(&self, child: NodeKindId, adm: &HashSet<NodeKindId>) -> bool {
         adm.contains(&child)
+            // Tolerated over-acceptance: an extra (a comment) is admitted under *any*
+            // parent, even a lexically sealed node like `string` that never holds one, so
+            // `(string (comment))` slips through. Proving a position sealed is a lexer-level
+            // question (token longest-match/precedence), not the `IMMEDIATE_TOKEN` fact it
+            // resembles — closing delimiters are non-immediate in nearly every grammar — and
+            // our metadata-only model can't answer it. Sound: this only widens admissibility.
             || self.grammar.is_extra(child)
             || (self.grammar.is_supertype(child)
                 && self
@@ -385,18 +370,19 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         located: &Located<Pattern>,
         ctx: &ParentNode,
         field: &FieldRef,
+        walk: &mut AdmissibilityWalkState,
     ) {
         match located.node() {
             Pattern::CapturedPattern(cap) => {
                 if let Some(inner) = cap.inner() {
-                    self.check_field_value(&located.wrap(inner), ctx, field);
+                    self.check_field_value(&located.wrap(inner), ctx, field, walk);
                 }
             }
             Pattern::NodePattern(node) => {
-                self.check_field_named_value(&located.wrap(node.clone()), ctx, field);
+                self.check_field_named_value(&located.wrap(node.clone()), ctx, field, walk);
             }
             Pattern::TokenPattern(anon) => {
-                self.check_field_anon_value(&located.wrap(anon.clone()), ctx, field);
+                self.check_field_anon_value(&located.wrap(anon.clone()), ctx, field, walk);
             }
             // Alternations, quantifiers, and references are not checked here; a field value
             // can't be a sequence (rejected earlier as `FieldSequenceValue`).
@@ -414,6 +400,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         located: &Located<NodePattern>,
         ctx: &ParentNode,
         field: &FieldRef,
+        walk: &mut AdmissibilityWalkState,
     ) {
         let node = located.node();
         if node.is_any() {
@@ -438,7 +425,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             return;
         };
 
-        if self.field_admissible(value_id, ctx.id(), field.id) {
+        let admissible = walk.field_admissible_set(self.grammar, ctx.id(), field.id);
+        if self.field_admissible(value_id, admissible) {
             return;
         }
 
@@ -460,6 +448,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         located: &Located<ast::TokenPattern>,
         ctx: &ParentNode,
         field: &FieldRef,
+        walk: &mut AdmissibilityWalkState,
     ) {
         let anon = located.node();
         // The bare `_` matches any node, anonymous tokens included, so it always fits.
@@ -474,8 +463,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             return;
         };
 
-        if self
-            .field_admissible_set(ctx.id(), field.id)
+        if walk
+            .field_admissible_set(self.grammar, ctx.id(), field.id)
             .contains(&value_id)
         {
             return;
@@ -491,26 +480,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         );
     }
 
-    fn field_admissible_set(
-        &self,
-        parent: NodeKindId,
-        field_id: NodeFieldId,
-    ) -> HashSet<NodeKindId> {
-        let mut admissible = HashSet::new();
-        for &seed in self.grammar.valid_field_types(parent, field_id) {
-            admissible.insert(seed);
-            admissible.extend(self.grammar.collect_subtypes(seed));
-        }
-        admissible
-    }
-
-    fn field_admissible(
-        &self,
-        value: NodeKindId,
-        parent: NodeKindId,
-        field_id: NodeFieldId,
-    ) -> bool {
-        let admissible = self.field_admissible_set(parent, field_id);
+    fn field_admissible(&self, value: NodeKindId, admissible: &HashSet<NodeKindId>) -> bool {
         admissible.contains(&value)
             || (self.grammar.is_supertype(value)
                 && self
@@ -582,23 +552,6 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     }
 }
 
-/// Whether structural checks must fire at this position. Set to `Deferred` once the
-/// walk descends into an alternation branch or a quantified body: inside those, nothing is
-/// guaranteed to participate in a match (a sibling branch or zero repetitions can satisfy the
-/// query), so the grammar checks must NOT fire there — doing so would reject queries that can
-/// match. Skipping a check can only miss a rejection, never reject a valid query.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) enum AdmissibilityMode {
-    Required,
-    Deferred,
-}
-
-impl AdmissibilityMode {
-    fn is_required(self) -> bool {
-        matches!(self, AdmissibilityMode::Required)
-    }
-}
-
 pub(super) struct FieldRef<'a> {
     pub(super) id: NodeFieldId,
     pub(super) name: &'a str,
@@ -635,7 +588,53 @@ pub(super) struct AdmissibilityWalkState {
     /// Definitions currently on the recursion stack — guards against cycles.
     in_progress: HashSet<String>,
     /// Definitions already validated under a given context. A definition's
-    /// validation depends only on `(name, ctx, mode)`, so caching it keeps shared
+    /// validation depends only on `(name, ctx, participation)`, so caching it keeps shared
     /// references (e.g. diamond graphs) from being re-walked exponentially.
-    validated: HashSet<(String, Option<ParentNode>, AdmissibilityMode)>,
+    validated: HashSet<(String, Option<ParentNode>, Participation)>,
+    /// Expanded bare-child admissibility sets by parent node kind.
+    admissible_by_parent: HashMap<NodeKindId, HashSet<NodeKindId>>,
+    /// Expanded field-value admissibility sets by `(parent, field)`.
+    admissible_by_field: HashMap<(NodeKindId, NodeFieldId), HashSet<NodeKindId>>,
+}
+
+impl AdmissibilityWalkState {
+    /// All child kinds (named children and field values) the grammar can place under `parent`,
+    /// expanded through supertype subtyping. A bare child is admissible iff it lands in this
+    /// set (or is an extra / a supertype overlapping it).
+    fn admissible_set(&mut self, grammar: &Grammar, parent: NodeKindId) -> &HashSet<NodeKindId> {
+        self.admissible_by_parent.entry(parent).or_insert_with(|| {
+            let seeds = grammar.valid_child_types(parent).iter().copied().chain(
+                grammar
+                    .field_ids_for_node_kind(parent)
+                    .iter()
+                    .flat_map(|&field| grammar.valid_field_types(parent, field).iter().copied()),
+            );
+            expanded_types(grammar, seeds)
+        })
+    }
+
+    fn field_admissible_set(
+        &mut self,
+        grammar: &Grammar,
+        parent: NodeKindId,
+        field: NodeFieldId,
+    ) -> &HashSet<NodeKindId> {
+        let key = (parent, field);
+        self.admissible_by_field.entry(key).or_insert_with(|| {
+            let seeds = grammar.valid_field_types(parent, field).iter().copied();
+            expanded_types(grammar, seeds)
+        })
+    }
+}
+
+fn expanded_types(
+    grammar: &Grammar,
+    seeds: impl IntoIterator<Item = NodeKindId>,
+) -> HashSet<NodeKindId> {
+    let mut admissible = HashSet::new();
+    for seed in seeds {
+        admissible.insert(seed);
+        admissible.extend(grammar.collect_subtypes(seed));
+    }
+    admissible
 }
