@@ -91,7 +91,10 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
         for def in root.defs() {
             if let Some(body) = def.body() {
                 let located = Located::new(source, body);
-                if reporter.walk(&located, Participation::Required) {
+                if reporter
+                    .walk(&located, Participation::Required)
+                    .is_too_complex()
+                {
                     return;
                 }
                 // A resource ceiling tripped mid-construction: the verdicts that follow
@@ -116,29 +119,50 @@ struct Reporter<'a, 'q> {
     diag: &'a mut Diagnostics,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WalkOutcome {
+    Continue,
+    TooComplex,
+}
+
+impl WalkOutcome {
+    fn is_too_complex(self) -> bool {
+        matches!(self, Self::TooComplex)
+    }
+}
+
+impl From<diagnose::ReportOutcome> for WalkOutcome {
+    fn from(outcome: diagnose::ReportOutcome) -> Self {
+        if outcome.is_too_complex() {
+            Self::TooComplex
+        } else {
+            Self::Continue
+        }
+    }
+}
+
 impl Reporter<'_, '_> {
     /// Report what is impossible under `located` at `participation`. The descent
     /// crosses always-present wrappers, lowers into disjunctive branches and `?`/`*`
     /// bodies as `Deferred`, and stops at each node pattern, whose interior the
     /// engine judges whole.
-    /// Returns `true` when diagnostic refinement already emitted `QueryTooComplex`;
+    /// Returns `TooComplex` when diagnostic refinement already emitted `QueryTooComplex`;
     /// callers must then stop rather than spending fresh probe budgets on later nodes.
-    fn walk(&mut self, located: &Located<Pattern>, participation: Participation) -> bool {
+    fn walk(&mut self, located: &Located<Pattern>, participation: Participation) -> WalkOutcome {
         match located.node() {
             Pattern::NodePattern(node) => {
                 let node = located.wrap(node.clone());
                 if !participation.is_required() {
-                    return false;
+                    return WalkOutcome::Continue;
                 }
                 if let Some(kind) = root_kind(self.solver.context(), &node) {
                     if !self.solver.satisfiable(&node, kind) {
-                        return diagnose::report(self.solver, &node, kind, self.diag)
-                            .is_too_complex();
+                        return diagnose::report(self.solver, &node, kind, self.diag).into();
                     }
                 } else if is_wildcard_parent(&node) && !self.solver.wildcard_satisfiable(&node) {
                     diagnose::report_wildcard(&node, self.diag);
                 }
-                false
+                WalkOutcome::Continue
             }
             Pattern::Union(_) | Pattern::Enum(_) => {
                 // A branch failing is normally excused by its siblings; but when every
@@ -151,41 +175,43 @@ impl Reporter<'_, '_> {
                     participation.inside_disjunction_branch()
                 };
                 for branch in located.node().children() {
-                    if self.walk(&located.wrap(branch), branch_participation) {
-                        return true;
+                    let outcome = self.walk(&located.wrap(branch), branch_participation);
+                    if outcome.is_too_complex() {
+                        return outcome;
                     }
                 }
-                false
+                WalkOutcome::Continue
             }
             Pattern::CapturedPattern(cap) => {
                 if let Some(inner) = cap.inner() {
                     return self.walk(&located.wrap(inner), participation);
                 }
-                false
+                WalkOutcome::Continue
             }
             Pattern::FieldPattern(field) => {
                 if let Some(value) = field.value() {
                     return self.walk(&located.wrap(value), participation);
                 }
-                false
+                WalkOutcome::Continue
             }
             Pattern::SeqPattern(seq) => {
                 for child in seq.children() {
-                    if self.walk(&located.wrap(child), participation) {
-                        return true;
+                    let outcome = self.walk(&located.wrap(child), participation);
+                    if outcome.is_too_complex() {
+                        return outcome;
                     }
                 }
-                false
+                WalkOutcome::Continue
             }
             Pattern::QuantifiedPattern(q) => {
                 if let Some(inner) = q.inner() {
                     let inner_participation = participation.inside_quantifier_body(q);
                     return self.walk(&located.wrap(inner), inner_participation);
                 }
-                false
+                WalkOutcome::Continue
             }
             // A token always matches; a reference is walked at its own definition.
-            Pattern::TokenPattern(_) | Pattern::DefRef(_) => false,
+            Pattern::TokenPattern(_) | Pattern::DefRef(_) => WalkOutcome::Continue,
         }
     }
 
