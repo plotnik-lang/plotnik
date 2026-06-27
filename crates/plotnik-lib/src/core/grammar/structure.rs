@@ -47,6 +47,8 @@
 //!   is built for every grammar even with no consumer yet, and `Grammar` clones
 //!   deep-copy it; both are provisional, to revisit when a consumer lands.
 
+use std::collections::HashMap;
+
 use crate::core::{NodeFieldId, NodeKindId};
 
 use super::lower::public_node_kind;
@@ -185,7 +187,7 @@ impl StructureTable {
     /// descends into. Includes a variable's own public id and every surfaced
     /// production step (aliases included), so reachability and satisfiability share
     /// one traversal of the ordered grammar model.
-    pub(crate) fn surface_realizers(&self) -> impl Iterator<Item = SurfaceRealizer> + '_ {
+    fn surface_realizers(&self) -> impl Iterator<Item = SurfaceRealizer> + '_ {
         self.iter().flat_map(|(var_id, variable)| {
             let own_id = variable.id.map(|kind| SurfaceRealizer {
                 kind,
@@ -199,6 +201,20 @@ impl StructureTable {
             });
             own_id.into_iter().chain(step_ids)
         })
+    }
+
+    /// Every surfaced kind grouped to the distinct realizers that can stand behind
+    /// it. This is the shared index for consumers that need to descend from a
+    /// public kind back into the ordered skeleton.
+    pub(crate) fn surface_realizers_by_kind(&self) -> HashMap<NodeKindId, Vec<SurfaceRealizer>> {
+        let mut by_kind: HashMap<NodeKindId, Vec<SurfaceRealizer>> = HashMap::new();
+        for realizer in self.surface_realizers() {
+            let entry = by_kind.entry(realizer.kind).or_default();
+            if !entry.contains(&realizer) {
+                entry.push(realizer);
+            }
+        }
+        by_kind
     }
 }
 

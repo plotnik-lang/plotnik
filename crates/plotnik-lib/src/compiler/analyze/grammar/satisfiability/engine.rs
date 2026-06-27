@@ -870,21 +870,23 @@ fn gap_scratch(frozen: &Frozen, p: PatternId) -> Vec<GapClass> {
 /// Index every kind to the realizers that can realize it: the variable named for the
 /// kind, and every step occurrence that surfaces it (aliases included).
 fn build_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<NodeRealizer>> {
-    let mut realizers_by_kind: HashMap<NodeKindId, Vec<NodeRealizer>> = HashMap::new();
-    let push = |map: &mut HashMap<NodeKindId, Vec<NodeRealizer>>, kind, realizer| {
-        let entry = map.entry(kind).or_default();
-        if !entry.contains(&realizer) {
-            entry.push(realizer);
-        }
-    };
-    for surface in grammar.structure().surface_realizers() {
-        let realizer = surface
-            .body
-            .map(NodeRealizer::Var)
-            .unwrap_or(NodeRealizer::Leaf);
-        push(&mut realizers_by_kind, surface.kind, realizer);
-    }
-    realizers_by_kind
+    grammar
+        .structure()
+        .surface_realizers_by_kind()
+        .into_iter()
+        .map(|(kind, surfaces)| {
+            let realizers = surfaces
+                .into_iter()
+                .map(|surface| {
+                    surface
+                        .body
+                        .map(NodeRealizer::Var)
+                        .unwrap_or(NodeRealizer::Leaf)
+                })
+                .collect();
+            (kind, realizers)
+        })
+        .collect()
 }
 
 fn build_parent_candidate_kinds(
