@@ -366,6 +366,36 @@ fn relaxed_anchor_probe_budget_reports_too_complex() {
 }
 
 #[test]
+fn relaxed_anchor_probes_share_step_budget() {
+    let mut source_map = SourceMap::new();
+    source_map.add_file(
+        SourcePath::new("q.ptk"),
+        indoc! {"
+            Q0 = (array .! (identifier))
+            Q1 = (array .! (identifier))
+            Q2 = (array .! (identifier))
+        "},
+    );
+
+    let linked = QueryBuilder::new(source_map)
+        .with_satisfiability_step_budget(2_000)
+        .analyze()
+        .unwrap()
+        .link(javascript());
+
+    let kinds: Vec<_> = linked.diagnostics().kinds().collect();
+    assert_eq!(
+        kinds,
+        vec![
+            DiagnosticKind::UnsatisfiablePattern,
+            DiagnosticKind::QueryTooComplex
+        ],
+        "relaxed anchor probes must spend from the primary budget:\n{}",
+        linked.dump_diagnostics(),
+    );
+}
+
+#[test]
 fn multifile_field_with_ref_to_seq_error() {
     let res = expect_invalid! {
         "defs.ptk": "X = {(a) (b)}",

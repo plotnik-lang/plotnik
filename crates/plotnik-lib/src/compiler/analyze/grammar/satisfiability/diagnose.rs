@@ -210,12 +210,15 @@ enum AnchorProbe {
 }
 
 /// Re-solve the culprit with every gap widened to "any node may intervene". A fresh
-/// solver keeps the relaxed automata out of the real run's memo. If this matches
-/// while the strict solve did not, the anchors are provably the only obstacle.
-fn relaxing_anchors(solver: &SatisfiabilitySolver, culprit: &Culprit) -> AnchorProbe {
+/// solver keeps the relaxed automata out of the real run's memo, but still spends
+/// from the real run's remaining budget. If this matches while the strict solve did
+/// not, the anchors are provably the only obstacle.
+fn relaxing_anchors(solver: &mut SatisfiabilitySolver, culprit: &Culprit) -> AnchorProbe {
     let mut relaxed = solver.relaxing_anchors();
     let matches = relaxed.satisfiable(&culprit.node, culprit.kind);
-    if relaxed.is_too_complex() {
+    let too_complex = relaxed.is_too_complex();
+    solver.absorb_probe_budget(&relaxed);
+    if too_complex {
         return AnchorProbe::TooComplex;
     }
     if matches {

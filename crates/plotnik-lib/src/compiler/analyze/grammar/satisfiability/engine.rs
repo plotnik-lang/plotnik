@@ -340,8 +340,12 @@ impl<'a> SatisfiabilitySolver<'a> {
             self.frozen.ctx,
             AnchorMode::Relax,
             self.frozen.max_depth,
-            self.solve.budget,
+            self.solve.remaining_budget(),
         )
+    }
+
+    pub(super) fn absorb_probe_budget(&mut self, probe: &Self) {
+        self.solve.absorb_probe_budget(&probe.solve);
     }
 
     fn with_anchor_mode(
@@ -479,6 +483,17 @@ impl<'a> SatisfiabilitySolver<'a> {
 }
 
 impl Solve {
+    fn remaining_budget(&self) -> u64 {
+        self.budget.saturating_sub(self.steps)
+    }
+
+    fn absorb_probe_budget(&mut self, probe: &Self) {
+        self.steps = self.steps.saturating_add(probe.steps);
+        if probe.exhausted || self.steps > self.budget {
+            self.exhausted = true;
+        }
+    }
+
     fn sat_value(&self, key: SatKey) -> bool {
         self.sat.get(&key).copied().unwrap_or(false)
     }
