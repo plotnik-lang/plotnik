@@ -60,10 +60,9 @@ pub(super) enum KindConstraint {
 #[derive(Clone, Copy, Debug)]
 pub(super) struct ChildMatcher {
     pub(super) kind: KindConstraint,
-    /// The child node whose child structure the grammar realizer must realize, or
-    /// `None` when the child is childless (a bare node, token, or wildcard) and
-    /// matching its kind is the whole constraint.
-    pub(super) child: Option<PatternId>,
+    /// The nested query pattern whose child structure the grammar realizer must
+    /// satisfy, or `None` when matching this kind is the whole constraint.
+    pub(super) nested_pattern: Option<PatternId>,
     /// The field the matched child must bind, when the query wrote `field: …`. The
     /// engine enforces it only against a node's *direct* children, where the grammar's
     /// step field is authoritative; a field surfacing through a hidden rule is left
@@ -556,7 +555,7 @@ impl Builder<'_, '_> {
         if self.ref_stack.iter().any(|n| n == name) {
             let any_sibling = ChildMatcher {
                 kind: KindConstraint::AnyNode,
-                child: None,
+                nested_pattern: None,
                 field: None,
             };
             self.states[from as usize]
@@ -593,13 +592,13 @@ impl Builder<'_, '_> {
         // `items()`, so testing items alone would treat `(pair -key)` as a bare `(pair)`
         // and silently drop the negation — letting it match any `pair`.
         let constrains_children = node.items().next().is_some() || has_negated_field(node);
-        let child = constrains_children.then(|| {
+        let nested_pattern = constrains_children.then(|| {
             self.table
                 .intern(Located::new(descent.source, node.clone()))
         });
         ChildMatcher {
             kind,
-            child,
+            nested_pattern,
             field: descent.field,
         }
     }
@@ -607,7 +606,7 @@ impl Builder<'_, '_> {
     fn token_matcher(&self, token: &TokenPattern, descent: Descent) -> ChildMatcher {
         ChildMatcher {
             kind: self.token_kind(token, descent.source),
-            child: None,
+            nested_pattern: None,
             field: descent.field,
         }
     }
@@ -671,7 +670,7 @@ fn checked_anonymous_node(ctx: AutomatonContext<'_>, text: &str) -> NodeKindId {
 fn unconstrained_matcher(field: Option<NodeFieldId>) -> ChildMatcher {
     ChildMatcher {
         kind: KindConstraint::Unconstrained,
-        child: None,
+        nested_pattern: None,
         field,
     }
 }

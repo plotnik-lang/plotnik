@@ -691,9 +691,9 @@ impl Solve {
         matcher: &ChildMatcher,
         realizer: NodeRealizer,
     ) -> bool {
-        match matcher.child {
+        match matcher.nested_pattern {
             None => true,
-            Some(child) => self.get_sat((child, realizer)),
+            Some(nested_pattern) => self.get_sat((nested_pattern, realizer)),
         }
     }
 
@@ -754,7 +754,7 @@ impl Solve {
         if matcher.field.is_some() {
             return false;
         }
-        let Some(child) = matcher.child else {
+        let Some(nested_pattern) = matcher.nested_pattern else {
             // Childless matcher: it consumes an extra iff it admits any extra kind. No
             // subtree to realize, so answer in O(1) without building the admitted list —
             // the hot path on wide wildcard child lists.
@@ -765,7 +765,7 @@ impl Solve {
                 .realizers_of(extra)
                 .iter()
                 .copied()
-                .any(|realizer| self.get_sat((child, realizer)))
+                .any(|realizer| self.get_sat((nested_pattern, realizer)))
         })
     }
 }
