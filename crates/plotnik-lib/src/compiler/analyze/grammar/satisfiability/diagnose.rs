@@ -234,21 +234,13 @@ fn emit_anchor_failure(solver: &SatisfiabilitySolver, culprit: &Culprit, diag: &
 
     // A leading anchor pins the first child; a trailing one the last. The two read
     // differently, so each gets its own message naming the boundary the grammar fixes.
-    let (boundary, allowed, wanted) = if leads_with_anchor(node) {
-        (
-            "first",
-            solver.first_child_kinds(culprit.kind),
-            first_pattern_label(&culprit.node, ctx),
-        )
-    } else if ends_with_anchor(node) {
-        (
-            "last",
-            solver.last_child_kinds(culprit.kind),
-            last_pattern_label(&culprit.node, ctx),
-        )
-    } else {
+    let Some(boundary) = Boundary::of(node) else {
         return emit_interior_anchor_failure(ctx, culprit, strict, diag);
     };
+    let boundary_name = boundary.name();
+    let boundary_verb = boundary.verb();
+    let allowed = boundary.child_kinds(solver, culprit.kind);
+    let wanted = boundary.pattern_label(&culprit.node, ctx);
 
     let demand = if strict {
         "with strict adjacency (`.!`)"
@@ -257,16 +249,16 @@ fn emit_anchor_failure(solver: &SatisfiabilitySolver, culprit: &Culprit, diag: &
     };
     let detail = match &wanted {
         Some(want) => format!(
-            "{demand}, the {boundary} child of {kind_name} must be {want}, \
+            "{demand}, the {boundary_name} child of {kind_name} must be {want}, \
              but {kind_name} {} {}",
-            boundary_verb(boundary),
+            boundary_verb,
             render_kind_list(ctx, &allowed, "other kinds"),
         ),
         None => format!(
-            "{demand}, no {kind_name} places this child {boundary}; \
+            "{demand}, no {kind_name} places this child {boundary_name}; \
              {} {kind_name} {} {}",
             indefinite_article(&kind_name),
-            boundary_verb(boundary),
+            boundary_verb,
             render_kind_list(ctx, &allowed, "no fixed kind"),
         ),
     };
@@ -377,12 +369,55 @@ fn has_anchor(node: &NodePattern) -> bool {
     node.items().any(|item| matches!(item, SeqItem::Anchor(_)))
 }
 
-fn leads_with_anchor(node: &NodePattern) -> bool {
-    matches!(node.items().next(), Some(SeqItem::Anchor(_)))
+#[derive(Clone, Copy)]
+enum Boundary {
+    First,
+    Last,
 }
 
-fn ends_with_anchor(node: &NodePattern) -> bool {
-    matches!(node.items().last(), Some(SeqItem::Anchor(_)))
+impl Boundary {
+    fn of(node: &NodePattern) -> Option<Self> {
+        if matches!(node.items().next(), Some(SeqItem::Anchor(_))) {
+            Some(Self::First)
+        } else if matches!(node.items().last(), Some(SeqItem::Anchor(_))) {
+            Some(Self::Last)
+        } else {
+            None
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::First => "first",
+            Self::Last => "last",
+        }
+    }
+
+    fn verb(self) -> &'static str {
+        match self {
+            Self::First => "begins with",
+            Self::Last => "ends with",
+        }
+    }
+
+    fn child_kinds(self, solver: &SatisfiabilitySolver, kind: NodeKindId) -> Vec<NodeKindId> {
+        match self {
+            Self::First => solver.first_child_kinds(kind),
+            Self::Last => solver.last_child_kinds(kind),
+        }
+    }
+
+    fn pattern_label(
+        self,
+        node: &Located<NodePattern>,
+        ctx: AutomatonContext<'_>,
+    ) -> Option<String> {
+        let pattern = match self {
+            Self::First => node.node().items().find_map(seq_pattern)?,
+            Self::Last => node.node().items().filter_map(seq_pattern).last()?,
+        };
+        pattern_label(&node.wrap(pattern), ctx)
+    }
 }
 
 /// Whether any anchor in the node is strict — strict adjacency is the harsher demand,
@@ -390,25 +425,6 @@ fn ends_with_anchor(node: &NodePattern) -> bool {
 fn strictest_anchor(node: &NodePattern) -> bool {
     node.items()
         .any(|item| matches!(item, SeqItem::Anchor(a) if a.is_strict()))
-}
-
-fn boundary_verb(boundary: &str) -> &'static str {
-    if boundary == "first" {
-        "begins with"
-    } else {
-        "ends with"
-    }
-}
-
-/// The label of the first/last child pattern (`identifier`, `"+"`), for "must be …".
-fn first_pattern_label(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -> Option<String> {
-    let pattern = node.node().items().find_map(seq_pattern)?;
-    pattern_label(&node.wrap(pattern), ctx)
-}
-
-fn last_pattern_label(node: &Located<NodePattern>, ctx: AutomatonContext<'_>) -> Option<String> {
-    let pattern = node.node().items().filter_map(seq_pattern).last()?;
-    pattern_label(&node.wrap(pattern), ctx)
 }
 
 fn seq_pattern(item: SeqItem) -> Option<Pattern> {
