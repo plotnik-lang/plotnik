@@ -46,11 +46,21 @@ impl QueryBuilder {
         self
     }
 
-    /// Override the depth ceiling for all stack-recursive compiler walks. Internally
-    /// those are separate parser, reference-graph, and satisfiability-inlining limits;
-    /// this existing public knob updates all three for compatibility.
+    /// Override the parser's source-nesting ceiling.
     pub fn with_parse_max_depth(mut self, limit: u32) -> Self {
         self.limits = self.limits.with_parse_max_depth(limit);
+        self
+    }
+
+    /// Override the reference graph's recursion ceiling.
+    pub fn with_reference_max_depth(mut self, limit: u32) -> Self {
+        self.limits = self.limits.with_reference_max_depth(limit);
+        self
+    }
+
+    /// Override the satisfiability automaton's inlined-pattern nesting ceiling.
+    pub fn with_satisfiability_automaton_max_depth(mut self, limit: u32) -> Self {
+        self.limits = self.limits.with_satisfiability_automaton_max_depth(limit);
         self
     }
 

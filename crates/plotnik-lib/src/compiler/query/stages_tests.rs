@@ -241,8 +241,8 @@ fn multifile_ref_to_body_with_internal_error_attributes_to_defining_file() {
 #[test]
 fn deep_reference_chain_hits_recursion_limit() {
     // `A0 = (A1)`, `A1 = (A2)`, … is flat at every definition, so dependency analysis
-    // owns its own stack ceiling. The existing public depth knob updates that ceiling
-    // for compatibility, and an over-deep chain gets the same fatal recursion-limit error.
+    // owns its own stack ceiling, and an over-deep chain gets the same fatal
+    // recursion-limit error as over-deep source nesting.
     let depth = 100;
     let mut src = String::new();
     for i in 0..depth {
@@ -251,7 +251,7 @@ fn deep_reference_chain_hits_recursion_limit() {
     writeln!(src, "A{depth} = (identifier)").unwrap();
 
     let result = QueryBuilder::from_inline(&src)
-        .with_parse_max_depth(50)
+        .with_reference_max_depth(50)
         .analyze();
 
     match result {

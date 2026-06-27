@@ -46,7 +46,15 @@ impl CompilerLimits {
 
     pub(crate) fn with_parse_max_depth(mut self, max_depth: u32) -> Self {
         self.parse.max_depth = max_depth;
+        self
+    }
+
+    pub(crate) fn with_reference_max_depth(mut self, max_depth: u32) -> Self {
         self.references.max_depth = max_depth;
+        self
+    }
+
+    pub(crate) fn with_satisfiability_automaton_max_depth(mut self, max_depth: u32) -> Self {
         self.satisfiability.automaton_max_depth = max_depth;
         self
     }
@@ -81,4 +89,21 @@ pub(crate) struct ReferenceLimits {
 pub(crate) struct SatisfiabilityLimits {
     pub(crate) automaton_max_depth: u32,
     pub(crate) step_budget: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn depth_setters_are_stage_specific() {
+        let limits = CompilerLimits::default()
+            .with_parse_max_depth(11)
+            .with_reference_max_depth(22)
+            .with_satisfiability_automaton_max_depth(33);
+
+        assert_eq!(limits.parse.max_depth, 11);
+        assert_eq!(limits.references.max_depth, 22);
+        assert_eq!(limits.satisfiability.automaton_max_depth, 33);
+    }
 }
