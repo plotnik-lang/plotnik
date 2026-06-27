@@ -242,23 +242,32 @@ impl<'a> Frozen<'a> {
             return;
         }
         for production in &self.variable(var).productions {
-            let mut steps: Vec<&SkeletonStep> = production.iter().collect();
-            if matches!(edge, Edge::Last) {
-                steps.reverse();
+            match edge {
+                Edge::First => self.edge_kinds_of_steps(production.iter(), edge, out, visited),
+                Edge::Last => self.edge_kinds_of_steps(production.iter().rev(), edge, out, visited),
             }
-            for step in steps {
-                match self.classify(step) {
-                    StepClass::Visible { kind, .. } => {
-                        out.push(kind);
-                        break;
-                    }
-                    StepClass::HiddenSubtree(h) => {
-                        self.edge_kinds_of_var(h, edge, out, visited);
-                        break;
-                    }
-                    // A hidden token surfaces nothing — the edge child is further along.
-                    StepClass::HiddenLeaf => {}
+        }
+    }
+
+    fn edge_kinds_of_steps<'s>(
+        &self,
+        steps: impl Iterator<Item = &'s SkeletonStep>,
+        edge: Edge,
+        out: &mut Vec<NodeKindId>,
+        visited: &mut HashSet<VarId>,
+    ) {
+        for step in steps {
+            match self.classify(step) {
+                StepClass::Visible { kind, .. } => {
+                    out.push(kind);
+                    break;
                 }
+                StepClass::HiddenSubtree(h) => {
+                    self.edge_kinds_of_var(h, edge, out, visited);
+                    break;
+                }
+                // A hidden token surfaces nothing — the edge child is further along.
+                StepClass::HiddenLeaf => {}
             }
         }
     }
