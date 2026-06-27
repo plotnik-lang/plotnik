@@ -294,12 +294,12 @@ impl ExtraCandidates<'_> {
     }
 }
 
-/// Default ceiling on solve work before the query is declared too complex. Charged
-/// once per visited state in the two quadratic inner loops (`closure` and a `Visible`
-/// `thread_step`), so it caps the dominant cost. The widest real fixture settles in a
-/// few thousand steps, so this leaves roughly three orders of magnitude of headroom,
-/// while a child list past about a thousand wide — quadratic at ~2n² steps — trips it
-/// in a fraction of a second rather than running for tens. Tunable per query via
+/// Default ceiling on solve work before the query is declared too complex. Charged in
+/// the two quadratic inner loops (`closure` and a `Visible` `thread_step`) for state
+/// visits and pattern-edge scans, so it caps the dominant cost. The widest real
+/// fixture settles in a few thousand steps, leaving roughly three orders of magnitude
+/// of headroom, while a child list past about a thousand wide trips it in a fraction
+/// of a second rather than running for tens. Tunable per query via
 /// [`QueryBuilder::with_satisfiability_step_budget`](crate::QueryBuilder::with_satisfiability_step_budget)
 /// for the rare case that legitimately needs a wider one.
 pub const DEFAULT_SATISFIABILITY_STEP_BUDGET: u64 = 2_000_000;
@@ -315,9 +315,9 @@ struct Solve {
     current: Option<Key>,
     queue: VecDeque<Key>,
     queued: HashSet<Key>,
-    /// State-visits charged so far, the ceiling they may reach, and whether they
-    /// crossed it. Once `exhausted`, the solve stops doing work and every verdict
-    /// reads as accept.
+    /// Work units charged so far, the ceiling they may reach, and whether they
+    /// crossed it. Once `exhausted`, callers stop trusting memo values and reject
+    /// the query as too complex instead.
     steps: u64,
     budget: u64,
     exhausted: bool,
@@ -469,14 +469,19 @@ impl Solve {
         self.sat.get(&key).copied().unwrap_or(false)
     }
 
-    /// Charge one unit of state-visiting work, latching `exhausted` once the budget is
-    /// spent. Called in the hot per-state loops so total work — not any single key — is
-    /// what the bound governs.
-    fn charge(&mut self) {
+    /// Charge one unit of solver work, returning whether the caller may continue.
+    /// Called in the hot loops so total work — not any single key — is what the
+    /// bound governs.
+    fn charge(&mut self) -> bool {
+        if self.exhausted {
+            return false;
+        }
         self.steps = self.steps.saturating_add(1);
         if self.steps > self.budget {
             self.exhausted = true;
+            return false;
         }
+        true
     }
 
     fn seed(&mut self, key: Key) {
@@ -621,10 +626,13 @@ impl Solve {
         let mut current = self.closure(frozen, automaton, start, gaps);
         for step in production {
             // A dead frontier stays dead; the rest of the production cannot revive it.
-            if current.is_empty() {
+            if self.exhausted || current.is_empty() {
                 break;
             }
             current = self.thread_step(frozen, p, &current, gaps, step, inherited);
+            if self.exhausted {
+                break;
+            }
             let automaton = frozen.automaton(p);
             current = self.closure(frozen, automaton, &current, gaps);
         }
@@ -661,13 +669,18 @@ impl Solve {
                 let extra = frozen.ctx.grammar.is_extra(kind);
                 let mut next = StateSet::default();
                 for q in current.iter() {
-                    self.charge();
+                    if !self.charge() {
+                        break;
+                    }
                     // The state's *effective* gap (tightest erasure path that reaches it),
                     // so a strict anchor erased into this position still forbids the skip.
                     if gaps[q as usize].admits(anonymous, extra) {
                         next.insert(q);
                     }
                     for (matcher, to) in automaton.pattern_edges(q) {
+                        if !self.charge() {
+                            break;
+                        }
                         if frozen.kind_ok(matcher.kind, kind)
                             && field_ok(matcher.field, effective)
                             && self.child_sat(frozen, matcher, realizer)
@@ -685,6 +698,9 @@ impl Solve {
                 let pushed = step.field.or(inherited);
                 let mut next = StateSet::default();
                 for q in current.iter() {
+                    if !self.charge() {
+                        break;
+                    }
                     let reached = self.get_thread(ThreadKey {
                         pattern: p,
                         hidden_var: h,
@@ -739,15 +755,23 @@ impl Solve {
             stack.push(q);
         }
         while let Some(q) = stack.pop() {
-            self.charge();
+            if !self.charge() {
+                break;
+            }
             let gq = gaps[q as usize];
             for &to in automaton.eps_edges(q) {
+                if !self.charge() {
+                    break;
+                }
                 let candidate = gq.tighten(automaton.gap(to));
                 if relax_into(gaps, &mut result, to, candidate) {
                     stack.push(to);
                 }
             }
             for (matcher, to) in automaton.pattern_edges(q) {
+                if !self.charge() {
+                    break;
+                }
                 if self.can_consume_extra(frozen, matcher) {
                     let candidate = gq.tighten(automaton.gap(*to));
                     if relax_into(gaps, &mut result, *to, candidate) {
