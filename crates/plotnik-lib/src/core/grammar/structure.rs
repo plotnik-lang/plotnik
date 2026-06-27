@@ -123,6 +123,43 @@ pub struct SkeletonStep {
     pub field: Option<NodeFieldId>,
 }
 
+impl SkeletonStep {
+    pub(crate) fn projection(self, grammar: &Grammar) -> StepProjection {
+        if let Some(kind) = self.target.visible_kind(grammar) {
+            return StepProjection::Visible {
+                kind,
+                field: self.field,
+                body: self.target.body,
+            };
+        }
+        if let Some(body) = self.target.transparent_body(grammar) {
+            StepProjection::Transparent {
+                body,
+                field: self.field,
+            }
+        } else {
+            StepProjection::HiddenLeaf
+        }
+    }
+}
+
+/// How a skeleton step surfaces to consumers that reason over visible tree children.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StepProjection {
+    Visible {
+        kind: NodeKindId,
+        field: Option<NodeFieldId>,
+        /// Variable the visible child descends into, if it is not a token.
+        body: Option<VarId>,
+    },
+    Transparent {
+        body: VarId,
+        /// Field pushed onto the transparent frontier, if any.
+        field: Option<NodeFieldId>,
+    },
+    HiddenLeaf,
+}
+
 /// A grammar variable reduced to its productions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SkeletonVariable {

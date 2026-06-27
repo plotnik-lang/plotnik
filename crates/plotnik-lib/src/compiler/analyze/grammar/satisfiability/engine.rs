@@ -29,7 +29,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
 use crate::compiler::limits::SatisfiabilityLimits;
 use crate::compiler::parse::ast::NodePattern;
-use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, VarId};
+use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, StepProjection, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
 
 use super::automaton::{
@@ -58,20 +58,16 @@ impl StepClass {
     /// Keying the descent off the step's own `body` is what keeps aliased nodes
     /// structurally distinct from their namesakes.
     fn of(step: &SkeletonStep, grammar: &Grammar) -> Self {
-        if let Some(kind) = step.target.visible_kind(grammar) {
-            return StepClass::Visible(VisibleStep {
+        match step.projection(grammar) {
+            StepProjection::Visible { kind, field, body } => StepClass::Visible(VisibleStep {
                 kind,
-                field: step.field,
-                realizer: NodeRealizer::of_step(step),
-            });
-        }
-        if let Some(var) = step.target.transparent_body(grammar) {
-            StepClass::HiddenSubtree(HiddenStep {
-                var,
-                field: step.field,
-            })
-        } else {
-            StepClass::HiddenLeaf
+                field,
+                realizer: NodeRealizer::of_body(body),
+            }),
+            StepProjection::Transparent { body, field } => {
+                StepClass::HiddenSubtree(HiddenStep { var: body, field })
+            }
+            StepProjection::HiddenLeaf => StepClass::HiddenLeaf,
         }
     }
 }

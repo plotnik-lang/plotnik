@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::compiler::analyze::grammar::satisfiability::automaton::KindConstraint;
 use crate::core::NodeKindId;
-use crate::core::grammar::{Grammar, SkeletonStep, SurfaceRealizer, VarId};
+use crate::core::grammar::{Grammar, SurfaceRealizer, VarId};
 
 /// The grammar body that realizes a matched node's child structure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -12,18 +12,11 @@ pub(super) enum NodeRealizer {
 }
 
 impl NodeRealizer {
-    /// The realizer a visible step descends into: its own variable, or `Leaf` for a
-    /// token. Keying `SAT` by the step's own `body` — never "any variable realizing
-    /// this kind" — is what makes nesting alias-correct.
-    pub(super) fn of_step(step: &SkeletonStep) -> Self {
-        Self::of_body(step.target.body)
-    }
-
     fn of_surface(surface: SurfaceRealizer) -> Self {
         Self::of_body(surface.body)
     }
 
-    fn of_body(body: Option<VarId>) -> Self {
+    pub(super) fn of_body(body: Option<VarId>) -> Self {
         body.map(NodeRealizer::Var).unwrap_or(NodeRealizer::Leaf)
     }
 }
