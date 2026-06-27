@@ -1,0 +1,12 @@
+Q = (type_alias_declaration name: (identifier) @name)
+==== input.ts ====
+==== diagnostics ====
+error: `identifier` can't be the value of `name`
+ --> query.ptk:1:36
+  |
+1 | Q = (type_alias_declaration name: (identifier) @name)
+  |                             ----   ^^^^^^^^^^
+  |                             |
+  |                             field `name`
+  |
+help: `name` accepts: `type_identifier`
