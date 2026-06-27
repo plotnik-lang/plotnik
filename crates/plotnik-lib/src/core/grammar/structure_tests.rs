@@ -1,36 +1,42 @@
 use super::Grammar;
 use super::prepared::VariableType;
 use super::raw::RawGrammar;
+use super::structure::{
+    AdmissibilityStep, FieldValueProjection, SkeletonStep, StepProjection, StepTarget,
+};
+use indoc::indoc;
 
 #[test]
 fn distills_resolved_productions() {
-    let json = r#"{
-        "name": "test",
-        "rules": {
-            "source_file": {
-                "type": "SEQ",
-                "members": [
-                    { "type": "ALIAS", "value": "type_name", "named": true,
-                      "content": { "type": "SYMBOL", "name": "identifier" } },
-                    { "type": "STRING", "value": "fn" },
-                    { "type": "FIELD", "name": "name",
-                      "content": { "type": "SYMBOL", "name": "identifier" } },
-                    { "type": "ALIAS", "value": "block_alias", "named": true,
-                      "content": { "type": "SYMBOL", "name": "block" } },
-                    { "type": "SYMBOL", "name": "_body" }
-                ]
-            },
-            "identifier": { "type": "PATTERN", "value": "[a-z]+" },
-            "_body": { "type": "SYMBOL", "name": "block" },
-            "block": {
-                "type": "SEQ",
-                "members": [
-                    { "type": "STRING", "value": "{" },
-                    { "type": "STRING", "value": "}" }
-                ]
+    let json = indoc! {r#"{
+            "name": "test",
+            "rules": {
+                "source_file": {
+                    "type": "SEQ",
+                    "members": [
+                        { "type": "ALIAS", "value": "type_name", "named": true,
+                          "content": { "type": "SYMBOL", "name": "identifier" } },
+                        { "type": "STRING", "value": "fn" },
+                        { "type": "FIELD", "name": "name",
+                          "content": { "type": "SYMBOL", "name": "identifier" } },
+                        { "type": "ALIAS", "value": "block_alias", "named": true,
+                          "content": { "type": "SYMBOL", "name": "block" } },
+                        { "type": "SYMBOL", "name": "_body" },
+                        { "type": "FIELD", "name": "body",
+                          "content": { "type": "SYMBOL", "name": "_body" } }
+                    ]
+                },
+                "identifier": { "type": "PATTERN", "value": "[a-z]+" },
+                "_body": { "type": "SYMBOL", "name": "block" },
+                "block": {
+                    "type": "SEQ",
+                    "members": [
+                        { "type": "STRING", "value": "{" },
+                        { "type": "STRING", "value": "}" }
+                    ]
+                }
             }
-        }
-    }"#;
+        }"#};
     let raw = RawGrammar::from_json(json).unwrap();
     let grammar = Grammar::from_raw(&raw).unwrap();
 
@@ -48,7 +54,7 @@ fn distills_resolved_productions() {
     assert!(source.id.is_some());
 
     let steps = &source.productions[0];
-    assert_eq!(steps.len(), 5);
+    assert_eq!(steps.len(), 6);
 
     // [0] alias of a TOKEN (identifier -> type_name): has a public id, nothing to
     // descend into.
@@ -87,6 +93,17 @@ fn distills_resolved_productions() {
         .expect("hidden non-terminal descends into its variable");
     assert_eq!(table.variable(inner).unwrap().name, "_body");
 
+    // [5] fielded hidden non-terminal: no value id of its own, so field
+    // admissibility descends to the value frontier.
+    assert_eq!(steps[5].target.id, None);
+    let fielded_inner = steps[5]
+        .target
+        .body
+        .expect("fielded hidden non-terminal descends into its variable");
+    assert_eq!(fielded_inner, inner);
+    let body_field = grammar.resolve_field("body").unwrap();
+    assert_eq!(steps[5].field, Some(body_field));
+
     // `block` is a visible named non-terminal: it has an id of its own.
     let block = find("block");
     assert_eq!(block.id, grammar.resolve_named_node("block"));
@@ -102,4 +119,62 @@ fn distills_resolved_productions() {
         .body
         .expect("descends into block");
     assert_eq!(table.variable(spliced).unwrap().name, "block");
+
+    let type_name = grammar.resolve_named_node("type_name").unwrap();
+    assert_eq!(
+        steps[0].projection(&grammar),
+        StepProjection::Visible {
+            kind: type_name,
+            field: None,
+            body: None,
+        }
+    );
+
+    let identifier = grammar.resolve_named_node("identifier").unwrap();
+    let name_field = grammar.resolve_field("name").unwrap();
+    assert_eq!(
+        steps[2].admissibility(&grammar),
+        AdmissibilityStep::Field {
+            field: name_field,
+            value: FieldValueProjection::Kind(identifier),
+        }
+    );
+
+    let block_alias = grammar.resolve_named_node("block_alias").unwrap();
+    assert_eq!(
+        steps[3].projection(&grammar),
+        StepProjection::Visible {
+            kind: block_alias,
+            field: None,
+            body: Some(aliased_body),
+        }
+    );
+    assert_eq!(
+        steps[4].projection(&grammar),
+        StepProjection::Transparent {
+            body: inner,
+            field: None,
+        }
+    );
+    assert_eq!(
+        steps[5].admissibility(&grammar),
+        AdmissibilityStep::Field {
+            field: body_field,
+            value: FieldValueProjection::Frontier(fielded_inner),
+        }
+    );
+
+    let hidden_leaf = SkeletonStep {
+        target: StepTarget {
+            id: None,
+            body: None,
+        },
+        field: None,
+    };
+    assert_eq!(hidden_leaf.projection(&grammar), StepProjection::HiddenLeaf);
+    assert_eq!(
+        hidden_leaf.admissibility(&grammar),
+        AdmissibilityStep::HiddenLeaf
+    );
+    assert_eq!(hidden_leaf.field_value(), FieldValueProjection::Empty);
 }
