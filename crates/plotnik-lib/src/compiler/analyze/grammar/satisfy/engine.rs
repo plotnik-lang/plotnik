@@ -99,6 +99,9 @@ struct Frozen<'a> {
     /// Kind → the producers that can build a node of that kind: the variable named
     /// for it, plus every aliased step occurrence surfacing it.
     producers: HashMap<NodeKindId, Vec<Producer>>,
+    /// Supertype kind → sorted transitive concrete members. Built once so hot
+    /// matcher checks do not allocate a subtype closure per candidate child.
+    supertype_members: HashMap<NodeKindId, Vec<NodeKindId>>,
     /// Visible extra kinds (comments), and the named subset, for extra-consumption.
     extras: Vec<NodeKindId>,
     named_extras: Vec<NodeKindId>,
@@ -153,7 +156,11 @@ impl<'a> Frozen<'a> {
         let grammar = self.ctx.grammar;
         match constraint {
             KindConstraint::Exact(id) => {
-                id == k || (grammar.is_supertype(k) && grammar.collect_subtypes(k).contains(&id))
+                id == k
+                    || self
+                        .supertype_members
+                        .get(&k)
+                        .is_some_and(|members| members.binary_search(&id).is_ok())
             }
             KindConstraint::AnyNamed => !grammar.is_anonymous_node(k),
             KindConstraint::AnyNode | KindConstraint::Unconstrained => true,
@@ -189,17 +196,19 @@ impl<'a> Frozen<'a> {
 
     /// Extra kinds a child matcher could consume. Only kinds the matcher admits — a
     /// `(comment)` admits the `comment` extra, a `(_)` any named extra, `_` any extra.
-    fn extras_admitted_by(&self, constraint: KindConstraint) -> Vec<NodeKindId> {
+    fn extras_admitted_by(&self, constraint: KindConstraint) -> ExtraCandidates<'_> {
         match constraint {
             KindConstraint::Exact(id) => {
                 if self.ctx.grammar.is_extra(id) {
-                    vec![id]
+                    ExtraCandidates::One(id)
                 } else {
-                    Vec::new()
+                    ExtraCandidates::None
                 }
             }
-            KindConstraint::AnyNamed => self.named_extras.clone(),
-            KindConstraint::AnyNode | KindConstraint::Unconstrained => self.extras.clone(),
+            KindConstraint::AnyNamed => ExtraCandidates::Many(&self.named_extras),
+            KindConstraint::AnyNode | KindConstraint::Unconstrained => {
+                ExtraCandidates::Many(&self.extras)
+            }
         }
     }
 
@@ -260,6 +269,22 @@ enum Edge {
     Last,
 }
 
+enum ExtraCandidates<'a> {
+    None,
+    One(NodeKindId),
+    Many(&'a [NodeKindId]),
+}
+
+impl ExtraCandidates<'_> {
+    fn any(self, mut predicate: impl FnMut(NodeKindId) -> bool) -> bool {
+        match self {
+            Self::None => false,
+            Self::One(kind) => predicate(kind),
+            Self::Many(kinds) => kinds.iter().copied().any(predicate),
+        }
+    }
+}
+
 /// Default ceiling on solve work before the query is declared too complex. Charged
 /// once per visited state in the two quadratic inner loops (`closure` and a `Visible`
 /// `thread_step`), so it caps the dominant cost. The widest real fixture settles in a
@@ -315,12 +340,15 @@ impl<'a> Satisfier<'a> {
         step_budget: u64,
     ) -> Self {
         let (extras, named_extras) = extra_kinds(ctx.grammar);
+        let producers = build_producers(ctx.grammar);
+        let supertype_members = build_supertype_members(ctx.grammar, &producers);
         Self {
             frozen: Frozen {
                 ctx,
                 automata: Vec::new(),
                 table: automaton::PatternTable::default(),
-                producers: build_producers(ctx.grammar),
+                producers,
+                supertype_members,
                 extras,
                 named_extras,
                 anchor_mode,
@@ -724,17 +752,13 @@ impl Solve {
             // the hot path on wide wildcard child lists.
             return frozen.admits_any_extra(matcher.kind);
         };
-        for extra in frozen.extras_admitted_by(matcher.kind) {
-            let realized = frozen
+        frozen.extras_admitted_by(matcher.kind).any(|extra| {
+            frozen
                 .producers_of(extra)
-                .to_vec()
-                .into_iter()
-                .any(|producer| self.get_sat((child, producer)));
-            if realized {
-                return true;
-            }
-        }
-        false
+                .iter()
+                .copied()
+                .any(|producer| self.get_sat((child, producer)))
+        })
     }
 }
 
@@ -796,6 +820,22 @@ fn build_producers(grammar: &Grammar) -> HashMap<NodeKindId, Vec<Producer>> {
         }
     }
     producers
+}
+
+fn build_supertype_members(
+    grammar: &Grammar,
+    producers: &HashMap<NodeKindId, Vec<Producer>>,
+) -> HashMap<NodeKindId, Vec<NodeKindId>> {
+    let mut members = HashMap::new();
+    for &kind in producers.keys() {
+        if !grammar.is_supertype(kind) {
+            continue;
+        }
+        let mut subtypes: Vec<NodeKindId> = grammar.collect_subtypes(kind).into_iter().collect();
+        subtypes.sort_unstable();
+        members.insert(kind, subtypes);
+    }
+    members
 }
 
 fn extra_kinds(grammar: &Grammar) -> (Vec<NodeKindId>, Vec<NodeKindId>) {
