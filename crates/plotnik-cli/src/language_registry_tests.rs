@@ -9,6 +9,14 @@
 
 use std::collections::HashSet;
 
+#[cfg(any(
+    feature = "lang-lua",
+    feature = "lang-go",
+    feature = "lang-java",
+    feature = "lang-rust",
+    feature = "lang-python",
+    feature = "lang-typescript"
+))]
 use indoc::indoc;
 
 use crate::language_registry::{self, Lang, all, from_name};
@@ -327,8 +335,8 @@ fn format_id(id: Option<u16>) -> String {
 fn abi_compat_all_languages() {
     let langs = language_registry::all();
     if langs.is_empty() {
-        assert!(!cfg!(feature = "all-languages"), "no languages registered");
-        return;
+        #[cfg(feature = "all-languages")]
+        panic!("no languages registered");
     }
 
     for lang in langs {
