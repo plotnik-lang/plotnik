@@ -26,7 +26,7 @@ use std::sync::Arc;
 use indexmap::IndexSet;
 
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::anchors::GapClass;
+use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
 use crate::compiler::parse::ast::NodePattern;
 use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
@@ -170,6 +170,7 @@ impl GrammarFacts {
 /// at once (disjoint borrows) while threading.
 struct Frozen<'a> {
     ctx: AutomatonContext<'a>,
+    anchor_semantics: AnchorSemantics<'a>,
     automata: Vec<ChildAutomaton>,
     table: automaton::PatternTable,
     facts: Arc<GrammarFacts>,
@@ -422,6 +423,7 @@ impl<'a> SatisfiabilitySolver<'a> {
         Self {
             frozen: Frozen {
                 ctx,
+                anchor_semantics: AnchorSemantics::new(ctx.symbol_table),
                 automata: Vec::new(),
                 table: automaton::PatternTable::default(),
                 facts,
@@ -502,6 +504,7 @@ impl<'a> SatisfiabilitySolver<'a> {
                 &node,
                 self.frozen.ctx,
                 &mut self.frozen.table,
+                &self.frozen.anchor_semantics,
                 self.frozen.anchor_mode,
                 self.frozen.max_depth,
                 remaining_budget,

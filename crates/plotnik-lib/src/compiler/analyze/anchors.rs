@@ -230,6 +230,10 @@ impl<'a> AnchorSemantics<'a> {
         }
     }
 
+    pub fn pattern_may_match_anonymous(&self, pattern: Option<&Pattern>) -> bool {
+        self.classifier.pattern_may_match_anonymous(pattern)
+    }
+
     /// Check for trailing anchor in items, descending into a sole-child sequence if needed.
     pub fn check_trailing_anchor(&self, items: &[SeqItem]) -> (bool, Option<Nav>) {
         if let Some(SeqItem::Anchor(anchor)) = items.last() {

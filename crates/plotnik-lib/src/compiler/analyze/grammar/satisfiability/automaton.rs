@@ -258,10 +258,11 @@ impl PatternTable {
 /// Builds `A_p` from a node pattern, interning child node patterns into `table`.
 /// [`AnchorMode::Relax`] widens every gap to [`GapClass::Any`] so the diagnostic
 /// probe can ask whether anchors alone are the obstacle.
-pub(super) fn build(
+pub(super) fn build<'a>(
     node: &Located<NodePattern>,
-    ctx: AutomatonContext<'_>,
+    ctx: AutomatonContext<'a>,
     table: &mut PatternTable,
+    anchor_semantics: &AnchorSemantics<'a>,
     anchor_mode: AnchorMode,
     max_depth: u32,
     state_budget: u64,
@@ -276,11 +277,10 @@ pub(super) fn build(
         };
     }
 
-    let anchor_semantics = AnchorSemantics::new(ctx.symbol_table);
     let mut builder = Builder {
         ctx,
         table,
-        anchor_semantics: &anchor_semantics,
+        anchor_semantics,
         states: Vec::new(),
         state_budget,
         states_built: 0,

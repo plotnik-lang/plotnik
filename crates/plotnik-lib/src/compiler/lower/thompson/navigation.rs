@@ -1,14 +1,14 @@
 //! Navigation computation for sequence and node compilation.
 //!
-//! Anchor-based gap semantics — `AnchorSemantics` and `AnonymousClassifier` — live in
-//! `analyze/anchors.rs`, shared with the grammar satisfiability checker so the two
-//! cannot drift, and are re-exported here for codegen. This module keeps the
-//! codegen-only navs that drive the VM's sibling search and quantifier repeat iteration.
+//! Anchor-based gap semantics live in `analyze/anchors.rs`, shared with the grammar
+//! satisfiability checker so the two cannot drift, and are re-exported here for codegen.
+//! This module keeps the codegen-only navs that drive the VM's sibling search and quantifier
+//! repeat iteration.
 
 use crate::bytecode::Nav;
 use crate::compiler::parse::ast::Pattern;
 
-pub use crate::compiler::analyze::anchors::{AnchorSemantics, AnonymousClassifier};
+pub use crate::compiler::analyze::anchors::AnchorSemantics;
 
 /// Check if a pattern compiles to a loop that owns its own sibling
 /// iteration. Only quantifiers do: a quantifier matches a variable number of
