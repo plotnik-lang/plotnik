@@ -44,8 +44,8 @@
 //!   every shipped grammar; if it ever trips, the classifier has a new gap.
 //! - **Built only via `from_raw`, eagerly and owned.** The flattened grammar is gone
 //!   by `from_metadata`, so a metadata-only `Grammar` has an empty table. The table
-//!   is built for every grammar even with no consumer yet, and `Grammar` clones
-//!   deep-copy it; both are provisional, to revisit when a consumer lands.
+//!   is built eagerly because reachability and satisfiability both consume it, and
+//!   `Grammar` clones deep-copy it; if clone cost shows up, share this owned table.
 
 use std::collections::HashMap;
 
