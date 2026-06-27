@@ -682,7 +682,7 @@ fn unconstrained_matcher(field: Option<NodeFieldId>) -> ChildMatcher {
 /// never widened — it is the user's adjacency demand.
 fn satisfiability_gap(gap: GapClass, pattern: &Pattern) -> GapClass {
     if gap == GapClass::ExtrasOnly && has_direct_alt_branch_nav(pattern) {
-        GapClass::AnonAndExtras
+        GapClass::AnonymousAndExtras
     } else {
         gap
     }

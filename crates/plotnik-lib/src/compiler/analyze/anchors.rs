@@ -29,7 +29,7 @@ pub enum GapClass {
     /// No anchor: any node may sit in the gap (the VM's `SkipPolicy::Any`).
     Any,
     /// Soft `.` with both operands named: skip anonymous tokens and extras.
-    AnonAndExtras,
+    AnonymousAndExtras,
     /// Soft `.` with an anonymous operand: skip extras only.
     ExtrasOnly,
     /// Strict `.!`: nothing may intervene.
@@ -43,20 +43,21 @@ impl GapClass {
     pub fn admits(self, anonymous: bool, extra: bool) -> bool {
         match self {
             Self::Any => true,
-            Self::AnonAndExtras => anonymous || extra,
+            Self::AnonymousAndExtras => anonymous || extra,
             Self::ExtrasOnly => extra,
             Self::Nothing => false,
         }
     }
 
     /// Rank by permissiveness. The classes nest — `Nothing ⊂ ExtrasOnly ⊂
-    /// AnonAndExtras ⊂ Any` — so a total order captures their intersection and union
-    /// exactly, which is what [`tighten`](Self::tighten)/[`loosen`](Self::loosen) need.
+    /// AnonymousAndExtras ⊂ Any` — so a total order captures their intersection and
+    /// union exactly, which is what [`tighten`](Self::tighten)/[`loosen`](Self::loosen)
+    /// need.
     fn permissiveness(self) -> u8 {
         match self {
             Self::Nothing => 0,
             Self::ExtrasOnly => 1,
-            Self::AnonAndExtras => 2,
+            Self::AnonymousAndExtras => 2,
             Self::Any => 3,
         }
     }
@@ -91,7 +92,7 @@ impl GapClass {
     pub fn from_nav(nav: Nav) -> Option<Self> {
         let class = match nav {
             Nav::Next | Nav::Down | Nav::Up(_) => Self::Any,
-            Nav::NextSkip | Nav::DownSkip | Nav::UpSkipTrivia(_) => Self::AnonAndExtras,
+            Nav::NextSkip | Nav::DownSkip | Nav::UpSkipTrivia(_) => Self::AnonymousAndExtras,
             Nav::NextSkipExtras | Nav::DownSkipExtras | Nav::UpSkipExtras(_) => Self::ExtrasOnly,
             Nav::NextExact | Nav::DownExact | Nav::UpExact(_) => Self::Nothing,
             Nav::Epsilon | Nav::Stay | Nav::StayExact => return None,

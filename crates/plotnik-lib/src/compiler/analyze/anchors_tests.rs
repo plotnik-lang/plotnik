@@ -16,10 +16,10 @@ fn admits_mirrors_vm_skip_policy() {
     assert!(GapClass::Any.admits(anon.0, anon.1));
 
     // Broad skip = the VM's `is_trivia` = anonymous || extra.
-    assert!(!GapClass::AnonAndExtras.admits(named.0, named.1));
-    assert!(GapClass::AnonAndExtras.admits(anon.0, anon.1));
-    assert!(GapClass::AnonAndExtras.admits(named_extra.0, named_extra.1));
-    assert!(GapClass::AnonAndExtras.admits(anon_extra.0, anon_extra.1));
+    assert!(!GapClass::AnonymousAndExtras.admits(named.0, named.1));
+    assert!(GapClass::AnonymousAndExtras.admits(anon.0, anon.1));
+    assert!(GapClass::AnonymousAndExtras.admits(named_extra.0, named_extra.1));
+    assert!(GapClass::AnonymousAndExtras.admits(anon_extra.0, anon_extra.1));
 
     // Narrow skip = extras only.
     assert!(!GapClass::ExtrasOnly.admits(named.0, named.1));
@@ -39,16 +39,16 @@ fn from_nav_projects_skip_suffix() {
 
     assert_eq!(
         GapClass::from_nav(Nav::NextSkip),
-        Some(GapClass::AnonAndExtras)
+        Some(GapClass::AnonymousAndExtras)
     );
     assert_eq!(
         GapClass::from_nav(Nav::DownSkip),
-        Some(GapClass::AnonAndExtras)
+        Some(GapClass::AnonymousAndExtras)
     );
     // `UpSkipTrivia` is the broad skip despite its name (mirrors `is_trivia`).
     assert_eq!(
         GapClass::from_nav(Nav::UpSkipTrivia(1)),
-        Some(GapClass::AnonAndExtras)
+        Some(GapClass::AnonymousAndExtras)
     );
 
     assert_eq!(
