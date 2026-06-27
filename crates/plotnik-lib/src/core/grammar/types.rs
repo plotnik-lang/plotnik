@@ -686,9 +686,10 @@ fn variable_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<VarI
     realizers_by_kind
 }
 
-/// Child- and field-kind reachability for every node kind — the single child/field model the
-/// grammar checker reasons over, so the structural check and the satisfiability check
-/// cannot disagree.
+/// Child- and field-kind reachability for every node kind — the model the structural
+/// grammar check queries for local admissibility. It is derived from the same ordered
+/// skeleton that satisfiability threads, so the two checks stay conservatively aligned
+/// without sharing one runtime model.
 ///
 /// It is the **union of two derivations of the same grammar, each correct but lossy in a
 /// different place**, so either one alone would reject queries the grammar actually allows:

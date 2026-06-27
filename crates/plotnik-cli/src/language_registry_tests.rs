@@ -9,6 +9,8 @@
 
 use std::collections::HashSet;
 
+use indoc::indoc;
+
 use crate::language_registry::{self, Lang, all, from_name};
 
 #[test]
@@ -367,14 +369,32 @@ fn abi_compat_all_languages() {
 ))]
 fn grammar_admits_every_field_and_child_in_real_trees() {
     const SNIPPETS: &[(&str, &str)] = &[
-        ("lua", "local function f() end\nlocal x = 1\n"),
+        (
+            "lua",
+            indoc! {"
+                local function f() end
+                local x = 1
+            "},
+        ),
         (
             "go",
-            "package p\nvar x []int\nvar y map[string]int\nfunc g() T { return a }\n",
+            indoc! {"
+                package p
+                var x []int
+                var y map[string]int
+                func g() T { return a }
+            "},
         ),
         ("java", "class A { int x = 1; void m() { return; } }"),
         ("rust", "fn f() -> T { let x: U = a; }"),
-        ("python", "match x:\n    case 1:\n        pass\n"),
+        (
+            "python",
+            indoc! {"
+                match x:
+                    case 1:
+                        pass
+            "},
+        ),
         ("typescript", "function f(a: number): void { return; }"),
     ];
 

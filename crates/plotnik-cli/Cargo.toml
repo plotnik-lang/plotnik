@@ -381,4 +381,5 @@ flate2 = "1.1"
 plotnik-lib = { path = "../plotnik-lib", version = "0.3.3", default-features = false }
 
 [dev-dependencies]
+indoc = "=2.0.7"
 insta = "=1.48.0"

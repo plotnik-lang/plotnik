@@ -66,9 +66,9 @@ pub(super) struct ChildMatcher {
     /// satisfy, or `None` when matching this kind is the whole constraint.
     pub(super) nested_pattern: Option<PatternId>,
     /// The field the matched child must bind, when the query wrote `field: …`. The
-    /// engine enforces it only against a node's *direct* children, where the grammar's
-    /// step field is authoritative; a field surfacing through a hidden rule is left
-    /// unconstrained (its inner-vs-outer label is ambiguous), so a rejection is sound.
+    /// engine compares it with the grammar step's effective field: the step's own
+    /// field, or the field inherited while surfacing a visible child through hidden
+    /// structure.
     pub(super) field: Option<NodeFieldId>,
 }
 
