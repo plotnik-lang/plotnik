@@ -7,7 +7,7 @@ clippy:
 	@cargo clippy --workspace --all-targets -- -D warnings
 
 test:
-	@cargo nextest run --no-fail-fast --hide-progress-bar --status-level none --failure-output final
+	@cargo nextest run --no-fail-fast --show-progress only --status-level fail --failure-output final
 
 shot:
 	@# See AGENTS.md for diagnostic guidelines
