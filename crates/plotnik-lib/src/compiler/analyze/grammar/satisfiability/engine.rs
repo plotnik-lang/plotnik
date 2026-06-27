@@ -569,9 +569,10 @@ impl Solve {
             // are the node's own children, so no field is inherited from above.
             NodeRealizer::Var(v) => {
                 let production_count = frozen.variable(v).productions.len();
+                let mut gaps = gap_scratch(frozen, p);
                 (0..production_count).any(|i| {
                     let production = &frozen.variable(v).productions[i];
-                    self.thread_production(frozen, p, production, &start, None)
+                    self.thread_production(frozen, p, production, &start, None, &mut gaps)
                         .contains(accept)
                 })
             }
@@ -581,10 +582,12 @@ impl Solve {
     fn compute_thread(&mut self, frozen: &Frozen, (p, h, q, inherited): ThreadKey) -> StateSet {
         let start = StateSet::singleton(q);
         let mut reached = StateSet::default();
+        let mut gaps = gap_scratch(frozen, p);
         let production_count = frozen.variable(h).productions.len();
         for i in 0..production_count {
             let production = &frozen.variable(h).productions[i];
-            let states = self.thread_production(frozen, p, production, &start, inherited);
+            let states =
+                self.thread_production(frozen, p, production, &start, inherited, &mut gaps);
             reached.union_with(&states);
         }
         reached
@@ -600,21 +603,18 @@ impl Solve {
         production: &[SkeletonStep],
         start: &StateSet,
         inherited: Option<NodeFieldId>,
+        gaps: &mut [GapClass],
     ) -> StateSet {
         let automaton = frozen.automaton(p);
-        // Effective skip gap per state, recomputed by each `closure` and read by the next
-        // `thread_step`. Sized once to the automaton; states outside the live frontier are
-        // never read, so stale entries between rounds do not matter.
-        let mut gaps = vec![GapClass::Any; automaton.state_count()];
-        let mut current = self.closure(frozen, automaton, start, &mut gaps);
+        let mut current = self.closure(frozen, automaton, start, gaps);
         for step in production {
             // A dead frontier stays dead; the rest of the production cannot revive it.
             if current.is_empty() {
                 break;
             }
-            current = self.thread_step(frozen, p, &current, &gaps, step, inherited);
+            current = self.thread_step(frozen, p, &current, gaps, step, inherited);
             let automaton = frozen.automaton(p);
-            current = self.closure(frozen, automaton, &current, &mut gaps);
+            current = self.closure(frozen, automaton, &current, gaps);
         }
         current
     }
@@ -803,6 +803,13 @@ fn eps_closure(automaton: &ChildAutomaton, set: &StateSet) -> StateSet {
         }
     }
     result
+}
+
+/// Effective skip gap per state, recomputed by each `closure` and read by the next
+/// `thread_step`. States outside the live frontier are never read, so stale entries
+/// between productions do not matter.
+fn gap_scratch(frozen: &Frozen, p: PatternId) -> Vec<GapClass> {
+    vec![GapClass::Any; frozen.automaton(p).state_count()]
 }
 
 /// Index every kind to the realizers that can realize it: the variable named for the
