@@ -437,13 +437,20 @@ impl Grammar {
         &self.extra_node_kinds
     }
 
+    /// Whether admissibility APIs are backed by the [`Reachability`] union
+    /// (node-shape summary ∪ structural recovery) rather than metadata-only
+    /// node-shape constraints.
+    fn has_recovered_reachability(&self) -> bool {
+        !self.structure.variables().is_empty()
+    }
+
     pub fn has_field(&self, node_kind_id: NodeKindId, node_field_id: NodeFieldId) -> bool {
         // On the `from_raw` path the faithful field set is `field_kinds` (the summary ∪
         // structural-recovery union, see [`Reachability`]): a field applied to a supertype
         // member (lua `chunk.local_declaration`) surfaces on the enclosing node at runtime,
         // but the summary alone flattens supertypes away and drops it. Metadata-only grammars
         // fall back to the summary.
-        if !self.structure.variables().is_empty() {
+        if self.has_recovered_reachability() {
             return self
                 .field_kinds
                 .contains_key(&(node_kind_id, node_field_id));
@@ -472,7 +479,7 @@ impl Grammar {
         // concrete members a query may write even when the field is typed by an inlined
         // supertype (go's `_type`). A metadata-only grammar has no structure, so fall back to
         // the summary.
-        if !self.structure.variables().is_empty() {
+        if self.has_recovered_reachability() {
             return self
                 .field_kinds
                 .get(&(node_kind_id, node_field_id))
@@ -505,7 +512,7 @@ impl Grammar {
         // child reachable only through a hidden rule — e.g. python `(module (match_statement))`,
         // routed through the hidden `_statement` chain. A metadata-only grammar has no
         // structure, so fall back to the node-shape constraints.
-        if !self.structure.variables().is_empty() {
+        if self.has_recovered_reachability() {
             return self
                 .child_kinds
                 .get(&node_kind_id)
