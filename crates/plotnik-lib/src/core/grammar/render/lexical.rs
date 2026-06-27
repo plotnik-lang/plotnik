@@ -8,8 +8,8 @@
 //! choice-with-`Blank` becomes `(…)?` (or `(…)*` over a repeat). Sub-patterns are
 //! parenthesized only where precedence demands it.
 
-use super::TokenText;
 use super::super::rules::Rule;
+use super::TokenText;
 
 /// Synthesize a token's text. A token whose whole body is a single string renders
 /// as a string literal; anything else renders as a regex.
@@ -135,9 +135,7 @@ fn synth_choice(members: &[Rule]) -> Piece {
         .collect();
 
     // `choice(repeat(X), blank)` is tree-sitter's encoding of `X*`.
-    if has_blank
-        && let [Rule::Repeat(inner)] = non_blank.as_slice()
-    {
+    if has_blank && let [Rule::Repeat(inner)] = non_blank.as_slice() {
         return Piece {
             text: format!("{}*", synth(inner).atom()),
             prec: Prec::Atom,
@@ -191,8 +189,8 @@ fn escape_literal(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for ch in value.chars() {
         match ch {
-            '\\' | '.' | '^' | '$' | '|' | '?' | '*' | '+' | '(' | ')' | '[' | ']' | '{'
-            | '}' | '/' => {
+            '\\' | '.' | '^' | '$' | '|' | '?' | '*' | '+' | '(' | ')' | '[' | ']' | '{' | '}'
+            | '/' => {
                 out.push('\\');
                 out.push(ch);
             }

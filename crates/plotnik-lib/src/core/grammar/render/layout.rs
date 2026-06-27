@@ -69,7 +69,11 @@ fn expand_shape(shape: &Shape, col: usize, indent: usize, width: usize) -> Strin
         Shape::Seq(members) => expand_group('{', '}', members, indent, width),
         Shape::Choice(members) => expand_group('[', ']', members, indent, width),
         Shape::Quantified(inner, quant) => {
-            format!("{}{}", render_shape(inner, col, indent, width), quant.marker())
+            format!(
+                "{}{}",
+                render_shape(inner, col, indent, width),
+                quant.marker()
+            )
         }
         Shape::Field(name, inner) => {
             let prefix = format!("{name}: ");

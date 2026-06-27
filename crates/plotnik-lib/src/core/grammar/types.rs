@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
 
+use super::admissibility::{AdmissibilityIndex, KindSet, Reachability};
 use super::json::GrammarError;
 use super::raw::RawGrammar;
 use super::render::TreeGrammar;
@@ -70,11 +71,14 @@ pub struct Grammar {
     token_node_ids: HashSet<NodeKindId>,
     /// Public node ids that name anonymous (literal-token) kinds.
     anonymous_node_id_set: HashSet<NodeKindId>,
-    fields_by_node: HashMap<NodeKindId, Vec<String>>,
     all_named_node_kinds: Vec<String>,
     all_anonymous_node_kinds: Vec<String>,
     all_field_names: Vec<String>,
     structure: StructureTable,
+    /// Child/field admissibility model: the node-shape summary for a metadata-only
+    /// grammar, replaced by the [`Reachability`] union (summary ∪ structural
+    /// recovery) on the `from_raw` path.
+    admissibility: AdmissibilityIndex,
     /// Tree-shape rendering model for `lang dump` and diagnostics. Populated only
     /// on the `from_raw` path (the pipeline data it taps does not survive into
     /// `GrammarTables`); empty otherwise.
@@ -112,8 +116,12 @@ impl Grammar {
         // shapes now, in place, so the grammars never have to be cloned; the
         // closure-dependent bits are attached from `node_shapes` further down.
         let rule_order: Vec<String> = raw.rules.keys().cloned().collect();
-        let (mut tree, tree_aliases) =
-            super::render::lower(raw.name.clone(), &rule_order, &syntax_grammar, &lexical_grammar);
+        let (mut tree, tree_aliases) = super::render::lower(
+            raw.name.clone(),
+            &rule_order,
+            &syntax_grammar,
+            &lexical_grammar,
+        );
         let syntax_grammar = expand_repeats(syntax_grammar);
         let mut syntax_grammar = flatten_grammar(syntax_grammar)
             .map_err(|error| GrammarError::Analysis(error.to_string()))?;
@@ -145,6 +153,8 @@ impl Grammar {
             Self::from_tables(raw.name.clone(), tables).map_err(GrammarError::Analysis)?;
         let structure = StructureTable::build(grammar_ctx, &grammar);
         grammar.structure = structure;
+        let reachability = Reachability::compute(&grammar, &grammar.node_constraints);
+        grammar.admissibility = AdmissibilityIndex::from_reachability(reachability);
         grammar.tree = tree;
         Ok(grammar)
     }
@@ -202,36 +212,19 @@ impl Grammar {
         )
         .map_err(|error| error.to_string())?;
 
+        let resolver =
+            SubtypeResolver::new(&tables.node_shapes, &named_node_ids, &anonymous_node_ids);
         let mut subtypes = HashMap::new();
         for shape in &tables.node_shapes {
-            let Some(shape_subtypes) = &shape.subtypes else {
+            if shape.subtypes.is_none() {
                 continue;
-            };
+            }
             let Some(supertype) =
                 resolve_node_id(&named_node_ids, &anonymous_node_ids, shape.node_kind())
             else {
                 continue;
             };
-
-            let resolved = shape_subtypes
-                .iter()
-                .filter_map(|subtype| {
-                    resolve_node_id(&named_node_ids, &anonymous_node_ids, subtype.node_kind())
-                })
-                .collect::<Vec<_>>();
-            subtypes.insert(supertype, resolved);
-        }
-
-        let mut fields_by_node = HashMap::new();
-        for shape in &tables.node_shapes {
-            let Some(node_id) =
-                resolve_node_id(&named_node_ids, &anonymous_node_ids, shape.node_kind())
-            else {
-                continue;
-            };
-            let mut fields = shape.fields.keys().cloned().collect::<Vec<_>>();
-            fields.sort();
-            fields_by_node.insert(node_id, fields);
+            subtypes.insert(supertype, resolver.members(shape.node_kind()));
         }
 
         let mut all_named_node_kinds = named_node_ids.keys().cloned().collect::<Vec<_>>();
@@ -264,6 +257,7 @@ impl Grammar {
             .collect::<HashSet<_>>();
 
         let anonymous_node_id_set = anonymous_node_ids.values().copied().collect::<HashSet<_>>();
+        let admissibility = AdmissibilityIndex::from_summary(&node_constraints, &field_names);
 
         Ok(Self {
             name,
@@ -279,13 +273,13 @@ impl Grammar {
             subtypes,
             token_node_ids,
             anonymous_node_id_set,
-            fields_by_node,
             all_named_node_kinds,
             all_anonymous_node_kinds,
             all_field_names,
             // Populated only on the `from_raw` path: `GrammarTables` has already
             // discarded the flattened productions the table distills.
             structure: StructureTable::default(),
+            admissibility,
             tree: TreeGrammar::default(),
         })
     }
@@ -351,10 +345,17 @@ impl Grammar {
     }
 
     pub fn fields_for_node_kind(&self, node_kind_id: NodeKindId) -> Vec<&str> {
-        self.fields_by_node
-            .get(&node_kind_id)
-            .map(|fields| fields.iter().map(String::as_str).collect())
-            .unwrap_or_default()
+        self.field_ids_for_node_kind(node_kind_id)
+            .iter()
+            .map(|&field| {
+                self.field_name(field)
+                    .expect("admissible field id must have a name")
+            })
+            .collect()
+    }
+
+    pub fn field_ids_for_node_kind(&self, node_kind_id: NodeKindId) -> &[NodeFieldId] {
+        self.admissibility.field_ids_for_node_kind(node_kind_id)
     }
 
     pub fn is_supertype(&self, node_kind_id: NodeKindId) -> bool {
@@ -405,19 +406,28 @@ impl Grammar {
         self.extra_node_kinds.contains(&node_kind_id)
     }
 
-    pub fn has_field(&self, node_kind_id: NodeKindId, node_field_id: NodeFieldId) -> bool {
-        self.node_constraints
-            .get(&node_kind_id)
-            .is_some_and(|constraints| constraints.fields.contains_key(&node_field_id))
+    /// The visible extra kinds (comments and the like) the parser may insert between
+    /// siblings at any level. Most are lexical tokens, so they are absent from the
+    /// syntax-variable structure; sequence validation enumerates them here to model
+    /// optional extras a query child may match.
+    pub fn extra_node_kinds(&self) -> &[NodeKindId] {
+        &self.extra_node_kinds
     }
 
+    pub fn has_field(&self, node_kind_id: NodeKindId, node_field_id: NodeFieldId) -> bool {
+        self.admissibility.has_field(node_kind_id, node_field_id)
+    }
+
+    /// Cardinality when the field came from the node-shape summary. Fields recovered
+    /// only through structural reachability are still admissible, but their exact
+    /// cardinality is unknown.
     pub fn field_cardinality(
         &self,
         node_kind_id: NodeKindId,
         node_field_id: NodeFieldId,
     ) -> Option<Cardinality> {
-        self.field_constraints(node_kind_id, node_field_id)
-            .map(|field| field.cardinality)
+        self.admissibility
+            .field_cardinality(node_kind_id, node_field_id)
     }
 
     pub fn valid_field_types(
@@ -425,9 +435,8 @@ impl Grammar {
         node_kind_id: NodeKindId,
         node_field_id: NodeFieldId,
     ) -> &[NodeKindId] {
-        self.field_constraints(node_kind_id, node_field_id)
-            .map(|field| field.valid_types.as_slice())
-            .unwrap_or(&[])
+        self.admissibility
+            .valid_field_types(node_kind_id, node_field_id)
     }
 
     pub fn is_valid_field_type(
@@ -445,24 +454,22 @@ impl Grammar {
             .map(|children| children.cardinality)
     }
 
+    /// Whether the exact node-shape summary declares any child structure for this kind.
+    ///
+    /// This intentionally does not use the widened admissibility index: an over-approximation
+    /// is right for accepting possible field/child queries, but a hard predicate rejection needs
+    /// a proven non-leaf shape.
+    pub fn has_declared_child_structure(&self, node_kind_id: NodeKindId) -> bool {
+        let constraints = self.node_constraints_for(node_kind_id);
+        constraints.children.is_some() || !constraints.fields.is_empty()
+    }
+
     pub fn valid_child_types(&self, node_kind_id: NodeKindId) -> &[NodeKindId] {
-        self.children_constraints(node_kind_id)
-            .map(|children| children.valid_types.as_slice())
-            .unwrap_or(&[])
+        self.admissibility.valid_child_types(node_kind_id)
     }
 
     pub fn is_valid_child_type(&self, node_kind_id: NodeKindId, child: NodeKindId) -> bool {
         self.valid_child_types(node_kind_id).contains(&child)
-    }
-
-    fn field_constraints(
-        &self,
-        node_kind_id: NodeKindId,
-        field_id: NodeFieldId,
-    ) -> Option<&FieldConstraints> {
-        self.node_constraints_for(node_kind_id)
-            .fields
-            .get(&field_id)
     }
 
     fn children_constraints(&self, node_kind_id: NodeKindId) -> Option<&ChildrenConstraints> {
@@ -504,6 +511,66 @@ fn resolve_node_id(
 fn node_field_id(id: u16) -> NodeFieldId {
     NodeFieldId::try_from(id)
         .expect("lowered field symbol id must be non-zero in production grammar")
+}
+
+/// Expands a supertype to the concrete member ids it stands for, splicing any *inlined*
+/// supertype member — one tree-sitter gives no public id (go's `_type`) — through to its
+/// own members. Without the splice those members are lost, so [`Grammar::collect_subtypes`]
+/// under-reports and a field or child typed by a supertype that reaches members through one
+/// rejects a legitimate concrete value (java `field_declaration.type: (integral_type)`). A
+/// kept (id-bearing) sub-supertype is returned as its id; the transitive `collect_subtypes`
+/// closure expands it through its own map entry.
+struct SubtypeResolver<'a> {
+    shapes_by_kind: HashMap<NodeKind<&'a str>, &'a NodeShape>,
+    named_node_ids: &'a HashMap<String, NodeKindId>,
+    anonymous_node_ids: &'a HashMap<String, NodeKindId>,
+}
+
+impl<'a> SubtypeResolver<'a> {
+    fn new(
+        node_shapes: &'a [NodeShape],
+        named_node_ids: &'a HashMap<String, NodeKindId>,
+        anonymous_node_ids: &'a HashMap<String, NodeKindId>,
+    ) -> Self {
+        Self {
+            shapes_by_kind: node_shapes
+                .iter()
+                .map(|shape| (shape.node_kind(), shape))
+                .collect(),
+            named_node_ids,
+            anonymous_node_ids,
+        }
+    }
+
+    fn members(&self, supertype: NodeKind<&'a str>) -> Vec<NodeKindId> {
+        let mut members = KindSet::default();
+        self.collect(supertype, &mut members, &mut HashSet::new());
+        members.into_vec()
+    }
+
+    fn collect(
+        &self,
+        kind: NodeKind<&'a str>,
+        out: &mut KindSet,
+        visiting: &mut HashSet<NodeKind<&'a str>>,
+    ) {
+        if !visiting.insert(kind) {
+            return;
+        }
+        let Some(shape) = self.shapes_by_kind.get(&kind) else {
+            return;
+        };
+        let Some(subtypes) = &shape.subtypes else {
+            return;
+        };
+        for subtype in subtypes {
+            let subtype_kind = subtype.node_kind();
+            match resolve_node_id(self.named_node_ids, self.anonymous_node_ids, subtype_kind) {
+                Some(id) => out.insert(id),
+                None => self.collect(subtype_kind, out, visiting),
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

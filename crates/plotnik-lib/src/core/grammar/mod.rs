@@ -1,5 +1,6 @@
 //! Grammar metadata derived from tree-sitter `grammar.json` files.
 
+mod admissibility;
 mod aliases;
 mod json;
 mod lower;
@@ -26,6 +27,7 @@ mod structure_tests;
 mod types_tests;
 
 pub use json::GrammarError;
+pub use prepared::VariableType;
 pub use render::{
     Body, DEFAULT_WIDTH, Def, DefKind, DumpOptions, NodeRef, Quant, Shape, TokenText, TreeGrammar,
 };
