@@ -43,21 +43,19 @@ pub const DEFAULT_FUEL: u32 = 1_000_000;
 /// the real usage at the resulting depth (~256 KiB) clears even WASM's ~1 MiB stack.
 const ASSUMED_STACK_BYTES: usize = 2 * 1024 * 1024;
 /// One recursion level costs ≈2 KiB in release (measured: an 8 MiB stack overflows
-/// near depth 4000). Assume 8 KiB to cover debug builds' fatter frames and the AST
-/// passes the parser feeds — type inference and satisfiability walk the parsed tree,
-/// recursing to the same depth on the same stack.
+/// near depth 4000). Assume 8 KiB to cover debug builds' fatter frames and later
+/// passes that recurse over the parsed tree.
 const STACK_PER_LEVEL_BYTES: usize = 8 * 1024;
 /// Spend at most half the assumed stack here, leaving the rest for the caller's frames
 /// above us and the non-recursive locals along the way.
 const STACK_SAFETY_DIVISOR: usize = 2;
 
 /// Default maximum structural depth, derived so the deepest legal parse uses at most
-/// half of the smallest mainstream stack. Bounding the parser bounds the AST, which
-/// bounds every downstream pass that walks it — one ceiling keeps them all off the
-/// native stack. Real queries nest a handful of levels (recursion is written with named
-/// definitions, flat in the source), so this sits far above anything legitimate and
-/// only stops runaway nesting, with a clean diagnostic instead of an abort. Raise it via
-/// [`ParseConfig::max_depth`] when parsing trusted, deeply-nested input on a larger stack.
+/// half of the smallest mainstream stack. Real queries nest a handful of levels
+/// (recursion is written with named definitions, flat in the source), so this sits far
+/// above anything legitimate and only stops runaway nesting, with a clean diagnostic
+/// instead of an abort. Raise it via [`ParseConfig::max_depth`] when parsing trusted,
+/// deeply-nested input on a larger stack.
 pub const DEFAULT_MAX_DEPTH: u32 =
     (ASSUMED_STACK_BYTES / STACK_SAFETY_DIVISOR / STACK_PER_LEVEL_BYTES) as u32;
 

@@ -27,6 +27,7 @@ use indexmap::IndexSet;
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
+use crate::compiler::limits::SatisfiabilityLimits;
 use crate::compiler::parse::ast::NodePattern;
 use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, VarId};
 use crate::core::{NodeFieldId, NodeKindId};
@@ -175,8 +176,8 @@ struct Frozen<'a> {
     table: automaton::PatternTable,
     facts: Arc<GrammarFacts>,
     anchor_mode: AnchorMode,
-    /// Structural-depth ceiling for automaton construction — the parser's `max_depth`.
-    max_depth: u32,
+    /// Native-recursion ceiling for automaton construction while inlining references.
+    automaton_max_depth: u32,
 }
 
 impl<'a> Frozen<'a> {
@@ -211,7 +212,7 @@ impl<'a> Frozen<'a> {
             &mut self.table,
             &self.anchor_semantics,
             self.anchor_mode,
-            self.max_depth,
+            self.automaton_max_depth,
             remaining_budget,
         )
     }
@@ -405,22 +406,24 @@ pub(super) struct SatisfiabilitySolver<'a> {
 }
 
 impl<'a> SatisfiabilitySolver<'a> {
-    pub(super) fn checking(ctx: AutomatonContext<'a>, max_depth: u32, step_budget: u64) -> Self {
+    pub(super) fn checking(ctx: AutomatonContext<'a>, limits: SatisfiabilityLimits) -> Self {
         Self::with_anchor_mode(
             ctx,
             AnchorMode::Enforce,
-            max_depth,
-            step_budget,
+            limits,
             Arc::new(GrammarFacts::from_grammar(ctx.grammar)),
         )
     }
 
     pub(super) fn relaxing_anchors(&self, step_budget: u64) -> Self {
+        let limits = SatisfiabilityLimits {
+            automaton_max_depth: self.frozen.automaton_max_depth,
+            step_budget,
+        };
         Self::with_anchor_mode(
             self.frozen.ctx,
             AnchorMode::Relax,
-            self.frozen.max_depth,
-            step_budget,
+            limits,
             Arc::clone(&self.frozen.facts),
         )
     }
@@ -432,8 +435,7 @@ impl<'a> SatisfiabilitySolver<'a> {
     fn with_anchor_mode(
         ctx: AutomatonContext<'a>,
         anchor_mode: AnchorMode,
-        max_depth: u32,
-        step_budget: u64,
+        limits: SatisfiabilityLimits,
         facts: Arc<GrammarFacts>,
     ) -> Self {
         Self {
@@ -444,10 +446,10 @@ impl<'a> SatisfiabilitySolver<'a> {
                 table: automaton::PatternTable::default(),
                 facts,
                 anchor_mode,
-                max_depth,
+                automaton_max_depth: limits.automaton_max_depth,
             },
             solve: Solve {
-                budget: step_budget,
+                budget: limits.step_budget,
                 ..Solve::default()
             },
         }

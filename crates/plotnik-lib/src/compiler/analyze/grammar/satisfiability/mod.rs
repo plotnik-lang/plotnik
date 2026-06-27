@@ -39,6 +39,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
+use crate::compiler::limits::SatisfiabilityLimits;
 use crate::compiler::parse::ast::{self, NodePattern, Pattern, Root, token_src};
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::core::NodeKindId;
@@ -54,12 +55,7 @@ pub(super) struct SatisfiabilityInput<'a> {
     pub(super) symbol_table: &'a SymbolTable,
     pub(super) source_map: &'a SourceMap,
     pub(super) ast_map: &'a IndexMap<SourceId, Root>,
-    /// The query's structural-depth ceiling (the parser's `max_depth`), reused to bound
-    /// automaton construction so an inlining chain cannot outrun the native stack.
-    pub(super) max_depth: u32,
-    /// Work ceiling for the satisfiability solve — a wide child list drives a quadratic
-    /// fixed point, so past this many state-visits the query is rejected as too complex.
-    pub(super) satisfiability_step_budget: u64,
+    pub(super) limits: SatisfiabilityLimits,
 }
 
 /// Run the satisfiability pass over every definition, reporting impossible patterns.
@@ -76,9 +72,8 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
         source_map: input.source_map,
     };
 
-    let mut solver =
-        SatisfiabilitySolver::checking(ctx, input.max_depth, input.satisfiability_step_budget);
-    let anchor_probes = diagnose::AnchorProbes::new(&solver, input.satisfiability_step_budget);
+    let mut solver = SatisfiabilitySolver::checking(ctx, input.limits);
+    let anchor_probes = diagnose::AnchorProbes::new(&solver, input.limits.step_budget);
     let mut reporter = Reporter {
         solver: &mut solver,
         diag,

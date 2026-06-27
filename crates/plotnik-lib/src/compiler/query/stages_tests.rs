@@ -240,10 +240,9 @@ fn multifile_ref_to_body_with_internal_error_attributes_to_defining_file() {
 
 #[test]
 fn deep_reference_chain_hits_recursion_limit() {
-    // `A0 = (A1)`, `A1 = (A2)`, … is flat at every definition, so the parser's nesting
-    // cap never sees it — but dependency analysis recurses one frame per link, and a
-    // chain longer than `max_depth` would overflow the native stack. It is rejected with
-    // the same recursion-limit error deep nesting raises, on every platform.
+    // `A0 = (A1)`, `A1 = (A2)`, … is flat at every definition, so dependency analysis
+    // owns its own stack ceiling. The existing public depth knob updates that ceiling
+    // for compatibility, and an over-deep chain gets the same fatal recursion-limit error.
     let depth = 100;
     let mut src = String::new();
     for i in 0..depth {

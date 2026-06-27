@@ -17,6 +17,7 @@ use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
+use crate::compiler::limits::SatisfiabilityLimits;
 use crate::compiler::parse::ast::Root;
 
 /// The threaded dependencies of the link pass. Decoupled from `Query` to allow
@@ -27,10 +28,7 @@ pub struct GrammarLinkInput<'a, 'q> {
     pub source_map: &'q SourceMap,
     pub ast_map: &'q IndexMap<SourceId, Root>,
     pub symbol_table: &'a SymbolTable,
-    /// The parser's `max_depth`, reused to bound satisfiability automaton construction.
-    pub max_depth: u32,
-    /// Work ceiling for the satisfiability solve.
-    pub satisfiability_step_budget: u64,
+    pub satisfiability_limits: SatisfiabilityLimits,
 }
 
 impl<'q> GrammarLinkInput<'_, 'q> {
@@ -63,8 +61,7 @@ impl<'q> GrammarLinkInput<'_, 'q> {
                     symbol_table: self.symbol_table,
                     source_map: self.source_map,
                     ast_map: self.ast_map,
-                    max_depth: self.max_depth,
-                    satisfiability_step_budget: self.satisfiability_step_budget,
+                    limits: self.satisfiability_limits,
                 },
                 diagnostics,
             );

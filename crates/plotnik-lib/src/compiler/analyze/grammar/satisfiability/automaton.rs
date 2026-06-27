@@ -264,7 +264,7 @@ pub(super) fn build<'a>(
     table: &mut PatternTable,
     anchor_semantics: &AnchorSemantics<'a>,
     anchor_mode: AnchorMode,
-    max_depth: u32,
+    automaton_max_depth: u32,
     state_budget: u64,
 ) -> ChildAutomaton {
     if state_budget == 0 {
@@ -286,7 +286,7 @@ pub(super) fn build<'a>(
         states_built: 0,
         too_complex: false,
         ref_stack: Vec::new(),
-        max_depth,
+        max_depth: automaton_max_depth,
         depth: 0,
     };
     let start = builder.new_state(GapClass::Any);
@@ -351,11 +351,9 @@ struct Builder<'a, 'b> {
     /// Definition names currently being inlined, to catch sibling-recursive refs
     /// that would splice siblings without bound.
     ref_stack: Vec<String>,
-    /// The structural-depth ceiling — the parser's own `max_depth`. Inlining a long
-    /// chain of references (`A = {(B)}`, `B = {(C)}`, …) expands the tree past any
-    /// nesting the parser admitted, and the recursion that builds it is native; left
-    /// unbounded it overflows the stack. Capping construction at the depth the parser
-    /// already survived keeps the two in lockstep — if it parsed, it builds.
+    /// Native-recursion ceiling while inlining references. A long chain like
+    /// `A = {(B)}`, `B = {(C)}`, … is flat source but recursive construction; left
+    /// unbounded it overflows the stack.
     max_depth: u32,
     /// Current [`Self::emit_pattern`] recursion depth, checked against `max_depth`.
     depth: u32,
@@ -505,10 +503,10 @@ impl Builder<'_, '_> {
 
     /// Emit one item between `from` and the returned exit state, counting recursion
     /// depth. Every descent funnels through here, so one check bounds the whole walk:
-    /// outrunning `max_depth` means the inlined expansion is deeper than any tree the
-    /// parser would admit, so we stop and flag the query too complex (rejected). An
-    /// already-bailing build — from depth or the state cap — short-circuits without doing
-    /// more work.
+    /// outrunning `max_depth` means the inlined expansion has crossed the configured
+    /// automaton recursion ceiling, so we stop and flag the query too complex
+    /// (rejected). An already-bailing build — from depth or the state cap —
+    /// short-circuits without doing more work.
     fn emit_pattern(&mut self, pattern: &Pattern, descent: Descent, from: State) -> State {
         if self.too_complex {
             return from;

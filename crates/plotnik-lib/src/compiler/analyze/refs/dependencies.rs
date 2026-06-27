@@ -13,6 +13,7 @@ use indexmap::{IndexMap, IndexSet};
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::Error;
 use crate::compiler::ids::DefId;
+use crate::compiler::limits::ReferenceLimits;
 use crate::compiler::parse::ast::{DefRef, Pattern};
 
 use super::dependency_analysis::DefInfo;
@@ -21,16 +22,12 @@ pub use super::dependency_analysis::DependencyAnalysis;
 pub fn analyze_dependencies(
     symbol_table: &SymbolTable,
     interner: &mut Interner,
-    max_depth: u32,
+    limits: ReferenceLimits,
 ) -> Result<DependencyAnalysis, Error> {
-    // `strongconnect` recurses one frame per edge it follows, so a reference chain
-    // longer than `max_depth` (`A = (B)`, `B = (C)`, …, thousands deep) overflows the
-    // native stack here — a vector the parser's nesting cap never sees, since each such
-    // definition is flat. Reject it with the same recursion-limit error the parser
-    // raises for deep nesting. Self/mutual recursion stays shallow: a back-edge to an
-    // already-visited node takes the non-recursive branch, so only an acyclic chain
-    // grows the stack.
-    let Some(sccs) = TarjanScc::find(symbol_table, max_depth) else {
+    // `strongconnect` recurses one frame per edge it follows. A chain like
+    // `A = (B)`, `B = (C)`, … is flat source, so the parser cannot bound it; this
+    // analysis owns the corresponding stack ceiling.
+    let Some(sccs) = TarjanScc::find(symbol_table, limits.max_depth) else {
         return Err(Error::RecursionLimitExceeded);
     };
 
