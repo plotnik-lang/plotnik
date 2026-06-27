@@ -44,15 +44,24 @@ enum StepClass {
     /// A real child surfacing under `kind`, realized by `realizer`, bound to `field`
     /// when the grammar labels it. A label on this step overrides any pushed down
     /// from a hidden ancestor (the innermost label is the one the runtime attaches).
-    Visible {
-        kind: NodeKindId,
-        field: Option<NodeFieldId>,
-        realizer: NodeRealizer,
-    },
+    Visible(VisibleStep),
     /// A child spliced in without an id of its own: thread through its frontier.
     HiddenSubtree(VarId),
     /// A hidden token: present in the production, absent from the tree.
     HiddenLeaf,
+}
+
+#[derive(Clone, Copy)]
+struct VisibleStep {
+    kind: NodeKindId,
+    field: Option<NodeFieldId>,
+    realizer: NodeRealizer,
+}
+
+impl VisibleStep {
+    fn effective_field(self, inherited: Option<NodeFieldId>) -> Option<NodeFieldId> {
+        self.field.or(inherited)
+    }
 }
 
 /// Whether a matcher demanding field `want` accepts a child whose runtime label is
@@ -174,11 +183,11 @@ impl<'a> Frozen<'a> {
     /// structurally distinct from their namesakes.
     fn classify(&self, step: &SkeletonStep) -> StepClass {
         if let Some(kind) = step.target.visible_kind(self.ctx.grammar) {
-            return StepClass::Visible {
+            return StepClass::Visible(VisibleStep {
                 kind,
                 field: step.field,
                 realizer: NodeRealizer::of_step(step),
-            };
+            });
         }
         if let Some(var) = step.target.transparent_body(self.ctx.grammar) {
             StepClass::HiddenSubtree(var)
@@ -263,8 +272,8 @@ impl<'a> Frozen<'a> {
     ) {
         for step in steps {
             match self.classify(step) {
-                StepClass::Visible { kind, .. } => {
-                    out.push(kind);
+                StepClass::Visible(visible) => {
+                    out.push(visible.kind);
                     break;
                 }
                 StepClass::HiddenSubtree(h) => {
@@ -657,48 +666,11 @@ impl Solve {
         current: &StateSet,
         step: &SkeletonStep,
     ) -> StateSet {
-        let automaton = thread.automaton();
         match thread.frozen.classify(step) {
             // A real child of kind `kind`. Each current state either skips it through a
             // gap self-loop, or consumes it through an edge whose kind and field both
             // admit the step. The step's own label wins over an inherited one.
-            StepClass::Visible {
-                kind,
-                field,
-                realizer,
-            } => {
-                let effective = field.or(thread.inherited_field);
-                // The query asserts this field absent (`-field`); a production binding it
-                // gives the node a forbidden child, so this whole path is dead — it can be
-                // neither consumed nor skipped past.
-                if automaton.negates(effective) {
-                    return StateSet::default();
-                }
-                let node_class = thread.frozen.ctx.grammar.node_class(kind);
-                let mut next = StateSet::default();
-                for q in current.iter() {
-                    if !self.charge() {
-                        break;
-                    }
-                    // The state's *effective* gap (tightest erasure path that reaches it),
-                    // so a strict anchor erased into this position still forbids the skip.
-                    if thread.gaps[q as usize].admits(node_class) {
-                        next.insert(q);
-                    }
-                    for (matcher, to) in automaton.pattern_edges(q) {
-                        if !self.charge() {
-                            break;
-                        }
-                        if thread.frozen.kind_ok(matcher.kind, kind)
-                            && field_ok(matcher.field, effective)
-                            && self.child_sat(matcher, realizer)
-                        {
-                            next.insert(*to);
-                        }
-                    }
-                }
-                next
-            }
+            StepClass::Visible(visible) => self.thread_visible_step(thread, current, visible),
             // Splice the hidden variable's visible frontier in, pushing down the label it
             // inherits: this step's own field if it has one, otherwise the one already
             // inherited (a plain supertype link never relabels what it carries).
@@ -717,6 +689,46 @@ impl Solve {
             // A hidden token surfaces nothing and consumes nothing.
             StepClass::HiddenLeaf => current.clone(),
         }
+    }
+
+    fn thread_visible_step(
+        &mut self,
+        thread: &mut ProductionThread<'_, '_, '_>,
+        current: &StateSet,
+        visible: VisibleStep,
+    ) -> StateSet {
+        let automaton = thread.automaton();
+        let effective = visible.effective_field(thread.inherited_field);
+        // The query asserts this field absent (`-field`); a production binding it
+        // gives the node a forbidden child, so this whole path is dead — it can be
+        // neither consumed nor skipped past.
+        if automaton.negates(effective) {
+            return StateSet::default();
+        }
+        let node_class = thread.frozen.ctx.grammar.node_class(visible.kind);
+        let mut next = StateSet::default();
+        for q in current.iter() {
+            if !self.charge() {
+                break;
+            }
+            // The state's *effective* gap (tightest erasure path that reaches it),
+            // so a strict anchor erased into this position still forbids the skip.
+            if thread.gaps[q as usize].admits(node_class) {
+                next.insert(q);
+            }
+            for (matcher, to) in automaton.pattern_edges(q) {
+                if !self.charge() {
+                    break;
+                }
+                if thread.frozen.kind_ok(matcher.kind, visible.kind)
+                    && field_ok(matcher.field, effective)
+                    && self.child_sat(matcher, visible.realizer)
+                {
+                    next.insert(*to);
+                }
+            }
+        }
+        next
     }
 
     fn thread_closure(
