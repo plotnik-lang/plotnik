@@ -21,6 +21,7 @@
 //! machine — a slow host merely takes proportionally longer to reach it.
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
 
 use indexmap::IndexSet;
 
@@ -95,13 +96,10 @@ enum Key {
     Thread(ThreadKey),
 }
 
-/// Data fixed once the automata are built; only `solve` mutates around it. Splitting
-/// it from the mutable solve state lets the worklist hold `&Frozen` and `&mut Solve`
-/// at once (disjoint borrows) while threading.
-struct Frozen<'a> {
-    ctx: AutomatonContext<'a>,
-    automata: Vec<ChildAutomaton>,
-    table: automaton::PatternTable,
+/// Grammar-wide indexes reused by the primary solve and diagnostic probes. They
+/// are independent of anchor mode and query automata, so relaxed probes can share
+/// them instead of rebuilding the same maps for every reported culprit.
+struct GrammarFacts {
     /// Kind → realizers that may surface that tree kind: the variable named for it,
     /// plus every aliased step occurrence surfacing it.
     realizers_by_kind: HashMap<NodeKindId, Vec<NodeRealizer>>,
@@ -113,6 +111,32 @@ struct Frozen<'a> {
     /// Visible extra kinds (comments), and the named subset, for extra-consumption.
     extras: Vec<NodeKindId>,
     named_extras: Vec<NodeKindId>,
+}
+
+impl GrammarFacts {
+    fn from_grammar(grammar: &Grammar) -> Self {
+        let (extras, named_extras) = extra_kinds(grammar);
+        let realizers_by_kind = build_realizers_by_kind(grammar);
+        let parent_candidate_kinds = build_parent_candidate_kinds(grammar, &realizers_by_kind);
+        let supertype_members = build_supertype_members(grammar, &realizers_by_kind);
+        Self {
+            realizers_by_kind,
+            parent_candidate_kinds,
+            supertype_members,
+            extras,
+            named_extras,
+        }
+    }
+}
+
+/// Data fixed once the automata are built; only `solve` mutates around it. Splitting
+/// it from the mutable solve state lets the worklist hold `&Frozen` and `&mut Solve`
+/// at once (disjoint borrows) while threading.
+struct Frozen<'a> {
+    ctx: AutomatonContext<'a>,
+    automata: Vec<ChildAutomaton>,
+    table: automaton::PatternTable,
+    facts: Arc<GrammarFacts>,
     anchor_mode: AnchorMode,
     /// Structural-depth ceiling for automaton construction — the parser's `max_depth`.
     max_depth: u32,
@@ -132,7 +156,8 @@ impl<'a> Frozen<'a> {
     }
 
     fn realizers_of(&self, kind: NodeKindId) -> &[NodeRealizer] {
-        self.realizers_by_kind
+        self.facts
+            .realizers_by_kind
             .get(&kind)
             .map(Vec::as_slice)
             .unwrap_or(&[])
@@ -169,6 +194,7 @@ impl<'a> Frozen<'a> {
             KindConstraint::Exact(id) => {
                 id == k
                     || self
+                        .facts
                         .supertype_members
                         .get(&k)
                         .is_some_and(|members| members.binary_search(&id).is_ok())
@@ -184,8 +210,10 @@ impl<'a> Frozen<'a> {
     fn admits_any_extra(&self, constraint: KindConstraint) -> bool {
         match constraint {
             KindConstraint::Exact(id) => self.ctx.grammar.is_extra(id),
-            KindConstraint::AnyNamed => !self.named_extras.is_empty(),
-            KindConstraint::AnyNode | KindConstraint::Unconstrained => !self.extras.is_empty(),
+            KindConstraint::AnyNamed => !self.facts.named_extras.is_empty(),
+            KindConstraint::AnyNode | KindConstraint::Unconstrained => {
+                !self.facts.extras.is_empty()
+            }
         }
     }
 
@@ -193,7 +221,7 @@ impl<'a> Frozen<'a> {
     /// kind the grammar can surface. A wildcard with children is satisfiable iff one of
     /// these takes those children — a token can never be a parent, so it is excluded.
     fn parent_candidate_kinds(&self) -> &[NodeKindId] {
-        &self.parent_candidate_kinds
+        &self.facts.parent_candidate_kinds
     }
 
     /// Extra kinds a child matcher could consume. Only kinds the matcher admits — a
@@ -207,9 +235,9 @@ impl<'a> Frozen<'a> {
                     ExtraCandidates::None
                 }
             }
-            KindConstraint::AnyNamed => ExtraCandidates::Many(&self.named_extras),
+            KindConstraint::AnyNamed => ExtraCandidates::Many(&self.facts.named_extras),
             KindConstraint::AnyNode | KindConstraint::Unconstrained => {
-                ExtraCandidates::Many(&self.extras)
+                ExtraCandidates::Many(&self.facts.extras)
             }
         }
     }
@@ -332,7 +360,13 @@ pub(super) struct SatisfiabilitySolver<'a> {
 
 impl<'a> SatisfiabilitySolver<'a> {
     pub(super) fn checking(ctx: AutomatonContext<'a>, max_depth: u32, step_budget: u64) -> Self {
-        Self::with_anchor_mode(ctx, AnchorMode::Enforce, max_depth, step_budget)
+        Self::with_anchor_mode(
+            ctx,
+            AnchorMode::Enforce,
+            max_depth,
+            step_budget,
+            Arc::new(GrammarFacts::from_grammar(ctx.grammar)),
+        )
     }
 
     pub(super) fn relaxing_anchors(&self) -> Self {
@@ -341,6 +375,7 @@ impl<'a> SatisfiabilitySolver<'a> {
             AnchorMode::Relax,
             self.frozen.max_depth,
             self.solve.remaining_budget(),
+            Arc::clone(&self.frozen.facts),
         )
     }
 
@@ -353,21 +388,14 @@ impl<'a> SatisfiabilitySolver<'a> {
         anchor_mode: AnchorMode,
         max_depth: u32,
         step_budget: u64,
+        facts: Arc<GrammarFacts>,
     ) -> Self {
-        let (extras, named_extras) = extra_kinds(ctx.grammar);
-        let realizers_by_kind = build_realizers_by_kind(ctx.grammar);
-        let parent_candidate_kinds = build_parent_candidate_kinds(ctx.grammar, &realizers_by_kind);
-        let supertype_members = build_supertype_members(ctx.grammar, &realizers_by_kind);
         Self {
             frozen: Frozen {
                 ctx,
                 automata: Vec::new(),
                 table: automaton::PatternTable::default(),
-                realizers_by_kind,
-                parent_candidate_kinds,
-                supertype_members,
-                extras,
-                named_extras,
+                facts,
                 anchor_mode,
                 max_depth,
             },
