@@ -1,4 +1,5 @@
 use crate::core::grammar::{Grammar, raw::RawGrammar};
+use indoc::indoc;
 use std::sync::LazyLock;
 
 use crate::compiler::diagnostics::DiagnosticKind;
@@ -331,9 +332,11 @@ fn relaxed_anchor_probe_budget_reports_too_complex() {
     let mut source_map = SourceMap::new();
     source_map.add_file(
         SourcePath::new("q.ptk"),
-        "Q0 = (array .! (identifier))\n\
-         Q1 = (array .! (identifier))\n\
-         Q2 = (array .! (identifier))",
+        indoc! {"
+            Q0 = (array .! (identifier))
+            Q1 = (array .! (identifier))
+            Q2 = (array .! (identifier))
+        "},
     );
 
     let linked = QueryBuilder::new(source_map)
