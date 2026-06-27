@@ -287,7 +287,7 @@ fn deeply_referenced_alternation_compiles_in_linear_time() {
 }
 
 #[test]
-fn satisfy_step_budget_rejects_and_is_tunable() {
+fn satisfiability_step_budget_rejects_and_is_tunable() {
     // A wide child list drives the satisfiability solve's quadratic fixed point. Under a
     // deliberately tiny budget it trips and the query is rejected as too complex; under
     // the default it compiles — so the knob fails closed yet stays out of the way.
@@ -302,7 +302,7 @@ fn satisfy_step_budget_rejects_and_is_tunable() {
         source_map.add_file(SourcePath::new("q.ptk"), &src);
         let mut builder = QueryBuilder::new(source_map);
         if let Some(budget) = budget {
-            builder = builder.with_satisfy_step_budget(budget);
+            builder = builder.with_satisfiability_step_budget(budget);
         }
         builder.analyze().unwrap().link(javascript())
     };
@@ -332,7 +332,7 @@ fn relaxed_anchor_probe_budget_reports_too_complex() {
     source_map.add_file(SourcePath::new("q.ptk"), "Q = (array .! (identifier))");
 
     let linked = QueryBuilder::new(source_map)
-        .with_satisfy_step_budget(2)
+        .with_satisfiability_step_budget(2)
         .analyze()
         .unwrap()
         .link(javascript());

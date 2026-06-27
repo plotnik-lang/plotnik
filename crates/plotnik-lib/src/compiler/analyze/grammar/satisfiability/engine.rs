@@ -168,7 +168,7 @@ impl<'a> Frozen<'a> {
     }
 
     /// Whether the matcher's kind admits at least one extra kind. The childless fast
-    /// path of [`Satisfier::can_consume_extra`] — answered without materializing the
+    /// path of [`SatisfiabilitySolver::can_consume_extra`] — answered without materializing the
     /// admitted-extra list, which matters on wide wildcard child lists.
     fn admits_any_extra(&self, constraint: KindConstraint) -> bool {
         match constraint {
@@ -291,9 +291,9 @@ impl ExtraCandidates<'_> {
 /// few thousand steps, so this leaves roughly three orders of magnitude of headroom,
 /// while a child list past about a thousand wide — quadratic at ~2n² steps — trips it
 /// in a fraction of a second rather than running for tens. Tunable per query via
-/// [`QueryBuilder::with_satisfy_step_budget`](crate::QueryBuilder::with_satisfy_step_budget)
+/// [`QueryBuilder::with_satisfiability_step_budget`](crate::QueryBuilder::with_satisfiability_step_budget)
 /// for the rare case that legitimately needs a wider one.
-pub const DEFAULT_SATISFY_STEP_BUDGET: u64 = 2_000_000;
+pub const DEFAULT_SATISFIABILITY_STEP_BUDGET: u64 = 2_000_000;
 
 /// The mutable fixed-point state: memo tables, reverse dependencies, and the worklist.
 #[derive(Default)]
@@ -314,12 +314,12 @@ struct Solve {
     exhausted: bool,
 }
 
-pub(super) struct Satisfier<'a> {
+pub(super) struct SatisfiabilitySolver<'a> {
     frozen: Frozen<'a>,
     solve: Solve,
 }
 
-impl<'a> Satisfier<'a> {
+impl<'a> SatisfiabilitySolver<'a> {
     pub(super) fn checking(ctx: AutomatonContext<'a>, max_depth: u32, step_budget: u64) -> Self {
         Self::with_anchor_mode(ctx, AnchorMode::Enforce, max_depth, step_budget)
     }

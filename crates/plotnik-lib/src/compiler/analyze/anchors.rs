@@ -1,7 +1,7 @@
 //! Shared anchor truth: the one place sibling-gap semantics are computed.
 //!
 //! Both codegen (`lower/thompson`) and the grammar satisfiability checker
-//! (`analyze/grammar/satisfy`) must agree on exactly what an anchor lets a gap
+//! (`analyze/grammar/satisfiability`) must agree on exactly what an anchor lets a gap
 //! skip — if they drift, the checker rejects what the VM would have matched (or
 //! the reverse). So the nav computation lives here, in `analyze`, where both may
 //! depend on it, and codegen re-exports it rather than forking it. [`GapClass`]

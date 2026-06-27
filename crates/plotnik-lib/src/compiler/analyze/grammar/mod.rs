@@ -7,11 +7,11 @@ mod check;
 mod diagnostics;
 pub mod link;
 mod resolve;
-mod satisfy;
+mod satisfiability;
 mod utils;
 
 pub use binding::{GrammarBinding, GrammarBindingBuilder};
-pub use satisfy::DEFAULT_SATISFY_STEP_BUDGET;
+pub use satisfiability::DEFAULT_SATISFIABILITY_STEP_BUDGET;
 
 #[cfg(test)]
 mod link_tests;

@@ -28,7 +28,7 @@ mod diagnose;
 mod engine;
 mod state_set;
 
-pub use engine::DEFAULT_SATISFY_STEP_BUDGET;
+pub use engine::DEFAULT_SATISFIABILITY_STEP_BUDGET;
 
 #[cfg(test)]
 mod state_set_tests;
@@ -45,10 +45,10 @@ use crate::core::NodeKindId;
 use crate::core::grammar::Grammar;
 
 use automaton::AutomatonContext;
-use engine::Satisfier;
+use engine::SatisfiabilitySolver;
 
 /// The threaded dependencies of the satisfiability pass.
-pub(super) struct SatisfyInput<'a> {
+pub(super) struct SatisfiabilityInput<'a> {
     pub(super) grammar: &'a Grammar,
     pub(super) symbol_table: &'a SymbolTable,
     pub(super) source_map: &'a SourceMap,
@@ -58,11 +58,11 @@ pub(super) struct SatisfyInput<'a> {
     pub(super) max_depth: u32,
     /// Work ceiling for the satisfiability solve — a wide child list drives a quadratic
     /// fixed point, so past this many state-visits the query is rejected as too complex.
-    pub(super) satisfy_step_budget: u64,
+    pub(super) satisfiability_step_budget: u64,
 }
 
 /// Run the satisfiability pass over every definition, reporting impossible patterns.
-pub(super) fn check(input: SatisfyInput<'_>, diag: &mut Diagnostics) {
+pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
     // A metadata-only grammar has no retained productions, so nothing can be decided;
     // accept everything rather than reason from an empty model.
     if input.grammar.structure().variables().is_empty() {
@@ -75,9 +75,10 @@ pub(super) fn check(input: SatisfyInput<'_>, diag: &mut Diagnostics) {
         source_map: input.source_map,
     };
 
-    let mut satisfier = Satisfier::checking(ctx, input.max_depth, input.satisfy_step_budget);
+    let mut solver =
+        SatisfiabilitySolver::checking(ctx, input.max_depth, input.satisfiability_step_budget);
     let mut reporter = Reporter {
-        satisfier: &mut satisfier,
+        solver: &mut solver,
         diag,
     };
 
@@ -93,7 +94,7 @@ pub(super) fn check(input: SatisfyInput<'_>, diag: &mut Diagnostics) {
                 // A resource ceiling tripped mid-construction: the verdicts that follow
                 // would rest on an automaton we declined to finish, so stop and reject
                 // the whole query as too complex rather than report anything dubious.
-                if reporter.satisfier.is_too_complex() {
+                if reporter.solver.is_too_complex() {
                     diagnose::report_too_complex(&located, reporter.diag);
                     return;
                 }
@@ -107,7 +108,7 @@ pub(super) fn check(input: SatisfyInput<'_>, diag: &mut Diagnostics) {
 /// alternation can match — each of those branches with its own reason. Holds the solver
 /// and the diagnostic sink, so the recursion threads only the position and its mode.
 struct Reporter<'a, 'q> {
-    satisfier: &'a mut Satisfier<'q>,
+    solver: &'a mut SatisfiabilitySolver<'q>,
     diag: &'a mut Diagnostics,
 }
 
@@ -123,11 +124,11 @@ impl Reporter<'_, '_> {
                 if !mode.is_required() {
                     return;
                 }
-                if let Some(kind) = root_kind(self.satisfier.context(), &node) {
-                    if !self.satisfier.satisfiable(&node, kind) {
-                        diagnose::report(self.satisfier, &node, kind, self.diag);
+                if let Some(kind) = root_kind(self.solver.context(), &node) {
+                    if !self.solver.satisfiable(&node, kind) {
+                        diagnose::report(self.solver, &node, kind, self.diag);
                     }
-                } else if is_wildcard_parent(&node) && !self.satisfier.wildcard_satisfiable(&node) {
+                } else if is_wildcard_parent(&node) && !self.solver.wildcard_satisfiable(&node) {
                     diagnose::report_wildcard(&node, self.diag);
                 }
             }
@@ -185,11 +186,9 @@ impl Reporter<'_, '_> {
         match located.node() {
             Pattern::NodePattern(node) => {
                 let node = located.wrap(node.clone());
-                match root_kind(self.satisfier.context(), &node) {
-                    Some(kind) => !self.satisfier.satisfiable(&node, kind),
-                    None if is_wildcard_parent(&node) => {
-                        !self.satisfier.wildcard_satisfiable(&node)
-                    }
+                match root_kind(self.solver.context(), &node) {
+                    Some(kind) => !self.solver.satisfiable(&node, kind),
+                    None if is_wildcard_parent(&node) => !self.solver.wildcard_satisfiable(&node),
                     None => false,
                 }
             }

@@ -4,7 +4,7 @@ use rowan::TextRange;
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::grammar::link;
 use crate::compiler::analyze::grammar::{
-    DEFAULT_SATISFY_STEP_BUDGET, GrammarBinding, GrammarBindingBuilder,
+    DEFAULT_SATISFIABILITY_STEP_BUDGET, GrammarBinding, GrammarBindingBuilder,
 };
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
@@ -29,7 +29,7 @@ pub(crate) type AstMap = IndexMap<SourceId, Root>;
 struct QueryConfig {
     pub parse_fuel: u32,
     pub parse_max_depth: u32,
-    pub satisfy_step_budget: u64,
+    pub satisfiability_step_budget: u64,
 }
 
 pub struct QueryBuilder {
@@ -42,7 +42,7 @@ impl QueryBuilder {
         let config = QueryConfig {
             parse_fuel: DEFAULT_FUEL,
             parse_max_depth: DEFAULT_MAX_DEPTH,
-            satisfy_step_budget: DEFAULT_SATISFY_STEP_BUDGET,
+            satisfiability_step_budget: DEFAULT_SATISFIABILITY_STEP_BUDGET,
         };
 
         Self { source_map, config }
@@ -67,8 +67,8 @@ impl QueryBuilder {
     /// legitimately needs a wide child list the default rejects as too complex; the
     /// default protects against an adversarial one driving the quadratic solve for an
     /// unbounded stretch.
-    pub fn with_satisfy_step_budget(mut self, budget: u64) -> Self {
-        self.config.satisfy_step_budget = budget;
+    pub fn with_satisfiability_step_budget(mut self, budget: u64) -> Self {
+        self.config.satisfiability_step_budget = budget;
         self
     }
 
@@ -114,7 +114,7 @@ impl QueryBuilder {
             diag,
             ast_map: ast,
             max_depth: self.config.parse_max_depth,
-            satisfy_step_budget: self.config.satisfy_step_budget,
+            satisfiability_step_budget: self.config.satisfiability_step_budget,
         })
     }
 }
@@ -128,7 +128,7 @@ pub(crate) struct QueryParsed {
     /// check can bound automaton construction by the same budget the parser already enforced.
     max_depth: u32,
     /// The satisfiability solve's work ceiling, carried forward to that check.
-    satisfy_step_budget: u64,
+    satisfiability_step_budget: u64,
 }
 
 impl QueryParsed {
@@ -324,7 +324,7 @@ impl Query {
             ast_map: &analyzed.parsed.ast_map,
             symbol_table: &analyzed.analysis.symbol_table,
             max_depth: analyzed.parsed.max_depth,
-            satisfy_step_budget: analyzed.parsed.satisfy_step_budget,
+            satisfiability_step_budget: analyzed.parsed.satisfiability_step_budget,
         }
         .link(&mut output, &mut analyzed.parsed.diag);
 

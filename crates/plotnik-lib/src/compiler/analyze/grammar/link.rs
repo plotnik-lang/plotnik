@@ -29,7 +29,7 @@ pub struct GrammarLinkInput<'a, 'q> {
     /// The parser's `max_depth`, reused to bound satisfiability automaton construction.
     pub max_depth: u32,
     /// Work ceiling for the satisfiability solve.
-    pub satisfy_step_budget: u64,
+    pub satisfiability_step_budget: u64,
 }
 
 impl<'q> GrammarLinkInput<'_, 'q> {
@@ -56,14 +56,14 @@ impl<'q> GrammarLinkInput<'_, 'q> {
         // structural check left clean: it adds rejections those checks cannot see, and
         // gating keeps it from piling onto an impossibility already pinned precisely.
         if !diagnostics.has_errors() {
-            super::satisfy::check(
-                super::satisfy::SatisfyInput {
+            super::satisfiability::check(
+                super::satisfiability::SatisfiabilityInput {
                     grammar: self.grammar,
                     symbol_table: self.symbol_table,
                     source_map: self.source_map,
                     ast_map: self.ast_map,
                     max_depth: self.max_depth,
-                    satisfy_step_budget: self.satisfy_step_budget,
+                    satisfiability_step_budget: self.satisfiability_step_budget,
                 },
                 diagnostics,
             );

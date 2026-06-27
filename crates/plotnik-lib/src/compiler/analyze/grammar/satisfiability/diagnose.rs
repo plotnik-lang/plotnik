@@ -23,20 +23,20 @@ use crate::compiler::parse::cst::SyntaxNode;
 use crate::core::{NodeFieldId, NodeKindId};
 
 use super::automaton::AutomatonContext;
-use super::engine::Satisfier;
+use super::engine::SatisfiabilitySolver;
 use super::{Mode, collect_goals, root_kind};
 
 /// Emit the impossibility diagnostic for a failed root goal.
 pub(super) fn report(
-    satisfier: &mut Satisfier,
+    solver: &mut SatisfiabilitySolver,
     node: &Located<NodePattern>,
     kind: NodeKindId,
     diag: &mut Diagnostics,
 ) {
     let mut visited = HashSet::new();
-    let culprit = locate(satisfier, node.clone(), kind, &mut visited);
+    let culprit = locate(solver, node.clone(), kind, &mut visited);
 
-    let ctx = satisfier.context();
+    let ctx = solver.context();
 
     // A single-valued field bound more than once is the whole obstacle on its own —
     // a sharper thing to say than a vague "combination the grammar never produces".
@@ -45,13 +45,13 @@ pub(super) fn report(
     }
 
     let anchor_probe = if has_anchor(culprit.node.node()) {
-        relaxing_anchors(satisfier, &culprit)
+        relaxing_anchors(solver, &culprit)
     } else {
         AnchorProbe::DoesNotMatch
     };
 
     match anchor_probe {
-        AnchorProbe::Matches => emit_anchor_failure(satisfier, &culprit, diag),
+        AnchorProbe::Matches => emit_anchor_failure(solver, &culprit, diag),
         AnchorProbe::DoesNotMatch => emit_arrangement_failure(ctx, &culprit, diag),
         AnchorProbe::TooComplex => report_node_too_complex(&culprit.node, diag),
     }
@@ -157,7 +157,7 @@ struct Culprit {
 /// satisfiable on their own — the point where the arrangement, not any one child, is
 /// what the grammar rejects.
 fn locate(
-    satisfier: &mut Satisfier,
+    solver: &mut SatisfiabilitySolver,
     node: Located<NodePattern>,
     kind: NodeKindId,
     visited: &mut HashSet<SyntaxNode>,
@@ -167,15 +167,15 @@ fn locate(
         return Culprit { node, kind };
     }
 
-    let ctx = satisfier.context();
+    let ctx = solver.context();
     let mut children = Vec::new();
     for child in node.node().children() {
         collect_goals(&node.wrap(child), Mode::Required, ctx, &mut children);
     }
 
     for child in children {
-        if !satisfier.satisfiable(&child.node, child.kind) {
-            return locate(satisfier, child.node, child.kind, visited);
+        if !solver.satisfiable(&child.node, child.kind) {
+            return locate(solver, child.node, child.kind, visited);
         }
     }
 
@@ -189,10 +189,10 @@ enum AnchorProbe {
 }
 
 /// Re-solve the culprit with every gap widened to "any node may intervene". A fresh
-/// satisfier keeps the relaxed automata out of the real run's memo. If this matches
+/// solver keeps the relaxed automata out of the real run's memo. If this matches
 /// while the strict solve did not, the anchors are provably the only obstacle.
-fn relaxing_anchors(satisfier: &Satisfier, culprit: &Culprit) -> AnchorProbe {
-    let mut relaxed = satisfier.relaxing_anchors();
+fn relaxing_anchors(solver: &SatisfiabilitySolver, culprit: &Culprit) -> AnchorProbe {
+    let mut relaxed = solver.relaxing_anchors();
     let matches = relaxed.satisfiable(&culprit.node, culprit.kind);
     if relaxed.is_too_complex() {
         return AnchorProbe::TooComplex;
@@ -204,8 +204,8 @@ fn relaxing_anchors(satisfier: &Satisfier, culprit: &Culprit) -> AnchorProbe {
     }
 }
 
-fn emit_anchor_failure(satisfier: &Satisfier, culprit: &Culprit, diag: &mut Diagnostics) {
-    let ctx = satisfier.context();
+fn emit_anchor_failure(solver: &SatisfiabilitySolver, culprit: &Culprit, diag: &mut Diagnostics) {
+    let ctx = solver.context();
     let node = culprit.node.node();
     let kind_name = render_kind(ctx, culprit.kind);
     let span = kind_span(&culprit.node);
@@ -216,13 +216,13 @@ fn emit_anchor_failure(satisfier: &Satisfier, culprit: &Culprit, diag: &mut Diag
     let (boundary, allowed, wanted) = if leads_with_anchor(node) {
         (
             "first",
-            satisfier.first_child_kinds(culprit.kind),
+            solver.first_child_kinds(culprit.kind),
             first_pattern_label(&culprit.node, ctx),
         )
     } else if ends_with_anchor(node) {
         (
             "last",
-            satisfier.last_child_kinds(culprit.kind),
+            solver.last_child_kinds(culprit.kind),
             last_pattern_label(&culprit.node, ctx),
         )
     } else {
