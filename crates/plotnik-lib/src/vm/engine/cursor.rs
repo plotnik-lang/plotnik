@@ -6,7 +6,7 @@
 use arborium_tree_sitter::{Node, TreeCursor};
 
 use crate::bytecode::Nav;
-use crate::core::NodeFieldId;
+use crate::core::{NodeClass, NodeFieldId, SkipClass};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SkipPolicy {
@@ -18,6 +18,21 @@ pub enum SkipPolicy {
     Extras,
     /// No skipping allowed (exact match required).
     Exact,
+}
+
+impl SkipPolicy {
+    fn skip_class(self) -> SkipClass {
+        match self {
+            Self::Any => SkipClass::Any,
+            Self::Trivia => SkipClass::Trivia,
+            Self::Extras => SkipClass::Extras,
+            Self::Exact => SkipClass::Exact,
+        }
+    }
+
+    fn admits(self, node: &Node<'_>) -> bool {
+        self.skip_class().admits(CursorWrapper::node_class(node))
+    }
 }
 
 /// Exit constraint for Up navigation, checked at *each* level ascended (so
@@ -32,6 +47,17 @@ pub enum UpMode {
     SkipExtras,
     /// Each node left must be its parent's last child.
     Exact,
+}
+
+impl UpMode {
+    fn skip_class(self) -> SkipClass {
+        match self {
+            Self::Any => SkipClass::Any,
+            Self::SkipTrivia => SkipClass::Trivia,
+            Self::SkipExtras => SkipClass::Extras,
+            Self::Exact => SkipClass::Exact,
+        }
+    }
 }
 
 /// Wrapper around TreeCursor with Plotnik navigation semantics.
@@ -78,15 +104,17 @@ impl<'t> CursorWrapper<'t> {
         self.cursor.goto_parent()
     }
 
-    /// TODO: when extracting a common tree-sitter wrapper (arborium vs vanilla tree-sitter),
-    ///       give `Node` an `is_trivia()` method so n.is_trivia(), n.is_named(), and
-    ///       n.is_extra() are uniform.
+    #[inline]
+    fn node_class(node: &Node<'_>) -> NodeClass {
+        NodeClass {
+            anonymous: !node.is_named(),
+            extra: node.is_extra(),
+        }
+    }
+
     #[inline]
     pub fn is_trivia(node: &Node<'_>) -> bool {
-        // Anonymous skipping is documented anchor semantics; `is_extra` is the
-        // parser's per-instance bit, so the same kind can be extra in one
-        // position and structural in another.
-        !node.is_named() || node.is_extra()
+        SkipClass::Trivia.admits(Self::node_class(node))
     }
 
     /// Navigate according to Nav command, preparing for match attempt.
@@ -167,7 +195,10 @@ impl<'t> CursorWrapper<'t> {
             }
             // Last child once trailing trivia / extras are ignored.
             UpMode::SkipTrivia => self.is_last_child_skipping(Self::is_trivia),
-            UpMode::SkipExtras => self.is_last_child_skipping(|n| n.is_extra()),
+            UpMode::SkipExtras => {
+                let skip_class = mode.skip_class();
+                self.is_last_child_skipping(|n| skip_class.admits(Self::node_class(n)))
+            }
         }
     }
 
@@ -198,14 +229,8 @@ impl<'t> CursorWrapper<'t> {
     pub fn continue_search(&mut self, policy: SkipPolicy) -> bool {
         match policy {
             SkipPolicy::Exact => false,
-            SkipPolicy::Trivia => {
-                if !Self::is_trivia(&self.cursor.node()) {
-                    return false;
-                }
-                self.cursor.goto_next_sibling()
-            }
-            SkipPolicy::Extras => {
-                if !self.cursor.node().is_extra() {
+            SkipPolicy::Trivia | SkipPolicy::Extras => {
+                if !policy.admits(&self.cursor.node()) {
                     return false;
                 }
                 self.cursor.goto_next_sibling()

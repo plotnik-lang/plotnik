@@ -9,11 +9,13 @@ use crate::compiler::lower::ir::{InstructionIR, Label, NfaGraph, ReturnIR, Tramp
 use crate::compiler::parse::ast::Pattern;
 
 use super::capture::PatternCtx;
+use super::navigation::AnchorSemantics;
 use super::scope::{CaptureExits, Struct};
 
 /// NfaBuilder state for Thompson construction.
 pub struct NfaBuilder<'a> {
     pub(super) ctx: &'a LowerInput<'a>,
+    pub(super) anchor_semantics: AnchorSemantics<'a>,
     pub(super) instructions: Vec<InstructionIR>,
     pub(crate) next_label_id: u32,
     pub(super) def_entries: IndexMap<DefId, Label>,
@@ -26,6 +28,7 @@ impl<'a> NfaBuilder<'a> {
     pub(in crate::compiler::lower) fn new(ctx: &'a LowerInput<'a>) -> Self {
         Self {
             ctx,
+            anchor_semantics: AnchorSemantics::new(ctx.symbol_table),
             instructions: Vec::new(),
             next_label_id: 0,
             def_entries: IndexMap::new(),

@@ -10,7 +10,7 @@ use crate::core::Symbol;
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::{
-    AnonymousClassifier, is_skippable_quantifier, pattern_owns_iteration, resumable_search_nav,
+    AnchorSemantics, is_skippable_quantifier, pattern_owns_iteration, resumable_search_nav,
 };
 
 /// The alternation's resumable search nav (from [`resumable_search_nav`]), kept
@@ -59,11 +59,11 @@ fn nav_for_alt_branch(
     first_nav: Option<Nav>,
     search_nav: AltSearchNav,
     body: &Pattern,
-    classifier: &AnonymousClassifier<'_>,
+    anchor_semantics: &AnchorSemantics<'_>,
 ) -> Option<Nav> {
     let nav = exact_nav_for_alt_branch(first_nav, search_nav)?;
 
-    if !classifier.pattern_may_match_anonymous(Some(body)) {
+    if !anchor_semantics.pattern_may_match_anonymous(Some(body)) {
         return Some(nav);
     }
 
@@ -125,21 +125,19 @@ impl NfaBuilder<'_> {
     /// matching `nav_for_alt_branch`'s before-anchor classification. The twin is a
     /// `NextSkip` clone of a conservative (`NextSkipExtras`) soft follower, worth
     /// cloning only when at least one branch is itself named.
-    fn alt_branch_routing(
-        &mut self,
-        branches: &[ast::Branch],
-        exit: Label,
-        classifier: &AnonymousClassifier,
-    ) -> BranchRouting {
-        let branch_named: Vec<bool> = branches
-            .iter()
-            .map(|b| {
-                b.body().is_some_and(|body| {
-                    !pattern_owns_iteration(&body)
-                        && !classifier.pattern_may_match_anonymous(Some(&body))
+    fn alt_branch_routing(&mut self, branches: &[ast::Branch], exit: Label) -> BranchRouting {
+        let branch_named: Vec<bool> = {
+            let anchor_semantics = &self.anchor_semantics;
+            branches
+                .iter()
+                .map(|b| {
+                    b.body().is_some_and(|body| {
+                        !pattern_owns_iteration(&body)
+                            && !anchor_semantics.pattern_may_match_anonymous(Some(&body))
+                    })
                 })
-            })
-            .collect();
+                .collect()
+        };
 
         let named_exit = branch_named
             .iter()
@@ -205,8 +203,7 @@ impl NfaBuilder<'_> {
 
         let search_nav = resumable_search_nav(first_nav);
         let branch_search = AltSearchNav(search_nav);
-        let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
-        let branch_routing = self.alt_branch_routing(&branches, exit, &classifier);
+        let branch_routing = self.alt_branch_routing(&branches, exit);
 
         let mut successors = Vec::new();
         for (branch_idx, branch) in branches.iter().enumerate() {
@@ -261,7 +258,8 @@ impl NfaBuilder<'_> {
                 vec![]
             };
 
-            let branch_nav = nav_for_alt_branch(first_nav, branch_search, &body, &classifier);
+            let branch_nav =
+                nav_for_alt_branch(first_nav, branch_search, &body, &self.anchor_semantics);
             let branch_entry = if is_skippable_quantifier(&body) {
                 let exit = if capture.post.is_empty() {
                     branch_exit
@@ -339,8 +337,7 @@ impl NfaBuilder<'_> {
 
         let search_nav = resumable_search_nav(first_nav);
         let branch_search = AltSearchNav(search_nav);
-        let classifier = AnonymousClassifier::new(self.ctx.symbol_table);
-        let branch_routing = self.alt_branch_routing(&branches, exit, &classifier);
+        let branch_routing = self.alt_branch_routing(&branches, exit);
 
         let mut successors = Vec::new();
         for (branch_idx, branch) in branches.iter().enumerate() {
@@ -350,7 +347,8 @@ impl NfaBuilder<'_> {
 
             let branch_exit = branch_routing.branch_exit(branch_idx, exit);
 
-            let branch_nav = nav_for_alt_branch(first_nav, branch_search, &body, &classifier);
+            let branch_nav =
+                nav_for_alt_branch(first_nav, branch_search, &body, &self.anchor_semantics);
 
             let label = branch.label().expect("enum branch must have label");
             let (variant_idx, payload_type_id) = self
