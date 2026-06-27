@@ -78,10 +78,16 @@ fn field_ok(want: Option<NodeFieldId>, have: Option<NodeFieldId>) -> bool {
 }
 
 type SatKey = (PatternId, NodeRealizer);
-/// `(query node, hidden variable, automaton state, inherited field)`. The inherited
-/// field is part of the key: the same frontier entered under different labels admits
-/// different `field:` matchers, so the memo must keep them apart.
-type ThreadKey = (PatternId, VarId, State, Option<NodeFieldId>);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct ThreadKey {
+    pattern: PatternId,
+    hidden_var: VarId,
+    state: State,
+    /// Part of the key: the same frontier entered under different labels admits
+    /// different `field:` matchers, so the memo must keep them apart.
+    inherited_field: Option<NodeFieldId>,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Key {
@@ -579,15 +585,21 @@ impl Solve {
         }
     }
 
-    fn compute_thread(&mut self, frozen: &Frozen, (p, h, q, inherited): ThreadKey) -> StateSet {
-        let start = StateSet::singleton(q);
+    fn compute_thread(&mut self, frozen: &Frozen, key: ThreadKey) -> StateSet {
+        let start = StateSet::singleton(key.state);
         let mut reached = StateSet::default();
-        let mut gaps = gap_scratch(frozen, p);
-        let production_count = frozen.variable(h).productions.len();
+        let mut gaps = gap_scratch(frozen, key.pattern);
+        let production_count = frozen.variable(key.hidden_var).productions.len();
         for i in 0..production_count {
-            let production = &frozen.variable(h).productions[i];
-            let states =
-                self.thread_production(frozen, p, production, &start, inherited, &mut gaps);
+            let production = &frozen.variable(key.hidden_var).productions[i];
+            let states = self.thread_production(
+                frozen,
+                key.pattern,
+                production,
+                &start,
+                key.inherited_field,
+                &mut gaps,
+            );
             reached.union_with(&states);
         }
         reached
@@ -673,7 +685,12 @@ impl Solve {
                 let pushed = step.field.or(inherited);
                 let mut next = StateSet::default();
                 for q in current.iter() {
-                    let reached = self.get_thread((p, h, q, pushed));
+                    let reached = self.get_thread(ThreadKey {
+                        pattern: p,
+                        hidden_var: h,
+                        state: q,
+                        inherited_field: pushed,
+                    });
                     next.union_with(&reached);
                 }
                 next
