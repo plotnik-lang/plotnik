@@ -1,3 +1,4 @@
+pub mod anchors;
 mod artifacts;
 pub mod grammar;
 pub mod located;

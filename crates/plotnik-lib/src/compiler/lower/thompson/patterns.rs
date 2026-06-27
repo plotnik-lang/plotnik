@@ -22,7 +22,6 @@ use crate::compiler::analyze::types::CaptureKind;
 
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
-use super::navigation::check_trailing_anchor;
 use super::scope::{CaptureExits, CaptureRequest, SplitExits};
 use super::sequences::SeqItemsCtx;
 
@@ -85,7 +84,7 @@ impl NfaBuilder<'_> {
         }
 
         let (has_trailing_anchor, trailing_nav) =
-            check_trailing_anchor(&items, self.ctx.symbol_table);
+            self.anchor_semantics.check_trailing_anchor(&items);
 
         // Emit Up instruction with appropriate strictness. A trailing anchor only
         // changes this ascent into a lastness check (`Up*`); the body itself

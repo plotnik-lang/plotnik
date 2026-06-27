@@ -10,8 +10,7 @@ use crate::compiler::parse::ast::{self, SeqItem};
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::{
-    compute_nav_modes, is_down_nav, is_skippable_quantifier, pattern_owns_iteration,
-    resumable_search_nav,
+    is_down_nav, is_skippable_quantifier, pattern_owns_iteration, resumable_search_nav,
 };
 use super::scope::SplitExits;
 
@@ -126,7 +125,9 @@ impl NfaBuilder<'_> {
             skip_exit,
         } = ctx;
 
-        let mut nav_modes = compute_nav_modes(items, is_inside_node, self.ctx.symbol_table);
+        let mut nav_modes = self
+            .anchor_semantics
+            .compute_nav_modes(items, is_inside_node);
 
         if nav_modes.is_empty() {
             return exit;
