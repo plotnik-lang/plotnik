@@ -235,16 +235,10 @@ pub(super) fn build(
         depth: 0,
     };
     let start = builder.new_state(GapClass::Any);
-    let items: Vec<SeqItem> = node.node().items().collect();
-    let accept = builder.emit_items(
-        &items,
-        Descent::root(node.source()),
-        NavContext::NodeChildren,
-        None,
-        start,
-    );
+    let items = ItemList::node_children(node.node());
+    let accept = builder.emit_items(&items, Descent::root(node.source()), start);
 
-    let (has_trailing, trailing_nav) = check_trailing_anchor(&items, ctx.symbol_table);
+    let (has_trailing, trailing_nav) = check_trailing_anchor(items.as_slice(), ctx.symbol_table);
     let trailing_gap = if has_trailing {
         trailing_nav
             .and_then(GapClass::from_nav)
@@ -312,6 +306,34 @@ struct Builder<'a, 'b> {
     max_depth: u32,
     /// Current [`Self::emit_pattern`] recursion depth, checked against `max_depth`.
     depth: u32,
+}
+
+struct ItemList {
+    items: Vec<SeqItem>,
+    nav_context: NavContext,
+    first_gap: Option<GapClass>,
+}
+
+impl ItemList {
+    fn node_children(node: &NodePattern) -> Self {
+        Self {
+            items: node.items().collect(),
+            nav_context: NavContext::NodeChildren,
+            first_gap: None,
+        }
+    }
+
+    fn spliced_sequence(seq: &ast::SeqPattern, first_gap: GapClass) -> Self {
+        Self {
+            items: seq.items().collect(),
+            nav_context: NavContext::SplicedSequence,
+            first_gap: Some(first_gap),
+        }
+    }
+
+    fn as_slice(&self) -> &[SeqItem] {
+        &self.items
+    }
 }
 
 /// The context one query position is lowered under. `source` is the file its text
@@ -382,19 +404,16 @@ impl Builder<'_, '_> {
     /// spine starting at `entry`, stamping each pattern's leading gap from the shared
     /// nav computation. Returns the exit state. Each item descends field-fresh — a
     /// sibling's label comes only from its own `field: …`, never the list's context.
-    fn emit_items(
-        &mut self,
-        items: &[SeqItem],
-        descent: Descent,
-        nav_context: NavContext,
-        first_gap: Option<GapClass>,
-        entry: State,
-    ) -> State {
-        let navs = compute_nav_modes(items, nav_context.is_inside_node(), self.ctx.symbol_table);
+    fn emit_items(&mut self, items: &ItemList, descent: Descent, entry: State) -> State {
+        let navs = compute_nav_modes(
+            items.as_slice(),
+            items.nav_context.is_inside_node(),
+            self.ctx.symbol_table,
+        );
         let mut navs = navs.into_iter();
         let mut cur = entry;
         let mut first = true;
-        for item in items {
+        for item in items.as_slice() {
             let SeqItem::Pattern(pattern) = item else {
                 continue;
             };
@@ -405,7 +424,7 @@ impl Builder<'_, '_> {
             // body) inherits that anchor's gap on its first child: the outer level
             // already chose it, so recomputing here would drop the adjacency and let a
             // strict anchor leak through the boundary.
-            let gap = match (first, first_gap) {
+            let gap = match (first, items.first_gap) {
                 (true, Some(g)) => g,
                 _ => satisfiability_gap(
                     nav.and_then(GapClass::from_nav).unwrap_or(GapClass::Any),
@@ -468,18 +487,11 @@ impl Builder<'_, '_> {
             // A sequence is several siblings, never a single field value (the grammar
             // forbids `field: {…}`), so the field does not carry into its items.
             Pattern::SeqPattern(seq) => {
-                let items: Vec<SeqItem> = seq.items().collect();
                 // The group sits at one child position whose gap `from` already carries;
                 // thread it as the first child's gap so an enclosing anchor survives the
                 // `{…}` boundary instead of being recomputed away.
-                let first_gap = Some(self.states[from as usize].gap);
-                self.emit_items(
-                    &items,
-                    descent,
-                    NavContext::SplicedSequence,
-                    first_gap,
-                    from,
-                )
+                let items = ItemList::spliced_sequence(seq, self.states[from as usize].gap);
+                self.emit_items(&items, descent, from)
             }
             Pattern::DefRef(def_ref) => self.emit_def_ref(def_ref, descent, from),
         }
