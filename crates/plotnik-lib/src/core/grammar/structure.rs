@@ -141,6 +141,37 @@ impl SkeletonStep {
             StepProjection::HiddenLeaf
         }
     }
+
+    pub(crate) fn admissibility(self, grammar: &Grammar) -> AdmissibilityStep {
+        if let Some(field) = self.field {
+            return AdmissibilityStep::Field {
+                field,
+                value: self.field_value(),
+            };
+        }
+        if let Some(kind) = self.target.id {
+            return AdmissibilityStep::Child {
+                kind,
+                transparent_fields: self.target.transparent_body(grammar),
+            };
+        }
+        if let Some(body) = self.target.transparent_body(grammar) {
+            AdmissibilityStep::Transparent { body }
+        } else {
+            AdmissibilityStep::HiddenLeaf
+        }
+    }
+
+    pub(crate) fn field_value(self) -> FieldValueProjection {
+        if let Some(kind) = self.target.id {
+            return FieldValueProjection::Kind(kind);
+        }
+        if let Some(body) = self.target.idless_value_body() {
+            FieldValueProjection::Frontier(body)
+        } else {
+            FieldValueProjection::Empty
+        }
+    }
 }
 
 /// How a skeleton step surfaces to consumers that reason over visible tree children.
@@ -158,6 +189,32 @@ pub(crate) enum StepProjection {
         field: Option<NodeFieldId>,
     },
     HiddenLeaf,
+}
+
+/// How a skeleton step widens the structural admissibility model.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AdmissibilityStep {
+    Field {
+        field: NodeFieldId,
+        value: FieldValueProjection,
+    },
+    Child {
+        kind: NodeKindId,
+        /// Supertype members may expose fields on the enclosing node.
+        transparent_fields: Option<VarId>,
+    },
+    Transparent {
+        body: VarId,
+    },
+    HiddenLeaf,
+}
+
+/// The value side of a fielded step or an id-less value frontier.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FieldValueProjection {
+    Kind(NodeKindId),
+    Frontier(VarId),
+    Empty,
 }
 
 /// A grammar variable reduced to its productions.

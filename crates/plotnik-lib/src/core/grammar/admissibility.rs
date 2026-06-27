@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::core::{Cardinality, NodeFieldId, NodeKindId};
 
-use super::structure::{SkeletonVariable, StepTarget, VarId};
+use super::structure::{AdmissibilityStep, FieldValueProjection, SkeletonVariable, VarId};
 use super::types::{Grammar, NodeConstraints};
 
 /// Insertion-ordered set of node kinds: dedups while keeping first-seen order, so derived
@@ -282,19 +282,25 @@ impl ReachabilityBuilder<'_> {
         }
         let variable = structure_variable(self.grammar, var);
         for step in variable.productions.iter().flatten() {
-            if let Some(field) = step.field {
-                self.collect_field_value(node, field, step.target);
-                continue;
-            }
-            if let Some(id) = step.target.id {
-                if !self.grammar.is_anonymous_node(id) {
-                    self.children.entry(node).or_default().insert(id);
+            match step.admissibility(self.grammar) {
+                AdmissibilityStep::Field { field, value } => {
+                    self.collect_field_value(node, field, value);
                 }
-                if let Some(body) = step.target.transparent_body(self.grammar) {
-                    self.collect_transparent_fields(node, body, &mut HashSet::new());
+                AdmissibilityStep::Child {
+                    kind,
+                    transparent_fields,
+                } => {
+                    if !self.grammar.is_anonymous_node(kind) {
+                        self.children.entry(node).or_default().insert(kind);
+                    }
+                    if let Some(body) = transparent_fields {
+                        self.collect_transparent_fields(node, body, &mut HashSet::new());
+                    }
                 }
-            } else if let Some(body) = step.target.transparent_body(self.grammar) {
-                self.collect_node(node, body, seen);
+                AdmissibilityStep::Transparent { body } => {
+                    self.collect_node(node, body, seen);
+                }
+                AdmissibilityStep::HiddenLeaf => {}
             }
         }
     }
@@ -314,12 +320,22 @@ impl ReachabilityBuilder<'_> {
         }
         let variable = structure_variable(self.grammar, var);
         for step in variable.productions.iter().flatten() {
-            if let Some(field) = step.field {
-                self.collect_field_value(node, field, step.target);
-                continue;
-            }
-            if let Some(body) = step.target.transparent_body(self.grammar) {
-                self.collect_transparent_fields(node, body, seen);
+            match step.admissibility(self.grammar) {
+                AdmissibilityStep::Field { field, value } => {
+                    self.collect_field_value(node, field, value);
+                }
+                AdmissibilityStep::Child {
+                    transparent_fields: Some(body),
+                    ..
+                }
+                | AdmissibilityStep::Transparent { body } => {
+                    self.collect_transparent_fields(node, body, seen);
+                }
+                AdmissibilityStep::Child {
+                    transparent_fields: None,
+                    ..
+                }
+                | AdmissibilityStep::HiddenLeaf => {}
             }
         }
     }
@@ -329,12 +345,19 @@ impl ReachabilityBuilder<'_> {
     /// expanded downstream by `collect_subtypes`. An id-less inlined value (go's `_type`) is
     /// transparent: descend it to the concrete kinds it stands for. Anonymous kinds are kept
     /// — a field value may be a literal token (`operator: "+"`).
-    fn collect_field_value(&mut self, node: NodeKindId, field: NodeFieldId, target: StepTarget) {
+    fn collect_field_value(
+        &mut self,
+        node: NodeKindId,
+        field: NodeFieldId,
+        value_projection: FieldValueProjection,
+    ) {
         let value = &mut self.fields.entry((node, field)).or_default().types;
-        if let Some(id) = target.id {
-            value.insert(id);
-        } else if let Some(body) = target.idless_value_body() {
-            collect_value_frontier(self.grammar, body, value, &mut HashSet::new());
+        match value_projection {
+            FieldValueProjection::Kind(kind) => value.insert(kind),
+            FieldValueProjection::Frontier(body) => {
+                collect_value_frontier(self.grammar, body, value, &mut HashSet::new());
+            }
+            FieldValueProjection::Empty => {}
         }
     }
 }
@@ -372,10 +395,12 @@ fn collect_value_frontier(
     }
     let variable = structure_variable(grammar, var);
     for step in variable.productions.iter().flatten() {
-        if let Some(id) = step.target.id {
-            out.insert(id);
-        } else if let Some(body) = step.target.idless_value_body() {
-            collect_value_frontier(grammar, body, out, seen);
+        match step.field_value() {
+            FieldValueProjection::Kind(kind) => out.insert(kind),
+            FieldValueProjection::Frontier(body) => {
+                collect_value_frontier(grammar, body, out, seen)
+            }
+            FieldValueProjection::Empty => {}
         }
     }
 }
