@@ -1,5 +1,6 @@
 //! Grammar metadata derived from tree-sitter `grammar.json` files.
 
+mod admissibility;
 mod aliases;
 mod json;
 mod lower;
