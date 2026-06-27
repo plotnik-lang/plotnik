@@ -43,7 +43,7 @@ pub(super) fn report(
     node: &Located<NodePattern>,
     kind: NodeKindId,
     diag: &mut Diagnostics,
-    anchor_probe_budget: &mut u64,
+    anchor_probes: &mut AnchorProbes<'_>,
 ) -> ReportOutcome {
     let mut visited = HashSet::new();
     let culprit = locate(solver, node.clone(), kind, &mut visited);
@@ -62,7 +62,7 @@ pub(super) fn report(
     }
 
     let anchor_probe = if has_anchor(culprit.node.node()) {
-        relaxing_anchors(solver, &culprit, anchor_probe_budget)
+        anchor_probes.relax(&culprit)
     } else {
         AnchorProbe::DoesNotMatch
     };
@@ -214,32 +214,35 @@ enum AnchorProbe {
     Inconclusive,
 }
 
-/// Re-solve the culprit with every gap widened to "any node may intervene". A fresh
-/// solver keeps the relaxed automata out of the real run's memo and spends from the
-/// reporter-owned diagnostic budget, not the primary proof budget. If the probe runs
-/// out, the proof remains a proven unsatisfiable pattern; only the explanation becomes
-/// less specific.
-fn relaxing_anchors(
-    solver: &SatisfiabilitySolver,
-    culprit: &Culprit,
-    anchor_probe_budget: &mut u64,
-) -> AnchorProbe {
-    let budget = (*anchor_probe_budget).min(solver.remaining_budget());
-    if budget == 0 {
-        return AnchorProbe::Inconclusive;
+/// Re-solves anchored culprits with every gap widened to "any node may intervene".
+/// It owns one relaxed solver for the whole reporting pass, so automata and fixed-point
+/// memos survive across diagnostics. Exhausting this diagnostic solver never changes the
+/// primary proof; it only makes later explanations less specific.
+pub(super) struct AnchorProbes<'a> {
+    solver: SatisfiabilitySolver<'a>,
+}
+
+impl<'a> AnchorProbes<'a> {
+    pub(super) fn new(primary: &SatisfiabilitySolver<'a>, step_budget: u64) -> Self {
+        Self {
+            solver: primary.relaxing_anchors(step_budget),
+        }
     }
 
-    let mut relaxed = solver.relaxing_anchors(budget);
-    let matches = relaxed.satisfiable(&culprit.node, culprit.kind);
-    let too_complex = relaxed.is_too_complex();
-    *anchor_probe_budget = anchor_probe_budget.saturating_sub(relaxed.steps_spent());
-    if too_complex {
-        return AnchorProbe::Inconclusive;
-    }
-    if matches {
-        AnchorProbe::Matches
-    } else {
-        AnchorProbe::DoesNotMatch
+    fn relax(&mut self, culprit: &Culprit) -> AnchorProbe {
+        if self.solver.is_too_complex() || self.solver.remaining_budget() == 0 {
+            return AnchorProbe::Inconclusive;
+        }
+
+        let matches = self.solver.satisfiable(&culprit.node, culprit.kind);
+        if self.solver.is_too_complex() {
+            return AnchorProbe::Inconclusive;
+        }
+        if matches {
+            AnchorProbe::Matches
+        } else {
+            AnchorProbe::DoesNotMatch
+        }
     }
 }
 

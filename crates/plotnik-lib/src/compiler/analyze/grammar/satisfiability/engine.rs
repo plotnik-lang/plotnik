@@ -413,10 +413,6 @@ impl<'a> SatisfiabilitySolver<'a> {
         self.solve.remaining_budget()
     }
 
-    pub(super) fn steps_spent(&self) -> u64 {
-        self.solve.steps
-    }
-
     fn with_anchor_mode(
         ctx: AutomatonContext<'a>,
         anchor_mode: AnchorMode,

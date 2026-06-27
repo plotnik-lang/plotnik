@@ -78,10 +78,11 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
 
     let mut solver =
         SatisfiabilitySolver::checking(ctx, input.max_depth, input.satisfiability_step_budget);
+    let anchor_probes = diagnose::AnchorProbes::new(&solver, input.satisfiability_step_budget);
     let mut reporter = Reporter {
         solver: &mut solver,
         diag,
-        anchor_probe_budget: input.satisfiability_step_budget,
+        anchor_probes,
     };
 
     // Each definition body must be matchable in its own right — the structural check's
@@ -118,7 +119,7 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
 struct Reporter<'a, 'q> {
     solver: &'a mut SatisfiabilitySolver<'q>,
     diag: &'a mut Diagnostics,
-    anchor_probe_budget: u64,
+    anchor_probes: diagnose::AnchorProbes<'q>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -164,7 +165,7 @@ impl Reporter<'_, '_> {
                             &node,
                             kind,
                             self.diag,
-                            &mut self.anchor_probe_budget,
+                            &mut self.anchor_probes,
                         )
                         .into();
                     }
