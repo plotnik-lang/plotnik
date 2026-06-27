@@ -141,22 +141,17 @@ impl Reporter<'_, '_> {
                 false
             }
             Pattern::Union(_) | Pattern::Enum(_) => {
-                let branches: Vec<Pattern> = located.node().children().collect();
                 // A branch failing is normally excused by its siblings; but when every
                 // branch is impossible the alternation is too, so promote them — each is
                 // then reported with the reason it cannot match.
-                let dead = participation.is_required()
-                    && !branches.is_empty()
-                    && branches
-                        .iter()
-                        .all(|branch| self.impossible(&located.wrap(branch.clone())));
+                let dead = participation.is_required() && self.all_branches_impossible(located);
                 let branch_participation = if dead {
                     Participation::Required
                 } else {
                     participation.inside_disjunction_branch()
                 };
-                for branch in &branches {
-                    if self.walk(&located.wrap(branch.clone()), branch_participation) {
+                for branch in located.node().children() {
+                    if self.walk(&located.wrap(branch), branch_participation) {
                         return true;
                     }
                 }
@@ -209,13 +204,7 @@ impl Reporter<'_, '_> {
                     None => false,
                 }
             }
-            Pattern::Union(_) | Pattern::Enum(_) => {
-                let branches: Vec<Pattern> = located.node().children().collect();
-                !branches.is_empty()
-                    && branches
-                        .iter()
-                        .all(|branch| self.impossible(&located.wrap(branch.clone())))
-            }
+            Pattern::Union(_) | Pattern::Enum(_) => self.all_branches_impossible(located),
             Pattern::CapturedPattern(cap) => cap
                 .inner()
                 .is_some_and(|inner| self.impossible(&located.wrap(inner))),
@@ -232,6 +221,17 @@ impl Reporter<'_, '_> {
             }
             Pattern::TokenPattern(_) | Pattern::DefRef(_) => false,
         }
+    }
+
+    fn all_branches_impossible(&mut self, located: &Located<Pattern>) -> bool {
+        let mut saw_branch = false;
+        for branch in located.node().children() {
+            saw_branch = true;
+            if !self.impossible(&located.wrap(branch)) {
+                return false;
+            }
+        }
+        saw_branch
     }
 }
 
