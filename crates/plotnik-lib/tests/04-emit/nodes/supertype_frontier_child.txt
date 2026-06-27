@@ -1,0 +1,35 @@
+Q = (array (call_expression) @call)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "call"
+S2 "Q"
+S3 "array"
+S4 "call_expression"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { call }
+
+[type_members]
+M0: S1 → T0  ; call: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06   !   (array)                          08
+  07  ...
+  08  └‣─  (call_expression) [Node Set(M0)]  10
+  10  ─‣┘  _                                11
+  11                                        ▶

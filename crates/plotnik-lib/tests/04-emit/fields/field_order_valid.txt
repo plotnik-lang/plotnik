@@ -1,0 +1,41 @@
+Q = (function_declaration name: (identifier) @n body: (statement_block) @b)
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "n"
+S2 "b"
+S3 "Q"
+S4 "function_declaration"
+S5 "identifier"
+S6 "statement_block"
+S7 "name"
+S8 "body"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { n, b }
+
+[type_members]
+M0: S1 → T0  ; n: <Node>
+M1: S2 → T0  ; b: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06   !   (function_declaration)           08
+  07  ...
+  08  └‣─  name: (identifier) [Node Set(M0)]  10
+  10  ─‣─  body: (statement_block) [Node Set(M1)]  12
+  12  ─‣┘  _                                13
+  13                                        ▶
