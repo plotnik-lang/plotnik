@@ -172,6 +172,12 @@ impl SkeletonStep {
             FieldValueProjection::Empty
         }
     }
+
+    fn surface_realizer(self) -> Option<SurfaceRealizer> {
+        self.target
+            .id
+            .map(|kind| SurfaceRealizer::new(kind, self.target.body))
+    }
 }
 
 /// How a skeleton step surfaces to consumers that reason over visible tree children.
@@ -241,6 +247,12 @@ pub(crate) struct SurfaceRealizer {
     pub(crate) body: Option<VarId>,
 }
 
+impl SurfaceRealizer {
+    fn new(kind: NodeKindId, body: Option<VarId>) -> Self {
+        Self { kind, body }
+    }
+}
+
 /// Ordered structural skeleton of every syntax variable in the grammar.
 ///
 /// Retained from `Grammar::from_raw`'s flattened `SyntaxGrammar` before it is
@@ -307,16 +319,14 @@ impl StructureTable {
     /// one traversal of the ordered grammar model.
     fn surface_realizers(&self) -> impl Iterator<Item = SurfaceRealizer> + '_ {
         self.iter().flat_map(|(var_id, variable)| {
-            let own_id = variable.id.map(|kind| SurfaceRealizer {
-                kind,
-                body: Some(var_id),
-            });
-            let step_ids = variable.productions.iter().flatten().filter_map(|step| {
-                step.target.id.map(|kind| SurfaceRealizer {
-                    kind,
-                    body: step.target.body,
-                })
-            });
+            let own_id = variable
+                .id
+                .map(|kind| SurfaceRealizer::new(kind, Some(var_id)));
+            let step_ids = variable
+                .productions
+                .iter()
+                .flatten()
+                .filter_map(|step| step.surface_realizer());
             own_id.into_iter().chain(step_ids)
         })
     }
