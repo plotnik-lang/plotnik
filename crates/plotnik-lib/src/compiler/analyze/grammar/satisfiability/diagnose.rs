@@ -37,15 +37,30 @@ impl ReportOutcome {
     }
 }
 
+#[derive(Default)]
+pub(super) struct ReportedCulprits {
+    nodes: HashSet<SyntaxNode>,
+}
+
+impl ReportedCulprits {
+    fn insert(&mut self, culprit: &Goal) -> bool {
+        self.nodes.insert(culprit.node().node().syntax().clone())
+    }
+}
+
 /// Emit the impossibility diagnostic for a failed root goal.
 pub(super) fn report_goal(
     solver: &mut SatisfiabilitySolver,
     goal: Goal,
     diag: &mut Diagnostics,
     anchor_probes: &mut AnchorProbes<'_>,
+    reported: &mut ReportedCulprits,
 ) -> ReportOutcome {
     let mut visited = HashSet::new();
     let culprit = locate(solver, goal, &mut visited);
+    if !reported.insert(&culprit) {
+        return ReportOutcome::Emitted;
+    }
     report_culprit(solver, culprit, diag, anchor_probes)
 }
 

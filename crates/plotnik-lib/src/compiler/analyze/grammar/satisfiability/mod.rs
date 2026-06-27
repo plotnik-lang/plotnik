@@ -83,6 +83,7 @@ pub(super) fn check(input: SatisfiabilityInput<'_>, diag: &mut Diagnostics) {
         solver: &mut solver,
         diag,
         anchor_probes,
+        reported: diagnose::ReportedCulprits::default(),
     };
 
     // Each definition body must be matchable in its own right — the structural check's
@@ -120,6 +121,7 @@ struct Reporter<'a, 'q> {
     solver: &'a mut SatisfiabilitySolver<'q>,
     diag: &'a mut Diagnostics,
     anchor_probes: diagnose::AnchorProbes<'q>,
+    reported: diagnose::ReportedCulprits,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -164,7 +166,14 @@ impl Reporter<'_, '_> {
                 if !goal.is_impossible(self.solver) {
                     return WalkOutcome::Continue;
                 }
-                diagnose::report_goal(self.solver, goal, self.diag, &mut self.anchor_probes).into()
+                diagnose::report_goal(
+                    self.solver,
+                    goal,
+                    self.diag,
+                    &mut self.anchor_probes,
+                    &mut self.reported,
+                )
+                .into()
             }
             Pattern::Union(_) | Pattern::Enum(_) => {
                 // A branch failing is normally excused by its siblings; but when every
@@ -244,7 +253,9 @@ impl Reporter<'_, '_> {
                     && q.inner()
                         .is_some_and(|inner| self.impossible(&located.wrap(inner)))
             }
-            Pattern::TokenPattern(_) | Pattern::DefRef(_) => false,
+            Pattern::DefRef(def_ref) => Goal::from_def_ref(self.solver.context(), def_ref)
+                .is_some_and(|goal| goal.is_impossible(self.solver)),
+            Pattern::TokenPattern(_) => false,
         }
     }
 
@@ -277,6 +288,15 @@ impl Goal {
             return Some(Self::Concrete { node, kind });
         }
         is_wildcard_parent(&node).then_some(Self::Wildcard { node })
+    }
+
+    fn from_def_ref(ctx: AutomatonContext<'_>, def_ref: &ast::DefRef) -> Option<Self> {
+        let name = def_ref.name()?;
+        let target = ctx.symbol_table.located_definition(name.text())?;
+        let Pattern::NodePattern(node) = target.node() else {
+            return None;
+        };
+        Self::from_node(ctx, target.wrap(node.clone()))
     }
 
     fn node(&self) -> &Located<NodePattern> {
@@ -347,8 +367,13 @@ fn collect_goals(
                 );
             }
         }
-        // A reference's target is walked when the loop reaches its own definition.
-        Pattern::DefRef(_) => {}
+        Pattern::DefRef(def_ref) => {
+            if participation.is_required()
+                && let Some(goal) = Goal::from_def_ref(ctx, def_ref)
+            {
+                out.push(goal);
+            }
+        }
     }
 }
 

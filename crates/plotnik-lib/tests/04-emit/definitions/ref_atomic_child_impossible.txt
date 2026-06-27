@@ -1,0 +1,11 @@
+Q = (program (expression_statement (Impossible) @expr))
+Impossible = (binary_expression right: (_) left: (_))
+==== diagnostics ====
+error: the grammar builds no `binary_expression` with these children
+ --> query.ptk:2:15
+  |
+2 | Impossible = (binary_expression right: (_) left: (_))
+  |               ^^^^^^^^^^^^^^^^^
+  |
+help: `binary_expression` allows fields `left`, `operator` or `right`
+help: each child is admissible here on its own — it is their combination or order the grammar never produces
