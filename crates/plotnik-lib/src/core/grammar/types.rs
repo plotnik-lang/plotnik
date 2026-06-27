@@ -679,10 +679,11 @@ fn structure_producers(grammar: &Grammar) -> HashMap<NodeKindId, Vec<VarId>> {
 }
 
 /// Child- and field-kind reachability for every node kind — the single child/field model the
-/// grammar checker reasons over, so Stage A and Stage B cannot disagree.
+/// grammar checker reasons over, so the structural check and the satisfiability check
+/// cannot disagree.
 ///
-/// It is the **union of two derivations of the same grammar, each sound but lossy in a
-/// different place**, so neither alone never-rejects-the-possible:
+/// It is the **union of two derivations of the same grammar, each correct but lossy in a
+/// different place**, so either one alone would reject queries the grammar actually allows:
 ///
 /// - The **node-shape summary** applies tree-sitter's full field/child resolution — including
 ///   bubbling a sibling field out of a hidden field-value rule (gleam `let.assign`, carried by

@@ -1,19 +1,27 @@
-//! Stage B: sequence / anchor / arity satisfiability.
+//! Sequence, anchor, and arity satisfiability.
 //!
-//! Stage A (`../check.rs`) validates each query position in isolation — kind exists,
-//! field is on the node, child kind is admissible. It is order-, adjacency-, and
-//! arity-blind, so `(function_declaration .! (identifier))` and `(array (statement))`
-//! slip through. This pass closes that gap: it threads the grammar's productions
-//! through a per-query-node child automaton (`automaton.rs`) under a least fixed
-//! point (`engine.rs`), and rejects a query node exactly when no tree the grammar can
-//! produce realizes its children. `diagnose.rs` turns a failure into a message that
-//! points at the deepest culprit and explains the obstacle.
+//! The structural check (`../check.rs`) validates each query position in isolation —
+//! kind exists, field is on the node, child kind is admissible. It is order-,
+//! adjacency-, and arity-blind, so `(function_declaration .! (identifier))` and
+//! `(array (statement))` slip through. This pass closes that gap: it threads the
+//! grammar's productions through a per-query-node child automaton (`automaton.rs`)
+//! under a least fixed point (`engine.rs`), and rejects a query node exactly when no
+//! tree the grammar can produce realizes its children. `diagnose.rs` turns a failure
+//! into a message that points at the deepest culprit and explains the obstacle.
 //!
-//! The contract is **sound rejection**: every rejection is truly impossible; whenever
-//! the question cannot be decided, the pass accepts. A false rejection is the one
-//! unacceptable outcome, so the walk only reports at `Required` positions — a
-//! concrete-kind node not under an alternation branch or quantified body, where a
-//! failure cannot be excused by a sibling branch or zero repetitions.
+//! The goal is completeness: reject every query the grammar can never match. What this
+//! pass rejects *is* its value, so an impossible query that slips through is a real
+//! defect — one to keep closing, not to excuse because the pass played it safe.
+//! Correctness is how much it catches, not merely what it refrains from rejecting;
+//! "couldn't prove it impossible" is the floor, not the bar. We are not there yet, and
+//! the grammar model we keep is lossy, so some impossibilities are still invisible here.
+//!
+//! One rule is absolute and shapes how we reach for that goal: never reject a query the
+//! grammar *can* match. A false rejection blocks legitimate work, so it is the single
+//! failure we must prevent — when a verdict is genuinely undecidable, accept. That is
+//! why the walk only reports at `Required` positions: a concrete-kind node not under an
+//! alternation branch or quantified body, where a failure cannot be excused by a
+//! sibling branch or zero repetitions.
 
 mod automaton;
 mod diagnose;
@@ -73,10 +81,10 @@ pub(super) fn check(input: SatisfyInput<'_>, diag: &mut Diagnostics) {
         diag,
     };
 
-    // Each definition body must be matchable in its own right — Stage A's stance — so it
-    // is walked at the `Required` mode. References are not followed: a node used as a
-    // whole child is judged by the engine in context, and a referenced definition is
-    // walked when the loop reaches its own entry.
+    // Each definition body must be matchable in its own right — the structural check's
+    // stance — so it is walked at the `Required` mode. References are not followed: a node
+    // used as a whole child is judged by the engine in context, and a referenced
+    // definition is walked when the loop reaches its own entry.
     for (&source, root) in input.ast_map {
         for def in root.defs() {
             if let Some(body) = def.body() {
@@ -168,10 +176,11 @@ impl Reporter<'_, '_> {
         }
     }
 
-    /// Whether `located` provably cannot match any grammar tree — the sound under-side
-    /// of satisfiability that decides an alternation is dead. An alternation is
-    /// impossible only when every branch is; a sequence when any item is; a node when
-    /// the solver says so; tokens, references, and optional bodies stay matchable.
+    /// Whether `located` provably cannot match any grammar tree — the cautious counterpart
+    /// to satisfiability, used to decide an alternation is dead. It answers `true` only when
+    /// impossibility is certain, never on doubt. An alternation is impossible only when every
+    /// branch is; a sequence when any item is; a node when the solver says so; tokens,
+    /// references, and optional bodies stay matchable.
     fn impossible(&mut self, located: &Located<Pattern>) -> bool {
         match located.node() {
             Pattern::NodePattern(node) => {
@@ -309,7 +318,7 @@ fn root_kind(ctx: AutomatonContext<'_>, located: &Located<NodePattern>) -> Optio
     }
     let text = token_src(&type_token, ctx.content(located.source()));
     let id = ctx.grammar.resolve_named_node(text)?;
-    // Query supertypes are rejected by Stage A; if one reaches here, skip it.
+    // Query supertypes are rejected by the structural check; if one reaches here, skip it.
     if ctx.grammar.is_supertype(id) {
         return None;
     }

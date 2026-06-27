@@ -111,7 +111,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 let Some(inner) = q.inner() else { return };
                 // `?`/`*` admit zero matches, so the body need not hold — defer it. `+`
                 // requires the body at least once, so it keeps the current mode: an
-                // impossible `+` body makes the whole `+` impossible. Mirrors Stage B's walk.
+                // impossible `+` body makes the whole `+` impossible.
+                // Mirrors the satisfiability walk.
                 let inner_mode = if q.is_optional() {
                     AdmissibilityMode::Deferred
                 } else {

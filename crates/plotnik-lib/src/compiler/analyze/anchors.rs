@@ -24,7 +24,7 @@ use crate::compiler::parse::ast::{DefRef, Pattern, SeqItem};
 /// comment, say). The two are independent — a named comment is `(false, true)`, an
 /// anonymous brace `(true, false)`. A broad skip clears `anonymous || extra` (the
 /// VM's `is_trivia`); a narrow skip clears only `extra`.
-// The grammar satisfiability checker (`analyze/grammar/satisfy`, Stage B) is the
+// The grammar satisfiability checker (`analyze/grammar/satisfy`) is the
 // consumer; it lands on top of this shared truth, so the type is dead until then.
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

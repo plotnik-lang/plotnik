@@ -124,10 +124,10 @@ pub(crate) struct QueryParsed {
     source_map: SourceMap,
     ast_map: AstMap,
     diag: Diagnostics,
-    /// The structural-depth ceiling parsing ran under, carried forward so Stage B can
-    /// bound automaton construction by the same budget the parser already enforced.
+    /// The structural-depth ceiling parsing ran under, carried forward so the satisfiability
+    /// check can bound automaton construction by the same budget the parser already enforced.
     max_depth: u32,
-    /// The satisfiability solve's work ceiling, carried forward to Stage B.
+    /// The satisfiability solve's work ceiling, carried forward to that check.
     satisfy_step_budget: u64,
 }
 

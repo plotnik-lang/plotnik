@@ -26,9 +26,9 @@ pub struct GrammarLinkInput<'a, 'q> {
     pub source_map: &'q SourceMap,
     pub ast_map: &'q IndexMap<SourceId, Root>,
     pub symbol_table: &'a SymbolTable,
-    /// The parser's `max_depth`, reused to bound Stage B automaton construction.
+    /// The parser's `max_depth`, reused to bound satisfiability automaton construction.
     pub max_depth: u32,
-    /// Work ceiling for the Stage B satisfiability solve.
+    /// Work ceiling for the satisfiability solve.
     pub satisfy_step_budget: u64,
 }
 
@@ -52,9 +52,9 @@ impl<'q> GrammarLinkInput<'_, 'q> {
             linker.link(source_id, root);
         }
 
-        // Stage B (sequence/anchor/arity) runs only on a query the structural pass
-        // left clean: it adds rejections those checks cannot see, and gating keeps it
-        // from piling onto an impossibility Stage A already pinned precisely.
+        // The satisfiability check (sequence/anchor/arity) runs only on a query the
+        // structural check left clean: it adds rejections those checks cannot see, and
+        // gating keeps it from piling onto an impossibility already pinned precisely.
         if !diagnostics.has_errors() {
             super::satisfy::check(
                 super::satisfy::SatisfyInput {
