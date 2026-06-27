@@ -135,7 +135,11 @@ fn build_parent_candidate_kinds(
     let mut candidates: Vec<NodeKindId> = realizers_by_kind
         .keys()
         .copied()
-        .filter(|&kind| !grammar.is_anonymous_node(kind) && !grammar.is_supertype(kind))
+        .filter(|&kind| {
+            !grammar.is_anonymous_node(kind)
+                && !grammar.is_supertype(kind)
+                && !grammar.is_token(kind)
+        })
         .collect();
     candidates.sort_unstable();
     candidates
@@ -151,4 +155,40 @@ fn extra_kinds(grammar: &Grammar) -> (Vec<NodeKindId>, Vec<NodeKindId>) {
         .filter(|&kind| !grammar.is_anonymous_node(kind))
         .collect();
     (extras, named)
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::*;
+    use crate::core::grammar::raw::RawGrammar;
+
+    #[test]
+    fn wildcard_parent_candidates_exclude_leaf_tokens() {
+        let json = indoc! {r#"
+            {
+                "name": "test",
+                "rules": {
+                    "program": { "type": "REPEAT1", "content": { "type": "SYMBOL", "name": "statement" } },
+                    "statement": { "type": "SYMBOL", "name": "identifier" },
+                    "identifier": { "type": "PATTERN", "value": "[a-z]+" }
+                },
+                "extras": []
+            }
+        "#};
+
+        let grammar = Grammar::from_raw(&RawGrammar::from_json(json).unwrap()).unwrap();
+        let facts = GrammarFacts::from_grammar(&grammar);
+        let statement = grammar.resolve_named_node("statement").unwrap();
+        let identifier = grammar.resolve_named_node("identifier").unwrap();
+
+        assert!(grammar.is_token(identifier));
+        assert!(
+            !facts.realizers_of(identifier).is_empty(),
+            "token kinds still have realizers for exact leaf matching"
+        );
+        assert!(facts.parent_candidate_kinds().contains(&statement));
+        assert!(!facts.parent_candidate_kinds().contains(&identifier));
+    }
 }
