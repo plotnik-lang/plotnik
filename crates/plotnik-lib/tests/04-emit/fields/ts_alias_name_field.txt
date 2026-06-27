@@ -33,7 +33,7 @@ _StructWrap:
 
 Q:
   06   !   (type_alias_declaration)         08
-  07  ...  
+  07  ...
   08  └‣─  name: (type_identifier) [Node Set(M0)]  10
   10  ─‣─  value: (predefined_type) [Node Set(M1)]  12
   12  ─‣┘  _                                13

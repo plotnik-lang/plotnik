@@ -51,12 +51,12 @@ _StructWrap:
 
 Q:
   06   !   (program)                        08
-  07  ...  
+  07  ...
   08  -ε-  [ArrayOpen]                      18, 11
   10                                        ▶
   11  -ε-  [ArrayClose Set(M0)]             10
   13   !   (lexical_declaration) [Node Push]  22, 24
-  15  ...  
+  15  ...
   16  ─‣─  _                                13, 16
   18  └‣─  _                                13, 16
   20  ─‣─  _                                13, 20

@@ -47,6 +47,6 @@ Q:
   11  ─•─  (identifier) [Node Set(M1)]      13
   13  ─‣┘³ _                                14
   14                                        ▶
-  15  ...  
+  15  ...
   16   !   (identifier) [Node Set(M0)]      11
   18  ─‣─  _                                16, 18

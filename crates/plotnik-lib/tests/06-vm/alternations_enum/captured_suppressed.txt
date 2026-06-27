@@ -41,7 +41,7 @@ _StructWrap:
 
 Q:
   06   !   (program)                        08
-  07  ...  
+  07  ...
   08  └‣─  _                                16, 18
   10   !   [SuppressBegin] (expression_statement)  12
   12  ─‣┘  [SuppressEnd EnumClose] _        14

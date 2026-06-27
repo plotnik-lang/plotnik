@@ -32,12 +32,12 @@ _StructWrap:
 
 Q:
   06   !   (program)                        08
-  07  ...  
+  07  ...
   08  -ε-  [SuppressBegin]                  20, 16
   10   !   (identifier) [Node]              12
   12  ─‣┘  [SuppressEnd] _                  14
   14                                        ▶
-  15  ...  
+  15  ...
   16  -ε-  [SuppressEnd]                    14
   18  ─‣─  _                                10, 18
   20  └‣─  _                                10, 18

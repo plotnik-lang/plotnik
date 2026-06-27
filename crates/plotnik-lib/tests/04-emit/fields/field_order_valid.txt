@@ -34,7 +34,7 @@ _StructWrap:
 
 Q:
   06   !   (function_declaration)           08
-  07  ...  
+  07  ...
   08  └‣─  name: (identifier) [Node Set(M0)]  10
   10  ─‣─  body: (statement_block) [Node Set(M1)]  12
   12  ─‣┘  _                                13

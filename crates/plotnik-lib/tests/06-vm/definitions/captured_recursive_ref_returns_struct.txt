@@ -86,7 +86,7 @@ Q:
   26  -ε-  [StructClose]                    24
   28   !   (Nested)                         06 : 26
   29  -ε-  [StructOpen]                     28
-  31  ...  
+  31  ...
   32  -ε-  [Null Set(M0)]                   29
 ==== trace ====
 _StructWrap:

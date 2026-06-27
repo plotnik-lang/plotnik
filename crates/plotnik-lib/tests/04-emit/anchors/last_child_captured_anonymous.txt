@@ -29,7 +29,7 @@ _StructWrap:
 
 Q:
   06   !   (statement_block)                08
-  07  ...  
+  07  ...
   08  └‣─  _                                10, 14
   10   !   "}" [Node Set(M0)]               12
   12  ─◦┘  _                                13

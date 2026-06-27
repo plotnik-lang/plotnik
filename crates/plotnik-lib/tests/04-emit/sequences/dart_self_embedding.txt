@@ -31,7 +31,7 @@ _StructWrap:
 
 Q:
   06   !   (list_literal)                   08
-  07  ...  
+  07  ...
   08  └‣─  (list_literal) [Node Set(M0)]    10
   10  ─‣─  (list_literal) [Node Set(M1)]    12
   12  ─‣┘  _                                13

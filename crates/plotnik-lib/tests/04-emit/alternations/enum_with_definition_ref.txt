@@ -59,5 +59,5 @@ Test:
   18   !   (Inner)                          06 : 16
   19  -ε-  [StructOpen]                     18
   21  -ε-  [EnumOpen(M2)]                   19
-  23  ...  
+  23  ...
   24   !   [EnumOpen(M3)] (number) [Node Set(M1) EnumClose Set(M4)]  11

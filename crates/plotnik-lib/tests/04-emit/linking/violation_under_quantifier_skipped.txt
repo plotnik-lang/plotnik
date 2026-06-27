@@ -31,7 +31,7 @@ _StructWrap:
 
 Q:
   06   !   (program)                        08
-  07  ...  
+  07  ...
   08  -ε-  [ArrayOpen]                      24, 16
   10  -ε-                                   11
   11  ─‣┘  [ArrayClose Set(M0)] _           15

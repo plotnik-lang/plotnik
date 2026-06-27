@@ -61,7 +61,7 @@ Q:
   09  -ε-  [Set(M2)]                        08
   11  -ε-  [EnumClose]                      09
   13  -ε-  [Null Set(M0)]                   11
-  15  ...  
+  15  ...
   16   !   (identifier) [Node Set(M0) EnumClose Set(M2)]  08
   19  ─‣─  _                                16, 19
   21   !   _                                16, 19

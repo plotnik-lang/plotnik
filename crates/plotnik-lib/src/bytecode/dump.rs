@@ -395,9 +395,12 @@ fn instruction_step_count(instr: &Instruction) -> u16 {
 impl DumpFormatter<'_> {
     /// Format a single padding step line.
     ///
-    /// Output: `  07  ... ` (step number and " ... " in symbol column)
+    /// Output: `  07  ...` (step number and "..." in the symbol column)
     fn padding_step(&self, step: u16) -> String {
-        LineBuilder::new(self.step_width).instruction_prefix(step, Symbol::PADDING)
+        LineBuilder::new(self.step_width)
+            .instruction_prefix(step, Symbol::PADDING)
+            .trim_end()
+            .to_string()
     }
 
     fn instruction(&self, step: u16, instr: &Instruction) -> String {
