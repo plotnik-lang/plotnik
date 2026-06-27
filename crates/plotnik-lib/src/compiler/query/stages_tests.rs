@@ -1,21 +1,11 @@
-use crate::core::grammar::{Grammar, raw::RawGrammar};
+use crate::compiler::test_utils::javascript_grammar as javascript;
 use indoc::indoc;
-use std::sync::LazyLock;
+use std::fmt::Write as _;
 
 use crate::compiler::diagnostics::DiagnosticKind;
 use crate::compiler::{SourceMap, SourcePath};
 
 use super::{LinkOutcome, Query, QueryBuilder};
-
-fn javascript() -> &'static Grammar {
-    static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw = RawGrammar::from_json(include_str!(env!("PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON")))
-            .expect("javascript grammar fixture");
-        Grammar::from_raw(&raw).expect("javascript grammar metadata")
-    });
-
-    &GRAMMAR
-}
 
 macro_rules! expect_invalid {
     ($($name:literal: $content:literal),+ $(,)?) => {{
@@ -167,7 +157,13 @@ fn dry_run_accepts_valid_query() {
 
 #[test]
 fn dry_run_flags_dropped_value_less_def_among_valid() {
-    let linked = Query::expect("Bad = .\nGood = (identifier) @id").link(javascript());
+    let linked = Query::expect(indoc!(
+        "
+        Bad = .
+        Good = (identifier) @id
+    "
+    ))
+    .link(javascript());
     let diag = linked.dry_run();
     assert!(diag.has_errors());
     let rendered = diag.render(linked.source_map());
@@ -251,9 +247,9 @@ fn deep_reference_chain_hits_recursion_limit() {
     let depth = 100;
     let mut src = String::new();
     for i in 0..depth {
-        src.push_str(&format!("A{i} = (A{})\n", i + 1));
+        writeln!(src, "A{i} = (A{})", i + 1).unwrap();
     }
-    src.push_str(&format!("A{depth} = (identifier)\n"));
+    writeln!(src, "A{depth} = (identifier)").unwrap();
 
     let result = QueryBuilder::from_inline(&src)
         .with_parse_max_depth(50)
@@ -274,9 +270,11 @@ fn deeply_referenced_alternation_compiles_in_linear_time() {
     // each definition is classified once and the whole pipeline stays linear; this test
     // completing at all is the regression guard.
     let depth = 40;
-    let mut src = format!("Top = (A{depth})\nA1 = [(identifier) (identifier)]\n");
+    let mut src = String::new();
+    writeln!(src, "Top = (A{depth})").unwrap();
+    writeln!(src, "A1 = [(identifier) (identifier)]").unwrap();
     for i in 2..=depth {
-        src.push_str(&format!("A{i} = [(A{p}) (A{p})]\n", p = i - 1));
+        writeln!(src, "A{i} = [(A{p}) (A{p})]", p = i - 1).unwrap();
     }
 
     let linked = Query::parse_and_validate(&src).link(javascript());

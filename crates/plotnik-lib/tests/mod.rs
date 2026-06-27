@@ -54,6 +54,8 @@ use plotnik_lib::{
     TypeScriptConfig, VM, Verbosity, materialize_verified,
 };
 
+mod support;
+
 const FIXTURE_EXT: &str = "txt";
 
 fn main() {
@@ -470,24 +472,24 @@ impl Lang {
     }
 }
 
-/// Define a lazily-loaded `&'static Grammar` from the `grammar.json` whose path
-/// `build.rs` exported under `$env`. One per wired language.
+/// Define a lazily-loaded `&'static Grammar` from the `grammar.json` shipped by
+/// the arborium dev-dependency. One per wired language.
 macro_rules! grammar_loader {
-    ($name:ident, $env:literal) => {
+    ($name:ident, $package:literal) => {
         fn $name() -> &'static Grammar {
             static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-                let raw = RawGrammar::from_json(include_str!(env!($env)))
-                    .expect(concat!($env, " grammar fixture"));
-                Grammar::from_raw(&raw).expect(concat!($env, " grammar metadata"))
+                let raw = RawGrammar::from_json(&support::load_arborium_grammar_json($package))
+                    .expect(concat!($package, " grammar fixture"));
+                Grammar::from_raw(&raw).expect(concat!($package, " grammar metadata"))
             });
             &GRAMMAR
         }
     };
 }
 
-grammar_loader!(javascript_grammar, "PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON");
-grammar_loader!(typescript_grammar, "PLOTNIK_LIB_TYPESCRIPT_GRAMMAR_JSON");
-grammar_loader!(dart_grammar, "PLOTNIK_LIB_DART_GRAMMAR_JSON");
+grammar_loader!(javascript_grammar, "arborium-javascript");
+grammar_loader!(typescript_grammar, "arborium-typescript");
+grammar_loader!(dart_grammar, "arborium-dart");
 
 fn source_map(query: &str) -> SourceMap {
     let mut sm = SourceMap::new();

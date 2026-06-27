@@ -5,23 +5,13 @@
 //! and that a truncated or corrupted module is rejected by `Module::load`.
 
 use std::fmt::Write as _;
-use std::sync::LazyLock;
 
 use crate::bytecode::{EncodeError, Module};
-use crate::core::grammar::{Grammar, raw::RawGrammar};
 
 use super::EmitError;
 use crate::compiler::query::QueryBuilder;
+use crate::compiler::test_utils::javascript_grammar as javascript;
 use crate::compiler::{SourceMap, SourcePath};
-
-fn javascript() -> &'static Grammar {
-    static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw = RawGrammar::from_json(include_str!(env!("PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON")))
-            .expect("javascript grammar fixture");
-        Grammar::from_raw(&raw).expect("javascript grammar metadata")
-    });
-    &GRAMMAR
-}
 
 /// Link `src` (which must be valid — capacity limits live at emit, not link) and
 /// return the emission result.
@@ -82,7 +72,7 @@ fn effect_member_payload_overflow_is_emit_error() {
             // (the wide member count is the point, not wildcard matching).
             write!(query, " (expression_statement) @d{def}_f{field}").unwrap();
         }
-        query.push_str(")\n");
+        writeln!(query, ")").unwrap();
     }
 
     let err = try_emit(&query).expect_err("> 1023 members must not encode");

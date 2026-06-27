@@ -13,14 +13,13 @@
 //!   2. the run happens on a deliberately tiny (256 KiB) thread stack, so the
 //!      pre-fix recursive version would abort the test binary here.
 
-use std::sync::LazyLock;
 use std::thread;
 
 use arborium_tree_sitter::{Language as TsLanguage, Node, Parser as TsParser, Tree};
 
 use crate::bytecode::{EffectKind, Instruction, Module, Nav};
+use crate::compiler::test_utils::javascript_grammar;
 use crate::core::{Colors, NodeFieldId};
-use crate::grammar::{Grammar, raw::RawGrammar};
 use crate::{
     Limit, QueryBuilder, RuntimeEffect, RuntimeError, RuntimeLimitSpec, Tracer, VM, Value,
 };
@@ -123,15 +122,6 @@ impl Tracer for DepthProbe {
     fn trace_enter_preamble(&mut self) {
         self.boundary();
     }
-}
-
-fn javascript_grammar() -> &'static Grammar {
-    static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw = RawGrammar::from_json(include_str!(env!("PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON")))
-            .expect("javascript grammar fixture");
-        Grammar::from_raw(&raw).expect("javascript grammar metadata")
-    });
-    &GRAMMAR
 }
 
 fn compile(query: &str) -> Module {
