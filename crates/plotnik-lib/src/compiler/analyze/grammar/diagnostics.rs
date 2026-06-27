@@ -92,13 +92,13 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             );
         }
 
-        let fields = self.grammar.fields_for_node_kind(parent_id);
-        if fields.is_empty() {
+        let field_ids = self.grammar.field_ids_for_node_kind(parent_id);
+        if field_ids.is_empty() {
             return format!("`{}` has no named children", parent_name);
         }
-        let rendered = fields
+        let rendered = field_ids
             .iter()
-            .map(|field| self.render_field(parent_id, field))
+            .map(|&field| self.render_field(parent_id, field))
             .collect::<Vec<_>>()
             .join(", ");
         format!(
@@ -108,12 +108,14 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     }
 
     /// Render a field as `name: (kind)` using its first valid kind, for child/field hints.
-    fn render_field(&self, parent_id: NodeKindId, field_name: &str) -> String {
+    fn render_field(&self, parent_id: NodeKindId, field_id: NodeFieldId) -> String {
+        let field_name = self
+            .grammar
+            .field_name(field_id)
+            .expect("admissible field id must have a name");
         let type_name = self
             .grammar
-            .resolve_field(field_name)
-            .map(|field_id| self.grammar.valid_field_types(parent_id, field_id))
-            .unwrap_or(&[])
+            .valid_field_types(parent_id, field_id)
             .iter()
             .find_map(|&id| self.grammar.node_kind(id))
             .unwrap_or("_");

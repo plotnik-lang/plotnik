@@ -281,10 +281,8 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
     /// it lands in this set (or is an extra / a supertype overlapping it).
     fn admissible_set(&self, parent: NodeKindId) -> HashSet<NodeKindId> {
         let mut seeds = self.grammar.valid_child_types(parent).to_vec();
-        for field_name in self.grammar.fields_for_node_kind(parent) {
-            if let Some(field_id) = self.grammar.resolve_field(field_name) {
-                seeds.extend_from_slice(self.grammar.valid_field_types(parent, field_id));
-            }
+        for &field_id in self.grammar.field_ids_for_node_kind(parent) {
+            seeds.extend_from_slice(self.grammar.valid_field_types(parent, field_id));
         }
 
         let mut admissible = HashSet::new();

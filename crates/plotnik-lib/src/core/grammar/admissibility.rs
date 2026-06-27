@@ -36,10 +36,10 @@ impl KindSet {
 pub(super) struct AdmissibilityIndex {
     children: HashMap<NodeKindId, Vec<NodeKindId>>,
     fields: HashMap<(NodeKindId, NodeFieldId), AdmissibleField>,
-    /// Per-node field-name index backing [`Grammar::fields_for_node_kind`],
+    /// Per-node field-id index backing [`Grammar::field_ids_for_node_kind`],
     /// pre-grouped so the lookup is O(fields-on-node) rather than a scan of every
     /// `(node, field)` key.
-    fields_by_node: HashMap<NodeKindId, Vec<String>>,
+    fields_by_node: HashMap<NodeKindId, Vec<NodeFieldId>>,
 }
 
 #[derive(Debug, Clone)]
@@ -73,12 +73,18 @@ impl AdmissibilityIndex {
                         cardinality: Some(field_constraints.cardinality),
                     },
                 );
-                if let Some(name) = field_names.get(&field) {
-                    node_fields.push(name.clone());
-                }
+                node_fields.push(field);
             }
             if !node_fields.is_empty() {
-                node_fields.sort_unstable();
+                node_fields.sort_unstable_by(|a, b| {
+                    let a = field_names
+                        .get(a)
+                        .expect("admissible field id must have a name");
+                    let b = field_names
+                        .get(b)
+                        .expect("admissible field id must have a name");
+                    a.cmp(b)
+                });
                 fields_by_node.insert(node, node_fields);
             }
         }
@@ -98,11 +104,11 @@ impl AdmissibilityIndex {
         }
     }
 
-    pub(super) fn fields_for_node_kind(&self, node_kind_id: NodeKindId) -> Vec<&str> {
+    pub(super) fn field_ids_for_node_kind(&self, node_kind_id: NodeKindId) -> &[NodeFieldId] {
         self.fields_by_node
             .get(&node_kind_id)
-            .map(|fields| fields.iter().map(String::as_str).collect())
-            .unwrap_or_default()
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
     }
 
     pub(super) fn has_field(&self, node_kind_id: NodeKindId, node_field_id: NodeFieldId) -> bool {
@@ -167,8 +173,8 @@ pub(super) struct Reachability {
     children: HashMap<NodeKindId, Vec<NodeKindId>>,
     fields: HashMap<(NodeKindId, NodeFieldId), AdmissibleField>,
     /// The `fields` keys grouped by node into a name-sorted per-node index, so
-    /// [`Grammar::fields_for_node_kind`] is a single map lookup rather than a scan of every key.
-    fields_by_node: HashMap<NodeKindId, Vec<String>>,
+    /// [`Grammar::field_ids_for_node_kind`] is a single map lookup rather than a scan of every key.
+    fields_by_node: HashMap<NodeKindId, Vec<NodeFieldId>>,
 }
 
 impl Reachability {
@@ -246,17 +252,20 @@ impl ReachabilityBuilder<'_> {
                 )
             })
             .collect();
-        let mut fields_by_node: HashMap<NodeKindId, Vec<String>> = HashMap::new();
+        let mut fields_by_node: HashMap<NodeKindId, Vec<NodeFieldId>> = HashMap::new();
         for &(node, field) in fields.keys() {
-            if let Some(name) = grammar.field_name(field) {
-                fields_by_node
-                    .entry(node)
-                    .or_default()
-                    .push(name.to_string());
-            }
+            fields_by_node.entry(node).or_default().push(field);
         }
-        for names in fields_by_node.values_mut() {
-            names.sort_unstable();
+        for ids in fields_by_node.values_mut() {
+            ids.sort_unstable_by(|a, b| {
+                let a = grammar
+                    .field_name(*a)
+                    .expect("admissible field id must have a name");
+                let b = grammar
+                    .field_name(*b)
+                    .expect("admissible field id must have a name");
+                a.cmp(b)
+            });
         }
         Reachability {
             children,

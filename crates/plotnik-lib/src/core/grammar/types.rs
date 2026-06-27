@@ -345,7 +345,17 @@ impl Grammar {
     }
 
     pub fn fields_for_node_kind(&self, node_kind_id: NodeKindId) -> Vec<&str> {
-        self.admissibility.fields_for_node_kind(node_kind_id)
+        self.field_ids_for_node_kind(node_kind_id)
+            .iter()
+            .map(|&field| {
+                self.field_name(field)
+                    .expect("admissible field id must have a name")
+            })
+            .collect()
+    }
+
+    pub fn field_ids_for_node_kind(&self, node_kind_id: NodeKindId) -> &[NodeFieldId] {
+        self.admissibility.field_ids_for_node_kind(node_kind_id)
     }
 
     pub fn is_supertype(&self, node_kind_id: NodeKindId) -> bool {
