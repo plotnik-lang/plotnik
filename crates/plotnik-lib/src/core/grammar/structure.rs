@@ -92,6 +92,12 @@ pub struct StepTarget {
 }
 
 impl StepTarget {
+    /// Public concrete kind this step surfaces as a child. Supertypes are not concrete
+    /// CST nodes, so consumers that need runtime-visible steps must descend through them.
+    pub(crate) fn visible_kind(self, grammar: &Grammar) -> Option<NodeKindId> {
+        self.id.filter(|&id| !grammar.is_supertype(id))
+    }
+
     /// Variable whose children/fields surface through this step without crossing into
     /// a concrete child: id-less inlined rules and kept supertypes.
     pub(crate) fn transparent_body(self, grammar: &Grammar) -> Option<VarId> {
@@ -118,6 +124,24 @@ pub struct SkeletonStep {
 }
 
 impl SkeletonStep {
+    pub(crate) fn projection(self, grammar: &Grammar) -> StepProjection {
+        if let Some(kind) = self.target.visible_kind(grammar) {
+            return StepProjection::Visible {
+                kind,
+                field: self.field,
+                body: self.target.body,
+            };
+        }
+        if let Some(body) = self.target.transparent_body(grammar) {
+            StepProjection::Transparent {
+                body,
+                field: self.field,
+            }
+        } else {
+            StepProjection::HiddenLeaf
+        }
+    }
+
     pub(crate) fn admissibility(self, grammar: &Grammar) -> AdmissibilityStep {
         if let Some(field) = self.field {
             return AdmissibilityStep::Field {
@@ -154,6 +178,23 @@ impl SkeletonStep {
             .id
             .map(|kind| SurfaceRealizer::new(kind, self.target.body))
     }
+}
+
+/// How a skeleton step surfaces to consumers that reason over visible tree children.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StepProjection {
+    Visible {
+        kind: NodeKindId,
+        field: Option<NodeFieldId>,
+        /// Variable the visible child descends into, if it is not a token.
+        body: Option<VarId>,
+    },
+    Transparent {
+        body: VarId,
+        /// Field pushed onto the transparent frontier, if any.
+        field: Option<NodeFieldId>,
+    },
+    HiddenLeaf,
 }
 
 /// How a skeleton step widens the structural admissibility model.

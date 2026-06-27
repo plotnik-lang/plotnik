@@ -10,10 +10,9 @@ use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate
 use crate::compiler::analyze::types::check_entrypoints;
 use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
 use crate::compiler::emit::tables::EmitError;
+use crate::compiler::limits::CompilerLimits;
 use crate::compiler::lower::{LowerInput, lower_to_nfa};
-use crate::compiler::parse::{
-    DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser, Root, SyntaxNode, lex,
-};
+use crate::compiler::parse::{Parser, Root, SyntaxNode, lex};
 use crate::core::Interner;
 use crate::core::grammar::Grammar;
 
@@ -24,24 +23,17 @@ use crate::compiler::source::{SourceId, SourceMap};
 
 pub(crate) type AstMap = IndexMap<SourceId, Root>;
 
-struct QueryConfig {
-    pub parse_fuel: u32,
-    pub parse_max_depth: u32,
-}
-
 pub struct QueryBuilder {
     source_map: SourceMap,
-    config: QueryConfig,
+    limits: CompilerLimits,
 }
 
 impl QueryBuilder {
     pub fn new(source_map: SourceMap) -> Self {
-        let config = QueryConfig {
-            parse_fuel: DEFAULT_FUEL,
-            parse_max_depth: DEFAULT_MAX_DEPTH,
-        };
-
-        Self { source_map, config }
+        Self {
+            source_map,
+            limits: CompilerLimits::default(),
+        }
     }
 
     pub fn from_inline(src: &str) -> Self {
@@ -50,17 +42,39 @@ impl QueryBuilder {
     }
 
     pub fn with_parse_fuel(mut self, fuel: u32) -> Self {
-        self.config.parse_fuel = fuel;
+        self.limits = self.limits.with_parse_fuel(fuel);
         self
     }
 
+    /// Override the parser's source-nesting ceiling.
     pub fn with_parse_max_depth(mut self, limit: u32) -> Self {
-        self.config.parse_max_depth = limit;
+        self.limits = self.limits.with_parse_max_depth(limit);
+        self
+    }
+
+    /// Override the reference graph's recursion ceiling.
+    pub fn with_reference_max_depth(mut self, limit: u32) -> Self {
+        self.limits = self.limits.with_reference_max_depth(limit);
+        self
+    }
+
+    /// Override the satisfiability automaton's inlined-pattern nesting ceiling.
+    pub fn with_satisfiability_automaton_max_depth(mut self, limit: u32) -> Self {
+        self.limits = self.limits.with_satisfiability_automaton_max_depth(limit);
+        self
+    }
+
+    /// Override the satisfiability solve's work ceiling. Raise it for a query that
+    /// legitimately needs a wide child list the default rejects as too complex; the
+    /// default protects against an adversarial one driving the quadratic solve for an
+    /// unbounded stretch.
+    pub fn with_satisfiability_step_budget(mut self, budget: u64) -> Self {
+        self.limits = self.limits.with_satisfiability_step_budget(budget);
         self
     }
 
     pub fn analyze(self) -> crate::compiler::QueryResult<Query> {
-        Ok(self.parse()?.analyze())
+        self.parse()?.analyze()
     }
 
     pub fn check(self, grammar: &Grammar) -> crate::compiler::QueryResult<CheckedQuery> {
@@ -86,10 +100,7 @@ impl QueryBuilder {
                 source.id,
                 tokens,
                 &mut diag,
-                ParseConfig {
-                    fuel: self.config.parse_fuel,
-                    max_depth: self.config.parse_max_depth,
-                },
+                self.limits.parse().config(),
             );
 
             let res = parser.parse()?;
@@ -100,6 +111,7 @@ impl QueryBuilder {
             source_map: self.source_map,
             diag,
             ast_map: ast,
+            limits: self.limits,
         })
     }
 }
@@ -109,22 +121,29 @@ pub(crate) struct QueryParsed {
     source_map: SourceMap,
     ast_map: AstMap,
     diag: Diagnostics,
+    limits: CompilerLimits,
 }
 
 impl QueryParsed {
-    pub(crate) fn analyze(mut self) -> Query {
+    pub(crate) fn analyze(mut self) -> crate::compiler::QueryResult<Query> {
         let Some(validated) = validate_ast(ShapeValidationInput {
             source_map: &self.source_map,
             ast_map: &self.ast_map,
             diag: &mut self.diag,
         }) else {
-            return Query::parsed_only(self);
+            return Ok(Query::parsed_only(self));
         };
 
         let mut interner = Interner::new();
         let symbol_table = resolve_names(&validated, &mut self.diag);
 
-        let dependency_analysis = dependencies::analyze_dependencies(&symbol_table, &mut interner);
+        // A flat reference chain can recurse as deeply as a nested source tree, so it gets
+        // an explicit stack-depth ceiling and the same fatal recursion-limit outcome.
+        let dependency_analysis = dependencies::analyze_dependencies(
+            &symbol_table,
+            &mut interner,
+            self.limits.references(),
+        )?;
         validate_recursion(
             &dependency_analysis,
             validated.ast_map(),
@@ -156,7 +175,7 @@ impl QueryParsed {
             dependency_analysis,
         };
 
-        Query::analyzed(self, analysis)
+        Ok(Query::analyzed(self, analysis))
     }
 
     pub(crate) fn source_map(&self) -> &SourceMap {
@@ -299,6 +318,7 @@ impl Query {
             source_map: &analyzed.parsed.source_map,
             ast_map: &analyzed.parsed.ast_map,
             symbol_table: &analyzed.analysis.symbol_table,
+            satisfiability_limits: analyzed.parsed.limits.satisfiability(),
         }
         .link(&mut output, &mut analyzed.parsed.diag);
 

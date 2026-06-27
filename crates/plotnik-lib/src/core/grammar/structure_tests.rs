@@ -1,7 +1,9 @@
 use super::Grammar;
 use super::prepared::VariableType;
 use super::raw::RawGrammar;
-use super::structure::{AdmissibilityStep, FieldValueProjection, SkeletonStep, StepTarget};
+use super::structure::{
+    AdmissibilityStep, FieldValueProjection, SkeletonStep, StepProjection, StepTarget,
+};
 use indoc::indoc;
 
 #[test]
@@ -118,6 +120,16 @@ fn distills_resolved_productions() {
         .expect("descends into block");
     assert_eq!(table.variable(spliced).unwrap().name, "block");
 
+    let type_name = grammar.resolve_named_node("type_name").unwrap();
+    assert_eq!(
+        steps[0].projection(&grammar),
+        StepProjection::Visible {
+            kind: type_name,
+            field: None,
+            body: None,
+        }
+    );
+
     let identifier = grammar.resolve_named_node("identifier").unwrap();
     let name_field = grammar.resolve_field("name").unwrap();
     assert_eq!(
@@ -128,6 +140,22 @@ fn distills_resolved_productions() {
         }
     );
 
+    let block_alias = grammar.resolve_named_node("block_alias").unwrap();
+    assert_eq!(
+        steps[3].projection(&grammar),
+        StepProjection::Visible {
+            kind: block_alias,
+            field: None,
+            body: Some(aliased_body),
+        }
+    );
+    assert_eq!(
+        steps[4].projection(&grammar),
+        StepProjection::Transparent {
+            body: inner,
+            field: None,
+        }
+    );
     assert_eq!(
         steps[5].admissibility(&grammar),
         AdmissibilityStep::Field {
@@ -143,6 +171,7 @@ fn distills_resolved_productions() {
         },
         field: None,
     };
+    assert_eq!(hidden_leaf.projection(&grammar), StepProjection::HiddenLeaf);
     assert_eq!(
         hidden_leaf.admissibility(&grammar),
         AdmissibilityStep::HiddenLeaf

@@ -1,10 +1,10 @@
-Q = (array "+" .)
+Q = (statement_block "}" .)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
 S1 "Q"
-S2 "array"
-S3 "+"
+S2 "statement_block"
+S3 "}"
 
 [type_defs]
 T0 = <Void>
@@ -25,10 +25,10 @@ _StructWrap:
   05                                        ▶
 
 Q:
-  06   !   (array)                          08
+  06   !   (statement_block)                08
   07  ...
   08  └‣─  _                                10, 13
-  10   !   "+"                              11
+  10   !   "}"                              11
   11  ─◦┘  _                                12
   12                                        ▶
   13  ─‣─  _                                10, 13

@@ -11,11 +11,13 @@ use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId};
 use indexmap::IndexMap;
 
 use super::binding::GrammarBindingBuilder;
-use super::check::{AdmissibilityMode, AdmissibilityWalkState};
+use super::check::AdmissibilityWalkState;
+use super::participation::Participation;
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
+use crate::compiler::limits::SatisfiabilityLimits;
 use crate::compiler::parse::ast::Root;
 
 /// The threaded dependencies of the link pass. Decoupled from `Query` to allow
@@ -26,6 +28,7 @@ pub struct GrammarLinkInput<'a, 'q> {
     pub source_map: &'q SourceMap,
     pub ast_map: &'q IndexMap<SourceId, Root>,
     pub symbol_table: &'a SymbolTable,
+    pub satisfiability_limits: SatisfiabilityLimits,
 }
 
 impl<'q> GrammarLinkInput<'_, 'q> {
@@ -47,6 +50,23 @@ impl<'q> GrammarLinkInput<'_, 'q> {
             };
             linker.link(source_id, root);
         }
+
+        // The satisfiability check (sequence/anchor/arity) runs only on a query the
+        // structural check left clean: it adds rejections those checks cannot see, and
+        // gating keeps it from piling onto an impossibility already pinned precisely.
+        if diagnostics.has_errors() {
+            return;
+        }
+        super::satisfiability::check(
+            super::satisfiability::SatisfiabilityInput {
+                grammar: self.grammar,
+                symbol_table: self.symbol_table,
+                source_map: self.source_map,
+                ast_map: self.ast_map,
+                limits: self.satisfiability_limits,
+            },
+            diagnostics,
+        );
     }
 }
 
@@ -77,7 +97,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             let Some(body) = def.body() else { continue };
             let located = Located::new(source, body);
             let mut walk = AdmissibilityWalkState::default();
-            self.check_pattern_grammar(&located, None, AdmissibilityMode::Required, &mut walk);
+            self.check_pattern_grammar(&located, None, Participation::Required, &mut walk);
         }
     }
 }

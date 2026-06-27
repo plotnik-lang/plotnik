@@ -2,11 +2,11 @@ Expr = [
   Lit: (number) @value
   Nested: (call_expression
     function: (identifier) @fn
-    arguments: (Expr) @inner
+    arguments: (arguments (Expr) @inner)
   )
 ]
 
-Test = (program (Expr) @expr)
+Test = (program (expression_statement (Expr) @expr))
 ==== bytecode ====
 [strings]
 S00 "Beauty will save the world"
@@ -21,9 +21,10 @@ S08 "Test"
 S09 "number"
 S10 "call_expression"
 S11 "identifier"
-S12 "program"
-S13 "function"
-S14 "arguments"
+S12 "arguments"
+S13 "program"
+S14 "expression_statement"
+S15 "function"
 
 [type_defs]
 T0 = <Node>
@@ -56,16 +57,20 @@ _StructWrap:
   05                                        ▶
 
 Expr:
-  06  -ε-                                   17, 22
+  06  -ε-                                   21, 27
 
 Test:
   08   !   (program)                        09
-  09  └‣─  (Expr)                           06 : 10
-  10  ─‣┘  [Set(M5)] _                      12
-  12                                        ▶
-  13  ─‣─  arguments: (Expr)                06 : 14
-  14  ─‣┘  [Set(M2)] _ [EnumClose]          16
-  16                                        ▶
-  17   !   [EnumOpen(M3)] (number) [Node Set(M0) EnumClose]  16
-  20  └‣─  function: (identifier) [Node Set(M1)]  13
-  22   !   [EnumOpen(M4)] (call_expression)  20
+  09  └‣─  (expression_statement)           10
+  10  └‣─  (Expr)                           06 : 11
+  11  ─‣┘² [Set(M5)] _                      13
+  13                                        ▶
+  14  └‣─  (Expr)                           06 : 16
+  15  ...
+  16  ─‣┘  [Set(M2)] _                      18
+  18  ─‣┘  _ [EnumClose]                    20
+  20                                        ▶
+  21   !   [EnumOpen(M3)] (number) [Node Set(M0) EnumClose]  20
+  24  ─‣─  arguments: (arguments)           14
+  25  └‣─  function: (identifier) [Node Set(M1)]  24
+  27   !   [EnumOpen(M4)] (call_expression)  25
