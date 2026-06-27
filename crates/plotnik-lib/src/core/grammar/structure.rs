@@ -164,7 +164,7 @@ impl StructureTable {
     }
 
     /// Each variable paired with its [`VarId`]. The id is otherwise unconstructible
-    /// outside this module, so this is how a consumer keys facts (producers,
+    /// outside this module, so this is how a consumer keys facts (realizers,
     /// first-sets) by the variable a step descends into.
     pub fn iter(&self) -> impl Iterator<Item = (VarId, &SkeletonVariable)> {
         self.variables

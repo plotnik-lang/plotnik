@@ -659,23 +659,23 @@ impl<'a> SubtypeResolver<'a> {
     }
 }
 
-/// Index each public node kind to the structural variables that build it: the variable
-/// named for it, plus every step occurrence (aliases included) that surfaces it, whose body
-/// is the variable that builds it. Mirrors the satisfiability engine's producer index, so
-/// both passes reason over the same model.
-fn structure_producers(grammar: &Grammar) -> HashMap<NodeKindId, Vec<VarId>> {
-    let mut producers: HashMap<NodeKindId, Vec<VarId>> = HashMap::new();
+/// Index each public node kind to the skeleton variables that realize it: the
+/// variable named for it, plus every step occurrence (aliases included) that
+/// surfaces it and descends into a variable body. Mirrors the satisfiability
+/// engine's `realizers_by_kind`, so both passes reason over the same model.
+fn variable_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<VarId>> {
+    let mut realizers_by_kind: HashMap<NodeKindId, Vec<VarId>> = HashMap::new();
     for (var_id, variable) in grammar.structure.iter() {
         if let Some(id) = variable.id {
-            producers.entry(id).or_default().push(var_id);
+            realizers_by_kind.entry(id).or_default().push(var_id);
         }
         for step in variable.productions.iter().flatten() {
             if let (Some(id), Some(body)) = (step.target.id, step.target.body) {
-                producers.entry(id).or_default().push(body);
+                realizers_by_kind.entry(id).or_default().push(body);
             }
         }
     }
-    producers
+    realizers_by_kind
 }
 
 /// Child- and field-kind reachability for every node kind — the single child/field model the
@@ -718,9 +718,9 @@ impl Reachability {
             fields: HashMap::new(),
         };
         builder.seed_from_summary();
-        for (kind, producers) in structure_producers(grammar) {
-            for producer in producers {
-                builder.collect_node(kind, producer, &mut HashSet::new());
+        for (kind, realizers) in variable_realizers_by_kind(grammar) {
+            for realizer in realizers {
+                builder.collect_node(kind, realizer, &mut HashSet::new());
             }
         }
         builder.finish()
