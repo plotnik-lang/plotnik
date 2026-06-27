@@ -70,26 +70,14 @@ pub struct Grammar {
     token_node_ids: HashSet<NodeKindId>,
     /// Public node ids that name anonymous (literal-token) kinds.
     anonymous_node_id_set: HashSet<NodeKindId>,
-    /// Per-node field-name index backing [`fields_for_node_kind`](Self::fields_for_node_kind):
-    /// the node-shape summary for a metadata-only grammar, the [`Reachability`] union (summary ∪
-    /// structural recovery) on the `from_raw` path. Pre-grouped so the lookup is O(fields-on-node)
-    /// rather than a scan of every `(node, field)` key in `field_kinds`.
-    fields_by_node: HashMap<NodeKindId, Vec<String>>,
     all_named_node_kinds: Vec<String>,
     all_anonymous_node_kinds: Vec<String>,
     all_field_names: Vec<String>,
     structure: StructureTable,
-    /// Named, unlabeled child kinds reachable under each node — the [`Reachability`] union of
-    /// the node-shape summary and the structural recovery. Backs
-    /// [`valid_child_types`](Self::valid_child_types) on the `from_raw` path; empty for
-    /// metadata-only grammars, which fall back to the node-shape constraints.
-    child_kinds: HashMap<NodeKindId, Vec<NodeKindId>>,
-    /// Labeled field-value kinds reachable under each `(node, field)` — the [`Reachability`]
-    /// union of the node-shape summary and the structural recovery. Backs
-    /// [`valid_field_types`](Self::valid_field_types), [`has_field`](Self::has_field), and
-    /// [`fields_for_node_kind`](Self::fields_for_node_kind) on the `from_raw` path; empty for
-    /// metadata-only grammars, which fall back to the node-shape constraints.
-    field_kinds: HashMap<(NodeKindId, NodeFieldId), Vec<NodeKindId>>,
+    /// Child/field admissibility model: the node-shape summary for a metadata-only
+    /// grammar, replaced by the [`Reachability`] union (summary ∪ structural
+    /// recovery) on the `from_raw` path.
+    admissibility: AdmissibilityIndex,
     /// Tree-shape rendering model for `lang dump` and diagnostics. Populated only
     /// on the `from_raw` path (the pipeline data it taps does not survive into
     /// `GrammarTables`); empty otherwise.
@@ -165,9 +153,7 @@ impl Grammar {
         let structure = StructureTable::build(grammar_ctx, &grammar);
         grammar.structure = structure;
         let reachability = Reachability::compute(&grammar);
-        grammar.child_kinds = reachability.children;
-        grammar.field_kinds = reachability.fields;
-        grammar.fields_by_node = reachability.fields_by_node;
+        grammar.admissibility = AdmissibilityIndex::from_reachability(reachability);
         grammar.tree = tree;
         Ok(grammar)
     }
@@ -240,18 +226,6 @@ impl Grammar {
             subtypes.insert(supertype, resolver.members(shape.node_kind()));
         }
 
-        let mut fields_by_node = HashMap::new();
-        for shape in &tables.node_shapes {
-            let Some(node_id) =
-                resolve_node_id(&named_node_ids, &anonymous_node_ids, shape.node_kind())
-            else {
-                continue;
-            };
-            let mut fields = shape.fields.keys().cloned().collect::<Vec<_>>();
-            fields.sort();
-            fields_by_node.insert(node_id, fields);
-        }
-
         let mut all_named_node_kinds = named_node_ids.keys().cloned().collect::<Vec<_>>();
         all_named_node_kinds.sort();
 
@@ -282,6 +256,7 @@ impl Grammar {
             .collect::<HashSet<_>>();
 
         let anonymous_node_id_set = anonymous_node_ids.values().copied().collect::<HashSet<_>>();
+        let admissibility = AdmissibilityIndex::from_summary(&node_constraints, &field_names);
 
         Ok(Self {
             name,
@@ -297,15 +272,13 @@ impl Grammar {
             subtypes,
             token_node_ids,
             anonymous_node_id_set,
-            fields_by_node,
             all_named_node_kinds,
             all_anonymous_node_kinds,
             all_field_names,
             // Populated only on the `from_raw` path: `GrammarTables` has already
             // discarded the flattened productions the table distills.
             structure: StructureTable::default(),
-            child_kinds: HashMap::new(),
-            field_kinds: HashMap::new(),
+            admissibility,
             tree: TreeGrammar::default(),
         })
     }
@@ -371,14 +344,7 @@ impl Grammar {
     }
 
     pub fn fields_for_node_kind(&self, node_kind_id: NodeKindId) -> Vec<&str> {
-        // `fields_by_node` already holds the faithful, name-sorted field set — the union on the
-        // `from_raw` path (so a field reaching this node only through a supertype member, lua
-        // `chunk.local_declaration`, is listed), the summary for a metadata-only grammar. Reading
-        // the index is O(fields-on-node); the former scan of every `field_kinds` key was not.
-        self.fields_by_node
-            .get(&node_kind_id)
-            .map(|fields| fields.iter().map(String::as_str).collect())
-            .unwrap_or_default()
+        self.admissibility.fields_for_node_kind(node_kind_id)
     }
 
     pub fn is_supertype(&self, node_kind_id: NodeKindId) -> bool {
@@ -437,27 +403,8 @@ impl Grammar {
         &self.extra_node_kinds
     }
 
-    /// Whether admissibility APIs are backed by the [`Reachability`] union
-    /// (node-shape summary ∪ structural recovery) rather than metadata-only
-    /// node-shape constraints.
-    fn has_recovered_reachability(&self) -> bool {
-        !self.structure.variables().is_empty()
-    }
-
     pub fn has_field(&self, node_kind_id: NodeKindId, node_field_id: NodeFieldId) -> bool {
-        // On the `from_raw` path the faithful field set is `field_kinds` (the summary ∪
-        // structural-recovery union, see [`Reachability`]): a field applied to a supertype
-        // member (lua `chunk.local_declaration`) surfaces on the enclosing node at runtime,
-        // but the summary alone flattens supertypes away and drops it. Metadata-only grammars
-        // fall back to the summary.
-        if self.has_recovered_reachability() {
-            return self
-                .field_kinds
-                .contains_key(&(node_kind_id, node_field_id));
-        }
-        self.node_constraints
-            .get(&node_kind_id)
-            .is_some_and(|constraints| constraints.fields.contains_key(&node_field_id))
+        self.admissibility.has_field(node_kind_id, node_field_id)
     }
 
     pub fn field_cardinality(
@@ -474,21 +421,8 @@ impl Grammar {
         node_kind_id: NodeKindId,
         node_field_id: NodeFieldId,
     ) -> &[NodeKindId] {
-        // On the `from_raw` path, `field_kinds` is the union of the node-shape summary and
-        // the structural recovery (see [`Reachability`]): the faithful value set, listing
-        // concrete members a query may write even when the field is typed by an inlined
-        // supertype (go's `_type`). A metadata-only grammar has no structure, so fall back to
-        // the summary.
-        if self.has_recovered_reachability() {
-            return self
-                .field_kinds
-                .get(&(node_kind_id, node_field_id))
-                .map(Vec::as_slice)
-                .unwrap_or(&[]);
-        }
-        self.field_constraints(node_kind_id, node_field_id)
-            .map(|field| field.valid_types.as_slice())
-            .unwrap_or(&[])
+        self.admissibility
+            .valid_field_types(node_kind_id, node_field_id)
     }
 
     pub fn is_valid_field_type(
@@ -507,21 +441,7 @@ impl Grammar {
     }
 
     pub fn valid_child_types(&self, node_kind_id: NodeKindId) -> &[NodeKindId] {
-        // On the `from_raw` path, `child_kinds` is the union of the node-shape summary and
-        // the structural recovery (see [`Reachability`]): the faithful child set, admitting a
-        // child reachable only through a hidden rule — e.g. python `(module (match_statement))`,
-        // routed through the hidden `_statement` chain. A metadata-only grammar has no
-        // structure, so fall back to the node-shape constraints.
-        if self.has_recovered_reachability() {
-            return self
-                .child_kinds
-                .get(&node_kind_id)
-                .map(Vec::as_slice)
-                .unwrap_or(&[]);
-        }
-        self.children_constraints(node_kind_id)
-            .map(|children| children.valid_types.as_slice())
-            .unwrap_or(&[])
+        self.admissibility.valid_child_types(node_kind_id)
     }
 
     pub fn is_valid_child_type(&self, node_kind_id: NodeKindId, child: NodeKindId) -> bool {
@@ -603,6 +523,88 @@ impl KindSet {
         self.kinds
             .sort_unstable_by(|a, b| grammar.node_kind(*a).cmp(&grammar.node_kind(*b)));
         self.kinds
+    }
+}
+
+#[derive(Debug, Clone)]
+struct AdmissibilityIndex {
+    children: HashMap<NodeKindId, Vec<NodeKindId>>,
+    fields: HashMap<(NodeKindId, NodeFieldId), Vec<NodeKindId>>,
+    /// Per-node field-name index backing [`Grammar::fields_for_node_kind`],
+    /// pre-grouped so the lookup is O(fields-on-node) rather than a scan of every
+    /// `(node, field)` key.
+    fields_by_node: HashMap<NodeKindId, Vec<String>>,
+}
+
+impl AdmissibilityIndex {
+    fn from_summary(
+        node_constraints: &HashMap<NodeKindId, NodeConstraints>,
+        field_names: &HashMap<NodeFieldId, String>,
+    ) -> Self {
+        let mut children = HashMap::new();
+        let mut fields = HashMap::new();
+        let mut fields_by_node = HashMap::new();
+
+        for (&node, constraints) in node_constraints {
+            if let Some(child_constraints) = &constraints.children {
+                children.insert(node, child_constraints.valid_types.clone());
+            }
+
+            let mut node_fields = Vec::new();
+            for (&field, field_constraints) in &constraints.fields {
+                fields.insert((node, field), field_constraints.valid_types.clone());
+                if let Some(name) = field_names.get(&field) {
+                    node_fields.push(name.clone());
+                }
+            }
+            if !node_fields.is_empty() {
+                node_fields.sort_unstable();
+                fields_by_node.insert(node, node_fields);
+            }
+        }
+
+        Self {
+            children,
+            fields,
+            fields_by_node,
+        }
+    }
+
+    fn from_reachability(reachability: Reachability) -> Self {
+        Self {
+            children: reachability.children,
+            fields: reachability.fields,
+            fields_by_node: reachability.fields_by_node,
+        }
+    }
+
+    fn fields_for_node_kind(&self, node_kind_id: NodeKindId) -> Vec<&str> {
+        self.fields_by_node
+            .get(&node_kind_id)
+            .map(|fields| fields.iter().map(String::as_str).collect())
+            .unwrap_or_default()
+    }
+
+    fn has_field(&self, node_kind_id: NodeKindId, node_field_id: NodeFieldId) -> bool {
+        self.fields.contains_key(&(node_kind_id, node_field_id))
+    }
+
+    fn valid_field_types(
+        &self,
+        node_kind_id: NodeKindId,
+        node_field_id: NodeFieldId,
+    ) -> &[NodeKindId] {
+        self.fields
+            .get(&(node_kind_id, node_field_id))
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    }
+
+    fn valid_child_types(&self, node_kind_id: NodeKindId) -> &[NodeKindId] {
+        self.children
+            .get(&node_kind_id)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
     }
 }
 
