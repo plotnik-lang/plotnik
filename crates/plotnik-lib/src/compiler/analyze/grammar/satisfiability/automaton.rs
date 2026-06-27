@@ -16,7 +16,9 @@ use std::collections::HashMap;
 use rowan::TextRange;
 
 use crate::compiler::analyze::Located;
-use crate::compiler::analyze::anchors::{GapClass, check_trailing_anchor, compute_nav_modes};
+use crate::compiler::analyze::anchors::{
+    GapClass, check_trailing_anchor, compute_nav_modes, has_direct_alternation_branch_nav,
+};
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::diagnostics::source::{SourceId, SourceMap};
 use crate::compiler::parse::ast::{
@@ -681,19 +683,9 @@ fn unconstrained_matcher(field: Option<NodeFieldId>) -> ChildMatcher {
 /// branches at once and so takes the most permissive gap. Strict (`Nothing`) is
 /// never widened — it is the user's adjacency demand.
 fn satisfiability_gap(gap: GapClass, pattern: &Pattern) -> GapClass {
-    if gap == GapClass::ExtrasOnly && has_direct_alt_branch_nav(pattern) {
+    if gap == GapClass::ExtrasOnly && has_direct_alternation_branch_nav(pattern) {
         GapClass::AnonymousAndExtras
     } else {
         gap
-    }
-}
-
-fn has_direct_alt_branch_nav(pattern: &Pattern) -> bool {
-    match pattern {
-        Pattern::Union(_) | Pattern::Enum(_) => true,
-        Pattern::CapturedPattern(cap) => {
-            cap.inner().as_ref().is_some_and(has_direct_alt_branch_nav)
-        }
-        _ => false,
     }
 }

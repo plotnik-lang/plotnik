@@ -111,13 +111,17 @@ pub struct AnonymousClassifier<'a> {
     cache: RefCell<HashMap<String, bool>>,
 }
 
-fn pattern_has_direct_alt_branch_nav(pattern: &Pattern) -> bool {
+/// Whether this pattern's immediate branches compile branch-local entry navs.
+///
+/// A soft anchor before such a pattern is decided by each branch, not by the
+/// alternation's whole-pattern anonymous classification.
+pub(crate) fn has_direct_alternation_branch_nav(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::Union(_) | Pattern::Enum(_) => true,
         Pattern::CapturedPattern(cap) => cap
             .inner()
             .as_ref()
-            .is_some_and(pattern_has_direct_alt_branch_nav),
+            .is_some_and(has_direct_alternation_branch_nav),
         _ => false,
     }
 }
@@ -263,7 +267,7 @@ pub fn compute_nav_modes(
                 let current_is_anonymous = classifier.pattern_may_match_anonymous(Some(pattern));
                 // Alternation branches compile their own entry nav, so the branch body—not
                 // the whole alternation—decides whether soft anchors use extras-only nav.
-                let current_is_anonymous_for_anchor = if pattern_has_direct_alt_branch_nav(pattern)
+                let current_is_anonymous_for_anchor = if has_direct_alternation_branch_nav(pattern)
                 {
                     false
                 } else {
