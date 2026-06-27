@@ -221,21 +221,6 @@ impl AnchorMode {
     }
 }
 
-/// The sibling context for anchor navigation. Boundary anchors only become `Down`
-/// navs inside a node's own child list; a spliced `{...}` sequence inherits its
-/// outer gap instead.
-#[derive(Clone, Copy)]
-enum NavContext {
-    NodeChildren,
-    SplicedSequence,
-}
-
-impl NavContext {
-    fn is_inside_node(self) -> bool {
-        matches!(self, Self::NodeChildren)
-    }
-}
-
 /// Interns query node patterns to [`PatternId`]s. Keyed by `(source, range)` so the
 /// same definition body interns once however many references reach it.
 #[derive(Default)]
@@ -290,12 +275,17 @@ pub(super) fn build<'a>(
         automaton_max_depth,
     );
     let start = builder.new_state(GapClass::Any);
-    let items = ItemList::node_children(node.node());
-    let accept = builder.emit_items(&items, Descent::root(node.source()), start);
+    let items: Vec<SeqItem> = node.node().items().collect();
+    let anchors_inside_node = true;
+    let accept = builder.emit_items(
+        &items,
+        Descent::root(node.source()),
+        start,
+        anchors_inside_node,
+        None,
+    );
 
-    let (has_trailing, trailing_nav) = builder
-        .anchor_semantics
-        .check_trailing_anchor(items.as_slice());
+    let (has_trailing, trailing_nav) = builder.anchor_semantics.check_trailing_anchor(&items);
     let trailing_gap = if has_trailing {
         trailing_nav
             .and_then(GapClass::from_nav)
@@ -344,34 +334,6 @@ struct Builder<'a, 'b> {
     max_depth: u32,
     /// Current [`Self::emit_pattern`] recursion depth, checked against `max_depth`.
     depth: u32,
-}
-
-struct ItemList {
-    items: Vec<SeqItem>,
-    nav_context: NavContext,
-    first_gap: Option<GapClass>,
-}
-
-impl ItemList {
-    fn node_children(node: &NodePattern) -> Self {
-        Self {
-            items: node.items().collect(),
-            nav_context: NavContext::NodeChildren,
-            first_gap: None,
-        }
-    }
-
-    fn spliced_sequence(seq: &ast::SeqPattern, first_gap: GapClass) -> Self {
-        Self {
-            items: seq.items().collect(),
-            nav_context: NavContext::SplicedSequence,
-            first_gap: Some(first_gap),
-        }
-    }
-
-    fn as_slice(&self) -> &[SeqItem] {
-        &self.items
-    }
 }
 
 /// The context one query position is lowered under. `source` is the file its text
@@ -499,14 +461,21 @@ impl<'a, 'b> Builder<'a, 'b> {
     /// spine starting at `entry`, stamping each pattern's leading gap from the shared
     /// nav computation. Returns the exit state. Each item descends field-fresh — a
     /// sibling's label comes only from its own `field: …`, never the list's context.
-    fn emit_items(&mut self, items: &ItemList, descent: Descent, entry: State) -> State {
+    fn emit_items(
+        &mut self,
+        items: &[SeqItem],
+        descent: Descent,
+        entry: State,
+        anchors_inside_node: bool,
+        inherited_first_gap: Option<GapClass>,
+    ) -> State {
         let navs = self
             .anchor_semantics
-            .compute_nav_modes(items.as_slice(), items.nav_context.is_inside_node());
+            .compute_nav_modes(items, anchors_inside_node);
         let mut navs = navs.into_iter();
         let mut cur = entry;
         let mut first = true;
-        for item in items.as_slice() {
+        for item in items {
             let SeqItem::Pattern(pattern) = item else {
                 continue;
             };
@@ -517,7 +486,7 @@ impl<'a, 'b> Builder<'a, 'b> {
             // body) inherits that anchor's gap on its first child: the outer level
             // already chose it, so recomputing here would drop the adjacency and let a
             // strict anchor leak through the boundary.
-            let gap = match (first, items.first_gap) {
+            let gap = match (first, inherited_first_gap) {
                 (true, Some(g)) => g,
                 _ => satisfiability_gap(
                     nav.and_then(GapClass::from_nav).unwrap_or(GapClass::Any),
@@ -583,8 +552,15 @@ impl<'a, 'b> Builder<'a, 'b> {
                 // The group sits at one child position whose gap `from` already carries;
                 // thread it as the first child's gap so an enclosing anchor survives the
                 // `{…}` boundary instead of being recomputed away.
-                let items = ItemList::spliced_sequence(seq, self.states[from as usize].gap);
-                self.emit_items(&items, descent, from)
+                let items: Vec<SeqItem> = seq.items().collect();
+                let anchors_inside_node = false;
+                self.emit_items(
+                    &items,
+                    descent,
+                    from,
+                    anchors_inside_node,
+                    Some(self.states[from as usize].gap),
+                )
             }
             Pattern::DefRef(def_ref) => self.emit_def_ref(def_ref, descent, from),
         }
