@@ -444,6 +444,16 @@ impl Grammar {
             .map(|children| children.cardinality)
     }
 
+    /// Whether the exact node-shape summary declares any child structure for this kind.
+    ///
+    /// This intentionally does not use the widened admissibility index: an over-approximation
+    /// is right for accepting possible field/child queries, but a hard predicate rejection needs
+    /// a proven non-leaf shape.
+    pub fn has_declared_child_structure(&self, node_kind_id: NodeKindId) -> bool {
+        let constraints = self.node_constraints_for(node_kind_id);
+        constraints.children.is_some() || !constraints.fields.is_empty()
+    }
+
     pub fn valid_child_types(&self, node_kind_id: NodeKindId) -> &[NodeKindId] {
         self.admissibility.valid_child_types(node_kind_id)
     }

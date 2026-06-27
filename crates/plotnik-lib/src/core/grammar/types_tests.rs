@@ -1,6 +1,6 @@
 use super::types::{
-    Grammar, GrammarTables, NodeKindEntry, NodeKindRef, NodeShape, NodeShapeBuildError, NodeSlot,
-    build_node_constraints,
+    FieldEntry, Grammar, GrammarTables, NodeKindEntry, NodeKindRef, NodeShape, NodeShapeBuildError,
+    NodeSlot, build_node_constraints,
 };
 use crate::core::{NodeFieldId, NodeKind, NodeKindId};
 
@@ -211,4 +211,39 @@ fn constraint_lookup_on_shapeless_kind_is_empty_not_panic() {
         .expect("bare is a node kind");
 
     assert!(grammar.valid_child_types(bare).is_empty());
+}
+
+#[test]
+fn declared_child_structure_uses_exact_node_shape() {
+    let metadata = GrammarTables {
+        node_shapes: vec![
+            NodeShape::root("root").with_children(slot_of("fielded")),
+            NodeShape::named("fielded").with_field("body", child_slot(false, false)),
+            NodeShape::named("abstract_only").with_children(slot_of("_abstract")),
+            NodeShape::named("_abstract"),
+            NodeShape::named("leaf"),
+            NodeShape::named("child"),
+        ],
+        symbols: vec![
+            named_symbol(1, "root", false),
+            named_symbol(2, "fielded", false),
+            named_symbol(3, "abstract_only", false),
+            named_symbol(4, "_abstract", false),
+            named_symbol(5, "leaf", true),
+            named_symbol(6, "child", true),
+        ],
+        fields: vec![FieldEntry {
+            id: 1,
+            name: "body".to_string(),
+        }],
+    };
+
+    let grammar = Grammar::from_tables("test".to_string(), metadata).expect("metadata builds");
+    let fielded = grammar.resolve_named_node("fielded").unwrap();
+    let abstract_only = grammar.resolve_named_node("abstract_only").unwrap();
+    let leaf = grammar.resolve_named_node("leaf").unwrap();
+
+    assert!(grammar.has_declared_child_structure(fielded));
+    assert!(grammar.has_declared_child_structure(abstract_only));
+    assert!(!grammar.has_declared_child_structure(leaf));
 }

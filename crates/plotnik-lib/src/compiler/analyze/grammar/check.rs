@@ -40,8 +40,7 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 if participation.is_required()
                     && let Some(pred) = node.predicate()
                     && let Some(ctx) = &child_ctx
-                    && (!self.grammar.valid_child_types(ctx.id()).is_empty()
-                        || !self.grammar.fields_for_node_kind(ctx.id()).is_empty())
+                    && self.grammar.has_declared_child_structure(ctx.id())
                 {
                     self.diag
                         .report(
