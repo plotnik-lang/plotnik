@@ -105,9 +105,6 @@ struct GrammarFacts {
     realizers_by_kind: HashMap<NodeKindId, Vec<NodeRealizer>>,
     /// Concrete named, non-supertype kinds a wildcard parent could be.
     parent_candidate_kinds: Vec<NodeKindId>,
-    /// Supertype kind → sorted transitive concrete members. Built once so hot
-    /// matcher checks do not allocate a subtype closure per candidate child.
-    supertype_members: HashMap<NodeKindId, Vec<NodeKindId>>,
     /// Visible extra kinds (comments), and the named subset, for extra-consumption.
     extras: Vec<NodeKindId>,
     named_extras: Vec<NodeKindId>,
@@ -118,11 +115,9 @@ impl GrammarFacts {
         let (extras, named_extras) = extra_kinds(grammar);
         let realizers_by_kind = build_realizers_by_kind(grammar);
         let parent_candidate_kinds = build_parent_candidate_kinds(grammar, &realizers_by_kind);
-        let supertype_members = build_supertype_members(grammar, &realizers_by_kind);
         Self {
             realizers_by_kind,
             parent_candidate_kinds,
-            supertype_members,
             extras,
             named_extras,
         }
@@ -184,21 +179,13 @@ impl<'a> Frozen<'a> {
         }
     }
 
-    /// Whether a child-position kind constraint admits grammar kind `k`. Query
-    /// supertypes are rejected before this pass runs, so the only supertype case is a
-    /// *grammar* step that surfaces as a supertype: a concrete query kind matches it
-    /// if it is one of the supertype's subtypes.
+    /// Whether a child-position kind constraint admits visible grammar kind `k`.
+    /// Query supertypes are rejected before this pass runs, and grammar supertype
+    /// steps are classified as hidden frontiers before matching.
     fn kind_ok(&self, constraint: KindConstraint, k: NodeKindId) -> bool {
         let grammar = self.ctx.grammar;
         match constraint {
-            KindConstraint::Exact(id) => {
-                id == k
-                    || self
-                        .facts
-                        .supertype_members
-                        .get(&k)
-                        .is_some_and(|members| members.binary_search(&id).is_ok())
-            }
+            KindConstraint::Exact(id) => id == k,
             KindConstraint::AnyNamed => !grammar.is_anonymous_node(k),
             KindConstraint::AnyNode | KindConstraint::Unconstrained => true,
         }
@@ -943,22 +930,6 @@ fn build_parent_candidate_kinds(
         .collect();
     candidates.sort_unstable();
     candidates
-}
-
-fn build_supertype_members(
-    grammar: &Grammar,
-    realizers_by_kind: &HashMap<NodeKindId, Vec<NodeRealizer>>,
-) -> HashMap<NodeKindId, Vec<NodeKindId>> {
-    let mut members = HashMap::new();
-    for &kind in realizers_by_kind.keys() {
-        if !grammar.is_supertype(kind) {
-            continue;
-        }
-        let mut subtypes: Vec<NodeKindId> = grammar.collect_subtypes(kind).into_iter().collect();
-        subtypes.sort_unstable();
-        members.insert(kind, subtypes);
-    }
-    members
 }
 
 fn extra_kinds(grammar: &Grammar) -> (Vec<NodeKindId>, Vec<NodeKindId>) {
