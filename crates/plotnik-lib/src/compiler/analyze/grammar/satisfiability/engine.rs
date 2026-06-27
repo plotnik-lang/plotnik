@@ -33,8 +33,7 @@ use crate::core::grammar::{Grammar, SkeletonStep, SkeletonVariable, StepProjecti
 use crate::core::{NodeFieldId, NodeKindId};
 
 use super::automaton::{
-    self, AnchorMode, AutomatonContext, ChildAutomaton, ChildMatcher, KindConstraint, PatternId,
-    State,
+    self, AutomatonContext, ChildAutomaton, ChildMatcher, KindConstraint, PatternId, State,
 };
 use super::facts::{ExtraCandidates, GrammarFacts, NodeRealizer};
 use super::state_set::StateSet;
@@ -171,7 +170,7 @@ struct Frozen<'a> {
     automata: Vec<ChildAutomaton>,
     table: automaton::PatternTable,
     facts: Arc<GrammarFacts>,
-    anchor_mode: AnchorMode,
+    relax_anchors: bool,
     /// Native-recursion ceiling for automaton construction while inlining references.
     automaton_max_depth: u32,
 }
@@ -203,7 +202,7 @@ impl<'a> Frozen<'a> {
             self.ctx,
             &mut self.table,
             &self.anchor_semantics,
-            self.anchor_mode,
+            self.relax_anchors,
             self.automaton_max_depth,
             remaining_budget,
         )
@@ -344,9 +343,10 @@ pub(super) struct SatisfiabilitySolver<'a> {
 
 impl<'a> SatisfiabilitySolver<'a> {
     pub(super) fn checking(ctx: AutomatonContext<'a>, limits: SatisfiabilityLimits) -> Self {
-        Self::with_anchor_mode(
+        let relax_anchors = false;
+        Self::with_anchor_relaxation(
             ctx,
-            AnchorMode::Enforce,
+            relax_anchors,
             limits,
             Arc::new(GrammarFacts::from_grammar(ctx.grammar)),
         )
@@ -357,9 +357,10 @@ impl<'a> SatisfiabilitySolver<'a> {
             automaton_max_depth: self.frozen.automaton_max_depth,
             step_budget,
         };
-        Self::with_anchor_mode(
+        let relax_anchors = true;
+        Self::with_anchor_relaxation(
             self.frozen.ctx,
-            AnchorMode::Relax,
+            relax_anchors,
             limits,
             Arc::clone(&self.frozen.facts),
         )
@@ -369,9 +370,9 @@ impl<'a> SatisfiabilitySolver<'a> {
         self.solve.remaining_budget()
     }
 
-    fn with_anchor_mode(
+    fn with_anchor_relaxation(
         ctx: AutomatonContext<'a>,
-        anchor_mode: AnchorMode,
+        relax_anchors: bool,
         limits: SatisfiabilityLimits,
         facts: Arc<GrammarFacts>,
     ) -> Self {
@@ -382,7 +383,7 @@ impl<'a> SatisfiabilitySolver<'a> {
                 automata: Vec::new(),
                 table: automaton::PatternTable::default(),
                 facts,
-                anchor_mode,
+                relax_anchors,
                 automaton_max_depth: limits.automaton_max_depth,
             },
             solve: Solve {

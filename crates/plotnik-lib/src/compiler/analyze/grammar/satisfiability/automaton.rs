@@ -207,20 +207,6 @@ impl<'a> AutomatonContext<'a> {
     }
 }
 
-/// Whether construction should preserve query anchors or widen every gap for the
-/// diagnostic probe that asks "would this match without the anchors?"
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum AnchorMode {
-    Enforce,
-    Relax,
-}
-
-impl AnchorMode {
-    fn relaxes(self) -> bool {
-        matches!(self, Self::Relax)
-    }
-}
-
 /// Interns query node patterns to [`PatternId`]s. Keyed by `(source, range)` so the
 /// same definition body interns once however many references reach it.
 #[derive(Default)]
@@ -251,14 +237,14 @@ impl PatternTable {
 }
 
 /// Builds `A_p` from a node pattern, interning child node patterns into `table`.
-/// [`AnchorMode::Relax`] widens every gap to [`GapClass::Any`] so the diagnostic
-/// probe can ask whether anchors alone are the obstacle.
+/// `relax_anchors` widens every gap to [`GapClass::Any`] so the diagnostic probe
+/// can ask whether anchors alone are the obstacle.
 pub(super) fn build<'a>(
     node: &Located<NodePattern>,
     ctx: AutomatonContext<'a>,
     table: &mut PatternTable,
     anchor_semantics: &AnchorSemantics<'a>,
-    anchor_mode: AnchorMode,
+    relax_anchors: bool,
     automaton_max_depth: u32,
     state_budget: u64,
 ) -> ChildAutomaton {
@@ -295,7 +281,7 @@ pub(super) fn build<'a>(
     };
     builder.states[accept as usize].gap = trailing_gap;
 
-    builder.finish(start, accept, negated_fields, anchor_mode)
+    builder.finish(start, accept, negated_fields, relax_anchors)
 }
 
 /// The fields a node pattern asserts absent through `-field` items, resolved to ids.
@@ -415,10 +401,10 @@ impl<'a, 'b> Builder<'a, 'b> {
         start: State,
         accept: State,
         negated_fields: Vec<NodeFieldId>,
-        anchor_mode: AnchorMode,
+        relax_anchors: bool,
     ) -> ChildAutomaton {
         let mut states = self.states;
-        if anchor_mode.relaxes() {
+        if relax_anchors {
             for state in &mut states {
                 state.gap = GapClass::Any;
             }
