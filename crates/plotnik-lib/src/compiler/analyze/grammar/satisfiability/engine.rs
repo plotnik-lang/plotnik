@@ -90,6 +90,47 @@ struct ThreadKey {
     inherited_field: Option<NodeFieldId>,
 }
 
+struct ProductionThread<'f, 'q, 'g> {
+    frozen: &'f Frozen<'q>,
+    pattern: PatternId,
+    inherited_field: Option<NodeFieldId>,
+    gaps: &'g mut [GapClass],
+}
+
+impl<'f, 'q, 'g> ProductionThread<'f, 'q, 'g> {
+    fn new(
+        frozen: &'f Frozen<'q>,
+        pattern: PatternId,
+        inherited_field: Option<NodeFieldId>,
+        gaps: &'g mut [GapClass],
+    ) -> Self {
+        Self {
+            frozen,
+            pattern,
+            inherited_field,
+            gaps,
+        }
+    }
+
+    fn automaton(&self) -> &ChildAutomaton {
+        self.frozen.automaton(self.pattern)
+    }
+
+    fn hidden_key(
+        &self,
+        hidden_var: VarId,
+        state: State,
+        inherited_field: Option<NodeFieldId>,
+    ) -> ThreadKey {
+        ThreadKey {
+            pattern: self.pattern,
+            hidden_var,
+            state,
+            inherited_field,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Key {
     Sat(SatKey),
@@ -625,9 +666,10 @@ impl Solve {
             NodeRealizer::Var(v) => {
                 let production_count = frozen.variable(v).productions.len();
                 let mut gaps = gap_scratch(frozen, p);
+                let mut thread = ProductionThread::new(frozen, p, None, &mut gaps);
                 (0..production_count).any(|i| {
                     let production = &frozen.variable(v).productions[i];
-                    self.thread_production(frozen, p, production, &start, None, &mut gaps)
+                    self.thread_production(&mut thread, production, &start)
                         .contains(accept)
                 })
             }
@@ -638,62 +680,48 @@ impl Solve {
         let start = StateSet::singleton(key.state);
         let mut reached = StateSet::default();
         let mut gaps = gap_scratch(frozen, key.pattern);
+        let mut thread = ProductionThread::new(frozen, key.pattern, key.inherited_field, &mut gaps);
         let production_count = frozen.variable(key.hidden_var).productions.len();
         for i in 0..production_count {
             let production = &frozen.variable(key.hidden_var).productions[i];
-            let states = self.thread_production(
-                frozen,
-                key.pattern,
-                production,
-                &start,
-                key.inherited_field,
-                &mut gaps,
-            );
+            let states = self.thread_production(&mut thread, production, &start);
             reached.union_with(&states);
         }
         reached
     }
 
     /// Thread one production's steps, left to right, through `A_p` from `start`,
-    /// returning the reachable state set. `inherited` is the field a hidden ancestor
+    /// returning the reachable state set. `thread.inherited_field` is the field a hidden ancestor
     /// step pushed onto this frontier — `None` for a node's own children.
     fn thread_production(
         &mut self,
-        frozen: &Frozen,
-        p: PatternId,
+        thread: &mut ProductionThread<'_, '_, '_>,
         production: &[SkeletonStep],
         start: &StateSet,
-        inherited: Option<NodeFieldId>,
-        gaps: &mut [GapClass],
     ) -> StateSet {
-        let automaton = frozen.automaton(p);
-        let mut current = self.closure(frozen, automaton, start, gaps);
+        let mut current = self.thread_closure(thread, start);
         for step in production {
             // A dead frontier stays dead; the rest of the production cannot revive it.
             if self.exhausted || current.is_empty() {
                 break;
             }
-            current = self.thread_step(frozen, p, &current, gaps, step, inherited);
+            current = self.thread_step(thread, &current, step);
             if self.exhausted {
                 break;
             }
-            let automaton = frozen.automaton(p);
-            current = self.closure(frozen, automaton, &current, gaps);
+            current = self.thread_closure(thread, &current);
         }
         current
     }
 
     fn thread_step(
         &mut self,
-        frozen: &Frozen,
-        p: PatternId,
+        thread: &mut ProductionThread<'_, '_, '_>,
         current: &StateSet,
-        gaps: &[GapClass],
         step: &SkeletonStep,
-        inherited: Option<NodeFieldId>,
     ) -> StateSet {
-        let automaton = frozen.automaton(p);
-        match frozen.classify(step) {
+        let automaton = thread.automaton();
+        match thread.frozen.classify(step) {
             // A real child of kind `kind`. Each current state either skips it through a
             // gap self-loop, or consumes it through an edge whose kind and field both
             // admit the step. The step's own label wins over an inherited one.
@@ -702,15 +730,15 @@ impl Solve {
                 field,
                 realizer,
             } => {
-                let effective = field.or(inherited);
+                let effective = field.or(thread.inherited_field);
                 // The query asserts this field absent (`-field`); a production binding it
                 // gives the node a forbidden child, so this whole path is dead — it can be
                 // neither consumed nor skipped past.
                 if automaton.negates(effective) {
                     return StateSet::default();
                 }
-                let anonymous = frozen.ctx.grammar.is_anonymous_node(kind);
-                let extra = frozen.ctx.grammar.is_extra(kind);
+                let anonymous = thread.frozen.ctx.grammar.is_anonymous_node(kind);
+                let extra = thread.frozen.ctx.grammar.is_extra(kind);
                 let mut next = StateSet::default();
                 for q in current.iter() {
                     if !self.charge() {
@@ -718,16 +746,16 @@ impl Solve {
                     }
                     // The state's *effective* gap (tightest erasure path that reaches it),
                     // so a strict anchor erased into this position still forbids the skip.
-                    if gaps[q as usize].admits(anonymous, extra) {
+                    if thread.gaps[q as usize].admits(anonymous, extra) {
                         next.insert(q);
                     }
                     for (matcher, to) in automaton.pattern_edges(q) {
                         if !self.charge() {
                             break;
                         }
-                        if frozen.kind_ok(matcher.kind, kind)
+                        if thread.frozen.kind_ok(matcher.kind, kind)
                             && field_ok(matcher.field, effective)
-                            && self.child_sat(frozen, matcher, realizer)
+                            && self.child_sat(matcher, realizer)
                         {
                             next.insert(*to);
                         }
@@ -739,18 +767,13 @@ impl Solve {
             // inherits: this step's own field if it has one, otherwise the one already
             // inherited (a plain supertype link never relabels what it carries).
             StepClass::HiddenSubtree(h) => {
-                let pushed = step.field.or(inherited);
+                let pushed = step.field.or(thread.inherited_field);
                 let mut next = StateSet::default();
                 for q in current.iter() {
                     if !self.charge() {
                         break;
                     }
-                    let reached = self.get_thread(ThreadKey {
-                        pattern: p,
-                        hidden_var: h,
-                        state: q,
-                        inherited_field: pushed,
-                    });
+                    let reached = self.get_thread(thread.hidden_key(h, q, pushed));
                     next.union_with(&reached);
                 }
                 next
@@ -760,14 +783,19 @@ impl Solve {
         }
     }
 
+    fn thread_closure(
+        &mut self,
+        thread: &mut ProductionThread<'_, '_, '_>,
+        set: &StateSet,
+    ) -> StateSet {
+        let frozen = thread.frozen;
+        let automaton = frozen.automaton(thread.pattern);
+        self.closure(frozen, automaton, set, thread.gaps)
+    }
+
     /// Whether the matched child's own structure is realized by `realizer` — trivially
     /// true when the child is childless.
-    fn child_sat(
-        &mut self,
-        _frozen: &Frozen,
-        matcher: &ChildMatcher,
-        realizer: NodeRealizer,
-    ) -> bool {
+    fn child_sat(&mut self, matcher: &ChildMatcher, realizer: NodeRealizer) -> bool {
         match matcher.nested_pattern {
             None => true,
             Some(nested_pattern) => self.get_sat((nested_pattern, realizer)),
