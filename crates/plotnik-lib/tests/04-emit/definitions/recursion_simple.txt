@@ -52,6 +52,6 @@ Expr:
   09  ─‣┘  [Set(M2)] _ [EnumClose]          11
   11                                        ▶
   12   !   [EnumOpen(M3)] (number) [Node Set(M0) EnumClose]  11
-  15  ...  
+  15  ...
   16  └‣─  function: (identifier) [Node Set(M1)]  08
   18   !   [EnumOpen(M4)] (call_expression)  16

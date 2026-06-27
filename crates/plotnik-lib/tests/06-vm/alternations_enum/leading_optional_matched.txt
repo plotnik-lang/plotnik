@@ -68,17 +68,17 @@ _StructWrap:
 
 Q:
   06   !   (program)                        08
-  07  ...  
+  07  ...
   08  └‣─  _                                26, 28
   10                                        ▶
   11  ─‣─  (expression_statement) [Node Set(M1)]  30
   13   !   (expression_statement) [Node Set(M0)]  11
-  15  ...  
+  15  ...
   16  ─‣─  (expression_statement) [Node Set(M1)]  30
   18  ─‣─  (expression_statement) [Node Set(M0)]  16
   20   !   (comment)                        18
   21  ─‣─  _                                20, 21
-  23  ...  
+  23  ...
   24   !   _                                20, 21
   26  -ε-  [EnumOpen(M2)]                   24, 13
   28  ─‣─  _                                26, 28

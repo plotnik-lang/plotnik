@@ -76,7 +76,7 @@ Q:
   17  -ε-  [ArrayClose Set(M1)]             07
   19  -ε-  [StructClose Push]               30, 10
   21   !   [StructOpen] (expression_statement)  13
-  23  ...  
+  23  ...
   24  ─‣─  _                                21, 24
   26  └‣─  _                                21, 24
   28  ─‣─  _                                21, 28

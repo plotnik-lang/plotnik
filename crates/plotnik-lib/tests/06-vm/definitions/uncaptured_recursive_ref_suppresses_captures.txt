@@ -75,7 +75,7 @@ Q:
   19                                        ▶
   20   !   (identifier) [Node Set(M0)]      22
   22  ─‣┘  _                                19
-  23  ...  
+  23  ...
   24  -ε-  [SuppressEnd]                    22
   26   !   (Nested)                         06 : 24
   27  -ε-  [SuppressBegin]                  26

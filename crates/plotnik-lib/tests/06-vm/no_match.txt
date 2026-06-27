@@ -37,7 +37,7 @@ _StructWrap:
 
 Q:
   06   !   (program)                        08
-  07  ...  
+  07  ...
   08  └‣─  (class_declaration) [Node Set(M0)]  10
   10  ─‣┘  _                                11
   11                                        ▶

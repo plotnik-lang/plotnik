@@ -33,7 +33,7 @@ _StructWrap:
 
 Q:
   06   !   (binary_expression)              08
-  07  ...  
+  07  ...
   08  └‣─  left: (_) [Node Set(M0)]         10
   10  ─‣─  right: (_) [Node Set(M1)]        12
   12  ─‣┘  _                                13
