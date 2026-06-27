@@ -863,17 +863,12 @@ fn build_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<NodeRea
             entry.push(realizer);
         }
     };
-    for (var_id, variable) in grammar.structure().iter() {
-        if let Some(kind) = variable.id {
-            push(&mut realizers_by_kind, kind, NodeRealizer::Var(var_id));
-        }
-        for production in &variable.productions {
-            for step in production {
-                if let Some(kind) = step.target.id {
-                    push(&mut realizers_by_kind, kind, NodeRealizer::of_step(step));
-                }
-            }
-        }
+    for surface in grammar.structure().surface_realizers() {
+        let realizer = surface
+            .body
+            .map(NodeRealizer::Var)
+            .unwrap_or(NodeRealizer::Leaf);
+        push(&mut realizers_by_kind, surface.kind, realizer);
     }
     realizers_by_kind
 }

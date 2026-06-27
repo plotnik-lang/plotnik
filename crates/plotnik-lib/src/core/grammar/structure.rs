@@ -113,6 +113,14 @@ pub struct SkeletonVariable {
     pub productions: Vec<Vec<SkeletonStep>>,
 }
 
+/// A public kind the skeleton can surface, and the variable it descends into when
+/// it is not a leaf token.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SurfaceRealizer {
+    pub(crate) kind: NodeKindId,
+    pub(crate) body: Option<VarId>,
+}
+
 /// Ordered structural skeleton of every syntax variable in the grammar.
 ///
 /// Retained from `Grammar::from_raw`'s flattened `SyntaxGrammar` before it is
@@ -171,6 +179,26 @@ impl StructureTable {
             .iter()
             .enumerate()
             .map(|(index, variable)| (VarId(index as u32), variable))
+    }
+
+    /// Every public kind the skeleton can surface, paired with the variable it
+    /// descends into. Includes a variable's own public id and every surfaced
+    /// production step (aliases included), so reachability and satisfiability share
+    /// one traversal of the ordered grammar model.
+    pub(crate) fn surface_realizers(&self) -> impl Iterator<Item = SurfaceRealizer> + '_ {
+        self.iter().flat_map(|(var_id, variable)| {
+            let own_id = variable.id.map(|kind| SurfaceRealizer {
+                kind,
+                body: Some(var_id),
+            });
+            let step_ids = variable.productions.iter().flatten().filter_map(|step| {
+                step.target.id.map(|kind| SurfaceRealizer {
+                    kind,
+                    body: step.target.body,
+                })
+            });
+            own_id.into_iter().chain(step_ids)
+        })
     }
 }
 

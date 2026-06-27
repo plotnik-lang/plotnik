@@ -661,18 +661,17 @@ impl<'a> SubtypeResolver<'a> {
 
 /// Index each public node kind to the skeleton variables that realize it: the
 /// variable named for it, plus every step occurrence (aliases included) that
-/// surfaces it and descends into a variable body. Mirrors the satisfiability
-/// engine's `realizers_by_kind`, so both passes reason over the same model.
+/// surfaces it and descends into a variable body. Built from
+/// [`StructureTable::surface_realizers`], the same stream the satisfiability
+/// engine indexes, so both passes reason over the same model.
 fn variable_realizers_by_kind(grammar: &Grammar) -> HashMap<NodeKindId, Vec<VarId>> {
     let mut realizers_by_kind: HashMap<NodeKindId, Vec<VarId>> = HashMap::new();
-    for (var_id, variable) in grammar.structure.iter() {
-        if let Some(id) = variable.id {
-            realizers_by_kind.entry(id).or_default().push(var_id);
-        }
-        for step in variable.productions.iter().flatten() {
-            if let (Some(id), Some(body)) = (step.target.id, step.target.body) {
-                realizers_by_kind.entry(id).or_default().push(body);
-            }
+    for realizer in grammar.structure.surface_realizers() {
+        if let Some(body) = realizer.body {
+            realizers_by_kind
+                .entry(realizer.kind)
+                .or_default()
+                .push(body);
         }
     }
     realizers_by_kind
