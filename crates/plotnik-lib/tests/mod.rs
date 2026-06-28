@@ -3,7 +3,14 @@
 //! Each file under `tests/0N-stage/` is one fixture: an authored Plotnik query,
 //! an optional `==== input ====` source section, and generated artifact sections
 //! the harness rewrites in place on accept. The stage directory selects which
-//! artifacts render:
+//! artifacts render.
+//!
+//! The input header's suffix selects the grammar a query compiles against:
+//! `==== input.ts ====` picks TypeScript, `==== input.dart ====` dart, plain
+//! `==== input ====` (or `.js`) JavaScript (see `Lang::resolve`). For a 06-vm
+//! fixture the body is the source the VM runs; for a compile-only stage (04-emit,
+//! 05-typegen) only the suffix matters, so the body is left empty — the header is
+//! a pure grammar selector. The stage directory selects which artifacts render:
 //!
 //! | dir          | sections                                   |
 //! | ------------ | ------------------------------------------ |
@@ -46,6 +53,8 @@ use plotnik_lib::{
     Colors, CompiledQuery, PrintTracer, QueryBuilder, RuntimeError, SourceMap, SourcePath,
     TypeScriptConfig, VM, Verbosity, materialize_verified,
 };
+
+mod support;
 
 const FIXTURE_EXT: &str = "txt";
 
@@ -440,8 +449,16 @@ impl Lang {
                 grammar: javascript_grammar(),
                 ts: arborium_javascript::language().into(),
             }),
+            Some("ts") | Some("typescript") => Ok(Lang {
+                grammar: typescript_grammar(),
+                ts: arborium_typescript::language().into(),
+            }),
+            Some("dart") => Ok(Lang {
+                grammar: dart_grammar(),
+                ts: arborium_dart::language().into(),
+            }),
             Some(other) => Err(format!(
-                "input language `{other}` is not wired into the fixture suite yet (only JavaScript)"
+                "input language `{other}` is not wired into the fixture suite yet (have: javascript, typescript, dart)"
             )),
         }
     }
@@ -455,14 +472,24 @@ impl Lang {
     }
 }
 
-fn javascript_grammar() -> &'static Grammar {
-    static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw = RawGrammar::from_json(include_str!(env!("PLOTNIK_LIB_JAVASCRIPT_GRAMMAR_JSON")))
-            .expect("javascript grammar fixture");
-        Grammar::from_raw(&raw).expect("javascript grammar metadata")
-    });
-    &GRAMMAR
+/// Define a lazily-loaded `&'static Grammar` from the `grammar.json` shipped by
+/// the arborium dev-dependency. One per wired language.
+macro_rules! grammar_loader {
+    ($name:ident, $package:literal) => {
+        fn $name() -> &'static Grammar {
+            static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
+                let raw = RawGrammar::from_json(&support::load_arborium_grammar_json($package))
+                    .expect(concat!($package, " grammar fixture"));
+                Grammar::from_raw(&raw).expect(concat!($package, " grammar metadata"))
+            });
+            &GRAMMAR
+        }
+    };
 }
+
+grammar_loader!(javascript_grammar, "arborium-javascript");
+grammar_loader!(typescript_grammar, "arborium-typescript");
+grammar_loader!(dart_grammar, "arborium-dart");
 
 fn source_map(query: &str) -> SourceMap {
     let mut sm = SourceMap::new();

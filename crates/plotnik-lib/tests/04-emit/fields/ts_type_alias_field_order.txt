@@ -1,0 +1,12 @@
+Q = (type_alias_declaration type_parameters: (type_parameters) @tp name: (type_identifier) @name)
+==== input.ts ====
+==== diagnostics ====
+error: the grammar places `name:` before `type_parameters:` in `type_alias_declaration`
+ --> query.ptk:1:29
+  |
+1 | Q = (type_alias_declaration type_parameters: (type_parameters) @tp name: (type_identifier) @name)
+  |      ---------------------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ----------------------------- `name:` must come before `type_parameters:`
+  |      |
+  |      inside `type_alias_declaration`
+  |
+help: write `name:` before `type_parameters:`

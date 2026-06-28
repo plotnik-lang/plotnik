@@ -21,7 +21,10 @@ pub fn run_dump(lang_name: &str, legend: bool, json: bool, width: Option<usize>)
 
     if json {
         // The machine escape hatch: hand back the grammar's own source format.
-        let raw = lang.raw().to_json().map_err(|e| CliError::fatal(e.to_string()))?;
+        let raw = lang
+            .raw()
+            .to_json()
+            .map_err(|e| CliError::fatal(e.to_string()))?;
         println!("{raw}");
         return Ok(());
     }

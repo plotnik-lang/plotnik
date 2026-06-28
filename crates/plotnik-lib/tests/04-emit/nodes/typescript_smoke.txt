@@ -1,0 +1,32 @@
+Q = (interface_declaration) @decl
+==== input.ts ====
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "decl"
+S2 "Q"
+S3 "interface_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { decl }
+
+[type_members]
+M0: S1 → T0  ; decl: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 6 :: T1
+
+[transitions]
+_StructWrap:
+  0  -ε-  [StructOpen]                      2
+  2       Trampoline                        3
+  3  -ε-  [StructClose]                     5
+  5                                         ▶
+
+Q:
+  6   !   (interface_declaration) [Node Set(M0)]  8
+  8                                         ▶
