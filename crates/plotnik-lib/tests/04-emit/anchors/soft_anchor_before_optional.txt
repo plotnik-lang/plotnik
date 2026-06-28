@@ -1,0 +1,9 @@
+Q = (array . ";"? (identifier) @id)
+==== diagnostics ====
+error: after the soft anchor (`.`), no `array` places this child first; an `array` begins with `"["`
+ --> query.ptk:1:6
+  |
+1 | Q = (array . ";"? (identifier) @id)
+  |      ^^^^^
+  |
+help: here `.` skips extras only because one side can match an anonymous token; use `(_)` for a named node, or drop the anchor to match these children in any positions

@@ -1,0 +1,21 @@
+Q = (object [(pair -key) (pair -value)] @x)
+==== diagnostics ====
+error: `-key` can never match
+ --> query.ptk:1:21
+  |
+1 | Q = (object [(pair -key) (pair -value)] @x)
+  |               ----  ^^^
+  |               |
+  |               on `pair`
+  |
+help: `-key` requires `key` to be absent, but every `pair` has one — drop `-key`
+
+error: `-value` can never match
+ --> query.ptk:1:33
+  |
+1 | Q = (object [(pair -key) (pair -value)] @x)
+  |                           ----  ^^^^^
+  |                           |
+  |                           on `pair`
+  |
+help: `-value` requires `value` to be absent, but every `pair` has one — drop `-value`
