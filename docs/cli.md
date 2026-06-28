@@ -279,7 +279,7 @@ sized from the input so they stay invisible to legitimate queries:
 | -------------- | ---------------------------------- | ------- |
 | `--max-steps`  | a step count, `auto`, `unbounded`  | `auto`  |
 | `--max-memory` | a binary size, `auto`, `unbounded` | `auto`  |
-| `--limits`     | `auto` or `unbounded` (preset)     | `auto`  |
+| `--limits`     | `auto` or `unbounded` runtime preset | `auto`  |
 
 - **Steps** bound total work (instruction dispatches) — the guard against
   catastrophic backtracking.
@@ -293,9 +293,10 @@ sized from the input so they stay invisible to legitimate queries:
 **Sizes** use binary units only: a bare integer is bytes; `KiB`/`MiB`/`GiB`
 scale by 1024. SI units (`MB`, `GB`) are rejected as ambiguous — use `MiB`/`GiB`.
 
-**Precedence** is order-independent: `--limits` sets the baseline for every
-resource, and an explicit `--max-*` overrides that one. So `--limits unbounded
---max-steps 5` means "unbounded everywhere except steps = 5".
+**Precedence** is order-independent: `--limits` sets the baseline for both
+runtime resources, and an explicit `--max-*` overrides that one. So
+`--limits unbounded --max-steps 5` means "unbounded runtime limits except
+steps = 5".
 
 ```sh
 plotnik run q.ptk app.js --max-steps 5000000      # explicit work ceiling
