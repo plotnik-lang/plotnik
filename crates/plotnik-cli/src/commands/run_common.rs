@@ -7,7 +7,7 @@ use std::path::Path;
 use arborium_tree_sitter as tree_sitter;
 use plotnik_lib::bytecode::{Entrypoint, Module};
 
-use super::compile::compile_module;
+use super::compile::compile_query;
 use super::lang_resolver::reconcile_lang;
 use super::query_loader::load_query;
 use crate::error::CliError;
@@ -69,21 +69,13 @@ pub fn resolve_run_lang(
     ))
 }
 
-/// Resolve entrypoint by name or use the single available one.
+/// Resolve the selected entrypoint after defaulting has already happened.
 pub fn resolve_entrypoint(module: &Module, name: Option<&str>) -> Result<Entrypoint, CliError> {
     match name {
         Some(name) => module
             .entrypoint(name)
             .ok_or_else(|| CliError::fatal(format!("invalid entrypoint: {}", name))),
-        None => match module.entrypoint_count() {
-            0 => Err(CliError::fatal("no entrypoints in module")),
-            1 => module
-                .entrypoint_at(0)
-                .ok_or_else(|| CliError::fatal("no entrypoints in module")),
-            _ => Err(CliError::fatal(
-                "multiple entrypoints, specify one with --entry",
-            )),
-        },
+        None => Err(CliError::fatal("no entrypoints in module")),
     }
 }
 
@@ -147,10 +139,17 @@ pub fn plan_exec(input: ExecRequest) -> Result<ExecPlan, CliError> {
         input.source_path,
     )?;
 
-    let module = compile_module(loaded.sources, lang, input.color)?;
+    let compiled = compile_query(loaded.sources, lang, input.color)?;
+    // Queries conventionally put the top-level definition last.
+    let default_entry = compiled.definition_names().last();
+    let module = compiled.into_module().expect("dry_run guarantees a module");
 
-    let entry = input.entry.or(loaded.shebang.entry.as_deref());
-    let entrypoint = resolve_entrypoint(&module, entry)?;
+    let entry = input
+        .entry
+        .map(str::to_owned)
+        .or_else(|| loaded.shebang.entry.clone())
+        .or(default_entry);
+    let entrypoint = resolve_entrypoint(&module, entry.as_deref())?;
     let tree = lang.parse_source(&source_code);
 
     Ok(ExecPlan {

@@ -12,7 +12,7 @@ help: wrap in parentheses
 1 + Q = (Expr) ^^^ (identifier)
   |
 
-error: unexpected token
+error: expected a pattern
  --> query.ptk:1:10
   |
 1 | Q = Expr ^^^ (identifier)

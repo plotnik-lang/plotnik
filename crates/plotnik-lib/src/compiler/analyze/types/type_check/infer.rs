@@ -336,7 +336,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let unified_flow = match unify_flows(self.ctx.type_ctx, flows) {
             Ok(flow) => flow,
             Err(err) => {
-                self.report_unify_error(union.node().text_range(), &err);
+                self.report_unify_error(union.node(), &err);
                 PatternFlow::Void
             }
         };

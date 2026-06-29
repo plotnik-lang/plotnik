@@ -1,9 +1,7 @@
 [@x (a)]
 ==== diagnostics ====
-error: unexpected token
+error: expected a branch, or `]` to close
  --> query.ptk:1:2
   |
 1 | [@x (a)]
   |  ^^
-  |
-help: expected a branch, or `]` to close

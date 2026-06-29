@@ -8,10 +8,8 @@ error: tree-sitter predicates are not supported
   |
 help: use `(node == "x")`
 
-error: unexpected token
+error: expected a child node, or `)` to close
  --> query.ptk:1:16
   |
 1 | (function #eq? @name "test")
   |                ^^^^^
-  |
-help: expected a child node, or `)` to close

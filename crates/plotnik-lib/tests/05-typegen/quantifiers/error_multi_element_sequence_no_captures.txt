@@ -3,7 +3,7 @@ Bad = {
   (number)
 }* @items
 ==== diagnostics ====
-error: sequence with `*` matches multiple nodes but has no internal captures
+error: this `*` group matches several nodes but captures none of them
  --> query.ptk:1:7
   |
 1 |   Bad = {

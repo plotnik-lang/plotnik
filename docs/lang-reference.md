@@ -106,7 +106,7 @@ Expr = [(identifier) (number) (string)]
 Stmt = (statement) @stmt
 ````
 
-All definitions are entrypoints and included in the binary. Use `--entry <Name>` to select which one to execute.
+All definitions are entrypoints and included in the binary. `--entry <Name>` selects which one to execute; with no `--entry`, the last definition runs by default.
 
 ### Script vs Module Mode
 
@@ -145,8 +145,8 @@ Set with `-l/--lang` or a shebang (`#!/usr/bin/env -S plotnik run -l <language>`
 
 ### Execution
 
-- Single definition: Default entrypoint
-- Multiple definitions: Use `--entry <Name>`
+- Single definition: it is the default entrypoint.
+- Multiple definitions: the **last** definition is the default entrypoint; pass `--entry <Name>` to run a different one.
 
 ### Example
 

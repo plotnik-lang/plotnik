@@ -13,7 +13,7 @@ help: wrap in parentheses
 1 + (Broken) ^^^
   |
 
-error: unexpected token
+error: expected a pattern
  --> query.ptk:1:8
   |
 1 | Broken ^^^

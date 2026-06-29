@@ -15,6 +15,9 @@ pub mod trace;
 mod check_tests;
 
 #[cfg(test)]
+mod run_common_tests;
+
+#[cfg(test)]
 mod runtime_report_tests;
 
 #[cfg(test)]
