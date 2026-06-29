@@ -1,9 +1,7 @@
 Q = (expression #binary_expression)
 ==== diagnostics ====
-error: unexpected token
+error: expected a child node, or `)` to close
  --> query.ptk:1:17
   |
 1 | Q = (expression #binary_expression)
   |                 ^
-  |
-help: expected a child node, or `)` to close

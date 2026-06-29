@@ -3,7 +3,7 @@ Q = {
   .
 }
 ==== diagnostics ====
-error: boundary anchor requires parent node context
+error: anchor needs an enclosing node
  --> query.ptk:3:3
   |
 3 |   .

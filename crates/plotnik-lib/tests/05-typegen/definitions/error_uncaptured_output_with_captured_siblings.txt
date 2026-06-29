@@ -5,7 +5,7 @@ Q = (program
   (debugger_statement) @name
 )
 ==== diagnostics ====
-error: output-producing expression requires capture when siblings have captures
+error: this match isn't captured, but its siblings are
  --> query.ptk:4:3
   |
 4 |   (A)

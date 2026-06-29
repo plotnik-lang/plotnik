@@ -9,6 +9,7 @@ use crate::compiler::analyze::visitor::{
 };
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::parse::ast::{NodePattern, SeqPattern, UnionPattern};
+use crate::compiler::parse::cst::SyntaxNode;
 
 pub fn validate_empty_constructs(input: ValidationInput) {
     let ValidationInput {
@@ -26,9 +27,7 @@ struct EmptyConstructsValidator<'d> {
 
 impl Visitor for EmptyConstructsValidator<'_> {
     fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
-        // Check for truly empty tree: no child nodes at all in CST (only tokens like parens)
-        // This excludes invalid content like predicates which create Error nodes
-        if node.node().syntax().children().next().is_none() && node.node().kind_token().is_none() {
+        if is_construct_empty(node.node().syntax()) && node.node().kind_token().is_none() {
             self.diag
                 .report(
                     DiagnosticKind::EmptyTree,
@@ -40,7 +39,7 @@ impl Visitor for EmptyConstructsValidator<'_> {
     }
 
     fn visit_seq_pattern(&mut self, seq: &Located<SeqPattern>) {
-        if seq.node().children().next().is_none() {
+        if is_construct_empty(seq.node().syntax()) {
             self.diag
                 .report(
                     DiagnosticKind::EmptySequence,
@@ -52,9 +51,7 @@ impl Visitor for EmptyConstructsValidator<'_> {
     }
 
     fn visit_union_pattern(&mut self, union: &Located<UnionPattern>) {
-        // An empty alternation `[]` has no labels, so it always casts to a union;
-        // an enum always has at least one labeled branch.
-        if union.node().branches().next().is_none() {
+        if is_construct_empty(union.node().syntax()) {
             self.diag
                 .report(
                     DiagnosticKind::EmptyAlternation,
@@ -64,4 +61,9 @@ impl Visitor for EmptyConstructsValidator<'_> {
         }
         walk_union_pattern(self, union);
     }
+}
+
+fn is_construct_empty(syntax: &SyntaxNode) -> bool {
+    // Invalid contents still produce error nodes, so only delimiter-only constructs count.
+    syntax.children().next().is_none()
 }

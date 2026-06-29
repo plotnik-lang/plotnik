@@ -3,7 +3,7 @@ Bad = {
   (number) @b
 }*
 ==== diagnostics ====
-error: quantifier `*` contains captures (`@a`, `@b`) but has no struct capture
+error: captures `@a`, `@b` repeat with `*` but aren't collected into a list
  --> query.ptk:1:7
   |
 1 |   Bad = {
@@ -13,4 +13,4 @@ error: quantifier `*` contains captures (`@a`, `@b`) but has no struct capture
 4 | | }*
   | |__^
   |
-help: add a struct capture: `{...}* @name`
+help: add a row capture so each repeat becomes one element: `{...}* @items`

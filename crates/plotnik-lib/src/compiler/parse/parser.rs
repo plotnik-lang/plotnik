@@ -286,6 +286,19 @@ impl<'q, 'd> Parser<'q, 'd> {
         false
     }
 
+    /// Expect a closing delimiter. On mismatch, report the unclosed-delimiter diagnostic
+    /// rather than a bespoke "expected ..." message, so a missing `)`/`]`/`}` reads the
+    /// same whether it ran off the end of input or hit a stray token first.
+    pub(super) fn expect_close(&mut self, kind: SyntaxKind, unclosed: DiagnosticKind) -> bool {
+        if self.eat_token(kind) {
+            return true;
+        }
+        if let Some(report) = self.report_current(unclosed) {
+            report.emit();
+        }
+        false
+    }
+
     pub(super) fn current_suppression_span(&mut self) -> TextRange {
         match self.delimiter_stack.last() {
             Some(d) => TextRange::new(d.span.start(), self.eof_offset()),

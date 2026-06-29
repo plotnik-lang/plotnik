@@ -249,7 +249,7 @@ impl<'q> Parser<'q, '_> {
         self.report_unsupported_predicate(span, name);
         self.consume_until_matching_paren();
         self.pop_delimiter();
-        self.expect(SyntaxKind::ParenClose, "closing ')' for predicate");
+        self.expect_close(SyntaxKind::ParenClose, DiagnosticKind::UnclosedTree);
         self.finish_node();
     }
 
@@ -383,7 +383,7 @@ impl<'q> Parser<'q, '_> {
             }
         }
         self.pop_delimiter();
-        self.expect(SyntaxKind::ParenClose, "closing ')' for (ERROR)");
+        self.expect_close(SyntaxKind::ParenClose, DiagnosticKind::UnclosedTree);
         self.finish_node();
     }
 
@@ -403,14 +403,14 @@ impl<'q> Parser<'q, '_> {
             }
         }
         self.pop_delimiter();
-        self.expect(SyntaxKind::ParenClose, "closing ')' for (MISSING)");
+        self.expect_close(SyntaxKind::ParenClose, DiagnosticKind::UnclosedTree);
         self.finish_node();
     }
 
     fn finish_named_node_parsing(&mut self, checkpoint: Checkpoint, head: ParenHead<'q>) {
         let has_children = !self.at(SyntaxKind::ParenClose);
 
-        let what = match head {
+        match head {
             ParenHead::DefRef(name) if has_children => {
                 self.start_node_at(checkpoint, SyntaxKind::NamedNode);
                 let children_start = self.current_span().start();
@@ -423,20 +423,17 @@ impl<'q> Parser<'q, '_> {
                 {
                     report.detail(name).fix("remove the children", "").emit();
                 }
-                "closing ')' for tree"
             }
             ParenHead::DefRef(_) => {
                 self.start_node_at(checkpoint, SyntaxKind::DefRef);
-                "closing ')' for reference"
             }
             ParenHead::Concrete => {
                 self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY_TOKENS);
-                "closing ')' for tree"
             }
-        };
+        }
 
         self.pop_delimiter();
-        self.expect(SyntaxKind::ParenClose, what);
+        self.expect_close(SyntaxKind::ParenClose, DiagnosticKind::UnclosedTree);
         self.finish_node();
     }
 
@@ -475,9 +472,26 @@ impl<'q> Parser<'q, '_> {
             if self.at_ts(recovery) {
                 break;
             }
-            self.report_current_and_bump(DiagnosticKind::UnexpectedToken, |report| {
-                report.hint("expected a child node, or `)` to close")
-            });
+            self.report_unexpected_children_run(until, recovery);
+        }
+    }
+
+    fn report_unexpected_children_run(&mut self, until: SyntaxKind, recovery: TokenSet) {
+        let detail = match until {
+            SyntaxKind::BraceClose => "expected an item, or `}` to close",
+            _ => "expected a child node, or `)` to close",
+        };
+        let Some(range) = self.consume_unexpected_run(|parser| {
+            parser.at(until)
+                || parser.at_ts(SEPARATORS)
+                || parser.at_ts(PATTERN_FIRST_TOKENS)
+                || parser.at_ts(recovery)
+                || parser.at_ts_predicate()
+        }) else {
+            return;
+        };
+        if let Some(report) = self.report_at(DiagnosticKind::UnexpectedToken, range) {
+            report.detail(detail).emit();
         }
     }
 
@@ -491,7 +505,10 @@ impl<'q> Parser<'q, '_> {
         self.parse_alternation_children();
 
         self.pop_delimiter();
-        self.expect(SyntaxKind::BracketClose, "closing ']' for alternation");
+        self.expect_close(
+            SyntaxKind::BracketClose,
+            DiagnosticKind::UnclosedAlternation,
+        );
         self.finish_node();
     }
 
@@ -539,10 +556,49 @@ impl<'q> Parser<'q, '_> {
             if self.at_ts(ALT_RECOVERY_TOKENS) {
                 break;
             }
-            self.report_current_and_bump(DiagnosticKind::UnexpectedToken, |report| {
-                report.hint("expected a branch, or `]` to close")
-            });
+            self.report_unexpected_branch_run();
         }
+    }
+
+    fn report_unexpected_branch_run(&mut self) {
+        let Some(range) = self.consume_unexpected_run(|parser| {
+            parser.at(SyntaxKind::BracketClose)
+                || parser.at_ts(SEPARATORS)
+                || (parser.at(SyntaxKind::Id) && parser.next_is(SyntaxKind::Colon))
+                || matches!(parser.current(), SyntaxKind::Dot | SyntaxKind::DotBang)
+                || parser.at_ts_predicate()
+                || parser.at_ts(PATTERN_FIRST_TOKENS)
+                || parser.at_ts(ALT_RECOVERY_TOKENS)
+        }) else {
+            return;
+        };
+        if let Some(report) = self.report_at(DiagnosticKind::UnexpectedToken, range) {
+            report.detail("expected a branch, or `]` to close").emit();
+        }
+    }
+
+    /// Consume adjacent garbage as one error node so recovery reports one diagnostic per run.
+    fn consume_unexpected_run(
+        &mut self,
+        mut boundary: impl FnMut(&mut Self) -> bool,
+    ) -> Option<TextRange> {
+        let start = self.current_span().start();
+        if self.eof() {
+            return None;
+        }
+        self.start_node(SyntaxKind::Error);
+        self.bump();
+        loop {
+            // Lookahead probes can drain trailing trivia; check EOF after them.
+            let stop = self.has_fatal_error() || boundary(self) || self.eof();
+            if stop {
+                break;
+            }
+            self.bump();
+        }
+        let end = self.last_non_trivia_end().unwrap_or(start);
+        self.finish_node();
+        Some(TextRange::new(start, end))
     }
 
     /// Enum branch: `Label: pattern`
@@ -589,7 +645,7 @@ impl<'q> Parser<'q, '_> {
         self.parse_children(SyntaxKind::BraceClose, SEQ_RECOVERY_TOKENS);
 
         self.pop_delimiter();
-        self.expect(SyntaxKind::BraceClose, "closing '}' for sequence");
+        self.expect_close(SyntaxKind::BraceClose, DiagnosticKind::UnclosedSequence);
         self.finish_node();
     }
 

@@ -1,25 +1,7 @@
 [^^^ @name]
 ==== diagnostics ====
-error: empty `[]` matches nothing
- --> query.ptk:1:1
-  |
-1 | [^^^ @name]
-  | ^^^^^^^^^^^
-  |
-help: alternations must contain at least one branch
-
-error: unexpected token
+error: expected a branch, or `]` to close
  --> query.ptk:1:2
   |
 1 | [^^^ @name]
-  |  ^^^
-  |
-help: expected a branch, or `]` to close
-
-error: unexpected token
- --> query.ptk:1:6
-  |
-1 | [^^^ @name]
-  |      ^^^^^
-  |
-help: expected a branch, or `]` to close
+  |  ^^^^^^^^^

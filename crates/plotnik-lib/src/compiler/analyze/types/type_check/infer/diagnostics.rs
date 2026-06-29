@@ -4,7 +4,10 @@ use crate::compiler::analyze::types::type_shape::{Arity, PatternFlow, PatternSha
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
-use crate::compiler::parse::ast::{FieldPattern, Pattern, QuantifiedPattern};
+use crate::compiler::parse::ast::{
+    CapturedPattern, FieldPattern, Pattern, QuantifiedPattern, UnionPattern,
+};
+use crate::compiler::parse::cst::{SyntaxNode, SyntaxToken};
 
 use super::super::unify::UnifyError;
 use super::InferVisitor;
@@ -37,11 +40,9 @@ impl InferVisitor<'_, '_> {
         Some((source, body.text_range()))
     }
 
-    /// Strict-dimensionality check 1: a multi-element pattern (`Arity::Many`)
-    /// without captures can't become a scalar array. Applies even under a row
-    /// capture — you can't meaningfully capture multiple nodes per iteration as
-    /// a scalar. Returns `true` when it reports, signalling the caller to skip
-    /// the internal-capture check (the original short-circuit).
+    /// Report a repeated multi-element pattern that cannot produce a scalar list.
+    /// Returns whether it emitted a diagnostic so the caller can keep the two
+    /// dimensionality checks mutually exclusive.
     pub(super) fn report_multi_element_scalar(
         &mut self,
         quant: &QuantifiedPattern,
@@ -58,15 +59,14 @@ impl InferVisitor<'_, '_> {
             quant.text_range(),
         )
         .detail(format!(
-            "sequence with `{}` matches multiple nodes but has no internal captures",
+            "this `{}` group matches several nodes but captures none of them",
             op
         ))
         .emit();
         true
     }
 
-    /// Strict-dimensionality check 2: internal captures require a row capture on
-    /// the quantifier. Skipped when inference runs in row-capture mode.
+    /// Report repeated inner captures that need an enclosing row capture.
     pub(super) fn report_internal_capture_dimensionality(
         &mut self,
         quant: &QuantifiedPattern,
@@ -82,22 +82,41 @@ impl InferVisitor<'_, '_> {
             return;
         }
 
-        let capture_names: Vec<_> = fields
+        let raw_names: Vec<String> = fields
             .keys()
-            .map(|s| format!("`@{}`", self.ctx.interner.resolve(*s)))
+            .map(|s| self.ctx.interner.resolve(*s).to_string())
             .collect();
-        let captures_str = capture_names.join(", ");
+        let captures_str = raw_names
+            .iter()
+            .map(|n| format!("`@{}`", n))
+            .collect::<Vec<_>>()
+            .join(", ");
 
         let op = self.quantifier_operator(quant);
+
+        // The suggestion lands beside sibling captures, so avoid names bound there.
+        let mut taken = raw_names;
+        let scope_root = enclosing_scope_root(quant.syntax());
+        let mut scope_tokens = Vec::new();
+        direct_scope_capture_tokens(&scope_root, &mut scope_tokens);
+        taken.extend(
+            scope_tokens
+                .iter()
+                .filter_map(|tok| tok.text().get(1..).map(str::to_owned)),
+        );
+        let placeholder = fresh_capture_name(&taken);
         self.report(
             DiagnosticKind::StrictDimensionalityViolation,
             quant.text_range(),
         )
         .detail(format!(
-            "quantifier `{}` contains captures ({}) but has no struct capture",
-            op, captures_str
+            "captures {} repeat with `{}` but aren't collected into a list",
+            captures_str, op
         ))
-        .hint(format!("add a struct capture: `{{...}}{} @name`", op))
+        .hint(format!(
+            "add a row capture so each repeat becomes one element: `{{...}}{} @{}`",
+            op, placeholder
+        ))
         .emit();
     }
 
@@ -129,25 +148,38 @@ impl InferVisitor<'_, '_> {
         }
     }
 
-    pub(super) fn report_unify_error(&mut self, range: TextRange, err: &UnifyError) {
-        let (kind, msg, hint) = match err {
-            UnifyError::ScalarInUnion => (
-                DiagnosticKind::IncompatibleTypes,
-                "a branch produces a value but this is a union alternation".to_string(),
-                Some("give every branch a branch label for an enum, e.g. `[A: ... B: ...]`"),
-            ),
-            UnifyError::IncompatibleTypes { field } => (
-                DiagnosticKind::IncompatibleCaptureTypes,
-                self.ctx.interner.resolve(*field).to_string(),
-                Some("make every branch produce the same type, or label the branches for an enum"),
-            ),
-        };
+    pub(super) fn report_unify_error(&mut self, union: &UnionPattern, err: &UnifyError) {
+        match err {
+            UnifyError::ScalarInUnion => {
+                self.report(
+                    DiagnosticKind::IncompatibleTypes,
+                    union.syntax().text_range(),
+                )
+                .detail("this branch produces a value, but the alternation is a union")
+                .hint("give every branch a branch label for an enum, e.g. `[A: ... B: ...]`")
+                .emit();
+            }
+            UnifyError::IncompatibleTypes { field } => {
+                let field_name = self.ctx.interner.resolve(*field).to_string();
+                let sites = capture_sites(union, &field_name);
+                let source = self.source;
+                let (primary, rest) = match sites.split_first() {
+                    Some((first, rest)) => (*first, rest),
+                    None => (union.syntax().text_range(), &[] as &[TextRange]),
+                };
 
-        let mut builder = self.report(kind, range).detail(msg);
-        if let Some(h) = hint {
-            builder = builder.hint(h);
+                let mut builder = self
+                    .report(DiagnosticKind::IncompatibleCaptureTypes, primary)
+                    .detail(field_name);
+                for &site in rest {
+                    builder =
+                        builder.related_to(Span::new(source, site), "and a different type here");
+                }
+                builder
+                    .hint("make every branch produce the same type, or label the branches for an enum")
+                    .emit();
+            }
         }
-        builder.emit();
     }
 
     fn quantifier_operator(&self, quant: &QuantifiedPattern) -> String {
@@ -156,4 +188,86 @@ impl InferVisitor<'_, '_> {
             .map(|t| t.text().to_string())
             .unwrap_or_else(|| "*".to_string())
     }
+}
+
+/// Find same-named captures that belong to the alternation's output scope.
+/// Nested row scopes are excluded because their fields cannot conflict here.
+fn capture_sites(union: &UnionPattern, field_name: &str) -> Vec<TextRange> {
+    let mut tokens = Vec::new();
+    direct_scope_capture_tokens(union.syntax(), &mut tokens);
+    tokens
+        .into_iter()
+        .filter(|tok| tok.text().get(1..) == Some(field_name))
+        .map(|tok| tok.text_range())
+        .collect()
+}
+
+/// Collect captures that contribute fields to one output scope.
+fn direct_scope_capture_tokens(scope_root: &SyntaxNode, out: &mut Vec<SyntaxToken>) {
+    for child in scope_root.children() {
+        if let Some(cap) = CapturedPattern::cast(child.clone()) {
+            if let Some(tok) = cap.name() {
+                out.push(tok);
+            }
+            if inner_captures_bubble_up(&cap) {
+                direct_scope_capture_tokens(&child, out);
+            }
+            continue;
+        }
+        direct_scope_capture_tokens(&child, out);
+    }
+}
+
+/// Find the output scope that would receive a row-capture suggestion.
+fn enclosing_scope_root(node: &SyntaxNode) -> SyntaxNode {
+    let mut root = node.clone();
+    for ancestor in node.ancestors().skip(1) {
+        if opens_nested_scope(&ancestor) {
+            break;
+        }
+        if !is_pattern_node(&ancestor) {
+            break;
+        }
+        root = ancestor;
+    }
+    root
+}
+
+fn opens_nested_scope(node: &SyntaxNode) -> bool {
+    CapturedPattern::cast(node.clone()).is_some_and(|cap| !inner_captures_bubble_up(&cap))
+}
+
+fn is_pattern_node(node: &SyntaxNode) -> bool {
+    Pattern::cast(node.clone()).is_some()
+}
+
+/// Decide whether a capture exposes its inner fields to the surrounding output scope.
+/// Plain node captures do; structured, repeating, and suppressive captures contain them.
+fn inner_captures_bubble_up(cap: &CapturedPattern) -> bool {
+    if cap.is_suppressive() {
+        return false;
+    }
+    let mut inner = cap.inner();
+    loop {
+        match inner {
+            // A field constraint navigates to a child; it does not create a scope.
+            Some(Pattern::FieldPattern(f)) => inner = f.value(),
+            Some(Pattern::QuantifiedPattern(q)) => {
+                if q.is_repeating() {
+                    return false;
+                }
+                inner = q.inner();
+            }
+            Some(Pattern::SeqPattern(_) | Pattern::Union(_) | Pattern::Enum(_)) => return false,
+            _ => return true,
+        }
+    }
+}
+
+/// Pick a suggestion that will not collide with captures already in scope.
+fn fresh_capture_name(taken: &[String]) -> &'static str {
+    ["items", "rows", "matches", "entries", "elements"]
+        .into_iter()
+        .find(|candidate| !taken.iter().any(|t| t == candidate))
+        .unwrap_or("items")
 }

@@ -307,18 +307,14 @@ impl DiagnosticKind {
             Self::RecursionNoEscape => "infinite recursion: no escape path",
             Self::DirectRecursion => "infinite recursion: cycle consumes no input",
             Self::FieldSequenceValue => "field cannot match a sequence",
-            Self::AnchorWithoutContext => "boundary anchor requires parent node context",
+            Self::AnchorWithoutContext => "anchor needs an enclosing node",
             Self::IncompatibleTypes => "incompatible types",
             Self::UnusedBranchLabels => "branch labels have no effect without capture",
             Self::StrictDimensionalityViolation => {
-                "quantifier with captures requires a struct capture"
+                "a repeated capture must be collected into a list"
             }
-            Self::MultiElementScalarCapture => {
-                "cannot capture multi-element pattern as scalar array"
-            }
-            Self::UncapturedOutputWithCaptures => {
-                "output-producing expression requires capture when siblings have captures"
-            }
+            Self::MultiElementScalarCapture => "a repeated group needs internal captures",
+            Self::UncapturedOutputWithCaptures => "this match isn't captured, but its siblings are",
             Self::AmbiguousUncapturedOutputs => {
                 "multiple expressions produce output without capture"
             }
@@ -363,7 +359,8 @@ impl DiagnosticKind {
             Self::FieldSequenceValue => "field `{}` cannot match a sequence".to_string(),
             Self::DuplicateDefinition => "`{}` is already defined".to_string(),
             Self::UndefinedReference => "`{}` is not defined".to_string(),
-            Self::IncompatibleTypes => "incompatible types: {}".to_string(),
+            // The detail leads with the specific conflict; the kind name is not prefixed.
+            Self::IncompatibleTypes => "{}".to_string(),
             Self::StrictDimensionalityViolation => "{}".to_string(),
             Self::MultiElementScalarCapture => "{}".to_string(),
             Self::AmbiguousUncapturedOutputs => "{}".to_string(),

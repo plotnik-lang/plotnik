@@ -30,7 +30,9 @@ impl Parser<'_, '_> {
         }
 
         self.report_current_and_bump(DiagnosticKind::UnexpectedToken, |report| {
-            report.hint("try `(node)`, `[a b]`, `{a b}`, `\"literal\"`, or `_`")
+            report
+                .detail("expected a pattern")
+                .hint("try `(node)`, `[a b]`, `{a b}`, `\"literal\"`, or `_`")
         });
         false
     }
@@ -116,7 +118,9 @@ impl Parser<'_, '_> {
                 self.error_and_bump(DiagnosticKind::ErrorMissingOutsideParens);
             }
             _ => {
-                self.error_and_bump(DiagnosticKind::UnexpectedToken);
+                self.report_current_and_bump(DiagnosticKind::UnexpectedToken, |report| {
+                    report.detail("expected a pattern")
+                });
             }
         }
 

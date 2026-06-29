@@ -1,6 +1,6 @@
 @name
 ==== diagnostics ====
-error: unexpected token
+error: expected a pattern
  --> query.ptk:1:1
   |
 1 | @name

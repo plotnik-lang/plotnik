@@ -2,13 +2,11 @@
 ^^^
 b)
 ==== diagnostics ====
-error: unexpected token
+error: expected a child node, or `)` to close
  --> query.ptk:2:1
   |
 2 | ^^^
   | ^^^
-  |
-help: expected a child node, or `)` to close
 
 error: node kinds must be parenthesized
  --> query.ptk:3:1

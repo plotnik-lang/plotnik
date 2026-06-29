@@ -1,5 +1,6 @@
 Q = [
   (identifier) @x
+  {(string) @x} @row
   (number)* @x
 ]
 ==== diagnostics ====
@@ -8,7 +9,8 @@ error: capture `@x` has incompatible types across branches
   |
 2 |   (identifier) @x
   |                ^^
-3 |   (number)* @x
+3 |   {(string) @x} @row
+4 |   (number)* @x
   |             -- and a different type here
   |
 help: make every branch produce the same type, or label the branches for an enum

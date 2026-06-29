@@ -1,9 +1,9 @@
 Bad = {(identifier) @c}+
 ==== diagnostics ====
-error: quantifier `+` contains captures (`@c`) but has no struct capture
+error: captures `@c` repeat with `+` but aren't collected into a list
  --> query.ptk:1:7
   |
 1 | Bad = {(identifier) @c}+
   |       ^^^^^^^^^^^^^^^^^^
   |
-help: add a struct capture: `{...}+ @name`
+help: add a row capture so each repeat becomes one element: `{...}+ @items`

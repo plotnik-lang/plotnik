@@ -4,7 +4,7 @@ Q = {
   .
 }
 ==== diagnostics ====
-error: boundary anchor requires parent node context
+error: anchor needs an enclosing node
  --> query.ptk:2:3
   |
 2 |   .
@@ -12,7 +12,7 @@ error: boundary anchor requires parent node context
   |
 help: wrap in a named node: `(parent . (child))`
 
-error: boundary anchor requires parent node context
+error: anchor needs an enclosing node
  --> query.ptk:4:3
   |
 4 |   .

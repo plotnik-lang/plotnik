@@ -1,12 +1,14 @@
 [(a) ) (b)]
 ==== diagnostics ====
-error: expected closing ']' for alternation
+error: missing closing `]`
  --> query.ptk:1:6
   |
 1 | [(a) ) (b)]
   |      ^
+  |
+help: add `]` to close the alternation
 
-error: unexpected token
+error: expected a pattern
  --> query.ptk:1:11
   |
 1 | [(a) ) (b)]
