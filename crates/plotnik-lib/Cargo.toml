@@ -18,7 +18,7 @@ workspace = true
 
 [dependencies]
 annotate-snippets = "0.12.9"
-arborium-tree-sitter = "2.18.0"
+arborium-tree-sitter = "2.18.1"
 bitflags = "2"
 crc32fast = "1.4"
 indexmap = { version = "2", features = ["serde"] }
@@ -37,10 +37,10 @@ topological-sort = "0.2"
 default = []
 
 [dev-dependencies]
-arborium-dart = "2.18.0"
-arborium-javascript = "2.18.0"
-arborium-tree-sitter = "2.18.0"
-arborium-typescript = "2.18.0"
+arborium-dart = "2.18.1"
+arborium-javascript = "2.18.1"
+arborium-tree-sitter = "2.18.1"
+arborium-typescript = "2.18.1"
 cargo_metadata = "=0.23.1"
 insta = { version = "=1.48.0", features = ["yaml"] }
 indoc = "=2.0.7"
