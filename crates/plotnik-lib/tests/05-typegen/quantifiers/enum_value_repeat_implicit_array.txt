@@ -1,0 +1,16 @@
+Q = (program [
+  A: (expression_statement)
+  B: (lexical_declaration)
+]*)
+==== types ====
+export interface Q2A {
+  $tag: "A";
+}
+
+export interface Q2B {
+  $tag: "B";
+}
+
+export type Q2 = Q2A | Q2B;
+
+export type Q = Q2[];

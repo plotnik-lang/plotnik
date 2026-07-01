@@ -6,4 +6,4 @@ error: captures `@name` repeat with `*` but aren't collected into a list
 1 | Bad = (array (identifier) @name)*
   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
-help: add a row capture so each repeat becomes one element: `{...}* @items`
+help: add a row capture so each repeat becomes one element: `(...)* @items`

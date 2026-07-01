@@ -6,6 +6,7 @@
 use std::collections::HashSet;
 
 use crate::bytecode::{EffectKind, Nav};
+use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::analyze::types::{CaptureKind, TypeAnalysis, TypeShape};
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label};
@@ -210,6 +211,21 @@ impl NfaBuilder<'_> {
     ///
     /// For such refs, we skip the Node effect in captures - the Call leaves
     /// the structured result (Enum/Struct/Array) pending for Set to consume.
+    /// Whether an uncaptured repeated `pattern` produces a structured value per
+    /// iteration — an enum or a structured ref, inline or referenced — so the
+    /// quantifier must still open an array scope: the inferred type is an array
+    /// of those values even without an explicit row capture. Capture-carrying
+    /// values are rejected by strict dimensionality before lowering ever runs;
+    /// this gate keeps the capture-free ones (and mid-inference self-recursive
+    /// refs, which escape that check) sound.
+    pub(super) fn quantified_value_needs_array(&self, inner: &Pattern) -> bool {
+        let info = self.ctx.analysis.type_analysis.expect_pattern_result(inner);
+        match &info.flow {
+            PatternFlow::Value(t) => self.ctx.analysis.type_analysis.is_structured_output(*t),
+            _ => false,
+        }
+    }
+
     pub(super) fn is_ref_returning_structured(&self, pattern: &Pattern) -> bool {
         match pattern {
             Pattern::DefRef(_) => self.ctx.analysis.type_analysis.ref_returns_structured(

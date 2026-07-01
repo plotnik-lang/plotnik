@@ -190,10 +190,11 @@ impl NfaBuilder<'_> {
             capture,
         } = ctx;
 
-        // When the inner returns a structured type (enum/struct) and this is a star/plus
-        // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
-        // because the type system expects an array of these values.
-        let needs_implicit_array = quant.is_repeating() && self.is_ref_returning_structured(&inner);
+        // When the inner produces a structured value (an enum, inline or via ref)
+        // and this is a star/plus quantifier without explicit capture, we still
+        // need array scope (Arr/Push/EndArr) because the type system expects an
+        // array of these values.
+        let needs_implicit_array = quant.is_repeating() && self.quantified_value_needs_array(&inner);
 
         if needs_implicit_array {
             // No Set on the array itself — collect structured values via Push only.
@@ -317,10 +318,10 @@ impl NfaBuilder<'_> {
             QuantifierForm::Quantified { inner, kind } => (inner, kind),
         };
 
-        // When the inner returns a structured type (enum/struct) and this is a star/plus
-        // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
-        // with split exits for the skip/match paths.
-        let needs_implicit_array = quant.is_repeating() && self.is_ref_returning_structured(&inner);
+        // When the inner produces a structured value (an enum, inline or via ref)
+        // and this is a star/plus quantifier without explicit capture, we still
+        // need array scope (Arr/Push/EndArr) with split exits for the skip/match paths.
+        let needs_implicit_array = quant.is_repeating() && self.quantified_value_needs_array(&inner);
 
         if needs_implicit_array {
             let quant_pattern = Pattern::QuantifiedPattern(quant.clone());

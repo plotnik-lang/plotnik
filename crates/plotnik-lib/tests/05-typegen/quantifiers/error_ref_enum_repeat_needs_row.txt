@@ -1,14 +1,10 @@
-A = [
-  X: (identifier) @x
-  Y: (number) @y
-]
-
-Q = (arguments (A)+)
+Item = [A: (identifier) @id]
+Bad = (program (Item)+)
 ==== diagnostics ====
 error: each `+` repeat produces a value, but the values aren't collected into a list
- --> query.ptk:6:16
+ --> query.ptk:2:16
   |
-6 | Q = (arguments (A)+)
-  |                ^^^^
+2 | Bad = (program (Item)+)
+  |                ^^^^^^^
   |
 help: add a row capture so each repeat becomes one element: `(...)+ @items`

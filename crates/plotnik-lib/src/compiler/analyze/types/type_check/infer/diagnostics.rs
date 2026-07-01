@@ -66,33 +66,58 @@ impl InferVisitor<'_, '_> {
         true
     }
 
-    /// Report repeated inner captures that need an enclosing row capture.
+    /// Report repeated inner output that needs an enclosing row capture.
+    ///
+    /// Fires for both flavors of per-repeat captured output: bubbling capture
+    /// fields (`Fields`) and capture-carrying values (`Value` of an enum whose
+    /// payloads hold captures, or a ref to one). Either way each repeat produces
+    /// captured data with no list to collect it into (#495). Capture-free values
+    /// are exempt — the lowering collects those into an implicit array.
     pub(super) fn report_internal_capture_dimensionality(
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
     ) {
-        let PatternFlow::Fields(type_id) = &inner_info.flow else {
-            return;
+        let type_ctx = self.ctx.type_ctx.in_progress();
+        let raw_names: Vec<String> = match &inner_info.flow {
+            PatternFlow::Fields(type_id) => {
+                let fields = type_ctx.expect_struct_fields(*type_id);
+                if fields.is_empty() {
+                    return;
+                }
+                fields
+                    .keys()
+                    .map(|s| self.ctx.interner.resolve(*s).to_string())
+                    .collect()
+            }
+            // A capture-free repeated value (`[A: (x) B: (y)]*`, `(CaptureFreeDef)+`)
+            // is collected by the lowering's implicit array and needs no row capture.
+            // Only capture-carrying values fall under strict dimensionality. Enum
+            // payloads own their captures, so the fields map is empty here; name the
+            // captures the user can see in the repeated pattern instead.
+            PatternFlow::Value(type_id) if type_ctx.value_carries_captures(*type_id) => {
+                visible_capture_names(quant)
+            }
+            _ => return,
         };
 
-        let type_ctx = self.ctx.type_ctx.in_progress();
-        let fields = type_ctx.expect_struct_fields(*type_id);
-        if fields.is_empty() {
-            return;
-        }
-
-        let raw_names: Vec<String> = fields
-            .keys()
-            .map(|s| self.ctx.interner.resolve(*s).to_string())
-            .collect();
-        let captures_str = raw_names
-            .iter()
-            .map(|n| format!("`@{}`", n))
-            .collect::<Vec<_>>()
-            .join(", ");
-
         let op = self.quantifier_operator(quant);
+        let detail = if raw_names.is_empty() {
+            format!(
+                "each `{}` repeat produces a value, but the values aren't collected into a list",
+                op
+            )
+        } else {
+            let captures_str = raw_names
+                .iter()
+                .map(|n| format!("`@{}`", n))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "captures {} repeat with `{}` but aren't collected into a list",
+                captures_str, op
+            )
+        };
 
         // The suggestion lands beside sibling captures, so avoid names bound there.
         let mut taken = raw_names;
@@ -105,17 +130,15 @@ impl InferVisitor<'_, '_> {
                 .filter_map(|tok| tok.text().get(1..).map(str::to_owned)),
         );
         let placeholder = fresh_capture_name(&taken);
+        let brackets = row_capture_brackets(quant);
         self.report(
             DiagnosticKind::StrictDimensionalityViolation,
             quant.text_range(),
         )
-        .detail(format!(
-            "captures {} repeat with `{}` but aren't collected into a list",
-            captures_str, op
-        ))
+        .detail(detail)
         .hint(format!(
-            "add a row capture so each repeat becomes one element: `{{...}}{} @{}`",
-            op, placeholder
+            "add a row capture so each repeat becomes one element: `{}{} @{}`",
+            brackets, op, placeholder
         ))
         .emit();
     }
@@ -187,6 +210,35 @@ impl InferVisitor<'_, '_> {
             .operator()
             .map(|t| t.text().to_string())
             .unwrap_or_else(|| "*".to_string())
+    }
+}
+
+/// Source-order capture names visible in the quantified pattern, for naming
+/// the repeats in a dimensionality diagnostic. Suppressive `@_` captures
+/// produce no output, so they are excluded.
+fn visible_capture_names(quant: &QuantifiedPattern) -> Vec<String> {
+    let mut tokens = Vec::new();
+    direct_scope_capture_tokens(quant.syntax(), &mut tokens);
+    let mut names: Vec<String> = Vec::new();
+    for tok in tokens {
+        let Some(name) = tok.text().get(1..) else {
+            continue;
+        };
+        if name != "_" && !names.iter().any(|n| n == name) {
+            names.push(name.to_owned());
+        }
+    }
+    names
+}
+
+/// The bracket shorthand for the row-capture hint, matching the shape the
+/// user actually wrote: `[...]` for alternations, `(...)` for nodes and refs,
+/// `{...}` for sequences (and anything else).
+fn row_capture_brackets(quant: &QuantifiedPattern) -> &'static str {
+    match quant.inner() {
+        Some(Pattern::Union(_) | Pattern::Enum(_)) => "[...]",
+        Some(Pattern::DefRef(_) | Pattern::NodePattern(_)) => "(...)",
+        _ => "{...}",
     }
 }
 

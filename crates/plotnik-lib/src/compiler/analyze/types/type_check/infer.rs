@@ -659,10 +659,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 PatternFlow::Value(array_type)
             }
             PatternFlow::Fields(struct_type) => {
-                // `report_internal_capture_dimensionality` already emitted an error for
-                // this case (Fields under * or + without a row capture). We still
-                // produce a plausible array type so downstream inference isn't poisoned
-                // by void.
+                // In `Bare` mode `report_internal_capture_dimensionality` already
+                // emitted an error for this case (per-repeat output under * or +
+                // without a row capture — same for structured `Value` flow above).
+                // We still produce a plausible array type so downstream inference
+                // isn't poisoned by void.
                 let array_type = self.ctx.type_ctx.intern_type(TypeShape::Array {
                     element: struct_type,
                     non_empty,

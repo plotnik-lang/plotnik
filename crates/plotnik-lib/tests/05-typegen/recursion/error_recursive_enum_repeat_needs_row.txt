@@ -1,0 +1,13 @@
+Expr = [
+  Lit: (number) @n
+  Rec: (parenthesized_expression (Expr))
+]
+Bad = (expression_statement (Expr)*)
+==== diagnostics ====
+error: each `*` repeat produces a value, but the values aren't collected into a list
+ --> query.ptk:5:29
+  |
+5 | Bad = (expression_statement (Expr)*)
+  |                             ^^^^^^^
+  |
+help: add a row capture so each repeat becomes one element: `(...)* @items`

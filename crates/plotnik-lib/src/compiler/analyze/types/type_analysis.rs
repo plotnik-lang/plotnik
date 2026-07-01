@@ -11,7 +11,7 @@
 //! owned by `DependencyAnalysis` and read from there. This artifact only maps the
 //! `DefId`s that analysis already assigned to the types it inferred for them.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::compiler::analyze::types::type_shape::{
     Arity, FieldInfo, PatternFlow, PatternShape, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
@@ -83,6 +83,40 @@ impl TypeAnalysis {
             Some(shape @ (TypeShape::Array { .. } | TypeShape::Optional(_))) => shape
                 .child_type_ids()
                 .any(|id| id != TYPE_NODE && self.is_structured_output(id)),
+            _ => false,
+        }
+    }
+
+    /// Whether a value of this type embeds captured data — a non-empty struct
+    /// somewhere inside — as opposed to carrying only tags and matched nodes.
+    ///
+    /// Distinguishes the two repeated-value cases under a bare `*`/`+`: a
+    /// capture-free value (e.g. `[A: (x) B: (y)]`) may be collected into an
+    /// implicit array, while a capture-carrying one falls under strict
+    /// dimensionality and needs an explicit row capture (#495).
+    ///
+    /// A `Ref` whose definition is still being inferred (a self-recursive
+    /// reference mid-pass) reports `false`; the lowering's implicit-array
+    /// scope keeps that case sound regardless.
+    pub fn value_carries_captures(&self, type_id: TypeId) -> bool {
+        self.value_carries_captures_inner(type_id, &mut HashSet::new())
+    }
+
+    fn value_carries_captures_inner(&self, type_id: TypeId, seen: &mut HashSet<TypeId>) -> bool {
+        if !seen.insert(type_id) {
+            return false;
+        }
+        match self.type_shape(type_id) {
+            Some(TypeShape::Struct(fields)) => !fields.is_empty(),
+            Some(TypeShape::Enum(variants)) => variants
+                .values()
+                .any(|&payload| self.value_carries_captures_inner(payload, seen)),
+            Some(TypeShape::Ref(def_id)) => self
+                .def_output(*def_id)
+                .is_some_and(|t| self.value_carries_captures_inner(t, seen)),
+            Some(shape @ (TypeShape::Array { .. } | TypeShape::Optional(_))) => shape
+                .child_type_ids()
+                .any(|id| self.value_carries_captures_inner(id, seen)),
             _ => false,
         }
     }
@@ -226,6 +260,10 @@ impl TypeAnalysisView<'_> {
 
     pub(crate) fn is_structured_output(&self, type_id: TypeId) -> bool {
         self.analysis.is_structured_output(type_id)
+    }
+
+    pub(crate) fn value_carries_captures(&self, type_id: TypeId) -> bool {
+        self.analysis.value_carries_captures(type_id)
     }
 
     pub(crate) fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternShape> {
