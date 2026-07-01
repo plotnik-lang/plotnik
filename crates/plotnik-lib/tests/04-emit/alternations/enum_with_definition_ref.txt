@@ -51,13 +51,10 @@ Inner:
   08                                        ▶
 
 Test:
-  09  -ε-                                   21, 24
+  09  -ε-                                   16, 18
   11                                        ▶
-  12  -ε-  [Set(M4)]                        11
-  14  -ε-  [EnumClose]                      12
-  16  -ε-  [StructClose]                    14
-  18   !   (Inner)                          06 : 16
-  19  -ε-  [StructOpen]                     18
-  21  -ε-  [EnumOpen(M2)]                   19
-  23  ...
-  24   !   [EnumOpen(M3)] (number) [Node Set(M1) EnumClose Set(M4)]  11
+  12  -ε-  [StructClose EnumClose Set(M4)]  11
+  14   !   (Inner)                          06 : 12
+  15  ...
+  16  -ε-  [EnumOpen(M2) StructOpen]        14
+  18   !   [EnumOpen(M3)] (number) [Node Set(M1) EnumClose Set(M4)]  11

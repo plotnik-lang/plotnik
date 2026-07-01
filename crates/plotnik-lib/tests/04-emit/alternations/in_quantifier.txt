@@ -53,16 +53,14 @@ _StructWrap:
 Q:
   06   !   (object)                         08
   07  ...
-  08  -ε-  [ArrayOpen]                      28, 14
-  10  -ε-                                   11
-  11  ─‣┘  [ArrayClose Set(M5)] _           13
-  13                                        ▶
-  14  -ε-  [ArrayClose Set(M5)]             13
-  16  -ε-  [StructClose Push]               32, 10
-  18   !   [EnumOpen(M2)] (pair) [Node Set(M0) EnumClose Set(M4)]  16
-  21   !   [EnumOpen(M3)] (shorthand_property_identifier) [Node Set(M1) EnumClose Set(M4)]  16
-  24  -ε-  [StructOpen]                     18, 21
-  26  ─‣─  _                                24, 26
-  28  └‣─  _                                24, 26
-  30  ─‣─  _                                24, 30
-  32  ─‣─  _                                24, 30
+  08  -ε-  [ArrayOpen]                      26, 11
+  10                                        ▶
+  11  -ε-  [ArrayClose Set(M5)]             10
+  13  -ε-  [StructClose Push]               24, 28
+  15  ...
+  16   !   [EnumOpen(M2)] (pair) [Node Set(M0) EnumClose Set(M4)]  13
+  19   !   [EnumOpen(M3)] (shorthand_property_identifier) [Node Set(M1) EnumClose Set(M4)]  13
+  22  -ε-  [StructOpen]                     16, 19
+  24  ─‣─  _                                22, 24
+  26  └‣─  _                                22, 24
+  28  ─‣┘  [ArrayClose Set(M5)] _           10

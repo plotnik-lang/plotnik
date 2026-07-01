@@ -70,19 +70,18 @@ Q:
   06   !   (program)                        08
   07  ...
   08  └‣─  _                                26, 28
-  10                                        ▶
-  11  ─‣─  (expression_statement) [Node Set(M1)]  30
-  13   !   (expression_statement) [Node Set(M0)]  11
+  10  ─‣─  (expression_statement) [Node Set(M1)]  12
+  12  ─‣┘  [EnumClose] _                    14
+  14                                        ▶
   15  ...
-  16  ─‣─  (expression_statement) [Node Set(M1)]  30
-  18  ─‣─  (expression_statement) [Node Set(M0)]  16
+  16   !   (expression_statement) [Node Set(M0)]  10
+  18  ─‣─  (expression_statement) [Node Set(M0)]  10
   20   !   (comment)                        18
   21  ─‣─  _                                20, 21
   23  ...
   24   !   _                                20, 21
-  26  -ε-  [EnumOpen(M2)]                   24, 13
+  26  -ε-  [EnumOpen(M2)]                   24, 16
   28  ─‣─  _                                26, 28
-  30  ─‣┘  [EnumClose] _                    10
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -94,7 +93,7 @@ Q:
        ●   program
   08       _                                26, 28
        ●   expression_statement
-  26  -ε-  [EnumOpen(M2)]                   24, 13
+  26  -ε-  [EnumOpen(M2)]                   24, 16
   24       _                                20, 21
        ●   expression_statement
   20       (comment)                        18
@@ -107,13 +106,13 @@ Q:
   21  ❮❮❮ 
   21       _                                20, 21
   26  ❮❮❮ 
-  13       (expression_statement) [Node Set(M0)]  11
+  16       (expression_statement) [Node Set(M0)]  10
        ●   expression_statement
-  11       (expression_statement) [Node Set(M1)]  30
+  10       (expression_statement) [Node Set(M1)]  12
        ●   expression_statement
-  30       [EnumClose] _                    10
+  12       [EnumClose] _                    14
        ●   program
-  10   ◀   (Q)                              
+  14   ◀   (Q)                              
 
 _StructWrap:
   03  -ε-  [StructClose]                    05

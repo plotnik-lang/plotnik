@@ -34,10 +34,8 @@ Q:
   08  -ε-  [ArrayOpen]                      18, 11
   10                                        ▶
   11  -ε-  [ArrayClose Set(M0)]             10
-  13   !   (decorator) [Node Push]          22, 24
+  13   !   (decorator) [Node Push]          16, 20
   15  ...
   16  ─‣─  _                                13, 16
   18  └‣─  _                                13, 16
-  20  ─‣─  _                                13, 20
-  22  ─‣─  _                                13, 20
-  24  ─‣┘  [ArrayClose Set(M0)] _           10
+  20  ─‣┘  [ArrayClose Set(M0)] _           10

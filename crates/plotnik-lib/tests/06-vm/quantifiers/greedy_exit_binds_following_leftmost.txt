@@ -60,16 +60,13 @@ _StructWrap:
 Q:
   06   !   (program)                        08
   07  ─‣┘  _                                10
-  08  -ε-  [ArrayOpen]                      24, 19
+  08  -ε-  [ArrayOpen]                      14, 11
   10                                        ▶
   11  └‣─  [ArrayClose Set(M0)] (_) [Node Set(M1)]  07
-  14  ─‣─  _                                20, 26
+  14  └‣─  _                                19, 21
   16  ─‣─  [ArrayClose Set(M0)] (_) [Node Set(M1)]  07
-  19  -ε-                                   11
-  20   !   (lexical_declaration) [Node Push]  14, 16
-  22  ─‣─  _                                20, 22
-  24  └‣─  _                                20, 22
-  26  ─‣─  _                                20, 26
+  19   !   (lexical_declaration) [Node Push]  21, 16
+  21  ─‣─  _                                19, 21
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -79,23 +76,23 @@ _StructWrap:
 Q:
   06       (program)                        08
        ●   program
-  08  -ε-  [ArrayOpen]                      24, 19
-  24       _                                20, 22
+  08  -ε-  [ArrayOpen]                      14, 11
+  14       _                                19, 21
        ●   lexical_declaration
-  20       (lexical_declaration) [Node Push]  14, 16
+  19       (lexical_declaration) [Node Push]  21, 16
        ●   lexical_declaration
-  14       _                                20, 26
+  21       _                                19, 21
        ●   expression_statement
-  20       (lexical_declaration) [Node Push]  14, 16
+  19       (lexical_declaration) [Node Push]  21, 16
        ○   expression_statement
-  14  ❮❮❮ 
-  26       _                                20, 26
+  21  ❮❮❮ 
+  21       _                                19, 21
        ●   expression_statement
-  20       (lexical_declaration) [Node Push]  14, 16
+  19       (lexical_declaration) [Node Push]  21, 16
        ○   expression_statement
-  26  ❮❮❮ 
-  26       _                                20, 26
-  20  ❮❮❮ 
+  21  ❮❮❮ 
+  21       _                                19, 21
+  19  ❮❮❮ 
   16       [ArrayClose Set(M0)] (_) [Node Set(M1)]  07
        ●   expression_statement
   07       _                                10

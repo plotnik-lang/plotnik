@@ -63,14 +63,12 @@ Q:
   08  -ε-  [ArrayOpen]                      21, 11
   10                                        ▶
   11  -ε-  [ArrayClose]                     10
-  13   !   [EnumOpen(M0)] (expression_statement) [EnumClose Push]  26, 28
-  16   !   [EnumOpen(M1)] (lexical_declaration) [EnumClose Push]  26, 28
+  13   !   [EnumOpen(M0)] (expression_statement) [EnumClose Push]  19, 24
+  16   !   [EnumOpen(M1)] (lexical_declaration) [EnumClose Push]  19, 24
   19  ─‣─  _                                13, 16, 19
   21  └‣─  _                                13, 16, 19
   23  ...
-  24  ─‣─  _                                13, 16, 24
-  26  ─‣─  _                                13, 16, 24
-  28  ─‣┘  [ArrayClose] _                   10
+  24  ─‣┘  [ArrayClose] _                   10
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -83,18 +81,18 @@ Q:
   08  -ε-  [ArrayOpen]                      21, 11
   21       _                                13, 16, 19
        ●   expression_statement
-  13       [EnumOpen(M0)] (expression_statement) [EnumClose Push]  26, 28
+  13       [EnumOpen(M0)] (expression_statement) [EnumClose Push]  19, 24
        ●   expression_statement
-  26       _                                13, 16, 24
+  19       _                                13, 16, 19
        ●   lexical_declaration
-  13       [EnumOpen(M0)] (expression_statement) [EnumClose Push]  26, 28
+  13       [EnumOpen(M0)] (expression_statement) [EnumClose Push]  19, 24
        ○   lexical_declaration
-  26  ❮❮❮ 
-  16       [EnumOpen(M1)] (lexical_declaration) [EnumClose Push]  26, 28
+  19  ❮❮❮ 
+  16       [EnumOpen(M1)] (lexical_declaration) [EnumClose Push]  19, 24
        ●   lexical_declaration
-  26       _                                13, 16, 24
+  19       _                                13, 16, 19
   16  ❮❮❮ 
-  28       [ArrayClose] _                   10
+  24       [ArrayClose] _                   10
        ●   program
   10   ◀   (Q)                              
 

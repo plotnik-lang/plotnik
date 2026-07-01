@@ -72,23 +72,20 @@ _StructWrap:
 
 Q:
   06   !   (program)                        08
-  07  ...
-  08  └‣─  _                                29, 32
-  10  └‣─  (call_expression) [Node Set(M0)]  12
-  12  ─‣┘  _                                21
-  13                                        ▶
-  14  ─‣─  (expression_statement) [Node Set(M2)]  34
-  16   !   [Null Set(M0)] (expression_statement) [Node Set(M1)]  14
-  19  ─‣─  (expression_statement) [Node Set(M2)]  34
-  21  ─‣─  (expression_statement) [Node Set(M1)]  19
-  23  -ε-                                   16
-  24   !   (expression_statement)           10
-  25  ─‣─  _                                24, 25
-  27   !   _                                24, 25
-  29  -ε-  [EnumOpen(M3)]                   27, 23
-  31  ...
-  32  ─‣─  _                                29, 32
-  34  ─‣┘  [EnumClose] _                    13
+  07                                        ▶
+  08  └‣─  _                                28, 30
+  10  ─‣─  (expression_statement) [Node Set(M2)]  12
+  12  ─‣┘  [EnumClose] _                    07
+  14  └‣─  (call_expression) [Node Set(M0)]  16
+  16  ─‣┘  _                                20
+  17   !   [Null Set(M0)] (expression_statement) [Node Set(M1)]  10
+  20  ─‣─  (expression_statement) [Node Set(M1)]  10
+  22   !   (expression_statement)           14
+  23  ...
+  24  ─‣─  _                                22, 24
+  26   !   _                                22, 24
+  28  -ε-  [EnumOpen(M3)]                   26, 17
+  30  ─‣─  _                                28, 30
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -98,35 +95,34 @@ _StructWrap:
 Q:
   06       (program)                        08
        ●   program
-  08       _                                29, 32
+  08       _                                28, 30
        ●   expression_statement
-  29  -ε-  [EnumOpen(M3)]                   27, 23
-  27       _                                24, 25
+  28  -ε-  [EnumOpen(M3)]                   26, 17
+  26       _                                22, 24
        ●   expression_statement
-  24       (expression_statement)           10
+  22       (expression_statement)           14
        ●   expression_statement
-  10       (call_expression) [Node Set(M0)]  12
+  14       (call_expression) [Node Set(M0)]  16
        ○   identifier
        ○   ;
-  27  ❮❮❮ 
-  25       _                                24, 25
+  26  ❮❮❮ 
+  24       _                                22, 24
        ●   expression_statement
-  24       (expression_statement)           10
+  22       (expression_statement)           14
        ●   expression_statement
-  10       (call_expression) [Node Set(M0)]  12
+  14       (call_expression) [Node Set(M0)]  16
        ○   identifier
        ○   ;
-  25  ❮❮❮ 
-  25       _                                24, 25
-  29  ❮❮❮ 
-  23  -ε-                                   16
-  16       [Null Set(M0)] (expression_statement) [Node Set(M1)]  14
+  24  ❮❮❮ 
+  24       _                                22, 24
+  28  ❮❮❮ 
+  17       [Null Set(M0)] (expression_statement) [Node Set(M1)]  10
        ●   expression_statement
-  14       (expression_statement) [Node Set(M2)]  34
+  10       (expression_statement) [Node Set(M2)]  12
        ●   expression_statement
-  34       [EnumClose] _                    13
+  12       [EnumClose] _                    07
        ●   program
-  13   ◀   (Q)                              
+  07   ◀   (Q)                              
 
 _StructWrap:
   03  -ε-  [StructClose]                    05

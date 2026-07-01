@@ -1,6 +1,6 @@
 use super::*;
 use crate::bytecode::Nav;
-use crate::compiler::lower::ir::EffectIR;
+use crate::compiler::lower::ir::{CallIR, CalleeEntry, EffectIR, ReturnAddr, ReturnIR};
 
 fn make_epsilon(label: u32, succs: Vec<u32>) -> InstructionIR {
     InstructionIR::Match(
@@ -191,6 +191,91 @@ fn laser_vision_multi_succ_effectless_only() {
     };
     assert_eq!(m0.successors, vec![Label(1), Label(3)]);
     assert!(m0.post_effects.is_empty());
+}
+
+#[test]
+fn laser_vision_epsilon_source_absorbs_chain() {
+    // 0 (ε+Struct pre) → 1 (ε+EndStruct post) → 2 (match)
+    // The head epsilon absorbs the chain: 0 (ε, pre Struct, post EndStruct) → 2
+    let instructions = vec![
+        make_epsilon_with_pre(0, vec![1]),
+        make_epsilon_with_post(1, vec![2]),
+        make_match(2, Nav::Next, vec![]),
+    ];
+
+    let mut result = NfaGraph {
+        instructions,
+        def_entries: indexmap::IndexMap::new(),
+        preamble_entry: Label(0),
+    };
+
+    laser_vision(&mut result);
+
+    let m0 = match &result.instructions[0] {
+        InstructionIR::Match(m) => m,
+        _ => panic!(),
+    };
+    assert_eq!(m0.successors, vec![Label(2)]);
+    assert_eq!(m0.pre_effects.len(), 1);
+    assert_eq!(m0.post_effects.len(), 1);
+}
+
+#[test]
+fn laser_vision_branching_epsilon_skips_pure_jump() {
+    // 0 (ε+Struct pre, branching) → [1 (ε pure) → 3, 4]
+    // The pure jump is bypassed per-successor; effects stay on the branch point.
+    let instructions = vec![
+        make_epsilon_with_pre(0, vec![1, 4]),
+        make_epsilon(1, vec![3]),
+        make_match(3, Nav::Next, vec![]),
+        make_match(4, Nav::Next, vec![]),
+    ];
+
+    let mut result = NfaGraph {
+        instructions,
+        def_entries: indexmap::IndexMap::new(),
+        preamble_entry: Label(0),
+    };
+
+    laser_vision(&mut result);
+
+    let m0 = match &result.instructions[0] {
+        InstructionIR::Match(m) => m,
+        _ => panic!(),
+    };
+    assert_eq!(m0.successors, vec![Label(3), Label(4)]);
+    assert_eq!(m0.pre_effects.len(), 1);
+    assert!(m0.post_effects.is_empty());
+}
+
+#[test]
+fn epsilon_chain_around_call_coalesces() {
+    // Scope brackets around a Call ride separate epsilons (CallIR carries no
+    // effects). The chain head must absorb the rest:
+    // 0 (ε+Struct pre) → 1 (ε+EndStruct post) → 2 (call → 4, next 3)
+    let instructions = vec![
+        make_epsilon_with_pre(0, vec![1]),
+        make_epsilon_with_post(1, vec![2]),
+        CallIR::new(Label(2), ReturnAddr(Label(3)), CalleeEntry(Label(4))).into(),
+        make_match(3, Nav::Next, vec![]),
+        ReturnIR::new(Label(4)).into(),
+    ];
+
+    let mut result = NfaGraph {
+        instructions,
+        def_entries: indexmap::IndexMap::new(),
+        preamble_entry: Label(0),
+    };
+
+    eliminate_epsilons(&mut result);
+
+    let m0 = match &result.instructions[0] {
+        InstructionIR::Match(m) => m,
+        _ => panic!(),
+    };
+    assert_eq!(m0.successors, vec![Label(2)]);
+    assert_eq!(m0.pre_effects.len(), 1);
+    assert_eq!(m0.post_effects.len(), 1);
 }
 
 #[test]

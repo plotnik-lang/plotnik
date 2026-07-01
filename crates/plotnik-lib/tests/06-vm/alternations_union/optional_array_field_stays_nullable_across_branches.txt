@@ -57,23 +57,21 @@ _StructWrap:
 Q:
   06   !   (program)                        07
   07  └‣─  (expression_statement)           08
-  08  └‣─  _                                32, 34, 37
+  08  └‣─  _                                28, 32, 30
   10                                        ▶
   11  -ε-  [Null Set(M0)]                   15
-  13   !   (identifier) [Node Push]         22, 24
+  13   !   (identifier) [Node Push]         16, 20
   15  ─‣┘² _                                10
   16  ─‣─  _                                13, 16
   18  └‣─  [ArrayOpen] _                    13, 16
-  20  ─‣─  _                                13, 20
-  22  ─‣─  _                                13, 20
-  24  ─‣┘² [ArrayClose Set(M0)] _           15
-  26   !   (arguments)                      18
-  27  ─‣─  _                                26, 27
-  29  └‣─  _                                26, 27
-  31  ...
-  32   !   [Null Set(M1)] (call_expression)  29, 11
-  34   !   [Null Set(M0)] (identifier) [Node Set(M1)]  15
-  37  ─‣─  _                                32, 34, 37
+  20  ─‣┘² [ArrayClose Set(M0)] _           15
+  22   !   (arguments)                      18
+  23  ...
+  24  ─‣─  _                                22, 24
+  26  └‣─  _                                22, 24
+  28   !   [Null Set(M1)] (call_expression)  26, 11
+  30  ─‣─  _                                28, 32, 30
+  32   !   [Null Set(M0)] (identifier) [Node Set(M1)]  15
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -85,33 +83,33 @@ Q:
        ●   program
   07       (expression_statement)           08
        ●   expression_statement
-  08       _                                32, 34, 37
+  08       _                                28, 32, 30
        ●   call_expression
-  32       [Null Set(M1)] (call_expression)  29, 11
+  28       [Null Set(M1)] (call_expression)  26, 11
        ●   call_expression
-  29       _                                26, 27
+  26       _                                22, 24
        ●   identifier
-  26       (arguments)                      18
+  22       (arguments)                      18
        ○   identifier
-  29  ❮❮❮ 
-  27       _                                26, 27
+  26  ❮❮❮ 
+  24       _                                22, 24
        ●   arguments
-  26       (arguments)                      18
+  22       (arguments)                      18
        ●   arguments
   18       [ArrayOpen] _                    13, 16
        ●   (
-  13       (identifier) [Node Push]         22, 24
+  13       (identifier) [Node Push]         16, 20
        ○   (
   18  ❮❮❮ 
   16       _                                13, 16
        ●   )
-  13       (identifier) [Node Push]         22, 24
+  13       (identifier) [Node Push]         16, 20
        ○   )
   16  ❮❮❮ 
   16       _                                13, 16
-  27  ❮❮❮ 
-  27       _                                26, 27
-  32  ❮❮❮ 
+  24  ❮❮❮ 
+  24       _                                22, 24
+  28  ❮❮❮ 
   11  -ε-  [Null Set(M0)]                   15
   15       _                                10
        ●   program

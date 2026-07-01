@@ -67,20 +67,18 @@ _StructWrap:
 
 Q:
   06   !   (program)                        08
-  07                                        ▶
-  08  -ε-  [ArrayOpen]                      26, 17
-  10  -ε-                                   11
-  11  ─‣┘  [ArrayClose Set(M1)] _           07
-  13  └‣─  (identifier) =~ /^x/ [Node Set(M0)]  16
-  16  ─‣┘  _                                19
-  17  -ε-  [ArrayClose Set(M1)]             07
-  19  -ε-  [StructClose Push]               30, 10
-  21   !   [StructOpen] (expression_statement)  13
-  23  ...
-  24  ─‣─  _                                21, 24
-  26  └‣─  _                                21, 24
-  28  ─‣─  _                                21, 28
-  30  ─‣─  _                                21, 28
+  07  ...
+  08  -ε-  [ArrayOpen]                      24, 16
+  10  └‣─  (identifier) =~ /^x/ [Node Set(M0)]  13
+  13  ─‣┘  _                                18
+  14                                        ▶
+  15  ...
+  16  -ε-  [ArrayClose Set(M1)]             14
+  18  -ε-  [StructClose Push]               22, 26
+  20   !   [StructOpen] (expression_statement)  10
+  22  ─‣─  _                                20, 22
+  24  └‣─  _                                20, 22
+  26  ─‣┘  [ArrayClose Set(M1)] _           14
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -90,38 +88,37 @@ _StructWrap:
 Q:
   06       (program)                        08
        ●   program
-  08  -ε-  [ArrayOpen]                      26, 17
-  26       _                                21, 24
+  08  -ε-  [ArrayOpen]                      24, 16
+  24       _                                20, 22
        ●   expression_statement
-  21       [StructOpen] (expression_statement)  13
+  20       [StructOpen] (expression_statement)  10
        ●   expression_statement
-  13       (identifier) =~ /^x/ [Node Set(M0)]  16
+  10       (identifier) =~ /^x/ [Node Set(M0)]  13
        ●   identifier
-  16       _                                19
+  13       _                                18
        ●   expression_statement
-  19  -ε-  [StructClose Push]               30, 10
-  30       _                                21, 28
+  18  -ε-  [StructClose Push]               22, 26
+  22       _                                20, 22
        ●   expression_statement
-  21       [StructOpen] (expression_statement)  13
+  20       [StructOpen] (expression_statement)  10
        ●   expression_statement
-  13       (identifier) =~ /^x/ [Node Set(M0)]  16
+  10       (identifier) =~ /^x/ [Node Set(M0)]  13
        ○   ;
-  30  ❮❮❮ 
-  28       _                                21, 28
+  22  ❮❮❮ 
+  22       _                                20, 22
        ●   expression_statement
-  21       [StructOpen] (expression_statement)  13
+  20       [StructOpen] (expression_statement)  10
        ●   expression_statement
-  13       (identifier) =~ /^x/ [Node Set(M0)]  16
+  10       (identifier) =~ /^x/ [Node Set(M0)]  13
        ●   identifier
-  16       _                                19
+  13       _                                18
        ●   expression_statement
-  19  -ε-  [StructClose Push]               30, 10
-  30       _                                21, 28
-  19  ❮❮❮ 
-  10  -ε-                                   11
-  11       [ArrayClose Set(M1)] _           07
+  18  -ε-  [StructClose Push]               22, 26
+  22       _                                20, 22
+  18  ❮❮❮ 
+  26       [ArrayClose Set(M1)] _           14
        ●   program
-  07   ◀   (Q)                              
+  14   ◀   (Q)                              
 
 _StructWrap:
   03  -ε-  [StructClose]                    05

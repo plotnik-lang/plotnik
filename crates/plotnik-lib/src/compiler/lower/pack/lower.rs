@@ -72,10 +72,14 @@ impl Emitter {
 
     fn lower_match(&mut self, mut m: MatchIR) {
         if m.pre_effects.len() > MAX_PRE_EFFECTS {
-            let all_pre = std::mem::take(&mut m.pre_effects);
+            // Keep the trailing MAX on the match itself (mirroring the post_effects
+            // drain below); only the leading overflow spills to the epsilon chain.
+            // The chain runs first, so the effect order is unchanged.
+            let split = m.pre_effects.len() - MAX_PRE_EFFECTS;
+            let overflow: Vec<EffectIR> = m.pre_effects.drain(..split).collect();
             let entry = m.label;
             m.label = self.fresh_label();
-            self.emit_effects_chain(entry, m.label, all_pre);
+            self.emit_effects_chain(entry, m.label, overflow);
         }
 
         let post_chains = drain_post_chains(&mut m);

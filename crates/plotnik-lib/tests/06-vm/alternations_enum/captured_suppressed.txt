@@ -46,8 +46,8 @@ Q:
   10   !   [SuppressBegin] (expression_statement)  12
   12  ─‣┘  [SuppressEnd EnumClose] _        14
   14                                        ▶
-  15  -ε-                                   10
-  16  -ε-  [EnumOpen(M0)]                   15
+  15  ...
+  16  -ε-  [EnumOpen(M0)]                   10
   18  ─‣─  _                                16, 18
 ==== trace ====
 _StructWrap:
@@ -60,8 +60,7 @@ Q:
        ●   program
   08       _                                16, 18
        ●   expression_statement
-  16  -ε-  [EnumOpen(M0)]                   15
-  15  -ε-                                   10
+  16  -ε-  [EnumOpen(M0)]                   10
   10       [SuppressBegin] (expression_statement)  12
        ●   expression_statement
   12       [SuppressEnd EnumClose] _        14

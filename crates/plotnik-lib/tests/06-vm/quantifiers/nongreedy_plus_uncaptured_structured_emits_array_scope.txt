@@ -63,16 +63,13 @@ A:
 
 Q:
   09   !   (program)                        10
-  10  └‣─  [ArrayOpen] _                    19, 20
+  10  └‣─  [ArrayOpen] _                    18, 19
   12  ─•─  [ArrayClose] (debugger_statement)  14
   14  ─‣┘  _                                15
   15                                        ▶
-  16  -ε-                                   12
-  17  -ε-  [Push]                           16, 24
-  19   !   (A)                              06 : 17
-  20  ─‣─  _                                19, 20
-  22  ─‣─  _                                19, 22
-  24  ─‣─  _                                19, 22
+  16  -ε-  [Push]                           12, 19
+  18   !   (A)                              06 : 16
+  19  ─‣─  _                                18, 19
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -82,9 +79,9 @@ _StructWrap:
 Q:
   09       (program)                        10
        ●   program
-  10       [ArrayOpen] _                    19, 20
+  10       [ArrayOpen] _                    18, 19
        ●   expression_statement
-  19       (A)                              06 : 17
+  18       (A)                              06 : 16
        ▶   (A)
 
 A:
@@ -93,14 +90,13 @@ A:
   08   ◀   (A)                              
 
 Q:
-  17  -ε-  [Push]                           16, 24
-  16  -ε-                                   12
+  16  -ε-  [Push]                           12, 19
   12       [ArrayClose] (debugger_statement)  14
        ○   expression_statement
-  17  ❮❮❮ 
-  24       _                                19, 22
+  16  ❮❮❮ 
+  19       _                                18, 19
        ●   expression_statement
-  19       (A)                              06 : 17
+  18       (A)                              06 : 16
        ▶   (A)
 
 A:
@@ -109,8 +105,7 @@ A:
   08   ◀   (A)                              
 
 Q:
-  17  -ε-  [Push]                           16, 24
-  16  -ε-                                   12
+  16  -ε-  [Push]                           12, 19
   12       [ArrayClose] (debugger_statement)  14
        ●   debugger_statement
   14       _                                15

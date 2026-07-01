@@ -42,15 +42,13 @@ _StructWrap:
 Q:
   06   !   (array)                          08
   07  ...
-  08  -ε-  [ArrayOpen]                      24, 14
-  10  -ε-                                   11
-  11  ─‣┘  [ArrayClose Set(M2)] _           13
-  13                                        ▶
-  14  -ε-  [ArrayClose Set(M2)]             13
-  16  -ε-  [StructClose Push]               28, 10
-  18  ─‣─  (number) [Node Set(M1)]          16
-  20   !   [StructOpen] (identifier) [Node Set(M0)]  18
-  22  ─‣─  _                                20, 22
-  24  └‣─  _                                20, 22
-  26  ─‣─  _                                20, 26
-  28  ─‣─  _                                20, 26
+  08  -ε-  [ArrayOpen]                      22, 11
+  10                                        ▶
+  11  -ε-  [ArrayClose Set(M2)]             10
+  13  -ε-  [StructClose Push]               20, 24
+  15  ...
+  16  ─‣─  (number) [Node Set(M1)]          13
+  18   !   [StructOpen] (identifier) [Node Set(M0)]  16
+  20  ─‣─  _                                18, 20
+  22  └‣─  _                                18, 20
+  24  ─‣┘  [ArrayClose Set(M2)] _           10

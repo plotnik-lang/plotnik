@@ -56,30 +56,22 @@ _StructWrap:
   05                                        ▶
 
 Q:
-  06   !   (program)                        48, 42
+  06   !   (program)                        34, 28
   08  └‣─  (identifier) == "foo"            10
-  10  ─‣┘  _                                31
-  11  └‣─  (identifier) == "foo"            13
-  13  ─‣┘  _                                31
-  14  └‣─  (identifier) == "foo"            16
-  16  ─‣┘  _                                31
-  17                                        ▶
-  18  └•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
-  21  ─•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  11
-  24  -ε-                                   18
-  25  └•─  (debugger_statement) [Node Push]  21, 27
-  27  ─•─  (debugger_statement) [Node Push]  21, 27
-  29  -ε-  [ArrayOpen]                      24, 25
-  31  ─‣┘  _                                17
-  32  ─•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  14
-  35  -ε-                                   32
-  36  ─•─  (debugger_statement) [Node Push]  32, 38
-  38  ─•─  (debugger_statement) [Node Push]  32, 38
-  40  -ε-  [ArrayOpen]                      35, 36
-  42  -ε-  [Null Set(M0)]                   29
-  44   !   (lexical_declaration) [Node Set(M0)]  40
-  46  ─‣─  _                                44, 46
-  48  └‣─  _                                44, 46
+  10  ─‣┘  _                                11
+  11  ─‣┘  _                                12
+  12                                        ▶
+  13  └•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
+  16  ─•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
+  19  └•─  (debugger_statement) [Node Push]  16, 21
+  21  ─•─  (debugger_statement) [Node Push]  16, 21
+  23  ...
+  24  -ε-  [ArrayOpen]                      13, 19
+  26  -ε-  [ArrayOpen]                      16, 21
+  28  -ε-  [Null Set(M0)]                   24
+  30   !   (lexical_declaration) [Node Set(M0)]  26
+  32  ─‣─  _                                30, 32
+  34  └‣─  _                                30, 32
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -87,32 +79,31 @@ _StructWrap:
        ▶   (Q)
 
 Q:
-  06       (program)                        48, 42
+  06       (program)                        34, 28
        ●   program
-  48       _                                44, 46
+  34       _                                30, 32
        ●   expression_statement
-  44       (lexical_declaration) [Node Set(M0)]  40
+  30       (lexical_declaration) [Node Set(M0)]  26
        ○   expression_statement
-  48  ❮❮❮ 
-  46       _                                44, 46
+  34  ❮❮❮ 
+  32       _                                30, 32
        ●   debugger_statement
-  44       (lexical_declaration) [Node Set(M0)]  40
+  30       (lexical_declaration) [Node Set(M0)]  26
        ○   debugger_statement
-  46  ❮❮❮ 
-  46       _                                44, 46
+  32  ❮❮❮ 
+  32       _                                30, 32
        ●   expression_statement
-  44       (lexical_declaration) [Node Set(M0)]  40
+  30       (lexical_declaration) [Node Set(M0)]  26
        ○   expression_statement
-  46  ❮❮❮ 
-  46       _                                44, 46
+  32  ❮❮❮ 
+  32       _                                30, 32
   06  ❮❮❮ 
-  42  -ε-  [Null Set(M0)]                   29
-  29  -ε-  [ArrayOpen]                      24, 25
-  24  -ε-                                   18
-  18       [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
+  28  -ε-  [Null Set(M0)]                   24
+  24  -ε-  [ArrayOpen]                      13, 19
+  13       [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
        ●   expression_statement
   08       (identifier) == "foo"            10
        ○   ;
-  29  ❮❮❮ 
-  25       (debugger_statement) [Node Push]  21, 27
+  24  ❮❮❮ 
+  19       (debugger_statement) [Node Push]  16, 21
        ○   expression_statement

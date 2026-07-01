@@ -77,28 +77,25 @@ Q:
   06   !   (program)                        07
   07  └‣─  (expression_statement)           08
   08  └‣─  (array)                          09
-  09  -ε-  [ArrayOpen]                      44, 16
-  11  -ε-                                   12
-  12  ─‣┘  [ArrayClose Set(M2)] _           15
-  14                                        ▶
-  15  ─‣┘² _                                14
-  16  -ε-  [ArrayClose Set(M2)]             15
-  18  -ε-  [StructClose Push]               48, 11
-  20  -ε-  [Null Set(M0)]                   18
-  22   !   (identifier) [Node Set(M0)]      18
-  24  ─‣─  _                                22, 24
-  26   !   _                                22, 24
-  28  -ε-  [Null Set(M1)]                   26, 20
-  30  -ε-  [Null Set(M1)]                   18
-  32   !   (number) [Node Set(M1)]          18
-  34  ─‣─  _                                32, 34
-  36   !   _                                32, 34
-  38  -ε-  [Null Set(M0)]                   36, 30
-  40  -ε-  [StructOpen]                     28, 38
-  42  ─‣─  _                                40, 42
-  44  └‣─  _                                40, 42
-  46  ─‣─  _                                40, 46
-  48  ─‣─  _                                40, 46
+  09  -ε-  [ArrayOpen]                      40, 12
+  11                                        ▶
+  12  -ε-  [ArrayClose Set(M2)]             44
+  14  -ε-  [StructClose Push]               38, 42
+  16  -ε-  [Null Set(M0)]                   14
+  18   !   (identifier) [Node Set(M0)]      14
+  20  ─‣─  _                                18, 20
+  22   !   _                                18, 20
+  24  -ε-  [Null Set(M1)]                   22, 16
+  26  -ε-  [Null Set(M1)]                   14
+  28   !   (number) [Node Set(M1)]          14
+  30  ─‣─  _                                28, 30
+  32   !   _                                28, 30
+  34  -ε-  [Null Set(M0)]                   32, 26
+  36  -ε-  [StructOpen]                     24, 34
+  38  ─‣─  _                                36, 38
+  40  └‣─  _                                36, 38
+  42  ─‣┘  [ArrayClose Set(M2)] _           44
+  44  ─‣┘² _                                11
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -112,56 +109,55 @@ Q:
        ●   expression_statement
   08       (array)                          09
        ●   array
-  09  -ε-  [ArrayOpen]                      44, 16
-  44       _                                40, 42
+  09  -ε-  [ArrayOpen]                      40, 12
+  40       _                                36, 38
        ●   [
-  40  -ε-  [StructOpen]                     28, 38
-  28  -ε-  [Null Set(M1)]                   26, 20
-  26       _                                22, 24
+  36  -ε-  [StructOpen]                     24, 34
+  24  -ε-  [Null Set(M1)]                   22, 16
+  22       _                                18, 20
        ●   [
-  22       (identifier) [Node Set(M0)]      18
+  18       (identifier) [Node Set(M0)]      14
        ○   [
-  26  ❮❮❮ 
-  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
        ●   identifier
-  22       (identifier) [Node Set(M0)]      18
+  18       (identifier) [Node Set(M0)]      14
        ●   identifier
-  18  -ε-  [StructClose Push]               48, 11
-  48       _                                40, 46
+  14  -ε-  [StructClose Push]               38, 42
+  38       _                                36, 38
        ●   ,
-  40  -ε-  [StructOpen]                     28, 38
-  28  -ε-  [Null Set(M1)]                   26, 20
-  26       _                                22, 24
+  36  -ε-  [StructOpen]                     24, 34
+  24  -ε-  [Null Set(M1)]                   22, 16
+  22       _                                18, 20
        ●   ,
-  22       (identifier) [Node Set(M0)]      18
+  18       (identifier) [Node Set(M0)]      14
        ○   ,
-  26  ❮❮❮ 
-  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
        ●   identifier
-  22       (identifier) [Node Set(M0)]      18
+  18       (identifier) [Node Set(M0)]      14
        ●   identifier
-  18  -ε-  [StructClose Push]               48, 11
-  48       _                                40, 46
+  14  -ε-  [StructClose Push]               38, 42
+  38       _                                36, 38
        ●   ]
-  40  -ε-  [StructOpen]                     28, 38
-  28  -ε-  [Null Set(M1)]                   26, 20
-  26       _                                22, 24
+  36  -ε-  [StructOpen]                     24, 34
+  24  -ε-  [Null Set(M1)]                   22, 16
+  22       _                                18, 20
        ●   ]
-  22       (identifier) [Node Set(M0)]      18
+  18       (identifier) [Node Set(M0)]      14
        ○   ]
-  26  ❮❮❮ 
-  24       _                                22, 24
-  28  ❮❮❮ 
-  20  -ε-  [Null Set(M0)]                   18
-  18  -ε-  [StructClose Push]               48, 11
-  48       _                                40, 46
-  18  ❮❮❮ 
-  11  -ε-                                   12
-  12       [ArrayClose Set(M2)] _           15
+  22  ❮❮❮ 
+  20       _                                18, 20
+  24  ❮❮❮ 
+  16  -ε-  [Null Set(M0)]                   14
+  14  -ε-  [StructClose Push]               38, 42
+  38       _                                36, 38
+  14  ❮❮❮ 
+  42       [ArrayClose Set(M2)] _           44
        ●   array
-  15       _                                14
+  44       _                                11
        ●   program
-  14   ◀   (Q)                              
+  11   ◀   (Q)                              
 
 _StructWrap:
   03  -ε-  [StructClose]                    05

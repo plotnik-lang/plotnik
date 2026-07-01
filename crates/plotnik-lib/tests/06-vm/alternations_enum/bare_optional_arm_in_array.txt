@@ -73,21 +73,19 @@ _StructWrap:
 Q:
   06   !   (program)                        08
   07  ...
-  08  -ε-  [ArrayOpen]                      30, 14
-  10  -ε-                                   11
-  11  ─‣┘  [ArrayClose Set(M2)] _           13
-  13                                        ▶
-  14  -ε-  [ArrayClose Set(M2)]             13
-  16  -ε-  [EnumClose Push]                 34, 10
-  18  -ε-  [Null Set(M0)]                   16
-  20   !   (comment) [Node Set(M0)]         16
-  22  ─‣─  _                                20, 22
-  24   !   _                                20, 22
-  26  -ε-  [EnumOpen(M1)]                   24, 18
-  28  ─‣─  _                                26, 28
-  30  └‣─  _                                26, 28
-  32  ─‣─  _                                26, 32
-  34  ─‣─  _                                26, 32
+  08  -ε-  [ArrayOpen]                      28, 11
+  10                                        ▶
+  11  -ε-  [ArrayClose Set(M2)]             10
+  13  -ε-  [EnumClose Push]                 26, 30
+  15  ...
+  16  -ε-  [Null Set(M0)]                   13
+  18   !   (comment) [Node Set(M0)]         13
+  20  ─‣─  _                                18, 20
+  22   !   _                                18, 20
+  24  -ε-  [EnumOpen(M1)]                   22, 16
+  26  ─‣─  _                                24, 26
+  28  └‣─  _                                24, 26
+  30  ─‣┘  [ArrayClose Set(M2)] _           10
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -97,33 +95,32 @@ _StructWrap:
 Q:
   06       (program)                        08
        ●   program
-  08  -ε-  [ArrayOpen]                      30, 14
-  30       _                                26, 28
+  08  -ε-  [ArrayOpen]                      28, 11
+  28       _                                24, 26
        ●   comment
-  26  -ε-  [EnumOpen(M1)]                   24, 18
-  24       _                                20, 22
+  24  -ε-  [EnumOpen(M1)]                   22, 16
+  22       _                                18, 20
        ●   comment
-  20       (comment) [Node Set(M0)]         16
+  18       (comment) [Node Set(M0)]         13
        ●   comment
-  16  -ε-  [EnumClose Push]                 34, 10
-  34       _                                26, 32
+  13  -ε-  [EnumClose Push]                 26, 30
+  26       _                                24, 26
        ●   expression_statement
-  26  -ε-  [EnumOpen(M1)]                   24, 18
-  24       _                                20, 22
+  24  -ε-  [EnumOpen(M1)]                   22, 16
+  22       _                                18, 20
        ●   expression_statement
-  20       (comment) [Node Set(M0)]         16
+  18       (comment) [Node Set(M0)]         13
        ○   expression_statement
+  22  ❮❮❮ 
+  20       _                                18, 20
   24  ❮❮❮ 
-  22       _                                20, 22
-  26  ❮❮❮ 
-  18  -ε-  [Null Set(M0)]                   16
-  16  -ε-  [EnumClose Push]                 34, 10
-  34       _                                26, 32
-  16  ❮❮❮ 
-  10  -ε-                                   11
-  11       [ArrayClose Set(M2)] _           13
+  16  -ε-  [Null Set(M0)]                   13
+  13  -ε-  [EnumClose Push]                 26, 30
+  26       _                                24, 26
+  13  ❮❮❮ 
+  30       [ArrayClose Set(M2)] _           10
        ●   program
-  13   ◀   (Q)                              
+  10   ◀   (Q)                              
 
 _StructWrap:
   03  -ε-  [StructClose]                    05

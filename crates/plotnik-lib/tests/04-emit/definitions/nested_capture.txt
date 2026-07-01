@@ -48,20 +48,14 @@ Inner:
 
 Outer:
   12   !   (array)                          13
-  13  -ε-  [ArrayOpen]                      36, 19
-  15  -ε-                                   16
-  16  ─‣┘  [ArrayClose Set(M2)] _           18
-  18                                        ▶
-  19  -ε-  [ArrayClose Set(M2)]             18
-  21  -ε-  [StructClose Push]               40, 15
+  13  -ε-  [ArrayOpen]                      28, 16
+  15                                        ▶
+  16  -ε-  [ArrayClose Set(M2)]             15
+  18  -ε-  [StructClose Push]               26, 30
+  20  -ε-  [StructClose Set(M1)]            18
+  22   !   (Inner)                          06 : 20
   23  ...
-  24  -ε-  [Set(M1)]                        21
-  26  -ε-  [StructClose]                    24
-  28   !   (Inner)                          06 : 26
-  29  -ε-  [StructOpen]                     28
-  31  ...
-  32  -ε-  [StructOpen]                     29
-  34  ─‣─  _                                32, 34
-  36  └‣─  _                                32, 34
-  38  ─‣─  _                                32, 38
-  40  ─‣─  _                                32, 38
+  24  -ε-  [StructOpen] [StructOpen]        22
+  26  ─‣─  _                                24, 26
+  28  └‣─  _                                24, 26
+  30  ─‣┘  [ArrayClose Set(M2)] _           15

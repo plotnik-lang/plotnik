@@ -5,7 +5,8 @@
 //!
 //! 1. **Forward migration**: Effectful epsilons push effects to exclusive successors
 //! 2. **Expand branching**: Effectless branching epsilons expanded into predecessors
-//! 3. **Laser vision**: Instructions look through epsilon chains, absorbing or bypassing
+//! 3. **Laser vision**: Every instruction (epsilons included) looks through epsilon
+//!    chains, absorbing or bypassing
 //!
 //! Phases iterate until no changes occur.
 
@@ -218,6 +219,14 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
 /// Each instruction looks through epsilon chains to find reachable targets:
 /// - Single-successor instructions can absorb effects
 /// - Multi-successor instructions follow effectless chains only
+///
+/// Epsilons participate as sources too: a single-successor epsilon absorbs the
+/// whole downstream chain into itself (coalescing the effect chains that scope
+/// brackets around a `Call` produce, since `CallIR` can't carry effects), and a
+/// branching epsilon bypasses pure jumps per successor. Effects bubble *up*
+/// toward branch points this way, while forward migration pushes them *down*
+/// into non-epsilon instructions; both strictly shorten chains, so the
+/// fixpoint terminates.
 fn laser_vision(result: &mut NfaGraph) -> bool {
     let mut changed = false;
     let idx = build_label_to_index(&result.instructions);
@@ -255,7 +264,7 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
 
     for i in 0..result.instructions.len() {
         let m = match &result.instructions[i] {
-            InstructionIR::Match(m) if !m.is_epsilon() => m,
+            InstructionIR::Match(m) => m,
             _ => continue,
         };
 
@@ -280,11 +289,12 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
             }
 
             // No `reads_matched_node` guard is needed here (unlike forward_migrate):
-            // `m` is non-epsilon so it sets `matched_node`, and the seen-through
-            // chain is all epsilons (which preserve it), so absorbing into `post`
-            // still reads `m`'s node — the node these effects saw at their original
-            // position. forward_migrate is unsafe only because it pushes effects
-            // *past* a navigation that clears `matched_node`.
+            // the seen-through chain is all epsilons, which preserve `matched_node`,
+            // so absorbing into `post` still reads the node these effects saw at
+            // their original position — `m`'s own node if `m` is non-epsilon, or the
+            // unchanged inbound node if `m` is an epsilon. forward_migrate is unsafe
+            // only because it pushes effects *past* a navigation that clears
+            // `matched_node`.
             edited
                 .get_or_insert_with(|| MatchEdit::from_match(m))
                 .rewrite_successor(j, target, effects);
