@@ -3,7 +3,9 @@ use std::collections::{BTreeMap, HashSet};
 use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::TypeId;
-use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MemberRef, NodeKindConstraint};
+use crate::compiler::lower::ir::{
+    EffectIR, InstructionIR, Label, MatchIR, MemberRef, NodeKindConstraint,
+};
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::core::Symbol;
 
@@ -92,29 +94,59 @@ impl NfaBuilder<'_> {
     /// successor has already been emitted; label references are symbolic IR, so
     /// the order is irrelevant until packing.
     ///
-    /// Returns `None` — caller stays conservative — unless the follower's entry is
-    /// a single `Match` carrying `NextSkipExtras` on a `Named` node, the one shape
-    /// where the upgrade is both safe and needed. Anonymous/`_` followers are
-    /// intrinsically extras-only; refs (`Call`) and scope-wrapped followers
-    /// (epsilon entry) carry no such instruction and are left for follow-up.
+    /// A captured/tagged alternation does not exit straight into the follower:
+    /// capture lowering interposes effect epsilons (`Set`, scope closes) between
+    /// alternation exit and follower (#472). The walk below sees through that
+    /// chain and clones it along with the follower, so each branch runs the
+    /// chain's effects exactly once — via the named twin or the conservative
+    /// original, never both.
+    ///
+    /// Returns `None` — caller stays conservative — unless the chain is
+    /// single-successor epsilons ending at a `Match` carrying `NextSkipExtras` on
+    /// a `Named` node, the one shape where the upgrade is both safe and needed.
+    /// The `Named` check matters because `NextSkipExtras` is ambiguous: it also
+    /// appears when the *follower* may match anonymous nodes, and then extras-only
+    /// skipping is correct even after a named branch. Anonymous/`_` followers fail
+    /// that check; a ref follower (`Call`) is skipped because the IR alone cannot
+    /// prove the callee never matches an anonymous node.
     fn clone_named_follower_skip_entry(&mut self, exit: Label) -> Option<Label> {
-        let mut twin = {
-            let InstructionIR::Match(m) = self.instructions.iter().find(|i| i.label() == exit)?
+        let mut chain: Vec<MatchIR> = Vec::new();
+        let mut seen = HashSet::new();
+        let mut cursor = exit;
+        let mut twin = loop {
+            if !seen.insert(cursor) {
+                return None;
+            }
+            let InstructionIR::Match(m) = self.instructions.iter().find(|i| i.label() == cursor)?
             else {
                 return None;
             };
-            if m.nav != Nav::NextSkipExtras || !matches!(m.node_kind, NodeKindConstraint::Named(_))
-            {
-                return None;
+            if !m.is_epsilon() {
+                break m.clone();
             }
-            m.clone()
+            let &[next] = m.successors.as_slice() else {
+                return None;
+            };
+            chain.push(m.clone());
+            cursor = next;
         };
+
+        if twin.nav != Nav::NextSkipExtras || !matches!(twin.node_kind, NodeKindConstraint::Named(_))
+        {
+            return None;
+        }
 
         twin.label = self.fresh_label();
         twin.nav = Nav::NextSkip;
-        let label = twin.label;
+        let mut entry = twin.label;
         self.instructions.push(twin.into());
-        Some(label)
+        for mut eps in chain.into_iter().rev() {
+            eps.label = self.fresh_label();
+            eps.successors = vec![entry];
+            entry = eps.label;
+            self.instructions.push(eps.into());
+        }
+        Some(entry)
     }
 
     /// Per-branch "named" flags plus the soft-skip follower twin — shared by both

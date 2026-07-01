@@ -1,0 +1,109 @@
+Q = (program
+  (expression_statement
+    (binary_expression
+      [
+        (number) @n
+        "+"
+      ] @t
+      .
+      (identifier)
+    )
+  )
+)
+==== input ====
+5 * x
+==== types ====
+export interface Qt {
+  n: Node | null;
+}
+
+export interface Q {
+  t: Qt;
+}
+==== output ====
+{
+  "t": {
+    "n": {
+      "kind": "number",
+      "text": "5",
+      "span": [0, 1]
+    }
+  }
+}
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "n"
+S2 "t"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "binary_expression"
+S7 "number"
+S8 "+"
+S9 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { n }
+T2 = Struct  M1:1  ; { t }
+T3 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T3  ; n: T3
+M1: S2 → T1  ; t: T1
+
+[type_names]
+N0: S3 → T2  ; Q
+
+[entrypoints]
+Q = 06 :: T2
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        07
+  07  └‣─  (expression_statement)           08
+  08  └‣─  (binary_expression)              09
+  09  └‣─  _                                20, 22
+  11                                        ▶
+  12  ─◦─  [StructClose Set(M1)] (identifier)  24
+  14  ─•─  [StructClose Set(M1)] (identifier)  24
+  16   !   (number) [Node Set(M0)]          14
+  18   !   [Null Set(M0)] "+"               12
+  20  -ε-  [StructOpen]                     16, 18
+  22  ─‣─  _                                20, 22
+  24  ─‣┘³ _                                11
+==== trace ====
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        07
+       ●   program
+  07       (expression_statement)           08
+       ●   expression_statement
+  08       (binary_expression)              09
+       ●   binary_expression
+  09       _                                20, 22
+       ●   number
+  20  -ε-  [StructOpen]                     16, 18
+  16       (number) [Node Set(M0)]          14
+       ●   number
+  14       [StructClose Set(M1)] (identifier)  24
+       ○   *
+       ●   identifier
+  24       _                                11
+       ●   program
+  11   ◀   (Q)                              
+
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼

@@ -1,0 +1,110 @@
+Q = (program
+  (expression_statement
+    (binary_expression
+      [
+        A: (number)
+        B: "+"
+      ] @t
+      .
+      (identifier)
+    )
+  )
+)
+==== input ====
+5 + x
+==== types ====
+export interface QtA {
+  $tag: "A";
+}
+
+export interface QtB {
+  $tag: "B";
+}
+
+export type Qt = QtA | QtB;
+
+export interface Q {
+  t: Qt;
+}
+==== output ====
+{
+  "t": {
+    "$tag": "A"
+  }
+}
+==== bytecode ====
+[strings]
+S00 "Beauty will save the world"
+S01 "A"
+S02 "B"
+S03 "t"
+S04 "Q"
+S05 "program"
+S06 "expression_statement"
+S07 "binary_expression"
+S08 "number"
+S09 "+"
+S10 "identifier"
+
+[type_defs]
+T0 = <Void>
+T1 = Enum    M0:2  ; A | B
+T2 = Struct  M2:1  ; { t }
+
+[type_members]
+M0: S01 → T0  ; A: <Void>
+M1: S02 → T0  ; B: <Void>
+M2: S03 → T1  ; t: T1
+
+[type_names]
+N0: S04 → T2  ; Q
+
+[entrypoints]
+Q = 06 :: T2
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        07
+  07  └‣─  (expression_statement)           08
+  08  └‣─  (binary_expression)              09
+  09  └‣─  _                                16, 18, 20
+  11                                        ▶
+  12  ─◦─  [Set(M2)] (identifier)           22
+  14  ─•─  [Set(M2)] (identifier)           22
+  16   !   [EnumOpen(M0)] (number) [EnumClose]  14
+  18   !   [EnumOpen(M1)] "+" [EnumClose]   12
+  20  ─‣─  _                                16, 18, 20
+  22  ─‣┘³ _                                11
+==== trace ====
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        07
+       ●   program
+  07       (expression_statement)           08
+       ●   expression_statement
+  08       (binary_expression)              09
+       ●   binary_expression
+  09       _                                16, 18, 20
+       ●   number
+  16       [EnumOpen(M0)] (number) [EnumClose]  14
+       ●   number
+  14       [Set(M2)] (identifier)           22
+       ○   +
+       ●   identifier
+  22       _                                11
+       ●   program
+  11   ◀   (Q)                              
+
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼
