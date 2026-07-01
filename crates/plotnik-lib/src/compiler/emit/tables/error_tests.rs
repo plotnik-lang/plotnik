@@ -46,11 +46,13 @@ fn enum_variant_count_overflow_is_emit_error() {
     // 256 enum branches → an enum with 256 variants, past the u8 limit. Each branch
     // is `(_)` so every variant is a valid program child and the query is matchable —
     // an enum of `(identifier)` would be rejected (a program holds no bare identifier).
+    // The alternation is captured so it is consumed (produces the enum) rather
+    // than degrading to a union.
     let mut query = String::from("Q = (program [");
     for i in 0..256 {
         write!(query, " L{i}: (_) @v{i}").unwrap();
     }
-    query.push_str("])");
+    query.push_str("] @alt)");
 
     let err = try_emit(&query).expect_err("256 enum variants must not encode");
     assert!(

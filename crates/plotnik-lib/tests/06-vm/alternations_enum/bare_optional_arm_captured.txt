@@ -2,15 +2,11 @@ Q = [A:(identifier)?@id]@x
 ==== input ====
 let x
 ==== types ====
-export interface QxA {
-  $tag: "A";
-  $data: { id: Node | null };
-}
-
-export type Qx = QxA;
+export type QX =
+  | { $tag: "A"; $data: { id: Node | null } };
 
 export interface Q {
-  x: Qx;
+  x: QX;
 }
 ==== output ====
 {
@@ -27,8 +23,9 @@ S0 "Beauty will save the world"
 S1 "id"
 S2 "A"
 S3 "x"
-S4 "Q"
-S5 "identifier"
+S4 "QX"
+S5 "Q"
+S6 "identifier"
 
 [type_defs]
 T0 = <Node>
@@ -40,10 +37,11 @@ T4 = Optional(T0)  ; <Node>?
 [type_members]
 M0: S1 → T4  ; id: T4
 M1: S2 → T1  ; A: T1
-M2: S3 → T2  ; x: T2
+M2: S3 → T2  ; x: QX
 
 [type_names]
-N0: S4 → T3  ; Q
+N0: S4 → T2  ; QX
+N1: S5 → T3  ; Q
 
 [entrypoints]
 Q = 06 :: T3

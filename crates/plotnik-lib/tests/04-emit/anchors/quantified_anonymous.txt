@@ -2,10 +2,10 @@ Q = (array (identifier) . ","?)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "array"
-S3 "identifier"
-S4 ","
+S1 "array"
+S2 "identifier"
+S3 ","
+S4 "Q"
 
 [type_defs]
 T0 = <Void>
@@ -13,7 +13,6 @@ T0 = <Void>
 [type_members]
 
 [type_names]
-N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 06 :: T0

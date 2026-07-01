@@ -1,0 +1,17 @@
+Foo = (function_declaration
+  body: (statement_block {
+    (expression_statement {(identifier) @v} @inner)
+  } @outer :: Bar)
+)
+==== types ====
+export interface BarInner {
+  v: Node;
+}
+
+export interface Bar {
+  inner: BarInner;
+}
+
+export interface Foo {
+  outer: Bar;
+}

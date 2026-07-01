@@ -8,32 +8,34 @@ S1 "name"
 S2 "item"
 S3 "items"
 S4 "Item"
-S5 "Collect"
-S6 "Test"
+S5 "CollectItems"
+S6 "Collect"
 S7 "identifier"
 S8 "array"
+S9 "Test"
 
 [type_defs]
-T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:1  ; { item }
-T3 = ArrayStar(T2)  ; T2*
-T4 = Struct  M2:1  ; { items }
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { name }
+T3 = Struct  M1:1  ; { item }
+T4 = ArrayStar(T3)  ; CollectItems*
+T5 = Struct  M2:1  ; { items }
 
 [type_members]
-M0: S1 → T0  ; name: <Node>
-M1: S2 → T1  ; item: Item
-M2: S3 → T3  ; items: T3
+M0: S1 → T1  ; name: <Node>
+M1: S2 → T2  ; item: Item
+M2: S3 → T4  ; items: T4
 
 [type_names]
-N0: S4 → T1  ; Item
-N1: S5 → T4  ; Collect
-N2: S6 → T4  ; Test
+N0: S4 → T2  ; Item
+N1: S5 → T3  ; CollectItems
+N2: S6 → T5  ; Collect
 
 [entrypoints]
-Collect = 09 :: T4
-Item    = 06 :: T1
-Test    = 11 :: T4
+Collect = 09 :: T5
+Item    = 06 :: T2
+Test    = 11 :: T0
 
 [transitions]
 _StructWrap:
@@ -47,19 +49,18 @@ Item:
   08                                        ▶
 
 Collect:
-  09  -ε-  [ArrayOpen]                      28, 16
+  09  -ε-  [ArrayOpen]                      29, 18
 
 Test:
-  11   !   (array)                          12
-  12  └‣─  (Collect)                        09 : 13
-  13  ─‣┘  _                                14
-  14                                        ▶
-  15                                        ▶
-  16  -ε-  [ArrayClose Set(M2)]             15
-  18  -ε-  [StructClose Push]               26, 16
-  20  -ε-  [StructClose Set(M1)]            18
-  22   !   (Item)                           06 : 20
-  23  ...
-  24  -ε-  [StructOpen] [StructOpen]        22
-  26  ─‣─  _                                24, 26
-  28   !   _                                24, 26
+  11   !   (array) [SuppressBegin]          13
+  13  └‣─  (Collect)                        09 : 14
+  14  ─‣┘  [SuppressEnd] _                  16
+  16                                        ▶
+  17                                        ▶
+  18  -ε-  [ArrayClose Set(M2)]             17
+  20  -ε-  [StructClose Push]               27, 18
+  22  -ε-  [StructClose Set(M1)]            20
+  24   !   (Item)                           06 : 22
+  25  -ε-  [StructOpen] [StructOpen]        24
+  27  ─‣─  _                                25, 27
+  29   !   _                                25, 27

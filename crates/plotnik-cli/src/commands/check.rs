@@ -43,7 +43,9 @@ pub fn run(args: CheckArgs) -> CliResult {
         // Contract: on exit 0/1 stdout is a JSON array, `[]` when clean.
         // Exit 2 (couldn't answer) keeps text on stderr and emits no JSON.
         println!("{}", diagnostics.render_json(source_map));
-    } else if !valid {
+    } else if !valid || diagnostics.has_warnings() {
+        // Warnings print even when the query is valid (like cargo check);
+        // only a fully clean query stays silent.
         eprint!("{}", diagnostics.render_colored(source_map, args.color));
     }
 
@@ -51,6 +53,5 @@ pub fn run(args: CheckArgs) -> CliResult {
         return Err(CliError::No);
     }
 
-    // Silent on success (like cargo check)
     Ok(())
 }

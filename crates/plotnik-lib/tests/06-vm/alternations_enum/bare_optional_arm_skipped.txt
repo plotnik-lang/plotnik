@@ -2,12 +2,8 @@ Q = [A:(identifier)?@id]
 ==== input ====
 let x
 ==== types ====
-export interface QA {
-  $tag: "A";
-  $data: { id: Node | null };
-}
-
-export type Q = QA;
+export type Q =
+  | { $tag: "A"; $data: { id: Node | null } };
 ==== output ====
 {
   "$tag": "A",

@@ -1,7 +1,7 @@
 //! Unification logic for alternation branches.
 //!
 //! Handles merging PatternFlow from different branches of union alternations.
-//! Enum alternations don't unify — they produce Enum types directly.
+//! Consumed enum alternations don't unify — they produce Enum types directly.
 
 use std::collections::BTreeMap;
 
@@ -14,8 +14,6 @@ use crate::core::Symbol;
 /// Error during type unification.
 #[derive(Clone, Debug)]
 pub enum UnifyError {
-    /// Scalar type appeared in union alternation (needs a label)
-    ScalarInUnion,
     /// Capture has incompatible types across branches
     IncompatibleTypes { field: Symbol },
 }
@@ -38,16 +36,15 @@ pub fn unify_flows(
 /// - Void ∪ Void → Void
 /// - Void ∪ Fields(s) → Fields(make_all_optional(s))
 /// - Fields(a) ∪ Fields(b) → Fields(merge_fields(a, b))
-/// - Value in union → Error
+/// - Value is an uncaptured pending value (a bare reference); it is suppressed
+///   like any uncaptured match, so it unifies as Void.
 pub fn unify_flow(
     ctx: &mut TypeAnalysisBuilder,
     a: PatternFlow,
     b: PatternFlow,
 ) -> Result<PatternFlow, UnifyError> {
-    // Union alternations cannot contain scalars.
-    if matches!(a, PatternFlow::Value(_)) || matches!(b, PatternFlow::Value(_)) {
-        return Err(UnifyError::ScalarInUnion);
-    }
+    let a = suppress_value(a);
+    let b = suppress_value(b);
 
     match (a, b) {
         (PatternFlow::Void, PatternFlow::Void) => Ok(PatternFlow::Void),
@@ -68,9 +65,16 @@ pub fn unify_flow(
             Ok(PatternFlow::Fields(ctx.intern_struct(merged)))
         }
 
-        // The scalar guard above (`matches!(a|b, Value)`) already returns Err.
-        // Every remaining PatternFlow variant (Void, Fields) is matched explicitly above.
-        _ => unreachable!("unify_flow: unexpected PatternFlow variant after scalar guard"),
+        // `suppress_value` above rewrites every Value to Void; the remaining
+        // variants (Void, Fields) are matched exhaustively.
+        _ => unreachable!("unify_flow: unexpected PatternFlow variant after value suppression"),
+    }
+}
+
+fn suppress_value(flow: PatternFlow) -> PatternFlow {
+    match flow {
+        PatternFlow::Value(_) => PatternFlow::Void,
+        other => other,
     }
 }
 
@@ -123,7 +127,7 @@ fn merge_fields(
 
     for (key, a_info) in a {
         if let Some(b_info) = b.remove(&key) {
-            let type_id = unify_type_ids(a_info.type_id, b_info.type_id, key)?;
+            let type_id = unify_type_ids(ctx, a_info.type_id, b_info.type_id, key)?;
             let optional = a_info.optional || b_info.optional;
             result.insert(key, FieldInfo::with_optional(type_id, optional));
         } else {
@@ -141,17 +145,24 @@ fn merge_fields(
 
 /// Unify two type IDs.
 ///
-/// Types must match exactly; `Void` is the identity element (compatible with any type).
-fn unify_type_ids(a: TypeId, b: TypeId, field: Symbol) -> Result<TypeId, UnifyError> {
-    if a == b {
-        return Ok(a);
-    }
-
-    // Void is compatible with anything (treat as identity)
+/// Structs and enums mint a fresh id per occurrence (nominal typing), so two
+/// branches capturing structurally identical anonymous composites carry
+/// different ids for the same shape — compare structurally, keeping the first
+/// branch's id. `Void` is the identity element (compatible with any type).
+fn unify_type_ids(
+    ctx: &TypeAnalysisBuilder,
+    a: TypeId,
+    b: TypeId,
+    field: Symbol,
+) -> Result<TypeId, UnifyError> {
     if a == TYPE_VOID {
         return Ok(b);
     }
     if b == TYPE_VOID {
+        return Ok(a);
+    }
+
+    if ctx.types_structurally_equal(a, b) {
         return Ok(a);
     }
 

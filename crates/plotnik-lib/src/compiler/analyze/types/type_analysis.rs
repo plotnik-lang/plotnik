@@ -11,14 +11,24 @@
 //! owned by `DependencyAnalysis` and read from there. This artifact only maps the
 //! `DefId`s that analysis already assigned to the types it inferred for them.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::compiler::analyze::types::type_shape::{
     Arity, FieldInfo, PatternFlow, PatternShape, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
 };
+use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
 use crate::core::Symbol;
+
+/// One `:: TypeName` annotation occurrence, recorded during inference for the
+/// naming pass to validate (nominal identity, collisions, redundancy).
+#[derive(Clone, Copy, Debug)]
+pub struct TypeAnnotation {
+    pub name: Symbol,
+    pub span: Span,
+    pub type_id: TypeId,
+}
 
 /// Frozen registry of inferred types and per-definition / per-pattern results.
 ///
@@ -38,9 +48,13 @@ pub struct TypeAnalysis {
 
     pattern_result: HashMap<Pattern, PatternShape>,
 
-    /// Explicit type aliases from annotations like `{...} @x :: TypeName`.
-    /// Maps a struct/enum `TypeId` to the name it should have in generated code.
-    type_aliases: HashMap<TypeId, Symbol>,
+    /// Every named type, assigned by the naming pass: definition results carry
+    /// their definition's name, nested composites carry path-derived names
+    /// (`FooItems`), and `:: TypeName` annotations override. Complete: every
+    /// struct/enum reachable from a definition output outside an enum-variant
+    /// payload position has exactly one name. `BTreeMap` for deterministic
+    /// emission order.
+    type_names: BTreeMap<TypeId, Symbol>,
 }
 
 impl TypeAnalysis {
@@ -74,49 +88,24 @@ impl TypeAnalysis {
         }
     }
 
-    /// Whether a type is a meaningful structured output (enum/struct/ref, or an
+    /// Whether a type is a meaningful structured output (enum/struct, or an
     /// array/optional thereof). Plain `Node` is not — it is the matched node,
     /// captured directly.
+    ///
+    /// A `Ref` resolves through its target: a reference to a void definition
+    /// leaves no pending value at runtime (the capture takes the matched node),
+    /// so it must not classify as structured. Mid-inference a same-SCC target
+    /// has no output yet; assume structured — the admitted classification that
+    /// lowering reads always resolves.
     pub fn is_structured_output(&self, type_id: TypeId) -> bool {
         match self.type_shape(type_id) {
-            Some(TypeShape::Enum(_) | TypeShape::Struct(_) | TypeShape::Ref(_)) => true,
+            Some(TypeShape::Enum(_) | TypeShape::Struct(_)) => true,
+            Some(TypeShape::Ref(def_id)) => self
+                .def_output(*def_id)
+                .is_none_or(|t| self.is_structured_output(t)),
             Some(shape @ (TypeShape::Array { .. } | TypeShape::Optional(_))) => shape
                 .child_type_ids()
                 .any(|id| id != TYPE_NODE && self.is_structured_output(id)),
-            _ => false,
-        }
-    }
-
-    /// Whether a value of this type embeds captured data — a non-empty struct
-    /// somewhere inside — as opposed to carrying only tags and matched nodes.
-    ///
-    /// Distinguishes the two repeated-value cases under a bare `*`/`+`: a
-    /// capture-free value (e.g. `[A: (x) B: (y)]`) may be collected into an
-    /// implicit array, while a capture-carrying one falls under strict
-    /// dimensionality and needs an explicit row capture (#495).
-    ///
-    /// A `Ref` whose definition is still being inferred (a self-recursive
-    /// reference mid-pass) reports `false`; the lowering's implicit-array
-    /// scope keeps that case sound regardless.
-    pub fn value_carries_captures(&self, type_id: TypeId) -> bool {
-        self.value_carries_captures_inner(type_id, &mut HashSet::new())
-    }
-
-    fn value_carries_captures_inner(&self, type_id: TypeId, seen: &mut HashSet<TypeId>) -> bool {
-        if !seen.insert(type_id) {
-            return false;
-        }
-        match self.type_shape(type_id) {
-            Some(TypeShape::Struct(fields)) => !fields.is_empty(),
-            Some(TypeShape::Enum(variants)) => variants
-                .values()
-                .any(|&payload| self.value_carries_captures_inner(payload, seen)),
-            Some(TypeShape::Ref(def_id)) => self
-                .def_output(*def_id)
-                .is_some_and(|t| self.value_carries_captures_inner(t, seen)),
-            Some(shape @ (TypeShape::Array { .. } | TypeShape::Optional(_))) => shape
-                .child_type_ids()
-                .any(|id| self.value_carries_captures_inner(id, seen)),
             _ => false,
         }
     }
@@ -146,11 +135,18 @@ impl TypeAnalysis {
     /// Follow a `Ref` chain to the underlying materialized type; non-ref types
     /// resolve to themselves. The accessor type-table emission uses to map a
     /// query type to the concrete shape it stands for.
+    ///
+    /// A `Ref` whose definition ended up void resolves to `Node`: the runtime
+    /// capture of such a reference takes the matched node (the callee leaves no
+    /// pending value), so `Node` is the shape the reference stands for.
     pub fn resolve_underlying_type_id(&self, type_id: TypeId) -> TypeId {
         let Some(TypeShape::Ref(def_id)) = self.type_shape(type_id) else {
             return type_id;
         };
         let target = self.expect_def_output(*def_id);
+        if target == TYPE_VOID {
+            return TYPE_NODE;
+        }
         self.resolve_underlying_type_id(target)
     }
 
@@ -160,8 +156,14 @@ impl TypeAnalysis {
         self.def_output.iter().map(|(&id, &type_id)| (id, type_id))
     }
 
-    pub fn iter_type_aliases(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
-        self.type_aliases.iter().map(|(&id, &sym)| (id, sym))
+    /// The name of a type, if the naming pass assigned one.
+    pub fn type_name(&self, type_id: TypeId) -> Option<Symbol> {
+        self.type_names.get(&type_id).copied()
+    }
+
+    /// Iterate all named types in `TypeId` order (deterministic).
+    pub fn iter_type_names(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
+        self.type_names.iter().map(|(&id, &sym)| (id, sym))
     }
 
     /// Admission check for [`TypeAnalysisBuilder::finish`]: the frozen result must
@@ -199,8 +201,8 @@ impl TypeAnalysis {
             self.assert_flow_well_formed(&info.flow);
         }
 
-        for &type_id in self.type_aliases.keys() {
-            self.assert_type_id_registered(type_id, "type alias type id out of range");
+        for &type_id in self.type_names.keys() {
+            self.assert_type_id_registered(type_id, "named type id out of range");
         }
     }
 
@@ -234,15 +236,25 @@ impl TypeAnalysis {
 pub struct TypeAnalysisBuilder {
     analysis: TypeAnalysis,
 
-    /// Reverse index for `intern_type` deduplication. Scratch: the frozen result
-    /// looks types up by `TypeId`, never by shape.
+    /// Reverse index for `intern_type` deduplication of leaf and wrapper shapes.
+    /// Structs and enums are deliberately NOT deduplicated: they are nominal —
+    /// two definitions with identical capture profiles are two distinct types,
+    /// each carrying its own name. Scratch: the frozen result looks types up by
+    /// `TypeId`, never by shape.
     intern_index: HashMap<TypeShape, TypeId>,
 
-    /// Each definition's full inferred `PatternShape`, keyed by `DefId`. Lets a
-    /// non-recursive `Ref` return its target's result (arity + flow, fields
-    /// intact for bubbling) without re-descending into the referenced body.
-    /// Scratch: only the inference walk consults it.
-    def_memo: HashMap<DefId, PatternShape>,
+    /// Creation site of every fresh struct/enum, for naming-pass diagnostics.
+    /// Scratch: only the naming pass consults it.
+    type_provenance: HashMap<TypeId, Span>,
+
+    /// Each definition's structural arity, so a reference reflects whether its
+    /// target matches one node or a sibling sequence (`f: (SeqDef)` must be
+    /// rejected like an inline sequence). Scratch: only inference consults it.
+    def_arity: HashMap<DefId, Arity>,
+
+    /// `:: TypeName` annotation occurrences in source order.
+    /// Scratch: only the naming pass consults it.
+    annotations: Vec<TypeAnnotation>,
 }
 
 pub(crate) struct TypeAnalysisView<'a> {
@@ -256,14 +268,6 @@ impl TypeAnalysisView<'_> {
 
     pub(crate) fn expect_struct_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
         self.analysis.expect_struct_fields(id)
-    }
-
-    pub(crate) fn is_structured_output(&self, type_id: TypeId) -> bool {
-        self.analysis.is_structured_output(type_id)
-    }
-
-    pub(crate) fn value_carries_captures(&self, type_id: TypeId) -> bool {
-        self.analysis.value_carries_captures(type_id)
     }
 
     pub(crate) fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternShape> {
@@ -288,10 +292,12 @@ impl TypeAnalysisBuilder {
                 types: Vec::new(),
                 def_output: BTreeMap::new(),
                 pattern_result: HashMap::new(),
-                type_aliases: HashMap::new(),
+                type_names: BTreeMap::new(),
             },
             intern_index: HashMap::new(),
-            def_memo: HashMap::new(),
+            type_provenance: HashMap::new(),
+            def_arity: HashMap::new(),
+            annotations: Vec::new(),
         };
 
         // Pre-register builtin types at their expected IDs.
@@ -319,8 +325,16 @@ impl TypeAnalysisBuilder {
         }
     }
 
-    /// Intern a type shape, deduplicating by structural equality.
+    /// Intern a type shape. Leaf and wrapper shapes deduplicate structurally;
+    /// structs and enums always mint a fresh id (they are nominal — see the
+    /// `intern_index` field docs).
     pub fn intern_type(&mut self, shape: TypeShape) -> TypeId {
+        if matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)) {
+            let id = TypeId(self.analysis.types.len() as u32);
+            self.analysis.types.push(shape);
+            return id;
+        }
+
         if let Some(&id) = self.intern_index.get(&shape) {
             return id;
         }
@@ -339,6 +353,24 @@ impl TypeAnalysisBuilder {
         self.intern_type(TypeShape::Struct(BTreeMap::from([(name, info)])))
     }
 
+    /// Record where a fresh struct/enum came from, for naming-pass diagnostics.
+    pub fn record_type_provenance(&mut self, type_id: TypeId, span: Span) {
+        self.type_provenance.entry(type_id).or_insert(span);
+    }
+
+    pub fn type_provenance(&self, type_id: TypeId) -> Option<Span> {
+        self.type_provenance.get(&type_id).copied()
+    }
+
+    /// Record a `:: TypeName` annotation occurrence for the naming pass.
+    pub fn record_annotation(&mut self, annotation: TypeAnnotation) {
+        self.annotations.push(annotation);
+    }
+
+    pub fn annotations(&self) -> &[TypeAnnotation] {
+        &self.annotations
+    }
+
     pub fn record_pattern_result(&mut self, pattern: Pattern, shape: PatternShape) {
         self.analysis.pattern_result.insert(pattern, shape);
     }
@@ -347,18 +379,70 @@ impl TypeAnalysisBuilder {
         self.analysis.def_output.insert(def_id, type_id);
     }
 
-    /// Record a definition's full inferred result, so non-recursive references
-    /// can resolve to it instead of re-descending into the body.
-    pub fn record_def_memo(&mut self, def_id: DefId, shape: PatternShape) {
-        self.def_memo.insert(def_id, shape);
+    pub fn record_def_arity(&mut self, def_id: DefId, arity: Arity) {
+        self.def_arity.insert(def_id, arity);
     }
 
-    pub fn def_memo(&self, def_id: DefId) -> Option<&PatternShape> {
-        self.def_memo.get(&def_id)
+    pub fn def_arity(&self, def_id: DefId) -> Option<Arity> {
+        self.def_arity.get(&def_id).copied()
     }
 
-    /// Associate an explicit alias with a type (from `@x :: TypeName` on struct captures).
-    pub fn define_type_alias(&mut self, type_id: TypeId, name: Symbol) {
-        self.analysis.type_aliases.insert(type_id, name);
+    /// Install the naming pass's result. Names must be complete and validated
+    /// before the analysis is frozen.
+    pub fn set_type_names(&mut self, names: BTreeMap<TypeId, Symbol>) {
+        self.analysis.type_names = names;
+    }
+
+    /// Deep structural equality over the in-progress type registry.
+    ///
+    /// Structs and enums mint a fresh id per occurrence (nominal typing), so
+    /// two structurally identical composites can carry different ids; interned
+    /// shapes (Node, Custom, Ref, and wrappers over shared ids) compare by id.
+    /// `Ref` cuts recursion, so the walk terminates on recursive types.
+    pub(crate) fn types_structurally_equal(&self, a: TypeId, b: TypeId) -> bool {
+        if a == b {
+            return true;
+        }
+
+        let (Some(shape_a), Some(shape_b)) = (
+            self.analysis.type_shape(a),
+            self.analysis.type_shape(b),
+        ) else {
+            return false;
+        };
+
+        match (shape_a, shape_b) {
+            (TypeShape::Struct(fa), TypeShape::Struct(fb)) => {
+                fa.len() == fb.len()
+                    && fa.iter().zip(fb.iter()).all(|((ka, ia), (kb, ib))| {
+                        ka == kb
+                            && ia.optional == ib.optional
+                            && self.types_structurally_equal(ia.type_id, ib.type_id)
+                    })
+            }
+            (TypeShape::Enum(va), TypeShape::Enum(vb)) => {
+                va.len() == vb.len()
+                    && va
+                        .iter()
+                        .zip(vb.iter())
+                        .all(|((ka, pa), (kb, pb))| {
+                            ka == kb && self.types_structurally_equal(*pa, *pb)
+                        })
+            }
+            (
+                TypeShape::Array {
+                    element: ea,
+                    non_empty: na,
+                },
+                TypeShape::Array {
+                    element: eb,
+                    non_empty: nb,
+                },
+            ) => na == nb && self.types_structurally_equal(*ea, *eb),
+            (TypeShape::Optional(ia), TypeShape::Optional(ib)) => {
+                self.types_structurally_equal(*ia, *ib)
+            }
+            _ => false,
+        }
     }
 }

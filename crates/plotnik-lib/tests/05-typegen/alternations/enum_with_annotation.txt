@@ -3,16 +3,8 @@ Q = [
   Num: (number) @n
 ]
 ==== types ====
-export interface QStr {
-  $tag: "Str";
-  $data: { s: Foo };
-}
-
-export interface QNum {
-  $tag: "Num";
-  $data: { n: Node };
-}
-
-export type Q = QStr | QNum;
+export type Q =
+  | { $tag: "Str"; $data: { s: Foo } }
+  | { $tag: "Num"; $data: { n: Node } };
 
 export type Foo = Node;

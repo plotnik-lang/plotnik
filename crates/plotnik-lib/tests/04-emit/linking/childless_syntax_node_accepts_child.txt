@@ -2,8 +2,8 @@ Q = (debugger_statement (_))
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "debugger_statement"
+S1 "debugger_statement"
+S2 "Q"
 
 [type_defs]
 T0 = <Void>
@@ -11,7 +11,6 @@ T0 = <Void>
 [type_members]
 
 [type_names]
-N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 6 :: T0

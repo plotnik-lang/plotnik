@@ -1,11 +1,11 @@
 use rowan::TextRange;
 
-use crate::compiler::analyze::types::type_shape::{Arity, PatternFlow, PatternShape, TypeId};
+use crate::compiler::analyze::types::type_shape::{Arity, PatternFlow, PatternShape};
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{
-    CapturedPattern, FieldPattern, Pattern, QuantifiedPattern, UnionPattern,
+    CapturedPattern, EnumPattern, FieldPattern, Pattern, QuantifiedPattern,
 };
 use crate::compiler::parse::cst::{SyntaxNode, SyntaxToken};
 
@@ -40,17 +40,17 @@ impl InferVisitor<'_, '_> {
         Some((source, body.text_range()))
     }
 
-    /// Report a repeated multi-element pattern that cannot produce a scalar list.
-    /// Returns whether it emitted a diagnostic so the caller can keep the two
-    /// dimensionality checks mutually exclusive.
+    /// Report a captured repeat of a multi-element void group: it matches
+    /// several nodes per iteration but captures none, so an element value is
+    /// undefined.
     pub(super) fn report_multi_element_scalar(
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
-    ) -> bool {
+    ) {
         let is_multi_element_scalar = inner_info.arity == Arity::Many && inner_info.flow.is_void();
         if !is_multi_element_scalar {
-            return false;
+            return;
         }
 
         let op = self.quantifier_operator(quant);
@@ -63,61 +63,38 @@ impl InferVisitor<'_, '_> {
             op
         ))
         .emit();
-        true
     }
 
-    /// Report repeated inner output that needs an enclosing row capture.
-    ///
-    /// Fires for both flavors of per-repeat captured output: bubbling capture
-    /// fields (`Fields`) and capture-carrying values (`Value` of an enum whose
-    /// payloads hold captures, or a ref to one). Either way each repeat produces
-    /// captured data with no list to collect it into (#495). Capture-free values
-    /// are exempt — the lowering collects those into an implicit array.
+    /// Report repeated bubbling captures that need an enclosing row capture:
+    /// each repeat produces captured fields with no list to collect them into.
     pub(super) fn report_internal_capture_dimensionality(
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
     ) {
-        let type_ctx = self.ctx.type_ctx.in_progress();
-        let raw_names: Vec<String> = match &inner_info.flow {
-            PatternFlow::Fields(type_id) => {
-                let fields = type_ctx.expect_struct_fields(*type_id);
-                if fields.is_empty() {
-                    return;
-                }
-                fields
-                    .keys()
-                    .map(|s| self.ctx.interner.resolve(*s).to_string())
-                    .collect()
-            }
-            // A capture-free repeated value (`[A: (x) B: (y)]*`, `(CaptureFreeDef)+`)
-            // is collected by the lowering's implicit array and needs no row capture.
-            // Only capture-carrying values fall under strict dimensionality. Enum
-            // payloads own their captures, so the fields map is empty here; name the
-            // captures the user can see in the repeated pattern instead.
-            PatternFlow::Value(type_id) if type_ctx.value_carries_captures(*type_id) => {
-                visible_capture_names(quant)
-            }
-            _ => return,
+        let PatternFlow::Fields(type_id) = &inner_info.flow else {
+            return;
         };
+        let type_ctx = self.ctx.type_ctx.in_progress();
+        let fields = type_ctx.expect_struct_fields(*type_id);
+        if fields.is_empty() {
+            return;
+        }
+        let raw_names: Vec<String> = fields
+            .keys()
+            .map(|s| self.ctx.interner.resolve(*s).to_string())
+            .collect();
 
         let op = self.quantifier_operator(quant);
-        let detail = if raw_names.is_empty() {
-            format!(
-                "each `{}` repeat produces a value, but the values aren't collected into a list",
-                op
-            )
-        } else {
-            let captures_str = raw_names
-                .iter()
-                .map(|n| format!("`@{}`", n))
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!(
-                "captures {} repeat with `{}` but aren't collected into a list",
-                captures_str, op
-            )
-        };
+        let captures_str = raw_names
+            .iter()
+            .map(|n| format!("`@{}`", n))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let detail = format!(
+            "captures {} repeat with `{}` but aren't collected into a list",
+            captures_str, op
+        );
 
         // The suggestion lands beside sibling captures, so avoid names bound there.
         let mut taken = raw_names;
@@ -143,52 +120,22 @@ impl InferVisitor<'_, '_> {
         .emit();
     }
 
-    pub(super) fn report_ambiguous_outputs(
-        &mut self,
-        parent_range: TextRange,
-        outputs: &[(TextRange, TypeId)],
-    ) {
-        let source = self.source;
-        let mut builder = self
-            .report(DiagnosticKind::AmbiguousUncapturedOutputs, parent_range)
-            .detail(format!(
-                "{} expressions here produce a value but none is captured",
-                outputs.len()
-            ));
-        for (range, _) in outputs {
-            builder = builder.related_to(Span::new(source, *range), "produces a value");
-        }
-        builder.emit();
+    /// Warn about a labeled alternation whose value nothing consumes: the
+    /// labels are inert and the alternation behaves as a plain union.
+    pub(super) fn report_unused_branch_labels(&mut self, e: &EnumPattern) {
+        self.report(DiagnosticKind::UnusedBranchLabels, e.text_range())
+            .emit();
     }
 
-    pub(super) fn report_uncaptured_output_with_captures(
-        &mut self,
-        outputs: &[(TextRange, TypeId)],
-    ) {
-        for (range, _) in outputs {
-            self.report(DiagnosticKind::UncapturedOutputWithCaptures, *range)
-                .emit();
-        }
-    }
-
-    pub(super) fn report_unify_error(&mut self, union: &UnionPattern, err: &UnifyError) {
+    pub(super) fn report_branch_unify_error(&mut self, alternation: &SyntaxNode, err: &UnifyError) {
         match err {
-            UnifyError::ScalarInUnion => {
-                self.report(
-                    DiagnosticKind::IncompatibleTypes,
-                    union.syntax().text_range(),
-                )
-                .detail("this branch produces a value, but the alternation is a union")
-                .hint("give every branch a branch label for an enum, e.g. `[A: ... B: ...]`")
-                .emit();
-            }
             UnifyError::IncompatibleTypes { field } => {
                 let field_name = self.ctx.interner.resolve(*field).to_string();
-                let sites = capture_sites(union, &field_name);
+                let sites = capture_sites(alternation, &field_name);
                 let source = self.source;
                 let (primary, rest) = match sites.split_first() {
                     Some((first, rest)) => (*first, rest),
-                    None => (union.syntax().text_range(), &[] as &[TextRange]),
+                    None => (alternation.text_range(), &[] as &[TextRange]),
                 };
 
                 let mut builder = self
@@ -213,24 +160,6 @@ impl InferVisitor<'_, '_> {
     }
 }
 
-/// Source-order capture names visible in the quantified pattern, for naming
-/// the repeats in a dimensionality diagnostic. Suppressive `@_` captures
-/// produce no output, so they are excluded.
-fn visible_capture_names(quant: &QuantifiedPattern) -> Vec<String> {
-    let mut tokens = Vec::new();
-    direct_scope_capture_tokens(quant.syntax(), &mut tokens);
-    let mut names: Vec<String> = Vec::new();
-    for tok in tokens {
-        let Some(name) = tok.text().get(1..) else {
-            continue;
-        };
-        if name != "_" && !names.iter().any(|n| n == name) {
-            names.push(name.to_owned());
-        }
-    }
-    names
-}
-
 /// The bracket shorthand for the row-capture hint, matching the shape the
 /// user actually wrote: `[...]` for alternations, `(...)` for nodes and refs,
 /// `{...}` for sequences (and anything else).
@@ -244,9 +173,9 @@ fn row_capture_brackets(quant: &QuantifiedPattern) -> &'static str {
 
 /// Find same-named captures that belong to the alternation's output scope.
 /// Nested row scopes are excluded because their fields cannot conflict here.
-fn capture_sites(union: &UnionPattern, field_name: &str) -> Vec<TextRange> {
+fn capture_sites(alternation: &SyntaxNode, field_name: &str) -> Vec<TextRange> {
     let mut tokens = Vec::new();
-    direct_scope_capture_tokens(union.syntax(), &mut tokens);
+    direct_scope_capture_tokens(alternation, &mut tokens);
     tokens
         .into_iter()
         .filter(|tok| tok.text().get(1..) == Some(field_name))

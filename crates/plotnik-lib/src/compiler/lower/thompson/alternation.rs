@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::analyze::types::TypeShape;
+use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{
     EffectIR, InstructionIR, Label, MatchIR, MemberRef, NodeKindConstraint,
@@ -213,12 +214,32 @@ impl NfaBuilder<'_> {
 
     /// Union alternation: each branch merges into one struct.
     pub(super) fn compile_union(&mut self, union: &ast::UnionPattern, ctx: PatternCtx) -> Label {
+        let branches: Vec<_> = union.branches().collect();
+        self.compile_union_branches(&Pattern::Union(union.clone()), &branches, ctx)
+    }
+
+    /// A labeled alternation nothing consumes: the labels are inert (inference
+    /// degraded it to a union and warned), so it compiles exactly like one —
+    /// branch captures set into the enclosing scope, no variant tagging.
+    pub(super) fn compile_degraded_enum(&mut self, e: &ast::EnumPattern, ctx: PatternCtx) -> Label {
+        let branches: Vec<_> = e.branches().collect();
+        self.compile_union_branches(&Pattern::Enum(e.clone()), &branches, ctx)
+    }
+
+    /// Shared lowering for union alternations and degraded (unconsumed) enum
+    /// alternations. `alternation` is the pattern whose inferred result carries
+    /// the merged output struct.
+    fn compile_union_branches(
+        &mut self,
+        alternation: &Pattern,
+        branches: &[ast::Branch],
+        ctx: PatternCtx,
+    ) -> Label {
         let PatternCtx {
             exit,
             nav: first_nav,
             capture,
         } = ctx;
-        let branches: Vec<_> = union.branches().collect();
         if branches.is_empty() {
             return exit;
         }
@@ -227,7 +248,7 @@ impl NfaBuilder<'_> {
             .ctx
             .analysis
             .type_analysis
-            .expect_pattern_result(&Pattern::Union(union.clone()))
+            .expect_pattern_result(alternation)
             .flow
             .type_id();
         let merged_fields =
@@ -252,16 +273,25 @@ impl NfaBuilder<'_> {
             // single source of truth; a syntactic capture walk would miscount nested
             // names and drop a needed default.
             let null_effects: Vec<EffectIR> = if let Some(fields) = merged_fields {
-                let provided: HashSet<Symbol> = self
+                // Only bubbling fields count as provided; a `Value` branch (a
+                // bare reference, suppressed) contributes nothing here.
+                let provided: HashSet<Symbol> = match &self
                     .ctx
                     .analysis
                     .type_analysis
                     .expect_pattern_result(&body)
                     .flow
-                    .type_id()
-                    .map(|id| self.ctx.analysis.type_analysis.expect_struct_fields(id))
-                    .map(|f| f.keys().copied().collect())
-                    .unwrap_or_default();
+                {
+                    PatternFlow::Fields(id) => self
+                        .ctx
+                        .analysis
+                        .type_analysis
+                        .expect_struct_fields(*id)
+                        .keys()
+                        .copied()
+                        .collect(),
+                    _ => HashSet::new(),
+                };
                 fields
                     .iter()
                     .filter(|(sym, _)| !provided.contains(*sym))

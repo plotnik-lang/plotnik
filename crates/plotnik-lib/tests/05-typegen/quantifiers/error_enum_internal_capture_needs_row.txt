@@ -2,6 +2,17 @@ Bad = [
   A: (identifier) @id
 ]*
 ==== diagnostics ====
+warning: branch labels have no effect without capture
+ --> query.ptk:1:7
+  |
+1 |   Bad = [
+  |  _______^
+2 | |   A: (identifier) @id
+3 | | ]*
+  | |_^
+  |
+help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
+
 error: captures `@id` repeat with `*` but aren't collected into a list
  --> query.ptk:1:7
   |

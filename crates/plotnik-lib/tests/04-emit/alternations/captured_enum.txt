@@ -10,9 +10,10 @@ S2 "b"
 S3 "A"
 S4 "B"
 S5 "item"
-S6 "Q"
-S7 "identifier"
-S8 "number"
+S6 "QItem"
+S7 "Q"
+S8 "identifier"
+S9 "number"
 
 [type_defs]
 T0 = <Node>
@@ -26,10 +27,11 @@ M0: S1 → T0  ; a: <Node>
 M1: S2 → T0  ; b: <Node>
 M2: S3 → T1  ; A: T1
 M3: S4 → T2  ; B: T2
-M4: S5 → T3  ; item: T3
+M4: S5 → T3  ; item: QItem
 
 [type_names]
-N0: S6 → T4  ; Q
+N0: S6 → T3  ; QItem
+N1: S7 → T4  ; Q
 
 [entrypoints]
 Q = 06 :: T4

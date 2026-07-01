@@ -16,7 +16,10 @@ fn type_interning_deduplicates() {
 }
 
 #[test]
-fn struct_types_intern_correctly() {
+fn struct_types_are_nominal() {
+    // Structs mint a fresh id per occurrence: two definitions with identical
+    // capture profiles are distinct named types. Structural equality is a
+    // separate relation used by unification.
     let mut ctx = TypeAnalysisBuilder::new();
     let mut interner = Interner::new();
 
@@ -27,5 +30,6 @@ fn struct_types_intern_correctly() {
     let id1 = ctx.intern_type(TypeShape::Struct(fields.clone()));
     let id2 = ctx.intern_type(TypeShape::Struct(fields));
 
-    assert_eq!(id1, id2);
+    assert_ne!(id1, id2);
+    assert!(ctx.types_structurally_equal(id1, id2));
 }

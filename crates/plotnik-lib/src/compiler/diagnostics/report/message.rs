@@ -71,11 +71,11 @@ pub enum DiagnosticKind {
     UnusedBranchLabels,
     StrictDimensionalityViolation,
     MultiElementScalarCapture,
-    UncapturedOutputWithCaptures,
-    AmbiguousUncapturedOutputs,
     DuplicateCaptureInScope,
     IncompatibleCaptureTypes,
     IncompatibleStructShapes,
+    TypeNameConflict,
+    RedundantTypeAnnotation,
 
     PredicateOnNonLeaf,
     EmptyRegex,
@@ -110,6 +110,7 @@ impl DiagnosticKind {
     pub fn severity(&self) -> Severity {
         match self {
             Self::UnusedBranchLabels
+            | Self::RedundantTypeAnnotation
             | Self::TreeSitterSequenceSyntaxDeprecated
             | Self::NegationSyntaxDeprecated
             | Self::SupertypeSlashDeprecated => Severity::Warning,
@@ -198,9 +199,8 @@ impl DiagnosticKind {
             Self::QuantifiedAnchor | Self::CapturedAnchor => {
                 "anchors constrain position and produce no value"
             }
-            Self::UncapturedOutputWithCaptures => "add `@name` to capture the output",
-            Self::AmbiguousUncapturedOutputs => {
-                "capture each expression explicitly: `(X) @x (Y) @y`"
+            Self::UnusedBranchLabels => {
+                "capture the alternation (`[...] @name`) to make the labels enum variants, or remove them"
             }
             Self::MultiElementScalarCapture => "add internal captures: `{(a) @a (b) @b}* @items`",
             Self::UnclosedTree => "add `)` to close the node",
@@ -314,13 +314,11 @@ impl DiagnosticKind {
                 "a repeated capture must be collected into a list"
             }
             Self::MultiElementScalarCapture => "a repeated group needs internal captures",
-            Self::UncapturedOutputWithCaptures => "this match isn't captured, but its siblings are",
-            Self::AmbiguousUncapturedOutputs => {
-                "multiple expressions produce output without capture"
-            }
             Self::DuplicateCaptureInScope => "duplicate capture in scope",
             Self::IncompatibleCaptureTypes => "incompatible capture types",
             Self::IncompatibleStructShapes => "incompatible struct shapes",
+            Self::TypeNameConflict => "conflicting type name",
+            Self::RedundantTypeAnnotation => "redundant type annotation",
             Self::PredicateOnNonLeaf => {
                 "predicates match text content, but this node can contain children"
             }
@@ -363,7 +361,8 @@ impl DiagnosticKind {
             Self::IncompatibleTypes => "{}".to_string(),
             Self::StrictDimensionalityViolation => "{}".to_string(),
             Self::MultiElementScalarCapture => "{}".to_string(),
-            Self::AmbiguousUncapturedOutputs => "{}".to_string(),
+            Self::TypeNameConflict => "type name `{}` is already used for a different type".to_string(),
+            Self::RedundantTypeAnnotation => "this type annotation {}".to_string(),
             Self::DuplicateCaptureInScope => {
                 "capture `@{}` already defined in this scope".to_string()
             }

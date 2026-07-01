@@ -21,12 +21,12 @@ impl Emitter<'_> {
             TypeDefKind::Primitive(_) => "unknown".to_string(),
             TypeDefKind::Wrapper {
                 kind: TypeKind::Alias,
-                ..
+                inner,
             } => {
                 if let Some(name) = self.type_names.get(&type_id) {
                     format!("{}{}{}", c.blue, name, c.reset)
                 } else {
-                    "Node".to_string()
+                    self.render_ty(inner)
                 }
             }
             TypeDefKind::Wrapper {
@@ -114,46 +114,41 @@ impl Emitter<'_> {
             .types
             .members_of(type_def)
             .map(|member| {
-                let name = self.strings.get(member.name_id);
-                if self.is_void_type(member.type_id) {
-                    // Void payload: omit $data
-                    format!(
-                        "{}{{{} $tag{}:{} {}\"{}\"{}{}}}{}",
-                        c.dim, c.reset, c.dim, c.reset, c.green, name, c.reset, c.dim, c.reset
-                    )
-                } else {
-                    let data_type = self.render_ty(member.type_id);
-                    format!(
-                        "{}{{{} $tag{}:{} {}\"{}\"{}{}; $data{}:{} {} {}}}{}",
-                        c.dim,
-                        c.reset,
-                        c.dim,
-                        c.reset,
-                        c.green,
-                        name,
-                        c.reset,
-                        c.dim,
-                        c.dim,
-                        c.reset,
-                        data_type,
-                        c.dim,
-                        c.reset
-                    )
-                }
+                let name = self.strings.get(member.name_id).to_string();
+                self.render_variant(&name, member.type_id)
             })
             .collect();
 
         variant_strs.join(&format!(" {}|{} ", c.dim, c.reset))
     }
 
-    pub(super) fn inline_variant_payload(&self, type_id: TypeId) -> String {
+    /// One variant literal: `{ $tag: "A" }`, or `{ $tag: "A"; $data: … }` for
+    /// a variant with a payload.
+    pub(super) fn render_variant(&self, name: &str, payload_type: TypeId) -> String {
         let c = self.colors();
+        if self.is_void_type(payload_type) {
+            return format!(
+                "{}{{{} $tag{}:{} {}\"{}\"{} {}}}{}",
+                c.dim, c.reset, c.dim, c.reset, c.green, name, c.reset, c.dim, c.reset
+            );
+        }
+
+        let data = self.inline_variant_payload(payload_type);
+        format!(
+            "{}{{{} $tag{}:{} {}\"{}\"{}{}; $data{}:{} {} {}}}{}",
+            c.dim, c.reset, c.dim, c.reset, c.green, name, c.reset, c.dim, c.dim, c.reset, data,
+            c.dim, c.reset
+        )
+    }
+
+    fn inline_variant_payload(&self, type_id: TypeId) -> String {
         let Some(type_def) = self.types.get(type_id) else {
             return self.render_ty(type_id);
         };
 
+        // A struct payload is anonymous by design — always inline, even if a
+        // name table (foreign bytecode) happens to name it.
         match type_def.decode() {
-            TypeDefKind::Primitive(TypeKind::Void) => format!("{}{{}}{}", c.dim, c.reset),
             TypeDefKind::Struct { .. } => self.inline_struct(&type_def),
             _ => self.render_ty(type_id),
         }

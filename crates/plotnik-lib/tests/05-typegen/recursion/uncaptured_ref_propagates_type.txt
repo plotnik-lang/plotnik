@@ -5,16 +5,8 @@ Rec = [
 
 Q = (Rec)
 ==== types ====
-export interface RecA {
-  $tag: "A";
-  $data: { inner: Rec };
-}
+export type Rec =
+  | { $tag: "A"; $data: { inner: Rec } }
+  | { $tag: "B"; $data: { id: Node } };
 
-export interface RecB {
-  $tag: "B";
-  $data: { id: Node };
-}
-
-export type Rec = RecA | RecB;
-
-export type Q = Rec;
+export type Q = undefined;

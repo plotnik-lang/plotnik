@@ -27,10 +27,9 @@ pub enum CaptureKind {
     /// the `Call`/`Return` (with an `Struct`/`EndStruct` scope when the definition
     /// returns a struct) and consumes the result — the capture emits no `Node`.
     Ref,
-    /// The inner expression itself leaves the captured value pending — an enum
-    /// alternation (`Enum … EndEnum`) or a named node forwarding a single
-    /// structured output child. Emit the inner, then a trailing `Set`; the capture
-    /// contributes no `Node` and no wrapper.
+    /// The inner expression itself leaves the captured value pending — a
+    /// consumed enum alternation (`Enum … EndEnum`). Emit the inner, then a
+    /// trailing `Set`; the capture contributes no `Node` and no wrapper.
     PendingValue,
     /// An array collected by `*` or `+` (`Arr … Push … EndArr`).
     Array,
@@ -105,17 +104,16 @@ impl TypeAnalysis {
             // scope; a named node instead captures its matched node and lets the
             // children bubble alongside as sibling fields.
             PatternFlow::Fields(_) => {
-                // Only a union alternation flows `Fields` here; an enum flows `Value`
-                // and is handled below, so it must not appear in this arm.
+                // A captured alternation is a consumed position, so an enum
+                // flows `Value` (handled below); only a union flows `Fields`.
                 if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Union(_)) {
                     CaptureKind::Struct
                 } else {
                     CaptureKind::Node
                 }
             }
-            // A structured scalar is left pending by the inner itself — an enum
-            // alternation (`Enum`/`EndEnum`) or a named node forwarding a structured
-            // output child.
+            // A structured scalar left pending by the inner itself — a consumed
+            // enum alternation (`Enum`/`EndEnum`).
             PatternFlow::Value(type_id) if self.is_structured_output(*type_id) => {
                 CaptureKind::PendingValue
             }
@@ -168,12 +166,10 @@ impl TypeAnalysis {
             );
         }
 
-        // During inference a leaf definition may not be registered yet — the visitor
-        // walks every definition in a file before any output type is set. Fall back to
-        // the reference's own transparently-inferred flow: a structured result either
-        // bubbles its fields (struct) or is a structured scalar (enum/array).
+        // During inference a same-SCC target is not registered yet. Fall back to
+        // the reference's own inferred flow: a reference carries its target's
+        // result as a pending value (`Value`), structured or not.
         match self.pattern_result(pattern).map(|info| &info.flow) {
-            Some(PatternFlow::Fields(_)) => true,
             Some(PatternFlow::Value(t)) => self.is_structured_output(*t),
             _ => false,
         }

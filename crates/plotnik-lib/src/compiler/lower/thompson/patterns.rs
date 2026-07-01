@@ -7,9 +7,8 @@
 //! - Field constraints: `name: pattern`
 //! - Captured patterns: `@name`, `pattern @name`
 
-use crate::bytecode::{Nav, PredicateOp};
+use crate::bytecode::{EffectKind, Nav, PredicateOp};
 use crate::compiler::analyze::types::TypeShape;
-use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
     CalleeEntry, EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
     ReturnAddr,
@@ -29,8 +28,21 @@ use super::sequences::SeqItemsCtx;
 enum RefLowering {
     ScopedCapture,
     CapturedValue,
-    SuppressedOpaqueRecursion,
+    SuppressedCall,
     PlainCall,
+}
+
+/// Whether the post-effect chain consumes the call's pending value.
+///
+/// A capture on the reference itself puts its consumer (`Set`, or `Push` for an
+/// array element) first in the chain — `build_capture_effects` emits no `Node`
+/// for the `Ref` mechanism. Anything else first — a `Node`+`Set` pair capturing
+/// the matched node, or an enclosing scope's close (`EnumClose` on a tag-only
+/// variant) — leaves the reference itself unconsumed, so its output is
+/// suppressed.
+fn post_consumes_call_value(post: &[EffectIR]) -> bool {
+    post.first()
+        .is_some_and(|e| matches!(e.kind(), EffectKind::Set | EffectKind::Push))
 }
 
 impl<'a> CaptureRequest<'a> {
@@ -196,7 +208,9 @@ impl NfaBuilder<'_> {
     ///
     /// - Captured ref returning struct: `Struct → Call → EndStruct → Set → exit`
     /// - Captured ref returning scalar: `Call → Set → exit`
-    /// - Uncaptured ref: `Call → exit` (def's Sets go to parent scope)
+    /// - Bare ref to a non-void definition: `SuppressBegin → Call → SuppressEnd → exit`
+    ///   (matches structurally, output discarded)
+    /// - Bare ref to a void definition: `Call → exit` (nothing to discard)
     pub(super) fn compile_ref(
         &mut self,
         r: &ast::DefRef,
@@ -234,8 +248,8 @@ impl NfaBuilder<'_> {
             .analysis
             .type_analysis
             .expect_type_shape(def_output_id);
-        let is_captured = !capture.post.is_empty();
-        let lowering = self.ref_call_lowering(def_id, def_output_shape, is_captured);
+        let is_captured = post_consumes_call_value(&capture.post);
+        let lowering = self.ref_call_lowering(def_output_shape, is_captured);
 
         let nav = nav_override.unwrap_or(Nav::Stay);
 
@@ -255,14 +269,16 @@ impl NfaBuilder<'_> {
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
                 self.emit_call(nav, field_override, ReturnAddr(return_addr), callee)
             }
-            RefLowering::SuppressedOpaqueRecursion => {
-                // Suppress bracket keeps the structural match but discards all effects,
-                // matching the Void that inference assigns to uncaptured opaque recursion.
-                let suppress_end = self.emit_effects_epsilon(
-                    exit,
-                    vec![EffectIR::suppress_end()],
-                    CaptureEffects::default(),
-                );
+            RefLowering::SuppressedCall => {
+                // Suppress bracket keeps the structural match but discards the
+                // definition's output effects, matching the void that inference
+                // assigns to a bare reference. Non-consuming post effects (an
+                // enclosing variant's EnumClose, a scope close) run after the
+                // bracket, outside the discarded region.
+                let mut close_effects = vec![EffectIR::suppress_end()];
+                close_effects.extend(capture.post);
+                let suppress_end =
+                    self.emit_effects_epsilon(exit, close_effects, CaptureEffects::default());
                 let call_label =
                     self.emit_call(nav, field_override, ReturnAddr(suppress_end), callee);
                 self.emit_effects_epsilon(
@@ -272,8 +288,14 @@ impl NfaBuilder<'_> {
                 )
             }
             RefLowering::PlainCall => {
-                // Uncaptured ref: just Call → exit (def's Sets go to parent scope)
-                self.emit_call(nav, field_override, ReturnAddr(exit), callee)
+                // A void definition emits no output effects; the call needs no
+                // bracket. Enclosing-scope post effects still run after it.
+                let return_addr = if capture.post.is_empty() {
+                    exit
+                } else {
+                    self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default())
+                };
+                self.emit_call(nav, field_override, ReturnAddr(return_addr), callee)
             }
         };
 
@@ -285,12 +307,7 @@ impl NfaBuilder<'_> {
         self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
     }
 
-    fn ref_call_lowering(
-        &self,
-        def_id: DefId,
-        def_output_shape: &TypeShape,
-        is_captured: bool,
-    ) -> RefLowering {
+    fn ref_call_lowering(&self, def_output_shape: &TypeShape, is_captured: bool) -> RefLowering {
         if is_captured {
             if matches!(def_output_shape, TypeShape::Struct(_)) {
                 return RefLowering::ScopedCapture;
@@ -299,22 +316,14 @@ impl NfaBuilder<'_> {
             return RefLowering::CapturedValue;
         }
 
-        // An uncaptured recursive reference is opaque: inference types it Void, so
-        // its captures must not bubble into the parent scope. Enum recursion
-        // is the exception — inference forwards its enum value — so only the rest is
-        // suppressed.
-        let ref_returns_enum = matches!(def_output_shape, TypeShape::Enum(_));
-        if self
-            .ctx
-            .analysis
-            .dependency_analysis
-            .is_recursive_def(def_id)
-            && !ref_returns_enum
-        {
-            return RefLowering::SuppressedOpaqueRecursion;
+        // References are opaque: a bare reference matches structurally and its
+        // output is suppressed (inference types it void). Only a void-returning
+        // definition emits no output effects and can be called unbracketed.
+        if matches!(def_output_shape, TypeShape::Void) {
+            return RefLowering::PlainCall;
         }
 
-        RefLowering::PlainCall
+        RefLowering::SuppressedCall
     }
 
     pub(super) fn compile_field(&mut self, field: &ast::FieldPattern, ctx: PatternCtx) -> Label {

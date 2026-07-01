@@ -4,6 +4,7 @@
 
 pub mod capture_kind;
 mod entrypoints;
+mod naming;
 pub mod type_analysis;
 pub mod type_check;
 pub mod type_shape;

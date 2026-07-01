@@ -1,0 +1,13 @@
+A = [X: (expression_statement) @s]
+
+Q = (program
+  (A)
+  (debugger_statement) @name
+)
+==== types ====
+export interface Q {
+  name: Node;
+}
+
+export type A =
+  | { $tag: "X"; $data: { s: Node } };

@@ -13,18 +13,12 @@ Q = (program
 ==== input ====
 5 * x
 ==== types ====
-export interface QtA {
-  $tag: "A";
-}
-
-export interface QtB {
-  $tag: "B";
-}
-
-export type Qt = QtA | QtB;
+export type QT =
+  | { $tag: "A" }
+  | { $tag: "B" };
 
 export interface Q {
-  t: Qt;
+  t: QT;
 }
 ==== output ====
 {
@@ -38,13 +32,14 @@ S00 "Beauty will save the world"
 S01 "A"
 S02 "B"
 S03 "t"
-S04 "Q"
-S05 "program"
-S06 "expression_statement"
-S07 "binary_expression"
-S08 "number"
-S09 "+"
-S10 "identifier"
+S04 "QT"
+S05 "Q"
+S06 "program"
+S07 "expression_statement"
+S08 "binary_expression"
+S09 "number"
+S10 "+"
+S11 "identifier"
 
 [type_defs]
 T0 = <Void>
@@ -54,10 +49,11 @@ T2 = Struct  M2:1  ; { t }
 [type_members]
 M0: S01 → T0  ; A: <Void>
 M1: S02 → T0  ; B: <Void>
-M2: S03 → T1  ; t: T1
+M2: S03 → T1  ; t: QT
 
 [type_names]
-N0: S04 → T2  ; Q
+N0: S04 → T1  ; QT
+N1: S05 → T2  ; Q
 
 [entrypoints]
 Q = 06 :: T2

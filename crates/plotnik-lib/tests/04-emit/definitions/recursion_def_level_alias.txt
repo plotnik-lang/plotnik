@@ -11,31 +11,30 @@ S2 "id"
 S3 "A"
 S4 "B"
 S5 "Rec"
-S6 "Q"
-S7 "program"
-S8 "expression_statement"
-S9 "identifier"
+S6 "program"
+S7 "expression_statement"
+S8 "identifier"
+S9 "Q"
 
 [type_defs]
-T0 = <Node>
-T1 = Struct  M0:1  ; { inner }
-T2 = Struct  M1:1  ; { id }
-T3 = Enum    M2:2  ; A | B
-T4 = Alias(T3)
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { inner }
+T3 = Struct  M1:1  ; { id }
+T4 = Enum    M2:2  ; A | B
 
 [type_members]
-M0: S1 → T3  ; inner: Rec
-M1: S2 → T0  ; id: <Node>
-M2: S3 → T1  ; A: T1
-M3: S4 → T2  ; B: T2
+M0: S1 → T4  ; inner: Rec
+M1: S2 → T1  ; id: <Node>
+M2: S3 → T2  ; A: T2
+M3: S4 → T3  ; B: T3
 
 [type_names]
-N0: S5 → T3  ; Rec
-N1: S6 → T4  ; Q
+N0: S5 → T4  ; Rec
 
 [entrypoints]
-Q   = 08 :: T3
-Rec = 06 :: T3
+Q   = 08 :: T0
+Rec = 06 :: T4
 
 [transitions]
 _StructWrap:
@@ -45,15 +44,18 @@ _StructWrap:
   05                                        ▶
 
 Rec:
-  06  -ε-                                   17, 19
+  06  -ε-                                   22, 24
 
 Q:
-  08   !   (Rec)                            06 : 09
-  09                                        ▶
-  10  └‣─  (Rec)                            06 : 11
-  11  ─‣┘  [Set(M0)] _                      13
-  13  ─‣┘  _ [EnumClose]                    15
-  15                                        ▶
-  16  └‣─  (expression_statement)           10
-  17   !   [EnumOpen(M2)] (program)         16
-  19   !   [EnumOpen(M3)] (identifier) [Node Set(M1) EnumClose]  15
+  08  -ε-  [SuppressBegin]                  10
+  10   !   (Rec)                            06 : 11
+  11  -ε-  [SuppressEnd]                    13
+  13                                        ▶
+  14  └‣─  (Rec)                            06 : 16
+  15  ...
+  16  ─‣┘  [Set(M0)] _                      18
+  18  ─‣┘  _ [EnumClose]                    20
+  20                                        ▶
+  21  └‣─  (expression_statement)           14
+  22   !   [EnumOpen(M2)] (program)         21
+  24   !   [EnumOpen(M3)] (identifier) [Node Set(M1) EnumClose]  20

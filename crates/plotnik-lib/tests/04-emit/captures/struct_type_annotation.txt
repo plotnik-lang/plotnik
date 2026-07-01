@@ -4,8 +4,8 @@ Q = {(identifier) @fn} @outer :: FunctionInfo
 S0 "Beauty will save the world"
 S1 "fn"
 S2 "outer"
-S3 "Q"
-S4 "FunctionInfo"
+S3 "FunctionInfo"
+S4 "Q"
 S5 "identifier"
 
 [type_defs]
@@ -18,8 +18,8 @@ M0: S1 → T0  ; fn: <Node>
 M1: S2 → T1  ; outer: FunctionInfo
 
 [type_names]
-N0: S3 → T2  ; Q
-N1: S4 → T1  ; FunctionInfo
+N0: S3 → T1  ; FunctionInfo
+N1: S4 → T2  ; Q
 
 [entrypoints]
 Q = 08 :: T2

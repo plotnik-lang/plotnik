@@ -4,11 +4,9 @@ A = [
 ]
 
 Q = (arguments (A)+)
-==== diagnostics ====
-error: each `+` repeat produces a value, but the values aren't collected into a list
- --> query.ptk:6:16
-  |
-6 | Q = (arguments (A)+)
-  |                ^^^^
-  |
-help: add a row capture so each repeat becomes one element: `(...)+ @items`
+==== types ====
+export type A =
+  | { $tag: "X"; $data: { x: Node } }
+  | { $tag: "Y"; $data: { y: Node } };
+
+export type Q = undefined;

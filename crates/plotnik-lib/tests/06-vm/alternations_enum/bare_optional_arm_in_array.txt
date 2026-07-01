@@ -3,12 +3,8 @@ Q = (program [A: (comment)? @c]* @items)
 // c
 x;
 ==== types ====
-export interface QItemsA {
-  $tag: "A";
-  $data: { c: Node | null };
-}
-
-export type QItems = QItemsA;
+export type QItems =
+  | { $tag: "A"; $data: { c: Node | null } };
 
 export interface Q {
   items: QItems[];
@@ -40,15 +36,16 @@ S0 "Beauty will save the world"
 S1 "c"
 S2 "A"
 S3 "items"
-S4 "Q"
-S5 "program"
-S6 "comment"
+S4 "QItems"
+S5 "Q"
+S6 "program"
+S7 "comment"
 
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:1  ; { c }
 T2 = Enum    M1:1  ; A
-T3 = ArrayStar(T2)  ; T2*
+T3 = ArrayStar(T2)  ; QItems*
 T4 = Struct  M2:1  ; { items }
 T5 = Optional(T0)  ; <Node>?
 
@@ -58,7 +55,8 @@ M1: S2 → T1  ; A: T1
 M2: S3 → T3  ; items: T3
 
 [type_names]
-N0: S4 → T4  ; Q
+N0: S4 → T2  ; QItems
+N1: S5 → T4  ; Q
 
 [entrypoints]
 Q = 06 :: T4

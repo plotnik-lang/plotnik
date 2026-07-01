@@ -2,8 +2,8 @@ Q = (identifier) @name :: Identifier
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
-S1 "Identifier"
-S2 "name"
+S1 "name"
+S2 "Identifier"
 S3 "Q"
 S4 "identifier"
 
@@ -13,10 +13,10 @@ T1 = Alias(T0)
 T2 = Struct  M0:1  ; { name }
 
 [type_members]
-M0: S2 → T1  ; name: Identifier
+M0: S1 → T1  ; name: Identifier
 
 [type_names]
-N0: S1 → T1  ; Identifier
+N0: S2 → T1  ; Identifier
 N1: S3 → T2  ; Q
 
 [entrypoints]

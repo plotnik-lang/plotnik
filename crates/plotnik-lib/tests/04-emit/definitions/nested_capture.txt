@@ -7,16 +7,17 @@ S1 "name"
 S2 "item"
 S3 "items"
 S4 "Inner"
-S5 "Outer"
-S6 "call_expression"
-S7 "identifier"
-S8 "array"
+S5 "OuterItems"
+S6 "Outer"
+S7 "call_expression"
+S8 "identifier"
+S9 "array"
 
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:1  ; { name }
 T2 = Struct  M1:1  ; { item }
-T3 = ArrayStar(T2)  ; T2*
+T3 = ArrayStar(T2)  ; OuterItems*
 T4 = Struct  M2:1  ; { items }
 
 [type_members]
@@ -26,7 +27,8 @@ M2: S3 → T3  ; items: T3
 
 [type_names]
 N0: S4 → T1  ; Inner
-N1: S5 → T4  ; Outer
+N1: S5 → T2  ; OuterItems
+N2: S6 → T4  ; Outer
 
 [entrypoints]
 Inner = 06 :: T1

@@ -13,12 +13,12 @@ Q = (program
 ==== input ====
 5 * x
 ==== types ====
-export interface Qt {
+export interface QT {
   n: Node | null;
 }
 
 export interface Q {
-  t: Qt;
+  t: QT;
 }
 ==== output ====
 {
@@ -32,16 +32,17 @@ export interface Q {
 }
 ==== bytecode ====
 [strings]
-S0 "Beauty will save the world"
-S1 "n"
-S2 "t"
-S3 "Q"
-S4 "program"
-S5 "expression_statement"
-S6 "binary_expression"
-S7 "number"
-S8 "+"
-S9 "identifier"
+S00 "Beauty will save the world"
+S01 "n"
+S02 "t"
+S03 "QT"
+S04 "Q"
+S05 "program"
+S06 "expression_statement"
+S07 "binary_expression"
+S08 "number"
+S09 "+"
+S10 "identifier"
 
 [type_defs]
 T0 = <Node>
@@ -50,11 +51,12 @@ T2 = Struct  M1:1  ; { t }
 T3 = Optional(T0)  ; <Node>?
 
 [type_members]
-M0: S1 → T3  ; n: T3
-M1: S2 → T1  ; t: T1
+M0: S01 → T3  ; n: T3
+M1: S02 → T1  ; t: QT
 
 [type_names]
-N0: S3 → T2  ; Q
+N0: S03 → T1  ; QT
+N1: S04 → T2  ; Q
 
 [entrypoints]
 Q = 06 :: T2

@@ -6,6 +6,6 @@ export interface Id {
   id: Node;
 }
 
-export type Foo = Id;
+export type Foo = undefined;
 
-export type Bar = Id;
+export type Bar = undefined;

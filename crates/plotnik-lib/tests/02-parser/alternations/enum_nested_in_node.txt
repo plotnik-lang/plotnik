@@ -4,6 +4,17 @@ Q = (expr
     Unary: (unary_expression)
   ]
 )
+==== diagnostics ====
+warning: branch labels have no effect without capture
+ --> query.ptk:2:3
+  |
+2 | /   [
+3 | |     Binary: (binary_expression)
+4 | |     Unary: (unary_expression)
+5 | |   ]
+  | |___^
+  |
+help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
 ==== cst ====
 # query.ptk
 Root

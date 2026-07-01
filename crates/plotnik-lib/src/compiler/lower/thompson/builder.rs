@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 
 use crate::bytecode::Nav;
+use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::{InstructionIR, Label, NfaGraph, ReturnIR, TrampolineIR};
@@ -141,7 +142,22 @@ impl<'a> NfaBuilder<'a> {
             Pattern::TokenPattern(n) => self.compile_token_pattern(n, ctx),
             Pattern::SeqPattern(s) => self.compile_seq(s, ctx),
             Pattern::Union(u) => self.compile_union(u, ctx),
-            Pattern::Enum(e) => self.compile_enum(e, ctx),
+            Pattern::Enum(e) => {
+                // Inference decides tagging by consumption: a consumed enum
+                // flows `Value(enum)`; an unconsumed one degraded to a union
+                // (fields or void) and compiles without variant scopes.
+                let flow = &self
+                    .ctx
+                    .analysis
+                    .type_analysis
+                    .expect_pattern_result(pattern)
+                    .flow;
+                if matches!(flow, PatternFlow::Value(_)) {
+                    self.compile_enum(e, ctx)
+                } else {
+                    self.compile_degraded_enum(e, ctx)
+                }
+            }
             Pattern::CapturedPattern(c) => {
                 let PatternCtx { exit, nav, capture } = ctx;
                 self.compile_captured(c, c.inner(), nav, capture, CaptureExits::Single(exit))

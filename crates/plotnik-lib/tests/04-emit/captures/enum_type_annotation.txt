@@ -10,8 +10,8 @@ S2 "num"
 S3 "A"
 S4 "B"
 S5 "expr"
-S6 "Q"
-S7 "Expression"
+S6 "Expression"
+S7 "Q"
 S8 "identifier"
 S9 "number"
 
@@ -30,8 +30,8 @@ M3: S4 → T2  ; B: T2
 M4: S5 → T3  ; expr: Expression
 
 [type_names]
-N0: S6 → T4  ; Q
-N1: S7 → T3  ; Expression
+N0: S6 → T3  ; Expression
+N1: S7 → T4  ; Q
 
 [entrypoints]
 Q = 06 :: T4

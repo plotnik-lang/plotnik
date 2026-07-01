@@ -3,17 +3,9 @@ Q = [
   B: (number) @n
 ]* @rows
 ==== types ====
-export interface QRowsA {
-  $tag: "A";
-  $data: { id: Node };
-}
-
-export interface QRowsB {
-  $tag: "B";
-  $data: { n: Node };
-}
-
-export type QRows = QRowsA | QRowsB;
+export type QRows =
+  | { $tag: "A"; $data: { id: Node } }
+  | { $tag: "B"; $data: { n: Node } };
 
 export interface Q {
   rows: QRows[];

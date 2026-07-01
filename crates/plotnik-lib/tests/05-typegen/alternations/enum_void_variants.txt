@@ -8,15 +8,9 @@ Q = (program
   (debugger_statement) @name
 )
 ==== types ====
-export interface AX {
-  $tag: "X";
-}
-
-export interface AY {
-  $tag: "Y";
-}
-
-export type A = AX | AY;
+export type A =
+  | { $tag: "X" }
+  | { $tag: "Y" };
 
 export interface Q {
   a: A;

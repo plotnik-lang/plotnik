@@ -190,26 +190,6 @@ impl NfaBuilder<'_> {
             capture,
         } = ctx;
 
-        // When the inner produces a structured value (an enum, inline or via ref)
-        // and this is a star/plus quantifier without explicit capture, we still
-        // need array scope (Arr/Push/EndArr) because the type system expects an
-        // array of these values.
-        let needs_implicit_array = quant.is_repeating() && self.quantified_value_needs_array(&inner);
-
-        if needs_implicit_array {
-            // No Set on the array itself — collect structured values via Push only.
-            let quant_pattern = Pattern::QuantifiedPattern(quant.clone());
-            return self.compile_array_capture(
-                CaptureRequest {
-                    inner: &quant_pattern,
-                    nav: nav_override,
-                    capture_effects: vec![],
-                    outer_capture: capture,
-                },
-                CaptureExits::Single(exit),
-            );
-        }
-
         let config = QuantifierConfig {
             inner: &inner,
             kind,
@@ -318,27 +298,6 @@ impl NfaBuilder<'_> {
             QuantifierForm::Quantified { inner, kind } => (inner, kind),
         };
 
-        // When the inner produces a structured value (an enum, inline or via ref)
-        // and this is a star/plus quantifier without explicit capture, we still
-        // need array scope (Arr/Push/EndArr) with split exits for the skip/match paths.
-        let needs_implicit_array = quant.is_repeating() && self.quantified_value_needs_array(&inner);
-
-        if needs_implicit_array {
-            let quant_pattern = Pattern::QuantifiedPattern(quant.clone());
-            return self.compile_array_capture(
-                CaptureRequest {
-                    inner: &quant_pattern,
-                    nav: nav_override,
-                    capture_effects: vec![],
-                    outer_capture: capture,
-                },
-                CaptureExits::Split {
-                    match_exit,
-                    skip_exit,
-                },
-            );
-        }
-
         let skip_with_null = self.emit_null_for_skip_path(skip_exit, &capture);
         let skip_with_internal_null = self.emit_null_for_internal_captures(skip_with_null, &inner);
 
@@ -357,14 +316,13 @@ impl NfaBuilder<'_> {
         self.compile_quantified_unified(config)
     }
 
-    /// Compile an array capture (`(x)* @cap`) or an uncaptured implicit array
-    /// (`(R)*` where `R` returns a structured type) — `Arr → quantifier (with Push)
+    /// Compile an array capture (`(x)* @cap`) — `Arr → quantifier (with Push)
     /// → EndArr+capture → exit(s)`. With `Single` exits the loop falls straight
     /// through; with `Split` exits a zero-match takes `skip_exit` and a loop-exit
     /// takes `match_exit`, each closing the array. `capture_effects` is built once
-    /// by the caller (empty for an implicit array); the matched element's
-    /// `Node` is pushed only when the element is not already a structured
-    /// value ([`quantifier_needs_node_for_push`](Self::quantifier_needs_node_for_push)).
+    /// by the caller; the matched element's `Node` is pushed only when the
+    /// element is not already a structured value
+    /// ([`quantifier_needs_node_for_push`](Self::quantifier_needs_node_for_push)).
     pub(super) fn compile_array_capture(
         &mut self,
         req: CaptureRequest<'_>,

@@ -2,31 +2,29 @@ Q = (program [Tag: [In: (expression_statement) @a] @y])
 ==== input ====
 a;
 ==== types ====
-export interface QTag {
-  $tag: "Tag";
-  $data: { y: Enum };
+export type QY =
+  | { $tag: "In"; $data: { a: Node } };
+
+export interface Q {
+  y: QY;
 }
-
-export type Q = QTag;
-
-export interface EnumIn {
-  $tag: "In";
-  $data: { a: Node };
-}
-
-export type Enum = EnumIn;
+==== diagnostics ====
+warning: branch labels have no effect without capture
+ --> query.ptk:1:14
+  |
+1 | Q = (program [Tag: [In: (expression_statement) @a] @y])
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
 ==== output ====
 {
-  "$tag": "Tag",
-  "$data": {
-    "y": {
-      "$tag": "In",
-      "$data": {
-        "a": {
-          "kind": "expression_statement",
-          "text": "a;",
-          "span": [0, 2]
-        }
+  "y": {
+    "$tag": "In",
+    "$data": {
+      "a": {
+        "kind": "expression_statement",
+        "text": "a;",
+        "span": [0, 2]
       }
     }
   }
@@ -37,7 +35,7 @@ S0 "Beauty will save the world"
 S1 "a"
 S2 "In"
 S3 "y"
-S4 "Tag"
+S4 "QY"
 S5 "Q"
 S6 "program"
 S7 "expression_statement"
@@ -47,19 +45,18 @@ T0 = <Node>
 T1 = Struct  M0:1  ; { a }
 T2 = Enum    M1:1  ; In
 T3 = Struct  M2:1  ; { y }
-T4 = Enum    M3:1  ; Tag
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
 M1: S2 → T1  ; In: T1
-M2: S3 → T2  ; y: T2
-M3: S4 → T3  ; Tag: T3
+M2: S3 → T2  ; y: QY
 
 [type_names]
-N0: S5 → T4  ; Q
+N0: S4 → T2  ; QY
+N1: S5 → T3  ; Q
 
 [entrypoints]
-Q = 06 :: T4
+Q = 06 :: T3
 
 [transitions]
 _StructWrap:
@@ -72,8 +69,8 @@ Q:
   06   !   (program)                        08
   07  ...
   08  └‣─  _                                10, 16
-  10   !   [EnumOpen(M3) EnumOpen(M1)] (expression_statement) [Node Set(M0) EnumClose]  13
-  13  ─‣┘  [Set(M2) EnumClose] _            15
+  10   !   [EnumOpen(M1)] (expression_statement) [Node Set(M0) EnumClose]  13
+  13  ─‣┘  [Set(M2)] _                      15
   15                                        ▶
   16  ─‣─  _                                10, 16
 ==== trace ====
@@ -87,9 +84,9 @@ Q:
        ●   program
   08       _                                10, 16
        ●   expression_statement
-  10       [EnumOpen(M3) EnumOpen(M1)] (expression_statement) [Node Set(M0) EnumClose]  13
+  10       [EnumOpen(M1)] (expression_statement) [Node Set(M0) EnumClose]  13
        ●   expression_statement
-  13       [Set(M2) EnumClose] _            15
+  13       [Set(M2)] _                      15
        ●   program
   15   ◀   (Q)                              
 

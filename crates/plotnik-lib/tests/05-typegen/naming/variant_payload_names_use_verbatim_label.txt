@@ -1,0 +1,16 @@
+Q = (program [
+  Stmt: (expression_statement {(identifier) @name} @info)
+  DECL: (lexical_declaration) @node
+] @item)
+==== types ====
+export type QItem =
+  | { $tag: "Stmt"; $data: { info: QItemStmtInfo } }
+  | { $tag: "DECL"; $data: { node: Node } };
+
+export interface Q {
+  item: QItem;
+}
+
+export interface QItemStmtInfo {
+  name: Node;
+}
