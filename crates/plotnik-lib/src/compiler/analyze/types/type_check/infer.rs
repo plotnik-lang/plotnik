@@ -481,6 +481,15 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let captured_inner = self.resolve_capture_inner(&inner);
         let inner_info = captured_inner.info;
 
+        // A void inner that doesn't match exactly one node has no single node
+        // for the capture to bind. Recover as `Node` — the error is already
+        // reported. Direct quantifiers are exempt: the captured-quantifier
+        // machinery defines their value (array, or optional node), and the
+        // exactly-one check runs on their element instead.
+        if !matches!(inner.node(), Pattern::QuantifiedPattern(_)) {
+            self.report_capture_on_multi_node_void(inner.node(), &inner_info);
+        }
+
         // Only the `Node` mechanism captures the matched node and lets the inner's
         // fields bubble up alongside (e.g. `(named (child) @c) @cap`). Every other
         // mechanism owns the inner's fields, so they must not also bubble. Sharing
@@ -692,14 +701,23 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let quantifier = self.quantifier_kind(quant.node());
 
         let flow = match quantifier {
-            QuantifierKind::Optional => self.make_flow_optional(inner_info.flow),
+            QuantifierKind::Optional => {
+                // A captured `?` of a multi-node void group has no single node
+                // to bind (or null), just like a captured repeat.
+                if context == QuantifiedContext::Captured {
+                    self.report_multi_element_scalar(quant.node(), &inner_info);
+                }
+                self.make_flow_optional(inner_info.flow)
+            }
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
                 self.check_quantified_array_dimensionality(quant.node(), &inner_info, context);
                 self.make_flow_array(inner_info.flow, quantifier.is_non_empty(), context)
             }
         };
 
-        PatternShape::new(inner_info.arity, flow)
+        // One match of a quantified pattern spans a variable range of sibling
+        // positions — never "exactly one node", whatever the inner's arity.
+        PatternShape::new(Arity::Many, flow)
     }
 
     fn check_quantified_array_dimensionality(
@@ -796,12 +814,38 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Consumption::Plain => self.infer_pattern(&value),
         };
 
-        // Validation: Fields cannot be assigned 'Many' arity values directly
-        if value_info.arity == Arity::Many {
+        // A field names exactly one child per match. Quantifiers and captures
+        // on a field value apply to the whole field constraint (`f: (x)*`
+        // repeats the field), so the exactly-one requirement lands on the
+        // pattern under them.
+        if self.field_core_arity(value.node(), &value_info) == Arity::Many {
             self.report_field_arity_error(field.node(), value.node());
         }
 
         PatternShape::new(Arity::One, value_info.flow)
+    }
+
+    /// The arity of a field value under its capture/quantifier wrappers. The
+    /// core was inferred as part of the value, so its result is cached.
+    fn field_core_arity(&self, value: &Pattern, value_info: &PatternShape) -> Arity {
+        let mut core = value.clone();
+        loop {
+            let inner = match &core {
+                Pattern::CapturedPattern(c) => c.inner(),
+                Pattern::QuantifiedPattern(q) => q.inner(),
+                _ => None,
+            };
+            match inner {
+                Some(inner) => core = inner,
+                None => break,
+            }
+        }
+        self.ctx
+            .type_ctx
+            .in_progress()
+            .pattern_result(&core)
+            .map(|info| info.arity)
+            .unwrap_or(value_info.arity)
     }
 
     fn quantifier_kind(&self, quant: &QuantifiedPattern) -> QuantifierKind {

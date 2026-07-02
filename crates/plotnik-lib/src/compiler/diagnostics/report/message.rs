@@ -202,7 +202,6 @@ impl DiagnosticKind {
             Self::UnusedBranchLabels => {
                 "capture the alternation (`[...] @name`) to make the labels enum variants, or remove them"
             }
-            Self::MultiElementScalarCapture => "add internal captures: `{(a) @a (b) @b}* @items`",
             Self::UnclosedTree => "add `)` to close the node",
             Self::UnclosedSequence => "add `}` to close the sequence",
             Self::UnclosedAlternation => "add `]` to close the alternation",
@@ -313,7 +312,7 @@ impl DiagnosticKind {
             Self::StrictDimensionalityViolation => {
                 "a repeated capture must be collected into a list"
             }
-            Self::MultiElementScalarCapture => "a repeated group needs internal captures",
+            Self::MultiElementScalarCapture => "a captured pattern must match exactly one node",
             Self::DuplicateCaptureInScope => "duplicate capture in scope",
             Self::IncompatibleCaptureTypes => "incompatible capture types",
             Self::IncompatibleStructShapes => "incompatible struct shapes",

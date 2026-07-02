@@ -40,9 +40,8 @@ impl InferVisitor<'_, '_> {
         Some((source, body.text_range()))
     }
 
-    /// Report a captured repeat of a multi-element void group: it matches
-    /// several nodes per iteration but captures none, so an element value is
-    /// undefined.
+    /// Report a captured quantifier whose void inner doesn't match exactly one
+    /// node: there is no single node to bind (per element, for repeats).
     pub(super) fn report_multi_element_scalar(
         &mut self,
         quant: &QuantifiedPattern,
@@ -54,15 +53,63 @@ impl InferVisitor<'_, '_> {
         }
 
         let op = self.quantifier_operator(quant);
+        let (detail, hint) = if op.starts_with('?') {
+            (
+                format!("this `{op}` group doesn't match exactly one node, so there is no single node to bind"),
+                "capture individual nodes inside the group: `{(a) @a (b) @b}? @x`".to_string(),
+            )
+        } else {
+            (
+                format!("one repeat of this `{op}` group doesn't match exactly one node, so there is no single node to bind per element"),
+                format!("add internal captures: `{{(a) @a (b) @b}}{op} @items`"),
+            )
+        };
         self.report(
             DiagnosticKind::MultiElementScalarCapture,
             quant.text_range(),
         )
-        .detail(format!(
-            "this `{}` group matches several nodes but captures none of them",
-            op
-        ))
+        .detail(detail)
+        .hint(hint)
         .emit();
+    }
+
+    /// Report a capture whose void inner doesn't match exactly one node —
+    /// whether several or possibly none, there is no single node to bind.
+    /// Without this, the capture would silently bind an arbitrary node (or one
+    /// per repeat), or dangle on a zero-width match.
+    pub(super) fn report_capture_on_multi_node_void(
+        &mut self,
+        inner: &Pattern,
+        inner_info: &PatternShape,
+    ) {
+        if inner_info.arity != Arity::Many || !inner_info.flow.is_void() {
+            return;
+        }
+
+        let (detail, hint) = match inner {
+            Pattern::DefRef(_) => (
+                "the referenced definition doesn't match exactly one node, so there is no single node to bind",
+                "capture nodes inside the definition, or drop this capture",
+            ),
+            Pattern::Union(_) | Pattern::Enum(_) => (
+                "this alternation doesn't match exactly one node, so there is no single node to bind",
+                "capture inside the branches, or drop this capture",
+            ),
+            _ => (
+                "this group doesn't match exactly one node, so there is no single node to bind",
+                "capture individual nodes inside the group: `{(a) @a (b) @b} @x`",
+            ),
+        };
+
+        let related = self.referenced_definition_range(inner);
+        let mut builder = self
+            .report(DiagnosticKind::MultiElementScalarCapture, inner.text_range())
+            .detail(detail)
+            .hint(hint);
+        if let Some((src, range)) = related {
+            builder = builder.related_to(Span::new(src, range), "defined here");
+        }
+        builder.emit();
     }
 
     /// Report repeated bubbling captures that need an enclosing row capture:

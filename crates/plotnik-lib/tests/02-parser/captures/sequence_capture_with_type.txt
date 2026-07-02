@@ -1,6 +1,6 @@
 Q = {
-  (a)
-  (b)
+  (a) @a
+  (b) @b
 } @seq :: MySequence
 ==== cst ====
 # query.ptk
@@ -11,14 +11,18 @@ Root
     Capture
       Sequence
         BraceOpen "{"
-        NamedNode
-          ParenOpen "("
-          Id "a"
-          ParenClose ")"
-        NamedNode
-          ParenOpen "("
-          Id "b"
-          ParenClose ")"
+        Capture
+          NamedNode
+            ParenOpen "("
+            Id "a"
+            ParenClose ")"
+          CaptureToken "@a"
+        Capture
+          NamedNode
+            ParenOpen "("
+            Id "b"
+            ParenClose ")"
+          CaptureToken "@b"
         BraceClose "}"
       CaptureToken "@seq"
       TypeAnnotation
@@ -30,5 +34,7 @@ Root
   Def Q
     CapturedPattern @seq :: MySequence
       Seq
-        NamedNode a
-        NamedNode b
+        CapturedPattern @a
+          NamedNode a
+        CapturedPattern @b
+          NamedNode b

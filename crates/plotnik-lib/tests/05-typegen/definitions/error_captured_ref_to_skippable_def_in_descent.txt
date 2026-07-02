@@ -1,0 +1,12 @@
+A = (identifier)??
+Q = (program (A) @x)
+==== diagnostics ====
+error: the referenced definition doesn't match exactly one node, so there is no single node to bind
+ --> query.ptk:2:14
+  |
+1 | A = (identifier)??
+  |     -------------- defined here
+2 | Q = (program (A) @x)
+  |              ^^^
+  |
+help: capture nodes inside the definition, or drop this capture
