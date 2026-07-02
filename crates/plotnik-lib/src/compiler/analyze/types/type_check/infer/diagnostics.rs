@@ -138,10 +138,17 @@ impl InferVisitor<'_, '_> {
             .map(|n| format!("`@{}`", n))
             .collect::<Vec<_>>()
             .join(", ");
-        let detail = format!(
-            "captures {} repeat with `{}` but aren't collected into a list",
-            captures_str, op
-        );
+        let detail = if op.starts_with('?') {
+            format!(
+                "captures {} skip together with `{}` but nothing collects them",
+                captures_str, op
+            )
+        } else {
+            format!(
+                "captures {} repeat with `{}` but aren't collected into a list",
+                captures_str, op
+            )
+        };
 
         // The suggestion lands beside sibling captures, so avoid names bound there.
         let mut taken = raw_names;
@@ -155,14 +162,26 @@ impl InferVisitor<'_, '_> {
         );
         let placeholder = fresh_capture_name(&taken);
         let brackets = row_capture_brackets(quant);
+        let hint = if op.starts_with('?') {
+            format!(
+                "capture the group so the skip is a single null: `{}{} @{}`",
+                brackets, op, placeholder
+            )
+        } else {
+            format!(
+                "add a row capture so each repeat becomes one element: `{}{} @{}`",
+                brackets, op, placeholder
+            )
+        };
         self.report(
             DiagnosticKind::StrictDimensionalityViolation,
             quant.text_range(),
         )
         .detail(detail)
+        .hint(hint)
         .hint(format!(
-            "add a row capture so each repeat becomes one element: `{}{} @{}`",
-            brackets, op, placeholder
+            "or discard the captures if only the structure matters: `{}{} @_`",
+            brackets, op
         ))
         .emit();
     }

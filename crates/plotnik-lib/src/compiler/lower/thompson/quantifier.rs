@@ -4,7 +4,7 @@
 //! `compile_quantified_unified` entry point so greediness and search-nav logic
 //! stay in one place.
 
-use crate::bytecode::Nav;
+use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOperator};
@@ -314,6 +314,85 @@ impl NfaBuilder<'_> {
         };
 
         self.compile_quantified_unified(config)
+    }
+
+    /// Compile a struct-mechanism capture whose inner is an optional quantifier
+    /// (`{...}? @x`, `[...]? @x`) — the only quantifier that reaches the struct
+    /// mechanism, since `*`/`+` classify as `Array`.
+    ///
+    /// The row is optional as a whole. Mirroring how arrays scope each element
+    /// row, the `Struct → body → EndStruct+Set` wrapper lives inside the
+    /// iteration; the skip path emits a bare `Null` for the capture instead of
+    /// a hollow `{ field: null }` struct, matching the declared
+    /// `{ … } | null` type.
+    pub(super) fn compile_optional_row_capture(
+        &mut self,
+        quant: &ast::QuantifiedPattern,
+        nav_override: Option<Nav>,
+        capture_effects: Vec<EffectIR>,
+        outer_capture: CaptureEffects,
+        exits: CaptureExits,
+    ) -> Label {
+        let QuantifierForm::Quantified { inner, kind } = classify_quantifier(quant) else {
+            unreachable!("admitted struct-mechanism quantifier has an operator and an inner");
+        };
+        assert!(
+            matches!(kind.kind(), QuantifierKind::Optional),
+            "`*`/`+` captures classify as Array, never Struct"
+        );
+
+        let (match_exit, skip_exit) = match exits {
+            CaptureExits::Single(exit) => (exit, exit),
+            CaptureExits::Split {
+                match_exit,
+                skip_exit,
+            } => (match_exit, skip_exit),
+        };
+
+        // Skip: the row is absent — null the capture; the enclosing scope's
+        // trailing effects still run, as they do on the match path.
+        let mut skip_effects: Vec<EffectIR> = capture_effects
+            .iter()
+            .filter(|eff| eff.kind() == EffectKind::Set)
+            .flat_map(|set_eff| [EffectIR::null(), set_eff.clone()])
+            .collect();
+        skip_effects.extend(outer_capture.post.iter().cloned());
+        let skip_target = self.emit_effects_if_nonempty(skip_exit, skip_effects);
+
+        // The row scope's type drives the inner captures' Set member resolution.
+        let row_type_id = self
+            .ctx
+            .analysis
+            .type_analysis
+            .expect_pattern_result(&inner)
+            .flow
+            .type_id();
+
+        let end_effects = ScopeCloseEffects {
+            capture: &capture_effects,
+            outer: &outer_capture.post,
+        };
+        let iterate = self.emit_iteration(
+            nav_override.unwrap_or(Nav::Down),
+            match_exit,
+            |this, target| {
+                let ExitNav { exit, nav } = target;
+                let struct_close = this.emit_struct_close_step_with_effects(end_effects, exit);
+                let body = this.compile_with_optional_scope(row_type_id, |t| {
+                    t.compile_pattern(&inner, struct_close, Some(nav))
+                });
+                this.emit_struct_step(body)
+            },
+        );
+
+        let entry = self.emit_branch_epsilon(
+            BranchTargets {
+                prefer: iterate,
+                other: skip_target,
+            },
+            Greediness::from(kind),
+        );
+        self.wrap_entry_pre(entry, outer_capture.pre)
     }
 
     /// Compile an array capture (`(x)* @cap`) — `Arr → quantifier (with Push)

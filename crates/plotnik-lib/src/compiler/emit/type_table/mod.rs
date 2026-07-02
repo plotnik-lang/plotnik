@@ -263,12 +263,15 @@ fn resolve_field_type(
 ) -> Result<WireTypeId, EmitError> {
     let base_type = types.resolve_type(field_info.type_id, type_ctx)?;
 
-    // `Optional` is idempotent. A captured optional whose base already carries
-    // `Optional` — `(Inner)? @x`, where `make_flow_optional` wrapped the inner
-    // before the capture set `optional` too — must not become
-    // `Optional(Optional(T))`: one skip path emits one `Null`, so the field is a
-    // single `| null`.
-    if field_info.optional && !source_is_optional(type_ctx, field_info.type_id) {
+    if field_info.optional {
+        // Field optionality is single-sourced: inference puts a captured `?`'s
+        // null on the capture field alone, never on the base type as well. A
+        // base still resolving to `Optional` would declare the null twice for
+        // one skip-path `Null`.
+        assert!(
+            !source_is_optional(type_ctx, field_info.type_id),
+            "optional field over an already-optional base type"
+        );
         types.intern_optional(base_type)
     } else {
         Ok(base_type)

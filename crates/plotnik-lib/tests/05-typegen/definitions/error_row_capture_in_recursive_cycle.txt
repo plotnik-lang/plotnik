@@ -1,10 +1,10 @@
-A = {(expression_statement) (statement_block (B)* @xs)?}
+A = {(expression_statement) (statement_block (B)* @xs)? @blk}
 B = {(debugger_statement) (statement_block (A))?}
 ==== diagnostics ====
 error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
  --> query.ptk:1:46
   |
-1 | A = {(expression_statement) (statement_block (B)* @xs)?}
+1 | A = {(expression_statement) (statement_block (B)* @xs)? @blk}
   |                                              ^^^^
   |
 help: add internal captures: `{(a) @a (b) @b}* @items`

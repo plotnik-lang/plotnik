@@ -68,7 +68,11 @@ impl TypeAnalysis {
             return match kind {
                 // `*` / `+` collect into an array regardless of element shape.
                 QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureKind::Array,
-                // `?` only adds optionality; the value mechanism is the inner's.
+                // `?` adds optionality to the inner's value mechanism — except a
+                // fields-flow inner, whose captures the `?` collects as one
+                // nullable row (the `?` counterpart of `*`'s Array). That holds
+                // for a named node too, even though its bare capture is a
+                // `Node`: quantified, its fields have nowhere to bubble.
                 QuantifierKind::Optional => {
                     let Some(inner) = quant.inner() else {
                         return mode.recover(
@@ -76,7 +80,14 @@ impl TypeAnalysis {
                             CaptureKind::Node,
                         );
                     };
-                    self.classify(&inner, deps, interner, mode)
+                    let kind = self.classify(&inner, deps, interner, mode);
+                    let inner_flow = mode.pattern_flow(self, &unwrap_field(&inner));
+                    if kind == CaptureKind::Node
+                        && matches!(inner_flow, Some(PatternFlow::Fields(_)))
+                    {
+                        return CaptureKind::Struct;
+                    }
+                    kind
                 }
             };
         }

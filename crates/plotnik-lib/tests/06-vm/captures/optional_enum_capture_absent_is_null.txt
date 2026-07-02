@@ -27,20 +27,20 @@ S7 "identifier"
 T0 = <Node>
 T1 = Struct  M0:1  ; { a }
 T2 = Enum    M1:1  ; A
-T3 = Optional(T2)  ; QE?
-T4 = Struct  M2:1  ; { e }
+T3 = Struct  M2:1  ; { e }
+T4 = Optional(T2)  ; QE?
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
 M1: S2 → T1  ; A: T1
-M2: S3 → T3  ; e: T3
+M2: S3 → T4  ; e: T4
 
 [type_names]
 N0: S4 → T2  ; QE
-N1: S5 → T4  ; Q
+N1: S5 → T3  ; Q
 
 [entrypoints]
-Q = 06 :: T4
+Q = 06 :: T3
 
 [transitions]
 _StructWrap:

@@ -123,12 +123,11 @@ impl NfaBuilder<'_> {
 
     /// Compile a struct-scope capture: `Struct → inner → EndStruct+capture → exit(s)`.
     ///
-    /// The struct opens once and closes on every continuation. With `Single` exits
-    /// the inner is compiled straight through; with `Split` exits (a `{...}? @cap`
-    /// optional at a navigating first-child) the inner is compiled with split exits
-    /// inside the scope and the struct closes on both — a skipped optional yields
-    /// `{ field: null }`, never a bare null capture, so the child position stays
-    /// consistent with the same pattern at the query root (#470).
+    /// A quantified inner (`{...}? @cap`) routes to
+    /// [`compile_optional_row_capture`](Self::compile_optional_row_capture): the
+    /// row is optional as a whole, so the struct scope must not open on the skip
+    /// path. For the remaining (non-quantified) inners the struct opens once and
+    /// closes on every continuation.
     ///
     /// `outer_capture.pre` runs in the enclosing scope before the struct opens
     /// (e.g. an alternation branch's null-injected defaults, or an enum variant's
@@ -145,6 +144,20 @@ impl NfaBuilder<'_> {
             capture_effects,
             outer_capture,
         } = req;
+
+        // `{...}? @x`: the row is optional as a whole. The struct scope moves
+        // inside the quantifier iteration so a skip emits a bare `Null` for the
+        // capture — never a hollow `{ field: null }` struct.
+        if let Pattern::QuantifiedPattern(quant) = inner {
+            return self.compile_optional_row_capture(
+                quant,
+                nav,
+                capture_effects,
+                outer_capture,
+                exits,
+            );
+        }
+
         // The struct scope's type drives the inner captures' Set member resolution.
         let scope_type_id = self
             .ctx

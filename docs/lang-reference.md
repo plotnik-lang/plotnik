@@ -266,9 +266,13 @@ Node arrays work when the quantified pattern has **no internal captures**. For p
 
 | Pattern         | Output Type       | Meaning                                 |
 | --------------- | ----------------- | --------------------------------------- |
-| `{...}* @items` | `items: T[]`      | zero or more structs                    |
-| `{...}+ @items` | `items: [T, ...]` | one or more structs                     |
-| `{...}? @item`  | `item: T \| null` | nullable struct (bubbles if uncaptured) |
+| `{...}* @items` | `items: T[]`      | zero or more structs |
+| `{...}+ @items` | `items: [T, ...]` | one or more structs  |
+| `{...}? @item`  | `item: T \| null` | nullable struct      |
+
+The capture on the quantifier is required whenever the pattern has internal
+captures — for `?` just like `*`/`+` (use `@_` to match structurally and
+discard them).
 
 ### Creating Nested Structure
 

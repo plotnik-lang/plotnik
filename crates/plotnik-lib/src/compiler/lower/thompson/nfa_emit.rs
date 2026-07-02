@@ -150,7 +150,7 @@ impl NfaBuilder<'_> {
         self.emit_effects_if_nonempty(exit, null_effects)
     }
 
-    fn emit_effects_if_nonempty(&mut self, exit: Label, effects: Vec<EffectIR>) -> Label {
+    pub(super) fn emit_effects_if_nonempty(&mut self, exit: Label, effects: Vec<EffectIR>) -> Label {
         if effects.is_empty() {
             return exit;
         }

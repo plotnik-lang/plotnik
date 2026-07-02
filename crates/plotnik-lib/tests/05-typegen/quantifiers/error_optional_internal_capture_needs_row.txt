@@ -1,0 +1,17 @@
+Q = {
+  (identifier) @mod
+  (decorator) @dec
+}?
+==== diagnostics ====
+error: captures `@mod`, `@dec` skip together with `?` but nothing collects them
+ --> query.ptk:1:5
+  |
+1 |   Q = {
+  |  _____^
+2 | |   (identifier) @mod
+3 | |   (decorator) @dec
+4 | | }?
+  | |__^
+  |
+help: capture the group so the skip is a single null: `{...}? @items`
+help: or discard the captures if only the structure matters: `{...}? @_`

@@ -716,14 +716,26 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let quantifier = self.quantifier_kind(quant.node());
 
         let flow = match quantifier {
-            QuantifierKind::Optional => {
+            QuantifierKind::Optional => match context {
                 // A captured `?` of a multi-node void group has no single node
-                // to bind (or null), just like a captured repeat.
-                if context == QuantifiedContext::Captured {
+                // to bind (or null), just like a captured repeat. Otherwise the
+                // inner flow passes through untouched: the capture collects it
+                // as one nullable value — fields keep their true modality, the
+                // null lives on the capture field alone.
+                QuantifiedContext::Captured => {
                     self.report_multi_element_scalar(quant.node(), &inner_info);
+                    inner_info.flow
                 }
-                self.make_flow_optional(inner_info.flow)
-            }
+                // Internal captures of a bare `?` have nothing to collect them,
+                // exactly like a bare repeat: a skip would scatter correlated
+                // nulls into the enclosing scope. Recover with the legacy
+                // bubbling shape so downstream inference stays coherent.
+                QuantifiedContext::Bare => {
+                    self.report_internal_capture_dimensionality(quant.node(), &inner_info);
+                    self.make_flow_optional(inner_info.flow)
+                }
+                QuantifiedContext::Suppressed => self.make_flow_optional(inner_info.flow),
+            },
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
                 self.check_quantified_array_dimensionality(quant.node(), &inner_info, context);
                 self.make_flow_array(inner_info.flow, quantifier.is_non_empty(), context)

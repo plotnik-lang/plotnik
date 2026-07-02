@@ -142,11 +142,18 @@ Rule: `.!` is exact. Soft `.` skips anonymous nodes only when both sides are nam
 
 Note: `{}` is for grouping siblings into a sequence, not for satisfying dimensionality.
 
-**Optional bubbling**: `?` does NOT require row capture (no dimensionality added):
+**Optional rows**: `?` follows the same rule — internal captures need a
+capture on the quantifier (`@_` to discard); the collected row is nullable:
 
 ```
-{(a) @a (b) @b}?    ; OK: a?: Node, b?: Node (bubbles to parent)
+{(a) @a (b) @b}?    ; ERROR: captures skip together, nothing collects them
+{(a) @a (b) @b}? @x ; OK: x: { a: Node, b: Node } | null (one nullable row)
+(el (a) @a)? @x     ; OK: x: { a: Node } | null (like (el (a) @a)* @xs rows)
+(a)? @x             ; OK: x: Node | null (capture on the quantifier itself)
 ```
+
+A skip yields `x: null`, never `{ a: null, b: null }` — fields keep their
+true modality inside the row.
 
 **Recursion rules** — every cycle must both escape (a non-recursive branch) and consume (descend into a child each pass):
 

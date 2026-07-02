@@ -105,13 +105,17 @@ matches exactly one node — the capture takes that node (`{(a)} @x` ≡
 
 Two rules keep repetition and captures honest:
 
-**1. A repeated capture must be collected into a list.** Quantifying a pattern
-whose captures bubble requires a row capture on the quantifier:
+**1. A quantifier's internal captures must be collected by a capture on the
+quantifier.** All quantifiers, uniformly — `*`/`+` collect a list of rows, `?`
+collects one nullable row; `@_` discards:
 
 ```
 {(key) @k (value) @v}*            ; ERROR: captures repeat, nothing collects them
 {(key) @k (value) @v}* @entries   ; OK: entries: { k: Node, v: Node }[]
+{(key) @k (value) @v}?            ; ERROR: captures skip together, nothing collects them
+{(key) @k (value) @v}? @entry     ; OK: entry: { k: Node, v: Node } | null
 (func (id) @name)*                ; ERROR: same rule through node patterns
+(func (id) @name)? @fn            ; OK: fn: { name: Node } | null
 ```
 
 **2. A capture needs exactly one node or a value.** A void pattern under a
@@ -151,15 +155,27 @@ Item = (pair key: (_) @k value: (_) @v)
 (Item)+ @items                    ; ref list:   items: [Item, ...Item[]]
 ```
 
-### Optional Bubbling
+### Optional Rows
 
-`?` adds no dimensionality — an uncaptured optional group bubbles its captures
-as optional fields:
+A captured optional group is one nullable row — the `?` counterpart of a `*`
+row list:
 
 ```
-{(modifier) @mod (decorator) @dec}?
-→ { mod: Node | null, dec: Node | null }
+{(modifier) @mod (decorator) @dec}? @attrs
+→ { attrs: { mod: Node, dec: Node } | null }
 ```
+
+The fields keep their true modality — if the row matched, both are present —
+and a skip yields `attrs: null`, never a hollow `{ mod: null, dec: null }`.
+A quantified named node collects the same way: `(pair (key) @k)? @p` gives
+`p: { k: Node } | null`, mirroring `(pair (key) @k)* @ps` rows.
+
+There is no uncaptured fallback (dimensionality rule 1): a bare
+`{(mod) @mod (dec) @dec}?` would scatter correlated nulls into the enclosing
+scope as independently-optional fields — a type that permits states the match
+can never produce. For a single optional node with no wrapper, put the capture
+on the quantifier: `(decorator)? @dec` → `dec: Node | null`. To match
+structurally and drop the captures, suppress: `{...}? @_`.
 
 ### Null, Not Absent
 

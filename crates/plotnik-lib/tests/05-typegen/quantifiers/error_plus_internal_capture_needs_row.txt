@@ -7,3 +7,4 @@ error: captures `@c` repeat with `+` but aren't collected into a list
   |       ^^^^^^^^^^^^^^^^^^
   |
 help: add a row capture so each repeat becomes one element: `{...}+ @items`
+help: or discard the captures if only the structure matters: `{...}+ @_`

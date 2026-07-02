@@ -14,3 +14,4 @@ error: captures `@a`, `@b` repeat with `*` but aren't collected into a list
   | |__^
   |
 help: add a row capture so each repeat becomes one element: `{...}* @items`
+help: or discard the captures if only the structure matters: `{...}* @_`
