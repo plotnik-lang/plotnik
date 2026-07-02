@@ -24,6 +24,7 @@ mod vm;
 pub use crate::bytecode::type_system;
 pub use crate::core::colors;
 pub use crate::core::grammar;
+pub use crate::core::utils as text_utils;
 
 pub mod diagnostics {
     pub use crate::compiler::diagnostics::report::{

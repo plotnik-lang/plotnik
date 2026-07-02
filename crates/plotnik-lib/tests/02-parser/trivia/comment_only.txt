@@ -1,8 +1,9 @@
 // just a comment
-==== cst ====
-# query.ptk
-Root
-  LineComment "// just a comment"
-==== ast ====
-# query.ptk
-Root
+==== diagnostics ====
+error: query defines nothing
+ --> query.ptk:1:1
+  |
+1 | // just a comment
+  | ^^^^^^^^^^^^^^^^^
+  |
+help: add a definition, e.g. `Q = (identifier) @id`

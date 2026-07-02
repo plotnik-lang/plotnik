@@ -103,6 +103,7 @@ pub enum DiagnosticKind {
     EmitFailed,
     BytecodeRejected,
     NoEntrypoints,
+    EmptyQuery,
 }
 
 impl DiagnosticKind {
@@ -250,6 +251,7 @@ impl DiagnosticKind {
             Self::NoEntrypoints => {
                 "every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing"
             }
+            Self::EmptyQuery => "add a definition, e.g. `Q = (identifier) @id`",
             Self::UnsupportedSupertype => {
                 "match the concrete subtypes with an alternation, e.g. `[(a) (b)]`"
             }
@@ -341,6 +343,7 @@ impl DiagnosticKind {
             Self::EmitFailed => "bytecode emission failed",
             Self::BytecodeRejected => "query compiles to invalid bytecode",
             Self::NoEntrypoints => "query produces no entrypoints",
+            Self::EmptyQuery => "query defines nothing",
         }
     }
 

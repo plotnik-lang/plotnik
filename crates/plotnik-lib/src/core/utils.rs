@@ -63,3 +63,46 @@ pub fn to_snake_case(s: &str) -> String {
     }
     result
 }
+
+/// Simple edit distance for fuzzy matching (Levenshtein).
+///
+/// This is optimized for correctness and small inputs (identifiers, field names),
+/// not for very large strings.
+pub fn edit_distance(a: &str, b: &str) -> usize {
+    let a_len = a.chars().count();
+    let b_len = b.chars().count();
+
+    if a_len == 0 {
+        return b_len;
+    }
+    if b_len == 0 {
+        return a_len;
+    }
+
+    let mut prev: Vec<usize> = (0..=b_len).collect();
+    let mut curr = vec![0; b_len + 1];
+
+    for (i, ca) in a.chars().enumerate() {
+        curr[0] = i + 1;
+        for (j, cb) in b.chars().enumerate() {
+            let cost = if ca == cb { 0 } else { 1 };
+            curr[j + 1] = (prev[j + 1] + 1).min(curr[j] + 1).min(prev[j] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+
+    prev[b_len]
+}
+
+/// Find the best match from candidates within the shared suggestion threshold.
+///
+/// Returns the closest candidate (lowest distance) if it is within the threshold.
+pub fn find_similar<'a>(name: &str, candidates: &[&'a str]) -> Option<&'a str> {
+    let max_distance = (name.len() / 3).clamp(2, 4);
+    candidates
+        .iter()
+        .map(|&c| (c, edit_distance(name, c)))
+        .filter(|(_, d)| *d <= max_distance)
+        .min_by_key(|(_, d)| *d)
+        .map(|(c, _)| c)
+}

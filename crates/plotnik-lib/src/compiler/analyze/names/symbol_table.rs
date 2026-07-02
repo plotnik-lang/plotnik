@@ -107,6 +107,13 @@ impl SymbolTableBuilder {
         self.table.contains_key(name)
     }
 
+    /// The already-recorded definition for `name`, if any.
+    pub fn get(&self, name: &str) -> Option<(SourceId, &ast::Pattern)> {
+        let pattern = self.table.get(name)?;
+        let source = *self.files.get(name)?;
+        Some((source, pattern))
+    }
+
     /// Record a definition. Returns `true` if newly inserted, `false` if it
     /// replaced an existing entry.
     pub fn insert(&mut self, name: &str, source_id: SourceId, pattern: ast::Pattern) -> bool {
