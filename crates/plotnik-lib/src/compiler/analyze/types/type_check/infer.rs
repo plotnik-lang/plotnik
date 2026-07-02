@@ -52,6 +52,7 @@ use crate::compiler::parse::ast::{
 
 mod diagnostics;
 mod flow;
+mod recursive_captures;
 
 /// Shared state for a single inference pass over the AST.
 pub struct InferState<'a, 'd> {
@@ -229,11 +230,30 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .def_id_for_sym(name_sym)
             .expect("a defined reference has a DefId");
 
+        // Arity is precomputed to a fixpoint before inference, so every
+        // reference — recursive ones included — delegates its target's real
+        // arity and the exactly-one checks stay sound through recursion.
+        let arity = self
+            .ctx
+            .type_ctx
+            .def_arity(def_id)
+            .expect("def arities are precomputed before inference");
+
         if self.ctx.dependency_analysis.is_recursive_def(def_id) {
-            // A same-SCC target's arity is not known yet; recursion must
-            // consume a node per step, so One is the sound assumption.
-            let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
-            return PatternShape::new(Arity::One, PatternFlow::Value(ref_type));
+            // A recursive target's output type stays behind `TypeShape::Ref`
+            // (resolved at emission). Its void-ness, however, is real as soon
+            // as the def is registered: a completed void target must flow
+            // Void so the single-referent check sees it. A same-SCC target
+            // not yet registered is a pending value here; those capture
+            // sites are re-checked once the SCC completes.
+            let flow = match self.ctx.type_ctx.in_progress().def_output(def_id) {
+                Some(output) if output == TYPE_VOID => PatternFlow::Void,
+                _ => {
+                    let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
+                    PatternFlow::Value(ref_type)
+                }
+            };
+            return PatternShape::new(arity, flow);
         }
 
         let output = self
@@ -241,11 +261,6 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .type_ctx
             .in_progress()
             .def_output(def_id)
-            .expect("non-recursive reference target is inferred before the referrer (SCC order)");
-        let arity = self
-            .ctx
-            .type_ctx
-            .def_arity(def_id)
             .expect("non-recursive reference target is inferred before the referrer (SCC order)");
         let flow = if output == TYPE_VOID {
             PatternFlow::Void
@@ -901,9 +916,22 @@ impl<'a, 'd> InferPass<'a, 'd> {
     }
 
     pub fn run(mut self) -> TypeAnalysis {
+        // Definition arities are a syntactic fixpoint, computed up front so
+        // that references always report their target's real arity —
+        // recursion included. Only output *types* need SCC deferral.
+        let arities = super::def_arity::compute_def_arities(
+            self.analysis.interner,
+            self.analysis.symbol_table,
+            self.analysis.dependency_analysis,
+        );
+        for (def_id, arity) in arities {
+            self.ctx.record_def_arity(def_id, arity);
+        }
+
         // Definition identity (names, DefIds) is owned by DependencyAnalysis and
         // read from there; the builder only accumulates inferred types.
         self.process_sccs();
+        self.check_in_progress_reference_captures();
         self.assert_all_definitions_processed();
 
         super::super::naming::assign_type_names(
@@ -988,6 +1016,14 @@ impl<'a, 'd> InferPass<'a, 'd> {
             }
         };
         self.ctx.record_def_output(def_id, type_id);
-        self.ctx.record_def_arity(def_id, info.arity);
+
+        let precomputed = self
+            .ctx
+            .def_arity(def_id)
+            .expect("def arities are precomputed before inference");
+        assert_eq!(
+            info.arity, precomputed,
+            "def-arity pre-pass must agree with inference",
+        );
     }
 }

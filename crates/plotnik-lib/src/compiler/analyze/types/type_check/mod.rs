@@ -3,6 +3,7 @@
 //! Computes both structural arity (for field validation) and data flow types
 //! (for TypeScript emission) in a single traversal.
 
+mod def_arity;
 mod infer;
 mod unify;
 

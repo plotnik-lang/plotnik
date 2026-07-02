@@ -1,0 +1,8 @@
+A = (parenthesized_expression (A)?)
+Q = (expression_statement (A) @x)
+==== types ====
+export interface Q {
+  x: Node;
+}
+
+export type A = undefined;
