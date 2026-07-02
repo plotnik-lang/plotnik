@@ -298,7 +298,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     .in_progress()
                     .expect_struct_fields(*type_id)
                     .clone();
-                self.merge_fields(&mut merged_fields, &fields, child.node().text_range());
+                self.merge_scope_fields(&mut merged_fields, &fields, child.node().text_range());
             }
         }
 

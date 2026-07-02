@@ -7,13 +7,10 @@
 //! - neg_fields > 7 → epsilon chain for overflow checks
 //! - successors > 28 → cascading epsilon branches
 
-use crate::bytecode::{MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS};
+use crate::bytecode::{MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS, MAX_PRE_EFFECTS};
 use crate::core::NodeFieldId;
 
 use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR, NfaGraph};
-
-const MAX_POST_EFFECTS: usize = 7;
-const MAX_NEG_FIELDS: usize = 7;
 
 enum PostChain {
     NegFields(Vec<NodeFieldId>),
@@ -116,10 +113,10 @@ impl Emitter {
     }
 
     fn emit_effects_chain(&mut self, entry: Label, exit: Label, mut effects: Vec<EffectIR>) {
-        if effects.is_empty() {
-            self.push(MatchIR::epsilon(entry, exit).into());
-            return;
-        }
+        assert!(
+            !effects.is_empty(),
+            "callers only spill non-empty effect overflow"
+        );
 
         if effects.len() <= MAX_PRE_EFFECTS {
             self.push(MatchIR::epsilon(entry, exit).pre_effects(effects).into());

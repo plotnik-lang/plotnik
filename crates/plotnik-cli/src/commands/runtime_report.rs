@@ -8,6 +8,7 @@
 //! domain answer the callers handle (exit 1), not a failure rendered here.
 
 use plotnik_lib::RuntimeError;
+use plotnik_lib::text_utils::escape_json_into;
 
 /// Render a runtime error for stderr, or as a one-line JSON object when `json`.
 pub fn render_runtime_error(error: &RuntimeError, json: bool) -> String {
@@ -137,17 +138,7 @@ fn human_size(bytes: u64) -> String {
 fn json_quote(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('"');
-    for ch in s.chars() {
-        match ch {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
+    escape_json_into(&mut out, s);
     out.push('"');
     out
 }

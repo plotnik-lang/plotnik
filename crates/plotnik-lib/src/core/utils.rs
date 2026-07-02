@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 fn is_separator(c: char) -> bool {
     matches!(c, '_' | '-' | '.')
 }
@@ -105,4 +107,31 @@ pub fn find_similar<'a>(name: &str, candidates: &[&'a str]) -> Option<&'a str> {
         .filter(|(_, d)| *d <= max_distance)
         .min_by_key(|(_, d)| *d)
         .map(|(c, _)| c)
+}
+
+/// Escape `s` for a JSON string literal, appending to `out`.
+pub fn escape_json_into(out: &mut String, s: &str) {
+    let needs_escape = |c: char| matches!(c, '"' | '\\' | '\n' | '\r' | '\t') || c.is_control();
+
+    // Copy the unescaped prefix in one shot, then escape from the first
+    // offending char onward.
+    let Some((split, _)) = s.char_indices().find(|&(_, c)| needs_escape(c)) else {
+        out.push_str(s);
+        return;
+    };
+
+    out.push_str(&s[..split]);
+    for ch in s[split..].chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_control() => {
+                let _ = write!(out, "\\u{:04x}", c as u32);
+            }
+            c => out.push(c),
+        }
+    }
 }

@@ -13,7 +13,7 @@ impl InferVisitor<'_, '_> {
     /// Fold `source` fields into `target` in place, reporting a diagnostic on any
     /// name collision. Shared by sequences and named nodes so both paths reject
     /// duplicate captures identically.
-    pub(super) fn merge_fields(
+    pub(super) fn merge_scope_fields(
         &mut self,
         target: &mut BTreeMap<Symbol, FieldInfo>,
         source: &BTreeMap<Symbol, FieldInfo>,

@@ -85,6 +85,11 @@ impl Expander {
                 params: params.clone(),
             },
 
+            Rule::Reserved { rule, context_name } => Rule::Reserved {
+                rule: Box::new(self.expand_rule(rule)),
+                context_name: context_name.clone(),
+            },
+
             // For repetitions, introduce an auxiliary rule that contains the
             // repeated content, but can also contain a recursive binary tree structure.
             Rule::Repeat(content) => {

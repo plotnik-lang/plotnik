@@ -7,6 +7,7 @@ use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 
 use crate::core::Colors;
+use crate::core::utils::escape_json_into;
 
 /// Lifetime-free node handle for output.
 ///
@@ -440,32 +441,6 @@ fn emit_key(ctx: &mut FormatCtx<'_>, key: &str) {
 }
 
 /// Escape `s` as a JSON string body, appending to `out`.
-fn escape_json_into(out: &mut String, s: &str) {
-    let needs_escape = |c: char| matches!(c, '"' | '\\' | '\n' | '\r' | '\t') || c.is_control();
-
-    // Copy the unescaped prefix in one shot, then escape from the first
-    // offending char onward.
-    let Some((split, _)) = s.char_indices().find(|&(_, c)| needs_escape(c)) else {
-        out.push_str(s);
-        return;
-    };
-
-    out.push_str(&s[..split]);
-    for ch in s[split..].chars() {
-        match ch {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if c.is_control() => {
-                let _ = write!(out, "\\u{:04x}", c as u32);
-            }
-            c => out.push(c),
-        }
-    }
-}
-
 fn push_indent(out: &mut String, n: usize) {
     for _ in 0..n {
         out.push(' ');
