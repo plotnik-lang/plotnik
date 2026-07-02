@@ -356,7 +356,9 @@ impl<'t> VM<'t> {
     /// RegexTable over StringTable for `value_ref`.
     fn evaluate_predicate(&self, op: u8, is_regex: bool, value_ref: u16, module: &Module) -> bool {
         let node = self.cursor.node();
-        let node_text = &self.source[node.start_byte()..node.end_byte()];
+        let node_text = node
+            .utf8_text(self.source.as_bytes())
+            .expect("node source text must be valid UTF-8");
         let op = PredicateOp::from_byte(op);
 
         if is_regex {
