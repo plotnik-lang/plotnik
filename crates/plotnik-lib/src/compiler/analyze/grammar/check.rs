@@ -521,33 +521,25 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
             .to_string();
         let span = located.span_of(kind_token.text_range());
 
-        if node.has_supertype_marker() {
-            let subtypes = self
-                .grammar
-                .subtypes(id)
-                .iter()
-                .filter_map(|&sub| self.grammar.node_kind(sub))
-                .collect::<Vec<_>>();
-            let mut builder = self
-                .diag
-                .report(DiagnosticKind::UnsupportedSupertype, span)
-                .detail(name.as_str());
-            if !subtypes.is_empty() {
-                builder = builder.hint(format!(
-                    "subtypes of `{name}`: {}",
-                    format_list(&subtypes, 8)
-                ));
-            }
-            builder.emit();
+        let kind = if node.has_supertype_marker() {
+            DiagnosticKind::UnsupportedSupertype
         } else {
-            self.diag
-                .report(DiagnosticKind::BareSupertype, span)
-                .detail(name.as_str())
-                .hint(format!(
-                    "use `({name}#)` instead, but it's not supported yet"
-                ))
-                .emit();
+            DiagnosticKind::BareSupertype
+        };
+        let subtypes = self
+            .grammar
+            .subtypes(id)
+            .iter()
+            .filter_map(|&sub| self.grammar.node_kind(sub))
+            .collect::<Vec<_>>();
+        let mut builder = self.diag.report(kind, span).detail(name.as_str());
+        if !subtypes.is_empty() {
+            builder = builder.hint(format!(
+                "subtypes of `{name}`: {}",
+                format_list(&subtypes, 8)
+            ));
         }
+        builder.emit();
         true
     }
 }

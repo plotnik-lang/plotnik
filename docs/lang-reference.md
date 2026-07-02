@@ -494,14 +494,13 @@ Output type:
 
 ### Supertypes
 
-Query abstract node kinds directly. A `#subtype` refinement is accepted syntactically but
-not yet enforced — the node currently matches on its supertype alone, so `(expression)` and
-`(expression#binary_expression)` behave identically for now:
+Supertypes (abstract node kinds like `expression`) cannot be matched yet. Both the bare
+form `(expression)` and the `#subtype` refinement `(expression#binary_expression)` are
+rejected at compile time; the `#` syntax is reserved for a future release. Match the
+concrete subtypes with an alternation instead:
 
 ```
-(expression) @expr
-(expression#binary_expression) @binary
-(expression#"()") @empty_parens
+[(binary_expression) (unary_expression)] @expr
 ```
 
 The separator is tight-binding — no whitespace around `#`. The tree-sitter spelling

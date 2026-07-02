@@ -252,7 +252,7 @@ impl DiagnosticKind {
                 "every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing"
             }
             Self::EmptyQuery => "add a definition, e.g. `Q = (identifier) @id`",
-            Self::UnsupportedSupertype => {
+            Self::UnsupportedSupertype | Self::BareSupertype => {
                 "match the concrete subtypes with an alternation, e.g. `[(a) (b)]`"
             }
             _ => return None,
@@ -334,7 +334,7 @@ impl DiagnosticKind {
             Self::InvalidFieldChildType => "node kind not valid for this field",
             Self::InvalidChildType => "node kind not valid as child",
             Self::UnsupportedSupertype => "matching a supertype is not supported yet",
-            Self::BareSupertype => "supertype must be written with `#`",
+            Self::BareSupertype => "supertype is not a matchable node kind",
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
             Self::NegatedRequiredField => "this field is always present",
             Self::UnsatisfiablePattern => "pattern can never match",
