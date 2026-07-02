@@ -1,0 +1,106 @@
+Q = (program
+  (lexical_declaration
+    (variable_declarator
+      name: (identifier) @n
+      value: (number)? @v
+    )
+  )
+)
+==== input ====
+let x = 1
+==== types ====
+export interface Q {
+  n: Node;
+  v: Node | null;
+}
+==== output ====
+{
+  "n": {
+    "kind": "identifier",
+    "text": "x",
+    "span": [4, 5]
+  },
+  "v": {
+    "kind": "number",
+    "text": "1",
+    "span": [8, 9]
+  }
+}
+==== bytecode ====
+[strings]
+S00 "Beauty will save the world"
+S01 "n"
+S02 "v"
+S03 "Q"
+S04 "program"
+S05 "lexical_declaration"
+S06 "variable_declarator"
+S07 "identifier"
+S08 "number"
+S09 "name"
+S10 "value"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { n, v }
+T2 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S01 → T0  ; n: <Node>
+M1: S02 → T2  ; v: T2
+
+[type_names]
+N0: S03 → T1  ; Q
+
+[entrypoints]
+Q = 06 :: T1
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        07
+  07  └‣─  (lexical_declaration)            08
+  08  └‣─  (variable_declarator)            09
+  09  └‣─  name: (identifier) [Node Set(M0)]  16, 12
+  11                                        ▶
+  12  -ε-  [Null Set(M1)]                   18
+  14   !   value: (number) [Node Set(M1)]   18
+  16  ─‣─  _                                14, 16
+  18  ─‣┘³ _                                11
+==== trace ====
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        07
+       ●   program
+  07       (lexical_declaration)            08
+       ●   lexical_declaration
+  08       (variable_declarator)            09
+       ○   let
+       ●   variable_declarator
+  09       name: (identifier) [Node Set(M0)]  16, 12
+       ●   identifier
+  16       _                                14, 16
+       ●   =
+  14       value: (number) [Node Set(M1)]   18
+       ○   =
+  16  ❮❮❮ 
+  16       _                                14, 16
+       ●   number
+  14       value: (number) [Node Set(M1)]   18
+       ●   number
+  18       _                                11
+       ●   program
+  11   ◀   (Q)                              
+
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼
