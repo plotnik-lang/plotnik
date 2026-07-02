@@ -227,16 +227,23 @@ fn lex_regex_predicate(lexer: &mut logos::Lexer<SyntaxKind>) -> bool {
     let remaining = lexer.remainder();
     let mut backslash_count = 0;
 
+    let mut line_end = remaining.len();
     for (i, c) in remaining.char_indices() {
         if c == '/' && backslash_count % 2 == 0 {
             lexer.bump(i + 1);
             return true;
         }
+        if c == '\n' {
+            line_end = i;
+            break;
+        }
         backslash_count = if c == '\\' { backslash_count + 1 } else { 0 };
     }
 
-    // No closing slash - consume rest as unclosed regex (parser will error)
-    lexer.bump(remaining.len());
+    // No closing slash on this line: stop at the line end so the rest of the
+    // file still lexes (an unclosed regex must not swallow every following
+    // definition); the parser reports the unclosed literal.
+    lexer.bump(line_end);
     true
 }
 

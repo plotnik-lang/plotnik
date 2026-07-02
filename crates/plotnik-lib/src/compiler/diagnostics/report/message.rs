@@ -17,12 +17,13 @@ use super::Span;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DiagnosticKind {
-    // UnclosedString ranks first: an unterminated string swallows subsequent closing delimiters.
+    // UnclosedString/UnclosedRegex rank first: an unterminated literal swallows
+    // subsequent closing delimiters, so it is the root cause to show.
     UnclosedString,
+    UnclosedRegex,
     UnclosedTree,
     UnclosedSequence,
     UnclosedAlternation,
-    UnclosedRegex,
 
     ExpectedExpression,
     ExpectedTypeName,
