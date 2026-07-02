@@ -152,9 +152,10 @@ impl NfaBuilder<'_> {
         // so all fields (including nested bubble captures) reference the same root struct.
         if let Some(name_token) = cap.name() {
             let capture_name = &name_token.text()[1..];
-            // Suppressive/no-output contexts can compile inner captures under a
-            // non-struct scope; they intentionally emit value effects without a Set.
-            // Once a struct scope exists, though, a missing member is our bug.
+            // Suppressed regions never reach here (their captures are inert), so
+            // the enclosing scope is a struct at every real capture site — except
+            // an enum-rooted definition body, whose scope carries no fields. Once
+            // a struct scope exists, a missing member is our bug.
             if let Some(Struct(type_id)) = self.scope_stack.last().copied()
                 && self
                     .ctx

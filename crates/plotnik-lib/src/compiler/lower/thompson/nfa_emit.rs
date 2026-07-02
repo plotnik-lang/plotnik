@@ -128,6 +128,12 @@ impl NfaBuilder<'_> {
         exit: Label,
         inner: &Pattern,
     ) -> Label {
+        // Suppressed captures declare no fields; the name lookup below would
+        // silently bind a same-named field of the enclosing scope.
+        if self.is_suppressed() {
+            return exit;
+        }
+
         let captures = Self::collect_captures(inner);
         if captures.is_empty() {
             return exit;

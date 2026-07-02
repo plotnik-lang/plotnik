@@ -466,8 +466,11 @@ impl NfaBuilder<'_> {
         exits: CaptureExits,
     ) -> Label {
         // Must precede mechanism dispatch: suppressive captures ignore the mechanism
-        // entirely and must not build any capture effects for it.
-        if cap.is_suppressive() {
+        // entirely and must not build any capture effects for it. Inside an
+        // already-suppressed region every capture is equally inert — inference
+        // dropped its field, so emitting a Set would resolve against the wrong
+        // scope (the panic behind #470).
+        if cap.is_suppressive() || self.is_suppressed() {
             return self.compile_suppressive(
                 inner_opt.as_ref(),
                 nav_override,
@@ -617,15 +620,16 @@ impl NfaBuilder<'_> {
         )
     }
 
-    /// Compile a suppressive capture (`@_`/`@_name`): wrap the inner in
-    /// SuppressBegin/SuppressEnd and emit no value. The suppress region brackets
-    /// whatever the inner emits (its own `Set`s, a skipped optional's nulls) and
-    /// discards it at runtime, matching the `void` the type system infers.
+    /// Compile a suppressive capture (`@_`/`@_name`), or any capture inside an
+    /// already-suppressed region: compile the inner structurally, in suppress
+    /// mode, so nothing in the region emits output effects — captures are
+    /// inert, alternations tag nothing, skip paths inject no nulls. That
+    /// matches the `void` the type system infers without any runtime discard.
+    /// The one output source that survives is a definition call (shared code),
+    /// which the call site brackets itself (`RefLowering::SuppressedCall`).
     ///
-    /// With `Split` exits the inner's match/skip paths route to two SuppressEnd
-    /// steps. `outer.pre` (e.g. an enum variant's `Enum`-open) runs before
-    /// SuppressBegin in the enclosing scope, so the tag is produced and the later
-    /// `EndEnum` matches.
+    /// `outer.pre`/`outer.post` (e.g. an enum variant's `Enum`-open/`EndEnum`)
+    /// belong to the enclosing scope and run outside the suppressed region.
     fn compile_suppressive(
         &mut self,
         inner: Option<&Pattern>,
@@ -645,49 +649,52 @@ impl NfaBuilder<'_> {
             return self.wrap_entry_pre(entry, pre);
         };
 
-        // SuppressEnd + outer post (e.g. an enum variant's EndEnum) closes each exit;
-        // the inner is compiled with NO capture effects.
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
-                let end_label = self.emit_effects_epsilon(
-                    exit,
-                    vec![EffectIR::suppress_end()],
-                    CaptureEffects::new_post(post),
-                );
-                self.dispatch_pattern(inner, PatternCtx::with_nav(end_label, nav_override))
+                let end_label = if post.is_empty() {
+                    exit
+                } else {
+                    self.emit_effects_epsilon(exit, vec![], CaptureEffects::new_post(post))
+                };
+                self.with_suppression(|this| {
+                    this.dispatch_pattern(inner, PatternCtx::with_nav(end_label, nav_override))
+                })
             }
             CaptureExits::Split {
                 match_exit,
                 skip_exit,
             } => {
-                let end_match = self.emit_effects_epsilon(
-                    match_exit,
-                    vec![EffectIR::suppress_end()],
-                    CaptureEffects::new_post(post.clone()),
-                );
-                let end_skip = self.emit_effects_epsilon(
-                    skip_exit,
-                    vec![EffectIR::suppress_end()],
-                    CaptureEffects::new_post(post),
-                );
-                self.compile_skippable_with_exits(
-                    inner,
-                    SplitExits {
-                        match_exit: end_match,
-                        skip_exit: end_skip,
-                    },
-                    nav_override,
-                    CaptureEffects::default(),
-                )
+                let (end_match, end_skip) = if post.is_empty() {
+                    (match_exit, skip_exit)
+                } else {
+                    (
+                        self.emit_effects_epsilon(
+                            match_exit,
+                            vec![],
+                            CaptureEffects::new_post(post.clone()),
+                        ),
+                        self.emit_effects_epsilon(
+                            skip_exit,
+                            vec![],
+                            CaptureEffects::new_post(post),
+                        ),
+                    )
+                };
+                self.with_suppression(|this| {
+                    this.compile_skippable_with_exits(
+                        inner,
+                        SplitExits {
+                            match_exit: end_match,
+                            skip_exit: end_skip,
+                        },
+                        nav_override,
+                        CaptureEffects::default(),
+                    )
+                })
             }
         };
 
-        let begin_entry = self.emit_effects_epsilon(
-            inner_entry,
-            vec![EffectIR::suppress_begin()],
-            CaptureEffects::default(),
-        );
-        self.wrap_entry_pre(begin_entry, pre)
+        self.wrap_entry_pre(inner_entry, pre)
     }
 
     pub(super) fn resolve_anonymous_node_kind(&mut self, text: &str) -> NodeKindConstraint {

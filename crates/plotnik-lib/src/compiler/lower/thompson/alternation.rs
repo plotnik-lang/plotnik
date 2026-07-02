@@ -244,13 +244,18 @@ impl NfaBuilder<'_> {
             return exit;
         }
 
-        let union_type_id = self
-            .ctx
-            .analysis
-            .type_analysis
-            .expect_pattern_result(alternation)
-            .flow
-            .type_id();
+        // In a suppressed region there is no output shape to keep stable (and a
+        // consumed enum routed here still flows `Value(enum)`, not a struct).
+        let union_type_id = if self.is_suppressed() {
+            None
+        } else {
+            self.ctx
+                .analysis
+                .type_analysis
+                .expect_pattern_result(alternation)
+                .flow
+                .type_id()
+        };
         let merged_fields =
             union_type_id.map(|id| self.ctx.analysis.type_analysis.expect_struct_fields(id));
 

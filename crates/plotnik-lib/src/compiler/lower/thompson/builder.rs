@@ -23,6 +23,12 @@ pub struct NfaBuilder<'a> {
     /// Stack of active struct scopes for capture lookup.
     /// Innermost scope is at the end.
     pub(super) scope_stack: Vec<Struct>,
+    /// Non-zero while compiling under a suppressive capture (`@_`). The whole
+    /// region compiles structurally: captures are inert, alternations emit no
+    /// variant tags or null defaults. Only definition calls still produce
+    /// output — shared code emits unconditionally — and the call site brackets
+    /// them with SuppressBegin/SuppressEnd (`RefLowering::SuppressedCall`).
+    pub(super) suppress_depth: u32,
 }
 
 impl<'a> NfaBuilder<'a> {
@@ -34,7 +40,19 @@ impl<'a> NfaBuilder<'a> {
             next_label_id: 0,
             def_entries: IndexMap::new(),
             scope_stack: Vec::new(),
+            suppress_depth: 0,
         }
+    }
+
+    pub(super) fn is_suppressed(&self) -> bool {
+        self.suppress_depth > 0
+    }
+
+    pub(super) fn with_suppression<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.suppress_depth += 1;
+        let result = f(self);
+        self.suppress_depth -= 1;
+        result
     }
 
     pub(in crate::compiler::lower) fn build_ir(ctx: &'a LowerInput<'a>) -> NfaGraph {
@@ -145,14 +163,16 @@ impl<'a> NfaBuilder<'a> {
             Pattern::Enum(e) => {
                 // Inference decides tagging by consumption: a consumed enum
                 // flows `Value(enum)`; an unconsumed one degraded to a union
-                // (fields or void) and compiles without variant scopes.
+                // (fields or void) and compiles without variant scopes. A
+                // suppressed region discards the value, so even a consumed
+                // enum compiles structurally there.
                 let flow = &self
                     .ctx
                     .analysis
                     .type_analysis
                     .expect_pattern_result(pattern)
                     .flow;
-                if matches!(flow, PatternFlow::Value(_)) {
+                if matches!(flow, PatternFlow::Value(_)) && !self.is_suppressed() {
                     self.compile_enum(e, ctx)
                 } else {
                     self.compile_degraded_enum(e, ctx)

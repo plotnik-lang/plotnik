@@ -156,11 +156,6 @@ impl TypeAnalysis {
         self.def_output.iter().map(|(&id, &type_id)| (id, type_id))
     }
 
-    /// The name of a type, if the naming pass assigned one.
-    pub fn type_name(&self, type_id: TypeId) -> Option<Symbol> {
-        self.type_names.get(&type_id).copied()
-    }
-
     /// Iterate all named types in `TypeId` order (deterministic).
     pub fn iter_type_names(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
         self.type_names.iter().map(|(&id, &sym)| (id, sym))

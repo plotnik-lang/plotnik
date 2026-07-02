@@ -70,11 +70,15 @@ pub struct InferVisitor<'a, 'd> {
 
 /// Whether a quantifier sits under a capture. A captured quantifier owns its
 /// repeats (row semantics for `*`/`+`, optionality for `?`) and consumes an
-/// enum inner; a bare one is structural and produces nothing.
+/// enum inner; a bare one is structural and produces nothing. A suppressed one
+/// (under `@_`) consumes like a captured one — labels stay meaningful, no
+/// degradation warning — but every value is discarded, so neither
+/// dimensionality demand applies.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum QuantifiedContext {
     Bare,
     Captured,
+    Suppressed,
 }
 
 struct CaptureInner {
@@ -435,13 +439,17 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // Suppressive captures don't contribute to output type. The inner is
         // still inferred for structural validation — in consumed position, so
         // an explicitly suppressed alternation keeps its tags (and warns about
-        // nothing): the user said "discard all of it".
+        // nothing): the user said "discard all of it". A quantified inner is
+        // consumed the same way, with no dimensionality demand — nothing is
+        // collected, so no association can be lost.
         if node.is_suppressive() {
-            return node
-                .inner()
-                .map(|i| self.infer_pattern_consumed(&cap.wrap(i)))
-                .map(|info| PatternShape::new(info.arity, PatternFlow::Void))
-                .unwrap_or_else(PatternShape::void);
+            let info = match node.inner() {
+                None => return PatternShape::void(),
+                Some(Pattern::QuantifiedPattern(q)) => self
+                    .infer_quantified_pattern_in(&cap.wrap(q), QuantifiedContext::Suppressed),
+                Some(i) => self.infer_pattern_consumed(&cap.wrap(i)),
+            };
+            return PatternShape::new(info.arity, PatternFlow::Void);
         }
 
         let Some(name_tok) = node.name() else {
@@ -676,7 +684,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let inner = quant.wrap(inner);
 
         let inner_info = match context {
-            QuantifiedContext::Captured => self.infer_pattern_consumed(&inner),
+            QuantifiedContext::Captured | QuantifiedContext::Suppressed => {
+                self.infer_pattern_consumed(&inner)
+            }
             QuantifiedContext::Bare => self.infer_pattern(&inner),
         };
         let quantifier = self.quantifier_kind(quant.node());
@@ -708,6 +718,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             QuantifiedContext::Captured => {
                 self.report_multi_element_scalar(quant, inner_info);
             }
+            // Everything is discarded; there is nothing to collect wrongly.
+            QuantifiedContext::Suppressed => {}
         }
     }
 
@@ -743,10 +755,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         match (context, flow) {
             // A bare repeat is structural: nothing consumes its values, so a
-            // void or suppressed-value inner produces nothing.
-            (QuantifiedContext::Bare, PatternFlow::Void | PatternFlow::Value(_)) => {
-                PatternFlow::Void
-            }
+            // void or suppressed-value inner produces nothing. A suppressed
+            // repeat discards everything outright.
+            (
+                QuantifiedContext::Bare,
+                PatternFlow::Void | PatternFlow::Value(_),
+            )
+            | (QuantifiedContext::Suppressed, _) => PatternFlow::Void,
             // Bare with bubbling captures: `report_internal_capture_dimensionality`
             // already errored. Produce the plausible array type anyway so
             // downstream inference isn't poisoned by void.
