@@ -1,7 +1,7 @@
 A = (expression_statement (identifier) @id)? @x
 Q = (program (A)* @xs)
 ==== input ====
-a; b;
+a; debugger; b;
 ==== types ====
 export interface AX {
   id: Node;
@@ -31,7 +31,7 @@ export interface Q {
         "id": {
           "kind": "identifier",
           "text": "b",
-          "span": [3, 4]
+          "span": [13, 14]
         }
       }
     }
@@ -128,8 +128,13 @@ Q:
        ●   expression_statement
   34  -ε-  [StructClose Push]               42, 46
   42       _                                40, 42
-       ●   expression_statement
+       ●   debugger_statement
   40       [StructOpen] _                   36, 38
+       ●   debugger_statement
+  36       [StructOpen] (expression_statement)  16
+       ○   debugger_statement
+  40  ❮❮❮ 
+  38       _                                36, 38
        ●   expression_statement
   36       [StructOpen] (expression_statement)  16
        ●   expression_statement

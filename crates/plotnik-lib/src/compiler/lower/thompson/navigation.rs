@@ -68,9 +68,3 @@ fn quantifier_kind(pattern: &Pattern) -> Option<crate::compiler::parse::ast::Qua
     };
     q.quantifier_kind()
 }
-
-pub fn is_skippable_quantifier(pattern: &Pattern) -> bool {
-    use crate::compiler::parse::ast::QuantifierKind;
-    quantifier_kind(pattern)
-        .is_some_and(|kind| matches!(kind, QuantifierKind::Optional | QuantifierKind::ZeroOrMore))
-}

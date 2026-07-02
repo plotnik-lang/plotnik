@@ -39,15 +39,14 @@ _StructWrap:
   05                                        ▶
 
 Q:
-  06   !   (array)                          08
-  07  ...
-  08  └‣─  _                                20, 14, 22, 24
-  10  ─◦─  (identifier) [Node Set(M1)]      12
-  12  ─‣┘  _                                13
-  13                                        ▶
-  14  -ε-  [Null Set(M0)]                   10
-  16   !   (identifier) [Node Set(M0)]      10
-  18  ─‣─  _                                16, 18
-  20   !   _                                16, 18
-  22   !   [Null Set(M0)] ";"               10
-  24  ─‣─  _                                20, 14, 22, 24
+  06   !   (array)                          24, 09
+  08                                        ▶
+  09  └•─  [Null Set(M0)] (identifier) [Node Set(M1)]  26
+  12  ─◦─  (identifier) [Node Set(M1)]      26
+  14   !   (identifier) [Node Set(M0)]      12
+  16  ─‣─  _                                14, 16
+  18   !   _                                14, 16
+  20   !   [Null Set(M0)] ";"               12
+  22  ─‣─  _                                18, 20, 22
+  24  └‣─  _                                18, 20, 22
+  26  ─‣┘  _                                08

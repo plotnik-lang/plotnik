@@ -1,7 +1,7 @@
 MaybeId = (identifier)?
 Q = (program (expression_statement (array (MaybeId)* @xs)))
 ==== diagnostics ====
-error: the referenced definition can match zero nodes, so one `*` repeat may not advance
+error: the referenced definition can match zero nodes, but a `*` repeat must consume input on every iteration — its empty case could never occur here
  --> query.ptk:2:43
   |
 1 | MaybeId = (identifier)?

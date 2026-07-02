@@ -1,7 +1,7 @@
 A = (expression_statement (identifier) @id)? @x
 Q = (program (A)* @xs)
 ==== input ====
-a; b;
+debugger;
 ==== types ====
 export interface AX {
   id: Node;
@@ -16,26 +16,7 @@ export interface Q {
 }
 ==== output ====
 {
-  "xs": [
-    {
-      "x": {
-        "id": {
-          "kind": "identifier",
-          "text": "a",
-          "span": [0, 1]
-        }
-      }
-    },
-    {
-      "x": {
-        "id": {
-          "kind": "identifier",
-          "text": "b",
-          "span": [3, 4]
-        }
-      }
-    }
-  ]
+  "xs": []
 }
 ==== bytecode ====
 [strings]
@@ -117,31 +98,17 @@ Q:
        ●   program
   09  -ε-  [ArrayOpen]                      44, 32
   44       _                                40, 42
-       ●   expression_statement
+       ●   debugger_statement
   40       [StructOpen] _                   36, 38
-       ●   expression_statement
+       ●   debugger_statement
   36       [StructOpen] (expression_statement)  16
-       ●   expression_statement
-  16       (identifier) [Node Set(M0)]      18
-       ●   identifier
-  18       _ [StructClose Set(M1)]          34
-       ●   expression_statement
-  34  -ε-  [StructClose Push]               42, 46
+       ○   debugger_statement
+  40  ❮❮❮ 
+  38       _                                36, 38
+  44  ❮❮❮ 
   42       _                                40, 42
-       ●   expression_statement
-  40       [StructOpen] _                   36, 38
-       ●   expression_statement
-  36       [StructOpen] (expression_statement)  16
-       ●   expression_statement
-  16       (identifier) [Node Set(M0)]      18
-       ●   identifier
-  18       _ [StructClose Set(M1)]          34
-       ●   expression_statement
-  34  -ε-  [StructClose Push]               42, 46
-  42       _                                40, 42
-  34  ❮❮❮ 
-  46       [ArrayClose Set(M2)] _           30
-       ●   program
+  09  ❮❮❮ 
+  32  -ε-  [ArrayClose Set(M2)]             30
   30   ◀   (Q)                              
 
 _StructWrap:

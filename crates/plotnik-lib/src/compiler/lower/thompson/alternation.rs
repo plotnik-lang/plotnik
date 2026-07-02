@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::bytecode::{EffectKind, Nav};
 use crate::compiler::analyze::types::TypeShape;
+use crate::compiler::analyze::types::type_shape::FieldInfo;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{
@@ -12,9 +13,8 @@ use crate::core::Symbol;
 
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
-use super::navigation::{
-    AnchorSemantics, is_skippable_quantifier, pattern_owns_iteration, resumable_search_nav,
-};
+use super::navigation::{AnchorSemantics, pattern_owns_iteration, resumable_search_nav};
+use super::scope::{SkipExit, SplitExits};
 
 /// The alternation's resumable search nav (from [`resumable_search_nav`]), kept
 /// distinct from a branch's `first_nav` so the two adjacent `Option<Nav>` inputs
@@ -187,53 +187,102 @@ impl NfaBuilder<'_> {
     /// A resumable search nav (`Down`/`Next`/`Stay`) gets one position-search retry
     /// wrapper around the fanned-in branches; otherwise each branch already performed
     /// its own exact navigation.
+    ///
+    /// `zero_width` holds the lifted zero-width continuations of nullable
+    /// branches (see [`compile_union_branches`](Self::compile_union_branches)).
+    /// They sit outside the position search — a zero-width outcome needs no
+    /// candidate node — and after it: consuming matches, at any candidate and
+    /// in any branch, are preferred over a zero-width one.
     fn assemble_alt_branches(
         &mut self,
         successors: Vec<Label>,
+        zero_width: Vec<Label>,
         search_nav: Option<Nav>,
         exit: Label,
     ) -> Label {
-        if successors.is_empty() {
+        if successors.is_empty() && zero_width.is_empty() {
             return exit;
         }
 
-        let alt_entry = if successors.len() == 1 {
-            successors[0]
+        let real_entry = if successors.is_empty() {
+            None
         } else {
-            let entry = self.fresh_label();
-            self.emit_epsilon(entry, successors);
-            entry
+            let alt_entry = if successors.len() == 1 {
+                successors[0]
+            } else {
+                let entry = self.fresh_label();
+                self.emit_epsilon(entry, successors);
+                entry
+            };
+            Some(match search_nav {
+                Some(nav) => self.emit_position_search(nav, alt_entry),
+                None => alt_entry,
+            })
         };
 
-        if let Some(nav) = search_nav {
-            return self.emit_position_search(nav, alt_entry);
+        let mut alternatives: Vec<Label> = real_entry.into_iter().chain(zero_width).collect();
+        if alternatives.len() == 1 {
+            return alternatives.remove(0);
         }
-
-        alt_entry
+        let entry = self.fresh_label();
+        self.emit_epsilon(entry, alternatives);
+        entry
     }
 
     /// Union alternation: each branch merges into one struct.
     pub(super) fn compile_union(&mut self, union: &ast::UnionPattern, ctx: PatternCtx) -> Label {
+        let skip_exit = SkipExit::To(ctx.exit);
+        self.compile_union_with_exits(union, ctx, skip_exit)
+    }
+
+    /// [`compile_union`](Self::compile_union) with a distinct zero-width
+    /// continuation (a skippable sequence item, or a pruned iteration element).
+    pub(super) fn compile_union_with_exits(
+        &mut self,
+        union: &ast::UnionPattern,
+        ctx: PatternCtx,
+        skip_exit: SkipExit,
+    ) -> Label {
         let branches: Vec<_> = union.branches().collect();
-        self.compile_union_branches(&Pattern::Union(union.clone()), &branches, ctx)
+        self.compile_union_branches(&Pattern::Union(union.clone()), &branches, ctx, skip_exit)
     }
 
     /// A labeled alternation nothing consumes: the labels are inert (inference
     /// degraded it to a union and warned), so it compiles exactly like one —
     /// branch captures set into the enclosing scope, no variant tagging.
     pub(super) fn compile_degraded_enum(&mut self, e: &ast::EnumPattern, ctx: PatternCtx) -> Label {
+        let skip_exit = SkipExit::To(ctx.exit);
+        self.compile_degraded_enum_with_exits(e, ctx, skip_exit)
+    }
+
+    /// [`compile_degraded_enum`](Self::compile_degraded_enum) with a distinct
+    /// zero-width continuation.
+    pub(super) fn compile_degraded_enum_with_exits(
+        &mut self,
+        e: &ast::EnumPattern,
+        ctx: PatternCtx,
+        skip_exit: SkipExit,
+    ) -> Label {
         let branches: Vec<_> = e.branches().collect();
-        self.compile_union_branches(&Pattern::Enum(e.clone()), &branches, ctx)
+        self.compile_union_branches(&Pattern::Enum(e.clone()), &branches, ctx, skip_exit)
     }
 
     /// Shared lowering for union alternations and degraded (unconsumed) enum
     /// alternations. `alternation` is the pattern whose inferred result carries
     /// the merged output struct.
+    ///
+    /// A nullable branch compiles pruned ([`SkipExit::Fail`]) so its body only
+    /// matches by consuming; its zero-width outcome is lifted to one shared
+    /// alternative after the candidate search — a pure-effect epsilon that
+    /// defaults every merged field and exits to `skip_exit` with the cursor
+    /// untouched. That gives the zero-width path a life outside the search
+    /// (it needs no candidate node) and an honest cursor for any follower.
     fn compile_union_branches(
         &mut self,
         alternation: &Pattern,
         branches: &[ast::Branch],
         ctx: PatternCtx,
+        skip_exit: SkipExit,
     ) -> Label {
         let PatternCtx {
             exit,
@@ -264,6 +313,7 @@ impl NfaBuilder<'_> {
         let branch_routing = self.alt_branch_routing(branches, exit);
 
         let mut successors = Vec::new();
+        let mut any_nullable = false;
         for (branch_idx, branch) in branches.iter().enumerate() {
             let Some(body) = branch.body() else {
                 continue;
@@ -297,37 +347,17 @@ impl NfaBuilder<'_> {
                         .collect(),
                     _ => HashSet::new(),
                 };
-                fields
-                    .iter()
-                    .filter(|(sym, _)| !provided.contains(*sym))
-                    .flat_map(|(sym, field_info)| {
-                        let name = self.ctx.analysis.interner.resolve(*sym);
-                        let member_ref = self
-                            .lookup_member_in_scope(name)
-                            .expect("union bubbling field must resolve in enclosing scope");
-                        let set = EffectIR::with_member(EffectKind::Set, member_ref);
-                        let is_required_list = !field_info.optional
-                            && matches!(
-                                self.ctx
-                                    .analysis
-                                    .type_analysis
-                                    .expect_type_shape(field_info.type_id),
-                                TypeShape::Array { .. }
-                            );
-                        if is_required_list {
-                            vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
-                        } else {
-                            vec![EffectIR::null(), set]
-                        }
-                    })
-                    .collect()
+                self.union_default_effects(fields, &provided)
             } else {
                 vec![]
             };
 
             let branch_nav =
                 nav_for_alt_branch(first_nav, branch_search, &body, &self.anchor_semantics);
-            let branch_entry = if is_skippable_quantifier(&body) {
+            let branch_entry = if self.pattern_is_nullable(&body) {
+                any_nullable = true;
+                // Pruned body: merged effects stay on dominating epsilons —
+                // the body's partial-skip paths must not drop them.
                 let exit = if capture.post.is_empty() {
                     branch_exit
                 } else {
@@ -337,13 +367,14 @@ impl NfaBuilder<'_> {
                         CaptureEffects::new_post(capture.post.clone()),
                     )
                 };
-                let entry = self.dispatch_pattern(
+                let entry = self.compile_skippable_with_exits(
                     &body,
-                    PatternCtx {
-                        exit,
-                        nav: branch_nav,
-                        capture: CaptureEffects::default(),
+                    SplitExits {
+                        match_exit: exit,
+                        skip_exit: SkipExit::Fail,
                     },
+                    branch_nav,
+                    CaptureEffects::default(),
                 );
                 let mut pre = capture.pre.clone();
                 pre.extend(null_effects);
@@ -362,12 +393,124 @@ impl NfaBuilder<'_> {
             successors.push(branch_entry);
         }
 
-        self.assemble_alt_branches(successors, search_nav, exit)
+        // One shared zero-width alternative: whichever nullable branch matched
+        // zero-width, the union output is the same — every merged field at its
+        // default.
+        let zero_width = match skip_exit {
+            SkipExit::To(skip) if any_nullable => {
+                let defaults = merged_fields
+                    .map(|fields| self.union_default_effects(fields, &HashSet::new()))
+                    .unwrap_or_default();
+                let mut pre = capture.pre.clone();
+                pre.extend(defaults);
+                vec![self.emit_zero_width_step(skip, pre, capture.post.clone())]
+            }
+            _ => vec![],
+        };
+
+        self.assemble_alt_branches(successors, zero_width, search_nav, exit)
+    }
+
+    /// `[Null, Set]` (or `[Arr, EndArr, Set]` for a required list) for every
+    /// merged field not in `provided`, resolved against the enclosing scope —
+    /// the output a path that skips those captures owes.
+    fn union_default_effects(
+        &self,
+        fields: &BTreeMap<Symbol, FieldInfo>,
+        provided: &HashSet<Symbol>,
+    ) -> Vec<EffectIR> {
+        fields
+            .iter()
+            .filter(|(sym, _)| !provided.contains(*sym))
+            .flat_map(|(sym, field_info)| {
+                let name = self.ctx.analysis.interner.resolve(*sym);
+                let member_ref = self
+                    .lookup_member_in_scope(name)
+                    .expect("union bubbling field must resolve in enclosing scope");
+                let set = EffectIR::with_member(EffectKind::Set, member_ref);
+                if self.field_defaults_to_empty_list(field_info) {
+                    vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
+                } else {
+                    vec![EffectIR::null(), set]
+                }
+            })
+            .collect()
+    }
+
+    /// Defaults for every field of an enum variant's payload struct, with
+    /// member refs built against the payload type itself. Empty for a
+    /// tag-only variant (no payload struct).
+    fn payload_default_effects(&self, payload_type_id: TypeId) -> Vec<EffectIR> {
+        let Some(fields) = self.ctx.analysis.type_analysis.struct_fields(payload_type_id) else {
+            return vec![];
+        };
+        fields
+            .iter()
+            .enumerate()
+            .flat_map(|(idx, (_, field_info))| {
+                let member_ref = MemberRef::new(payload_type_id, idx as u16);
+                let set = EffectIR::with_member(EffectKind::Set, member_ref);
+                if self.field_defaults_to_empty_list(field_info) {
+                    vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
+                } else {
+                    vec![EffectIR::null(), set]
+                }
+            })
+            .collect()
+    }
+
+    /// A required list defaults to `[]`, everything else to `null`.
+    fn field_defaults_to_empty_list(&self, field_info: &FieldInfo) -> bool {
+        !field_info.optional
+            && matches!(
+                self.ctx
+                    .analysis
+                    .type_analysis
+                    .expect_type_shape(field_info.type_id),
+                TypeShape::Array { .. }
+            )
+    }
+
+    /// A pure-effect epsilon for a lifted zero-width outcome: `pre` runs in
+    /// the enclosing scope (opens + defaults), `post` closes it; the cursor
+    /// stays untouched.
+    fn emit_zero_width_step(
+        &mut self,
+        exit: Label,
+        pre: Vec<EffectIR>,
+        post: Vec<EffectIR>,
+    ) -> Label {
+        if pre.is_empty() && post.is_empty() {
+            return exit;
+        }
+        let label = self.fresh_label();
+        self.instructions.push(
+            MatchIR::epsilon(label, exit)
+                .pre_effects(pre)
+                .post_effects(post)
+                .into(),
+        );
+        label
     }
 
     /// Enum alternation: each enum branch opens its variant scope
     /// (`EnumOpen`...`EnumClose`) and compiles its payload inside it.
     pub(super) fn compile_enum(&mut self, e: &ast::EnumPattern, ctx: PatternCtx) -> Label {
+        let skip_exit = SkipExit::To(ctx.exit);
+        self.compile_enum_with_exits(e, ctx, skip_exit)
+    }
+
+    /// [`compile_enum`](Self::compile_enum) with a distinct zero-width
+    /// continuation. A nullable branch compiles pruned; its zero-width outcome
+    /// is lifted to a per-branch alternative after the candidate search — the
+    /// variant tags with every payload field at its default (see
+    /// [`compile_union_branches`](Self::compile_union_branches)).
+    pub(super) fn compile_enum_with_exits(
+        &mut self,
+        e: &ast::EnumPattern,
+        ctx: PatternCtx,
+        skip_exit: SkipExit,
+    ) -> Label {
         let PatternCtx {
             exit,
             nav: first_nav,
@@ -407,6 +550,7 @@ impl NfaBuilder<'_> {
         let branch_routing = self.alt_branch_routing(&branches, exit);
 
         let mut successors = Vec::new();
+        let mut zero_width = Vec::new();
         for (branch_idx, branch) in branches.iter().enumerate() {
             let Some(body) = branch.body() else {
                 continue;
@@ -432,26 +576,30 @@ impl NfaBuilder<'_> {
                 MemberRef::new(enum_type_id, variant_idx),
             );
 
+            let branch_nullable = self.pattern_is_nullable(&body);
             let body_entry = self.with_scope(payload_type_id, |this| {
-                if is_skippable_quantifier(&body) {
+                if branch_nullable {
                     let close_exit = this.emit_effects_epsilon(
                         branch_exit,
                         vec![EffectIR::end_enum()],
                         CaptureEffects::new_post(capture.post.clone()),
                     );
-                    let inner_entry = this.dispatch_pattern(
+                    let inner_entry = this.compile_skippable_with_exits(
                         &body,
-                        PatternCtx {
-                            exit: close_exit,
-                            nav: branch_nav,
-                            capture: CaptureEffects::default(),
+                        SplitExits {
+                            match_exit: close_exit,
+                            skip_exit: SkipExit::Fail,
                         },
+                        branch_nav,
+                        CaptureEffects::default(),
                     );
                     let mut entry_pre = capture.pre.clone();
-                    entry_pre.push(e_effect);
+                    entry_pre.push(e_effect.clone());
                     this.wrap_entry_pre(inner_entry, entry_pre)
                 } else {
-                    let branch_capture = capture.clone().nest_scope(e_effect, EffectIR::end_enum());
+                    let branch_capture = capture
+                        .clone()
+                        .nest_scope(e_effect.clone(), EffectIR::end_enum());
                     this.dispatch_pattern(
                         &body,
                         PatternCtx {
@@ -464,8 +612,17 @@ impl NfaBuilder<'_> {
             });
 
             successors.push(body_entry);
+
+            if branch_nullable && let SkipExit::To(skip) = skip_exit {
+                let mut pre = capture.pre.clone();
+                pre.push(e_effect);
+                pre.extend(self.payload_default_effects(payload_type_id));
+                let mut post = vec![EffectIR::end_enum()];
+                post.extend(capture.post.iter().cloned());
+                zero_width.push(self.emit_zero_width_step(skip, pre, post));
+            }
         }
 
-        self.assemble_alt_branches(successors, search_nav, exit)
+        self.assemble_alt_branches(successors, zero_width, search_nav, exit)
     }
 }

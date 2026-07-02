@@ -63,18 +63,19 @@ _StructWrap:
   05                                        ▶
 
 Q:
-  06   !   (program)                        26, 20
+  06   !   (program)                        28, 22
   08  -ε-  [ArrayClose Set(M1)]             10
   10  ─•┘  _                                11
   11                                        ▶
-  12  └•─  (debugger_statement) [Node Push]  14, 08
-  14  ─•─  (debugger_statement) [Node Push]  14, 08
-  16  -ε-  [ArrayOpen]                      12, 08
-  18  -ε-  [ArrayOpen]                      14, 08
-  20  -ε-  [Null Set(M0)]                   16
-  22   !   (lexical_declaration) [Node Set(M0)]  18
-  24  ─‣─  _                                22, 24
-  26  └‣─  _                                22, 24
+  12  -ε-  [ArrayClose Set(M1)]             11
+  14  └•─  (debugger_statement) [Node Push]  16, 08
+  16  ─•─  (debugger_statement) [Node Push]  16, 08
+  18  -ε-  [ArrayOpen]                      14, 12
+  20  -ε-  [ArrayOpen]                      16, 08
+  22  -ε-  [Null Set(M0)]                   18
+  24   !   (lexical_declaration) [Node Set(M0)]  20
+  26  ─‣─  _                                24, 26
+  28  └‣─  _                                24, 26
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -82,28 +83,28 @@ _StructWrap:
        ▶   (Q)
 
 Q:
-  06       (program)                        26, 20
+  06       (program)                        28, 22
        ●   program
-  26       _                                22, 24
+  28       _                                24, 26
        ●   debugger_statement
-  22       (lexical_declaration) [Node Set(M0)]  18
+  24       (lexical_declaration) [Node Set(M0)]  20
+       ○   debugger_statement
+  28  ❮❮❮ 
+  26       _                                24, 26
+       ●   debugger_statement
+  24       (lexical_declaration) [Node Set(M0)]  20
        ○   debugger_statement
   26  ❮❮❮ 
-  24       _                                22, 24
-       ●   debugger_statement
-  22       (lexical_declaration) [Node Set(M0)]  18
-       ○   debugger_statement
-  24  ❮❮❮ 
-  24       _                                22, 24
+  26       _                                24, 26
   06  ❮❮❮ 
-  20  -ε-  [Null Set(M0)]                   16
-  16  -ε-  [ArrayOpen]                      12, 08
-  12       (debugger_statement) [Node Push]  14, 08
+  22  -ε-  [Null Set(M0)]                   18
+  18  -ε-  [ArrayOpen]                      14, 12
+  14       (debugger_statement) [Node Push]  16, 08
        ●   debugger_statement
-  14       (debugger_statement) [Node Push]  14, 08
+  16       (debugger_statement) [Node Push]  16, 08
        ●   debugger_statement
-  14       (debugger_statement) [Node Push]  14, 08
-  14  ❮❮❮ 
+  16       (debugger_statement) [Node Push]  16, 08
+  16  ❮❮❮ 
   08  -ε-  [ArrayClose Set(M1)]             10
   10       _                                11
        ●   program

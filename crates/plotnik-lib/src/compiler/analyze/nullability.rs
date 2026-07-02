@@ -56,7 +56,11 @@ pub(crate) fn compute_nullable_defs(
     nullable
 }
 
-fn pattern_nullable(
+/// Whether a pattern can match zero nodes, given the set of nullable
+/// definitions (for `DefRef` leaves). Shared by the fixpoint above and by
+/// lowering, which prunes zero-width paths in quantifier iterations and
+/// alternation branches.
+pub(crate) fn pattern_nullable(
     pattern: &Pattern,
     nullable: &HashSet<DefId>,
     deps: &DependencyAnalysis,
@@ -75,9 +79,11 @@ fn pattern_nullable(
             };
             match q.quantifier_kind() {
                 Some(QuantifierKind::Optional | QuantifierKind::ZeroOrMore) => true,
-                Some(QuantifierKind::OneOrMore) | None => {
-                    pattern_nullable(&inner, nullable, deps, interner)
-                }
+                // A `+` always consumes: lowering prunes the zero-width path
+                // of a nullable element inside quantifier iterations, so even
+                // `+` over a nullable inner cannot match zero nodes.
+                Some(QuantifierKind::OneOrMore) => false,
+                None => pattern_nullable(&inner, nullable, deps, interner),
             }
         }
         Pattern::CapturedPattern(c) => c

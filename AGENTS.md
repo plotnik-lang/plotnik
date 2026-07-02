@@ -69,6 +69,8 @@ An alternation `[...]` matches one of several branches:
 
 Mixing enum and union branches in one `[...]` is an error.
 
+**Zero-width is last resort**: a repeat iteration never matches zero-width (`*` collects only consuming matches; `+` needs one real match even over a nullable element). An alternation branch that can match zero nodes succeeds zero-width only after every consuming alternative fails — it then needs no candidate node (matches in an empty parent) and defaults all output (union: fields null/`[]`; enum: tag with defaulted payload).
+
 Note the output shapes invert the usual TypeScript intuition: an **enum** compiles to a TS *discriminated union* (`A | B`), while a **union** compiles to a TS *struct* (`{ x?, y? }`). Enums render as one multi-line union literal; variant payloads are anonymous (inlined, never named declarations).
 
 ## Common Patterns
@@ -151,7 +153,7 @@ Ids = (identifier)*             ; OK: Ids = Node[]
 Rows = (Row)*                   ; OK: Rows = Row[] (Row is its own def)
 Bad = (func (id) @name)*        ; ERROR: element row is unnamed — split it out
 Bad = [K: (a) @a V: (b) @b]*    ; ERROR: element enum is unnamed — split it out
-Loop = (Ids)*                   ; ERROR: Ids can match zero nodes, repeat can't advance
+Loop = (Ids)*                   ; ERROR: Ids can match zero nodes, a repeat must consume
 ```
 
 **Optional rows**: `?` follows the same rule — internal captures need a

@@ -10,7 +10,7 @@ use crate::compiler::parse::ast::{self, SeqItem};
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::{is_down_nav, resumable_search_nav};
-use super::scope::SplitExits;
+use super::scope::{SkipExit, SplitExits};
 
 /// The sibling nav implied by a sequence's trailing anchor, used to mark the
 /// last pattern as anchor-followed.
@@ -78,7 +78,7 @@ pub(super) struct SeqItemsCtx<'a> {
     pub(super) is_inside_node: bool,
     pub(super) first_nav: Option<Nav>,
     pub(super) capture: CaptureEffects,
-    pub(super) skip_exit: Option<Label>,
+    pub(super) skip_exit: Option<SkipExit>,
 }
 
 impl NfaBuilder<'_> {
@@ -157,8 +157,11 @@ impl NfaBuilder<'_> {
         // advancing to a sibling — otherwise the skip path over-advances and never binds.
         let first_positions = is_down_nav(first_pattern_nav)
             || matches!(first_pattern_nav, Some(Nav::Stay | Nav::StayExact));
-        let needs_skip_exit =
-            first_is_skippable && first_positions && (nav_modes.len() > 1 || skip_exit.is_some());
+        // A caller-threaded skip exit must be honored at any nav: the all-skip
+        // path has to reach it (a childless-node bypass, or a `Fail` prune),
+        // not fall through to the match exit.
+        let needs_skip_exit = first_is_skippable
+            && (skip_exit.is_some() || (first_positions && nav_modes.len() > 1));
 
         if needs_skip_exit {
             return self.compile_seq_items_with_skip_exit(
@@ -329,7 +332,7 @@ impl NfaBuilder<'_> {
         let (skip_exit, match_exit, first_post) = if nav_modes.len() < 2 {
             // The skippable item is the only (and last) item, so it carries `post_keep`.
             (
-                caller_skip_exit.unwrap_or(exit),
+                caller_skip_exit.unwrap_or(SkipExit::To(exit)),
                 exit,
                 CaptureEffects::new_post(post_effects.item_post),
             )
@@ -356,7 +359,7 @@ impl NfaBuilder<'_> {
                 capture: cont,
                 skip_exit: None, // Match path doesn't need skip exit
             });
-            (skip, mtch, CaptureEffects::default())
+            (SkipExit::To(skip), mtch, CaptureEffects::default())
         };
 
         let entry = self.compile_skippable_with_exits(

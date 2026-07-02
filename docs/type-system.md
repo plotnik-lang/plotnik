@@ -102,9 +102,11 @@ Good = (Row)*                     ; Good = Row[]
 
 Two consequences:
 
-- A definition whose root is `*` or `?` can match zero nodes, so repeating a
-  reference to it (`(MaybeId)*`) is rejected — a zero-width iteration would
-  collect a spurious null at every non-matching candidate.
+- A definition whose root is `*` or `?` can match zero nodes, but a repeat
+  iteration must consume input — so repeating a reference to it
+  (`(MaybeId)*`) is rejected: the wrapper's empty case could never occur
+  under the repeat, and the intent is clearer with the quantifier in one
+  place.
 - A quantifier-rooted definition used as an entrypoint is a **value
   entrypoint**: `run` outputs a top-level JSON array (or `null`), not an
   object. A `*`-rooted entrypoint that matches zero times prints `[]` and

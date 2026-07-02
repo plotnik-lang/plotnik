@@ -21,12 +21,6 @@ export interface Q {
           "span": [0, 4]
         }
       }
-    },
-    {
-      "$tag": "A",
-      "$data": {
-        "c": null
-      }
     }
   ]
 }
@@ -71,19 +65,17 @@ _StructWrap:
 Q:
   06   !   (program)                        08
   07  ...
-  08  -ε-  [ArrayOpen]                      28, 11
+  08  -ε-  [ArrayOpen]                      24, 11
   10                                        ▶
   11  -ε-  [ArrayClose Set(M2)]             10
-  13  -ε-  [EnumClose Push]                 26, 30
+  13  -ε-  [EnumClose Push]                 22, 26
   15  ...
-  16  -ε-  [Null Set(M0)]                   13
-  18   !   (comment) [Node Set(M0)]         13
-  20  ─‣─  _                                18, 20
-  22   !   _                                18, 20
-  24  -ε-  [EnumOpen(M1)]                   22, 16
-  26  ─‣─  _                                24, 26
-  28  └‣─  _                                24, 26
-  30  ─‣┘  [ArrayClose Set(M2)] _           10
+  16   !   (comment) [Node Set(M0)]         13
+  18  ─‣─  _                                16, 18
+  20   !   [EnumOpen(M1)] _                 16, 18
+  22  ─‣─  _                                20, 22
+  24  └‣─  _                                20, 22
+  26  ─‣┘  [ArrayClose Set(M2)] _           10
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -93,30 +85,26 @@ _StructWrap:
 Q:
   06       (program)                        08
        ●   program
-  08  -ε-  [ArrayOpen]                      28, 11
-  28       _                                24, 26
+  08  -ε-  [ArrayOpen]                      24, 11
+  24       _                                20, 22
        ●   comment
-  24  -ε-  [EnumOpen(M1)]                   22, 16
-  22       _                                18, 20
+  20       [EnumOpen(M1)] _                 16, 18
        ●   comment
-  18       (comment) [Node Set(M0)]         13
+  16       (comment) [Node Set(M0)]         13
        ●   comment
-  13  -ε-  [EnumClose Push]                 26, 30
-  26       _                                24, 26
+  13  -ε-  [EnumClose Push]                 22, 26
+  22       _                                20, 22
        ●   expression_statement
-  24  -ε-  [EnumOpen(M1)]                   22, 16
-  22       _                                18, 20
+  20       [EnumOpen(M1)] _                 16, 18
        ●   expression_statement
-  18       (comment) [Node Set(M0)]         13
+  16       (comment) [Node Set(M0)]         13
        ○   expression_statement
+  20  ❮❮❮ 
+  18       _                                16, 18
   22  ❮❮❮ 
-  20       _                                18, 20
-  24  ❮❮❮ 
-  16  -ε-  [Null Set(M0)]                   13
-  13  -ε-  [EnumClose Push]                 26, 30
-  26       _                                24, 26
+  22       _                                20, 22
   13  ❮❮❮ 
-  30       [ArrayClose Set(M2)] _           10
+  26       [ArrayClose Set(M2)] _           10
        ●   program
   10   ◀   (Q)                              
 

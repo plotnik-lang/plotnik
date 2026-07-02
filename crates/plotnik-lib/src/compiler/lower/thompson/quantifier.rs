@@ -14,7 +14,8 @@ use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx, needs_struct_wrapper, row_type_id};
 use super::navigation::resumable_search_nav;
 use super::nfa_emit::{BranchTargets, Greediness};
-use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SplitExits};
+use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SkipExit, SplitExits};
+use super::sequences::SeqItemsCtx;
 
 /// The nav under which a quantifier iteration runs a resumable position search,
 /// or `None` for a bounded anchor that matches a single candidate directly.
@@ -319,6 +320,61 @@ impl NfaBuilder<'_> {
             }
         }
 
+        // An alternation with a nullable branch: the lifted zero-width
+        // alternative exits to `skip_exit` (or is pruned) instead of
+        // dead-ending inside the candidate search.
+        if let Pattern::Union(u) = pattern {
+            return self.compile_union_with_exits(
+                u,
+                PatternCtx {
+                    exit: match_exit,
+                    nav: nav_override,
+                    capture,
+                },
+                skip_exit,
+            );
+        }
+        if let Pattern::Enum(e) = pattern {
+            let ctx = PatternCtx {
+                exit: match_exit,
+                nav: nav_override,
+                capture,
+            };
+            // Mirrors dispatch_pattern: only a consumed enum outside
+            // suppression tags its variants.
+            let flow = &self
+                .ctx
+                .analysis
+                .type_analysis
+                .expect_pattern_result(pattern)
+                .flow;
+            return if matches!(flow, PatternFlow::Value(_)) && !self.is_suppressed() {
+                self.compile_enum_with_exits(e, ctx, skip_exit)
+            } else {
+                self.compile_degraded_enum_with_exits(e, ctx, skip_exit)
+            };
+        }
+
+        // A group whose items can all skip: compile the items with the skip
+        // exit threaded through, so the all-skip path exits with the
+        // checkpoint-restored cursor exactly like a single skippable item
+        // (partial matches exit through `match_exit` as usual).
+        if let Pattern::SeqPattern(seq) = pattern {
+            let items: Vec<_> = seq.items().collect();
+            let is_inside_node = matches!(
+                nav_override,
+                Some(Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact)
+            );
+            return self.compile_seq_items(SeqItemsCtx {
+                items: &items,
+                exit: match_exit,
+                is_inside_node,
+                first_nav: nav_override,
+                capture,
+                skip_exit: Some(skip_exit),
+            });
+        }
+
         // Must be a QuantifiedPattern at this point
         let Pattern::QuantifiedPattern(quant) = pattern else {
             return self.dispatch_pattern(
@@ -358,8 +414,13 @@ impl NfaBuilder<'_> {
             );
         }
 
-        let skip_with_null = self.emit_null_for_skip_path(skip_exit, &capture);
-        let skip_with_internal_null = self.emit_null_for_internal_captures(skip_with_null, &inner);
+        let skip_exit = match skip_exit {
+            SkipExit::To(skip) => {
+                let skip_with_null = self.emit_null_for_skip_path(skip, &capture);
+                SkipExit::To(self.emit_null_for_internal_captures(skip_with_null, &inner))
+            }
+            SkipExit::Fail => SkipExit::Fail,
+        };
 
         let config = QuantifierConfig {
             inner: &inner,
@@ -369,7 +430,7 @@ impl NfaBuilder<'_> {
             element_capture: capture,
             exits: CaptureExits::Split {
                 match_exit,
-                skip_exit: skip_with_internal_null,
+                skip_exit,
             },
         };
 
@@ -402,7 +463,7 @@ impl NfaBuilder<'_> {
         );
 
         let (match_exit, skip_exit) = match exits {
-            CaptureExits::Single(exit) => (exit, exit),
+            CaptureExits::Single(exit) => (exit, SkipExit::To(exit)),
             CaptureExits::Split {
                 match_exit,
                 skip_exit,
@@ -411,13 +472,18 @@ impl NfaBuilder<'_> {
 
         // Skip: the row is absent — null the capture; the enclosing scope's
         // trailing effects still run, as they do on the match path.
-        let mut skip_effects: Vec<EffectIR> = capture_effects
-            .iter()
-            .filter(|eff| eff.kind() == EffectKind::Set)
-            .flat_map(|set_eff| [EffectIR::null(), set_eff.clone()])
-            .collect();
-        skip_effects.extend(outer_capture.post.iter().cloned());
-        let skip_target = self.emit_effects_if_nonempty(skip_exit, skip_effects);
+        let skip_target = match skip_exit {
+            SkipExit::To(skip) => {
+                let mut skip_effects: Vec<EffectIR> = capture_effects
+                    .iter()
+                    .filter(|eff| eff.kind() == EffectKind::Set)
+                    .flat_map(|set_eff| [EffectIR::null(), set_eff.clone()])
+                    .collect();
+                skip_effects.extend(outer_capture.post.iter().cloned());
+                Some(self.emit_effects_if_nonempty(skip, skip_effects))
+            }
+            SkipExit::Fail => None,
+        };
 
         // The row scope's type drives the inner captures' Set member resolution.
         let row_type_id = self
@@ -439,19 +505,23 @@ impl NfaBuilder<'_> {
                 let ExitNav { exit, nav } = target;
                 let struct_close = this.emit_struct_close_step_with_effects(end_effects, exit);
                 let body = this.compile_with_optional_scope(row_type_id, |t| {
-                    t.compile_pattern(&inner, struct_close, Some(nav))
+                    t.compile_iteration_element(&inner, PatternCtx::with_nav(struct_close, Some(nav)))
                 });
                 this.emit_struct_step(body)
             },
         );
 
-        let entry = self.emit_branch_epsilon(
-            BranchTargets {
-                prefer: iterate,
-                other: skip_target,
-            },
-            Greediness::from(kind),
-        );
+        let entry = match skip_target {
+            Some(skip_target) => self.emit_branch_epsilon(
+                BranchTargets {
+                    prefer: iterate,
+                    other: skip_target,
+                },
+                Greediness::from(kind),
+            ),
+            // Pruned: the row must match — a zero-width outcome backtracks.
+            None => iterate,
+        };
         self.wrap_entry_pre(entry, outer_capture.pre)
     }
 
@@ -498,7 +568,10 @@ impl NfaBuilder<'_> {
                 skip_exit,
             } => {
                 let match_endarr = self.emit_endarr_step(end_effects, match_exit);
-                let skip_endarr = self.emit_endarr_step(end_effects, skip_exit);
+                let skip_endarr = match skip_exit {
+                    SkipExit::To(skip) => SkipExit::To(self.emit_endarr_step(end_effects, skip)),
+                    SkipExit::Fail => SkipExit::Fail,
+                };
                 self.compile_star_for_array_with_exits(
                     inner,
                     SplitExits {
@@ -673,9 +746,30 @@ impl NfaBuilder<'_> {
             }
 
             QuantifierKind::ZeroOrMore => match exits {
+                // Pruned zero-match: the star must consume, so it compiles
+                // exactly like a plus — total failure backtracks to the caller.
                 CaptureExits::Split {
                     match_exit,
-                    skip_exit,
+                    skip_exit: SkipExit::Fail,
+                } => {
+                    let loop_entry = self.fresh_label();
+                    let (first_iterate, repeat_iterate) =
+                        self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
+
+                    self.emit_branch_epsilon_at(
+                        loop_entry,
+                        BranchTargets {
+                            prefer: repeat_iterate,
+                            other: match_exit,
+                        },
+                        greediness,
+                    );
+
+                    first_iterate
+                }
+                CaptureExits::Split {
+                    match_exit,
+                    skip_exit: SkipExit::To(skip_exit),
                 } => {
                     let split_scope = element_scope.by_array_exit();
                     let split_body = |this: &mut Self, target: ExitNav| -> Label {
@@ -730,7 +824,17 @@ impl NfaBuilder<'_> {
 
             QuantifierKind::Optional => {
                 let skip_with_null = match exits {
-                    CaptureExits::Split { skip_exit, .. } => skip_exit,
+                    CaptureExits::Split {
+                        skip_exit: SkipExit::To(skip_exit),
+                        ..
+                    } => skip_exit,
+                    // Pruned: the element must match — no skip alternative.
+                    CaptureExits::Split {
+                        skip_exit: SkipExit::Fail,
+                        ..
+                    } => {
+                        return self.emit_iteration(first_nav_mode, match_exit, compile_body);
+                    }
                     CaptureExits::Single(_) => {
                         let null_exit =
                             self.emit_null_for_skip_path(match_exit, element_scope.capture());
@@ -800,7 +904,7 @@ impl NfaBuilder<'_> {
         outer: CaptureEffects,
     ) -> Label {
         let (match_exit, skip_exit) = match exits {
-            CaptureExits::Single(exit) => (exit, exit),
+            CaptureExits::Single(exit) => (exit, SkipExit::To(exit)),
             CaptureExits::Split {
                 match_exit,
                 skip_exit,
@@ -809,9 +913,14 @@ impl NfaBuilder<'_> {
         let CaptureEffects { pre, post } = outer;
 
         // Skip: the value is a bare null; enclosing-scope effects still run.
-        let mut skip_effects = vec![EffectIR::null()];
-        skip_effects.extend(post.iter().cloned());
-        let skip_target = self.emit_effects_if_nonempty(skip_exit, skip_effects);
+        let skip_target = match skip_exit {
+            SkipExit::To(skip) => {
+                let mut skip_effects = vec![EffectIR::null()];
+                skip_effects.extend(post.iter().cloned());
+                Some(self.emit_effects_if_nonempty(skip, skip_effects))
+            }
+            SkipExit::Fail => None,
+        };
         let match_target = self.emit_effects_if_nonempty(match_exit, post);
 
         // A field constraint is navigation on the element, not structure.
@@ -839,7 +948,7 @@ impl NfaBuilder<'_> {
                         def_id,
                         SplitExits {
                             match_exit: exit,
-                            skip_exit: exit,
+                            skip_exit: SkipExit::To(exit),
                         },
                         Some(nav),
                     )
@@ -853,7 +962,7 @@ impl NfaBuilder<'_> {
         } else {
             self.emit_iteration(first_nav, match_target, |this, target| {
                 let ExitNav { exit, nav } = target;
-                this.dispatch_pattern(
+                this.compile_iteration_element(
                     &element,
                     PatternCtx {
                         exit,
@@ -864,14 +973,38 @@ impl NfaBuilder<'_> {
             })
         };
 
-        let entry = self.emit_branch_epsilon(
-            BranchTargets {
-                prefer: iterate,
-                other: skip_target,
-            },
-            Greediness::from(kind),
-        );
+        let entry = match skip_target {
+            Some(skip_target) => self.emit_branch_epsilon(
+                BranchTargets {
+                    prefer: iterate,
+                    other: skip_target,
+                },
+                Greediness::from(kind),
+            ),
+            // Pruned: the value must match — a zero-width outcome backtracks.
+            None => iterate,
+        };
         self.wrap_entry_pre(entry, pre)
+    }
+
+    /// Compile one quantifier-iteration element. A nullable element compiles
+    /// with its zero-width path pruned ([`SkipExit::Fail`]): an iteration that
+    /// consumes nothing is a failed attempt — the search advances or the loop
+    /// exits — never a spurious empty element.
+    pub(super) fn compile_iteration_element(&mut self, inner: &Pattern, ctx: PatternCtx) -> Label {
+        if self.pattern_is_nullable(inner) {
+            let PatternCtx { exit, nav, capture } = ctx;
+            return self.compile_skippable_with_exits(
+                inner,
+                SplitExits {
+                    match_exit: exit,
+                    skip_exit: SkipExit::Fail,
+                },
+                nav,
+                capture,
+            );
+        }
+        self.dispatch_pattern(inner, ctx)
     }
 
     fn compile_quantified_body(
@@ -883,7 +1016,7 @@ impl NfaBuilder<'_> {
         let ExitNav { exit, nav } = target;
         match element_scope {
             IterationScope::Standalone { capture }
-            | IterationScope::RowScopedByArrayExit { capture } => self.dispatch_pattern(
+            | IterationScope::RowScopedByArrayExit { capture } => self.compile_iteration_element(
                 inner,
                 PatternCtx {
                     exit,
@@ -898,7 +1031,7 @@ impl NfaBuilder<'_> {
                 row_type_id,
                 capture,
             } => self.compile_with_optional_scope(row_type_id, |this| {
-                this.dispatch_pattern(
+                this.compile_iteration_element(
                     inner,
                     PatternCtx {
                         exit,

@@ -22,9 +22,9 @@ use crate::compiler::analyze::types::CaptureKind;
 
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
-use super::navigation::{is_skippable_quantifier, pattern_owns_iteration};
+use super::navigation::pattern_owns_iteration;
 use super::nfa_emit::{BranchTargets, Greediness};
-use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SplitExits};
+use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SkipExit, SplitExits};
 use super::sequences::SeqItemsCtx;
 
 #[derive(Clone, Copy)]
@@ -145,7 +145,8 @@ impl NfaBuilder<'_> {
             is_inside_node: true,
             first_nav: None,
             capture: CaptureEffects::default(),
-            skip_exit: Some(final_exit), // Skip exit bypasses Up when Down fails (childless node)
+            // Skip exit bypasses Up when Down fails (childless node)
+            skip_exit: Some(SkipExit::To(final_exit)),
         });
 
         self.instructions
@@ -234,10 +235,21 @@ impl NfaBuilder<'_> {
         self.nullable_defs.contains(&self.resolve_ref_def_id(r))
     }
 
-    /// A sequence item that may consume nothing: a skippable quantifier, or a
-    /// reference to a nullable definition.
+    /// Whether a pattern can match zero nodes (see `analyze::nullability`).
+    pub(super) fn pattern_is_nullable(&self, pattern: &Pattern) -> bool {
+        crate::compiler::analyze::nullability::pattern_nullable(
+            pattern,
+            &self.nullable_defs,
+            self.ctx.analysis.dependency_analysis,
+            self.ctx.analysis.interner,
+        )
+    }
+
+    /// A sequence item that may consume nothing: a skippable quantifier, a
+    /// reference to a nullable definition, a group of such items, or an
+    /// alternation with a nullable branch.
     pub(super) fn is_skippable_item(&self, pattern: &Pattern) -> bool {
-        is_skippable_quantifier(pattern) || self.is_nullable_ref_item(pattern)
+        self.pattern_is_nullable(pattern)
     }
 
     /// [`pattern_owns_iteration`] extended to nullable references: the inlined
@@ -310,7 +322,7 @@ impl NfaBuilder<'_> {
                 def_id,
                 SplitExits {
                     match_exit: exit,
-                    skip_exit: exit,
+                    skip_exit: SkipExit::To(exit),
                 },
                 nav,
                 capture,
@@ -545,10 +557,12 @@ impl NfaBuilder<'_> {
                 outer: &[],
             };
             let close_match = self.emit_struct_close_step_with_effects(end, match_exit);
-            let close_skip = if skip_exit == match_exit {
-                close_match
-            } else {
-                self.emit_struct_close_step_with_effects(end, skip_exit)
+            let close_skip = match skip_exit {
+                SkipExit::To(skip) if skip == match_exit => SkipExit::To(close_match),
+                SkipExit::To(skip) => {
+                    SkipExit::To(self.emit_struct_close_step_with_effects(end, skip))
+                }
+                SkipExit::Fail => SkipExit::Fail,
             };
             let body_entry = self.with_scope(def_output_id, |this| {
                 this.compile_skippable_with_exits(
@@ -566,10 +580,10 @@ impl NfaBuilder<'_> {
             // Scalar-valued (enum) body: it leaves its value pending; the
             // consumer chain runs after it on either continuation.
             let set_match = self.emit_effects_if_nonempty(match_exit, post.clone());
-            let set_skip = if skip_exit == match_exit {
-                set_match
-            } else {
-                self.emit_effects_if_nonempty(skip_exit, post)
+            let set_skip = match skip_exit {
+                SkipExit::To(skip) if skip == match_exit => SkipExit::To(set_match),
+                SkipExit::To(skip) => SkipExit::To(self.emit_effects_if_nonempty(skip, post)),
+                SkipExit::Fail => SkipExit::Fail,
             };
             let body_entry = self.with_scope(def_output_id, |this| {
                 this.compile_skippable_with_exits(
@@ -591,10 +605,10 @@ impl NfaBuilder<'_> {
             // Non-consuming post effects (an enclosing scope's close) run
             // after the body, outside the suppressed region.
             let end_match = self.emit_effects_if_nonempty(match_exit, post.clone());
-            let end_skip = if skip_exit == match_exit {
-                end_match
-            } else {
-                self.emit_effects_if_nonempty(skip_exit, post)
+            let end_skip = match skip_exit {
+                SkipExit::To(skip) if skip == match_exit => SkipExit::To(end_match),
+                SkipExit::To(skip) => SkipExit::To(self.emit_effects_if_nonempty(skip, post)),
+                SkipExit::Fail => SkipExit::Fail,
             };
             let body_entry = self.with_suppression(|this| {
                 this.compile_skippable_with_exits(
@@ -641,7 +655,10 @@ impl NfaBuilder<'_> {
         // that must run on both paths.
         let CaptureEffects { pre, post } = capture;
 
-        let skip = self.emit_effects_if_nonempty(skip_exit, post.clone());
+        let skip = match skip_exit {
+            SkipExit::To(skip) => Some(self.emit_effects_if_nonempty(skip, post.clone())),
+            SkipExit::Fail => None,
+        };
         let call_entry = self.compile_ref_call(
             def_id,
             PatternCtx {
@@ -652,13 +669,17 @@ impl NfaBuilder<'_> {
             None,
             false,
         );
-        let entry = self.emit_branch_epsilon(
-            BranchTargets {
-                prefer: call_entry,
-                other: skip,
-            },
-            Greediness::NonGreedy,
-        );
+        let entry = match skip {
+            Some(skip) => self.emit_branch_epsilon(
+                BranchTargets {
+                    prefer: call_entry,
+                    other: skip,
+                },
+                Greediness::NonGreedy,
+            ),
+            // Pruned: the cycle must consume — no zero-width bypass.
+            None => call_entry,
+        };
         self.wrap_entry_pre(entry, pre)
     }
 
@@ -1003,18 +1024,20 @@ impl NfaBuilder<'_> {
                 let (end_match, end_skip) = if post.is_empty() {
                     (match_exit, skip_exit)
                 } else {
-                    (
-                        self.emit_effects_epsilon(
-                            match_exit,
-                            vec![],
-                            CaptureEffects::new_post(post.clone()),
-                        ),
-                        self.emit_effects_epsilon(
-                            skip_exit,
+                    let end_match = self.emit_effects_epsilon(
+                        match_exit,
+                        vec![],
+                        CaptureEffects::new_post(post.clone()),
+                    );
+                    let end_skip = match skip_exit {
+                        SkipExit::To(skip) => SkipExit::To(self.emit_effects_epsilon(
+                            skip,
                             vec![],
                             CaptureEffects::new_post(post),
-                        ),
-                    )
+                        )),
+                        SkipExit::Fail => SkipExit::Fail,
+                    };
+                    (end_match, end_skip)
                 };
                 self.with_suppression(|this| {
                     this.compile_skippable_with_exits(

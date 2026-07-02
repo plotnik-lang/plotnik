@@ -17,6 +17,9 @@ NFA-based cursor walk with backtracking.
 - **Root-anchored**: Matches the entire tree structure (like `^...$` in regex)
 - **Backtracking**: Failed branches restore state and try alternatives
 - **Ordered choice**: `[A B C]` tries branches left-to-right; first match wins
+- **Zero-width is last resort**: a pattern that can match zero nodes (an
+  optional, a star, a group of optionals, a reference to such a definition)
+  matches zero-width only when no consuming match exists at its position
 
 ### Trivia Handling
 
@@ -579,6 +582,20 @@ The `+` quantifier always produces non-empty arrays — no opt-out.
 
 Plotnik also supports non-greedy variants: `*?`, `+?`, `??`
 
+A repeat iteration must consume input. When the element can itself match
+zero nodes — a reference to a definition rooted at `?`, or an alternation
+with an optional branch — only its consuming matches become elements:
+
+```
+A = (expression_statement (identifier) @id)? @x
+Q = (program (A)* @xs)    ; xs collects one row per real match;
+                          ; non-matching statements are skipped, not
+                          ; collected as { x: null } rows
+```
+
+`(A)+` likewise requires at least one real match; a zero-width outcome never
+satisfies it.
+
 ---
 
 ## Sequences
@@ -655,6 +672,14 @@ Match alternatives with `[...]`:
 
 - **Union** (no branch labels): Fields merge across branches
 - **Enum** (with branch labels): Discriminated union
+
+A branch that can match zero nodes (`[(a)? (b)]`) succeeds zero-width only
+as a last resort: every branch's consuming match, at any candidate position,
+is preferred first. The zero-width outcome needs no candidate at all — it
+matches even in an empty parent — and leaves the cursor in place for any
+following pattern. In a union it yields every merged field at its default
+(`null`, or `[]` for a required list); in an enum it tags the variant with a
+defaulted payload.
 
 ```
 [

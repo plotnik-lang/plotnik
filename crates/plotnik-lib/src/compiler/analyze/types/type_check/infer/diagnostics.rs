@@ -119,7 +119,7 @@ impl InferVisitor<'_, '_> {
         let mut builder = self
             .report(DiagnosticKind::ZeroWidthRepeat, quant.text_range())
             .detail(format!(
-                "the referenced definition can match zero nodes, so one `{op}` repeat may not advance"
+                "the referenced definition can match zero nodes, but a `{op}` repeat must consume input on every iteration — its empty case could never occur here"
             ))
             .hint("make the definition consume at least one node, or drop the quantifier");
         if let Some((src, range)) = related {
