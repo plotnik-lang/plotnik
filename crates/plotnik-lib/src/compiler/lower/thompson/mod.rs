@@ -22,6 +22,7 @@ mod builder;
 mod capture;
 mod navigation;
 mod nfa_emit;
+mod nullability;
 mod patterns;
 mod quantifier;
 mod scope;

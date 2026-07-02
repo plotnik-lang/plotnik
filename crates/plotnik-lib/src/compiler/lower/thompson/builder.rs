@@ -1,5 +1,7 @@
 //! Core compiler state and entry points.
 
+use std::collections::HashSet;
+
 use indexmap::IndexMap;
 
 use crate::bytecode::Nav;
@@ -11,6 +13,7 @@ use crate::compiler::parse::ast::Pattern;
 
 use super::capture::PatternCtx;
 use super::navigation::AnchorSemantics;
+use super::nullability::compute_nullable_defs;
 use super::scope::{CaptureExits, Struct};
 
 /// NfaBuilder state for Thompson construction.
@@ -29,6 +32,13 @@ pub struct NfaBuilder<'a> {
     /// output — shared code emits unconditionally — and the call site brackets
     /// them with SuppressBegin/SuppressEnd (`RefLowering::SuppressedCall`).
     pub(super) suppress_depth: u32,
+    /// Definitions whose body can match zero nodes; references to them are
+    /// inlined at the call site (see `nullability`).
+    pub(super) nullable_defs: HashSet<DefId>,
+    /// Definitions whose body is currently being compiled (standalone or
+    /// inlined). A nullable reference back into this set cannot inline again —
+    /// it falls back to a guarded call (`compile_ref_guarded_call`).
+    pub(super) inline_stack: Vec<DefId>,
 }
 
 impl<'a> NfaBuilder<'a> {
@@ -41,6 +51,12 @@ impl<'a> NfaBuilder<'a> {
             def_entries: IndexMap::new(),
             scope_stack: Vec::new(),
             suppress_depth: 0,
+            nullable_defs: compute_nullable_defs(
+                ctx.analysis.interner,
+                ctx.symbol_table,
+                ctx.analysis.dependency_analysis,
+            ),
+            inline_stack: Vec::new(),
         }
     }
 
@@ -128,10 +144,14 @@ impl<'a> NfaBuilder<'a> {
         // Definitions are compiled in normalized form: body -> Return
         // No Struct/EndStruct wrapper - that's the caller's responsibility (call-site scoping).
         // We still use with_scope for member index lookup during compilation.
+        // The inline-stack entry keeps a nullable self-reference inside this
+        // body (`A = (x (A) (y))?`) from inlining itself endlessly.
         let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        self.inline_stack.push(def_id);
         let body_entry = self.with_scope(type_id, |this| {
             this.compile_pattern(body, return_label, body_nav)
         });
+        self.inline_stack.pop();
 
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);

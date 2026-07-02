@@ -271,6 +271,25 @@ impl NfaBuilder<'_> {
             );
         }
 
+        // A reference to a nullable definition skips like an inline `?`: its
+        // body is inlined so the zero-width path takes `skip_exit` with the
+        // checkpoint-restored cursor (a call's zero-width return cannot — the
+        // return address carries the consumed-candidate navigation).
+        if let Pattern::DefRef(r) = pattern {
+            let def_id = self.resolve_ref_def_id(r);
+            if self.nullable_defs.contains(&def_id) {
+                return self.compile_ref_inline(
+                    def_id,
+                    SplitExits {
+                        match_exit,
+                        skip_exit,
+                    },
+                    nav_override,
+                    capture,
+                );
+            }
+        }
+
         // Must be a QuantifiedPattern at this point
         let Pattern::QuantifiedPattern(quant) = pattern else {
             return self.dispatch_pattern(

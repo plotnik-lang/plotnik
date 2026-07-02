@@ -261,7 +261,7 @@ impl NfaBuilder<'_> {
 
         let search_nav = resumable_search_nav(first_nav);
         let branch_search = AltSearchNav(search_nav);
-        let branch_routing = self.alt_branch_routing(&branches, exit);
+        let branch_routing = self.alt_branch_routing(branches, exit);
 
         let mut successors = Vec::new();
         for (branch_idx, branch) in branches.iter().enumerate() {

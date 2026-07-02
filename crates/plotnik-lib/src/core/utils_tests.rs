@@ -34,6 +34,18 @@ fn pascal_case_from_dotted() {
 }
 
 #[test]
+fn pascal_case_from_camel() {
+    assert_eq!(to_pascal_case("fooBar"), "FooBar");
+    assert_eq!(to_pascal_case("fooBarBaz"), "FooBarBaz");
+}
+
+#[test]
+fn pascal_case_acronyms() {
+    assert_eq!(to_pascal_case("HTTPServer"), "HttpServer");
+    assert_eq!(to_pascal_case("parseHTTPResponse"), "ParseHttpResponse");
+}
+
+#[test]
 fn snake_case_from_pascal() {
     assert_eq!(to_snake_case("FooBar"), "foo_bar");
     assert_eq!(to_snake_case("Foo"), "foo");
@@ -43,4 +55,11 @@ fn snake_case_from_pascal() {
 fn snake_case_from_camel() {
     assert_eq!(to_snake_case("fooBar"), "foo_bar");
     assert_eq!(to_snake_case("fooBarBaz"), "foo_bar_baz");
+}
+
+#[test]
+fn snake_case_acronyms() {
+    assert_eq!(to_snake_case("HTTPServer"), "http_server");
+    assert_eq!(to_snake_case("ParseHTTPResponse"), "parse_http_response");
+    assert_eq!(to_snake_case("FOO_BAR"), "foo_bar");
 }

@@ -49,18 +49,22 @@ Item:
   08                                        ▶
 
 Collect:
-  09  -ε-  [ArrayOpen]                      29, 18
+  09  -ε-  [ArrayOpen]                      26, 14
 
 Test:
-  11   !   (array) [SuppressBegin]          13
-  13  └‣─  (Collect)                        09 : 14
-  14  ─‣┘  [SuppressEnd] _                  16
-  16                                        ▶
-  17                                        ▶
-  18  -ε-  [ArrayClose Set(M2)]             17
-  20  -ε-  [StructClose Push]               27, 18
-  22  -ε-  [StructClose Set(M1)]            20
-  24   !   (Item)                           06 : 22
-  25  -ε-  [StructOpen] [StructOpen]        24
-  27  ─‣─  _                                25, 27
-  29   !   _                                25, 27
+  11   !   (array)                          36, 28
+  13                                        ▶
+  14  -ε-  [ArrayClose Set(M2)]             13
+  16  -ε-  [StructClose Push]               24, 14
+  18  -ε-  [StructClose Set(M1)]            16
+  20   !   (Item)                           06 : 18
+  21  -ε-  [StructOpen] [StructOpen]        20
+  23  ─‣┘  _                                28
+  24  ─‣─  _                                21, 24
+  26   !   _                                21, 24
+  28                                        ▶
+  29  -ε-  [SuppressEnd]                    34, 23
+  31   !   (Item)                           06 : 29
+  32  -ε-  [SuppressBegin]                  31
+  34  ─‣─  _                                32, 34
+  36  └‣─  _                                32, 34

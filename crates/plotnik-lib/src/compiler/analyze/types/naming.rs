@@ -103,10 +103,10 @@ impl Namer<'_, '_> {
             let span = definition_name_span(symbol_table, self.interner, name_sym);
             let type_id = (output != TYPE_VOID).then_some(output);
 
-            if self.claim(name_sym, type_id, span) {
-                if let Some(type_id) = type_id {
-                    self.names.insert(type_id, name_sym);
-                }
+            if self.claim(name_sym, type_id, span)
+                && let Some(type_id) = type_id
+            {
+                self.names.insert(type_id, name_sym);
             }
         }
     }

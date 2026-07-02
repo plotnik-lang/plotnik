@@ -9,9 +9,7 @@ use crate::compiler::parse::ast::{self, SeqItem};
 
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
-use super::navigation::{
-    is_down_nav, is_skippable_quantifier, pattern_owns_iteration, resumable_search_nav,
-};
+use super::navigation::{is_down_nav, resumable_search_nav};
 use super::scope::SplitExits;
 
 /// The sibling nav implied by a sequence's trailing anchor, used to mark the
@@ -151,7 +149,7 @@ impl NfaBuilder<'_> {
         let first_is_skippable = nav_modes
             .first()
             .and_then(|(idx, _)| items[*idx].as_pattern())
-            .is_some_and(is_skippable_quantifier);
+            .is_some_and(|p| self.is_skippable_item(p));
         // The skip path makes the follower the new "first" item, so it must re-derive
         // first-position navigation rather than the sibling `Next` the match path uses.
         // This is required whenever the first item navigates to a position (`Down*` into
@@ -185,7 +183,7 @@ impl NfaBuilder<'_> {
         let last_is_skippable = nav_modes
             .last()
             .and_then(|(idx, _)| items[*idx].as_pattern())
-            .is_some_and(is_skippable_quantifier);
+            .is_some_and(|p| self.is_skippable_item(p));
 
         // Build chain in reverse: last pattern exits to `exit`, each prior exits to next.
         let mut current_exit = exit;
@@ -238,7 +236,7 @@ impl NfaBuilder<'_> {
                 Some(Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact)
             );
             let search_nav = resumable_search_nav(nav_override)
-                .filter(|_| followed_by_anchor && !pattern_owns_iteration(pattern));
+                .filter(|_| followed_by_anchor && !self.item_owns_iteration(pattern));
 
             current_exit = if let Some(nav) = search_nav {
                 let body = self.dispatch_pattern(
