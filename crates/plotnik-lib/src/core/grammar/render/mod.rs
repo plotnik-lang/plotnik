@@ -47,10 +47,6 @@ impl TreeGrammar {
         &self.defs
     }
 
-    /// Look up a definition by its display name.
-    pub fn def(&self, name: &str) -> Option<&Def> {
-        self.defs.iter().find(|def| def.name == name)
-    }
 }
 
 /// One top-level definition: a node shape, a hidden rule, a category, a token,
