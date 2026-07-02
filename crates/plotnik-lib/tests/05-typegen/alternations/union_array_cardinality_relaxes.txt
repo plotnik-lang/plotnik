@@ -1,0 +1,8 @@
+Q = [
+  {(identifier)+ @xs}
+  {(number)* @xs}
+]
+==== types ====
+export interface Q {
+  xs: Node[];
+}

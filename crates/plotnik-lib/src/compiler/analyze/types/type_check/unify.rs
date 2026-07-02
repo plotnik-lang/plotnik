@@ -166,5 +166,24 @@ fn unify_type_ids(
         return Ok(a);
     }
 
+    // Arrays that differ only in cardinality relax to zero-or-more: only one
+    // branch matches, so the merged list is non-empty only when the `+` branch
+    // did — `T[]+ ∪ T[]* = T[]*`.
+    if let (
+        Some(&TypeShape::Array {
+            element: ea,
+            non_empty: na,
+        }),
+        Some(&TypeShape::Array {
+            element: eb,
+            non_empty: nb,
+        }),
+    ) = (ctx.in_progress().type_shape(a), ctx.in_progress().type_shape(b))
+        && na != nb
+        && ctx.types_structurally_equal(ea, eb)
+    {
+        return Ok(if na { b } else { a });
+    }
+
     Err(UnifyError::IncompatibleTypes { field })
 }
