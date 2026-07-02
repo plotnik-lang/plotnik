@@ -183,12 +183,15 @@ reserved-zero checks reject smuggled state where the format pins a field to zero
 
 ## Code Generation
 
-To emit types (TypeScript, Rust, etc.):
+The compiler's naming pass makes the name table complete and consistent, so a
+code generator is a pure renderer:
 
 1. Build reverse map: `TypeId → Option<StringId>` from TypeNames
-2. Start from entrypoints or iterate TypeNames
+2. Start from entrypoints, walk reachable types
 3. For each type:
    - Look up structure in TypeDefs
-   - Look up name (if any) in reverse map
-   - Emit named types with their name; anonymous types inline or with generated names
-4. Detect when multiple names map to the same TypeId → emit aliases
+   - Named → emit a declaration under that name, verbatim; anonymous (enum
+     variant payloads, foreign bytecode) → render inline at use sites
+4. The same name may appear on several TypeIds only for structurally identical
+   types (nominal twins from repeated annotations) — one declaration serves
+   them all. Never invent names.

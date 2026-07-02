@@ -108,7 +108,8 @@ With `-l`: also validates node kinds and field names exist in grammar.
 | `--strict`   | Treat warnings as errors   |
 | `--json`     | Output diagnostics as JSON |
 
-On success: silent, exits 0.
+On success: silent, exits 0. A valid query with warnings prints them and
+still exits 0 (`--strict` turns warnings into failures).
 On error: prints diagnostics to stderr, exits 1.
 
 With `--json`, on exit 0 or 1 stdout is a JSON array of diagnostics (`[]`
