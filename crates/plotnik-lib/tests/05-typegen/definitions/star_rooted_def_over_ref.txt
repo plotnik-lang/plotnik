@@ -1,0 +1,14 @@
+Row = (pair key: (_) @key value: (_) @val)
+Rows = (Row)*
+Q = (program (expression_statement (parenthesized_expression (object (Rows) @rows))))
+==== types ====
+export interface Row {
+  key: Node;
+  val: Node;
+}
+
+export interface Q {
+  rows: Rows;
+}
+
+export type Rows = Row[];

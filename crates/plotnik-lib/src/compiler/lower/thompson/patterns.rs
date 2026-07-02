@@ -316,7 +316,7 @@ impl NfaBuilder<'_> {
                 capture,
             );
         }
-        self.compile_ref_call(def_id, ctx, field_override)
+        self.compile_ref_call(def_id, ctx, field_override, false)
     }
 
     /// Compile a reference as a `Call` to the definition's standalone body.
@@ -329,11 +329,16 @@ impl NfaBuilder<'_> {
     /// - Bare ref to a non-void definition: `SuppressBegin → Call → SuppressEnd → exit`
     ///   (matches structurally, output discarded)
     /// - Bare ref to a void definition: `Call → exit` (nothing to discard)
+    ///
+    /// `keep_value` forces the consumed lowering even with no consumer effect
+    /// at this site: the callee's pending value must survive the call — it is
+    /// the caller's own return value (a quantifier at a definition's root).
     fn compile_ref_call(
         &mut self,
         def_id: DefId,
         ctx: PatternCtx,
         field_override: Option<NodeFieldId>,
+        keep_value: bool,
     ) -> Label {
         let PatternCtx {
             exit,
@@ -357,7 +362,7 @@ impl NfaBuilder<'_> {
             .analysis
             .type_analysis
             .expect_type_shape(def_output_id);
-        let is_captured = post_consumes_call_value(&capture.post);
+        let is_captured = post_consumes_call_value(&capture.post) || keep_value;
         let lowering = self.ref_call_lowering(def_output_shape, is_captured);
 
         let nav = nav_override.unwrap_or(Nav::Stay);
@@ -456,6 +461,49 @@ impl NfaBuilder<'_> {
         nav_override: Option<Nav>,
         capture: CaptureEffects,
     ) -> Label {
+        self.compile_ref_inline_in(def_id, exits, nav_override, capture, false)
+    }
+
+    /// [`compile_ref_inline`](Self::compile_ref_inline) with `keep_value`: the
+    /// body's pending value survives with no consumer effect at this site (see
+    /// [`compile_ref_call`](Self::compile_ref_call)).
+    pub(super) fn compile_ref_inline_keep_value(
+        &mut self,
+        def_id: DefId,
+        exits: SplitExits,
+        nav_override: Option<Nav>,
+    ) -> Label {
+        self.compile_ref_inline_in(def_id, exits, nav_override, CaptureEffects::default(), true)
+    }
+
+    /// Call a definition keeping its pending value alive (no consumer effect).
+    pub(super) fn compile_ref_call_keep_value(
+        &mut self,
+        def_id: DefId,
+        exit: Label,
+        nav_override: Option<Nav>,
+        field_override: Option<NodeFieldId>,
+    ) -> Label {
+        self.compile_ref_call(
+            def_id,
+            PatternCtx {
+                exit,
+                nav: nav_override,
+                capture: CaptureEffects::default(),
+            },
+            field_override,
+            true,
+        )
+    }
+
+    fn compile_ref_inline_in(
+        &mut self,
+        def_id: DefId,
+        exits: SplitExits,
+        nav_override: Option<Nav>,
+        capture: CaptureEffects,
+        keep_value: bool,
+    ) -> Label {
         if self.inline_stack.contains(&def_id) {
             return self.compile_ref_guarded_call(def_id, exits, nav_override, capture);
         }
@@ -477,7 +525,7 @@ impl NfaBuilder<'_> {
             .analysis
             .type_analysis
             .expect_type_shape(def_output_id);
-        let is_captured = post_consumes_call_value(&capture.post);
+        let is_captured = post_consumes_call_value(&capture.post) || keep_value;
         let inline_scoped_capture =
             is_captured && matches!(def_output_shape, TypeShape::Struct(_));
 
@@ -602,6 +650,7 @@ impl NfaBuilder<'_> {
                 capture: CaptureEffects::new_post(post),
             },
             None,
+            false,
         );
         let entry = self.emit_branch_epsilon(
             BranchTargets {

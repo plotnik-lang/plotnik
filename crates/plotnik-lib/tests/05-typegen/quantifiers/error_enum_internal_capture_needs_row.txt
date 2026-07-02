@@ -2,18 +2,7 @@ Bad = [
   A: (identifier) @id
 ]*
 ==== diagnostics ====
-warning: branch labels have no effect without capture
- --> query.ptk:1:7
-  |
-1 |   Bad = [
-  |  _______^
-2 | |   A: (identifier) @id
-3 | | ]*
-  | |_^
-  |
-help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
-
-error: captures `@id` repeat with `*` but aren't collected into a list
+error: the definition names the list itself, so each `*` element — a labeled alternation — is left without a type name
  --> query.ptk:1:7
   |
 1 |   Bad = [
@@ -22,5 +11,4 @@ error: captures `@id` repeat with `*` but aren't collected into a list
 3 | | ]*
   | |__^
   |
-help: add a row capture so each repeat becomes one element: `[...]* @items`
-help: or discard the captures if only the structure matters: `[...]* @_`
+help: name the element type in its own definition, then quantify a reference to it: `Elem = ...` and `(Elem)*`

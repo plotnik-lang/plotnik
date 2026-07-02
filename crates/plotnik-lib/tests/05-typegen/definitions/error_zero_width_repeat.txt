@@ -1,0 +1,12 @@
+MaybeId = (identifier)?
+Q = (program (expression_statement (array (MaybeId)* @xs)))
+==== diagnostics ====
+error: the referenced definition can match zero nodes, so one `*` repeat may not advance
+ --> query.ptk:2:43
+  |
+1 | MaybeId = (identifier)?
+  |           ------------- can match zero nodes here
+2 | Q = (program (expression_statement (array (MaybeId)* @xs)))
+  |                                           ^^^^^^^^^^
+  |
+help: make the definition consume at least one node, or drop the quantifier

@@ -1,0 +1,14 @@
+Row = (pair key: (_) @key value: (_) @val)
+MaybeRow = (Row)?
+Q = (program (expression_statement (parenthesized_expression (object (MaybeRow) @first))))
+==== types ====
+export interface Row {
+  key: Node;
+  val: Node;
+}
+
+export interface Q {
+  first: MaybeRow;
+}
+
+export type MaybeRow = Row | null;

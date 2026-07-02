@@ -1,0 +1,9 @@
+Ids = (identifier)+
+Q = (program (expression_statement (array (Ids) @ids (Ids)* @runs)))
+==== types ====
+export interface Q {
+  ids: Ids;
+  runs: Ids[];
+}
+
+export type Ids = [Node, ...Node[]];

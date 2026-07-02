@@ -50,12 +50,11 @@ _StructWrap:
   05                                        ▶
 
 Q:
-  06   !   (program)                        18, 13
-  08   !   [EnumOpen(M1)] (identifier) [Node Set(M0) EnumClose Set(M2)]  11
-  11  ─‣┘  _                                12
-  12                                        ▶
-  13  -ε-  [Null Set(M2)]                   12
-  15  ...
+  06   !   (program)                        18, 14
+  08   !   [EnumOpen(M1)] (identifier) [Node Set(M0) EnumClose Node]  11
+  11  ─‣┘  [Set(M2)] _                      13
+  13                                        ▶
+  14  -ε-  [Null Set(M2)]                   13
   16  ─‣─  _                                08, 16
   18  └‣─  _                                08, 16
 ==== trace ====
@@ -65,17 +64,17 @@ _StructWrap:
        ▶   (Q)
 
 Q:
-  06       (program)                        18, 13
+  06       (program)                        18, 14
        ●   program
   18       _                                08, 16
        ●   lexical_declaration
-  08       [EnumOpen(M1)] (identifier) [Node Set(M0) EnumClose Set(M2)]  11
+  08       [EnumOpen(M1)] (identifier) [Node Set(M0) EnumClose Node]  11
        ○   lexical_declaration
   18  ❮❮❮ 
   16       _                                08, 16
   06  ❮❮❮ 
-  13  -ε-  [Null Set(M2)]                   12
-  12   ◀   (Q)                              
+  14  -ε-  [Null Set(M2)]                   13
+  13   ◀   (Q)                              
 
 _StructWrap:
   03  -ε-  [StructClose]                    05

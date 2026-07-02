@@ -7,20 +7,20 @@
 //! zero-width return would step over an unmatched node. So `compile_ref`
 //! inlines nullable bodies at the call site instead, where the ordinary
 //! split-exit machinery gives the skip path its own continuation
-//! (see [`NfaBuilder::compile_ref_inline`](super::NfaBuilder)).
+//! (see `compile_ref_inline` in the lowering).
 //!
 //! Mirrors the `def_arity` pre-pass: a fixpoint over the definition graph in
 //! reverse-topological SCC order, so lowering never guesses.
 
 use std::collections::HashSet;
 
-use crate::compiler::analyze::names::SymbolTable;
-use crate::compiler::analyze::refs::DependencyAnalysis;
+use super::names::SymbolTable;
+use super::refs::DependencyAnalysis;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::{Pattern, QuantifierKind};
 use crate::core::Interner;
 
-pub(super) fn compute_nullable_defs(
+pub(crate) fn compute_nullable_defs(
     interner: &Interner,
     symbol_table: &SymbolTable,
     dependency_analysis: &DependencyAnalysis,

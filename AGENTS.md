@@ -54,6 +54,7 @@ Validate once, at the boundary. Two smells to fix on sight: a swallowed must-hol
 - Row list (with internal captures): `(x @y)* @rows` → `rows: { y: T }[]`
 - **Strict dimensionality**: `*`/`+` with internal captures requires row capture on the quantifier
 - **Single referent**: a capture on a void pattern that doesn't match exactly one node (`{(a) (b)} @x`, `{(a)+} @x`, `{(a)?} @x`, ref to such a def) is an error
+- **Quantifier-rooted defs collect**: the def name is a consuming position — `Ids = (identifier)*` → `Ids = Node[]`, `Rows = (Row)*` → `Rows = Row[]`, `First = (Row)?` → `First = Row | null`. The element must be nameable (node or ref); an anonymous row/enum element is an error (name it in its own def). As entrypoints these output top-level JSON arrays/null.
 - **Type names** are compile-time and path-derived (`{Parent}{PascalField}`); `:: Name` overrides and resets the chain; same name + same shape = one type, different shape = error; `Node` and def names reserved
 - `@_` consumes and discards: subtree matches structurally, inner captures inert, no warnings
 
@@ -141,6 +142,17 @@ Rule: `.!` is exact. Soft `.` skips anonymous nodes only when both sides are nam
 ```
 
 Note: `{}` is for grouping siblings into a sequence, not for satisfying dimensionality.
+
+**Quantifier-rooted definitions**: the def name collects, but only nameable
+elements qualify:
+
+```
+Ids = (identifier)*             ; OK: Ids = Node[]
+Rows = (Row)*                   ; OK: Rows = Row[] (Row is its own def)
+Bad = (func (id) @name)*        ; ERROR: element row is unnamed — split it out
+Bad = [K: (a) @a V: (b) @b]*    ; ERROR: element enum is unnamed — split it out
+Loop = (Ids)*                   ; ERROR: Ids can match zero nodes, repeat can't advance
+```
 
 **Optional rows**: `?` follows the same rule — internal captures need a
 capture on the quantifier (`@_` to discard); the collected row is nullable:

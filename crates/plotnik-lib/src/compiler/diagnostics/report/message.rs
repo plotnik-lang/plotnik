@@ -72,6 +72,8 @@ pub enum DiagnosticKind {
     UnusedBranchLabels,
     StrictDimensionalityViolation,
     MultiElementScalarCapture,
+    UnnamedQuantifiedElement,
+    ZeroWidthRepeat,
     DuplicateCaptureInScope,
     IncompatibleCaptureTypes,
     IncompatibleStructShapes,
@@ -316,6 +318,10 @@ impl DiagnosticKind {
                 "a repeated capture must be collected into a list"
             }
             Self::MultiElementScalarCapture => "a captured pattern must match exactly one node",
+            Self::UnnamedQuantifiedElement => {
+                "quantifier at definition root leaves its element type unnamed"
+            }
+            Self::ZeroWidthRepeat => "cannot repeat a pattern that can match zero nodes",
             Self::DuplicateCaptureInScope => "duplicate capture in scope",
             Self::IncompatibleCaptureTypes => "incompatible capture types",
             Self::IncompatibleStructShapes => "incompatible struct shapes",
@@ -364,6 +370,8 @@ impl DiagnosticKind {
             Self::IncompatibleTypes => "{}".to_string(),
             Self::StrictDimensionalityViolation => "{}".to_string(),
             Self::MultiElementScalarCapture => "{}".to_string(),
+            Self::UnnamedQuantifiedElement => "{}".to_string(),
+            Self::ZeroWidthRepeat => "{}".to_string(),
             Self::TypeNameConflict => "type name `{}` is already used for a different type".to_string(),
             Self::RedundantTypeAnnotation => "this type annotation {}".to_string(),
             Self::DuplicateCaptureInScope => {

@@ -64,6 +64,52 @@ export type Foo = undefined;              ; matches or not — no data
 
 There is no pure type aliasing: `Foo = (Id)` does not re-export `Id`'s type.
 
+### Quantifier-Rooted Definitions
+
+The definition name is a consuming position — exactly as it is for labeled
+alternations. A quantifier standing as the whole body collects into the
+definition's own output, which is the container itself:
+
+```
+Ids = (identifier)*          ; Ids = Node[]
+MaybeId = (identifier)?      ; MaybeId = Node | null
+Row = (pair key: (_) @k value: (_) @v)
+Rows = (Row)*                ; Rows = Row[]
+First = (Row)?               ; First = Row | null
+```
+
+```typescript
+export type Ids = Node[];
+export type Rows = Row[];
+export type First = Row | null;
+```
+
+References stay opaque at call sites: `(Rows) @rows` → `rows: Rows`, bare
+`(Rows)` is structural, `(Rows)* @xss` → `xss: Rows[]`. An optional-rooted
+definition under a call-site `?` nests: `(MaybeId)? @x` → `x: MaybeId | null`
+(both nulls print the same in JSON).
+
+Containers never mint type names — names come only from definitions,
+captures, `::` annotations, and variant tags. So the element must already be
+a nameable type: a plain node, or a reference. An anonymous element shape is
+rejected; name it in its own definition:
+
+```
+Bad = {(key) @k (value) @v}*      ; ERROR: the element row has no type name
+Row = (pair key: (_) @k value: (_) @v)
+Good = (Row)*                     ; Good = Row[]
+```
+
+Two consequences:
+
+- A definition whose root is `*` or `?` can match zero nodes, so repeating a
+  reference to it (`(MaybeId)*`) is rejected — a zero-width iteration would
+  collect a spurious null at every non-matching candidate.
+- A quantifier-rooted definition used as an entrypoint is a **value
+  entrypoint**: `run` outputs a top-level JSON array (or `null`), not an
+  object. A `*`-rooted entrypoint that matches zero times prints `[]` and
+  exits 0 — the zero-iteration match is a successful match.
+
 ## Scope Model
 
 Within a definition, captures bubble up through query nesting to the nearest

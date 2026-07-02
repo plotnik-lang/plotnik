@@ -13,7 +13,7 @@ use crate::compiler::parse::ast::Pattern;
 
 use super::capture::PatternCtx;
 use super::navigation::AnchorSemantics;
-use super::nullability::compute_nullable_defs;
+use crate::compiler::analyze::nullability::compute_nullable_defs;
 use super::scope::{CaptureExits, Struct};
 
 /// NfaBuilder state for Thompson construction.

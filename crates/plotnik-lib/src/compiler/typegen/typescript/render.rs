@@ -38,7 +38,7 @@ impl Emitter<'_> {
                 self.emit_type_decl(&name, &body);
             }
             _ => {
-                let body = self.render_ty(type_id);
+                let body = self.render_shape(type_id);
                 self.emit_type_decl(&name, &body);
             }
         }

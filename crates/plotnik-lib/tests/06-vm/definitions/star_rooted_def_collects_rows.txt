@@ -1,0 +1,231 @@
+Row = (pair key: (_) @key value: (_) @val)
+Rows = (Row)*
+Q = (program (expression_statement (parenthesized_expression (object (Rows) @rows))))
+==== input ====
+({a: 1, b: 2});
+==== types ====
+export interface Row {
+  key: Node;
+  val: Node;
+}
+
+export interface Q {
+  rows: Rows;
+}
+
+export type Rows = Row[];
+==== output ====
+{
+  "rows": [
+    {
+      "key": {
+        "kind": "property_identifier",
+        "text": "a",
+        "span": [2, 3]
+      },
+      "val": {
+        "kind": "number",
+        "text": "1",
+        "span": [5, 6]
+      }
+    },
+    {
+      "key": {
+        "kind": "property_identifier",
+        "text": "b",
+        "span": [8, 9]
+      },
+      "val": {
+        "kind": "number",
+        "text": "2",
+        "span": [11, 12]
+      }
+    }
+  ]
+}
+==== bytecode ====
+[strings]
+S00 "Beauty will save the world"
+S01 "key"
+S02 "val"
+S03 "rows"
+S04 "Row"
+S05 "Rows"
+S06 "Q"
+S07 "pair"
+S08 "program"
+S09 "expression_statement"
+S10 "parenthesized_expression"
+S11 "object"
+S12 "value"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { key, val }
+T2 = ArrayStar(T1)  ; Row*
+T3 = Struct  M2:1  ; { rows }
+
+[type_members]
+M0: S01 → T0  ; key: <Node>
+M1: S02 → T0  ; val: <Node>
+M2: S03 → T2  ; rows: Rows
+
+[type_names]
+N0: S04 → T1  ; Row
+N1: S05 → T2  ; Rows
+N2: S06 → T3  ; Q
+
+[entrypoints]
+Q    = 16 :: T3
+Row  = 06 :: T1
+Rows = 14 :: T2
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Row:
+  06   !   (pair)                           08
+  07  ...
+  08  └‣─  key: (_) [Node Set(M0)]          10
+  10  ─‣─  value: (_) [Node Set(M1)]        12
+  12  ─‣┘  _                                13
+  13                                        ▶
+
+Rows:
+  14  -ε-  [ArrayOpen]                      40, 27
+
+Q:
+  16   !   (program)                        17
+  17  └‣─  (expression_statement)           18
+  18  └‣─  (parenthesized_expression)       19
+  19  └‣─  (object)                         20
+  20  -ε-  [ArrayOpen]                      56, 43
+  22  -ε-  [ArrayClose]                     24
+  24  ─‣┘  [Set(M2)] _                      31
+  26                                        ▶
+  27  -ε-  [ArrayClose]                     26
+  29  -ε-  [Push]                           37, 27
+  31  ─‣┘³ _                                42
+  32  -ε-  [StructClose]                    29
+  34   !   (Row)                            06 : 32
+  35  -ε-  [StructOpen]                     34
+  37  ─‣─  _                                35, 37
+  39  ...
+  40   !   _                                35, 37
+  42                                        ▶
+  43  -ε-  [ArrayClose Set(M2)]             31
+  45  -ε-  [Push]                           53, 22
+  47  ...
+  48  -ε-  [StructClose]                    45
+  50   !   (Row)                            06 : 48
+  51  -ε-  [StructOpen]                     50
+  53  ─‣─  _                                51, 53
+  55  ...
+  56  └‣─  _                                51, 53
+==== trace ====
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  16       (program)                        17
+       ●   program
+  17       (expression_statement)           18
+       ●   expression_statement
+  18       (parenthesized_expression)       19
+       ●   parenthesized_expression
+  19       (object)                         20
+       ○   (
+       ●   object
+  20  -ε-  [ArrayOpen]                      56, 43
+  56       _                                51, 53
+       ●   {
+  51  -ε-  [StructOpen]                     50
+  50       (Row)                            06 : 48
+       ▶   (Row)
+
+Row:
+  06       (pair)                           08
+       ○   {
+  56  ❮❮❮ 
+  53       _                                51, 53
+       ●   pair
+  51  -ε-  [StructOpen]                     50
+  50       (Row)                            06 : 48
+       ▶   (Row)
+
+Row:
+  06       (pair)                           08
+       ●   pair
+  08       key: (_) [Node Set(M0)]          10
+       ●   property_identifier
+  10       value: (_) [Node Set(M1)]        12
+       ○   :
+       ●   number
+  12       _                                13
+       ●   pair
+  13   ◀   (Row)                            
+
+Row:
+  48  -ε-  [StructClose]                    45
+  45  -ε-  [Push]                           53, 22
+  53       _                                51, 53
+       ●   ,
+  51  -ε-  [StructOpen]                     50
+  50       (Row)                            06 : 48
+       ▶   (Row)
+
+Row:
+  06       (pair)                           08
+       ○   ,
+  53  ❮❮❮ 
+  53       _                                51, 53
+       ●   pair
+  51  -ε-  [StructOpen]                     50
+  50       (Row)                            06 : 48
+       ▶   (Row)
+
+Row:
+  06       (pair)                           08
+       ●   pair
+  08       key: (_) [Node Set(M0)]          10
+       ●   property_identifier
+  10       value: (_) [Node Set(M1)]        12
+       ○   :
+       ●   number
+  12       _                                13
+       ●   pair
+  13   ◀   (Row)                            
+
+Row:
+  48  -ε-  [StructClose]                    45
+  45  -ε-  [Push]                           53, 22
+  53       _                                51, 53
+       ●   }
+  51  -ε-  [StructOpen]                     50
+  50       (Row)                            06 : 48
+       ▶   (Row)
+
+Row:
+  06       (pair)                           08
+       ○   }
+  53  ❮❮❮ 
+  53       _                                51, 53
+  45  ❮❮❮ 
+  22  -ε-  [ArrayClose]                     24
+  24       [Set(M2)] _                      31
+       ●   object
+  31       _                                42
+       ●   program
+  42   ◀   (Row)                            
+
+Row:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Row)                            
+
+Row:

@@ -125,6 +125,11 @@ impl Emitter<'_> {
                 out.insert(type_id);
             }
             TypeDefKind::Wrapper { inner, .. } => {
+                // A named wrapper is a definition's output (`A = (Row)*`) and
+                // gets its own declaration; anonymous wrappers render inline.
+                if self.type_names.contains_key(&type_id) {
+                    out.insert(type_id);
+                }
                 self.collect_emit_set(inner, out);
             }
             TypeDefKind::Struct { .. } => {

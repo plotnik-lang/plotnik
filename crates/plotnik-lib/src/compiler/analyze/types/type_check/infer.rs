@@ -23,7 +23,7 @@
 //!   captures bubble as optional fields) and a warning points at the dead
 //!   labels.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use crate::core::{Interner, Symbol};
 use rowan::TextRange;
@@ -40,6 +40,7 @@ use crate::compiler::analyze::types::type_shape::{
 
 use crate::compiler::analyze::Located;
 use crate::compiler::analyze::names::SymbolTable;
+use crate::compiler::analyze::nullability::compute_nullable_defs;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::diagnostics::report::{DiagnosticBuilder, DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
@@ -60,6 +61,8 @@ pub struct InferState<'a, 'd> {
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
     pub dependency_analysis: &'a DependencyAnalysis,
+    /// Definitions whose body can match zero nodes (shared with lowering).
+    pub nullable_defs: &'a HashSet<DefId>,
     pub(crate) diag: &'d mut Diagnostics,
 }
 
@@ -74,12 +77,16 @@ pub struct InferVisitor<'a, 'd> {
 /// enum inner; a bare one is structural and produces nothing. A suppressed one
 /// (under `@_`) consumes like a captured one — labels stay meaningful, no
 /// degradation warning — but every value is discarded, so neither
-/// dimensionality demand applies.
+/// dimensionality demand applies. In a quantifier-rooted definition body
+/// (`Consumed`) the quantifier collects into the definition's own output: the
+/// definition name is a consuming position, so the output type is the
+/// container (array/optional) itself.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum QuantifiedContext {
     Bare,
     Captured,
     Suppressed,
+    Consumed,
 }
 
 struct CaptureInner {
@@ -144,6 +151,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Pattern::Enum(e) => self.infer_enum(&pattern.wrap(e.clone()), Consumption::Consumed),
             Pattern::FieldPattern(f) => {
                 self.infer_field_pattern_in(&pattern.wrap(f.clone()), Consumption::Consumed)
+            }
+            Pattern::QuantifiedPattern(q) => {
+                return self.infer_quantified_pattern_in(
+                    &pattern.wrap(q.clone()),
+                    QuantifiedContext::Consumed,
+                );
             }
             _ => return self.infer_pattern(pattern),
         };
@@ -708,9 +721,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let inner = quant.wrap(inner);
 
         let inner_info = match context {
-            QuantifiedContext::Captured | QuantifiedContext::Suppressed => {
-                self.infer_pattern_consumed(&inner)
-            }
+            QuantifiedContext::Captured
+            | QuantifiedContext::Suppressed
+            | QuantifiedContext::Consumed => self.infer_pattern_consumed(&inner),
             QuantifiedContext::Bare => self.infer_pattern(&inner),
         };
         let quantifier = self.quantifier_kind(quant.node());
@@ -735,10 +748,35 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     self.make_flow_optional(inner_info.flow)
                 }
                 QuantifiedContext::Suppressed => self.make_flow_optional(inner_info.flow),
+                // The definition collects the skip as its own null: the output
+                // is the optional type itself, not a field-optionality flag.
+                QuantifiedContext::Consumed => {
+                    let element =
+                        self.consumed_quantifier_element(quant.node(), &inner, &inner_info);
+                    PatternFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Optional(element)))
+                }
             },
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
-                self.check_quantified_array_dimensionality(quant.node(), &inner_info, context);
-                self.make_flow_array(inner_info.flow, quantifier.is_non_empty(), context)
+                // A value-collecting repeat over a zero-width-capable element
+                // could complete an iteration without advancing; reject before
+                // lowering has to give the loop an exit it cannot have.
+                if matches!(
+                    context,
+                    QuantifiedContext::Captured | QuantifiedContext::Consumed
+                ) {
+                    self.reject_zero_width_repeat(quant.node(), &inner);
+                }
+                if context == QuantifiedContext::Consumed {
+                    let element =
+                        self.consumed_quantifier_element(quant.node(), &inner, &inner_info);
+                    PatternFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Array {
+                        element,
+                        non_empty: quantifier.is_non_empty(),
+                    }))
+                } else {
+                    self.check_quantified_array_dimensionality(quant.node(), &inner_info, context);
+                    self.make_flow_array(inner_info.flow, quantifier.is_non_empty(), context)
+                }
             }
         };
 
@@ -765,6 +803,88 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
             // Everything is discarded; there is nothing to collect wrongly.
             QuantifiedContext::Suppressed => {}
+            QuantifiedContext::Consumed => {
+                unreachable!("quantifier-rooted definitions resolve their element type instead")
+            }
+        }
+    }
+
+    /// Reject `*`/`+` whose element is a reference to an optional- or
+    /// array-rooted definition that can match zero nodes: a zero-width
+    /// iteration completes without consuming, so the loop collects a spurious
+    /// null/empty element at every non-matching candidate. Scoped to
+    /// wrapper-shaped outputs — the surface quantifier-rooted definitions
+    /// introduce — so nullable struct-valued definitions (a captured `?` at
+    /// the root) keep their existing repeat behavior.
+    fn reject_zero_width_repeat(&mut self, quant: &QuantifiedPattern, inner: &Located<Pattern>) {
+        let mut element = inner.node().clone();
+        while let Pattern::FieldPattern(f) = &element {
+            match f.value() {
+                Some(v) => element = v,
+                None => return,
+            }
+        }
+        let Pattern::DefRef(r) = &element else {
+            return;
+        };
+        let Some(name) = r.name() else {
+            return;
+        };
+        let Some(def_id) = self
+            .ctx
+            .dependency_analysis
+            .def_id_for_name(self.ctx.interner, name.text())
+        else {
+            return;
+        };
+        if !self.ctx.nullable_defs.contains(&def_id) {
+            return;
+        }
+        // Mid-SCC targets have no registered output yet; the recursion checks
+        // own those cycles.
+        let view = self.ctx.type_ctx.in_progress();
+        let wrapper_output = view.def_output(def_id).is_some_and(|output| {
+            matches!(
+                view.type_shape(output),
+                Some(TypeShape::Optional(_) | TypeShape::Array { .. })
+            )
+        });
+        if wrapper_output {
+            self.report_zero_width_repeat(quant, &element);
+        }
+    }
+
+    /// Resolve the element type of a quantifier-rooted definition body.
+    ///
+    /// The definition names its output — the container — so the element must
+    /// be a type that needs no fresh name: a matched node (void inner) or
+    /// another definition's output (a reference). Anonymous element shapes — a
+    /// row of captures, a labeled alternation — have no name source (names
+    /// come only from defs, captures, annotations, and variant tags) and are
+    /// rejected with a hint to split the element into its own definition. The
+    /// plausible element type is still returned so downstream inference isn't
+    /// poisoned by void.
+    fn consumed_quantifier_element(
+        &mut self,
+        quant: &QuantifiedPattern,
+        inner: &Located<Pattern>,
+        inner_info: &PatternShape,
+    ) -> TypeId {
+        match &inner_info.flow {
+            PatternFlow::Void => {
+                self.report_multi_element_scalar(quant, inner_info);
+                TYPE_NODE
+            }
+            PatternFlow::Value(t) => {
+                if consumable_enum_root(inner.node()) {
+                    self.report_unnamed_quantified_element(quant, "a labeled alternation");
+                }
+                *t
+            }
+            PatternFlow::Fields(t) => {
+                self.report_unnamed_quantified_element(quant, "a row of captures");
+                *t
+            }
         }
     }
 
@@ -822,6 +942,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 QuantifiedContext::Captured,
                 PatternFlow::Value(element) | PatternFlow::Fields(element),
             ) => intern_array(self.ctx.type_ctx, element),
+            (QuantifiedContext::Consumed, _) => {
+                unreachable!("quantifier-rooted definitions resolve their element type instead")
+            }
         }
     }
 
@@ -906,6 +1029,17 @@ fn consumable_enum_root(pattern: &Pattern) -> bool {
     }
 }
 
+/// A definition body's root consumes a pending value: a labeled alternation
+/// produces its enum, a quantifier collects into the definition's output
+/// (array for `*`/`+`, optional for `?`). Reached through field wrappers.
+fn consumable_value_root(pattern: &Pattern) -> bool {
+    match pattern {
+        Pattern::Enum(_) | Pattern::QuantifiedPattern(_) => true,
+        Pattern::FieldPattern(f) => f.value().is_some_and(|v| consumable_value_root(&v)),
+        _ => false,
+    }
+}
+
 pub(super) struct InferPassEnv<'a, 'd> {
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
@@ -917,13 +1051,20 @@ pub(super) struct InferPassEnv<'a, 'd> {
 pub(super) struct InferPass<'a, 'd> {
     ctx: TypeAnalysisBuilder,
     analysis: InferPassEnv<'a, 'd>,
+    nullable_defs: HashSet<DefId>,
 }
 
 impl<'a, 'd> InferPass<'a, 'd> {
     pub fn new(analysis: InferPassEnv<'a, 'd>) -> Self {
+        let nullable_defs = compute_nullable_defs(
+            analysis.interner,
+            analysis.symbol_table,
+            analysis.dependency_analysis,
+        );
         Self {
             ctx: TypeAnalysisBuilder::new(),
             analysis,
+            nullable_defs,
         }
     }
 
@@ -1004,6 +1145,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
                     interner: self.analysis.interner,
                     symbol_table: self.analysis.symbol_table,
                     dependency_analysis: self.analysis.dependency_analysis,
+                    nullable_defs: &self.nullable_defs,
                     diag: &mut *self.analysis.diag,
                 },
                 source_id,
@@ -1015,12 +1157,12 @@ impl<'a, 'd> InferPass<'a, 'd> {
             PatternFlow::Void => TYPE_VOID,
             PatternFlow::Fields(t) => *t,
             // A root value is the definition's result only when the root is a
-            // consumed alternation (its labels are output syntax). A bare
-            // reference (or a bare quantifier over one) is suppressed: no
-            // capture, no output — the definition still matches, like a
-            // capture-less regex.
+            // consuming position: a labeled alternation (its labels are output
+            // syntax) or a quantifier (the def name collects it). A bare
+            // reference is suppressed: no capture, no output — the definition
+            // still matches, like a capture-less regex.
             PatternFlow::Value(t) => {
-                if consumable_enum_root(&body) {
+                if consumable_value_root(&body) {
                     *t
                 } else {
                     TYPE_VOID

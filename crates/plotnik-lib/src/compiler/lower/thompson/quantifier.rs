@@ -5,6 +5,7 @@
 //! stay in one place.
 
 use crate::bytecode::{EffectKind, Nav};
+use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOperator};
@@ -172,6 +173,25 @@ pub(super) struct QuantifierConfig<'a> {
 }
 
 impl NfaBuilder<'_> {
+    /// Whether this quantifier collects into a definition's output (inferred
+    /// flow `Value`): the root of a definition body, compiled like a captured
+    /// quantifier whose result is left pending as the call's return value.
+    /// Suppressed regions discard the value and compile structurally.
+    fn is_value_collecting(&self, quant: &ast::QuantifiedPattern) -> bool {
+        if self.is_suppressed() {
+            return false;
+        }
+        let pattern = Pattern::QuantifiedPattern(quant.clone());
+        matches!(
+            self.ctx
+                .analysis
+                .type_analysis
+                .expect_pattern_result(&pattern)
+                .flow,
+            PatternFlow::Value(_)
+        )
+    }
+
     /// Compile a quantified pattern with capture effects (passed to body).
     pub(super) fn compile_quantified(
         &mut self,
@@ -189,6 +209,15 @@ impl NfaBuilder<'_> {
             nav: nav_override,
             capture,
         } = ctx;
+
+        if self.is_value_collecting(quant) {
+            return self.compile_valued_quantifier(
+                quant,
+                CaptureExits::Single(exit),
+                nav_override,
+                capture,
+            );
+        }
 
         let config = QuantifierConfig {
             inner: &inner,
@@ -316,6 +345,18 @@ impl NfaBuilder<'_> {
             }
             QuantifierForm::Quantified { inner, kind } => (inner, kind),
         };
+
+        if self.is_value_collecting(quant) {
+            return self.compile_valued_quantifier(
+                quant,
+                CaptureExits::Split {
+                    match_exit,
+                    skip_exit,
+                },
+                nav_override,
+                capture,
+            );
+        }
 
         let skip_with_null = self.emit_null_for_skip_path(skip_exit, &capture);
         let skip_with_internal_null = self.emit_null_for_internal_captures(skip_with_null, &inner);
@@ -709,6 +750,128 @@ impl NfaBuilder<'_> {
                 )
             }
         }
+    }
+
+    /// Compile a quantifier that IS a definition's output: the collected
+    /// value is left pending as the call's return value — a captured
+    /// quantifier with no consumer of its own. `*`/`+` collect an array
+    /// (`Arr → iterations with Push → EndArr`); `?` leaves the element's
+    /// value pending on the match path and a bare `Null` on the skip path.
+    fn compile_valued_quantifier(
+        &mut self,
+        quant: &ast::QuantifiedPattern,
+        exits: CaptureExits,
+        nav_override: Option<Nav>,
+        outer: CaptureEffects,
+    ) -> Label {
+        let QuantifierForm::Quantified { inner, kind } = classify_quantifier(quant) else {
+            unreachable!("a value-collecting quantifier has an operator and an inner");
+        };
+
+        match kind.kind() {
+            QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
+                let pattern = Pattern::QuantifiedPattern(quant.clone());
+                let req = CaptureRequest {
+                    inner: &pattern,
+                    nav: nav_override,
+                    capture_effects: vec![],
+                    outer_capture: outer,
+                };
+                self.compile_array_capture(req, exits)
+            }
+            QuantifierKind::Optional => {
+                self.compile_valued_optional(&inner, kind, exits, nav_override, outer)
+            }
+        }
+    }
+
+    /// The `?` half of [`compile_valued_quantifier`](Self::compile_valued_quantifier).
+    ///
+    /// The element's value must survive as the pending call value, so a
+    /// reference element compiles with the keep-value ref lowering (a plain
+    /// `Set`-consumer chain doesn't exist at a definition's root); a node
+    /// element pends its matched node via a `Node` effect.
+    fn compile_valued_optional(
+        &mut self,
+        inner: &Pattern,
+        kind: QuantifierOperator,
+        exits: CaptureExits,
+        nav_override: Option<Nav>,
+        outer: CaptureEffects,
+    ) -> Label {
+        let (match_exit, skip_exit) = match exits {
+            CaptureExits::Single(exit) => (exit, exit),
+            CaptureExits::Split {
+                match_exit,
+                skip_exit,
+            } => (match_exit, skip_exit),
+        };
+        let CaptureEffects { pre, post } = outer;
+
+        // Skip: the value is a bare null; enclosing-scope effects still run.
+        let mut skip_effects = vec![EffectIR::null()];
+        skip_effects.extend(post.iter().cloned());
+        let skip_target = self.emit_effects_if_nonempty(skip_exit, skip_effects);
+        let match_target = self.emit_effects_if_nonempty(match_exit, post);
+
+        // A field constraint is navigation on the element, not structure.
+        let (element, field_override) = match inner {
+            Pattern::FieldPattern(f) => {
+                let field_id = self.resolve_field(f);
+                match f.value() {
+                    Some(v) => (v, field_id),
+                    None => (inner.clone(), None),
+                }
+            }
+            other => (other.clone(), None),
+        };
+
+        let first_nav = nav_override.unwrap_or(Nav::Down);
+        let iterate = if let Pattern::DefRef(r) = &element {
+            let def_id = self.resolve_ref_def_id(r);
+            if self.nullable_defs.contains(&def_id) {
+                // A zero-width element match and a skip of the `?` both leave
+                // a null pending; funneling the inline skip into the match
+                // continuation keeps the two paths one value.
+                self.emit_iteration(first_nav, match_target, |this, target| {
+                    let ExitNav { exit, nav } = target;
+                    this.compile_ref_inline_keep_value(
+                        def_id,
+                        SplitExits {
+                            match_exit: exit,
+                            skip_exit: exit,
+                        },
+                        Some(nav),
+                    )
+                })
+            } else {
+                self.emit_iteration(first_nav, match_target, |this, target| {
+                    let ExitNav { exit, nav } = target;
+                    this.compile_ref_call_keep_value(def_id, exit, Some(nav), field_override)
+                })
+            }
+        } else {
+            self.emit_iteration(first_nav, match_target, |this, target| {
+                let ExitNav { exit, nav } = target;
+                this.dispatch_pattern(
+                    &element,
+                    PatternCtx {
+                        exit,
+                        nav: Some(nav),
+                        capture: CaptureEffects::new_post(vec![EffectIR::node()]),
+                    },
+                )
+            })
+        };
+
+        let entry = self.emit_branch_epsilon(
+            BranchTargets {
+                prefer: iterate,
+                other: skip_target,
+            },
+            Greediness::from(kind),
+        );
+        self.wrap_entry_pre(entry, pre)
     }
 
     fn compile_quantified_body(

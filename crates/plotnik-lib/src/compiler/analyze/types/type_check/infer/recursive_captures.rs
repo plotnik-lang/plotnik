@@ -46,6 +46,7 @@ impl InferPass<'_, '_> {
                         interner: self.analysis.interner,
                         symbol_table: self.analysis.symbol_table,
                         dependency_analysis: deps,
+                        nullable_defs: &self.nullable_defs,
                         diag: &mut *self.analysis.diag,
                     },
                     deps.def_source_id(def_id),

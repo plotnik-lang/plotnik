@@ -6,7 +6,26 @@ use super::Emitter;
 use super::config::VoidType;
 
 impl Emitter<'_> {
+    /// Render a type reference at a use site: any named type renders by its
+    /// name (its declaration is emitted separately); anonymous types render
+    /// their shape inline.
     pub(super) fn render_ty(&self, type_id: TypeId) -> String {
+        let c = self.colors();
+        let Some(type_def) = self.types.get(type_id) else {
+            return "unknown".to_string();
+        };
+        if !matches!(type_def.decode(), TypeDefKind::Primitive(_))
+            && let Some(name) = self.type_names.get(&type_id)
+        {
+            return format!("{}{}{}", c.blue, name, c.reset);
+        }
+        self.render_shape(type_id)
+    }
+
+    /// Render a type's structure, ignoring its own name — the body of a
+    /// declaration (`export type Name = <shape>;`). Nested references still
+    /// render by name via [`render_ty`](Self::render_ty).
+    pub(super) fn render_shape(&self, type_id: TypeId) -> String {
         let c = self.colors();
         let Some(type_def) = self.types.get(type_id) else {
             return "unknown".to_string();
@@ -22,13 +41,7 @@ impl Emitter<'_> {
             TypeDefKind::Wrapper {
                 kind: TypeKind::Alias,
                 inner,
-            } => {
-                if let Some(name) = self.type_names.get(&type_id) {
-                    format!("{}{}{}", c.blue, name, c.reset)
-                } else {
-                    self.render_ty(inner)
-                }
-            }
+            } => self.render_ty(inner),
             TypeDefKind::Wrapper {
                 kind: TypeKind::ArrayZeroOrMore,
                 inner,
@@ -54,20 +67,8 @@ impl Emitter<'_> {
                 format!("{} {}|{} null", inner_type, c.dim, c.reset)
             }
             TypeDefKind::Wrapper { .. } => "unknown".to_string(),
-            TypeDefKind::Struct { .. } => {
-                if let Some(name) = self.type_names.get(&type_id) {
-                    format!("{}{}{}", c.blue, name, c.reset)
-                } else {
-                    self.inline_struct(&type_def)
-                }
-            }
-            TypeDefKind::Enum { .. } => {
-                if let Some(name) = self.type_names.get(&type_id) {
-                    format!("{}{}{}", c.blue, name, c.reset)
-                } else {
-                    self.inline_enum(&type_def)
-                }
-            }
+            TypeDefKind::Struct { .. } => self.inline_struct(&type_def),
+            TypeDefKind::Enum { .. } => self.inline_enum(&type_def),
         }
     }
 

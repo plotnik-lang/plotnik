@@ -1,0 +1,8 @@
+A = (identifier)??
+Q = (program (A) @x)
+==== types ====
+export interface Q {
+  x: A;
+}
+
+export type A = Node | null;

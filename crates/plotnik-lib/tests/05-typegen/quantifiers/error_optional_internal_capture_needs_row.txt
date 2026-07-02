@@ -3,7 +3,7 @@ Q = {
   (decorator) @dec
 }?
 ==== diagnostics ====
-error: captures `@mod`, `@dec` skip together with `?` but nothing collects them
+error: the definition names the optional itself, so each `?` element — a row of captures — is left without a type name
  --> query.ptk:1:5
   |
 1 |   Q = {
@@ -13,5 +13,4 @@ error: captures `@mod`, `@dec` skip together with `?` but nothing collects them
 4 | | }?
   | |__^
   |
-help: capture the group so the skip is a single null: `{...}? @items`
-help: or discard the captures if only the structure matters: `{...}? @_`
+help: name the element type in its own definition, then quantify a reference to it: `Elem = ...` and `(Elem)?`

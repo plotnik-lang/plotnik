@@ -264,26 +264,16 @@ fn resolve_field_type(
     let base_type = types.resolve_type(field_info.type_id, type_ctx)?;
 
     if field_info.optional {
-        // Field optionality is single-sourced: inference puts a captured `?`'s
-        // null on the capture field alone, never on the base type as well. A
-        // base still resolving to `Optional` would declare the null twice for
-        // one skip-path `Null`.
-        assert!(
-            !source_is_optional(type_ctx, field_info.type_id),
-            "optional field over an already-optional base type"
-        );
+        // Wrappers compose: a base that is itself `Optional` (a reference to
+        // an optional-rooted definition under a call-site `?`) legitimately
+        // nests — the two nulls come from two distinct syntax sites, the
+        // definition's `?` and the capture's. For everything else inference
+        // keeps field optionality single-sourced (the captured `?`'s null
+        // lives on the capture field alone, never on the base type too).
         types.intern_optional(base_type)
     } else {
         Ok(base_type)
     }
-}
-
-fn source_is_optional(type_ctx: &TypeAnalysis, type_id: TypeId) -> bool {
-    let underlying = type_ctx.resolve_underlying_type_id(type_id);
-    matches!(
-        type_ctx.expect_type_shape(underlying),
-        TypeShape::Optional(_)
-    )
 }
 
 struct TypeEmitCtx<'a> {

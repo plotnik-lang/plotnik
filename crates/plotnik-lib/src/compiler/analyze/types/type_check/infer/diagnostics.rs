@@ -112,6 +112,46 @@ impl InferVisitor<'_, '_> {
         builder.emit();
     }
 
+    /// Report a repeat whose element is a reference that can match zero nodes.
+    pub(super) fn report_zero_width_repeat(&mut self, quant: &QuantifiedPattern, inner: &Pattern) {
+        let op = self.quantifier_operator(quant);
+        let related = self.referenced_definition_range(inner);
+        let mut builder = self
+            .report(DiagnosticKind::ZeroWidthRepeat, quant.text_range())
+            .detail(format!(
+                "the referenced definition can match zero nodes, so one `{op}` repeat may not advance"
+            ))
+            .hint("make the definition consume at least one node, or drop the quantifier");
+        if let Some((src, range)) = related {
+            builder = builder.related_to(Span::new(src, range), "can match zero nodes here");
+        }
+        builder.emit();
+    }
+
+    /// Report a quantifier-rooted definition whose element shape has no name
+    /// source. The definition names the collection (the array/optional type);
+    /// naming the element takes its own definition.
+    pub(super) fn report_unnamed_quantified_element(
+        &mut self,
+        quant: &QuantifiedPattern,
+        element_desc: &str,
+    ) {
+        let op = self.quantifier_operator(quant);
+        let (collection, example_op) = if op.starts_with('?') {
+            ("optional", op.as_str())
+        } else {
+            ("list", op.as_str())
+        };
+        self.report(DiagnosticKind::UnnamedQuantifiedElement, quant.text_range())
+            .detail(format!(
+                "the definition names the {collection} itself, so each `{op}` element — {element_desc} — is left without a type name"
+            ))
+            .hint(format!(
+                "name the element type in its own definition, then quantify a reference to it: `Elem = ...` and `(Elem){example_op}`"
+            ))
+            .emit();
+    }
+
     /// Report repeated bubbling captures that need an enclosing row capture:
     /// each repeat produces captured fields with no list to collect them into.
     pub(super) fn report_internal_capture_dimensionality(

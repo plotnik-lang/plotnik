@@ -166,14 +166,22 @@ impl TypeAnalysis {
             let output_type = self.expect_def_output(def_id);
             return matches!(
                 self.expect_type_shape(output_type),
-                TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. }
+                TypeShape::Struct(_)
+                    | TypeShape::Enum(_)
+                    | TypeShape::Array { .. }
+                    | TypeShape::Optional(_)
             );
         }
 
         if let Some(output_type) = self.def_output(def_id) {
             return matches!(
                 self.type_shape(output_type),
-                Some(TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. })
+                Some(
+                    TypeShape::Struct(_)
+                        | TypeShape::Enum(_)
+                        | TypeShape::Array { .. }
+                        | TypeShape::Optional(_)
+                )
             );
         }
 

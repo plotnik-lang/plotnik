@@ -8,7 +8,7 @@ export interface Q {
   d: Node;
 }
 
-export type B = undefined;
+export type B = Node | null;
 
 export type A = undefined;
 ==== output ====
@@ -23,28 +23,30 @@ export type A = undefined;
 [strings]
 S0 "Beauty will save the world"
 S1 "d"
-S2 "Q"
-S3 "expression_statement"
-S4 "program"
-S5 "debugger_statement"
-S6 "B"
+S2 "B"
+S3 "Q"
+S4 "expression_statement"
+S5 "program"
+S6 "debugger_statement"
 S7 "A"
 
 [type_defs]
 T0 = <Void>
 T1 = <Node>
-T2 = Struct  M0:1  ; { d }
+T2 = Optional(T1)  ; <Node>?
+T3 = Struct  M0:1  ; { d }
 
 [type_members]
 M0: S1 → T1  ; d: <Node>
 
 [type_names]
-N0: S2 → T2  ; Q
+N0: S2 → T2  ; B
+N1: S3 → T3  ; Q
 
 [entrypoints]
 A = 08 :: T0
-B = 06 :: T0
-Q = 10 :: T2
+B = 06 :: T2
+Q = 10 :: T3
 
 [transitions]
 _StructWrap:
@@ -54,28 +56,30 @@ _StructWrap:
   05                                        ▶
 
 B:
-  06  -ε-                                   16, 12
+  06  -ε-                                   20, 13
 
 A:
-  08  -ε-                                   22, 18
+  08  -ε-                                   26, 22
 
 Q:
-  10   !   (program)                        32, 25
+  10   !   (program)                        37, 29
   12                                        ▶
-  13   !   (expression_statement)           12
-  14  ─‣─  _                                13, 14
-  16   !   _                                13, 14
-  18                                        ▶
-  19   !   (expression_statement)           18
-  20  ─‣─  _                                19, 20
-  22   !   _                                19, 20
-  24                                        ▶
-  25  └‣─  (debugger_statement) [Node Set(M0)]  34
-  27  ─‣─  (debugger_statement) [Node Set(M0)]  34
-  29   !   (expression_statement)           27
-  30  ─‣─  _                                29, 30
-  32  └‣─  _                                29, 30
-  34  ─‣┘  _                                24
+  13  -ε-  [Null]                           12
+  15  ─‣┘  _                                28
+  16   !   (expression_statement) [Node]    12
+  18  ─‣─  _                                16, 18
+  20   !   _                                16, 18
+  22                                        ▶
+  23   !   (expression_statement)           22
+  24  ─‣─  _                                23, 24
+  26   !   _                                23, 24
+  28                                        ▶
+  29  └‣─  (debugger_statement) [Node Set(M0)]  15
+  31  ...
+  32  ─‣─  (debugger_statement) [Node Set(M0)]  15
+  34   !   (expression_statement)           32
+  35  ─‣─  _                                34, 35
+  37  └‣─  _                                34, 35
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -83,20 +87,20 @@ _StructWrap:
        ▶   (Q)
 
 Q:
-  10       (program)                        32, 25
+  10       (program)                        37, 29
        ●   program
-  32       _                                29, 30
+  37       _                                34, 35
        ●   debugger_statement
-  29       (expression_statement)           27
+  34       (expression_statement)           32
        ○   debugger_statement
-  32  ❮❮❮ 
-  30       _                                29, 30
+  37  ❮❮❮ 
+  35       _                                34, 35
   10  ❮❮❮ 
-  25       (debugger_statement) [Node Set(M0)]  34
+  29       (debugger_statement) [Node Set(M0)]  15
        ●   debugger_statement
-  34       _                                24
+  15       _                                28
        ●   program
-  24   ◀   (Q)                              
+  28   ◀   (Q)                              
 
 _StructWrap:
   03  -ε-  [StructClose]                    05
