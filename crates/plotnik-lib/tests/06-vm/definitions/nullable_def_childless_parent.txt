@@ -1,0 +1,65 @@
+A = (expression_statement)?
+Q = (program (A))
+==== input ====
+==== types ====
+export type A = undefined;
+
+export type Q = undefined;
+==== output ====
+null
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "expression_statement"
+S2 "program"
+S3 "A"
+S4 "Q"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+
+[entrypoints]
+A = 06 :: T0
+Q = 08 :: T0
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+A:
+  06  -ε-                                   16, 12
+
+Q:
+  08   !   (program)                        21, 18
+  10   !   (expression_statement)           11
+  11  ─‣┘  _                                18
+  12                                        ▶
+  13   !   (expression_statement)           12
+  14  ─‣─  _                                13, 14
+  16   !   _                                13, 14
+  18                                        ▶
+  19  ─‣─  _                                10, 19
+  21  └‣─  _                                10, 19
+==== trace ====
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  08       (program)                        21, 18
+       ●   program
+  21       _                                10, 19
+  08  ❮❮❮ 
+  18   ◀   (Q)                              
+
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼
