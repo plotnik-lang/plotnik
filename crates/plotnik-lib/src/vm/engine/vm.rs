@@ -1,6 +1,6 @@
 //! Virtual machine for executing compiled Plotnik queries.
 
-use arborium_tree_sitter::{Node, Tree};
+use arborium_tree_sitter::Tree;
 
 use crate::bytecode::{
     Call, Effect, EffectKind, Entrypoint, Instruction, Match, Module, Nav, NodeKindConstraint,
@@ -17,38 +17,6 @@ use super::frame::FrameArena;
 use super::limits::{ResolvedRuntimeLimits, RuntimeLimitSpec};
 use super::trace::{NoopTracer, Tracer};
 
-/// Tracks the node matched by the most recent `Match`, which node-valued
-/// captures (`Node`) read. A missing node means the source matched nothing
-/// (e.g. a zero-width callee return, #383), so the consuming effect fails
-/// rather than fabricating a node. Centralizing the set/clear/refresh transitions
-/// here keeps that contract in one place.
-#[derive(Clone, Copy, Default)]
-struct MatchedNode<'t>(Option<Node<'t>>);
-
-impl<'t> MatchedNode<'t> {
-    fn set(&mut self, node: Node<'t>) {
-        self.0 = Some(node);
-    }
-
-    /// Forget any matched node (no source matched yet on this path).
-    fn clear(&mut self) {
-        self.0 = None;
-    }
-
-    /// Replace the node only when one is already present, leaving an absent
-    /// match absent. Used on Return so a non-empty callee match re-points at
-    /// the current cursor node while a zero-width return stays empty (#383).
-    fn refresh(&mut self, node: Node<'t>) {
-        if self.0.is_some() {
-            self.0 = Some(node);
-        }
-    }
-
-    fn node(&self) -> Option<Node<'t>> {
-        self.0
-    }
-}
-
 /// Virtual machine state for query execution.
 pub struct VM<'t> {
     pub(crate) cursor: CursorWrapper<'t>,
@@ -57,7 +25,6 @@ pub struct VM<'t> {
     pub(crate) frames: FrameArena,
     pub(crate) checkpoints: CheckpointStack,
     pub(crate) effects: EffectLog<'t>,
-    matched_node: MatchedNode<'t>,
 
     pub(crate) steps_used: u64,
     pub(crate) recursion_depth: u32,
@@ -108,7 +75,6 @@ impl<'t> VMBuilder<'t> {
             frames: FrameArena::new(),
             checkpoints: CheckpointStack::new(),
             effects: EffectLog::new(),
-            matched_node: MatchedNode::default(),
             steps_used: 0,
             recursion_depth: 0,
             limits: self.spec.resolve(source_nodes),
@@ -155,8 +121,7 @@ impl<'t> VM<'t> {
     /// `CheckpointState`. The exhaustive destructure is the point: a newly-added
     /// VM field will not compile until it is classified here, so it cannot
     /// silently escape the checkpoint contract. `ip` is resumed separately by
-    /// [`Self::backtrack`] and `matched_node` is deliberately not snapshotted
-    /// (#383). Debug-only.
+    /// [`Self::backtrack`]. Debug-only.
     #[cfg(debug_assertions)]
     fn assert_checkpoint_restored(&self, state: &CheckpointState) {
         let VM {
@@ -167,12 +132,11 @@ impl<'t> VM<'t> {
             recursion_depth,
             suppress_depth,
             // Deliberately outside `CheckpointState`:
-            ip: _,           // resumed separately by `backtrack` (cp.ip / call_resume)
-            checkpoints: _,  // the stack this checkpoint was just popped from
-            matched_node: _, // intentionally not snapshotted (#383)
-            steps_used: _,   // monotonic step counter, never rewound on backtrack
-            limits: _,       // immutable execution config
-            source: _,       // immutable input text
+            ip: _,          // resumed separately by `backtrack` (cp.ip / call_resume)
+            checkpoints: _, // the stack this checkpoint was just popped from
+            steps_used: _,  // monotonic step counter, never rewound on backtrack
+            limits: _,      // immutable execution config
+            source: _,      // immutable input text
         } = self;
 
         debug_assert_eq!(
@@ -297,10 +261,7 @@ impl<'t> VM<'t> {
         module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
-        // Only clear matched_node for non-epsilon transitions.
-        // For epsilon, preserve matched_node from previous match or return.
         if !m.is_epsilon() {
-            self.matched_node.clear();
             self.navigate_and_match(m, module, tracer)?;
         }
 
@@ -336,7 +297,6 @@ impl<'t> VM<'t> {
             tracer.trace_field_success(field_id);
         }
 
-        self.matched_node.set(self.cursor.node());
         Ok(())
     }
 
@@ -489,10 +449,6 @@ impl<'t> VM<'t> {
             "recursion_depth desynced from frame stack after Call"
         );
         self.ip = target;
-        // The callee owns its own match: until one of its Matches succeeds,
-        // there is no matched node. Clearing here lets a zero-width callee
-        // return "nothing" instead of leaking the call-site node (#383).
-        self.matched_node.clear();
     }
 
     /// Navigate to a field and return the skip policy for retry support.
@@ -567,10 +523,6 @@ impl<'t> VM<'t> {
 
         // Prune frames (O(1) amortized)
         self.frames.prune(self.checkpoints.max_frame_idx());
-
-        // Re-point at the callee's match so effects after a Call can capture it;
-        // `refresh` leaves a zero-width return empty (#383).
-        self.matched_node.refresh(self.cursor.node());
 
         self.ip = return_addr;
         Ok(())
@@ -658,15 +610,7 @@ impl<'t> VM<'t> {
                 return Ok(());
             }
 
-            // Node-valued captures. A missing `matched_node` means the source
-            // matched nothing (a zero-width callee return, #383): fail this path
-            // rather than fabricate the call-site node.
-            Node => {
-                let Some(node) = self.matched_node.node() else {
-                    return Err(self.backtrack(tracer));
-                };
-                RuntimeEffect::Node(node)
-            }
+            Node => RuntimeEffect::Node(self.cursor.node()),
             ArrayOpen => RuntimeEffect::ArrayOpen,
             Push => RuntimeEffect::Push,
             ArrayClose => RuntimeEffect::ArrayClose,

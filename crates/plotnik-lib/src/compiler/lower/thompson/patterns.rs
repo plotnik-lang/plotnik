@@ -117,10 +117,9 @@ impl NfaBuilder<'_> {
             Nav::Up(1)
         };
 
-        // Split capture.post: Node effects (and their Set) go on entry (need matched_node
-        // right after match), other effects go on final_exit (after children processing).
-        // Node capture effects use matched_node which is only valid immediately after the match,
-        // before descending into children (which may clobber matched_node via backtracking).
+        // Split capture.post: Node effects (and their Set) go on entry so
+        // they read the cursor immediately after this node matched. Other
+        // effects run after child constraints have completed.
         use crate::bytecode::EffectKind;
 
         let mut entry_effects = Vec::new();

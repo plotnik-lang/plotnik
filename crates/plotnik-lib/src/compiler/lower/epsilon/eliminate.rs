@@ -131,10 +131,10 @@ impl MatchEdit {
     }
 }
 
-/// Whether any effect reads the VM's `matched_node` (`Node`). Such
-/// effects are position-sensitive: their meaning depends on which node was
-/// most recently matched, so they cannot be reordered across a navigation.
-fn reads_matched_node(effects: &[EffectIR]) -> bool {
+/// Whether any effect reads the VM cursor (`Node`). Such effects are
+/// position-sensitive: their meaning depends on the current cursor node, so
+/// they cannot be reordered across a navigation.
+fn reads_cursor(effects: &[EffectIR]) -> bool {
     effects.iter().any(|e| e.kind() == EffectKind::Node)
 }
 
@@ -170,11 +170,10 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
             continue;
         }
 
-        // Effects that read `matched_node` (Node) must not migrate forward:
-        // the non-epsilon successor's navigation clears `matched_node` before the
-        // migrated effects would run, so they'd capture the successor's node
-        // instead of the inbound one (#383). Keep such epsilons in place.
-        if reads_matched_node(&eps.effects) {
+        // Effects that read the cursor (Node) must not migrate forward across
+        // the non-epsilon successor's navigation: they would capture the
+        // successor's node instead of the inbound one.
+        if reads_cursor(&eps.effects) {
             continue;
         }
 
@@ -297,13 +296,11 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
                 continue;
             }
 
-            // No `reads_matched_node` guard is needed here (unlike forward_migrate):
-            // the seen-through chain is all epsilons, which preserve `matched_node`,
-            // so appending still reads the node these effects saw at
-            // their original position — `m`'s own node if `m` is non-epsilon, or the
-            // unchanged inbound node if `m` is an epsilon. forward_migrate is unsafe
-            // only because it pushes effects *past* a navigation that clears
-            // `matched_node`.
+            // No `reads_cursor` guard is needed here (unlike forward_migrate):
+            // the seen-through chain is all epsilons, which preserve the cursor,
+            // so appending still reads the node these effects saw at their
+            // original position. forward_migrate is unsafe only because it
+            // pushes effects past a navigation.
             edited
                 .get_or_insert_with(|| MatchEdit::from_match(m))
                 .rewrite_successor(j, target, effects);
