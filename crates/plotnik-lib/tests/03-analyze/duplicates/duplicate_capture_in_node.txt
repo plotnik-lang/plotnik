@@ -2,7 +2,7 @@ Q = (node
   (a) @x
   (b) @x
 )
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: capture `@x` already defined in this scope
  --> query.ptk:3:3
   |
@@ -10,5 +10,5 @@ error: capture `@x` already defined in this scope
   |   ^^^^^^
   |
 help: rename one capture, or use an enum if they are mutually exclusive branches
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Q

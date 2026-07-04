@@ -2,7 +2,7 @@ E = [
   Left: (E)
   Right: (x)
 ]
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: infinite recursion: cycle consumes no input
  --> query.ptk:2:10
   |
@@ -12,6 +12,6 @@ error: infinite recursion: cycle consumes no input
   |          references itself
   |
 help: recursive references must consume input before recursing
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 E
   E (cycle)

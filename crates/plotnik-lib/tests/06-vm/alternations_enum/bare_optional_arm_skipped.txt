@@ -1,17 +1,17 @@
 Q = [A:(identifier)?@id]
-==== input ====
+--------------------- INPUT ----------------------
 let x
-==== types ====
+--------------------- TYPES ----------------------
 export type Q =
   | { $tag: "A"; $data: { id: Node | null } };
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "$tag": "A",
   "$data": {
     "id": null
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "id"
@@ -46,7 +46,7 @@ Q:
   08   !   _ [EnumOpen(M1)]                 03, 05
   10  -ε-  [EnumOpen(M1) Null Set(M0) EnumClose]  02
   13  -ε-                                   08, 10
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00       (?)                              13 : 01
        ▶   (?)

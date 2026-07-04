@@ -2,7 +2,7 @@ Q = [
   (identifier) @x
   (number) @x
 ]
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   x: Node;
 }

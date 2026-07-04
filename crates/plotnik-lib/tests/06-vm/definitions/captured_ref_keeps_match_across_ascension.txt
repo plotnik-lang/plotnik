@@ -1,14 +1,14 @@
 A = (lexical_declaration)
 Q = (program (A) @a)
-==== input ====
+--------------------- INPUT ----------------------
 let x;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   a: Node;
 }
 
 export type A = Node;
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "a": {
     "kind": "lexical_declaration",
@@ -16,7 +16,7 @@ export type A = Node;
     "span": [0, 6]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -58,7 +58,7 @@ Q:
   15   !   (lexical_declaration)            14
   16  └‣─  (@15)                            15 : 11
   17   !   (program)                        16
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   04  -ε-  [StructOpen]                     06
   06       (?)                              17 : 08

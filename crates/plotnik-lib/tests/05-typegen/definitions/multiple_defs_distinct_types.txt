@@ -5,7 +5,7 @@ Both = (pair
   (property_identifier) @key
   (number) @val
 )
-==== types ====
+--------------------- TYPES ----------------------
 export interface Both {
   key: Node;
   val: Node;

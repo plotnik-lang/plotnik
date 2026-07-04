@@ -1,5 +1,5 @@
 Q = (function_definition name: (identifier))
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -16,7 +16,7 @@ Root
           Id "identifier"
           ParenClose ")"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

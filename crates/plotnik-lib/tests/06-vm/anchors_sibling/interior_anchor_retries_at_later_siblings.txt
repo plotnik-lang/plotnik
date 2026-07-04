@@ -5,14 +5,14 @@ Q = (program
     (expression_statement) @b
   }
 )
-==== input ====
+--------------------- INPUT ----------------------
 let x; let y; foo;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   a: Node;
   b: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "a": {
     "kind": "lexical_declaration",
@@ -25,7 +25,7 @@ export interface Q {
     "span": [14, 18]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -62,7 +62,7 @@ Q:
   12  ─‣─  _                                10, 12
   14  └‣─  _                                10, 12
   16   !   (program)                        14
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              16 : 03

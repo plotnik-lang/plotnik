@@ -1,5 +1,5 @@
 A = (a), B = (b)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: expected a pattern
  --> query.ptk:1:8
   |

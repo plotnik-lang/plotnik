@@ -1,6 +1,6 @@
 A = [(B) (x)]
 B = (A)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: infinite recursion: cycle consumes no input
  --> query.ptk:2:6
   |
@@ -13,7 +13,7 @@ error: infinite recursion: cycle consumes no input
   | B is defined here
   |
 help: recursive references must consume input before recursing
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 A
   B
     A (cycle)

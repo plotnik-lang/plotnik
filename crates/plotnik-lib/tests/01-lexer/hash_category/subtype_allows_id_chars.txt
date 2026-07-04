@@ -1,5 +1,5 @@
 (expression#member-expression)
-==== tokens ====
+--------------------- TOKENS ---------------------
 ParenOpen "("
 Id "expression"
 Hash "#"

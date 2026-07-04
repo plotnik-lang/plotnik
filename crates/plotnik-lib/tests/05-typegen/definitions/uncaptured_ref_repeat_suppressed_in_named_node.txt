@@ -4,7 +4,7 @@ A = [
 ]
 
 Q = (arguments (A)+)
-==== types ====
+--------------------- TYPES ----------------------
 export type A =
   | { $tag: "X"; $data: { x: Node } }
   | { $tag: "Y"; $data: { y: Node } };

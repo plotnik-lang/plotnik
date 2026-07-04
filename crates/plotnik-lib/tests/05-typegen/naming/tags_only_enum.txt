@@ -2,7 +2,7 @@ Q = (program [
   Stmt: (expression_statement)
   Decl: (lexical_declaration)
 ] @kind)
-==== types ====
+--------------------- TYPES ----------------------
 export type QKind =
   | { $tag: "Stmt" }
   | { $tag: "Decl" };

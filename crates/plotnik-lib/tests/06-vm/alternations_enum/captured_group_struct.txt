@@ -1,7 +1,7 @@
 Q = (program [Tag: ((expression_statement) @a) @x])
-==== input ====
+--------------------- INPUT ----------------------
 a;
-==== types ====
+--------------------- TYPES ----------------------
 export interface QX {
   a: Node;
 }
@@ -9,7 +9,7 @@ export interface QX {
 export interface Q {
   x: QX;
 }
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
  --> query.ptk:1:14
   |
@@ -25,7 +25,7 @@ warning: parenthesized sequences are tree-sitter syntax
   |                    ^
   |
 help: use `{(a) (b)}` to match a sequence of siblings
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "x": {
     "a": {
@@ -35,7 +35,7 @@ help: use `{(a) (b)}` to match a sequence of siblings
     }
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -73,7 +73,7 @@ Q:
   11  ─‣─  _                                06, 11
   13  └‣─  _                                06, 11
   15   !   (program)                        13
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              15 : 03

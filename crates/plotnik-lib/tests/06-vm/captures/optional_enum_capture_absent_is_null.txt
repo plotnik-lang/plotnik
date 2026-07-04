@@ -1,18 +1,18 @@
 Q = (program [A: (identifier) @a]? @e)
-==== input ====
+--------------------- INPUT ----------------------
 let x
-==== types ====
+--------------------- TYPES ----------------------
 export type QE =
   | { $tag: "A"; $data: { a: Node } };
 
 export interface Q {
   e: QE | null;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "e": null
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -57,7 +57,7 @@ Q:
   16  ─‣─  _                                08, 16
   18  └‣─  _                                08, 16
   20   !   (program)                        18, 14
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              20 : 03

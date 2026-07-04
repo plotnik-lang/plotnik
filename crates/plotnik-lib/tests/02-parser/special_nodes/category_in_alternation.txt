@@ -2,7 +2,7 @@ Q = [
   (expression#identifier)
   (expression#number)
 ]
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -25,7 +25,7 @@ Root
           Id "number"
           ParenClose ")"
       BracketClose "]"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

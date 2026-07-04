@@ -2,7 +2,7 @@ Q = (program [
   A: (expression_statement)
   B: (lexical_declaration)
 ]*)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
  --> query.ptk:1:14
   |
@@ -14,5 +14,5 @@ warning: branch labels have no effect without capture
   | |_^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
-==== types ====
+--------------------- TYPES ----------------------
 export type Q = Node;

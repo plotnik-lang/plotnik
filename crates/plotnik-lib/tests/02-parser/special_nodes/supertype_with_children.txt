@@ -2,7 +2,7 @@ Q = (expression/binary_expression
   left: (_) @left
   right: (_) @right
 )
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: `supertype/subtype` paths are tree-sitter syntax
  --> query.ptk:1:16
   |
@@ -15,7 +15,7 @@ help: use `#`
 1 + Q = (expression#binary_expression
   |
 help: use `supertype#subtype` instead of `supertype/subtype`
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -45,7 +45,7 @@ Root
             ParenClose ")"
         CaptureToken "@right"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

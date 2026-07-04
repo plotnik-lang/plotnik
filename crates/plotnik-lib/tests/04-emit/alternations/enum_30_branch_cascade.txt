@@ -10,7 +10,7 @@ Q = [
     A24: (identifier) @x24 A25: (identifier) @x25 A26: (identifier) @x26
     A27: (identifier) @x27 A28: (identifier) @x28 A29: (identifier) @x29
 ]
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "x0"

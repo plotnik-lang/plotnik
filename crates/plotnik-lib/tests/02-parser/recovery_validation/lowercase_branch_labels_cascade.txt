@@ -2,7 +2,7 @@
   left: (a)
   right: (b)
 ]
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: branch labels must be PascalCase
  --> query.ptk:2:3
   |

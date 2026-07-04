@@ -2,7 +2,7 @@ Q = [
   A: (identifier) @id
   B: (number) @n
 ]* @rows
-==== types ====
+--------------------- TYPES ----------------------
 export type QRows =
   | { $tag: "A"; $data: { id: Node } }
   | { $tag: "B"; $data: { n: Node } };

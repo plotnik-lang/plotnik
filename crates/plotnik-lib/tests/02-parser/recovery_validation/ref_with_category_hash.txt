@@ -1,5 +1,5 @@
 (RefName#subtype)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: references cannot have supertypes
  --> query.ptk:1:9
   |

@@ -1,5 +1,5 @@
 Q = (function_declaration name: (number))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `number` can't be the value of `name`
  --> query.ptk:1:34
   |

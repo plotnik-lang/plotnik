@@ -2,7 +2,7 @@ Q = {
   (a)
   .
 }
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: anchor needs an enclosing node
  --> query.ptk:3:3
   |
@@ -10,4 +10,4 @@ error: anchor needs an enclosing node
   |   ^
   |
 help: wrap in a named node: `(parent . (child))`
-==== symbols ====
+-------------------- SYMBOLS ---------------------

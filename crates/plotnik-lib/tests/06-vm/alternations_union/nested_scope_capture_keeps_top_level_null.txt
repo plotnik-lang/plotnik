@@ -6,9 +6,9 @@ Q = (program
     ]
   )
 )
-==== input ====
+--------------------- INPUT ----------------------
 foo
-==== types ====
+--------------------- TYPES ----------------------
 export interface QRow {
   x: Node;
 }
@@ -17,7 +17,7 @@ export interface Q {
   row: QRow | null;
   x: Node | null;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "x": null,
   "row": {
@@ -28,7 +28,7 @@ export interface Q {
     }
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "x"
@@ -73,7 +73,7 @@ Q:
   16  └‣─  _                                08, 11, 14
   18  └‣─  (expression_statement)           16
   19   !   (program)                        18
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              19 : 03

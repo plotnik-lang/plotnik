@@ -1,5 +1,5 @@
 Expr = (identifier)
-==== tokens ====
+--------------------- TOKENS ---------------------
 Id "Expr"
 Equals "="
 ParenOpen "("

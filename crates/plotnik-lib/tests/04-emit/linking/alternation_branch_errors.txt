@@ -2,7 +2,7 @@ Q = [
   (function_declaraton)
   (class_declaraton)
 ] @decl
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `function_declaraton` is not a valid node kind
  --> query.ptk:2:4
   |

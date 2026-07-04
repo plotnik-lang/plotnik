@@ -1,5 +1,5 @@
 Q = (statement)+
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -11,7 +11,7 @@ Root
         Id "statement"
         ParenClose ")"
       Plus "+"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

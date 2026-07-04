@@ -1,11 +1,11 @@
 Q = (program (expression_statement (call_expression arguments: (arguments . [(identifier) @arg]))))
-==== input ====
+--------------------- INPUT ----------------------
 f(x)
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   arg: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "arg": {
     "kind": "identifier",
@@ -13,7 +13,7 @@ export interface Q {
     "span": [2, 3]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "arg"
@@ -50,7 +50,7 @@ Q:
   11  └‣─  (call_expression)                10
   12  └‣─  (expression_statement)           11
   13   !   (program)                        12
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              13 : 03

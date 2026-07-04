@@ -1,6 +1,6 @@
 Expr = (expression)
 Named = (Expr) @e
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Expr
 Named
   Expr

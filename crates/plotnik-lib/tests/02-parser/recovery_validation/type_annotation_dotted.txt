@@ -1,5 +1,5 @@
 (a) @x :: My.Type
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: type names must be PascalCase
  --> query.ptk:1:11
   |

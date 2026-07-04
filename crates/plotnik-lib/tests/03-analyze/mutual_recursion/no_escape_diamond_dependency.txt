@@ -2,7 +2,7 @@ A = (a [(B) (C)])
 B = (b (D))
 C = (c (D))
 D = (d (A))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: infinite recursion: no escape path
  --> query.ptk:3:9
   |
@@ -18,7 +18,7 @@ error: infinite recursion: no escape path
   |         - references A
   |
 help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 A
   B
     D

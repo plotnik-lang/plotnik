@@ -1,5 +1,5 @@
 Q = (function_declaration (program))+ @fns
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `program` cannot be a child of this node
  --> query.ptk:1:28
   |

@@ -1,7 +1,7 @@
 Q = (program (expression_statement (array (array (number) @n .!) .!)))
-==== input ====
+--------------------- INPUT ----------------------
 [[1], x]
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: with strict adjacency (`.!`), the last child of `array` must be `number`, but `array` ends with `"]"`
  --> query.ptk:1:44
   |

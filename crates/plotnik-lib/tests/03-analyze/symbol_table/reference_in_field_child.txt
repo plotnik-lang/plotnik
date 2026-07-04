@@ -1,6 +1,6 @@
 Expr = (expression)
 Call = (call_expression function: (Expr))
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Expr
 Call
   Expr

@@ -1,5 +1,5 @@
 (identifier) =~ /foo.*bar/
-==== tokens ====
+--------------------- TOKENS ---------------------
 ParenOpen "("
 Id "identifier"
 ParenClose ")"

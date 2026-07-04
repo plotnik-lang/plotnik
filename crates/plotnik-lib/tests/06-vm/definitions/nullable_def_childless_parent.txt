@@ -1,17 +1,17 @@
 A = (expression_statement)?
 Q = (program (A))
-==== input ====
-==== types ====
+--------------------- INPUT ----------------------
+--------------------- TYPES ----------------------
 export type A = Node | null;
 
 export type Q = Node;
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "kind": "program",
   "text": "",
   "span": [0, 0]
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "Q"
@@ -56,7 +56,7 @@ Q:
   23  ...
   24  └‣─  _                                06, 20
   26   !   (program)                        24, 15
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   02       (?)                              26 : 03
        ▶   (?)

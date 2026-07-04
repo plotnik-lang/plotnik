@@ -1,5 +1,5 @@
 // just a comment
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: query defines nothing
  --> query.ptk:1:1
   |

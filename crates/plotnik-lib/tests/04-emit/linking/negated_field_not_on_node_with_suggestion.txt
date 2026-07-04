@@ -1,5 +1,5 @@
 Q = (function_declaration -parameter) @fn
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: field `parameter` is not valid on this node kind
  --> query.ptk:1:28
   |

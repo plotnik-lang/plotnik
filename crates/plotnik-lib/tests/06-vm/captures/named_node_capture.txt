@@ -1,12 +1,12 @@
 Q = (program (function_declaration name: (identifier) @name) @fn)
-==== input ====
+--------------------- INPUT ----------------------
 function foo() {}
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   fn: Node;
   name: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "fn": {
     "kind": "function_declaration",
@@ -19,7 +19,7 @@ export interface Q {
     "span": [9, 12]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "fn"
@@ -54,7 +54,7 @@ Q:
   09                                        ▶
   10  └‣─  (function_declaration) [Node Set(M0)]  06
   12   !   (program)                        10
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              12 : 03

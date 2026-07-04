@@ -1,5 +1,5 @@
 Q = (identifier (_))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `identifier` is a leaf token — it has no child nodes
  --> query.ptk:1:17
   |

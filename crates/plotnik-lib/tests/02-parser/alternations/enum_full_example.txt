@@ -7,7 +7,7 @@ Expression = [
     right: (Expression) @right
   )
 ]
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -77,7 +77,7 @@ Root
             CaptureToken "@right"
           ParenClose ")"
       BracketClose "]"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Expression

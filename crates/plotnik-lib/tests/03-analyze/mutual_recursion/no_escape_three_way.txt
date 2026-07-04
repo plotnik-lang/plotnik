@@ -1,7 +1,7 @@
 A = (a (B))
 B = (b (C))
 C = (c (A))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: infinite recursion: no escape path
  --> query.ptk:3:9
   |
@@ -16,7 +16,7 @@ error: infinite recursion: no escape path
   | C is defined here
   |
 help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 A
   B
     C

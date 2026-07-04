@@ -1,5 +1,5 @@
 Q = (function_declaration "xyzzy_fake_token") @fn
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `xyzzy_fake_token` is not a valid node kind
  --> query.ptk:1:28
   |

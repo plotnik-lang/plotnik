@@ -2,7 +2,7 @@ Q = {
   (identifier) @mod
   (decorator) @dec
 }?
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: the definition names the optional itself, so each `?` element — a row of captures — is left without a type name
  --> query.ptk:1:5
   |

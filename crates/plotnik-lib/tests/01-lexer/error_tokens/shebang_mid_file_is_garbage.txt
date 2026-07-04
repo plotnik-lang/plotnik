@@ -1,6 +1,6 @@
 (a)
 #!/usr/bin/env plotnik
-==== tokens ====
+--------------------- TOKENS ---------------------
 ParenOpen "("
 Id "a"
 ParenClose ")"

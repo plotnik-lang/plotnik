@@ -2,11 +2,11 @@ Q = (program [
   A: (expression_statement)
   B: (lexical_declaration)
 ]*)
-==== input ====
+--------------------- INPUT ----------------------
 foo(); let x
-==== types ====
+--------------------- TYPES ----------------------
 export type Q = Node;
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
  --> query.ptk:1:14
   |
@@ -18,13 +18,13 @@ warning: branch labels have no effect without capture
   | |_^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "kind": "program",
   "text": "foo(); let x",
   "span": [0, 12]
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "Q"
@@ -57,7 +57,7 @@ Q:
   14  ...
   15  ...
   16   !   (program)                        12, 04
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00       (?)                              16 : 01
        ▶   (?)

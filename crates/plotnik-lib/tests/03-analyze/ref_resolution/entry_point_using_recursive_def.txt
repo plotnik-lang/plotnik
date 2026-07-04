@@ -1,6 +1,6 @@
 E = [(x) (call (E))]
 Q = (program (E))
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 E
   E (cycle)
 Q

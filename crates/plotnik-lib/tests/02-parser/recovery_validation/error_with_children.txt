@@ -1,5 +1,5 @@
 (ERROR (something))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `(ERROR)` cannot have children
  --> query.ptk:1:8
   |

@@ -1,5 +1,5 @@
 Q = (statement)+ @stmts :: Statement
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -16,7 +16,7 @@ Root
       TypeAnnotation
         DoubleColon "::"
         Id "Statement"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

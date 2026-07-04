@@ -1,6 +1,6 @@
 Expr = (expression)
 Pair = {(Expr) (Expr)}
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Expr
 Pair
   Expr

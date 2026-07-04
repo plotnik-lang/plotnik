@@ -2,7 +2,7 @@ Q = (function
   name: (identifier) @name :: Foo
   body: (block (statement)* @body_stmts :: Statement)
 ) @func :: Function
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -47,7 +47,7 @@ Root
       TypeAnnotation
         DoubleColon "::"
         Id "Function"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

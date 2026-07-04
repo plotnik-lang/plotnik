@@ -1,5 +1,5 @@
 Q = (expression#_private)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: node kinds must be parenthesized
  --> query.ptk:1:18
   |

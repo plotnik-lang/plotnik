@@ -1,5 +1,5 @@
 (identifier) @name ::
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: expected a type name after `::`
  --> query.ptk:1:22
   |

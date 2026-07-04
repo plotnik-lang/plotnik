@@ -3,7 +3,7 @@ Q = [
   .!
   (b)
 ]
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: anchors cannot appear directly in alternations
  --> query.ptk:3:3
   |
@@ -11,4 +11,4 @@ error: anchors cannot appear directly in alternations
   |   ^^
   |
 help: use `[{(a) . (b)} (c)]` to anchor within a branch
-==== symbols ====
+-------------------- SYMBOLS ---------------------

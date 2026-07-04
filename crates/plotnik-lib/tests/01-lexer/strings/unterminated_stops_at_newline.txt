@@ -1,6 +1,6 @@
 "abc
 (x)
-==== tokens ====
+--------------------- TOKENS ---------------------
 UnterminatedString "\"abc"
 ParenOpen "("
 Id "x"

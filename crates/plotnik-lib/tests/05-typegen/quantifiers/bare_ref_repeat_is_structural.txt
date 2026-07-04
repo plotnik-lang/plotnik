@@ -1,6 +1,6 @@
 Item = [A: (expression_statement) @s]
 Q = (program (Item)+)
-==== types ====
+--------------------- TYPES ----------------------
 export type Item =
   | { $tag: "A"; $data: { s: Node } };
 

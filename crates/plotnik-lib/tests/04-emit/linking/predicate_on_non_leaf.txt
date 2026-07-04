@@ -1,5 +1,5 @@
 Q = (function_declaration == 'foo')
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: predicates match text content, but this node can contain children
  --> query.ptk:1:27
   |

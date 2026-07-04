@@ -1,5 +1,5 @@
 Q = (dotted_name (identifier) @a .! (identifier) @b)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -23,7 +23,7 @@ Root
           ParenClose ")"
         CaptureToken "@b"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

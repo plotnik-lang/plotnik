@@ -1,5 +1,5 @@
 E = (call (E)+?)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: infinite recursion: no escape path
  --> query.ptk:1:12
   |
@@ -9,6 +9,6 @@ error: infinite recursion: no escape path
   |            E references itself
   |
 help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 E
   E (cycle)

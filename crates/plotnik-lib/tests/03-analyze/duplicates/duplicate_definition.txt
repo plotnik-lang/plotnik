@@ -1,6 +1,6 @@
 Expr = (expression)
 Expr = (other)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `Expr` is already defined
  --> query.ptk:2:1
   |
@@ -8,5 +8,5 @@ error: `Expr` is already defined
   | ---- first defined here
 2 | Expr = (other)
   | ^^^^
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Expr

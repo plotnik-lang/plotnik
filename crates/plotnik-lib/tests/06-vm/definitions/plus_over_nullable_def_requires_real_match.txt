@@ -1,8 +1,8 @@
 A = (expression_statement (identifier) @id)? @x
 Q = (program (A)+ @xs)
-==== input ====
+--------------------- INPUT ----------------------
 debugger;
-==== types ====
+--------------------- TYPES ----------------------
 export interface AX {
   id: Node;
 }
@@ -14,9 +14,9 @@ export interface A {
 export interface Q {
   xs: [A, ...A[]];
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 <no match>
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "id"
@@ -84,7 +84,7 @@ Q:
   44  └‣─  _ [ArrayOpen]                    40, 42
   46  ─‣┘  _ [ArrayClose Set(M2)]           32
   48   !   (program)                        44
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   06  -ε-  [StructOpen]                     08
   08       (?)                              48 : 09

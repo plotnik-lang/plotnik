@@ -6,7 +6,7 @@ Q = (node
   baz: (baz)+?
   baz: (baz)+?
 )
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -70,7 +70,7 @@ Root
             ParenClose ")"
         PlusQuestion "+?"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

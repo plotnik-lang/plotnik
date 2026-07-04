@@ -68,15 +68,37 @@ fn discover(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 fn parse_query<'a>(raw: &'a str, path: &Path) -> &'a str {
-    raw.split_once("\n==== tokens ====\n")
-        .unwrap_or_else(|| {
-            panic!(
-                "fixture {} must contain an exact `==== tokens ====` section",
-                path.display()
-            )
-        })
-        .0
+    // The query is everything before the `TOKENS` rule; the dump after it is
+    // regenerated, so only the boundary matters.
+    let mut offset = 0;
+    for line in raw.split_inclusive('\n') {
+        if is_tokens_rule(line) {
+            return raw[..offset].strip_suffix('\n').unwrap_or(&raw[..offset]);
+        }
+        offset += line.len();
+    }
+    panic!(
+        "fixture {} must contain a `TOKENS` section rule",
+        path.display()
+    )
 }
+
+/// A column-zero, space-padded ` TOKENS ` rule — the shape `TOKENS_RULE` emits.
+/// The padding keeps authored query bytes like `-tokens-` out of the boundary.
+fn is_tokens_rule(line: &str) -> bool {
+    let line = line.trim_end();
+    line.starts_with('-')
+        && line.ends_with('-')
+        && line
+            .trim_matches('-')
+            .strip_prefix(' ')
+            .and_then(|s| s.strip_suffix(' '))
+            .is_some_and(|label| label.trim().eq_ignore_ascii_case("tokens"))
+}
+
+/// The rule that separates the authored query from the generated token dump —
+/// `tokens` centered in a 50-column dash rule.
+const TOKENS_RULE: &str = "--------------------- TOKENS ---------------------";
 
 fn canonical(query: &str, tokens: &str) -> String {
     let mut out = String::new();
@@ -84,7 +106,8 @@ fn canonical(query: &str, tokens: &str) -> String {
     if !out.ends_with('\n') {
         out.push('\n');
     }
-    out.push_str("==== tokens ====\n");
+    out.push_str(TOKENS_RULE);
+    out.push('\n');
     out.push_str(tokens.trim_matches('\n'));
     out.push('\n');
     out

@@ -1,14 +1,14 @@
 Q = (program [Tag: [In: (expression_statement) @a] @y])
-==== input ====
+--------------------- INPUT ----------------------
 a;
-==== types ====
+--------------------- TYPES ----------------------
 export type QY =
   | { $tag: "In"; $data: { a: Node } };
 
 export interface Q {
   y: QY;
 }
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
  --> query.ptk:1:14
   |
@@ -16,7 +16,7 @@ warning: branch labels have no effect without capture
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "y": {
     "$tag": "In",
@@ -29,7 +29,7 @@ help: capture the alternation (`[...] @name`) to make the labels enum variants, 
     }
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -72,7 +72,7 @@ Q:
   14  ─‣─  _                                08, 14
   16  └‣─  _                                08, 14
   18   !   (program)                        16
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              18 : 03

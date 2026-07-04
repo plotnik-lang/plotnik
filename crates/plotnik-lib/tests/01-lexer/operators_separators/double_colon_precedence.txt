@@ -1,5 +1,5 @@
 :: : ::
-==== tokens ====
+--------------------- TOKENS ---------------------
 DoubleColon "::"
 Colon ":"
 DoubleColon "::"

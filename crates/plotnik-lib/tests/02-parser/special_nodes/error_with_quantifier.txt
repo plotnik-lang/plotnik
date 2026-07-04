@@ -1,5 +1,5 @@
 Q = (ERROR)*
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -11,7 +11,7 @@ Root
         KwError "ERROR"
         ParenClose ")"
       Star "*"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

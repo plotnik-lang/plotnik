@@ -1,5 +1,5 @@
 (call "abc
-==== tokens ====
+--------------------- TOKENS ---------------------
 ParenOpen "("
 Id "call"
 UnterminatedString "\"abc"

@@ -1,5 +1,5 @@
 (call name:)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: expected an expression
  --> query.ptk:1:12
   |

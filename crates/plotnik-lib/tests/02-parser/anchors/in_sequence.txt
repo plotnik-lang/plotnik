@@ -1,5 +1,5 @@
 Q = (parent {. (first) (second) .})
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -24,7 +24,7 @@ Root
           Dot "."
         BraceClose "}"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

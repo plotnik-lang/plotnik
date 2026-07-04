@@ -4,9 +4,9 @@ Q = (program
     ((comment) @b)
   ] @w
 )
-==== input ====
+--------------------- INPUT ----------------------
 a;
-==== types ====
+--------------------- TYPES ----------------------
 export interface QWGrp {
   a: Node;
 }
@@ -19,7 +19,7 @@ export interface QW {
 export interface Q {
   w: QW;
 }
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: parenthesized sequences are tree-sitter syntax
  --> query.ptk:3:5
   |
@@ -35,7 +35,7 @@ warning: parenthesized sequences are tree-sitter syntax
   |     ^
   |
 help: use `{(a) (b)}` to match a sequence of siblings
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "w": {
     "b": null,
@@ -48,7 +48,7 @@ help: use `{(a) (b)}` to match a sequence of siblings
     }
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "a"
@@ -98,7 +98,7 @@ Q:
   16  └‣─  _ [StructOpen]                   08, 11, 14
   18  ─‣┘  _ [StructClose Set(M3)]          06
   20   !   (program)                        16
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              20 : 03

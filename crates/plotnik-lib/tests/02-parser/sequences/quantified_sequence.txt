@@ -2,7 +2,7 @@ Q = {
   (a) @a
   (b) @b
 }+ @rows
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -27,7 +27,7 @@ Root
           BraceClose "}"
         Plus "+"
       CaptureToken "@rows"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

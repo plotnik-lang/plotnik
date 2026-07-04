@@ -1,13 +1,13 @@
 Q = (program (expression_statement (number) @n))
-==== input ====
+--------------------- INPUT ----------------------
 foo;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   n: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 <no match>
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "n"
@@ -40,7 +40,7 @@ Q:
   09                                        ▶
   10  └‣─  (expression_statement)           06
   11   !   (program)                        10
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              11 : 03

@@ -1,7 +1,7 @@
 Q = (program (expression_statement (identifier =~ /^x/) @id)* @rows)
-==== input ====
+--------------------- INPUT ----------------------
 x1; ax; x3;
-==== types ====
+--------------------- TYPES ----------------------
 export interface QRows {
   id: Node;
 }
@@ -9,7 +9,7 @@ export interface QRows {
 export interface Q {
   rows: QRows[];
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "rows": [
     {
@@ -28,7 +28,7 @@ export interface Q {
     }
   ]
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "^x"
@@ -78,7 +78,7 @@ Q:
   22  └‣─  _                                18, 20
   24  -ε-  [ArrayOpen]                      22, 13
   26   !   (program)                        24
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              26 : 03

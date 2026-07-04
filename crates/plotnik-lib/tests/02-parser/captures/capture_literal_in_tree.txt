@@ -1,5 +1,5 @@
 Q = (binary_expression "+" @op)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -15,7 +15,7 @@ Root
           DoubleQuote "\""
         CaptureToken "@op"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

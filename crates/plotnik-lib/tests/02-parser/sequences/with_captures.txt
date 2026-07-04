@@ -2,7 +2,7 @@ Q = {
   (comment)* @comments
   (function) @fn
 }
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -25,7 +25,7 @@ Root
           ParenClose ")"
         CaptureToken "@fn"
       BraceClose "}"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

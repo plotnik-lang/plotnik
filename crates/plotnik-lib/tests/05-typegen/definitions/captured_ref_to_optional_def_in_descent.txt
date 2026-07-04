@@ -1,6 +1,6 @@
 A = (identifier)??
 Q = (program (A) @x)
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   x: A;
 }

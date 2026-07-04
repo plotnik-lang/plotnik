@@ -2,7 +2,7 @@ Q = {
   (identifier) @items
   {(number) @x}*
 }
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: captures `@x` repeat with `*` but aren't collected into a list
  --> query.ptk:3:3
   |

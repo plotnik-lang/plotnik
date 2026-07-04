@@ -4,7 +4,7 @@ Q = (expr
     Unary: (unary_expression)
   ]
 )
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
  --> query.ptk:2:3
   |
@@ -15,7 +15,7 @@ warning: branch labels have no effect without capture
   | |___^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -42,7 +42,7 @@ Root
             ParenClose ")"
         BracketClose "]"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

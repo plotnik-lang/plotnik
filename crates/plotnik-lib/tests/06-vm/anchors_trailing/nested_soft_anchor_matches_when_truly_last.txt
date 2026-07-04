@@ -1,11 +1,11 @@
 Q = (program (expression_statement (array (object (pair) @p .) .)))
-==== input ====
+--------------------- INPUT ----------------------
 [{a:1}]
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   p: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "p": {
     "kind": "pair",
@@ -13,7 +13,7 @@ export interface Q {
     "span": [2, 5]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "p"
@@ -55,7 +55,7 @@ Q:
   20  └‣─  (array)                          18
   21  └‣─  (expression_statement)           20
   22   !   (program)                        21
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              22 : 03

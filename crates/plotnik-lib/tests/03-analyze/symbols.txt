@@ -1,6 +1,6 @@
 Value = (string) @text
 Main = (array (Value) @item)
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Value
 Main
   Value

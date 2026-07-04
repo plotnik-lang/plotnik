@@ -6,14 +6,14 @@ Q = (program
     ]
   )
 )
-==== input ====
+--------------------- INPUT ----------------------
 x
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   args: Node[];
   id: Node | null;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "args": [],
   "id": {
@@ -22,7 +22,7 @@ export interface Q {
     "span": [0, 1]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "args"
@@ -69,7 +69,7 @@ Q:
   24  └‣─  _                                17, 19, 22
   26  └‣─  (expression_statement)           24
   27   !   (program)                        26
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              27 : 03

@@ -1,16 +1,18 @@
 //! Golden-fixture test suite.
 //!
 //! Each file under `tests/0N-stage/` is one fixture: an authored Plotnik query,
-//! an optional `==== input ====` source section, and generated artifact sections
+//! an optional `INPUT` source section, and generated artifact sections
 //! the harness rewrites in place on accept. The stage directory selects which
 //! artifacts render.
 //!
-//! The input header's suffix selects the grammar a query compiles against:
-//! `==== input.ts ====` picks TypeScript, `==== input.dart ====` dart, plain
-//! `==== input ====` (or `.js`) JavaScript (see `Lang::resolve`). For a 06-vm
-//! fixture the body is the source the VM runs; for a compile-only stage (04-emit,
-//! 05-typegen) only the suffix matters, so the body is left empty — the header is
-//! a pure grammar selector. The stage directory selects which artifacts render:
+//! Sections are separated by a centered 50-column rule — `----- DIAGNOSTICS -----`.
+//! The `INPUT` rule's parenthesized grammar selects what a query compiles against:
+//! `INPUT (ts)` picks TypeScript, `INPUT (dart)` dart, plain `INPUT` JavaScript
+//! (see `Lang::resolve`). Authors may dash the rule loosely (`--- INPUT (ts) ---`);
+//! `make shot` normalizes it. For a 06-vm fixture the body is the source the VM
+//! runs; for a compile-only stage (04-emit, 05-typegen) only the grammar matters,
+//! so the body is left empty — the rule is a pure grammar selector. The stage
+//! directory selects which artifacts render:
 //!
 //! | dir          | sections                                   |
 //! | ------------ | ------------------------------------------ |
@@ -20,7 +22,7 @@
 //! | `05-typegen` | types                                      |
 //! | `06-vm`      | types, output, bytecode, trace (requires input) |
 //!
-//! `==== diagnostics ====` renders whenever the query produces warnings or errors.
+//! The `DIAGNOSTICS` section renders whenever the query produces warnings or errors.
 //! Errors are terminal for the compile stages (bytecode/types/trace/output are
 //! suppressed); for `02-parser` they suppress cst/ast too, matching the recovery
 //! tests. Warnings coexist with the normal sections.
@@ -179,8 +181,8 @@ fn shot_enabled() -> bool {
 fn parse_fixture(raw: &str, stage: &str) -> Result<Parsed, String> {
     let normalized = raw.replace("\r\n", "\n");
     let mut query_lines: Vec<&str> = Vec::new();
-    let mut sections: Vec<(&str, Vec<&str>)> = Vec::new();
-    let mut current: Option<(&str, Vec<&str>)> = None;
+    let mut sections: Vec<(String, Vec<&str>)> = Vec::new();
+    let mut current: Option<(String, Vec<&str>)> = None;
 
     for line in normalized.lines() {
         if let Some(name) = parse_section_header(line) {
@@ -200,13 +202,13 @@ fn parse_fixture(raw: &str, stage: &str) -> Result<Parsed, String> {
 
     let query = query_lines.join("\n");
     if query.trim().is_empty() {
-        return Err("fixture has no query (text before the first `==== … ====` section)".into());
+        return Err("fixture has no query (text before the first `--- … ---` rule)".into());
     }
 
     // Input is authored only as the first section; an `input`-looking header
     // anywhere later belongs to a regenerated artifact, not to the source.
     let (input, generated_start) = match sections.first() {
-        Some((name, body)) if *name == "input" || name.starts_with("input.") => {
+        Some((name, body)) if name.as_str() == "input" || name.starts_with("input.") => {
             let ext = name
                 .strip_prefix("input")
                 .and_then(|rest| rest.strip_prefix('.'))
@@ -227,15 +229,18 @@ fn parse_fixture(raw: &str, stage: &str) -> Result<Parsed, String> {
     Ok(Parsed { query, input })
 }
 
-fn validate_generated_headers(stage: &str, sections: &[(&str, Vec<&str>)]) -> Result<(), String> {
+fn validate_generated_headers(stage: &str, sections: &[(String, Vec<&str>)]) -> Result<(), String> {
     let legal = generated_section_order(stage)
         .ok_or_else(|| format!("unknown stage directory `{stage}`"))?;
     let mut cursor = 0;
 
     for (name, _) in sections {
-        let Some(offset) = legal[cursor..].iter().position(|known| known == name) else {
+        let Some(offset) = legal[cursor..]
+            .iter()
+            .position(|known| *known == name.as_str())
+        else {
             return Err(format!(
-                "section `==== {name} ====` is invalid or out of order for `{stage}`; exact fixture section headers are reserved in authored query/input text"
+                "section `{name}` is invalid or out of order for `{stage}`; fixture section rules are reserved in authored query/input text"
             ));
         };
         cursor += offset + 1;
@@ -255,17 +260,44 @@ fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
     }
 }
 
-/// Only exact fixture section headers become boundaries. Stage-order validation
-/// then rejects headers that look generated but appear in the wrong place.
-fn parse_section_header(line: &str) -> Option<&str> {
-    let inner = line.strip_prefix("==== ")?.strip_suffix(" ====")?;
-    let known = inner == "input"
-        || inner.starts_with("input.")
+/// Only fixture section rules become boundaries. Stage-order validation then
+/// rejects rules that look generated but appear in the wrong place. A rule is a
+/// label centered in dashes — `-------- DIAGNOSTICS --------`; the `INPUT` rule
+/// carries its grammar in parens, `INPUT (ts)`.
+fn parse_section_header(line: &str) -> Option<String> {
+    let label = rule_label(line)?;
+    let name = match label.split_once('(') {
+        Some((head, ext)) if head.trim().eq_ignore_ascii_case("input") => {
+            format!("input.{}", ext.strip_suffix(')')?.trim())
+        }
+        Some(_) => return None,
+        None => label.to_ascii_lowercase(),
+    };
+    let known = name == "input"
+        || name.starts_with("input.")
         || matches!(
-            inner,
+            name.as_str(),
             "cst" | "ast" | "symbols" | "bytecode" | "types" | "trace" | "output" | "diagnostics"
         );
-    known.then_some(inner)
+    known.then_some(name)
+}
+
+/// The label inside a `----- LABEL -----` rule, or `None` when the line isn't a
+/// rule. A rule sits at column zero and pads its label with a space on each side
+/// (` LABEL `), exactly as `section_rule` emits it; requiring that padding keeps
+/// authored query/input bytes — a negated field `-types-`, an indented source
+/// line — from being read as a section boundary.
+fn rule_label(line: &str) -> Option<&str> {
+    let line = line.trim_end();
+    if !line.starts_with('-') || !line.ends_with('-') {
+        return None;
+    }
+    let label = line
+        .trim_matches('-')
+        .strip_prefix(' ')?
+        .strip_suffix(' ')?
+        .trim();
+    (!label.is_empty()).then_some(label)
 }
 
 fn render(
@@ -374,7 +406,7 @@ fn render_compile(
         }
         Compile::Vm => {
             let input = input.ok_or_else(|| {
-                "06-vm fixtures require an `==== input ====` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
+                "06-vm fixtures require an `INPUT` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
             })?;
             let entry = compiled
                 .definition_names()
@@ -520,9 +552,8 @@ fn canonical(query: &str, input: Option<&Input>, generated: &[(String, String)])
 }
 
 fn push_authored_section(out: &mut String, name: &str, body: &str) {
-    out.push_str("==== ");
-    out.push_str(name);
-    out.push_str(" ====\n");
+    out.push_str(&section_rule(name));
+    out.push('\n');
     out.push_str(body);
     if !out.ends_with('\n') {
         out.push('\n');
@@ -530,14 +561,31 @@ fn push_authored_section(out: &mut String, name: &str, body: &str) {
 }
 
 fn push_section(out: &mut String, name: &str, body: &str) {
-    out.push_str("==== ");
-    out.push_str(name);
-    out.push_str(" ====\n");
+    out.push_str(&section_rule(name));
+    out.push('\n');
     let body = body.trim_matches('\n');
     if !body.is_empty() {
         out.push_str(body);
         out.push('\n');
     }
+}
+
+/// A section boundary: the name centered in a 50-column dash rule. `input` and
+/// `input.<ext>` render the grammar as `INPUT` / `INPUT (<ext>)`; every other
+/// section is the uppercased name.
+fn section_rule(name: &str) -> String {
+    const WIDTH: usize = 50;
+    let label = match name.strip_prefix("input.") {
+        Some(ext) => format!("INPUT ({ext})"),
+        None => name.to_ascii_uppercase(),
+    };
+    // At least one dash each side so an over-wide label still round-trips through
+    // `rule_label`; width degrades gracefully past 50 columns.
+    let fill = WIDTH.saturating_sub(label.len() + 2);
+    let half = fill / 2;
+    let left = half.max(1);
+    let right = (fill - half).max(1);
+    format!("{} {label} {}", "-".repeat(left), "-".repeat(right))
 }
 
 fn unified_diff(actual: &str, expected: &str) -> String {

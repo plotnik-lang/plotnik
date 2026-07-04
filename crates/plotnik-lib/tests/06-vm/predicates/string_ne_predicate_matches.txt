@@ -1,11 +1,11 @@
 Q = (program (expression_statement (identifier != "foo") @id))
-==== input ====
+--------------------- INPUT ----------------------
 bar;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   id: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "id": {
     "kind": "identifier",
@@ -13,7 +13,7 @@ export interface Q {
     "span": [0, 3]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "foo"
@@ -49,7 +49,7 @@ Q:
   12                                        ▶
   13  └‣─  (expression_statement)           08
   14   !   (program)                        13
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              14 : 03

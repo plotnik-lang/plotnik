@@ -1,6 +1,6 @@
 A = {(expression_statement) (statement_block (B)* @xs)? @blk}
 B = {(debugger_statement) (statement_block (A))?}
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
  --> query.ptk:1:46
   |

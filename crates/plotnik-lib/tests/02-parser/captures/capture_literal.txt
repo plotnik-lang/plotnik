@@ -1,5 +1,5 @@
 Q = "foo" @keyword
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -11,7 +11,7 @@ Root
         StringContent "foo"
         DoubleQuote "\""
       CaptureToken "@keyword"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

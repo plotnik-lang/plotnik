@@ -1,5 +1,5 @@
 (call "foo)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: unterminated string
  --> query.ptk:1:7
   |

@@ -1,5 +1,5 @@
 [@x (a)]
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: expected a branch, or `]` to close
  --> query.ptk:1:2
   |

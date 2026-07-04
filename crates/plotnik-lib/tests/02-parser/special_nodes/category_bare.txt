@@ -1,5 +1,5 @@
 Q = (value#)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -10,7 +10,7 @@ Root
       Id "value"
       Hash "#"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

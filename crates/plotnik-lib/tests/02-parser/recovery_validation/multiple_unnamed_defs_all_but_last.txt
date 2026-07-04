@@ -1,7 +1,7 @@
 (first)
 (second)
 (third)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: definition must be named
  --> query.ptk:1:1
   |

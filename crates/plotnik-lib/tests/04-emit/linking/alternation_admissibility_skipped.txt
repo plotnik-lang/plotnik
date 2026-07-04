@@ -4,7 +4,7 @@ Q = (function_declaration body:
     (class_declaration) @b
   ]
 )
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"

@@ -1,5 +1,5 @@
 Q = (decorator)* @decorators
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   decorators: Node[];
 }

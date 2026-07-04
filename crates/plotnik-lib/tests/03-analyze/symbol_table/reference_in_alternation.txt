@@ -1,6 +1,6 @@
 Expr = (expression)
 Value = [(Expr) (literal)]
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Expr
 Value
   Expr

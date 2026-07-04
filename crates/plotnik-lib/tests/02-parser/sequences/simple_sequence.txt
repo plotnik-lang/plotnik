@@ -2,7 +2,7 @@ Q = {
   (a)
   (b)
 }
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -19,7 +19,7 @@ Root
         Id "b"
         ParenClose ")"
       BraceClose "}"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

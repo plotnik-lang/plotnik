@@ -1,6 +1,6 @@
 Q = (program [A: (identifier)? @id  B: (debugger_statement) @d] @x)
-==== input ====
-==== types ====
+--------------------- INPUT ----------------------
+--------------------- TYPES ----------------------
 export type QX =
   | { $tag: "A"; $data: { id: Node | null } }
   | { $tag: "B"; $data: { d: Node } };
@@ -8,7 +8,7 @@ export type QX =
 export interface Q {
   x: QX;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "x": {
     "$tag": "A",
@@ -17,7 +17,7 @@ export interface Q {
     }
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "id"
@@ -70,7 +70,7 @@ Q:
   22  ─‣─  _                                13, 19, 22
   24  └‣─  _                                13, 19, 22
   26   !   (program)                        24, 16
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              26 : 03

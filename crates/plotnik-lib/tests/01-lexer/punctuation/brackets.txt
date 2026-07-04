@@ -1,5 +1,5 @@
 [ (a) (b) ]
-==== tokens ====
+--------------------- TOKENS ---------------------
 BracketOpen "["
 ParenOpen "("
 Id "a"

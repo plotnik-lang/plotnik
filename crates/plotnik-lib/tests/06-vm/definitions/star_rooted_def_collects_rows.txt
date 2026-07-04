@@ -1,9 +1,9 @@
 Row = (pair key: (_) @key value: (_) @val)
 Rows = (Row)*
 Q = (program (expression_statement (parenthesized_expression (object (Rows) @rows))))
-==== input ====
+--------------------- INPUT ----------------------
 ({a: 1, b: 2});
-==== types ====
+--------------------- TYPES ----------------------
 export interface Row {
   key: Node;
   val: Node;
@@ -14,7 +14,7 @@ export interface Q {
 }
 
 export type Rows = Row[];
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "rows": [
     {
@@ -43,7 +43,7 @@ export type Rows = Row[];
     }
   ]
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "key"
@@ -129,7 +129,7 @@ Q:
   62  └‣─  (expression_statement)           61
   63  ...
   64   !   (program)                        62
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   08  -ε-  [StructOpen]                     10
   10       (?)                              64 : 11

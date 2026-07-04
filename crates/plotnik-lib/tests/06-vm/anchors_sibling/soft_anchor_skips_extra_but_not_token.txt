@@ -7,13 +7,13 @@ Q = (program
     )
   )
 )
-==== input ====
+--------------------- INPUT ----------------------
 [1, /* c */ 2]
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   n: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "n": {
     "kind": "number",
@@ -21,7 +21,7 @@ export interface Q {
     "span": [12, 13]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "n"
@@ -60,7 +60,7 @@ Q:
   15  └‣─  (array)                          13
   16  └‣─  (expression_statement)           15
   17   !   (program)                        16
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              17 : 03

@@ -1,7 +1,7 @@
 Row = (pair key: (_) @key value: (_) @val)
 Rows = (Row)*
 Q = (program (expression_statement (parenthesized_expression (object (Rows) @rows))))
-==== types ====
+--------------------- TYPES ----------------------
 export interface Row {
   key: Node;
   val: Node;

@@ -1,5 +1,5 @@
 Q = (node 'if')
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -13,7 +13,7 @@ Root
         StringContent "if"
         SingleQuote "'"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

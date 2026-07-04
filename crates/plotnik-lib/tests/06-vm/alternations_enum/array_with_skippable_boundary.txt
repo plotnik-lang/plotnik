@@ -8,9 +8,9 @@ Q = (program
     ]
   }* @items
 )
-==== input ====
+--------------------- INPUT ----------------------
 a; b;
-==== types ====
+--------------------- TYPES ----------------------
 export interface QItems {
   a: Node;
 }
@@ -18,7 +18,7 @@ export interface QItems {
 export interface Q {
   items: QItems[];
 }
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
  --> query.ptk:3:5
   |
@@ -31,7 +31,7 @@ warning: branch labels have no effect without capture
   | |_____^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "items": [
     {
@@ -50,7 +50,7 @@ help: capture the alternation (`[...] @name`) to make the labels enum variants, 
     }
   ]
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -98,7 +98,7 @@ Q:
   24  -ε-  [ArrayOpen]                      21, 08
   26  ─‣┘  _ [ArrayClose Set(M1)]           06
   28   !   (program)                        24
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              28 : 03

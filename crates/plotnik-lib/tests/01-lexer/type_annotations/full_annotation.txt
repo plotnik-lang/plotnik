@@ -1,5 +1,5 @@
 (identifier) @name :: Foo
-==== tokens ====
+--------------------- TOKENS ---------------------
 ParenOpen "("
 Id "identifier"
 ParenClose ")"

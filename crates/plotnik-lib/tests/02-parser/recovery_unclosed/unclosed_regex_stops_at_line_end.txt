@@ -1,6 +1,6 @@
 Q = (identifier =~ /foo
 Second = (number) @n
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: missing closing `/` for regex
  --> query.ptk:1:20
   |

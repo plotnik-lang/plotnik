@@ -1,7 +1,7 @@
 Q = (program (expression_statement (identifier) @id)? @x (debugger_statement) @d)
-==== input ====
+--------------------- INPUT ----------------------
 debugger;
-==== types ====
+--------------------- TYPES ----------------------
 export interface QX {
   id: Node;
 }
@@ -10,7 +10,7 @@ export interface Q {
   d: Node;
   x: QX | null;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "x": null,
   "d": {
@@ -19,7 +19,7 @@ export interface Q {
     "span": [0, 9]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "id"
@@ -67,7 +67,7 @@ Q:
   22  ─‣┘  _                                09
   23  ...
   24   !   (program)                        20, 10
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              24 : 03

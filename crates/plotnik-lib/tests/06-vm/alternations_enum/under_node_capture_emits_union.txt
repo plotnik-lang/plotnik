@@ -6,9 +6,9 @@ Q = (program
     ] @e
   )
 )
-==== input ====
+--------------------- INPUT ----------------------
 foo
-==== types ====
+--------------------- TYPES ----------------------
 export type QE =
   | { $tag: "A"; $data: { a: Node } }
   | { $tag: "B"; $data: { b: Node } };
@@ -16,7 +16,7 @@ export type QE =
 export interface Q {
   e: QE;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "e": {
     "$tag": "A",
@@ -29,7 +29,7 @@ export interface Q {
     }
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "a"
@@ -80,7 +80,7 @@ Q:
   18  ─‣┘² _ [Set(M4)]                      06
   20  └‣─  (expression_statement)           16
   21   !   (program)                        20
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              21 : 03

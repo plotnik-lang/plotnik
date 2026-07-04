@@ -1,5 +1,5 @@
 Q = (block (last_statement) .)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -15,7 +15,7 @@ Root
       Anchor
         Dot "."
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

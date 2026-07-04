@@ -1,5 +1,5 @@
 Q = (array (array (array (identifier) @d) @c) @b) @a
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"

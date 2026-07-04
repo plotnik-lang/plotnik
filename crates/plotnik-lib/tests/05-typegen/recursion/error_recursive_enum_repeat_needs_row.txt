@@ -3,7 +3,7 @@ Expr = [
   Rec: (parenthesized_expression (Expr))
 ]
 Bad = (expression_statement (Expr)*)
-==== types ====
+--------------------- TYPES ----------------------
 export type Expr =
   | { $tag: "Lit"; $data: { n: Node } }
   | { $tag: "Rec" };

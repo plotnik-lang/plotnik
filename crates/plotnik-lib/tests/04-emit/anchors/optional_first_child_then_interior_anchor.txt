@@ -5,7 +5,7 @@ Q = (program
     (debugger_statement) @b
   }
 )
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"

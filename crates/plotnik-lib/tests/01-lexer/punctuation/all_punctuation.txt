@@ -1,5 +1,5 @@
 ( ) [ ] { } : = ! ~ _ . .!
-==== tokens ====
+--------------------- TOKENS ---------------------
 ParenOpen "("
 ParenClose ")"
 BracketOpen "["

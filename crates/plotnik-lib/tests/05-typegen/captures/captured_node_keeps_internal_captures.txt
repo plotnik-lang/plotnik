@@ -2,7 +2,7 @@ Q = (function_declaration
   name: (identifier) @name
   body: (statement_block) @body
 ) @func :: FunctionInfo
-==== types ====
+--------------------- TYPES ----------------------
 export type FunctionInfo = Node;
 
 export interface Q {

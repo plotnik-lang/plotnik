@@ -1,16 +1,16 @@
 Q = (program [(identifier)* @ids (debugger_statement) @d])
-==== input ====
-==== types ====
+--------------------- INPUT ----------------------
+--------------------- TYPES ----------------------
 export interface Q {
   d: Node | null;
   ids: Node[];
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "ids": [],
   "d": null
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "ids"
@@ -54,7 +54,7 @@ Q:
   24  ─‣─  _                                16, 18, 24
   26  └‣─  _                                16, 18, 24
   28   !   (program)                        26, 21
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              28 : 03

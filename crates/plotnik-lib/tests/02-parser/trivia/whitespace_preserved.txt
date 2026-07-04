@@ -1,5 +1,5 @@
 Q = (identifier)  @name
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -14,7 +14,7 @@ Root
         ParenClose ")"
       Whitespace "  "
       CaptureToken "@name"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

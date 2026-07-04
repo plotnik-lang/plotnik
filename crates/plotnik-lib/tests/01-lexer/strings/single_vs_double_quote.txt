@@ -1,5 +1,5 @@
 'single' "double"
-==== tokens ====
+--------------------- TOKENS ---------------------
 SingleQuote "'"
 StringContent "single"
 SingleQuote "'"

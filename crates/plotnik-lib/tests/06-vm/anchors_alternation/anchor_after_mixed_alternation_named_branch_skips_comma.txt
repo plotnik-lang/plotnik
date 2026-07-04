@@ -12,14 +12,14 @@ Q = (program
     )
   )
 )
-==== input ====
+--------------------- INPUT ----------------------
 f(a, b)
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   x: Node | null;
   y: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "x": {
     "kind": "identifier",
@@ -32,7 +32,7 @@ export interface Q {
     "span": [5, 6]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "x"
@@ -79,7 +79,7 @@ Q:
   22  └‣─  (expression_statement)           21
   23  ...
   24   !   (program)                        22
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              24 : 03

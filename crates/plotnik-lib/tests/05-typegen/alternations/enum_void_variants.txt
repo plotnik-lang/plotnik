@@ -7,7 +7,7 @@ Q = (program
   (expression_statement (A) @a)
   (debugger_statement) @name
 )
-==== types ====
+--------------------- TYPES ----------------------
 export type A =
   | { $tag: "X" }
   | { $tag: "Y" };

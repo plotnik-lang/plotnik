@@ -1,5 +1,5 @@
 (call (a) . * (b))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: anchors cannot be quantified
  --> query.ptk:1:13
   |

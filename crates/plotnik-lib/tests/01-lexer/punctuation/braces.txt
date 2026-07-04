@@ -1,5 +1,5 @@
 { (a) (b) }
-==== tokens ====
+--------------------- TOKENS ---------------------
 BraceOpen "{"
 ParenOpen "("
 Id "a"

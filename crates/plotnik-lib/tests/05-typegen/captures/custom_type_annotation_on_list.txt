@@ -1,5 +1,5 @@
 Q = (identifier)* @names :: Ident
-==== types ====
+--------------------- TYPES ----------------------
 export type Ident = Node;
 
 export interface Q {

@@ -1,5 +1,5 @@
 Q = (expression#binary_expression) @expr
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -13,7 +13,7 @@ Root
         Id "binary_expression"
         ParenClose ")"
       CaptureToken "@expr"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

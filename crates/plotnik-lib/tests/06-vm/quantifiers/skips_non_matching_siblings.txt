@@ -1,11 +1,11 @@
 Q = (program (lexical_declaration)* @decls)
-==== input ====
+--------------------- INPUT ----------------------
 let a; foo; let b;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   decls: Node[];
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "decls": [
     {
@@ -20,7 +20,7 @@ export interface Q {
     }
   ]
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "decls"
@@ -57,7 +57,7 @@ Q:
   16  -ε-  [ArrayOpen]                      14, 08
   18  ─‣┘  _ [ArrayClose Set(M0)]           06
   20   !   (program)                        16
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              20 : 03

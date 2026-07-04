@@ -1,5 +1,5 @@
 Q = (a (b (c (d))))
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -21,7 +21,7 @@ Root
           ParenClose ")"
         ParenClose ")"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

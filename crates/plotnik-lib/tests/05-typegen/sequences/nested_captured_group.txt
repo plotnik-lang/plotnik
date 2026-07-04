@@ -5,7 +5,7 @@ Q = {
     (number) @v
   } @pair
 }
-==== types ====
+--------------------- TYPES ----------------------
 export interface QPair {
   k: Node;
   v: Node;

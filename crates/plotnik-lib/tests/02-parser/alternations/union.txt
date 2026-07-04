@@ -2,7 +2,7 @@ Q = [
   (identifier)
   (string)
 ]
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -21,7 +21,7 @@ Root
           Id "string"
           ParenClose ")"
       BracketClose "]"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

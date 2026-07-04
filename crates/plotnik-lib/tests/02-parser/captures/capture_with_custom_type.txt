@@ -1,5 +1,5 @@
 Q = (function_declaration) @fn :: FunctionDecl
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -14,7 +14,7 @@ Root
       TypeAnnotation
         DoubleColon "::"
         Id "FunctionDecl"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

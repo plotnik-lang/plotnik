@@ -1,11 +1,11 @@
 Q = (program {(lexical_declaration)+? @d})
-==== input ====
+--------------------- INPUT ----------------------
 let a; let b;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   d: [Node, ...Node[]];
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "d": [
     {
@@ -15,7 +15,7 @@ export interface Q {
     }
   ]
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "d"
@@ -50,7 +50,7 @@ Q:
   12  └‣─  _ [ArrayOpen]                    08, 10
   14  ─‣┘  _ [ArrayClose Set(M0)]           06
   16   !   (program)                        12
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              16 : 03

@@ -1,5 +1,5 @@
 Expr =
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: expected an expression
  --> query.ptk:1:7
   |

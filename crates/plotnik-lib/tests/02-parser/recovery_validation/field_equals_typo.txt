@@ -1,5 +1,5 @@
 (node name = (identifier))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: fields use `:`, not `=`
  --> query.ptk:1:12
   |

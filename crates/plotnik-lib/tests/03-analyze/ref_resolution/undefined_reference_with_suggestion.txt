@@ -1,6 +1,6 @@
 Expr = (identifier) @x
 Q = (call_expression function: (Expl))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `Expl` is not defined
  --> query.ptk:2:33
   |
@@ -13,7 +13,7 @@ help: did you mean `(Expr)`?
 2 + Q = (call_expression function: (Expr))
   |
 help: `(Name)` uses a definition; define `Name = ...` or check the spelling
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Expr
 Q
   Expl?

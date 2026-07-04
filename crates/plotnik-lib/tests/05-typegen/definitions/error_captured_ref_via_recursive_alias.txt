@@ -1,6 +1,6 @@
 A = (B)
 B = {(debugger_statement) (statement_block (A) @x)? @s}
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
  --> query.ptk:2:44
   |

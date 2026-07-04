@@ -1,5 +1,5 @@
 ERROR ERRORx Errors
-==== tokens ====
+--------------------- TOKENS ---------------------
 KwError "ERROR"
 Id "ERRORx"
 Id "Errors"

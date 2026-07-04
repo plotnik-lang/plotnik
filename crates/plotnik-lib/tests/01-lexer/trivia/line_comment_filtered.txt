@@ -1,5 +1,5 @@
 foo // comment
 bar
-==== tokens ====
+--------------------- TOKENS ---------------------
 Id "foo"
 Id "bar"

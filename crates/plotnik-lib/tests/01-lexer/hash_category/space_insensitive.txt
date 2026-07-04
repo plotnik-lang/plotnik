@@ -1,5 +1,5 @@
 (expression #binary_expression)
-==== tokens ====
+--------------------- TOKENS ---------------------
 ParenOpen "("
 Id "expression"
 Hash "#"

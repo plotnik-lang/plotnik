@@ -9,15 +9,15 @@ Q = (program
     )
   )
 )
-==== input ====
+--------------------- INPUT ----------------------
 [1, 2, "x"]
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   s: Node;
 }
 
 export type Comma = Node;
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "s": {
     "kind": "string",
@@ -25,7 +25,7 @@ export type Comma = Node;
     "span": [7, 10]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "s"
@@ -75,7 +75,7 @@ Q:
   22  └‣─  (expression_statement)           21
   23  ...
   24   !   (program)                        22
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   04  -ε-  [StructOpen]                     06
   06       (?)                              24 : 08

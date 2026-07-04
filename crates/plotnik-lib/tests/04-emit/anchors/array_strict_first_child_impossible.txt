@@ -1,5 +1,5 @@
 Q = (array .! (identifier))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: with strict adjacency (`.!`), the first child of `array` must be `identifier`, but `array` begins with `"["`
  --> query.ptk:1:6
   |

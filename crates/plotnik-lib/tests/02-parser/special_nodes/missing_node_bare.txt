@@ -1,5 +1,5 @@
 Q = (MISSING)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -9,7 +9,7 @@ Root
       ParenOpen "("
       KwMissing "MISSING"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

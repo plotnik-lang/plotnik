@@ -1,14 +1,14 @@
 Q = (program (expression_statement [A: (identifier) @a]? @e))
-==== input ====
+--------------------- INPUT ----------------------
 x
-==== types ====
+--------------------- TYPES ----------------------
 export type QE =
   | { $tag: "A"; $data: { a: Node } };
 
 export interface Q {
   e: QE | null;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "e": {
     "$tag": "A",
@@ -21,7 +21,7 @@ export interface Q {
     }
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -68,7 +68,7 @@ Q:
   18  └‣─  _                                08, 16
   20  └‣─  (expression_statement)           18, 14
   22   !   (program)                        20
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              22 : 03

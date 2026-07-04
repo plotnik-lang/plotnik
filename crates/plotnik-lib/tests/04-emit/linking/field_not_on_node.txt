@@ -1,5 +1,5 @@
 Q = (function_declaration condition: (identifier) @name) @fn
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: field `condition` is not valid on this node kind
  --> query.ptk:1:27
   |

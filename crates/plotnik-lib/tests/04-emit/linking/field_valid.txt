@@ -1,7 +1,7 @@
 Q = (function_declaration
   name: (identifier) @name
 ) @fn
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "fn"

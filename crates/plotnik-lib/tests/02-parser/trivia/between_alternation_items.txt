@@ -2,7 +2,7 @@ Q = [
     (a)
     (b)
 ]
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -28,7 +28,7 @@ Root
           ParenClose ")"
       Newline "\n"
       BracketClose "]"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

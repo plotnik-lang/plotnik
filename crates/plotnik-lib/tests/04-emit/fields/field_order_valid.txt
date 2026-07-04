@@ -1,5 +1,5 @@
 Q = (function_declaration name: (identifier) @n body: (statement_block) @b)
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "n"

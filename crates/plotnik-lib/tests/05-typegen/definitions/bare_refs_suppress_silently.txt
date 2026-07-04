@@ -1,7 +1,7 @@
 A = [X: (expression_statement) @s]
 B = [Y: (lexical_declaration) @d]
 Q = (program (A) (B))
-==== types ====
+--------------------- TYPES ----------------------
 export type B =
   | { $tag: "Y"; $data: { d: Node } };
 

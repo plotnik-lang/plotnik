@@ -1,7 +1,7 @@
 Bad = [
   A: (identifier) @id
 ]*
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: the definition names the list itself, so each `*` element — a labeled alternation — is left without a type name
  --> query.ptk:1:7
   |

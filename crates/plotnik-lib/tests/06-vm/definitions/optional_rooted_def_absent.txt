@@ -1,15 +1,15 @@
 MaybeId = (identifier)?
 Q = (program (expression_statement (array (MaybeId) @first (number) @n)))
-==== input ====
+--------------------- INPUT ----------------------
 [1];
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   first: MaybeId;
   n: Node;
 }
 
 export type MaybeId = Node | null;
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "first": null,
   "n": {
@@ -18,7 +18,7 @@ export type MaybeId = Node | null;
     "span": [1, 2]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "first"
@@ -76,7 +76,7 @@ Q:
   34  └‣─  (array)                          32, 26
   36  └‣─  (expression_statement)           34
   37   !   (program)                        36
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   02  -ε-  [StructOpen]                     04
   04       (?)                              37 : 05

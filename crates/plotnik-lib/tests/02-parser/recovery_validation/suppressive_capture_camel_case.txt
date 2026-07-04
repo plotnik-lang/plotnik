@@ -1,5 +1,5 @@
 (a) @_fooBar
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: capture names must be snake_case
  --> query.ptk:1:5
   |

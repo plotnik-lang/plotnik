@@ -7,7 +7,7 @@ Expr = [
 ]
 
 Test = (program (expression_statement (Expr) @expr))
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "value"

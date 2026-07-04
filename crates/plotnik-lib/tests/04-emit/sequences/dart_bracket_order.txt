@@ -1,6 +1,6 @@
 Q = (list_literal "]" "[")
-==== input.dart ====
-==== diagnostics ====
+------------------ INPUT (dart) ------------------
+------------------ DIAGNOSTICS -------------------
 error: the grammar places `"["` before `"]"` in `list_literal`
  --> query.ptk:1:19
   |

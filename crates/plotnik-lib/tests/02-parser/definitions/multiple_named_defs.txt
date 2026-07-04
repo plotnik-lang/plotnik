@@ -1,6 +1,6 @@
 Expr = (expression)
 Stmt = (statement)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -17,7 +17,7 @@ Root
       ParenOpen "("
       Id "statement"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Expr

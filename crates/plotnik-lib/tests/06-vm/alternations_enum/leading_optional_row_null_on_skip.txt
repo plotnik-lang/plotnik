@@ -7,9 +7,9 @@ Q = (program
     }
   ]
 )
-==== input ====
+--------------------- INPUT ----------------------
 a; b;
-==== types ====
+--------------------- TYPES ----------------------
 export interface QLead {
   c: Node;
 }
@@ -19,7 +19,7 @@ export interface Q {
   b: Node;
   lead: QLead | null;
 }
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
  --> query.ptk:2:3
   |
@@ -32,7 +32,7 @@ warning: branch labels have no effect without capture
   | |___^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "lead": null,
   "a": {
@@ -46,7 +46,7 @@ help: capture the alternation (`[...] @name`) to make the labels enum variants, 
     "span": [3, 5]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "c"
@@ -98,7 +98,7 @@ Q:
   26  ─‣─  _                                24, 13, 26
   28  └‣─  _                                24, 13, 26
   30   !   (program)                        28
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              30 : 03
