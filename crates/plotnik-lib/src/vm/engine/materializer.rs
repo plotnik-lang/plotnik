@@ -27,21 +27,11 @@ impl<'a> ValueMaterializer<'a> {
         self.strings.get(member.name_id).to_owned()
     }
 
-    fn resolve_member_type(&self, idx: u16) -> TypeId {
-        self.types.get_member(idx as usize).type_id
-    }
-
-    fn is_void_type(&self, type_id: TypeId) -> bool {
-        self.types
-            .get(type_id)
-            .is_some_and(|def| matches!(def.decode(), TypeDefKind::Primitive(TypeKind::Void)))
-    }
-
     fn accumulator_for_type(&self, type_id: TypeId) -> ValueAccumulator {
         let def = self
             .types
             .get(type_id)
-            .unwrap_or_else(|| panic!("unknown type_id {type_id}"));
+            .expect("result type must exist in module type table");
 
         match def.decode() {
             TypeDefKind::Struct { member_count, .. } => {
@@ -84,7 +74,6 @@ enum ValueAccumulator {
     Struct(Vec<(String, Value)>),
     Enum {
         tag: String,
-        payload_type: TypeId,
         fields: Vec<(String, Value)>,
     },
 }
@@ -92,10 +81,11 @@ enum ValueAccumulator {
 impl ValueAccumulator {
     fn finish(self) -> Value {
         match self {
-            ValueAccumulator::Scalar(v) => v.unwrap_or(Value::Null),
+            ValueAccumulator::Scalar(Some(v)) => v,
+            ValueAccumulator::Scalar(None) => Value::Null,
             ValueAccumulator::Array(arr) => Value::Array(arr),
             ValueAccumulator::Struct(fields) => Value::Struct(fields),
-            ValueAccumulator::Enum { tag, fields, .. } => Value::Enum {
+            ValueAccumulator::Enum { tag, fields } => Value::Enum {
                 tag,
                 data: Some(Box::new(Value::Struct(fields))),
             },
@@ -134,7 +124,9 @@ impl ValueMaterializer<'_> {
                     stack.push(ValueAccumulator::Array(vec![]));
                 }
                 RuntimeEffect::Push => {
-                    let val = pending.take().unwrap_or(Value::Null);
+                    let val = pending
+                        .take()
+                        .expect("Push requires a produced value (verified at load)");
                     let Some(ValueAccumulator::Array(arr)) = stack.last_mut() else {
                         panic!(
                             "effect {effect_idx}: Push expects Array on stack, found {:?}",
@@ -158,7 +150,9 @@ impl ValueMaterializer<'_> {
                 }
                 RuntimeEffect::Set(idx) => {
                     let field_name = self.resolve_member_name(*idx);
-                    let val = pending.take().unwrap_or(Value::Null);
+                    let val = pending
+                        .take()
+                        .expect("Set requires a produced value (verified at load)");
                     match stack.last_mut() {
                         Some(ValueAccumulator::Struct(fields)) => fields.push((field_name, val)),
                         Some(ValueAccumulator::Enum { fields, .. }) => {
@@ -195,33 +189,28 @@ impl ValueMaterializer<'_> {
                 }
                 RuntimeEffect::EnumOpen(idx) => {
                     let tag = self.resolve_member_name(*idx);
-                    let payload_type = self.resolve_member_type(*idx);
                     stack.push(ValueAccumulator::Enum {
                         tag,
-                        payload_type,
                         fields: vec![],
                     });
                 }
                 RuntimeEffect::EnumClose => {
                     let top = stack.pop();
-                    let Some(ValueAccumulator::Enum {
-                        tag,
-                        payload_type,
-                        fields,
-                    }) = top
-                    else {
+                    let Some(ValueAccumulator::Enum { tag, fields }) = top else {
                         panic!(
                             "effect {effect_idx}: EnumClose expects Enum on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
-                    // Void payloads produce no $data field
-                    let data = if self.is_void_type(payload_type) {
-                        None
-                    } else {
-                        // If inner returned a structured value (via StructOpen/StructClose), use it as data
-                        // Otherwise use fields collected from direct Set effects
-                        Some(Box::new(pending.take().unwrap_or(Value::Struct(fields))))
+                    let data = match (pending.take(), fields.is_empty()) {
+                        (Some(v), true) => Some(Box::new(v)),
+                        (None, false) => Some(Box::new(Value::Struct(fields))),
+                        (None, true) => None,
+                        (Some(_), false) => {
+                            panic!(
+                                "enum payload arrived both as pending value and as direct fields"
+                            )
+                        }
                     };
                     pending = Some(Value::Enum { tag, data });
                 }
