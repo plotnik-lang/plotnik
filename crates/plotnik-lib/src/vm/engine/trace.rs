@@ -339,7 +339,7 @@ impl<'s> PrintTracer<'s> {
 
     /// Format match content for instruction line (matches dump format exactly).
     ///
-    /// Order: [pre-effects] -neg_fields field: (type) predicate [post-effects]
+    /// Order: field/type/predicate content, one effects group, then successors.
     fn format_match_content(&self, m: &Match<'_>) -> String {
         self.render.trace_match_content(m)
     }
@@ -371,11 +371,11 @@ impl<'s> PrintTracer<'s> {
         self.lines.push(format!("{prefix}{content}"));
     }
 
-    /// Format definition name (blue). User definitions get parentheses, preamble doesn't.
+    /// Format definition name (blue). User definitions get parentheses.
     fn format_def_ref(&self, name: &str) -> String {
         let c = self.colors;
         if name.starts_with('_') {
-            // Preamble/internal names: no parentheses
+            // Internal labels: no parentheses.
             format!("{}{}{}", c.blue, name, c.reset)
         } else {
             // User definitions: wrap in parentheses
