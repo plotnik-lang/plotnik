@@ -263,6 +263,15 @@ fn effect_word(kind: EffectKind) -> [u8; 2] {
     ((kind as u16) << EFFECT_PAYLOAD_BITS).to_le_bytes()
 }
 
+fn effect_payload(bytes: &[u8], slot: usize) -> u16 {
+    u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & EFFECT_PAYLOAD_MAX as u16
+}
+
+fn type_member_type_id_off(bytes: &[u8], member: u16) -> usize {
+    let m = Module::load(bytes).expect("module loads before tampering");
+    m.offsets().type_members as usize + member as usize * 4 + 2
+}
+
 /// Byte offset of the first non-empty inter-section alignment gap — the padding
 /// the emitter zero-fills before each aligned section (or the final tail).
 fn first_section_gap(bytes: &[u8]) -> usize {
@@ -639,6 +648,70 @@ fn forged_scalar_capture_set_to_push_is_rejected() {
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged scalar Set->Push must be rejected");
+    assert!(
+        matches!(err, ModuleError::EffectStackImbalance(_)),
+        "expected EffectStackImbalance, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_set_without_producer_is_rejected() {
+    // Replace the producer in `[Node Set]` with a frame opener. The following
+    // `Set` has a valid Struct target, but no pending value to consume.
+    let mut bytes = emit_bytes(r#"Q = (identifier) @id"#);
+    let slot = first_effect_op(&bytes, |op| op == EffectKind::Node as u16);
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::StructOpen));
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged producerless Set must be rejected");
+    assert!(
+        matches!(err, ModuleError::EffectStackImbalance(_)),
+        "expected EffectStackImbalance, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_void_enum_variant_with_data_is_rejected() {
+    // The enum branch emits direct fields for a structured variant. Lie that the
+    // variant is tag-only (`Void`): `EnumClose` must reject the data-bearing
+    // payload instead of letting materialization silently drop or mis-shape it.
+    let mut bytes = emit_bytes(r#"Q = [A: (identifier) @a B: (number)]"#);
+    let enum_open = first_effect_op(&bytes, |op| op == EffectKind::EnumOpen as u16);
+    let variant_member = effect_payload(&bytes, enum_open);
+    let type_id_off = type_member_type_id_off(&bytes, variant_member);
+
+    bytes[type_id_off..type_id_off + 2].copy_from_slice(&0u16.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged void enum data must be rejected");
+    assert!(
+        matches!(err, ModuleError::EffectStackImbalance(_)),
+        "expected EffectStackImbalance, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_data_enum_variant_without_data_is_rejected() {
+    // A tag-only branch emits `EnumOpen`/`EnumClose` and has no payload effects.
+    // Lie that the variant is non-void by pointing it at the enum type itself.
+    let mut bytes = emit_bytes(r#"Q = [A: (identifier)]"#);
+    let type_count = Module::load(&bytes)
+        .expect("module loads before tampering")
+        .header()
+        .type_defs_count;
+    assert!(
+        type_count > 1,
+        "query must emit a non-void type to point at"
+    );
+
+    let enum_open = first_effect_op(&bytes, |op| op == EffectKind::EnumOpen as u16);
+    let variant_member = effect_payload(&bytes, enum_open);
+    let type_id_off = type_member_type_id_off(&bytes, variant_member);
+
+    bytes[type_id_off..type_id_off + 2].copy_from_slice(&1u16.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged missing enum data must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
