@@ -95,16 +95,6 @@ impl<'t> CursorWrapper<'t> {
     }
 
     #[inline]
-    pub fn depth(&self) -> u32 {
-        self.cursor.depth()
-    }
-
-    #[inline]
-    pub fn goto_parent(&mut self) -> bool {
-        self.cursor.goto_parent()
-    }
-
-    #[inline]
     fn node_class(node: &Node<'_>) -> NodeClass {
         NodeClass {
             anonymous: !node.is_named(),

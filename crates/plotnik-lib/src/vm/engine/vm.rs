@@ -486,12 +486,10 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    /// Push a frame for `target` (returning to `next`) and jump in. Tree depth
-    /// is saved AFTER navigation; on Return the cursor ascends back to it.
+    /// Push a frame for `target` (returning to `next`) and jump in.
     fn enter_callee<T: Tracer>(&mut self, target: u16, next: u16, tracer: &mut T) {
-        let saved_depth = self.cursor.depth();
         tracer.trace_call(target);
-        self.frames.push(next, saved_depth);
+        self.frames.push(next);
         self.recursion_depth += 1;
         debug_assert_eq!(
             self.recursion_depth,
@@ -510,10 +508,8 @@ impl<'t> VM<'t> {
     /// Trampoline is like Call, but the target comes from VM context (`trampoline_target`)
     /// rather than being encoded in the instruction. Used for universal entry preamble.
     fn exec_trampoline<T: Tracer>(&mut self, t: Trampoline, tracer: &mut T) -> Result<(), Signal> {
-        // Trampoline doesn't navigate - it's always at root, cursor stays at root
-        let saved_depth = self.cursor.depth();
         tracer.trace_call(self.trampoline_target);
-        self.frames.push(u16::from(t.next), saved_depth);
+        self.frames.push(u16::from(t.next));
         self.recursion_depth += 1;
         debug_assert_eq!(
             self.recursion_depth,
@@ -583,7 +579,7 @@ impl<'t> VM<'t> {
             return Err(ControlFlow::Accept.into());
         }
 
-        let (return_addr, saved_depth) = self.frames.pop();
+        let return_addr = self.frames.pop();
         self.recursion_depth = self
             .recursion_depth
             .checked_sub(1)
@@ -597,23 +593,9 @@ impl<'t> VM<'t> {
         // Prune frames (O(1) amortized)
         self.frames.prune(self.checkpoints.max_frame_idx());
 
-        // Re-point at the callee's match BEFORE going up so effects after a
-        // Call can capture it; `refresh` leaves a zero-width return empty (#383).
+        // Re-point at the callee's match so effects after a Call can capture it;
+        // `refresh` leaves a zero-width return empty (#383).
         self.matched_node.refresh(self.cursor.node());
-
-        // Go up to saved depth level. This preserves sibling advances
-        // (continue_search at same level) while restoring level when
-        // the callee descended into children.
-        while self.cursor.depth() > saved_depth {
-            if !self.cursor.goto_parent() {
-                break;
-            }
-        }
-        debug_assert_eq!(
-            self.cursor.depth(),
-            saved_depth,
-            "Return did not ascend to the caller's saved cursor depth"
-        );
 
         self.ip = return_addr;
         Ok(())

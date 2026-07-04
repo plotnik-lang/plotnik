@@ -483,7 +483,7 @@ fn forged_out_of_range_successor_is_rejected() {
 }
 
 #[test]
-fn forged_cursor_depth_imbalance_is_rejected() {
+fn forged_depth_imbalance_is_rejected() {
     let mut bytes = emit_bytes(r#"Q = (program)"#);
 
     let nav_off = first_match_nav(&bytes, |nav| nav == Nav::StayExact.to_byte());
