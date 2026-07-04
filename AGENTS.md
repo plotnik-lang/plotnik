@@ -1,384 +1,227 @@
-# Ethos
+# Plotnik
 
-- `AGENTS.md` is our constitution. When you notice systematic gaps (repeated retries, patterns discovered through trial-and-error), propose amendments at the end of the session.
-- Resilient parser with user-friendly error messages called "diagnostics" (see `diagnostics/`)
-- Stability via invariants: `panic!`/`assert!`/`.expect()` for simple cases, `invariants.rs` otherwise
+- Tree-sitter-based code query language:
+  - bytecode and VM
+  - compiler
+- Rust 2024
 
-# Invariant Discipline
+# Coding rules
 
-One rule, two sides of a trust boundary — where untrusted input becomes trusted state (the compiler admitting a query, the loader admitting bytecode):
+- Use early exit (`return`, `continue`, `break`) over deep nesting
+- Rust 2024 `let` chains: `if let Some(x) = a && let Some(y) = b { ... }`
+- Write comments like the reader is new to the codebase but familiar with the goal of the project
 
-- **Outside** (query source, external bytecode): never panic — answer with a diagnostic or a `Result` error.
-- **Inside** (after a successful parse or load): trust completely; state invariants loudly (`panic!`/`.expect()`/`invariants.rs`). A violation is _our_ bug.
+Lifetimes:
 
-Validate once, at the boundary. Two smells to fix on sight: a swallowed must-hold fact (`unwrap_or`, `.ok()`) → make it loud; a `panic!` on untrusted input → make it a clean error.
+| Lifetime | Meaning       |
+| -------- | ------------- |
+| `'q`     | query source  |
+| `'d`     | diagnostics   |
+| `'s`     | source code   |
+| `'t`     | parsed tree   |
+| `'a`     | anything else |
 
-# Documentation
+## Error handling
 
-[docs/README.md](docs/README.md) | [CLI Guide](docs/cli.md) | [Language Reference](docs/lang-reference.md) | [Type System](docs/type-system.md) | [Runtime Engine](docs/runtime-engine.md) | [Tree Navigation](docs/tree-navigation.md) | [Binary Format](docs/binary-format/01-overview.md)
+Two zones, one rule each:
 
-# Query Syntax Quick Reference
+- Outside (query text, source files, CLI args, bytecode files):
+  - never panic
+  - report through `Diagnostics` or `Result`
+- Inside (everything past validation, including subsystem boundaries):
+  - trust completely
+  - assert with: `.expect("why")`, `panic!`, `unreachable!`
+  - `.unwrap()` is denied (except tests)
+  - hedging with `unwrap_or` / `.ok()` is a smell:
+    - either assert, or move the check to the validation layer
 
-**Pattern.** A *pattern* is a query matcher over the target syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A node pattern `(kind)` matches a named node; a token pattern `"text"` or `_` matches an anonymous token (or any node); sequences, alternations, quantifiers, fields, and captures are all patterns.
+# Commands
 
-## Core Constructs
+| Command               | What it does                                          |
+| --------------------- | ----------------------------------------------------- |
+| `make check`          | `cargo check --workspace --all-targets`               |
+| `make clippy`         | clippy with `-D warnings`                             |
+| `make test`           | full test suite via `cargo nextest`                   |
+| `make shot`           | accept golden fixtures + insta snapshots, then re-run |
+| `make fmt`            | `cargo fmt` + prettier                                |
+| `make coverage-lines` | per-file missing lines for `plotnik-lib`              |
+
+Check your changes: `make test`
+Before commit: `make fmt`
+
+# Project structure
+
+```
+crates/
+  plotnik-cli/
+    src/cli/                   # clap defs, dispatch, shebang, limit flags
+    src/commands/              # one module per CLI subcommand
+    src/language_registry.rs   # define_langs! table, one entry per language
+    build.rs                   # embeds gzipped grammar.json per enabled lang feature
+  plotnik-lib/
+    src/bytecode/              # binary format, instruction set, module loading
+    src/compiler/
+      parse/                   # lexer, grammar, AST
+      analyze/                 # semantic analysis passes
+      lower/                   # Thompson NFA build + optimization passes
+      emit/                    # IR → binary module
+      query/                   # facade: Query, QueryBuilder, CheckedQuery, CompiledQuery
+      typegen/                 # bytecode → TypeScript .d.ts
+      diagnostics/             # user-facing error reporting
+    src/core/                  # grammar metadata, node-kind database, interner
+    src/vm/                    # runtime engine, backtracking, materialization
+    tests/                     # golden fixtures
+      mod.rs                   # test harness + docs
+      01-lexer/
+      02-parser/
+      03-analyze/
+      04-emit/
+      05-typegen/
+      06-vm/
+docs/                          # specs: language, type system, CLI, runtime, binary format
+```
+
+Pipeline:
+
+1. Parse: query text to AST
+2. Analyze: resolve names, infer types, check recursion
+3. Link (a grammar): bind node kinds and fields to the target grammar
+4. Lower: build and optimize the Thompson NFA
+5. Emit: NFA to binary bytecode module
+
+# Query language
+
+Full spec: `docs/lang-reference.md`, `docs/type-system.md`. The essentials:
 
 | Syntax              | Meaning                            |
 | ------------------- | ---------------------------------- |
 | `(node_kind)`       | Named node                         |
 | `"text"` / `'text'` | Anonymous node (literal token)     |
-| `(_)`               | Any named node                     |
-| `_`                 | Any node                           |
+| `(_)` / `_`         | Any named node / any node          |
 | `@name`             | Capture (snake_case only)          |
 | `@x :: T`           | Type annotation (T is PascalCase)  |
 | `field: pattern`    | Field constraint                   |
 | `-field`            | Negated field (assert absent)      |
-| `?` `*` `+`         | Quantifiers (0-1, 0+, 1+)          |
-| `??` `*?` `+?`      | Non-greedy variants                |
-| `.`                 | Soft anchor (skips trivia)         |
-| `.!`                | Strict anchor (exact adjacency)    |
+| `?` `*` `+`         | Quantifiers (non-greedy: `??` etc) |
+| `.` / `.!`          | Soft / strict anchor               |
 | `{...}`             | Sequence (siblings in order)       |
-| `[...]`             | Alternation (first match wins)     |
+| `[...]`             | Union / enum (first match wins)    |
 | `Name = ...`        | Named definition (entrypoint)      |
-| `(Name)`            | Use named expression               |
+| `(Name)`            | Use named definition               |
 | `(node == "x")`     | String predicate (== != ^= $= \*=) |
 | `(node =~ /x/)`     | Regex predicate (=~ !~)            |
 
-## Data Model Rules
+Rules that trip everyone:
 
-- **Output model**: output exists exactly where output syntax is written — `@capture` (field), def name (type), branch label (variant, when consumed), `:: Name` (type name). No captures — no data, like regex.
-- Captures are flat by default: nesting in pattern ≠ nesting in output
-- `{...} @x` or `[...] @x` creates a nested scope
-- **References are opaque**: bare `(Foo)` matches structurally, no output; `(Foo) @x` → `x: Foo` (void def → `x: Node`); `(Foo)* @xs` → `xs: Foo[]`. Fields never leak through a ref boundary; there is no pure aliasing (`Foo = (Bar)` is void)
-- Scalar list (no internal captures): `(x)* @a` → `a: T[]`
-- Row list (with internal captures): `(x @y)* @rows` → `rows: { y: T }[]`
-- **Strict dimensionality**: `*`/`+` with internal captures requires row capture on the quantifier
-- **Single referent**: a capture on a void pattern that doesn't match exactly one node (`{(a) (b)} @x`, `{(a)+} @x`, `{(a)?} @x`, ref to such a def) is an error
-- **Quantifier-rooted defs collect**: the def name is a consuming position — `Ids = (identifier)*` → `Ids = Node[]`, `Rows = (Row)*` → `Rows = Row[]`, `First = (Row)?` → `First = Row | null`. The element must be nameable (node or ref); an anonymous row/enum element is an error (name it in its own def). As entrypoints these output top-level JSON arrays/null.
-- **Type names** are compile-time and path-derived (`{Parent}{PascalField}`); `:: Name` overrides and resets the chain; same name + same shape = one type, different shape = error; `Node` and def names reserved
-- `@_` consumes and discards: subtree matches structurally, inner captures inert, no warnings
-
-## Alternations
-
-An alternation `[...]` matches one of several branches:
-
-- **Union** — `[(identifier) @x (number) @y]` → `{ x?: Node, y?: Node }`. Branch captures merge into one struct of optional fields: the fields overlap, with no discriminant for which branch matched. A bare-ref branch is a structural alternative (contributes nothing).
-- **Enum** — `[A: (id) @x  B: (num) @y]` → `{ $tag: "A", $data: { x } } | { $tag: "B", $data: { y } }`. Each branch label becomes a discriminant tag, i.e. a Rust-style `enum`.
-
-**Tagging on consumption**: labels take effect when the alternation's value is consumed — captured (`[...] @x`), row-captured (`[...]* @xs`), or a def body (`Expr = [...]`). Unconsumed labeled alternations degrade to a plain union + `UnusedBranchLabels` warning. A captureless branch (incl. bare ref or `@_`) is a tag-only variant (no `$data`); tags-only enums are legitimate.
-
-Mixing enum and union branches in one `[...]` is an error.
-
-**Zero-width is last resort**: a repeat iteration never matches zero-width (`*` collects only consuming matches; `+` needs one real match even over a nullable element). An alternation branch that can match zero nodes succeeds zero-width only after every consuming alternative fails — it then needs no candidate node (matches in an empty parent) and defaults all output (union: fields null/`[]`; enum: tag with defaulted payload).
-
-Note the output shapes invert the usual TypeScript intuition: an **enum** compiles to a TS *discriminated union* (`A | B`), while a **union** compiles to a TS *struct* (`{ x?, y? }`). Enums render as one multi-line union literal; variant payloads are anonymous (inlined, never named declarations).
-
-## Common Patterns
+- There is no implicit "search anywhere" (matching starts at the tree root):
+  - `Q = (identifier) @id` matches nothing
+  - `Q = (program (lexical_declaration (variable_declarator name: (identifier) @id)))` could match.
+- Sequences are `{(a) (b)}`, not tree-sitter's `((a) (b))`.
+- Predicates: `(id == "foo") @x`, not tree-sitter's `(#eq? @x "foo")`
+- Capture names are snake_case: `@function_name`, not `@function.name`.
+- Output exists only where output syntax is written:
+  - `@capture` becomes a field
+  - `Foo = (...)` becomes a type
+  - `[Foo: (...) Bar: (...)]` creates `Foo` and `Bar` enum variants
+  - `@foo :: Name` helps to specify type name and avoid synthetic name
+  - Think regex: no capture — no data
+  - Refs are opaque:
+    - `(Foo)` match structure only (no data from `Foo`)
+    - `(Foo) @x` match + capture `x: Foo`
+- Strict dimensionality — a repeated capture must be collected into a list:
+  - a capture under a `*`/`+`/`?` repeats once per match, so a capture on the repeat gathers them (or `@_` discards)
+  - No inner captures: `(id)* @ids` produces `ids: Node[]` (scalar list)
+  - Inner captures: `(f (id) @name)* @funcs` produces `funcs: { name }[]` (row list)
+  - Inner captures with nothing collecting them: error
+- Unions and enums (`[...]`) — one branch matches, first wins:
+  - Union merges captures from each branch into a struct
+    - field is nullable unless every branch captures it
+    - merging is 1-level deep
+    - example: `[(id) @a (num) @b]` produces `{ a: Node | null; b: Node | null }`
+  - Enum produces discriminated union with `$tag` and `$data` fields:
+    - example: `[Str: (s) @s Num: (n) @n]` produces `{ $tag: "Str"; $data: { s } } | { $tag: "Num"; $data: { n } }`
+    - an enum branch with no capture is tag-only: `{ $tag: "..." }`, no `$data`
+  - a `[...]` can't be part union, part enum
+  - the right framing: enums are unions with extra precision, unions are loose enums
 
 ```
-; Match with field
-(binary_expression left: (identifier) @left)
+// field constraint
+(binary_expression
+  left: (identifier) @left
+)
 
-; Sequence of siblings
-{(comment) (function_declaration) @fn}
+// sibling sequence
+{
+  (comment)
+  (function_declaration) @fn
+}
 
-; Optional child
+// optional
 (function (decorator)? @dec)
 
-; Recursion
-Nested = (call function: [(id) @name (Nested) @inner])
+// rows: funcs: { name }[]
+(func
+  (id) @name
+)* @funcs
+
+// recursive enum
+Expr = [
+  Lit: (num) @n
+  Rec: (Expr) @e
+]
 ```
 
-## Anchor Strictness
+# Running queries
 
-The `.` anchor is soft, `.!` is strict:
-
-| Pattern      | Behavior                                              |
-| ------------ | ----------------------------------------------------- |
-| `(a) . (b)`  | Skip extras + anonymous nodes; no named nodes between |
-| `"x" . (b)`  | Skip extras only; no anonymous/named nodes between    |
-| `(a) . "x"`  | Skip extras only; no anonymous/named nodes between    |
-| `(a) .! (b)` | Strict, nothing between                               |
-
-Rule: `.!` is exact. Soft `.` skips anonymous nodes only when both sides are named.
-
-**Placement**: Boundary anchors require parent node context:
-
-```
-(parent . (first))    ; ✓ valid
-(parent (last) .)     ; ✓ valid
-{(a) . (b)}           ; ✓ interior anchor OK
-{. (a)}               ; ✗ boundary without parent
-```
-
-## Anti-patterns
-
-```
-; WRONG: groups can't be field values
-(x field: {...})
-
-; WRONG: dot capture syntax
-@function.name  ; use @function_name
-
-; WRONG: tree-sitter predicate syntax
-(id) @x (#eq? @x "foo")  ; use (id == "foo") @x
-
-; WRONG: boundary anchors without parent node
-{. (a)}  ; use (parent {. (a)})
-
-; WRONG: anchors directly in alternations
-[(a) . (b)]  ; use [{(a) . (b)} (c)]
-```
-
-## Type System Rules
-
-**Strict dimensionality**: Quantifiers with internal captures require a row capture on the quantifier:
-
-```
-(func (id) @name)*              ; ERROR: no row capture
-(func (id) @name)* @funcs       ; OK: funcs: { name: Node }[]
-{(a) @a (b) @b}*                ; ERROR: no row capture
-{(a) @a (b) @b}* @rows          ; OK: rows: { a: Node, b: Node }[]
-(Item)* @items                  ; OK: items: Item[] (refs are opaque)
-(Item)*                         ; OK: structural, no output
-```
-
-Note: `{}` is for grouping siblings into a sequence, not for satisfying dimensionality.
-
-**Quantifier-rooted definitions**: the def name collects, but only nameable
-elements qualify:
-
-```
-Ids = (identifier)*             ; OK: Ids = Node[]
-Rows = (Row)*                   ; OK: Rows = Row[] (Row is its own def)
-Bad = (func (id) @name)*        ; ERROR: element row is unnamed — split it out
-Bad = [K: (a) @a V: (b) @b]*    ; ERROR: element enum is unnamed — split it out
-Loop = (Ids)*                   ; ERROR: Ids can match zero nodes, a repeat must consume
-```
-
-**Optional rows**: `?` follows the same rule — internal captures need a
-capture on the quantifier (`@_` to discard); the collected row is nullable:
-
-```
-{(a) @a (b) @b}?    ; ERROR: captures skip together, nothing collects them
-{(a) @a (b) @b}? @x ; OK: x: { a: Node, b: Node } | null (one nullable row)
-(el (a) @a)? @x     ; OK: x: { a: Node } | null (like (el (a) @a)* @xs rows)
-(a)? @x             ; OK: x: Node | null (capture on the quantifier itself)
-```
-
-A skip yields `x: null`, never `{ a: null, b: null }` — fields keep their
-true modality inside the row.
-
-**Recursion rules** — every cycle must both escape (a non-recursive branch) and consume (descend into a child each pass):
-
-```
-Loop = (Loop)                       ; ERROR: no escape path
-Expr = [Lit: (n) @n  Rec: (Expr)]   ; OK: Lit escapes (Rec is a tag-only variant)
-
-A = (foo (B))  B = (bar (A))        ; ERROR: descends but no branch terminates
-A = [X: (n) @n  Y: (B) @b]  B = (A) ; ERROR: escape exists, but cycle consumes no input
-```
-
-## ⚠️ Sequence Syntax (Tree-sitter vs Plotnik)
-
-Tree-sitter: `((a) (b))` — Plotnik: `{(a) (b)}`. The #1 syntax error.
-
-# Project Structure
-
-```
-crates/
-  plotnik-cli/         # CLI tool and language-feature registry
-    src/commands/      # Subcommands (run, check, ast, infer, dump, trace, lang)
-  plotnik-lib/         # Published library crate and internal implementation modules
-    src/
-      bytecode/        # Binary format definitions, instruction set, module loading
-      compiler/        # Private compilation pipeline
-        core/          # Inter-pass data types: AST, IR, source maps, type shapes
-        diagnostics/   # User-friendly error reporting
-        parse/         # Syntactic parsing (lexer, grammar, AST wrappers)
-        analyze/       # Semantic analysis (names, refs, recursion, shape, types, grammar)
-        lower/         # AST/type analysis → bytecode IR lowering passes
-        emit/          # Bytecode emission (IR → binary)
-        query/         # Query facade (Query, QueryBuilder, SourceMap)
-        typegen/       # Type declaration extraction (bytecode → .d.ts)
-      core/            # Grammar metadata, node kind database, interning, colors
-      vm/              # Runtime VM execution, backtracking, effects, materialization
-docs/
-  binary-format/       # Bytecode format specification
-  lang-reference.md    # Language specification
-```
-
-# CLI Reference
-
-Run: `cargo run -p plotnik -- <command>`
-
-| Command       | Purpose                                                    |
-| ------------- | ---------------------------------------------------------- |
-| `run`         | Execute query, output JSON (`exec` is a hidden alias)      |
-| `check`       | Validate query (`--json` for machine-readable diagnostics) |
-| `ast`         | Show AST of query and/or source                            |
-| `infer`       | Generate TypeScript types                                  |
-| `dump`        | Show compiled bytecode                                     |
-| `trace`       | Trace execution for debugging                              |
-| `lang list`   | List supported languages                                   |
-| `lang dump`   | Dump grammar for a language                                |
-| `completions` | Generate shell completions                                 |
-
-Exit codes are uniform: `0` yes/success, `1` domain "no" (run: no match;
-check: invalid), `2` couldn't answer (usage/IO/internal).
-
-`.ptk` files may declare their language on line 1 via shebang
-(`#!/usr/bin/env -S plotnik run -l typescript`); all commands read it, and
-explicit `-l` must agree with it. `plotnik query.ptk app.ts` (no subcommand)
-routes to `run`.
-
-## ast
-
-Show AST of query and/or source file.
-
-```sh
-cargo run -p plotnik -- ast query.ptk               # query AST
-cargo run -p plotnik -- ast app.ts                  # source AST (tree-sitter)
-cargo run -p plotnik -- ast query.ptk app.ts        # both ASTs
-cargo run -p plotnik -- ast query.ptk app.ts --raw  # CST / include anonymous nodes
-```
-
-## check
-
-Validate a query (silent on success, like `cargo check`).
-
-```sh
-cargo run -p plotnik -- check query.ptk -l typescript
-cargo run -p plotnik -- check queries.ts/ -l typescript   # workspace directory
-cargo run -p plotnik -- check -q '(identifier) @id' -l javascript
-```
-
-## dump
-
-Show compiled bytecode.
-
-```sh
-cargo run -p plotnik -- dump query.ptk -l typescript
-cargo run -p plotnik -- dump -q '(identifier) @id' -l typescript
-```
-
-## infer
-
-Generate TypeScript type definitions from a query.
-
-```sh
-cargo run -p plotnik -- infer query.ptk -l javascript
-cargo run -p plotnik -- infer queries.ts/ -l typescript -o types.d.ts
-cargo run -p plotnik -- infer -q '(identifier) @id' -l typescript
-```
-
-Options: `--verbose-nodes`, `--no-node-type`, `--no-export`, `-o <FILE>`
-
-## run
-
-Execute a query against source code and output JSON.
-
-**Usage variants:**
-
-```
-run <QUERY> <SOURCE>           # two positional files
-run -q <TEXT> <SOURCE>         # inline query + source file
-run -q <TEXT> -s <TEXT> -l <LANG>  # all inline
-```
+`cargo run -p plotnik -- <command>`. Full reference: `docs/cli.md`.
 
 ```sh
 cargo run -p plotnik -- run query.ptk app.ts
-cargo run -p plotnik -- run -q 'Q = (identifier) @id' app.ts
-cargo run -p plotnik -- run -q 'Q = (identifier) @id' -s 'let x' -l javascript
+cargo run -p plotnik -- run -q 'Q = (program (expression_statement (identifier) @id))' -s 'x' -l javascript
+cargo run -p plotnik -- check query.ptk -l typescript   # silent on success; --json, --strict
+cargo run -p plotnik -- infer query.ptk -l typescript   # emit TypeScript types
+cargo run -p plotnik -- ast app.ts                      # tree-sitter AST of source
+cargo run -p plotnik -- trace query.ptk app.ts -vv      # step-by-step execution
+cargo run -p plotnik -- lang list                       # languages + aliases
 ```
 
-Options: `--compact`, `--entry <NAME>`, `--max-steps <auto|unbounded|N>`,
-`--max-memory <auto|unbounded|SIZE>`, `--limits <auto|unbounded>`
+- Exit codes:
+  - `0`: yes/success
+  - `1`: domain "no" (no match or invalid query)
+  - `2`: couldn't answer (usage/IO/internal)
 
-## trace
+# Testing
 
-Trace query execution for debugging.
+The golden fixtures have priority over Rust-based tests.
 
-**Usage variants:**
+- Run `make shot` to (re)write generated sections
+- Name new fixture folders after existing ones in sibling stages
+- Rust `*_tests.rs` are unit-logic only
+  - `foo.rs` gets a sibling `foo_tests.rs`, declared as `#[cfg(test)] mod foo_tests;`
+  - AAA sections separated by blank lines (unless all 3 are one-liners)
+  - single-line input literal, multi-line uses `indoc!`
+- Don't generate data for `insta` snapshots and golden fixtures by hand:
+  - use `@""` for `insta` placeholders, then `make shot`
+  - fill inputs only for golden snapshots
 
-```
-trace <QUERY> <SOURCE>           # two positional files
-trace -q <TEXT> <SOURCE>         # inline query + source file
-trace -q <TEXT> -s <TEXT> -l <LANG>  # all inline
-```
+# Pull requests
 
-```sh
-cargo run -p plotnik -- trace query.ptk app.ts
-cargo run -p plotnik -- trace -q 'Q = (identifier) @id' app.ts
-cargo run -p plotnik -- trace query.ptk app.ts --no-result -vv
-```
+Use conventional commits for PR titles and commit messages.
 
-Options: `-v` (verbose), `-vv` (very verbose), `--no-result`,
-`--max-steps <auto|unbounded|N>`, `--max-memory <auto|unbounded|SIZE>`,
-`--limits <auto|unbounded>`
-
-## lang
-
-Language information and grammar tools.
-
-```sh
-cargo run -p plotnik -- lang list                  # List languages with aliases
-cargo run -p plotnik -- lang dump json             # Dump JSON grammar
-cargo run -p plotnik -- lang dump typescript       # Dump TypeScript grammar
-```
-
-# Coding Rules
-
-- Early exit (`return`, `continue`, `break`) over deep nesting
-- Comments for seniors, not juniors
-- Rust 2024 `let` chains: `if let Some(x) = a && let Some(y) = b { ... }`
-- Never claim "all tests pass" — CI verifies this
-
-## Lifetime Conventions
-
-| Lifetime | Meaning                                     |
-| -------- | ------------------------------------------- |
-| `'q`     | Query source string (`.ptk` file content)   |
-| `'d`     | Diagnostics reference                       |
-| `'s`     | Source code string (tree-sitter input)      |
-| `'t`     | Parsed tree-sitter tree                     |
-| `'a`     | Any other (generic borrows, bytecode views) |
-
-# Testing Rules
-
-Behavioral tests are golden fixtures under `crates/plotnik-lib/tests/0N-stage/`, not
-Rust: author a query (+ `==== input ====` source for `06-vm`), then `make shot` fills the
-generated sections. Rust `*_tests.rs` are unit-logic only — `foo.rs` → `foo_tests.rs`
-(`#[cfg(test)] mod foo_tests;`).
-
-```sh
-make test  # Run tests
-make shot  # Accept fixtures + insta snapshots
-```
-
-- AAA sections separated by blank lines (unless ≤3 lines)
-- Single-line input: literal; Multi-line: `indoc!`
-- Never write snapshots manually — use `@""` then `cargo insta accept`
-
-Coverage: `make coverage-lines | grep recursion`
-
-`invariants.rs`: `ensure_*()` functions for unreachable code exclusion from coverage.
-
-# PR Body Format
+Body format:
 
 ```
 ## Summary
+
 <1-3 bullets: what this PR does>
 
 ## Why
+
 <1-2 sentences: motivation, problem solved, or link to relevant docs>
 
 ## Notes (optional)
-<Tradeoffs, alternatives considered, gotchas for future reference>
+
+<Tradeoffs, alternatives considered, gotchas>
 ```
 
-- **Summary**: Quick scan; becomes squash-merge commit body
-- **Why**: Captures context that code/diff doesn't convey
-- **Notes**: Escape hatch for edge cases
-
-**Omit**: How (diff shows this), Testing (CI covers it).
+Summary becomes the squash-merge commit body. Omit "How" (the diff shows it) and "Testing" (CI covers it).
