@@ -372,7 +372,9 @@ impl DiagnosticKind {
             Self::MultiElementScalarCapture => "{}".to_string(),
             Self::UnnamedQuantifiedElement => "{}".to_string(),
             Self::ZeroWidthRepeat => "{}".to_string(),
-            Self::TypeNameConflict => "type name `{}` is already used for a different type".to_string(),
+            Self::TypeNameConflict => {
+                "type name `{}` is already used for a different type".to_string()
+            }
             Self::RedundantTypeAnnotation => "this type annotation {}".to_string(),
             Self::DuplicateCaptureInScope => {
                 "capture `@{}` already defined in this scope".to_string()

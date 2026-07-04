@@ -69,5 +69,3 @@ pub fn suggest_language(input: &str) -> Option<String> {
     let names: Vec<&str> = langs.iter().map(|lang| lang.name()).collect();
     find_similar(&input_lower, &names).map(str::to_string)
 }
-
-

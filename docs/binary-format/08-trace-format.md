@@ -355,25 +355,25 @@ Hidden:
 
 ## Sub-Line Reference
 
-| Symbol  | Format              | Example                      |
-| ------- | ------------------- | ---------------------------- |
-| (blank) | `     kind`         | `     identifier`            |
-| `└‣─`   | `└‣─  kind`         | `└‣─  identifier`            |
-| `└─!`   | `└─!  kind text`    | `└─!  identifier foo`        |
-| `─‣─`   | `─‣─  kind`         | `─‣─  return_statement`      |
-| `─‣┘`   | `─‣┘  kind`         | `─‣┘  assignment_expression` |
-| `  ●  ` | `●   kind`          | `●   identifier`             |
-| `  ●  ` | `●   kind text`     | `●   identifier foo`         |
-| `  ●  ` | `●   field:`        | `●   left:`                  |
-| `  ○  ` | `○   kind`          | `○   string`                 |
-| `  ⬥  ` | `⬥   Effect`        | `⬥   Node`                   |
-| `  ⬥  ` | `⬥   Set "field"`   | `⬥   Set "target"`           |
-| `  ⬥  ` | `⬥   EnumOpen "var"` | `⬥   EnumOpen "Literal"`    |
-| `  ⬥  ` | `⬥   SuppressBegin` | `⬥   SuppressBegin`          |
-| `  ⬥  ` | `⬥   SuppressEnd`   | `⬥   SuppressEnd`            |
-| `  ⬦  ` | `⬦   Effect`        | `⬦   Node` (suppressed)      |
-| `  ⬦  ` | `⬦   SuppressBegin` | `⬦   SuppressBegin` (nested) |
-| `  ▶  ` | `▶   (Name)`        | `▶   (Expression)`           |
+| Symbol  | Format               | Example                      |
+| ------- | -------------------- | ---------------------------- |
+| (blank) | `     kind`          | `     identifier`            |
+| `└‣─`   | `└‣─  kind`          | `└‣─  identifier`            |
+| `└─!`   | `└─!  kind text`     | `└─!  identifier foo`        |
+| `─‣─`   | `─‣─  kind`          | `─‣─  return_statement`      |
+| `─‣┘`   | `─‣┘  kind`          | `─‣┘  assignment_expression` |
+| `  ●  ` | `●   kind`           | `●   identifier`             |
+| `  ●  ` | `●   kind text`      | `●   identifier foo`         |
+| `  ●  ` | `●   field:`         | `●   left:`                  |
+| `  ○  ` | `○   kind`           | `○   string`                 |
+| `  ⬥  ` | `⬥   Effect`         | `⬥   Node`                   |
+| `  ⬥  ` | `⬥   Set "field"`    | `⬥   Set "target"`           |
+| `  ⬥  ` | `⬥   EnumOpen "var"` | `⬥   EnumOpen "Literal"`     |
+| `  ⬥  ` | `⬥   SuppressBegin`  | `⬥   SuppressBegin`          |
+| `  ⬥  ` | `⬥   SuppressEnd`    | `⬥   SuppressEnd`            |
+| `  ⬦  ` | `⬦   Effect`         | `⬦   Node` (suppressed)      |
+| `  ⬦  ` | `⬦   SuppressBegin`  | `⬦   SuppressBegin` (nested) |
+| `  ▶  ` | `▶   (Name)`         | `▶   (Expression)`           |
 
 ### Backtrack (Instruction-Level)
 
@@ -400,20 +400,20 @@ For the complete table of connector symbols, see [07-dump-format.md](07-dump-for
 
 ## Effects
 
-| Effect              | Description                    |
-| ------------------- | ------------------------------ |
-| Node                | Capture matched node           |
-| Set "field"         | Assign to struct field         |
-| EnumOpen "variant"  | Start enum variant             |
-| EnumClose           | End enum variant               |
-| ArrayOpen           | Start array                    |
-| Push                | Push to array                  |
-| ArrayClose          | End array                      |
-| StructOpen          | Start struct                   |
-| StructClose         | End struct                     |
-| Null                | Null value                     |
-| SuppressBegin       | Enter suppression scope (`@_`) |
-| SuppressEnd         | Exit suppression scope         |
+| Effect             | Description                    |
+| ------------------ | ------------------------------ |
+| Node               | Capture matched node           |
+| Set "field"        | Assign to struct field         |
+| EnumOpen "variant" | Start enum variant             |
+| EnumClose          | End enum variant               |
+| ArrayOpen          | Start array                    |
+| Push               | Push to array                  |
+| ArrayClose         | End array                      |
+| StructOpen         | Start struct                   |
+| StructClose        | End struct                     |
+| Null               | Null value                     |
+| SuppressBegin      | Enter suppression scope (`@_`) |
+| SuppressEnd        | Exit suppression scope         |
 
 ## Command Options
 

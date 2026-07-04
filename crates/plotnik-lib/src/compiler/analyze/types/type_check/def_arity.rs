@@ -71,11 +71,9 @@ fn pattern_arity(
                 Arity::One
             }
         }
-        Pattern::CapturedPattern(c) => c
-            .inner()
-            .map_or(Arity::One, |inner| {
-                pattern_arity(&inner, arities, deps, interner)
-            }),
+        Pattern::CapturedPattern(c) => c.inner().map_or(Arity::One, |inner| {
+            pattern_arity(&inner, arities, deps, interner)
+        }),
         Pattern::SeqPattern(s) => {
             let mut children = s.children();
             let Some(first) = children.next() else {

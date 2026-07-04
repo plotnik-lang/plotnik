@@ -187,18 +187,18 @@ Effects in `[pre]` execute before match attempt; effects in `[post]` execute aft
 
 ## Effects
 
-| Effect         | Description            |
-| -------------- | ---------------------- |
-| StructOpen     | Start struct           |
-| StructClose    | End struct             |
-| ArrayOpen      | Start array            |
-| ArrayClose     | End array              |
-| Push           | Push to array          |
-| EnumOpen(Mxx)  | Start enum variant Mxx |
-| EnumClose      | End enum variant       |
-| Node           | Capture matched node   |
-| Set(Mxx)       | Set field/member Mxx   |
-| Null           | Null value             |
+| Effect        | Description            |
+| ------------- | ---------------------- |
+| StructOpen    | Start struct           |
+| StructClose   | End struct             |
+| ArrayOpen     | Start array            |
+| ArrayClose    | End array              |
+| Push          | Push to array          |
+| EnumOpen(Mxx) | Start enum variant Mxx |
+| EnumClose     | End enum variant       |
+| Node          | Capture matched node   |
+| Set(Mxx)      | Set field/member Mxx   |
+| Null          | Null value             |
 
 ## Index Prefixes
 

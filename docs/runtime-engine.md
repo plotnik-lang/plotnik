@@ -169,15 +169,15 @@ struct EffectLog<'t>(Vec<RuntimeEffect<'t>>);
 
 Lifetime `'t` denotes the parsed tree-sitter tree (per project conventions).
 
-| Effect                  | Action                                    |
-| ----------------------- | ----------------------------------------- |
-| Node(n)                 | Capture node `n`                          |
-| StructOpen/StructClose  | Struct boundaries                         |
-| Set(idx)                | Assign to field at member index           |
-| ArrayOpen/ArrayClose    | Array boundaries                          |
-| Push                    | Append to array                           |
-| EnumOpen/EnumClose      | Enum boundaries (variant at index)        |
-| Null                    | Null placeholder (optional/alternation)   |
+| Effect                 | Action                                  |
+| ---------------------- | --------------------------------------- |
+| Node(n)                | Capture node `n`                        |
+| StructOpen/StructClose | Struct boundaries                       |
+| Set(idx)               | Assign to field at member index         |
+| ArrayOpen/ArrayClose   | Array boundaries                        |
+| Push                   | Append to array                         |
+| EnumOpen/EnumClose     | Enum boundaries (variant at index)      |
+| Null                   | Null placeholder (optional/alternation) |
 
 The `Node` variant carries the actual `tree_sitter::Node` so the materializer has direct access without needing a separate node buffer. This single-stream design allows natural iteration: `for effect in log.0 { match effect { ... } }`.
 
@@ -196,9 +196,9 @@ Materializer consumes `EffectLog` to build output. Stream is purely structural; 
 A run is bounded by two orthogonal resources, each a `Limit` (`Auto`, `Of(n)`,
 or `Unbounded`):
 
-| Resource | `Auto` default            | Bounds                                            |
-| -------- | ------------------------- | ------------------------------------------------- |
-| Steps    | `1M + 1024 · node_count`  | total work (instruction dispatches)               |
+| Resource | `Auto` default              | Bounds                                               |
+| -------- | --------------------------- | ---------------------------------------------------- |
+| Steps    | `1M + 1024 · node_count`    | total work (instruction dispatches)                  |
 | Memory   | `64 MiB + 256 · node_count` | live runtime heap (frame, checkpoint, effect arenas) |
 
 Both `Auto` ceilings scale linearly with the source's node count, so a

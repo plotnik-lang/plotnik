@@ -2,7 +2,7 @@
 
 Plotnik is a pattern-matching language for tree-sitter syntax trees. It extends [tree-sitter's query syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with named expressions, recursion, and static type inference.
 
-**Pattern.** A *pattern* is a query matcher over the target syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A node pattern `(kind)` matches a named node; a token pattern `"text"` or `_` matches an anonymous token (or any node); sequences, alternations, quantifiers, fields, and captures are all patterns.
+**Pattern.** A _pattern_ is a query matcher over the target syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A node pattern `(kind)` matches a named node; a token pattern `"text"` or `_` matches an anonymous token (or any node); sequences, alternations, quantifiers, fields, and captures are all patterns.
 
 Tree-sitter predicates (`#eq?`, `#match?`) and directives (`#set!`) are not supported. Plotnik has its own inline predicate syntax (see [Predicates](#predicates)).
 
@@ -267,8 +267,8 @@ key), and a missing list is `[]` (never `null`). The output shape is stable.
 
 Node arrays work when the quantified pattern has **no internal captures**. For patterns with internal captures, use struct arrays:
 
-| Pattern         | Output Type       | Meaning                                 |
-| --------------- | ----------------- | --------------------------------------- |
+| Pattern         | Output Type       | Meaning              |
+| --------------- | ----------------- | -------------------- |
 | `{...}* @items` | `items: T[]`      | zero or more structs |
 | `{...}+ @items` | `items: [T, ...]` | one or more structs  |
 | `{...}? @item`  | `item: T \| null` | nullable struct      |
@@ -341,18 +341,18 @@ Rules:
 
 ### Summary
 
-| Pattern                  | Output                                |
-| ------------------------ | ------------------------------------- |
-| `@name`                  | Field in current scope                |
-| `(x)? @a`                | Optional field                        |
-| `(x)* @a`                | Node array (no internal captures)     |
-| `{...}* @items`          | Struct array (with internal captures) |
-| `{...} @x` / `[...] @x`  | Nested object (new scope)             |
-| `(Def)`                  | Structural match, no output           |
-| `(Def) @x`               | The definition's type                 |
-| `(Def)* @xs`             | Array of the definition's type        |
-| `[...] @_`               | Match and discard                     |
-| `@x :: T`                | Custom type name                      |
+| Pattern                 | Output                                |
+| ----------------------- | ------------------------------------- |
+| `@name`                 | Field in current scope                |
+| `(x)? @a`               | Optional field                        |
+| `(x)* @a`               | Node array (no internal captures)     |
+| `{...}* @items`         | Struct array (with internal captures) |
+| `{...} @x` / `[...] @x` | Nested object (new scope)             |
+| `(Def)`                 | Structural match, no output           |
+| `(Def) @x`              | The definition's type                 |
+| `(Def)* @xs`            | Array of the definition's type        |
+| `[...] @_`              | Match and discard                     |
+| `@x :: T`               | Custom type name                      |
 
 ---
 

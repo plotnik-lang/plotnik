@@ -55,12 +55,16 @@ impl InferVisitor<'_, '_> {
         let op = self.quantifier_operator(quant);
         let (detail, hint) = if op.starts_with('?') {
             (
-                format!("this `{op}` group doesn't match exactly one node, so there is no single node to bind"),
+                format!(
+                    "this `{op}` group doesn't match exactly one node, so there is no single node to bind"
+                ),
                 "capture individual nodes inside the group: `{(a) @a (b) @b}? @x`".to_string(),
             )
         } else {
             (
-                format!("one repeat of this `{op}` group doesn't match exactly one node, so there is no single node to bind per element"),
+                format!(
+                    "one repeat of this `{op}` group doesn't match exactly one node, so there is no single node to bind per element"
+                ),
                 format!("add internal captures: `{{(a) @a (b) @b}}{op} @items`"),
             )
         };
@@ -103,7 +107,10 @@ impl InferVisitor<'_, '_> {
 
         let related = self.referenced_definition_range(inner);
         let mut builder = self
-            .report(DiagnosticKind::MultiElementScalarCapture, inner.text_range())
+            .report(
+                DiagnosticKind::MultiElementScalarCapture,
+                inner.text_range(),
+            )
             .detail(detail)
             .hint(hint);
         if let Some((src, range)) = related {

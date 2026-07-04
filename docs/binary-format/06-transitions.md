@@ -357,9 +357,9 @@ This allows a single compiled preamble to dispatch to any entrypoint without rec
 2. Execute `pre_effects`.
 3. Execute `post_effects`.
 4. Continuation:
-    - `succ_count == 0` → accept.
-    - `succ_count == 1` → `ip = successors[0]`.
-    - `succ_count >= 2` → push checkpoints for `successors[1..n]`, execute `successors[0]`.
+   - `succ_count == 0` → accept.
+   - `succ_count == 1` → `ip = successors[0]`.
+   - `succ_count >= 2` → push checkpoints for `successors[1..n]`, execute `successors[0]`.
 
 ### 5.3. Backtracking
 

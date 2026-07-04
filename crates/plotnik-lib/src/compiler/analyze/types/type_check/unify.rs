@@ -178,8 +178,10 @@ fn unify_type_ids(
             element: eb,
             non_empty: nb,
         }),
-    ) = (ctx.in_progress().type_shape(a), ctx.in_progress().type_shape(b))
-        && na != nb
+    ) = (
+        ctx.in_progress().type_shape(a),
+        ctx.in_progress().type_shape(b),
+    ) && na != nb
         && ctx.types_structurally_equal(ea, eb)
     {
         return Ok(if na { b } else { a });

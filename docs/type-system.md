@@ -9,16 +9,16 @@ the JSON materializer are pure renderers of that information.
 **Output exists exactly where output syntax is written.** Four constructs
 produce output, and nothing else does:
 
-| Syntax        | Output                                  |
-| ------------- | --------------------------------------- |
-| `@name`       | A field in the enclosing scope          |
-| `Def = ...`   | A named type (the definition's result)  |
+| Syntax        | Output                                       |
+| ------------- | -------------------------------------------- |
+| `@name`       | A field in the enclosing scope               |
+| `Def = ...`   | A named type (the definition's result)       |
 | `Label:`      | An enum variant (when the value is consumed) |
-| `:: TypeName` | A name for the type at that position    |
+| `:: TypeName` | A name for the type at that position         |
 
 Everything else — node patterns, sequences, references, quantifiers, anchors,
-predicates — is structural: it constrains *whether* the query matches, not
-*what* it returns. A query with no captures is like a regex with no capture
+predicates — is structural: it constrains _whether_ the query matches, not
+_what_ it returns. A query with no captures is like a regex with no capture
 groups: it still answers "did it match", and nothing more.
 
 ## Definitions Are Types
@@ -145,7 +145,7 @@ Boundaries (a new scope starts):
 → { info: { s: Node } }           ; @info creates a nested scope
 ```
 
-A captured sequence *without* internal captures is only meaningful when it
+A captured sequence _without_ internal captures is only meaningful when it
 matches exactly one node — the capture takes that node (`{(a)} @x` ≡
 `(a) @x`). See the multi-node rule below.
 
@@ -187,7 +187,7 @@ group, capture the quantifier directly (`(a)+ @xs` → a list), or capture
 nothing.
 
 References are opaque, so quantifying one is dimensionally simple — the
-definition's *type* is the element, no matter how many captures it contains:
+definition's _type_ is the element, no matter how many captures it contains:
 
 ```
 Item = (pair key: (_) @k value: (_) @v)
@@ -247,7 +247,7 @@ row struct for captured groups, the enum for labeled alternations.
 ## Alternations
 
 `[...]` matches one of several branches. Its output form depends on labels
-*and consumption*.
+_and consumption_.
 
 ### Unions (no labels)
 
@@ -303,7 +303,7 @@ Variant payloads come from the branch's bubbling captures:
 - Captures → `$data` is an anonymous struct (always inlined, never a named
   standalone type).
 - No captures → the variant is tag-only and omits `$data` entirely. Tags-only
-  enums are legitimate — sometimes which branch matched *is* the data.
+  enums are legitimate — sometimes which branch matched _is_ the data.
 - A bare reference (or `@_`) as branch body → tag-only variant.
   `[Call: (Inner)]` tags the branch; `[Call: (Inner) @data]` also carries the
   value.
@@ -413,13 +413,19 @@ Foo = (function_declaration
 ```
 
 ```typescript
-export interface FooItemsInner { v: Node; }
-export interface FooItems { inner: FooItemsInner; }
-export interface Foo { items: FooItems; }
+export interface FooItemsInner {
+  v: Node;
+}
+export interface FooItems {
+  inner: FooItemsInner;
+}
+export interface Foo {
+  items: FooItems;
+}
 ```
 
 Enum variant payloads are anonymous (inlined), so they take no name; a
-composite *inside* a payload field is named
+composite _inside_ a payload field is named
 `{EnumName}{VerbatimLabel}{PascalCase(field)}`:
 
 ```
@@ -452,9 +458,15 @@ Foo = (function_declaration
 ```
 
 ```typescript
-export interface BarInner { v: Node; }
-export interface Bar { inner: BarInner; }
-export interface Foo { outer: Bar; }
+export interface BarInner {
+  v: Node;
+}
+export interface Bar {
+  inner: BarInner;
+}
+export interface Foo {
+  outer: Bar;
+}
 ```
 
 On a plain node capture, `:: Name` declares a named alias:

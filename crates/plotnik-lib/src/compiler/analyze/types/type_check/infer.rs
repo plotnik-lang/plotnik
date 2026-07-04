@@ -269,12 +269,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             return PatternShape::new(arity, flow);
         }
 
-        let output = self
-            .ctx
-            .type_ctx
-            .in_progress()
-            .def_output(def_id)
-            .expect("non-recursive reference target is inferred before the referrer (SCC order)");
+        let output =
+            self.ctx.type_ctx.in_progress().def_output(def_id).expect(
+                "non-recursive reference target is inferred before the referrer (SCC order)",
+            );
         let flow = if output == TYPE_VOID {
             PatternFlow::Void
         } else {
@@ -403,7 +401,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn check_duplicate_labels(&mut self, e: &Located<EnumPattern>) {
         let mut seen: BTreeMap<Symbol, ()> = BTreeMap::new();
         for branch in e.node().branches() {
-            let Some(label) = branch.label() else { continue };
+            let Some(label) = branch.label() else {
+                continue;
+            };
             let label_sym = self.ctx.interner.intern(label.text());
             if seen.insert(label_sym, ()).is_some() {
                 self.report_duplicate_enum_label(label.text_range(), label.text());
@@ -473,8 +473,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         if node.is_suppressive() {
             let info = match node.inner() {
                 None => return PatternShape::void(),
-                Some(Pattern::QuantifiedPattern(q)) => self
-                    .infer_quantified_pattern_in(&cap.wrap(q), QuantifiedContext::Suppressed),
+                Some(Pattern::QuantifiedPattern(q)) => {
+                    self.infer_quantified_pattern_in(&cap.wrap(q), QuantifiedContext::Suppressed)
+                }
                 Some(i) => self.infer_pattern_consumed(&cap.wrap(i)),
             };
             return PatternShape::new(info.arity, PatternFlow::Void);
@@ -493,10 +494,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         let Some(inner) = node.inner() else {
             // Capture without inner -> a Node field (annotation may alias it).
-            let type_id = annotation
-                .map_or(TYPE_NODE, |(name, range)| {
-                    self.annotate_named(TYPE_NODE, name, range)
-                });
+            let type_id = annotation.map_or(TYPE_NODE, |(name, range)| {
+                self.annotate_named(TYPE_NODE, name, range)
+            });
             let field = FieldInfo::required(type_id);
             return PatternShape::new(
                 Arity::One,
@@ -617,9 +617,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         annotation: Option<(Symbol, TextRange)>,
         is_optional: bool,
     ) -> FieldInfo {
-        let captured_type = annotation.map_or(base, |(name, range)| {
-            self.annotate_named(base, name, range)
-        });
+        let captured_type =
+            annotation.map_or(base, |(name, range)| self.annotate_named(base, name, range));
 
         FieldInfo::with_optional(captured_type, is_optional)
     }
@@ -922,10 +921,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             // A bare repeat is structural: nothing consumes its values, so a
             // void or suppressed-value inner produces nothing. A suppressed
             // repeat discards everything outright.
-            (
-                QuantifiedContext::Bare,
-                PatternFlow::Void | PatternFlow::Value(_),
-            )
+            (QuantifiedContext::Bare, PatternFlow::Void | PatternFlow::Value(_))
             | (QuantifiedContext::Suppressed, _) => PatternFlow::Void,
             // Bare with bubbling captures: `report_internal_capture_dimensionality`
             // already errored. Produce the plausible array type anyway so

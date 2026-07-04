@@ -137,8 +137,19 @@ impl Emitter<'_> {
         let data = self.inline_variant_payload(payload_type);
         format!(
             "{}{{{} $tag{}:{} {}\"{}\"{}{}; $data{}:{} {} {}}}{}",
-            c.dim, c.reset, c.dim, c.reset, c.green, name, c.reset, c.dim, c.dim, c.reset, data,
-            c.dim, c.reset
+            c.dim,
+            c.reset,
+            c.dim,
+            c.reset,
+            c.green,
+            name,
+            c.reset,
+            c.dim,
+            c.dim,
+            c.reset,
+            data,
+            c.dim,
+            c.reset
         )
     }
 

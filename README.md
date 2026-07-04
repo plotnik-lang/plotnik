@@ -12,7 +12,7 @@
   A type-safe query language for <a href="https://tree-sitter.github.io">Tree-sitter</a>.<br/>
   Powered by the <a href="https://github.com/bearcove/arborium">arborium</a> grammar collection.
 </p>
-  
+
 <br/>
 
 <p align="center">
