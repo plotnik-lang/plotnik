@@ -188,7 +188,16 @@ impl NfaBuilder<'_> {
             return true;
         };
 
-        if self.is_ref_returning_structured(&inner) {
+        self.element_needs_node(&inner)
+    }
+
+    /// Whether a quantifier element needs a `Node` effect to produce its value.
+    ///
+    /// A ref returning a structured type leaves its value pending via Call/Return;
+    /// a struct- or enum-shaped element leaves it pending via EndStruct/EndEnum.
+    /// Everything else (a plain node match) needs an explicit `Node`.
+    pub(super) fn element_needs_node(&self, element: &Pattern) -> bool {
+        if self.is_ref_returning_structured(element) {
             return false;
         }
 
@@ -198,7 +207,7 @@ impl NfaBuilder<'_> {
             .ctx
             .analysis
             .type_analysis
-            .expect_pattern_result(&inner);
+            .expect_pattern_result(element);
 
         !info
             .flow

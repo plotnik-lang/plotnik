@@ -896,8 +896,9 @@ impl NfaBuilder<'_> {
     ///
     /// The element's value must survive as the pending call value, so a
     /// reference element compiles with the keep-value ref lowering (a plain
-    /// `Set`-consumer chain doesn't exist at a definition's root); a node
-    /// element pends its matched node via a `Node` effect.
+    /// `Set`-consumer chain doesn't exist at a definition's root); a scalar
+    /// element pends its matched node via a `Node` effect, while structured
+    /// elements leave their own value pending.
     fn compile_valued_optional(
         &mut self,
         inner: &Pattern,
@@ -963,14 +964,20 @@ impl NfaBuilder<'_> {
                 })
             }
         } else {
+            let needs_node = self.element_needs_node(inner);
             self.emit_iteration(first_nav, match_target, |this, target| {
                 let ExitNav { exit, nav } = target;
+                let post = if needs_node {
+                    vec![EffectIR::node()]
+                } else {
+                    vec![]
+                };
                 this.compile_iteration_element(
                     &element,
                     PatternCtx {
                         exit,
                         nav: Some(nav),
-                        capture: CaptureEffects::new_post(vec![EffectIR::node()]),
+                        capture: CaptureEffects::new_post(post),
                     },
                 )
             })
