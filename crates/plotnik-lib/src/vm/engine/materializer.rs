@@ -1,6 +1,6 @@
 //! Materializes VM effect logs into output values.
 
-use crate::bytecode::{Entrypoint, Module, StringsView, TypeDefKind, TypeId, TypeKind, TypesView};
+use crate::bytecode::{Entrypoint, Module, StringsView, TypesView};
 use crate::core::Colors;
 
 use super::effect::RuntimeEffect;
@@ -26,25 +26,6 @@ impl<'a> ValueMaterializer<'a> {
         let member = self.types.get_member(idx as usize);
         self.strings.get(member.name_id).to_owned()
     }
-
-    fn accumulator_for_type(&self, type_id: TypeId) -> ValueAccumulator {
-        let def = self
-            .types
-            .get(type_id)
-            .expect("result type must exist in module type table");
-
-        match def.decode() {
-            TypeDefKind::Struct { member_count, .. } => {
-                ValueAccumulator::Struct(Vec::with_capacity(member_count as usize))
-            }
-            TypeDefKind::Enum { .. } => ValueAccumulator::Scalar(None),
-            TypeDefKind::Wrapper {
-                kind: TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore,
-                ..
-            } => ValueAccumulator::Array(vec![]),
-            _ => ValueAccumulator::Scalar(None),
-        }
-    }
 }
 
 /// Materialize the effect log into a [`Value`], then check it against the
@@ -62,14 +43,13 @@ pub fn materialize_verified<'t>(
     colors: Colors,
 ) -> Value {
     let materializer = ValueMaterializer::new(source, module);
-    let value = materializer.materialize(effects, entrypoint.result_type());
+    let value = materializer.materialize(effects);
     debug_verify_type(&value, entrypoint.result_type(), module, colors);
     value
 }
 
 /// Value accumulator for stack-based materialization.
 enum ValueAccumulator {
-    Scalar(Option<Value>),
     Array(Vec<Value>),
     Struct(Vec<(String, Value)>),
     Enum {
@@ -79,22 +59,8 @@ enum ValueAccumulator {
 }
 
 impl ValueAccumulator {
-    fn finish(self) -> Value {
-        match self {
-            ValueAccumulator::Scalar(Some(v)) => v,
-            ValueAccumulator::Scalar(None) => Value::Null,
-            ValueAccumulator::Array(arr) => Value::Array(arr),
-            ValueAccumulator::Struct(fields) => Value::Struct(fields),
-            ValueAccumulator::Enum { tag, fields } => Value::Enum {
-                tag,
-                data: Some(Box::new(Value::Struct(fields))),
-            },
-        }
-    }
-
     fn kind(&self) -> &'static str {
         match self {
-            ValueAccumulator::Scalar(_) => "Scalar",
             ValueAccumulator::Array(_) => "Array",
             ValueAccumulator::Struct(_) => "Struct",
             ValueAccumulator::Enum { .. } => "Enum",
@@ -103,11 +69,8 @@ impl ValueAccumulator {
 }
 
 impl ValueMaterializer<'_> {
-    pub fn materialize<'t>(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Value {
+    pub fn materialize<'t>(&self, effects: &[RuntimeEffect<'t>]) -> Value {
         let mut stack: Vec<ValueAccumulator> = vec![];
-
-        let result_builder = self.accumulator_for_type(result_type);
-        stack.push(result_builder);
 
         // Pending value from Node/Null (consumed by Set/Push)
         let mut pending: Option<Value> = None;
@@ -172,20 +135,7 @@ impl ValueMaterializer<'_> {
                             top.as_ref().map(|b| b.kind())
                         );
                     };
-                    if !fields.is_empty() {
-                        pending = Some(Value::Struct(fields));
-                    } else if pending.is_none() {
-                        // Empty struct with no pending value:
-                        // - If nested (stack.len() > 1): produce empty struct {}
-                        //   This handles captured empty sequences like `{ } @x`
-                        //   Note: stack always has at least the result_builder, so we check > 1
-                        // - If at root (stack.len() <= 1): void result → null
-                        if stack.len() > 1 {
-                            pending = Some(Value::Struct(vec![]));
-                        }
-                        // else: pending stays None (void result)
-                    }
-                    // else: pending has a value, keep it (passthrough for enums, suppressive, etc.)
+                    pending = Some(Value::Struct(fields));
                 }
                 RuntimeEffect::EnumOpen(idx) => {
                     let tag = self.resolve_member_name(*idx);
@@ -217,8 +167,10 @@ impl ValueMaterializer<'_> {
             }
         }
 
-        pending
-            .or_else(|| stack.pop().map(ValueAccumulator::finish))
-            .unwrap_or(Value::Null)
+        debug_assert!(
+            stack.is_empty(),
+            "unclosed builder frames after materialization"
+        );
+        pending.unwrap_or(Value::Null)
     }
 }
