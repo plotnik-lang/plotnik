@@ -10,26 +10,34 @@ Q = (program
 ==== input ====
 /* c */ a; b;
 ==== types ====
-export interface QTag {
-  $tag: "Tag";
-  $data: { a: Node; b: Node };
+export interface Q {
+  a: Node;
+  b: Node;
 }
-
-export type Q = QTag;
+==== diagnostics ====
+warning: branch labels have no effect without capture
+ --> query.ptk:2:3
+  |
+2 | /   [
+3 | |     Tag: {
+4 | |       (comment)?
+5 | |       (expression_statement) @a
+... |
+8 | |   ]
+  | |___^
+  |
+help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
 ==== output ====
 {
-  "$tag": "Tag",
-  "$data": {
-    "a": {
-      "kind": "expression_statement",
-      "text": "a;",
-      "span": [8, 10]
-    },
-    "b": {
-      "kind": "expression_statement",
-      "text": "b;",
-      "span": [11, 13]
-    }
+  "a": {
+    "kind": "expression_statement",
+    "text": "a;",
+    "span": [8, 10]
+  },
+  "b": {
+    "kind": "expression_statement",
+    "text": "b;",
+    "span": [11, 13]
   }
 }
 ==== bytecode ====
@@ -37,27 +45,24 @@ export type Q = QTag;
 S0 "Beauty will save the world"
 S1 "a"
 S2 "b"
-S3 "Tag"
-S4 "Q"
-S5 "program"
-S6 "comment"
-S7 "expression_statement"
+S3 "Q"
+S4 "program"
+S5 "comment"
+S6 "expression_statement"
 
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:2  ; { a, b }
-T2 = Enum    M2:1  ; Tag
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
 M1: S2 → T0  ; b: <Node>
-M2: S3 → T1  ; Tag: T1
 
 [type_names]
-N0: S4 → T2  ; Q
+N0: S3 → T1  ; Q
 
 [entrypoints]
-Q = 06 :: T2
+Q = 06 :: T1
 
 [transitions]
 _StructWrap:
@@ -69,20 +74,17 @@ _StructWrap:
 Q:
   06   !   (program)                        08
   07  ...
-  08  └‣─  _                                26, 28
-  10                                        ▶
-  11  ─‣─  (expression_statement) [Node Set(M1)]  30
-  13   !   (expression_statement) [Node Set(M0)]  11
-  15  ...
-  16  ─‣─  (expression_statement) [Node Set(M1)]  30
-  18  ─‣─  (expression_statement) [Node Set(M0)]  16
-  20   !   (comment)                        18
-  21  ─‣─  _                                20, 21
+  08  └‣─  _                                21, 14, 24
+  10  ─‣─  (expression_statement) [Node Set(M1)]  12
+  12  ─‣┘  _                                13
+  13                                        ▶
+  14   !   (expression_statement) [Node Set(M0)]  10
+  16  ─‣─  (expression_statement) [Node Set(M0)]  10
+  18   !   (comment)                        16
+  19  ─‣─  _                                18, 19
+  21   !   _                                18, 19
   23  ...
-  24   !   _                                20, 21
-  26  -ε-  [EnumOpen(M2)]                   24, 13
-  28  ─‣─  _                                26, 28
-  30  ─‣┘  [EnumClose] _                    10
+  24  ─‣─  _                                21, 14, 24
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -92,20 +94,19 @@ _StructWrap:
 Q:
   06       (program)                        08
        ●   program
-  08       _                                26, 28
+  08       _                                21, 14, 24
        ●   comment
-  26  -ε-  [EnumOpen(M2)]                   24, 13
-  24       _                                20, 21
+  21       _                                18, 19
        ●   comment
-  20       (comment)                        18
+  18       (comment)                        16
        ●   comment
-  18       (expression_statement) [Node Set(M0)]  16
+  16       (expression_statement) [Node Set(M0)]  10
        ●   expression_statement
-  16       (expression_statement) [Node Set(M1)]  30
+  10       (expression_statement) [Node Set(M1)]  12
        ●   expression_statement
-  30       [EnumClose] _                    10
+  12       _                                13
        ●   program
-  10   ◀   (Q)                              
+  13   ◀   (Q)                              
 
 _StructWrap:
   03  -ε-  [StructClose]                    05

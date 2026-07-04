@@ -1,0 +1,107 @@
+A = (statement_block (A) (debugger_statement))?
+Q = (program (A) (expression_statement) @e)
+==== input ====
+{ { debugger; } debugger; } f();
+==== types ====
+export interface Q {
+  e: Node;
+}
+
+export type A = Node | null;
+==== output ====
+{
+  "e": {
+    "kind": "expression_statement",
+    "text": "f();",
+    "span": [28, 32]
+  }
+}
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "e"
+S2 "A"
+S3 "Q"
+S4 "statement_block"
+S5 "debugger_statement"
+S6 "program"
+S7 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Optional(T0)  ; <Node>?
+T2 = Struct  M0:1  ; { e }
+
+[type_members]
+M0: S1 → T0  ; e: <Node>
+
+[type_names]
+N0: S2 → T1  ; A
+N1: S3 → T2  ; Q
+
+[entrypoints]
+A = 06 :: T1
+Q = 08 :: T2
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+A:
+  06  -ε-                                   24, 11
+
+Q:
+  08   !   (program)                        42, 27
+  10                                        ▶
+  11  -ε-  [Null]                           10
+  13  └‣─  (debugger_statement)             19
+  14  ─‣─  [SuppressEnd] (debugger_statement)  19
+  16  └‣─  (A)                              06 : 14
+  17  -ε-  [SuppressBegin]                  16
+  19  ─‣┘  _                                10
+  20   !   (statement_block) [Node]         13, 17
+  22  ─‣─  _                                20, 22
+  24   !   _                                20, 22
+  26                                        ▶
+  27  └‣─  (expression_statement) [Node Set(M0)]  44
+  29  ─‣─  (expression_statement) [Node Set(M0)]  44
+  31  └‣─  (debugger_statement)             37
+  32  ─‣─  [SuppressEnd] (debugger_statement)  37
+  34  └‣─  (A)                              06 : 32
+  35  -ε-  [SuppressBegin]                  34
+  37  ─‣┘  _                                29
+  38   !   (statement_block)                31, 35
+  40  ─‣─  _                                38, 40
+  42  └‣─  _                                38, 40
+  44  ─‣┘  _                                26
+==== trace ====
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  08       (program)                        42, 27
+       ●   program
+  42       _                                38, 40
+       ●   statement_block
+  38       (statement_block)                31, 35
+       ●   statement_block
+  31       (debugger_statement)             37
+       ○   {
+       ○   statement_block
+       ●   debugger_statement
+  37       _                                29
+       ●   statement_block
+  29       (expression_statement) [Node Set(M0)]  44
+       ●   expression_statement
+  44       _                                26
+       ●   program
+  26   ◀   (Q)                              
+
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼

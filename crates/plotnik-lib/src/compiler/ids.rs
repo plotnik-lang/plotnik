@@ -32,8 +32,9 @@ impl DefId {
 /// Interned query type identifier.
 ///
 /// Indexes the analysis-time type registry. This is distinct from the serialized
-/// bytecode `TypeId`, which is compacted during emission.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+/// bytecode `TypeId`, which is compacted during emission. Ordered so name-table
+/// iteration is deterministic (registration order).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct TypeId(pub u32);
 
 impl TypeId {

@@ -17,12 +17,13 @@ use super::Span;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DiagnosticKind {
-    // UnclosedString ranks first: an unterminated string swallows subsequent closing delimiters.
+    // UnclosedString/UnclosedRegex rank first: an unterminated literal swallows
+    // subsequent closing delimiters, so it is the root cause to show.
     UnclosedString,
+    UnclosedRegex,
     UnclosedTree,
     UnclosedSequence,
     UnclosedAlternation,
-    UnclosedRegex,
 
     ExpectedExpression,
     ExpectedTypeName,
@@ -71,11 +72,13 @@ pub enum DiagnosticKind {
     UnusedBranchLabels,
     StrictDimensionalityViolation,
     MultiElementScalarCapture,
-    UncapturedOutputWithCaptures,
-    AmbiguousUncapturedOutputs,
+    UnnamedQuantifiedElement,
+    ZeroWidthRepeat,
     DuplicateCaptureInScope,
     IncompatibleCaptureTypes,
     IncompatibleStructShapes,
+    TypeNameConflict,
+    RedundantTypeAnnotation,
 
     PredicateOnNonLeaf,
     EmptyRegex,
@@ -103,6 +106,7 @@ pub enum DiagnosticKind {
     EmitFailed,
     BytecodeRejected,
     NoEntrypoints,
+    EmptyQuery,
 }
 
 impl DiagnosticKind {
@@ -110,6 +114,7 @@ impl DiagnosticKind {
     pub fn severity(&self) -> Severity {
         match self {
             Self::UnusedBranchLabels
+            | Self::RedundantTypeAnnotation
             | Self::TreeSitterSequenceSyntaxDeprecated
             | Self::NegationSyntaxDeprecated
             | Self::SupertypeSlashDeprecated => Severity::Warning,
@@ -198,11 +203,9 @@ impl DiagnosticKind {
             Self::QuantifiedAnchor | Self::CapturedAnchor => {
                 "anchors constrain position and produce no value"
             }
-            Self::UncapturedOutputWithCaptures => "add `@name` to capture the output",
-            Self::AmbiguousUncapturedOutputs => {
-                "capture each expression explicitly: `(X) @x (Y) @y`"
+            Self::UnusedBranchLabels => {
+                "capture the alternation (`[...] @name`) to make the labels enum variants, or remove them"
             }
-            Self::MultiElementScalarCapture => "add internal captures: `{(a) @a (b) @b}* @items`",
             Self::UnclosedTree => "add `)` to close the node",
             Self::UnclosedSequence => "add `}` to close the sequence",
             Self::UnclosedAlternation => "add `]` to close the alternation",
@@ -251,7 +254,8 @@ impl DiagnosticKind {
             Self::NoEntrypoints => {
                 "every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing"
             }
-            Self::UnsupportedSupertype => {
+            Self::EmptyQuery => "add a definition, e.g. `Q = (identifier) @id`",
+            Self::UnsupportedSupertype | Self::BareSupertype => {
                 "match the concrete subtypes with an alternation, e.g. `[(a) (b)]`"
             }
             _ => return None,
@@ -313,14 +317,16 @@ impl DiagnosticKind {
             Self::StrictDimensionalityViolation => {
                 "a repeated capture must be collected into a list"
             }
-            Self::MultiElementScalarCapture => "a repeated group needs internal captures",
-            Self::UncapturedOutputWithCaptures => "this match isn't captured, but its siblings are",
-            Self::AmbiguousUncapturedOutputs => {
-                "multiple expressions produce output without capture"
+            Self::MultiElementScalarCapture => "a captured pattern must match exactly one node",
+            Self::UnnamedQuantifiedElement => {
+                "quantifier at definition root leaves its element type unnamed"
             }
+            Self::ZeroWidthRepeat => "cannot repeat a pattern that can match zero nodes",
             Self::DuplicateCaptureInScope => "duplicate capture in scope",
             Self::IncompatibleCaptureTypes => "incompatible capture types",
             Self::IncompatibleStructShapes => "incompatible struct shapes",
+            Self::TypeNameConflict => "conflicting type name",
+            Self::RedundantTypeAnnotation => "redundant type annotation",
             Self::PredicateOnNonLeaf => {
                 "predicates match text content, but this node can contain children"
             }
@@ -335,7 +341,7 @@ impl DiagnosticKind {
             Self::InvalidFieldChildType => "node kind not valid for this field",
             Self::InvalidChildType => "node kind not valid as child",
             Self::UnsupportedSupertype => "matching a supertype is not supported yet",
-            Self::BareSupertype => "supertype must be written with `#`",
+            Self::BareSupertype => "supertype is not a matchable node kind",
             Self::ChildUnderLeafToken => "leaf tokens have no child nodes",
             Self::NegatedRequiredField => "this field is always present",
             Self::UnsatisfiablePattern => "pattern can never match",
@@ -344,6 +350,7 @@ impl DiagnosticKind {
             Self::EmitFailed => "bytecode emission failed",
             Self::BytecodeRejected => "query compiles to invalid bytecode",
             Self::NoEntrypoints => "query produces no entrypoints",
+            Self::EmptyQuery => "query defines nothing",
         }
     }
 
@@ -363,7 +370,10 @@ impl DiagnosticKind {
             Self::IncompatibleTypes => "{}".to_string(),
             Self::StrictDimensionalityViolation => "{}".to_string(),
             Self::MultiElementScalarCapture => "{}".to_string(),
-            Self::AmbiguousUncapturedOutputs => "{}".to_string(),
+            Self::UnnamedQuantifiedElement => "{}".to_string(),
+            Self::ZeroWidthRepeat => "{}".to_string(),
+            Self::TypeNameConflict => "type name `{}` is already used for a different type".to_string(),
+            Self::RedundantTypeAnnotation => "this type annotation {}".to_string(),
             Self::DuplicateCaptureInScope => {
                 "capture `@{}` already defined in this scope".to_string()
             }

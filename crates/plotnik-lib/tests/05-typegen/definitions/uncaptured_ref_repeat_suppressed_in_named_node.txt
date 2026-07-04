@@ -1,0 +1,12 @@
+A = [
+  X: (identifier) @x
+  Y: (number) @y
+]
+
+Q = (arguments (A)+)
+==== types ====
+export type A =
+  | { $tag: "X"; $data: { x: Node } }
+  | { $tag: "Y"; $data: { y: Node } };
+
+export type Q = undefined;

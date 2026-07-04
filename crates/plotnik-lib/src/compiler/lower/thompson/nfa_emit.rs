@@ -128,6 +128,12 @@ impl NfaBuilder<'_> {
         exit: Label,
         inner: &Pattern,
     ) -> Label {
+        // Suppressed captures declare no fields; the name lookup below would
+        // silently bind a same-named field of the enclosing scope.
+        if self.is_suppressed() {
+            return exit;
+        }
+
         let captures = Self::collect_captures(inner);
         if captures.is_empty() {
             return exit;
@@ -144,7 +150,7 @@ impl NfaBuilder<'_> {
         self.emit_effects_if_nonempty(exit, null_effects)
     }
 
-    fn emit_effects_if_nonempty(&mut self, exit: Label, effects: Vec<EffectIR>) -> Label {
+    pub(super) fn emit_effects_if_nonempty(&mut self, exit: Label, effects: Vec<EffectIR>) -> Label {
         if effects.is_empty() {
             return exit;
         }

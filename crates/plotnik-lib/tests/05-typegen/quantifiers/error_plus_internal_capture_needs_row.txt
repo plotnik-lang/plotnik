@@ -1,9 +1,9 @@
 Bad = {(identifier) @c}+
 ==== diagnostics ====
-error: captures `@c` repeat with `+` but aren't collected into a list
+error: the definition names the list itself, so each `+` element — a row of captures — is left without a type name
  --> query.ptk:1:7
   |
 1 | Bad = {(identifier) @c}+
   |       ^^^^^^^^^^^^^^^^^^
   |
-help: add a row capture so each repeat becomes one element: `{...}+ @items`
+help: name the element type in its own definition, then quantify a reference to it: `Elem = ...` and `(Elem)+`

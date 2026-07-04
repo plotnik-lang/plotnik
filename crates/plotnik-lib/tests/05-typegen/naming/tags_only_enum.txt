@@ -1,0 +1,12 @@
+Q = (program [
+  Stmt: (expression_statement)
+  Decl: (lexical_declaration)
+] @kind)
+==== types ====
+export type QKind =
+  | { $tag: "Stmt" }
+  | { $tag: "Decl" };
+
+export interface Q {
+  kind: QKind;
+}

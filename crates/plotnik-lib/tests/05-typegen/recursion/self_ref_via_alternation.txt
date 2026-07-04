@@ -6,14 +6,6 @@ Expr = [
   )
 ]
 ==== types ====
-export interface ExprLit {
-  $tag: "Lit";
-  $data: { value: Node };
-}
-
-export interface ExprBinary {
-  $tag: "Binary";
-  $data: { left: Expr; right: Expr };
-}
-
-export type Expr = ExprLit | ExprBinary;
+export type Expr =
+  | { $tag: "Lit"; $data: { value: Node } }
+  | { $tag: "Binary"; $data: { left: Expr; right: Expr } };

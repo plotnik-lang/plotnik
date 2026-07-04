@@ -1,0 +1,18 @@
+Q = (program [
+  A: (expression_statement)
+  B: (lexical_declaration)
+]*)
+==== diagnostics ====
+warning: branch labels have no effect without capture
+ --> query.ptk:1:14
+  |
+1 |   Q = (program [
+  |  ______________^
+2 | |   A: (expression_statement)
+3 | |   B: (lexical_declaration)
+4 | | ]*)
+  | |_^
+  |
+help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
+==== types ====
+export type Q = undefined;

@@ -1,0 +1,11 @@
+Id = (identifier) @id
+Foo = (function_declaration name: (Id))
+Bar = (class_declaration name: (Id))
+==== types ====
+export interface Id {
+  id: Node;
+}
+
+export type Foo = undefined;
+
+export type Bar = undefined;

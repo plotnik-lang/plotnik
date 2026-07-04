@@ -27,10 +27,9 @@ pub enum CaptureKind {
     /// the `Call`/`Return` (with an `Struct`/`EndStruct` scope when the definition
     /// returns a struct) and consumes the result — the capture emits no `Node`.
     Ref,
-    /// The inner expression itself leaves the captured value pending — an enum
-    /// alternation (`Enum … EndEnum`) or a named node forwarding a single
-    /// structured output child. Emit the inner, then a trailing `Set`; the capture
-    /// contributes no `Node` and no wrapper.
+    /// The inner expression itself leaves the captured value pending — a
+    /// consumed enum alternation (`Enum … EndEnum`). Emit the inner, then a
+    /// trailing `Set`; the capture contributes no `Node` and no wrapper.
     PendingValue,
     /// An array collected by `*` or `+` (`Arr … Push … EndArr`).
     Array,
@@ -69,7 +68,11 @@ impl TypeAnalysis {
             return match kind {
                 // `*` / `+` collect into an array regardless of element shape.
                 QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureKind::Array,
-                // `?` only adds optionality; the value mechanism is the inner's.
+                // `?` adds optionality to the inner's value mechanism — except a
+                // fields-flow inner, whose captures the `?` collects as one
+                // nullable row (the `?` counterpart of `*`'s Array). That holds
+                // for a named node too, even though its bare capture is a
+                // `Node`: quantified, its fields have nowhere to bubble.
                 QuantifierKind::Optional => {
                     let Some(inner) = quant.inner() else {
                         return mode.recover(
@@ -77,7 +80,14 @@ impl TypeAnalysis {
                             CaptureKind::Node,
                         );
                     };
-                    self.classify(&inner, deps, interner, mode)
+                    let kind = self.classify(&inner, deps, interner, mode);
+                    let inner_flow = mode.pattern_flow(self, &unwrap_field(&inner));
+                    if kind == CaptureKind::Node
+                        && matches!(inner_flow, Some(PatternFlow::Fields(_)))
+                    {
+                        return CaptureKind::Struct;
+                    }
+                    kind
                 }
             };
         }
@@ -105,17 +115,16 @@ impl TypeAnalysis {
             // scope; a named node instead captures its matched node and lets the
             // children bubble alongside as sibling fields.
             PatternFlow::Fields(_) => {
-                // Only a union alternation flows `Fields` here; an enum flows `Value`
-                // and is handled below, so it must not appear in this arm.
+                // A captured alternation is a consumed position, so an enum
+                // flows `Value` (handled below); only a union flows `Fields`.
                 if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Union(_)) {
                     CaptureKind::Struct
                 } else {
                     CaptureKind::Node
                 }
             }
-            // A structured scalar is left pending by the inner itself — an enum
-            // alternation (`Enum`/`EndEnum`) or a named node forwarding a structured
-            // output child.
+            // A structured scalar left pending by the inner itself — a consumed
+            // enum alternation (`Enum`/`EndEnum`).
             PatternFlow::Value(type_id) if self.is_structured_output(*type_id) => {
                 CaptureKind::PendingValue
             }
@@ -157,23 +166,29 @@ impl TypeAnalysis {
             let output_type = self.expect_def_output(def_id);
             return matches!(
                 self.expect_type_shape(output_type),
-                TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. }
+                TypeShape::Struct(_)
+                    | TypeShape::Enum(_)
+                    | TypeShape::Array { .. }
+                    | TypeShape::Optional(_)
             );
         }
 
         if let Some(output_type) = self.def_output(def_id) {
             return matches!(
                 self.type_shape(output_type),
-                Some(TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Array { .. })
+                Some(
+                    TypeShape::Struct(_)
+                        | TypeShape::Enum(_)
+                        | TypeShape::Array { .. }
+                        | TypeShape::Optional(_)
+                )
             );
         }
 
-        // During inference a leaf definition may not be registered yet — the visitor
-        // walks every definition in a file before any output type is set. Fall back to
-        // the reference's own transparently-inferred flow: a structured result either
-        // bubbles its fields (struct) or is a structured scalar (enum/array).
+        // During inference a same-SCC target is not registered yet. Fall back to
+        // the reference's own inferred flow: a reference carries its target's
+        // result as a pending value (`Value`), structured or not.
         match self.pattern_result(pattern).map(|info| &info.flow) {
-            Some(PatternFlow::Fields(_)) => true,
             Some(PatternFlow::Value(t)) => self.is_structured_output(*t),
             _ => false,
         }

@@ -1,0 +1,18 @@
+Inner = (expression_statement (call_expression) @call)
+
+Q = (program [
+  Call: (Inner) @_
+  Decl: (lexical_declaration) @d
+] @item)
+==== types ====
+export type QItem =
+  | { $tag: "Call" }
+  | { $tag: "Decl"; $data: { d: Node } };
+
+export interface Q {
+  item: QItem;
+}
+
+export interface Inner {
+  call: Node;
+}

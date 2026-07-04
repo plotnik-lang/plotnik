@@ -1,0 +1,13 @@
+Entry = [Id: (identifier) @id  Num: (number) @num]
+Items = (Entry)*
+Q = (program (expression_statement (array (Items) @items)))
+==== types ====
+export type Entry =
+  | { $tag: "Id"; $data: { id: Node } }
+  | { $tag: "Num"; $data: { num: Node } };
+
+export interface Q {
+  items: Items;
+}
+
+export type Items = Entry[];

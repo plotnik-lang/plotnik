@@ -6,7 +6,7 @@ Bad = [
   }
 ]* @items
 ==== diagnostics ====
-error: this `*` group matches several nodes but captures none of them
+error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
  --> query.ptk:1:7
   |
 1 |   Bad = [

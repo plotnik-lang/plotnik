@@ -70,11 +70,20 @@ fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
             e
         ))
     })?;
-    let mut paths: Vec<_> = entries
-        .filter_map(|e| e.ok())
-        .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|ext| ext == "ptk"))
-        .collect();
+    let mut paths = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| {
+            CliError::fatal(format!(
+                "failed to read an entry of directory '{}': {}",
+                dir.display(),
+                e
+            ))
+        })?;
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "ptk") {
+            paths.push(path);
+        }
+    }
 
     if paths.is_empty() {
         return Err(CliError::fatal(format!(

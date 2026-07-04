@@ -1,11 +1,13 @@
 //! Structural arity definitions.
 
-/// Structural arity - whether an expression matches one or many positions.
+/// Structural arity — whether one match of an expression spans exactly one
+/// node position.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Arity {
     /// Exactly one node position.
     One,
-    /// Multiple sequential positions.
+    /// Anything else: multiple sequential positions, or a variable range
+    /// (quantified patterns match zero or more positions).
     Many,
 }
 

@@ -6,16 +6,17 @@ Q = (pair
 )
 ==== bytecode ====
 [strings]
-S0 "Beauty will save the world"
-S1 "a"
-S2 "A"
-S3 "B"
-S4 "kind"
-S5 "Q"
-S6 "pair"
-S7 "identifier"
-S8 "number"
-S9 "key"
+S00 "Beauty will save the world"
+S01 "a"
+S02 "A"
+S03 "B"
+S04 "kind"
+S05 "QKind"
+S06 "Q"
+S07 "pair"
+S08 "identifier"
+S09 "number"
+S10 "key"
 
 [type_defs]
 T0 = <Void>
@@ -25,13 +26,14 @@ T3 = Enum    M1:2  ; A | B
 T4 = Struct  M3:1  ; { kind }
 
 [type_members]
-M0: S1 → T1  ; a: <Node>
-M1: S2 → T2  ; A: T2
-M2: S3 → T0  ; B: <Void>
-M3: S4 → T3  ; kind: T3
+M0: S01 → T1  ; a: <Node>
+M1: S02 → T2  ; A: T2
+M2: S03 → T0  ; B: <Void>
+M3: S04 → T3  ; kind: QKind
 
 [type_names]
-N0: S5 → T4  ; Q
+N0: S05 → T3  ; QKind
+N1: S06 → T4  ; Q
 
 [entrypoints]
 Q = 06 :: T4

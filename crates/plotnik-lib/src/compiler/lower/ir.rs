@@ -44,7 +44,7 @@ pub struct CalleeEntry(pub Label);
 /// base (`member_base`) plus `relative_index`. The parent type is a scope or
 /// enum that an entrypoint result reaches, so it is always present in the emitted
 /// type table.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct MemberRef {
     /// The query type whose member table this indexes (struct or enum).
     pub parent_type: TypeId,
@@ -63,7 +63,7 @@ impl MemberRef {
 
 /// Effect operation with symbolic member references.
 /// Used during compilation; resolved to Effect during emission.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EffectIR {
     kind: EffectKind,
     payload: EffectArg,
@@ -71,7 +71,7 @@ pub struct EffectIR {
 
 /// An effect's argument: a literal value, or a symbolic member reference — used by
 /// Set/Enum effects — resolved to a member index during emission.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EffectArg {
     Literal(usize),
     Member(MemberRef),
@@ -159,7 +159,7 @@ impl EffectIR {
 ///
 /// Both variants store predicate text. Emit interns that text into the bytecode
 /// string table after the IR is complete.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PredicateValueIR {
     /// String comparison value.
     String(Box<str>),
@@ -183,7 +183,7 @@ impl PredicateValueIR {
 ///
 /// Applied after node kind/field matching. Compares node text against
 /// a string literal or regex pattern.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PredicateIR {
     pub op: PredicateOp,
     pub value: PredicateValueIR,

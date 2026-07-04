@@ -8,9 +8,9 @@ null
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "program"
-S3 "expression_statement"
+S1 "program"
+S2 "expression_statement"
+S3 "Q"
 
 [type_defs]
 T0 = <Void>
@@ -18,7 +18,6 @@ T0 = <Void>
 [type_members]
 
 [type_names]
-N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 06 :: T0
@@ -31,15 +30,12 @@ _StructWrap:
   05                                        ▶
 
 Q:
-  06   !   (program)                        08
-  07  ...
-  08  -ε-  [SuppressBegin]                  18, 14
-  10   !   (expression_statement)           11
-  11  ─‣┘  [SuppressEnd] _                  13
-  13                                        ▶
-  14  -ε-  [SuppressEnd]                    13
-  16  ─‣─  _                                10, 16
-  18  └‣─  _                                10, 16
+  06   !   (program)                        13, 10
+  08   !   (expression_statement)           09
+  09  ─‣┘  _                                10
+  10                                        ▶
+  11  ─‣─  _                                08, 11
+  13  └‣─  _                                08, 11
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -47,16 +43,15 @@ _StructWrap:
        ▶   (Q)
 
 Q:
-  06       (program)                        08
+  06       (program)                        13, 10
        ●   program
-  08  -ε-  [SuppressBegin]                  18, 14
-  18       _                                10, 16
+  13       _                                08, 11
        ●   expression_statement
-  10       (expression_statement)           11
+  08       (expression_statement)           09
        ●   expression_statement
-  11       [SuppressEnd] _                  13
+  09       _                                10
        ●   program
-  13   ◀   (Q)                              
+  10   ◀   (Q)                              
 
 _StructWrap:
   03  -ε-  [StructClose]                    05

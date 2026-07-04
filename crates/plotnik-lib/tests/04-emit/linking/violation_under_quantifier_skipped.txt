@@ -32,16 +32,14 @@ _StructWrap:
 Q:
   06   !   (program)                        08
   07  ...
-  08  -ε-  [ArrayOpen]                      24, 16
-  10  -ε-                                   11
-  11  ─‣┘  [ArrayClose Set(M0)] _           15
-  13  └‣─  (class_declaration)              14
-  14  ─‣┘  _                                18
-  15                                        ▶
-  16  -ε-  [ArrayClose Set(M0)]             15
-  18  -ε-  [Push]                           28, 10
-  20   !   (function_declaration) [Node]    13
-  22  ─‣─  _                                20, 22
-  24  └‣─  _                                20, 22
-  26  ─‣─  _                                20, 26
-  28  ─‣─  _                                20, 26
+  08  -ε-  [ArrayOpen]                      22, 13
+  10  └‣─  (class_declaration)              11
+  11  ─‣┘  _                                16
+  12                                        ▶
+  13  -ε-  [ArrayClose Set(M0)]             12
+  15  ...
+  16  -ε-  [Push]                           20, 24
+  18   !   (function_declaration) [Node]    10
+  20  ─‣─  _                                18, 20
+  22  └‣─  _                                18, 20
+  24  ─‣┘  [ArrayClose Set(M0)] _           12

@@ -1,0 +1,17 @@
+A = [
+  X: (identifier) @x
+  Y: (number) @y
+]
+
+Q = [
+  (A)
+  (number) @b
+]
+==== types ====
+export interface Q {
+  b: Node | null;
+}
+
+export type A =
+  | { $tag: "X"; $data: { x: Node } }
+  | { $tag: "Y"; $data: { y: Node } };

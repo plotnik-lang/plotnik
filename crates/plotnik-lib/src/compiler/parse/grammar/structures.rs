@@ -305,7 +305,11 @@ impl<'q> Parser<'q, '_> {
             }
             SyntaxKind::RegexLiteral => {
                 self.start_node(SyntaxKind::Regex);
-                self.bump();
+                if regex_literal_is_closed(self.current_text()) {
+                    self.bump();
+                } else {
+                    self.error_and_bump(DiagnosticKind::UnclosedRegex);
+                }
                 self.finish_node();
             }
             SyntaxKind::Slash => {
@@ -666,4 +670,17 @@ impl<'q> Parser<'q, '_> {
         }
         self.bump_as_error();
     }
+}
+
+/// A `RegexLiteral` token is `/`-delimited; the lexer stops at the line end
+/// when the closing `/` is missing, so closedness must be re-checked here.
+fn regex_literal_is_closed(text: &str) -> bool {
+    let Some(body) = text.strip_suffix('/') else {
+        return false;
+    };
+    if body.is_empty() {
+        // A lone `/` is only an opener.
+        return false;
+    }
+    body.chars().rev().take_while(|&c| c == '\\').count() % 2 == 0
 }

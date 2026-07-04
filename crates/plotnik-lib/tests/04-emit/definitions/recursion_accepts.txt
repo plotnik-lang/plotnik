@@ -39,19 +39,17 @@ _StructWrap:
   05                                        ▶
 
 Nested:
-  06  -ε-                                   21, 27
+  06  -ε-                                   21, 25
 
 Q:
   08   !   (array) [StructOpen]             10
   10  └‣─  (Nested)                         06 : 11
   11  -ε-  [StructClose]                    13
-  13  -ε-                                   14
-  14  ─‣┘  [Set(M2)] _                      16
-  16                                        ▶
-  17  -ε-                                   18
+  13  ─‣┘  [Set(M2)] _                      15
+  15                                        ▶
+  16  -ε-  [StructClose]                    18
   18  ─‣┘  [Set(M1)] _                      20
   20                                        ▶
   21   !   [Null Set(M1)] (identifier) [Node Set(M0)]  20
-  24  -ε-  [StructClose]                    17
-  26  └‣─  (Nested)                         06 : 24
-  27   !   [Null Set(M0)] (array) [StructOpen]  26
+  24  └‣─  (Nested)                         06 : 16
+  25   !   [Null Set(M0)] (array) [StructOpen]  24

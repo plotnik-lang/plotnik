@@ -133,27 +133,16 @@ fn fill_slots(
 
 fn emit_type_names(
     types: &mut TypeTableBuilder,
-    input: &AnalysisArtifacts<'_>,
+    _input: &AnalysisArtifacts<'_>,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
-    for (def_id, type_id) in ctx.type_analysis.iter_def_output() {
-        let name_sym = input.dependency_analysis.def_name_sym(def_id);
-        let name = ctx.strings.intern(name_sym, ctx.interner)?;
-        let bc_type_id = types
-            .lookup(type_id)
-            .expect("def result type must be mapped");
-        types.push_name(TypeNameEntry::new(name, bc_type_id))?;
-    }
-
-    // Collect TypeNameEntry entries for explicit type annotations on struct captures,
-    // e.g. `{(fn) @fn} @outer :: FunctionInfo` names the struct "FunctionInfo".
-    // A name only attaches to a non-suppressive capture's struct/enum, so the
-    // type is reachable from a def result and must survive dead-type elimination;
-    // a miss here is a compiler bug, not anything a query can trigger.
-    for (type_id, name_sym) in ctx.type_analysis.iter_type_aliases() {
-        let bc_type_id = types
-            .lookup(type_id)
-            .expect("named type annotation must survive dead-type elimination");
+    // The naming pass is the single source of names: definition results,
+    // path-generated composites, and `:: TypeName` annotations, in `TypeId`
+    // (deterministic) order. Every named type is reachable from a definition
+    // result, so it survives dead-type elimination; a miss here is a compiler
+    // bug, not anything a query can trigger.
+    for (type_id, name_sym) in ctx.type_analysis.iter_type_names() {
+        let bc_type_id = types.lookup(type_id).expect("named type must be mapped");
         let name = ctx.strings.intern(name_sym, ctx.interner)?;
         types.push_name(TypeNameEntry::new(name, bc_type_id))?;
     }
@@ -172,15 +161,11 @@ fn emit_type_at_slot(
             unreachable!("builtins should be handled separately")
         }
 
-        TypeShape::Custom(sym) => {
-            // Custom type annotation: @x :: Identifier → type Identifier = Node
-            let bc_type_id = WireTypeId::from(
-                u16::try_from(slot_index).map_err(|_| EmitError::TooManyTypes(slot_index))?,
-            );
-
-            let name = ctx.strings.intern(*sym, ctx.interner)?;
-            types.push_name(TypeNameEntry::new(name, bc_type_id))?;
-
+        TypeShape::Custom(_) => {
+            // Custom type annotation: @x :: Identifier → type Identifier = Node.
+            // The name entry comes from the naming pass via `emit_type_names`;
+            // here only the alias shape is emitted.
+            //
             // Custom types alias Node - look up Node's actual bytecode ID.
             // Reaching a Custom type means it was in `ordered_types`, so
             // `BuiltinUsage::collect` marked Node used (`Custom(_) => usage.node =
@@ -254,8 +239,17 @@ fn emit_type_at_slot(
         }
 
         TypeShape::Ref(def_id) => {
+            // A recursive reference to a definition that ended up void (its
+            // captures all suppressed) leaves no pending value at runtime: the
+            // capture takes the matched node, so the alias targets Node.
             let target = ctx.type_analysis.expect_def_output(*def_id);
-            let alias = types.resolve_type(target, ctx.type_analysis)?;
+            let alias = if target == TYPE_VOID {
+                types
+                    .lookup(TYPE_NODE)
+                    .expect("Node is mapped before a Ref alias that targets it is emitted")
+            } else {
+                types.resolve_type(target, ctx.type_analysis)?
+            };
             types.fill_slot(slot_index, TypeDef::alias(alias));
             Ok(())
         }
@@ -269,24 +263,17 @@ fn resolve_field_type(
 ) -> Result<WireTypeId, EmitError> {
     let base_type = types.resolve_type(field_info.type_id, type_ctx)?;
 
-    // `Optional` is idempotent. A captured optional whose base already carries
-    // `Optional` — `(Inner)? @x`, where `make_flow_optional` wrapped the inner
-    // before the capture set `optional` too — must not become
-    // `Optional(Optional(T))`: one skip path emits one `Null`, so the field is a
-    // single `| null`.
-    if field_info.optional && !source_is_optional(type_ctx, field_info.type_id) {
+    if field_info.optional {
+        // Wrappers compose: a base that is itself `Optional` (a reference to
+        // an optional-rooted definition under a call-site `?`) legitimately
+        // nests — the two nulls come from two distinct syntax sites, the
+        // definition's `?` and the capture's. For everything else inference
+        // keeps field optionality single-sourced (the captured `?`'s null
+        // lives on the capture field alone, never on the base type too).
         types.intern_optional(base_type)
     } else {
         Ok(base_type)
     }
-}
-
-fn source_is_optional(type_ctx: &TypeAnalysis, type_id: TypeId) -> bool {
-    let underlying = type_ctx.resolve_underlying_type_id(type_id);
-    matches!(
-        type_ctx.expect_type_shape(underlying),
-        TypeShape::Optional(_)
-    )
 }
 
 struct TypeEmitCtx<'a> {
@@ -373,7 +360,12 @@ impl BuiltinUsage {
             TypeShape::Custom(_) => self.uses_node = true, // Custom types alias Node
             TypeShape::Ref(def_id) => {
                 let target_id = type_ctx.expect_def_output(*def_id);
-                self.collect(target_id, type_ctx);
+                if target_id == TYPE_VOID {
+                    // The Ref emits as an alias of Node (see `emit_type_at_slot`).
+                    self.uses_node = true;
+                } else {
+                    self.collect(target_id, type_ctx);
+                }
             }
             _ => {
                 for child_id in type_shape.child_type_ids() {

@@ -29,7 +29,10 @@ pub(super) enum CaptureExits {
     /// single-exit caller where match and skip coincide).
     Single(Label),
     /// Distinct continuations for the matched path and the zero-match skip path.
-    Split { match_exit: Label, skip_exit: Label },
+    Split {
+        match_exit: Label,
+        skip_exit: SkipExit,
+    },
 }
 
 impl CaptureExits {
@@ -43,13 +46,26 @@ impl CaptureExits {
     }
 }
 
+/// Continuation for a zero-width (skip) outcome.
+///
+/// `Fail` prunes the path: no continuation is emitted, so a zero-width outcome
+/// backtracks like a plain match failure (the effect journal unwinds with it).
+/// Quantifier iterations and alternation branches compile nullable elements
+/// this way — there, consuming nothing is a failed attempt, never an empty
+/// element or a zero-width win.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum SkipExit {
+    To(Label),
+    Fail,
+}
+
 /// The two distinct continuations a skippable pattern (`?`/`*`) routes to:
 /// the matched path and the zero-match skip path. Bundling them keeps the two
-/// adjacent `Label`s from being transposed at a call site.
+/// from being transposed at a call site.
 #[derive(Clone, Copy)]
 pub(super) struct SplitExits {
     pub match_exit: Label,
-    pub skip_exit: Label,
+    pub skip_exit: SkipExit,
 }
 
 /// The per-capture inputs shared by every capture lowering. The continuation is
@@ -123,12 +139,11 @@ impl NfaBuilder<'_> {
 
     /// Compile a struct-scope capture: `Struct → inner → EndStruct+capture → exit(s)`.
     ///
-    /// The struct opens once and closes on every continuation. With `Single` exits
-    /// the inner is compiled straight through; with `Split` exits (a `{...}? @cap`
-    /// optional at a navigating first-child) the inner is compiled with split exits
-    /// inside the scope and the struct closes on both — a skipped optional yields
-    /// `{ field: null }`, never a bare null capture, so the child position stays
-    /// consistent with the same pattern at the query root (#470).
+    /// A quantified inner (`{...}? @cap`) routes to
+    /// [`compile_optional_row_capture`](Self::compile_optional_row_capture): the
+    /// row is optional as a whole, so the struct scope must not open on the skip
+    /// path. For the remaining (non-quantified) inners the struct opens once and
+    /// closes on every continuation.
     ///
     /// `outer_capture.pre` runs in the enclosing scope before the struct opens
     /// (e.g. an alternation branch's null-injected defaults, or an enum variant's
@@ -145,6 +160,20 @@ impl NfaBuilder<'_> {
             capture_effects,
             outer_capture,
         } = req;
+
+        // `{...}? @x`: the row is optional as a whole. The struct scope moves
+        // inside the quantifier iteration so a skip emits a bare `Null` for the
+        // capture — never a hollow `{ field: null }` struct.
+        if let Pattern::QuantifiedPattern(quant) = inner {
+            return self.compile_optional_row_capture(
+                quant,
+                nav,
+                capture_effects,
+                outer_capture,
+                exits,
+            );
+        }
+
         // The struct scope's type drives the inner captures' Set member resolution.
         let scope_type_id = self
             .ctx
@@ -171,8 +200,12 @@ impl NfaBuilder<'_> {
             } => {
                 let match_struct_close =
                     self.emit_struct_close_step_with_effects(end_effects, match_exit);
-                let skip_struct_close =
-                    self.emit_struct_close_step_with_effects(end_effects, skip_exit);
+                let skip_struct_close = match skip_exit {
+                    SkipExit::To(skip) => {
+                        SkipExit::To(self.emit_struct_close_step_with_effects(end_effects, skip))
+                    }
+                    SkipExit::Fail => SkipExit::Fail,
+                };
                 self.compile_with_optional_scope(scope_type_id, |this| {
                     this.compile_skippable_with_exits(
                         inner,
@@ -251,7 +284,7 @@ impl NfaBuilder<'_> {
 
         // row_type_id drives Set effects inside the struct scope.
         let inner_entry = self.compile_with_optional_scope(row_type_id, |this| {
-            this.compile_pattern(inner, struct_close_step, nav_override)
+            this.compile_iteration_element(inner, PatternCtx::with_nav(struct_close_step, nav_override))
         });
 
         let struct_step = self.fresh_label();

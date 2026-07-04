@@ -5,16 +5,8 @@ A = [
 
 Q = {(A)}
 ==== types ====
-export interface AX {
-  $tag: "X";
-  $data: { x: Node };
-}
+export type A =
+  | { $tag: "X"; $data: { x: Node } }
+  | { $tag: "Y"; $data: { y: Node } };
 
-export interface AY {
-  $tag: "Y";
-  $data: { y: Node };
-}
-
-export type A = AX | AY;
-
-export type Q = A;
+export type Q = undefined;

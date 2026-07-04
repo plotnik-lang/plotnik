@@ -34,13 +34,10 @@ _StructWrap:
 Q:
   06   !   (array)                          08
   07  ─‣┘  _                                10
-  08  -ε-  [ArrayOpen]                      24, 19
+  08  -ε-  [ArrayOpen]                      14, 11
   10                                        ▶
   11  └‣─  [ArrayClose Set(M0)] (number) [Node Set(M1)]  07
-  14  ─‣─  _                                20, 26
+  14  └‣─  _                                19, 21
   16  ─‣─  [ArrayClose Set(M0)] (number) [Node Set(M1)]  07
-  19  -ε-                                   11
-  20   !   (identifier) [Node Push]         14, 16
-  22  ─‣─  _                                20, 22
-  24  └‣─  _                                20, 22
-  26  ─‣─  _                                20, 26
+  19   !   (identifier) [Node Push]         21, 16
+  21  ─‣─  _                                19, 21

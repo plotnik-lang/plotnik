@@ -88,7 +88,11 @@ pub fn collapse_up(result: &mut NfaGraph) {
                 break;
             }
 
-            if predecessor_count.get(&succ_label).copied().unwrap_or(0) != 1 {
+            let preds = predecessor_count
+                .get(&succ_label)
+                .copied()
+                .expect("a label reached as a successor was counted as one");
+            if preds != 1 {
                 break;
             }
 

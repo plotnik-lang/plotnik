@@ -109,6 +109,7 @@ pub fn void_type_arg() -> Arg {
     Arg::new("void_type")
         .long("void-type")
         .value_name("TYPE")
+        .value_parser(["undefined", "null"])
         .help("Type for void results: undefined (default) or null")
 }
 

@@ -30,25 +30,27 @@ S13 "right"
 T0 = <Node>
 T1 = Struct  M0:1  ; { name }
 T2 = Struct  M1:1  ; { value }
-T3 = Enum    M2:2  ; Literal | Variable
-T4 = Struct  M4:2  ; { value, target }
+T3 = Struct  M2:1  ; { name }
+T4 = Enum    M3:2  ; Literal | Variable
+T5 = Struct  M5:2  ; { value, target }
 
 [type_members]
 M0: S01 → T0  ; name: <Node>
 M1: S02 → T0  ; value: <Node>
-M2: S03 → T2  ; Literal: T2
-M3: S04 → T1  ; Variable: Ident
-M4: S02 → T3  ; value: Expression
-M5: S05 → T0  ; target: <Node>
+M2: S01 → T0  ; name: <Node>
+M3: S03 → T2  ; Literal: T2
+M4: S04 → T3  ; Variable: T3
+M5: S02 → T4  ; value: Expression
+M6: S05 → T0  ; target: <Node>
 
 [type_names]
 N0: S06 → T1  ; Ident
-N1: S07 → T3  ; Expression
-N2: S08 → T4  ; Assignment
+N1: S07 → T4  ; Expression
+N2: S08 → T5  ; Assignment
 
 [entrypoints]
-Assignment = 11 :: T4
-Expression = 09 :: T3
+Assignment = 11 :: T5
+Expression = 09 :: T4
 Ident      = 06 :: T1
 
 [transitions]
@@ -67,12 +69,12 @@ Expression:
 
 Assignment:
   11   !   (assignment_expression)          12
-  12  └‣─  left: (identifier) [Node Set(M5)]  14
+  12  └‣─  left: (identifier) [Node Set(M6)]  14
   14  ─‣─  right: (Expression)              09 : 16
   15  ...
-  16  ─‣┘  [Set(M4)] _                      18
+  16  ─‣┘  [Set(M5)] _                      18
   18                                        ▶
   19                                        ▶
-  20   !   [EnumOpen(M2)] (number) [Node Set(M1) EnumClose]  19
+  20   !   [EnumOpen(M3)] (number) [Node Set(M1) EnumClose]  19
   23  ...
-  24   !   [EnumOpen(M3)] (identifier) [Node Set(M0) EnumClose]  19
+  24   !   [EnumOpen(M4)] (identifier) [Node Set(M2) EnumClose]  19

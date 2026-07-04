@@ -1,11 +1,11 @@
 use rowan::TextRange;
 
-use crate::compiler::analyze::types::type_shape::{Arity, PatternFlow, PatternShape, TypeId};
+use crate::compiler::analyze::types::type_shape::{Arity, PatternFlow, PatternShape};
 use crate::compiler::diagnostics::report::DiagnosticKind;
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast::{
-    CapturedPattern, FieldPattern, Pattern, QuantifiedPattern, UnionPattern,
+    CapturedPattern, EnumPattern, FieldPattern, Pattern, QuantifiedPattern,
 };
 use crate::compiler::parse::cst::{SyntaxNode, SyntaxToken};
 
@@ -40,33 +40,120 @@ impl InferVisitor<'_, '_> {
         Some((source, body.text_range()))
     }
 
-    /// Report a repeated multi-element pattern that cannot produce a scalar list.
-    /// Returns whether it emitted a diagnostic so the caller can keep the two
-    /// dimensionality checks mutually exclusive.
+    /// Report a captured quantifier whose void inner doesn't match exactly one
+    /// node: there is no single node to bind (per element, for repeats).
     pub(super) fn report_multi_element_scalar(
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
-    ) -> bool {
+    ) {
         let is_multi_element_scalar = inner_info.arity == Arity::Many && inner_info.flow.is_void();
         if !is_multi_element_scalar {
-            return false;
+            return;
         }
 
         let op = self.quantifier_operator(quant);
+        let (detail, hint) = if op.starts_with('?') {
+            (
+                format!("this `{op}` group doesn't match exactly one node, so there is no single node to bind"),
+                "capture individual nodes inside the group: `{(a) @a (b) @b}? @x`".to_string(),
+            )
+        } else {
+            (
+                format!("one repeat of this `{op}` group doesn't match exactly one node, so there is no single node to bind per element"),
+                format!("add internal captures: `{{(a) @a (b) @b}}{op} @items`"),
+            )
+        };
         self.report(
             DiagnosticKind::MultiElementScalarCapture,
             quant.text_range(),
         )
-        .detail(format!(
-            "this `{}` group matches several nodes but captures none of them",
-            op
-        ))
+        .detail(detail)
+        .hint(hint)
         .emit();
-        true
     }
 
-    /// Report repeated inner captures that need an enclosing row capture.
+    /// Report a capture whose void inner doesn't match exactly one node —
+    /// whether several or possibly none, there is no single node to bind.
+    /// Without this, the capture would silently bind an arbitrary node (or one
+    /// per repeat), or dangle on a zero-width match.
+    pub(super) fn report_capture_on_multi_node_void(
+        &mut self,
+        inner: &Pattern,
+        inner_info: &PatternShape,
+    ) {
+        if inner_info.arity != Arity::Many || !inner_info.flow.is_void() {
+            return;
+        }
+
+        let (detail, hint) = match inner {
+            Pattern::DefRef(_) => (
+                "the referenced definition doesn't match exactly one node, so there is no single node to bind",
+                "capture nodes inside the definition, or drop this capture",
+            ),
+            Pattern::Union(_) | Pattern::Enum(_) => (
+                "this alternation doesn't match exactly one node, so there is no single node to bind",
+                "capture inside the branches, or drop this capture",
+            ),
+            _ => (
+                "this group doesn't match exactly one node, so there is no single node to bind",
+                "capture individual nodes inside the group: `{(a) @a (b) @b} @x`",
+            ),
+        };
+
+        let related = self.referenced_definition_range(inner);
+        let mut builder = self
+            .report(DiagnosticKind::MultiElementScalarCapture, inner.text_range())
+            .detail(detail)
+            .hint(hint);
+        if let Some((src, range)) = related {
+            builder = builder.related_to(Span::new(src, range), "defined here");
+        }
+        builder.emit();
+    }
+
+    /// Report a repeat whose element is a reference that can match zero nodes.
+    pub(super) fn report_zero_width_repeat(&mut self, quant: &QuantifiedPattern, inner: &Pattern) {
+        let op = self.quantifier_operator(quant);
+        let related = self.referenced_definition_range(inner);
+        let mut builder = self
+            .report(DiagnosticKind::ZeroWidthRepeat, quant.text_range())
+            .detail(format!(
+                "the referenced definition can match zero nodes, but a `{op}` repeat must consume input on every iteration — its empty case could never occur here"
+            ))
+            .hint("make the definition consume at least one node, or drop the quantifier");
+        if let Some((src, range)) = related {
+            builder = builder.related_to(Span::new(src, range), "can match zero nodes here");
+        }
+        builder.emit();
+    }
+
+    /// Report a quantifier-rooted definition whose element shape has no name
+    /// source. The definition names the collection (the array/optional type);
+    /// naming the element takes its own definition.
+    pub(super) fn report_unnamed_quantified_element(
+        &mut self,
+        quant: &QuantifiedPattern,
+        element_desc: &str,
+    ) {
+        let op = self.quantifier_operator(quant);
+        let (collection, example_op) = if op.starts_with('?') {
+            ("optional", op.as_str())
+        } else {
+            ("list", op.as_str())
+        };
+        self.report(DiagnosticKind::UnnamedQuantifiedElement, quant.text_range())
+            .detail(format!(
+                "the definition names the {collection} itself, so each `{op}` element — {element_desc} — is left without a type name"
+            ))
+            .hint(format!(
+                "name the element type in its own definition, then quantify a reference to it: `Elem = ...` and `(Elem){example_op}`"
+            ))
+            .emit();
+    }
+
+    /// Report repeated bubbling captures that need an enclosing row capture:
+    /// each repeat produces captured fields with no list to collect them into.
     pub(super) fn report_internal_capture_dimensionality(
         &mut self,
         quant: &QuantifiedPattern,
@@ -75,24 +162,33 @@ impl InferVisitor<'_, '_> {
         let PatternFlow::Fields(type_id) = &inner_info.flow else {
             return;
         };
-
         let type_ctx = self.ctx.type_ctx.in_progress();
         let fields = type_ctx.expect_struct_fields(*type_id);
         if fields.is_empty() {
             return;
         }
-
         let raw_names: Vec<String> = fields
             .keys()
             .map(|s| self.ctx.interner.resolve(*s).to_string())
             .collect();
+
+        let op = self.quantifier_operator(quant);
         let captures_str = raw_names
             .iter()
             .map(|n| format!("`@{}`", n))
             .collect::<Vec<_>>()
             .join(", ");
-
-        let op = self.quantifier_operator(quant);
+        let detail = if op.starts_with('?') {
+            format!(
+                "captures {} skip together with `{}` but nothing collects them",
+                captures_str, op
+            )
+        } else {
+            format!(
+                "captures {} repeat with `{}` but aren't collected into a list",
+                captures_str, op
+            )
+        };
 
         // The suggestion lands beside sibling captures, so avoid names bound there.
         let mut taken = raw_names;
@@ -105,67 +201,47 @@ impl InferVisitor<'_, '_> {
                 .filter_map(|tok| tok.text().get(1..).map(str::to_owned)),
         );
         let placeholder = fresh_capture_name(&taken);
+        let brackets = row_capture_brackets(quant);
+        let hint = if op.starts_with('?') {
+            format!(
+                "capture the group so the skip is a single null: `{}{} @{}`",
+                brackets, op, placeholder
+            )
+        } else {
+            format!(
+                "add a row capture so each repeat becomes one element: `{}{} @{}`",
+                brackets, op, placeholder
+            )
+        };
         self.report(
             DiagnosticKind::StrictDimensionalityViolation,
             quant.text_range(),
         )
-        .detail(format!(
-            "captures {} repeat with `{}` but aren't collected into a list",
-            captures_str, op
-        ))
+        .detail(detail)
+        .hint(hint)
         .hint(format!(
-            "add a row capture so each repeat becomes one element: `{{...}}{} @{}`",
-            op, placeholder
+            "or discard the captures if only the structure matters: `{}{} @_`",
+            brackets, op
         ))
         .emit();
     }
 
-    pub(super) fn report_ambiguous_outputs(
-        &mut self,
-        parent_range: TextRange,
-        outputs: &[(TextRange, TypeId)],
-    ) {
-        let source = self.source;
-        let mut builder = self
-            .report(DiagnosticKind::AmbiguousUncapturedOutputs, parent_range)
-            .detail(format!(
-                "{} expressions here produce a value but none is captured",
-                outputs.len()
-            ));
-        for (range, _) in outputs {
-            builder = builder.related_to(Span::new(source, *range), "produces a value");
-        }
-        builder.emit();
+    /// Warn about a labeled alternation whose value nothing consumes: the
+    /// labels are inert and the alternation behaves as a plain union.
+    pub(super) fn report_unused_branch_labels(&mut self, e: &EnumPattern) {
+        self.report(DiagnosticKind::UnusedBranchLabels, e.text_range())
+            .emit();
     }
 
-    pub(super) fn report_uncaptured_output_with_captures(
-        &mut self,
-        outputs: &[(TextRange, TypeId)],
-    ) {
-        for (range, _) in outputs {
-            self.report(DiagnosticKind::UncapturedOutputWithCaptures, *range)
-                .emit();
-        }
-    }
-
-    pub(super) fn report_unify_error(&mut self, union: &UnionPattern, err: &UnifyError) {
+    pub(super) fn report_branch_unify_error(&mut self, alternation: &SyntaxNode, err: &UnifyError) {
         match err {
-            UnifyError::ScalarInUnion => {
-                self.report(
-                    DiagnosticKind::IncompatibleTypes,
-                    union.syntax().text_range(),
-                )
-                .detail("this branch produces a value, but the alternation is a union")
-                .hint("give every branch a branch label for an enum, e.g. `[A: ... B: ...]`")
-                .emit();
-            }
             UnifyError::IncompatibleTypes { field } => {
                 let field_name = self.ctx.interner.resolve(*field).to_string();
-                let sites = capture_sites(union, &field_name);
+                let sites = capture_sites(alternation, &field_name);
                 let source = self.source;
                 let (primary, rest) = match sites.split_first() {
                     Some((first, rest)) => (*first, rest),
-                    None => (union.syntax().text_range(), &[] as &[TextRange]),
+                    None => (alternation.text_range(), &[] as &[TextRange]),
                 };
 
                 let mut builder = self
@@ -190,11 +266,22 @@ impl InferVisitor<'_, '_> {
     }
 }
 
+/// The bracket shorthand for the row-capture hint, matching the shape the
+/// user actually wrote: `[...]` for alternations, `(...)` for nodes and refs,
+/// `{...}` for sequences (and anything else).
+fn row_capture_brackets(quant: &QuantifiedPattern) -> &'static str {
+    match quant.inner() {
+        Some(Pattern::Union(_) | Pattern::Enum(_)) => "[...]",
+        Some(Pattern::DefRef(_) | Pattern::NodePattern(_)) => "(...)",
+        _ => "{...}",
+    }
+}
+
 /// Find same-named captures that belong to the alternation's output scope.
 /// Nested row scopes are excluded because their fields cannot conflict here.
-fn capture_sites(union: &UnionPattern, field_name: &str) -> Vec<TextRange> {
+fn capture_sites(alternation: &SyntaxNode, field_name: &str) -> Vec<TextRange> {
     let mut tokens = Vec::new();
-    direct_scope_capture_tokens(union.syntax(), &mut tokens);
+    direct_scope_capture_tokens(alternation, &mut tokens);
     tokens
         .into_iter()
         .filter(|tok| tok.text().get(1..) == Some(field_name))

@@ -1,0 +1,9 @@
+Q = (program (expression_statement (identifier) @id)? @x)
+==== types ====
+export interface QX {
+  id: Node;
+}
+
+export interface Q {
+  x: QX | null;
+}

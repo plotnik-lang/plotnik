@@ -345,16 +345,18 @@ This allows a single compiled preamble to dispatch to any entrypoint without rec
 
 ### 5.2. Match16–64 Execution
 
-1. Execute `pre_effects`.
-2. If `nav == Epsilon`: skip steps 3-6, go to step 7.
-3. Clear `matched_node`.
-4. Execute `nav` movement.
-5. Check `node_kind` according to the node_kind class (see Match8 Execution).
-6. Check `node_field` (if not 0).
-7. On success: `matched_node = cursor.node()`.
-8. Verify all `negated_fields` are absent on current node.
-9. Execute `post_effects`.
-10. Continuation:
+1. If `nav != Epsilon` (an epsilon transition skips this step entirely,
+   preserving `matched_node` from the previous match or return):
+   1. Clear `matched_node`.
+   2. Execute `nav` movement.
+   3. Check `node_kind` according to the node_kind class (see Match8 Execution).
+   4. Check `node_field` (if not 0).
+   5. Verify all `negated_fields` are absent on the current node.
+   6. Evaluate the predicate (if present).
+   7. Any failed step backtracks; on success `matched_node = cursor.node()`.
+2. Execute `pre_effects`.
+3. Execute `post_effects`.
+4. Continuation:
     - `succ_count == 0` → accept.
     - `succ_count == 1` → `ip = successors[0]`.
     - `succ_count >= 2` → push checkpoints for `successors[1..n]`, execute `successors[0]`.

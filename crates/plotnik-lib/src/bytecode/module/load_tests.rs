@@ -1148,3 +1148,60 @@ fn load_walks_past_extended_match_payload() {
 
     assert_eq!(module.header().transitions_count, 2);
 }
+
+/// Byte offset of the first negated-field slot in the transitions stream.
+fn first_neg_slot(bytes: &[u8]) -> usize {
+    let (base, steps) = transitions(bytes);
+    let mut step = 0u16;
+    while step < steps {
+        let off = base + step as usize * 8;
+        let opcode = bytes[off] & 0x0F;
+        if (1..=5).contains(&opcode) {
+            let counts = u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]);
+            let pre = ((counts >> 13) & 0x7) as usize;
+            let neg = ((counts >> 10) & 0x7) as usize;
+            if neg > 0 {
+                return off + 8 + pre * 2;
+            }
+        }
+        step += (instr_size(opcode) / 8) as u16;
+    }
+    panic!("query must emit a negated-field slot");
+}
+
+#[test]
+fn forged_zero_neg_field_is_rejected() {
+    // Neg-field slots decode through `NodeFieldId::try_from(raw)` (`NonZeroU16`);
+    // a forged zero would panic `neg_fields()` in the VM or `dump`.
+    let mut bytes = emit_bytes(r#"Q = (variable_declarator -value)"#);
+
+    let off = first_neg_slot(&bytes);
+    bytes[off..off + 2].copy_from_slice(&0u16.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged zero neg field must be rejected");
+    assert!(
+        matches!(err, ModuleError::MalformedTransitions),
+        "expected MalformedTransitions, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_zero_node_symbol_is_rejected() {
+    // The `symbol` half of a node-kind entry decodes as `NodeKindId`
+    // (`NonZeroU16`) in the renderers; a forged zero would panic `dump`/`trace`.
+    let mut bytes = emit_bytes(r#"Top = (identifier) @id"#);
+    let off = Module::load(&bytes)
+        .expect("module loads before tampering")
+        .offsets()
+        .node_kinds as usize;
+
+    bytes[off..off + 2].copy_from_slice(&0u16.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged node symbol must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidNodeSymbol(0)),
+        "expected InvalidNodeSymbol(0), got {err:?}"
+    );
+}

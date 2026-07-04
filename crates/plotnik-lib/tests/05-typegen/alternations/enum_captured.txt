@@ -3,17 +3,9 @@ Q = [
   Num: (number) @n
 ] @result
 ==== types ====
-export interface QResultStr {
-  $tag: "Str";
-  $data: { s: Node };
-}
-
-export interface QResultNum {
-  $tag: "Num";
-  $data: { n: Node };
-}
-
-export type QResult = QResultStr | QResultNum;
+export type QResult =
+  | { $tag: "Str"; $data: { s: Node } }
+  | { $tag: "Num"; $data: { n: Node } };
 
 export interface Q {
   result: QResult;

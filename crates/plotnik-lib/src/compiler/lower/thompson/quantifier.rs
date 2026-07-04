@@ -4,7 +4,8 @@
 //! `compile_quantified_unified` entry point so greediness and search-nav logic
 //! stay in one place.
 
-use crate::bytecode::Nav;
+use crate::bytecode::{EffectKind, Nav};
+use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOperator};
@@ -13,7 +14,8 @@ use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx, needs_struct_wrapper, row_type_id};
 use super::navigation::resumable_search_nav;
 use super::nfa_emit::{BranchTargets, Greediness};
-use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SplitExits};
+use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SkipExit, SplitExits};
+use super::sequences::SeqItemsCtx;
 
 /// The nav under which a quantifier iteration runs a resumable position search,
 /// or `None` for a bounded anchor that matches a single candidate directly.
@@ -172,6 +174,25 @@ pub(super) struct QuantifierConfig<'a> {
 }
 
 impl NfaBuilder<'_> {
+    /// Whether this quantifier collects into a definition's output (inferred
+    /// flow `Value`): the root of a definition body, compiled like a captured
+    /// quantifier whose result is left pending as the call's return value.
+    /// Suppressed regions discard the value and compile structurally.
+    fn is_value_collecting(&self, quant: &ast::QuantifiedPattern) -> bool {
+        if self.is_suppressed() {
+            return false;
+        }
+        let pattern = Pattern::QuantifiedPattern(quant.clone());
+        matches!(
+            self.ctx
+                .analysis
+                .type_analysis
+                .expect_pattern_result(&pattern)
+                .flow,
+            PatternFlow::Value(_)
+        )
+    }
+
     /// Compile a quantified pattern with capture effects (passed to body).
     pub(super) fn compile_quantified(
         &mut self,
@@ -190,22 +211,12 @@ impl NfaBuilder<'_> {
             capture,
         } = ctx;
 
-        // When the inner returns a structured type (enum/struct) and this is a star/plus
-        // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
-        // because the type system expects an array of these values.
-        let needs_implicit_array = quant.is_repeating() && self.is_ref_returning_structured(&inner);
-
-        if needs_implicit_array {
-            // No Set on the array itself — collect structured values via Push only.
-            let quant_pattern = Pattern::QuantifiedPattern(quant.clone());
-            return self.compile_array_capture(
-                CaptureRequest {
-                    inner: &quant_pattern,
-                    nav: nav_override,
-                    capture_effects: vec![],
-                    outer_capture: capture,
-                },
+        if self.is_value_collecting(quant) {
+            return self.compile_valued_quantifier(
+                quant,
                 CaptureExits::Single(exit),
+                nav_override,
+                capture,
             );
         }
 
@@ -290,6 +301,80 @@ impl NfaBuilder<'_> {
             );
         }
 
+        // A reference to a nullable definition skips like an inline `?`: its
+        // body is inlined so the zero-width path takes `skip_exit` with the
+        // checkpoint-restored cursor (a call's zero-width return cannot — the
+        // return address carries the consumed-candidate navigation).
+        if let Pattern::DefRef(r) = pattern {
+            let def_id = self.resolve_ref_def_id(r);
+            if self.nullable_defs.contains(&def_id) {
+                return self.compile_ref_inline(
+                    def_id,
+                    SplitExits {
+                        match_exit,
+                        skip_exit,
+                    },
+                    nav_override,
+                    capture,
+                );
+            }
+        }
+
+        // An alternation with a nullable branch: the lifted zero-width
+        // alternative exits to `skip_exit` (or is pruned) instead of
+        // dead-ending inside the candidate search.
+        if let Pattern::Union(u) = pattern {
+            return self.compile_union_with_exits(
+                u,
+                PatternCtx {
+                    exit: match_exit,
+                    nav: nav_override,
+                    capture,
+                },
+                skip_exit,
+            );
+        }
+        if let Pattern::Enum(e) = pattern {
+            let ctx = PatternCtx {
+                exit: match_exit,
+                nav: nav_override,
+                capture,
+            };
+            // Mirrors dispatch_pattern: only a consumed enum outside
+            // suppression tags its variants.
+            let flow = &self
+                .ctx
+                .analysis
+                .type_analysis
+                .expect_pattern_result(pattern)
+                .flow;
+            return if matches!(flow, PatternFlow::Value(_)) && !self.is_suppressed() {
+                self.compile_enum_with_exits(e, ctx, skip_exit)
+            } else {
+                self.compile_degraded_enum_with_exits(e, ctx, skip_exit)
+            };
+        }
+
+        // A group whose items can all skip: compile the items with the skip
+        // exit threaded through, so the all-skip path exits with the
+        // checkpoint-restored cursor exactly like a single skippable item
+        // (partial matches exit through `match_exit` as usual).
+        if let Pattern::SeqPattern(seq) = pattern {
+            let items: Vec<_> = seq.items().collect();
+            let is_inside_node = matches!(
+                nav_override,
+                Some(Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact)
+            );
+            return self.compile_seq_items(SeqItemsCtx {
+                items: &items,
+                exit: match_exit,
+                is_inside_node,
+                first_nav: nav_override,
+                capture,
+                skip_exit: Some(skip_exit),
+            });
+        }
+
         // Must be a QuantifiedPattern at this point
         let Pattern::QuantifiedPattern(quant) = pattern else {
             return self.dispatch_pattern(
@@ -317,29 +402,25 @@ impl NfaBuilder<'_> {
             QuantifierForm::Quantified { inner, kind } => (inner, kind),
         };
 
-        // When the inner returns a structured type (enum/struct) and this is a star/plus
-        // quantifier without explicit capture, we still need array scope (Arr/Push/EndArr)
-        // with split exits for the skip/match paths.
-        let needs_implicit_array = quant.is_repeating() && self.is_ref_returning_structured(&inner);
-
-        if needs_implicit_array {
-            let quant_pattern = Pattern::QuantifiedPattern(quant.clone());
-            return self.compile_array_capture(
-                CaptureRequest {
-                    inner: &quant_pattern,
-                    nav: nav_override,
-                    capture_effects: vec![],
-                    outer_capture: capture,
-                },
+        if self.is_value_collecting(quant) {
+            return self.compile_valued_quantifier(
+                quant,
                 CaptureExits::Split {
                     match_exit,
                     skip_exit,
                 },
+                nav_override,
+                capture,
             );
         }
 
-        let skip_with_null = self.emit_null_for_skip_path(skip_exit, &capture);
-        let skip_with_internal_null = self.emit_null_for_internal_captures(skip_with_null, &inner);
+        let skip_exit = match skip_exit {
+            SkipExit::To(skip) => {
+                let skip_with_null = self.emit_null_for_skip_path(skip, &capture);
+                SkipExit::To(self.emit_null_for_internal_captures(skip_with_null, &inner))
+            }
+            SkipExit::Fail => SkipExit::Fail,
+        };
 
         let config = QuantifierConfig {
             inner: &inner,
@@ -349,21 +430,108 @@ impl NfaBuilder<'_> {
             element_capture: capture,
             exits: CaptureExits::Split {
                 match_exit,
-                skip_exit: skip_with_internal_null,
+                skip_exit,
             },
         };
 
         self.compile_quantified_unified(config)
     }
 
-    /// Compile an array capture (`(x)* @cap`) or an uncaptured implicit array
-    /// (`(R)*` where `R` returns a structured type) — `Arr → quantifier (with Push)
+    /// Compile a struct-mechanism capture whose inner is an optional quantifier
+    /// (`{...}? @x`, `[...]? @x`) — the only quantifier that reaches the struct
+    /// mechanism, since `*`/`+` classify as `Array`.
+    ///
+    /// The row is optional as a whole. Mirroring how arrays scope each element
+    /// row, the `Struct → body → EndStruct+Set` wrapper lives inside the
+    /// iteration; the skip path emits a bare `Null` for the capture instead of
+    /// a hollow `{ field: null }` struct, matching the declared
+    /// `{ … } | null` type.
+    pub(super) fn compile_optional_row_capture(
+        &mut self,
+        quant: &ast::QuantifiedPattern,
+        nav_override: Option<Nav>,
+        capture_effects: Vec<EffectIR>,
+        outer_capture: CaptureEffects,
+        exits: CaptureExits,
+    ) -> Label {
+        let QuantifierForm::Quantified { inner, kind } = classify_quantifier(quant) else {
+            unreachable!("admitted struct-mechanism quantifier has an operator and an inner");
+        };
+        assert!(
+            matches!(kind.kind(), QuantifierKind::Optional),
+            "`*`/`+` captures classify as Array, never Struct"
+        );
+
+        let (match_exit, skip_exit) = match exits {
+            CaptureExits::Single(exit) => (exit, SkipExit::To(exit)),
+            CaptureExits::Split {
+                match_exit,
+                skip_exit,
+            } => (match_exit, skip_exit),
+        };
+
+        // Skip: the row is absent — null the capture; the enclosing scope's
+        // trailing effects still run, as they do on the match path.
+        let skip_target = match skip_exit {
+            SkipExit::To(skip) => {
+                let mut skip_effects: Vec<EffectIR> = capture_effects
+                    .iter()
+                    .filter(|eff| eff.kind() == EffectKind::Set)
+                    .flat_map(|set_eff| [EffectIR::null(), set_eff.clone()])
+                    .collect();
+                skip_effects.extend(outer_capture.post.iter().cloned());
+                Some(self.emit_effects_if_nonempty(skip, skip_effects))
+            }
+            SkipExit::Fail => None,
+        };
+
+        // The row scope's type drives the inner captures' Set member resolution.
+        let row_type_id = self
+            .ctx
+            .analysis
+            .type_analysis
+            .expect_pattern_result(&inner)
+            .flow
+            .type_id();
+
+        let end_effects = ScopeCloseEffects {
+            capture: &capture_effects,
+            outer: &outer_capture.post,
+        };
+        let iterate = self.emit_iteration(
+            nav_override.unwrap_or(Nav::Down),
+            match_exit,
+            |this, target| {
+                let ExitNav { exit, nav } = target;
+                let struct_close = this.emit_struct_close_step_with_effects(end_effects, exit);
+                let body = this.compile_with_optional_scope(row_type_id, |t| {
+                    t.compile_iteration_element(&inner, PatternCtx::with_nav(struct_close, Some(nav)))
+                });
+                this.emit_struct_step(body)
+            },
+        );
+
+        let entry = match skip_target {
+            Some(skip_target) => self.emit_branch_epsilon(
+                BranchTargets {
+                    prefer: iterate,
+                    other: skip_target,
+                },
+                Greediness::from(kind),
+            ),
+            // Pruned: the row must match — a zero-width outcome backtracks.
+            None => iterate,
+        };
+        self.wrap_entry_pre(entry, outer_capture.pre)
+    }
+
+    /// Compile an array capture (`(x)* @cap`) — `Arr → quantifier (with Push)
     /// → EndArr+capture → exit(s)`. With `Single` exits the loop falls straight
     /// through; with `Split` exits a zero-match takes `skip_exit` and a loop-exit
     /// takes `match_exit`, each closing the array. `capture_effects` is built once
-    /// by the caller (empty for an implicit array); the matched element's
-    /// `Node` is pushed only when the element is not already a structured
-    /// value ([`quantifier_needs_node_for_push`](Self::quantifier_needs_node_for_push)).
+    /// by the caller; the matched element's `Node` is pushed only when the
+    /// element is not already a structured value
+    /// ([`quantifier_needs_node_for_push`](Self::quantifier_needs_node_for_push)).
     pub(super) fn compile_array_capture(
         &mut self,
         req: CaptureRequest<'_>,
@@ -400,7 +568,10 @@ impl NfaBuilder<'_> {
                 skip_exit,
             } => {
                 let match_endarr = self.emit_endarr_step(end_effects, match_exit);
-                let skip_endarr = self.emit_endarr_step(end_effects, skip_exit);
+                let skip_endarr = match skip_exit {
+                    SkipExit::To(skip) => SkipExit::To(self.emit_endarr_step(end_effects, skip)),
+                    SkipExit::Fail => SkipExit::Fail,
+                };
                 self.compile_star_for_array_with_exits(
                     inner,
                     SplitExits {
@@ -575,9 +746,30 @@ impl NfaBuilder<'_> {
             }
 
             QuantifierKind::ZeroOrMore => match exits {
+                // Pruned zero-match: the star must consume, so it compiles
+                // exactly like a plus — total failure backtracks to the caller.
                 CaptureExits::Split {
                     match_exit,
-                    skip_exit,
+                    skip_exit: SkipExit::Fail,
+                } => {
+                    let loop_entry = self.fresh_label();
+                    let (first_iterate, repeat_iterate) =
+                        self.emit_loop_iterations(first_nav_mode, loop_entry, compile_body);
+
+                    self.emit_branch_epsilon_at(
+                        loop_entry,
+                        BranchTargets {
+                            prefer: repeat_iterate,
+                            other: match_exit,
+                        },
+                        greediness,
+                    );
+
+                    first_iterate
+                }
+                CaptureExits::Split {
+                    match_exit,
+                    skip_exit: SkipExit::To(skip_exit),
                 } => {
                     let split_scope = element_scope.by_array_exit();
                     let split_body = |this: &mut Self, target: ExitNav| -> Label {
@@ -632,7 +824,17 @@ impl NfaBuilder<'_> {
 
             QuantifierKind::Optional => {
                 let skip_with_null = match exits {
-                    CaptureExits::Split { skip_exit, .. } => skip_exit,
+                    CaptureExits::Split {
+                        skip_exit: SkipExit::To(skip_exit),
+                        ..
+                    } => skip_exit,
+                    // Pruned: the element must match — no skip alternative.
+                    CaptureExits::Split {
+                        skip_exit: SkipExit::Fail,
+                        ..
+                    } => {
+                        return self.emit_iteration(first_nav_mode, match_exit, compile_body);
+                    }
                     CaptureExits::Single(_) => {
                         let null_exit =
                             self.emit_null_for_skip_path(match_exit, element_scope.capture());
@@ -654,6 +856,157 @@ impl NfaBuilder<'_> {
         }
     }
 
+    /// Compile a quantifier that IS a definition's output: the collected
+    /// value is left pending as the call's return value — a captured
+    /// quantifier with no consumer of its own. `*`/`+` collect an array
+    /// (`Arr → iterations with Push → EndArr`); `?` leaves the element's
+    /// value pending on the match path and a bare `Null` on the skip path.
+    fn compile_valued_quantifier(
+        &mut self,
+        quant: &ast::QuantifiedPattern,
+        exits: CaptureExits,
+        nav_override: Option<Nav>,
+        outer: CaptureEffects,
+    ) -> Label {
+        let QuantifierForm::Quantified { inner, kind } = classify_quantifier(quant) else {
+            unreachable!("a value-collecting quantifier has an operator and an inner");
+        };
+
+        match kind.kind() {
+            QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
+                let pattern = Pattern::QuantifiedPattern(quant.clone());
+                let req = CaptureRequest {
+                    inner: &pattern,
+                    nav: nav_override,
+                    capture_effects: vec![],
+                    outer_capture: outer,
+                };
+                self.compile_array_capture(req, exits)
+            }
+            QuantifierKind::Optional => {
+                self.compile_valued_optional(&inner, kind, exits, nav_override, outer)
+            }
+        }
+    }
+
+    /// The `?` half of [`compile_valued_quantifier`](Self::compile_valued_quantifier).
+    ///
+    /// The element's value must survive as the pending call value, so a
+    /// reference element compiles with the keep-value ref lowering (a plain
+    /// `Set`-consumer chain doesn't exist at a definition's root); a node
+    /// element pends its matched node via a `Node` effect.
+    fn compile_valued_optional(
+        &mut self,
+        inner: &Pattern,
+        kind: QuantifierOperator,
+        exits: CaptureExits,
+        nav_override: Option<Nav>,
+        outer: CaptureEffects,
+    ) -> Label {
+        let (match_exit, skip_exit) = match exits {
+            CaptureExits::Single(exit) => (exit, SkipExit::To(exit)),
+            CaptureExits::Split {
+                match_exit,
+                skip_exit,
+            } => (match_exit, skip_exit),
+        };
+        let CaptureEffects { pre, post } = outer;
+
+        // Skip: the value is a bare null; enclosing-scope effects still run.
+        let skip_target = match skip_exit {
+            SkipExit::To(skip) => {
+                let mut skip_effects = vec![EffectIR::null()];
+                skip_effects.extend(post.iter().cloned());
+                Some(self.emit_effects_if_nonempty(skip, skip_effects))
+            }
+            SkipExit::Fail => None,
+        };
+        let match_target = self.emit_effects_if_nonempty(match_exit, post);
+
+        // A field constraint is navigation on the element, not structure.
+        let (element, field_override) = match inner {
+            Pattern::FieldPattern(f) => {
+                let field_id = self.resolve_field(f);
+                match f.value() {
+                    Some(v) => (v, field_id),
+                    None => (inner.clone(), None),
+                }
+            }
+            other => (other.clone(), None),
+        };
+
+        let first_nav = nav_override.unwrap_or(Nav::Down);
+        let iterate = if let Pattern::DefRef(r) = &element {
+            let def_id = self.resolve_ref_def_id(r);
+            if self.nullable_defs.contains(&def_id) {
+                // A zero-width element match and a skip of the `?` both leave
+                // a null pending; funneling the inline skip into the match
+                // continuation keeps the two paths one value.
+                self.emit_iteration(first_nav, match_target, |this, target| {
+                    let ExitNav { exit, nav } = target;
+                    this.compile_ref_inline_keep_value(
+                        def_id,
+                        SplitExits {
+                            match_exit: exit,
+                            skip_exit: SkipExit::To(exit),
+                        },
+                        Some(nav),
+                    )
+                })
+            } else {
+                self.emit_iteration(first_nav, match_target, |this, target| {
+                    let ExitNav { exit, nav } = target;
+                    this.compile_ref_call_keep_value(def_id, exit, Some(nav), field_override)
+                })
+            }
+        } else {
+            self.emit_iteration(first_nav, match_target, |this, target| {
+                let ExitNav { exit, nav } = target;
+                this.compile_iteration_element(
+                    &element,
+                    PatternCtx {
+                        exit,
+                        nav: Some(nav),
+                        capture: CaptureEffects::new_post(vec![EffectIR::node()]),
+                    },
+                )
+            })
+        };
+
+        let entry = match skip_target {
+            Some(skip_target) => self.emit_branch_epsilon(
+                BranchTargets {
+                    prefer: iterate,
+                    other: skip_target,
+                },
+                Greediness::from(kind),
+            ),
+            // Pruned: the value must match — a zero-width outcome backtracks.
+            None => iterate,
+        };
+        self.wrap_entry_pre(entry, pre)
+    }
+
+    /// Compile one quantifier-iteration element. A nullable element compiles
+    /// with its zero-width path pruned ([`SkipExit::Fail`]): an iteration that
+    /// consumes nothing is a failed attempt — the search advances or the loop
+    /// exits — never a spurious empty element.
+    pub(super) fn compile_iteration_element(&mut self, inner: &Pattern, ctx: PatternCtx) -> Label {
+        if self.pattern_is_nullable(inner) {
+            let PatternCtx { exit, nav, capture } = ctx;
+            return self.compile_skippable_with_exits(
+                inner,
+                SplitExits {
+                    match_exit: exit,
+                    skip_exit: SkipExit::Fail,
+                },
+                nav,
+                capture,
+            );
+        }
+        self.dispatch_pattern(inner, ctx)
+    }
+
     fn compile_quantified_body(
         &mut self,
         inner: &Pattern,
@@ -663,7 +1016,7 @@ impl NfaBuilder<'_> {
         let ExitNav { exit, nav } = target;
         match element_scope {
             IterationScope::Standalone { capture }
-            | IterationScope::RowScopedByArrayExit { capture } => self.dispatch_pattern(
+            | IterationScope::RowScopedByArrayExit { capture } => self.compile_iteration_element(
                 inner,
                 PatternCtx {
                     exit,
@@ -678,7 +1031,7 @@ impl NfaBuilder<'_> {
                 row_type_id,
                 capture,
             } => self.compile_with_optional_scope(row_type_id, |this| {
-                this.dispatch_pattern(
+                this.compile_iteration_element(
                     inner,
                     PatternCtx {
                         exit,

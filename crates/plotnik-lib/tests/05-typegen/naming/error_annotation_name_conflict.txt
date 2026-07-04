@@ -1,0 +1,12 @@
+Q = (program
+  {(expression_statement) @foo :: QBar} @a
+  {(lexical_declaration) @x} @bar
+)
+==== diagnostics ====
+error: type name `QBar` is already used for a different type
+ --> query.ptk:3:3
+  |
+2 |   {(expression_statement) @foo :: QBar} @a
+  |                                   ---- already used here
+3 |   {(lexical_declaration) @x} @bar
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,3 +1,5 @@
+use plotnik_lib::text_utils::find_similar;
+
 use crate::error::CliError;
 use crate::language_registry::{self, Lang};
 
@@ -63,37 +65,9 @@ pub fn require_lang(
 
 pub fn suggest_language(input: &str) -> Option<String> {
     let input_lower = input.to_lowercase();
-    language_registry::all()
-        .into_iter()
-        .filter(|lang| levenshtein(lang.name(), &input_lower) <= 2)
-        .min_by_key(|lang| levenshtein(lang.name(), &input_lower))
-        .map(|lang| lang.name().to_string())
+    let langs = language_registry::all();
+    let names: Vec<&str> = langs.iter().map(|lang| lang.name()).collect();
+    find_similar(&input_lower, &names).map(str::to_string)
 }
 
-fn levenshtein(a: &str, b: &str) -> usize {
-    let a_chars: Vec<char> = a.chars().collect();
-    let b_chars: Vec<char> = b.chars().collect();
-    let m = a_chars.len();
-    let n = b_chars.len();
 
-    if m == 0 {
-        return n;
-    }
-    if n == 0 {
-        return m;
-    }
-
-    let mut prev = (0..=n).collect::<Vec<_>>();
-    let mut curr = vec![0; n + 1];
-
-    for i in 1..=m {
-        curr[0] = i;
-        for j in 1..=n {
-            let cost = usize::from(a_chars[i - 1] != b_chars[j - 1]);
-            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
-        }
-        std::mem::swap(&mut prev, &mut curr);
-    }
-
-    prev[n]
-}

@@ -46,12 +46,14 @@ struct TypeVerifier<'a> {
 
 /// Native-recursion bound for the verifier — the one remaining recursive walk over
 /// a materialized value. The cap keeps a pathologically deep value from overflowing
-/// the stack in debug builds. Past it, verification simply stops: a type-soundness
-/// bug deeper than the cap goes unchecked. That is an accepted trade, not a
-/// guarantee of completeness — the verifier is debug-only defense-in-depth (release
-/// builds skip it entirely) and such bugs almost always surface shallow.
+/// the stack in debug builds, so it must sit well under the real limit (debug
+/// frames here are fat; the stack gives out around ~2500 of them). Past it,
+/// verification simply stops: a type-soundness bug deeper than the cap goes
+/// unchecked. That is an accepted trade, not a guarantee of completeness — the
+/// verifier is debug-only defense-in-depth (release builds skip it entirely) and
+/// such bugs almost always surface shallow.
 #[cfg(debug_assertions)]
-const MAX_VERIFY_DEPTH: u32 = 4096;
+const MAX_VERIFY_DEPTH: u32 = 512;
 
 #[cfg(debug_assertions)]
 impl<'a> TypeVerifier<'a> {

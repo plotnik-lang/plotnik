@@ -2,17 +2,22 @@ Q = (program [Tag: ((expression_statement) @a) @x])
 ==== input ====
 a;
 ==== types ====
-export interface QTag {
-  $tag: "Tag";
-  $data: { x: Struct };
-}
-
-export type Q = QTag;
-
-export interface Struct {
+export interface QX {
   a: Node;
 }
+
+export interface Q {
+  x: QX;
+}
 ==== diagnostics ====
+warning: branch labels have no effect without capture
+ --> query.ptk:1:14
+  |
+1 | Q = (program [Tag: ((expression_statement) @a) @x])
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
+
 warning: parenthesized sequences are tree-sitter syntax
  --> query.ptk:1:20
   |
@@ -22,14 +27,11 @@ warning: parenthesized sequences are tree-sitter syntax
 help: use `{(a) (b)}` to match a sequence of siblings
 ==== output ====
 {
-  "$tag": "Tag",
-  "$data": {
-    "x": {
-      "a": {
-        "kind": "expression_statement",
-        "text": "a;",
-        "span": [0, 2]
-      }
+  "x": {
+    "a": {
+      "kind": "expression_statement",
+      "text": "a;",
+      "span": [0, 2]
     }
   }
 }
@@ -38,7 +40,7 @@ help: use `{(a) (b)}` to match a sequence of siblings
 S0 "Beauty will save the world"
 S1 "a"
 S2 "x"
-S3 "Tag"
+S3 "QX"
 S4 "Q"
 S5 "program"
 S6 "expression_statement"
@@ -47,18 +49,17 @@ S6 "expression_statement"
 T0 = <Node>
 T1 = Struct  M0:1  ; { a }
 T2 = Struct  M1:1  ; { x }
-T3 = Enum    M2:1  ; Tag
 
 [type_members]
 M0: S1 → T0  ; a: <Node>
-M1: S2 → T1  ; x: T1
-M2: S3 → T2  ; Tag: T2
+M1: S2 → T1  ; x: QX
 
 [type_names]
-N0: S4 → T3  ; Q
+N0: S3 → T1  ; QX
+N1: S4 → T2  ; Q
 
 [entrypoints]
-Q = 06 :: T3
+Q = 06 :: T2
 
 [transitions]
 _StructWrap:
@@ -71,9 +72,10 @@ Q:
   06   !   (program)                        08
   07  ...
   08  └‣─  _                                10, 16
-  10   !   [EnumOpen(M2) StructOpen] (expression_statement) [Node Set(M0)]  13
-  13  ─‣┘  [StructClose Set(M1) EnumClose] _  15
-  15                                        ▶
+  10   !   [StructOpen] (expression_statement) [Node Set(M0)]  12
+  12  ─‣┘  [StructClose Set(M1)] _          14
+  14                                        ▶
+  15  ...
   16  ─‣─  _                                10, 16
 ==== trace ====
 _StructWrap:
@@ -86,11 +88,11 @@ Q:
        ●   program
   08       _                                10, 16
        ●   expression_statement
-  10       [EnumOpen(M2) StructOpen] (expression_statement) [Node Set(M0)]  13
+  10       [StructOpen] (expression_statement) [Node Set(M0)]  12
        ●   expression_statement
-  13       [StructClose Set(M1) EnumClose] _  15
+  12       [StructClose Set(M1)] _          14
        ●   program
-  15   ◀   (Q)                              
+  14   ◀   (Q)                              
 
 _StructWrap:
   03  -ε-  [StructClose]                    05

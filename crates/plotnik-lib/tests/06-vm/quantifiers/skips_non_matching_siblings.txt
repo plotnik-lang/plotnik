@@ -55,13 +55,11 @@ Q:
   08  -ε-  [ArrayOpen]                      18, 11
   10                                        ▶
   11  -ε-  [ArrayClose Set(M0)]             10
-  13   !   (lexical_declaration) [Node Push]  22, 24
+  13   !   (lexical_declaration) [Node Push]  16, 20
   15  ...
   16  ─‣─  _                                13, 16
   18  └‣─  _                                13, 16
-  20  ─‣─  _                                13, 20
-  22  ─‣─  _                                13, 20
-  24  ─‣┘  [ArrayClose Set(M0)] _           10
+  20  ─‣┘  [ArrayClose Set(M0)] _           10
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -74,20 +72,20 @@ Q:
   08  -ε-  [ArrayOpen]                      18, 11
   18       _                                13, 16
        ●   lexical_declaration
-  13       (lexical_declaration) [Node Push]  22, 24
+  13       (lexical_declaration) [Node Push]  16, 20
        ●   lexical_declaration
-  22       _                                13, 20
+  16       _                                13, 16
        ●   expression_statement
-  13       (lexical_declaration) [Node Push]  22, 24
+  13       (lexical_declaration) [Node Push]  16, 20
        ○   expression_statement
-  22  ❮❮❮ 
-  20       _                                13, 20
+  16  ❮❮❮ 
+  16       _                                13, 16
        ●   lexical_declaration
-  13       (lexical_declaration) [Node Push]  22, 24
+  13       (lexical_declaration) [Node Push]  16, 20
        ●   lexical_declaration
-  22       _                                13, 20
+  16       _                                13, 16
   13  ❮❮❮ 
-  24       [ArrayClose Set(M0)] _           10
+  20       [ArrayClose Set(M0)] _           10
        ●   program
   10   ◀   (Q)                              
 

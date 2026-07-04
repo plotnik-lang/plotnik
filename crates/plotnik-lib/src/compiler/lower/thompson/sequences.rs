@@ -9,10 +9,8 @@ use crate::compiler::parse::ast::{self, SeqItem};
 
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
-use super::navigation::{
-    is_down_nav, is_skippable_quantifier, pattern_owns_iteration, resumable_search_nav,
-};
-use super::scope::SplitExits;
+use super::navigation::{is_down_nav, resumable_search_nav};
+use super::scope::{SkipExit, SplitExits};
 
 /// The sibling nav implied by a sequence's trailing anchor, used to mark the
 /// last pattern as anchor-followed.
@@ -80,7 +78,7 @@ pub(super) struct SeqItemsCtx<'a> {
     pub(super) is_inside_node: bool,
     pub(super) first_nav: Option<Nav>,
     pub(super) capture: CaptureEffects,
-    pub(super) skip_exit: Option<Label>,
+    pub(super) skip_exit: Option<SkipExit>,
 }
 
 impl NfaBuilder<'_> {
@@ -151,7 +149,7 @@ impl NfaBuilder<'_> {
         let first_is_skippable = nav_modes
             .first()
             .and_then(|(idx, _)| items[*idx].as_pattern())
-            .is_some_and(is_skippable_quantifier);
+            .is_some_and(|p| self.is_skippable_item(p));
         // The skip path makes the follower the new "first" item, so it must re-derive
         // first-position navigation rather than the sibling `Next` the match path uses.
         // This is required whenever the first item navigates to a position (`Down*` into
@@ -159,8 +157,11 @@ impl NfaBuilder<'_> {
         // advancing to a sibling — otherwise the skip path over-advances and never binds.
         let first_positions = is_down_nav(first_pattern_nav)
             || matches!(first_pattern_nav, Some(Nav::Stay | Nav::StayExact));
-        let needs_skip_exit =
-            first_is_skippable && first_positions && (nav_modes.len() > 1 || skip_exit.is_some());
+        // A caller-threaded skip exit must be honored at any nav: the all-skip
+        // path has to reach it (a childless-node bypass, or a `Fail` prune),
+        // not fall through to the match exit.
+        let needs_skip_exit = first_is_skippable
+            && (skip_exit.is_some() || (first_positions && nav_modes.len() > 1));
 
         if needs_skip_exit {
             return self.compile_seq_items_with_skip_exit(
@@ -185,7 +186,7 @@ impl NfaBuilder<'_> {
         let last_is_skippable = nav_modes
             .last()
             .and_then(|(idx, _)| items[*idx].as_pattern())
-            .is_some_and(is_skippable_quantifier);
+            .is_some_and(|p| self.is_skippable_item(p));
 
         // Build chain in reverse: last pattern exits to `exit`, each prior exits to next.
         let mut current_exit = exit;
@@ -238,7 +239,7 @@ impl NfaBuilder<'_> {
                 Some(Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact)
             );
             let search_nav = resumable_search_nav(nav_override)
-                .filter(|_| followed_by_anchor && !pattern_owns_iteration(pattern));
+                .filter(|_| followed_by_anchor && !self.item_owns_iteration(pattern));
 
             current_exit = if let Some(nav) = search_nav {
                 let body = self.dispatch_pattern(
@@ -331,7 +332,7 @@ impl NfaBuilder<'_> {
         let (skip_exit, match_exit, first_post) = if nav_modes.len() < 2 {
             // The skippable item is the only (and last) item, so it carries `post_keep`.
             (
-                caller_skip_exit.unwrap_or(exit),
+                caller_skip_exit.unwrap_or(SkipExit::To(exit)),
                 exit,
                 CaptureEffects::new_post(post_effects.item_post),
             )
@@ -358,7 +359,7 @@ impl NfaBuilder<'_> {
                 capture: cont,
                 skip_exit: None, // Match path doesn't need skip exit
             });
-            (skip, mtch, CaptureEffects::default())
+            (SkipExit::To(skip), mtch, CaptureEffects::default())
         };
 
         let entry = self.compile_skippable_with_exits(

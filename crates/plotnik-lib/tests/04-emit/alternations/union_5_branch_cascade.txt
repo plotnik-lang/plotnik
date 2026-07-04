@@ -42,23 +42,25 @@ _StructWrap:
   07  ...
 
 Q:
-  08  -ε-                                   11, 18, 26, 34, 42
-  11  -ε-  [Null Set(M1) Null Set(M2) Null Set(M3) Null]  14
-  14  -ε-  [Set(M4)]                        16
-  16   !   (identifier) [Node Set(M0)]      06
-  18  -ε-  [Null Set(M0) Null Set(M2) Null Set(M3) Null]  21
-  21  -ε-  [Set(M4)]                        24
+  08  -ε-                                   11, 13, 20, 28, 36
+  11  -ε-  [Null]                           16
+  13  -ε-  [Null]                           24
+  15  ...
+  16   !   [Set(M1) Null Set(M2) Null Set(M3) Null Set(M4)] (identifier) [Node Set(M0)]  06
+  20  -ε-  [Null]                           32
+  22  ...
   23  ...
-  24   !   (number) [Node Set(M1)]          06
-  26  -ε-  [Null Set(M0) Null Set(M1) Null Set(M3) Null]  29
-  29  -ε-  [Set(M4)]                        32
+  24   !   [Set(M0) Null Set(M2) Null Set(M3) Null Set(M4)] (number) [Node Set(M1)]  06
+  28  -ε-  [Null]                           40
+  30  ...
   31  ...
-  32   !   (string) [Node Set(M2)]          06
-  34  -ε-  [Null Set(M0) Null Set(M1) Null Set(M2) Null]  37
-  37  -ε-  [Set(M4)]                        40
+  32   !   [Set(M0) Null Set(M1) Null Set(M3) Null Set(M4)] (string) [Node Set(M2)]  06
+  36  -ε-  [Null]                           48
+  38  ...
   39  ...
-  40   !   (binary_expression) [Node Set(M3)]  06
-  42  -ε-  [Null Set(M0) Null Set(M1) Null Set(M2) Null]  45
-  45  -ε-  [Set(M3)]                        48
+  40   !   [Set(M0) Null Set(M1) Null Set(M2) Null Set(M4)] (binary_expression) [Node Set(M3)]  06
+  44  ...
+  45  ...
+  46  ...
   47  ...
-  48   !   (call_expression) [Node Set(M4)]  06
+  48   !   [Set(M0) Null Set(M1) Null Set(M2) Null Set(M3)] (call_expression) [Node Set(M4)]  06

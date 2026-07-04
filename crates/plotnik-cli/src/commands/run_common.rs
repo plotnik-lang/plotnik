@@ -6,6 +6,7 @@ use std::path::Path;
 
 use arborium_tree_sitter as tree_sitter;
 use plotnik_lib::bytecode::{Entrypoint, Module};
+use plotnik_lib::text_utils::find_similar;
 
 use super::compile::compile_query;
 use super::lang_resolver::reconcile_lang;
@@ -72,9 +73,15 @@ pub fn resolve_run_lang(
 /// Resolve the selected entrypoint after defaulting has already happened.
 pub fn resolve_entrypoint(module: &Module, name: Option<&str>) -> Result<Entrypoint, CliError> {
     match name {
-        Some(name) => module
-            .entrypoint(name)
-            .ok_or_else(|| CliError::fatal(format!("invalid entrypoint: {}", name))),
+        Some(name) => module.entrypoint(name).ok_or_else(|| {
+            let names: Vec<&str> = module.entrypoint_names().collect();
+            let mut msg = format!("invalid entrypoint: {}", name);
+            if let Some(similar) = find_similar(name, &names) {
+                msg.push_str(&format!("\n\nDid you mean '{}'?", similar));
+            }
+            msg.push_str(&format!("\n\nAvailable entrypoints: {}", names.join(", ")));
+            CliError::fatal(msg)
+        }),
         None => Err(CliError::fatal("no entrypoints in module")),
     }
 }

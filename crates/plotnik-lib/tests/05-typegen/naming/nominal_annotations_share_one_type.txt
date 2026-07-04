@@ -1,0 +1,13 @@
+Q = (program
+  {(expression_statement) @stmt} @a :: Info
+  {(expression_statement) @stmt} @b :: Info
+)
+==== types ====
+export interface Info {
+  stmt: Node;
+}
+
+export interface Q {
+  a: Info;
+  b: Info;
+}

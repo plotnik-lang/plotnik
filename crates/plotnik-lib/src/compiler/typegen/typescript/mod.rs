@@ -7,7 +7,6 @@ mod analysis;
 mod config;
 mod convert;
 mod emitter;
-mod naming;
 mod render;
 
 pub use config::{Config, VoidType};

@@ -64,8 +64,8 @@ Q:
   09   !   (program)                        10
   10  └‣─  (function_declaration) [StructOpen]  12
   12  └‣─  name: (Name)                     06 : 13
-  13  -ε-  [StructClose]                    15
-  15  -ε-                                   16
+  13  -ε-  [StructClose]                    16
+  15  ...
   16  ─‣┘² [Set(M1)] _                      18
   18                                        ▶
 ==== trace ====
@@ -88,8 +88,7 @@ Name:
   08   ◀   (Name)                           
 
 Q:
-  13  -ε-  [StructClose]                    15
-  15  -ε-                                   16
+  13  -ε-  [StructClose]                    16
   16       [Set(M1)] _                      18
        ●   program
   18   ◀   (Q)                              

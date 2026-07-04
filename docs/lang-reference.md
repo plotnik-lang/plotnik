@@ -17,6 +17,9 @@ NFA-based cursor walk with backtracking.
 - **Root-anchored**: Matches the entire tree structure (like `^...$` in regex)
 - **Backtracking**: Failed branches restore state and try alternatives
 - **Ordered choice**: `[A B C]` tries branches left-to-right; first match wins
+- **Zero-width is last resort**: a pattern that can match zero nodes (an
+  optional, a star, a group of optionals, a reference to such a definition)
+  matches zero-width only when no consuming match exists at its position
 
 ### Trivia Handling
 
@@ -164,8 +167,10 @@ DeepSearch = [
 `main.ptk`:
 
 ```
-AllIdentifiers = (program (DeepSearch)*)
+AllIdentifiers = (program (DeepSearch)* @found)
 ```
+
+The capture on the reference is what produces output — `found: DeepSearch[]`. A bare `(DeepSearch)*` would match the same structure and return nothing.
 
 ---
 
@@ -187,7 +192,7 @@ Plotnik infers output types from your query. See [Type System](type-system.md) f
 
 ### Flat by Default
 
-Query nesting does NOT create output nesting. All captures bubble up to the nearest scope boundary:
+Query nesting does NOT create output nesting. Within a definition, all captures bubble up to the nearest scope boundary:
 
 ```
 (function_declaration
@@ -204,6 +209,8 @@ Output type:
 
 The pattern is 4 levels deep, but the output is flat. You're extracting specific pieces from an AST, not reconstructing its shape.
 
+Definitions are the exception: references are **opaque**. A bare `(Item)` matches structurally and produces nothing; `(Item) @item` produces the definition's type. Fields never leak through a reference boundary. See [Type System: Definitions Are Types](type-system.md#definitions-are-types).
+
 ### Strict Dimensionality
 
 **Quantifiers (`*`, `+`) containing internal captures require a struct capture.**
@@ -217,7 +224,17 @@ The pattern is 4 levels deep, but the output is flat. You're extracting specific
 → { methods: { method: Node, name: Node }[] }
 ```
 
-This prevents association loss — each struct is a distinct object, not parallel arrays that lose per-iteration grouping. See [Type System: Strict Dimensionality](type-system.md#1-strict-dimensionality).
+This prevents association loss — each struct is a distinct object, not parallel arrays that lose per-iteration grouping.
+
+Because references are opaque, repeating one is dimensionally simple — the definition's type is the element:
+
+```
+Item = (pair key: (_) @k value: (_) @v)
+(program (Item)* @items)
+→ { items: Item[] }
+```
+
+See [Type System: Strict Dimensionality](type-system.md#strict-dimensionality).
 
 ### The Node Type
 
@@ -225,12 +242,13 @@ Default capture type — a reference to a tree-sitter node:
 
 ```
 interface Node {
-  kind: string;    // e.g. "identifier"
-  text: string;    // source text
-  start: Position; // { row, column }
-  end: Position;
+  kind: string;           // e.g. "identifier"
+  text: string;           // source text
+  span: [number, number]; // byte offsets
 }
 ```
+
+`infer --verbose-nodes` adds `startPosition`/`endPosition` (`{ row, column }`).
 
 ### Cardinality: Quantifiers → Arrays
 
@@ -251,9 +269,13 @@ Node arrays work when the quantified pattern has **no internal captures**. For p
 
 | Pattern         | Output Type       | Meaning                                 |
 | --------------- | ----------------- | --------------------------------------- |
-| `{...}* @items` | `items: T[]`      | zero or more structs                    |
-| `{...}+ @items` | `items: [T, ...]` | one or more structs                     |
-| `{...}? @item`  | `item: T \| null` | nullable struct (bubbles if uncaptured) |
+| `{...}* @items` | `items: T[]`      | zero or more structs |
+| `{...}+ @items` | `items: [T, ...]` | one or more structs  |
+| `{...}? @item`  | `item: T \| null` | nullable struct      |
+
+The capture on the quantifier is required whenever the pattern has internal
+captures — for `?` just like `*`/`+` (use `@_` to match structurally and
+discard them).
 
 ### Creating Nested Structure
 
@@ -287,58 +309,35 @@ The `@func` capture on the sequence creates a nested scope. All captures inside 
 
 Type names must be `PascalCase`.
 
+Every structured type has a compiler-generated name already (`{Parent}{Field}` along the capture path), so annotations are optional. An annotation overrides the generated name and resets the chain — nested composites derive from the new name. Names are nominal: the same name on identical shapes denotes one shared type; on different shapes it's a compile error. `Node` and definition names are reserved. See [Type System: Type Naming](type-system.md#type-naming).
+
 ### Suppressive Captures
 
-Suppress captures from contributing to output with `@_` or `@_name`:
+`@_` (or `@_name`) consumes a pattern's output and discards all of it — the subtree still matches structurally:
 
 ```
-Expr = (binary_expression left: (number) @left right: (number) @right)
-
-; Without suppression: @left, @right bubble up
-Query = (statement (Expr) @expr)
-; Output: { expr: Node, left: Node, right: Node }
-
-; With suppression: inner captures are suppressed
-Query = (statement { (Expr) @_ } @expr)
-; Output: { expr: Node }
+; Structure required, no output at all
+Q = (program
+  (expression_statement (identifier) @x) @_
+  (debugger_statement) @d
+)
+; Output: { d: Node }
 ```
 
-Use cases:
+The main use since references are already opaque: intentionally discarding a labeled alternation's tags. An uncaptured labeled alternation degrades to a union with a warning; `@_` says "discard all of it" and silences the warning:
 
-- **Match structurally, don't extract**: Use a definition's pattern but discard its captures
-- **Wrap and isolate**: `{ inner @_ } @outer` captures the outer node while suppressing inner captures
+```
+(program [A: (expression_statement) B: (debugger_statement)] @_)
+; matches, output is null, no warning
+```
 
 Rules:
 
 - `@_` and `@_name` match like regular captures but produce no output
 - Named suppressive captures (`@_foo`) are equivalent to `@_` — the name is documentation only
+- Captures inside a suppressed subtree are inert; they never collide with same-named captures outside it
 - Type annotations are not allowed on suppressive captures
 - Nesting works: `@_outer` containing `@_inner` correctly suppresses both
-
-Example:
-
-```
-FuncDecl = {
-  (function_declaration
-    name: (identifier) @name
-    body: (_) @body
-  ) @node
-} @func :: FunctionDeclaration
-```
-
-Output type:
-
-```typescript
-interface FunctionDeclaration {
-  body: Node;
-  name: Node;
-  node: Node;
-}
-
-interface FuncDecl {
-  func: FunctionDeclaration;
-}
-```
 
 ### Summary
 
@@ -348,7 +347,11 @@ interface FuncDecl {
 | `(x)? @a`                | Optional field                        |
 | `(x)* @a`                | Node array (no internal captures)     |
 | `{...}* @items`          | Struct array (with internal captures) |
-| `{...} @x` / `[...] @x` | Nested object (new scope)             |
+| `{...} @x` / `[...] @x`  | Nested object (new scope)             |
+| `(Def)`                  | Structural match, no output           |
+| `(Def) @x`               | The definition's type                 |
+| `(Def)* @xs`             | Array of the definition's type        |
+| `[...] @_`               | Match and discard                     |
 | `@x :: T`                | Custom type name                      |
 
 ---
@@ -494,14 +497,13 @@ Output type:
 
 ### Supertypes
 
-Query abstract node kinds directly. A `#subtype` refinement is accepted syntactically but
-not yet enforced — the node currently matches on its supertype alone, so `(expression)` and
-`(expression#binary_expression)` behave identically for now:
+Supertypes (abstract node kinds like `expression`) cannot be matched yet. Both the bare
+form `(expression)` and the `#subtype` refinement `(expression#binary_expression)` are
+rejected at compile time; the `#` syntax is reserved for a future release. Match the
+concrete subtypes with an alternation instead:
 
 ```
-(expression) @expr
-(expression#binary_expression) @binary
-(expression#"()") @empty_parens
+[(binary_expression) (unary_expression)] @expr
 ```
 
 The separator is tight-binding — no whitespace around `#`. The tree-sitter spelling
@@ -580,6 +582,20 @@ The `+` quantifier always produces non-empty arrays — no opt-out.
 
 Plotnik also supports non-greedy variants: `*?`, `+?`, `??`
 
+A repeat iteration must consume input. When the element can itself match
+zero nodes — a reference to a definition rooted at `?`, or an alternation
+with an optional branch — only its consuming matches become elements:
+
+```
+A = (expression_statement (identifier) @id)? @x
+Q = (program (A)* @xs)    ; xs collects one row per real match;
+                          ; non-matching statements are skipped, not
+                          ; collected as { x: null } rows
+```
+
+`(A)+` likewise requires at least one real match; a zero-width outcome never
+satisfies it.
+
 ---
 
 ## Sequences
@@ -656,6 +672,14 @@ Match alternatives with `[...]`:
 
 - **Union** (no branch labels): Fields merge across branches
 - **Enum** (with branch labels): Discriminated union
+
+A branch that can match zero nodes (`[(a)? (b)]`) succeeds zero-width only
+as a last resort: every branch's consuming match, at any candidate position,
+is preferred first. The zero-width outcome needs no candidate at all — it
+matches even in an empty parent — and leaves the cursor in place for any
+following pattern. In a union it yields every merged field at its default
+(`null`, or `[]` for a required list); in an enum it tags the variant with a
+defaulted payload.
 
 ```
 [
@@ -760,28 +784,32 @@ type Stmt =
   | { $tag: "Call"; $data: { func: Node } };
 ```
 
-### Alternations with Type Annotations
+The tags materialize when the alternation's value is **consumed**: captured (`[...] @x`), row-captured (`[...]* @xs`), or used as a definition body (`Expr = [...]`). A labeled alternation nothing consumes has no value to tag — it degrades to a plain union (captures bubble as optional fields) and the compiler warns that the labels have no effect.
 
-When a merge alternation produces a structure (branches have internal captures), the capture on the alternation must have an explicit type annotation for codegen:
+A branch with no captures becomes a tag-only variant (`{ $tag: "..." }`, no `$data`) — tags-only enums are legitimate when which branch matched is all you want. A bare reference as a branch body is also tag-only; capture it (`[Call: (Inner) @data]`) to carry the definition's value.
+
+### Alternation Type Names
+
+A captured union that produces a structure gets a generated path name like any other composite; annotate to override it:
 
 ```
-(call_expression
+Q = (call_expression
   function: [
     (identifier) @fn
     (member_expression property: (property_identifier) @method)
-  ] @target :: Target)
+  ] @target)
 ```
 
 Output type:
 
 ```typescript
-interface Target {
+interface QTarget {
   fn: Node | null;
   method: Node | null;
 }
 
-{
-  target: Target;
+interface Q {
+  target: QTarget;
 }
 ```
 
@@ -944,12 +972,13 @@ Use as node kinds:
 (return_statement (BinaryOp) @expr)
 ```
 
-**Encapsulation**: `(Name)` matches but extracts nothing. You must capture (`(Name) @x`) to access fields. This separates structural reuse from data extraction.
+**Encapsulation**: `(Name)` matches but extracts nothing. Capture the reference to get the definition's typed result — `(BinaryOp) @expr` above produces `{ expr: BinaryOp }` where `BinaryOp` is `{ left: Node, op: Node, right: Node }`. This separates structural reuse from data extraction, and it means extracting a pattern into a definition never silently changes your output.
 
-Named expressions define both pattern and type:
+Named expressions define both pattern and type. A definition whose body has no captures is void — useful purely structurally:
 
 ```
 Expr = [(BinaryOp) (UnaryOp) (identifier) (number)]
+(statement (Expr))     ; matches any statement containing an Expr, no output
 ```
 
 ---
@@ -1006,44 +1035,22 @@ Root = (program (Statement)+ @statements)
 Output types:
 
 ```typescript
-type Expression = ExpressionIdent | ExpressionNum | ExpressionStr;
+export type Statement =
+  | { $tag: "Assign"; $data: { target: Node; value: Expression } }
+  | { $tag: "Call"; $data: { args: Expression[]; func: Node } }
+  | { $tag: "Return"; $data: { value: Expression | null } };
 
-interface ExpressionIdent {
-  $tag: "Ident";
-  $data: { name: Node };
-}
-
-interface ExpressionNum {
-  $tag: "Num";
-  $data: { value: Node };
-}
-
-interface ExpressionStr {
-  $tag: "Str";
-  $data: { value: Node };
-}
-
-type Statement = StatementAssign | StatementCall | StatementReturn;
-
-interface StatementAssign {
-  $tag: "Assign";
-  $data: { target: Node; value: Expression };
-}
-
-interface StatementCall {
-  $tag: "Call";
-  $data: { func: Node; args: Expression[] };
-}
-
-interface StatementReturn {
-  $tag: "Return";
-  $data: { value: Expression | null };
-}
-
-interface Root {
+export interface Root {
   statements: [Statement, ...Statement[]];
 }
+
+export type Expression =
+  | { $tag: "Ident"; $data: { name: Node } }
+  | { $tag: "Num"; $data: { value: Node } }
+  | { $tag: "Str"; $data: { value: Node } };
 ```
+
+Enums render as one multi-line union with inline variants — variant payloads never get standalone declarations.
 
 ---
 

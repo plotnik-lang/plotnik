@@ -1,0 +1,99 @@
+Q = (program
+  (expression_statement
+    [
+      (call_expression (arguments (identifier)+ @args))
+      (identifier) @id
+    ]
+  )
+)
+==== input ====
+x
+==== types ====
+export interface Q {
+  args: Node[];
+  id: Node | null;
+}
+==== output ====
+{
+  "args": [],
+  "id": {
+    "kind": "identifier",
+    "text": "x",
+    "span": [0, 1]
+  }
+}
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "args"
+S2 "id"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "call_expression"
+S7 "arguments"
+S8 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:2  ; { args, id }
+T3 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T1  ; args: T1
+M1: S2 → T3  ; id: T3
+
+[type_names]
+N0: S3 → T2  ; Q
+
+[entrypoints]
+Q = 06 :: T2
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06   !   (program)                        07
+  07  └‣─  (expression_statement)           08
+  08  └‣─  _                                21, 24, 27
+  10                                        ▶
+  11   !   (identifier) [Node Push]         13, 18
+  13  ─‣─  _                                11, 13
+  15  ─‣┘² _                                10
+  16  └‣─  [ArrayOpen] _                    11, 13
+  18  ─‣┘² [ArrayClose Set(M0)] _           15
+  20  └‣─  (arguments)                      16
+  21   !   [Null Set(M1)] (call_expression)  20
+  23  ...
+  24   !   [ArrayOpen ArrayClose Set(M0)] (identifier) [Node Set(M1)]  15
+  27  ─‣─  _                                21, 24, 27
+==== trace ====
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  06       (program)                        07
+       ●   program
+  07       (expression_statement)           08
+       ●   expression_statement
+  08       _                                21, 24, 27
+       ●   identifier
+  21       [Null Set(M1)] (call_expression)  20
+       ○   identifier
+  08  ❮❮❮ 
+  24       [ArrayOpen ArrayClose Set(M0)] (identifier) [Node Set(M1)]  15
+       ●   identifier
+  15       _                                10
+       ●   program
+  10   ◀   (Q)                              
+
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼

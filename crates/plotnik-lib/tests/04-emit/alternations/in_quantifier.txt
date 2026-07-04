@@ -15,10 +15,12 @@ S03 "A"
 S04 "B"
 S05 "item"
 S06 "items"
-S07 "Q"
-S08 "object"
-S09 "pair"
-S10 "shorthand_property_identifier"
+S07 "QItemsItem"
+S08 "QItems"
+S09 "Q"
+S10 "object"
+S11 "pair"
+S12 "shorthand_property_identifier"
 
 [type_defs]
 T0 = <Node>
@@ -26,7 +28,7 @@ T1 = Struct  M0:1  ; { a }
 T2 = Struct  M1:1  ; { b }
 T3 = Enum    M2:2  ; A | B
 T4 = Struct  M4:1  ; { item }
-T5 = ArrayStar(T4)  ; T4*
+T5 = ArrayStar(T4)  ; QItems*
 T6 = Struct  M5:1  ; { items }
 
 [type_members]
@@ -34,11 +36,13 @@ M0: S01 → T0  ; a: <Node>
 M1: S02 → T0  ; b: <Node>
 M2: S03 → T1  ; A: T1
 M3: S04 → T2  ; B: T2
-M4: S05 → T3  ; item: T3
+M4: S05 → T3  ; item: QItemsItem
 M5: S06 → T5  ; items: T5
 
 [type_names]
-N0: S07 → T6  ; Q
+N0: S07 → T3  ; QItemsItem
+N1: S08 → T4  ; QItems
+N2: S09 → T6  ; Q
 
 [entrypoints]
 Q = 06 :: T6
@@ -53,16 +57,14 @@ _StructWrap:
 Q:
   06   !   (object)                         08
   07  ...
-  08  -ε-  [ArrayOpen]                      28, 14
-  10  -ε-                                   11
-  11  ─‣┘  [ArrayClose Set(M5)] _           13
-  13                                        ▶
-  14  -ε-  [ArrayClose Set(M5)]             13
-  16  -ε-  [StructClose Push]               32, 10
-  18   !   [EnumOpen(M2)] (pair) [Node Set(M0) EnumClose Set(M4)]  16
-  21   !   [EnumOpen(M3)] (shorthand_property_identifier) [Node Set(M1) EnumClose Set(M4)]  16
-  24  -ε-  [StructOpen]                     18, 21
-  26  ─‣─  _                                24, 26
-  28  └‣─  _                                24, 26
-  30  ─‣─  _                                24, 30
-  32  ─‣─  _                                24, 30
+  08  -ε-  [ArrayOpen]                      26, 11
+  10                                        ▶
+  11  -ε-  [ArrayClose Set(M5)]             10
+  13  -ε-  [StructClose Push]               24, 28
+  15  ...
+  16   !   [EnumOpen(M2)] (pair) [Node Set(M0) EnumClose Set(M4)]  13
+  19   !   [EnumOpen(M3)] (shorthand_property_identifier) [Node Set(M1) EnumClose Set(M4)]  13
+  22  -ε-  [StructOpen]                     16, 19
+  24  ─‣─  _                                22, 24
+  26  └‣─  _                                22, 24
+  28  ─‣┘  [ArrayClose Set(M5)] _           10

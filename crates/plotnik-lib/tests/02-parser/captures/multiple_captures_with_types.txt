@@ -2,6 +2,12 @@ Q = (binary
   left: (_) @left :: Node
   right: (_) @right :: Foo
 ) @expr :: BinaryExpr
+==== diagnostics ====
+warning: this type annotation `Node` is already the default type; omit it
+ --> query.ptk:2:22
+  |
+2 |   left: (_) @left :: Node
+  |                      ^^^^
 ==== cst ====
 # query.ptk
 Root

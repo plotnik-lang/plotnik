@@ -1,0 +1,12 @@
+Q = [
+  A: (identifier) @id
+  B: (number) @n
+]* @rows
+==== types ====
+export type QRows =
+  | { $tag: "A"; $data: { id: Node } }
+  | { $tag: "B"; $data: { n: Node } };
+
+export interface Q {
+  rows: QRows[];
+}

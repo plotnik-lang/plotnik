@@ -7,7 +7,7 @@
 //! - Field constraints: `name: pattern`
 //! - Captured patterns: `@name`, `pattern @name`
 
-use crate::bytecode::{Nav, PredicateOp};
+use crate::bytecode::{EffectKind, Nav, PredicateOp};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
@@ -22,15 +22,30 @@ use crate::compiler::analyze::types::CaptureKind;
 
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
-use super::scope::{CaptureExits, CaptureRequest, SplitExits};
+use super::navigation::pattern_owns_iteration;
+use super::nfa_emit::{BranchTargets, Greediness};
+use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SkipExit, SplitExits};
 use super::sequences::SeqItemsCtx;
 
 #[derive(Clone, Copy)]
 enum RefLowering {
     ScopedCapture,
     CapturedValue,
-    SuppressedOpaqueRecursion,
+    SuppressedCall,
     PlainCall,
+}
+
+/// Whether the post-effect chain consumes the call's pending value.
+///
+/// A capture on the reference itself puts its consumer (`Set`, or `Push` for an
+/// array element) first in the chain — `build_capture_effects` emits no `Node`
+/// for the `Ref` mechanism. Anything else first — a `Node`+`Set` pair capturing
+/// the matched node, or an enclosing scope's close (`EnumClose` on a tag-only
+/// variant) — leaves the reference itself unconsumed, so its output is
+/// suppressed.
+fn post_consumes_call_value(post: &[EffectIR]) -> bool {
+    post.first()
+        .is_some_and(|e| matches!(e.kind(), EffectKind::Set | EffectKind::Push))
 }
 
 impl<'a> CaptureRequest<'a> {
@@ -130,7 +145,8 @@ impl NfaBuilder<'_> {
             is_inside_node: true,
             first_nav: None,
             capture: CaptureEffects::default(),
-            skip_exit: Some(final_exit), // Skip exit bypasses Up when Down fails (childless node)
+            // Skip exit bypasses Up when Down fails (childless node)
+            skip_exit: Some(SkipExit::To(final_exit)),
         });
 
         self.instructions
@@ -189,34 +205,158 @@ impl NfaBuilder<'_> {
         entry
     }
 
+    /// Resolve a reference to the `DefId` of its target definition.
+    pub(super) fn resolve_ref_def_id(&self, r: &ast::DefRef) -> DefId {
+        let name_token = r.name().expect("validated reference must have a name");
+        self.ctx
+            .analysis
+            .dependency_analysis
+            .def_id_for_name(self.ctx.analysis.interner, name_token.text())
+            .expect("analyzed reference must resolve to a definition")
+    }
+
+    /// Whether this pattern is a reference (possibly captured) to a nullable
+    /// definition — one whose body can match zero nodes. Such references are
+    /// skippable items: their bodies inline at the call site so the zero-width
+    /// path exits like an inline `?` (see [`compile_ref_inline`](Self::compile_ref_inline)).
+    pub(super) fn is_nullable_ref_item(&self, pattern: &Pattern) -> bool {
+        let inner = match pattern {
+            Pattern::CapturedPattern(cap) => {
+                let Some(inner) = cap.inner() else {
+                    return false;
+                };
+                inner
+            }
+            other => other.clone(),
+        };
+        let Pattern::DefRef(r) = &inner else {
+            return false;
+        };
+        self.nullable_defs.contains(&self.resolve_ref_def_id(r))
+    }
+
+    /// Whether a pattern can match zero nodes (see `analyze::nullability`).
+    pub(super) fn pattern_is_nullable(&self, pattern: &Pattern) -> bool {
+        crate::compiler::analyze::nullability::pattern_nullable(
+            pattern,
+            &self.nullable_defs,
+            self.ctx.analysis.dependency_analysis,
+            self.ctx.analysis.interner,
+        )
+    }
+
+    /// A sequence item that may consume nothing: a skippable quantifier, a
+    /// reference to a nullable definition, a group of such items, or an
+    /// alternation with a nullable branch.
+    pub(super) fn is_skippable_item(&self, pattern: &Pattern) -> bool {
+        self.pattern_is_nullable(pattern)
+    }
+
+    /// [`pattern_owns_iteration`] extended to nullable references: the inlined
+    /// body stands in for the item, so iteration ownership is the body's — a
+    /// quantifier-rooted body owns its sibling search, and wrapping it in a
+    /// position search would double-search.
+    pub(super) fn item_owns_iteration(&self, pattern: &Pattern) -> bool {
+        if pattern_owns_iteration(pattern) {
+            return true;
+        }
+        self.is_nullable_ref_item(pattern) && self.body_owns_iteration(pattern)
+    }
+
+    /// Iteration ownership of the pattern a reference inlines to, following
+    /// alias bodies. Terminates because pure-alias cycles never consume and
+    /// are rejected by the recursion rules.
+    fn body_owns_iteration(&self, pattern: &Pattern) -> bool {
+        let inner = match pattern {
+            Pattern::CapturedPattern(cap) => {
+                let Some(inner) = cap.inner() else {
+                    return false;
+                };
+                inner
+            }
+            other => other.clone(),
+        };
+        let Pattern::DefRef(r) = &inner else {
+            return pattern_owns_iteration(&inner);
+        };
+        let def_id = self.resolve_ref_def_id(r);
+        let name = self
+            .ctx
+            .analysis
+            .interner
+            .resolve(self.ctx.analysis.dependency_analysis.def_name_sym(def_id));
+        let body = self
+            .ctx
+            .symbol_table
+            .body(name)
+            .expect("analyzed definition has a body");
+        self.body_owns_iteration(body)
+    }
+
     /// Compile a reference with capture effects.
     ///
-    /// Call-site scoping: the caller decides whether to wrap with Struct/EndStruct based on
-    /// whether the ref is captured and the called definition returns a struct.
+    /// A reference to a nullable definition (body can match zero nodes) inlines
+    /// the body at the call site: a real call's zero-width return would resume
+    /// at a return address whose navigation assumes the candidate was consumed,
+    /// stepping over an unmatched node. Inlining lets the ordinary skip-path
+    /// machinery (checkpoint cursor restore, split exits) apply unchanged, so a
+    /// reference matches exactly like its body written inline.
     ///
-    /// - Captured ref returning struct: `Struct → Call → EndStruct → Set → exit`
-    /// - Captured ref returning scalar: `Call → Set → exit`
-    /// - Uncaptured ref: `Call → exit` (def's Sets go to parent scope)
+    /// Everything else compiles as a call ([`compile_ref_call`](Self::compile_ref_call)).
     pub(super) fn compile_ref(
         &mut self,
         r: &ast::DefRef,
         ctx: PatternCtx,
         field_override: Option<NodeFieldId>,
     ) -> Label {
+        let def_id = self.resolve_ref_def_id(r);
+        if self.nullable_defs.contains(&def_id) {
+            // A nullable body has arity Many, which field values reject
+            // upstream ("field cannot match a sequence").
+            assert!(
+                field_override.is_none(),
+                "field-constrained reference to a nullable definition must be rejected by analysis"
+            );
+            let PatternCtx { exit, nav, capture } = ctx;
+            return self.compile_ref_inline(
+                def_id,
+                SplitExits {
+                    match_exit: exit,
+                    skip_exit: SkipExit::To(exit),
+                },
+                nav,
+                capture,
+            );
+        }
+        self.compile_ref_call(def_id, ctx, field_override, false)
+    }
+
+    /// Compile a reference as a `Call` to the definition's standalone body.
+    ///
+    /// Call-site scoping: the caller decides whether to wrap with Struct/EndStruct based on
+    /// whether the ref is captured and the called definition returns a struct.
+    ///
+    /// - Captured ref returning struct: `Struct → Call → EndStruct → Set → exit`
+    /// - Captured ref returning scalar: `Call → Set → exit`
+    /// - Bare ref to a non-void definition: `SuppressBegin → Call → SuppressEnd → exit`
+    ///   (matches structurally, output discarded)
+    /// - Bare ref to a void definition: `Call → exit` (nothing to discard)
+    ///
+    /// `keep_value` forces the consumed lowering even with no consumer effect
+    /// at this site: the callee's pending value must survive the call — it is
+    /// the caller's own return value (a quantifier at a definition's root).
+    fn compile_ref_call(
+        &mut self,
+        def_id: DefId,
+        ctx: PatternCtx,
+        field_override: Option<NodeFieldId>,
+        keep_value: bool,
+    ) -> Label {
         let PatternCtx {
             exit,
             nav: nav_override,
             capture,
         } = ctx;
-        let name_token = r.name().expect("validated reference must have a name");
-        let name = name_token.text();
-
-        let def_id = self
-            .ctx
-            .analysis
-            .dependency_analysis
-            .def_id_for_name(self.ctx.analysis.interner, name)
-            .expect("analyzed reference must resolve to a definition");
 
         // Inside the trust boundary: `def_id_for_name` only yields DefIds for
         // symbol-table definitions, and `assert_all_definitions_processed` makes
@@ -234,8 +374,8 @@ impl NfaBuilder<'_> {
             .analysis
             .type_analysis
             .expect_type_shape(def_output_id);
-        let is_captured = !capture.post.is_empty();
-        let lowering = self.ref_call_lowering(def_id, def_output_shape, is_captured);
+        let is_captured = post_consumes_call_value(&capture.post) || keep_value;
+        let lowering = self.ref_call_lowering(def_output_shape, is_captured);
 
         let nav = nav_override.unwrap_or(Nav::Stay);
 
@@ -255,14 +395,16 @@ impl NfaBuilder<'_> {
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
                 self.emit_call(nav, field_override, ReturnAddr(return_addr), callee)
             }
-            RefLowering::SuppressedOpaqueRecursion => {
-                // Suppress bracket keeps the structural match but discards all effects,
-                // matching the Void that inference assigns to uncaptured opaque recursion.
-                let suppress_end = self.emit_effects_epsilon(
-                    exit,
-                    vec![EffectIR::suppress_end()],
-                    CaptureEffects::default(),
-                );
+            RefLowering::SuppressedCall => {
+                // Suppress bracket keeps the structural match but discards the
+                // definition's output effects, matching the void that inference
+                // assigns to a bare reference. Non-consuming post effects (an
+                // enclosing variant's EnumClose, a scope close) run after the
+                // bracket, outside the discarded region.
+                let mut close_effects = vec![EffectIR::suppress_end()];
+                close_effects.extend(capture.post);
+                let suppress_end =
+                    self.emit_effects_epsilon(exit, close_effects, CaptureEffects::default());
                 let call_label =
                     self.emit_call(nav, field_override, ReturnAddr(suppress_end), callee);
                 self.emit_effects_epsilon(
@@ -272,8 +414,14 @@ impl NfaBuilder<'_> {
                 )
             }
             RefLowering::PlainCall => {
-                // Uncaptured ref: just Call → exit (def's Sets go to parent scope)
-                self.emit_call(nav, field_override, ReturnAddr(exit), callee)
+                // A void definition emits no output effects; the call needs no
+                // bracket. Enclosing-scope post effects still run after it.
+                let return_addr = if capture.post.is_empty() {
+                    exit
+                } else {
+                    self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default())
+                };
+                self.emit_call(nav, field_override, ReturnAddr(return_addr), callee)
             }
         };
 
@@ -285,12 +433,7 @@ impl NfaBuilder<'_> {
         self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
     }
 
-    fn ref_call_lowering(
-        &self,
-        def_id: DefId,
-        def_output_shape: &TypeShape,
-        is_captured: bool,
-    ) -> RefLowering {
+    fn ref_call_lowering(&self, def_output_shape: &TypeShape, is_captured: bool) -> RefLowering {
         if is_captured {
             if matches!(def_output_shape, TypeShape::Struct(_)) {
                 return RefLowering::ScopedCapture;
@@ -299,22 +442,245 @@ impl NfaBuilder<'_> {
             return RefLowering::CapturedValue;
         }
 
-        // An uncaptured recursive reference is opaque: inference types it Void, so
-        // its captures must not bubble into the parent scope. Enum recursion
-        // is the exception — inference forwards its enum value — so only the rest is
-        // suppressed.
-        let ref_returns_enum = matches!(def_output_shape, TypeShape::Enum(_));
-        if self
-            .ctx
-            .analysis
-            .dependency_analysis
-            .is_recursive_def(def_id)
-            && !ref_returns_enum
-        {
-            return RefLowering::SuppressedOpaqueRecursion;
+        // References are opaque: a bare reference matches structurally and its
+        // output is suppressed (inference types it void). Only a void-returning
+        // definition emits no output effects and can be called unbracketed.
+        if matches!(def_output_shape, TypeShape::Void) {
+            return RefLowering::PlainCall;
         }
 
-        RefLowering::PlainCall
+        RefLowering::SuppressedCall
+    }
+
+    /// Inline a nullable definition's body at the reference site.
+    ///
+    /// The lowering mirrors [`ref_call_lowering`](Self::ref_call_lowering) with
+    /// the body substituted for the `Call`:
+    ///
+    /// - Captured ref returning struct: `Struct → body → EndStruct → Set → exit(s)`
+    /// - Captured ref returning scalar: `body → Set → exit(s)`
+    /// - Bare ref: body compiled under suppression (compile-time — no
+    ///   `SuppressBegin`/`SuppressEnd` brackets needed)
+    ///
+    /// The body routes through [`compile_skippable_with_exits`](Self::compile_skippable_with_exits),
+    /// so its zero-width path exits to `skip_exit` with the checkpoint-restored
+    /// cursor — exactly the inline `?` semantics. Single-exit callers pass the
+    /// same label for both exits; the paths still differ in cursor state.
+    pub(super) fn compile_ref_inline(
+        &mut self,
+        def_id: DefId,
+        exits: SplitExits,
+        nav_override: Option<Nav>,
+        capture: CaptureEffects,
+    ) -> Label {
+        self.compile_ref_inline_in(def_id, exits, nav_override, capture, false)
+    }
+
+    /// [`compile_ref_inline`](Self::compile_ref_inline) with `keep_value`: the
+    /// body's pending value survives with no consumer effect at this site (see
+    /// [`compile_ref_call`](Self::compile_ref_call)).
+    pub(super) fn compile_ref_inline_keep_value(
+        &mut self,
+        def_id: DefId,
+        exits: SplitExits,
+        nav_override: Option<Nav>,
+    ) -> Label {
+        self.compile_ref_inline_in(def_id, exits, nav_override, CaptureEffects::default(), true)
+    }
+
+    /// Call a definition keeping its pending value alive (no consumer effect).
+    pub(super) fn compile_ref_call_keep_value(
+        &mut self,
+        def_id: DefId,
+        exit: Label,
+        nav_override: Option<Nav>,
+        field_override: Option<NodeFieldId>,
+    ) -> Label {
+        self.compile_ref_call(
+            def_id,
+            PatternCtx {
+                exit,
+                nav: nav_override,
+                capture: CaptureEffects::default(),
+            },
+            field_override,
+            true,
+        )
+    }
+
+    fn compile_ref_inline_in(
+        &mut self,
+        def_id: DefId,
+        exits: SplitExits,
+        nav_override: Option<Nav>,
+        capture: CaptureEffects,
+        keep_value: bool,
+    ) -> Label {
+        if self.inline_stack.contains(&def_id) {
+            return self.compile_ref_guarded_call(def_id, exits, nav_override, capture);
+        }
+
+        let name = self
+            .ctx
+            .analysis
+            .interner
+            .resolve(self.ctx.analysis.dependency_analysis.def_name_sym(def_id));
+        let body = self
+            .ctx
+            .symbol_table
+            .body(name)
+            .expect("analyzed definition has a body");
+
+        let def_output_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let def_output_shape = self
+            .ctx
+            .analysis
+            .type_analysis
+            .expect_type_shape(def_output_id);
+        let is_captured = post_consumes_call_value(&capture.post) || keep_value;
+        let inline_scoped_capture =
+            is_captured && matches!(def_output_shape, TypeShape::Struct(_));
+
+        let SplitExits {
+            match_exit,
+            skip_exit,
+        } = exits;
+        let CaptureEffects { pre, post } = capture;
+
+        self.inline_stack.push(def_id);
+        let entry = if inline_scoped_capture {
+            // Struct isolates the definition's internal captures before the
+            // Set; both continuations close it (a zero-width body still
+            // produced its row of skip-path values, e.g. `{x: null}`).
+            let end = ScopeCloseEffects {
+                capture: &post,
+                outer: &[],
+            };
+            let close_match = self.emit_struct_close_step_with_effects(end, match_exit);
+            let close_skip = match skip_exit {
+                SkipExit::To(skip) if skip == match_exit => SkipExit::To(close_match),
+                SkipExit::To(skip) => {
+                    SkipExit::To(self.emit_struct_close_step_with_effects(end, skip))
+                }
+                SkipExit::Fail => SkipExit::Fail,
+            };
+            let body_entry = self.with_scope(def_output_id, |this| {
+                this.compile_skippable_with_exits(
+                    body,
+                    SplitExits {
+                        match_exit: close_match,
+                        skip_exit: close_skip,
+                    },
+                    nav_override,
+                    CaptureEffects::default(),
+                )
+            });
+            self.emit_struct_step_with_pre(body_entry, pre)
+        } else if is_captured {
+            // Scalar-valued (enum) body: it leaves its value pending; the
+            // consumer chain runs after it on either continuation.
+            let set_match = self.emit_effects_if_nonempty(match_exit, post.clone());
+            let set_skip = match skip_exit {
+                SkipExit::To(skip) if skip == match_exit => SkipExit::To(set_match),
+                SkipExit::To(skip) => SkipExit::To(self.emit_effects_if_nonempty(skip, post)),
+                SkipExit::Fail => SkipExit::Fail,
+            };
+            let body_entry = self.with_scope(def_output_id, |this| {
+                this.compile_skippable_with_exits(
+                    body,
+                    SplitExits {
+                        match_exit: set_match,
+                        skip_exit: set_skip,
+                    },
+                    nav_override,
+                    CaptureEffects::default(),
+                )
+            });
+            self.wrap_entry_pre(body_entry, pre)
+        } else {
+            // Bare reference: opaque, so the body compiles structurally.
+            // Suppression is compile-time here — captures are inert and
+            // alternations tag nothing — which matches the void that
+            // inference assigns without any runtime discard brackets.
+            // Non-consuming post effects (an enclosing scope's close) run
+            // after the body, outside the suppressed region.
+            let end_match = self.emit_effects_if_nonempty(match_exit, post.clone());
+            let end_skip = match skip_exit {
+                SkipExit::To(skip) if skip == match_exit => SkipExit::To(end_match),
+                SkipExit::To(skip) => SkipExit::To(self.emit_effects_if_nonempty(skip, post)),
+                SkipExit::Fail => SkipExit::Fail,
+            };
+            let body_entry = self.with_suppression(|this| {
+                this.compile_skippable_with_exits(
+                    body,
+                    SplitExits {
+                        match_exit: end_match,
+                        skip_exit: end_skip,
+                    },
+                    nav_override,
+                    CaptureEffects::default(),
+                )
+            });
+            self.wrap_entry_pre(body_entry, pre)
+        };
+        self.inline_stack.pop();
+
+        entry
+    }
+
+    /// A nullable reference back into a definition currently being compiled —
+    /// a consuming-position cycle through the def's own body, e.g.
+    /// `A = (x (A) (y))?`. Inlining would not terminate, so fall back to a
+    /// real call plus a zero-width bypass.
+    ///
+    /// The bypass is ordered first: the call's own zero-width return leaves
+    /// the cursor on the unconsumed candidate, so any match it finds is also
+    /// found — with an honest cursor and possibly an earlier follower
+    /// candidate — via the bypass. Trying the call first would let those
+    /// mis-navigated results shadow better ones; trying the bypass first makes
+    /// the call's zero-width path harmless (its continuations are a subset).
+    fn compile_ref_guarded_call(
+        &mut self,
+        def_id: DefId,
+        exits: SplitExits,
+        nav_override: Option<Nav>,
+        capture: CaptureEffects,
+    ) -> Label {
+        let SplitExits {
+            match_exit,
+            skip_exit,
+        } = exits;
+        // Captured references inside recursive cycles are rejected upstream,
+        // so `post` holds only non-consuming effects (enclosing-scope closes)
+        // that must run on both paths.
+        let CaptureEffects { pre, post } = capture;
+
+        let skip = match skip_exit {
+            SkipExit::To(skip) => Some(self.emit_effects_if_nonempty(skip, post.clone())),
+            SkipExit::Fail => None,
+        };
+        let call_entry = self.compile_ref_call(
+            def_id,
+            PatternCtx {
+                exit: match_exit,
+                nav: nav_override,
+                capture: CaptureEffects::new_post(post),
+            },
+            None,
+            false,
+        );
+        let entry = match skip {
+            Some(skip) => self.emit_branch_epsilon(
+                BranchTargets {
+                    prefer: call_entry,
+                    other: skip,
+                },
+                Greediness::NonGreedy,
+            ),
+            // Pruned: the cycle must consume — no zero-width bypass.
+            None => call_entry,
+        };
+        self.wrap_entry_pre(entry, pre)
     }
 
     pub(super) fn compile_field(&mut self, field: &ast::FieldPattern, ctx: PatternCtx) -> Label {
@@ -457,8 +823,11 @@ impl NfaBuilder<'_> {
         exits: CaptureExits,
     ) -> Label {
         // Must precede mechanism dispatch: suppressive captures ignore the mechanism
-        // entirely and must not build any capture effects for it.
-        if cap.is_suppressive() {
+        // entirely and must not build any capture effects for it. Inside an
+        // already-suppressed region every capture is equally inert — inference
+        // dropped its field, so emitting a Set would resolve against the wrong
+        // scope (the panic behind #470).
+        if cap.is_suppressive() || self.is_suppressed() {
             return self.compile_suppressive(
                 inner_opt.as_ref(),
                 nav_override,
@@ -608,15 +977,16 @@ impl NfaBuilder<'_> {
         )
     }
 
-    /// Compile a suppressive capture (`@_`/`@_name`): wrap the inner in
-    /// SuppressBegin/SuppressEnd and emit no value. The suppress region brackets
-    /// whatever the inner emits (its own `Set`s, a skipped optional's nulls) and
-    /// discards it at runtime, matching the `void` the type system infers.
+    /// Compile a suppressive capture (`@_`/`@_name`), or any capture inside an
+    /// already-suppressed region: compile the inner structurally, in suppress
+    /// mode, so nothing in the region emits output effects — captures are
+    /// inert, alternations tag nothing, skip paths inject no nulls. That
+    /// matches the `void` the type system infers without any runtime discard.
+    /// The one output source that survives is a definition call (shared code),
+    /// which the call site brackets itself (`RefLowering::SuppressedCall`).
     ///
-    /// With `Split` exits the inner's match/skip paths route to two SuppressEnd
-    /// steps. `outer.pre` (e.g. an enum variant's `Enum`-open) runs before
-    /// SuppressBegin in the enclosing scope, so the tag is produced and the later
-    /// `EndEnum` matches.
+    /// `outer.pre`/`outer.post` (e.g. an enum variant's `Enum`-open/`EndEnum`)
+    /// belong to the enclosing scope and run outside the suppressed region.
     fn compile_suppressive(
         &mut self,
         inner: Option<&Pattern>,
@@ -636,49 +1006,54 @@ impl NfaBuilder<'_> {
             return self.wrap_entry_pre(entry, pre);
         };
 
-        // SuppressEnd + outer post (e.g. an enum variant's EndEnum) closes each exit;
-        // the inner is compiled with NO capture effects.
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
-                let end_label = self.emit_effects_epsilon(
-                    exit,
-                    vec![EffectIR::suppress_end()],
-                    CaptureEffects::new_post(post),
-                );
-                self.dispatch_pattern(inner, PatternCtx::with_nav(end_label, nav_override))
+                let end_label = if post.is_empty() {
+                    exit
+                } else {
+                    self.emit_effects_epsilon(exit, vec![], CaptureEffects::new_post(post))
+                };
+                self.with_suppression(|this| {
+                    this.dispatch_pattern(inner, PatternCtx::with_nav(end_label, nav_override))
+                })
             }
             CaptureExits::Split {
                 match_exit,
                 skip_exit,
             } => {
-                let end_match = self.emit_effects_epsilon(
-                    match_exit,
-                    vec![EffectIR::suppress_end()],
-                    CaptureEffects::new_post(post.clone()),
-                );
-                let end_skip = self.emit_effects_epsilon(
-                    skip_exit,
-                    vec![EffectIR::suppress_end()],
-                    CaptureEffects::new_post(post),
-                );
-                self.compile_skippable_with_exits(
-                    inner,
-                    SplitExits {
-                        match_exit: end_match,
-                        skip_exit: end_skip,
-                    },
-                    nav_override,
-                    CaptureEffects::default(),
-                )
+                let (end_match, end_skip) = if post.is_empty() {
+                    (match_exit, skip_exit)
+                } else {
+                    let end_match = self.emit_effects_epsilon(
+                        match_exit,
+                        vec![],
+                        CaptureEffects::new_post(post.clone()),
+                    );
+                    let end_skip = match skip_exit {
+                        SkipExit::To(skip) => SkipExit::To(self.emit_effects_epsilon(
+                            skip,
+                            vec![],
+                            CaptureEffects::new_post(post),
+                        )),
+                        SkipExit::Fail => SkipExit::Fail,
+                    };
+                    (end_match, end_skip)
+                };
+                self.with_suppression(|this| {
+                    this.compile_skippable_with_exits(
+                        inner,
+                        SplitExits {
+                            match_exit: end_match,
+                            skip_exit: end_skip,
+                        },
+                        nav_override,
+                        CaptureEffects::default(),
+                    )
+                })
             }
         };
 
-        let begin_entry = self.emit_effects_epsilon(
-            inner_entry,
-            vec![EffectIR::suppress_begin()],
-            CaptureEffects::default(),
-        );
-        self.wrap_entry_pre(begin_entry, pre)
+        self.wrap_entry_pre(inner_entry, pre)
     }
 
     pub(super) fn resolve_anonymous_node_kind(&mut self, text: &str) -> NodeKindConstraint {

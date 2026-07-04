@@ -59,6 +59,8 @@ pub enum ModuleError {
     InvalidOpcode { step: u16, opcode: u8 },
     #[error("string id out of range at index {0}")]
     InvalidStringId(usize),
+    #[error("invalid node symbol at index {0}")]
+    InvalidNodeSymbol(usize),
     #[error("predicate operand out of range at step {0}")]
     InvalidPredicateOperand(usize),
     #[error("malformed transitions section")]
@@ -184,6 +186,7 @@ impl Module {
         // (`NonZero`) `StringId` from one — e.g. `validate_entrypoints` builds an
         // `Entrypoint`, which would otherwise panic on a forged zero name.
         self.validate_string_ids()?;
+        self.validate_symbol_ids()?;
         let is_start = self.validate_transitions()?;
         self.validate_entrypoints(&is_start)?;
         // Structural validity (every step decodes, every jump lands on a start)
@@ -520,6 +523,32 @@ impl Module {
         Ok(())
     }
 
+    /// The `symbol` half of each node-kind/node-field entry must be non-zero:
+    /// renderers rebuild `NodeKindId`/`NodeFieldId` (`NonZeroU16`) from it via
+    /// `try_from(..).expect(..)` (`render.rs`), so a forged zero would panic
+    /// `dump`/`trace` instead of failing the load.
+    fn validate_symbol_ids(&self) -> Result<(), ModuleError> {
+        let storage: &[u8] = &self.storage;
+        let check = |base: u32, count: usize| {
+            let base = base as usize;
+            for i in 0..count {
+                if read_u16_le(storage, base + i * SymbolNameEntry::SIZE) == 0 {
+                    return Err(ModuleError::InvalidNodeSymbol(i));
+                }
+            }
+            Ok(())
+        };
+        check(
+            self.offsets.node_kinds,
+            self.header.node_kinds_count as usize,
+        )?;
+        check(
+            self.offsets.node_fields,
+            self.header.node_fields_count as usize,
+        )?;
+        Ok(())
+    }
+
     /// Structurally re-verify the whole instruction stream so the documented
     /// guarantee — a loaded module never panics on view/decode access — holds
     /// for *any* module whose header and CRC check out, including a deliberately
@@ -734,6 +763,19 @@ impl Module {
         }
         for i in 0..post {
             check_effect(pre + neg + i)?;
+        }
+
+        // Neg-field slots hold raw `NodeFieldId`s (`NonZeroU16`); the decoder's
+        // `neg_fields()` rebuilds them via `try_from(..).expect(..)`
+        // (`instructions.rs`), so a forged zero must not load.
+        for i in 0..neg {
+            let off = instr_off + MATCH_PAYLOAD_START + (pre + i) * PAYLOAD_SLOT_SIZE;
+            let b = storage
+                .get(off..off + PAYLOAD_SLOT_SIZE)
+                .ok_or(ModuleError::MalformedTransitions)?;
+            if u16::from_le_bytes([b[0], b[1]]) == 0 {
+                return Err(ModuleError::MalformedTransitions);
+            }
         }
 
         if has_predicate {

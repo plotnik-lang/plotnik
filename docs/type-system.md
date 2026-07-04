@@ -1,199 +1,238 @@
 # Plotnik Type System
 
-Plotnik infers static types from query structure. This governs how captures materialize into output (JSON, structs, etc.).
+Plotnik infers static types from query structure. Types — including their
+names — are computed at compile time and stored in the bytecode; typegen and
+the JSON materializer are pure renderers of that information.
 
-## Design Philosophy
+## The Output Model
 
-Plotnik prioritizes **predictability** and **structural clarity** over terseness.
+**Output exists exactly where output syntax is written.** Four constructs
+produce output, and nothing else does:
 
-Two principles guide the type system:
+| Syntax        | Output                                  |
+| ------------- | --------------------------------------- |
+| `@name`       | A field in the enclosing scope          |
+| `Def = ...`   | A named type (the definition's result)  |
+| `Label:`      | An enum variant (when the value is consumed) |
+| `:: TypeName` | A name for the type at that position    |
 
-1. **Flat structure**: Captures bubble up to the nearest scope boundary.
+Everything else — node patterns, sequences, references, quantifiers, anchors,
+predicates — is structural: it constrains *whether* the query matches, not
+*what* it returns. A query with no captures is like a regex with no capture
+groups: it still answers "did it match", and nothing more.
 
-2. **Strict dimensionality**: Quantifiers (`*`, `+`) containing captures require a struct capture. The alternative — parallel arrays — loses per-iteration association between `a[i]` and `b[i]`.
+## Definitions Are Types
 
-### Why Transparent Scoping
-
-Extracting a pattern into a definition shouldn't change output:
-
-```
-// Inline
-(function name: (identifier) @name)
-→ { name: Node }
-
-// Extracted
-Func = (function name: (identifier) @name)
-(Func)
-→ { name: Node }   // Same shape — @name bubbles through
-```
-
-If definitions created implicit boundaries, extraction would wrap output in a new struct, breaking downstream types.
-
-## 1. Strict Dimensionality
-
-This is the core rule that prevents association loss.
-
-### The Rule
-
-**Any quantified pattern (`*`, `+`) containing captures must have a struct capture.**
-
-| Pattern                           | Status  | Reason                                            |
-| --------------------------------- | ------- | ------------------------------------------------- |
-| `(identifier)* @ids`              | ✓ Valid | No internal captures → node array                 |
-| `{ (a) @a (b) @b }* @items`       | ✓ Valid | Internal captures + struct capture → struct array |
-| `{ (a) @a (b) @b }*`              | ✗ Error | Internal captures, no struct capture              |
-| `(func (id) @name)*`              | ✗ Error | Internal capture, no struct capture               |
-| `(func (id) @name)* @funcs`       | ✗ Error | `@funcs` captures nodes, not structs              |
-| `(Item)*` where Item has captures | ✗ Error | Transitive: definition's captures count           |
-
-### Transitive Application
-
-Strict dimensionality applies **transitively through definitions**. Since definitions are transparent (captures bubble up), quantifying a definition that contains captures is equivalent to quantifying those captures directly:
+A definition is both a reusable pattern and a named type. References to it are
+**opaque**: fields never leak through a reference boundary.
 
 ```
-// Definition with captures
-Item = (pair (key) @k (value) @v)
+Item = (expression_statement (identifier) @id)
 
-// These are equivalent after expansion:
-(Item)*                              // ✗ Error
-(pair (key) @k (value) @v)*          // ✗ Error (same thing)
-
-// Fix: add struct capture
-{ (Item) @item }* @items             // ✓ Valid
+(program (Item))              ; matches structurally, no output
+(program (Item) @item)        ; { item: Item }
+(program (Item)* @items)      ; { items: Item[] }
+(program (Item)? @item)       ; { item: Item | null }
 ```
 
-The compiler expands definitions before validating strict dimensionality. This prevents a loophole where extracting a pattern into a definition would bypass the rule.
-
-### Node Arrays
-
-When the quantified pattern has **no internal captures**, the outer capture collects nodes directly:
-
-```
-(decorator)* @decorators
-→ { decorators: Node[] }
-
-(identifier)+ @names
-→ { names: [Node, ...Node[]] }  // Non-empty array
+```typescript
+export interface Item {
+  id: Node;
+}
 ```
 
-Use case: collecting simple tokens (identifiers, keywords, literals).
+- A **bare reference** `(Item)` matches the definition's pattern and discards
+  its output — silently, by design. Use it for purely structural constraints.
+- A **captured reference** `(Item) @x` produces the definition's result type.
+  If the definition is void (no output), the capture takes the matched node:
+  `x: Node`.
+- This is uniform for recursive and non-recursive definitions, so extracting a
+  pattern into a definition never silently changes your output shape — you
+  always say `@x` where you want the value.
 
-### Struct Arrays
+A definition with no output syntax in its body is **void**:
 
-When the quantified pattern **has internal captures**, wrap in a sequence and capture the sequence:
+```
+Id = (identifier) @id
+Foo = (function_declaration name: (Id))   ; bare ref → Foo is void
+```
+
+```typescript
+export interface Id { id: Node; }
+export type Foo = undefined;              ; matches or not — no data
+```
+
+There is no pure type aliasing: `Foo = (Id)` does not re-export `Id`'s type.
+
+### Quantifier-Rooted Definitions
+
+The definition name is a consuming position — exactly as it is for labeled
+alternations. A quantifier standing as the whole body collects into the
+definition's own output, which is the container itself:
+
+```
+Ids = (identifier)*          ; Ids = Node[]
+MaybeId = (identifier)?      ; MaybeId = Node | null
+Row = (pair key: (_) @k value: (_) @v)
+Rows = (Row)*                ; Rows = Row[]
+First = (Row)?               ; First = Row | null
+```
+
+```typescript
+export type Ids = Node[];
+export type Rows = Row[];
+export type First = Row | null;
+```
+
+References stay opaque at call sites: `(Rows) @rows` → `rows: Rows`, bare
+`(Rows)` is structural, `(Rows)* @xss` → `xss: Rows[]`. An optional-rooted
+definition under a call-site `?` nests: `(MaybeId)? @x` → `x: MaybeId | null`
+(both nulls print the same in JSON).
+
+Containers never mint type names — names come only from definitions,
+captures, `::` annotations, and variant tags. So the element must already be
+a nameable type: a plain node, or a reference. An anonymous element shape is
+rejected; name it in its own definition:
+
+```
+Bad = {(key) @k (value) @v}*      ; ERROR: the element row has no type name
+Row = (pair key: (_) @k value: (_) @v)
+Good = (Row)*                     ; Good = Row[]
+```
+
+Two consequences:
+
+- A definition whose root is `*` or `?` can match zero nodes, but a repeat
+  iteration must consume input — so repeating a reference to it
+  (`(MaybeId)*`) is rejected: the wrapper's empty case could never occur
+  under the repeat, and the intent is clearer with the quantifier in one
+  place.
+- A quantifier-rooted definition used as an entrypoint is a **value
+  entrypoint**: `run` outputs a top-level JSON array (or `null`), not an
+  object. A `*`-rooted entrypoint that matches zero times prints `[]` and
+  exits 0 — the zero-iteration match is a successful match.
+
+## Scope Model
+
+Within a definition, captures bubble up through query nesting to the nearest
+scope boundary:
+
+```
+(function_declaration
+  name: (identifier) @name
+  body: (statement_block
+    (return_statement (_) @retval)))
+→ { name: Node, retval: Node }    ; flat, not nested
+```
+
+Transparent (captures bubble through):
+
+- Node patterns `(kind ...)`
+- Uncaptured sequences `{...}`
+- Uncaptured alternations `[...]`
+
+Boundaries (a new scope starts):
+
+- **Captured sequences** `{...} @x` → nested struct
+- **Captured alternations** `[...] @x` → union struct or enum
+- **Definitions** — references are opaque (see above)
+- **Suppression** `@_` — discards the whole subtree's output
 
 ```
 {
-  (decorator) @dec
-  (function_declaration) @fn
-}* @items
-→ { items: { dec: Node, fn: Node }[] }
+  (expression_statement) @s
+} @info
+→ { info: { s: Node } }           ; @info creates a nested scope
 ```
 
-For node patterns with internal captures, wrap explicitly:
+A captured sequence *without* internal captures is only meaningful when it
+matches exactly one node — the capture takes that node (`{(a)} @x` ≡
+`(a) @x`). See the multi-node rule below.
+
+## Strict Dimensionality
+
+Two rules keep repetition and captures honest:
+
+**1. A quantifier's internal captures must be collected by a capture on the
+quantifier.** All quantifiers, uniformly — `*`/`+` collect a list of rows, `?`
+collects one nullable row; `@_` discards:
 
 ```
-// ERROR: internal capture without struct capture
-(parameter (identifier) @name)*
-
-// OK: struct capture on the sequence
-{ (formal_parameters (identifier) @name) @param }* @params
-→ { params: { name: Node, param: Node }[] }
+{(key) @k (value) @v}*            ; ERROR: captures repeat, nothing collects them
+{(key) @k (value) @v}* @entries   ; OK: entries: { k: Node, v: Node }[]
+{(key) @k (value) @v}?            ; ERROR: captures skip together, nothing collects them
+{(key) @k (value) @v}? @entry     ; OK: entry: { k: Node, v: Node } | null
+(func (id) @name)*                ; ERROR: same rule through node patterns
+(func (id) @name)? @fn            ; OK: fn: { name: Node } | null
 ```
 
-The strict rule forces you to think about structure upfront.
-
-### Optional Bubbling
-
-The `?` quantifier does **not** add dimensionality — it produces at most one value, not a list. Therefore, optional sequences without captures are allowed:
+**2. A capture needs exactly one node or a value.** A void pattern under a
+capture must match exactly one node — several, or possibly none, and there is
+no single node to bind. Both directions fail for the same reason:
 
 ```
-{ (decorator) @dec }?
-→ { dec: Node | null }   // Bubbles to parent as a nullable field
-
-{ (modifier) @mod (decorator) @dec }?
-→ { mod: Node | null, dec: Node | null }   // Both bubble as nullable
+{(a) (b)} @x                      ; ERROR: two nodes — which one is x?
+{(a)+} @x                        ; ERROR: a variable run of nodes
+{(a)?} @x                        ; ERROR: possibly no node at all
+[(a)+ (b)] @x                    ; ERROR: one branch is a run
+(SeqDef) @x                       ; ERROR when SeqDef is void and not one node
 ```
 
-This lets optional fragments contribute fields directly to the parent struct without forcing an extra wrapper object.
+Greediness never matters here: `?` and `??` (and `*`/`*?`, `+`/`+?`) are
+identical to the type system — they differ only in which alternative the
+runtime tries first.
+
+The fix is always to say what you mean: capture individual nodes inside the
+group, capture the quantifier directly (`(a)+ @xs` → a list), or capture
+nothing.
+
+References are opaque, so quantifying one is dimensionally simple — the
+definition's *type* is the element, no matter how many captures it contains:
+
+```
+Item = (pair key: (_) @k value: (_) @v)
+(Item)* @items                    ; OK: items: Item[]
+(Item)*                           ; OK: structural repeat, no output
+```
+
+### Scalar Lists vs Row Lists
+
+```
+(identifier)* @ids                ; scalar list: ids: Node[]
+{(a) @a (b) @b}* @rows            ; row list:   rows: { a: Node, b: Node }[]
+(Item)+ @items                    ; ref list:   items: [Item, ...Item[]]
+```
+
+### Optional Rows
+
+A captured optional group is one nullable row — the `?` counterpart of a `*`
+row list:
+
+```
+{(modifier) @mod (decorator) @dec}? @attrs
+→ { attrs: { mod: Node, dec: Node } | null }
+```
+
+The fields keep their true modality — if the row matched, both are present —
+and a skip yields `attrs: null`, never a hollow `{ mod: null, dec: null }`.
+A quantified named node collects the same way: `(pair (key) @k)? @p` gives
+`p: { k: Node } | null`, mirroring `(pair (key) @k)* @ps` rows.
+
+There is no uncaptured fallback (dimensionality rule 1): a bare
+`{(mod) @mod (dec) @dec}?` would scatter correlated nulls into the enclosing
+scope as independently-optional fields — a type that permits states the match
+can never produce. For a single optional node with no wrapper, put the capture
+on the quantifier: `(decorator)? @dec` → `dec: Node | null`. To match
+structurally and drop the captures, suppress: `{...}? @_`.
 
 ### Null, Not Absent
 
 Every declared field is **always present** in the output. An optional field
 renders as `T | null` and materializes as `null` when it doesn't match — never
-as a missing key. This keeps the object shape stable: consumers can index any
-declared field without guarding for `undefined`, and `strictNullChecks` stays
-satisfied. Missing **lists** are the empty array `[]`, never `null` (see
-[Array Captures in Alternations](#array-captures-in-alternations)).
+as a missing key. Missing **lists** are the empty array `[]`, never `null`.
+The output shape is stable; consumers never guard for `undefined`.
 
-## 2. Scope Model
-
-### Universal Bubbling
-
-Scopes are transparent by default. Captures bubble up through definitions and containers until hitting an explicit scope boundary.
-
-This enables reusable pattern fragments that contribute fields directly to parent output without creating nesting.
-
-- **Definitions (`Def = ...`)**: Transparent (macro-like)
-- **Uncaptured Containers (`{...}`, `[...]`)**: Transparent
-- **References (`(Def)`)**: Transparent
-
-### Explicit Scope Boundaries
-
-New data structures are created only when explicitly requested:
-
-1. **Captured Sequences**: `{...} @name` → Struct
-2. **Captured Alternations** (no branch labels): `[...] @name` → Union
-3. **Enum Alternations** (with branch labels): `[ L: ... ] @name` → Enum
-
-In case of using quantifiers with captures, compiler forces you to create scope boundaries.
-
-## 3. Data Shapes
-
-### Structs
-
-Created by `{ ... } @name`:
-
-| Captures | Result                             |
-| -------- | ---------------------------------- |
-| 0        | `Struct {}` (Empty)                |
-| 1+       | `Struct { field_1, ..., field_N }` |
-
-**No Implicit Unwrap**: `(node) @x` produces `{ x: Node }`, never bare `Node`.
-
-**Empty Structs**: `{ ... } @x` with no internal captures produces `{ x: {} }`. This ensures `x` is always an object, so adding fields later is non-breaking.
-
-### Unions and Enums
-
-Created by `[ ... ]`:
-
-- **Enum** (with branch labels): `[ L1: (a) @a  L2: (b) @b ]` → `{ "$tag": "L1", "$data": { a: Node } }`
-- **Union** (no branch labels): `[ (a) @a  (b) @b ]` → `{ a: Node | null, b: Node | null }` (merged 1-level deep)
-
-### Enum Variants
-
-| Captures | Payload |
-| -------- | ------- |
-| 0        | Void    |
-| 1+       | Struct  |
-
-Void payloads omit the `$data` field entirely:
-
-```
-Expr = [
-    Num: (number) @val
-    Empty: (string)
-]
-```
-
-- `Num` variant: `{ "$tag": "Num", "$data": { val: Node } }`
-- `Empty` variant: `{ "$tag": "Empty" }` (no `$data`)
-
-Single-capture variants stay wrapped (`result.$data.val`).
-
-## 4. Cardinality
-
-Quantifiers determine whether a field is singular, optional, or an array:
+## Cardinality
 
 | Pattern   | Output Type      | Meaning      |
 | --------- | ---------------- | ------------ |
@@ -202,154 +241,261 @@ Quantifiers determine whether a field is singular, optional, or an array:
 | `(A)* @a` | `a: T[]`         | zero or more |
 | `(A)+ @a` | `a: [T, ...T[]]` | one or more  |
 
-### Struct Array Cardinality
+`T` is `Node` for plain patterns, the definition's type for references, the
+row struct for captured groups, the enum for labeled alternations.
 
-When using struct arrays, the outer quantifier determines cardinality:
+## Alternations
 
-```
-{ (a) @a (b) @b }* @items   → items: { a: T, b: T }[]
-{ (a) @a (b) @b }+ @items   → items: [{ a: T, b: T }, ...]
-{ (a) @a (b) @b }? @item    → item: { a: T, b: T } | null
-```
+`[...]` matches one of several branches. Its output form depends on labels
+*and consumption*.
 
-### Nested Quantifiers
+### Unions (no labels)
 
-Within each struct, inner quantifiers apply to fields:
+Branch captures merge into one struct, one level deep:
 
-```
-{
-  (decorator)* @decs      // Array field within each struct
-  (function) @fn          // Singular field within each struct
-}* @items
-→ { items: { decs: Node[], fn: Node }[] }
-```
-
-Each struct has its own `decs` array — no cross-struct mixing.
-
-## 5. Type Unification in Alternations
-
-Shallow unification across union branches:
-
-| Scenario                    | Result               |
-| --------------------------- | -------------------- |
-| Same capture, all branches  | Required             |
-| Same capture, some branches | Nullable (`\| null`) |
-| Type mismatch               | Compile error        |
+- A capture present in **all** branches → required field.
+- A capture present in **some** branches → `T | null`.
+- A missing **list** in a branch → `[]`, not null.
+- The same capture must have the same type in every branch; a mismatch is an
+  error (`capture @x has incompatible types across branches`). Cardinality
+  counts: a `+` list and a `*` list do not unify.
+- A branch that is a bare node beside struct branches is fine — it simply
+  contributes no fields (or its own capture, if any).
+- A branch that is a bare reference is a structural alternative: it
+  contributes nothing to the merged struct.
 
 ```
 [
-  (a) @x
-  (b) @x
-]  // x: Node (required)
-
-[
-  (_ (a) @x (b) @y)
-  (_ (a) @x)
-]  // x: Node, y: Node | null
-
-[
-  (a) @x :: Foo
-  (b) @x :: Bar
-]  // ERROR: Foo vs Bar
+  (binary_expression left: (_) @x right: (_) @y)
+  (identifier) @x
+]
+→ { x: Node, y: Node | null }
 ```
 
-The choice of shallow unification is intentional. For more precision, users should use enums.
-
-### Array Captures in Alternations
-
-When a quantified capture appears in some branches but not others, the missing branch emits an empty array:
+A capture on the alternation itself takes the branch's value; for all-scalar
+branches that's the matched node:
 
 ```
-[
-  (a)+ @x
-  (b)
-]  // x: Node[]
+[(identifier) (number)] @value    → { value: Node }
 ```
 
-Union alternations are "I don't care which branch matched" — so distinguishing "branch didn't match" from "matched zero times" is irrelevant. The empty array is easier to consume downstream.
+### Enums (labels + consumption)
 
-When types start to conflict, use enum alternations:
-
-```
-[
-    A: (a) @x :: Foo
-    B: (b) @x :: Bar
-] @result
-```
-
-### Unification Rules
-
-1. Primitives: exact match required
-2. Arrays: element types unify; looser cardinality wins (`+` ∪ `*` → `*`)
-3. Structs: identical field sets, recursively compatible
-4. Enums: identical variant sets
-
-### 1-Level Merge Only
-
-Top-level fields merge with optionality; nested mismatches are errors:
+Branch labels prepare a tagged enum. The tags materialize when the
+alternation's value is **consumed** — captured, row-captured, or used as a
+definition body:
 
 ```
-// OK: top-level merge (absent scalars become nullable, always present)
-{ x: Node, y: Node } ∪ { x: Node, z: Node } → { x: Node, y: Node | null, z: Node | null }
-
-// OK: arrays emit [] when missing (not null)
-{ items: Node[], x: Node } ∪ { x: Node } → { items: Node[], x: Node }
-
-// OK: identical nested
-{ data: { a: Node } } ∪ { data: { a: Node }, extra: Node } → { data: { a: Node }, extra: Node | null }
-
-// ERROR: nested differ
-{ data: { a: Node } } ∪ { data: { b: Node } } → incompatible struct types
-```
-
-Deep merging produces heavily-optional types that defeat typed extraction's purpose.
-
-## 6. Recursion
-
-Self-referential types via:
-
-1. **TypeId indirection**: Types reference by ID, enabling cycles
-2. **Escape analysis**: Every cycle needs a non-recursive exit
-3. **Guarded recursion**: Every cycle must consume input (descend)
-4. **Automatic detection**: Compiler generates Call/Return instead of inlining
-
-### Example
-
-```
-Expr = [
-    Lit: (number) @value
-    Binary: (binary_expression
-        left: (Expr) @left
-        right: (Expr) @right
-    )
+Expr = [                          ; def body root: consumed
+  Lit: (number) @value
+  Neg: (unary_expression (Expr) @inner)
 ]
 ```
 
-### Requirements
-
-```
-Loop = (Loop)                    // ERROR: no escape path
-Expr = [ Lit: (n) @n  Rec: (Expr) @e ]  // OK: Lit escapes
-
-A = (B)
-B = (A)                          // ERROR: no input consumed
-
-A = (foo (B))
-B = (bar (A))                    // OK: descends each step
+```typescript
+export type Expr =
+  | { $tag: "Lit"; $data: { value: Node } }
+  | { $tag: "Neg"; $data: { inner: Expr } };
 ```
 
-### Scope Boundaries
+Variant payloads come from the branch's bubbling captures:
 
-Recursive definitions get automatic type boundaries:
+- Captures → `$data` is an anonymous struct (always inlined, never a named
+  standalone type).
+- No captures → the variant is tag-only and omits `$data` entirely. Tags-only
+  enums are legitimate — sometimes which branch matched *is* the data.
+- A bare reference (or `@_`) as branch body → tag-only variant.
+  `[Call: (Inner)]` tags the branch; `[Call: (Inner) @data]` also carries the
+  value.
+
+```
+[Stmt: (expression_statement)  Decl: (lexical_declaration)] @kind
+→ kind: { $tag: "Stmt" } | { $tag: "Decl" }
+```
+
+### Degradation
+
+A labeled alternation that nothing consumes cannot tag anything — there is no
+value to put the tag on. It **degrades to a plain union** (captures bubble as
+optional fields) and the compiler warns:
+
+```
+(program [A: (expression_statement) @e  B: (debugger_statement) @d])
+```
+
+```
+warning: branch labels have no effect without capture
+help: capture the alternation (`[...] @name`) to make the labels enum
+      variants, or remove them
+→ { e: Node | null, d: Node | null }
+```
+
+Mixing labeled and unlabeled branches in one `[...]` is an error.
+
+## Suppression: `@_`
+
+`@_` (or `@_name` — the name is documentation) consumes a pattern's output and
+discards all of it. The subtree matches structurally; captures inside it are
+inert, labels stay meaningful but produce nothing, and no degradation warning
+fires — you said "discard all of it":
+
+```
+(program [A: (expression_statement) B: (debugger_statement)] @_)
+→ matches, output is null; no warning
+```
+
+Suppressed captures never collide with real ones: a `@x` inside a suppressed
+subtree does not touch a `@x` outside it. Quantifiers under `@_` carry no
+dimensionality demands — nothing is collected, so nothing can be lost.
+
+## Recursion
+
+Definitions can reference themselves (or each other) when every cycle both
+**escapes** and **consumes**:
+
+1. **Escape**: some branch must terminate without recursing.
+2. **Consumption**: each pass around the cycle must descend into a child.
+
+```
+Loop = (Loop)
+; ERROR: infinite recursion: no escape path
+
+A = [X: (identifier) @i  Y: (B) @b]
+B = (A)
+; ERROR: infinite recursion: cycle consumes no input
+
+A = (parenthesized_expression (B))
+B = (array (A))
+; ERROR: no escape path — descending is not enough, some branch must terminate
+
+MemberChain = [
+  Base: (identifier) @name
+  Access: (member_expression
+    object: (MemberChain) @object
+    property: (property_identifier) @property)
+]
+; OK: Base escapes, Access descends
+```
+
+```typescript
+export type MemberChain =
+  | { $tag: "Base"; $data: { name: Node } }
+  | { $tag: "Access"; $data: { object: MemberChain; property: Node } };
+```
+
+A recursive reference in a union works the same way:
 
 ```
 NestedCall = (call_expression
-    function: [(identifier) @name (NestedCall) @inner])
+  function: [(identifier) @name (NestedCall) @inner]
+  arguments: (arguments))
+→ { name: Node | null, inner: NestedCall | null }
 ```
 
-## 7. Type Metadata
+## Type Naming
 
-For codegen, types are named:
+Every structured type gets its name at compile time. Names are deterministic
+and complete in the bytecode.
 
-- **Explicit**: `@name :: TypeName`
-- **Synthetic**: `{DefName}{FieldName}` (e.g., `FuncParams`), with numeric suffix on collision
+### Path Names
+
+A definition's result is named after the definition. Composite types created
+by captures are named `{ParentTypeName}{PascalCase(field)}`, following the
+capture path; arrays and optionals are transparent (the name lands on the
+element):
+
+```
+Foo = (function_declaration
+  body: (statement_block {
+    (expression_statement {(identifier) @v} @inner)
+  } @items)
+)
+```
+
+```typescript
+export interface FooItemsInner { v: Node; }
+export interface FooItems { inner: FooItemsInner; }
+export interface Foo { items: FooItems; }
+```
+
+Enum variant payloads are anonymous (inlined), so they take no name; a
+composite *inside* a payload field is named
+`{EnumName}{VerbatimLabel}{PascalCase(field)}`:
+
+```
+Q = (program [
+  Stmt: (expression_statement {(identifier) @name} @info)
+  DECL: (lexical_declaration) @node
+] @item)
+```
+
+```typescript
+export type QItem =
+  | { $tag: "Stmt"; $data: { info: QItemStmtInfo } }
+  | { $tag: "DECL"; $data: { node: Node } };
+```
+
+Labels are used **verbatim** (`DECL` stays `DECL`), so two labels can never
+collide after case conversion.
+
+### `::` Annotations
+
+`@x :: Name` overrides the generated name **and resets the chain** — children
+derive from the new name:
+
+```
+Foo = (function_declaration
+  body: (statement_block {
+    (expression_statement {(identifier) @v} @inner)
+  } @outer :: Bar)
+)
+```
+
+```typescript
+export interface BarInner { v: Node; }
+export interface Bar { inner: BarInner; }
+export interface Foo { outer: Bar; }
+```
+
+On a plain node capture, `:: Name` declares a named alias:
+
+```
+(identifier) @x :: MyName    →  export type MyName = Node;
+                                 { x: MyName }
+```
+
+### Names Are Nominal
+
+- The same annotation name on **structurally identical** types denotes one
+  type — annotate two identical shapes `:: Info` and both fields share
+  `Info`, declared once.
+- The same name on **different** shapes is a compile error, reported with
+  both spans (`type name X is already used for a different type`).
+- Definition names and the builtin `Node` are reserved; `Node = ...` is an
+  error.
+- An annotation that matches the name the compiler would generate anyway is a
+  warning (`omit it`), as is an annotation on a reference (a definition's type
+  cannot be renamed at a use site).
+- There is no numeric suffixing — a name conflict is always an error, never a
+  silent rename.
+
+## TypeScript Rendering
+
+- Structs render as named `interface`s.
+- Enums render as one multi-line union literal with inline variants — variant
+  payloads never get standalone declarations.
+- Void queries render as `export type Q = undefined;` — the query matches or
+  not, and carries no data.
+- Optional fields are `T | null` (always present), non-empty lists are
+  `[T, ...T[]]`.
+
+```typescript
+export type Statement =
+  | { $tag: "Assign"; $data: { target: Node; value: Expression } }
+  | { $tag: "Call"; $data: { args: Expression[]; func: Node } }
+  | { $tag: "Return"; $data: { value: Expression | null } };
+
+export interface Root {
+  statements: [Statement, ...Statement[]];
+}
+```

@@ -17,7 +17,7 @@ use crate::core::NodeKindId;
 /// | `01`            | Named | `(_)`/`(t)`  | Check `is_named()`  | Check `is_named()` + `kind_id()` |
 /// | `10`            | Anon  | `"text"`     | Check `!is_named()` | Check `!is_named()` + `kind_id()` |
 /// | `11`            | -     | Reserved     | Error               | Error             |
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub enum NodeKindConstraint {
     /// Any node (`_` pattern) - no kind check performed.
     #[default]

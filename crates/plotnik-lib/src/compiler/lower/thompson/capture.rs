@@ -152,9 +152,10 @@ impl NfaBuilder<'_> {
         // so all fields (including nested bubble captures) reference the same root struct.
         if let Some(name_token) = cap.name() {
             let capture_name = &name_token.text()[1..];
-            // Suppressive/no-output contexts can compile inner captures under a
-            // non-struct scope; they intentionally emit value effects without a Set.
-            // Once a struct scope exists, though, a missing member is our bug.
+            // Suppressed regions never reach here (their captures are inert), so
+            // the enclosing scope is a struct at every real capture site — except
+            // an enum-rooted definition body, whose scope carries no fields. Once
+            // a struct scope exists, a missing member is our bug.
             if let Some(Struct(type_id)) = self.scope_stack.last().copied()
                 && self
                     .ctx
@@ -209,7 +210,7 @@ impl NfaBuilder<'_> {
     /// Check if pattern is (or wraps) a ref returning a structured type.
     ///
     /// For such refs, we skip the Node effect in captures - the Call leaves
-    /// the structured result (Enum/Struct/Array) pending for Set to consume.
+    /// the structured result (Enum/Struct) pending for Set to consume.
     pub(super) fn is_ref_returning_structured(&self, pattern: &Pattern) -> bool {
         match pattern {
             Pattern::DefRef(_) => self.ctx.analysis.type_analysis.ref_returns_structured(

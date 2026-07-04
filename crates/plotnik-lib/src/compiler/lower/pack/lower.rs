@@ -7,13 +7,10 @@
 //! - neg_fields > 7 → epsilon chain for overflow checks
 //! - successors > 28 → cascading epsilon branches
 
-use crate::bytecode::{MAX_MATCH_PAYLOAD_SLOTS, MAX_PRE_EFFECTS};
+use crate::bytecode::{MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS, MAX_PRE_EFFECTS};
 use crate::core::NodeFieldId;
 
 use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR, NfaGraph};
-
-const MAX_POST_EFFECTS: usize = 7;
-const MAX_NEG_FIELDS: usize = 7;
 
 enum PostChain {
     NegFields(Vec<NodeFieldId>),
@@ -72,10 +69,14 @@ impl Emitter {
 
     fn lower_match(&mut self, mut m: MatchIR) {
         if m.pre_effects.len() > MAX_PRE_EFFECTS {
-            let all_pre = std::mem::take(&mut m.pre_effects);
+            // Keep the trailing MAX on the match itself (mirroring the post_effects
+            // drain below); only the leading overflow spills to the epsilon chain.
+            // The chain runs first, so the effect order is unchanged.
+            let split = m.pre_effects.len() - MAX_PRE_EFFECTS;
+            let overflow: Vec<EffectIR> = m.pre_effects.drain(..split).collect();
             let entry = m.label;
             m.label = self.fresh_label();
-            self.emit_effects_chain(entry, m.label, all_pre);
+            self.emit_effects_chain(entry, m.label, overflow);
         }
 
         let post_chains = drain_post_chains(&mut m);
@@ -112,10 +113,10 @@ impl Emitter {
     }
 
     fn emit_effects_chain(&mut self, entry: Label, exit: Label, mut effects: Vec<EffectIR>) {
-        if effects.is_empty() {
-            self.push(MatchIR::epsilon(entry, exit).into());
-            return;
-        }
+        assert!(
+            !effects.is_empty(),
+            "callers only spill non-empty effect overflow"
+        );
 
         if effects.len() <= MAX_PRE_EFFECTS {
             self.push(MatchIR::epsilon(entry, exit).pre_effects(effects).into());

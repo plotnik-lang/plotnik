@@ -7,16 +7,17 @@ S1 "name"
 S2 "item"
 S3 "items"
 S4 "Inner"
-S5 "Outer"
-S6 "call_expression"
-S7 "identifier"
-S8 "array"
+S5 "OuterItems"
+S6 "Outer"
+S7 "call_expression"
+S8 "identifier"
+S9 "array"
 
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:1  ; { name }
 T2 = Struct  M1:1  ; { item }
-T3 = ArrayStar(T2)  ; T2*
+T3 = ArrayStar(T2)  ; OuterItems*
 T4 = Struct  M2:1  ; { items }
 
 [type_members]
@@ -26,7 +27,8 @@ M2: S3 → T3  ; items: T3
 
 [type_names]
 N0: S4 → T1  ; Inner
-N1: S5 → T4  ; Outer
+N1: S5 → T2  ; OuterItems
+N2: S6 → T4  ; Outer
 
 [entrypoints]
 Inner = 06 :: T1
@@ -48,20 +50,14 @@ Inner:
 
 Outer:
   12   !   (array)                          13
-  13  -ε-  [ArrayOpen]                      36, 19
-  15  -ε-                                   16
-  16  ─‣┘  [ArrayClose Set(M2)] _           18
-  18                                        ▶
-  19  -ε-  [ArrayClose Set(M2)]             18
-  21  -ε-  [StructClose Push]               40, 15
+  13  -ε-  [ArrayOpen]                      28, 16
+  15                                        ▶
+  16  -ε-  [ArrayClose Set(M2)]             15
+  18  -ε-  [StructClose Push]               26, 30
+  20  -ε-  [StructClose Set(M1)]            18
+  22   !   (Inner)                          06 : 20
   23  ...
-  24  -ε-  [Set(M1)]                        21
-  26  -ε-  [StructClose]                    24
-  28   !   (Inner)                          06 : 26
-  29  -ε-  [StructOpen]                     28
-  31  ...
-  32  -ε-  [StructOpen]                     29
-  34  ─‣─  _                                32, 34
-  36  └‣─  _                                32, 34
-  38  ─‣─  _                                32, 38
-  40  ─‣─  _                                32, 38
+  24  -ε-  [StructOpen] [StructOpen]        22
+  26  ─‣─  _                                24, 26
+  28  └‣─  _                                24, 26
+  30  ─‣┘  [ArrayClose Set(M2)] _           15

@@ -124,20 +124,6 @@ impl CheckpointStack {
         self.max_frame_idx
     }
 
-    /// Check if empty.
-    #[inline]
-    #[allow(dead_code)]
-    pub fn is_empty(&self) -> bool {
-        self.stack.is_empty()
-    }
-
-    /// Get number of checkpoints.
-    #[inline]
-    #[allow(dead_code)]
-    pub fn len(&self) -> usize {
-        self.stack.len()
-    }
-
     /// Live heap bytes: checkpoint count × checkpoint size.
     #[inline]
     pub fn byte_footprint(&self) -> u64 {

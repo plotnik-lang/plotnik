@@ -46,22 +46,32 @@ Validate once, at the boundary. Two smells to fix on sight: a swallowed must-hol
 
 ## Data Model Rules
 
+- **Output model**: output exists exactly where output syntax is written — `@capture` (field), def name (type), branch label (variant, when consumed), `:: Name` (type name). No captures — no data, like regex.
 - Captures are flat by default: nesting in pattern ≠ nesting in output
 - `{...} @x` or `[...] @x` creates a nested scope
+- **References are opaque**: bare `(Foo)` matches structurally, no output; `(Foo) @x` → `x: Foo` (void def → `x: Node`); `(Foo)* @xs` → `xs: Foo[]`. Fields never leak through a ref boundary; there is no pure aliasing (`Foo = (Bar)` is void)
 - Scalar list (no internal captures): `(x)* @a` → `a: T[]`
 - Row list (with internal captures): `(x @y)* @rows` → `rows: { y: T }[]`
 - **Strict dimensionality**: `*`/`+` with internal captures requires row capture on the quantifier
+- **Single referent**: a capture on a void pattern that doesn't match exactly one node (`{(a) (b)} @x`, `{(a)+} @x`, `{(a)?} @x`, ref to such a def) is an error
+- **Quantifier-rooted defs collect**: the def name is a consuming position — `Ids = (identifier)*` → `Ids = Node[]`, `Rows = (Row)*` → `Rows = Row[]`, `First = (Row)?` → `First = Row | null`. The element must be nameable (node or ref); an anonymous row/enum element is an error (name it in its own def). As entrypoints these output top-level JSON arrays/null.
+- **Type names** are compile-time and path-derived (`{Parent}{PascalField}`); `:: Name` overrides and resets the chain; same name + same shape = one type, different shape = error; `Node` and def names reserved
+- `@_` consumes and discards: subtree matches structurally, inner captures inert, no warnings
 
 ## Alternations
 
-An alternation `[...]` matches one of several branches; its form determines its type:
+An alternation `[...]` matches one of several branches:
 
-- **Union** — `[(identifier) @x (number) @y]` → `{ x?: Node, y?: Node }`. Branch captures merge into one struct of optional fields: the fields overlap, with no discriminant for which branch matched.
+- **Union** — `[(identifier) @x (number) @y]` → `{ x?: Node, y?: Node }`. Branch captures merge into one struct of optional fields: the fields overlap, with no discriminant for which branch matched. A bare-ref branch is a structural alternative (contributes nothing).
 - **Enum** — `[A: (id) @x  B: (num) @y]` → `{ $tag: "A", $data: { x } } | { $tag: "B", $data: { y } }`. Each branch label becomes a discriminant tag, i.e. a Rust-style `enum`.
+
+**Tagging on consumption**: labels take effect when the alternation's value is consumed — captured (`[...] @x`), row-captured (`[...]* @xs`), or a def body (`Expr = [...]`). Unconsumed labeled alternations degrade to a plain union + `UnusedBranchLabels` warning. A captureless branch (incl. bare ref or `@_`) is a tag-only variant (no `$data`); tags-only enums are legitimate.
 
 Mixing enum and union branches in one `[...]` is an error.
 
-Note the output shapes invert the usual TypeScript intuition: an **enum** compiles to a TS *discriminated union* (`A | B`), while a **union** compiles to a TS *struct* (`{ x?, y? }`).
+**Zero-width is last resort**: a repeat iteration never matches zero-width (`*` collects only consuming matches; `+` needs one real match even over a nullable element). An alternation branch that can match zero nodes succeeds zero-width only after every consuming alternative fails — it then needs no candidate node (matches in an empty parent) and defaults all output (union: fields null/`[]`; enum: tag with defaulted payload).
+
+Note the output shapes invert the usual TypeScript intuition: an **enum** compiles to a TS *discriminated union* (`A | B`), while a **union** compiles to a TS *struct* (`{ x?, y? }`). Enums render as one multi-line union literal; variant payloads are anonymous (inlined, never named declarations).
 
 ## Common Patterns
 
@@ -129,24 +139,44 @@ Rule: `.!` is exact. Soft `.` skips anonymous nodes only when both sides are nam
 (func (id) @name)* @funcs       ; OK: funcs: { name: Node }[]
 {(a) @a (b) @b}*                ; ERROR: no row capture
 {(a) @a (b) @b}* @rows          ; OK: rows: { a: Node, b: Node }[]
+(Item)* @items                  ; OK: items: Item[] (refs are opaque)
+(Item)*                         ; OK: structural, no output
 ```
 
 Note: `{}` is for grouping siblings into a sequence, not for satisfying dimensionality.
 
-**Optional bubbling**: `?` does NOT require row capture (no dimensionality added):
+**Quantifier-rooted definitions**: the def name collects, but only nameable
+elements qualify:
 
 ```
-{(a) @a (b) @b}?    ; OK: a?: Node, b?: Node (bubbles to parent)
+Ids = (identifier)*             ; OK: Ids = Node[]
+Rows = (Row)*                   ; OK: Rows = Row[] (Row is its own def)
+Bad = (func (id) @name)*        ; ERROR: element row is unnamed — split it out
+Bad = [K: (a) @a V: (b) @b]*    ; ERROR: element enum is unnamed — split it out
+Loop = (Ids)*                   ; ERROR: Ids can match zero nodes, a repeat must consume
 ```
 
-**Recursion rules**:
+**Optional rows**: `?` follows the same rule — internal captures need a
+capture on the quantifier (`@_` to discard); the collected row is nullable:
 
 ```
-Loop = (Loop)                     ; ERROR: no escape path
-Expr = [Lit: (n) @n  Rec: (Expr)] ; OK: Lit escapes
+{(a) @a (b) @b}?    ; ERROR: captures skip together, nothing collects them
+{(a) @a (b) @b}? @x ; OK: x: { a: Node, b: Node } | null (one nullable row)
+(el (a) @a)? @x     ; OK: x: { a: Node } | null (like (el (a) @a)* @xs rows)
+(a)? @x             ; OK: x: Node | null (capture on the quantifier itself)
+```
 
-A = (B)  B = (A)                  ; ERROR: no input consumed
-A = (foo (B))  B = (bar (A))      ; OK: descends each step
+A skip yields `x: null`, never `{ a: null, b: null }` — fields keep their
+true modality inside the row.
+
+**Recursion rules** — every cycle must both escape (a non-recursive branch) and consume (descend into a child each pass):
+
+```
+Loop = (Loop)                       ; ERROR: no escape path
+Expr = [Lit: (n) @n  Rec: (Expr)]   ; OK: Lit escapes (Rec is a tag-only variant)
+
+A = (foo (B))  B = (bar (A))        ; ERROR: descends but no branch terminates
+A = [X: (n) @n  Y: (B) @b]  B = (A) ; ERROR: escape exists, but cycle consumes no input
 ```
 
 ## ⚠️ Sequence Syntax (Tree-sitter vs Plotnik)

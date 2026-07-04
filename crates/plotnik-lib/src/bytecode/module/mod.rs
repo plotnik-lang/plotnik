@@ -293,6 +293,13 @@ impl Module {
         self.entrypoints().find_by_name(name, &self.strings())
     }
 
+    /// Names of all entrypoints, in table order.
+    pub fn entrypoint_names(&self) -> impl Iterator<Item = &str> {
+        let strings = self.strings();
+        let entrypoints = self.entrypoints();
+        (0..self.entrypoint_count()).map(move |i| strings.get(entrypoints.get(i).name()))
+    }
+
     /// `count + 1` entries: the extra sentinel offset gives the final string's end.
     fn string_table_slice(&self) -> &[u8] {
         let offset = self.offsets.str_table as usize;

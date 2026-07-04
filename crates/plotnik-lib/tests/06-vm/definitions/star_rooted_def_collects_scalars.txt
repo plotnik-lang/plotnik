@@ -1,0 +1,145 @@
+Ids = (identifier)*
+Q = (program (expression_statement (array (Ids) @ids)))
+==== input ====
+[a, b, c];
+==== types ====
+export interface Q {
+  ids: Ids;
+}
+
+export type Ids = Node[];
+==== output ====
+{
+  "ids": [
+    {
+      "kind": "identifier",
+      "text": "a",
+      "span": [1, 2]
+    },
+    {
+      "kind": "identifier",
+      "text": "b",
+      "span": [4, 5]
+    },
+    {
+      "kind": "identifier",
+      "text": "c",
+      "span": [7, 8]
+    }
+  ]
+}
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "ids"
+S2 "Ids"
+S3 "Q"
+S4 "identifier"
+S5 "program"
+S6 "expression_statement"
+S7 "array"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { ids }
+
+[type_members]
+M0: S1 → T1  ; ids: Ids
+
+[type_names]
+N0: S2 → T1  ; Ids
+N1: S3 → T2  ; Q
+
+[entrypoints]
+Ids = 06 :: T1
+Q   = 08 :: T2
+
+[transitions]
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Ids:
+  06  -ε-  [ArrayOpen]                      26, 19
+
+Q:
+  08   !   (program)                        09
+  09  └‣─  (expression_statement)           10
+  10  └‣─  (array)                          11
+  11  -ε-  [ArrayOpen]                      36, 29
+  13  -ε-  [ArrayClose]                     16
+  15  ...
+  16  ─‣┘  [Set(M0)] _                      23
+  18                                        ▶
+  19  -ε-  [ArrayClose]                     18
+  21   !   (identifier) [Node Push]         24, 19
+  23  ─‣┘² _                                28
+  24  ─‣─  _                                21, 24
+  26   !   _                                21, 24
+  28                                        ▶
+  29  -ε-  [ArrayClose Set(M0)]             23
+  31  ...
+  32   !   (identifier) [Node Push]         34, 13
+  34  ─‣─  _                                32, 34
+  36  └‣─  _                                32, 34
+==== trace ====
+_StructWrap:
+  00  -ε-  [StructOpen]                     02
+  02       Trampoline                       03
+       ▶   (Q)
+
+Q:
+  08       (program)                        09
+       ●   program
+  09       (expression_statement)           10
+       ●   expression_statement
+  10       (array)                          11
+       ●   array
+  11  -ε-  [ArrayOpen]                      36, 29
+  36       _                                32, 34
+       ●   [
+  32       (identifier) [Node Push]         34, 13
+       ○   [
+  36  ❮❮❮ 
+  34       _                                32, 34
+       ●   identifier
+  32       (identifier) [Node Push]         34, 13
+       ●   identifier
+  34       _                                32, 34
+       ●   ,
+  32       (identifier) [Node Push]         34, 13
+       ○   ,
+  34  ❮❮❮ 
+  34       _                                32, 34
+       ●   identifier
+  32       (identifier) [Node Push]         34, 13
+       ●   identifier
+  34       _                                32, 34
+       ●   ,
+  32       (identifier) [Node Push]         34, 13
+       ○   ,
+  34  ❮❮❮ 
+  34       _                                32, 34
+       ●   identifier
+  32       (identifier) [Node Push]         34, 13
+       ●   identifier
+  34       _                                32, 34
+       ●   ]
+  32       (identifier) [Node Push]         34, 13
+       ○   ]
+  34  ❮❮❮ 
+  34       _                                32, 34
+  32  ❮❮❮ 
+  13  -ε-  [ArrayClose]                     16
+  16       [Set(M0)] _                      23
+       ●   array
+  23       _                                28
+       ●   program
+  28   ◀   (Q)                              
+
+_StructWrap:
+  03  -ε-  [StructClose]                    05
+  05   ◀   _StructWrap                      ◼

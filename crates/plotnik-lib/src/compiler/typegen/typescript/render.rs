@@ -1,35 +1,14 @@
 //! Output rendering methods.
 
-use crate::core::utils::to_pascal_case;
-
 use crate::bytecode::{TypeDef, TypeDefKind, TypeId, TypeKind};
 
 use super::Emitter;
 
 impl Emitter<'_> {
-    pub(super) fn assign_names(&mut self) {
-        // Entrypoint names are reserved first so generated names don't collide with them.
-        for ep in self.entrypoints.iter() {
-            let name = self.strings.get(ep.name());
-            self.used_names.insert(to_pascal_case(name));
-        }
-
-        for type_name in self.types.names() {
-            let name = self.strings.get(type_name.name_id);
-            self.type_names
-                .insert(type_name.type_id, to_pascal_case(name));
-        }
-
-        self.assign_generated_names();
-
-        self.mark_node_type_usage();
-
-        if self.config.emit_node_interface && self.needs_node_type {
-            self.emit_node_interface();
-        }
-    }
-
-    pub(super) fn emit_supporting_type(&mut self, type_id: TypeId) {
+    /// Emit the declaration for a named type: `interface` for a struct, a
+    /// multi-line tagged union for an enum, `type Name = …` for aliases.
+    /// Unnamed composites emit nothing — they render inline at use sites.
+    pub(super) fn emit_declaration(&mut self, type_id: TypeId) {
         if self.emitted_types.contains(&type_id) {
             return;
         }
@@ -37,50 +16,30 @@ impl Emitter<'_> {
         let Some(type_def) = self.types.get(type_id) else {
             return;
         };
-
-        match type_def.decode() {
-            TypeDefKind::Primitive(_) => (),
-            TypeDefKind::Wrapper {
-                kind: TypeKind::Alias,
-                ..
-            } => {
-                if let Some(name) = self.type_names.get(&type_id).cloned() {
-                    self.emit_node_alias(&name);
-                    self.emitted_types.insert(type_id);
-                }
-            }
-            TypeDefKind::Wrapper { .. } => (),
-            TypeDefKind::Struct { .. } => {
-                if let Some(name) = self.type_names.get(&type_id).cloned() {
-                    self.emitted_types.insert(type_id);
-                    self.emit_interface(&name, &type_def);
-                }
-            }
-            TypeDefKind::Enum { .. } => {
-                if let Some(name) = self.type_names.get(&type_id).cloned() {
-                    self.emitted_types.insert(type_id);
-                    self.emit_enum(&name, &type_def);
-                }
-            }
-        }
-    }
-
-    pub(super) fn emit_type_definition(&mut self, name: &str, type_id: TypeId) {
-        self.emitted_types.insert(type_id);
-        let type_name = to_pascal_case(name);
-
-        let Some(type_def) = self.types.get(type_id) else {
-            let ts_type = self.render_ty(type_id);
-            self.emit_type_decl(&type_name, &ts_type);
+        let Some(name) = self.type_names.get(&type_id).cloned() else {
             return;
         };
 
+        self.emitted_types.insert(type_id);
+        if !self.declared_names.insert(name.clone()) {
+            // A nominal twin: the compiler guarantees same name ⇒ same shape,
+            // so the first declaration serves this id too.
+            return;
+        }
+
         match type_def.decode() {
-            TypeDefKind::Struct { .. } => self.emit_interface(&type_name, &type_def),
-            TypeDefKind::Enum { .. } => self.emit_enum(&type_name, &type_def),
+            TypeDefKind::Struct { .. } => self.emit_interface(&name, &type_def),
+            TypeDefKind::Enum { .. } => self.emit_enum(&name, &type_def),
+            TypeDefKind::Wrapper {
+                kind: TypeKind::Alias,
+                inner,
+            } => {
+                let body = self.render_ty(inner);
+                self.emit_type_decl(&name, &body);
+            }
             _ => {
-                let ts_type = self.render_ty(type_id);
-                self.emit_type_decl(&type_name, &ts_type);
+                let body = self.render_shape(type_id);
+                self.emit_type_decl(&name, &body);
             }
         }
     }
@@ -132,57 +91,48 @@ impl Emitter<'_> {
         self.output.push_str(&format!("{}}}{}\n\n", c.dim, c.reset));
     }
 
+    /// Emit an enum as one multi-line union of inline variants:
+    ///
+    /// ```ts
+    /// export type Expr =
+    ///   | { $tag: "Lit"; $data: { value: Node } }
+    ///   | { $tag: "Neg"; $data: { inner: Expr } };
+    /// ```
+    ///
+    /// Variants have no standalone declarations; a void variant omits `$data`.
     fn emit_enum(&mut self, name: &str, type_def: &TypeDef) {
         let c = self.colors();
-        let mut variant_types = Vec::new();
 
-        for member in self.types.members_of(type_def) {
-            let variant_name = self.strings.get(member.name_id);
-            let variant_type_name = format!("{}{}", name, to_pascal_case(variant_name));
-            variant_types.push(variant_type_name.clone());
-
-            let is_void = self.is_void_type(member.type_id);
-
-            if self.config.export {
-                self.output
-                    .push_str(&format!("{}export{} ", c.dim, c.reset));
-            }
-            self.output.push_str(&format!(
-                "{}interface{} {}{}{} {}{{\n",
-                c.dim, c.reset, c.blue, variant_type_name, c.reset, c.dim
-            ));
-            self.output.push_str(&format!(
-                "{}  $tag{}:{} {}\"{}\"{}{};{}\n",
-                c.reset, c.dim, c.reset, c.green, variant_name, c.reset, c.dim, c.reset
-            ));
-            if !is_void {
-                let data_str = self.inline_variant_payload(member.type_id);
-                self.output.push_str(&format!(
-                    "  $data{}:{} {}{};\n",
-                    c.dim, c.reset, data_str, c.dim
-                ));
-            }
-            self.output.push_str(&format!("{}}}{}\n\n", c.dim, c.reset));
+        if self.config.export {
+            self.output
+                .push_str(&format!("{}export{} ", c.dim, c.reset));
         }
+        self.output.push_str(&format!(
+            "{}type{} {}{}{} {}={}\n",
+            c.dim, c.reset, c.blue, name, c.reset, c.dim, c.reset
+        ));
 
-        let union = variant_types
-            .iter()
-            .map(|v| format!("{}{}{}", c.blue, v, c.reset))
-            .collect::<Vec<_>>()
-            .join(&format!(" {}|{} ", c.dim, c.reset));
-        self.emit_type_decl(name, &union);
+        let variants: Vec<String> = self
+            .types
+            .members_of(type_def)
+            .map(|member| {
+                let variant_name = self.strings.get(member.name_id).to_string();
+                self.render_variant(&variant_name, member.type_id)
+            })
+            .collect();
+
+        let last = variants.len().saturating_sub(1);
+        for (i, variant) in variants.into_iter().enumerate() {
+            let terminator = if i == last { ";" } else { "" };
+            self.output.push_str(&format!(
+                "  {}|{} {}{}{}{}\n",
+                c.dim, c.reset, variant, c.dim, terminator, c.reset
+            ));
+        }
+        self.output.push('\n');
     }
 
-    fn emit_node_alias(&mut self, name: &str) {
-        self.emit_type_decl(name, "Node");
-    }
-
-    pub(super) fn emit_type_alias(&mut self, alias_name: &str, target_name: &str) {
-        let c = self.colors();
-        self.emit_type_decl(alias_name, &format!("{}{}{}", c.blue, target_name, c.reset));
-    }
-
-    fn emit_node_interface(&mut self) {
+    pub(super) fn emit_node_interface(&mut self) {
         let c = self.colors();
 
         if self.config.export {
