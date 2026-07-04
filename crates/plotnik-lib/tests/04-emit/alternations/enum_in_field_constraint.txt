@@ -4,7 +4,7 @@ Q = (pair
     B: (number)
   ] @kind
 )
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "a"

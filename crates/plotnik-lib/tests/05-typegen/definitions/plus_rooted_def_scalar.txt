@@ -1,6 +1,6 @@
 Ids = (identifier)+
 Q = (program (expression_statement (array (Ids) @ids (Ids)* @runs)))
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   ids: Ids;
   runs: Ids[];

@@ -1,5 +1,5 @@
 "hello\nworld" "tab\there"
-==== tokens ====
+--------------------- TOKENS ---------------------
 DoubleQuote "\""
 StringContent "hello\\nworld"
 DoubleQuote "\""

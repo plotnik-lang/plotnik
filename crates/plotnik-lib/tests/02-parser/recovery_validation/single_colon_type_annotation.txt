@@ -1,5 +1,5 @@
 (identifier) @name : Type
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: type annotations use `::`, not `:`
  --> query.ptk:1:20
   |

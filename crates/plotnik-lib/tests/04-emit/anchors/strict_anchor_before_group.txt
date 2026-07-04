@@ -1,5 +1,5 @@
 Q = (function_declaration .! {(identifier) @n})
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: with strict adjacency (`.!`), no `function_declaration` places this child first; a `function_declaration` begins with `"async"` or `"function"`
  --> query.ptk:1:6
   |

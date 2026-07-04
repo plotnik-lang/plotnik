@@ -1,6 +1,6 @@
 Broken ^^^
 Valid = (ok)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: references must be parenthesized
  --> query.ptk:1:1
   |

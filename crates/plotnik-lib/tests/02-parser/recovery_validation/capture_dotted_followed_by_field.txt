@@ -1,5 +1,5 @@
 (node) @foo.bar name: (other)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: capture names must be snake_case
  --> query.ptk:1:8
   |

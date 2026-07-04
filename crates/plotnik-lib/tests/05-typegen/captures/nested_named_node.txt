@@ -3,7 +3,7 @@ Q = (call_expression
     object: (identifier) @target
   )
 )
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   target: Node;
 }

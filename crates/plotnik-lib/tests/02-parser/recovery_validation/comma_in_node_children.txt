@@ -1,5 +1,5 @@
 (node (a), (b))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: patterns are separated by whitespace
  --> query.ptk:1:10
   |

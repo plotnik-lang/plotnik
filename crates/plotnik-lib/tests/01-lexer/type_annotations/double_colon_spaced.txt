@@ -1,5 +1,5 @@
 @name :: Type
-==== tokens ====
+--------------------- TOKENS ---------------------
 CaptureToken "@name"
 DoubleColon "::"
 Id "Type"

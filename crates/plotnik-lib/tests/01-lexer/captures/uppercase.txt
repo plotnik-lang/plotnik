@@ -1,3 +1,3 @@
 @Name
-==== tokens ====
+--------------------- TOKENS ---------------------
 CaptureToken "@Name"

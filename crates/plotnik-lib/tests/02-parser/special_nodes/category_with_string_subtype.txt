@@ -1,5 +1,5 @@
 Q = (expression#"()")
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -13,7 +13,7 @@ Root
       StringContent "()"
       DoubleQuote "\""
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

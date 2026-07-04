@@ -1,5 +1,5 @@
 foo* bar+ baz? qux*? lazy+? greedy??
-==== tokens ====
+--------------------- TOKENS ---------------------
 Id "foo"
 Star "*"
 Id "bar"

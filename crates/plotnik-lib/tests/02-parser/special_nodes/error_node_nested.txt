@@ -1,5 +1,5 @@
 Q = (function_definition body: (block (ERROR)))
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -20,7 +20,7 @@ Root
             ParenClose ")"
           ParenClose ")"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

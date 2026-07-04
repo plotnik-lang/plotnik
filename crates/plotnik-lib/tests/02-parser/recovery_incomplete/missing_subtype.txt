@@ -1,5 +1,5 @@
 (expression/)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: expected a subtype after `/`
  --> query.ptk:1:13
   |

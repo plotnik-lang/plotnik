@@ -1,6 +1,6 @@
 Leaf = (identifier)
 Tree = (call (Leaf))
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Leaf
 Tree
   Leaf

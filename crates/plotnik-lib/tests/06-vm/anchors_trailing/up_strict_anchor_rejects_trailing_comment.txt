@@ -1,11 +1,11 @@
 Q = (program (expression_statement (identifier == "a") .!))
-==== input ====
+--------------------- INPUT ----------------------
 a /* c */;
-==== types ====
+--------------------- TYPES ----------------------
 export type Q = Node;
-==== output ====
+--------------------- OUTPUT ---------------------
 <no match>
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -38,7 +38,7 @@ Q:
   11  └‣─  _                                04, 09
   13  └‣─  (expression_statement)           11
   14   !   (program)                        13
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00       (?)                              14 : 01
        ▶   (?)

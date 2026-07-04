@@ -1,5 +1,5 @@
 Q = (statement/expression_statement (expression/call_expression))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: `supertype/subtype` paths are tree-sitter syntax
  --> query.ptk:1:15
   |
@@ -25,7 +25,7 @@ help: use `#`
 1 + Q = (statement/expression_statement (expression#call_expression))
   |
 help: use `supertype#subtype` instead of `supertype/subtype`
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -43,7 +43,7 @@ Root
         Id "call_expression"
         ParenClose ")"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

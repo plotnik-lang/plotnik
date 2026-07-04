@@ -1,5 +1,5 @@
 Q = Expr ^^^ (identifier)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: references must be parenthesized
  --> query.ptk:1:5
   |

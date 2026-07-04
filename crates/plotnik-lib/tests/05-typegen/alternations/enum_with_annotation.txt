@@ -2,7 +2,7 @@ Q = [
   Str: (string) @s :: Foo
   Num: (number) @n
 ]
-==== types ====
+--------------------- TYPES ----------------------
 export type Q =
   | { $tag: "Str"; $data: { s: Foo } }
   | { $tag: "Num"; $data: { n: Node } };

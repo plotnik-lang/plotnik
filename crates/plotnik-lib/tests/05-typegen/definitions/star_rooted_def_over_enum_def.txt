@@ -1,7 +1,7 @@
 Entry = [Id: (identifier) @id  Num: (number) @num]
 Items = (Entry)*
 Q = (program (expression_statement (array (Items) @items)))
-==== types ====
+--------------------- TYPES ----------------------
 export type Entry =
   | { $tag: "Id"; $data: { id: Node } }
   | { $tag: "Num"; $data: { num: Node } };

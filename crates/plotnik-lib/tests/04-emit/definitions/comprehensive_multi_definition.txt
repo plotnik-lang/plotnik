@@ -9,7 +9,7 @@ Assignment = (assignment_expression
   left: (identifier) @target
   right: (Expression) @value
 )
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "name"

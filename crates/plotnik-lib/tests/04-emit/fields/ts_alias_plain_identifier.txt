@@ -1,6 +1,6 @@
 Q = (type_alias_declaration name: (identifier) @name)
-==== input.ts ====
-==== diagnostics ====
+------------------- INPUT (ts) -------------------
+------------------ DIAGNOSTICS -------------------
 error: `identifier` can't be the value of `name`
  --> query.ptk:1:36
   |

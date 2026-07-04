@@ -7,7 +7,7 @@ Expr = [
   (identifier)
   (Literal)
 ]
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -42,7 +42,7 @@ Root
           Id "Literal"
           ParenClose ")"
       BracketClose "]"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Literal

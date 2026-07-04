@@ -2,7 +2,7 @@ Q = [
   Assign: (assignment_expression left: (identifier) @left)
   Call: (call_expression function: (identifier) @func)
 ] @stmt
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -45,7 +45,7 @@ Root
             ParenClose ")"
         BracketClose "]"
       CaptureToken "@stmt"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

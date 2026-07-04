@@ -1,6 +1,6 @@
 Expr = (expression)
 List = (Expr)*
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Expr
 List
   Expr

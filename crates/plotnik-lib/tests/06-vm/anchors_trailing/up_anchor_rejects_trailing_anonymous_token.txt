@@ -1,11 +1,11 @@
 Q = (program (debugger_statement "debugger" .))
-==== input ====
+--------------------- INPUT ----------------------
 debugger;
-==== types ====
+--------------------- TYPES ----------------------
 export type Q = Node;
-==== output ====
+--------------------- OUTPUT ---------------------
 <no match>
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "Q"
@@ -37,7 +37,7 @@ Q:
   10  └‣─  _                                04, 08
   12  └‣─  (debugger_statement)             10
   13   !   (program)                        12
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00       (?)                              13 : 01
        ▶   (?)

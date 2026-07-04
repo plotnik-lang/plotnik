@@ -7,7 +7,7 @@ Q = [
   (A)
   (number) @b
 ]
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   b: Node | null;
 }

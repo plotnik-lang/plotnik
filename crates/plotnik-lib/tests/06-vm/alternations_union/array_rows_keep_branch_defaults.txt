@@ -1,7 +1,7 @@
 Q = (program (expression_statement (array [(identifier)? @a (number)? @b]* @items)))
-==== input ====
+--------------------- INPUT ----------------------
 [x, y]
-==== types ====
+--------------------- TYPES ----------------------
 export interface QItems {
   a: Node | null;
   b: Node | null;
@@ -10,7 +10,7 @@ export interface QItems {
 export interface Q {
   items: QItems[];
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "items": [
     {
@@ -31,7 +31,7 @@ export interface Q {
     }
   ]
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "a"
@@ -88,7 +88,7 @@ Q:
   34  └‣─  (array)                          30
   35  └‣─  (expression_statement)           34
   36   !   (program)                        35
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              36 : 03

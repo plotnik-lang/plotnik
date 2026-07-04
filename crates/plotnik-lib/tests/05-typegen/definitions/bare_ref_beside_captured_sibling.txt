@@ -4,7 +4,7 @@ Q = (program
   (A)
   (debugger_statement) @name
 )
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   name: Node;
 }

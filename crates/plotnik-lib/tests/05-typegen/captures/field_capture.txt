@@ -1,5 +1,5 @@
 Q = (function_declaration name: (identifier) @name)
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   name: Node;
 }

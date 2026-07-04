@@ -1,14 +1,14 @@
 Q = [A:(identifier)?@id]@x
-==== input ====
+--------------------- INPUT ----------------------
 let x
-==== types ====
+--------------------- TYPES ----------------------
 export type QX =
   | { $tag: "A"; $data: { id: Node | null } };
 
 export interface Q {
   x: QX;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "x": {
     "$tag": "A",
@@ -17,7 +17,7 @@ export interface Q {
     }
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "id"
@@ -60,7 +60,7 @@ Q:
   15  ...
   16  -ε-  [EnumOpen(M1) Null Set(M0) EnumClose Set(M2)]  06
   19  -ε-                                   13, 16
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              19 : 03

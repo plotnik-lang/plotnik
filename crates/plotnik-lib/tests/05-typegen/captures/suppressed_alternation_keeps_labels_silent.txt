@@ -2,5 +2,5 @@ Q = (program [
   A: (expression_statement)
   B: (debugger_statement)
 ] @_)
-==== types ====
+--------------------- TYPES ----------------------
 export type Q = undefined;

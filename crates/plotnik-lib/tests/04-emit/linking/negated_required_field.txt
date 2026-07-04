@@ -1,5 +1,5 @@
 Q = (function_declaration -name) @fn
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `-name` can never match
  --> query.ptk:1:28
   |

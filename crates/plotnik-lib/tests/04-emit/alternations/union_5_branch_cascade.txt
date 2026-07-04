@@ -1,5 +1,5 @@
 Q = [(identifier) @a (number) @b (string) @c (binary_expression) @d (call_expression) @e]
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "a"

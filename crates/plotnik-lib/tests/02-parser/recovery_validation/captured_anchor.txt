@@ -1,5 +1,5 @@
 (call (a) . @x (b))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: anchors cannot be captured
  --> query.ptk:1:13
   |

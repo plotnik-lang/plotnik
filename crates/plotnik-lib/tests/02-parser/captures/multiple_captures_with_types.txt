@@ -2,13 +2,13 @@ Q = (binary
   left: (_) @left :: Node
   right: (_) @right :: Foo
 ) @expr :: BinaryExpr
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: this type annotation `Node` is already the default type; omit it
  --> query.ptk:2:22
   |
 2 |   left: (_) @left :: Node
   |                      ^^^^
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -47,7 +47,7 @@ Root
       TypeAnnotation
         DoubleColon "::"
         Id "BinaryExpr"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

@@ -1,12 +1,12 @@
 Foo = (expression_statement (call_expression) @call)
 Q = (program (Foo) @val :: Renamed)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: this type annotation cannot rename a type that already has a name; omit it
  --> query.ptk:2:28
   |
 2 | Q = (program (Foo) @val :: Renamed)
   |                            ^^^^^^^
-==== types ====
+--------------------- TYPES ----------------------
 export interface Foo {
   call: Node;
 }

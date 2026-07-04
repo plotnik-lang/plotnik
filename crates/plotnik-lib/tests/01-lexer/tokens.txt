@@ -1,5 +1,5 @@
 Q = (function_declaration name: (identifier) @name)+
-==== tokens ====
+--------------------- TOKENS ---------------------
 Id "Q"
 Equals "="
 ParenOpen "("

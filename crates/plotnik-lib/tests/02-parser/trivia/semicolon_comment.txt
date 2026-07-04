@@ -1,6 +1,6 @@
 ; semicolon comment
 Q = (identifier)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   LineComment "; semicolon comment"
@@ -14,7 +14,7 @@ Root
       ParenOpen "("
       Id "identifier"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

@@ -1,5 +1,5 @@
 Q = (node foo: (bar)* @baz)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -20,7 +20,7 @@ Root
           Star "*"
         CaptureToken "@baz"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

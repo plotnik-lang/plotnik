@@ -1,5 +1,5 @@
 Foo BarBaz Test123
-==== tokens ====
+--------------------- TOKENS ---------------------
 Id "Foo"
 Id "BarBaz"
 Id "Test123"

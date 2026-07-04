@@ -1,5 +1,5 @@
 @name @value @other
-==== tokens ====
+--------------------- TOKENS ---------------------
 CaptureToken "@name"
 CaptureToken "@value"
 CaptureToken "@other"

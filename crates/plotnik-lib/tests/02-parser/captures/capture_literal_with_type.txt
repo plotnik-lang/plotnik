@@ -1,5 +1,5 @@
 Q = "return" @kw :: Foo
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -14,7 +14,7 @@ Root
       TypeAnnotation
         DoubleColon "::"
         Id "Foo"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

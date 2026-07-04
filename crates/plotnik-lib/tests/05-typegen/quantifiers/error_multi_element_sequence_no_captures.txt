@@ -2,7 +2,7 @@ Bad = {
   (identifier)
   (number)
 }* @items
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
  --> query.ptk:1:7
   |

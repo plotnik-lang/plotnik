@@ -1,5 +1,5 @@
 (MISSING identifier)
-==== tokens ====
+--------------------- TOKENS ---------------------
 ParenOpen "("
 KwMissing "MISSING"
 Id "identifier"

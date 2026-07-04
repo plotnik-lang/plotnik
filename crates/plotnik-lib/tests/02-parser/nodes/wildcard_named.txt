@@ -1,5 +1,5 @@
 Q = (_)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -9,7 +9,7 @@ Root
       ParenOpen "("
       Underscore "_"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

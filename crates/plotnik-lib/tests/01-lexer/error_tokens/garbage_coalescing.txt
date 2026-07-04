@@ -1,5 +1,5 @@
 (foo) ^$%& (bar)
-==== tokens ====
+--------------------- TOKENS ---------------------
 ParenOpen "("
 Id "foo"
 ParenClose ")"

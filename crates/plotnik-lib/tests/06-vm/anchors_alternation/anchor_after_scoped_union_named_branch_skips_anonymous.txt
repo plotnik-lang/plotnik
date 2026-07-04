@@ -10,9 +10,9 @@ Q = (program
     )
   )
 )
-==== input ====
+--------------------- INPUT ----------------------
 5 * x
-==== types ====
+--------------------- TYPES ----------------------
 export interface QT {
   n: Node | null;
 }
@@ -20,7 +20,7 @@ export interface QT {
 export interface Q {
   t: QT;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "t": {
     "n": {
@@ -30,7 +30,7 @@ export interface Q {
     }
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "n"
@@ -80,7 +80,7 @@ Q:
   23  ...
   24  └‣─  (expression_statement)           22
   25   !   (program)                        24
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              25 : 03

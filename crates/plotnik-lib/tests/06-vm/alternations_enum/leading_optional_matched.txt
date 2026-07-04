@@ -7,14 +7,14 @@ Q = (program
     }
   ]
 )
-==== input ====
+--------------------- INPUT ----------------------
 /* c */ a; b;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   a: Node;
   b: Node;
 }
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
  --> query.ptk:2:3
   |
@@ -27,7 +27,7 @@ warning: branch labels have no effect without capture
   | |___^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "a": {
     "kind": "expression_statement",
@@ -40,7 +40,7 @@ help: capture the alternation (`[...] @name`) to make the labels enum variants, 
     "span": [11, 13]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -82,7 +82,7 @@ Q:
   20  ─‣─  _                                18, 10, 20
   22  └‣─  _                                18, 10, 20
   24   !   (program)                        22
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              24 : 03

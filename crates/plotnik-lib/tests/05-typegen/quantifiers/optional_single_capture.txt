@@ -1,5 +1,5 @@
 Q = (decorator)? @dec
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   dec: Node | null;
 }

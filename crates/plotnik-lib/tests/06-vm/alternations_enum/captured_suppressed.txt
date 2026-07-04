@@ -1,9 +1,9 @@
 Q = (program [Tag: (expression_statement) @_])
-==== input ====
+--------------------- INPUT ----------------------
 a;
-==== types ====
+--------------------- TYPES ----------------------
 export type Q = undefined;
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
  --> query.ptk:1:14
   |
@@ -11,9 +11,9 @@ warning: branch labels have no effect without capture
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
-==== output ====
+--------------------- OUTPUT ---------------------
 null
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "program"
@@ -41,7 +41,7 @@ Q:
   07  ...
   08  └‣─  _                                02, 05
   10   !   (program)                        08
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00       (?)                              10 : 01
        ▶   (?)

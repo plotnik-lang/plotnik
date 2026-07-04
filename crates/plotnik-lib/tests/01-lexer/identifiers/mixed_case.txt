@@ -1,5 +1,5 @@
 Foo Bar baz test_case
-==== tokens ====
+--------------------- TOKENS ---------------------
 Id "Foo"
 Id "Bar"
 Id "baz"

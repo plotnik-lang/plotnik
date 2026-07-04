@@ -1,5 +1,5 @@
 Q = ()
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: empty `()` matches nothing
  --> query.ptk:1:5
   |
@@ -7,4 +7,4 @@ error: empty `()` matches nothing
   |     ^^
   |
 help: use `(_)` to match any named node, or `_` for any node
-==== symbols ====
+-------------------- SYMBOLS ---------------------

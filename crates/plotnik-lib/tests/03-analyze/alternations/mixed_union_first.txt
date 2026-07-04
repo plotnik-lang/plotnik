@@ -2,7 +2,7 @@ Q = [
   (a)
   B: (b)
 ]
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: cannot mix enum and union branches
  --> query.ptk:2:3
   |
@@ -12,4 +12,4 @@ error: cannot mix enum and union branches
   |   - enum branch here
   |
 help: use all labels for an enum, or none for a merged struct
-==== symbols ====
+-------------------- SYMBOLS ---------------------

@@ -1,5 +1,5 @@
 my_expr = (identifier)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: definition names must be PascalCase
  --> query.ptk:1:1
   |

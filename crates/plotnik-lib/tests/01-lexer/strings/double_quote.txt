@@ -1,5 +1,5 @@
 "hello" "world"
-==== tokens ====
+--------------------- TOKENS ---------------------
 DoubleQuote "\""
 StringContent "hello"
 DoubleQuote "\""

@@ -1,13 +1,13 @@
 Q = (program (class_declaration) @cls)
-==== input ====
+--------------------- INPUT ----------------------
 function foo() {}
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   cls: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 <no match>
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "cls"
@@ -38,7 +38,7 @@ Q:
   08  ─‣┘  _                                09
   09                                        ▶
   10   !   (program)                        06
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              10 : 03

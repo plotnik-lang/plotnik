@@ -6,14 +6,14 @@ Q = (program
     .
   }
 )
-==== input ====
+--------------------- INPUT ----------------------
 debugger;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   a: Node | null;
   b: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "a": null,
   "b": {
@@ -22,7 +22,7 @@ export interface Q {
     "span": [0, 9]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -62,7 +62,7 @@ Q:
   16  ─‣─  _                                13, 16
   18  └‣─  _                                13, 16
   20   !   (program)                        18, 08
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              20 : 03

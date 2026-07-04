@@ -10,9 +10,9 @@ Q = (program
     )
   )
 )
-==== input ====
+--------------------- INPUT ----------------------
 5 * x
-==== types ====
+--------------------- TYPES ----------------------
 export type QT =
   | { $tag: "A" }
   | { $tag: "B" };
@@ -20,13 +20,13 @@ export type QT =
 export interface Q {
   t: QT;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "t": {
     "$tag": "A"
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "A"
@@ -75,7 +75,7 @@ Q:
   20  └‣─  (binary_expression)              18
   21  └‣─  (expression_statement)           20
   22   !   (program)                        21
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              22 : 03

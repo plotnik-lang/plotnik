@@ -2,7 +2,7 @@ Q = {
   (a) @a
   (b) @b
 } @seq :: MySequence
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -28,7 +28,7 @@ Root
       TypeAnnotation
         DoubleColon "::"
         Id "MySequence"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

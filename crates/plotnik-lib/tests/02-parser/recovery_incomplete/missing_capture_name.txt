@@ -1,5 +1,5 @@
 (identifier) @
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: expected a capture name after `@`
  --> query.ptk:1:14
   |

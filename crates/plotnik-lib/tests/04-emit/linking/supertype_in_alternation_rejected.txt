@@ -2,7 +2,7 @@ Q = [
   (expression#statement_block)
   (identifier)
 ]
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: matching the `expression#` supertype is not supported yet
  --> query.ptk:2:4
   |

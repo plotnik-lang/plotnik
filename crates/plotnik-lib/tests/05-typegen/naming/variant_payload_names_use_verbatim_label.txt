@@ -2,7 +2,7 @@ Q = (program [
   Stmt: (expression_statement {(identifier) @name} @info)
   DECL: (lexical_declaration) @node
 ] @item)
-==== types ====
+--------------------- TYPES ----------------------
 export type QItem =
   | { $tag: "Stmt"; $data: { info: QItemStmtInfo } }
   | { $tag: "DECL"; $data: { node: Node } };

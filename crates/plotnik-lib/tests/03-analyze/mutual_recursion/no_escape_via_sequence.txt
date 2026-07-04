@@ -1,6 +1,6 @@
 A = (foo {(x) (B)})
 B = (bar (A))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: infinite recursion: no escape path
  --> query.ptk:2:11
   |
@@ -13,7 +13,7 @@ error: infinite recursion: no escape path
   | B is defined here
   |
 help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 A
   B
     A (cycle)

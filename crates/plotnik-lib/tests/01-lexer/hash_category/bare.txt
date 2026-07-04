@@ -1,5 +1,5 @@
 (value#)
-==== tokens ====
+--------------------- TOKENS ---------------------
 ParenOpen "("
 Id "value"
 Hash "#"

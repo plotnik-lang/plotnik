@@ -3,7 +3,7 @@ Q = (function_declaration
     (return_statement) @ret
   ) @body
 ) @fn
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "fn"

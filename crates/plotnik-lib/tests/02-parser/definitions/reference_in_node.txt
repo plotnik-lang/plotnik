@@ -1,6 +1,6 @@
 Expr = (identifier)
 Q = (call (Expr))
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -21,7 +21,7 @@ Root
         Id "Expr"
         ParenClose ")"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Expr

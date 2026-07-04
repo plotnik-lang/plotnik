@@ -4,7 +4,7 @@ Q = (program [
   Call: (Inner) @_
   Decl: (lexical_declaration) @d
 ] @item)
-==== types ====
+--------------------- TYPES ----------------------
 export type QItem =
   | { $tag: "Call" }
   | { $tag: "Decl"; $data: { d: Node } };

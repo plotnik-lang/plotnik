@@ -1,7 +1,7 @@
 Id = (identifier) @id
 Foo = (function_declaration name: (Id))
 Bar = (class_declaration name: (Id))
-==== types ====
+--------------------- TYPES ----------------------
 export interface Id {
   id: Node;
 }

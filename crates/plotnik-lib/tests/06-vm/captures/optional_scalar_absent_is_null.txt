@@ -2,14 +2,14 @@ Q = (program
   (lexical_declaration)? @decl
   (expression_statement) @stmt
 )
-==== input ====
+--------------------- INPUT ----------------------
 foo;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   decl: Node | null;
   stmt: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "decl": null,
   "stmt": {
@@ -18,7 +18,7 @@ export interface Q {
     "span": [0, 4]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "decl"
@@ -58,7 +58,7 @@ Q:
   16  ─‣─  _                                13, 16
   18  └‣─  _                                13, 16
   20   !   (program)                        18, 08
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              20 : 03

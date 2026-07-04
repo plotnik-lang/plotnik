@@ -2,7 +2,7 @@ Q = [
   (identifier) @x
   (number)* @x
 ]
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: capture `@x` has incompatible types across branches
  --> query.ptk:2:16
   |

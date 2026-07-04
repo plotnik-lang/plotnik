@@ -1,6 +1,6 @@
 Seq = [{(identifier)} {(identifier) (Seq)}]
 Q = (array .! (Seq))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: with strict adjacency (`.!`), no `array` places this child first; an `array` begins with `"["`
  --> query.ptk:2:6
   |

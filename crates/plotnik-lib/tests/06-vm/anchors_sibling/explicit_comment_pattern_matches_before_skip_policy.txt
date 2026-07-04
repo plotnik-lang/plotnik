@@ -5,15 +5,15 @@ Q = (program
     (function_declaration) @fn
   }
 )
-==== input ====
+--------------------- INPUT ----------------------
 // doc
 function f() {}
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   doc: Node;
   fn: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "doc": {
     "kind": "comment",
@@ -26,7 +26,7 @@ export interface Q {
     "span": [7, 22]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "doc"
@@ -63,7 +63,7 @@ Q:
   12  ─‣─  _                                10, 12
   14  └‣─  _                                10, 12
   16   !   (program)                        14
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              16 : 03

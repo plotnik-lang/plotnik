@@ -1,6 +1,6 @@
 Q = (list_literal (list_literal) @outer (list_literal) @inner)
-==== input.dart ====
-==== bytecode ====
+------------------ INPUT (dart) ------------------
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "outer"

@@ -1,5 +1,5 @@
 Q = (binary_expression left: (number) left: (number))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: a `binary_expression` has one `left`, but this pattern binds `left` 2 times
  --> query.ptk:1:6
   |

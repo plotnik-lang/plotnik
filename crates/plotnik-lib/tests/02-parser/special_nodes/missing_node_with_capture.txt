@@ -1,5 +1,5 @@
 Q = (MISSING ";") @missing_semi
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -14,7 +14,7 @@ Root
         DoubleQuote "\""
         ParenClose ")"
       CaptureToken "@missing_semi"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

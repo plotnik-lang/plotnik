@@ -1,7 +1,7 @@
 (first)
 Expr = (identifier)
 (last)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: definition must be named
  --> query.ptk:1:1
   |

@@ -5,7 +5,7 @@ Q = (function_declaration
     (number)
   ]
 )
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `class_declaration` cannot be a child of this node
  --> query.ptk:2:4
   |

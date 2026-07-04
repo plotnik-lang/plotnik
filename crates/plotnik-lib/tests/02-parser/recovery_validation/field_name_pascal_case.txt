@@ -1,5 +1,5 @@
 (call Name: (a))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: field names must be snake_case
  --> query.ptk:1:7
   |

@@ -1,7 +1,7 @@
 Q = (program {(expression_statement) @a (debugger_statement) @b}? @x)
-==== input ====
+--------------------- INPUT ----------------------
 class C {}
-==== types ====
+--------------------- TYPES ----------------------
 export interface QX {
   a: Node;
   b: Node;
@@ -10,11 +10,11 @@ export interface QX {
 export interface Q {
   x: QX | null;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "x": null
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
@@ -59,7 +59,7 @@ Q:
   16  ─‣─  _                                13, 16
   18  └‣─  _                                13, 16
   20   !   (program)                        18, 11
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              20 : 03

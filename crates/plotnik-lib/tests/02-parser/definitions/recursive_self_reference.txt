@@ -5,7 +5,7 @@ NestedCall = (call_expression
   ]
   arguments: (arguments)
 )
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -42,7 +42,7 @@ Root
           Id "arguments"
           ParenClose ")"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def NestedCall

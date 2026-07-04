@@ -5,7 +5,7 @@ Expr = [
     right: (Expr) @right
   )
 ]
-==== types ====
+--------------------- TYPES ----------------------
 export type Expr =
   | { $tag: "Lit"; $data: { value: Node } }
   | { $tag: "Binary"; $data: { left: Expr; right: Expr } };

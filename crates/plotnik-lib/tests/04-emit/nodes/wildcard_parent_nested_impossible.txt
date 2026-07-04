@@ -1,5 +1,5 @@
 Q = (array (_ (program) @p) @node)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: no node the grammar builds takes these children
  --> query.ptk:1:13
   |

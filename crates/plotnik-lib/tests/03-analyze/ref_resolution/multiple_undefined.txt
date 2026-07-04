@@ -1,5 +1,5 @@
 Q = (foo (X) (Y) (Z))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `X` is not defined
  --> query.ptk:1:11
   |
@@ -38,7 +38,7 @@ help: did you mean `(Q)`?
 1 + Q = (foo (X) (Y) (Q))
   |
 help: `(Name)` uses a definition; define `Name = ...` or check the spelling
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Q
   X?
   Y?

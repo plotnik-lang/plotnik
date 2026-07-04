@@ -3,7 +3,7 @@ Rec = [
   B: (identifier) @id
 ]
 Q = (Rec)
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "inner"

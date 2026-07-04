@@ -1,6 +1,6 @@
 Foo = {(expression_statement) (expression_statement)}
 Q = (program (Foo) @y)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
  --> query.ptk:2:14
   |
@@ -8,7 +8,7 @@ error: the referenced definition produces no value; add a capture inside it or c
   |       ----------------------------------------------- defined here
 2 | Q = (program (Foo) @y)
   |              ^^^^^
-==== symbols ====
+-------------------- SYMBOLS ---------------------
 Foo
 Q
   Foo

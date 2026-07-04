@@ -2,7 +2,7 @@ Q = [
   Single: (statement)
   Multiple: (statement)+
 ]
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -27,7 +27,7 @@ Root
             ParenClose ")"
           Plus "+"
       BracketClose "]"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

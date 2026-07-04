@@ -2,7 +2,7 @@ Q = (function_declaration
   name: (identifier) @name
   body: (statement_block) @body
 )
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   body: Node;
   name: Node;

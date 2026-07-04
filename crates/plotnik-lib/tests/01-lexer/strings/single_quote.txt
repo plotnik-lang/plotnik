@@ -1,5 +1,5 @@
 'hello'
-==== tokens ====
+--------------------- TOKENS ---------------------
 SingleQuote "'"
 StringContent "hello"
 SingleQuote "'"

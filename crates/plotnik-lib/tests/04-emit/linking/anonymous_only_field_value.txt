@@ -1,5 +1,5 @@
 Q = (binary_expression operator: (identifier))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `identifier` can't be the value of `operator`
  --> query.ptk:1:35
   |

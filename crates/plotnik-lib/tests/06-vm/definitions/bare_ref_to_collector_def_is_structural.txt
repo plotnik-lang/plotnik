@@ -1,14 +1,14 @@
 Ids = (identifier)*
 Q = (program (expression_statement (array (Ids) (number) @n)))
-==== input ====
+--------------------- INPUT ----------------------
 [a, b, 1];
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   n: Node;
 }
 
 export type Ids = Node[];
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "n": {
     "kind": "number",
@@ -16,7 +16,7 @@ export type Ids = Node[];
     "span": [7, 8]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "n"
@@ -71,7 +71,7 @@ Q:
   32  └‣─  (array)                          30, 21
   34  └‣─  (expression_statement)           32
   35   !   (program)                        34
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   02  -ε-  [StructOpen]                     04
   04       (?)                              35 : 05

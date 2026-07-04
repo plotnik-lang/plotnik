@@ -1,11 +1,11 @@
 Q = (program {(expression_statement) @stmt} @info :: QInfo)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: this type annotation matches the generated type name; omit it
  --> query.ptk:1:54
   |
 1 | Q = (program {(expression_statement) @stmt} @info :: QInfo)
   |                                                      ^^^^^
-==== types ====
+--------------------- TYPES ----------------------
 export interface QInfo {
   stmt: Node;
 }

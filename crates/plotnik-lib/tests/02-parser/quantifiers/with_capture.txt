@@ -1,5 +1,5 @@
 Q = (statement)* @statements
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -13,7 +13,7 @@ Root
           ParenClose ")"
         Star "*"
       CaptureToken "@statements"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

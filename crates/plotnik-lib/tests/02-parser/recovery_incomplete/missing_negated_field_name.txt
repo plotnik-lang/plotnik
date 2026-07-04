@@ -1,5 +1,5 @@
 (call -)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: expected a field name
  --> query.ptk:1:8
   |

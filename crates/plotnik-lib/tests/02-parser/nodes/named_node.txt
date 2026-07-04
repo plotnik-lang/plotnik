@@ -1,5 +1,5 @@
 Q = (identifier)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -9,7 +9,7 @@ Root
       ParenOpen "("
       Id "identifier"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

@@ -2,7 +2,7 @@ Q = (program
   {(expression_statement) @stmt} @a :: Info
   {(expression_statement) @stmt} @b :: Info
 )
-==== types ====
+--------------------- TYPES ----------------------
 export interface Info {
   stmt: Node;
 }

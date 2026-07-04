@@ -1,5 +1,5 @@
 Q = (identifier =~ /foo(?=bar)/)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: lookahead/lookbehind is not supported in regex
  --> query.ptk:1:25
   |
@@ -7,4 +7,4 @@ error: lookahead/lookbehind is not supported in regex
   |                         ^^
   |
 help: the regex engine cannot match lookaround; match the surrounding context with the query pattern instead
-==== symbols ====
+-------------------- SYMBOLS ---------------------

@@ -1,5 +1,5 @@
 @_ @_name @name
-==== tokens ====
+--------------------- TOKENS ---------------------
 SuppressiveCapture "@_"
 SuppressiveCapture "@_name"
 CaptureToken "@name"

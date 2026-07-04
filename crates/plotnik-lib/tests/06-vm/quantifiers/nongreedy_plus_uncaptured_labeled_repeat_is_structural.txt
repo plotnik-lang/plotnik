@@ -5,20 +5,20 @@ Q = (program
   .
   (debugger_statement)
 )
-==== input ====
+--------------------- INPUT ----------------------
 a; b; debugger;
-==== types ====
+--------------------- TYPES ----------------------
 export type A =
   | { $tag: "X" };
 
 export type Q = Node;
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "kind": "program",
   "text": "a; b; debugger;",
   "span": [0, 15]
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "X"
@@ -65,7 +65,7 @@ Q:
   18  ─‣─  _                                16, 18
   20  └‣─  _                                16, 18
   22   !   (program)                        20
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   02       (?)                              22 : 03
        ▶   (?)

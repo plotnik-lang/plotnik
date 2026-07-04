@@ -1,5 +1,5 @@
 Node = (program (statement) @x)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: type name `Node` is already used for a different type
  --> query.ptk:1:1
   |

@@ -5,7 +5,7 @@ Expr = [
     arguments: (Expr) @inner
   )
 ]
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "value"

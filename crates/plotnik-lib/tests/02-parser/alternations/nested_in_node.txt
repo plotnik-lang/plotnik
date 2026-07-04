@@ -4,7 +4,7 @@ Q = (expr
     (unary)
   ]
 )
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -27,7 +27,7 @@ Root
             ParenClose ")"
         BracketClose "]"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

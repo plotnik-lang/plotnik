@@ -1,5 +1,5 @@
 lowercase = (x)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: definition names must be PascalCase
  --> query.ptk:1:1
   |

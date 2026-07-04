@@ -2,7 +2,7 @@ Q = {
   (identifier) @a
   (number) @b
 } @row
-==== types ====
+--------------------- TYPES ----------------------
 export interface QRow {
   a: Node;
   b: Node;

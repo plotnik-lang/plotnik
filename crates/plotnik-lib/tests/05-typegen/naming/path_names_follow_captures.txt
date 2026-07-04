@@ -3,7 +3,7 @@ Foo = (function_declaration
     (expression_statement {(identifier) @v} @inner)
   } @items)
 )
-==== types ====
+--------------------- TYPES ----------------------
 export interface FooItemsInner {
   v: Node;
 }

@@ -1,5 +1,5 @@
 ERROR
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `ERROR` and `MISSING` must be parenthesized
  --> query.ptk:1:1
   |

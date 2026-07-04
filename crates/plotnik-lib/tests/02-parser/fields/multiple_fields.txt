@@ -2,7 +2,7 @@ Q = (assignment
   left: (identifier)
   right: (expression)
 )
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -26,7 +26,7 @@ Root
           Id "expression"
           ParenClose ")"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

@@ -2,7 +2,7 @@ Q = (program {
   (expression_statement)
   (debugger_statement)
 } @x)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: this group doesn't match exactly one node, so there is no single node to bind
  --> query.ptk:1:14
   |

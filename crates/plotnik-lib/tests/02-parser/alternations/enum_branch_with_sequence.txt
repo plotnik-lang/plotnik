@@ -5,7 +5,7 @@ Q = [
   }
   Single: (value)
 ]
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -35,7 +35,7 @@ Root
           Id "value"
           ParenClose ")"
       BracketClose "]"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

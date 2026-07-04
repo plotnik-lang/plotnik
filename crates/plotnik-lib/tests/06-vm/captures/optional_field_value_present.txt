@@ -6,14 +6,14 @@ Q = (program
     )
   )
 )
-==== input ====
+--------------------- INPUT ----------------------
 let x = 1
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   n: Node;
   v: Node | null;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "n": {
     "kind": "identifier",
@@ -26,7 +26,7 @@ export interface Q {
     "span": [8, 9]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "n"
@@ -70,7 +70,7 @@ Q:
   16  └‣─  (variable_declarator)            14
   17  └‣─  (lexical_declaration)            16
   18   !   (program)                        17
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              18 : 03

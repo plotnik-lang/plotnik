@@ -1,5 +1,5 @@
 Q = (object [(pair -key) (pair -value)] @x)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `-key` can never match
  --> query.ptk:1:21
   |

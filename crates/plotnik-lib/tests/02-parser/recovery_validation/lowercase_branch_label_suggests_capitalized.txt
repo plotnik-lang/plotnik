@@ -1,5 +1,5 @@
 [first: (a) Second: (b)]
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: branch labels must be PascalCase
  --> query.ptk:1:2
   |

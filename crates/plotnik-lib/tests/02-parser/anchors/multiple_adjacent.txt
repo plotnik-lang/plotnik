@@ -1,5 +1,5 @@
 Q = (tuple . (a) . (b) . (c) .)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -29,7 +29,7 @@ Root
       Anchor
         Dot "."
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

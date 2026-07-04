@@ -1,6 +1,6 @@
 A = (parenthesized_expression (A)?)
 Q = (expression_statement (A) @x)
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   x: Node;
 }

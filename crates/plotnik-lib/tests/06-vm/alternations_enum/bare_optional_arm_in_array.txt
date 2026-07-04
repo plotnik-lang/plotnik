@@ -1,15 +1,15 @@
 Q = (program [A: (comment)? @c]* @items)
-==== input ====
+--------------------- INPUT ----------------------
 // c
 x;
-==== types ====
+--------------------- TYPES ----------------------
 export type QItems =
   | { $tag: "A"; $data: { c: Node | null } };
 
 export interface Q {
   items: QItems[];
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "items": [
     {
@@ -24,7 +24,7 @@ export interface Q {
     }
   ]
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "c"
@@ -73,7 +73,7 @@ Q:
   22  -ε-  [ArrayOpen]                      20, 08
   24  ─‣┘  _ [ArrayClose Set(M2)]           06
   26   !   (program)                        22
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              26 : 03

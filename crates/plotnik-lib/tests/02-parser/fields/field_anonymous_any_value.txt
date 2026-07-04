@@ -3,7 +3,7 @@ Q = (binary_expression
   operator: _ @op
   right: (_) @right
 ) @expr
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -40,7 +40,7 @@ Root
           CaptureToken "@right"
         ParenClose ")"
       CaptureToken "@expr"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

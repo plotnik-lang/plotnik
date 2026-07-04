@@ -1,5 +1,5 @@
 Q = (MISSING identifier)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -10,7 +10,7 @@ Root
       KwMissing "MISSING"
       Id "identifier"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

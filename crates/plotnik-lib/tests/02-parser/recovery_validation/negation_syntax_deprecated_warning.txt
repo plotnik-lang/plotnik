@@ -1,5 +1,5 @@
 Test = (call !name)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: `!field` negation is deprecated
  --> query.ptk:1:14
   |
@@ -12,7 +12,7 @@ help: use `-`
 1 + Test = (call -name)
   |
 help: use `-field` instead of `!field`
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -25,7 +25,7 @@ Root
         Negation "!"
         Id "name"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Test

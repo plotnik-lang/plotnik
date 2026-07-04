@@ -1,5 +1,5 @@
 Q = (new_expression -arguments (arguments))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `-arguments` requires `arguments` to be absent, but this `new_expression` pattern also matches `arguments`
  --> query.ptk:1:22
   |

@@ -1,6 +1,6 @@
 Expr = (identifier)
 (Expr (a) (b) @cap)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: `Expr` is a reference and cannot have children
  --> query.ptk:2:7
   |

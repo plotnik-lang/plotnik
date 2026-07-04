@@ -2,7 +2,7 @@ Q = [
   (identifier)
   (string)
 ] @value
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -23,7 +23,7 @@ Root
             ParenClose ")"
         BracketClose "]"
       CaptureToken "@value"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

@@ -4,7 +4,7 @@ Q = (call
     (number)
   ]
 )
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -30,7 +30,7 @@ Root
               ParenClose ")"
           BracketClose "]"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

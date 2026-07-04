@@ -1,5 +1,5 @@
 MISSING MISSINGx Missing
-==== tokens ====
+--------------------- TOKENS ---------------------
 KwMissing "MISSING"
 Id "MISSINGx"
 Id "Missing"

@@ -1,5 +1,5 @@
 (a (b) @@@ (c)) (d)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: expected a child node, or `)` to close
  --> query.ptk:1:8
   |

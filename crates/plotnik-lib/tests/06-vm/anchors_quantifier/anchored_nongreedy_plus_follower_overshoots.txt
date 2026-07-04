@@ -7,17 +7,17 @@ Q = (program
     (expression_statement (identifier == "foo")) @c
   }
 )
-==== input ====
+--------------------- INPUT ----------------------
 bar; debugger; foo;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   a: Node | null;
   b: [Node, ...Node[]];
   c: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 <no match>
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "foo"
@@ -69,7 +69,7 @@ Q:
   28  ─‣─  _                                26, 28
   30  └‣─  _                                26, 28
   32   !   (program)                        30, 24
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              32 : 03

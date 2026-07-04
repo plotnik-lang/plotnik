@@ -4,14 +4,14 @@ Q = (program
     (_) @x
   }
 )
-==== input ====
+--------------------- INPUT ----------------------
 let a; foo; bar;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   decls: Node[];
   x: Node;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "decls": [
     {
@@ -26,7 +26,7 @@ export interface Q {
     "span": [7, 11]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "decls"
@@ -65,7 +65,7 @@ Q:
   18  └‣─  _                                14, 16
   20  -ε-  [ArrayOpen]                      18, 08
   22   !   (program)                        20
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              22 : 03

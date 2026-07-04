@@ -1,5 +1,5 @@
 Q = ((expression_statement))
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: parenthesized sequences are tree-sitter syntax
  --> query.ptk:1:5
   |
@@ -7,7 +7,7 @@ warning: parenthesized sequences are tree-sitter syntax
   |     ^
   |
 help: use `{(a) (b)}` to match a sequence of siblings
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -20,7 +20,7 @@ Root
         Id "expression_statement"
         ParenClose ")"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

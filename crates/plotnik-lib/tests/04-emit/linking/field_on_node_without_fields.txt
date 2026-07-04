@@ -1,7 +1,7 @@
 Q = (identifier
   name: (identifier) @inner
 ) @id
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: field `name` is not valid on this node kind
  --> query.ptk:2:3
   |

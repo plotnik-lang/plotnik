@@ -2,7 +2,7 @@ Q = [
   Base: (identifier) @name
   Access: (member_expression object: (_) @obj)
 ] @chain :: MemberChain
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -41,7 +41,7 @@ Root
       TypeAnnotation
         DoubleColon "::"
         Id "MemberChain"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

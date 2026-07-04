@@ -1,7 +1,7 @@
 [
     (a)
     (b)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: missing closing `]`
  --> query.ptk:1:1
   |

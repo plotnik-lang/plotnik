@@ -4,7 +4,7 @@ A = [
 ]
 
 Q = (expression_statement (A))
-==== types ====
+--------------------- TYPES ----------------------
 export type A =
   | { $tag: "X"; $data: { x: Node } }
   | { $tag: "Y"; $data: { y: Node } };

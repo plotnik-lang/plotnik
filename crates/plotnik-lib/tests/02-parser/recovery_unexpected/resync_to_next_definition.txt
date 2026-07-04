@@ -3,7 +3,7 @@ A = (a)
 B = (b)
 $$$
 C = (c)
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: expected a pattern
  --> query.ptk:2:1
   |

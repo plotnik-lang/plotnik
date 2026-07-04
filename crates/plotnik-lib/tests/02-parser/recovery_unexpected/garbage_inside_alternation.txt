@@ -1,5 +1,5 @@
 [(a) ^^^ (b)]
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: expected a branch, or `]` to close
  --> query.ptk:1:6
   |

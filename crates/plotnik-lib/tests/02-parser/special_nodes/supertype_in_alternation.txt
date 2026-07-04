@@ -2,7 +2,7 @@ Q = [
   (expression/identifier)
   (expression/number)
 ]
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 warning: `supertype/subtype` paths are tree-sitter syntax
  --> query.ptk:2:14
   |
@@ -28,7 +28,7 @@ help: use `#`
 3 +   (expression#number)
   |
 help: use `supertype#subtype` instead of `supertype/subtype`
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -51,7 +51,7 @@ Root
           Id "number"
           ParenClose ")"
       BracketClose "]"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

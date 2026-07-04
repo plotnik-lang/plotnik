@@ -1,5 +1,5 @@
 Q = (expression#binary_expression)
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -11,7 +11,7 @@ Root
       Hash "#"
       Id "binary_expression"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

@@ -1,14 +1,14 @@
 A = (debugger_statement)?
 Q = (program (A) (expression_statement) @e)
-==== input ====
+--------------------- INPUT ----------------------
 y(); g();
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   e: Node;
 }
 
 export type A = Node | null;
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "e": {
     "kind": "expression_statement",
@@ -16,7 +16,7 @@ export type A = Node | null;
     "span": [0, 4]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "e"
@@ -68,7 +68,7 @@ Q:
   29  └‣─  _                                26, 27
   31  ...
   32   !   (program)                        29, 21
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   02  -ε-  [StructOpen]                     04
   04       (?)                              32 : 05

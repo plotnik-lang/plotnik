@@ -2,7 +2,7 @@ Q = [
   "true"
   "false"
 ]
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -21,7 +21,7 @@ Root
           StringContent "false"
           DoubleQuote "\""
       BracketClose "]"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

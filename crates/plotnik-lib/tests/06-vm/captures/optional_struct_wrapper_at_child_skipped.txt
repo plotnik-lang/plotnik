@@ -1,7 +1,7 @@
 Q = (program (expression_statement {(identifier) @id}? @outer))
-==== input ====
+--------------------- INPUT ----------------------
 42;
-==== types ====
+--------------------- TYPES ----------------------
 export interface QOuter {
   id: Node;
 }
@@ -9,11 +9,11 @@ export interface QOuter {
 export interface Q {
   outer: QOuter | null;
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "outer": null
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "id"
@@ -56,7 +56,7 @@ Q:
   16  └‣─  _                                06, 13
   18  └‣─  (expression_statement)           16, 11
   20   !   (program)                        18
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              20 : 03

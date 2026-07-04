@@ -1,7 +1,7 @@
 Q = (statement#expression_statement
   (expression#call_expression)
 )
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -19,7 +19,7 @@ Root
         Id "call_expression"
         ParenClose ")"
       ParenClose ")"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

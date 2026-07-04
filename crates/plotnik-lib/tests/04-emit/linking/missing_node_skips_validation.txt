@@ -1,5 +1,5 @@
 Q = (MISSING) @miss
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "miss"

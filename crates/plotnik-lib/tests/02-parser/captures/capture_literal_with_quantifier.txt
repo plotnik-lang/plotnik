@@ -1,5 +1,5 @@
 Q = ","* @commas
-==== cst ====
+---------------------- CST -----------------------
 # query.ptk
 Root
   Def
@@ -13,7 +13,7 @@ Root
           DoubleQuote "\""
         Star "*"
       CaptureToken "@commas"
-==== ast ====
+---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q

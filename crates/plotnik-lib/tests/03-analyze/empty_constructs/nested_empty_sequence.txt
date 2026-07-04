@@ -1,5 +1,5 @@
 Q = (foo {})
-==== diagnostics ====
+------------------ DIAGNOSTICS -------------------
 error: empty `{}` matches nothing
  --> query.ptk:1:10
   |
@@ -7,4 +7,4 @@ error: empty `{}` matches nothing
   |          ^^
   |
 help: sequences must contain at least one expression
-==== symbols ====
+-------------------- SYMBOLS ---------------------

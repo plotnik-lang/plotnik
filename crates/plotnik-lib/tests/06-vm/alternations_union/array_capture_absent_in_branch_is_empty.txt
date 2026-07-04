@@ -4,14 +4,14 @@ Q = (program
     (expression_statement) @s
   ]
 )
-==== input ====
+--------------------- INPUT ----------------------
 foo;
-==== types ====
+--------------------- TYPES ----------------------
 export interface Q {
   s: Node | null;
   vs: Node[];
 }
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "vs": [],
   "s": {
@@ -20,7 +20,7 @@ export interface Q {
     "span": [0, 4]
   }
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "vs"
@@ -65,7 +65,7 @@ Q:
   23  ...
   24  └‣─  _                                16, 18, 21
   26   !   (program)                        24
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
   02       (?)                              26 : 03

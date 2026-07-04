@@ -1,9 +1,9 @@
 Entry = [Id: (identifier) @id  Num: (number) @num]
 Items = (Entry)*
 Q = (program (expression_statement (array (Items) @items)))
-==== input ====
+--------------------- INPUT ----------------------
 [a, 1, b];
-==== types ====
+--------------------- TYPES ----------------------
 export type Entry =
   | { $tag: "Id"; $data: { id: Node } }
   | { $tag: "Num"; $data: { num: Node } };
@@ -13,7 +13,7 @@ export interface Q {
 }
 
 export type Items = Entry[];
-==== output ====
+--------------------- OUTPUT ---------------------
 {
   "items": [
     {
@@ -48,7 +48,7 @@ export type Items = Entry[];
     }
   ]
 }
-==== bytecode ====
+-------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
 S01 "id"
@@ -130,7 +130,7 @@ Q:
   50  └‣─  (array)                          48
   51  └‣─  (expression_statement)           50
   52   !   (program)                        51
-==== trace ====
+--------------------- TRACE ----------------------
 Q:
   04  -ε-  [StructOpen]                     06
   06       (?)                              52 : 08
