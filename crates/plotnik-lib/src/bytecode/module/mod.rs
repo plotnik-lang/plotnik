@@ -23,6 +23,16 @@ mod load;
 
 pub use load::ModuleError;
 
+/// Append `value` if absent; returns whether it was newly inserted.
+fn push_unique(values: &mut Vec<u16>, value: u16) -> bool {
+    if values.contains(&value) {
+        false
+    } else {
+        values.push(value);
+        true
+    }
+}
+
 #[inline]
 fn read_u16_le(bytes: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([bytes[offset], bytes[offset + 1]])

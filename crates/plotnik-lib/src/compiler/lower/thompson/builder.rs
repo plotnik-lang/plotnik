@@ -18,14 +18,7 @@ use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::AnchorSemantics;
 use super::scope::{CaptureExits, SkipExit, SplitExits, Struct};
 use crate::compiler::analyze::nullability::compute_nullable_defs;
-
-fn consumable_value_root(pattern: &Pattern) -> bool {
-    match pattern {
-        Pattern::Enum(_) | Pattern::QuantifiedPattern(_) => true,
-        Pattern::FieldPattern(f) => f.value().is_some_and(|v| consumable_value_root(&v)),
-        _ => false,
-    }
-}
+use crate::compiler::analyze::types::type_check::consumable_value_root;
 
 /// NfaBuilder state for Thompson construction.
 pub struct NfaBuilder<'a> {

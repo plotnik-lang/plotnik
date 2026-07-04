@@ -266,7 +266,7 @@ impl<'t> VM<'t> {
         }
 
         for effect_op in m.effects() {
-            self.emit_effect(effect_op, tracer)?;
+            self.emit_effect(effect_op, tracer);
         }
 
         self.branch_to_successors(m, tracer)
@@ -586,14 +586,14 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn emit_effect<T: Tracer>(&mut self, op: Effect, tracer: &mut T) -> Result<(), Signal> {
+    fn emit_effect<T: Tracer>(&mut self, op: Effect, tracer: &mut T) {
         use EffectKind::*;
 
         let effect = match op.kind {
             SuppressBegin => {
                 tracer.trace_suppress_control(SuppressBegin, self.suppress_depth > 0);
                 self.suppress_depth += 1;
-                return Ok(());
+                return;
             }
             SuppressEnd => {
                 self.suppress_depth = self
@@ -601,13 +601,13 @@ impl<'t> VM<'t> {
                     .checked_sub(1)
                     .expect("SuppressEnd without matching SuppressBegin");
                 tracer.trace_suppress_control(SuppressEnd, self.suppress_depth > 0);
-                return Ok(());
+                return;
             }
 
             // Skip data effects when suppressing, but trace them
             _ if self.suppress_depth > 0 => {
                 tracer.trace_effect_suppressed(op.kind, op.payload);
-                return Ok(());
+                return;
             }
 
             Node => RuntimeEffect::Node(self.cursor.node()),
@@ -624,6 +624,5 @@ impl<'t> VM<'t> {
 
         tracer.trace_effect(&effect);
         self.effects.push(effect);
-        Ok(())
     }
 }

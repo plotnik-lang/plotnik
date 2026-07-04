@@ -45,7 +45,7 @@
 
 use std::collections::HashMap;
 
-use super::{Instruction, Module, ModuleError};
+use super::{Instruction, Module, ModuleError, push_unique};
 use crate::bytecode::{Effect, EffectKind, TypeDefKind, TypeKind};
 
 /// Builder frames the materializer pushes. The root/result frame can be a
@@ -481,14 +481,4 @@ fn enum_member_is_void(module: &Module, member: u16, step: u16) -> Result<bool, 
         type_def.decode(),
         TypeDefKind::Primitive(TypeKind::Void)
     ))
-}
-
-/// Append `value` if absent; returns whether it was newly inserted.
-fn push_unique(defs: &mut Vec<u16>, value: u16) -> bool {
-    if defs.contains(&value) {
-        false
-    } else {
-        defs.push(value);
-        true
-    }
 }

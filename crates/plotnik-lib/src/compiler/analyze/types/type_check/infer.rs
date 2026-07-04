@@ -1030,7 +1030,12 @@ fn consumable_enum_root(pattern: &Pattern) -> bool {
 /// A definition body's root consumes a pending value: a labeled alternation
 /// produces its enum, a quantifier collects into the definition's output
 /// (array for `*`/`+`, optional for `?`). Reached through field wrappers.
-fn consumable_value_root(pattern: &Pattern) -> bool {
+///
+/// Shared with lowering, which keys its pending-value emission on the same
+/// predicate: a `Value`-flow pattern compiles to producer effects only where
+/// this (or a consuming capture) says the value is observed. Diverging answers
+/// would make the load-time effect-stack verifier reject valid queries.
+pub(crate) fn consumable_value_root(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::Enum(_) | Pattern::QuantifiedPattern(_) => true,
         Pattern::FieldPattern(f) => f.value().is_some_and(|v| consumable_value_root(&v)),

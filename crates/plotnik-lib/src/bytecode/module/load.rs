@@ -894,9 +894,3 @@ impl Module {
         Ok(())
     }
 }
-
-fn push_unique(values: &mut Vec<u16>, value: u16) {
-    if !values.contains(&value) {
-        values.push(value);
-    }
-}

@@ -15,6 +15,7 @@ mod unify_tests;
 pub use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 pub use crate::compiler::analyze::types::type_shape::Arity;
 pub use crate::core::Interner;
+pub(crate) use infer::consumable_value_root;
 
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::refs::DependencyAnalysis;

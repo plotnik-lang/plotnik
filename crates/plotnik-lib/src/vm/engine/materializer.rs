@@ -167,7 +167,7 @@ impl ValueMaterializer<'_> {
             }
         }
 
-        debug_assert!(
+        assert!(
             stack.is_empty(),
             "unclosed builder frames after materialization"
         );
