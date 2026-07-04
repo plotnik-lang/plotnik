@@ -13,9 +13,7 @@ use crate::compiler::lower::ir::{Label, NfaGraph};
 
 /// Assign a cache-aligned step address to every label.
 pub fn compute_layout(ir: &NfaGraph) -> Result<LayoutMap, EmitError> {
-    // Preamble entry FIRST ensures it gets the lowest address (step 0).
-    let mut entry_labels: Vec<Label> = vec![ir.preamble_entry()];
-    entry_labels.extend(ir.def_entries().values().copied());
+    let entry_labels: Vec<Label> = ir.entrypoint_wrappers().values().copied().collect();
     let layout = CacheAligned::layout(ir.instructions(), &entry_labels);
 
     // Reject layouts whose step addresses overflow the u16 address space.

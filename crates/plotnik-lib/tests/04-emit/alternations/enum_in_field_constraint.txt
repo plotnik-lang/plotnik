@@ -36,20 +36,19 @@ N0: S05 → T3  ; QKind
 N1: S06 → T4  ; Q
 
 [entrypoints]
-Q = 06 :: T4
+Q = 00 :: T4
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@18)                            18 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (pair)                           08
+  06                                        ▶
   07  ...
-  08  └‣─  key: _                           11, 14
-  10                                        ▶
-  11   !   (identifier) [EnumOpen(M1) Node Set(M0) EnumClose]  16
-  14   !   (number) [EnumOpen(M2) EnumClose]  16
-  16  ─‣┘  _ [Set(M3)]                      10
+  08   !   (identifier) [EnumOpen(M1) Node Set(M0) EnumClose]  16
+  11   !   (number) [EnumOpen(M2) EnumClose]  16
+  13  └‣─  key: _                           08, 11
+  15  ...
+  16  ─‣┘  _ [Set(M3)]                      06
+  18   !   (pair)                           13

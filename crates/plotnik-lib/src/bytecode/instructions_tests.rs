@@ -8,8 +8,8 @@ use crate::core::{NodeFieldId, NodeKindId};
 
 use super::effects::{Effect, EffectKind};
 use super::instructions::{
-    Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepId, Trampoline,
-    align_to_section, select_match_opcode,
+    Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepId, align_to_section,
+    select_match_opcode,
 };
 use super::nav::Nav;
 use super::node_kind_constraint::NodeKindConstraint;
@@ -25,13 +25,12 @@ fn from_u8_decodes_known_and_rejects_unknown() {
         (0x5, Opcode::Match64),
         (0x6, Opcode::Call),
         (0x7, Opcode::Return),
-        (0x8, Opcode::Trampoline),
     ];
 
     for (nibble, expected) in known {
         assert_eq!(Opcode::from_u8(nibble), Some(expected));
     }
-    for nibble in 0x9u8..=0xF {
+    for nibble in 0x8u8..=0xF {
         assert_eq!(Opcode::from_u8(nibble), None, "nibble {nibble:#x}");
     }
 }
@@ -108,15 +107,6 @@ fn return_roundtrip() {
     let bytes = r.to_bytes();
     let decoded = Return::from_bytes(bytes);
     assert_eq!(decoded, r);
-}
-
-#[test]
-fn trampoline_roundtrip() {
-    let t = Trampoline::new(StepId::try_from(7).expect("step id must be non-zero"));
-
-    let bytes = t.to_bytes();
-    let decoded = Trampoline::from_bytes(bytes);
-    assert_eq!(decoded, t);
 }
 
 #[test]

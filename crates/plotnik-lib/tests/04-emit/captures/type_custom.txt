@@ -20,15 +20,14 @@ N0: S2 → T1  ; Identifier
 N1: S3 → T2  ; Q
 
 [entrypoints]
-Q = 6 :: T2
+Q = 0 :: T2
 
 [transitions]
-_StructWrap:
+Q:
   0  -ε-  [StructOpen]                      2
-  2       Trampoline                        3
+  2       (@8)                              8 : 3
   3  -ε-  [StructClose]                     5
   5                                         ▶
-
-Q:
-  6   !   (identifier) [Node Set(M0)]       8
-  8                                         ▶
+  6                                         ▶
+  7  ...
+  8   !   (identifier) [Node Set(M0)]       6

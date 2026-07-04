@@ -56,50 +56,49 @@ N0: S06 → T3  ; QX
 N1: S07 → T4  ; Q
 
 [entrypoints]
-Q = 06 :: T4
+Q = 00 :: T4
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@26)                            26 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        24, 16
-  08                                        ▶
-  09   !   (identifier) [Node Set(M0) EnumClose Set(M4)]  26
-  12  ─‣─  _                                09, 12
-  14   !   _ [EnumOpen(M2)]                 09, 12
-  16  -ε-  [EnumOpen(M2) Null Set(M0) EnumClose Set(M4)]  08
-  19   !   (debugger_statement) [EnumOpen(M3) Node Set(M1) EnumClose Set(M4)]  26
-  22  ─‣─  _                                14, 19, 22
-  24  └‣─  _                                14, 19, 22
-  26  ─‣┘  _                                08
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08   !   (identifier) [Node Set(M0) EnumClose Set(M4)]  07
+  11  ─‣─  _                                08, 11
+  13   !   _ [EnumOpen(M2)]                 08, 11
+  15  ...
+  16  -ε-  [EnumOpen(M2) Null Set(M0) EnumClose Set(M4)]  06
+  19   !   (debugger_statement) [EnumOpen(M3) Node Set(M1) EnumClose Set(M4)]  07
+  22  ─‣─  _                                13, 19, 22
+  24  └‣─  _                                13, 19, 22
+  26   !   (program)                        24, 16
 ==== trace ====
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+  02       (?)                              26 : 03
+       ▶   (?)
+
+?:
+  26       (program)                        24, 16
+       ●   program
+  24       _                                13, 19, 22
+       ●   debugger_statement
+  13       _ [EnumOpen(M2)]                 08, 11
+       ●   debugger_statement
+  08       (identifier) [Node Set(M0) EnumClose Set(M4)]  07
+       ○   debugger_statement
+  13  ❮❮❮ 
+  11       _                                08, 11
+  24  ❮❮❮ 
+  19       (debugger_statement) [EnumOpen(M3) Node Set(M1) EnumClose Set(M4)]  07
+       ●   debugger_statement
+  07       _                                06
+       ●   program
+  06   ◀   (?)                              
 
 Q:
-  06       (program)                        24, 16
-       ●   program
-  24       _                                14, 19, 22
-       ●   debugger_statement
-  14       _ [EnumOpen(M2)]                 09, 12
-       ●   debugger_statement
-  09       (identifier) [Node Set(M0) EnumClose Set(M4)]  26
-       ○   debugger_statement
-  14  ❮❮❮ 
-  12       _                                09, 12
-  24  ❮❮❮ 
-  19       (debugger_statement) [EnumOpen(M3) Node Set(M1) EnumClose Set(M4)]  26
-       ●   debugger_statement
-  26       _                                08
-       ●   program
-  08   ◀   (Q)                              
-
-_StructWrap:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

@@ -45,48 +45,46 @@ M1: S2 → T3  ; s: T3
 N0: S3 → T2  ; Q
 
 [entrypoints]
-Q = 06 :: T2
+Q = 00 :: T2
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@26)                            26 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        08
-  07  ...
-  08  └‣─  _                                20, 24, 22
-  10                                        ▶
-  11   !   (variable_declarator) [Node Push]  13, 18
-  13  ─‣─  _                                11, 13
-  15  ─‣┘  _                                10
-  16  └‣─  _ [ArrayOpen]                    11, 13
-  18  ─‣┘  _ [ArrayClose Set(M0)]           15
-  20   !   (lexical_declaration) [Null Set(M1)]  16
-  22  ─‣─  _                                20, 24, 22
-  24   !   (expression_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  15
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08   !   (variable_declarator) [Node Push]  10, 14
+  10  ─‣─  _                                08, 10
+  12  └‣─  _ [ArrayOpen]                    08, 10
+  14  ─‣┘  _ [ArrayClose Set(M0)]           07
+  16   !   (lexical_declaration) [Null Set(M1)]  12
+  18   !   (expression_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  07
+  21  ─‣─  _                                16, 18, 21
+  23  ...
+  24  └‣─  _                                16, 18, 21
+  26   !   (program)                        24
 ==== trace ====
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+  02       (?)                              26 : 03
+       ▶   (?)
+
+?:
+  26       (program)                        24
+       ●   program
+  24       _                                16, 18, 21
+       ●   expression_statement
+  16       (lexical_declaration) [Null Set(M1)]  12
+       ○   expression_statement
+  24  ❮❮❮ 
+  18       (expression_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  07
+       ●   expression_statement
+  07       _                                06
+       ●   program
+  06   ◀   (?)                              
 
 Q:
-  06       (program)                        08
-       ●   program
-  08       _                                20, 24, 22
-       ●   expression_statement
-  20       (lexical_declaration) [Null Set(M1)]  16
-       ○   expression_statement
-  08  ❮❮❮ 
-  24       (expression_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  15
-       ●   expression_statement
-  15       _                                10
-       ●   program
-  10   ◀   (Q)                              
-
-_StructWrap:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

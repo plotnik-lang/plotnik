@@ -38,12 +38,12 @@ pub(crate) use constants::{
 pub(crate) use dfa::deserialize_dfa;
 pub(crate) use effects::{Effect, EffectKind};
 pub(crate) use format::{
-    LineBuilder, PREAMBLE_NAME, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
+    LineBuilder, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
 };
 pub(crate) use header::Header;
 pub(crate) use ids::StringId;
 pub(crate) use instructions::{
-    Call, Match, MatchInstr, MatchPredicate, Return, StepId, Trampoline, select_match_opcode,
+    Call, Match, MatchInstr, MatchPredicate, Return, StepId, select_match_opcode,
 };
 pub(crate) use module::{EntrypointsView, Instruction, StringsView, TypesView};
 pub(crate) use nav::Nav;

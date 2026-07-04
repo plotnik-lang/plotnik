@@ -35,78 +35,74 @@ M0: S1 → T0  ; X: <Void>
 N0: S2 → T1  ; A
 
 [entrypoints]
-A = 06 :: T1
-Q = 09 :: T0
+A = 00 :: T1
+Q = 02 :: T0
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 A:
-  06   !   (expression_statement) [EnumOpen(M0) EnumClose]  08
-  08                                        ▶
+  00       (@05)                            05 : 01
+  01                                        ▶
 
 Q:
-  09   !   (program)                        12, 21
-  11                                        ▶
-  12  └•─  (debugger_statement)             23
-  13  ─•─  (debugger_statement)             23
-  14  -ε-  [SuppressEnd]                    13, 19
-  16   !   (A)                              06 : 14
-  17  -ε-  [SuppressBegin]                  16
-  19  ─‣─  _                                17, 19
-  21  └‣─  _                                17, 19
-  23  ─‣┘  _                                11
+  02       (@20)                            20 : 03
+  03                                        ▶
+  04                                        ▶
+  05   !   (expression_statement) [EnumOpen(M0) EnumClose]  04
+  07                                        ▶
+  08  └•─  (debugger_statement)             15
+  09  ─•─  (debugger_statement)             15
+  10  -ε-  [SuppressEnd]                    09, 16
+  12   !   (@05)                            05 : 10
+  13  -ε-  [SuppressBegin]                  12
+  15  ─‣┘  _                                07
+  16  ─‣─  _                                13, 16
+  18  └‣─  _                                13, 16
+  20   !   (program)                        08, 18
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  09       (program)                        12, 21
+  02       (?)                              20 : 03
+       ▶   (?)
+
+?:
+  20       (program)                        08, 18
        ●   program
-  12       (debugger_statement)             23
+  08       (debugger_statement)             15
        ○   expression_statement
-  09  ❮❮❮ 
-  21       _                                17, 19
+  20  ❮❮❮ 
+  18       _                                13, 16
        ●   expression_statement
-  17  -ε-  [SuppressBegin]                  16
-  16       (A)                              06 : 14
-       ▶   (A)
+  13  -ε-  [SuppressBegin]                  12
+  12       (?)                              05 : 10
+       ▶   (?)
 
-A:
-  06       (expression_statement) [EnumOpen(M0) EnumClose]  08
+?:
+  05       (expression_statement) [EnumOpen(M0) EnumClose]  04
        ●   expression_statement
-  08   ◀   (A)                              
+  04   ◀   (?)                              
 
-Q:
-  14  -ε-  [SuppressEnd]                    13, 19
-  13       (debugger_statement)             23
+?:
+  10  -ε-  [SuppressEnd]                    09, 16
+  09       (debugger_statement)             15
        ○   expression_statement
-  14  ❮❮❮ 
-  19       _                                17, 19
+  10  ❮❮❮ 
+  16       _                                13, 16
        ●   expression_statement
-  17  -ε-  [SuppressBegin]                  16
-  16       (A)                              06 : 14
-       ▶   (A)
+  13  -ε-  [SuppressBegin]                  12
+  12       (?)                              05 : 10
+       ▶   (?)
 
-A:
-  06       (expression_statement) [EnumOpen(M0) EnumClose]  08
+?:
+  05       (expression_statement) [EnumOpen(M0) EnumClose]  04
        ●   expression_statement
-  08   ◀   (A)                              
+  04   ◀   (?)                              
 
-Q:
-  14  -ε-  [SuppressEnd]                    13, 19
-  13       (debugger_statement)             23
+?:
+  10  -ε-  [SuppressEnd]                    09, 16
+  09       (debugger_statement)             15
        ●   debugger_statement
-  23       _                                11
+  15       _                                07
        ●   program
-  11   ◀   (Q)                              
+  07   ◀   (?)                              
 
-_StructWrap:
-  03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+Q:
+  03   ◀   (Q)                              ◼

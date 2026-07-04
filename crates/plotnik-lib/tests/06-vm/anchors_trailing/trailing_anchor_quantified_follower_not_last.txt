@@ -42,63 +42,61 @@ M1: S2 → T1  ; b: T1
 N0: S3 → T2  ; Q
 
 [entrypoints]
-Q = 06 :: T2
+Q = 00 :: T2
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@28)                            28 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        28, 22
-  08  -ε-  [ArrayClose Set(M1)]             10
-  10  ─•┘  _                                11
-  11                                        ▶
-  12  -ε-  [ArrayClose Set(M1)]             11
-  14  └•─  (debugger_statement) [Node Push]  16, 08
-  16  ─•─  (debugger_statement) [Node Push]  16, 08
-  18  -ε-  [ArrayOpen]                      14, 12
-  20  -ε-  [ArrayOpen]                      16, 08
-  22  -ε-  [Null Set(M0)]                   18
-  24   !   (lexical_declaration) [Node Set(M0)]  20
-  26  ─‣─  _                                24, 26
-  28  └‣─  _                                24, 26
+  06  -ε-  [ArrayClose Set(M1)]             08
+  08  ─•┘  _                                09
+  09                                        ▶
+  10  -ε-  [ArrayClose Set(M1)]             09
+  12  └•─  (debugger_statement) [Node Push]  14, 06
+  14  ─•─  (debugger_statement) [Node Push]  14, 06
+  16  -ε-  [ArrayOpen]                      12, 10
+  18  -ε-  [ArrayOpen]                      14, 06
+  20  -ε-  [Null Set(M0)]                   16
+  22   !   (lexical_declaration) [Node Set(M0)]  18
+  24  ─‣─  _                                22, 24
+  26  └‣─  _                                22, 24
+  28   !   (program)                        26, 20
 ==== trace ====
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+  02       (?)                              28 : 03
+       ▶   (?)
+
+?:
+  28       (program)                        26, 20
+       ●   program
+  26       _                                22, 24
+       ●   debugger_statement
+  22       (lexical_declaration) [Node Set(M0)]  18
+       ○   debugger_statement
+  26  ❮❮❮ 
+  24       _                                22, 24
+       ●   expression_statement
+  22       (lexical_declaration) [Node Set(M0)]  18
+       ○   expression_statement
+  24  ❮❮❮ 
+  24       _                                22, 24
+  28  ❮❮❮ 
+  20  -ε-  [Null Set(M0)]                   16
+  16  -ε-  [ArrayOpen]                      12, 10
+  12       (debugger_statement) [Node Push]  14, 06
+       ●   debugger_statement
+  14       (debugger_statement) [Node Push]  14, 06
+       ○   expression_statement
+  12  ❮❮❮ 
+  06  -ε-  [ArrayClose Set(M1)]             08
+  08       _                                09
+  16  ❮❮❮ 
+  10  -ε-  [ArrayClose Set(M1)]             09
+  09   ◀   (?)                              
 
 Q:
-  06       (program)                        28, 22
-       ●   program
-  28       _                                24, 26
-       ●   debugger_statement
-  24       (lexical_declaration) [Node Set(M0)]  20
-       ○   debugger_statement
-  28  ❮❮❮ 
-  26       _                                24, 26
-       ●   expression_statement
-  24       (lexical_declaration) [Node Set(M0)]  20
-       ○   expression_statement
-  26  ❮❮❮ 
-  26       _                                24, 26
-  06  ❮❮❮ 
-  22  -ε-  [Null Set(M0)]                   18
-  18  -ε-  [ArrayOpen]                      14, 12
-  14       (debugger_statement) [Node Push]  16, 08
-       ●   debugger_statement
-  16       (debugger_statement) [Node Push]  16, 08
-       ○   expression_statement
-  14  ❮❮❮ 
-  08  -ε-  [ArrayClose Set(M1)]             10
-  10       _                                11
-  18  ❮❮❮ 
-  12  -ε-  [ArrayClose Set(M1)]             11
-  11   ◀   (Q)                              
-
-_StructWrap:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

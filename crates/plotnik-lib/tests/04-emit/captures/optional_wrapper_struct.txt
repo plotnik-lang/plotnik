@@ -28,20 +28,20 @@ N1: S5 → T2  ; QOuter
 N2: S6 → T3  ; Q
 
 [entrypoints]
-Q = 06 :: T3
+Q = 00 :: T3
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@20)                            20 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06  -ε-                                   18, 09
-  08                                        ▶
-  09  -ε-  [Null Set(M2)]                   08
-  11   !   (identifier) [StructOpen Node Set(M0) StructClose Set(M1) StructClose Set(M2)]  08
-  14  -ε-  [StructOpen]                     11
-  16  ─‣─  _                                14, 16
-  18   !   _                                14, 16
+  06                                        ▶
+  07  ...
+  08  -ε-  [Null Set(M2)]                   06
+  10   !   (identifier) [StructOpen Node Set(M0) StructClose Set(M1) StructClose Set(M2)]  06
+  13  -ε-  [StructOpen]                     10
+  15  ...
+  16  ─‣─  _                                13, 16
+  18   !   _                                13, 16
+  20  -ε-                                   18, 08

@@ -72,7 +72,7 @@ impl<'a> InstrIndex<'a> {
             }
 
             let Some(m) = self.match_at(current) else {
-                return Some((current, effects)); // Non-Match target (Call/Return/Trampoline)
+                return Some((current, effects)); // Non-Match target (Call/Return)
             };
 
             if !m.is_epsilon() {
@@ -249,13 +249,15 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
         }
     }
 
-    if let Some((target, effects)) =
-        InstrIndex::new(&result.instructions, &idx).see_through(result.preamble_entry)
-        && effects.is_empty()
-        && target != result.preamble_entry
-    {
-        result.preamble_entry = target;
-        changed = true;
+    for entry in result.entrypoint_wrappers.values_mut() {
+        if let Some((target, effects)) =
+            InstrIndex::new(&result.instructions, &idx).see_through(*entry)
+            && effects.is_empty()
+            && target != *entry
+        {
+            *entry = target;
+            changed = true;
+        }
     }
 
     for i in 0..result.instructions.len() {
@@ -309,7 +311,6 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
     for i in 0..result.instructions.len() {
         let next_label = match &result.instructions[i] {
             InstructionIR::Call(c) => Some(c.next),
-            InstructionIR::Trampoline(t) => Some(t.next),
             _ => None,
         };
 
@@ -320,10 +321,8 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
         };
 
         if effects.is_empty() && target != next {
-            match &mut result.instructions[i] {
-                InstructionIR::Call(c) => c.next = target,
-                InstructionIR::Trampoline(t) => t.next = target,
-                _ => {}
+            if let InstructionIR::Call(c) = &mut result.instructions[i] {
+                c.next = target;
             }
             changed = true;
         }
@@ -375,7 +374,7 @@ fn expand_branching_epsilons(result: &mut NfaGraph) -> bool {
                         .splice(pos..pos + 1, eps_succs.iter().cloned());
                     changed = true;
                 }
-                // Call/Trampoline have single `next` - can't expand branching into them
+                // Call has a single `next` - can't expand branching into it
             }
         }
     }

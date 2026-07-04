@@ -49,48 +49,46 @@ M1: S02 → T2  ; v: T2
 N0: S03 → T1  ; Q
 
 [entrypoints]
-Q = 06 :: T1
+Q = 00 :: T1
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@18)                            18 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        07
-  07  └‣─  (lexical_declaration)            08
-  08  └‣─  (variable_declarator)            09
-  09  └‣─  name: (identifier) [Node Set(M0)]  16, 12
-  11                                        ▶
-  12  -ε-  [Null Set(M1)]                   18
-  14   !   value: (number) [Node Set(M1)]   18
-  16  ─‣─  _                                14, 16
-  18  ─‣┘³ _                                11
+  06                                        ▶
+  07  ─‣┘³ _                                06
+  08  -ε-  [Null Set(M1)]                   07
+  10   !   value: (number) [Node Set(M1)]   07
+  12  ─‣─  _                                10, 12
+  14  └‣─  name: (identifier) [Node Set(M0)]  12, 08
+  16  └‣─  (variable_declarator)            14
+  17  └‣─  (lexical_declaration)            16
+  18   !   (program)                        17
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  06       (program)                        07
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              18 : 03
+       ▶   (?)
+
+?:
+  18       (program)                        17
        ●   program
-  07       (lexical_declaration)            08
+  17       (lexical_declaration)            16
        ●   lexical_declaration
-  08       (variable_declarator)            09
+  16       (variable_declarator)            14
        ○   let
        ●   variable_declarator
-  09       name: (identifier) [Node Set(M0)]  16, 12
+  14       name: (identifier) [Node Set(M0)]  12, 08
        ●   identifier
-  16       _                                14, 16
-  09  ❮❮❮ 
-  12  -ε-  [Null Set(M1)]                   18
-  18       _                                11
+  12       _                                10, 12
+  14  ❮❮❮ 
+  08  -ε-  [Null Set(M1)]                   07
+  07       _                                06
        ●   program
-  11   ◀   (Q)                              
+  06   ◀   (?)                              
 
-_StructWrap:
+Q:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

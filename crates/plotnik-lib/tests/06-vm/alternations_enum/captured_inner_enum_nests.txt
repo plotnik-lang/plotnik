@@ -56,40 +56,39 @@ N0: S4 → T2  ; QY
 N1: S5 → T3  ; Q
 
 [entrypoints]
-Q = 06 :: T3
+Q = 00 :: T3
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@18)                            18 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        08
+  06  ...
   07  ...
-  08  └‣─  _                                10, 16
-  10   !   (expression_statement) [EnumOpen(M1) Node Set(M0) EnumClose]  13
-  13  ─‣┘  _ [Set(M2)]                      15
-  15                                        ▶
-  16  ─‣─  _                                10, 16
+  08   !   (expression_statement) [EnumOpen(M1) Node Set(M0) EnumClose]  11
+  11  ─‣┘  _ [Set(M2)]                      13
+  13                                        ▶
+  14  ─‣─  _                                08, 14
+  16  └‣─  _                                08, 14
+  18   !   (program)                        16
 ==== trace ====
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+  02       (?)                              18 : 03
+       ▶   (?)
+
+?:
+  18       (program)                        16
+       ●   program
+  16       _                                08, 14
+       ●   expression_statement
+  08       (expression_statement) [EnumOpen(M1) Node Set(M0) EnumClose]  11
+       ●   expression_statement
+  11       _ [Set(M2)]                      13
+       ●   program
+  13   ◀   (?)                              
 
 Q:
-  06       (program)                        08
-       ●   program
-  08       _                                10, 16
-       ●   expression_statement
-  10       (expression_statement) [EnumOpen(M1) Node Set(M0) EnumClose]  13
-       ●   expression_statement
-  13       _ [Set(M2)]                      15
-       ●   program
-  15   ◀   (Q)                              
-
-_StructWrap:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

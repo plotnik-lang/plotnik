@@ -69,86 +69,87 @@ N1: S5 → T2  ; A
 N2: S6 → T4  ; Q
 
 [entrypoints]
-A = 06 :: T2
-Q = 08 :: T4
+A = 00 :: T2
+Q = 06 :: T4
 
 [transitions]
-_StructWrap:
+A:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@30)                            30 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-A:
-  06  -ε-                                   28, 20
-
 Q:
-  08   !   (program)                        09
-  09  -ε-  [ArrayOpen]                      44, 32
-  11  └‣─  (identifier) [Node Set(M0)]      13
-  13  ─‣┘  _ [StructClose Set(M1)]          15
-  15                                        ▶
+  06  -ε-  [StructOpen]                     08
+  08       (@52)                            52 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  └‣─  (identifier) [Node Set(M0)]      14
+  14  ─‣┘  _ [StructClose Set(M1)]          20
   16  └‣─  (identifier) [Node Set(M0)]      18
-  18  ─‣┘  _ [StructClose Set(M1)]          34
-  20  -ε-  [Null Set(M1)]                   15
-  22  ...
+  18  ─‣┘  _ [StructClose Set(M1)]          35
+  20                                        ▶
+  21  -ε-  [Null Set(M1)]                   20
   23  ...
-  24   !   (expression_statement) [StructOpen]  11
+  24   !   (expression_statement) [StructOpen]  12
   26  ─‣─  _                                24, 26
   28   !   _                                24, 26
-  30                                        ▶
-  31  ...
-  32  -ε-  [ArrayClose Set(M2)]             30
-  34  -ε-  [StructClose Push]               42, 46
-  36   !   (expression_statement) [StructOpen]  16
-  38  ─‣─  _                                36, 38
-  40   !   _ [StructOpen]                   36, 38
-  42  ─‣─  _                                40, 42
-  44  └‣─  _                                40, 42
-  46  ─‣┘  _ [ArrayClose Set(M2)]           30
+  30  -ε-                                   28, 21
+  32                                        ▶
+  33  -ε-  [ArrayClose Set(M2)]             32
+  35  -ε-  [StructClose Push]               44, 50
+  37   !   (expression_statement) [StructOpen]  16
+  39  ...
+  40  ─‣─  _                                37, 40
+  42   !   _ [StructOpen]                   37, 40
+  44  ─‣─  _                                42, 44
+  46  └‣─  _                                42, 44
+  48  -ε-  [ArrayOpen]                      46, 33
+  50  ─‣┘  _ [ArrayClose Set(M2)]           32
+  52   !   (program)                        48
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+Q:
+  06  -ε-  [StructOpen]                     08
+  08       (?)                              52 : 09
+       ▶   (?)
+
+?:
+  52       (program)                        48
+       ●   program
+  48  -ε-  [ArrayOpen]                      46, 33
+  46       _                                42, 44
+       ●   expression_statement
+  42       _ [StructOpen]                   37, 40
+       ●   expression_statement
+  37       (expression_statement) [StructOpen]  16
+       ●   expression_statement
+  16       (identifier) [Node Set(M0)]      18
+       ●   identifier
+  18       _ [StructClose Set(M1)]          35
+       ●   expression_statement
+  35  -ε-  [StructClose Push]               44, 50
+  44       _                                42, 44
+       ●   debugger_statement
+  42       _ [StructOpen]                   37, 40
+       ●   debugger_statement
+  37       (expression_statement) [StructOpen]  16
+       ○   debugger_statement
+  42  ❮❮❮ 
+  40       _                                37, 40
+       ●   expression_statement
+  37       (expression_statement) [StructOpen]  16
+       ●   expression_statement
+  16       (identifier) [Node Set(M0)]      18
+       ●   identifier
+  18       _ [StructClose Set(M1)]          35
+       ●   expression_statement
+  35  -ε-  [StructClose Push]               44, 50
+  44       _                                42, 44
+  35  ❮❮❮ 
+  50       _ [ArrayClose Set(M2)]           32
+       ●   program
+  32   ◀   (?)                              
 
 Q:
-  08       (program)                        09
-       ●   program
-  09  -ε-  [ArrayOpen]                      44, 32
-  44       _                                40, 42
-       ●   expression_statement
-  40       _ [StructOpen]                   36, 38
-       ●   expression_statement
-  36       (expression_statement) [StructOpen]  16
-       ●   expression_statement
-  16       (identifier) [Node Set(M0)]      18
-       ●   identifier
-  18       _ [StructClose Set(M1)]          34
-       ●   expression_statement
-  34  -ε-  [StructClose Push]               42, 46
-  42       _                                40, 42
-       ●   debugger_statement
-  40       _ [StructOpen]                   36, 38
-       ●   debugger_statement
-  36       (expression_statement) [StructOpen]  16
-       ○   debugger_statement
-  40  ❮❮❮ 
-  38       _                                36, 38
-       ●   expression_statement
-  36       (expression_statement) [StructOpen]  16
-       ●   expression_statement
-  16       (identifier) [Node Set(M0)]      18
-       ●   identifier
-  18       _ [StructClose Set(M1)]          34
-       ●   expression_statement
-  34  -ε-  [StructClose Push]               42, 46
-  42       _                                40, 42
-  34  ❮❮❮ 
-  46       _ [ArrayClose Set(M2)]           30
-       ●   program
-  30   ◀   (Q)                              
-
-_StructWrap:
-  03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  09  -ε-  [StructClose]                    11
+  11   ◀   (Q)                              ◼

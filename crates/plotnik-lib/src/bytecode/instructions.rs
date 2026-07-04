@@ -126,8 +126,6 @@ impl MatchCounts {
 pub struct StepAddr(u16);
 
 impl StepAddr {
-    pub const PREAMBLE: Self = Self(0);
-
     #[inline]
     pub const fn get(self) -> u16 {
         self.0
@@ -219,7 +217,6 @@ pub enum Opcode {
     Match64 = 0x5,
     Call = 0x6,
     Return = 0x7,
-    Trampoline = 0x8,
 }
 
 impl Opcode {
@@ -235,7 +232,6 @@ impl Opcode {
             0x5 => Some(Self::Match64),
             0x6 => Some(Self::Call),
             0x7 => Some(Self::Return),
-            0x8 => Some(Self::Trampoline),
             _ => None,
         }
     }
@@ -250,7 +246,7 @@ impl Opcode {
             Self::Match32 => 32,
             Self::Match48 => 48,
             Self::Match64 => 64,
-            Self::Call | Self::Return | Self::Trampoline => STEP_SIZE,
+            Self::Call | Self::Return => STEP_SIZE,
         }
     }
 
@@ -272,7 +268,7 @@ impl Opcode {
     }
 
     /// Payload capacity in u16 slots — whatever follows the one-step header.
-    /// Zero for non-extended variants (Match8, Call, Return, Trampoline).
+    /// Zero for non-extended variants (Match8, Call, Return).
     pub const fn payload_slots(self) -> usize {
         (self.size() - MATCH_PAYLOAD_START) / PAYLOAD_SLOT_SIZE
     }
@@ -793,62 +789,6 @@ impl Return {
 impl Default for Return {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// Trampoline instruction for universal entry.
-///
-/// Like Call, but the target comes from VM context (external parameter)
-/// rather than being encoded in the instruction. Used at address 0 for
-/// the entry preamble: `StructOpen → Trampoline → StructClose → Accept`.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Trampoline {
-    /// Segment index (0-3).
-    pub segment: u8,
-    /// Return address (where to continue after entrypoint returns).
-    pub next: StepId,
-}
-
-impl Trampoline {
-    pub fn new(next: StepId) -> Self {
-        Self { segment: 0, next }
-    }
-
-    /// Decode from 8-byte bytecode.
-    ///
-    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
-    /// For Trampoline, node_class bits are ignored (always 0).
-    pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
-        let header = bytes[0];
-        let segment = header_byte::segment(header);
-        let opcode = header_byte::opcode(header).expect("invalid opcode");
-        assert!(
-            segment == 0,
-            "non-zero segment not yet supported: {segment}"
-        );
-        assert_eq!(opcode, Opcode::Trampoline, "expected Trampoline opcode");
-
-        Self {
-            segment,
-            next: StepId::try_from(u16::from_le_bytes([bytes[2], bytes[3]]))
-                .expect("step id must be non-zero"),
-        }
-    }
-
-    /// Encode to 8-byte bytecode.
-    ///
-    /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
-    pub fn to_bytes(self) -> [u8; 8] {
-        let mut bytes = [0u8; 8];
-        bytes[0] = header_byte::pack(self.segment, 0, Opcode::Trampoline);
-        // bytes[1] is padding
-        bytes[2..4].copy_from_slice(&u16::from(self.next).to_le_bytes());
-        // bytes[4..8] are reserved/padding
-        bytes
-    }
-
-    pub fn next(&self) -> StepId {
-        self.next
     }
 }
 

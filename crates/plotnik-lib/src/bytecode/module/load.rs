@@ -19,7 +19,6 @@ use super::super::sections::SymbolNameEntry;
 use super::super::type_meta::{TypeDefKind, TypeMember, TypeNameEntry};
 use super::super::{HEADER_SIZE, SECTION_ALIGN, VERSION};
 use super::*;
-use crate::bytecode::StepAddr;
 use crate::bytecode::predicate_op::PredicateOp;
 
 /// Module load error.
@@ -453,9 +452,9 @@ impl Module {
     /// The VM treats call bodies as independent cursors: a `Call` applies its own
     /// navigation, then resumes at `next` after a net-neutral callee returns. We
     /// therefore validate each entrypoint target and every encoded `Call` target
-    /// as its own root, plus the shared preamble at step 0.
+    /// as its own root.
     fn validate_depth_neutrality(&self) -> Result<(), ModuleError> {
-        let mut roots = vec![StepAddr::PREAMBLE.get()];
+        let mut roots = Vec::new();
 
         for entrypoint in self.entrypoints().iter() {
             push_unique(&mut roots, u16::from(entrypoint.target()));
@@ -471,7 +470,7 @@ impl Module {
                     push_unique(&mut roots, u16::from(c.target));
                     step += 1;
                 }
-                Instruction::Return(_) | Instruction::Trampoline(_) => {
+                Instruction::Return(_) => {
                     step += 1;
                 }
             }
@@ -516,9 +515,6 @@ impl Module {
                 }
                 Instruction::Call(c) => {
                     work.push((u16::from(c.next), net + c.nav.depth_delta()));
-                }
-                Instruction::Trampoline(t) => {
-                    work.push((u16::from(t.next()), net));
                 }
             }
         }
@@ -652,8 +648,8 @@ impl Module {
     ///    nav, node kind, effect opcodes, `Set`/`Enum` member operands, and
     ///    predicate operands, and rejecting any zero successor address. Record
     ///    each instruction start and collect every jump target.
-    /// 2. Every collected jump target — successor, call next/target, trampoline
-    ///    next — must land on a recorded instruction start.
+    /// 2. Every collected jump target — successor or call next/target — must land
+    ///    on a recorded instruction start.
     ///
     /// Returns the instruction-start bitmap so [`Self::validate_entrypoints`] can
     /// hold entrypoint targets to the same rule: an entrypoint pointing into the
@@ -697,15 +693,15 @@ impl Module {
                     opcode: nibble,
                 });
             };
-            // Every opcode reserves the segment bits; the call/return/trampoline
+            // Every opcode reserves the segment bits; the call/return
             // decoders `assert!` segment == 0, and a non-zero segment is unused.
             if header_byte::segment(header) != 0 {
                 return Err(ModuleError::MalformedTransitions);
             }
-            // node_class_bits (header bits 4-5) is meaningful only for Match variants;
-            // Call/Return/Trampoline ignore it, so the format pins those bits to
+            // node_class_bits (header bits 4-5) is meaningful only for Match
+            // variants; Call/Return ignore it, so the format pins those bits to
             // zero — a forged non-zero node_class_bits there is smuggled state.
-            if matches!(opcode, Opcode::Call | Opcode::Return | Opcode::Trampoline)
+            if matches!(opcode, Opcode::Call | Opcode::Return)
                 && header_byte::node_class_bits(header) != 0
             {
                 return Err(ModuleError::MalformedTransitions);
@@ -716,17 +712,6 @@ impl Module {
                     // Bytes 1-7 are reserved padding (`Return::to_bytes`); a forged
                     // non-zero pad would otherwise load unnoticed.
                     check_zero(instr_off + 1, 7)?;
-                }
-                Opcode::Trampoline => {
-                    let next = read_transition_u16(storage, instr_off + 2)?;
-                    if next == 0 {
-                        return Err(ModuleError::MalformedTransitions);
-                    }
-                    // Byte 1 and bytes 4-7 are reserved padding (`Trampoline::to_bytes`);
-                    // `next` occupies bytes 2-3.
-                    check_zero(instr_off + 1, 1)?;
-                    check_zero(instr_off + 4, 4)?;
-                    targets.push(next);
                 }
                 Opcode::Call => {
                     // `Call::from_bytes` decodes a nav and two non-zero `StepId`s.

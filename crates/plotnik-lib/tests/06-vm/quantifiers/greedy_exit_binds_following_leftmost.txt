@@ -48,57 +48,55 @@ M1: S2 → T0  ; x: <Node>
 N0: S3 → T2  ; Q
 
 [entrypoints]
-Q = 06 :: T2
+Q = 00 :: T2
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@22)                            22 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        08
-  07  ─‣┘  _                                10
-  08  -ε-  [ArrayOpen]                      14, 11
-  10                                        ▶
-  11  └‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
-  14  └‣─  _                                19, 21
-  16  ─‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
-  19   !   (lexical_declaration) [Node Push]  21, 16
-  21  ─‣─  _                                19, 21
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08  └‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
+  11  ─‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
+  14   !   (lexical_declaration) [Node Push]  16, 11
+  16  ─‣─  _                                14, 16
+  18  └‣─  _                                14, 16
+  20  -ε-  [ArrayOpen]                      18, 08
+  22   !   (program)                        20
 ==== trace ====
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+  02       (?)                              22 : 03
+       ▶   (?)
+
+?:
+  22       (program)                        20
+       ●   program
+  20  -ε-  [ArrayOpen]                      18, 08
+  18       _                                14, 16
+       ●   lexical_declaration
+  14       (lexical_declaration) [Node Push]  16, 11
+       ●   lexical_declaration
+  16       _                                14, 16
+       ●   expression_statement
+  14       (lexical_declaration) [Node Push]  16, 11
+       ○   expression_statement
+  16  ❮❮❮ 
+  16       _                                14, 16
+       ●   expression_statement
+  14       (lexical_declaration) [Node Push]  16, 11
+       ○   expression_statement
+  16  ❮❮❮ 
+  16       _                                14, 16
+  14  ❮❮❮ 
+  11       (_) [ArrayClose Set(M0) Node Set(M1)]  07
+       ●   expression_statement
+  07       _                                06
+       ●   program
+  06   ◀   (?)                              
 
 Q:
-  06       (program)                        08
-       ●   program
-  08  -ε-  [ArrayOpen]                      14, 11
-  14       _                                19, 21
-       ●   lexical_declaration
-  19       (lexical_declaration) [Node Push]  21, 16
-       ●   lexical_declaration
-  21       _                                19, 21
-       ●   expression_statement
-  19       (lexical_declaration) [Node Push]  21, 16
-       ○   expression_statement
-  21  ❮❮❮ 
-  21       _                                19, 21
-       ●   expression_statement
-  19       (lexical_declaration) [Node Push]  21, 16
-       ○   expression_statement
-  21  ❮❮❮ 
-  21       _                                19, 21
-  19  ❮❮❮ 
-  16       (_) [ArrayClose Set(M0) Node Set(M1)]  07
-       ●   expression_statement
-  07       _                                10
-       ●   program
-  10   ◀   (Q)                              
-
-_StructWrap:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

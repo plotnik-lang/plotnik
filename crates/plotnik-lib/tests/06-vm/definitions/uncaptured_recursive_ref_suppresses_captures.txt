@@ -50,82 +50,84 @@ N0: S3 → T1  ; Nested
 N1: S4 → T2  ; Q
 
 [entrypoints]
-Nested = 06 :: T1
-Q      = 10 :: T2
+Nested = 00 :: T1
+Q      = 06 :: T2
 
 [transitions]
-_StructWrap:
+Nested:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@27)                            27 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-Nested:
-  06   !   (call_expression)                08
-  07  ─‣┘  _                                19
-  08  └‣─  function: _                      20, 25
-
 Q:
-  10   !   (program)                        11
-  11  └‣─  (expression_statement) [StructOpen]  13
-  13  └‣─  (Nested)                         06 : 14
-  14  -ε-  [StructClose]                    16
-  16  ─‣┘² _ [Set(M1)]                      18
-  18                                        ▶
-  19                                        ▶
-  20   !   (identifier) [Node Set(M0)]      07
-  22  -ε-  [SuppressEnd]                    07
-  24   !   (Nested)                         06 : 22
-  25  -ε-  [Null Set(M0) SuppressBegin]     24
+  06  -ε-  [StructOpen]                     08
+  08       (@32)                            32 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  -ε-  [StructClose]                    14
+  14  ─‣┘² _ [Set(M1)]                      28
+  16                                        ▶
+  17   !   (identifier) [Node Set(M0)]      26
+  19  -ε-  [SuppressEnd]                    26
+  21   !   (@27)                            27 : 19
+  22  -ε-  [Null Set(M0) SuppressBegin]     21
+  24  └‣─  function: _                      17, 22
+  26  ─‣┘  _                                16
+  27   !   (call_expression)                24
+  28                                        ▶
+  29  └‣─  (@27)                            27 : 12
+  30  └‣─  (expression_statement) [StructOpen]  29
+  32   !   (program)                        30
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  10       (program)                        11
+  06  -ε-  [StructOpen]                     08
+  08       (?)                              32 : 09
+       ▶   (?)
+
+?:
+  32       (program)                        30
        ●   program
-  11       (expression_statement) [StructOpen]  13
+  30       (expression_statement) [StructOpen]  29
        ●   expression_statement
-  13       (Nested)                         06 : 14
-       ▶   (Nested)
+  29       (?)                              27 : 12
+       ▶   (?)
 
-Nested:
-  06       (call_expression)                08
+?:
+  27       (call_expression)                24
        ●   call_expression
-  08       function: _                      20, 25
+  24       function: _                      17, 22
        ●   call_expression
-  20       (identifier) [Node Set(M0)]      07
+  17       (identifier) [Node Set(M0)]      26
        ○   call_expression
-  08  ❮❮❮ 
-  25  -ε-  [Null Set(M0) SuppressBegin]     24
-  24       (Nested)                         06 : 22
-       ▶   (Nested)
+  24  ❮❮❮ 
+  22  -ε-  [Null Set(M0) SuppressBegin]     21
+  21       (?)                              27 : 19
+       ▶   (?)
 
-Nested:
-  06       (call_expression)                08
+?:
+  27       (call_expression)                24
        ●   call_expression
-  08       function: _                      20, 25
+  24       function: _                      17, 22
        ●   identifier
-  20       (identifier) [Node Set(M0)]      07
+  17       (identifier) [Node Set(M0)]      26
        ●   identifier
-  07       _                                19
+  26       _                                16
        ●   call_expression
-  19   ◀   (Nested)                         
+  16   ◀   (?)                              
 
-Nested:
-  22  -ε-  [SuppressEnd]                    07
-  07       _                                19
+?:
+  19  -ε-  [SuppressEnd]                    26
+  26       _                                16
        ●   call_expression
-  19   ◀   (Nested)                         
+  16   ◀   (?)                              
+
+?:
+  12  -ε-  [StructClose]                    14
+  14       _ [Set(M1)]                      28
+       ●   program
+  28   ◀   (?)                              
 
 Q:
-  14  -ε-  [StructClose]                    16
-  16       _ [Set(M1)]                      18
-       ●   program
-  18   ◀   (Q)                              
-
-_StructWrap:
-  03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  09  -ε-  [StructClose]                    11
+  11   ◀   (Q)                              ◼

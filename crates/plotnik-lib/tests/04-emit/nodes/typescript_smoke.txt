@@ -18,15 +18,14 @@ M0: S1 → T0  ; decl: <Node>
 N0: S2 → T1  ; Q
 
 [entrypoints]
-Q = 6 :: T1
+Q = 0 :: T1
 
 [transitions]
-_StructWrap:
+Q:
   0  -ε-  [StructOpen]                      2
-  2       Trampoline                        3
+  2       (@8)                              8 : 3
   3  -ε-  [StructClose]                     5
   5                                         ▶
-
-Q:
-  6   !   (interface_declaration) [Node Set(M0)]  8
-  8                                         ▶
+  6                                         ▶
+  7  ...
+  8   !   (interface_declaration) [Node Set(M0)]  6

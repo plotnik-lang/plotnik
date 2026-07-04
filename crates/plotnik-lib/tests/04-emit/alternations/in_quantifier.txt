@@ -45,26 +45,25 @@ N1: S08 → T4  ; QItems
 N2: S09 → T6  ; Q
 
 [entrypoints]
-Q = 06 :: T6
+Q = 00 :: T6
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@30)                            30 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (object)                         08
+  06                                        ▶
   07  ...
-  08  -ε-  [ArrayOpen]                      26, 11
-  10                                        ▶
-  11  -ε-  [ArrayClose Set(M5)]             10
-  13  -ε-  [StructClose Push]               24, 28
+  08  -ε-  [ArrayClose Set(M5)]             06
+  10  -ε-  [StructClose Push]               21, 28
+  12   !   (pair) [EnumOpen(M2) Node Set(M0) EnumClose Set(M4)]  10
   15  ...
-  16   !   (pair) [EnumOpen(M2) Node Set(M0) EnumClose Set(M4)]  13
-  19   !   (shorthand_property_identifier) [EnumOpen(M3) Node Set(M1) EnumClose Set(M4)]  13
-  22  -ε-  [StructOpen]                     16, 19
-  24  ─‣─  _                                22, 24
-  26  └‣─  _                                22, 24
-  28  ─‣┘  _ [ArrayClose Set(M5)]           10
+  16   !   (shorthand_property_identifier) [EnumOpen(M3) Node Set(M1) EnumClose Set(M4)]  10
+  19  -ε-  [StructOpen]                     12, 16
+  21  ─‣─  _                                19, 21
+  23  ...
+  24  └‣─  _                                19, 21
+  26  -ε-  [ArrayOpen]                      24, 08
+  28  ─‣┘  _ [ArrayClose Set(M5)]           06
+  30   !   (object)                         26

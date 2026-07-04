@@ -216,7 +216,6 @@ pub enum InstructionIR {
     Match(MatchIR),
     Call(CallIR),
     Return(ReturnIR),
-    Trampoline(TrampolineIR),
 }
 
 impl InstructionIR {
@@ -226,7 +225,6 @@ impl InstructionIR {
             Self::Match(m) => m.label,
             Self::Call(c) => c.label,
             Self::Return(r) => r.label,
-            Self::Trampoline(t) => t.label,
         }
     }
 
@@ -234,7 +232,7 @@ impl InstructionIR {
     pub fn size(&self) -> usize {
         match self {
             Self::Match(m) => m.size(),
-            Self::Call(_) | Self::Return(_) | Self::Trampoline(_) => 8,
+            Self::Call(_) | Self::Return(_) => 8,
         }
     }
 
@@ -244,7 +242,6 @@ impl InstructionIR {
             Self::Match(m) => &m.successors,
             Self::Call(c) => std::slice::from_ref(&c.next),
             Self::Return(_) => &[],
-            Self::Trampoline(t) => std::slice::from_ref(&t.next),
         }
     }
 }
@@ -444,39 +441,14 @@ impl From<ReturnIR> for InstructionIR {
     }
 }
 
-/// Trampoline instruction IR with symbolic return address.
-///
-/// Trampoline is like Call, but the target comes from VM context (external parameter)
-/// rather than being encoded in the instruction. Used for universal entry preamble.
-#[derive(Clone, Debug)]
-pub struct TrampolineIR {
-    /// Where this instruction lives.
-    pub label: Label,
-    /// Return address (where to continue after entrypoint returns).
-    pub next: Label,
-}
-
-impl TrampolineIR {
-    pub fn new(label: Label, next: Label) -> Self {
-        Self { label, next }
-    }
-}
-
-impl From<TrampolineIR> for InstructionIR {
-    fn from(t: TrampolineIR) -> Self {
-        Self::Trampoline(t)
-    }
-}
-
 /// Compiled query IR plus entry labels produced by the compile stage.
 #[derive(Clone, Debug)]
 pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
     /// Entry labels for each definition (in definition order).
     pub(in crate::compiler::lower) def_entries: IndexMap<DefId, Label>,
-    /// Entry label for the universal preamble.
-    /// The preamble wraps any entrypoint: Struct -> Trampoline -> EndStruct -> Return
-    pub(in crate::compiler::lower) preamble_entry: Label,
+    /// Entry labels for each emitted entrypoint wrapper, in definition order.
+    pub(in crate::compiler::lower) entrypoint_wrappers: IndexMap<DefId, Label>,
 }
 
 impl NfaGraph {
@@ -484,12 +456,8 @@ impl NfaGraph {
         &self.instructions
     }
 
-    pub(crate) fn def_entries(&self) -> &IndexMap<DefId, Label> {
-        &self.def_entries
-    }
-
-    pub(crate) fn preamble_entry(&self) -> Label {
-        self.preamble_entry
+    pub(crate) fn entrypoint_wrappers(&self) -> &IndexMap<DefId, Label> {
+        &self.entrypoint_wrappers
     }
 }
 

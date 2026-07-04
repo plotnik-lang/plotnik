@@ -22,46 +22,40 @@ T0 = <Void>
 [type_names]
 
 [entrypoints]
-Q = 06 :: T0
+Q = 00 :: T0
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Q:
-  06   !   (program)                        07
-  07  └‣─  (expression_statement)           08
-  08  └‣─  _                                10, 16
-  10   !   (identifier) == "a"              12
-  12  !─┘  _                                13
-  13  ─‣┘  _                                14
-  14                                        ▶
-  15  ...
-  16  ─‣─  _                                10, 16
+  00       (@13)                            13 : 01
+  01                                        ▶
+  02   !   (identifier) == "a"              04
+  04  !─┘  _                                05
+  05  ─‣┘  _                                06
+  06                                        ▶
+  07  ...
+  08  ─‣─  _                                02, 08
+  10  └‣─  _                                02, 08
+  12  └‣─  (expression_statement)           10
+  13   !   (program)                        12
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+Q:
+  00       (?)                              13 : 01
+       ▶   (?)
+
+?:
+  13       (program)                        12
+       ●   program
+  12       (expression_statement)           10
+       ●   expression_statement
+  10       _                                02, 08
+       ●   identifier
+  02       (identifier) == "a"              04
+       ●   identifier
+  04       _                                05
+       ●   expression_statement
+  05       _                                06
+       ●   program
+  06   ◀   (?)                              
 
 Q:
-  06       (program)                        07
-       ●   program
-  07       (expression_statement)           08
-       ●   expression_statement
-  08       _                                10, 16
-       ●   identifier
-  10       (identifier) == "a"              12
-       ●   identifier
-  12       _                                13
-       ●   expression_statement
-  13       _                                14
-       ●   program
-  14   ◀   (Q)                              
-
-_StructWrap:
-  03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  01   ◀   (Q)                              ◼

@@ -46,53 +46,54 @@ N0: S3 → T1  ; Name
 N1: S4 → T2  ; Q
 
 [entrypoints]
-Name = 06 :: T1
-Q    = 09 :: T2
+Name = 00 :: T1
+Q    = 06 :: T2
 
 [transitions]
-_StructWrap:
+Name:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@17)                            17 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-Name:
-  06   !   (identifier) [Node Set(M0)]      08
-  08                                        ▶
-
 Q:
-  09   !   (program)                        10
-  10  └‣─  (function_declaration) [StructOpen]  12
-  12  └‣─  name: (Name)                     06 : 13
-  13  -ε-  [StructClose]                    16
-  15  ...
-  16  ─‣┘² _ [Set(M1)]                      18
-  18                                        ▶
+  06  -ε-  [StructOpen]                     08
+  08       (@23)                            23 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  -ε-  [StructClose]                    14
+  14  ─‣┘² _ [Set(M1)]                      19
+  16                                        ▶
+  17   !   (identifier) [Node Set(M0)]      16
+  19                                        ▶
+  20  └‣─  name: (@17)                      17 : 12
+  21  └‣─  (function_declaration) [StructOpen]  20
+  23   !   (program)                        21
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  09       (program)                        10
+  06  -ε-  [StructOpen]                     08
+  08       (?)                              23 : 09
+       ▶   (?)
+
+?:
+  23       (program)                        21
        ●   program
-  10       (function_declaration) [StructOpen]  12
+  21       (function_declaration) [StructOpen]  20
        ●   function_declaration
-  12       (Name)                           06 : 13
-       ▶   (Name)
+  20       (?)                              17 : 12
+       ▶   (?)
 
-Name:
-  06       (identifier) [Node Set(M0)]      08
+?:
+  17       (identifier) [Node Set(M0)]      16
        ●   identifier
-  08   ◀   (Name)                           
+  16   ◀   (?)                              
+
+?:
+  12  -ε-  [StructClose]                    14
+  14       _ [Set(M1)]                      19
+       ●   program
+  19   ◀   (?)                              
 
 Q:
-  13  -ε-  [StructClose]                    16
-  16       _ [Set(M1)]                      18
-       ●   program
-  18   ◀   (Q)                              
-
-_StructWrap:
-  03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  09  -ε-  [StructClose]                    11
+  11   ◀   (Q)                              ◼

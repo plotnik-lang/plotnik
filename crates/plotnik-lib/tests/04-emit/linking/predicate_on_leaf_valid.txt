@@ -14,15 +14,11 @@ T0 = <Void>
 [type_names]
 
 [entrypoints]
-Q = 6 :: T0
+Q = 0 :: T0
 
 [transitions]
-_StructWrap:
-  0  -ε-  [StructOpen]                      2
-  2       Trampoline                        3
-  3  -ε-  [StructClose]                     5
-  5                                         ▶
-
 Q:
-  6   !   (identifier) == "foo"             8
-  8                                         ▶
+  0       (@3)                              3 : 1
+  1                                         ▶
+  2                                         ▶
+  3   !   (identifier) == "foo"             2

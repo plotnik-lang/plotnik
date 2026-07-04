@@ -58,70 +58,67 @@ N0: S4 → T1  ; QRows
 N1: S5 → T3  ; Q
 
 [entrypoints]
-Q = 06 :: T3
+Q = 00 :: T3
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@26)                            26 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        08
-  07  ...
-  08  -ε-  [ArrayOpen]                      24, 16
-  10  └‣─  (identifier) [Node Set(M0)] =~ /^x/  13
-  13  ─‣┘  _                                18
-  14                                        ▶
+  06  ─‣┘  _ [ArrayClose Set(M1)]           12
+  08  └‣─  (identifier) [Node Set(M0)] =~ /^x/  11
+  11  ─‣┘  _                                16
+  12                                        ▶
+  13  -ε-  [ArrayClose Set(M1)]             12
   15  ...
-  16  -ε-  [ArrayClose Set(M1)]             14
-  18  -ε-  [StructClose Push]               22, 26
-  20   !   (expression_statement) [StructOpen]  10
-  22  ─‣─  _                                20, 22
-  24  └‣─  _                                20, 22
-  26  ─‣┘  _ [ArrayClose Set(M1)]           14
+  16  -ε-  [StructClose Push]               20, 06
+  18   !   (expression_statement) [StructOpen]  08
+  20  ─‣─  _                                18, 20
+  22  └‣─  _                                18, 20
+  24  -ε-  [ArrayOpen]                      22, 13
+  26   !   (program)                        24
 ==== trace ====
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+  02       (?)                              26 : 03
+       ▶   (?)
+
+?:
+  26       (program)                        24
+       ●   program
+  24  -ε-  [ArrayOpen]                      22, 13
+  22       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement) [StructOpen]  08
+       ●   expression_statement
+  08       (identifier) [Node Set(M0)] =~ /^x/  11
+       ●   identifier
+  11       _                                16
+       ●   expression_statement
+  16  -ε-  [StructClose Push]               20, 06
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement) [StructOpen]  08
+       ●   expression_statement
+  08       (identifier) [Node Set(M0)] =~ /^x/  11
+       ○   ;
+  20  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement) [StructOpen]  08
+       ●   expression_statement
+  08       (identifier) [Node Set(M0)] =~ /^x/  11
+       ●   identifier
+  11       _                                16
+       ●   expression_statement
+  16  -ε-  [StructClose Push]               20, 06
+  20       _                                18, 20
+  16  ❮❮❮ 
+  06       _ [ArrayClose Set(M1)]           12
+       ●   program
+  12   ◀   (?)                              
 
 Q:
-  06       (program)                        08
-       ●   program
-  08  -ε-  [ArrayOpen]                      24, 16
-  24       _                                20, 22
-       ●   expression_statement
-  20       (expression_statement) [StructOpen]  10
-       ●   expression_statement
-  10       (identifier) [Node Set(M0)] =~ /^x/  13
-       ●   identifier
-  13       _                                18
-       ●   expression_statement
-  18  -ε-  [StructClose Push]               22, 26
-  22       _                                20, 22
-       ●   expression_statement
-  20       (expression_statement) [StructOpen]  10
-       ●   expression_statement
-  10       (identifier) [Node Set(M0)] =~ /^x/  13
-       ○   ;
-  22  ❮❮❮ 
-  22       _                                20, 22
-       ●   expression_statement
-  20       (expression_statement) [StructOpen]  10
-       ●   expression_statement
-  10       (identifier) [Node Set(M0)] =~ /^x/  13
-       ●   identifier
-  13       _                                18
-       ●   expression_statement
-  18  -ε-  [StructClose Push]               22, 26
-  22       _                                20, 22
-  18  ❮❮❮ 
-  26       _ [ArrayClose Set(M1)]           14
-       ●   program
-  14   ◀   (Q)                              
-
-_StructWrap:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

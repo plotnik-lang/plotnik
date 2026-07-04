@@ -15,20 +15,16 @@ T0 = <Void>
 [type_names]
 
 [entrypoints]
-Q = 06 :: T0
+Q = 00 :: T0
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Q:
-  06   !   (array)                          08
-  07  ─‣┘  _                                10
-  08  └‣─  _                                12, 14
-  10                                        ▶
-  11  ─◦─  ","                              07
-  12   !   (identifier)                     11, 07
-  14  ─‣─  _                                12, 14
+  00       (@11)                            11 : 01
+  01                                        ▶
+  02                                        ▶
+  03  ─◦─  ","                              10
+  04   !   (identifier)                     03, 10
+  06  ─‣─  _                                04, 06
+  08  └‣─  _                                04, 06
+  10  ─‣┘  _                                02
+  11   !   (array)                          08

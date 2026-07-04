@@ -8,8 +8,7 @@
 //!    sensitive to branch priority and to dropped/duplicated successors. Every
 //!    optimization pass must preserve it — see [`run_verified`].
 //! 2. **Structural invariants** on the instruction list: no duplicate labels and
-//!    no dangling references (successors, `Call` targets/returns, `Trampoline`
-//!    returns all resolve).
+//!    no dangling references (successors and `Call` targets/returns all resolve).
 //!
 //! The fingerprint normalizes away the two representation changes our passes make
 //! legitimately:
@@ -130,7 +129,7 @@ mod debug_impl {
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum WalkRoot {
-        Preamble,
+        Entrypoint(DefId),
         Def(DefId),
     }
 
@@ -369,13 +368,6 @@ mod debug_impl {
                     ops: vec![SemanticOp::Return],
                     succs: vec![],
                 },
-                InstructionIR::Trampoline(t) => WalkStep {
-                    // Part of the preamble; semantically transparent but still marked
-                    // visited so a (hypothetical) cycle through it terminates.
-                    see_through: false,
-                    ops: vec![],
-                    succs: vec![t.next],
-                },
             }
         }
 
@@ -569,8 +561,7 @@ mod debug_impl {
     /// Every body must return or accept at the same cursor depth it entered with.
     ///
     /// Calls apply their own navigation at the call site, but the callee is a
-    /// separately checked body. A trampoline is part of the entry preamble, so it
-    /// is depth-neutral and continues at its encoded return address.
+    /// separately checked body.
     fn check_depth_neutrality(nfa: &NfaGraph) -> Result<(), String> {
         let instr_map: HashMap<Label, &InstructionIR> =
             nfa.instructions.iter().map(|i| (i.label(), i)).collect();
@@ -632,9 +623,6 @@ mod debug_impl {
                         ));
                     }
                 }
-                InstructionIR::Trampoline(t) => {
-                    work.push((t.next, net));
-                }
             }
         }
 
@@ -648,7 +636,10 @@ mod debug_impl {
     }
 
     fn entries(nfa: &NfaGraph) -> Vec<(WalkRoot, Label)> {
-        let mut v = vec![(WalkRoot::Preamble, nfa.preamble_entry)];
+        let mut v = Vec::new();
+        for (&def_id, &label) in &nfa.entrypoint_wrappers {
+            v.push((WalkRoot::Entrypoint(def_id), label));
+        }
         for (&def_id, &label) in &nfa.def_entries {
             v.push((WalkRoot::Def(def_id), label));
         }

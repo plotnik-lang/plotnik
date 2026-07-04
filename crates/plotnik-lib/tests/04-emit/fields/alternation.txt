@@ -28,21 +28,17 @@ M1: S2 → T2  ; num: T2
 N0: S3 → T1  ; Q
 
 [entrypoints]
-Q = 06 :: T1
+Q = 00 :: T1
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@16)                            16 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (call_expression)                08
-  07  ...
-  08  └‣─  function: _                      11, 16
-  10                                        ▶
-  11   !   (identifier) [Null Set(M1) Node Set(M0)]  14
-  14  ─‣┘  _                                10
-  15  ...
-  16   !   (number) [Null Set(M0) Node Set(M1)]  14
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08   !   (identifier) [Null Set(M1) Node Set(M0)]  07
+  11   !   (number) [Null Set(M0) Node Set(M1)]  07
+  14  └‣─  function: _                      08, 11
+  16   !   (call_expression)                14

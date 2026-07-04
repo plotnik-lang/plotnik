@@ -24,19 +24,17 @@ M3: S4 → T0  ; d: <Node>
 N0: S5 → T1  ; Q
 
 [entrypoints]
-Q = 06 :: T1
+Q = 00 :: T1
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@14)                            14 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (array) [Node Set(M0)]           08
-  08  └‣─  (array) [Node Set(M1)]           10
-  10  └‣─  (array) [Node Set(M2)]           12
-  12  └‣─  (identifier) [Node Set(M3)]      14
-  14  ─‣┘³ _                                15
-  15                                        ▶
+  06  └‣─  (identifier) [Node Set(M3)]      08
+  08  ─‣┘³ _                                09
+  09                                        ▶
+  10  └‣─  (array) [Node Set(M2)]           06
+  12  └‣─  (array) [Node Set(M1)]           10
+  14   !   (array) [Node Set(M0)]           12

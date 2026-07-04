@@ -37,21 +37,19 @@ M4: S05 → T2  ; Rec: T2
 N0: S06 → T3  ; Expr
 
 [entrypoints]
-Expr = 06 :: T3
+Expr = 00 :: T3
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Expr:
-  06  -ε-                                   12, 18
-  08  ─‣─  arguments: (Expr)                06 : 09
-  09  ─‣┘  _ [Set(M2) EnumClose]            11
-  11                                        ▶
-  12   !   (number) [EnumOpen(M3) Node Set(M0) EnumClose]  11
+  00       (@16)                            16 : 01
+  01                                        ▶
+  02  ─‣─  arguments: (@16)                 16 : 03
+  03  ─‣┘  _ [Set(M2) EnumClose]            05
+  05                                        ▶
+  06  ...
+  07  ...
+  08   !   (number) [EnumOpen(M3) Node Set(M0) EnumClose]  05
+  11  └‣─  function: (identifier) [Node Set(M1)]  02
+  13   !   (call_expression) [EnumOpen(M4)]  11
   15  ...
-  16  └‣─  function: (identifier) [Node Set(M1)]  08
-  18   !   (call_expression) [EnumOpen(M4)]  16
+  16  -ε-                                   08, 13

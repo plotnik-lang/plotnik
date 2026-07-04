@@ -10,7 +10,7 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// v5: Added extras-only anchor navigation modes.
 /// v6: Reserved bit 7 of a Nav byte for the Up family (uniform 5-bit level).
 /// v7: Type kind and effect opcode discriminants renumbered contiguously.
-/// v8: single effects list per Match; per-entrypoint wrappers; Trampoline removed.
+/// v8: single effects list per Match; per-entrypoint wrappers.
 pub const VERSION: u32 = 8;
 
 /// Section alignment in bytes.

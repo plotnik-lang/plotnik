@@ -48,57 +48,58 @@ N1: S5 → T2  ; A
 N2: S6 → T4  ; Q
 
 [entrypoints]
-A = 06 :: T2
-Q = 08 :: T4
+A = 00 :: T2
+Q = 06 :: T4
 
 [transitions]
-_StructWrap:
+A:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@30)                            30 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-A:
-  06  -ε-                                   28, 20
-
 Q:
-  08   !   (program)                        09
-  09  └‣─  _ [ArrayOpen]                    38, 40
-  11  └‣─  (identifier) [Node Set(M0)]      13
-  13  ─‣┘  _ [StructClose Set(M1)]          15
-  15                                        ▶
+  06  -ε-  [StructOpen]                     08
+  08       (@48)                            48 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  └‣─  (identifier) [Node Set(M0)]      14
+  14  ─‣┘  _ [StructClose Set(M1)]          20
   16  └‣─  (identifier) [Node Set(M0)]      18
-  18  ─‣┘  _ [StructClose Set(M1)]          32
-  20  -ε-  [Null Set(M1)]                   15
-  22  ...
+  18  ─‣┘  _ [StructClose Set(M1)]          33
+  20                                        ▶
+  21  -ε-  [Null Set(M1)]                   20
   23  ...
-  24   !   (expression_statement) [StructOpen]  11
+  24   !   (expression_statement) [StructOpen]  12
   26  ─‣─  _                                24, 26
   28   !   _                                24, 26
-  30                                        ▶
-  31  ...
-  32  -ε-  [StructClose Push]               40, 42
-  34   !   (expression_statement) [StructOpen]  16
-  36  ─‣─  _                                34, 36
-  38   !   _ [StructOpen]                   34, 36
-  40  ─‣─  _                                38, 40
-  42  ─‣┘  _ [ArrayClose Set(M2)]           30
+  30  -ε-                                   28, 21
+  32                                        ▶
+  33  -ε-  [StructClose Push]               42, 46
+  35   !   (expression_statement) [StructOpen]  16
+  37  ─‣─  _                                35, 37
+  39  ...
+  40   !   _ [StructOpen]                   35, 37
+  42  ─‣─  _                                40, 42
+  44  └‣─  _ [ArrayOpen]                    40, 42
+  46  ─‣┘  _ [ArrayClose Set(M2)]           32
+  48   !   (program)                        44
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  08       (program)                        09
+  06  -ε-  [StructOpen]                     08
+  08       (?)                              48 : 09
+       ▶   (?)
+
+?:
+  48       (program)                        44
        ●   program
-  09       _ [ArrayOpen]                    38, 40
+  44       _ [ArrayOpen]                    40, 42
        ●   debugger_statement
-  38       _ [StructOpen]                   34, 36
+  40       _ [StructOpen]                   35, 37
        ●   debugger_statement
-  34       (expression_statement) [StructOpen]  16
+  35       (expression_statement) [StructOpen]  16
        ○   debugger_statement
-  38  ❮❮❮ 
-  36       _                                34, 36
-  09  ❮❮❮ 
-  40       _                                38, 40
+  40  ❮❮❮ 
+  37       _                                35, 37
+  44  ❮❮❮ 
+  42       _                                40, 42

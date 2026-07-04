@@ -31,26 +31,26 @@ N0: S3 → T1  ; Expression
 N1: S4 → T2  ; Root
 
 [entrypoints]
-Expression = 06 :: T1
-Root       = 08 :: T2
+Expression = 00 :: T1
+Root       = 06 :: T2
 
 [transitions]
-_StructWrap:
+Expression:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@22)                            22 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-Expression:
-  06  -ε-                                   16, 19
-
 Root:
-  08   !   (function_declaration)           09
-  09  └‣─  name: (identifier) [Node Set(M2)]  11
-  11  ─‣┘  _                                12
-  12                                        ▶
-  13                                        ▶
-  14  ...
-  15  ...
-  16   !   (identifier) [Null Set(M1) Node Set(M0)]  13
-  19   !   (number) [Null Set(M0) Node Set(M1)]  13
+  06  -ε-  [StructOpen]                     08
+  08       (@25)                            25 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  └‣─  name: (identifier) [Node Set(M2)]  14
+  14  ─‣┘  _                                24
+  15                                        ▶
+  16   !   (identifier) [Null Set(M1) Node Set(M0)]  15
+  19   !   (number) [Null Set(M0) Node Set(M1)]  15
+  22  -ε-                                   16, 19
+  24                                        ▶
+  25   !   (function_declaration)           12

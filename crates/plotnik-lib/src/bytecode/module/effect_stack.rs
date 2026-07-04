@@ -15,13 +15,13 @@
 //! ## Model
 //!
 //! The materializer's input is the inline concatenation of every committed
-//! `Match`'s `pre` then `post` effects across `Call`/`Return` boundaries, with
-//! the VM's suppression filter applied: `SuppressBegin`/`SuppressEnd` adjust a
-//! counter and, while it is positive, every data effect is dropped before the
-//! log. So the abstract state is `(stack, suppress)`: a builder-frame stack and
-//! a suppression depth. The walk starts from the preamble (step 0) and follows
-//! `Match` successors, descending through `Call`/`Trampoline` and resuming at
-//! their return address — exactly the edge set that orders effects at runtime.
+//! `Match`'s effects across `Call`/`Return` boundaries, with the VM's suppression
+//! filter applied: `SuppressBegin`/`SuppressEnd` adjust a counter and, while it
+//! is positive, every data effect is dropped before the log. So the abstract
+//! state is `(stack, suppress)`: a builder-frame stack and a suppression depth.
+//! The walk starts from each entrypoint wrapper and follows `Match` successors,
+//! descending through `Call` and resuming at its return address — exactly the
+//! edge set that orders effects at runtime.
 //!
 //! ## Why summaries
 //!
@@ -36,7 +36,7 @@
 //! both terminates and stays sound. The constraints are computed by a monotone
 //! fixpoint (a callee that reads its caller's top before pushing propagates the
 //! constraint up to its own callers), then a final pass checks every call site
-//! and the preamble against the stabilized constraints.
+//! and every entrypoint wrapper against the stabilized constraints.
 //!
 //! Net-neutrality, no popping below entry, and suppression balance are not
 //! assumed — they are verified, so a forged body that violates them is rejected
@@ -45,12 +45,10 @@
 use std::collections::HashMap;
 
 use super::{Instruction, Module, ModuleError};
-use crate::bytecode::StepAddr;
 use crate::bytecode::effects::EffectKind;
 
 /// Builder frames the materializer pushes. The root/result frame can be a
-/// scalar, but the walk starts at the always-`StructOpen` preamble, so only these three
-/// ever reach the abstract stack.
+/// scalar, but compiled effects only push these three frame kinds.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum FrameKind {
     Array,
@@ -102,7 +100,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
             let entry = defs[i];
             i += 1;
 
-            let analysis = analyze(module, &summaries, entry, None, false)?;
+            let analysis = analyze(module, &summaries, entry, false)?;
             for target in analysis.discovered {
                 if push_unique(&mut defs, target) {
                     summaries.insert(target, KS_ANY);
@@ -124,32 +122,17 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     // Final pass: with stabilized constraints, check every call site (membership
     // of the caller's top in the callee's `entry_tos`) inside each body...
     for &entry in &defs {
-        analyze(module, &summaries, entry, None, true)?;
+        analyze(module, &summaries, entry, true)?;
     }
 
-    // ...and the preamble per entrypoint. The shared preamble (step 0) opens the
-    // root `StructOpen`, trampolines into the entrypoint body, then closes it; binding
-    // the trampoline to this entrypoint's target checks that the body tolerates
-    // the `Struct` the preamble hands it.
-    //
-    // The preamble has no caller. A residual constraint on *its* entry means some
-    // effect read below the frames the preamble itself opened — with the root
-    // `StructOpen` intact, every entry read lands on that `Struct` and nothing bubbles,
-    // so a non-`KS_ANY` result is a forged preamble that fails to provide the
-    // frame. At runtime such a read would hit the materializer's result-type root
-    // frame, whose kind is attacker-controlled, and panic. Reject it instead of
-    // dropping the constraint into a caller that does not exist.
+    // ...and every entrypoint wrapper. A wrapper has no caller, so a residual
+    // caller-top constraint means some effect would read below the frames the
+    // wrapper itself opened and hit the materializer's result root frame.
     for entrypoint in entrypoints.iter() {
         let target = u16::from(entrypoint.target());
-        let preamble = analyze(
-            module,
-            &summaries,
-            StepAddr::PREAMBLE.get(),
-            Some(target),
-            true,
-        )?;
-        if preamble.entry_tos != KS_ANY {
-            return Err(ModuleError::EffectStackImbalance(StepAddr::PREAMBLE.get()));
+        let wrapper = analyze(module, &summaries, target, true)?;
+        if wrapper.entry_tos != KS_ANY {
+            return Err(ModuleError::EffectStackImbalance(target));
         }
     }
 
@@ -159,7 +142,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
 struct Analysis {
     /// Caller-top kinds this body tolerates (intersection of every read).
     entry_tos: u8,
-    /// Call/trampoline targets reached — definitions to summarize.
+    /// Call targets reached — definitions to summarize.
     discovered: Vec<u16>,
 }
 
@@ -167,14 +150,13 @@ struct Analysis {
 /// far (relative to this body's entry) and the suppression depth.
 type FrameState = (Vec<FrameKind>, i32);
 
-/// Walk one body (a definition entry, or the preamble when `trampoline` is set),
-/// computing its `entry_tos` and verifying its structural invariants. When
-/// `final_check` is set, also verify each call site against `summaries`.
+/// Walk one body, computing its `entry_tos` and verifying its structural
+/// invariants. When `final_check` is set, also verify each call site against
+/// `summaries`.
 fn analyze(
     module: &Module,
     summaries: &DefSummaries,
     entry: u16,
-    trampoline: Option<u16>,
     final_check: bool,
 ) -> Result<Analysis, ModuleError> {
     let mut entry_tos = KS_ANY;
@@ -229,22 +211,6 @@ fn analyze(
                     step,
                 )?;
                 work.push((u16::from(c.next), stack, suppress));
-            }
-            Instruction::Trampoline(t) => {
-                // The trampoline's callee is the entrypoint bound by the caller;
-                // it only appears in the preamble.
-                let target = trampoline.ok_or(ModuleError::EffectStackImbalance(step))?;
-                discovered.push(target);
-                apply_call(
-                    summaries,
-                    target,
-                    &stack,
-                    suppress,
-                    &mut entry_tos,
-                    final_check,
-                    step,
-                )?;
-                work.push((u16::from(t.next()), stack, suppress));
             }
         }
     }

@@ -59,53 +59,52 @@ N0: S03 → T1  ; QT
 N1: S04 → T2  ; Q
 
 [entrypoints]
-Q = 06 :: T2
+Q = 00 :: T2
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@25)                            25 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        07
-  07  └‣─  (expression_statement)           08
-  08  └‣─  (binary_expression)              09
-  09  └‣─  _                                20, 22
-  11                                        ▶
-  12  ─◦─  (identifier) [StructClose Set(M1)]  24
-  14  ─•─  (identifier) [StructClose Set(M1)]  24
-  16   !   (number) [Node Set(M0)]          14
-  18   !   "+" [Null Set(M0)]               12
-  20  -ε-  [StructOpen]                     16, 18
-  22  ─‣─  _                                20, 22
-  24  ─‣┘³ _                                11
+  06                                        ▶
+  07  ─‣┘³ _                                06
+  08  ─◦─  (identifier) [StructClose Set(M1)]  07
+  10  ─•─  (identifier) [StructClose Set(M1)]  07
+  12   !   (number) [Node Set(M0)]          10
+  14   !   "+" [Null Set(M0)]               08
+  16  -ε-  [StructOpen]                     12, 14
+  18  ─‣─  _                                16, 18
+  20  └‣─  _                                16, 18
+  22  └‣─  (binary_expression)              20
+  23  ...
+  24  └‣─  (expression_statement)           22
+  25   !   (program)                        24
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  06       (program)                        07
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              25 : 03
+       ▶   (?)
+
+?:
+  25       (program)                        24
        ●   program
-  07       (expression_statement)           08
+  24       (expression_statement)           22
        ●   expression_statement
-  08       (binary_expression)              09
+  22       (binary_expression)              20
        ●   binary_expression
-  09       _                                20, 22
+  20       _                                16, 18
        ●   number
-  20  -ε-  [StructOpen]                     16, 18
-  16       (number) [Node Set(M0)]          14
+  16  -ε-  [StructOpen]                     12, 14
+  12       (number) [Node Set(M0)]          10
        ●   number
-  14       (identifier) [StructClose Set(M1)]  24
+  10       (identifier) [StructClose Set(M1)]  07
        ○   *
        ●   identifier
-  24       _                                11
+  07       _                                06
        ●   program
-  11   ◀   (Q)                              
+  06   ◀   (?)                              
 
-_StructWrap:
+Q:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

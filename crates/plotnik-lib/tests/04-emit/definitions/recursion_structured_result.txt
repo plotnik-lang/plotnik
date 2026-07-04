@@ -46,31 +46,30 @@ N0: S07 → T3  ; Expr
 N1: S08 → T4  ; Test
 
 [entrypoints]
-Expr = 06 :: T3
-Test = 08 :: T4
+Expr = 00 :: T3
+Test = 02 :: T4
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Expr:
-  06  -ε-                                   21, 27
+  00       (@26)                            26 : 01
+  01                                        ▶
 
 Test:
-  08   !   (program)                        09
-  09  └‣─  (expression_statement)           10
-  10  └‣─  (Expr)                           06 : 11
-  11  ─‣┘² _ [Set(M5)]                      13
-  13                                        ▶
-  14  └‣─  (Expr)                           06 : 16
-  15  ...
-  16  ─‣┘  _ [Set(M2)]                      18
-  18  ─‣┘  _ [EnumClose]                    20
-  20                                        ▶
-  21   !   (number) [EnumOpen(M3) Node Set(M0) EnumClose]  20
-  24  ─‣─  arguments: (arguments)           14
-  25  └‣─  function: (identifier) [Node Set(M1)]  24
-  27   !   (call_expression) [EnumOpen(M4)]  25
+  02  -ε-  [StructOpen]                     04
+  04       (@29)                            29 : 05
+  05  -ε-  [StructClose]                    07
+  07                                        ▶
+  08  └‣─  (@26)                            26 : 09
+  09  ─‣┘  _ [Set(M2)]                      11
+  11  ─‣┘  _ [EnumClose]                    16
+  13  └‣─  (@26)                            26 : 14
+  14  ─‣┘² _ [Set(M5)]                      23
+  16                                        ▶
+  17   !   (number) [EnumOpen(M3) Node Set(M0) EnumClose]  16
+  20  ─‣─  arguments: (arguments)           08
+  21  └‣─  function: (identifier) [Node Set(M1)]  20
+  23                                        ▶
+  24   !   (call_expression) [EnumOpen(M4)]  21
+  26  -ε-                                   17, 24
+  28  └‣─  (expression_statement)           13
+  29   !   (program)                        28

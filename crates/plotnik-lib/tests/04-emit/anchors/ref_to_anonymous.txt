@@ -22,25 +22,26 @@ M0: S1 → T1  ; next: <Node>
 N0: S2 → T2  ; Test
 
 [entrypoints]
-Comma = 06 :: T0
-Test  = 08 :: T2
+Comma = 00 :: T0
+Test  = 02 :: T2
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Comma:
-  06   !   ","                              07
-  07                                        ▶
+  00       (@12)                            12 : 01
+  01                                        ▶
 
 Test:
-  08   !   (array)                          09
-  09  └‣─  _                                15, 16
-  11  ─◦─  (string) [Node Set(M0)]          13
-  13  ─‣┘  _                                14
-  14                                        ▶
-  15   !   (Comma)                          06 : 11
-  16  ─‣─  _                                15, 16
+  02  -ε-  [StructOpen]                     04
+  04       (@20)                            20 : 05
+  05  -ε-  [StructClose]                    07
+  07                                        ▶
+  08  ─◦─  (string) [Node Set(M0)]          10
+  10  ─‣┘  _                                13
+  11                                        ▶
+  12   !   ","                              11
+  13                                        ▶
+  14   !   (@12)                            12 : 08
+  15  ...
+  16  ─‣─  _                                14, 16
+  18  └‣─  _                                14, 16
+  20   !   (array)                          18

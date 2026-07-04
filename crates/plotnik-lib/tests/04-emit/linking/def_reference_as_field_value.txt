@@ -17,22 +17,20 @@ T0 = <Void>
 [type_names]
 
 [entrypoints]
-Foo = 06 :: T0
-Q   = 08 :: T0
+Foo = 0 :: T0
+Q   = 2 :: T0
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Foo:
-  06   !   (identifier)                     07
-  07                                        ▶
+  0       (@7)                              7 : 1
+  1                                         ▶
 
 Q:
-  08   !   (function_declaration)           09
-  09  └‣─  name: (Foo)                      06 : 10
-  10  ─‣┘  _                                11
-  11                                        ▶
+  2       (@9)                              9 : 3
+  3                                         ▶
+  4  └‣─  name: (@7)                        7 : 5
+  5  ─‣┘  _                                 8
+  6                                         ▶
+  7   !   (identifier)                      6
+  8                                         ▶
+  9   !   (function_declaration)            4

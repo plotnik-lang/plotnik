@@ -5,16 +5,19 @@ use std::collections::HashSet;
 use indexmap::IndexMap;
 
 use crate::bytecode::Nav;
+use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
-use crate::compiler::lower::ir::{InstructionIR, Label, NfaGraph, ReturnIR, TrampolineIR};
+use crate::compiler::lower::ir::{
+    CalleeEntry, InstructionIR, Label, NfaGraph, ReturnAddr, ReturnIR,
+};
 use crate::compiler::parse::ast::Pattern;
 
 use super::capture::PatternCtx;
 use super::navigation::AnchorSemantics;
-use crate::compiler::analyze::nullability::compute_nullable_defs;
 use super::scope::{CaptureExits, Struct};
+use crate::compiler::analyze::nullability::compute_nullable_defs;
 
 /// NfaBuilder state for Thompson construction.
 pub struct NfaBuilder<'a> {
@@ -74,10 +77,6 @@ impl<'a> NfaBuilder<'a> {
     pub(in crate::compiler::lower) fn build_ir(ctx: &'a LowerInput<'a>) -> NfaGraph {
         let mut compiler = NfaBuilder::new(ctx);
 
-        // Emit universal preamble first: Struct -> Trampoline -> EndStruct -> Return
-        // This wraps any entrypoint to create the top-level scope.
-        let preamble_entry = compiler.emit_preamble();
-
         for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
             let label = compiler.fresh_label();
             compiler.def_entries.insert(def_id, label);
@@ -87,29 +86,46 @@ impl<'a> NfaBuilder<'a> {
             compiler.compile_def(def_id);
         }
 
+        let mut entrypoint_wrappers = IndexMap::new();
+        for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
+            let wrapper = compiler.emit_entrypoint_wrapper(def_id);
+            entrypoint_wrappers.insert(def_id, wrapper);
+        }
+
         NfaGraph {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
-            preamble_entry,
+            entrypoint_wrappers,
         }
     }
 
-    /// Emit the universal preamble: Struct -> Trampoline -> EndStruct -> Return
-    ///
-    /// The preamble creates a scope for the entrypoint's captures.
-    /// The Trampoline instruction jumps to the actual entrypoint (set via VM context).
-    fn emit_preamble(&mut self) -> Label {
-        // Return (stack is empty after preamble, so this means Accept)
+    fn emit_entrypoint_wrapper(&mut self, def_id: DefId) -> Label {
         let return_label = self.fresh_label();
         self.instructions.push(ReturnIR::new(return_label).into());
 
-        let struct_close_label = self.emit_struct_close_step(return_label);
+        let output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let wraps_struct = matches!(
+            self.ctx.analysis.type_analysis.expect_type_shape(output),
+            TypeShape::Struct(_)
+        );
 
-        let trampoline_label = self.fresh_label();
-        self.instructions
-            .push(TrampolineIR::new(trampoline_label, struct_close_label).into());
+        let after_body = if wraps_struct {
+            self.emit_struct_close_step(return_label)
+        } else {
+            return_label
+        };
+        let call = self.emit_call(
+            Nav::Stay,
+            None,
+            ReturnAddr(after_body),
+            CalleeEntry(self.def_entries[&def_id]),
+        );
 
-        self.emit_struct_step(trampoline_label)
+        if wraps_struct {
+            self.emit_struct_step(call)
+        } else {
+            call
+        }
     }
 
     /// Generate a fresh label.

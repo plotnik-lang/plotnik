@@ -45,75 +45,75 @@ N0: S3 → T1  ; MaybeId
 N1: S4 → T2  ; Q
 
 [entrypoints]
-MaybeId = 06 :: T1
-Q       = 08 :: T2
+MaybeId = 00 :: T1
+Q       = 02 :: T2
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 MaybeId:
-  06  -ε-                                   20, 13
+  00       (@18)                            18 : 01
+  01                                        ▶
 
 Q:
-  08   !   (program)                        09
-  09  └‣─  (expression_statement)           10
-  10  └‣─  (array)                          34, 28
-  12                                        ▶
-  13  -ε-  [Null]                           12
-  15  ─‣┘³ _                                22
-  16   !   (identifier) [Node]              12
-  18  ─‣─  _                                16, 18
-  20   !   _                                16, 18
-  22                                        ▶
+  02  -ε-  [StructOpen]                     04
+  04       (@37)                            37 : 05
+  05  -ε-  [StructClose]                    07
+  07                                        ▶
+  08                                        ▶
+  09  -ε-  [Null]                           08
+  11   !   (identifier) [Node]              08
+  13  ─‣─  _                                11, 13
+  15  ─‣┘³ _                                20
+  16   !   _                                11, 13
+  18  -ε-                                   16, 09
+  20                                        ▶
+  21  └‣─  (number) [Set(M0) Node Set(M1)]  15
   23  ...
-  24  └‣─  (number) [Set(M0) Node Set(M1)]  15
-  26  ─‣─  (number) [Set(M0) Node Set(M1)]  15
-  28  -ε-  [Null]                           24
-  30   !   (identifier) [Node]              26
-  32  ─‣─  _                                30, 32
-  34  └‣─  _                                30, 32
+  24  ─‣─  (number) [Set(M0) Node Set(M1)]  15
+  26  -ε-  [Null]                           21
+  28   !   (identifier) [Node]              24
+  30  ─‣─  _                                28, 30
+  32  └‣─  _                                28, 30
+  34  └‣─  (array)                          32, 26
+  36  └‣─  (expression_statement)           34
+  37   !   (program)                        36
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+Q:
+  02  -ε-  [StructOpen]                     04
+  04       (?)                              37 : 05
+       ▶   (?)
+
+?:
+  37       (program)                        36
+       ●   program
+  36       (expression_statement)           34
+       ●   expression_statement
+  34       (array)                          32, 26
+       ●   array
+  32       _                                28, 30
+       ●   [
+  28       (identifier) [Node]              24
+       ○   [
+  32  ❮❮❮ 
+  30       _                                28, 30
+       ●   number
+  28       (identifier) [Node]              24
+       ○   number
+  30  ❮❮❮ 
+  30       _                                28, 30
+       ●   ]
+  28       (identifier) [Node]              24
+       ○   ]
+  30  ❮❮❮ 
+  30       _                                28, 30
+  34  ❮❮❮ 
+  26  -ε-  [Null]                           21
+  21       (number) [Set(M0) Node Set(M1)]  15
+       ○   [
+       ●   number
+  15       _                                20
+       ●   program
+  20   ◀   (?)                              
 
 Q:
-  08       (program)                        09
-       ●   program
-  09       (expression_statement)           10
-       ●   expression_statement
-  10       (array)                          34, 28
-       ●   array
-  34       _                                30, 32
-       ●   [
-  30       (identifier) [Node]              26
-       ○   [
-  34  ❮❮❮ 
-  32       _                                30, 32
-       ●   number
-  30       (identifier) [Node]              26
-       ○   number
-  32  ❮❮❮ 
-  32       _                                30, 32
-       ●   ]
-  30       (identifier) [Node]              26
-       ○   ]
-  32  ❮❮❮ 
-  32       _                                30, 32
-  10  ❮❮❮ 
-  28  -ε-  [Null]                           24
-  24       (number) [Set(M0) Node Set(M1)]  15
-       ○   [
-       ●   number
-  15       _                                22
-       ●   program
-  22   ◀   (Q)                              
-
-_StructWrap:
-  03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05  -ε-  [StructClose]                    07
+  07   ◀   (Q)                              ◼

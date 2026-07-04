@@ -28,16 +28,15 @@ N0: S4 → T1  ; QItem
 N1: S5 → T2  ; Q
 
 [entrypoints]
-Q = 06 :: T2
+Q = 00 :: T2
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@11)                            11 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (identifier) [StructOpen Node Set(M0)]  08
-  08  ─‣─  (number) [Node Set(M1) StructClose Set(M2)]  11
-  11                                        ▶
+  06                                        ▶
+  07  ...
+  08  ─‣─  (number) [Node Set(M1) StructClose Set(M2)]  06
+  11   !   (identifier) [StructOpen Node Set(M0)]  08

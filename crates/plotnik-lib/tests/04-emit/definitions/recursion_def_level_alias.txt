@@ -33,29 +33,29 @@ M3: S4 → T3  ; B: T3
 N0: S5 → T4  ; Rec
 
 [entrypoints]
-Q   = 08 :: T0
-Rec = 06 :: T4
+Q   = 02 :: T0
+Rec = 00 :: T4
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Rec:
-  06  -ε-                                   22, 24
+  00       (@19)                            19 : 01
+  01                                        ▶
 
 Q:
-  08  -ε-  [SuppressBegin]                  10
-  10   !   (Rec)                            06 : 11
-  11  -ε-  [SuppressEnd]                    13
-  13                                        ▶
-  14  └‣─  (Rec)                            06 : 16
+  02       (@25)                            25 : 03
+  03                                        ▶
+  04  └‣─  (@19)                            19 : 05
+  05  ─‣┘  _ [Set(M0)]                      08
+  07  ...
+  08  ─‣┘  _ [EnumClose]                    10
+  10                                        ▶
+  11  └‣─  (expression_statement)           04
+  12   !   (program) [EnumOpen(M2)]         11
+  14  ...
   15  ...
-  16  ─‣┘  _ [Set(M0)]                      18
-  18  ─‣┘  _ [EnumClose]                    20
-  20                                        ▶
-  21  └‣─  (expression_statement)           14
-  22   !   (program) [EnumOpen(M2)]         21
-  24   !   (identifier) [EnumOpen(M3) Node Set(M1) EnumClose]  20
+  16   !   (identifier) [EnumOpen(M3) Node Set(M1) EnumClose]  10
+  19  -ε-                                   12, 16
+  21                                        ▶
+  22  -ε-  [SuppressEnd]                    21
+  24   !   (@19)                            19 : 22
+  25  -ε-  [SuppressBegin]                  24

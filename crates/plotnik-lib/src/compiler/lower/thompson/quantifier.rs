@@ -79,7 +79,7 @@ enum IterationScope {
     Standalone {
         capture: CaptureEffects,
     },
-    StructWrapped {
+    StructScoped {
         row_type_id: Option<TypeId>,
         capture: CaptureEffects,
     },
@@ -105,7 +105,7 @@ impl IterationScope {
 
         let row_type_id = row_type_id(inner, type_ctx);
         if needs_struct_wrapper(inner, type_ctx) {
-            return Self::StructWrapped {
+            return Self::StructScoped {
                 row_type_id,
                 capture,
             };
@@ -122,10 +122,10 @@ impl IterationScope {
             Self::Standalone { capture } => Self::Standalone {
                 capture: capture.clone(),
             },
-            Self::StructWrapped {
+            Self::StructScoped {
                 row_type_id,
                 capture,
-            } => Self::StructWrapped {
+            } => Self::StructScoped {
                 row_type_id: *row_type_id,
                 capture: capture.clone(),
             },
@@ -141,7 +141,7 @@ impl IterationScope {
     fn capture(&self) -> &CaptureEffects {
         match self {
             Self::Standalone { capture }
-            | Self::StructWrapped { capture, .. }
+            | Self::StructScoped { capture, .. }
             | Self::RowScopedByIteration { capture, .. }
             | Self::RowScopedByArrayExit { capture } => capture,
         }
@@ -505,7 +505,10 @@ impl NfaBuilder<'_> {
                 let ExitNav { exit, nav } = target;
                 let struct_close = this.emit_struct_close_step_with_effects(end_effects, exit);
                 let body = this.compile_with_optional_scope(row_type_id, |t| {
-                    t.compile_iteration_element(&inner, PatternCtx::with_nav(struct_close, Some(nav)))
+                    t.compile_iteration_element(
+                        &inner,
+                        PatternCtx::with_nav(struct_close, Some(nav)),
+                    )
                 });
                 this.emit_struct_step(body)
             },
@@ -1024,7 +1027,7 @@ impl NfaBuilder<'_> {
                     capture,
                 },
             ),
-            IterationScope::StructWrapped { row_type_id, .. } => {
+            IterationScope::StructScoped { row_type_id, .. } => {
                 self.compile_struct_for_array(inner, exit, Some(nav), row_type_id)
             }
             IterationScope::RowScopedByIteration {

@@ -62,99 +62,97 @@ N0: S04 → T1  ; QItems
 N1: S05 → T3  ; Q
 
 [entrypoints]
-Q = 06 :: T3
+Q = 00 :: T3
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@36)                            36 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        07
-  07  └‣─  (expression_statement)           08
-  08  └‣─  (array)                          09
-  09  -ε-  [ArrayOpen]                      32, 12
-  11                                        ▶
-  12  -ε-  [ArrayClose Set(M2)]             36
-  14  -ε-  [StructClose Push]               30, 34
-  16   !   (identifier) [Node Set(M0)]      14
-  18  ─‣─  _                                16, 18
-  20   !   _ [Null Set(M1)]                 16, 18
-  22   !   (number) [Node Set(M1)]          14
-  24  ─‣─  _                                22, 24
-  26   !   _ [Null Set(M0)]                 22, 24
-  28  -ε-  [StructOpen]                     20, 26
-  30  ─‣─  _                                28, 30
-  32  └‣─  _                                28, 30
-  34  ─‣┘  _ [ArrayClose Set(M2)]           36
-  36  ─‣┘² _                                11
+  06                                        ▶
+  07  ─‣┘² _                                06
+  08  -ε-  [ArrayClose Set(M2)]             07
+  10  -ε-  [StructClose Push]               26, 32
+  12   !   (identifier) [Node Set(M0)]      10
+  14  ─‣─  _                                12, 14
+  16   !   _ [Null Set(M1)]                 12, 14
+  18   !   (number) [Node Set(M1)]          10
+  20  ─‣─  _                                18, 20
+  22   !   _ [Null Set(M0)]                 18, 20
+  24  -ε-  [StructOpen]                     16, 22
+  26  ─‣─  _                                24, 26
+  28  └‣─  _                                24, 26
+  30  -ε-  [ArrayOpen]                      28, 08
+  32  ─‣┘  _ [ArrayClose Set(M2)]           07
+  34  └‣─  (array)                          30
+  35  └‣─  (expression_statement)           34
+  36   !   (program)                        35
 ==== trace ====
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+  02       (?)                              36 : 03
+       ▶   (?)
+
+?:
+  36       (program)                        35
+       ●   program
+  35       (expression_statement)           34
+       ●   expression_statement
+  34       (array)                          30
+       ●   array
+  30  -ε-  [ArrayOpen]                      28, 08
+  28       _                                24, 26
+       ●   [
+  24  -ε-  [StructOpen]                     16, 22
+  16       _ [Null Set(M1)]                 12, 14
+       ●   [
+  12       (identifier) [Node Set(M0)]      10
+       ○   [
+  16  ❮❮❮ 
+  14       _                                12, 14
+       ●   identifier
+  12       (identifier) [Node Set(M0)]      10
+       ●   identifier
+  10  -ε-  [StructClose Push]               26, 32
+  26       _                                24, 26
+       ●   ,
+  24  -ε-  [StructOpen]                     16, 22
+  16       _ [Null Set(M1)]                 12, 14
+       ●   ,
+  12       (identifier) [Node Set(M0)]      10
+       ○   ,
+  16  ❮❮❮ 
+  14       _                                12, 14
+       ●   identifier
+  12       (identifier) [Node Set(M0)]      10
+       ●   identifier
+  10  -ε-  [StructClose Push]               26, 32
+  26       _                                24, 26
+       ●   ]
+  24  -ε-  [StructOpen]                     16, 22
+  16       _ [Null Set(M1)]                 12, 14
+       ●   ]
+  12       (identifier) [Node Set(M0)]      10
+       ○   ]
+  16  ❮❮❮ 
+  14       _                                12, 14
+  24  ❮❮❮ 
+  22       _ [Null Set(M0)]                 18, 20
+       ●   ]
+  18       (number) [Node Set(M1)]          10
+       ○   ]
+  22  ❮❮❮ 
+  20       _                                18, 20
+  26  ❮❮❮ 
+  26       _                                24, 26
+  10  ❮❮❮ 
+  32       _ [ArrayClose Set(M2)]           07
+       ●   array
+  07       _                                06
+       ●   program
+  06   ◀   (?)                              
 
 Q:
-  06       (program)                        07
-       ●   program
-  07       (expression_statement)           08
-       ●   expression_statement
-  08       (array)                          09
-       ●   array
-  09  -ε-  [ArrayOpen]                      32, 12
-  32       _                                28, 30
-       ●   [
-  28  -ε-  [StructOpen]                     20, 26
-  20       _ [Null Set(M1)]                 16, 18
-       ●   [
-  16       (identifier) [Node Set(M0)]      14
-       ○   [
-  20  ❮❮❮ 
-  18       _                                16, 18
-       ●   identifier
-  16       (identifier) [Node Set(M0)]      14
-       ●   identifier
-  14  -ε-  [StructClose Push]               30, 34
-  30       _                                28, 30
-       ●   ,
-  28  -ε-  [StructOpen]                     20, 26
-  20       _ [Null Set(M1)]                 16, 18
-       ●   ,
-  16       (identifier) [Node Set(M0)]      14
-       ○   ,
-  20  ❮❮❮ 
-  18       _                                16, 18
-       ●   identifier
-  16       (identifier) [Node Set(M0)]      14
-       ●   identifier
-  14  -ε-  [StructClose Push]               30, 34
-  30       _                                28, 30
-       ●   ]
-  28  -ε-  [StructOpen]                     20, 26
-  20       _ [Null Set(M1)]                 16, 18
-       ●   ]
-  16       (identifier) [Node Set(M0)]      14
-       ○   ]
-  20  ❮❮❮ 
-  18       _                                16, 18
-  28  ❮❮❮ 
-  26       _ [Null Set(M0)]                 22, 24
-       ●   ]
-  22       (number) [Node Set(M1)]          14
-       ○   ]
-  26  ❮❮❮ 
-  24       _                                22, 24
-  30  ❮❮❮ 
-  30       _                                28, 30
-  14  ❮❮❮ 
-  34       _ [ArrayClose Set(M2)]           36
-       ●   array
-  36       _                                11
-       ●   program
-  11   ◀   (Q)                              
-
-_StructWrap:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

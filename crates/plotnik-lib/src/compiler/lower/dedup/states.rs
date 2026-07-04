@@ -29,7 +29,6 @@
 //! identical, so keying them would fold all defs' accept states into one
 //! instruction across definition boundaries — an 8-byte saving per def that
 //! would cost each def its own accept state in dumps and layout locality.
-//! `Trampoline` is the singleton preamble head; there is nothing to merge.
 //!
 //! This pass cannot run under `verify::run_verified`: the debug fingerprint
 //! walks every path and cuts cycles by per-path visited *labels*, so merging
@@ -126,7 +125,7 @@ impl StateKey {
                 next: c.next,
                 target: c.target,
             }),
-            InstructionIR::Return(_) | InstructionIR::Trampoline(_) => None,
+            InstructionIR::Return(_) => None,
         }
     }
 }
@@ -156,10 +155,9 @@ fn plan_merges(instructions: &[InstructionIR], norm: SuccNorm) -> HashMap<Label,
     remap
 }
 
-/// Rewrite every reference in the graph through `remap`: successor lists,
-/// call continuations and targets, trampoline continuations, and the entry
-/// points themselves (a def whose entry state was merged enters through the
-/// representative).
+/// Rewrite every reference in the graph through `remap`: successor lists, call
+/// continuations and targets, and entry points themselves (a def or wrapper
+/// whose entry state was merged enters through the representative).
 fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
     let resolve = |label: Label| remap.get(&label).copied().unwrap_or(label);
 
@@ -174,9 +172,6 @@ fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
                 c.next = resolve(c.next);
                 c.target = resolve(c.target);
             }
-            InstructionIR::Trampoline(t) => {
-                t.next = resolve(t.next);
-            }
             InstructionIR::Return(_) => {}
         }
     }
@@ -184,7 +179,9 @@ fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
     for entry in nfa.def_entries.values_mut() {
         *entry = resolve(*entry);
     }
-    nfa.preamble_entry = resolve(nfa.preamble_entry);
+    for entry in nfa.entrypoint_wrappers.values_mut() {
+        *entry = resolve(*entry);
+    }
 }
 
 /// Drop repeated labels within each successor list, keeping the first

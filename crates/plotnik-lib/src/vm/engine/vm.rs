@@ -4,7 +4,7 @@ use arborium_tree_sitter::{Node, Tree};
 
 use crate::bytecode::{
     Call, Effect, EffectKind, Entrypoint, Instruction, Match, Module, Nav, NodeKindConstraint,
-    PredicateOp, StepAddr, Trampoline,
+    PredicateOp,
 };
 
 use crate::core::NodeFieldId;
@@ -72,10 +72,6 @@ pub struct VM<'t> {
     /// `u64` cannot overflow before the frame arena does.
     pub(crate) suppress_depth: u64,
 
-    /// Target address for Trampoline instruction.
-    /// Set from entrypoint before execution; Trampoline jumps to this address.
-    pub(crate) trampoline_target: u16,
-
     pub(crate) source: &'t str,
 }
 
@@ -117,7 +113,6 @@ impl<'t> VMBuilder<'t> {
             recursion_depth: 0,
             limits: self.spec.resolve(source_nodes),
             suppress_depth: 0,
-            trampoline_target: 0,
             source: self.source,
         }
     }
@@ -172,13 +167,12 @@ impl<'t> VM<'t> {
             recursion_depth,
             suppress_depth,
             // Deliberately outside `CheckpointState`:
-            ip: _,                // resumed separately by `backtrack` (cp.ip / call_resume)
-            checkpoints: _,       // the stack this checkpoint was just popped from
-            matched_node: _,      // intentionally not snapshotted (#383)
-            steps_used: _,        // monotonic step counter, never rewound on backtrack
-            limits: _,            // immutable execution config
-            trampoline_target: _, // set once before the run, never mutated
-            source: _,            // immutable input text
+            ip: _,           // resumed separately by `backtrack` (cp.ip / call_resume)
+            checkpoints: _,  // the stack this checkpoint was just popped from
+            matched_node: _, // intentionally not snapshotted (#383)
+            steps_used: _,   // monotonic step counter, never rewound on backtrack
+            limits: _,       // immutable execution config
+            source: _,       // immutable input text
         } = self;
 
         debug_assert_eq!(
@@ -249,9 +243,8 @@ impl<'t> VM<'t> {
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> Result<EffectLog<'t>, RuntimeError> {
-        self.ip = StepAddr::PREAMBLE.get();
-        self.trampoline_target = u16::from(entrypoint.target());
-        tracer.trace_enter_preamble();
+        self.ip = u16::from(entrypoint.target());
+        tracer.trace_enter_entrypoint(self.ip);
 
         loop {
             // Step ceiling: bound total work. `None` opts out (Unbounded).
@@ -288,7 +281,6 @@ impl<'t> VM<'t> {
                 Instruction::Match(m) => self.exec_match(m, module, tracer),
                 Instruction::Call(c) => self.exec_call(c, tracer),
                 Instruction::Return(_) => self.exec_return(tracer),
-                Instruction::Trampoline(t) => self.exec_trampoline(t, tracer),
             };
 
             match result {
@@ -501,23 +493,6 @@ impl<'t> VM<'t> {
         // there is no matched node. Clearing here lets a zero-width callee
         // return "nothing" instead of leaking the call-site node (#383).
         self.matched_node.clear();
-    }
-
-    /// Execute a Trampoline instruction.
-    ///
-    /// Trampoline is like Call, but the target comes from VM context (`trampoline_target`)
-    /// rather than being encoded in the instruction. Used for universal entry preamble.
-    fn exec_trampoline<T: Tracer>(&mut self, t: Trampoline, tracer: &mut T) -> Result<(), Signal> {
-        tracer.trace_call(self.trampoline_target);
-        self.frames.push(u16::from(t.next));
-        self.recursion_depth += 1;
-        debug_assert_eq!(
-            self.recursion_depth,
-            self.frames.depth(),
-            "recursion_depth desynced from frame stack after Trampoline"
-        );
-        self.ip = self.trampoline_target;
-        Ok(())
     }
 
     /// Navigate to a field and return the skip policy for retry support.

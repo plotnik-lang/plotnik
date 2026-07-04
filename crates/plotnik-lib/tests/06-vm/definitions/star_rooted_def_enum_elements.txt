@@ -86,165 +86,169 @@ N1: S07 → T4  ; Items
 N2: S08 → T5  ; Q
 
 [entrypoints]
-Entry = 06 :: T3
-Items = 08 :: T4
-Q     = 10 :: T5
+Entry = 00 :: T3
+Items = 02 :: T4
+Q     = 04 :: T5
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Entry:
-  06  -ε-                                   21, 24
+  00       (@22)                            22 : 01
+  01                                        ▶
 
 Items:
-  08  -ε-  [ArrayOpen]                      35, 28
+  02       (@34)                            34 : 03
+  03                                        ▶
 
 Q:
-  10   !   (program)                        11
-  11  └‣─  (expression_statement)           12
-  12  └‣─  (array)                          13
-  13  -ε-  [ArrayOpen]                      45, 38
-  15  ─‣┘² _                                37
-  16  -ε-  [ArrayClose]                     18
-  18  ─‣┘  _ [Set(M4)]                      15
-  20                                        ▶
-  21   !   (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  20
-  24   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose]  20
-  27                                        ▶
-  28  -ε-  [ArrayClose]                     27
-  30  -ε-  [Push]                           33, 28
-  32   !   (Entry)                          06 : 30
-  33  ─‣─  _                                32, 33
-  35   !   _                                32, 33
-  37                                        ▶
-  38  -ε-  [ArrayClose Set(M4)]             15
-  40  -ε-  [Push]                           43, 16
-  42   !   (Entry)                          06 : 40
+  04  -ε-  [StructOpen]                     06
+  06       (@52)                            52 : 08
+  07  ...
+  08  -ε-  [StructClose]                    10
+  10                                        ▶
+  11  -ε-  [ArrayClose]                     13
+  13  ─‣┘  _ [Set(M4)]                      39
+  15                                        ▶
+  16   !   (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
+  19   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
+  22  -ε-                                   16, 19
+  24                                        ▶
+  25  -ε-  [ArrayClose]                     24
+  27  -ε-  [Push]                           30, 25
+  29   !   (@22)                            22 : 27
+  30  ─‣─  _                                29, 30
+  32   !   _                                29, 30
+  34  -ε-  [ArrayOpen]                      32, 25
+  36                                        ▶
+  37  -ε-  [ArrayClose Set(M4)]             39
+  39  ─‣┘² _                                36
+  40  -ε-  [Push]                           43, 11
+  42   !   (@22)                            22 : 40
   43  ─‣─  _                                42, 43
   45  └‣─  _                                42, 43
+  47  ...
+  48  -ε-  [ArrayOpen]                      45, 37
+  50  └‣─  (array)                          48
+  51  └‣─  (expression_statement)           50
+  52   !   (program)                        51
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  10       (program)                        11
+  04  -ε-  [StructOpen]                     06
+  06       (?)                              52 : 08
+       ▶   (?)
+
+?:
+  52       (program)                        51
        ●   program
-  11       (expression_statement)           12
+  51       (expression_statement)           50
        ●   expression_statement
-  12       (array)                          13
+  50       (array)                          48
        ●   array
-  13  -ε-  [ArrayOpen]                      45, 38
+  48  -ε-  [ArrayOpen]                      45, 37
   45       _                                42, 43
        ●   [
-  42       (Entry)                          06 : 40
-       ▶   (Entry)
+  42       (?)                              22 : 40
+       ▶   (?)
 
-Entry:
-  06  -ε-                                   21, 24
-  21       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  20
+?:
+  22  -ε-                                   16, 19
+  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ○   [
-  06  ❮❮❮ 
-  24       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  20
+  22  ❮❮❮ 
+  19       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
        ○   [
   45  ❮❮❮ 
   43       _                                42, 43
        ●   identifier
-  42       (Entry)                          06 : 40
-       ▶   (Entry)
+  42       (?)                              22 : 40
+       ▶   (?)
 
-Entry:
-  06  -ε-                                   21, 24
-  21       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  20
+?:
+  22  -ε-                                   16, 19
+  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ●   identifier
-  20   ◀   (Entry)                          
+  15   ◀   (?)                              
 
-Entry:
-  40  -ε-  [Push]                           43, 16
+?:
+  40  -ε-  [Push]                           43, 11
   43       _                                42, 43
        ●   ,
-  42       (Entry)                          06 : 40
-       ▶   (Entry)
+  42       (?)                              22 : 40
+       ▶   (?)
 
-Entry:
-  06  -ε-                                   21, 24
-  21       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  20
+?:
+  22  -ε-                                   16, 19
+  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ○   ,
-  06  ❮❮❮ 
-  24       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  20
+  22  ❮❮❮ 
+  19       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
        ○   ,
   43  ❮❮❮ 
   43       _                                42, 43
        ●   number
-  42       (Entry)                          06 : 40
-       ▶   (Entry)
+  42       (?)                              22 : 40
+       ▶   (?)
 
-Entry:
-  06  -ε-                                   21, 24
-  21       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  20
+?:
+  22  -ε-                                   16, 19
+  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ○   number
-  06  ❮❮❮ 
-  24       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  20
+  22  ❮❮❮ 
+  19       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
        ●   number
-  20   ◀   (Entry)                          
+  15   ◀   (?)                              
 
-Entry:
-  40  -ε-  [Push]                           43, 16
+?:
+  40  -ε-  [Push]                           43, 11
   43       _                                42, 43
        ●   ,
-  42       (Entry)                          06 : 40
-       ▶   (Entry)
+  42       (?)                              22 : 40
+       ▶   (?)
 
-Entry:
-  06  -ε-                                   21, 24
-  21       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  20
+?:
+  22  -ε-                                   16, 19
+  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ○   ,
-  06  ❮❮❮ 
-  24       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  20
+  22  ❮❮❮ 
+  19       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
        ○   ,
   43  ❮❮❮ 
   43       _                                42, 43
        ●   identifier
-  42       (Entry)                          06 : 40
-       ▶   (Entry)
+  42       (?)                              22 : 40
+       ▶   (?)
 
-Entry:
-  06  -ε-                                   21, 24
-  21       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  20
+?:
+  22  -ε-                                   16, 19
+  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ●   identifier
-  20   ◀   (Entry)                          
+  15   ◀   (?)                              
 
-Entry:
-  40  -ε-  [Push]                           43, 16
+?:
+  40  -ε-  [Push]                           43, 11
   43       _                                42, 43
        ●   ]
-  42       (Entry)                          06 : 40
-       ▶   (Entry)
+  42       (?)                              22 : 40
+       ▶   (?)
 
-Entry:
-  06  -ε-                                   21, 24
-  21       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  20
+?:
+  22  -ε-                                   16, 19
+  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ○   ]
-  06  ❮❮❮ 
-  24       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  20
+  22  ❮❮❮ 
+  19       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
        ○   ]
   43  ❮❮❮ 
   43       _                                42, 43
   40  ❮❮❮ 
-  16  -ε-  [ArrayClose]                     18
-  18       _ [Set(M4)]                      15
+  11  -ε-  [ArrayClose]                     13
+  13       _ [Set(M4)]                      39
        ●   array
-  15       _                                37
+  39       _                                36
        ●   program
-  37   ◀   (Entry)                          
+  36   ◀   (?)                              
 
-Entry:
-  03  -ε-  [StructClose]                    05
-  05   ◀   (Entry)                          
+?:
+  08  -ε-  [StructClose]                    10
+  10   ◀   (?)                              
 
-Entry:
+?:

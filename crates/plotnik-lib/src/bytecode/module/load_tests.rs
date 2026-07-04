@@ -312,24 +312,24 @@ fn forged_nonzero_section_padding_is_rejected() {
 
 #[test]
 fn forged_unknown_opcode_is_rejected() {
-    // `9` is past the 0x0..=0x8 opcode range; the VM's `decode_step` would
+    // `8` is unassigned; the VM's `decode_step` would
     // `.expect()` on the `None` from `Opcode::from_u8` for this step.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let off = first_instr(&bytes, |_| true);
-    bytes[off] = (bytes[off] & 0xF0) | 0x09;
+    bytes[off] = (bytes[off] & 0xF0) | 0x08;
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged opcode must be rejected");
     assert!(
-        matches!(err, ModuleError::InvalidOpcode { opcode: 0x09, .. }),
+        matches!(err, ModuleError::InvalidOpcode { opcode: 0x08, .. }),
         "expected InvalidOpcode, got {err:?}"
     );
 }
 
 #[test]
 fn forged_nonzero_segment_is_rejected() {
-    // Segment bits (header bits 6-7) are reserved at zero; the call/return/
-    // trampoline decoders `assert!` on a non-zero segment.
+    // Segment bits (header bits 6-7) are reserved at zero; the call/return
+    // decoders `assert!` on a non-zero segment.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let off = first_instr(&bytes, |_| true);
     bytes[off] |= 0x40;
@@ -343,18 +343,17 @@ fn forged_nonzero_segment_is_rejected() {
 }
 
 #[test]
-fn forged_nonzero_call_return_trampoline_node_kind_is_rejected() {
+fn forged_nonzero_call_return_node_kind_is_rejected() {
     // node_class_bits (header bits 4-5) is meaningful only for Match variants; the
-    // Call/Return/Trampoline decoders ignore it, so the format pins those bits to
-    // zero. This query emits all three: a `(Leaf)` reference (Call), definition
-    // Returns, and the preamble Trampoline.
+    // Call/Return decoders ignore it, so the format pins those bits to zero.
+    // This query emits both via a `(Leaf)` reference and definition returns.
     const REF_QUERY: &str = indoc!(
         "
         Top = (binary_expression left: (Leaf) @l)
         Leaf = (identifier) @id
     "
     );
-    for opcode in [6u8, 7, 8] {
+    for opcode in [6u8, 7] {
         let mut bytes = emit_bytes(REF_QUERY);
         let off = first_instr(&bytes, |o| o == opcode);
         bytes[off] |= 0x10; // set node_class_bits bit 4
@@ -631,9 +630,9 @@ fn forged_effect_set_to_push_is_rejected() {
 #[test]
 fn forged_scalar_capture_set_to_push_is_rejected() {
     // The minimal case: a scalar struct whose only effect is a `Set` into the
-    // preamble's root struct. Forged to `Push`, the body now demands an Array
-    // top while the preamble hands it a Struct — caught when the entrypoint
-    // summary is checked against the preamble.
+    // entrypoint wrapper's root struct. Forged to `Push`, the body now demands
+    // an Array top while the wrapper hands it a Struct — caught when the entrypoint
+    // wrapper is checked as a root.
     let mut bytes = emit_bytes(r#"Q = (identifier) @id"#);
     let slot = first_effect_op(&bytes, |op| op == EffectKind::Set as u16);
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Push));
@@ -683,13 +682,13 @@ fn forged_suppress_underflow_is_rejected() {
 }
 
 #[test]
-fn forged_preamble_without_root_struct_is_rejected() {
-    // The shared preamble opens a root `StructOpen` before trampolining into the entry
-    // body, so the body always has a Struct to `Set` into. Neutralize that `StructOpen`
-    // and its matching `StructClose` (turn both into no-op `Null`s) and lie that the
-    // result type is scalar: the entry's `Set` would then hit the materializer's
-    // scalar root frame and panic. The preamble has no caller, so a requirement
-    // bubbling out of it must be rejected, not silently dropped.
+fn forged_wrapper_without_root_struct_is_rejected() {
+    // A struct entrypoint wrapper opens a root `StructOpen` before calling the
+    // body, so the body always has a Struct to `Set` into. Neutralize that
+    // `StructOpen` and its matching `StructClose` (turn both into no-op `Null`s)
+    // and lie that the result type is scalar: the entry's `Set` would then hit
+    // the materializer's scalar root frame and panic. The wrapper has no caller,
+    // so a requirement bubbling out of it must be rejected, not silently dropped.
     let mut bytes = emit_bytes(r#"Q = (_) @x"#);
     let ep_off = Module::load(&bytes)
         .expect("module loads before tampering")
@@ -705,26 +704,10 @@ fn forged_preamble_without_root_struct_is_rejected() {
     bytes[ep_off + 4..ep_off + 6].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load(&bytes).expect_err("forged rootless preamble must be rejected");
+    let err = Module::load(&bytes).expect_err("forged rootless wrapper must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
-    );
-}
-
-#[test]
-fn forged_out_of_range_trampoline_target_is_rejected() {
-    // The trampoline's `next` is a jump target too; an out-of-range value must be
-    // caught by the pass-2 instruction-start check, not decoded.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
-    let off = first_instr(&bytes, |o| o == 8); // Trampoline
-    bytes[off + 2..off + 4].copy_from_slice(&u16::MAX.to_le_bytes());
-    reseal(&mut bytes);
-
-    let err = Module::load(&bytes).expect_err("forged trampoline target must be rejected");
-    assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
     );
 }
 
@@ -756,25 +739,6 @@ fn forged_nonzero_return_pad_is_rejected() {
         reseal(&mut bytes);
 
         let err = Module::load(&bytes).expect_err("forged return pad must be rejected");
-        assert!(
-            matches!(err, ModuleError::MalformedTransitions),
-            "forged byte {byte}: expected MalformedTransitions, got {err:?}"
-        );
-    }
-}
-
-#[test]
-fn forged_nonzero_trampoline_pad_is_rejected() {
-    // A Trampoline is `header | pad | next(2) | 4 reserved padding bytes`
-    // (`Trampoline::to_bytes`); only `next` (bytes 2-3) is read, so byte 1 and
-    // bytes 4-7 must be rejected when non-zero.
-    for byte in [1usize, 4, 5, 6, 7] {
-        let mut bytes = emit_bytes(STRUCT_QUERY);
-        let off = first_instr(&bytes, |o| o == 8); // Trampoline
-        bytes[off + byte] = 1;
-        reseal(&mut bytes);
-
-        let err = Module::load(&bytes).expect_err("forged trampoline pad must be rejected");
         assert!(
             matches!(err, ModuleError::MalformedTransitions),
             "forged byte {byte}: expected MalformedTransitions, got {err:?}"

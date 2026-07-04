@@ -24,20 +24,22 @@ N0: S3 → T1  ; Foo
 N1: S4 → T2  ; Bar
 
 [entrypoints]
-Bar = 09 :: T2
-Foo = 06 :: T1
+Bar = 06 :: T2
+Foo = 00 :: T1
 
 [transitions]
-_StructWrap:
+Foo:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@13)                            13 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-Foo:
-  06   !   (identifier) [Node Set(M0)]      08
-  08                                        ▶
-
 Bar:
-  09   !   (string) [Node Set(M1)]          11
+  06  -ε-  [StructOpen]                     08
+  08       (@16)                            16 : 09
+  09  -ε-  [StructClose]                    11
   11                                        ▶
+  12                                        ▶
+  13   !   (identifier) [Node Set(M0)]      12
+  15                                        ▶
+  16   !   (string) [Node Set(M1)]          15

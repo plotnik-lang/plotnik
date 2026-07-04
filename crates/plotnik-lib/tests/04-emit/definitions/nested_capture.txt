@@ -31,33 +31,34 @@ N1: S5 → T2  ; OuterItems
 N2: S6 → T4  ; Outer
 
 [entrypoints]
-Inner = 06 :: T1
-Outer = 12 :: T4
+Inner = 00 :: T1
+Outer = 06 :: T4
 
 [transitions]
-_StructWrap:
+Inner:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@16)                            16 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-Inner:
-  06   !   (call_expression)                08
-  07  ...
-  08  └‣─  (identifier) [Node Set(M0)]      10
-  10  ─‣┘  _                                11
-  11                                        ▶
-
 Outer:
-  12   !   (array)                          13
-  13  -ε-  [ArrayOpen]                      28, 16
+  06  -ε-  [StructOpen]                     08
+  08       (@36)                            36 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  └‣─  (identifier) [Node Set(M0)]      14
+  14  ─‣┘  _                                15
   15                                        ▶
-  16  -ε-  [ArrayClose Set(M2)]             15
-  18  -ε-  [StructClose Push]               26, 30
-  20  -ε-  [StructClose Set(M1)]            18
-  22   !   (Inner)                          06 : 20
-  23  ...
-  24  -ε-  [StructOpen StructOpen]          22
-  26  ─‣─  _                                24, 26
-  28  └‣─  _                                24, 26
-  30  ─‣┘  _ [ArrayClose Set(M2)]           15
+  16   !   (call_expression)                12
+  17                                        ▶
+  18  -ε-  [ArrayClose Set(M2)]             17
+  20  -ε-  [StructClose Push]               27, 34
+  22  -ε-  [StructClose Set(M1)]            20
+  24   !   (@16)                            16 : 22
+  25  -ε-  [StructOpen StructOpen]          24
+  27  ─‣─  _                                25, 27
+  29  └‣─  _                                25, 27
+  31  ...
+  32  -ε-  [ArrayOpen]                      29, 18
+  34  ─‣┘  _ [ArrayClose Set(M2)]           17
+  36   !   (array)                          32

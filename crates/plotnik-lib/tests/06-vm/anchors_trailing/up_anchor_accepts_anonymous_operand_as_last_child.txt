@@ -21,45 +21,39 @@ T0 = <Void>
 [type_names]
 
 [entrypoints]
-Q = 06 :: T0
+Q = 00 :: T0
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
+Q:
+  00       (@11)                            11 : 01
+  01                                        ▶
+  02   !   "debugger"                       03
+  03  ─◦┘  _                                04
+  04  ─‣┘  _                                05
   05                                        ▶
-
-Q:
-  06   !   (program)                        07
-  07  └‣─  (debugger_statement)             08
-  08  └‣─  _                                10, 14
-  10   !   "debugger"                       11
-  11  ─◦┘  _                                12
-  12  ─‣┘  _                                13
-  13                                        ▶
-  14  ─‣─  _                                10, 14
+  06  ─‣─  _                                02, 06
+  08  └‣─  _                                02, 06
+  10  └‣─  (debugger_statement)             08
+  11   !   (program)                        10
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+Q:
+  00       (?)                              11 : 01
+       ▶   (?)
+
+?:
+  11       (program)                        10
+       ●   program
+  10       (debugger_statement)             08
+       ●   debugger_statement
+  08       _                                02, 06
+       ●   debugger
+  02       "debugger"                       03
+       ●   debugger
+  03       _                                04
+       ●   debugger_statement
+  04       _                                05
+       ●   program
+  05   ◀   (?)                              
 
 Q:
-  06       (program)                        07
-       ●   program
-  07       (debugger_statement)             08
-       ●   debugger_statement
-  08       _                                10, 14
-       ●   debugger
-  10       "debugger"                       11
-       ●   debugger
-  11       _                                12
-       ●   debugger_statement
-  12       _                                13
-       ●   program
-  13   ◀   (Q)                              
-
-_StructWrap:
-  03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  01   ◀   (Q)                              ◼
