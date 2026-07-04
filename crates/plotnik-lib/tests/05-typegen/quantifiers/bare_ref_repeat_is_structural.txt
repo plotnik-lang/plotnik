@@ -4,4 +4,4 @@ Q = (program (Item)+)
 export type Item =
   | { $tag: "A"; $data: { s: Node } };
 
-export type Q = undefined;
+export type Q = Node;

@@ -119,6 +119,29 @@ impl InferVisitor<'_, '_> {
         builder.emit();
     }
 
+    /// Report a captured reference whose definition has no value to capture.
+    pub(super) fn report_capture_on_void_ref(
+        &mut self,
+        inner: &Pattern,
+        inner_info: &PatternShape,
+    ) -> bool {
+        if !matches!(inner, Pattern::DefRef(_)) || !inner_info.flow.is_void() {
+            return false;
+        }
+
+        let Some((src, range)) = self.referenced_definition_range(inner) else {
+            return false;
+        };
+        let mut builder = self
+            .report(DiagnosticKind::VoidReferenceCapture, inner.text_range())
+            .detail(
+                "the referenced definition produces no value; add a capture inside it or capture a node pattern directly",
+            );
+        builder = builder.related_to(Span::new(src, range), "defined here");
+        builder.emit();
+        true
+    }
+
     /// Report a repeat whose element is a reference that can match zero nodes.
     pub(super) fn report_zero_width_repeat(&mut self, quant: &QuantifiedPattern, inner: &Pattern) {
         let op = self.quantifier_operator(quant);

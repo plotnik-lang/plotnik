@@ -514,7 +514,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // reported. Direct quantifiers are exempt: the captured-quantifier
         // machinery defines their value (array, or optional node), and the
         // exactly-one check runs on their element instead.
-        if !matches!(inner.node(), Pattern::QuantifiedPattern(_)) {
+        if !matches!(inner.node(), Pattern::QuantifiedPattern(_))
+            && !self.report_capture_on_void_ref(inner.node(), &inner_info)
+        {
             self.report_capture_on_multi_node_void(inner.node(), &inner_info);
         }
 
@@ -1036,6 +1038,52 @@ fn consumable_value_root(pattern: &Pattern) -> bool {
     }
 }
 
+fn captureless_root_default(pattern: &Pattern) -> Option<TypeId> {
+    if contains_capture(pattern) {
+        return None;
+    }
+
+    root_matches_single_node(pattern).then_some(TYPE_NODE)
+}
+
+fn contains_capture(pattern: &Pattern) -> bool {
+    if matches!(pattern, Pattern::CapturedPattern(_)) {
+        return true;
+    }
+
+    pattern.children().any(|child| contains_capture(&child))
+}
+
+fn root_matches_single_node(pattern: &Pattern) -> bool {
+    match pattern {
+        Pattern::NodePattern(_) | Pattern::TokenPattern(_) => true,
+        Pattern::FieldPattern(f) => f.value().is_some_and(|v| root_matches_single_node(&v)),
+        Pattern::Union(u) => {
+            let mut saw_branch = false;
+
+            for branch in u.branches() {
+                let Some(body) = branch.body() else {
+                    return false;
+                };
+                if !root_matches_single_node(&body) {
+                    return false;
+                }
+                saw_branch = true;
+            }
+
+            for pattern in u.patterns() {
+                if !root_matches_single_node(&pattern) {
+                    return false;
+                }
+                saw_branch = true;
+            }
+
+            saw_branch
+        }
+        _ => false,
+    }
+}
+
 pub(super) struct InferPassEnv<'a, 'd> {
     pub interner: &'a mut Interner,
     pub symbol_table: &'a SymbolTable,
@@ -1150,7 +1198,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
         };
 
         let type_id = match &info.flow {
-            PatternFlow::Void => TYPE_VOID,
+            PatternFlow::Void => captureless_root_default(&body).unwrap_or(TYPE_VOID),
             PatternFlow::Fields(t) => *t,
             // A root value is the definition's result only when the root is a
             // consuming position: a labeled alternation (its labels are output

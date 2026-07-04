@@ -2,61 +2,69 @@ Q = (program (comment)? (comment)? (comment)?)
 ==== input ====
 // c
 ==== types ====
-export type Q = undefined;
+export type Q = Node;
 ==== output ====
-null
+{
+  "kind": "program",
+  "text": "// c",
+  "span": [0, 4]
+}
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
-S1 "program"
-S2 "comment"
-S3 "Q"
+S1 "Q"
+S2 "program"
+S3 "comment"
 
 [type_defs]
-T0 = <Void>
+T0 = <Node>
 
 [type_members]
 
 [type_names]
+N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 00 :: T0
 
 [transitions]
 Q:
-  00       (@21)                            21 : 01
-  01                                        ▶
-  02                                        ▶
-  03   !   (comment)                        20
-  04  ─‣─  _                                03, 04
-  06  └‣─  _                                03, 04
-  08   !   (comment)                        04, 20
-  10  ─‣─  _                                08, 10
-  12  └‣─  _                                08, 10
-  14   !   (comment)                        10, 04, 20
-  16  ─‣─  _                                14, 16
-  18  └‣─  _                                14, 16
-  20  ─‣┘  _                                02
-  21   !   (program)                        18, 12, 06, 02
+  00       (@24)                            24 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
+  04                                        ▶
+  05   !   (comment)                        22
+  06  ─‣─  _                                05, 06
+  08  └‣─  _                                05, 06
+  10   !   (comment)                        06, 22
+  12  ─‣─  _                                10, 12
+  14  └‣─  _                                10, 12
+  16   !   (comment)                        12, 06, 22
+  18  ─‣─  _                                16, 18
+  20  └‣─  _                                16, 18
+  22  ─‣┘  _                                04
+  23  ...
+  24   !   (program)                        20, 14, 08, 04
 ==== trace ====
 Q:
-  00       (?)                              21 : 01
+  00       (?)                              24 : 01
        ▶   (?)
 
 ?:
-  21       (program)                        18, 12, 06, 02
+  24       (program)                        20, 14, 08, 04
        ●   program
-  18       _                                14, 16
+  20       _                                16, 18
        ●   comment
-  14       (comment)                        10, 04, 20
+  16       (comment)                        12, 06, 22
        ●   comment
-  10       _                                08, 10
-  14  ❮❮❮ 
-  04       _                                03, 04
-  14  ❮❮❮ 
-  20       _                                02
+  12       _                                10, 12
+  16  ❮❮❮ 
+  06       _                                05, 06
+  16  ❮❮❮ 
+  22       _                                04
        ●   program
-  02   ◀   (?)                              
+  04   ◀   (?)                              
 
 Q:
-  01   ◀   (Q)                              ◼
+  01  -ε-  [Node]                           03
+  03   ◀   (Q)                              ◼

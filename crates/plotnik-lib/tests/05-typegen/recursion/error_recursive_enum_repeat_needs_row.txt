@@ -8,4 +8,4 @@ export type Expr =
   | { $tag: "Lit"; $data: { n: Node } }
   | { $tag: "Rec" };
 
-export type Bad = undefined;
+export type Bad = Node;

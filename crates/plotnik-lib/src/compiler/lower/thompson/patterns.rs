@@ -350,9 +350,10 @@ impl NfaBuilder<'_> {
     ///
     /// - Captured ref returning struct: `Struct → Call → EndStruct → Set → exit`
     /// - Captured ref returning scalar: `Call → Set → exit`
-    /// - Bare ref to a non-void definition: `SuppressBegin → Call → SuppressEnd → exit`
+    /// - Bare ref returning output effects: `SuppressBegin → Call → SuppressEnd → exit`
     ///   (matches structurally, output discarded)
-    /// - Bare ref to a void definition: `Call → exit` (nothing to discard)
+    /// - Bare ref to a void or node-scalar definition: `Call → exit`
+    ///   (nothing to discard)
     ///
     /// `keep_value` forces the consumed lowering even with no consumer effect
     /// at this site: the callee's pending value must survive the call — it is
@@ -431,8 +432,9 @@ impl NfaBuilder<'_> {
                 )
             }
             RefLowering::PlainCall => {
-                // A void definition emits no output effects; the call needs no
-                // bracket. Enclosing-scope post effects still run after it.
+                // Void and node-scalar definitions emit no output effects in
+                // their bodies; the call needs no bracket. Enclosing-scope post
+                // effects still run after it.
                 let return_addr = if capture.post.is_empty() {
                     exit
                 } else {
@@ -460,9 +462,10 @@ impl NfaBuilder<'_> {
         }
 
         // References are opaque: a bare reference matches structurally and its
-        // output is suppressed (inference types it void). Only a void-returning
-        // definition emits no output effects and can be called unbracketed.
-        if matches!(def_output_shape, TypeShape::Void) {
+        // output is suppressed (inference types it void). Void and node-scalar
+        // definitions emit no output effects in their bodies, so there is
+        // nothing to bracket.
+        if matches!(def_output_shape, TypeShape::Void | TypeShape::Node) {
             return RefLowering::PlainCall;
         }
 

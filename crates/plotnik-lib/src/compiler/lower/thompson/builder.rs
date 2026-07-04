@@ -10,7 +10,7 @@ use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::{
-    CalleeEntry, InstructionIR, Label, NfaGraph, ReturnAddr, ReturnIR,
+    CalleeEntry, EffectIR, InstructionIR, Label, NfaGraph, ReturnAddr, ReturnIR,
 };
 use crate::compiler::parse::ast::Pattern;
 
@@ -115,13 +115,17 @@ impl<'a> NfaBuilder<'a> {
         self.instructions.push(ReturnIR::new(return_label).into());
 
         let output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
-        let wraps_struct = matches!(
-            self.ctx.analysis.type_analysis.expect_type_shape(output),
-            TypeShape::Struct(_)
-        );
+        let output_shape = self.ctx.analysis.type_analysis.expect_type_shape(output);
+        let wraps_struct = matches!(output_shape, TypeShape::Struct(_));
 
         let after_body = if wraps_struct {
             self.emit_struct_close_step(return_label)
+        } else if matches!(output_shape, TypeShape::Node) {
+            self.emit_effects_epsilon(
+                return_label,
+                vec![EffectIR::node()],
+                CaptureEffects::default(),
+            )
         } else {
             return_label
         };

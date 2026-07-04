@@ -3,34 +3,37 @@ Q = (function_declaration name: (Foo))
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
-S1 "identifier"
-S2 "function_declaration"
-S3 "name"
-S4 "Foo"
-S5 "Q"
+S1 "Q"
+S2 "identifier"
+S3 "function_declaration"
+S4 "name"
+S5 "Foo"
 
 [type_defs]
-T0 = <Void>
+T0 = <Node>
 
 [type_members]
 
 [type_names]
+N0: S1 → T0  ; Q
 
 [entrypoints]
-Foo = 0 :: T0
-Q   = 2 :: T0
+Foo = 00 :: T0
+Q   = 04 :: T0
 
 [transitions]
 Foo:
-  0       (@7)                              7 : 1
-  1                                         ▶
+  00       (@11)                            11 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
 
 Q:
-  2       (@9)                              9 : 3
-  3                                         ▶
-  4  └‣─  name: (@7)                        7 : 5
-  5  ─‣┘  _                                 8
-  6                                         ▶
-  7   !   (identifier)                      6
-  8                                         ▶
-  9   !   (function_declaration)            4
+  04       (@13)                            13 : 05
+  05  -ε-  [Node]                           07
+  07                                        ▶
+  08  └‣─  name: (@11)                      11 : 09
+  09  ─‣┘  _                                12
+  10                                        ▶
+  11   !   (identifier)                     10
+  12                                        ▶
+  13   !   (function_declaration)           08

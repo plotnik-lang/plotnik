@@ -2,28 +2,30 @@ Q = (statement_block "}" .)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
-S1 "statement_block"
-S2 "}"
-S3 "Q"
+S1 "Q"
+S2 "statement_block"
+S3 "}"
 
 [type_defs]
-T0 = <Void>
+T0 = <Node>
 
 [type_members]
 
 [type_names]
+N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 00 :: T0
 
 [transitions]
 Q:
-  00       (@10)                            10 : 01
-  01                                        ▶
-  02   !   "}"                              03
-  03  ─◦┘  _                                04
-  04                                        ▶
-  05  ─‣─  _                                02, 05
+  00       (@12)                            12 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
+  04   !   "}"                              05
+  05  ─◦┘  _                                06
+  06                                        ▶
   07  ...
-  08  └‣─  _                                02, 05
-  10   !   (statement_block)                08
+  08  ─‣─  _                                04, 08
+  10  └‣─  _                                04, 08
+  12   !   (statement_block)                10

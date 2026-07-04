@@ -9,4 +9,4 @@ export type A =
   | { $tag: "X"; $data: { x: Node } }
   | { $tag: "Y"; $data: { y: Node } };
 
-export type Q = undefined;
+export type Q = Node;

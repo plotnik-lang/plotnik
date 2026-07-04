@@ -7,7 +7,7 @@ export interface Q {
   a: Node;
 }
 
-export type A = undefined;
+export type A = Node;
 ==== output ====
 {
   "a": {
@@ -20,66 +20,67 @@ export type A = undefined;
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
-S2 "Q"
-S3 "lexical_declaration"
-S4 "program"
-S5 "A"
+S2 "A"
+S3 "Q"
+S4 "lexical_declaration"
+S5 "program"
 
 [type_defs]
-T0 = <Void>
-T1 = <Node>
-T2 = Struct  M0:1  ; { a }
+T0 = <Node>
+T1 = Struct  M0:1  ; { a }
 
 [type_members]
-M0: S1 → T1  ; a: <Node>
+M0: S1 → T0  ; a: <Node>
 
 [type_names]
-N0: S2 → T2  ; Q
+N0: S2 → T0  ; A
+N1: S3 → T1  ; Q
 
 [entrypoints]
 A = 00 :: T0
-Q = 02 :: T2
+Q = 04 :: T1
 
 [transitions]
 A:
-  00       (@12)                            12 : 01
-  01                                        ▶
+  00       (@15)                            15 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
 
 Q:
-  02  -ε-  [StructOpen]                     04
-  04       (@15)                            15 : 05
-  05  -ε-  [StructClose]                    07
+  04  -ε-  [StructOpen]                     06
+  06       (@17)                            17 : 08
   07                                        ▶
-  08  -ε-  [Node Set(M0)]                   10
-  10  ─‣┘  _                                13
-  11                                        ▶
-  12   !   (lexical_declaration)            11
-  13                                        ▶
-  14  └‣─  (@12)                            12 : 08
-  15   !   (program)                        14
+  08  -ε-  [StructClose]                    10
+  10                                        ▶
+  11  -ε-  [Node Set(M0)]                   13
+  13  ─‣┘  _                                07
+  14                                        ▶
+  15   !   (lexical_declaration)            14
+  16  └‣─  (@15)                            15 : 11
+  17   !   (program)                        16
 ==== trace ====
 Q:
-  02  -ε-  [StructOpen]                     04
-  04       (?)                              15 : 05
+  04  -ε-  [StructOpen]                     06
+  06       (?)                              17 : 08
        ▶   (?)
 
 ?:
-  15       (program)                        14
+  17       (program)                        16
        ●   program
-  14       (?)                              12 : 08
+  16       (?)                              15 : 11
        ▶   (?)
 
 ?:
-  12       (lexical_declaration)            11
+  15       (lexical_declaration)            14
        ●   lexical_declaration
-  11   ◀   (?)                              
+  14   ◀   (?)                              
 
 ?:
-  08  -ε-  [Node Set(M0)]                   10
-  10       _                                13
+  11  -ε-  [Node Set(M0)]                   13
+  13       _                                07
        ●   program
-  13   ◀   (?)                              
+  07   ◀   (?)                              
 
 Q:
-  05  -ε-  [StructClose]                    07
-  07   ◀   (Q)                              ◼
+  08  -ε-  [StructClose]                    10
+  10   ◀   (Q)                              ◼

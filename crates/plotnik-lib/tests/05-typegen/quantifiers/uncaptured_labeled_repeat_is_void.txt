@@ -15,4 +15,4 @@ warning: branch labels have no effect without capture
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
 ==== types ====
-export type Q = undefined;
+export type Q = Node;

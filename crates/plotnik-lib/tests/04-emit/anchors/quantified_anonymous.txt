@@ -2,29 +2,31 @@ Q = (array (identifier) . ","?)
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
-S1 "array"
-S2 "identifier"
-S3 ","
-S4 "Q"
+S1 "Q"
+S2 "array"
+S3 "identifier"
+S4 ","
 
 [type_defs]
-T0 = <Void>
+T0 = <Node>
 
 [type_members]
 
 [type_names]
+N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 00 :: T0
 
 [transitions]
 Q:
-  00       (@11)                            11 : 01
-  01                                        ▶
-  02                                        ▶
-  03  ─◦─  ","                              10
-  04   !   (identifier)                     03, 10
-  06  ─‣─  _                                04, 06
-  08  └‣─  _                                04, 06
-  10  ─‣┘  _                                02
-  11   !   (array)                          08
+  00       (@13)                            13 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
+  04                                        ▶
+  05  ─◦─  ","                              12
+  06   !   (identifier)                     05, 12
+  08  ─‣─  _                                06, 08
+  10  └‣─  _                                06, 08
+  12  ─‣┘  _                                04
+  13   !   (array)                          10

@@ -86,6 +86,7 @@ impl InferVisitor<'_, '_> {
                     Pattern::DefRef(_) => {
                         if let Some(shape) =
                             self.in_progress_target_shape(&inner, registration_order, captor_order)
+                            && !self.report_capture_on_void_ref(&inner, &shape)
                         {
                             self.report_capture_on_multi_node_void(&inner, &shape);
                         }
