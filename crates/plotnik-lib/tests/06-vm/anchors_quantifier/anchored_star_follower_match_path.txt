@@ -84,8 +84,8 @@ Q:
   10  ─‣┘  _                                11
   11  ─‣┘  _                                12
   12                                        ▶
-  13  └•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
-  16  ─•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
+  13  └•─  (expression_statement) [ArrayClose Set(M1) Node Set(M2)]  08
+  16  ─•─  (expression_statement) [ArrayClose Set(M1) Node Set(M2)]  08
   19  └•─  (debugger_statement) [Node Push]  21, 16
   21  ─•─  (debugger_statement) [Node Push]  21, 16
   23  ...
@@ -116,7 +116,7 @@ Q:
   21       (debugger_statement) [Node Push]  21, 16
        ○   expression_statement
   21  ❮❮❮ 
-  16       [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
+  16       (expression_statement) [ArrayClose Set(M1) Node Set(M2)]  08
        ●   expression_statement
   08       (identifier) == "foo"            10
        ●   identifier

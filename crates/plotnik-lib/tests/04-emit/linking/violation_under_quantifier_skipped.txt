@@ -42,4 +42,4 @@ Q:
   18   !   (function_declaration) [Node]    10
   20  ─‣─  _                                18, 20
   22  └‣─  _                                18, 20
-  24  ─‣┘  [ArrayClose Set(M0)] _           12
+  24  ─‣┘  _ [ArrayClose Set(M0)]           12

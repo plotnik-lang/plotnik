@@ -62,11 +62,11 @@ Q:
   11   !   (variable_declarator) [Node Push]  13, 18
   13  ─‣─  _                                11, 13
   15  ─‣┘  _                                10
-  16  └‣─  [ArrayOpen] _                    11, 13
-  18  ─‣┘  [ArrayClose Set(M0)] _           15
-  20   !   [Null Set(M1)] (lexical_declaration)  16
+  16  └‣─  _ [ArrayOpen]                    11, 13
+  18  ─‣┘  _ [ArrayClose Set(M0)]           15
+  20   !   (lexical_declaration) [Null Set(M1)]  16
   22  ─‣─  _                                20, 24, 22
-  24   !   [ArrayOpen ArrayClose Set(M0)] (expression_statement) [Node Set(M1)]  15
+  24   !   (expression_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  15
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -78,10 +78,10 @@ Q:
        ●   program
   08       _                                20, 24, 22
        ●   expression_statement
-  20       [Null Set(M1)] (lexical_declaration)  16
+  20       (lexical_declaration) [Null Set(M1)]  16
        ○   expression_statement
   08  ❮❮❮ 
-  24       [ArrayOpen ArrayClose Set(M0)] (expression_statement) [Node Set(M1)]  15
+  24       (expression_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  15
        ●   expression_statement
   15       _                                10
        ●   program

@@ -182,7 +182,7 @@ fn collapse_up_exact_same_mode() {
 
 #[test]
 fn collapse_up_with_effects_no_merge() {
-    // Up(1) with post_effects → Up(1) should NOT merge
+    // Up(1) with effects → Up(1) should NOT merge
     use crate::bytecode::EffectKind;
     use crate::compiler::lower::ir::EffectIR;
 
@@ -194,7 +194,7 @@ fn collapse_up_with_effects_no_merge() {
                 .into(),
             MatchIR::terminal(Label(1))
                 .nav(Nav::Up(1))
-                .post_effects(vec![EffectIR::literal(EffectKind::Null, 0)])
+                .append_effects(vec![EffectIR::literal(EffectKind::Null, 0)])
                 .next(Label(2))
                 .into(),
             MatchIR::terminal(Label(2)).into(),

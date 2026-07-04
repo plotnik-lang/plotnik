@@ -69,8 +69,8 @@ Q:
   06   !   (program)                        08
   07  ...
   08  └‣─  _                                10, 16
-  10   !   [EnumOpen(M1)] (expression_statement) [Node Set(M0) EnumClose]  13
-  13  ─‣┘  [Set(M2)] _                      15
+  10   !   (expression_statement) [EnumOpen(M1) Node Set(M0) EnumClose]  13
+  13  ─‣┘  _ [Set(M2)]                      15
   15                                        ▶
   16  ─‣─  _                                10, 16
 ==== trace ====
@@ -84,9 +84,9 @@ Q:
        ●   program
   08       _                                10, 16
        ●   expression_statement
-  10       [EnumOpen(M1)] (expression_statement) [Node Set(M0) EnumClose]  13
+  10       (expression_statement) [EnumOpen(M1) Node Set(M0) EnumClose]  13
        ●   expression_statement
-  13       [Set(M2)] _                      15
+  13       _ [Set(M2)]                      15
        ●   program
   15   ◀   (Q)                              
 

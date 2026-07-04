@@ -66,7 +66,7 @@ Q:
   12  └‣─  name: (Name)                     06 : 13
   13  -ε-  [StructClose]                    16
   15  ...
-  16  ─‣┘² [Set(M1)] _                      18
+  16  ─‣┘² _ [Set(M1)]                      18
   18                                        ▶
 ==== trace ====
 _StructWrap:
@@ -89,7 +89,7 @@ Name:
 
 Q:
   13  -ε-  [StructClose]                    16
-  16       [Set(M1)] _                      18
+  16       _ [Set(M1)]                      18
        ●   program
   18   ◀   (Q)                              
 

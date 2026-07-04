@@ -32,9 +32,8 @@ pub use module::{Module, ModuleError};
 pub use type_system::{Arity, PrimitiveType, TypeKind};
 
 pub(crate) use constants::{
-    HEADER_SIZE, MAGIC, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS,
-    MAX_PRE_EFFECTS, REGEX_TABLE_ENTRY_SIZE,
-    SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE, VERSION,
+    HEADER_SIZE, MAGIC, MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS,
+    REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE, VERSION,
 };
 pub(crate) use dfa::deserialize_dfa;
 pub(crate) use effects::{Effect, EffectKind};

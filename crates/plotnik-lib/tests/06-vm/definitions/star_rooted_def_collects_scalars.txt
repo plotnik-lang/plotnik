@@ -72,7 +72,7 @@ Q:
   11  -ε-  [ArrayOpen]                      36, 29
   13  -ε-  [ArrayClose]                     16
   15  ...
-  16  ─‣┘  [Set(M0)] _                      23
+  16  ─‣┘  _ [Set(M0)]                      23
   18                                        ▶
   19  -ε-  [ArrayClose]                     18
   21   !   (identifier) [Node Push]         24, 19
@@ -134,7 +134,7 @@ Q:
   34       _                                32, 34
   32  ❮❮❮ 
   13  -ε-  [ArrayClose]                     16
-  16       [Set(M0)] _                      23
+  16       _ [Set(M0)]                      23
        ●   array
   23       _                                28
        ●   program

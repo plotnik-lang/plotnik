@@ -718,31 +718,28 @@ impl Module {
         let storage: &[u8] = &self.storage;
 
         let counts = read_transition_u16(storage, instr_off + 6)?;
-        // Bit 0 of the counts word is reserved (docs/binary-format/06-transitions.md);
-        // the decoder never reads it, so a forged set bit would load unnoticed.
-        if MatchCounts::reserved_bit_set(counts) {
+        // Bits 2-0 of the counts word are reserved; the decoder never reads
+        // them, so a forged set bit would load unnoticed.
+        if MatchCounts::reserved_bits_set(counts) {
             return Err(ModuleError::MalformedTransitions);
         }
         let c = MatchCounts::unpack(counts);
-        let (pre, neg, post, succ) = (
-            c.pre as usize,
-            c.neg as usize,
-            c.post as usize,
-            c.succ as usize,
-        );
+        let effects = c.effects as usize;
+        let neg = c.neg as usize;
+        let succ = c.succ as usize;
         let has_predicate = c.has_predicate;
 
         // Every payload slot the decoders read — effects, predicate, successors —
         // must lie within this instruction's fixed-size slot, or the iterators
         // read into the next instruction (or past the buffer at the stream end).
-        let used = pre + neg + post + if has_predicate { PREDICATE_SLOTS } else { 0 } + succ;
+        let used = effects + neg + if has_predicate { PREDICATE_SLOTS } else { 0 } + succ;
         if used > opcode.payload_slots() {
             return Err(ModuleError::MalformedTransitions);
         }
 
-        // Pre/post effect opcodes are decoded (neg fields are plain `u16`); a
-        // `Set`/`Enum` operand indexes the type-member table via the
-        // materializer's `get_member`, which asserts the index is in bounds.
+        // Effect opcodes are decoded (neg fields are plain `u16`); a `Set`/`Enum`
+        // operand indexes the type-member table via the materializer's `get_member`,
+        // which asserts the index is in bounds.
         let members = self.header.type_members_count;
         let check_effect = |slot: usize| -> Result<(), ModuleError> {
             let off = instr_off + MATCH_PAYLOAD_START + slot * PAYLOAD_SLOT_SIZE;
@@ -758,18 +755,15 @@ impl Module {
             }
             Ok(())
         };
-        for i in 0..pre {
+        for i in 0..effects {
             check_effect(i)?;
-        }
-        for i in 0..post {
-            check_effect(pre + neg + i)?;
         }
 
         // Neg-field slots hold raw `NodeFieldId`s (`NonZeroU16`); the decoder's
         // `neg_fields()` rebuilds them via `try_from(..).expect(..)`
         // (`instructions.rs`), so a forged zero must not load.
         for i in 0..neg {
-            let off = instr_off + MATCH_PAYLOAD_START + (pre + i) * PAYLOAD_SLOT_SIZE;
+            let off = instr_off + MATCH_PAYLOAD_START + (effects + i) * PAYLOAD_SLOT_SIZE;
             let b = storage
                 .get(off..off + PAYLOAD_SLOT_SIZE)
                 .ok_or(ModuleError::MalformedTransitions)?;
@@ -779,7 +773,7 @@ impl Module {
         }
 
         if has_predicate {
-            let pred_off = instr_off + MATCH_PAYLOAD_START + (pre + neg + post) * PAYLOAD_SLOT_SIZE;
+            let pred_off = instr_off + MATCH_PAYLOAD_START + (effects + neg) * PAYLOAD_SLOT_SIZE;
             let b = storage
                 .get(pred_off..pred_off + PREDICATE_SIZE)
                 .ok_or(ModuleError::MalformedTransitions)?;
@@ -818,7 +812,7 @@ impl Module {
 
         let succ_off = instr_off
             + MATCH_PAYLOAD_START
-            + (pre + neg + post) * PAYLOAD_SLOT_SIZE
+            + (effects + neg) * PAYLOAD_SLOT_SIZE
             + if has_predicate { PREDICATE_SIZE } else { 0 };
         for i in 0..succ {
             let next = read_transition_u16(storage, succ_off + i * PAYLOAD_SLOT_SIZE)?;

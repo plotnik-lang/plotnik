@@ -50,6 +50,6 @@ Q:
   07  ...
   08  └‣─  key: _                           11, 14
   10                                        ▶
-  11   !   [EnumOpen(M1)] (identifier) [Node Set(M0) EnumClose]  16
-  14   !   [EnumOpen(M2)] (number) [EnumClose]  16
-  16  ─‣┘  [Set(M3)] _                      10
+  11   !   (identifier) [EnumOpen(M1) Node Set(M0) EnumClose]  16
+  14   !   (number) [EnumOpen(M2) EnumClose]  16
+  16  ─‣┘  _ [Set(M3)]                      10

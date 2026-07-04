@@ -71,11 +71,10 @@ fn find_predicate_off(bytes: &[u8]) -> usize {
         };
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[instr + 6], bytes[instr + 7]]);
-            if (counts >> 1) & 1 != 0 {
-                let pre = ((counts >> 13) & 0x7) as usize;
-                let neg = ((counts >> 10) & 0x7) as usize;
-                let post = ((counts >> 7) & 0x7) as usize;
-                return instr + 8 + (pre + neg + post) * 2;
+            if (counts >> 3) & 1 != 0 {
+                let effects = ((counts >> 12) & 0xF) as usize;
+                let neg = ((counts >> 9) & 0x7) as usize;
+                return instr + 8 + (effects + neg) * 2;
             }
         }
         step += (size / 8) as u16;
@@ -182,8 +181,8 @@ fn first_instr(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
     panic!("no matching instruction in transitions");
 }
 
-/// Byte offsets of every pre/post effect slot in the stream (the negated-field
-/// slots are skipped: those are plain field ids, not decoded effects).
+/// Byte offsets of every effect slot in the stream. Negated-field slots are
+/// skipped: those are plain field ids, not decoded effects.
 fn effect_slots(bytes: &[u8]) -> Vec<usize> {
     let (base, steps) = transitions(bytes);
     let mut slots = Vec::new();
@@ -193,11 +192,8 @@ fn effect_slots(bytes: &[u8]) -> Vec<usize> {
         let opcode = bytes[off] & 0x0F;
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]);
-            let pre = ((counts >> 13) & 0x7) as usize;
-            let neg = ((counts >> 10) & 0x7) as usize;
-            let post = ((counts >> 7) & 0x7) as usize;
-            slots.extend((0..pre).map(|i| off + 8 + i * 2));
-            slots.extend((0..post).map(|i| off + 8 + (pre + neg + i) * 2));
+            let effects = ((counts >> 12) & 0xF) as usize;
+            slots.extend((0..effects).map(|i| off + 8 + i * 2));
         }
         step += (instr_size(opcode) / 8) as u16;
     }
@@ -228,13 +224,12 @@ fn first_ext_successor(bytes: &[u8]) -> usize {
         let opcode = bytes[off] & 0x0F;
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]);
-            let pre = ((counts >> 13) & 0x7) as usize;
-            let neg = ((counts >> 10) & 0x7) as usize;
-            let post = ((counts >> 7) & 0x7) as usize;
-            let succ = ((counts >> 2) & 0x1F) as usize;
-            let has_pred = (counts >> 1) & 1 != 0;
+            let effects = ((counts >> 12) & 0xF) as usize;
+            let neg = ((counts >> 9) & 0x7) as usize;
+            let succ = ((counts >> 4) & 0x1F) as usize;
+            let has_pred = (counts >> 3) & 1 != 0;
             if succ > 0 {
-                return off + 8 + (pre + neg + post) * 2 + if has_pred { 4 } else { 0 };
+                return off + 8 + (effects + neg) * 2 + if has_pred { 4 } else { 0 };
             }
         }
         step += (instr_size(opcode) / 8) as u16;
@@ -242,7 +237,7 @@ fn first_ext_successor(bytes: &[u8]) -> usize {
     panic!("no extended-match successor in transitions");
 }
 
-/// Byte offset of the first pre/post effect slot whose opcode satisfies `want`.
+/// Byte offset of the first effect slot whose opcode satisfies `want`.
 fn first_effect_op(bytes: &[u8], want: impl Fn(u16) -> bool) -> usize {
     effect_slots(bytes)
         .into_iter()
@@ -1158,10 +1153,10 @@ fn first_neg_slot(bytes: &[u8]) -> usize {
         let opcode = bytes[off] & 0x0F;
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]);
-            let pre = ((counts >> 13) & 0x7) as usize;
-            let neg = ((counts >> 10) & 0x7) as usize;
+            let effects = ((counts >> 12) & 0xF) as usize;
+            let neg = ((counts >> 9) & 0x7) as usize;
             if neg > 0 {
-                return off + 8 + pre * 2;
+                return off + 8 + effects * 2;
             }
         }
         step += (instr_size(opcode) / 8) as u16;

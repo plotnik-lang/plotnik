@@ -58,8 +58,8 @@ Q:
   06   !   (program)                        08
   07  ...
   08  └‣─  (expression_statement)           20, 16
-  10   !   [StructOpen] (identifier) [Node Set(M0)]  12
-  12  ─‣┘  [StructClose Set(M1)] _          15
+  10   !   (identifier) [StructOpen Node Set(M0)]  12
+  12  ─‣┘  _ [StructClose Set(M1)]          15
   14                                        ▶
   15  ─‣┘  _                                14
   16  -ε-  [Null Set(M1)]                   15
@@ -78,9 +78,9 @@ Q:
        ●   expression_statement
   20       _                                10, 18
        ●   identifier
-  10       [StructOpen] (identifier) [Node Set(M0)]  12
+  10       (identifier) [StructOpen Node Set(M0)]  12
        ●   identifier
-  12       [StructClose Set(M1)] _          15
+  12       _ [StructClose Set(M1)]          15
        ●   expression_statement
   15       _                                14
        ●   program

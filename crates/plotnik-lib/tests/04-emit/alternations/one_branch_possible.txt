@@ -36,7 +36,7 @@ Q:
   08  └‣─  (program)                        09
   09  ─‣┘  _                                10
   10                                        ▶
-  11   !   [Null Set(M1)] (function_declaration) [Node Set(M0)]  08
+  11   !   (function_declaration) [Null Set(M1) Node Set(M0)]  08
   14  ...
   15  ...
-  16   !   [Null Set(M0)] (identifier) [Node Set(M1)]  10
+  16   !   (identifier) [Null Set(M0) Node Set(M1)]  10

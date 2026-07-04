@@ -61,14 +61,14 @@ _StructWrap:
 Q:
   06   !   (program)                        29, 09
   08                                        ▶
-  09  └‣─  [ArrayOpen ArrayClose Set(M0) Null Set(M1)] (debugger_statement) [Node Set(M2)]  31
+  09  └‣─  (debugger_statement) [ArrayOpen ArrayClose Set(M0) Null Set(M1) Node Set(M2)]  31
   12  ─‣─  (debugger_statement) [Node Set(M2)]  31
   14  -ε-  [ArrayClose Set(M0)]             12
   16   !   (identifier) [Node Push]         18, 14
   18  ─‣─  _                                16, 18
-  20   !   [ArrayOpen] _                    16, 18
+  20   !   _ [ArrayOpen]                    16, 18
   22  -ε-  [Null Set(M1)]                   20
-  24   !   [ArrayOpen ArrayClose Set(M0)] (empty_statement) [Node Set(M1)]  12
+  24   !   (empty_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  12
   27  ─‣─  _                                22, 24, 27
   29  └‣─  _                                22, 24, 27
   31  ─‣┘  _                                08
@@ -84,19 +84,19 @@ Q:
   29       _                                22, 24, 27
        ●   debugger_statement
   22  -ε-  [Null Set(M1)]                   20
-  20       [ArrayOpen] _                    16, 18
+  20       _ [ArrayOpen]                    16, 18
        ●   debugger_statement
   16       (identifier) [Node Push]         18, 14
        ○   debugger_statement
   20  ❮❮❮ 
   18       _                                16, 18
   29  ❮❮❮ 
-  24       [ArrayOpen ArrayClose Set(M0)] (empty_statement) [Node Set(M1)]  12
+  24       (empty_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  12
        ○   debugger_statement
   29  ❮❮❮ 
   27       _                                22, 24, 27
   06  ❮❮❮ 
-  09       [ArrayOpen ArrayClose Set(M0) Null Set(M1)] (debugger_statement) [Node Set(M2)]  31
+  09       (debugger_statement) [ArrayOpen ArrayClose Set(M0) Null Set(M1) Node Set(M2)]  31
        ●   debugger_statement
   31       _                                08
        ●   program

@@ -105,7 +105,7 @@ Q:
   19  └‣─  (object)                         20
   20  -ε-  [ArrayOpen]                      56, 43
   22  -ε-  [ArrayClose]                     24
-  24  ─‣┘  [Set(M2)] _                      31
+  24  ─‣┘  _ [Set(M2)]                      31
   26                                        ▶
   27  -ε-  [ArrayClose]                     26
   29  -ε-  [Push]                           37, 27
@@ -218,7 +218,7 @@ Row:
   53       _                                51, 53
   45  ❮❮❮ 
   22  -ε-  [ArrayClose]                     24
-  24       [Set(M2)] _                      31
+  24       _ [Set(M2)]                      31
        ●   object
   31       _                                42
        ●   program

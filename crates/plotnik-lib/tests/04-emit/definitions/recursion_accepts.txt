@@ -45,11 +45,11 @@ Q:
   08   !   (array) [StructOpen]             10
   10  └‣─  (Nested)                         06 : 11
   11  -ε-  [StructClose]                    13
-  13  ─‣┘  [Set(M2)] _                      15
+  13  ─‣┘  _ [Set(M2)]                      15
   15                                        ▶
   16  -ε-  [StructClose]                    18
-  18  ─‣┘  [Set(M1)] _                      20
+  18  ─‣┘  _ [Set(M1)]                      20
   20                                        ▶
-  21   !   [Null Set(M1)] (identifier) [Node Set(M0)]  20
+  21   !   (identifier) [Null Set(M1) Node Set(M0)]  20
   24  └‣─  (Nested)                         06 : 16
-  25   !   [Null Set(M0)] (array) [StructOpen]  24
+  25   !   (array) [Null Set(M0) StructOpen]  24

@@ -260,12 +260,10 @@ pub struct MatchIR {
     pub node_kind: NodeKindConstraint,
     /// Field constraint (None = wildcard).
     pub node_field: Option<NodeFieldId>,
-    /// Effects to execute before match attempt.
-    pub pre_effects: Vec<EffectIR>,
+    /// Effects to execute after a successful match, in bytecode order.
+    pub effects: Vec<EffectIR>,
     /// Fields that must NOT be present on the node.
     pub neg_fields: Vec<NodeFieldId>,
-    /// Effects to execute after successful match.
-    pub post_effects: Vec<EffectIR>,
     /// Predicate for node text filtering (None = no text check).
     pub predicate: Option<PredicateIR>,
     /// Successor labels (empty = accept, 1 = linear, 2+ = branch).
@@ -280,9 +278,8 @@ impl MatchIR {
             nav: Nav::Epsilon,
             node_kind: NodeKindConstraint::Any,
             node_field: None,
-            pre_effects: vec![],
+            effects: vec![],
             neg_fields: vec![],
-            post_effects: vec![],
             predicate: None,
             successors: vec![],
         }
@@ -308,13 +305,13 @@ impl MatchIR {
         self
     }
 
-    pub fn pre_effect(mut self, e: EffectIR) -> Self {
-        self.pre_effects.push(e);
+    pub fn prepend_effect(mut self, e: EffectIR) -> Self {
+        self.effects.insert(0, e);
         self
     }
 
-    pub fn post_effect(mut self, e: EffectIR) -> Self {
-        self.post_effects.push(e);
+    pub fn append_effect(mut self, e: EffectIR) -> Self {
+        self.effects.push(e);
         self
     }
 
@@ -323,13 +320,15 @@ impl MatchIR {
         self
     }
 
-    pub fn pre_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
-        self.pre_effects.extend(effects);
+    pub fn prepend_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
+        let mut ordered = effects.into_iter().collect::<Vec<_>>();
+        ordered.append(&mut self.effects);
+        self.effects = ordered;
         self
     }
 
-    pub fn post_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
-        self.post_effects.extend(effects);
+    pub fn append_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
+        self.effects.extend(effects);
         self
     }
 
@@ -350,9 +349,8 @@ impl MatchIR {
 
     pub fn size(&self) -> usize {
         // Match8 can be used if: no effects, no neg_fields, no predicate, and at most 1 successor
-        let can_use_match8 = self.pre_effects.is_empty()
+        let can_use_match8 = self.effects.is_empty()
             && self.neg_fields.is_empty()
-            && self.post_effects.is_empty()
             && self.predicate.is_none()
             && self.successors.len() <= 1;
 
@@ -362,11 +360,8 @@ impl MatchIR {
 
         // Predicate occupies 2 slots: op_byte(u8) + is_regex(u8)|value_ref(u16).
         let predicate_slots = if self.predicate.is_some() { 2 } else { 0 };
-        let slots = self.pre_effects.len()
-            + self.neg_fields.len()
-            + self.post_effects.len()
-            + predicate_slots
-            + self.successors.len();
+        let slots =
+            self.effects.len() + self.neg_fields.len() + predicate_slots + self.successors.len();
 
         select_match_opcode(slots)
             .expect("instruction fits a match opcode")

@@ -59,7 +59,7 @@ Q:
   20                                        ▶
   21   !   (expression_statement)           15
   22  ─‣─  _                                21, 22
-  24   !   [Null Set(M0)] _                 21, 22
+  24   !   _ [Null Set(M0)]                 21, 22
   26   !   (debugger_statement) [Node Set(M0)]  15
   28  -ε-  [Null Set(M0)]                   20
   30  ─‣─  _                                24, 26, 30

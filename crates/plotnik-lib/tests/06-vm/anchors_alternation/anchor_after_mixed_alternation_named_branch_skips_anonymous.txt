@@ -73,7 +73,7 @@ Q:
   12  ─◦─  (identifier) [Node Set(M1)]      22
   14  ─•─  (identifier) [Node Set(M1)]      22
   16   !   (identifier) [Node Set(M0)]      14
-  18   !   [Null Set(M0)] ";"               12
+  18   !   ";" [Null Set(M0)]               12
   20  ─‣─  _                                16, 18, 20
   22  ─‣┘³ _                                11
 ==== trace ====

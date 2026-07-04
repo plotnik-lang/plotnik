@@ -62,9 +62,9 @@ Q:
   11  -ε-  [ArrayClose Set(M5)]             10
   13  -ε-  [StructClose Push]               24, 28
   15  ...
-  16   !   [EnumOpen(M2)] (pair) [Node Set(M0) EnumClose Set(M4)]  13
-  19   !   [EnumOpen(M3)] (shorthand_property_identifier) [Node Set(M1) EnumClose Set(M4)]  13
+  16   !   (pair) [EnumOpen(M2) Node Set(M0) EnumClose Set(M4)]  13
+  19   !   (shorthand_property_identifier) [EnumOpen(M3) Node Set(M1) EnumClose Set(M4)]  13
   22  -ε-  [StructOpen]                     16, 19
   24  ─‣─  _                                22, 24
   26  └‣─  _                                22, 24
-  28  ─‣┘  [ArrayClose Set(M5)] _           10
+  28  ─‣┘  _ [ArrayClose Set(M5)]           10

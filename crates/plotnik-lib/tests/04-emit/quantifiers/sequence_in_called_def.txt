@@ -58,7 +58,7 @@ Test:
   16  -ε-  [StructClose Push]               24, 14
   18  -ε-  [StructClose Set(M1)]            16
   20   !   (Item)                           06 : 18
-  21  -ε-  [StructOpen] [StructOpen]        20
+  21  -ε-  [StructOpen StructOpen]          20
   23  ─‣┘  _                                28
   24  ─‣─  _                                21, 24
   26   !   _                                21, 24

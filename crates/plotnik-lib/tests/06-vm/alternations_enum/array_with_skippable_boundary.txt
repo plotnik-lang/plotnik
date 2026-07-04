@@ -94,11 +94,11 @@ Q:
   13  -ε-  [StructClose Push]               21, 26
   15   !   (comment)                        13
   16  ─‣─  _                                15, 16
-  18   !   [StructOpen] (expression_statement) [Node Set(M0)]  16, 13
+  18   !   (expression_statement) [StructOpen Node Set(M0)]  16, 13
   21  ─‣─  _                                18, 21
   23  ...
   24  └‣─  _                                18, 21
-  26  ─‣┘  [ArrayClose Set(M1)] _           10
+  26  ─‣┘  _ [ArrayClose Set(M1)]           10
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -111,7 +111,7 @@ Q:
   08  -ε-  [ArrayOpen]                      24, 11
   24       _                                18, 21
        ●   expression_statement
-  18       [StructOpen] (expression_statement) [Node Set(M0)]  16, 13
+  18       (expression_statement) [StructOpen Node Set(M0)]  16, 13
        ●   expression_statement
   16       _                                15, 16
        ●   expression_statement
@@ -123,14 +123,14 @@ Q:
   13  -ε-  [StructClose Push]               21, 26
   21       _                                18, 21
        ●   expression_statement
-  18       [StructOpen] (expression_statement) [Node Set(M0)]  16, 13
+  18       (expression_statement) [StructOpen Node Set(M0)]  16, 13
        ●   expression_statement
   16       _                                15, 16
   18  ❮❮❮ 
   13  -ε-  [StructClose Push]               21, 26
   21       _                                18, 21
   13  ❮❮❮ 
-  26       [ArrayClose Set(M1)] _           10
+  26       _ [ArrayClose Set(M1)]           10
        ●   program
   10   ◀   (Q)                              
 

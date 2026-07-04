@@ -29,9 +29,9 @@ use super::scope::Struct;
 /// - `post` contains `EndEnum` for branch exit
 #[derive(Clone, Default)]
 pub struct CaptureEffects {
-    /// Effects to place as pre_effects on the entry instruction.
+    /// Effects to place before the compiled subgraph's own effects.
     pub pre: Vec<EffectIR>,
-    /// Effects to place as post_effects on the exit instruction.
+    /// Effects to place after the compiled subgraph's own effects.
     pub post: Vec<EffectIR>,
 }
 

@@ -40,7 +40,7 @@ _StructWrap:
 Q:
   06   !   (program)                        07
   07  └‣─  (expression_statement)           08
-  08  └‣─  (identifier) == "foo" [Node Set(M0)]  11
+  08  └‣─  (identifier) [Node Set(M0)] == "foo"  11
   11  ─‣┘² _                                12
   12                                        ▶
 ==== trace ====
@@ -54,5 +54,5 @@ Q:
        ●   program
   07       (expression_statement)           08
        ●   expression_statement
-  08       (identifier) == "foo" [Node Set(M0)]  11
+  08       (identifier) [Node Set(M0)] == "foo"  11
        ○   ;

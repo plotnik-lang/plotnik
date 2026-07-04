@@ -51,8 +51,8 @@ _StructWrap:
 
 Q:
   06   !   (program)                        18, 14
-  08   !   [EnumOpen(M1)] (identifier) [Node Set(M0) EnumClose Node]  11
-  11  ─‣┘  [Set(M2)] _                      13
+  08   !   (identifier) [EnumOpen(M1) Node Set(M0) EnumClose Node]  11
+  11  ─‣┘  _ [Set(M2)]                      13
   13                                        ▶
   14  -ε-  [Null Set(M2)]                   13
   16  ─‣─  _                                08, 16
@@ -68,7 +68,7 @@ Q:
        ●   program
   18       _                                08, 16
        ●   lexical_declaration
-  08       [EnumOpen(M1)] (identifier) [Node Set(M0) EnumClose Node]  11
+  08       (identifier) [EnumOpen(M1) Node Set(M0) EnumClose Node]  11
        ○   lexical_declaration
   18  ❮❮❮ 
   16       _                                08, 16

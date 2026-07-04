@@ -28,7 +28,7 @@ _StructWrap:
   05                                        ▶
 
 Q:
-  06   !   [ArrayOpen] _                    11, 13
+  06   !   _ [ArrayOpen]                    11, 13
   08                                        ▶
   09  -ε-  [ArrayClose Set(M0)]             08
   11   !   (identifier) [Node Push]         13, 09

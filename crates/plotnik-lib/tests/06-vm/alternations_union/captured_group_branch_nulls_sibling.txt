@@ -94,11 +94,11 @@ _StructWrap:
 Q:
   06   !   (program)                        08
   07  ...
-  08  └‣─  [StructOpen] _                   11, 16, 19
+  08  └‣─  _ [StructOpen]                   11, 16, 19
   10                                        ▶
-  11   !   [Null Set(M2) StructOpen] (expression_statement) [Node Set(M0) StructClose Set(M1)]  14
-  14  ─‣┘  [StructClose Set(M3)] _          10
-  16   !   [Null Set(M1)] (comment) [Node Set(M2)]  14
+  11   !   (expression_statement) [Null Set(M2) StructOpen Node Set(M0) StructClose Set(M1)]  14
+  14  ─‣┘  _ [StructClose Set(M3)]          10
+  16   !   (comment) [Null Set(M1) Node Set(M2)]  14
   19  ─‣─  _                                11, 16, 19
 ==== trace ====
 _StructWrap:
@@ -109,11 +109,11 @@ _StructWrap:
 Q:
   06       (program)                        08
        ●   program
-  08       [StructOpen] _                   11, 16, 19
+  08       _ [StructOpen]                   11, 16, 19
        ●   expression_statement
-  11       [Null Set(M2) StructOpen] (expression_statement) [Node Set(M0) StructClose Set(M1)]  14
+  11       (expression_statement) [Null Set(M2) StructOpen Node Set(M0) StructClose Set(M1)]  14
        ●   expression_statement
-  14       [StructClose Set(M3)] _          10
+  14       _ [StructClose Set(M3)]          10
        ●   program
   10   ◀   (Q)                              
 

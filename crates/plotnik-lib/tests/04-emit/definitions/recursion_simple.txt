@@ -49,9 +49,9 @@ _StructWrap:
 Expr:
   06  -ε-                                   12, 18
   08  ─‣─  arguments: (Expr)                06 : 09
-  09  ─‣┘  [Set(M2)] _ [EnumClose]          11
+  09  ─‣┘  _ [Set(M2) EnumClose]            11
   11                                        ▶
-  12   !   [EnumOpen(M3)] (number) [Node Set(M0) EnumClose]  11
+  12   !   (number) [EnumOpen(M3) Node Set(M0) EnumClose]  11
   15  ...
   16  └‣─  function: (identifier) [Node Set(M1)]  08
-  18   !   [EnumOpen(M4)] (call_expression)  16
+  18   !   (call_expression) [EnumOpen(M4)]  16

@@ -11,7 +11,7 @@
 //!
 //! Constraints:
 //! - Same mode only (Up, UpSkipTrivia, UpSkipExtras, UpExact can't mix)
-//! - Effectless only (no pre_effects, post_effects, neg_fields)
+//! - Effectless only (no effects or neg_fields)
 //! - Capped at `Nav::MAX_UP_LEVEL` per instruction (the 5-bit level field)
 //! - Single successor (can't merge branching instructions)
 
@@ -127,8 +127,7 @@ pub fn collapse_up(result: &mut NfaGraph) {
 fn is_effectless(m: &MatchIR) -> bool {
     m.node_kind == NodeKindConstraint::Any
         && m.node_field.is_none()
-        && m.pre_effects.is_empty()
+        && m.effects.is_empty()
         && m.neg_fields.is_empty()
-        && m.post_effects.is_empty()
         && m.predicate.is_none()
 }

@@ -76,18 +76,18 @@ Q:
   18   !   (expression_statement)           11
   19   !   (empty_statement)                17
   20  ─‣─  _                                19, 20
-  22   !   [Null Set(M0)] _                 19, 20
+  22   !   _ [Null Set(M0)]                 19, 20
   24  -ε-  [Null Set(M0)]                   17
   26                                        ▶
-  27  └‣─  [StructClose Set(M1)] (debugger_statement) [Node Set(M2)]  30
+  27  └‣─  (debugger_statement) [StructClose Set(M1) Node Set(M2)]  30
   30  ─‣┘  _                                26
   31  ...
-  32  ─‣─  [StructClose Set(M1)] (debugger_statement) [Node Set(M2)]  30
+  32  ─‣─  (debugger_statement) [StructClose Set(M1) Node Set(M2)]  30
   35   !   (expression_statement)           14
   36   !   (empty_statement)                32
   37  ─‣─  _                                36, 37
   39  ...
-  40   !   [Null Set(M0)] _                 36, 37
+  40   !   _ [Null Set(M0)]                 36, 37
   42  -ε-  [Null Set(M0)]                   27
   44  ─‣─  _                                35, 40, 44
   46  └‣─  _                                35, 40, 44
@@ -106,7 +106,7 @@ Q:
   35       (expression_statement)           14
        ○   debugger_statement
   46  ❮❮❮ 
-  40       [Null Set(M0)] _                 36, 37
+  40       _ [Null Set(M0)]                 36, 37
        ●   debugger_statement
   36       (empty_statement)                32
        ○   debugger_statement
@@ -116,7 +116,7 @@ Q:
   44       _                                35, 40, 44
   09  ❮❮❮ 
   42  -ε-  [Null Set(M0)]                   27
-  27       [StructClose Set(M1)] (debugger_statement) [Node Set(M2)]  30
+  27       (debugger_statement) [StructClose Set(M1) Node Set(M2)]  30
        ●   debugger_statement
   30       _                                26
        ●   program

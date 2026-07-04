@@ -62,9 +62,9 @@ Q:
   07  ─‣┘  _                                10
   08  -ε-  [ArrayOpen]                      14, 11
   10                                        ▶
-  11  └‣─  [ArrayClose Set(M0)] (_) [Node Set(M1)]  07
+  11  └‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
   14  └‣─  _                                19, 21
-  16  ─‣─  [ArrayClose Set(M0)] (_) [Node Set(M1)]  07
+  16  ─‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
   19   !   (lexical_declaration) [Node Push]  21, 16
   21  ─‣─  _                                19, 21
 ==== trace ====
@@ -93,7 +93,7 @@ Q:
   21  ❮❮❮ 
   21       _                                19, 21
   19  ❮❮❮ 
-  16       [ArrayClose Set(M0)] (_) [Node Set(M1)]  07
+  16       (_) [ArrayClose Set(M0) Node Set(M1)]  07
        ●   expression_statement
   07       _                                10
        ●   program

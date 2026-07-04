@@ -10,8 +10,7 @@ use crate::core::{NodeFieldId, ZeroIdError};
 #[cfg(test)]
 use super::constants::SECTION_ALIGN;
 use super::constants::{
-    MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS, MAX_PRE_EFFECTS, MAX_SUCCESSORS,
-    STEP_SIZE,
+    MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_SUCCESSORS, STEP_SIZE,
 };
 use super::effects::{EFFECT_PAYLOAD_MAX, Effect};
 use super::nav::Nav;
@@ -70,43 +69,40 @@ pub(crate) mod header_byte {
 }
 
 /// The 16-bit counts word of an extended Match (`Match16`–`Match64`):
-/// `pre(3) | neg(3) | post(3) | succ(5) | has_predicate(1) | reserved(1)`.
+/// `effects(4) | neg(3) | succ(5) | has_predicate(1) | reserved(3)`.
 ///
 /// Decoded once here so the Match decoder, the encoder, and the load-time
 /// validator share one definition of the field positions.
 #[derive(Clone, Copy)]
 pub(crate) struct MatchCounts {
-    pub(crate) pre: u8,
+    pub(crate) effects: u8,
     pub(crate) neg: u8,
-    pub(crate) post: u8,
     pub(crate) succ: u8,
     pub(crate) has_predicate: bool,
 }
 
 impl MatchCounts {
-    const PRE_SHIFT: u32 = 13;
-    const NEG_SHIFT: u32 = 10;
-    const POST_SHIFT: u32 = 7;
-    const SUCC_SHIFT: u32 = 2;
+    const EFFECTS_SHIFT: u32 = 12;
+    const NEG_SHIFT: u32 = 9;
+    const SUCC_SHIFT: u32 = 4;
+    const EFFECTS_MASK: u16 = 0xF;
     const COUNT3_MASK: u16 = 0x7;
     const SUCC_MASK: u16 = 0x1F;
-    const PREDICATE_BIT: u16 = 1 << 1;
-    const RESERVED_MASK: u16 = 0x1;
+    const PREDICATE_BIT: u16 = 1 << 3;
+    const RESERVED_MASK: u16 = 0x7;
 
     pub(crate) fn unpack(w: u16) -> Self {
         Self {
-            pre: ((w >> Self::PRE_SHIFT) & Self::COUNT3_MASK) as u8,
+            effects: ((w >> Self::EFFECTS_SHIFT) & Self::EFFECTS_MASK) as u8,
             neg: ((w >> Self::NEG_SHIFT) & Self::COUNT3_MASK) as u8,
-            post: ((w >> Self::POST_SHIFT) & Self::COUNT3_MASK) as u8,
             succ: ((w >> Self::SUCC_SHIFT) & Self::SUCC_MASK) as u8,
             has_predicate: w & Self::PREDICATE_BIT != 0,
         }
     }
 
     pub(crate) fn pack(self) -> u16 {
-        ((self.pre as u16) << Self::PRE_SHIFT)
+        ((self.effects as u16) << Self::EFFECTS_SHIFT)
             | ((self.neg as u16) << Self::NEG_SHIFT)
-            | ((self.post as u16) << Self::POST_SHIFT)
             | ((self.succ as u16) << Self::SUCC_SHIFT)
             | if self.has_predicate {
                 Self::PREDICATE_BIT
@@ -115,8 +111,8 @@ impl MatchCounts {
             }
     }
 
-    /// Whether the reserved bit (bit 0) is set; load-time validation rejects it.
-    pub(crate) fn reserved_bit_set(w: u16) -> bool {
+    /// Whether any reserved bit (bits 2-0) is set; load-time validation rejects it.
+    pub(crate) fn reserved_bits_set(w: u16) -> bool {
         w & Self::RESERVED_MASK != 0
     }
 }
@@ -311,9 +307,8 @@ enum MatchLayout {
     /// `next == 0` means terminal.
     Match8 { next: u16 },
     Extended {
-        pre_count: u8,
+        effect_count: u8,
         neg_count: u8,
-        post_count: u8,
         succ_count: u8,
         has_predicate: bool,
     },
@@ -349,9 +344,8 @@ impl<'a> Match<'a> {
         } else {
             let c = MatchCounts::unpack(u16::from_le_bytes([bytes[6], bytes[7]]));
             MatchLayout::Extended {
-                pre_count: c.pre,
+                effect_count: c.effects,
                 neg_count: c.neg,
-                post_count: c.post,
                 succ_count: c.succ,
                 has_predicate: c.has_predicate,
             }
@@ -420,11 +414,11 @@ impl<'a> Match<'a> {
         }
     }
 
-    /// Iterate over pre-effects (executed after transition acceptance, before post-effects).
+    /// Iterate over effects executed after transition acceptance, in bytecode order.
     #[inline]
-    pub fn pre_effects(&self) -> impl Iterator<Item = Effect> + '_ {
+    pub fn effects(&self) -> impl Iterator<Item = Effect> + '_ {
         let start = MATCH_PAYLOAD_START;
-        (0..self.pre_count()).map(move |i| {
+        (0..self.effect_count()).map(move |i| {
             let offset = start + i * PAYLOAD_SLOT_SIZE;
             Effect::from_bytes([self.bytes[offset], self.bytes[offset + 1]])
         })
@@ -433,21 +427,11 @@ impl<'a> Match<'a> {
     /// Iterate over negated fields (must NOT be present on matched node).
     #[inline]
     pub fn neg_fields(&self) -> impl Iterator<Item = NodeFieldId> + '_ {
-        let start = MATCH_PAYLOAD_START + self.pre_count() * PAYLOAD_SLOT_SIZE;
+        let start = MATCH_PAYLOAD_START + self.effect_count() * PAYLOAD_SLOT_SIZE;
         (0..self.neg_count()).map(move |i| {
             let offset = start + i * PAYLOAD_SLOT_SIZE;
             let raw = u16::from_le_bytes([self.bytes[offset], self.bytes[offset + 1]]);
             NodeFieldId::try_from(raw).expect("neg field id must be non-zero")
-        })
-    }
-
-    /// Iterate over post-effects (executed after successful match).
-    #[inline]
-    pub fn post_effects(&self) -> impl Iterator<Item = Effect> + '_ {
-        let start = MATCH_PAYLOAD_START + (self.pre_count() + self.neg_count()) * PAYLOAD_SLOT_SIZE;
-        (0..self.post_count()).map(move |i| {
-            let offset = start + i * PAYLOAD_SLOT_SIZE;
-            Effect::from_bytes([self.bytes[offset], self.bytes[offset + 1]])
         })
     }
 
@@ -473,7 +457,7 @@ impl<'a> Match<'a> {
             return None;
         }
 
-        let offset = MATCH_PAYLOAD_START + self.effects_size();
+        let offset = MATCH_PAYLOAD_START + self.predicate_offset();
         let op_and_flags = u16::from_le_bytes([self.bytes[offset], self.bytes[offset + 1]]);
         let (op, is_regex) = MatchPredicate::unpack_op_flags(op_and_flags);
         let value_ref = u16::from_le_bytes([
@@ -489,9 +473,9 @@ impl<'a> Match<'a> {
     }
 
     #[inline]
-    fn pre_count(&self) -> usize {
+    fn effect_count(&self) -> usize {
         match self.layout {
-            MatchLayout::Extended { pre_count, .. } => pre_count as usize,
+            MatchLayout::Extended { effect_count, .. } => effect_count as usize,
             MatchLayout::Match8 { .. } => 0,
         }
     }
@@ -504,18 +488,10 @@ impl<'a> Match<'a> {
         }
     }
 
+    /// Byte offset where an optional predicate starts in the payload.
     #[inline]
-    fn post_count(&self) -> usize {
-        match self.layout {
-            MatchLayout::Extended { post_count, .. } => post_count as usize,
-            MatchLayout::Match8 { .. } => 0,
-        }
-    }
-
-    /// Bytes occupied by the pre/neg/post payload slots.
-    #[inline]
-    fn effects_size(&self) -> usize {
-        (self.pre_count() + self.neg_count() + self.post_count()) * PAYLOAD_SLOT_SIZE
+    fn predicate_offset(&self) -> usize {
+        (self.effect_count() + self.neg_count()) * PAYLOAD_SLOT_SIZE
     }
 
     /// Byte offset where successors start in the payload.
@@ -527,7 +503,7 @@ impl<'a> Match<'a> {
         } else {
             0
         };
-        MATCH_PAYLOAD_START + self.effects_size() + predicate_size
+        MATCH_PAYLOAD_START + self.predicate_offset() + predicate_size
     }
 
     /// Collect this borrowed view into an owned, encodable [`MatchInstr`].
@@ -538,9 +514,8 @@ impl<'a> Match<'a> {
             nav: self.nav,
             node_kind: self.node_kind,
             node_field: self.node_field,
-            pre_effects: self.pre_effects().collect(),
+            effects: self.effects().collect(),
             neg_fields: self.neg_fields().collect(),
-            post_effects: self.post_effects().collect(),
             predicate: self.predicate(),
             successors: self.successors().collect(),
         }
@@ -595,9 +570,8 @@ pub struct MatchInstr {
     pub nav: Nav,
     pub node_kind: NodeKindConstraint,
     pub node_field: Option<NodeFieldId>,
-    pub pre_effects: Vec<Effect>,
+    pub effects: Vec<Effect>,
     pub neg_fields: Vec<NodeFieldId>,
-    pub post_effects: Vec<Effect>,
     pub predicate: Option<MatchPredicate>,
     pub successors: Vec<StepId>,
 }
@@ -609,12 +583,10 @@ pub struct MatchInstr {
 /// or an `assert!` panic at encode time.
 #[derive(Clone, PartialEq, Eq, Debug, thiserror::Error)]
 pub enum EncodeError {
-    #[error("too many pre-effects on one match: {0} (max {MAX_PRE_EFFECTS})")]
-    TooManyPreEffects(usize),
+    #[error("too many effects on one match: {0} (max {MAX_EFFECTS})")]
+    TooManyEffects(usize),
     #[error("too many negated fields on one match: {0} (max {MAX_NEG_FIELDS})")]
     TooManyNegFields(usize),
-    #[error("too many post-effects on one match: {0} (max {MAX_POST_EFFECTS})")]
-    TooManyPostEffects(usize),
     #[error("too many successors on one match: {0} (max {MAX_SUCCESSORS})")]
     TooManySuccessors(usize),
     #[error("match payload too large: {0} slots (max {MAX_MATCH_PAYLOAD_SLOTS})")]
@@ -629,7 +601,7 @@ impl MatchInstr {
     /// Returns [`EncodeError`] rather than panicking when a count or payload
     /// exceeds what the format can represent.
     pub fn encode(&self) -> Result<Vec<u8>, EncodeError> {
-        for effect in self.pre_effects.iter().chain(&self.post_effects) {
+        for effect in &self.effects {
             if effect.payload > EFFECT_PAYLOAD_MAX {
                 return Err(EncodeError::EffectPayloadOverflow(effect.payload));
             }
@@ -638,9 +610,8 @@ impl MatchInstr {
         let (node_class, node_val) = self.node_kind.to_bytes();
         let node_field_val = self.node_field.map_or(0, u16::from);
 
-        let can_use_match8 = self.pre_effects.is_empty()
+        let can_use_match8 = self.effects.is_empty()
             && self.neg_fields.is_empty()
-            && self.post_effects.is_empty()
             && self.predicate.is_none()
             && self.successors.len() <= 1;
 
@@ -655,18 +626,14 @@ impl MatchInstr {
             return Ok(bytes);
         }
 
-        let pre = self.pre_effects.len();
+        let effects = self.effects.len();
         let neg = self.neg_fields.len();
-        let post = self.post_effects.len();
         let succ = self.successors.len();
-        if pre > MAX_PRE_EFFECTS {
-            return Err(EncodeError::TooManyPreEffects(pre));
+        if effects > MAX_EFFECTS {
+            return Err(EncodeError::TooManyEffects(effects));
         }
         if neg > MAX_NEG_FIELDS {
             return Err(EncodeError::TooManyNegFields(neg));
-        }
-        if post > MAX_POST_EFFECTS {
-            return Err(EncodeError::TooManyPostEffects(post));
         }
         if succ > MAX_SUCCESSORS {
             return Err(EncodeError::TooManySuccessors(succ));
@@ -677,7 +644,7 @@ impl MatchInstr {
         } else {
             0
         };
-        let slots = pre + neg + post + predicate_slots + succ;
+        let slots = effects + neg + predicate_slots + succ;
         let opcode = select_match_opcode(slots).ok_or(EncodeError::PayloadTooLarge(slots))?;
 
         let mut bytes = vec![0u8; opcode.size()];
@@ -687,9 +654,8 @@ impl MatchInstr {
         bytes[4..6].copy_from_slice(&node_field_val.to_le_bytes());
 
         let counts = MatchCounts {
-            pre: pre as u8,
+            effects: effects as u8,
             neg: neg as u8,
-            post: post as u8,
             succ: succ as u8,
             has_predicate: self.predicate.is_some(),
         };
@@ -700,14 +666,11 @@ impl MatchInstr {
             bytes[offset..offset + PAYLOAD_SLOT_SIZE].copy_from_slice(&data);
             offset += PAYLOAD_SLOT_SIZE;
         };
-        for effect in &self.pre_effects {
+        for effect in &self.effects {
             put(&mut bytes, effect.to_bytes());
         }
         for &field in &self.neg_fields {
             put(&mut bytes, u16::from(field).to_le_bytes());
-        }
-        for effect in &self.post_effects {
-            put(&mut bytes, effect.to_bytes());
         }
         if let Some(pred) = &self.predicate {
             put(&mut bytes, pred.pack_op_flags().to_le_bytes());

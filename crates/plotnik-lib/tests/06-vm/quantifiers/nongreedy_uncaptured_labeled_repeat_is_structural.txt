@@ -46,7 +46,7 @@ _StructWrap:
   05                                        ▶
 
 A:
-  06   !   [EnumOpen(M0)] (expression_statement) [EnumClose]  08
+  06   !   (expression_statement) [EnumOpen(M0) EnumClose]  08
   08                                        ▶
 
 Q:
@@ -79,7 +79,7 @@ Q:
        ▶   (A)
 
 A:
-  06       [EnumOpen(M0)] (expression_statement) [EnumClose]  08
+  06       (expression_statement) [EnumOpen(M0) EnumClose]  08
        ●   expression_statement
   08   ◀   (A)                              
 
@@ -95,7 +95,7 @@ Q:
        ▶   (A)
 
 A:
-  06       [EnumOpen(M0)] (expression_statement) [EnumClose]  08
+  06       (expression_statement) [EnumOpen(M0) EnumClose]  08
        ●   expression_statement
   08   ◀   (A)                              
 

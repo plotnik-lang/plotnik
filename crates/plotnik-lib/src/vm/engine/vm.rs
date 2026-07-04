@@ -312,11 +312,7 @@ impl<'t> VM<'t> {
             self.navigate_and_match(m, module, tracer)?;
         }
 
-        for effect_op in m.pre_effects() {
-            self.emit_effect(effect_op, tracer)?;
-        }
-
-        for effect_op in m.post_effects() {
+        for effect_op in m.effects() {
             self.emit_effect(effect_op, tracer)?;
         }
 

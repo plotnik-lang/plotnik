@@ -54,16 +54,7 @@ fn resolve_match(
     map: &BTreeMap<Label, StepAddr>,
     pool: ConstantPool<'_>,
 ) -> Result<Vec<u8>, EmitError> {
-    let pre_effects = m
-        .pre_effects
-        .iter()
-        .map(|e| resolve_effect(e, pool))
-        .collect();
-    let post_effects = m
-        .post_effects
-        .iter()
-        .map(|e| resolve_effect(e, pool))
-        .collect();
+    let effects = m.effects.iter().map(|e| resolve_effect(e, pool)).collect();
     let predicate = m.predicate.as_ref().map(|pred| {
         let string_id = pool
             .lookup_str(pred.value.text())
@@ -92,9 +83,8 @@ fn resolve_match(
         nav: m.nav,
         node_kind: m.node_kind,
         node_field: m.node_field,
-        pre_effects,
+        effects,
         neg_fields: m.neg_fields.clone(),
-        post_effects,
         predicate,
         successors,
     };

@@ -83,8 +83,7 @@ impl<'a> InstrIndex<'a> {
                 return Some((current, effects)); // Branching epsilon: visible but can't see through
             }
 
-            effects.extend(m.pre_effects.iter().cloned());
-            effects.extend(m.post_effects.iter().cloned());
+            effects.extend(m.effects.iter().cloned());
             current = m.successors[0];
         }
     }
@@ -110,25 +109,25 @@ impl<'a> InstrIndexMut<'a> {
 
 struct MatchEdit {
     successors: Vec<Label>,
-    post_effects: Vec<EffectIR>,
+    effects: Vec<EffectIR>,
 }
 
 impl MatchEdit {
     fn from_match(m: &MatchIR) -> Self {
         Self {
             successors: m.successors.clone(),
-            post_effects: m.post_effects.clone(),
+            effects: m.effects.clone(),
         }
     }
 
     fn rewrite_successor(&mut self, index: usize, target: Label, effects: Vec<EffectIR>) {
         self.successors[index] = target;
-        self.post_effects.extend(effects);
+        self.effects.extend(effects);
     }
 
     fn apply_to(self, m: &mut MatchIR) {
         m.successors = self.successors;
-        m.post_effects = self.post_effects;
+        m.effects = self.effects;
     }
 }
 
@@ -154,7 +153,7 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
             _ => continue,
         };
 
-        if eps.pre_effects.is_empty() && eps.post_effects.is_empty() {
+        if eps.effects.is_empty() {
             continue;
         }
 
@@ -175,7 +174,7 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
         // the non-epsilon successor's navigation clears `matched_node` before the
         // migrated effects would run, so they'd capture the successor's node
         // instead of the inbound one (#383). Keep such epsilons in place.
-        if reads_matched_node(&eps.pre_effects) || reads_matched_node(&eps.post_effects) {
+        if reads_matched_node(&eps.effects) {
             continue;
         }
 
@@ -187,26 +186,23 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
             continue;
         }
 
-        // Migrate: effects go to successor's pre_effects (in order: eps.pre, eps.post, succ.pre)
+        // Migrate: epsilon effects run before the successor's own effects.
         let eps_label = eps.label;
-        let eps_pre = eps.pre_effects.clone();
-        let eps_post = eps.post_effects.clone();
+        let eps_effects = eps.effects.clone();
 
         let mut view = InstrIndexMut::new(instructions, &idx);
 
         let succ = view
             .match_at_mut(succ_label)
             .expect("succ_label resolved via match_at above, so it indexes a Match instruction");
-        let mut new_pre = eps_pre;
-        new_pre.extend(eps_post);
-        new_pre.append(&mut succ.pre_effects);
-        succ.pre_effects = new_pre;
+        let mut effects = eps_effects;
+        effects.append(&mut succ.effects);
+        succ.effects = effects;
 
         let eps = view
             .match_at_mut(eps_label)
             .expect("eps_label is the current epsilon Match instruction at index i");
-        eps.pre_effects.clear();
-        eps.post_effects.clear();
+        eps.effects.clear();
 
         changed = true;
     }
@@ -290,7 +286,7 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
 
             // No `reads_matched_node` guard is needed here (unlike forward_migrate):
             // the seen-through chain is all epsilons, which preserve `matched_node`,
-            // so absorbing into `post` still reads the node these effects saw at
+            // so appending still reads the node these effects saw at
             // their original position — `m`'s own node if `m` is non-epsilon, or the
             // unchanged inbound node if `m` is an epsilon. forward_migrate is unsafe
             // only because it pushes effects *past* a navigation that clears
@@ -359,7 +355,7 @@ fn expand_branching_epsilons(result: &mut NfaGraph) -> bool {
         if !m.is_epsilon() {
             continue;
         }
-        if !m.pre_effects.is_empty() || !m.post_effects.is_empty() {
+        if !m.effects.is_empty() {
             continue;
         }
         if m.successors.len() <= 1 {

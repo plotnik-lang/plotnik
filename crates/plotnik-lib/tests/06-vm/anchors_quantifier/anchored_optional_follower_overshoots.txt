@@ -60,7 +60,7 @@ Q:
   10  ─‣┘  _                                11
   11  ─‣┘  _                                12
   12                                        ▶
-  13  └•─  [Null Set(M1)] (expression_statement) [Node Set(M2)]  08
+  13  └•─  (expression_statement) [Null Set(M1) Node Set(M2)]  08
   16  ─•─  (expression_statement) [Node Set(M2)]  08
   18  └•─  (debugger_statement) [Node Set(M1)]  16
   20  -ε-  [Null Set(M1)]                   16
@@ -99,7 +99,7 @@ Q:
   18       (debugger_statement) [Node Set(M1)]  16
        ○   expression_statement
   24  ❮❮❮ 
-  13       [Null Set(M1)] (expression_statement) [Node Set(M2)]  08
+  13       (expression_statement) [Null Set(M1) Node Set(M2)]  08
        ●   expression_statement
   08       (identifier) == "foo"            10
        ○   ;

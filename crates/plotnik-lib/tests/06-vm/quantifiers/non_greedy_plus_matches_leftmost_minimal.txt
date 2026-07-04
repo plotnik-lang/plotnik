@@ -47,12 +47,12 @@ _StructWrap:
 Q:
   06   !   (program)                        08
   07  ...
-  08  └‣─  [ArrayOpen] _                    11, 13
+  08  └‣─  _ [ArrayOpen]                    11, 13
   10                                        ▶
   11   !   (lexical_declaration) [Node Push]  16, 13
   13  ─‣─  _                                11, 13
   15  ...
-  16  ─‣┘  [ArrayClose Set(M0)] _           10
+  16  ─‣┘  _ [ArrayClose Set(M0)]           10
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -62,11 +62,11 @@ _StructWrap:
 Q:
   06       (program)                        08
        ●   program
-  08       [ArrayOpen] _                    11, 13
+  08       _ [ArrayOpen]                    11, 13
        ●   lexical_declaration
   11       (lexical_declaration) [Node Push]  16, 13
        ●   lexical_declaration
-  16       [ArrayClose Set(M0)] _           10
+  16       _ [ArrayClose Set(M0)]           10
        ●   program
   10   ◀   (Q)                              
 

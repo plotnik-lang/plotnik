@@ -58,7 +58,7 @@ Q:
   10                                        ▶
   11  -ε-  [Null]                           10
   13  └‣─  (debugger_statement)             19
-  14  ─‣─  [SuppressEnd] (debugger_statement)  19
+  14  ─‣─  (debugger_statement) [SuppressEnd]  19
   16  └‣─  (A)                              06 : 14
   17  -ε-  [SuppressBegin]                  16
   19  ─‣┘  _                                10
@@ -69,7 +69,7 @@ Q:
   27  └‣─  (expression_statement) [Node Set(M0)]  44
   29  ─‣─  (expression_statement) [Node Set(M0)]  44
   31  └‣─  (debugger_statement)             37
-  32  ─‣─  [SuppressEnd] (debugger_statement)  37
+  32  ─‣─  (debugger_statement) [SuppressEnd]  37
   34  └‣─  (A)                              06 : 32
   35  -ε-  [SuppressBegin]                  34
   37  ─‣┘  _                                29

@@ -88,9 +88,8 @@ enum StateKey {
         nav: Nav,
         node_kind: NodeKindConstraint,
         node_field: Option<NodeFieldId>,
-        pre_effects: Vec<EffectIR>,
+        effects: Vec<EffectIR>,
         neg_fields: Vec<NodeFieldId>,
-        post_effects: Vec<EffectIR>,
         predicate: Option<PredicateIR>,
         successors: Vec<SuccKey>,
     },
@@ -109,9 +108,8 @@ impl StateKey {
                 nav: m.nav,
                 node_kind: m.node_kind,
                 node_field: m.node_field,
-                pre_effects: m.pre_effects.clone(),
+                effects: m.effects.clone(),
                 neg_fields: m.neg_fields.clone(),
-                post_effects: m.post_effects.clone(),
                 predicate: m.predicate.clone(),
                 successors: m
                     .successors

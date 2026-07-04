@@ -73,8 +73,8 @@ impl NfaBuilder<'_> {
         let entry = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(entry, exit)
-                .post_effects(effects)
-                .post_effects(outer.post)
+                .append_effects(effects)
+                .append_effects(outer.post)
                 .into(),
         );
         entry
@@ -95,8 +95,11 @@ impl NfaBuilder<'_> {
             return entry;
         }
         let pre_step = self.fresh_label();
-        self.instructions
-            .push(MatchIR::epsilon(pre_step, entry).pre_effects(pre).into());
+        self.instructions.push(
+            MatchIR::epsilon(pre_step, entry)
+                .prepend_effects(pre)
+                .into(),
+        );
         pre_step
     }
 
@@ -150,7 +153,11 @@ impl NfaBuilder<'_> {
         self.emit_effects_if_nonempty(exit, null_effects)
     }
 
-    pub(super) fn emit_effects_if_nonempty(&mut self, exit: Label, effects: Vec<EffectIR>) -> Label {
+    pub(super) fn emit_effects_if_nonempty(
+        &mut self,
+        exit: Label,
+        effects: Vec<EffectIR>,
+    ) -> Label {
         if effects.is_empty() {
             return exit;
         }

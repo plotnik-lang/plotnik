@@ -48,10 +48,10 @@ fn merges_identical_nav_twins() {
     // wildcard Next steps into the same `try` state.
     let mut nfa = graph(
         vec![
-            eps(0, vec![1, 2]),      // try → [body, retry]
-            eps(1, vec![]),          // body
-            nav_next(2, vec![0]),    // retry
-            nav_next(3, vec![0]),    // navigate (duplicate of retry)
+            eps(0, vec![1, 2]),   // try → [body, retry]
+            eps(1, vec![]),       // body
+            nav_next(2, vec![0]), // retry
+            nav_next(3, vec![0]), // navigate (duplicate of retry)
         ],
         3,
     );
@@ -70,9 +70,15 @@ fn merge_cascades_to_predecessors() {
     let mut nfa = graph(
         vec![
             eps(0, vec![10, 20]),
-            MatchIR::terminal(Label(10)).nav(Nav::Down).next(Label(11)).into(),
+            MatchIR::terminal(Label(10))
+                .nav(Nav::Down)
+                .next(Label(11))
+                .into(),
             nav_next(11, vec![1]),
-            MatchIR::terminal(Label(20)).nav(Nav::Down).next(Label(21)).into(),
+            MatchIR::terminal(Label(20))
+                .nav(Nav::Down)
+                .next(Label(21))
+                .into(),
             nav_next(21, vec![1]),
             eps(1, vec![]),
         ],
@@ -113,10 +119,10 @@ fn different_effects_do_not_merge() {
         vec![
             eps(0, vec![10, 20]),
             MatchIR::epsilon(Label(10), Label(1))
-                .pre_effect(EffectIR::start_struct())
+                .prepend_effect(EffectIR::start_struct())
                 .into(),
             MatchIR::epsilon(Label(20), Label(1))
-                .pre_effect(EffectIR::end_struct())
+                .prepend_effect(EffectIR::end_struct())
                 .into(),
             eps(1, vec![]),
         ],

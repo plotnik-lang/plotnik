@@ -38,10 +38,10 @@ Func:
 
 Q:
   08   !   (program)                        09
-  09  └‣─  [ArrayOpen] _                    14, 16
+  09  └‣─  _ [ArrayOpen]                    14, 16
   11                                        ▶
   12  -ε-  [Node Push]                      16, 18
   14   !   (Func)                           06 : 12
   15  ...
   16  ─‣─  _                                14, 16
-  18  ─‣┘  [ArrayClose Set(M0)] _           11
+  18  ─‣┘  _ [ArrayClose Set(M0)]           11

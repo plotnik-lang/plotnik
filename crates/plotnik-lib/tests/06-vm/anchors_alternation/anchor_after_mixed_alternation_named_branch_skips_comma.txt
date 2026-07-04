@@ -78,7 +78,7 @@ Q:
   15  ─‣┘⁴ _                                12
   16  ─•─  (identifier) [Node Set(M1)]      15
   18   !   (identifier) [Node Set(M0)]      16
-  20   !   [Null Set(M0)] ";"               13
+  20   !   ";" [Null Set(M0)]               13
   22  ─‣─  _                                18, 20, 22
 ==== trace ====
 _StructWrap:
@@ -101,7 +101,7 @@ Q:
   18       (identifier) [Node Set(M0)]      16
        ○   (
   10  ❮❮❮ 
-  20       [Null Set(M0)] ";"               13
+  20       ";" [Null Set(M0)]               13
        ○   (
   10  ❮❮❮ 
   22       _                                18, 20, 22

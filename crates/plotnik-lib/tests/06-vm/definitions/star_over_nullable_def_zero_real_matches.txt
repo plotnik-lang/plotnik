@@ -74,19 +74,19 @@ Q:
   20  -ε-  [Null Set(M1)]                   15
   22  ...
   23  ...
-  24   !   [StructOpen] (expression_statement)  11
+  24   !   (expression_statement) [StructOpen]  11
   26  ─‣─  _                                24, 26
   28   !   _                                24, 26
   30                                        ▶
   31  ...
   32  -ε-  [ArrayClose Set(M2)]             30
   34  -ε-  [StructClose Push]               42, 46
-  36   !   [StructOpen] (expression_statement)  16
+  36   !   (expression_statement) [StructOpen]  16
   38  ─‣─  _                                36, 38
-  40   !   [StructOpen] _                   36, 38
+  40   !   _ [StructOpen]                   36, 38
   42  ─‣─  _                                40, 42
   44  └‣─  _                                40, 42
-  46  ─‣┘  [ArrayClose Set(M2)] _           30
+  46  ─‣┘  _ [ArrayClose Set(M2)]           30
 ==== trace ====
 _StructWrap:
   00  -ε-  [StructOpen]                     02
@@ -99,9 +99,9 @@ Q:
   09  -ε-  [ArrayOpen]                      44, 32
   44       _                                40, 42
        ●   debugger_statement
-  40       [StructOpen] _                   36, 38
+  40       _ [StructOpen]                   36, 38
        ●   debugger_statement
-  36       [StructOpen] (expression_statement)  16
+  36       (expression_statement) [StructOpen]  16
        ○   debugger_statement
   40  ❮❮❮ 
   38       _                                36, 38

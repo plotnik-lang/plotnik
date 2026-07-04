@@ -61,7 +61,7 @@ _StructWrap:
 Q:
   06   !   (program)                        28, 22
   08                                        ▶
-  09  └‣─  [Null Set(M1)] (debugger_statement) [Node Set(M2)]  30
+  09  └‣─  (debugger_statement) [Null Set(M1) Node Set(M2)]  30
   12  ─‣─  (debugger_statement) [Node Set(M2)]  30
   14   !   (empty_statement) [Node Set(M1)]  12
   16  ─‣─  _                                14, 16
@@ -96,7 +96,7 @@ Q:
   18  ❮❮❮ 
   16       _                                14, 16
   22  ❮❮❮ 
-  09       [Null Set(M1)] (debugger_statement) [Node Set(M2)]  30
+  09       (debugger_statement) [Null Set(M1) Node Set(M2)]  30
        ●   debugger_statement
   30       _                                08
        ●   program

@@ -246,7 +246,7 @@ impl NfaBuilder<'_> {
             let outer_step = self.fresh_label();
             self.instructions.push(
                 MatchIR::epsilon(outer_step, exit)
-                    .post_effects(outer_capture.post)
+                    .append_effects(outer_capture.post)
                     .into(),
             );
             outer_step
@@ -277,20 +277,23 @@ impl NfaBuilder<'_> {
         let struct_close_step = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(struct_close_step, exit)
-                .post_effect(EffectIR::end_struct())
-                .post_effect(EffectIR::push())
+                .append_effect(EffectIR::end_struct())
+                .append_effect(EffectIR::push())
                 .into(),
         );
 
         // row_type_id drives Set effects inside the struct scope.
         let inner_entry = self.compile_with_optional_scope(row_type_id, |this| {
-            this.compile_iteration_element(inner, PatternCtx::with_nav(struct_close_step, nav_override))
+            this.compile_iteration_element(
+                inner,
+                PatternCtx::with_nav(struct_close_step, nav_override),
+            )
         });
 
         let struct_step = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(struct_step, inner_entry)
-                .pre_effect(EffectIR::start_struct())
+                .prepend_effect(EffectIR::start_struct())
                 .into(),
         );
 
@@ -305,9 +308,9 @@ impl NfaBuilder<'_> {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, exit)
-                .post_effect(EffectIR::end_arr())
-                .post_effects(effects.capture.iter().cloned())
-                .post_effects(effects.outer.iter().cloned())
+                .append_effect(EffectIR::end_arr())
+                .append_effects(effects.capture.iter().cloned())
+                .append_effects(effects.outer.iter().cloned())
                 .into(),
         );
         label
@@ -336,21 +339,25 @@ impl NfaBuilder<'_> {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, exit)
-                .post_effect(EffectIR::end_struct())
-                .post_effects(effects.capture.iter().cloned())
-                .post_effects(effects.outer.iter().cloned())
+                .append_effect(EffectIR::end_struct())
+                .append_effects(effects.capture.iter().cloned())
+                .append_effects(effects.outer.iter().cloned())
                 .into(),
         );
         label
     }
 
     /// Emit an Arr epsilon step with optional pre-effects before start_arr.
-    pub(super) fn emit_arr_step(&mut self, successor: Label, pre_effects: Vec<EffectIR>) -> Label {
+    pub(super) fn emit_arr_step(
+        &mut self,
+        successor: Label,
+        leading_effects: Vec<EffectIR>,
+    ) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, successor)
-                .pre_effects(pre_effects)
-                .pre_effect(EffectIR::start_arr())
+                .prepend_effect(EffectIR::start_arr())
+                .prepend_effects(leading_effects)
                 .into(),
         );
         label
@@ -364,13 +371,13 @@ impl NfaBuilder<'_> {
     pub(super) fn emit_struct_step_with_pre(
         &mut self,
         successor: Label,
-        pre_effects: Vec<EffectIR>,
+        leading_effects: Vec<EffectIR>,
     ) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, successor)
-                .pre_effects(pre_effects)
-                .pre_effect(EffectIR::start_struct())
+                .prepend_effect(EffectIR::start_struct())
+                .prepend_effects(leading_effects)
                 .into(),
         );
         label

@@ -71,10 +71,10 @@ Q:
   07  └‣─  (expression_statement)           08
   08  └‣─  _                                11, 16, 19
   10                                        ▶
-  11   !   [Null Set(M2)] (number) [Node Set(M1)]  14
+  11   !   (number) [Null Set(M2) Node Set(M1)]  14
   14  ─‣┘² _                                10
   15  ...
-  16   !   [Null Set(M1) StructOpen] (identifier) [Node Set(M0) StructClose Set(M2)]  14
+  16   !   (identifier) [Null Set(M1) StructOpen Node Set(M0) StructClose Set(M2)]  14
   19  ─‣─  _                                11, 16, 19
 ==== trace ====
 _StructWrap:
@@ -89,10 +89,10 @@ Q:
        ●   expression_statement
   08       _                                11, 16, 19
        ●   identifier
-  11       [Null Set(M2)] (number) [Node Set(M1)]  14
+  11       (number) [Null Set(M2) Node Set(M1)]  14
        ○   identifier
   08  ❮❮❮ 
-  16       [Null Set(M1) StructOpen] (identifier) [Node Set(M0) StructClose Set(M2)]  14
+  16       (identifier) [Null Set(M1) StructOpen Node Set(M0) StructClose Set(M2)]  14
        ●   identifier
   14       _                                10
        ●   program

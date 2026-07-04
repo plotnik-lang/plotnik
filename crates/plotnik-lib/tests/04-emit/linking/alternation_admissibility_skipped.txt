@@ -42,7 +42,7 @@ Q:
   07  ...
   08  └‣─  body: _                          11, 16
   10                                        ▶
-  11   !   [Null Set(M1)] (statement_block) [Node Set(M0)]  14
+  11   !   (statement_block) [Null Set(M1) Node Set(M0)]  14
   14  ─‣┘  _                                10
   15  ...
-  16   !   [Null Set(M0)] (class_declaration) [Node Set(M1)]  14
+  16   !   (class_declaration) [Null Set(M0) Node Set(M1)]  14

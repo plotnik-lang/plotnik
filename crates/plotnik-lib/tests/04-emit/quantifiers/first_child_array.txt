@@ -36,8 +36,8 @@ Q:
   07  ─‣┘  _                                10
   08  -ε-  [ArrayOpen]                      14, 11
   10                                        ▶
-  11  └‣─  [ArrayClose Set(M0)] (number) [Node Set(M1)]  07
+  11  └‣─  (number) [ArrayClose Set(M0) Node Set(M1)]  07
   14  └‣─  _                                19, 21
-  16  ─‣─  [ArrayClose Set(M0)] (number) [Node Set(M1)]  07
+  16  ─‣─  (number) [ArrayClose Set(M0) Node Set(M1)]  07
   19   !   (identifier) [Node Push]         21, 16
   21  ─‣─  _                                19, 21

@@ -74,10 +74,10 @@ Q:
   08  └‣─  (binary_expression)              09
   09  └‣─  _                                20, 22
   11                                        ▶
-  12  ─◦─  [StructClose Set(M1)] (identifier)  24
-  14  ─•─  [StructClose Set(M1)] (identifier)  24
+  12  ─◦─  (identifier) [StructClose Set(M1)]  24
+  14  ─•─  (identifier) [StructClose Set(M1)]  24
   16   !   (number) [Node Set(M0)]          14
-  18   !   [Null Set(M0)] "+"               12
+  18   !   "+" [Null Set(M0)]               12
   20  -ε-  [StructOpen]                     16, 18
   22  ─‣─  _                                20, 22
   24  ─‣┘³ _                                11
@@ -99,7 +99,7 @@ Q:
   20  -ε-  [StructOpen]                     16, 18
   16       (number) [Node Set(M0)]          14
        ●   number
-  14       [StructClose Set(M1)] (identifier)  24
+  14       (identifier) [StructClose Set(M1)]  24
        ○   *
        ●   identifier
   24       _                                11

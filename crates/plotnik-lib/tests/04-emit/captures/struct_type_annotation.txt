@@ -34,5 +34,5 @@ _StructWrap:
   07  ...
 
 Q:
-  08   !   [StructOpen] (identifier) [Node Set(M0) StructClose Set(M1)]  11
+  08   !   (identifier) [StructOpen Node Set(M0) StructClose Set(M1)]  11
   11                                        ▶

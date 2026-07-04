@@ -90,8 +90,8 @@ impl NfaBuilder<'_> {
                 .nav(nav)
                 .node_kind(node_kind)
                 .neg_fields(neg_fields)
-                .pre_effects(capture.pre)
-                .post_effects(capture.post);
+                .prepend_effects(capture.pre)
+                .append_effects(capture.post);
             if let Some(p) = predicate {
                 m = m.predicate(p);
             }
@@ -136,7 +136,7 @@ impl NfaBuilder<'_> {
         }
 
         // With items: nav[entry_effects] → items → Up → [exit_effects] → exit
-        let final_exit = self.emit_post_effects_exit(exit, exit_effects);
+        let final_exit = self.emit_trailing_effects_exit(exit, exit_effects);
 
         let up_label = self.fresh_label();
         let items_entry = self.compile_seq_items(SeqItemsCtx {
@@ -156,8 +156,8 @@ impl NfaBuilder<'_> {
             .nav(nav)
             .node_kind(node_kind)
             .neg_fields(neg_fields)
-            .pre_effects(capture.pre)
-            .post_effects(entry_effects);
+            .prepend_effects(capture.pre)
+            .append_effects(entry_effects);
         if let Some(p) = predicate {
             entry_match = entry_match.predicate(p);
         }
@@ -168,7 +168,7 @@ impl NfaBuilder<'_> {
 
     /// Post-effects (like `EndEnum`) must run after children complete, not right after
     /// matching the parent node. Returns `exit` unchanged when `post` is empty.
-    fn emit_post_effects_exit(&mut self, exit: Label, post: Vec<EffectIR>) -> Label {
+    fn emit_trailing_effects_exit(&mut self, exit: Label, post: Vec<EffectIR>) -> Label {
         if post.is_empty() {
             exit
         } else {
@@ -198,8 +198,8 @@ impl NfaBuilder<'_> {
             MatchIR::epsilon(entry, exit)
                 .nav(nav)
                 .node_kind(node_kind)
-                .pre_effects(capture.pre)
-                .post_effects(capture.post),
+                .prepend_effects(capture.pre)
+                .append_effects(capture.post),
         );
 
         entry
@@ -379,7 +379,7 @@ impl NfaBuilder<'_> {
 
         let nav = nav_override.unwrap_or(Nav::Stay);
 
-        // Call instructions don't have pre_effects, so emit epsilon if needed
+        // Call instructions cannot carry effects, so emit epsilon if needed.
         let call_entry = match lowering {
             RefLowering::ScopedCapture => {
                 // Struct isolates the definition's internal captures before the Set.
@@ -538,8 +538,7 @@ impl NfaBuilder<'_> {
             .type_analysis
             .expect_type_shape(def_output_id);
         let is_captured = post_consumes_call_value(&capture.post) || keep_value;
-        let inline_scoped_capture =
-            is_captured && matches!(def_output_shape, TypeShape::Struct(_));
+        let inline_scoped_capture = is_captured && matches!(def_output_shape, TypeShape::Struct(_));
 
         let SplitExits {
             match_exit,

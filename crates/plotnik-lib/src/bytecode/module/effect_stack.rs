@@ -203,7 +203,7 @@ fn analyze(
                 require_neutral(&stack, suppress, step)?;
             }
             Instruction::Match(m) => {
-                for eff in m.pre_effects().chain(m.post_effects()) {
+                for eff in m.effects() {
                     apply_effect(eff.kind, &mut stack, &mut suppress, &mut entry_tos, step)?;
                 }
                 if m.succ_count() == 0 {

@@ -77,9 +77,9 @@ Q:
   07  └‣─  (expression_statement)           08
   08  └‣─  _                                11, 16, 19
   10                                        ▶
-  11   !   [EnumOpen(M2)] (identifier) [Node Set(M0) EnumClose]  14
-  14  ─‣┘² [Set(M4)] _                      10
-  16   !   [EnumOpen(M3)] (number) [Node Set(M1) EnumClose]  14
+  11   !   (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  14
+  14  ─‣┘² _ [Set(M4)]                      10
+  16   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose]  14
   19  ─‣─  _                                11, 16, 19
 ==== trace ====
 _StructWrap:
@@ -94,9 +94,9 @@ Q:
        ●   expression_statement
   08       _                                11, 16, 19
        ●   identifier
-  11       [EnumOpen(M2)] (identifier) [Node Set(M0) EnumClose]  14
+  11       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  14
        ●   identifier
-  14       [Set(M4)] _                      10
+  14       _ [Set(M4)]                      10
        ●   program
   10   ◀   (Q)                              
 

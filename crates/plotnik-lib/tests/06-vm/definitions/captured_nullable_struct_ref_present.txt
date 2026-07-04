@@ -90,15 +90,15 @@ Q:
   20                                        ▶
   21  -ε-  [Null Set(M1)]                   20
   23  ...
-  24   !   [StructOpen] (expression_statement)  11
+  24   !   (expression_statement) [StructOpen]  11
   26  ─‣─  _                                24, 26
   28   !   _                                24, 26
   30                                        ▶
   31  ...
-  32  └‣─  [StructClose Set(M2)] (debugger_statement) [Node Set(M3)]  15
-  35  ─‣─  [StructClose Set(M2)] (debugger_statement) [Node Set(M3)]  15
+  32  └‣─  (debugger_statement) [StructClose Set(M2) Node Set(M3)]  15
+  35  ─‣─  (debugger_statement) [StructClose Set(M2) Node Set(M3)]  15
   38  -ε-  [Null Set(M1)]                   32
-  40   !   [StructOpen] (expression_statement)  16
+  40   !   (expression_statement) [StructOpen]  16
   42  ─‣─  _                                40, 42
   44  └‣─  _                                40, 42
 ==== trace ====
@@ -113,13 +113,13 @@ Q:
   09  -ε-  [StructOpen]                     44, 38
   44       _                                40, 42
        ●   expression_statement
-  40       [StructOpen] (expression_statement)  16
+  40       (expression_statement) [StructOpen]  16
        ●   expression_statement
   16       (identifier) [Node Set(M0)]      18
        ●   identifier
   18       _ [StructClose Set(M1)]          35
        ●   expression_statement
-  35       [StructClose Set(M2)] (debugger_statement) [Node Set(M3)]  15
+  35       (debugger_statement) [StructClose Set(M2) Node Set(M3)]  15
        ●   debugger_statement
   15       _                                30
        ●   program

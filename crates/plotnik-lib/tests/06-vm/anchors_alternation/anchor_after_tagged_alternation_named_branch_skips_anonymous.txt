@@ -71,10 +71,10 @@ Q:
   08  └‣─  (binary_expression)              09
   09  └‣─  _                                16, 18, 20
   11                                        ▶
-  12  ─◦─  [Set(M2)] (identifier)           22
-  14  ─•─  [Set(M2)] (identifier)           22
-  16   !   [EnumOpen(M0)] (number) [EnumClose]  14
-  18   !   [EnumOpen(M1)] "+" [EnumClose]   12
+  12  ─◦─  (identifier) [Set(M2)]           22
+  14  ─•─  (identifier) [Set(M2)]           22
+  16   !   (number) [EnumOpen(M0) EnumClose]  14
+  18   !   "+" [EnumOpen(M1) EnumClose]     12
   20  ─‣─  _                                16, 18, 20
   22  ─‣┘³ _                                11
 ==== trace ====
@@ -92,9 +92,9 @@ Q:
        ●   binary_expression
   09       _                                16, 18, 20
        ●   number
-  16       [EnumOpen(M0)] (number) [EnumClose]  14
+  16       (number) [EnumOpen(M0) EnumClose]  14
        ●   number
-  14       [Set(M2)] (identifier)           22
+  14       (identifier) [Set(M2)]           22
        ○   *
        ●   identifier
   22       _                                11

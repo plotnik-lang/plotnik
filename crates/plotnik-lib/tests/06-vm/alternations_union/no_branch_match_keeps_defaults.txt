@@ -49,10 +49,10 @@ Q:
   07  ─‣┘  _                                23
   08  └‣─  (expression_statement)           26, 20
   10                                        ▶
-  11   !   [Null Set(M1)] (identifier) [Node Set(M0)]  07
+  11   !   (identifier) [Null Set(M1) Node Set(M0)]  07
   14   !   (number) [Node Set(M1)]          07
   16  ─‣─  _                                14, 16
-  18   !   [Null Set(M0)] _                 14, 16
+  18   !   _ [Null Set(M0)]                 14, 16
   20  -ε-  [Null Set(M0) Null Set(M1)]      23
   23  ─‣┘  _                                10
   24  ─‣─  _                                11, 18, 24
@@ -70,10 +70,10 @@ Q:
        ●   expression_statement
   26       _                                11, 18, 24
        ●   string
-  11       [Null Set(M1)] (identifier) [Node Set(M0)]  07
+  11       (identifier) [Null Set(M1) Node Set(M0)]  07
        ○   string
   26  ❮❮❮ 
-  18       [Null Set(M0)] _                 14, 16
+  18       _ [Null Set(M0)]                 14, 16
        ●   string
   14       (number) [Node Set(M1)]          07
        ○   string
@@ -87,10 +87,10 @@ Q:
   26  ❮❮❮ 
   24       _                                11, 18, 24
        ●   ;
-  11       [Null Set(M1)] (identifier) [Node Set(M0)]  07
+  11       (identifier) [Null Set(M1) Node Set(M0)]  07
        ○   ;
   24  ❮❮❮ 
-  18       [Null Set(M0)] _                 14, 16
+  18       _ [Null Set(M0)]                 14, 16
        ●   ;
   14       (number) [Node Set(M1)]          07
        ○   ;

@@ -10,7 +10,8 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// v5: Added extras-only anchor navigation modes.
 /// v6: Reserved bit 7 of a Nav byte for the Up family (uniform 5-bit level).
 /// v7: Type kind and effect opcode discriminants renumbered contiguously.
-pub const VERSION: u32 = 7;
+/// v8: single effects list per Match; per-entrypoint wrappers; Trampoline removed.
+pub const VERSION: u32 = 8;
 
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;
@@ -38,17 +39,11 @@ pub const REGEX_TABLE_ENTRY_SIZE: usize = 8;
 /// transition needs more successors, it must be split into a cascade.
 pub const MAX_MATCH_PAYLOAD_SLOTS: usize = 28;
 
-/// Maximum pre-effects per Match instruction.
-///
-/// Pre-effect count is stored in 3 bits (max 7). When exceeded,
-/// overflow effects must be emitted in leading epsilon transitions.
-pub const MAX_PRE_EFFECTS: usize = 7;
+/// Maximum effects per Match instruction (4-bit count field).
+pub const MAX_EFFECTS: usize = 15;
 
 /// Maximum negated fields per Match instruction (3-bit count field).
 pub const MAX_NEG_FIELDS: usize = 7;
-
-/// Maximum post-effects per Match instruction (3-bit count field).
-pub const MAX_POST_EFFECTS: usize = 7;
 
 /// Maximum successors per Match instruction (5-bit count field).
 pub const MAX_SUCCESSORS: usize = 31;

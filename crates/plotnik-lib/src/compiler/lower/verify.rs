@@ -149,12 +149,6 @@ mod debug_impl {
     fn collect_match_ops(m: &MatchIR, ctx: &LowerInput) -> Vec<SemanticOp> {
         let mut ops = Vec::new();
 
-        // Member names aren't resolved at the IR fingerprint stage (that needs the
-        // type table); the effect kind alone keys the fingerprint.
-        for e in &m.pre_effects {
-            ops.push(SemanticOp::Effect(e.kind(), None));
-        }
-
         if m.nav != Nav::Epsilon {
             if let Some(mode) = m.nav.up_mode_tag() {
                 ops.push(SemanticOp::UpNav(
@@ -202,11 +196,51 @@ mod debug_impl {
             ops.push(SemanticOp::Predicate(p.op.to_byte(), value));
         }
 
-        for e in &m.post_effects {
+        // Member names aren't resolved at the IR fingerprint stage (that needs the
+        // type table); the effect kind alone keys the fingerprint.
+        for e in &m.effects {
             ops.push(SemanticOp::Effect(e.kind(), None));
         }
 
         ops
+    }
+
+    fn normalize_commuting_effects(ops: Vec<SemanticOp>) -> Vec<SemanticOp> {
+        fn flush(
+            out: &mut Vec<SemanticOp>,
+            effects: &mut Vec<SemanticOp>,
+            others: &mut Vec<SemanticOp>,
+        ) {
+            out.append(effects);
+            out.append(others);
+        }
+
+        let mut out = Vec::with_capacity(ops.len());
+        let mut effects = Vec::new();
+        let mut others = Vec::new();
+
+        for op in ops {
+            match op {
+                SemanticOp::Effect(EffectKind::Node, _)
+                | SemanticOp::Call(_)
+                | SemanticOp::Return
+                | SemanticOp::CycleRef
+                | SemanticOp::DanglingLabel
+                | SemanticOp::DepthCut => {
+                    flush(&mut out, &mut effects, &mut others);
+                    out.push(op);
+                }
+                SemanticOp::Effect(..) => effects.push(op),
+                _ => others.push(op),
+            }
+        }
+
+        flush(&mut out, &mut effects, &mut others);
+        out
+    }
+
+    fn normalize_path(ops: Vec<SemanticOp>) -> Vec<SemanticOp> {
+        coalesce_ups(normalize_commuting_effects(ops))
     }
 
     /// Coalesce runs of same-mode Up navigation into a single summed `UpNav`.
@@ -299,7 +333,7 @@ mod debug_impl {
 
             match instr {
                 InstructionIR::Match(m) => {
-                    if m.is_epsilon() && m.pre_effects.is_empty() && m.post_effects.is_empty() {
+                    if m.is_epsilon() && m.effects.is_empty() {
                         return WalkStep {
                             see_through: true,
                             ops: vec![],
@@ -360,14 +394,14 @@ mod debug_impl {
                 }
                 if depth >= MAX_DEPTH {
                     ops.push(SemanticOp::DepthCut);
-                    on_path(coalesce_ups(ops));
+                    on_path(normalize_path(ops));
                     count += 1;
                     truncated = true;
                     continue;
                 }
                 if visited.contains(&label) {
                     ops.push(SemanticOp::CycleRef);
-                    on_path(coalesce_ups(ops));
+                    on_path(normalize_path(ops));
                     count += 1;
                     continue;
                 }
@@ -386,7 +420,7 @@ mod debug_impl {
                 ops.extend(walk_step.ops);
 
                 if walk_step.succs.is_empty() {
-                    on_path(coalesce_ups(ops));
+                    on_path(normalize_path(ops));
                     count += 1;
                     continue;
                 }

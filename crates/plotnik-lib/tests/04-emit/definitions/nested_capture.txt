@@ -57,7 +57,7 @@ Outer:
   20  -ε-  [StructClose Set(M1)]            18
   22   !   (Inner)                          06 : 20
   23  ...
-  24  -ε-  [StructOpen] [StructOpen]        22
+  24  -ε-  [StructOpen StructOpen]          22
   26  ─‣─  _                                24, 26
   28  └‣─  _                                24, 26
-  30  ─‣┘  [ArrayClose Set(M2)] _           15
+  30  ─‣┘  _ [ArrayClose Set(M2)]           15

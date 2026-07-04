@@ -70,7 +70,7 @@ Q:
   11  └‣─  (expression_statement) [StructOpen]  13
   13  └‣─  (Nested)                         06 : 14
   14  -ε-  [StructClose]                    16
-  16  ─‣┘² [Set(M1)] _                      18
+  16  ─‣┘² _ [Set(M1)]                      18
   18                                        ▶
   19                                        ▶
   20   !   (identifier) [Node Set(M0)]      07
@@ -122,7 +122,7 @@ Nested:
 
 Q:
   14  -ε-  [StructClose]                    16
-  16       [Set(M1)] _                      18
+  16       _ [Set(M1)]                      18
        ●   program
   18   ◀   (Q)                              
 

@@ -55,7 +55,7 @@ struct SequencePostEffects {
     exit_post: Vec<EffectIR>,
 }
 
-fn split_sequence_post_effects(post: Vec<EffectIR>) -> SequencePostEffects {
+fn split_sequence_tail_effects(post: Vec<EffectIR>) -> SequencePostEffects {
     let mut item_post = post;
     let exit_post = match item_post.iter().position(is_scope_close_effect) {
         Some(split) => item_post.split_off(split),
@@ -160,8 +160,8 @@ impl NfaBuilder<'_> {
         // A caller-threaded skip exit must be honored at any nav: the all-skip
         // path has to reach it (a childless-node bypass, or a `Fail` prune),
         // not fall through to the match exit.
-        let needs_skip_exit = first_is_skippable
-            && (skip_exit.is_some() || (first_positions && nav_modes.len() > 1));
+        let needs_skip_exit =
+            first_is_skippable && (skip_exit.is_some() || (first_positions && nav_modes.len() > 1));
 
         if needs_skip_exit {
             return self.compile_seq_items_with_skip_exit(
@@ -191,15 +191,15 @@ impl NfaBuilder<'_> {
         // Build chain in reverse: last pattern exits to `exit`, each prior exits to next.
         let mut current_exit = exit;
         let last_post = if last_is_skippable {
-            let post_effects = split_sequence_post_effects(capture.post);
-            if !post_effects.exit_post.is_empty() {
+            let tail_effects = split_sequence_tail_effects(capture.post);
+            if !tail_effects.exit_post.is_empty() {
                 current_exit = self.emit_effects_epsilon(
                     current_exit,
-                    post_effects.exit_post,
+                    tail_effects.exit_post,
                     CaptureEffects::default(),
                 );
             }
-            post_effects.item_post
+            tail_effects.item_post
         } else {
             capture.post
         };
@@ -308,11 +308,11 @@ impl NfaBuilder<'_> {
         // matched_node and the item's skip null injection, so an epsilon would capture
         // the wrong node or miss matched_node on the skip path. Split positionally so a
         // close and its consumer (e.g. `[EndEnum, Push]`) stay together and in order.
-        let post_effects = split_sequence_post_effects(capture.post);
-        let exit = if post_effects.exit_post.is_empty() {
+        let tail_effects = split_sequence_tail_effects(capture.post);
+        let exit = if tail_effects.exit_post.is_empty() {
             exit
         } else {
-            self.emit_effects_epsilon(exit, post_effects.exit_post, CaptureEffects::default())
+            self.emit_effects_epsilon(exit, tail_effects.exit_post, CaptureEffects::default())
         };
 
         // Compile the continuation with both navigations, or use exit if there is none.
@@ -334,11 +334,11 @@ impl NfaBuilder<'_> {
             (
                 caller_skip_exit.unwrap_or(SkipExit::To(exit)),
                 exit,
-                CaptureEffects::new_post(post_effects.item_post),
+                CaptureEffects::new_post(tail_effects.item_post),
             )
         } else {
             // The follower is the last item; `post_keep` rides its continuation.
-            let cont = CaptureEffects::new_post(post_effects.item_post);
+            let cont = CaptureEffects::new_post(tail_effects.item_post);
             let skip_rest = &items[first_pattern_idx + 1..];
             let skip = self.compile_seq_items(SeqItemsCtx {
                 items: skip_rest,

@@ -27,8 +27,8 @@ fn match_ir_size_extended() {
         .node_kind(NodeKindConstraint::Named(
             NonZeroU16::new(10).map(NodeKindId::from),
         ))
-        .pre_effect(EffectIR::start_struct())
-        .post_effect(EffectIR::node())
+        .prepend_effect(EffectIR::start_struct())
+        .append_effect(EffectIR::node())
         .next(Label(1));
 
     // 3 slots needed (1 pre + 1 post + 1 succ), fits in Match16 (4 slots)

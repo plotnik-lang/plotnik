@@ -81,14 +81,14 @@ Q:
   14  -ε-  [StructClose Push]               30, 34
   16   !   (identifier) [Node Set(M0)]      14
   18  ─‣─  _                                16, 18
-  20   !   [Null Set(M1)] _                 16, 18
+  20   !   _ [Null Set(M1)]                 16, 18
   22   !   (number) [Node Set(M1)]          14
   24  ─‣─  _                                22, 24
-  26   !   [Null Set(M0)] _                 22, 24
+  26   !   _ [Null Set(M0)]                 22, 24
   28  -ε-  [StructOpen]                     20, 26
   30  ─‣─  _                                28, 30
   32  └‣─  _                                28, 30
-  34  ─‣┘  [ArrayClose Set(M2)] _           36
+  34  ─‣┘  _ [ArrayClose Set(M2)]           36
   36  ─‣┘² _                                11
 ==== trace ====
 _StructWrap:
@@ -107,7 +107,7 @@ Q:
   32       _                                28, 30
        ●   [
   28  -ε-  [StructOpen]                     20, 26
-  20       [Null Set(M1)] _                 16, 18
+  20       _ [Null Set(M1)]                 16, 18
        ●   [
   16       (identifier) [Node Set(M0)]      14
        ○   [
@@ -120,7 +120,7 @@ Q:
   30       _                                28, 30
        ●   ,
   28  -ε-  [StructOpen]                     20, 26
-  20       [Null Set(M1)] _                 16, 18
+  20       _ [Null Set(M1)]                 16, 18
        ●   ,
   16       (identifier) [Node Set(M0)]      14
        ○   ,
@@ -133,14 +133,14 @@ Q:
   30       _                                28, 30
        ●   ]
   28  -ε-  [StructOpen]                     20, 26
-  20       [Null Set(M1)] _                 16, 18
+  20       _ [Null Set(M1)]                 16, 18
        ●   ]
   16       (identifier) [Node Set(M0)]      14
        ○   ]
   20  ❮❮❮ 
   18       _                                16, 18
   28  ❮❮❮ 
-  26       [Null Set(M0)] _                 22, 24
+  26       _ [Null Set(M0)]                 22, 24
        ●   ]
   22       (number) [Node Set(M1)]          14
        ○   ]
@@ -149,7 +149,7 @@ Q:
   30  ❮❮❮ 
   30       _                                28, 30
   14  ❮❮❮ 
-  34       [ArrayClose Set(M2)] _           36
+  34       _ [ArrayClose Set(M2)]           36
        ●   array
   36       _                                11
        ●   program

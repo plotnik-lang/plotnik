@@ -74,8 +74,8 @@ Q:
   20   !   _                                16, 18
   22                                        ▶
   23  ...
-  24  └‣─  [Set(M0)] (number) [Node Set(M1)]  15
-  26  ─‣─  [Set(M0)] (number) [Node Set(M1)]  15
+  24  └‣─  (number) [Set(M0) Node Set(M1)]  15
+  26  ─‣─  (number) [Set(M0) Node Set(M1)]  15
   28  -ε-  [Null]                           24
   30   !   (identifier) [Node]              26
   32  ─‣─  _                                30, 32
@@ -102,7 +102,7 @@ Q:
        ●   identifier
   30       (identifier) [Node]              26
        ●   identifier
-  26       [Set(M0)] (number) [Node Set(M1)]  15
+  26       (number) [Set(M0) Node Set(M1)]  15
        ○   ,
        ●   number
   15       _                                22

@@ -124,11 +124,6 @@ impl<'a> MatchRenderer<'a> {
     fn format_match_content(&self, m: &Match<'_>) -> String {
         let mut parts = Vec::new();
 
-        let pre: Vec<_> = m.pre_effects().map(|e| format_effect(&e)).collect();
-        if !pre.is_empty() {
-            parts.push(format!("[{}]", pre.join(" ")));
-        }
-
         if !m.is_epsilon() {
             for field_id in m.neg_fields() {
                 let name = self.format_node_field_name(field_id);
@@ -139,23 +134,25 @@ impl<'a> MatchRenderer<'a> {
             if !node_part.is_empty() {
                 parts.push(node_part);
             }
-
-            if let Some(predicate) = m.predicate() {
-                let op = PredicateOp::from_byte(predicate.op);
-                let value = if predicate.is_regex {
-                    let pattern = self.context.regex_pattern(predicate.value_ref as usize);
-                    format!("/{}/", pattern)
-                } else {
-                    let s = self.context.string(predicate.value_ref as usize);
-                    format!("{:?}", s)
-                };
-                parts.push(format!("{} {}", op.as_str(), value));
-            }
         }
 
-        let post: Vec<_> = m.post_effects().map(|e| format_effect(&e)).collect();
-        if !post.is_empty() {
-            parts.push(format!("[{}]", post.join(" ")));
+        let effects: Vec<_> = m.effects().map(|e| format_effect(&e)).collect();
+        if !effects.is_empty() {
+            parts.push(format!("[{}]", effects.join(" ")));
+        }
+
+        if !m.is_epsilon()
+            && let Some(predicate) = m.predicate()
+        {
+            let op = PredicateOp::from_byte(predicate.op);
+            let value = if predicate.is_regex {
+                let pattern = self.context.regex_pattern(predicate.value_ref as usize);
+                format!("/{}/", pattern)
+            } else {
+                let s = self.context.string(predicate.value_ref as usize);
+                format!("{:?}", s)
+            };
+            parts.push(format!("{} {}", op.as_str(), value));
         }
 
         parts.join(" ")

@@ -65,11 +65,11 @@ _StructWrap:
 Q:
   06   !   (program)                        20, 13
   08  ─‣─  (debugger_statement) [Node Set(M1)]  10
-  10  ─‣┘  [StructClose Set(M2)] _          12
+  10  ─‣┘  _ [StructClose Set(M2)]          12
   12                                        ▶
   13  -ε-  [Null Set(M2)]                   12
   15  ...
-  16   !   [StructOpen] (expression_statement) [Node Set(M0)]  08
+  16   !   (expression_statement) [StructOpen Node Set(M0)]  08
   18  ─‣─  _                                16, 18
   20  └‣─  _                                16, 18
 ==== trace ====
@@ -83,11 +83,11 @@ Q:
        ●   program
   20       _                                16, 18
        ●   expression_statement
-  16       [StructOpen] (expression_statement) [Node Set(M0)]  08
+  16       (expression_statement) [StructOpen Node Set(M0)]  08
        ●   expression_statement
   08       (debugger_statement) [Node Set(M1)]  10
        ●   debugger_statement
-  10       [StructClose Set(M2)] _          12
+  10       _ [StructClose Set(M2)]          12
        ●   program
   12   ◀   (Q)                              
 

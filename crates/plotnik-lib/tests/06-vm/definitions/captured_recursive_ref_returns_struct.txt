@@ -77,10 +77,10 @@ Q:
   11  └‣─  (expression_statement) [StructOpen]  13
   13  └‣─  (Nested)                         06 : 14
   14  -ε-  [StructClose]                    16
-  16  ─‣┘² [Set(M2)] _                      18
+  16  ─‣┘² _ [Set(M2)]                      18
   18                                        ▶
   19                                        ▶
-  20   !   [Null Set(M1)] (identifier) [Node Set(M0)]  23
+  20   !   (identifier) [Null Set(M1) Node Set(M0)]  23
   23  ─‣┘  _                                19
   24  -ε-  [StructClose Set(M1)]            23
   26   !   (Nested)                         06 : 24
@@ -104,7 +104,7 @@ Nested:
        ●   call_expression
   08       function: _                      20, 27
        ●   call_expression
-  20       [Null Set(M1)] (identifier) [Node Set(M0)]  23
+  20       (identifier) [Null Set(M1) Node Set(M0)]  23
        ○   call_expression
   08  ❮❮❮ 
   27  -ε-  [Null Set(M0) StructOpen]        26
@@ -116,7 +116,7 @@ Nested:
        ●   call_expression
   08       function: _                      20, 27
        ●   identifier
-  20       [Null Set(M1)] (identifier) [Node Set(M0)]  23
+  20       (identifier) [Null Set(M1) Node Set(M0)]  23
        ●   identifier
   23       _                                19
        ●   call_expression
@@ -130,7 +130,7 @@ Nested:
 
 Q:
   14  -ε-  [StructClose]                    16
-  16       [Set(M2)] _                      18
+  16       _ [Set(M2)]                      18
        ●   program
   18   ◀   (Q)                              
 

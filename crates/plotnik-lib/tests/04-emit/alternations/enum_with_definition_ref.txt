@@ -60,4 +60,4 @@ Test:
   14   !   (Inner)                          06 : 12
   15  ...
   16  -ε-  [EnumOpen(M2) SuppressBegin]     14
-  18   !   [EnumOpen(M3)] (number) [Node Set(M1) EnumClose Set(M4)]  11
+  18   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose Set(M4)]  11

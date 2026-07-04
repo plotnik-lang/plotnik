@@ -51,7 +51,7 @@ Q:
   09  -ε-  [ArrayClose Set(M3)]             08
   11  -ε-  [StructClose Push]               20, 09
   13  ─‣─  (number) [Node Set(M1) StructClose Set(M2)]  11
-  16   !   [StructOpen] (identifier) [Node Set(M0)]  13
+  16   !   (identifier) [StructOpen Node Set(M0)]  13
   18  -ε-  [StructOpen]                     16
   20  ─‣─  _                                18, 20
   22   !   _                                18, 20

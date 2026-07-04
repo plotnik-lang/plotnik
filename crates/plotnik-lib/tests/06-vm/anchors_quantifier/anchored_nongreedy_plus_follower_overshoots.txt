@@ -61,10 +61,10 @@ Q:
   10  ─‣┘  _                                11
   11  ─‣┘  _                                12
   12                                        ▶
-  13  ─•─  [ArrayClose Set(M1)] (expression_statement) [Node Set(M2)]  08
-  16  └•─  [ArrayOpen] (debugger_statement) [Node Push]  13, 19
+  13  ─•─  (expression_statement) [ArrayClose Set(M1) Node Set(M2)]  08
+  16  └•─  (debugger_statement) [ArrayOpen Node Push]  13, 19
   19  ─•─  (debugger_statement) [Node Push]  13, 19
-  21  ─•─  [ArrayOpen] (debugger_statement) [Node Push]  13, 19
+  21  ─•─  (debugger_statement) [ArrayOpen Node Push]  13, 19
   24  -ε-  [Null Set(M0)]                   16
   26   !   (lexical_declaration) [Node Set(M0)]  21
   28  ─‣─  _                                26, 28
@@ -96,5 +96,5 @@ Q:
   28       _                                26, 28
   06  ❮❮❮ 
   24  -ε-  [Null Set(M0)]                   16
-  16       [ArrayOpen] (debugger_statement) [Node Push]  13, 19
+  16       (debugger_statement) [ArrayOpen Node Push]  13, 19
        ○   expression_statement

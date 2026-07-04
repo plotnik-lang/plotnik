@@ -30,5 +30,5 @@ _StructWrap:
   07  ...
 
 Q:
-  08   !   (identifier) == "foo" [Node Set(M0)]  11
+  08   !   (identifier) [Node Set(M0)] == "foo"  11
   11                                        ▶

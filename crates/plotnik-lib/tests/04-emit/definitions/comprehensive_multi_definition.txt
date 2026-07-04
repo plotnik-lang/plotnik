@@ -72,9 +72,9 @@ Assignment:
   12  └‣─  left: (identifier) [Node Set(M6)]  14
   14  ─‣─  right: (Expression)              09 : 16
   15  ...
-  16  ─‣┘  [Set(M5)] _                      18
+  16  ─‣┘  _ [Set(M5)]                      18
   18                                        ▶
   19                                        ▶
-  20   !   [EnumOpen(M3)] (number) [Node Set(M1) EnumClose]  19
+  20   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose]  19
   23  ...
-  24   !   [EnumOpen(M4)] (identifier) [Node Set(M2) EnumClose]  19
+  24   !   (identifier) [EnumOpen(M4) Node Set(M2) EnumClose]  19

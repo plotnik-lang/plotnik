@@ -53,9 +53,9 @@ Q:
   13                                        ▶
   14  └‣─  (Rec)                            06 : 16
   15  ...
-  16  ─‣┘  [Set(M0)] _                      18
+  16  ─‣┘  _ [Set(M0)]                      18
   18  ─‣┘  _ [EnumClose]                    20
   20                                        ▶
   21  └‣─  (expression_statement)           14
-  22   !   [EnumOpen(M2)] (program)         21
-  24   !   [EnumOpen(M3)] (identifier) [Node Set(M1) EnumClose]  20
+  22   !   (program) [EnumOpen(M2)]         21
+  24   !   (identifier) [EnumOpen(M3) Node Set(M1) EnumClose]  20

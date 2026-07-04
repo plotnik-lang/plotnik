@@ -93,11 +93,11 @@ Q:
   12  ─‣┘  _                                07
   13  └‣─  (call_expression) [Node Set(M0)]  15
   15  ─‣┘  _                                19
-  16   !   [Null Set(M1)] (expression_statement) [Node Set(M2)]  10
-  19  ─‣─  [StructClose Set(M1)] (expression_statement) [Node Set(M2)]  10
+  16   !   (expression_statement) [Null Set(M1) Node Set(M2)]  10
+  19  ─‣─  (expression_statement) [StructClose Set(M1) Node Set(M2)]  10
   22  ...
   23  ...
-  24   !   [StructOpen] (expression_statement)  13
+  24   !   (expression_statement) [StructOpen]  13
   26  ─‣─  _                                24, 26
   28   !   _                                24, 26
   30  ─‣─  _                                28, 16, 30
@@ -114,7 +114,7 @@ Q:
        ●   expression_statement
   28       _                                24, 26
        ●   expression_statement
-  24       [StructOpen] (expression_statement)  13
+  24       (expression_statement) [StructOpen]  13
        ●   expression_statement
   13       (call_expression) [Node Set(M0)]  15
        ○   identifier
@@ -122,7 +122,7 @@ Q:
   28  ❮❮❮ 
   26       _                                24, 26
        ●   expression_statement
-  24       [StructOpen] (expression_statement)  13
+  24       (expression_statement) [StructOpen]  13
        ●   expression_statement
   13       (call_expression) [Node Set(M0)]  15
        ○   identifier
@@ -130,7 +130,7 @@ Q:
   26  ❮❮❮ 
   26       _                                24, 26
   08  ❮❮❮ 
-  16       [Null Set(M1)] (expression_statement) [Node Set(M2)]  10
+  16       (expression_statement) [Null Set(M1) Node Set(M2)]  10
        ●   expression_statement
   10       (expression_statement) [Node Set(M3)]  12
        ●   expression_statement
