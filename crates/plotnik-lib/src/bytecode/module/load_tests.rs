@@ -23,7 +23,7 @@ use indoc::indoc;
 use super::{ByteStorage, Module, ModuleError};
 use crate::bytecode::effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectKind};
 use crate::bytecode::type_meta::TypeDefKind;
-use crate::bytecode::{Header, STEP_SIZE};
+use crate::bytecode::{Header, Nav, STEP_SIZE};
 
 fn emit_bytes(query_src: &str) -> Vec<u8> {
     let mut source_map = SourceMap::new();
@@ -179,6 +179,20 @@ fn first_instr(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
         step += (instr_size(opcode) / 8) as u16;
     }
     panic!("no matching instruction in transitions");
+}
+
+fn first_match_nav(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
+    let (base, steps) = transitions(bytes);
+    let mut step = 0u16;
+    while step < steps {
+        let off = base + step as usize * 8;
+        let opcode = bytes[off] & 0x0F;
+        if (0..=5).contains(&opcode) && want(bytes[off + 1]) {
+            return off + 1;
+        }
+        step += (instr_size(opcode) / 8) as u16;
+    }
+    panic!("no matching match nav in transitions");
 }
 
 /// Byte offsets of every effect slot in the stream. Negated-field slots are
@@ -465,6 +479,21 @@ fn forged_out_of_range_successor_is_rejected() {
     assert!(
         matches!(err, ModuleError::MalformedTransitions),
         "expected MalformedTransitions, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_cursor_depth_imbalance_is_rejected() {
+    let mut bytes = emit_bytes(r#"Q = (program)"#);
+
+    let nav_off = first_match_nav(&bytes, |nav| nav == Nav::StayExact.to_byte());
+    bytes[nav_off] = Nav::Down.to_byte();
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged cursor-depth imbalance must be rejected");
+    assert!(
+        matches!(err, ModuleError::DepthImbalance(_)),
+        "expected DepthImbalance, got {err:?}"
     );
 }
 

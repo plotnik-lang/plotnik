@@ -5,6 +5,7 @@
 //! module completely (the no-panic guarantee, see `effect_stack.rs`). On any
 //! malformed input it returns a [`ModuleError`], never panics.
 
+use std::collections::HashMap;
 use std::io;
 
 use super::super::effects::{Effect, EffectKind};
@@ -18,6 +19,7 @@ use super::super::sections::SymbolNameEntry;
 use super::super::type_meta::{TypeDefKind, TypeMember, TypeNameEntry};
 use super::super::{HEADER_SIZE, SECTION_ALIGN, VERSION};
 use super::*;
+use crate::bytecode::StepAddr;
 use crate::bytecode::predicate_op::PredicateOp;
 
 /// Module load error.
@@ -67,6 +69,8 @@ pub enum ModuleError {
     MalformedTransitions,
     #[error("effect stack imbalance at step {0}")]
     EffectStackImbalance(u16),
+    #[error("cursor depth imbalance at step {0}")]
+    DepthImbalance(u16),
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 }
@@ -189,6 +193,7 @@ impl Module {
         self.validate_symbol_ids()?;
         let is_start = self.validate_transitions()?;
         self.validate_entrypoints(&is_start)?;
+        self.validate_depth_neutrality()?;
         // Structural validity (every step decodes, every jump lands on a start)
         // is now established, so the effect-stack walk can use the safe typed
         // instruction API. This closes the last forged-module panic class: the
@@ -440,6 +445,84 @@ impl Module {
                 return Err(invalid());
             }
         }
+        Ok(())
+    }
+
+    /// Every entry body returns at the same cursor depth it entered with.
+    ///
+    /// The VM treats call bodies as independent cursors: a `Call` applies its own
+    /// navigation, then resumes at `next` after a net-neutral callee returns. We
+    /// therefore validate each entrypoint target and every encoded `Call` target
+    /// as its own root, plus the shared preamble at step 0.
+    fn validate_depth_neutrality(&self) -> Result<(), ModuleError> {
+        let mut roots = vec![StepAddr::PREAMBLE.get()];
+
+        for entrypoint in self.entrypoints().iter() {
+            push_unique(&mut roots, u16::from(entrypoint.target()));
+        }
+
+        let mut step = 0u16;
+        while step < self.header.transitions_count {
+            match self.decode_step(step) {
+                Instruction::Match(m) => {
+                    step += m.step_count();
+                }
+                Instruction::Call(c) => {
+                    push_unique(&mut roots, u16::from(c.target));
+                    step += 1;
+                }
+                Instruction::Return(_) | Instruction::Trampoline(_) => {
+                    step += 1;
+                }
+            }
+        }
+
+        for root in roots {
+            self.validate_depth_root(root)?;
+        }
+        Ok(())
+    }
+
+    fn validate_depth_root(&self, entry: u16) -> Result<(), ModuleError> {
+        let mut memo: HashMap<u16, i32> = HashMap::new();
+        let mut work = vec![(entry, 0i32)];
+
+        while let Some((step, net)) = work.pop() {
+            if let Some(&seen) = memo.get(&step) {
+                if seen == net {
+                    continue;
+                }
+                return Err(ModuleError::DepthImbalance(step));
+            }
+            memo.insert(step, net);
+
+            match self.decode_step(step) {
+                Instruction::Return(_) => {
+                    if net != 0 {
+                        return Err(ModuleError::DepthImbalance(step));
+                    }
+                }
+                Instruction::Match(m) => {
+                    let next_net = net + m.nav.depth_delta();
+                    if m.succ_count() == 0 {
+                        if next_net != 0 {
+                            return Err(ModuleError::DepthImbalance(step));
+                        }
+                    } else {
+                        for succ in m.successors() {
+                            work.push((u16::from(succ), next_net));
+                        }
+                    }
+                }
+                Instruction::Call(c) => {
+                    work.push((u16::from(c.next), net + c.nav.depth_delta()));
+                }
+                Instruction::Trampoline(t) => {
+                    work.push((u16::from(t.next()), net));
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -824,5 +907,11 @@ impl Module {
             targets.push(next);
         }
         Ok(())
+    }
+}
+
+fn push_unique(values: &mut Vec<u16>, value: u16) {
+    if !values.contains(&value) {
+        values.push(value);
     }
 }

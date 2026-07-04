@@ -34,6 +34,10 @@ pub use debug_impl::{run_verified, verify_constructed};
 #[cfg(not(debug_assertions))]
 pub use release_impl::{run_verified, verify_constructed};
 
+#[cfg(all(test, debug_assertions))]
+#[path = "verify_tests.rs"]
+mod verify_tests;
+
 #[cfg(not(debug_assertions))]
 mod release_impl {
     use crate::compiler::lower::LowerInput;
@@ -562,6 +566,87 @@ mod debug_impl {
         Ok(())
     }
 
+    /// Every body must return or accept at the same cursor depth it entered with.
+    ///
+    /// Calls apply their own navigation at the call site, but the callee is a
+    /// separately checked body. A trampoline is part of the entry preamble, so it
+    /// is depth-neutral and continues at its encoded return address.
+    fn check_depth_neutrality(nfa: &NfaGraph) -> Result<(), String> {
+        let instr_map: HashMap<Label, &InstructionIR> =
+            nfa.instructions.iter().map(|i| (i.label(), i)).collect();
+
+        for (root, entry) in entries(nfa) {
+            check_depth_root(root, entry, &instr_map)?;
+        }
+        Ok(())
+    }
+
+    fn check_depth_root(
+        root: WalkRoot,
+        entry: Label,
+        instr_map: &HashMap<Label, &InstructionIR>,
+    ) -> Result<(), String> {
+        let mut memo: HashMap<Label, i32> = HashMap::new();
+        let mut work = vec![(entry, 0i32)];
+
+        while let Some((label, net)) = work.pop() {
+            if let Some(&seen) = memo.get(&label) {
+                if seen == net {
+                    continue;
+                }
+                return Err(format!(
+                    "{root:?}: label {label:?} reached at depths {seen} and {net}"
+                ));
+            }
+            memo.insert(label, net);
+
+            let instr = instr_map
+                .get(&label)
+                .copied()
+                .ok_or_else(|| format!("{root:?}: dangling label {label:?}"))?;
+
+            match instr {
+                InstructionIR::Match(m) => {
+                    let next_net = net + m.nav.depth_delta();
+                    if m.successors.is_empty() {
+                        if next_net != 0 {
+                            return Err(format!(
+                                "{root:?}: accepting match {:?} exits at depth {next_net}",
+                                m.label
+                            ));
+                        }
+                        continue;
+                    }
+                    for &succ in &m.successors {
+                        work.push((succ, next_net));
+                    }
+                }
+                InstructionIR::Call(c) => {
+                    work.push((c.next, net + c.nav.depth_delta()));
+                }
+                InstructionIR::Return(r) => {
+                    if net != 0 {
+                        return Err(format!(
+                            "{root:?}: return {:?} exits at depth {net}",
+                            r.label
+                        ));
+                    }
+                }
+                InstructionIR::Trampoline(t) => {
+                    work.push((t.next, net));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(super) fn assert_depth_neutrality(nfa: &NfaGraph, context: &str) {
+        if let Err(e) = check_depth_neutrality(nfa) {
+            panic!("[verify] {context} produced cursor-depth imbalance: {e}");
+        }
+    }
+
     fn entries(nfa: &NfaGraph) -> Vec<(WalkRoot, Label)> {
         let mut v = vec![(WalkRoot::Preamble, nfa.preamble_entry)];
         for (&def_id, &label) in &nfa.def_entries {
@@ -610,6 +695,7 @@ mod debug_impl {
         if let Err(e) = check_labels(&nfa.instructions) {
             panic!("[verify] pass `{name}` produced malformed IR: {e}");
         }
+        assert_depth_neutrality(nfa, &format!("pass `{name}`"));
 
         let before_walk = GraphWalk::new(&before.instructions, &nfa.def_entries, ctx);
         let after_walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
@@ -647,6 +733,7 @@ mod debug_impl {
         if let Err(e) = check_labels(&nfa.instructions) {
             panic!("[verify] construction produced malformed IR: {e}");
         }
+        assert_depth_neutrality(nfa, "construction");
         let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
         for (key, entry) in entries(nfa) {
             if let Err(e) = walk.check_scopes(entry) {
