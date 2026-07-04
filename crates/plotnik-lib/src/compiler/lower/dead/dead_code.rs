@@ -24,6 +24,7 @@ fn compute_reachable(nfa: &NfaGraph) -> HashSet<Label> {
     let mut reachable = HashSet::new();
     let mut queue: Vec<Label> = nfa.entrypoint_wrappers.values().copied().collect();
     queue.extend(nfa.def_entries.values().copied());
+    queue.extend(nfa.def_entries_consuming.values().copied());
 
     while let Some(label) = queue.pop() {
         if !reachable.insert(label) {

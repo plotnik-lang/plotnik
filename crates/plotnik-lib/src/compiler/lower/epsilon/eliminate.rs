@@ -240,6 +240,17 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
             changed = true;
         }
     }
+    for entry in result.def_entries_consuming.values_mut() {
+        if let Some((target, effects)) =
+            InstrIndex::new(&result.instructions, &idx).see_through(*entry)
+            && effects.is_empty()
+            && target != *entry
+        {
+            entry_remaps.insert(*entry, target);
+            *entry = target;
+            changed = true;
+        }
+    }
 
     for instr in &mut result.instructions {
         if let InstructionIR::Call(c) = instr

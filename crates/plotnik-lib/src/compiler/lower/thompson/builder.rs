@@ -14,9 +14,9 @@ use crate::compiler::lower::ir::{
 };
 use crate::compiler::parse::ast::Pattern;
 
-use super::capture::PatternCtx;
+use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::AnchorSemantics;
-use super::scope::{CaptureExits, Struct};
+use super::scope::{CaptureExits, SkipExit, SplitExits, Struct};
 use crate::compiler::analyze::nullability::compute_nullable_defs;
 
 fn consumable_value_root(pattern: &Pattern) -> bool {
@@ -34,6 +34,7 @@ pub struct NfaBuilder<'a> {
     pub(super) instructions: Vec<InstructionIR>,
     pub(crate) next_label_id: u32,
     pub(super) def_entries: IndexMap<DefId, Label>,
+    pub(super) def_entries_consuming: IndexMap<DefId, Label>,
     /// Stack of active struct scopes for capture lookup.
     /// Innermost scope is at the end.
     pub(super) scope_stack: Vec<Struct>,
@@ -60,6 +61,7 @@ impl<'a> NfaBuilder<'a> {
             instructions: Vec::new(),
             next_label_id: 0,
             def_entries: IndexMap::new(),
+            def_entries_consuming: IndexMap::new(),
             scope_stack: Vec::new(),
             suppress_depth: 0,
             nullable_defs: compute_nullable_defs(
@@ -103,6 +105,7 @@ impl<'a> NfaBuilder<'a> {
         NfaGraph {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
+            def_entries_consuming: compiler.def_entries_consuming,
             entrypoint_wrappers,
         }
     }
@@ -185,6 +188,49 @@ impl<'a> NfaBuilder<'a> {
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
         }
+    }
+
+    pub(super) fn compile_consuming_def(&mut self, def_id: DefId) -> Label {
+        if let Some(&entry) = self.def_entries_consuming.get(&def_id) {
+            return entry;
+        }
+
+        let entry_label = self.fresh_label();
+        self.def_entries_consuming.insert(def_id, entry_label);
+
+        let name_sym = self.ctx.analysis.dependency_analysis.def_name_sym(def_id);
+        let name = self.ctx.analysis.interner.resolve(name_sym);
+        let body = self
+            .ctx
+            .symbol_table
+            .body(name)
+            .expect("analyzed definition has a body");
+
+        let return_label = self.fresh_label();
+        self.instructions.push(ReturnIR::new(return_label).into());
+
+        let body_nav = Some(Nav::StayExact);
+        let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        self.inline_stack.push(def_id);
+        let body_entry = self.with_scope(type_id, |this| {
+            this.compile_skippable_with_exits(
+                body,
+                SplitExits {
+                    match_exit: return_label,
+                    skip_exit: SkipExit::Fail,
+                },
+                body_nav,
+                CaptureEffects::default(),
+                consumable_value_root(body),
+            )
+        });
+        self.inline_stack.pop();
+
+        if body_entry != entry_label {
+            self.emit_epsilon(entry_label, vec![body_entry]);
+        }
+
+        entry_label
     }
 
     pub(super) fn compile_pattern(

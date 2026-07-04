@@ -131,6 +131,7 @@ mod debug_impl {
     enum WalkRoot {
         Entrypoint(DefId),
         Def(DefId),
+        ConsumingDef(DefId),
     }
 
     struct PassSnapshot {
@@ -314,11 +315,16 @@ mod debug_impl {
         fn new(
             instructions: &'a [InstructionIR],
             def_entries: &IndexMap<DefId, Label>,
+            def_entries_consuming: &IndexMap<DefId, Label>,
             ctx: &'a LowerInput<'a>,
         ) -> Self {
             Self {
                 instr_map: instructions.iter().map(|i| (i.label(), i)).collect(),
-                label_to_def: def_entries.iter().map(|(&d, &l)| (l, d)).collect(),
+                label_to_def: def_entries
+                    .iter()
+                    .chain(def_entries_consuming.iter())
+                    .map(|(&d, &l)| (l, d))
+                    .collect(),
                 ctx,
             }
         }
@@ -572,6 +578,69 @@ mod debug_impl {
         Ok(())
     }
 
+    /// Every compiled `Node` effect must run after some real match has
+    /// consumed a candidate. This is only a compiler IR check: once the VM's
+    /// `Node` effect reads the cursor directly, forged bytecode can still
+    /// produce wrong values, but it cannot reach undefined state.
+    fn check_no_node_on_zero_width_paths(nfa: &NfaGraph) -> Result<(), String> {
+        let instr_map: HashMap<Label, &InstructionIR> =
+            nfa.instructions.iter().map(|i| (i.label(), i)).collect();
+
+        for (root, entry) in entries(nfa) {
+            check_zero_width_root(root, entry, &instr_map)?;
+        }
+        Ok(())
+    }
+
+    fn check_zero_width_root(
+        root: WalkRoot,
+        entry: Label,
+        instr_map: &HashMap<Label, &InstructionIR>,
+    ) -> Result<(), String> {
+        let mut memo: HashMap<Label, bool> = HashMap::new();
+        let mut work = vec![(entry, true)];
+
+        while let Some((label, zero_width)) = work.pop() {
+            if let Some(&seen_zero_width) = memo.get(&label)
+                && (seen_zero_width || !zero_width)
+            {
+                continue;
+            }
+            memo.insert(label, zero_width);
+
+            let instr = instr_map
+                .get(&label)
+                .copied()
+                .ok_or_else(|| format!("{root:?}: dangling label {label:?}"))?;
+
+            match instr {
+                InstructionIR::Match(m) => {
+                    let after_nav_zero_width = zero_width && m.nav == Nav::Epsilon;
+                    if after_nav_zero_width
+                        && m.effects
+                            .iter()
+                            .any(|effect| effect.kind() == EffectKind::Node)
+                    {
+                        return Err(format!(
+                            "{root:?}: Node effect at {:?} is reachable without a consumed node",
+                            m.label
+                        ));
+                    }
+
+                    for &succ in &m.successors {
+                        work.push((succ, after_nav_zero_width));
+                    }
+                }
+                InstructionIR::Call(c) => {
+                    work.push((c.next, false));
+                }
+                InstructionIR::Return(_) => {}
+            }
+        }
+
+        Ok(())
+    }
+
     fn check_depth_root(
         root: WalkRoot,
         entry: Label,
@@ -635,6 +704,13 @@ mod debug_impl {
         }
     }
 
+    #[cfg(test)]
+    pub(super) fn assert_no_node_on_zero_width_paths(nfa: &NfaGraph, context: &str) {
+        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
+            panic!("[verify] {context} produced zero-width Node effect: {e}");
+        }
+    }
+
     fn entries(nfa: &NfaGraph) -> Vec<(WalkRoot, Label)> {
         let mut v = Vec::new();
         for (&def_id, &label) in &nfa.entrypoint_wrappers {
@@ -643,11 +719,19 @@ mod debug_impl {
         for (&def_id, &label) in &nfa.def_entries {
             v.push((WalkRoot::Def(def_id), label));
         }
+        for (&def_id, &label) in &nfa.def_entries_consuming {
+            v.push((WalkRoot::ConsumingDef(def_id), label));
+        }
         v
     }
 
     fn snapshot(nfa: &NfaGraph, ctx: &LowerInput) -> PassSnapshot {
-        let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
+        let walk = GraphWalk::new(
+            &nfa.instructions,
+            &nfa.def_entries,
+            &nfa.def_entries_consuming,
+            ctx,
+        );
         let fingerprints = entries(nfa)
             .into_iter()
             .map(|(key, entry)| {
@@ -687,9 +771,22 @@ mod debug_impl {
             panic!("[verify] pass `{name}` produced malformed IR: {e}");
         }
         assert_depth_neutrality(nfa, &format!("pass `{name}`"));
+        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
+            panic!("[verify] pass `{name}` produced zero-width Node effect: {e}");
+        }
 
-        let before_walk = GraphWalk::new(&before.instructions, &nfa.def_entries, ctx);
-        let after_walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
+        let before_walk = GraphWalk::new(
+            &before.instructions,
+            &nfa.def_entries,
+            &nfa.def_entries_consuming,
+            ctx,
+        );
+        let after_walk = GraphWalk::new(
+            &nfa.instructions,
+            &nfa.def_entries,
+            &nfa.def_entries_consuming,
+            ctx,
+        );
         for (key, entry, before_fp) in &before.fingerprints {
             let after_fp = after_walk.fingerprint(*entry);
             if *before_fp != after_fp {
@@ -725,7 +822,15 @@ mod debug_impl {
             panic!("[verify] construction produced malformed IR: {e}");
         }
         assert_depth_neutrality(nfa, "construction");
-        let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
+        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
+            panic!("[verify] construction produced zero-width Node effect: {e}");
+        }
+        let walk = GraphWalk::new(
+            &nfa.instructions,
+            &nfa.def_entries,
+            &nfa.def_entries_consuming,
+            ctx,
+        );
         for (key, entry) in entries(nfa) {
             if let Err(e) = walk.check_scopes(entry) {
                 panic!("[verify] construction produced unbalanced scope effects for {key:?}:\n{e}");

@@ -11,6 +11,7 @@ fn graph(instructions: Vec<InstructionIR>, entry: u32) -> NfaGraph {
             m.insert(DefId::from_raw(0), Label(entry));
             m
         },
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: {
             let mut m = IndexMap::new();
             m.insert(DefId::from_raw(0), Label(entry));

@@ -179,6 +179,9 @@ fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
     for entry in nfa.def_entries.values_mut() {
         *entry = resolve(*entry);
     }
+    for entry in nfa.def_entries_consuming.values_mut() {
+        *entry = resolve(*entry);
+    }
     for entry in nfa.entrypoint_wrappers.values_mut() {
         *entry = resolve(*entry);
     }

@@ -21,6 +21,7 @@ fn lower_no_overflow_unchanged() {
                 .into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -40,6 +41,7 @@ fn lower_effects_overflow() {
                 .into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -70,6 +72,7 @@ fn lower_neg_fields_overflow() {
                 .into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -95,6 +98,7 @@ fn lower_successors_overflow() {
     let mut result = NfaGraph {
         instructions: vec![MatchIR::terminal(Label(0)).successors(succs).into()],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -120,6 +124,7 @@ fn lower_successors_overflow_preserves_all_successors() {
     let mut result = NfaGraph {
         instructions: vec![MatchIR::terminal(Label(0)).successors(succs.clone()).into()],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -162,6 +167,7 @@ fn lower_successors_with_payload_respect_combined_limit() {
                 .into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -207,6 +213,7 @@ fn lower_combined_overflow() {
                 .into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 

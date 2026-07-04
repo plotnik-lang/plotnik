@@ -447,6 +447,9 @@ pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
     /// Entry labels for each definition (in definition order).
     pub(in crate::compiler::lower) def_entries: IndexMap<DefId, Label>,
+    /// Entry labels for consuming-only definition bodies, emitted on demand for
+    /// guarded recursive nullable calls.
+    pub(in crate::compiler::lower) def_entries_consuming: IndexMap<DefId, Label>,
     /// Entry labels for each emitted entrypoint wrapper, in definition order.
     pub(in crate::compiler::lower) entrypoint_wrappers: IndexMap<DefId, Label>,
 }

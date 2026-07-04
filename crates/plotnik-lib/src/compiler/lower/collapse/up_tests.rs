@@ -22,6 +22,7 @@ fn collapse_up_single_mode() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -56,6 +57,7 @@ fn collapse_up_chain_of_three() {
             MatchIR::terminal(Label(3)).into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -85,6 +87,7 @@ fn collapse_up_mixed_modes_no_merge() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -109,6 +112,7 @@ fn collapse_up_skip_trivia_same_mode() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -138,6 +142,7 @@ fn collapse_up_skip_extras_same_mode() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -167,6 +172,7 @@ fn collapse_up_exact_same_mode() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -200,6 +206,7 @@ fn collapse_up_with_effects_no_merge() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -224,6 +231,7 @@ fn collapse_up_merges_up_to_max() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -254,6 +262,7 @@ fn collapse_up_refuses_merge_exceeding_max() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -287,6 +296,7 @@ fn collapse_up_branching_no_merge() {
             MatchIR::terminal(Label(3)).into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -319,6 +329,7 @@ fn collapse_up_deep_chain_splits_without_dangling() {
     let mut result = NfaGraph {
         instructions,
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -367,6 +378,7 @@ fn assert_constraint_chain_splits(make: fn(u8) -> Nav) {
     let mut result = NfaGraph {
         instructions,
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 
@@ -432,6 +444,7 @@ fn collapse_up_no_up_unchanged() {
             MatchIR::terminal(Label(2)).into(),
         ],
         def_entries: Default::default(),
+        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
     };
 

@@ -35,6 +35,12 @@ enum RefLowering {
     PlainCall,
 }
 
+#[derive(Clone, Copy)]
+enum CalleeVariant {
+    Full,
+    Consuming,
+}
+
 /// Whether the post-effect chain consumes the call's pending value.
 ///
 /// A capture on the reference itself puts its consumer (`Set`, or `Push` for an
@@ -335,7 +341,7 @@ impl NfaBuilder<'_> {
                 value,
             );
         }
-        self.compile_ref_call(def_id, ctx, field_override, false)
+        self.compile_ref_call(def_id, ctx, field_override, CalleeVariant::Full, false)
     }
 
     /// Compile a reference as a `Call` to the definition's standalone body.
@@ -357,6 +363,7 @@ impl NfaBuilder<'_> {
         def_id: DefId,
         ctx: PatternCtx,
         field_override: Option<NodeFieldId>,
+        callee_variant: CalleeVariant,
         keep_value: bool,
     ) -> Label {
         let PatternCtx {
@@ -370,10 +377,13 @@ impl NfaBuilder<'_> {
         // symbol-table definitions, and `assert_all_definitions_processed` makes
         // `def_output` total over those — so `build_ir` registered a label for
         // every one. A miss is a desynced `def_output`/`def_entries`, our bug.
-        let &target = self
-            .def_entries
-            .get(&def_id)
-            .expect("every analyzed DefId has a def_entries label");
+        let target = match callee_variant {
+            CalleeVariant::Full => *self
+                .def_entries
+                .get(&def_id)
+                .expect("every analyzed DefId has a def_entries label"),
+            CalleeVariant::Consuming => self.compile_consuming_def(def_id),
+        };
         let callee = CalleeEntry(target);
 
         let def_output_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
@@ -514,6 +524,7 @@ impl NfaBuilder<'_> {
                 value: false,
             },
             field_override,
+            CalleeVariant::Full,
             true,
         )
     }
@@ -680,6 +691,7 @@ impl NfaBuilder<'_> {
                 value: false,
             },
             None,
+            CalleeVariant::Consuming,
             false,
         );
         let entry = match skip {
