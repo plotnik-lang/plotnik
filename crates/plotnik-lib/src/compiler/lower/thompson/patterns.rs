@@ -7,7 +7,7 @@
 //! - Field constraints: `name: pattern`
 //! - Captured patterns: `@name`, `pattern @name`
 
-use crate::bytecode::{EffectKind, Nav, PredicateOp};
+use crate::bytecode::{Nav, PredicateOp};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
@@ -44,8 +44,7 @@ enum RefLowering {
 /// variant) — leaves the reference itself unconsumed, so its output is
 /// suppressed.
 fn post_consumes_call_value(post: &[EffectIR]) -> bool {
-    post.first()
-        .is_some_and(|e| matches!(e.kind(), EffectKind::Set | EffectKind::Push))
+    CaptureEffects::effects_consume_value(post)
 }
 
 impl<'a> CaptureRequest<'a> {
@@ -76,6 +75,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
+            value: _,
         } = ctx;
         let entry = self.fresh_label();
         let node_kind = self.resolve_node_kind(node);
@@ -185,6 +185,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
+            value: _,
         } = ctx;
         let entry = self.fresh_label();
         let nav = nav_override.unwrap_or(Nav::Next);
@@ -317,7 +318,12 @@ impl NfaBuilder<'_> {
                 field_override.is_none(),
                 "field-constrained reference to a nullable definition must be rejected by analysis"
             );
-            let PatternCtx { exit, nav, capture } = ctx;
+            let PatternCtx {
+                exit,
+                nav,
+                capture,
+                value,
+            } = ctx;
             return self.compile_ref_inline(
                 def_id,
                 SplitExits {
@@ -326,6 +332,7 @@ impl NfaBuilder<'_> {
                 },
                 nav,
                 capture,
+                value,
             );
         }
         self.compile_ref_call(def_id, ctx, field_override, false)
@@ -356,6 +363,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
+            value: _,
         } = ctx;
 
         // Inside the trust boundary: `def_id_for_name` only yields DefIds for
@@ -472,8 +480,9 @@ impl NfaBuilder<'_> {
         exits: SplitExits,
         nav_override: Option<Nav>,
         capture: CaptureEffects,
+        value: bool,
     ) -> Label {
-        self.compile_ref_inline_in(def_id, exits, nav_override, capture, false)
+        self.compile_ref_inline_in(def_id, exits, nav_override, capture, value)
     }
 
     /// [`compile_ref_inline`](Self::compile_ref_inline) with `keep_value`: the
@@ -502,6 +511,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture: CaptureEffects::default(),
+                value: false,
             },
             field_override,
             true,
@@ -572,6 +582,7 @@ impl NfaBuilder<'_> {
                     },
                     nav_override,
                     CaptureEffects::default(),
+                    false,
                 )
             });
             self.emit_struct_step_with_pre(body_entry, pre)
@@ -593,6 +604,7 @@ impl NfaBuilder<'_> {
                     },
                     nav_override,
                     CaptureEffects::default(),
+                    true,
                 )
             });
             self.wrap_entry_pre(body_entry, pre)
@@ -618,6 +630,7 @@ impl NfaBuilder<'_> {
                     },
                     nav_override,
                     CaptureEffects::default(),
+                    false,
                 )
             });
             self.wrap_entry_pre(body_entry, pre)
@@ -664,6 +677,7 @@ impl NfaBuilder<'_> {
                 exit: match_exit,
                 nav: nav_override,
                 capture: CaptureEffects::new_post(post),
+                value: false,
             },
             None,
             false,
@@ -687,6 +701,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
+            value: value_context,
         } = ctx;
         let value = field
             .value()
@@ -699,6 +714,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture,
+                value: value_context,
             };
             return self.compile_ref(r, value_ctx, node_field);
         }
@@ -713,6 +729,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture,
+                value: value_context,
             };
             return self.compile_wrapped_field_value(&value, value_ctx, field_id);
         }
@@ -723,6 +740,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture,
+                value: value_context,
             },
         );
 
@@ -745,13 +763,19 @@ impl NfaBuilder<'_> {
         ctx: PatternCtx,
         field_id: NodeFieldId,
     ) -> Label {
-        let PatternCtx { exit, nav, capture } = ctx;
+        let PatternCtx {
+            exit,
+            nav,
+            capture,
+            value: value_context,
+        } = ctx;
         let value_entry = self.dispatch_pattern(
             value,
             PatternCtx {
                 exit,
                 nav: None,
                 capture,
+                value: value_context,
             },
         );
 
@@ -889,6 +913,7 @@ impl NfaBuilder<'_> {
                             },
                             nav,
                             combined,
+                            false,
                         )
                     }
                     CaptureExits::Single(exit) => match mechanism {
@@ -917,7 +942,7 @@ impl NfaBuilder<'_> {
         let set_step =
             self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
         let inner_entry =
-            self.dispatch_pattern(inner, PatternCtx::with_nav(set_step, nav_override));
+            self.dispatch_pattern(inner, PatternCtx::with_value(set_step, nav_override));
         // The enclosing variant's `Enum`-open (in `pre`) must run before the
         // inner produces its pending value; routing it through the trailing
         // `Set` step would drop it and unbalance the scope.
@@ -941,6 +966,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture: combined,
+                value: false,
             },
         )
     }
@@ -972,6 +998,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture: combined,
+                value: false,
             },
         )
     }
@@ -1047,6 +1074,7 @@ impl NfaBuilder<'_> {
                         },
                         nav_override,
                         CaptureEffects::default(),
+                        false,
                     )
                 })
             }

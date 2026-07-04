@@ -289,6 +289,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
+            value: _,
         } = ctx;
         if branches.is_empty() {
             return exit;
@@ -376,6 +377,7 @@ impl NfaBuilder<'_> {
                     },
                     branch_nav,
                     CaptureEffects::default(),
+                    false,
                 );
                 let mut pre = capture.pre.clone();
                 pre.extend(null_effects);
@@ -388,6 +390,7 @@ impl NfaBuilder<'_> {
                         exit: branch_exit,
                         nav: branch_nav,
                         capture: branch_capture,
+                        value: false,
                     },
                 )
             };
@@ -521,6 +524,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
+            value: _,
         } = ctx;
         let branches: Vec<_> = e.branches().collect();
         if branches.is_empty() {
@@ -598,6 +602,7 @@ impl NfaBuilder<'_> {
                         },
                         branch_nav,
                         CaptureEffects::default(),
+                        true,
                     );
                     let mut entry_pre = capture.pre.clone();
                     entry_pre.push(e_effect.clone());
@@ -612,6 +617,7 @@ impl NfaBuilder<'_> {
                             exit: branch_exit,
                             nav: branch_nav,
                             capture: branch_capture,
+                            value: false,
                         },
                     )
                 }

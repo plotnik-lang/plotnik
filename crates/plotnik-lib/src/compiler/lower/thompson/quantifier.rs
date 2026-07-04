@@ -174,12 +174,11 @@ pub(super) struct QuantifierConfig<'a> {
 }
 
 impl NfaBuilder<'_> {
-    /// Whether this quantifier collects into a definition's output (inferred
-    /// flow `Value`): the root of a definition body, compiled like a captured
-    /// quantifier whose result is left pending as the call's return value.
-    /// Suppressed regions discard the value and compile structurally.
-    fn is_value_collecting(&self, quant: &ast::QuantifiedPattern) -> bool {
-        if self.is_suppressed() {
+    /// Whether this quantifier's value is observed by its continuation. The
+    /// inferred `Value` flow is necessary but not enough: nested bare values are
+    /// structural unless a root/capture/ref context consumes the pending value.
+    fn is_value_collecting(&self, quant: &ast::QuantifiedPattern, value_context: bool) -> bool {
+        if self.is_suppressed() || !value_context {
             return false;
         }
         let pattern = Pattern::QuantifiedPattern(quant.clone());
@@ -209,9 +208,11 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
+            value,
         } = ctx;
+        let value_context = value || capture.post_consumes_value();
 
-        if self.is_value_collecting(quant) {
+        if self.is_value_collecting(quant, value_context) {
             return self.compile_valued_quantifier(
                 quant,
                 CaptureExits::Single(exit),
@@ -251,6 +252,7 @@ impl NfaBuilder<'_> {
                         exit,
                         nav: nav_override,
                         capture: element_capture,
+                        value: false,
                     },
                 );
             }
@@ -276,6 +278,7 @@ impl NfaBuilder<'_> {
         exits: SplitExits,
         nav_override: Option<Nav>,
         capture: CaptureEffects,
+        value_context: bool,
     ) -> Label {
         let SplitExits {
             match_exit,
@@ -316,6 +319,7 @@ impl NfaBuilder<'_> {
                     },
                     nav_override,
                     capture,
+                    value_context,
                 );
             }
         }
@@ -330,6 +334,7 @@ impl NfaBuilder<'_> {
                     exit: match_exit,
                     nav: nav_override,
                     capture,
+                    value: value_context,
                 },
                 skip_exit,
             );
@@ -339,6 +344,7 @@ impl NfaBuilder<'_> {
                 exit: match_exit,
                 nav: nav_override,
                 capture,
+                value: value_context,
             };
             // Mirrors dispatch_pattern: only a consumed enum outside
             // suppression tags its variants.
@@ -348,7 +354,10 @@ impl NfaBuilder<'_> {
                 .type_analysis
                 .expect_pattern_result(pattern)
                 .flow;
-            return if matches!(flow, PatternFlow::Value(_)) && !self.is_suppressed() {
+            return if ctx.consumes_value()
+                && matches!(flow, PatternFlow::Value(_))
+                && !self.is_suppressed()
+            {
                 self.compile_enum_with_exits(e, ctx, skip_exit)
             } else {
                 self.compile_degraded_enum_with_exits(e, ctx, skip_exit)
@@ -383,6 +392,7 @@ impl NfaBuilder<'_> {
                     exit: match_exit,
                     nav: nav_override,
                     capture,
+                    value: value_context,
                 },
             );
         };
@@ -396,13 +406,14 @@ impl NfaBuilder<'_> {
                         exit: match_exit,
                         nav: nav_override,
                         capture,
+                        value: value_context,
                     },
                 );
             }
             QuantifierForm::Quantified { inner, kind } => (inner, kind),
         };
 
-        if self.is_value_collecting(quant) {
+        if self.is_value_collecting(quant, value_context || capture.post_consumes_value()) {
             return self.compile_valued_quantifier(
                 quant,
                 CaptureExits::Split {
@@ -609,6 +620,7 @@ impl NfaBuilder<'_> {
                     exit: match_exit,
                     nav: nav_override,
                     capture,
+                    value: false,
                 },
             );
         };
@@ -622,6 +634,7 @@ impl NfaBuilder<'_> {
                         exit: match_exit,
                         nav: nav_override,
                         capture,
+                        value: false,
                     },
                 );
             }
@@ -978,6 +991,7 @@ impl NfaBuilder<'_> {
                         exit,
                         nav: Some(nav),
                         capture: CaptureEffects::new_post(post),
+                        value: !needs_node,
                     },
                 )
             })
@@ -1003,7 +1017,12 @@ impl NfaBuilder<'_> {
     /// exits — never a spurious empty element.
     pub(super) fn compile_iteration_element(&mut self, inner: &Pattern, ctx: PatternCtx) -> Label {
         if self.pattern_is_nullable(inner) {
-            let PatternCtx { exit, nav, capture } = ctx;
+            let PatternCtx {
+                exit,
+                nav,
+                capture,
+                value,
+            } = ctx;
             return self.compile_skippable_with_exits(
                 inner,
                 SplitExits {
@@ -1012,6 +1031,7 @@ impl NfaBuilder<'_> {
                 },
                 nav,
                 capture,
+                value,
             );
         }
         self.dispatch_pattern(inner, ctx)
@@ -1032,6 +1052,7 @@ impl NfaBuilder<'_> {
                     exit,
                     nav: Some(nav),
                     capture,
+                    value: false,
                 },
             ),
             IterationScope::StructScoped { row_type_id, .. } => {
@@ -1047,6 +1068,7 @@ impl NfaBuilder<'_> {
                         exit,
                         nav: Some(nav),
                         capture,
+                        value: false,
                     },
                 )
             }),

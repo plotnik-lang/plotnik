@@ -87,6 +87,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
+            value: _,
         } = ctx;
         let items: Vec<_> = seq.items().collect();
         if items.is_empty() {
@@ -248,6 +249,7 @@ impl NfaBuilder<'_> {
                         exit: current_exit,
                         nav: Some(Nav::StayExact),
                         capture: item_capture,
+                        value: false,
                     },
                 );
                 self.emit_position_search(nav, body)
@@ -258,6 +260,7 @@ impl NfaBuilder<'_> {
                         exit: current_exit,
                         nav: nav_override,
                         capture: item_capture,
+                        value: false,
                     },
                 )
             };
@@ -370,6 +373,7 @@ impl NfaBuilder<'_> {
             },
             first_nav,
             first_post,
+            false,
         );
 
         // Open the scope on a single entry epsilon every path crosses first.

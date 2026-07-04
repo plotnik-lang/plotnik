@@ -215,6 +215,7 @@ impl NfaBuilder<'_> {
                         },
                         nav,
                         CaptureEffects::default(),
+                        false,
                     )
                 })
             }
@@ -259,6 +260,7 @@ impl NfaBuilder<'_> {
                 exit: actual_exit,
                 nav,
                 capture: inner_capture,
+                value: false,
             },
         )
     }

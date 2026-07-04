@@ -19,6 +19,14 @@ use super::navigation::AnchorSemantics;
 use super::scope::{CaptureExits, Struct};
 use crate::compiler::analyze::nullability::compute_nullable_defs;
 
+fn consumable_value_root(pattern: &Pattern) -> bool {
+    match pattern {
+        Pattern::Enum(_) | Pattern::QuantifiedPattern(_) => true,
+        Pattern::FieldPattern(f) => f.value().is_some_and(|v| consumable_value_root(&v)),
+        _ => false,
+    }
+}
+
 /// NfaBuilder state for Thompson construction.
 pub struct NfaBuilder<'a> {
     pub(super) ctx: &'a LowerInput<'a>,
@@ -165,7 +173,12 @@ impl<'a> NfaBuilder<'a> {
         let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
         self.inline_stack.push(def_id);
         let body_entry = self.with_scope(type_id, |this| {
-            this.compile_pattern(body, return_label, body_nav)
+            let ctx = if consumable_value_root(body) {
+                PatternCtx::with_value(return_label, body_nav)
+            } else {
+                PatternCtx::with_nav(return_label, body_nav)
+            };
+            this.dispatch_pattern(body, ctx)
         });
         self.inline_stack.pop();
 
@@ -208,14 +221,22 @@ impl<'a> NfaBuilder<'a> {
                     .type_analysis
                     .expect_pattern_result(pattern)
                     .flow;
-                if matches!(flow, PatternFlow::Value(_)) && !self.is_suppressed() {
+                if ctx.consumes_value()
+                    && matches!(flow, PatternFlow::Value(_))
+                    && !self.is_suppressed()
+                {
                     self.compile_enum(e, ctx)
                 } else {
                     self.compile_degraded_enum(e, ctx)
                 }
             }
             Pattern::CapturedPattern(c) => {
-                let PatternCtx { exit, nav, capture } = ctx;
+                let PatternCtx {
+                    exit,
+                    nav,
+                    capture,
+                    value: _,
+                } = ctx;
                 self.compile_captured(c, c.inner(), nav, capture, CaptureExits::Single(exit))
             }
             Pattern::QuantifiedPattern(q) => self.compile_quantified(q, ctx),

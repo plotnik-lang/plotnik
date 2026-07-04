@@ -100,19 +100,35 @@ impl CaptureEffects {
         self.post.splice(0..0, effects);
         self
     }
+
+    /// Whether the first trailing effect consumes a value the inner pattern
+    /// leaves pending. Producer effects like `Node` are not consumers; they
+    /// capture the matched node themselves.
+    pub fn post_consumes_value(&self) -> bool {
+        Self::effects_consume_value(&self.post)
+    }
+
+    pub fn effects_consume_value(effects: &[EffectIR]) -> bool {
+        effects
+            .first()
+            .is_some_and(|e| matches!(e.kind(), EffectKind::Set | EffectKind::Push))
+    }
 }
 
 /// The backbone calling convention threaded through the `dispatch_pattern` family.
 ///
-/// Bundles the three values every pattern compiler needs: where the compiled
+/// Bundles the values every pattern compiler needs: where the compiled
 /// fragment continues (`exit`), the navigation it should apply to reach its first
 /// candidate (`nav`, `None` meaning "use the form's default"), and the capture
 /// effects that land on its innermost match/scope-close instruction (`capture`).
+/// `value` marks contexts where the pattern's own pending value is observed,
+/// such as a definition-root quantifier or a set-after structured capture.
 #[derive(Clone)]
 pub(super) struct PatternCtx {
     pub exit: Label,
     pub nav: Option<Nav>,
     pub capture: CaptureEffects,
+    pub value: bool,
 }
 
 impl PatternCtx {
@@ -121,7 +137,21 @@ impl PatternCtx {
             exit,
             nav,
             capture: CaptureEffects::default(),
+            value: false,
         }
+    }
+
+    pub(super) fn with_value(exit: Label, nav: Option<Nav>) -> Self {
+        Self {
+            exit,
+            nav,
+            capture: CaptureEffects::default(),
+            value: true,
+        }
+    }
+
+    pub(super) fn consumes_value(&self) -> bool {
+        self.value || self.capture.post_consumes_value()
     }
 }
 
