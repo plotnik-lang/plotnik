@@ -2,19 +2,18 @@
 //!
 //! This pass handles bytecode encoding constraints by splitting oversized
 //! instructions into cascading epsilon chains:
-//! - pre_effects > 7 → epsilon chain before match
-//! - post_effects > 7 → epsilon chain after match
+//! - effects > 15 → epsilon chain after match
 //! - neg_fields > 7 → epsilon chain for overflow checks
 //! - successors > 28 → cascading epsilon branches
 
-use crate::bytecode::{MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_POST_EFFECTS, MAX_PRE_EFFECTS};
+use crate::bytecode::{MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS};
 use crate::core::NodeFieldId;
 
 use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR, NfaGraph};
 
 enum PostChain {
     NegFields(Vec<NodeFieldId>),
-    PostEffects(Vec<EffectIR>),
+    Effects(Vec<EffectIR>),
     Successors(Vec<Label>),
 }
 
@@ -68,17 +67,6 @@ impl Emitter {
     }
 
     fn lower_match(&mut self, mut m: MatchIR) {
-        if m.pre_effects.len() > MAX_PRE_EFFECTS {
-            // Keep the trailing MAX on the match itself (mirroring the post_effects
-            // drain below); only the leading overflow spills to the epsilon chain.
-            // The chain runs first, so the effect order is unchanged.
-            let split = m.pre_effects.len() - MAX_PRE_EFFECTS;
-            let overflow: Vec<EffectIR> = m.pre_effects.drain(..split).collect();
-            let entry = m.label;
-            m.label = self.fresh_label();
-            self.emit_effects_chain(entry, m.label, overflow);
-        }
-
         let post_chains = drain_post_chains(&mut m);
         if post_chains.is_empty() {
             self.push(m.into());
@@ -93,7 +81,7 @@ impl Emitter {
                 PostChain::NegFields(neg_fields) => {
                     self.emit_neg_fields_chain(chain_entry, current_succs, neg_fields);
                 }
-                PostChain::PostEffects(effects) => {
+                PostChain::Effects(effects) => {
                     self.emit_effects_chain_to_succs(chain_entry, current_succs, effects);
                 }
                 PostChain::Successors(succs) => {
@@ -110,27 +98,6 @@ impl Emitter {
 
         m.successors = current_succs;
         self.push(m.into());
-    }
-
-    fn emit_effects_chain(&mut self, entry: Label, exit: Label, mut effects: Vec<EffectIR>) {
-        assert!(
-            !effects.is_empty(),
-            "callers only spill non-empty effect overflow"
-        );
-
-        if effects.len() <= MAX_PRE_EFFECTS {
-            self.push(MatchIR::epsilon(entry, exit).pre_effects(effects).into());
-            return;
-        }
-
-        let first_batch: Vec<_> = effects.drain(..MAX_PRE_EFFECTS).collect();
-        let intermediate = self.fresh_label();
-        self.push(
-            MatchIR::epsilon(entry, intermediate)
-                .pre_effects(first_batch)
-                .into(),
-        );
-        self.emit_effects_chain(intermediate, exit, effects);
     }
 
     fn emit_neg_fields_chain(
@@ -163,18 +130,18 @@ impl Emitter {
         final_succs: Vec<Label>,
         mut effects: Vec<EffectIR>,
     ) {
-        if effects.len() <= MAX_POST_EFFECTS {
-            let mut m = MatchIR::terminal(entry).post_effects(effects);
+        if effects.len() <= MAX_EFFECTS {
+            let mut m = MatchIR::terminal(entry).append_effects(effects);
             m.successors = final_succs;
             self.push(m.into());
             return;
         }
 
-        let first_batch: Vec<_> = effects.drain(..MAX_POST_EFFECTS).collect();
+        let first_batch: Vec<_> = effects.drain(..MAX_EFFECTS).collect();
         let intermediate = self.fresh_label();
         self.push(
             MatchIR::terminal(entry)
-                .post_effects(first_batch)
+                .append_effects(first_batch)
                 .next(intermediate)
                 .into(),
         );
@@ -203,9 +170,9 @@ fn drain_post_chains(m: &mut MatchIR) -> Vec<PostChain> {
         post_chains.push(PostChain::NegFields(overflow));
     }
 
-    if m.post_effects.len() > MAX_POST_EFFECTS {
-        let overflow = m.post_effects.drain(MAX_POST_EFFECTS..).collect();
-        post_chains.push(PostChain::PostEffects(overflow));
+    if m.effects.len() > MAX_EFFECTS {
+        let overflow = m.effects.drain(MAX_EFFECTS..).collect();
+        post_chains.push(PostChain::Effects(overflow));
     }
 
     let succ_budget = successor_budget(m);
@@ -218,13 +185,12 @@ fn drain_post_chains(m: &mut MatchIR) -> Vec<PostChain> {
 }
 
 fn successor_budget(m: &MatchIR) -> usize {
-    // Successors share the 28-slot Match64 payload with the match's own retained
-    // pre/neg/post effects and predicate (`MatchIR::resolve` panics on a combined
+    // Successors share the 28-slot Match64 payload with the match's retained
+    // effects, neg fields, and predicate (`MatchIR::resolve` panics on a combined
     // overflow). Budget the successor split against those other slots — not the bare
     // 28 — so the kept successors plus the cascade entry appended below land exactly at
-    // the limit, never one over. (`other_slots` ≤ 7+7+7+2, so the budget stays ≥ 5.)
+    // the limit, never one over. (`other_slots` ≤ 15+7+2, so the budget stays ≥ 4.)
     let predicate_slots = if m.predicate.is_some() { 2 } else { 0 };
-    let other_slots =
-        m.pre_effects.len() + m.neg_fields.len() + m.post_effects.len() + predicate_slots;
+    let other_slots = m.effects.len() + m.neg_fields.len() + predicate_slots;
     MAX_MATCH_PAYLOAD_SLOTS - other_slots
 }

@@ -9,8 +9,6 @@ pub struct Frame {
     pub return_addr: u16,
     /// Parent frame index (for cactus stack).
     pub parent: Option<u32>,
-    /// Tree depth at Call time (for level restoration on Return).
-    pub cursor_depth: u32,
 }
 
 /// Append-only arena for frames (cactus stack implementation).
@@ -34,25 +32,24 @@ impl FrameArena {
     }
 
     /// Push a new frame, returns its index.
-    pub fn push(&mut self, return_addr: u16, cursor_depth: u32) -> u32 {
+    pub fn push(&mut self, return_addr: u16) -> u32 {
         let idx = self.frames.len() as u32;
         self.frames.push(Frame {
             return_addr,
             parent: self.current,
-            cursor_depth,
         });
         self.current = Some(idx);
         idx
     }
 
-    /// Pop the current frame, returning its return address and cursor depth.
+    /// Pop the current frame, returning its return address.
     ///
     /// Panics if the stack is empty.
-    pub fn pop(&mut self) -> (u16, u32) {
+    pub fn pop(&mut self) -> u16 {
         let current_idx = self.current.expect("pop on empty frame stack");
         let frame = self.frames[current_idx as usize];
         self.current = frame.parent;
-        (frame.return_addr, frame.cursor_depth)
+        frame.return_addr
     }
 
     /// Restore frame state for backtracking.

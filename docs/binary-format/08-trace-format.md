@@ -1,431 +1,110 @@
 # Execution Trace Format
 
-The `trace` command provides step-by-step execution visualization for debugging queries.
+`plotnik trace` prints the instruction stream as it executes. It reuses the dump
+line format and adds sub-lines for navigation, match results, effects, calls,
+and backtracking.
 
-## Command Usage
+## Command
 
 ```sh
 plotnik trace query.ptk source.js
-plotnik trace -q 'Pattern = (identifier) @id' -l javascript --source 'let x = 1'
-plotnik trace query.ptk source.js -v          # moderate verbosity
-plotnik trace query.ptk source.js -vv         # maximum verbosity
+plotnik trace -q 'Q = (program)' -s 'x;' -l javascript -v
 plotnik trace query.ptk source.js --max-steps 10000
 ```
 
-## Verbosity Levels
+## Verbosity
 
-| Level     | Sub-lines                     | Node Text          | Audience       |
-| --------- | ----------------------------- | ------------------ | -------------- |
-| (default) | match, backtrack, call/return | kind only          | LLM, CI        |
-| `-v`      | all                           | on match/failure   | Developer      |
-| `-vv`     | all                           | on all (incl. nav) | Deep debugging |
+| Level   | Sub-lines                     | Node Text         |
+| ------- | ----------------------------- | ----------------- |
+| default | match, backtrack, call/return | kind only         |
+| `-v`    | all                           | on match/failure  |
+| `-vv`   | all                           | on all navigation |
 
-**Text budget**: Node text fills the line up to the successors column (minimum 12 characters). Truncated text ends with `…`.
+## Instruction Lines
 
----
+Instruction lines are the same shape as `dump`:
 
-## Trace Format
-
-The trace output reuses the bytecode dump format, adding sub-lines that show execution dynamics: navigation results, type checks, effect emissions, and branching decisions.
-
-### Column Layout
-
-Same as dump format:
-
-```
-| 2 | step | 1 |   5   | 1 | content              | 1 | succ |
-|   | pad  |   | (ctr) |   |                      |   |      |
+```text
+  18       (document)                       16
+  02       (?)                              18 : 03
+  06   ◀   (?)
 ```
 
-- **Step padding**: Dynamic based on max step in graph
-- **Symbol column**: All symbols centered in 5 characters
+`(?)` is a call to an internal wrapper/body label that has no user definition
+name. Returns show `◀`; top-level return shows `◼`.
 
-### Instruction Line
+## Sub-Lines
 
-Each instruction shows a simplified view compared to `dump`:
+Sub-lines leave the step column blank and use the symbol column for the event:
 
-```
-  12       (program)                        13
-  13       (B)                              01 : 14
-  08   ◀   (B)
-```
+| Symbol | Meaning                   |
+| ------ | ------------------------- |
+| blank  | Stayed at position        |
+| `└‣─`  | Descended to child        |
+| `─‣─`  | Moved to sibling          |
+| `─‣┘`  | Ascended to parent        |
+| `●`    | Match success             |
+| `○`    | Match failure             |
+| `⬥`    | Effect emitted            |
+| `⬦`    | Effect suppressed by `@_` |
+| `▶`    | Entered a call            |
 
-**Match instructions** show empty symbol column (nav appears in sublines). **Call instructions** show `(Name)` with `target : return` successors. **Return instructions** show `◀` with `(Name)`.
+Backtracking is an instruction-level line:
 
-### Sub-Lines
-
-Below each instruction, sub-lines show what happened during execution. Each sub-line uses the same column layout with the step number area blank:
-
-| Symbol  | Meaning                           |
-| ------- | --------------------------------- |
-| (blank) | Navigation: stayed at position    |
-| `└‣─`   | Navigation: descended to child    |
-| `─‣─`   | Navigation: moved to sibling      |
-| `─‣┘`   | Navigation: ascended to parent    |
-| `  ●  ` | Match: success                    |
-| `  ○  ` | Match: failure                    |
-| `  ⬥  ` | Effect: data capture or structure |
-| `  ⬦  ` | Effect: suppressed (inside @\_)   |
-| `  ▶  ` | Call: entering definition         |
-
-Navigation symbols use the same detailed notation as dump output, and appear only in sub-lines. Match sub-lines show success (`●`) or failure (`○`) for type/field checks.
-
-### Return Line
-
-Return is an instruction-level line showing the definition being returned from:
-
-```
-  08   ◀   (B)
-  17   ◀   (A)                              ◼
+```text
+  08  ❮❮❮
 ```
 
-The `◀` symbol appears in the symbol column with the definition name in parentheses. Top-level returns (empty call stack) show `◼` as successor; mid-stack returns have no successor.
+## Example
 
-### Definition Labels
+Query:
 
-Definition labels (`Name:`) appear at:
-
-- Entry to a definition (initial or via call)
-- After returning from a call (showing the caller's name)
-
-```
-A:
-  09  -ε-                                  10
-  ...
-  13       (B)                              01 : 14
-       ▶   (B)
-B:
-  01  -ε-                                  02
-  ...
-  08   ◀   (B)
-A:
-  14                                        15
+```plotnik
+Value = (document [Num: (number) @n Str: (string) @s])
 ```
 
-### Backtrack Line
+Source:
 
-Backtrack is an instruction-level line (not a sub-line) showing checkpoint restoration:
-
-```
-  06  ❮❮❮
+```json
+42
 ```
 
-The step number indicates _where_ we're restoring to. `❮❮❮` is centered in the 5-char symbol column (`❮❮❮`).
+Trace with `-v --no-result`:
 
----
-
-## Example Query
-
-From `07-dump-format.md`:
-
-```
-Value = (document [
-    Num: (number) @n
-    Str: (string) @s
-])
-```
-
-Run: `plotnik trace -q '<query>' -s '<source>' -l json -v --no-result`
-
-### Bytecode Reference
-
-```
-[entrypoints]
-Value = 06 :: T3
-
-[transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
+```text
 Value:
-  06   !   (document)                       08
-  07  ...
-  08  └‣─  _                                11, 16, 19
-  10                                        ▶
-  11   !   [EnumOpen(M2)] (number) [Node Set(M0) EnumClose]  14
-  14  ─‣┘  _                                10
-  15  ...
-  16   !   [EnumOpen(M3)] (string) [Node Set(M1) EnumClose]  14
-  19  ─‣─  _                                11, 16, 19
-```
-
----
-
-## Trace 1: Successful Match on First Branch (`-v`)
-
-**Source:** `42` (JSON number)
-
-```
-(document
-  (number "42"))
-```
-
-### Execution Trace
-
-```
-_StructWrap:
   00  -ε-  [StructOpen]                     02
        ⬥   StructOpen
-  02       Trampoline                       03
-       ▶   (Value)
+  02       (?)                              18 : 03
+       ▶   (?)
 
-Value:
-  06       (document)                       08
+?:
+  --------------------------------------------
+  18       (document)                       16
        !   document
        ●   document 42
-  --------------------------------------------
-  08       _                                11, 16, 19
+  16       _                                08, 11, 14
       └‣─  number
        ●   number 42
-  11       [EnumOpen(M2)] (number) [Node Set(M0) EnumClose]  14
+  --------------------------------------------
+  08       (number) [Null Set(M1) Node Set(M0)]  07
        !   number
        ●   number 42
-       ⬥   EnumOpen "Num"
+       ⬥   Null
+       ⬥   Set "s"
        ⬥   Node
        ⬥   Set "n"
-       ⬥   EnumClose
-  14       _                                10
+  --------------------------------------------
+  07       _                                06
       ─‣┘  document
        ●   document 42
-  10   ◀   (Value)
+  06   ◀   (?)
 
-_StructWrap:
-  --------------------------------------------
+Value:
   03  -ε-  [StructClose]                    05
        ⬥   StructClose
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Value)                          ◼
 ```
 
-First branch (`Num`) matches — checkpoints at steps 16 and 19 are never used.
-
----
-
-## Trace 2: Successful Match with Backtracking (`-v`)
-
-**Source:** `"hello"` (JSON string)
-
-```
-(document
-  (string "\"hello\""))
-```
-
-### Execution Trace
-
-```
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-       ⬥   StructOpen
-  02       Trampoline                       03
-       ▶   (Value)
-
-Value:
-  06       (document)                       08
-       !   document
-       ●   document "hello"
-  --------------------------------------------
-  08       _                                11, 16, 19
-      └‣─  string
-       ●   string "hello"
-  11       [EnumOpen(M2)] (number) [Node Set(M0) EnumClose]  14
-       !   string
-       ○   string "hello"
-  08  ❮❮❮
-  --------------------------------------------
-  16       [EnumOpen(M3)] (string) [Node Set(M1) EnumClose]  14
-       !   string
-       ●   string "hello"
-       ⬥   EnumOpen "Str"
-       ⬥   Node
-       ⬥   Set "s"
-       ⬥   EnumClose
-  --------------------------------------------
-  14       _                                10
-      ─‣┘  document
-       ●   document "hello"
-  10   ◀   (Value)
-
-_StructWrap:
-  --------------------------------------------
-  03  -ε-  [StructClose]                    05
-       ⬥   StructClose
-  05   ◀   _StructWrap                      ◼
-```
-
-### Execution Summary
-
-1. **00→02**: Preamble starts, emit `StructOpen`
-2. **02→Value**: `Trampoline` dispatches to entrypoint
-3. **06→08**: Match `(document)` succeeds
-4. **08**: Search document children, create checkpoints for `Str` (16) and retry (19), try `Num` (11) first
-5. **11**: Try `Num` branch at the current child — type mismatch (`○`)
-6. **08 ❮❮❮**: Backtrack to the `Str` checkpoint
-7. **16**: Try `Str` branch at the same child — match (`●`)
-8. **14→10**: Navigate up, return from `Value`
-9. **03→05**: Preamble cleanup, emit `StructClose`, accept (`◼`)
-
----
-
-## Trace 3: Failed Match (`-v`)
-
-**Source:** `true` (JSON boolean — neither number nor string)
-
-```
-(document
-  (true "true"))
-```
-
-### Execution Trace
-
-```
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-       ⬥   StructOpen
-  02       Trampoline                       03
-       ▶   (Value)
-
-Value:
-  06       (document)                       08
-       !   document
-       ●   document true
-  --------------------------------------------
-  08       _                                11, 16, 19
-      └‣─  true
-       ●   true true
-  11       [EnumOpen(M2)] (number) [Node Set(M0) EnumClose]  14
-       !   true
-       ○   true true
-  08  ❮❮❮
-  --------------------------------------------
-  16       [EnumOpen(M3)] (string) [Node Set(M1) EnumClose]  14
-       !   true
-       ○   true true
-  08  ❮❮❮
-  19       _                                11, 16, 19
-       ○   ─‣─
-```
-
-Both branches fail. No more checkpoints — query does not match. The CLI exits with code 1.
-
----
-
-## Trace 4: Default Verbosity (Compact)
-
-Same as Trace 2 but with default verbosity (no `-v` flag). Navigation and effect sub-lines are hidden:
-
-```
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Value)
-
-Value:
-  06       (document)                       08
-       ●   document
-  08       _                                11, 16, 19
-       ●   string
-  11       [EnumOpen(M2)] (number) [Node Set(M0) EnumClose]  14
-       ○   string
-  08  ❮❮❮
-  16       [EnumOpen(M3)] (string) [Node Set(M1) EnumClose]  14
-       ●   string
-  14       _                                10
-       ●   document
-  10   ◀   (Value)
-
-_StructWrap:
-  03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
-```
-
-Default shows:
-
-- Match results (`●`, `○`) with kind only, no text
-- Backtrack (`❮❮❮`)
-- Call (`▶`) and return (`◀`)
-
-Hidden:
-
-- Navigation sub-lines (`└‣─`, `!`, `─‣┘`)
-- Effect sub-lines (`⬥`, `⬦`)
-
----
-
-## Sub-Line Reference
-
-| Symbol  | Format              | Example                      |
-| ------- | ------------------- | ---------------------------- |
-| (blank) | `     kind`         | `     identifier`            |
-| `└‣─`   | `└‣─  kind`         | `└‣─  identifier`            |
-| `└─!`   | `└─!  kind text`    | `└─!  identifier foo`        |
-| `─‣─`   | `─‣─  kind`         | `─‣─  return_statement`      |
-| `─‣┘`   | `─‣┘  kind`         | `─‣┘  assignment_expression` |
-| `  ●  ` | `●   kind`          | `●   identifier`             |
-| `  ●  ` | `●   kind text`     | `●   identifier foo`         |
-| `  ●  ` | `●   field:`        | `●   left:`                  |
-| `  ○  ` | `○   kind`          | `○   string`                 |
-| `  ⬥  ` | `⬥   Effect`        | `⬥   Node`                   |
-| `  ⬥  ` | `⬥   Set "field"`   | `⬥   Set "target"`           |
-| `  ⬥  ` | `⬥   EnumOpen "var"` | `⬥   EnumOpen "Literal"`    |
-| `  ⬥  ` | `⬥   SuppressBegin` | `⬥   SuppressBegin`          |
-| `  ⬥  ` | `⬥   SuppressEnd`   | `⬥   SuppressEnd`            |
-| `  ⬦  ` | `⬦   Effect`        | `⬦   Node` (suppressed)      |
-| `  ⬦  ` | `⬦   SuppressBegin` | `⬦   SuppressBegin` (nested) |
-| `  ▶  ` | `▶   (Name)`        | `▶   (Expression)`           |
-
-### Backtrack (Instruction-Level)
-
-```
-  NN  ❮❮❮
-```
-
-Step number `NN` is the checkpoint we're restoring to. Appears as an instruction line, not a sub-line.
-
-## Nav Symbols
-
-Trace output uses the same navigation symbols as dump output:
-
-| Nav                                        | Symbol  | Meaning                      |
-| ------------------------------------------ | ------- | ---------------------------- |
-| Epsilon                                    | -ε-     | Pure control flow, no cursor |
-| Stay                                       | (space) | No movement                  |
-| StayExact                                  | !       | Exact match without movement |
-| Down, DownSkip, DownSkipExtras, DownExact  | └‣─ etc | Descended to child           |
-| Next, NextSkip, NextSkipExtras, NextExact  | ─‣─ etc | Moved to sibling             |
-| Up(n), UpSkipTrivia, UpSkipExtras, UpExact | ─‣┘ etc | Ascended to parent           |
-
-For the complete table of connector symbols, see [07-dump-format.md](07-dump-format.md#nav-symbols).
-
-## Effects
-
-| Effect              | Description                    |
-| ------------------- | ------------------------------ |
-| Node                | Capture matched node           |
-| Set "field"         | Assign to struct field         |
-| EnumOpen "variant"  | Start enum variant             |
-| EnumClose           | End enum variant               |
-| ArrayOpen           | Start array                    |
-| Push                | Push to array                  |
-| ArrayClose          | End array                      |
-| StructOpen          | Start struct                   |
-| StructClose         | End struct                     |
-| Null                | Null value                     |
-| SuppressBegin       | Enter suppression scope (`@_`) |
-| SuppressEnd         | Exit suppression scope         |
-
-## Command Options
-
-| Option           | Description                              |
-| ---------------- | ---------------------------------------- |
-| `-v`             | Moderate verbosity (all sub-lines)       |
-| `-vv`            | Maximum verbosity (text on navigation)   |
-| `--max-steps N`  | Work limit (default: `auto`, size-based) |
-| `--max-memory S` | Memory limit (default: `auto`)           |
-| `--entry NAME`   | Select entrypoint for multi-def queries  |
-
-## Files
-
-- `crates/plotnik-cli/src/commands/trace.rs` — Command implementation
-- `crates/plotnik-lib/src/vm/engine/trace.rs` — Tracer trait and PrintTracer
+Default verbosity hides navigation and effect sub-lines but keeps match
+success/failure, calls, returns, and backtracking.

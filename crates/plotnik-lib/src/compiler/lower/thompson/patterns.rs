@@ -7,7 +7,7 @@
 //! - Field constraints: `name: pattern`
 //! - Captured patterns: `@name`, `pattern @name`
 
-use crate::bytecode::{EffectKind, Nav, PredicateOp};
+use crate::bytecode::{Nav, PredicateOp};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
@@ -35,6 +35,12 @@ enum RefLowering {
     PlainCall,
 }
 
+#[derive(Clone, Copy)]
+enum CalleeVariant {
+    Full,
+    Consuming,
+}
+
 /// Whether the post-effect chain consumes the call's pending value.
 ///
 /// A capture on the reference itself puts its consumer (`Set`, or `Push` for an
@@ -44,8 +50,7 @@ enum RefLowering {
 /// variant) — leaves the reference itself unconsumed, so its output is
 /// suppressed.
 fn post_consumes_call_value(post: &[EffectIR]) -> bool {
-    post.first()
-        .is_some_and(|e| matches!(e.kind(), EffectKind::Set | EffectKind::Push))
+    CaptureEffects::effects_consume_value(post)
 }
 
 impl<'a> CaptureRequest<'a> {
@@ -76,6 +81,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
+            value: _,
         } = ctx;
         let entry = self.fresh_label();
         let node_kind = self.resolve_node_kind(node);
@@ -90,8 +96,8 @@ impl NfaBuilder<'_> {
                 .nav(nav)
                 .node_kind(node_kind)
                 .neg_fields(neg_fields)
-                .pre_effects(capture.pre)
-                .post_effects(capture.post);
+                .prepend_effects(capture.pre)
+                .append_effects(capture.post);
             if let Some(p) = predicate {
                 m = m.predicate(p);
             }
@@ -111,10 +117,9 @@ impl NfaBuilder<'_> {
             Nav::Up(1)
         };
 
-        // Split capture.post: Node effects (and their Set) go on entry (need matched_node
-        // right after match), other effects go on final_exit (after children processing).
-        // Node capture effects use matched_node which is only valid immediately after the match,
-        // before descending into children (which may clobber matched_node via backtracking).
+        // Split capture.post: Node effects (and their Set) go on entry so
+        // they read the cursor immediately after this node matched. Other
+        // effects run after child constraints have completed.
         use crate::bytecode::EffectKind;
 
         let mut entry_effects = Vec::new();
@@ -136,7 +141,7 @@ impl NfaBuilder<'_> {
         }
 
         // With items: nav[entry_effects] → items → Up → [exit_effects] → exit
-        let final_exit = self.emit_post_effects_exit(exit, exit_effects);
+        let final_exit = self.emit_trailing_effects_exit(exit, exit_effects);
 
         let up_label = self.fresh_label();
         let items_entry = self.compile_seq_items(SeqItemsCtx {
@@ -156,8 +161,8 @@ impl NfaBuilder<'_> {
             .nav(nav)
             .node_kind(node_kind)
             .neg_fields(neg_fields)
-            .pre_effects(capture.pre)
-            .post_effects(entry_effects);
+            .prepend_effects(capture.pre)
+            .append_effects(entry_effects);
         if let Some(p) = predicate {
             entry_match = entry_match.predicate(p);
         }
@@ -168,7 +173,7 @@ impl NfaBuilder<'_> {
 
     /// Post-effects (like `EndEnum`) must run after children complete, not right after
     /// matching the parent node. Returns `exit` unchanged when `post` is empty.
-    fn emit_post_effects_exit(&mut self, exit: Label, post: Vec<EffectIR>) -> Label {
+    fn emit_trailing_effects_exit(&mut self, exit: Label, post: Vec<EffectIR>) -> Label {
         if post.is_empty() {
             exit
         } else {
@@ -185,6 +190,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
+            value: _,
         } = ctx;
         let entry = self.fresh_label();
         let nav = nav_override.unwrap_or(Nav::Next);
@@ -198,8 +204,8 @@ impl NfaBuilder<'_> {
             MatchIR::epsilon(entry, exit)
                 .nav(nav)
                 .node_kind(node_kind)
-                .pre_effects(capture.pre)
-                .post_effects(capture.post),
+                .prepend_effects(capture.pre)
+                .append_effects(capture.post),
         );
 
         entry
@@ -317,7 +323,12 @@ impl NfaBuilder<'_> {
                 field_override.is_none(),
                 "field-constrained reference to a nullable definition must be rejected by analysis"
             );
-            let PatternCtx { exit, nav, capture } = ctx;
+            let PatternCtx {
+                exit,
+                nav,
+                capture,
+                value,
+            } = ctx;
             return self.compile_ref_inline(
                 def_id,
                 SplitExits {
@@ -326,9 +337,10 @@ impl NfaBuilder<'_> {
                 },
                 nav,
                 capture,
+                value,
             );
         }
-        self.compile_ref_call(def_id, ctx, field_override, false)
+        self.compile_ref_call(def_id, ctx, field_override, CalleeVariant::Full, false)
     }
 
     /// Compile a reference as a `Call` to the definition's standalone body.
@@ -338,9 +350,10 @@ impl NfaBuilder<'_> {
     ///
     /// - Captured ref returning struct: `Struct → Call → EndStruct → Set → exit`
     /// - Captured ref returning scalar: `Call → Set → exit`
-    /// - Bare ref to a non-void definition: `SuppressBegin → Call → SuppressEnd → exit`
+    /// - Bare ref returning output effects: `SuppressBegin → Call → SuppressEnd → exit`
     ///   (matches structurally, output discarded)
-    /// - Bare ref to a void definition: `Call → exit` (nothing to discard)
+    /// - Bare ref to a void or node-scalar definition: `Call → exit`
+    ///   (nothing to discard)
     ///
     /// `keep_value` forces the consumed lowering even with no consumer effect
     /// at this site: the callee's pending value must survive the call — it is
@@ -350,22 +363,27 @@ impl NfaBuilder<'_> {
         def_id: DefId,
         ctx: PatternCtx,
         field_override: Option<NodeFieldId>,
+        callee_variant: CalleeVariant,
         keep_value: bool,
     ) -> Label {
         let PatternCtx {
             exit,
             nav: nav_override,
             capture,
+            value: _,
         } = ctx;
 
         // Inside the trust boundary: `def_id_for_name` only yields DefIds for
         // symbol-table definitions, and `assert_all_definitions_processed` makes
         // `def_output` total over those — so `build_ir` registered a label for
         // every one. A miss is a desynced `def_output`/`def_entries`, our bug.
-        let &target = self
-            .def_entries
-            .get(&def_id)
-            .expect("every analyzed DefId has a def_entries label");
+        let target = match callee_variant {
+            CalleeVariant::Full => *self
+                .def_entries
+                .get(&def_id)
+                .expect("every analyzed DefId has a def_entries label"),
+            CalleeVariant::Consuming => self.compile_consuming_def(def_id),
+        };
         let callee = CalleeEntry(target);
 
         let def_output_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
@@ -379,7 +397,7 @@ impl NfaBuilder<'_> {
 
         let nav = nav_override.unwrap_or(Nav::Stay);
 
-        // Call instructions don't have pre_effects, so emit epsilon if needed
+        // Call instructions cannot carry effects, so emit epsilon if needed.
         let call_entry = match lowering {
             RefLowering::ScopedCapture => {
                 // Struct isolates the definition's internal captures before the Set.
@@ -414,8 +432,9 @@ impl NfaBuilder<'_> {
                 )
             }
             RefLowering::PlainCall => {
-                // A void definition emits no output effects; the call needs no
-                // bracket. Enclosing-scope post effects still run after it.
+                // Void and node-scalar definitions emit no output effects in
+                // their bodies; the call needs no bracket. Enclosing-scope post
+                // effects still run after it.
                 let return_addr = if capture.post.is_empty() {
                     exit
                 } else {
@@ -443,9 +462,10 @@ impl NfaBuilder<'_> {
         }
 
         // References are opaque: a bare reference matches structurally and its
-        // output is suppressed (inference types it void). Only a void-returning
-        // definition emits no output effects and can be called unbracketed.
-        if matches!(def_output_shape, TypeShape::Void) {
+        // output is suppressed (inference types it void). Void and node-scalar
+        // definitions emit no output effects in their bodies, so there is
+        // nothing to bracket.
+        if matches!(def_output_shape, TypeShape::Void | TypeShape::Node) {
             return RefLowering::PlainCall;
         }
 
@@ -472,8 +492,9 @@ impl NfaBuilder<'_> {
         exits: SplitExits,
         nav_override: Option<Nav>,
         capture: CaptureEffects,
+        value: bool,
     ) -> Label {
-        self.compile_ref_inline_in(def_id, exits, nav_override, capture, false)
+        self.compile_ref_inline_in(def_id, exits, nav_override, capture, value)
     }
 
     /// [`compile_ref_inline`](Self::compile_ref_inline) with `keep_value`: the
@@ -502,8 +523,10 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture: CaptureEffects::default(),
+                value: false,
             },
             field_override,
+            CalleeVariant::Full,
             true,
         )
     }
@@ -538,8 +561,7 @@ impl NfaBuilder<'_> {
             .type_analysis
             .expect_type_shape(def_output_id);
         let is_captured = post_consumes_call_value(&capture.post) || keep_value;
-        let inline_scoped_capture =
-            is_captured && matches!(def_output_shape, TypeShape::Struct(_));
+        let inline_scoped_capture = is_captured && matches!(def_output_shape, TypeShape::Struct(_));
 
         let SplitExits {
             match_exit,
@@ -573,6 +595,7 @@ impl NfaBuilder<'_> {
                     },
                     nav_override,
                     CaptureEffects::default(),
+                    false,
                 )
             });
             self.emit_struct_step_with_pre(body_entry, pre)
@@ -594,6 +617,7 @@ impl NfaBuilder<'_> {
                     },
                     nav_override,
                     CaptureEffects::default(),
+                    true,
                 )
             });
             self.wrap_entry_pre(body_entry, pre)
@@ -619,6 +643,7 @@ impl NfaBuilder<'_> {
                     },
                     nav_override,
                     CaptureEffects::default(),
+                    false,
                 )
             });
             self.wrap_entry_pre(body_entry, pre)
@@ -665,8 +690,10 @@ impl NfaBuilder<'_> {
                 exit: match_exit,
                 nav: nav_override,
                 capture: CaptureEffects::new_post(post),
+                value: false,
             },
             None,
+            CalleeVariant::Consuming,
             false,
         );
         let entry = match skip {
@@ -688,6 +715,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: nav_override,
             capture,
+            value: value_context,
         } = ctx;
         let value = field
             .value()
@@ -700,6 +728,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture,
+                value: value_context,
             };
             return self.compile_ref(r, value_ctx, node_field);
         }
@@ -714,6 +743,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture,
+                value: value_context,
             };
             return self.compile_wrapped_field_value(&value, value_ctx, field_id);
         }
@@ -724,6 +754,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture,
+                value: value_context,
             },
         );
 
@@ -746,13 +777,19 @@ impl NfaBuilder<'_> {
         ctx: PatternCtx,
         field_id: NodeFieldId,
     ) -> Label {
-        let PatternCtx { exit, nav, capture } = ctx;
+        let PatternCtx {
+            exit,
+            nav,
+            capture,
+            value: value_context,
+        } = ctx;
         let value_entry = self.dispatch_pattern(
             value,
             PatternCtx {
                 exit,
                 nav: None,
                 capture,
+                value: value_context,
             },
         );
 
@@ -890,6 +927,7 @@ impl NfaBuilder<'_> {
                             },
                             nav,
                             combined,
+                            false,
                         )
                     }
                     CaptureExits::Single(exit) => match mechanism {
@@ -918,7 +956,7 @@ impl NfaBuilder<'_> {
         let set_step =
             self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
         let inner_entry =
-            self.dispatch_pattern(inner, PatternCtx::with_nav(set_step, nav_override));
+            self.dispatch_pattern(inner, PatternCtx::with_value(set_step, nav_override));
         // The enclosing variant's `Enum`-open (in `pre`) must run before the
         // inner produces its pending value; routing it through the trailing
         // `Set` step would drop it and unbalance the scope.
@@ -942,6 +980,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture: combined,
+                value: false,
             },
         )
     }
@@ -973,6 +1012,7 @@ impl NfaBuilder<'_> {
                 exit,
                 nav: nav_override,
                 capture: combined,
+                value: false,
             },
         )
     }
@@ -1048,6 +1088,7 @@ impl NfaBuilder<'_> {
                         },
                         nav_override,
                         CaptureEffects::default(),
+                        false,
                     )
                 })
             }

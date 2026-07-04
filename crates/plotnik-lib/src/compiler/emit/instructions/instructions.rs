@@ -3,12 +3,12 @@
 use std::collections::BTreeMap;
 
 use crate::bytecode::{
-    Call, Effect, MatchInstr, MatchPredicate, Return, STEP_SIZE, StepAddr, StepId, Trampoline,
+    Call, Effect, MatchInstr, MatchPredicate, Return, STEP_SIZE, StepAddr, StepId,
 };
 use crate::compiler::emit::layout_map::LayoutMap;
 use crate::compiler::emit::tables::{ConstantPool, EmitError};
 use crate::compiler::lower::ir::{
-    CallIR, EffectArg, EffectIR, InstructionIR, Label, MatchIR, MemberRef, TrampolineIR,
+    CallIR, EffectArg, EffectIR, InstructionIR, Label, MatchIR, MemberRef,
 };
 
 pub fn emit_instructions(
@@ -45,7 +45,6 @@ fn resolve_instruction(
         InstructionIR::Match(m) => resolve_match(m, map, pool),
         InstructionIR::Call(c) => Ok(resolve_call(c, map).to_vec()),
         InstructionIR::Return(_) => Ok(Return::new().to_bytes().to_vec()),
-        InstructionIR::Trampoline(t) => Ok(resolve_trampoline(t, map).to_vec()),
     }
 }
 
@@ -54,16 +53,7 @@ fn resolve_match(
     map: &BTreeMap<Label, StepAddr>,
     pool: ConstantPool<'_>,
 ) -> Result<Vec<u8>, EmitError> {
-    let pre_effects = m
-        .pre_effects
-        .iter()
-        .map(|e| resolve_effect(e, pool))
-        .collect();
-    let post_effects = m
-        .post_effects
-        .iter()
-        .map(|e| resolve_effect(e, pool))
-        .collect();
+    let effects = m.effects.iter().map(|e| resolve_effect(e, pool)).collect();
     let predicate = m.predicate.as_ref().map(|pred| {
         let string_id = pool
             .lookup_str(pred.value.text())
@@ -92,9 +82,8 @@ fn resolve_match(
         nav: m.nav,
         node_kind: m.node_kind,
         node_field: m.node_field,
-        pre_effects,
+        effects,
         neg_fields: m.neg_fields.clone(),
-        post_effects,
         predicate,
         successors,
     };
@@ -109,11 +98,6 @@ fn resolve_call(c: &CallIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
         StepId::try_from(c.target.resolve(map)).expect("step id must be non-zero"),
     )
     .to_bytes()
-}
-
-fn resolve_trampoline(t: &TrampolineIR, map: &BTreeMap<Label, StepAddr>) -> [u8; 8] {
-    Trampoline::new(StepId::try_from(t.next.resolve(map)).expect("step id must be non-zero"))
-        .to_bytes()
 }
 
 fn resolve_effect(effect: &EffectIR, pool: ConstantPool<'_>) -> Effect {

@@ -22,17 +22,14 @@ N0: S3 → T1  ; FunctionInfo
 N1: S4 → T2  ; Q
 
 [entrypoints]
-Q = 08 :: T2
+Q = 00 :: T2
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@08)                            08 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-  06  ...
+  06                                        ▶
   07  ...
-
-Q:
-  08   !   [StructOpen] (identifier) [Node Set(M0) StructClose Set(M1)]  11
-  11                                        ▶
+  08   !   (identifier) [StructOpen Node Set(M0) StructClose Set(M1)]  06

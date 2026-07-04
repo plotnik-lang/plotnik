@@ -53,61 +53,58 @@ N0: S4 → T2  ; QItems
 N1: S5 → T4  ; Q
 
 [entrypoints]
-Q = 06 :: T4
+Q = 00 :: T4
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@26)                            26 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        08
+  06                                        ▶
   07  ...
-  08  -ε-  [ArrayOpen]                      24, 11
-  10                                        ▶
-  11  -ε-  [ArrayClose Set(M2)]             10
-  13  -ε-  [EnumClose Push]                 22, 26
-  15  ...
-  16   !   (comment) [Node Set(M0)]         13
+  08  -ε-  [ArrayClose Set(M2)]             06
+  10  -ε-  [EnumClose Push]                 18, 24
+  12   !   (comment) [Node Set(M0)]         10
+  14  ─‣─  _                                12, 14
+  16   !   _ [EnumOpen(M1)]                 12, 14
   18  ─‣─  _                                16, 18
-  20   !   [EnumOpen(M1)] _                 16, 18
-  22  ─‣─  _                                20, 22
-  24  └‣─  _                                20, 22
-  26  ─‣┘  [ArrayClose Set(M2)] _           10
+  20  └‣─  _                                16, 18
+  22  -ε-  [ArrayOpen]                      20, 08
+  24  ─‣┘  _ [ArrayClose Set(M2)]           06
+  26   !   (program)                        22
 ==== trace ====
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+  02       (?)                              26 : 03
+       ▶   (?)
+
+?:
+  26       (program)                        22
+       ●   program
+  22  -ε-  [ArrayOpen]                      20, 08
+  20       _                                16, 18
+       ●   comment
+  16       _ [EnumOpen(M1)]                 12, 14
+       ●   comment
+  12       (comment) [Node Set(M0)]         10
+       ●   comment
+  10  -ε-  [EnumClose Push]                 18, 24
+  18       _                                16, 18
+       ●   expression_statement
+  16       _ [EnumOpen(M1)]                 12, 14
+       ●   expression_statement
+  12       (comment) [Node Set(M0)]         10
+       ○   expression_statement
+  16  ❮❮❮ 
+  14       _                                12, 14
+  18  ❮❮❮ 
+  18       _                                16, 18
+  10  ❮❮❮ 
+  24       _ [ArrayClose Set(M2)]           06
+       ●   program
+  06   ◀   (?)                              
 
 Q:
-  06       (program)                        08
-       ●   program
-  08  -ε-  [ArrayOpen]                      24, 11
-  24       _                                20, 22
-       ●   comment
-  20       [EnumOpen(M1)] _                 16, 18
-       ●   comment
-  16       (comment) [Node Set(M0)]         13
-       ●   comment
-  13  -ε-  [EnumClose Push]                 22, 26
-  22       _                                20, 22
-       ●   expression_statement
-  20       [EnumOpen(M1)] _                 16, 18
-       ●   expression_statement
-  16       (comment) [Node Set(M0)]         13
-       ○   expression_statement
-  20  ❮❮❮ 
-  18       _                                16, 18
-  22  ❮❮❮ 
-  22       _                                20, 22
-  13  ❮❮❮ 
-  26       [ArrayClose Set(M2)] _           10
-       ●   program
-  10   ◀   (Q)                              
-
-_StructWrap:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

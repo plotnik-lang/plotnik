@@ -30,37 +30,19 @@ M4: S05 → T2  ; e: T2
 N0: S06 → T1  ; Q
 
 [entrypoints]
-Q = 08 :: T1
+Q = 00 :: T1
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@28)                            28 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-
-Q:
-  08  -ε-                                   11, 13, 20, 28, 36
-  11  -ε-  [Null]                           16
-  13  -ε-  [Null]                           24
-  15  ...
-  16   !   [Set(M1) Null Set(M2) Null Set(M3) Null Set(M4)] (identifier) [Node Set(M0)]  06
-  20  -ε-  [Null]                           32
-  22  ...
-  23  ...
-  24   !   [Set(M0) Null Set(M2) Null Set(M3) Null Set(M4)] (number) [Node Set(M1)]  06
-  28  -ε-  [Null]                           40
-  30  ...
-  31  ...
-  32   !   [Set(M0) Null Set(M1) Null Set(M3) Null Set(M4)] (string) [Node Set(M2)]  06
-  36  -ε-  [Null]                           48
-  38  ...
-  39  ...
-  40   !   [Set(M0) Null Set(M1) Null Set(M2) Null Set(M4)] (binary_expression) [Node Set(M3)]  06
-  44  ...
-  45  ...
-  46  ...
-  47  ...
-  48   !   [Set(M0) Null Set(M1) Null Set(M2) Null Set(M3)] (call_expression) [Node Set(M4)]  06
+  08   !   (identifier) [Null Set(M1) Null Set(M2) Null Set(M3) Null Set(M4) Node Set(M0)]  06
+  12   !   (number) [Null Set(M0) Null Set(M2) Null Set(M3) Null Set(M4) Node Set(M1)]  06
+  16   !   (string) [Null Set(M0) Null Set(M1) Null Set(M3) Null Set(M4) Node Set(M2)]  06
+  20   !   (binary_expression) [Null Set(M0) Null Set(M1) Null Set(M2) Null Set(M4) Node Set(M3)]  06
+  24   !   (call_expression) [Null Set(M0) Null Set(M1) Null Set(M2) Null Set(M3) Node Set(M4)]  06
+  28  -ε-                                   08, 12, 16, 20, 24

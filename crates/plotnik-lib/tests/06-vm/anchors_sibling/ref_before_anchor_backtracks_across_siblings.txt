@@ -16,7 +16,7 @@ export interface Q {
   s: Node;
 }
 
-export type Comma = undefined;
+export type Comma = Node;
 ==== output ====
 {
   "s": {
@@ -29,123 +29,125 @@ export type Comma = undefined;
 [strings]
 S0 "Beauty will save the world"
 S1 "s"
-S2 "Q"
-S3 ","
-S4 "program"
-S5 "expression_statement"
-S6 "array"
-S7 "string"
-S8 "Comma"
+S2 "Comma"
+S3 "Q"
+S4 ","
+S5 "program"
+S6 "expression_statement"
+S7 "array"
+S8 "string"
 
 [type_defs]
-T0 = <Void>
-T1 = <Node>
-T2 = Struct  M0:1  ; { s }
+T0 = <Node>
+T1 = Struct  M0:1  ; { s }
 
 [type_members]
-M0: S1 → T1  ; s: <Node>
+M0: S1 → T0  ; s: <Node>
 
 [type_names]
-N0: S2 → T2  ; Q
+N0: S2 → T0  ; Comma
+N1: S3 → T1  ; Q
 
 [entrypoints]
-Comma = 06 :: T0
-Q     = 08 :: T2
+Comma = 00 :: T0
+Q     = 04 :: T1
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Comma:
-  06   !   ","                              07
+  00       (@15)                            15 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
+
+Q:
+  04  -ε-  [StructOpen]                     06
+  06       (@24)                            24 : 08
   07                                        ▶
-
-Q:
-  08   !   (program)                        09
-  09  └‣─  (expression_statement)           10
-  10  └‣─  (array)                          11
-  11  └‣─  _                                17, 18
-  13  ─◦─  (string) [Node Set(M0)]          15
-  15  ─‣┘³ _                                16
-  16                                        ▶
-  17   !   (Comma)                          06 : 13
-  18  ─‣─  _                                17, 18
+  08  -ε-  [StructClose]                    10
+  10                                        ▶
+  11  ─◦─  (string) [Node Set(M0)]          13
+  13  ─‣┘³ _                                07
+  14                                        ▶
+  15   !   ","                              14
+  16   !   (@15)                            15 : 11
+  17  ─‣─  _                                16, 17
+  19  └‣─  _                                16, 17
+  21  └‣─  (array)                          19
+  22  └‣─  (expression_statement)           21
+  23  ...
+  24   !   (program)                        22
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  08       (program)                        09
+  04  -ε-  [StructOpen]                     06
+  06       (?)                              24 : 08
+       ▶   (?)
+
+?:
+  24       (program)                        22
        ●   program
-  09       (expression_statement)           10
+  22       (expression_statement)           21
        ●   expression_statement
-  10       (array)                          11
+  21       (array)                          19
        ●   array
-  11       _                                17, 18
+  19       _                                16, 17
        ●   [
-  17       (Comma)                          06 : 13
-       ▶   (Comma)
+  16       (?)                              15 : 11
+       ▶   (?)
 
-Comma:
-  06       ","                              07
+?:
+  15       ","                              14
        ○   [
-  11  ❮❮❮ 
-  18       _                                17, 18
+  19  ❮❮❮ 
+  17       _                                16, 17
        ●   number
-  17       (Comma)                          06 : 13
-       ▶   (Comma)
+  16       (?)                              15 : 11
+       ▶   (?)
 
-Comma:
-  06       ","                              07
+?:
+  15       ","                              14
        ○   number
-  18  ❮❮❮ 
-  18       _                                17, 18
+  17  ❮❮❮ 
+  17       _                                16, 17
        ●   ,
-  17       (Comma)                          06 : 13
-       ▶   (Comma)
+  16       (?)                              15 : 11
+       ▶   (?)
 
-Comma:
-  06       ","                              07
+?:
+  15       ","                              14
        ●   ,
-  07   ◀   (Comma)                          
+  14   ◀   (?)                              
 
-Comma:
-  13       (string) [Node Set(M0)]          15
+?:
+  11       (string) [Node Set(M0)]          13
        ○   number
-  18  ❮❮❮ 
-  18       _                                17, 18
+  17  ❮❮❮ 
+  17       _                                16, 17
        ●   number
-  17       (Comma)                          06 : 13
-       ▶   (Comma)
+  16       (?)                              15 : 11
+       ▶   (?)
 
-Comma:
-  06       ","                              07
+?:
+  15       ","                              14
        ○   number
-  18  ❮❮❮ 
-  18       _                                17, 18
+  17  ❮❮❮ 
+  17       _                                16, 17
        ●   ,
-  17       (Comma)                          06 : 13
-       ▶   (Comma)
+  16       (?)                              15 : 11
+       ▶   (?)
 
-Comma:
-  06       ","                              07
+?:
+  15       ","                              14
        ●   ,
-  07   ◀   (Comma)                          
+  14   ◀   (?)                              
 
-Comma:
-  13       (string) [Node Set(M0)]          15
+?:
+  11       (string) [Node Set(M0)]          13
        ●   string
-  15       _                                16
+  13       _                                07
        ●   program
-  16   ◀   (Comma)                          
+  07   ◀   (?)                              
 
-Comma:
-  03  -ε-  [StructClose]                    05
-  05   ◀   (Comma)                          
+?:
+  08  -ε-  [StructClose]                    10
+  10   ◀   (?)                              
 
-Comma:
+?:

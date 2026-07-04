@@ -1,0 +1,14 @@
+Foo = {(expression_statement) (expression_statement)}
+Q = (program (Foo) @y)
+==== diagnostics ====
+error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+ --> query.ptk:2:14
+  |
+1 | Foo = {(expression_statement) (expression_statement)}
+  |       ----------------------------------------------- defined here
+2 | Q = (program (Foo) @y)
+  |              ^^^^^
+==== symbols ====
+Foo
+Q
+  Foo

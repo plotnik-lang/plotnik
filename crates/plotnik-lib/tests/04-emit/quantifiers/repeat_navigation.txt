@@ -19,23 +19,20 @@ M0: S1 → T1  ; decs: T1
 N0: S2 → T2  ; Q
 
 [entrypoints]
-Q = 06 :: T2
+Q = 00 :: T2
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@20)                            20 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (function_declaration)           08
+  06                                        ▶
   07  ...
-  08  -ε-  [ArrayOpen]                      18, 11
-  10                                        ▶
-  11  -ε-  [ArrayClose Set(M0)]             10
-  13   !   (decorator) [Node Push]          16, 20
-  15  ...
-  16  ─‣─  _                                13, 16
-  18  └‣─  _                                13, 16
-  20  ─‣┘  [ArrayClose Set(M0)] _           10
+  08  -ε-  [ArrayClose Set(M0)]             06
+  10   !   (decorator) [Node Push]          12, 18
+  12  ─‣─  _                                10, 12
+  14  └‣─  _                                10, 12
+  16  -ε-  [ArrayOpen]                      14, 08
+  18  ─‣┘  _ [ArrayClose Set(M0)]           06
+  20   !   (function_declaration)           16

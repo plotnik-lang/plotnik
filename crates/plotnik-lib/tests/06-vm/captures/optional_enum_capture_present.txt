@@ -1,0 +1,94 @@
+Q = (program (expression_statement [A: (identifier) @a]? @e))
+==== input ====
+x
+==== types ====
+export type QE =
+  | { $tag: "A"; $data: { a: Node } };
+
+export interface Q {
+  e: QE | null;
+}
+==== output ====
+{
+  "e": {
+    "$tag": "A",
+    "$data": {
+      "a": {
+        "kind": "identifier",
+        "text": "x",
+        "span": [0, 1]
+      }
+    }
+  }
+}
+==== bytecode ====
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "A"
+S3 "e"
+S4 "QE"
+S5 "Q"
+S6 "program"
+S7 "expression_statement"
+S8 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { a }
+T2 = Enum    M1:1  ; A
+T3 = Struct  M2:1  ; { e }
+T4 = Optional(T2)  ; QE?
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T1  ; A: T1
+M2: S3 → T4  ; e: T4
+
+[type_names]
+N0: S4 → T2  ; QE
+N1: S5 → T3  ; Q
+
+[entrypoints]
+Q = 00 :: T3
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@22)                            22 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  ─‣┘  _                                13
+  07  ...
+  08   !   (identifier) [EnumOpen(M1) Node Set(M0) EnumClose]  11
+  11  ─‣┘  _ [Set(M2)]                      06
+  13                                        ▶
+  14  -ε-  [Null Set(M2)]                   06
+  16  ─‣─  _                                08, 16
+  18  └‣─  _                                08, 16
+  20  └‣─  (expression_statement)           18, 14
+  22   !   (program)                        20
+==== trace ====
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              22 : 03
+       ▶   (?)
+
+?:
+  22       (program)                        20
+       ●   program
+  20       (expression_statement)           18, 14
+       ●   expression_statement
+  18       _                                08, 16
+       ●   identifier
+  08       (identifier) [EnumOpen(M1) Node Set(M0) EnumClose]  11
+       ●   identifier
+  11       _ [Set(M2)]                      06
+       ●   expression_statement
+  06       _                                13
+       ●   program
+  13   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

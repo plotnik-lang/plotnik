@@ -125,9 +125,10 @@ Rules that trip everyone:
   - `[Foo: (...) Bar: (...)]` creates `Foo` and `Bar` enum variants
   - `@foo :: Name` helps to specify type name and avoid synthetic name
   - Think regex: no capture — no data
+  - Definition root is captured by default when possible ("group 0"): `Foo = (program)` produces `Node`
   - Refs are opaque:
     - `(Foo)` match structure only (no data from `Foo`)
-    - `(Foo) @x` match + capture `x: Foo`
+    - `(Foo) @x` match + capture `x: Foo` (error if `Foo` is void)
 - Strict dimensionality — a repeated capture must be collected into a list:
   - a capture under a `*`/`+`/`?` repeats once per match, so a capture on the repeat gathers them (or `@_` discards)
   - No inner captures: `(id)* @ids` produces `ids: Node[]` (scalar list)

@@ -22,8 +22,8 @@
 use arborium_tree_sitter::Node;
 
 use crate::bytecode::{
-    EffectKind, Instruction, LineBuilder, Match, Module, ModuleRenderContext, Nav, PREAMBLE_NAME,
-    SECTION_ALIGN, STEP_SIZE, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
+    EffectKind, Instruction, LineBuilder, Match, Module, ModuleRenderContext, Nav, SECTION_ALIGN,
+    STEP_SIZE, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
 };
 use crate::core::{Colors, NodeFieldId};
 
@@ -93,9 +93,6 @@ pub trait Tracer {
 
     /// Called when entering an entrypoint (for section labels).
     fn trace_enter_entrypoint(&mut self, target_ip: u16);
-
-    /// Called when entering the preamble (bootstrap wrapper).
-    fn trace_enter_preamble(&mut self);
 }
 
 /// No-op tracer that gets optimized away completely.
@@ -146,9 +143,6 @@ impl Tracer for NoopTracer {
 
     #[inline(always)]
     fn trace_enter_entrypoint(&mut self, _target_ip: u16) {}
-
-    #[inline(always)]
-    fn trace_enter_preamble(&mut self) {}
 }
 
 pub struct PrintTracer<'s> {
@@ -345,7 +339,7 @@ impl<'s> PrintTracer<'s> {
 
     /// Format match content for instruction line (matches dump format exactly).
     ///
-    /// Order: [pre-effects] -neg_fields field: (type) predicate [post-effects]
+    /// Order: field/type/predicate content, one effects group, then successors.
     fn format_match_content(&self, m: &Match<'_>) -> String {
         self.render.trace_match_content(m)
     }
@@ -377,11 +371,11 @@ impl<'s> PrintTracer<'s> {
         self.lines.push(format!("{prefix}{content}"));
     }
 
-    /// Format definition name (blue). User definitions get parentheses, preamble doesn't.
+    /// Format definition name (blue). User definitions get parentheses.
     fn format_def_ref(&self, name: &str) -> String {
         let c = self.colors;
         if name.starts_with('_') {
-            // Preamble/internal names: no parentheses
+            // Internal labels: no parentheses.
             format!("{}{}{}", c.blue, name, c.reset)
         } else {
             // User definitions: wrap in parentheses
@@ -459,11 +453,6 @@ impl Tracer for PrintTracer<'_> {
             }
             Instruction::Return(_) => {
                 self.deferred_return_ip = Some(ip);
-            }
-            Instruction::Trampoline(t) => {
-                let content = "Trampoline";
-                let successors = format!("{:02}", u16::from(t.next));
-                self.add_instruction(ip, Symbol::EMPTY, content, &successors);
             }
         }
     }
@@ -604,11 +593,6 @@ impl Tracer for PrintTracer<'_> {
         let name = self.entrypoint_name(target_ip).to_string();
         self.push_def_header(&name);
         self.call_stack.push(name);
-    }
-
-    fn trace_enter_preamble(&mut self) {
-        self.push_def_header(PREAMBLE_NAME);
-        self.call_stack.push(PREAMBLE_NAME.to_string());
     }
 }
 

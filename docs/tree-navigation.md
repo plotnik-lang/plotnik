@@ -12,7 +12,7 @@ struct VM<'t> {
     ip: StepId,                      // current step index
     frames: Vec<Frame>,              // call stack
     effects: EffectLog<'t>,          // side-effect log
-    matched_node: Option<Node<'t>>,  // current match slot
+    suppress_depth: u64,             // suppressive capture depth
 }
 
 struct Checkpoint {
@@ -49,6 +49,7 @@ The `Node` API's `next_sibling()` is O(siblings) — unacceptable for repeated b
 
 | Nav               | Dump Symbol | Movement                                |
 | ----------------- | ----------- | --------------------------------------- |
+| `Epsilon`         | `-ε-`       | Pure control flow                       |
 | `Stay`            | (space)     | No movement                             |
 | `StayExact`       | `!`         | No movement, exact match only           |
 | `Down`            | `└‣─`       | First child, skip any                   |
@@ -74,7 +75,7 @@ Navigation and matching are intertwined. The `Nav` mode determines initial movem
 ```
 1. MOVE    Execute nav (goto_first_child, goto_next_sibling, etc.)
 2. SEARCH  Loop: try match, on fail apply skip policy
-3. EFFECTS On success: set matched_node, execute post_effects
+3. EFFECTS On success: execute the match's effects list in order
 ```
 
 For `Up*` variants, step 2 becomes: for each of the n levels, validate the exit
@@ -329,6 +330,6 @@ This is the same forward-search-with-backtracking that in-pattern anchors and qu
 
 ### Zero-width returns
 
-A `Call`'s return address carries the navigation the follower needs *after the callee consumed its candidate* — there is no return path that says "nothing was consumed, stay put." So references to *nullable* definitions (bodies that can match zero nodes, e.g. `A = (x)?`) are not compiled as calls at all: the body is inlined at the reference site, where the ordinary skip-path machinery (checkpoint cursor restore, split follower navigation) applies exactly as if the body were written inline. The one exception is a nullable reference back into a definition currently being compiled (`A = (x (A) (y))?`), which falls back to a real call guarded by a zero-width bypass branch that is tried first.
+A `Call`'s return address carries the navigation the follower needs _after the callee consumed its candidate_ — there is no return path that says "nothing was consumed, stay put." So references to _nullable_ definitions (bodies that can match zero nodes, e.g. `A = (x)?`) are not compiled as calls at all: the body is inlined at the reference site, where the ordinary skip-path machinery (checkpoint cursor restore, split follower navigation) applies exactly as if the body were written inline.
 
-Those guarded calls are the only calls that can still return zero-width, and they are always bare (captured refs in recursive cycles are rejected). As a backstop, `matched_node` is cleared on callee entry and only a successful `Match` sets it, so a zero-width return leaves it cleared and a `Node` capture over it fails the path rather than fabricating the call-site node.
+The one exception is a nullable reference back into a definition currently being compiled (`A = (x (A) (y))?`). It becomes a real call guarded by a zero-width bypass branch that is tried first. The call targets a consuming-only body, so the bypass covers the empty case and every actual call path consumes input.

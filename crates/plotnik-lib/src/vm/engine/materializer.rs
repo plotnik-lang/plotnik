@@ -1,6 +1,6 @@
 //! Materializes VM effect logs into output values.
 
-use crate::bytecode::{Entrypoint, Module, StringsView, TypeDefKind, TypeId, TypeKind, TypesView};
+use crate::bytecode::{Entrypoint, Module, StringsView, TypesView};
 use crate::core::Colors;
 
 use super::effect::RuntimeEffect;
@@ -26,35 +26,6 @@ impl<'a> ValueMaterializer<'a> {
         let member = self.types.get_member(idx as usize);
         self.strings.get(member.name_id).to_owned()
     }
-
-    fn resolve_member_type(&self, idx: u16) -> TypeId {
-        self.types.get_member(idx as usize).type_id
-    }
-
-    fn is_void_type(&self, type_id: TypeId) -> bool {
-        self.types
-            .get(type_id)
-            .is_some_and(|def| matches!(def.decode(), TypeDefKind::Primitive(TypeKind::Void)))
-    }
-
-    fn accumulator_for_type(&self, type_id: TypeId) -> ValueAccumulator {
-        let def = self
-            .types
-            .get(type_id)
-            .unwrap_or_else(|| panic!("unknown type_id {type_id}"));
-
-        match def.decode() {
-            TypeDefKind::Struct { member_count, .. } => {
-                ValueAccumulator::Struct(Vec::with_capacity(member_count as usize))
-            }
-            TypeDefKind::Enum { .. } => ValueAccumulator::Scalar(None),
-            TypeDefKind::Wrapper {
-                kind: TypeKind::ArrayZeroOrMore | TypeKind::ArrayOneOrMore,
-                ..
-            } => ValueAccumulator::Array(vec![]),
-            _ => ValueAccumulator::Scalar(None),
-        }
-    }
 }
 
 /// Materialize the effect log into a [`Value`], then check it against the
@@ -72,39 +43,24 @@ pub fn materialize_verified<'t>(
     colors: Colors,
 ) -> Value {
     let materializer = ValueMaterializer::new(source, module);
-    let value = materializer.materialize(effects, entrypoint.result_type());
+    let value = materializer.materialize(effects);
     debug_verify_type(&value, entrypoint.result_type(), module, colors);
     value
 }
 
 /// Value accumulator for stack-based materialization.
 enum ValueAccumulator {
-    Scalar(Option<Value>),
     Array(Vec<Value>),
     Struct(Vec<(String, Value)>),
     Enum {
         tag: String,
-        payload_type: TypeId,
         fields: Vec<(String, Value)>,
     },
 }
 
 impl ValueAccumulator {
-    fn finish(self) -> Value {
-        match self {
-            ValueAccumulator::Scalar(v) => v.unwrap_or(Value::Null),
-            ValueAccumulator::Array(arr) => Value::Array(arr),
-            ValueAccumulator::Struct(fields) => Value::Struct(fields),
-            ValueAccumulator::Enum { tag, fields, .. } => Value::Enum {
-                tag,
-                data: Some(Box::new(Value::Struct(fields))),
-            },
-        }
-    }
-
     fn kind(&self) -> &'static str {
         match self {
-            ValueAccumulator::Scalar(_) => "Scalar",
             ValueAccumulator::Array(_) => "Array",
             ValueAccumulator::Struct(_) => "Struct",
             ValueAccumulator::Enum { .. } => "Enum",
@@ -113,11 +69,8 @@ impl ValueAccumulator {
 }
 
 impl ValueMaterializer<'_> {
-    pub fn materialize<'t>(&self, effects: &[RuntimeEffect<'t>], result_type: TypeId) -> Value {
+    pub fn materialize<'t>(&self, effects: &[RuntimeEffect<'t>]) -> Value {
         let mut stack: Vec<ValueAccumulator> = vec![];
-
-        let result_builder = self.accumulator_for_type(result_type);
-        stack.push(result_builder);
 
         // Pending value from Node/Null (consumed by Set/Push)
         let mut pending: Option<Value> = None;
@@ -134,7 +87,9 @@ impl ValueMaterializer<'_> {
                     stack.push(ValueAccumulator::Array(vec![]));
                 }
                 RuntimeEffect::Push => {
-                    let val = pending.take().unwrap_or(Value::Null);
+                    let val = pending
+                        .take()
+                        .expect("Push requires a produced value (verified at load)");
                     let Some(ValueAccumulator::Array(arr)) = stack.last_mut() else {
                         panic!(
                             "effect {effect_idx}: Push expects Array on stack, found {:?}",
@@ -158,7 +113,9 @@ impl ValueMaterializer<'_> {
                 }
                 RuntimeEffect::Set(idx) => {
                     let field_name = self.resolve_member_name(*idx);
-                    let val = pending.take().unwrap_or(Value::Null);
+                    let val = pending
+                        .take()
+                        .expect("Set requires a produced value (verified at load)");
                     match stack.last_mut() {
                         Some(ValueAccumulator::Struct(fields)) => fields.push((field_name, val)),
                         Some(ValueAccumulator::Enum { fields, .. }) => {
@@ -178,58 +135,42 @@ impl ValueMaterializer<'_> {
                             top.as_ref().map(|b| b.kind())
                         );
                     };
-                    if !fields.is_empty() {
-                        pending = Some(Value::Struct(fields));
-                    } else if pending.is_none() {
-                        // Empty struct with no pending value:
-                        // - If nested (stack.len() > 1): produce empty struct {}
-                        //   This handles captured empty sequences like `{ } @x`
-                        //   Note: stack always has at least the result_builder, so we check > 1
-                        // - If at root (stack.len() <= 1): void result → null
-                        if stack.len() > 1 {
-                            pending = Some(Value::Struct(vec![]));
-                        }
-                        // else: pending stays None (void result)
-                    }
-                    // else: pending has a value, keep it (passthrough for enums, suppressive, etc.)
+                    pending = Some(Value::Struct(fields));
                 }
                 RuntimeEffect::EnumOpen(idx) => {
                     let tag = self.resolve_member_name(*idx);
-                    let payload_type = self.resolve_member_type(*idx);
                     stack.push(ValueAccumulator::Enum {
                         tag,
-                        payload_type,
                         fields: vec![],
                     });
                 }
                 RuntimeEffect::EnumClose => {
                     let top = stack.pop();
-                    let Some(ValueAccumulator::Enum {
-                        tag,
-                        payload_type,
-                        fields,
-                    }) = top
-                    else {
+                    let Some(ValueAccumulator::Enum { tag, fields }) = top else {
                         panic!(
                             "effect {effect_idx}: EnumClose expects Enum on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
-                    // Void payloads produce no $data field
-                    let data = if self.is_void_type(payload_type) {
-                        None
-                    } else {
-                        // If inner returned a structured value (via StructOpen/StructClose), use it as data
-                        // Otherwise use fields collected from direct Set effects
-                        Some(Box::new(pending.take().unwrap_or(Value::Struct(fields))))
+                    let data = match (pending.take(), fields.is_empty()) {
+                        (Some(v), true) => Some(Box::new(v)),
+                        (None, false) => Some(Box::new(Value::Struct(fields))),
+                        (None, true) => None,
+                        (Some(_), false) => {
+                            panic!(
+                                "enum payload arrived both as pending value and as direct fields"
+                            )
+                        }
                     };
                     pending = Some(Value::Enum { tag, data });
                 }
             }
         }
 
-        pending
-            .or_else(|| stack.pop().map(ValueAccumulator::finish))
-            .unwrap_or(Value::Null)
+        assert!(
+            stack.is_empty(),
+            "unclosed builder frames after materialization"
+        );
+        pending.unwrap_or(Value::Null)
     }
 }

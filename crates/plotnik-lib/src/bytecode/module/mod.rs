@@ -10,7 +10,7 @@ use std::path::Path;
 use super::aligned_vec::AlignedVec;
 use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
-use super::instructions::{Call, Match, Opcode, Return, Trampoline, header_byte};
+use super::instructions::{Call, Match, Opcode, Return, header_byte};
 use super::sections::SymbolNameEntry;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
@@ -22,6 +22,16 @@ mod effect_stack;
 mod load;
 
 pub use load::ModuleError;
+
+/// Append `value` if absent; returns whether it was newly inserted.
+fn push_unique(values: &mut Vec<u16>, value: u16) -> bool {
+    if values.contains(&value) {
+        false
+    } else {
+        values.push(value);
+        true
+    }
+}
 
 #[inline]
 fn read_u16_le(bytes: &[u8], offset: usize) -> u16 {
@@ -103,7 +113,6 @@ pub enum Instruction<'a> {
     Match(Match<'a>),
     Call(Call),
     Return(Return),
-    Trampoline(Trampoline),
 }
 
 impl<'a> Instruction<'a> {
@@ -120,10 +129,6 @@ impl<'a> Instruction<'a> {
             Opcode::Return => {
                 let arr: [u8; 8] = bytes[..8].try_into().expect("slice is exactly 8 bytes");
                 Self::Return(Return::from_bytes(arr))
-            }
-            Opcode::Trampoline => {
-                let arr: [u8; 8] = bytes[..8].try_into().expect("slice is exactly 8 bytes");
-                Self::Trampoline(Trampoline::from_bytes(arr))
             }
             _ => Self::Match(Match::from_bytes(bytes)),
         }

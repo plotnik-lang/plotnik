@@ -121,9 +121,6 @@ impl Tracer for DepthProbe {
     fn trace_enter_entrypoint(&mut self, _target_ip: u16) {
         self.boundary();
     }
-    fn trace_enter_preamble(&mut self) {
-        self.boundary();
-    }
 }
 
 fn compile(query: &str) -> Module {

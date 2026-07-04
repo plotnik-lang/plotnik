@@ -23,7 +23,8 @@ fn removes_unreachable_instructions() {
             m.insert(DefId::from_raw(0), Label(0));
             m
         },
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     remove_unreachable(&mut result);
@@ -56,7 +57,8 @@ fn keeps_all_when_all_reachable() {
             m.insert(DefId::from_raw(0), Label(0));
             m
         },
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     remove_unreachable(&mut result);
@@ -83,7 +85,8 @@ fn handles_branching() {
             m.insert(DefId::from_raw(0), Label(0));
             m
         },
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     remove_unreachable(&mut result);

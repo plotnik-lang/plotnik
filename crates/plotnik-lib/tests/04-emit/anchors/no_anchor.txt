@@ -2,31 +2,29 @@ Q = (array (identifier) (number))
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
-S1 "array"
-S2 "identifier"
-S3 "number"
-S4 "Q"
+S1 "Q"
+S2 "array"
+S3 "identifier"
+S4 "number"
 
 [type_defs]
-T0 = <Void>
+T0 = <Node>
 
 [type_members]
 
 [type_names]
+N0: S1 → T0  ; Q
 
 [entrypoints]
-Q = 06 :: T0
+Q = 0 :: T0
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Q:
-  06   !   (array)                          07
-  07  └‣─  (identifier)                     08
-  08  ─‣─  (number)                         09
-  09  ─‣┘  _                                10
-  10                                        ▶
+  0       (@8)                              8 : 1
+  1  -ε-  [Node]                            3
+  3                                         ▶
+  4  ─‣─  (number)                          5
+  5  ─‣┘  _                                 6
+  6                                         ▶
+  7  └‣─  (identifier)                      4
+  8   !   (array)                           7

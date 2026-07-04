@@ -7,7 +7,7 @@ export interface Q {
   a: Node;
 }
 
-export type A = undefined;
+export type A = Node;
 ==== output ====
 {
   "a": {
@@ -20,66 +20,67 @@ export type A = undefined;
 [strings]
 S0 "Beauty will save the world"
 S1 "a"
-S2 "Q"
-S3 "lexical_declaration"
-S4 "program"
-S5 "A"
+S2 "A"
+S3 "Q"
+S4 "lexical_declaration"
+S5 "program"
 
 [type_defs]
-T0 = <Void>
-T1 = <Node>
-T2 = Struct  M0:1  ; { a }
+T0 = <Node>
+T1 = Struct  M0:1  ; { a }
 
 [type_members]
-M0: S1 → T1  ; a: <Node>
+M0: S1 → T0  ; a: <Node>
 
 [type_names]
-N0: S2 → T2  ; Q
+N0: S2 → T0  ; A
+N1: S3 → T1  ; Q
 
 [entrypoints]
-A = 06 :: T0
-Q = 08 :: T2
+A = 00 :: T0
+Q = 04 :: T1
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 A:
-  06   !   (lexical_declaration)            07
+  00       (@15)                            15 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
+
+Q:
+  04  -ε-  [StructOpen]                     06
+  06       (@17)                            17 : 08
   07                                        ▶
-
-Q:
-  08   !   (program)                        09
-  09  └‣─  (A)                              06 : 10
-  10  -ε-  [Node Set(M0)]                   12
-  12  ─‣┘  _                                13
-  13                                        ▶
+  08  -ε-  [StructClose]                    10
+  10                                        ▶
+  11  -ε-  [Node Set(M0)]                   13
+  13  ─‣┘  _                                07
+  14                                        ▶
+  15   !   (lexical_declaration)            14
+  16  └‣─  (@15)                            15 : 11
+  17   !   (program)                        16
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  08       (program)                        09
-       ●   program
-  09       (A)                              06 : 10
-       ▶   (A)
+  04  -ε-  [StructOpen]                     06
+  06       (?)                              17 : 08
+       ▶   (?)
 
-A:
-  06       (lexical_declaration)            07
+?:
+  17       (program)                        16
+       ●   program
+  16       (?)                              15 : 11
+       ▶   (?)
+
+?:
+  15       (lexical_declaration)            14
        ●   lexical_declaration
-  07   ◀   (A)                              
+  14   ◀   (?)                              
+
+?:
+  11  -ε-  [Node Set(M0)]                   13
+  13       _                                07
+       ●   program
+  07   ◀   (?)                              
 
 Q:
-  10  -ε-  [Node Set(M0)]                   12
-  12       _                                13
-       ●   program
-  13   ◀   (Q)                              
-
-_StructWrap:
-  03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  08  -ε-  [StructClose]                    10
+  10   ◀   (Q)                              ◼

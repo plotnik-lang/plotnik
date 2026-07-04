@@ -8,8 +8,8 @@ use crate::core::{NodeFieldId, NodeKindId};
 
 use super::effects::{Effect, EffectKind};
 use super::instructions::{
-    Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepId, Trampoline,
-    align_to_section, select_match_opcode,
+    Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepId, align_to_section,
+    select_match_opcode,
 };
 use super::nav::Nav;
 use super::node_kind_constraint::NodeKindConstraint;
@@ -25,13 +25,12 @@ fn from_u8_decodes_known_and_rejects_unknown() {
         (0x5, Opcode::Match64),
         (0x6, Opcode::Call),
         (0x7, Opcode::Return),
-        (0x8, Opcode::Trampoline),
     ];
 
     for (nibble, expected) in known {
         assert_eq!(Opcode::from_u8(nibble), Some(expected));
     }
-    for nibble in 0x9u8..=0xF {
+    for nibble in 0x8u8..=0xF {
         assert_eq!(Opcode::from_u8(nibble), None, "nibble {nibble:#x}");
     }
 }
@@ -111,18 +110,9 @@ fn return_roundtrip() {
 }
 
 #[test]
-fn trampoline_roundtrip() {
-    let t = Trampoline::new(StepId::try_from(7).expect("step id must be non-zero"));
-
-    let bytes = t.to_bytes();
-    let decoded = Trampoline::from_bytes(bytes);
-    assert_eq!(decoded, t);
-}
-
-#[test]
 fn encode_rejects_effect_payload_overflow() {
     let instr = MatchInstr {
-        post_effects: vec![Effect::new(EffectKind::Set, 0x400)],
+        effects: vec![Effect::new(EffectKind::Set, 0x400)],
         successors: vec![StepId::try_from(1).expect("step id must be non-zero")],
         ..Default::default()
     };
@@ -213,45 +203,32 @@ fn arb_predicate() -> impl Strategy<Value = MatchPredicate> {
 }
 
 fn arb_match_instr() -> impl Strategy<Value = MatchInstr> {
-    // Per-field caps keep the worst case (7+7+7 + 2 predicate + 5) at exactly
+    // Per-field caps keep the worst case (15 + 7 + 2 predicate + 4) at exactly
     // Match64's 28-slot ceiling, so every generated instruction encodes.
     (
         arb_nav(),
         arb_node_type(),
         prop::option::of((1u16..=u16::MAX).prop_map(|n| NodeFieldId::try_from(n).unwrap())),
-        prop::collection::vec(arb_effect(), 0..=7),
+        prop::collection::vec(arb_effect(), 0..=15),
         prop::collection::vec(
             (1u16..=u16::MAX).prop_map(|n| NodeFieldId::try_from(n).unwrap()),
             0..=7,
         ),
-        prop::collection::vec(arb_effect(), 0..=7),
         prop::option::of(arb_predicate()),
         prop::collection::vec(
             (1u16..=u16::MAX).prop_map(|n| StepId::try_from(n).unwrap()),
-            0..=5,
+            0..=4,
         ),
     )
         .prop_map(
-            |(
+            |(nav, node_kind, node_field, effects, neg_fields, predicate, successors)| MatchInstr {
                 nav,
                 node_kind,
                 node_field,
-                pre_effects,
+                effects,
                 neg_fields,
-                post_effects,
                 predicate,
                 successors,
-            )| {
-                MatchInstr {
-                    nav,
-                    node_kind,
-                    node_field,
-                    pre_effects,
-                    neg_fields,
-                    post_effects,
-                    predicate,
-                    successors,
-                }
             },
         )
 }

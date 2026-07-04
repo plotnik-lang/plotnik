@@ -23,17 +23,15 @@ M0: S1 → T0  ; key: <Node>
 N0: S2 → T1  ; Q
 
 [entrypoints]
-Q = 06 :: T1
+Q = 00 :: T1
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@10)                            10 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   -alias (import_specifier)        08
-  08  └‣─  name: (identifier) [Node Set(M0)]  10
-  10  ─‣┘  _                                11
-  11                                        ▶
+  06  └‣─  name: (identifier) [Node Set(M0)]  08
+  08  ─‣┘  _                                09
+  09                                        ▶
+  10   !   -alias (import_specifier)        06

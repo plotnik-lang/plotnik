@@ -8,8 +8,7 @@
 //!    sensitive to branch priority and to dropped/duplicated successors. Every
 //!    optimization pass must preserve it — see [`run_verified`].
 //! 2. **Structural invariants** on the instruction list: no duplicate labels and
-//!    no dangling references (successors, `Call` targets/returns, `Trampoline`
-//!    returns all resolve).
+//!    no dangling references (successors and `Call` targets/returns all resolve).
 //!
 //! The fingerprint normalizes away the two representation changes our passes make
 //! legitimately:
@@ -33,6 +32,10 @@ pub use debug_impl::{run_verified, verify_constructed};
 
 #[cfg(not(debug_assertions))]
 pub use release_impl::{run_verified, verify_constructed};
+
+#[cfg(all(test, debug_assertions))]
+#[path = "verify_tests.rs"]
+mod verify_tests;
 
 #[cfg(not(debug_assertions))]
 mod release_impl {
@@ -126,8 +129,9 @@ mod debug_impl {
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum WalkRoot {
-        Preamble,
+        Entrypoint(DefId),
         Def(DefId),
+        ConsumingDef(DefId),
     }
 
     struct PassSnapshot {
@@ -148,12 +152,6 @@ mod debug_impl {
     /// Collect the ordered ops a single match contributes.
     fn collect_match_ops(m: &MatchIR, ctx: &LowerInput) -> Vec<SemanticOp> {
         let mut ops = Vec::new();
-
-        // Member names aren't resolved at the IR fingerprint stage (that needs the
-        // type table); the effect kind alone keys the fingerprint.
-        for e in &m.pre_effects {
-            ops.push(SemanticOp::Effect(e.kind(), None));
-        }
 
         if m.nav != Nav::Epsilon {
             if let Some(mode) = m.nav.up_mode_tag() {
@@ -202,11 +200,51 @@ mod debug_impl {
             ops.push(SemanticOp::Predicate(p.op.to_byte(), value));
         }
 
-        for e in &m.post_effects {
+        // Member names aren't resolved at the IR fingerprint stage (that needs the
+        // type table); the effect kind alone keys the fingerprint.
+        for e in &m.effects {
             ops.push(SemanticOp::Effect(e.kind(), None));
         }
 
         ops
+    }
+
+    fn normalize_commuting_effects(ops: Vec<SemanticOp>) -> Vec<SemanticOp> {
+        fn flush(
+            out: &mut Vec<SemanticOp>,
+            effects: &mut Vec<SemanticOp>,
+            others: &mut Vec<SemanticOp>,
+        ) {
+            out.append(effects);
+            out.append(others);
+        }
+
+        let mut out = Vec::with_capacity(ops.len());
+        let mut effects = Vec::new();
+        let mut others = Vec::new();
+
+        for op in ops {
+            match op {
+                SemanticOp::Effect(EffectKind::Node, _)
+                | SemanticOp::Call(_)
+                | SemanticOp::Return
+                | SemanticOp::CycleRef
+                | SemanticOp::DanglingLabel
+                | SemanticOp::DepthCut => {
+                    flush(&mut out, &mut effects, &mut others);
+                    out.push(op);
+                }
+                SemanticOp::Effect(..) => effects.push(op),
+                _ => others.push(op),
+            }
+        }
+
+        flush(&mut out, &mut effects, &mut others);
+        out
+    }
+
+    fn normalize_path(ops: Vec<SemanticOp>) -> Vec<SemanticOp> {
+        coalesce_ups(normalize_commuting_effects(ops))
     }
 
     /// Coalesce runs of same-mode Up navigation into a single summed `UpNav`.
@@ -277,11 +315,16 @@ mod debug_impl {
         fn new(
             instructions: &'a [InstructionIR],
             def_entries: &IndexMap<DefId, Label>,
+            def_entries_consuming: &IndexMap<DefId, Label>,
             ctx: &'a LowerInput<'a>,
         ) -> Self {
             Self {
                 instr_map: instructions.iter().map(|i| (i.label(), i)).collect(),
-                label_to_def: def_entries.iter().map(|(&d, &l)| (l, d)).collect(),
+                label_to_def: def_entries
+                    .iter()
+                    .chain(def_entries_consuming.iter())
+                    .map(|(&d, &l)| (l, d))
+                    .collect(),
                 ctx,
             }
         }
@@ -299,7 +342,7 @@ mod debug_impl {
 
             match instr {
                 InstructionIR::Match(m) => {
-                    if m.is_epsilon() && m.pre_effects.is_empty() && m.post_effects.is_empty() {
+                    if m.is_epsilon() && m.effects.is_empty() {
                         return WalkStep {
                             see_through: true,
                             ops: vec![],
@@ -331,13 +374,6 @@ mod debug_impl {
                     ops: vec![SemanticOp::Return],
                     succs: vec![],
                 },
-                InstructionIR::Trampoline(t) => WalkStep {
-                    // Part of the preamble; semantically transparent but still marked
-                    // visited so a (hypothetical) cycle through it terminates.
-                    see_through: false,
-                    ops: vec![],
-                    succs: vec![t.next],
-                },
             }
         }
 
@@ -360,14 +396,14 @@ mod debug_impl {
                 }
                 if depth >= MAX_DEPTH {
                     ops.push(SemanticOp::DepthCut);
-                    on_path(coalesce_ups(ops));
+                    on_path(normalize_path(ops));
                     count += 1;
                     truncated = true;
                     continue;
                 }
                 if visited.contains(&label) {
                     ops.push(SemanticOp::CycleRef);
-                    on_path(coalesce_ups(ops));
+                    on_path(normalize_path(ops));
                     count += 1;
                     continue;
                 }
@@ -386,7 +422,7 @@ mod debug_impl {
                 ops.extend(walk_step.ops);
 
                 if walk_step.succs.is_empty() {
-                    on_path(coalesce_ups(ops));
+                    on_path(normalize_path(ops));
                     count += 1;
                     continue;
                 }
@@ -528,16 +564,174 @@ mod debug_impl {
         Ok(())
     }
 
+    /// Every body must return or accept at the same cursor depth it entered with.
+    ///
+    /// Calls apply their own navigation at the call site, but the callee is a
+    /// separately checked body.
+    fn check_depth_neutrality(nfa: &NfaGraph) -> Result<(), String> {
+        let instr_map: HashMap<Label, &InstructionIR> =
+            nfa.instructions.iter().map(|i| (i.label(), i)).collect();
+
+        for (root, entry) in entries(nfa) {
+            check_depth_root(root, entry, &instr_map)?;
+        }
+        Ok(())
+    }
+
+    /// Every compiled `Node` effect must run after some real match has
+    /// consumed a candidate. This is only a compiler IR check: once the VM's
+    /// `Node` effect reads the cursor directly, forged bytecode can still
+    /// produce wrong values, but it cannot reach undefined state.
+    fn check_no_node_on_zero_width_paths(nfa: &NfaGraph) -> Result<(), String> {
+        let instr_map: HashMap<Label, &InstructionIR> =
+            nfa.instructions.iter().map(|i| (i.label(), i)).collect();
+
+        for (root, entry) in entries(nfa) {
+            check_zero_width_root(root, entry, &instr_map)?;
+        }
+        Ok(())
+    }
+
+    fn check_zero_width_root(
+        root: WalkRoot,
+        entry: Label,
+        instr_map: &HashMap<Label, &InstructionIR>,
+    ) -> Result<(), String> {
+        let mut memo: HashMap<Label, bool> = HashMap::new();
+        let mut work = vec![(entry, true)];
+
+        while let Some((label, zero_width)) = work.pop() {
+            if let Some(&seen_zero_width) = memo.get(&label)
+                && (seen_zero_width || !zero_width)
+            {
+                continue;
+            }
+            memo.insert(label, zero_width);
+
+            let instr = instr_map
+                .get(&label)
+                .copied()
+                .ok_or_else(|| format!("{root:?}: dangling label {label:?}"))?;
+
+            match instr {
+                InstructionIR::Match(m) => {
+                    let after_nav_zero_width = zero_width && m.nav == Nav::Epsilon;
+                    if after_nav_zero_width
+                        && m.effects
+                            .iter()
+                            .any(|effect| effect.kind() == EffectKind::Node)
+                    {
+                        return Err(format!(
+                            "{root:?}: Node effect at {:?} is reachable without a consumed node",
+                            m.label
+                        ));
+                    }
+
+                    for &succ in &m.successors {
+                        work.push((succ, after_nav_zero_width));
+                    }
+                }
+                InstructionIR::Call(c) => {
+                    work.push((c.next, false));
+                }
+                InstructionIR::Return(_) => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    fn check_depth_root(
+        root: WalkRoot,
+        entry: Label,
+        instr_map: &HashMap<Label, &InstructionIR>,
+    ) -> Result<(), String> {
+        let mut memo: HashMap<Label, i32> = HashMap::new();
+        let mut work = vec![(entry, 0i32)];
+
+        while let Some((label, net)) = work.pop() {
+            if let Some(&seen) = memo.get(&label) {
+                if seen == net {
+                    continue;
+                }
+                return Err(format!(
+                    "{root:?}: label {label:?} reached at depths {seen} and {net}"
+                ));
+            }
+            memo.insert(label, net);
+
+            let instr = instr_map
+                .get(&label)
+                .copied()
+                .ok_or_else(|| format!("{root:?}: dangling label {label:?}"))?;
+
+            match instr {
+                InstructionIR::Match(m) => {
+                    let next_net = net + m.nav.depth_delta();
+                    if m.successors.is_empty() {
+                        if next_net != 0 {
+                            return Err(format!(
+                                "{root:?}: accepting match {:?} exits at depth {next_net}",
+                                m.label
+                            ));
+                        }
+                        continue;
+                    }
+                    for &succ in &m.successors {
+                        work.push((succ, next_net));
+                    }
+                }
+                InstructionIR::Call(c) => {
+                    work.push((c.next, net + c.nav.depth_delta()));
+                }
+                InstructionIR::Return(r) => {
+                    if net != 0 {
+                        return Err(format!(
+                            "{root:?}: return {:?} exits at depth {net}",
+                            r.label
+                        ));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(super) fn assert_depth_neutrality(nfa: &NfaGraph, context: &str) {
+        if let Err(e) = check_depth_neutrality(nfa) {
+            panic!("[verify] {context} produced cursor-depth imbalance: {e}");
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn assert_no_node_on_zero_width_paths(nfa: &NfaGraph, context: &str) {
+        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
+            panic!("[verify] {context} produced zero-width Node effect: {e}");
+        }
+    }
+
     fn entries(nfa: &NfaGraph) -> Vec<(WalkRoot, Label)> {
-        let mut v = vec![(WalkRoot::Preamble, nfa.preamble_entry)];
+        let mut v = Vec::new();
+        for (&def_id, &label) in &nfa.entrypoint_wrappers {
+            v.push((WalkRoot::Entrypoint(def_id), label));
+        }
         for (&def_id, &label) in &nfa.def_entries {
             v.push((WalkRoot::Def(def_id), label));
+        }
+        for (&def_id, &label) in &nfa.def_entries_consuming {
+            v.push((WalkRoot::ConsumingDef(def_id), label));
         }
         v
     }
 
     fn snapshot(nfa: &NfaGraph, ctx: &LowerInput) -> PassSnapshot {
-        let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
+        let walk = GraphWalk::new(
+            &nfa.instructions,
+            &nfa.def_entries,
+            &nfa.def_entries_consuming,
+            ctx,
+        );
         let fingerprints = entries(nfa)
             .into_iter()
             .map(|(key, entry)| {
@@ -576,9 +770,23 @@ mod debug_impl {
         if let Err(e) = check_labels(&nfa.instructions) {
             panic!("[verify] pass `{name}` produced malformed IR: {e}");
         }
+        assert_depth_neutrality(nfa, &format!("pass `{name}`"));
+        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
+            panic!("[verify] pass `{name}` produced zero-width Node effect: {e}");
+        }
 
-        let before_walk = GraphWalk::new(&before.instructions, &nfa.def_entries, ctx);
-        let after_walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
+        let before_walk = GraphWalk::new(
+            &before.instructions,
+            &nfa.def_entries,
+            &nfa.def_entries_consuming,
+            ctx,
+        );
+        let after_walk = GraphWalk::new(
+            &nfa.instructions,
+            &nfa.def_entries,
+            &nfa.def_entries_consuming,
+            ctx,
+        );
         for (key, entry, before_fp) in &before.fingerprints {
             let after_fp = after_walk.fingerprint(*entry);
             if *before_fp != after_fp {
@@ -613,7 +821,16 @@ mod debug_impl {
         if let Err(e) = check_labels(&nfa.instructions) {
             panic!("[verify] construction produced malformed IR: {e}");
         }
-        let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
+        assert_depth_neutrality(nfa, "construction");
+        if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
+            panic!("[verify] construction produced zero-width Node effect: {e}");
+        }
+        let walk = GraphWalk::new(
+            &nfa.instructions,
+            &nfa.def_entries,
+            &nfa.def_entries_consuming,
+            ctx,
+        );
         for (key, entry) in entries(nfa) {
             if let Err(e) = walk.check_scopes(entry) {
                 panic!("[verify] construction produced unbalanced scope effects for {key:?}:\n{e}");

@@ -51,9 +51,7 @@ pub fn check_entrypoints(
 
     // A defless query (empty file, comments only) has nothing for the loops
     // above to flag; without this it would validate silently.
-    if !any_defs
-        && let Some((source_id, root)) = ast_map.first()
-    {
+    if !any_defs && let Some((source_id, root)) = ast_map.first() {
         diag.report(
             DiagnosticKind::EmptyQuery,
             Span::new(*source_id, root.syntax().text_range()),

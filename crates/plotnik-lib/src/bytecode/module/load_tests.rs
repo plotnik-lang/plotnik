@@ -23,7 +23,7 @@ use indoc::indoc;
 use super::{ByteStorage, Module, ModuleError};
 use crate::bytecode::effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectKind};
 use crate::bytecode::type_meta::TypeDefKind;
-use crate::bytecode::{Header, STEP_SIZE};
+use crate::bytecode::{Header, Nav, STEP_SIZE};
 
 fn emit_bytes(query_src: &str) -> Vec<u8> {
     let mut source_map = SourceMap::new();
@@ -71,11 +71,10 @@ fn find_predicate_off(bytes: &[u8]) -> usize {
         };
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[instr + 6], bytes[instr + 7]]);
-            if (counts >> 1) & 1 != 0 {
-                let pre = ((counts >> 13) & 0x7) as usize;
-                let neg = ((counts >> 10) & 0x7) as usize;
-                let post = ((counts >> 7) & 0x7) as usize;
-                return instr + 8 + (pre + neg + post) * 2;
+            if (counts >> 3) & 1 != 0 {
+                let effects = ((counts >> 12) & 0xF) as usize;
+                let neg = ((counts >> 9) & 0x7) as usize;
+                return instr + 8 + (effects + neg) * 2;
             }
         }
         step += (size / 8) as u16;
@@ -182,8 +181,22 @@ fn first_instr(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
     panic!("no matching instruction in transitions");
 }
 
-/// Byte offsets of every pre/post effect slot in the stream (the negated-field
-/// slots are skipped: those are plain field ids, not decoded effects).
+fn first_match_nav(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
+    let (base, steps) = transitions(bytes);
+    let mut step = 0u16;
+    while step < steps {
+        let off = base + step as usize * 8;
+        let opcode = bytes[off] & 0x0F;
+        if (0..=5).contains(&opcode) && want(bytes[off + 1]) {
+            return off + 1;
+        }
+        step += (instr_size(opcode) / 8) as u16;
+    }
+    panic!("no matching match nav in transitions");
+}
+
+/// Byte offsets of every effect slot in the stream. Negated-field slots are
+/// skipped: those are plain field ids, not decoded effects.
 fn effect_slots(bytes: &[u8]) -> Vec<usize> {
     let (base, steps) = transitions(bytes);
     let mut slots = Vec::new();
@@ -193,11 +206,8 @@ fn effect_slots(bytes: &[u8]) -> Vec<usize> {
         let opcode = bytes[off] & 0x0F;
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]);
-            let pre = ((counts >> 13) & 0x7) as usize;
-            let neg = ((counts >> 10) & 0x7) as usize;
-            let post = ((counts >> 7) & 0x7) as usize;
-            slots.extend((0..pre).map(|i| off + 8 + i * 2));
-            slots.extend((0..post).map(|i| off + 8 + (pre + neg + i) * 2));
+            let effects = ((counts >> 12) & 0xF) as usize;
+            slots.extend((0..effects).map(|i| off + 8 + i * 2));
         }
         step += (instr_size(opcode) / 8) as u16;
     }
@@ -228,13 +238,12 @@ fn first_ext_successor(bytes: &[u8]) -> usize {
         let opcode = bytes[off] & 0x0F;
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]);
-            let pre = ((counts >> 13) & 0x7) as usize;
-            let neg = ((counts >> 10) & 0x7) as usize;
-            let post = ((counts >> 7) & 0x7) as usize;
-            let succ = ((counts >> 2) & 0x1F) as usize;
-            let has_pred = (counts >> 1) & 1 != 0;
+            let effects = ((counts >> 12) & 0xF) as usize;
+            let neg = ((counts >> 9) & 0x7) as usize;
+            let succ = ((counts >> 4) & 0x1F) as usize;
+            let has_pred = (counts >> 3) & 1 != 0;
             if succ > 0 {
-                return off + 8 + (pre + neg + post) * 2 + if has_pred { 4 } else { 0 };
+                return off + 8 + (effects + neg) * 2 + if has_pred { 4 } else { 0 };
             }
         }
         step += (instr_size(opcode) / 8) as u16;
@@ -242,7 +251,7 @@ fn first_ext_successor(bytes: &[u8]) -> usize {
     panic!("no extended-match successor in transitions");
 }
 
-/// Byte offset of the first pre/post effect slot whose opcode satisfies `want`.
+/// Byte offset of the first effect slot whose opcode satisfies `want`.
 fn first_effect_op(bytes: &[u8], want: impl Fn(u16) -> bool) -> usize {
     effect_slots(bytes)
         .into_iter()
@@ -252,6 +261,15 @@ fn first_effect_op(bytes: &[u8], want: impl Fn(u16) -> bool) -> usize {
 
 fn effect_word(kind: EffectKind) -> [u8; 2] {
     ((kind as u16) << EFFECT_PAYLOAD_BITS).to_le_bytes()
+}
+
+fn effect_payload(bytes: &[u8], slot: usize) -> u16 {
+    u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & EFFECT_PAYLOAD_MAX as u16
+}
+
+fn type_member_type_id_off(bytes: &[u8], member: u16) -> usize {
+    let m = Module::load(bytes).expect("module loads before tampering");
+    m.offsets().type_members as usize + member as usize * 4 + 2
 }
 
 /// Byte offset of the first non-empty inter-section alignment gap — the padding
@@ -303,24 +321,24 @@ fn forged_nonzero_section_padding_is_rejected() {
 
 #[test]
 fn forged_unknown_opcode_is_rejected() {
-    // `9` is past the 0x0..=0x8 opcode range; the VM's `decode_step` would
+    // `8` is unassigned; the VM's `decode_step` would
     // `.expect()` on the `None` from `Opcode::from_u8` for this step.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let off = first_instr(&bytes, |_| true);
-    bytes[off] = (bytes[off] & 0xF0) | 0x09;
+    bytes[off] = (bytes[off] & 0xF0) | 0x08;
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged opcode must be rejected");
     assert!(
-        matches!(err, ModuleError::InvalidOpcode { opcode: 0x09, .. }),
+        matches!(err, ModuleError::InvalidOpcode { opcode: 0x08, .. }),
         "expected InvalidOpcode, got {err:?}"
     );
 }
 
 #[test]
 fn forged_nonzero_segment_is_rejected() {
-    // Segment bits (header bits 6-7) are reserved at zero; the call/return/
-    // trampoline decoders `assert!` on a non-zero segment.
+    // Segment bits (header bits 6-7) are reserved at zero; the call/return
+    // decoders `assert!` on a non-zero segment.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let off = first_instr(&bytes, |_| true);
     bytes[off] |= 0x40;
@@ -334,18 +352,17 @@ fn forged_nonzero_segment_is_rejected() {
 }
 
 #[test]
-fn forged_nonzero_call_return_trampoline_node_kind_is_rejected() {
+fn forged_nonzero_call_return_node_kind_is_rejected() {
     // node_class_bits (header bits 4-5) is meaningful only for Match variants; the
-    // Call/Return/Trampoline decoders ignore it, so the format pins those bits to
-    // zero. This query emits all three: a `(Leaf)` reference (Call), definition
-    // Returns, and the preamble Trampoline.
+    // Call/Return decoders ignore it, so the format pins those bits to zero.
+    // This query emits both via a `(Leaf)` reference and definition returns.
     const REF_QUERY: &str = indoc!(
         "
         Top = (binary_expression left: (Leaf) @l)
         Leaf = (identifier) @id
     "
     );
-    for opcode in [6u8, 7, 8] {
+    for opcode in [6u8, 7] {
         let mut bytes = emit_bytes(REF_QUERY);
         let off = first_instr(&bytes, |o| o == opcode);
         bytes[off] |= 0x10; // set node_class_bits bit 4
@@ -470,6 +487,21 @@ fn forged_out_of_range_successor_is_rejected() {
     assert!(
         matches!(err, ModuleError::MalformedTransitions),
         "expected MalformedTransitions, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_depth_imbalance_is_rejected() {
+    let mut bytes = emit_bytes(r#"Q = (program)"#);
+
+    let nav_off = first_match_nav(&bytes, |nav| nav == Nav::StayExact.to_byte());
+    bytes[nav_off] = Nav::Down.to_byte();
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged cursor-depth imbalance must be rejected");
+    assert!(
+        matches!(err, ModuleError::DepthImbalance(_)),
+        "expected DepthImbalance, got {err:?}"
     );
 }
 
@@ -607,15 +639,79 @@ fn forged_effect_set_to_push_is_rejected() {
 #[test]
 fn forged_scalar_capture_set_to_push_is_rejected() {
     // The minimal case: a scalar struct whose only effect is a `Set` into the
-    // preamble's root struct. Forged to `Push`, the body now demands an Array
-    // top while the preamble hands it a Struct — caught when the entrypoint
-    // summary is checked against the preamble.
+    // entrypoint wrapper's root struct. Forged to `Push`, the body now demands
+    // an Array top while the wrapper hands it a Struct — caught when the entrypoint
+    // wrapper is checked as a root.
     let mut bytes = emit_bytes(r#"Q = (identifier) @id"#);
     let slot = first_effect_op(&bytes, |op| op == EffectKind::Set as u16);
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Push));
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged scalar Set->Push must be rejected");
+    assert!(
+        matches!(err, ModuleError::EffectStackImbalance(_)),
+        "expected EffectStackImbalance, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_set_without_producer_is_rejected() {
+    // Replace the producer in `[Node Set]` with a frame opener. The following
+    // `Set` has a valid Struct target, but no pending value to consume.
+    let mut bytes = emit_bytes(r#"Q = (identifier) @id"#);
+    let slot = first_effect_op(&bytes, |op| op == EffectKind::Node as u16);
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::StructOpen));
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged producerless Set must be rejected");
+    assert!(
+        matches!(err, ModuleError::EffectStackImbalance(_)),
+        "expected EffectStackImbalance, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_void_enum_variant_with_data_is_rejected() {
+    // The enum branch emits direct fields for a structured variant. Lie that the
+    // variant is tag-only (`Void`): `EnumClose` must reject the data-bearing
+    // payload instead of letting materialization silently drop or mis-shape it.
+    let mut bytes = emit_bytes(r#"Q = [A: (identifier) @a B: (number)]"#);
+    let enum_open = first_effect_op(&bytes, |op| op == EffectKind::EnumOpen as u16);
+    let variant_member = effect_payload(&bytes, enum_open);
+    let type_id_off = type_member_type_id_off(&bytes, variant_member);
+
+    bytes[type_id_off..type_id_off + 2].copy_from_slice(&0u16.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged void enum data must be rejected");
+    assert!(
+        matches!(err, ModuleError::EffectStackImbalance(_)),
+        "expected EffectStackImbalance, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_data_enum_variant_without_data_is_rejected() {
+    // A tag-only branch emits `EnumOpen`/`EnumClose` and has no payload effects.
+    // Lie that the variant is non-void by pointing it at the enum type itself.
+    let mut bytes = emit_bytes(r#"Q = [A: (identifier)]"#);
+    let type_count = Module::load(&bytes)
+        .expect("module loads before tampering")
+        .header()
+        .type_defs_count;
+    assert!(
+        type_count > 1,
+        "query must emit a non-void type to point at"
+    );
+
+    let enum_open = first_effect_op(&bytes, |op| op == EffectKind::EnumOpen as u16);
+    let variant_member = effect_payload(&bytes, enum_open);
+    let type_id_off = type_member_type_id_off(&bytes, variant_member);
+
+    bytes[type_id_off..type_id_off + 2].copy_from_slice(&1u16.to_le_bytes());
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged missing enum data must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -659,13 +755,13 @@ fn forged_suppress_underflow_is_rejected() {
 }
 
 #[test]
-fn forged_preamble_without_root_struct_is_rejected() {
-    // The shared preamble opens a root `StructOpen` before trampolining into the entry
-    // body, so the body always has a Struct to `Set` into. Neutralize that `StructOpen`
-    // and its matching `StructClose` (turn both into no-op `Null`s) and lie that the
-    // result type is scalar: the entry's `Set` would then hit the materializer's
-    // scalar root frame and panic. The preamble has no caller, so a requirement
-    // bubbling out of it must be rejected, not silently dropped.
+fn forged_wrapper_without_root_struct_is_rejected() {
+    // A struct entrypoint wrapper opens a root `StructOpen` before calling the
+    // body, so the body always has a Struct to `Set` into. Neutralize that
+    // `StructOpen` and its matching `StructClose` (turn both into no-op `Null`s)
+    // and lie that the result type is scalar: the entry's `Set` would then hit
+    // the materializer's scalar root frame and panic. The wrapper has no caller,
+    // so a requirement bubbling out of it must be rejected, not silently dropped.
     let mut bytes = emit_bytes(r#"Q = (_) @x"#);
     let ep_off = Module::load(&bytes)
         .expect("module loads before tampering")
@@ -681,26 +777,10 @@ fn forged_preamble_without_root_struct_is_rejected() {
     bytes[ep_off + 4..ep_off + 6].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err = Module::load(&bytes).expect_err("forged rootless preamble must be rejected");
+    let err = Module::load(&bytes).expect_err("forged rootless wrapper must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
-    );
-}
-
-#[test]
-fn forged_out_of_range_trampoline_target_is_rejected() {
-    // The trampoline's `next` is a jump target too; an out-of-range value must be
-    // caught by the pass-2 instruction-start check, not decoded.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
-    let off = first_instr(&bytes, |o| o == 8); // Trampoline
-    bytes[off + 2..off + 4].copy_from_slice(&u16::MAX.to_le_bytes());
-    reseal(&mut bytes);
-
-    let err = Module::load(&bytes).expect_err("forged trampoline target must be rejected");
-    assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
     );
 }
 
@@ -732,25 +812,6 @@ fn forged_nonzero_return_pad_is_rejected() {
         reseal(&mut bytes);
 
         let err = Module::load(&bytes).expect_err("forged return pad must be rejected");
-        assert!(
-            matches!(err, ModuleError::MalformedTransitions),
-            "forged byte {byte}: expected MalformedTransitions, got {err:?}"
-        );
-    }
-}
-
-#[test]
-fn forged_nonzero_trampoline_pad_is_rejected() {
-    // A Trampoline is `header | pad | next(2) | 4 reserved padding bytes`
-    // (`Trampoline::to_bytes`); only `next` (bytes 2-3) is read, so byte 1 and
-    // bytes 4-7 must be rejected when non-zero.
-    for byte in [1usize, 4, 5, 6, 7] {
-        let mut bytes = emit_bytes(STRUCT_QUERY);
-        let off = first_instr(&bytes, |o| o == 8); // Trampoline
-        bytes[off + byte] = 1;
-        reseal(&mut bytes);
-
-        let err = Module::load(&bytes).expect_err("forged trampoline pad must be rejected");
         assert!(
             matches!(err, ModuleError::MalformedTransitions),
             "forged byte {byte}: expected MalformedTransitions, got {err:?}"
@@ -1158,10 +1219,10 @@ fn first_neg_slot(bytes: &[u8]) -> usize {
         let opcode = bytes[off] & 0x0F;
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]);
-            let pre = ((counts >> 13) & 0x7) as usize;
-            let neg = ((counts >> 10) & 0x7) as usize;
+            let effects = ((counts >> 12) & 0xF) as usize;
+            let neg = ((counts >> 9) & 0x7) as usize;
             if neg > 0 {
-                return off + 8 + pre * 2;
+                return off + 8 + effects * 2;
             }
         }
         step += (instr_size(opcode) / 8) as u16;

@@ -2,28 +2,26 @@ Q = (debugger_statement (_))
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
-S1 "debugger_statement"
-S2 "Q"
+S1 "Q"
+S2 "debugger_statement"
 
 [type_defs]
-T0 = <Void>
+T0 = <Node>
 
 [type_members]
 
 [type_names]
+N0: S1 → T0  ; Q
 
 [entrypoints]
-Q = 6 :: T0
+Q = 0 :: T0
 
 [transitions]
-_StructWrap:
-  0  -ε-  [StructOpen]                      2
-  2       Trampoline                        3
-  3  -ε-  [StructClose]                     5
-  5                                         ▶
-
 Q:
-  6   !   (debugger_statement)              7
-  7  └‣─  (_)                               8
-  8  ─‣┘  _                                 9
-  9                                         ▶
+  0       (@7)                              7 : 1
+  1  -ε-  [Node]                            3
+  3                                         ▶
+  4  └‣─  (_)                               5
+  5  ─‣┘  _                                 6
+  6                                         ▶
+  7   !   (debugger_statement)              4

@@ -37,7 +37,7 @@ fn trailing_anchor_follow_nav(items: &[SeqItem]) -> Option<Nav> {
 /// onward, the effects belong to the whole sequence (they close its scope and consume
 /// the produced value) and must run on every path, so that contiguous suffix rides a
 /// dominating epsilon. The prefix before it is the item's own value capture — it needs
-/// the item's `matched_node` and skip-path null injection, so it stays on the item.
+/// the item's cursor position and skip-path null injection, so it stays on the item.
 /// Splitting positionally (not by effect kind) keeps a close and its consumer together
 /// and in order.
 fn is_scope_close_effect(e: &EffectIR) -> bool {
@@ -55,7 +55,7 @@ struct SequencePostEffects {
     exit_post: Vec<EffectIR>,
 }
 
-fn split_sequence_post_effects(post: Vec<EffectIR>) -> SequencePostEffects {
+fn split_sequence_tail_effects(post: Vec<EffectIR>) -> SequencePostEffects {
     let mut item_post = post;
     let exit_post = match item_post.iter().position(is_scope_close_effect) {
         Some(split) => item_post.split_off(split),
@@ -87,6 +87,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
+            value: _,
         } = ctx;
         let items: Vec<_> = seq.items().collect();
         if items.is_empty() {
@@ -160,8 +161,8 @@ impl NfaBuilder<'_> {
         // A caller-threaded skip exit must be honored at any nav: the all-skip
         // path has to reach it (a childless-node bypass, or a `Fail` prune),
         // not fall through to the match exit.
-        let needs_skip_exit = first_is_skippable
-            && (skip_exit.is_some() || (first_positions && nav_modes.len() > 1));
+        let needs_skip_exit =
+            first_is_skippable && (skip_exit.is_some() || (first_positions && nav_modes.len() > 1));
 
         if needs_skip_exit {
             return self.compile_seq_items_with_skip_exit(
@@ -182,7 +183,7 @@ impl NfaBuilder<'_> {
         // the merged effect, unbalancing the path (e.g. EndEnum with no Enum). So a
         // skippable boundary's *scope* effects move to a dominating epsilon every path
         // crosses. Value effects (Node/Set/…) stay on the matched item — they need its
-        // matched_node and its skip-path null injection — so only scope effects move.
+        // cursor position and its skip-path null injection — so only scope effects move.
         let last_is_skippable = nav_modes
             .last()
             .and_then(|(idx, _)| items[*idx].as_pattern())
@@ -191,15 +192,15 @@ impl NfaBuilder<'_> {
         // Build chain in reverse: last pattern exits to `exit`, each prior exits to next.
         let mut current_exit = exit;
         let last_post = if last_is_skippable {
-            let post_effects = split_sequence_post_effects(capture.post);
-            if !post_effects.exit_post.is_empty() {
+            let tail_effects = split_sequence_tail_effects(capture.post);
+            if !tail_effects.exit_post.is_empty() {
                 current_exit = self.emit_effects_epsilon(
                     current_exit,
-                    post_effects.exit_post,
+                    tail_effects.exit_post,
                     CaptureEffects::default(),
                 );
             }
-            post_effects.item_post
+            tail_effects.item_post
         } else {
             capture.post
         };
@@ -248,6 +249,7 @@ impl NfaBuilder<'_> {
                         exit: current_exit,
                         nav: Some(Nav::StayExact),
                         capture: item_capture,
+                        value: false,
                     },
                 );
                 self.emit_position_search(nav, body)
@@ -258,6 +260,7 @@ impl NfaBuilder<'_> {
                         exit: current_exit,
                         nav: nav_override,
                         capture: item_capture,
+                        value: false,
                     },
                 )
             };
@@ -305,14 +308,14 @@ impl NfaBuilder<'_> {
         // Close the *scope* on a single exit epsilon every continuation converges to.
         // From the first scope close onward the suffix runs on every path; the value
         // prefix (`post_keep`) instead rides the sequence's last matched item — it needs
-        // matched_node and the item's skip null injection, so an epsilon would capture
-        // the wrong node or miss matched_node on the skip path. Split positionally so a
+        // that item's cursor position and skip null injection, so an epsilon would capture
+        // the wrong node or miss null on the skip path. Split positionally so a
         // close and its consumer (e.g. `[EndEnum, Push]`) stay together and in order.
-        let post_effects = split_sequence_post_effects(capture.post);
-        let exit = if post_effects.exit_post.is_empty() {
+        let tail_effects = split_sequence_tail_effects(capture.post);
+        let exit = if tail_effects.exit_post.is_empty() {
             exit
         } else {
-            self.emit_effects_epsilon(exit, post_effects.exit_post, CaptureEffects::default())
+            self.emit_effects_epsilon(exit, tail_effects.exit_post, CaptureEffects::default())
         };
 
         // Compile the continuation with both navigations, or use exit if there is none.
@@ -334,11 +337,11 @@ impl NfaBuilder<'_> {
             (
                 caller_skip_exit.unwrap_or(SkipExit::To(exit)),
                 exit,
-                CaptureEffects::new_post(post_effects.item_post),
+                CaptureEffects::new_post(tail_effects.item_post),
             )
         } else {
             // The follower is the last item; `post_keep` rides its continuation.
-            let cont = CaptureEffects::new_post(post_effects.item_post);
+            let cont = CaptureEffects::new_post(tail_effects.item_post);
             let skip_rest = &items[first_pattern_idx + 1..];
             let skip = self.compile_seq_items(SeqItemsCtx {
                 items: skip_rest,
@@ -370,6 +373,7 @@ impl NfaBuilder<'_> {
             },
             first_nav,
             first_post,
+            false,
         );
 
         // Open the scope on a single entry epsilon every path crosses first.

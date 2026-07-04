@@ -35,75 +35,74 @@ M1: S2 → T2  ; b: T2
 N0: S3 → T1  ; Q
 
 [entrypoints]
-Q = 06 :: T1
+Q = 00 :: T1
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@28)                            28 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        08
-  07  ─‣┘  _                                23
-  08  └‣─  (expression_statement)           26, 20
-  10                                        ▶
-  11   !   [Null Set(M1)] (identifier) [Node Set(M0)]  07
-  14   !   (number) [Node Set(M1)]          07
-  16  ─‣─  _                                14, 16
-  18   !   [Null Set(M0)] _                 14, 16
-  20  -ε-  [Null Set(M0) Null Set(M1)]      23
-  23  ─‣┘  _                                10
-  24  ─‣─  _                                11, 18, 24
-  26  └‣─  _                                11, 18, 24
+  06                                        ▶
+  07  ...
+  08   !   (identifier) [Null Set(M1) Node Set(M0)]  15
+  11   !   (number) [Node Set(M1)]          15
+  13  ─‣─  _                                11, 13
+  15  ─‣┘  _                                23
+  16   !   _ [Null Set(M0)]                 11, 13
+  18  -ε-  [Null Set(M0) Null Set(M1)]      23
+  21  ─‣─  _                                08, 16, 21
+  23  ─‣┘  _                                06
+  24  └‣─  _                                08, 16, 21
+  26  └‣─  (expression_statement)           24, 18
+  28   !   (program)                        26
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  06       (program)                        08
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              28 : 03
+       ▶   (?)
+
+?:
+  28       (program)                        26
        ●   program
-  08       (expression_statement)           26, 20
+  26       (expression_statement)           24, 18
        ●   expression_statement
-  26       _                                11, 18, 24
+  24       _                                08, 16, 21
        ●   string
-  11       [Null Set(M1)] (identifier) [Node Set(M0)]  07
+  08       (identifier) [Null Set(M1) Node Set(M0)]  15
        ○   string
-  26  ❮❮❮ 
-  18       [Null Set(M0)] _                 14, 16
+  24  ❮❮❮ 
+  16       _ [Null Set(M0)]                 11, 13
        ●   string
-  14       (number) [Node Set(M1)]          07
+  11       (number) [Node Set(M1)]          15
        ○   string
-  18  ❮❮❮ 
-  16       _                                14, 16
+  16  ❮❮❮ 
+  13       _                                11, 13
        ●   ;
-  14       (number) [Node Set(M1)]          07
+  11       (number) [Node Set(M1)]          15
+       ○   ;
+  13  ❮❮❮ 
+  13       _                                11, 13
+  24  ❮❮❮ 
+  21       _                                08, 16, 21
+       ●   ;
+  08       (identifier) [Null Set(M1) Node Set(M0)]  15
+       ○   ;
+  21  ❮❮❮ 
+  16       _ [Null Set(M0)]                 11, 13
+       ●   ;
+  11       (number) [Node Set(M1)]          15
        ○   ;
   16  ❮❮❮ 
-  16       _                                14, 16
+  13       _                                11, 13
+  21  ❮❮❮ 
+  21       _                                08, 16, 21
   26  ❮❮❮ 
-  24       _                                11, 18, 24
-       ●   ;
-  11       [Null Set(M1)] (identifier) [Node Set(M0)]  07
-       ○   ;
-  24  ❮❮❮ 
-  18       [Null Set(M0)] _                 14, 16
-       ●   ;
-  14       (number) [Node Set(M1)]          07
-       ○   ;
-  18  ❮❮❮ 
-  16       _                                14, 16
-  24  ❮❮❮ 
-  24       _                                11, 18, 24
-  08  ❮❮❮ 
-  20  -ε-  [Null Set(M0) Null Set(M1)]      23
-  23       _                                10
+  18  -ε-  [Null Set(M0) Null Set(M1)]      23
+  23       _                                06
        ●   program
-  10   ◀   (Q)                              
+  06   ◀   (?)                              
 
-_StructWrap:
+Q:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

@@ -259,15 +259,15 @@ plotnik trace query.ptk app.js -vv  # very verbose
 
 **Flags:**
 
-| Flag             | Purpose                          |
-| ---------------- | -------------------------------- |
-| `-v`             | Verbose output                   |
-| `-vv`            | Very verbose output              |
-| `--no-result`    | Skip materialization             |
-| `--max-steps`    | Work limit (see Execution Limits) |
-| `--max-memory`   | Memory limit (see Execution Limits) |
-| `--limits`       | Limit preset (`auto`/`unbounded`) |
-| `--entry`        | Start from specific definition   |
+| Flag           | Purpose                             |
+| -------------- | ----------------------------------- |
+| `-v`           | Verbose output                      |
+| `-vv`          | Very verbose output                 |
+| `--no-result`  | Skip materialization                |
+| `--max-steps`  | Work limit (see Execution Limits)   |
+| `--max-memory` | Memory limit (see Execution Limits) |
+| `--limits`     | Limit preset (`auto`/`unbounded`)   |
+| `--entry`      | Start from specific definition      |
 
 ---
 
@@ -276,10 +276,10 @@ plotnik trace query.ptk app.js -vv  # very verbose
 `run` and `trace` bound a run by two orthogonal resources, on by default and
 sized from the input so they stay invisible to legitimate queries:
 
-| Flag           | Accepts                            | Default |
-| -------------- | ---------------------------------- | ------- |
-| `--max-steps`  | a step count, `auto`, `unbounded`  | `auto`  |
-| `--max-memory` | a binary size, `auto`, `unbounded` | `auto`  |
+| Flag           | Accepts                              | Default |
+| -------------- | ------------------------------------ | ------- |
+| `--max-steps`  | a step count, `auto`, `unbounded`    | `auto`  |
+| `--max-memory` | a binary size, `auto`, `unbounded`   | `auto`  |
 | `--limits`     | `auto` or `unbounded` runtime preset | `auto`  |
 
 - **Steps** bound total work (instruction dispatches) — the guard against

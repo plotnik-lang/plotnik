@@ -18,17 +18,14 @@ M0: S2 → T0  ; id: <Node>
 N0: S3 → T1  ; Q
 
 [entrypoints]
-Q = 08 :: T1
+Q = 00 :: T1
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@08)                            08 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-  06  ...
+  06                                        ▶
   07  ...
-
-Q:
-  08   !   (identifier) $= "foo" [Node Set(M0)]  11
-  11                                        ▶
+  08   !   (identifier) [Node Set(M0)] $= "foo"  06

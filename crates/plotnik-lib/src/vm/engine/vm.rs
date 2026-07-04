@@ -1,10 +1,10 @@
 //! Virtual machine for executing compiled Plotnik queries.
 
-use arborium_tree_sitter::{Node, Tree};
+use arborium_tree_sitter::Tree;
 
 use crate::bytecode::{
     Call, Effect, EffectKind, Entrypoint, Instruction, Match, Module, Nav, NodeKindConstraint,
-    PredicateOp, StepAddr, Trampoline,
+    PredicateOp,
 };
 
 use crate::core::NodeFieldId;
@@ -17,38 +17,6 @@ use super::frame::FrameArena;
 use super::limits::{ResolvedRuntimeLimits, RuntimeLimitSpec};
 use super::trace::{NoopTracer, Tracer};
 
-/// Tracks the node matched by the most recent `Match`, which node-valued
-/// captures (`Node`) read. A missing node means the source matched nothing
-/// (e.g. a zero-width callee return, #383), so the consuming effect fails
-/// rather than fabricating a node. Centralizing the set/clear/refresh transitions
-/// here keeps that contract in one place.
-#[derive(Clone, Copy, Default)]
-struct MatchedNode<'t>(Option<Node<'t>>);
-
-impl<'t> MatchedNode<'t> {
-    fn set(&mut self, node: Node<'t>) {
-        self.0 = Some(node);
-    }
-
-    /// Forget any matched node (no source matched yet on this path).
-    fn clear(&mut self) {
-        self.0 = None;
-    }
-
-    /// Replace the node only when one is already present, leaving an absent
-    /// match absent. Used on Return so a non-empty callee match re-points at
-    /// the current cursor node while a zero-width return stays empty (#383).
-    fn refresh(&mut self, node: Node<'t>) {
-        if self.0.is_some() {
-            self.0 = Some(node);
-        }
-    }
-
-    fn node(&self) -> Option<Node<'t>> {
-        self.0
-    }
-}
-
 /// Virtual machine state for query execution.
 pub struct VM<'t> {
     pub(crate) cursor: CursorWrapper<'t>,
@@ -57,7 +25,6 @@ pub struct VM<'t> {
     pub(crate) frames: FrameArena,
     pub(crate) checkpoints: CheckpointStack,
     pub(crate) effects: EffectLog<'t>,
-    matched_node: MatchedNode<'t>,
 
     pub(crate) steps_used: u64,
     pub(crate) recursion_depth: u32,
@@ -71,10 +38,6 @@ pub struct VM<'t> {
     /// A `u16` was far too narrow (deep `@_` recursion overflowed it at 65_536);
     /// `u64` cannot overflow before the frame arena does.
     pub(crate) suppress_depth: u64,
-
-    /// Target address for Trampoline instruction.
-    /// Set from entrypoint before execution; Trampoline jumps to this address.
-    pub(crate) trampoline_target: u16,
 
     pub(crate) source: &'t str,
 }
@@ -112,12 +75,10 @@ impl<'t> VMBuilder<'t> {
             frames: FrameArena::new(),
             checkpoints: CheckpointStack::new(),
             effects: EffectLog::new(),
-            matched_node: MatchedNode::default(),
             steps_used: 0,
             recursion_depth: 0,
             limits: self.spec.resolve(source_nodes),
             suppress_depth: 0,
-            trampoline_target: 0,
             source: self.source,
         }
     }
@@ -160,8 +121,7 @@ impl<'t> VM<'t> {
     /// `CheckpointState`. The exhaustive destructure is the point: a newly-added
     /// VM field will not compile until it is classified here, so it cannot
     /// silently escape the checkpoint contract. `ip` is resumed separately by
-    /// [`Self::backtrack`] and `matched_node` is deliberately not snapshotted
-    /// (#383). Debug-only.
+    /// [`Self::backtrack`]. Debug-only.
     #[cfg(debug_assertions)]
     fn assert_checkpoint_restored(&self, state: &CheckpointState) {
         let VM {
@@ -172,13 +132,11 @@ impl<'t> VM<'t> {
             recursion_depth,
             suppress_depth,
             // Deliberately outside `CheckpointState`:
-            ip: _,                // resumed separately by `backtrack` (cp.ip / call_resume)
-            checkpoints: _,       // the stack this checkpoint was just popped from
-            matched_node: _,      // intentionally not snapshotted (#383)
-            steps_used: _,        // monotonic step counter, never rewound on backtrack
-            limits: _,            // immutable execution config
-            trampoline_target: _, // set once before the run, never mutated
-            source: _,            // immutable input text
+            ip: _,          // resumed separately by `backtrack` (cp.ip / call_resume)
+            checkpoints: _, // the stack this checkpoint was just popped from
+            steps_used: _,  // monotonic step counter, never rewound on backtrack
+            limits: _,      // immutable execution config
+            source: _,      // immutable input text
         } = self;
 
         debug_assert_eq!(
@@ -249,9 +207,8 @@ impl<'t> VM<'t> {
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> Result<EffectLog<'t>, RuntimeError> {
-        self.ip = StepAddr::PREAMBLE.get();
-        self.trampoline_target = u16::from(entrypoint.target());
-        tracer.trace_enter_preamble();
+        self.ip = u16::from(entrypoint.target());
+        tracer.trace_enter_entrypoint(self.ip);
 
         loop {
             // Step ceiling: bound total work. `None` opts out (Unbounded).
@@ -288,7 +245,6 @@ impl<'t> VM<'t> {
                 Instruction::Match(m) => self.exec_match(m, module, tracer),
                 Instruction::Call(c) => self.exec_call(c, tracer),
                 Instruction::Return(_) => self.exec_return(tracer),
-                Instruction::Trampoline(t) => self.exec_trampoline(t, tracer),
             };
 
             match result {
@@ -305,19 +261,12 @@ impl<'t> VM<'t> {
         module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
-        // Only clear matched_node for non-epsilon transitions.
-        // For epsilon, preserve matched_node from previous match or return.
         if !m.is_epsilon() {
-            self.matched_node.clear();
             self.navigate_and_match(m, module, tracer)?;
         }
 
-        for effect_op in m.pre_effects() {
-            self.emit_effect(effect_op, tracer)?;
-        }
-
-        for effect_op in m.post_effects() {
-            self.emit_effect(effect_op, tracer)?;
+        for effect_op in m.effects() {
+            self.emit_effect(effect_op, tracer);
         }
 
         self.branch_to_successors(m, tracer)
@@ -348,7 +297,6 @@ impl<'t> VM<'t> {
             tracer.trace_field_success(field_id);
         }
 
-        self.matched_node.set(self.cursor.node());
         Ok(())
     }
 
@@ -490,12 +438,10 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    /// Push a frame for `target` (returning to `next`) and jump in. Tree depth
-    /// is saved AFTER navigation; on Return the cursor ascends back to it.
+    /// Push a frame for `target` (returning to `next`) and jump in.
     fn enter_callee<T: Tracer>(&mut self, target: u16, next: u16, tracer: &mut T) {
-        let saved_depth = self.cursor.depth();
         tracer.trace_call(target);
-        self.frames.push(next, saved_depth);
+        self.frames.push(next);
         self.recursion_depth += 1;
         debug_assert_eq!(
             self.recursion_depth,
@@ -503,29 +449,6 @@ impl<'t> VM<'t> {
             "recursion_depth desynced from frame stack after Call"
         );
         self.ip = target;
-        // The callee owns its own match: until one of its Matches succeeds,
-        // there is no matched node. Clearing here lets a zero-width callee
-        // return "nothing" instead of leaking the call-site node (#383).
-        self.matched_node.clear();
-    }
-
-    /// Execute a Trampoline instruction.
-    ///
-    /// Trampoline is like Call, but the target comes from VM context (`trampoline_target`)
-    /// rather than being encoded in the instruction. Used for universal entry preamble.
-    fn exec_trampoline<T: Tracer>(&mut self, t: Trampoline, tracer: &mut T) -> Result<(), Signal> {
-        // Trampoline doesn't navigate - it's always at root, cursor stays at root
-        let saved_depth = self.cursor.depth();
-        tracer.trace_call(self.trampoline_target);
-        self.frames.push(u16::from(t.next), saved_depth);
-        self.recursion_depth += 1;
-        debug_assert_eq!(
-            self.recursion_depth,
-            self.frames.depth(),
-            "recursion_depth desynced from frame stack after Trampoline"
-        );
-        self.ip = self.trampoline_target;
-        Ok(())
     }
 
     /// Navigate to a field and return the skip policy for retry support.
@@ -587,7 +510,7 @@ impl<'t> VM<'t> {
             return Err(ControlFlow::Accept.into());
         }
 
-        let (return_addr, saved_depth) = self.frames.pop();
+        let return_addr = self.frames.pop();
         self.recursion_depth = self
             .recursion_depth
             .checked_sub(1)
@@ -600,24 +523,6 @@ impl<'t> VM<'t> {
 
         // Prune frames (O(1) amortized)
         self.frames.prune(self.checkpoints.max_frame_idx());
-
-        // Re-point at the callee's match BEFORE going up so effects after a
-        // Call can capture it; `refresh` leaves a zero-width return empty (#383).
-        self.matched_node.refresh(self.cursor.node());
-
-        // Go up to saved depth level. This preserves sibling advances
-        // (continue_search at same level) while restoring level when
-        // the callee descended into children.
-        while self.cursor.depth() > saved_depth {
-            if !self.cursor.goto_parent() {
-                break;
-            }
-        }
-        debug_assert_eq!(
-            self.cursor.depth(),
-            saved_depth,
-            "Return did not ascend to the caller's saved cursor depth"
-        );
 
         self.ip = return_addr;
         Ok(())
@@ -681,14 +586,14 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn emit_effect<T: Tracer>(&mut self, op: Effect, tracer: &mut T) -> Result<(), Signal> {
+    fn emit_effect<T: Tracer>(&mut self, op: Effect, tracer: &mut T) {
         use EffectKind::*;
 
         let effect = match op.kind {
             SuppressBegin => {
                 tracer.trace_suppress_control(SuppressBegin, self.suppress_depth > 0);
                 self.suppress_depth += 1;
-                return Ok(());
+                return;
             }
             SuppressEnd => {
                 self.suppress_depth = self
@@ -696,24 +601,16 @@ impl<'t> VM<'t> {
                     .checked_sub(1)
                     .expect("SuppressEnd without matching SuppressBegin");
                 tracer.trace_suppress_control(SuppressEnd, self.suppress_depth > 0);
-                return Ok(());
+                return;
             }
 
             // Skip data effects when suppressing, but trace them
             _ if self.suppress_depth > 0 => {
                 tracer.trace_effect_suppressed(op.kind, op.payload);
-                return Ok(());
+                return;
             }
 
-            // Node-valued captures. A missing `matched_node` means the source
-            // matched nothing (a zero-width callee return, #383): fail this path
-            // rather than fabricate the call-site node.
-            Node => {
-                let Some(node) = self.matched_node.node() else {
-                    return Err(self.backtrack(tracer));
-                };
-                RuntimeEffect::Node(node)
-            }
+            Node => RuntimeEffect::Node(self.cursor.node()),
             ArrayOpen => RuntimeEffect::ArrayOpen,
             Push => RuntimeEffect::Push,
             ArrayClose => RuntimeEffect::ArrayClose,
@@ -727,6 +624,5 @@ impl<'t> VM<'t> {
 
         tracer.trace_effect(&effect);
         self.effects.push(effect);
-        Ok(())
     }
 }

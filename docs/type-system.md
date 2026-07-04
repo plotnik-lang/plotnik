@@ -6,20 +6,21 @@ the JSON materializer are pure renderers of that information.
 
 ## The Output Model
 
-**Output exists exactly where output syntax is written.** Four constructs
-produce output, and nothing else does:
+**Output exists where output syntax is written, plus the definition root.**
+Five constructs produce output:
 
-| Syntax        | Output                                  |
-| ------------- | --------------------------------------- |
-| `@name`       | A field in the enclosing scope          |
-| `Def = ...`   | A named type (the definition's result)  |
+| Syntax        | Output                                       |
+| ------------- | -------------------------------------------- |
+| `@name`       | A field in the enclosing scope               |
+| `Def = ...`   | A named type (the definition's result)       |
 | `Label:`      | An enum variant (when the value is consumed) |
-| `:: TypeName` | A name for the type at that position    |
+| `:: TypeName` | A name for the type at that position         |
+| root pattern  | Default value for a capture-less definition  |
 
-Everything else — node patterns, sequences, references, quantifiers, anchors,
-predicates — is structural: it constrains *whether* the query matches, not
-*what* it returns. A query with no captures is like a regex with no capture
-groups: it still answers "did it match", and nothing more.
+Everything else — nested node patterns, sequences, references, anchors,
+predicates — is structural unless one of those output positions consumes it.
+A capture-less definition is like regex group 0: when its body has a single
+root value, the definition returns that matched root node.
 
 ## Definitions Are Types
 
@@ -44,17 +45,41 @@ export interface Item {
 - A **bare reference** `(Item)` matches the definition's pattern and discards
   its output — silently, by design. Use it for purely structural constraints.
 - A **captured reference** `(Item) @x` produces the definition's result type.
-  If the definition is void (no output), the capture takes the matched node:
-  `x: Node`.
+  If the definition is void, the capture is rejected because there is no value
+  to bind.
 - This is uniform for recursive and non-recursive definitions, so extracting a
   pattern into a definition never silently changes your output shape — you
   always say `@x` where you want the value.
 
-A definition with no output syntax in its body is **void**:
+### Default Root Values
+
+A definition with no captures anywhere in its body is typed by its root value:
+
+- A single node root — named, anonymous, wildcard, with fields, predicates, or
+  anchors — returns `Node`.
+- A `?`, `*`, or `+` root returns the optional/list container described below.
+- A union root returns `Node` only when every branch is a single node root.
+- A sequence root is void because it has no unique root value.
+- A labeled alternation is unchanged: branch labels are explicit output
+  syntax, and tag-only variants remain tag-only.
+
+If the body contains any capture, those captures define the result and the
+default root value disappears; there is no hybrid `{ $node, ... }` output.
+
+```
+Program = (program)                         ; Program = Node
+MaybeProgram = (program)?                   ; MaybeProgram = Node | null
+Expr = [(identifier) (number)]              ; Expr = Node
+Pair = {(identifier) (number)}              ; Pair = undefined
+Named = (program (identifier) @id)          ; Named = { id: Node }
+```
+
+A definition is **void** when its root has no value, usually because it is a
+sequence:
 
 ```
 Id = (identifier) @id
-Foo = (function_declaration name: (Id))   ; bare ref → Foo is void
+Foo = {(function_declaration name: (Id))} ; sequence root → Foo is void
 ```
 
 ```typescript
@@ -145,7 +170,7 @@ Boundaries (a new scope starts):
 → { info: { s: Node } }           ; @info creates a nested scope
 ```
 
-A captured sequence *without* internal captures is only meaningful when it
+A captured sequence _without_ internal captures is only meaningful when it
 matches exactly one node — the capture takes that node (`{(a)} @x` ≡
 `(a) @x`). See the multi-node rule below.
 
@@ -175,7 +200,7 @@ no single node to bind. Both directions fail for the same reason:
 {(a)+} @x                        ; ERROR: a variable run of nodes
 {(a)?} @x                        ; ERROR: possibly no node at all
 [(a)+ (b)] @x                    ; ERROR: one branch is a run
-(SeqDef) @x                       ; ERROR when SeqDef is void and not one node
+(SeqDef) @x                       ; ERROR when SeqDef is void
 ```
 
 Greediness never matters here: `?` and `??` (and `*`/`*?`, `+`/`+?`) are
@@ -187,7 +212,7 @@ group, capture the quantifier directly (`(a)+ @xs` → a list), or capture
 nothing.
 
 References are opaque, so quantifying one is dimensionally simple — the
-definition's *type* is the element, no matter how many captures it contains:
+definition's _type_ is the element, no matter how many captures it contains:
 
 ```
 Item = (pair key: (_) @k value: (_) @v)
@@ -247,7 +272,7 @@ row struct for captured groups, the enum for labeled alternations.
 ## Alternations
 
 `[...]` matches one of several branches. Its output form depends on labels
-*and consumption*.
+_and consumption_.
 
 ### Unions (no labels)
 
@@ -303,7 +328,7 @@ Variant payloads come from the branch's bubbling captures:
 - Captures → `$data` is an anonymous struct (always inlined, never a named
   standalone type).
 - No captures → the variant is tag-only and omits `$data` entirely. Tags-only
-  enums are legitimate — sometimes which branch matched *is* the data.
+  enums are legitimate — sometimes which branch matched _is_ the data.
 - A bare reference (or `@_`) as branch body → tag-only variant.
   `[Call: (Inner)]` tags the branch; `[Call: (Inner) @data]` also carries the
   value.
@@ -413,13 +438,19 @@ Foo = (function_declaration
 ```
 
 ```typescript
-export interface FooItemsInner { v: Node; }
-export interface FooItems { inner: FooItemsInner; }
-export interface Foo { items: FooItems; }
+export interface FooItemsInner {
+  v: Node;
+}
+export interface FooItems {
+  inner: FooItemsInner;
+}
+export interface Foo {
+  items: FooItems;
+}
 ```
 
 Enum variant payloads are anonymous (inlined), so they take no name; a
-composite *inside* a payload field is named
+composite _inside_ a payload field is named
 `{EnumName}{VerbatimLabel}{PascalCase(field)}`:
 
 ```
@@ -452,9 +483,15 @@ Foo = (function_declaration
 ```
 
 ```typescript
-export interface BarInner { v: Node; }
-export interface Bar { inner: BarInner; }
-export interface Foo { outer: Bar; }
+export interface BarInner {
+  v: Node;
+}
+export interface Bar {
+  inner: BarInner;
+}
+export interface Foo {
+  outer: Bar;
+}
 ```
 
 On a plain node capture, `:: Name` declares a named alias:

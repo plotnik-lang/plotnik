@@ -113,6 +113,27 @@ impl Nav {
         }
     }
 
+    /// Cursor-depth delta this navigation applies to the abstract AST cursor.
+    ///
+    /// The verifier only tracks depth, not sibling position: `Down*` enters a
+    /// child, `Up*` exits one or more parents, and stay/next/epsilon variants
+    /// keep the current depth.
+    pub(crate) const fn depth_delta(self) -> i32 {
+        match self {
+            Self::Epsilon
+            | Self::Stay
+            | Self::StayExact
+            | Self::Next
+            | Self::NextSkip
+            | Self::NextSkipExtras
+            | Self::NextExact => 0,
+            Self::Down | Self::DownSkip | Self::DownSkipExtras | Self::DownExact => 1,
+            Self::Up(n) | Self::UpSkipTrivia(n) | Self::UpSkipExtras(n) | Self::UpExact(n) => {
+                -(n as i32)
+            }
+        }
+    }
+
     /// Pack an Up command: family flag, 2-bit mode, 5-bit level.
     fn up_byte(mode: u8, level: u8) -> u8 {
         assert!(

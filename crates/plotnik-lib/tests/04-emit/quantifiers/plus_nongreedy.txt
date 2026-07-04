@@ -18,18 +18,17 @@ M0: S1 → T1  ; items: T1
 N0: S2 → T2  ; Q
 
 [entrypoints]
-Q = 06 :: T2
+Q = 00 :: T2
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@14)                            14 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   [ArrayOpen] _                    11, 13
-  08                                        ▶
-  09  -ε-  [ArrayClose Set(M0)]             08
-  11   !   (identifier) [Node Push]         09, 13
-  13  ─‣─  _                                11, 13
+  06                                        ▶
+  07  ...
+  08  -ε-  [ArrayClose Set(M0)]             06
+  10   !   (identifier) [Node Push]         08, 12
+  12  ─‣─  _                                10, 12
+  14   !   _ [ArrayOpen]                    10, 12

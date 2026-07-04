@@ -5,6 +5,7 @@
 //! module completely (the no-panic guarantee, see `effect_stack.rs`). On any
 //! malformed input it returns a [`ModuleError`], never panics.
 
+use std::collections::HashMap;
 use std::io;
 
 use super::super::effects::{Effect, EffectKind};
@@ -67,6 +68,8 @@ pub enum ModuleError {
     MalformedTransitions,
     #[error("effect stack imbalance at step {0}")]
     EffectStackImbalance(u16),
+    #[error("cursor depth imbalance at step {0}")]
+    DepthImbalance(u16),
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 }
@@ -189,6 +192,7 @@ impl Module {
         self.validate_symbol_ids()?;
         let is_start = self.validate_transitions()?;
         self.validate_entrypoints(&is_start)?;
+        self.validate_depth_neutrality()?;
         // Structural validity (every step decodes, every jump lands on a start)
         // is now established, so the effect-stack walk can use the safe typed
         // instruction API. This closes the last forged-module panic class: the
@@ -443,6 +447,81 @@ impl Module {
         Ok(())
     }
 
+    /// Every entry body returns at the same cursor depth it entered with.
+    ///
+    /// The VM treats call bodies as independent cursors: a `Call` applies its own
+    /// navigation, then resumes at `next` after a net-neutral callee returns. We
+    /// therefore validate each entrypoint target and every encoded `Call` target
+    /// as its own root.
+    fn validate_depth_neutrality(&self) -> Result<(), ModuleError> {
+        let mut roots = Vec::new();
+
+        for entrypoint in self.entrypoints().iter() {
+            push_unique(&mut roots, u16::from(entrypoint.target()));
+        }
+
+        let mut step = 0u16;
+        while step < self.header.transitions_count {
+            match self.decode_step(step) {
+                Instruction::Match(m) => {
+                    step += m.step_count();
+                }
+                Instruction::Call(c) => {
+                    push_unique(&mut roots, u16::from(c.target));
+                    step += 1;
+                }
+                Instruction::Return(_) => {
+                    step += 1;
+                }
+            }
+        }
+
+        for root in roots {
+            self.validate_depth_root(root)?;
+        }
+        Ok(())
+    }
+
+    fn validate_depth_root(&self, entry: u16) -> Result<(), ModuleError> {
+        let mut memo: HashMap<u16, i32> = HashMap::new();
+        let mut work = vec![(entry, 0i32)];
+
+        while let Some((step, net)) = work.pop() {
+            if let Some(&seen) = memo.get(&step) {
+                if seen == net {
+                    continue;
+                }
+                return Err(ModuleError::DepthImbalance(step));
+            }
+            memo.insert(step, net);
+
+            match self.decode_step(step) {
+                Instruction::Return(_) => {
+                    if net != 0 {
+                        return Err(ModuleError::DepthImbalance(step));
+                    }
+                }
+                Instruction::Match(m) => {
+                    let next_net = net + m.nav.depth_delta();
+                    if m.succ_count() == 0 {
+                        if next_net != 0 {
+                            return Err(ModuleError::DepthImbalance(step));
+                        }
+                    } else {
+                        for succ in m.successors() {
+                            work.push((u16::from(succ), next_net));
+                        }
+                    }
+                }
+                Instruction::Call(c) => {
+                    work.push((u16::from(c.next), net + c.nav.depth_delta()));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Every *required* `StringId` held in a section — entrypoint names,
     /// node/field symbol names, type names, type member names, and regex pattern
     /// names — must address a real string-table entry, so the view accessors that
@@ -569,8 +648,8 @@ impl Module {
     ///    nav, node kind, effect opcodes, `Set`/`Enum` member operands, and
     ///    predicate operands, and rejecting any zero successor address. Record
     ///    each instruction start and collect every jump target.
-    /// 2. Every collected jump target — successor, call next/target, trampoline
-    ///    next — must land on a recorded instruction start.
+    /// 2. Every collected jump target — successor or call next/target — must land
+    ///    on a recorded instruction start.
     ///
     /// Returns the instruction-start bitmap so [`Self::validate_entrypoints`] can
     /// hold entrypoint targets to the same rule: an entrypoint pointing into the
@@ -614,15 +693,15 @@ impl Module {
                     opcode: nibble,
                 });
             };
-            // Every opcode reserves the segment bits; the call/return/trampoline
+            // Every opcode reserves the segment bits; the call/return
             // decoders `assert!` segment == 0, and a non-zero segment is unused.
             if header_byte::segment(header) != 0 {
                 return Err(ModuleError::MalformedTransitions);
             }
-            // node_class_bits (header bits 4-5) is meaningful only for Match variants;
-            // Call/Return/Trampoline ignore it, so the format pins those bits to
+            // node_class_bits (header bits 4-5) is meaningful only for Match
+            // variants; Call/Return ignore it, so the format pins those bits to
             // zero — a forged non-zero node_class_bits there is smuggled state.
-            if matches!(opcode, Opcode::Call | Opcode::Return | Opcode::Trampoline)
+            if matches!(opcode, Opcode::Call | Opcode::Return)
                 && header_byte::node_class_bits(header) != 0
             {
                 return Err(ModuleError::MalformedTransitions);
@@ -633,17 +712,6 @@ impl Module {
                     // Bytes 1-7 are reserved padding (`Return::to_bytes`); a forged
                     // non-zero pad would otherwise load unnoticed.
                     check_zero(instr_off + 1, 7)?;
-                }
-                Opcode::Trampoline => {
-                    let next = read_transition_u16(storage, instr_off + 2)?;
-                    if next == 0 {
-                        return Err(ModuleError::MalformedTransitions);
-                    }
-                    // Byte 1 and bytes 4-7 are reserved padding (`Trampoline::to_bytes`);
-                    // `next` occupies bytes 2-3.
-                    check_zero(instr_off + 1, 1)?;
-                    check_zero(instr_off + 4, 4)?;
-                    targets.push(next);
                 }
                 Opcode::Call => {
                     // `Call::from_bytes` decodes a nav and two non-zero `StepId`s.
@@ -718,31 +786,28 @@ impl Module {
         let storage: &[u8] = &self.storage;
 
         let counts = read_transition_u16(storage, instr_off + 6)?;
-        // Bit 0 of the counts word is reserved (docs/binary-format/06-transitions.md);
-        // the decoder never reads it, so a forged set bit would load unnoticed.
-        if MatchCounts::reserved_bit_set(counts) {
+        // Bits 2-0 of the counts word are reserved; the decoder never reads
+        // them, so a forged set bit would load unnoticed.
+        if MatchCounts::reserved_bits_set(counts) {
             return Err(ModuleError::MalformedTransitions);
         }
         let c = MatchCounts::unpack(counts);
-        let (pre, neg, post, succ) = (
-            c.pre as usize,
-            c.neg as usize,
-            c.post as usize,
-            c.succ as usize,
-        );
+        let effects = c.effects as usize;
+        let neg = c.neg as usize;
+        let succ = c.succ as usize;
         let has_predicate = c.has_predicate;
 
         // Every payload slot the decoders read — effects, predicate, successors —
         // must lie within this instruction's fixed-size slot, or the iterators
         // read into the next instruction (or past the buffer at the stream end).
-        let used = pre + neg + post + if has_predicate { PREDICATE_SLOTS } else { 0 } + succ;
+        let used = effects + neg + if has_predicate { PREDICATE_SLOTS } else { 0 } + succ;
         if used > opcode.payload_slots() {
             return Err(ModuleError::MalformedTransitions);
         }
 
-        // Pre/post effect opcodes are decoded (neg fields are plain `u16`); a
-        // `Set`/`Enum` operand indexes the type-member table via the
-        // materializer's `get_member`, which asserts the index is in bounds.
+        // Effect opcodes are decoded (neg fields are plain `u16`); a `Set`/`Enum`
+        // operand indexes the type-member table via the materializer's `get_member`,
+        // which asserts the index is in bounds.
         let members = self.header.type_members_count;
         let check_effect = |slot: usize| -> Result<(), ModuleError> {
             let off = instr_off + MATCH_PAYLOAD_START + slot * PAYLOAD_SLOT_SIZE;
@@ -758,18 +823,15 @@ impl Module {
             }
             Ok(())
         };
-        for i in 0..pre {
+        for i in 0..effects {
             check_effect(i)?;
-        }
-        for i in 0..post {
-            check_effect(pre + neg + i)?;
         }
 
         // Neg-field slots hold raw `NodeFieldId`s (`NonZeroU16`); the decoder's
         // `neg_fields()` rebuilds them via `try_from(..).expect(..)`
         // (`instructions.rs`), so a forged zero must not load.
         for i in 0..neg {
-            let off = instr_off + MATCH_PAYLOAD_START + (pre + i) * PAYLOAD_SLOT_SIZE;
+            let off = instr_off + MATCH_PAYLOAD_START + (effects + i) * PAYLOAD_SLOT_SIZE;
             let b = storage
                 .get(off..off + PAYLOAD_SLOT_SIZE)
                 .ok_or(ModuleError::MalformedTransitions)?;
@@ -779,7 +841,7 @@ impl Module {
         }
 
         if has_predicate {
-            let pred_off = instr_off + MATCH_PAYLOAD_START + (pre + neg + post) * PAYLOAD_SLOT_SIZE;
+            let pred_off = instr_off + MATCH_PAYLOAD_START + (effects + neg) * PAYLOAD_SLOT_SIZE;
             let b = storage
                 .get(pred_off..pred_off + PREDICATE_SIZE)
                 .ok_or(ModuleError::MalformedTransitions)?;
@@ -818,7 +880,7 @@ impl Module {
 
         let succ_off = instr_off
             + MATCH_PAYLOAD_START
-            + (pre + neg + post) * PAYLOAD_SLOT_SIZE
+            + (effects + neg) * PAYLOAD_SLOT_SIZE
             + if has_predicate { PREDICATE_SIZE } else { 0 };
         for i in 0..succ {
             let next = read_transition_u16(storage, succ_off + i * PAYLOAD_SLOT_SIZE)?;

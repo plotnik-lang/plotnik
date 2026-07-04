@@ -132,7 +132,8 @@ impl NfaBuilder<'_> {
             cursor = next;
         };
 
-        if twin.nav != Nav::NextSkipExtras || !matches!(twin.node_kind, NodeKindConstraint::Named(_))
+        if twin.nav != Nav::NextSkipExtras
+            || !matches!(twin.node_kind, NodeKindConstraint::Named(_))
         {
             return None;
         }
@@ -288,6 +289,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
+            value: _,
         } = ctx;
         if branches.is_empty() {
             return exit;
@@ -375,6 +377,7 @@ impl NfaBuilder<'_> {
                     },
                     branch_nav,
                     CaptureEffects::default(),
+                    false,
                 );
                 let mut pre = capture.pre.clone();
                 pre.extend(null_effects);
@@ -387,6 +390,7 @@ impl NfaBuilder<'_> {
                         exit: branch_exit,
                         nav: branch_nav,
                         capture: branch_capture,
+                        value: false,
                     },
                 )
             };
@@ -441,7 +445,12 @@ impl NfaBuilder<'_> {
     /// member refs built against the payload type itself. Empty for a
     /// tag-only variant (no payload struct).
     fn payload_default_effects(&self, payload_type_id: TypeId) -> Vec<EffectIR> {
-        let Some(fields) = self.ctx.analysis.type_analysis.struct_fields(payload_type_id) else {
+        let Some(fields) = self
+            .ctx
+            .analysis
+            .type_analysis
+            .struct_fields(payload_type_id)
+        else {
             return vec![];
         };
         fields
@@ -486,8 +495,8 @@ impl NfaBuilder<'_> {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, exit)
-                .pre_effects(pre)
-                .post_effects(post)
+                .prepend_effects(pre)
+                .append_effects(post)
                 .into(),
         );
         label
@@ -515,6 +524,7 @@ impl NfaBuilder<'_> {
             exit,
             nav: first_nav,
             capture,
+            value: _,
         } = ctx;
         let branches: Vec<_> = e.branches().collect();
         if branches.is_empty() {
@@ -592,6 +602,7 @@ impl NfaBuilder<'_> {
                         },
                         branch_nav,
                         CaptureEffects::default(),
+                        true,
                     );
                     let mut entry_pre = capture.pre.clone();
                     entry_pre.push(e_effect.clone());
@@ -606,6 +617,7 @@ impl NfaBuilder<'_> {
                             exit: branch_exit,
                             nav: branch_nav,
                             capture: branch_capture,
+                            value: false,
                         },
                     )
                 }

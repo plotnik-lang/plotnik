@@ -29,81 +29,79 @@ M0: S1 → T0  ; p: <Node>
 N0: S2 → T1  ; Q
 
 [entrypoints]
-Q = 06 :: T1
+Q = 00 :: T1
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@22)                            22 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        07
-  07  └‣─  (expression_statement)           08
-  08  └‣─  (array)                          09
-  09  └‣─  _                                20, 21
-  11   !   (pair) [Node Set(M0)]            13
-  13  ─•┘² _                                14
-  14  ─‣┘² _                                15
-  15                                        ▶
-  16  ─‣─  _                                11, 16
-  18  └‣─  _                                11, 16
-  20   !   (object)                         18
-  21  ─‣─  _                                20, 21
+  06   !   (pair) [Node Set(M0)]            08
+  08  ─•┘² _                                09
+  09  ─‣┘² _                                10
+  10                                        ▶
+  11  ─‣─  _                                06, 11
+  13  └‣─  _                                06, 11
+  15   !   (object)                         13
+  16  ─‣─  _                                15, 16
+  18  └‣─  _                                15, 16
+  20  └‣─  (array)                          18
+  21  └‣─  (expression_statement)           20
+  22   !   (program)                        21
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  06       (program)                        07
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              22 : 03
+       ▶   (?)
+
+?:
+  22       (program)                        21
        ●   program
-  07       (expression_statement)           08
+  21       (expression_statement)           20
        ●   expression_statement
-  08       (array)                          09
+  20       (array)                          18
        ●   array
-  09       _                                20, 21
+  18       _                                15, 16
        ●   [
-  20       (object)                         18
+  15       (object)                         13
        ○   [
-  09  ❮❮❮ 
-  21       _                                20, 21
-       ●   object
-  20       (object)                         18
-       ●   object
-  18       _                                11, 16
-       ●   {
-  11       (pair) [Node Set(M0)]            13
-       ○   {
   18  ❮❮❮ 
-  16       _                                11, 16
+  16       _                                15, 16
+       ●   object
+  15       (object)                         13
+       ●   object
+  13       _                                06, 11
+       ●   {
+  06       (pair) [Node Set(M0)]            08
+       ○   {
+  13  ❮❮❮ 
+  11       _                                06, 11
        ●   pair
-  11       (pair) [Node Set(M0)]            13
+  06       (pair) [Node Set(M0)]            08
        ●   pair
-  13       _                                14
-  16  ❮❮❮ 
-  16       _                                11, 16
+  08       _                                09
+  11  ❮❮❮ 
+  11       _                                06, 11
        ●   }
-  11       (pair) [Node Set(M0)]            13
+  06       (pair) [Node Set(M0)]            08
        ○   }
+  11  ❮❮❮ 
+  11       _                                06, 11
   16  ❮❮❮ 
-  16       _                                11, 16
-  21  ❮❮❮ 
-  21       _                                20, 21
+  16       _                                15, 16
        ●   ,
-  20       (object)                         18
+  15       (object)                         13
        ○   ,
-  21  ❮❮❮ 
-  21       _                                20, 21
+  16  ❮❮❮ 
+  16       _                                15, 16
        ●   identifier
-  20       (object)                         18
+  15       (object)                         13
        ○   identifier
-  21  ❮❮❮ 
-  21       _                                20, 21
+  16  ❮❮❮ 
+  16       _                                15, 16
        ●   ]
-  20       (object)                         18
+  15       (object)                         13
        ○   ]
-  21  ❮❮❮ 
-  21       _                                20, 21
+  16  ❮❮❮ 
+  16       _                                15, 16

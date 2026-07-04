@@ -4,43 +4,44 @@ Test = (array (Comma) . (string) @next)
 [strings]
 S0 "Beauty will save the world"
 S1 "next"
-S2 "Test"
-S3 ","
-S4 "array"
-S5 "string"
-S6 "Comma"
+S2 "Comma"
+S3 "Test"
+S4 ","
+S5 "array"
+S6 "string"
 
 [type_defs]
-T0 = <Void>
-T1 = <Node>
-T2 = Struct  M0:1  ; { next }
+T0 = <Node>
+T1 = Struct  M0:1  ; { next }
 
 [type_members]
-M0: S1 → T1  ; next: <Node>
+M0: S1 → T0  ; next: <Node>
 
 [type_names]
-N0: S2 → T2  ; Test
+N0: S2 → T0  ; Comma
+N1: S3 → T1  ; Test
 
 [entrypoints]
-Comma = 06 :: T0
-Test  = 08 :: T2
+Comma = 00 :: T0
+Test  = 04 :: T1
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Comma:
-  06   !   ","                              07
-  07                                        ▶
+  00       (@15)                            15 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
 
 Test:
-  08   !   (array)                          09
-  09  └‣─  _                                15, 16
+  04  -ε-  [StructOpen]                     06
+  06       (@21)                            21 : 08
+  07                                        ▶
+  08  -ε-  [StructClose]                    10
+  10                                        ▶
   11  ─◦─  (string) [Node Set(M0)]          13
-  13  ─‣┘  _                                14
+  13  ─‣┘  _                                07
   14                                        ▶
-  15   !   (Comma)                          06 : 11
-  16  ─‣─  _                                15, 16
+  15   !   ","                              14
+  16   !   (@15)                            15 : 11
+  17  ─‣─  _                                16, 17
+  19  └‣─  _                                16, 17
+  21   !   (array)                          19

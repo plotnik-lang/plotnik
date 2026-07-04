@@ -2,63 +2,60 @@ Q = (program (debugger_statement "debugger" .))
 ==== input ====
 debugger;
 ==== types ====
-export type Q = undefined;
+export type Q = Node;
 ==== output ====
 <no match>
 ==== bytecode ====
 [strings]
 S0 "Beauty will save the world"
-S1 "program"
-S2 "debugger_statement"
-S3 "debugger"
-S4 "Q"
+S1 "Q"
+S2 "program"
+S3 "debugger_statement"
+S4 "debugger"
 
 [type_defs]
-T0 = <Void>
+T0 = <Node>
 
 [type_members]
 
 [type_names]
+N0: S1 → T0  ; Q
 
 [entrypoints]
-Q = 06 :: T0
+Q = 00 :: T0
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 Q:
-  06   !   (program)                        07
-  07  └‣─  (debugger_statement)             08
-  08  └‣─  _                                10, 14
-  10   !   "debugger"                       11
-  11  ─◦┘  _                                12
-  12  ─‣┘  _                                13
-  13                                        ▶
-  14  ─‣─  _                                10, 14
+  00       (@13)                            13 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
+  04   !   "debugger"                       05
+  05  ─◦┘  _                                06
+  06  ─‣┘  _                                07
+  07                                        ▶
+  08  ─‣─  _                                04, 08
+  10  └‣─  _                                04, 08
+  12  └‣─  (debugger_statement)             10
+  13   !   (program)                        12
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  06       (program)                        07
+  00       (?)                              13 : 01
+       ▶   (?)
+
+?:
+  13       (program)                        12
        ●   program
-  07       (debugger_statement)             08
+  12       (debugger_statement)             10
        ●   debugger_statement
-  08       _                                10, 14
+  10       _                                04, 08
        ●   debugger
-  10       "debugger"                       11
+  04       "debugger"                       05
        ●   debugger
-  11       _                                12
-  08  ❮❮❮ 
-  14       _                                10, 14
+  05       _                                06
+  10  ❮❮❮ 
+  08       _                                04, 08
        ●   ;
-  10       "debugger"                       11
+  04       "debugger"                       05
        ○   ;
-  14  ❮❮❮ 
-  14       _                                10, 14
+  08  ❮❮❮ 
+  08       _                                04, 08

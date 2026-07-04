@@ -10,7 +10,9 @@
 
 use std::collections::HashMap;
 
-use crate::compiler::analyze::types::type_shape::{PatternFlow, PatternShape, TYPE_VOID, TypeShape};
+use crate::compiler::analyze::types::type_shape::{
+    PatternFlow, PatternShape, TYPE_VOID, TypeShape,
+};
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
 
@@ -24,8 +26,12 @@ impl InferPass<'_, '_> {
             if scc.len() == 1 && !deps.is_recursive_def(scc[0]) {
                 continue;
             }
-            let registration_order: HashMap<DefId, usize> =
-                scc.iter().copied().enumerate().map(|(i, d)| (d, i)).collect();
+            let registration_order: HashMap<DefId, usize> = scc
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(i, d)| (d, i))
+                .collect();
 
             for (captor_order, &def_id) in scc.iter().enumerate() {
                 let name = self
@@ -64,8 +70,9 @@ impl InferVisitor<'_, '_> {
         registration_order: &HashMap<DefId, usize>,
         captor_order: usize,
     ) {
-        let recurse =
-            |visitor: &mut Self, p: &Pattern| visitor.recheck_capture_sites(p, registration_order, captor_order);
+        let recurse = |visitor: &mut Self, p: &Pattern| {
+            visitor.recheck_capture_sites(p, registration_order, captor_order)
+        };
 
         match pattern {
             Pattern::CapturedPattern(cap) => {
@@ -79,6 +86,7 @@ impl InferVisitor<'_, '_> {
                     Pattern::DefRef(_) => {
                         if let Some(shape) =
                             self.in_progress_target_shape(&inner, registration_order, captor_order)
+                            && !self.report_capture_on_void_ref(&inner, &shape)
                         {
                             self.report_capture_on_multi_node_void(&inner, &shape);
                         }

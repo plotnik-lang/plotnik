@@ -18,20 +18,20 @@ fn make_match(label: u32, nav: Nav, succs: Vec<u32>) -> InstructionIR {
     )
 }
 
-fn make_epsilon_with_pre(label: u32, succs: Vec<u32>) -> InstructionIR {
+fn make_epsilon_with_start(label: u32, succs: Vec<u32>) -> InstructionIR {
     InstructionIR::Match(
         MatchIR::terminal(Label(label))
             .nav(Nav::Epsilon)
-            .pre_effect(EffectIR::start_struct())
+            .append_effect(EffectIR::start_struct())
             .successors(succs.into_iter().map(Label).collect()),
     )
 }
 
-fn make_epsilon_with_post(label: u32, succs: Vec<u32>) -> InstructionIR {
+fn make_epsilon_with_end(label: u32, succs: Vec<u32>) -> InstructionIR {
     InstructionIR::Match(
         MatchIR::terminal(Label(label))
             .nav(Nav::Epsilon)
-            .post_effect(EffectIR::end_struct())
+            .append_effect(EffectIR::end_struct())
             .successors(succs.into_iter().map(Label).collect()),
     )
 }
@@ -57,8 +57,8 @@ fn see_through_effectless_chain() {
 fn see_through_with_effects() {
     // 0 (ε+Struct) → 1 (ε+EndStruct) → 2 (match)
     let instructions = vec![
-        make_epsilon_with_pre(0, vec![1]),
-        make_epsilon_with_post(1, vec![2]),
+        make_epsilon_with_start(0, vec![1]),
+        make_epsilon_with_end(1, vec![2]),
         make_match(2, Nav::Down, vec![]),
     ];
     let idx = build_label_to_index(&instructions);
@@ -100,7 +100,7 @@ fn see_through_blocked_by_branch() {
 fn forward_migrate_to_exclusive_successor() {
     // 0 (ε+Struct) → 1 (match), only 0 points to 1
     let mut instructions = vec![
-        make_epsilon_with_pre(0, vec![1]),
+        make_epsilon_with_start(0, vec![1]),
         make_match(1, Nav::Down, vec![]),
     ];
 
@@ -110,13 +110,13 @@ fn forward_migrate_to_exclusive_successor() {
         InstructionIR::Match(m) => m,
         _ => panic!(),
     };
-    assert!(eps.pre_effects.is_empty());
+    assert!(eps.effects.is_empty());
 
     let m1 = match &instructions[1] {
         InstructionIR::Match(m) => m,
         _ => panic!(),
     };
-    assert_eq!(m1.pre_effects.len(), 1);
+    assert_eq!(m1.effects.len(), 1);
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn forward_migrate_blocked_by_multi_pred() {
     // 0, 2 both point to 1 (match)
     // ε can't forward-migrate because 1 has multiple preds
     let mut instructions = vec![
-        make_epsilon_with_pre(0, vec![1]),
+        make_epsilon_with_start(0, vec![1]),
         make_match(1, Nav::Down, vec![]),
         make_match(2, Nav::Down, vec![1]),
     ];
@@ -136,7 +136,7 @@ fn forward_migrate_blocked_by_multi_pred() {
         InstructionIR::Match(m) => m,
         _ => panic!(),
     };
-    assert_eq!(eps.pre_effects.len(), 1); // Still has effect
+    assert_eq!(eps.effects.len(), 1); // Still has effect
 }
 
 #[test]
@@ -144,14 +144,15 @@ fn laser_vision_single_succ_absorbs_effects() {
     // 0 (match, single succ) → 1 (ε+Struct) → 2 (match)
     let instructions = vec![
         make_match(0, Nav::Down, vec![1]),
-        make_epsilon_with_pre(1, vec![2]),
+        make_epsilon_with_start(1, vec![2]),
         make_match(2, Nav::Next, vec![]),
     ];
 
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     laser_vision(&mut result);
@@ -162,7 +163,7 @@ fn laser_vision_single_succ_absorbs_effects() {
         _ => panic!(),
     };
     assert_eq!(m0.successors, vec![Label(2)]);
-    assert_eq!(m0.post_effects.len(), 1);
+    assert_eq!(m0.effects.len(), 1);
 }
 
 #[test]
@@ -171,7 +172,7 @@ fn laser_vision_multi_succ_effectless_only() {
     // 1 (ε+Struct) → 2
     let instructions = vec![
         make_match(0, Nav::Down, vec![1, 3]),
-        make_epsilon_with_pre(1, vec![2]),
+        make_epsilon_with_start(1, vec![2]),
         make_match(2, Nav::Next, vec![]),
         make_match(3, Nav::Next, vec![]),
     ];
@@ -179,7 +180,8 @@ fn laser_vision_multi_succ_effectless_only() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     laser_vision(&mut result);
@@ -190,23 +192,24 @@ fn laser_vision_multi_succ_effectless_only() {
         _ => panic!(),
     };
     assert_eq!(m0.successors, vec![Label(1), Label(3)]);
-    assert!(m0.post_effects.is_empty());
+    assert!(m0.effects.is_empty());
 }
 
 #[test]
 fn laser_vision_epsilon_source_absorbs_chain() {
-    // 0 (ε+Struct pre) → 1 (ε+EndStruct post) → 2 (match)
-    // The head epsilon absorbs the chain: 0 (ε, pre Struct, post EndStruct) → 2
+    // 0 (ε+Struct) → 1 (ε+EndStruct) → 2 (match)
+    // The head epsilon absorbs the chain: 0 (ε, Struct, EndStruct) → 2
     let instructions = vec![
-        make_epsilon_with_pre(0, vec![1]),
-        make_epsilon_with_post(1, vec![2]),
+        make_epsilon_with_start(0, vec![1]),
+        make_epsilon_with_end(1, vec![2]),
         make_match(2, Nav::Next, vec![]),
     ];
 
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     laser_vision(&mut result);
@@ -216,16 +219,15 @@ fn laser_vision_epsilon_source_absorbs_chain() {
         _ => panic!(),
     };
     assert_eq!(m0.successors, vec![Label(2)]);
-    assert_eq!(m0.pre_effects.len(), 1);
-    assert_eq!(m0.post_effects.len(), 1);
+    assert_eq!(m0.effects.len(), 2);
 }
 
 #[test]
 fn laser_vision_branching_epsilon_skips_pure_jump() {
-    // 0 (ε+Struct pre, branching) → [1 (ε pure) → 3, 4]
+    // 0 (ε+Struct, branching) → [1 (ε pure) → 3, 4]
     // The pure jump is bypassed per-successor; effects stay on the branch point.
     let instructions = vec![
-        make_epsilon_with_pre(0, vec![1, 4]),
+        make_epsilon_with_start(0, vec![1, 4]),
         make_epsilon(1, vec![3]),
         make_match(3, Nav::Next, vec![]),
         make_match(4, Nav::Next, vec![]),
@@ -234,7 +236,8 @@ fn laser_vision_branching_epsilon_skips_pure_jump() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     laser_vision(&mut result);
@@ -244,18 +247,17 @@ fn laser_vision_branching_epsilon_skips_pure_jump() {
         _ => panic!(),
     };
     assert_eq!(m0.successors, vec![Label(3), Label(4)]);
-    assert_eq!(m0.pre_effects.len(), 1);
-    assert!(m0.post_effects.is_empty());
+    assert_eq!(m0.effects.len(), 1);
 }
 
 #[test]
 fn epsilon_chain_around_call_coalesces() {
     // Scope brackets around a Call ride separate epsilons (CallIR carries no
     // effects). The chain head must absorb the rest:
-    // 0 (ε+Struct pre) → 1 (ε+EndStruct post) → 2 (call → 4, next 3)
+    // 0 (ε+Struct) → 1 (ε+EndStruct) → 2 (call → 4, next 3)
     let instructions = vec![
-        make_epsilon_with_pre(0, vec![1]),
-        make_epsilon_with_post(1, vec![2]),
+        make_epsilon_with_start(0, vec![1]),
+        make_epsilon_with_end(1, vec![2]),
         CallIR::new(Label(2), ReturnAddr(Label(3)), CalleeEntry(Label(4))).into(),
         make_match(3, Nav::Next, vec![]),
         ReturnIR::new(Label(4)).into(),
@@ -264,7 +266,8 @@ fn epsilon_chain_around_call_coalesces() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     eliminate_epsilons(&mut result);
@@ -274,8 +277,7 @@ fn epsilon_chain_around_call_coalesces() {
         _ => panic!(),
     };
     assert_eq!(m0.successors, vec![Label(2)]);
-    assert_eq!(m0.pre_effects.len(), 1);
-    assert_eq!(m0.post_effects.len(), 1);
+    assert_eq!(m0.effects.len(), 2);
 }
 
 #[test]
@@ -284,11 +286,11 @@ fn combined_forward_then_laser() {
     // 0 (match) → [1 (ε+Struct), 3]
     // 1 → 2 (match), only 1 points to 2
     //
-    // Phase A: 1 forward-migrates Struct to 2.pre, 1 becomes effectless
+    // Phase A: 1 forward-migrates Struct to 2, 1 becomes effectless
     // Phase B: 0 sees through 1 (now effectless) to 2
     let instructions = vec![
         make_match(0, Nav::Down, vec![1, 3]),
-        make_epsilon_with_pre(1, vec![2]),
+        make_epsilon_with_start(1, vec![2]),
         make_match(2, Nav::Next, vec![]),
         make_match(3, Nav::Next, vec![]),
     ];
@@ -296,7 +298,8 @@ fn combined_forward_then_laser() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     forward_migrate(&mut result.instructions);
@@ -306,13 +309,13 @@ fn combined_forward_then_laser() {
         InstructionIR::Match(m) => m,
         _ => panic!(),
     };
-    assert!(eps.pre_effects.is_empty());
+    assert!(eps.effects.is_empty());
 
     let m2 = match &result.instructions[2] {
         InstructionIR::Match(m) => m,
         _ => panic!(),
     };
-    assert_eq!(m2.pre_effects.len(), 1);
+    assert_eq!(m2.effects.len(), 1);
 
     laser_vision(&mut result);
 
@@ -340,7 +343,8 @@ fn entry_point_resolution() {
             m.insert(crate::compiler::ids::DefId::from_raw(0), Label(0));
             m
         },
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     laser_vision(&mut result);
@@ -364,7 +368,8 @@ fn branching_epsilon_preserved_by_laser_vision() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     // laser_vision alone can't see through branching epsilon
@@ -391,7 +396,8 @@ fn expand_branching_epsilon() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     expand_branching_epsilons(&mut result);
@@ -421,7 +427,8 @@ fn expand_branching_multiple_predecessors() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     expand_branching_epsilons(&mut result);
@@ -455,7 +462,8 @@ fn expand_branching_preserves_other_successors() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     expand_branching_epsilons(&mut result);
@@ -473,7 +481,7 @@ fn expand_blocked_by_effects() {
     // Effectful branching epsilon cannot be expanded
     let instructions = vec![
         make_match(0, Nav::Down, vec![1]),
-        make_epsilon_with_pre(1, vec![2, 3]),
+        make_epsilon_with_start(1, vec![2, 3]),
         make_match(2, Nav::Next, vec![]),
         make_match(3, Nav::Next, vec![]),
     ];
@@ -481,7 +489,8 @@ fn expand_blocked_by_effects() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        preamble_entry: Label(0),
+        def_entries_consuming: Default::default(),
+        entrypoint_wrappers: Default::default(),
     };
 
     let changed = expand_branching_epsilons(&mut result);

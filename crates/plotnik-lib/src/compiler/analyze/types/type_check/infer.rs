@@ -269,12 +269,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             return PatternShape::new(arity, flow);
         }
 
-        let output = self
-            .ctx
-            .type_ctx
-            .in_progress()
-            .def_output(def_id)
-            .expect("non-recursive reference target is inferred before the referrer (SCC order)");
+        let output =
+            self.ctx.type_ctx.in_progress().def_output(def_id).expect(
+                "non-recursive reference target is inferred before the referrer (SCC order)",
+            );
         let flow = if output == TYPE_VOID {
             PatternFlow::Void
         } else {
@@ -403,7 +401,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn check_duplicate_labels(&mut self, e: &Located<EnumPattern>) {
         let mut seen: BTreeMap<Symbol, ()> = BTreeMap::new();
         for branch in e.node().branches() {
-            let Some(label) = branch.label() else { continue };
+            let Some(label) = branch.label() else {
+                continue;
+            };
             let label_sym = self.ctx.interner.intern(label.text());
             if seen.insert(label_sym, ()).is_some() {
                 self.report_duplicate_enum_label(label.text_range(), label.text());
@@ -473,8 +473,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         if node.is_suppressive() {
             let info = match node.inner() {
                 None => return PatternShape::void(),
-                Some(Pattern::QuantifiedPattern(q)) => self
-                    .infer_quantified_pattern_in(&cap.wrap(q), QuantifiedContext::Suppressed),
+                Some(Pattern::QuantifiedPattern(q)) => {
+                    self.infer_quantified_pattern_in(&cap.wrap(q), QuantifiedContext::Suppressed)
+                }
                 Some(i) => self.infer_pattern_consumed(&cap.wrap(i)),
             };
             return PatternShape::new(info.arity, PatternFlow::Void);
@@ -493,10 +494,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         let Some(inner) = node.inner() else {
             // Capture without inner -> a Node field (annotation may alias it).
-            let type_id = annotation
-                .map_or(TYPE_NODE, |(name, range)| {
-                    self.annotate_named(TYPE_NODE, name, range)
-                });
+            let type_id = annotation.map_or(TYPE_NODE, |(name, range)| {
+                self.annotate_named(TYPE_NODE, name, range)
+            });
             let field = FieldInfo::required(type_id);
             return PatternShape::new(
                 Arity::One,
@@ -514,7 +514,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // reported. Direct quantifiers are exempt: the captured-quantifier
         // machinery defines their value (array, or optional node), and the
         // exactly-one check runs on their element instead.
-        if !matches!(inner.node(), Pattern::QuantifiedPattern(_)) {
+        if !matches!(inner.node(), Pattern::QuantifiedPattern(_))
+            && !self.report_capture_on_void_ref(inner.node(), &inner_info)
+        {
             self.report_capture_on_multi_node_void(inner.node(), &inner_info);
         }
 
@@ -617,9 +619,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         annotation: Option<(Symbol, TextRange)>,
         is_optional: bool,
     ) -> FieldInfo {
-        let captured_type = annotation.map_or(base, |(name, range)| {
-            self.annotate_named(base, name, range)
-        });
+        let captured_type =
+            annotation.map_or(base, |(name, range)| self.annotate_named(base, name, range));
 
         FieldInfo::with_optional(captured_type, is_optional)
     }
@@ -922,10 +923,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             // A bare repeat is structural: nothing consumes its values, so a
             // void or suppressed-value inner produces nothing. A suppressed
             // repeat discards everything outright.
-            (
-                QuantifiedContext::Bare,
-                PatternFlow::Void | PatternFlow::Value(_),
-            )
+            (QuantifiedContext::Bare, PatternFlow::Void | PatternFlow::Value(_))
             | (QuantifiedContext::Suppressed, _) => PatternFlow::Void,
             // Bare with bubbling captures: `report_internal_capture_dimensionality`
             // already errored. Produce the plausible array type anyway so
@@ -1032,10 +1030,61 @@ fn consumable_enum_root(pattern: &Pattern) -> bool {
 /// A definition body's root consumes a pending value: a labeled alternation
 /// produces its enum, a quantifier collects into the definition's output
 /// (array for `*`/`+`, optional for `?`). Reached through field wrappers.
-fn consumable_value_root(pattern: &Pattern) -> bool {
+///
+/// Shared with lowering, which keys its pending-value emission on the same
+/// predicate: a `Value`-flow pattern compiles to producer effects only where
+/// this (or a consuming capture) says the value is observed. Diverging answers
+/// would make the load-time effect-stack verifier reject valid queries.
+pub(crate) fn consumable_value_root(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::Enum(_) | Pattern::QuantifiedPattern(_) => true,
         Pattern::FieldPattern(f) => f.value().is_some_and(|v| consumable_value_root(&v)),
+        _ => false,
+    }
+}
+
+fn captureless_root_default(pattern: &Pattern) -> Option<TypeId> {
+    if contains_capture(pattern) {
+        return None;
+    }
+
+    root_matches_single_node(pattern).then_some(TYPE_NODE)
+}
+
+fn contains_capture(pattern: &Pattern) -> bool {
+    if matches!(pattern, Pattern::CapturedPattern(_)) {
+        return true;
+    }
+
+    pattern.children().any(|child| contains_capture(&child))
+}
+
+fn root_matches_single_node(pattern: &Pattern) -> bool {
+    match pattern {
+        Pattern::NodePattern(_) | Pattern::TokenPattern(_) => true,
+        Pattern::FieldPattern(f) => f.value().is_some_and(|v| root_matches_single_node(&v)),
+        Pattern::Union(u) => {
+            let mut saw_branch = false;
+
+            for branch in u.branches() {
+                let Some(body) = branch.body() else {
+                    return false;
+                };
+                if !root_matches_single_node(&body) {
+                    return false;
+                }
+                saw_branch = true;
+            }
+
+            for pattern in u.patterns() {
+                if !root_matches_single_node(&pattern) {
+                    return false;
+                }
+                saw_branch = true;
+            }
+
+            saw_branch
+        }
         _ => false,
     }
 }
@@ -1154,7 +1203,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
         };
 
         let type_id = match &info.flow {
-            PatternFlow::Void => TYPE_VOID,
+            PatternFlow::Void => captureless_root_default(&body).unwrap_or(TYPE_VOID),
             PatternFlow::Fields(t) => *t,
             // A root value is the definition's result only when the root is a
             // consuming position: a labeled alternation (its labels are output

@@ -89,7 +89,7 @@ impl<'a> EmitPipeline<'a> {
 
             let target = self
                 .ir
-                .def_entries()
+                .entrypoint_wrappers()
                 .get(&def_id)
                 .and_then(|label| self.layout.step_addrs().get(label))
                 .copied()

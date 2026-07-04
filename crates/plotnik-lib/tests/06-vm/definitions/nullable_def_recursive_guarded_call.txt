@@ -40,68 +40,77 @@ N0: S2 → T1  ; A
 N1: S3 → T2  ; Q
 
 [entrypoints]
-A = 06 :: T1
-Q = 08 :: T2
+A = 00 :: T1
+Q = 02 :: T2
 
 [transitions]
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-
 A:
-  06  -ε-                                   24, 11
+  00       (@38)                            38 : 01
+  01                                        ▶
 
 Q:
-  08   !   (program)                        42, 27
-  10                                        ▶
-  11  -ε-  [Null]                           10
-  13  └‣─  (debugger_statement)             19
-  14  ─‣─  [SuppressEnd] (debugger_statement)  19
-  16  └‣─  (A)                              06 : 14
-  17  -ε-  [SuppressBegin]                  16
-  19  ─‣┘  _                                10
-  20   !   (statement_block) [Node]         13, 17
-  22  ─‣─  _                                20, 22
-  24   !   _                                20, 22
-  26                                        ▶
-  27  └‣─  (expression_statement) [Node Set(M0)]  44
-  29  ─‣─  (expression_statement) [Node Set(M0)]  44
-  31  └‣─  (debugger_statement)             37
-  32  ─‣─  [SuppressEnd] (debugger_statement)  37
-  34  └‣─  (A)                              06 : 32
-  35  -ε-  [SuppressBegin]                  34
-  37  ─‣┘  _                                29
-  38   !   (statement_block)                31, 35
-  40  ─‣─  _                                38, 40
-  42  └‣─  _                                38, 40
-  44  ─‣┘  _                                26
+  02  -ε-  [StructOpen]                     04
+  04       (@59)                            59 : 05
+  05  -ε-  [StructClose]                    07
+  07                                        ▶
+  08                                        ▶
+  09  -ε-  [Null]                           08
+  11  └‣─  (debugger_statement)             31
+  12  ─‣─  (debugger_statement) [SuppressEnd]  31
+  14                                        ▶
+  15  └‣─  (debugger_statement)             21
+  16  ─‣─  (debugger_statement) [SuppressEnd]  21
+  18  └‣─  (@26)                            26 : 16
+  19  -ε-  [SuppressBegin]                  18
+  21  ─‣┘  _                                14
+  22   !   (statement_block) [Node]         15, 19
+  24  ─‣─  _                                22, 24
+  26   !   _                                22, 24
+  28  └‣─  (@26)                            26 : 12
+  29  -ε-  [SuppressBegin]                  28
+  31  ─‣┘  _                                08
+  32   !   (statement_block) [Node]         11, 29
+  34  ─‣─  _                                32, 34
+  36   !   _                                32, 34
+  38  -ε-                                   36, 09
+  40                                        ▶
+  41  └‣─  (expression_statement) [Node Set(M0)]  58
+  43  ─‣─  (expression_statement) [Node Set(M0)]  58
+  45  └‣─  (debugger_statement)             51
+  46  ─‣─  (debugger_statement) [SuppressEnd]  51
+  48  └‣─  (@26)                            26 : 46
+  49  -ε-  [SuppressBegin]                  48
+  51  ─‣┘  _                                43
+  52   !   (statement_block)                45, 49
+  54  ─‣─  _                                52, 54
+  56  └‣─  _                                52, 54
+  58  ─‣┘  _                                40
+  59   !   (program)                        56, 41
 ==== trace ====
-_StructWrap:
-  00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
-
 Q:
-  08       (program)                        42, 27
+  02  -ε-  [StructOpen]                     04
+  04       (?)                              59 : 05
+       ▶   (?)
+
+?:
+  59       (program)                        56, 41
        ●   program
-  42       _                                38, 40
+  56       _                                52, 54
        ●   statement_block
-  38       (statement_block)                31, 35
+  52       (statement_block)                45, 49
        ●   statement_block
-  31       (debugger_statement)             37
+  45       (debugger_statement)             51
        ○   {
        ○   statement_block
        ●   debugger_statement
-  37       _                                29
+  51       _                                43
        ●   statement_block
-  29       (expression_statement) [Node Set(M0)]  44
+  43       (expression_statement) [Node Set(M0)]  58
        ●   expression_statement
-  44       _                                26
+  58       _                                40
        ●   program
-  26   ◀   (Q)                              
+  40   ◀   (?)                              
 
-_StructWrap:
-  03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+Q:
+  05  -ε-  [StructClose]                    07
+  07   ◀   (Q)                              ◼

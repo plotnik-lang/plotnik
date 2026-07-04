@@ -399,10 +399,9 @@ impl TypeAnalysisBuilder {
             return true;
         }
 
-        let (Some(shape_a), Some(shape_b)) = (
-            self.analysis.type_shape(a),
-            self.analysis.type_shape(b),
-        ) else {
+        let (Some(shape_a), Some(shape_b)) =
+            (self.analysis.type_shape(a), self.analysis.type_shape(b))
+        else {
             return false;
         };
 
@@ -417,12 +416,9 @@ impl TypeAnalysisBuilder {
             }
             (TypeShape::Enum(va), TypeShape::Enum(vb)) => {
                 va.len() == vb.len()
-                    && va
-                        .iter()
-                        .zip(vb.iter())
-                        .all(|((ka, pa), (kb, pb))| {
-                            ka == kb && self.types_structurally_equal(*pa, *pb)
-                        })
+                    && va.iter().zip(vb.iter()).all(|((ka, pa), (kb, pb))| {
+                        ka == kb && self.types_structurally_equal(*pa, *pb)
+                    })
             }
             (
                 TypeShape::Array {

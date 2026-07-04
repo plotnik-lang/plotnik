@@ -5,10 +5,9 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use crate::bytecode::StepAddr;
 use crate::core::Colors;
 
-use super::format::{LineBuilder, PREAMBLE_NAME, Symbol, nav_symbol, width_for_count};
+use super::format::{LineBuilder, Symbol, nav_symbol, width_for_count};
 use super::ids::TypeId;
 use super::instructions::StepId;
 use super::module::{Instruction, Module};
@@ -16,7 +15,7 @@ use super::nav::Nav;
 use super::node_kind_constraint::NodeKindConstraint;
 use super::render::ModuleRenderContext;
 use super::type_meta::{TypeDefKind, TypeKind};
-use super::{Call, Match, Return, Trampoline};
+use super::{Call, Match, Return};
 use crate::bytecode::type_system::TYPE_CUSTOM_START;
 
 /// Generate a human-readable dump of the bytecode module.
@@ -62,8 +61,6 @@ impl DumpContext {
         let entrypoints = module.entrypoints();
 
         let mut step_labels = BTreeMap::new();
-        // Preamble always at step 0 (first in layout)
-        step_labels.insert(u16::from(StepAddr::PREAMBLE), PREAMBLE_NAME.to_string());
         for ep in entrypoints.iter() {
             let name = strings.get(ep.name()).to_string();
             step_labels.insert(u16::from(ep.target()), name);
@@ -388,7 +385,7 @@ struct DumpFormatter<'a> {
 fn instruction_step_count(instr: &Instruction) -> u16 {
     match instr {
         Instruction::Match(m) => m.step_count(),
-        Instruction::Call(_) | Instruction::Return(_) | Instruction::Trampoline(_) => 1,
+        Instruction::Call(_) | Instruction::Return(_) => 1,
     }
 }
 
@@ -408,7 +405,6 @@ impl DumpFormatter<'_> {
             Instruction::Match(m) => self.format_match(step, m),
             Instruction::Call(c) => self.format_call(step, c),
             Instruction::Return(r) => self.format_return(step, r),
-            Instruction::Trampoline(t) => self.format_trampoline(step, t),
         }
     }
 
@@ -481,20 +477,6 @@ impl DumpFormatter<'_> {
             sw = self.step_width
         );
         builder.pad_successors(prefix, "▶")
-    }
-
-    fn format_trampoline(&self, step: u16, t: &Trampoline) -> String {
-        let builder = LineBuilder::new(self.step_width);
-        let prefix = format!(
-            "  {:0sw$} {} ",
-            step,
-            Symbol::EMPTY.format(),
-            sw = self.step_width
-        );
-        let content = "Trampoline";
-        let successors = format!("{:0w$}", u16::from(t.next), w = self.step_width);
-        let base = format!("{prefix}{content}");
-        builder.pad_successors(base, &successors)
     }
 
     fn format_step(&self, step: StepId) -> String {

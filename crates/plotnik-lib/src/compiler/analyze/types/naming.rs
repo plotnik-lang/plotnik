@@ -17,8 +17,8 @@
 //! Downstream (bytecode emission, typegen) renders names; it never invents
 //! them.
 
-use std::collections::{BTreeMap, HashMap};
 use std::collections::hash_map::Entry;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::refs::DependencyAnalysis;
@@ -236,8 +236,10 @@ impl Namer<'_, '_> {
                     );
                 }
             }
-            TypeShape::Void | TypeShape::Node | TypeShape::Array { .. } | TypeShape::Optional(_) => {
-            }
+            TypeShape::Void
+            | TypeShape::Node
+            | TypeShape::Array { .. }
+            | TypeShape::Optional(_) => {}
         }
     }
 

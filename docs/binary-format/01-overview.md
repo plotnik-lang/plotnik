@@ -67,14 +67,14 @@ Section offsets are not stored in the header. Loaders compute them by:
 
 The bytes filling each 64-byte alignment gap (and the final tail up to `total_size`) are reserved zero; loaders reject a non-zero byte in any gap.
 
-## Header (v5)
+## Header (v8)
 
 ```rust
 #[repr(C, align(64))]
 struct Header {
     // Bytes 0-23: Identity and sizes (6 × u32)
     magic: [u8; 4],          // b"PTKQ"
-    version: u32,            // 6
+    version: u32,            // 8
     checksum: u32,           // CRC32 of everything after header
     total_size: u32,
     str_blob_size: u32,
@@ -105,7 +105,7 @@ recomputed over crafted bytes. The CRC is not a MAC, so the structural checks
 (steps 5–11), not the checksum, are what uphold the no-panic guarantee.
 Validation, in order:
 
-1. **Magic / version / size** — `PTKQ`, version 6, and `total_size` equal to the
+1. **Magic / version / size** — `PTKQ`, version 8, and `total_size` equal to the
    byte length.
 2. **Reserved bytes** — bytes 42–63 must be zero (the checksum does not cover the
    header, so these are checked explicitly).
@@ -128,15 +128,16 @@ Validation, in order:
    effect opcodes, `Set`/`EnumOpen` member operands, and predicate operands, and
    rejecting any zero successor; it records each instruction start and must tile
    the section exactly. Pass 2 requires every jump target (successor, call
-   next/target, trampoline next) to land on a recorded instruction start. This
+   next/target) to land on a recorded instruction start. This
    makes every lazy `decode_step` / view / materializer access panic-free.
 10. **Entrypoints** — each `target` must land on a recorded instruction start
     (not merely in range — an entrypoint into the interior of a multi-step
     instruction would start decoding mid-instruction) and `result_type` must
     address a real TypeDef.
 11. **Effect stack** — an interprocedural walk of the committed-effect order
-    (across `Call`/`Return`/`Trampoline`, under the suppression filter) proves no
-    path can drive the materializer's builder stack (`Push`/`Set`/`ArrayClose`/
-    `StructClose`/`EnumClose`) or the VM's suppression counter into a panic. This closes
-    the last forged-module panic class — the materializer's builder-stack panics
-    and the VM's `SuppressEnd` underflow — that decode-level checks cannot see.
+    (across `Call`/`Return`, under the suppression filter) proves no path can
+    drive the materializer's builder stack (`Push`/`Set`/`ArrayClose`/
+    `StructClose`/`EnumClose`) or the VM's suppression counter into a panic.
+    This closes the last forged-module panic class — the materializer's
+    builder-stack panics and the VM's `SuppressEnd` underflow — that
+    decode-level checks cannot see.

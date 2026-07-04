@@ -28,28 +28,31 @@ N0: S4 → T1  ; Nested
 N1: S5 → T2  ; Q
 
 [entrypoints]
-Nested = 06 :: T1
-Q      = 08 :: T2
+Nested = 00 :: T1
+Q      = 06 :: T2
 
 [transitions]
-_StructWrap:
+Nested:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@27)                            27 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-Nested:
-  06  -ε-                                   21, 25
-
 Q:
-  08   !   (array) [StructOpen]             10
-  10  └‣─  (Nested)                         06 : 11
-  11  -ε-  [StructClose]                    13
-  13  ─‣┘  [Set(M2)] _                      15
-  15                                        ▶
+  06  -ε-  [StructOpen]                     08
+  08       (@32)                            32 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  -ε-  [StructClose]                    14
+  14  ─‣┘  _ [Set(M1)]                      20
   16  -ε-  [StructClose]                    18
-  18  ─‣┘  [Set(M1)] _                      20
+  18  ─‣┘  _ [Set(M2)]                      29
   20                                        ▶
-  21   !   [Null Set(M1)] (identifier) [Node Set(M0)]  20
-  24  └‣─  (Nested)                         06 : 16
-  25   !   [Null Set(M0)] (array) [StructOpen]  24
+  21   !   (identifier) [Null Set(M1) Node Set(M0)]  20
+  24  └‣─  (@27)                            27 : 12
+  25   !   (array) [Null Set(M0) StructOpen]  24
+  27  -ε-                                   21, 25
+  29                                        ▶
+  30  └‣─  (@27)                            27 : 16
+  31  ...
+  32   !   (array) [StructOpen]             30

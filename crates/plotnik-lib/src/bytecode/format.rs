@@ -12,10 +12,6 @@ use super::Effect;
 use super::effects::EffectKind;
 use super::nav::Nav;
 
-/// Display label for the bootstrap preamble at step 0. The preamble has no name
-/// in the format; `dump` and `trace` share this so both render it identically.
-pub const PREAMBLE_NAME: &str = "_StructWrap";
-
 /// Column widths for instruction line formatting.
 pub mod cols {
     /// Leading indentation (2 spaces).

@@ -8,4 +8,4 @@ export type B =
 export type A =
   | { $tag: "X"; $data: { s: Node } };
 
-export type Q = undefined;
+export type Q = Node;

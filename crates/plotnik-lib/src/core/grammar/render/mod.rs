@@ -46,7 +46,6 @@ impl TreeGrammar {
     pub fn defs(&self) -> &[Def] {
         &self.defs
     }
-
 }
 
 /// One top-level definition: a node shape, a hidden rule, a category, a token,

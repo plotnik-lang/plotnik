@@ -216,7 +216,6 @@ pub enum InstructionIR {
     Match(MatchIR),
     Call(CallIR),
     Return(ReturnIR),
-    Trampoline(TrampolineIR),
 }
 
 impl InstructionIR {
@@ -226,7 +225,6 @@ impl InstructionIR {
             Self::Match(m) => m.label,
             Self::Call(c) => c.label,
             Self::Return(r) => r.label,
-            Self::Trampoline(t) => t.label,
         }
     }
 
@@ -234,7 +232,7 @@ impl InstructionIR {
     pub fn size(&self) -> usize {
         match self {
             Self::Match(m) => m.size(),
-            Self::Call(_) | Self::Return(_) | Self::Trampoline(_) => 8,
+            Self::Call(_) | Self::Return(_) => 8,
         }
     }
 
@@ -244,7 +242,6 @@ impl InstructionIR {
             Self::Match(m) => &m.successors,
             Self::Call(c) => std::slice::from_ref(&c.next),
             Self::Return(_) => &[],
-            Self::Trampoline(t) => std::slice::from_ref(&t.next),
         }
     }
 }
@@ -260,12 +257,10 @@ pub struct MatchIR {
     pub node_kind: NodeKindConstraint,
     /// Field constraint (None = wildcard).
     pub node_field: Option<NodeFieldId>,
-    /// Effects to execute before match attempt.
-    pub pre_effects: Vec<EffectIR>,
+    /// Effects to execute after a successful match, in bytecode order.
+    pub effects: Vec<EffectIR>,
     /// Fields that must NOT be present on the node.
     pub neg_fields: Vec<NodeFieldId>,
-    /// Effects to execute after successful match.
-    pub post_effects: Vec<EffectIR>,
     /// Predicate for node text filtering (None = no text check).
     pub predicate: Option<PredicateIR>,
     /// Successor labels (empty = accept, 1 = linear, 2+ = branch).
@@ -280,9 +275,8 @@ impl MatchIR {
             nav: Nav::Epsilon,
             node_kind: NodeKindConstraint::Any,
             node_field: None,
-            pre_effects: vec![],
+            effects: vec![],
             neg_fields: vec![],
-            post_effects: vec![],
             predicate: None,
             successors: vec![],
         }
@@ -308,13 +302,13 @@ impl MatchIR {
         self
     }
 
-    pub fn pre_effect(mut self, e: EffectIR) -> Self {
-        self.pre_effects.push(e);
+    pub fn prepend_effect(mut self, e: EffectIR) -> Self {
+        self.effects.insert(0, e);
         self
     }
 
-    pub fn post_effect(mut self, e: EffectIR) -> Self {
-        self.post_effects.push(e);
+    pub fn append_effect(mut self, e: EffectIR) -> Self {
+        self.effects.push(e);
         self
     }
 
@@ -323,13 +317,15 @@ impl MatchIR {
         self
     }
 
-    pub fn pre_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
-        self.pre_effects.extend(effects);
+    pub fn prepend_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
+        let mut ordered = effects.into_iter().collect::<Vec<_>>();
+        ordered.append(&mut self.effects);
+        self.effects = ordered;
         self
     }
 
-    pub fn post_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
-        self.post_effects.extend(effects);
+    pub fn append_effects(mut self, effects: impl IntoIterator<Item = EffectIR>) -> Self {
+        self.effects.extend(effects);
         self
     }
 
@@ -350,9 +346,8 @@ impl MatchIR {
 
     pub fn size(&self) -> usize {
         // Match8 can be used if: no effects, no neg_fields, no predicate, and at most 1 successor
-        let can_use_match8 = self.pre_effects.is_empty()
+        let can_use_match8 = self.effects.is_empty()
             && self.neg_fields.is_empty()
-            && self.post_effects.is_empty()
             && self.predicate.is_none()
             && self.successors.len() <= 1;
 
@@ -362,11 +357,8 @@ impl MatchIR {
 
         // Predicate occupies 2 slots: op_byte(u8) + is_regex(u8)|value_ref(u16).
         let predicate_slots = if self.predicate.is_some() { 2 } else { 0 };
-        let slots = self.pre_effects.len()
-            + self.neg_fields.len()
-            + self.post_effects.len()
-            + predicate_slots
-            + self.successors.len();
+        let slots =
+            self.effects.len() + self.neg_fields.len() + predicate_slots + self.successors.len();
 
         select_match_opcode(slots)
             .expect("instruction fits a match opcode")
@@ -449,39 +441,17 @@ impl From<ReturnIR> for InstructionIR {
     }
 }
 
-/// Trampoline instruction IR with symbolic return address.
-///
-/// Trampoline is like Call, but the target comes from VM context (external parameter)
-/// rather than being encoded in the instruction. Used for universal entry preamble.
-#[derive(Clone, Debug)]
-pub struct TrampolineIR {
-    /// Where this instruction lives.
-    pub label: Label,
-    /// Return address (where to continue after entrypoint returns).
-    pub next: Label,
-}
-
-impl TrampolineIR {
-    pub fn new(label: Label, next: Label) -> Self {
-        Self { label, next }
-    }
-}
-
-impl From<TrampolineIR> for InstructionIR {
-    fn from(t: TrampolineIR) -> Self {
-        Self::Trampoline(t)
-    }
-}
-
 /// Compiled query IR plus entry labels produced by the compile stage.
 #[derive(Clone, Debug)]
 pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
     /// Entry labels for each definition (in definition order).
     pub(in crate::compiler::lower) def_entries: IndexMap<DefId, Label>,
-    /// Entry label for the universal preamble.
-    /// The preamble wraps any entrypoint: Struct -> Trampoline -> EndStruct -> Return
-    pub(in crate::compiler::lower) preamble_entry: Label,
+    /// Entry labels for consuming-only definition bodies, emitted on demand for
+    /// guarded recursive nullable calls.
+    pub(in crate::compiler::lower) def_entries_consuming: IndexMap<DefId, Label>,
+    /// Entry labels for each emitted entrypoint wrapper, in definition order.
+    pub(in crate::compiler::lower) entrypoint_wrappers: IndexMap<DefId, Label>,
 }
 
 impl NfaGraph {
@@ -489,12 +459,8 @@ impl NfaGraph {
         &self.instructions
     }
 
-    pub(crate) fn def_entries(&self) -> &IndexMap<DefId, Label> {
-        &self.def_entries
-    }
-
-    pub(crate) fn preamble_entry(&self) -> Label {
-        self.preamble_entry
+    pub(crate) fn entrypoint_wrappers(&self) -> &IndexMap<DefId, Label> {
+        &self.entrypoint_wrappers
     }
 }
 

@@ -37,44 +37,42 @@ M0: S1 → T0  ; d: <Node>
 N0: S2 → T1  ; Q
 
 [entrypoints]
-Q = 06 :: T1
+Q = 00 :: T1
 
 [transitions]
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
+  02       (@13)                            13 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-
-Q:
-  06   !   (program)                        07
-  07  └‣─  (expression_statement)           08
-  08  └‣─  (identifier)                     09
-  09  ─‣┘  _                                10
-  10  ─‣─  (debugger_statement) [Node Set(M0)]  12
-  12  ─‣┘  _                                13
-  13                                        ▶
+  06  ─‣─  (debugger_statement) [Node Set(M0)]  08
+  08  ─‣┘  _                                11
+  09  └‣─  (identifier)                     10
+  10  ─‣┘  _                                06
+  11                                        ▶
+  12  └‣─  (expression_statement)           09
+  13   !   (program)                        12
 ==== trace ====
-_StructWrap:
+Q:
   00  -ε-  [StructOpen]                     02
-  02       Trampoline                       03
-       ▶   (Q)
+  02       (?)                              13 : 03
+       ▶   (?)
+
+?:
+  13       (program)                        12
+       ●   program
+  12       (expression_statement)           09
+       ●   expression_statement
+  09       (identifier)                     10
+       ●   identifier
+  10       _                                06
+       ●   expression_statement
+  06       (debugger_statement) [Node Set(M0)]  08
+       ●   debugger_statement
+  08       _                                11
+       ●   program
+  11   ◀   (?)                              
 
 Q:
-  06       (program)                        07
-       ●   program
-  07       (expression_statement)           08
-       ●   expression_statement
-  08       (identifier)                     09
-       ●   identifier
-  09       _                                10
-       ●   expression_statement
-  10       (debugger_statement) [Node Set(M0)]  12
-       ●   debugger_statement
-  12       _                                13
-       ●   program
-  13   ◀   (Q)                              
-
-_StructWrap:
   03  -ε-  [StructClose]                    05
-  05   ◀   _StructWrap                      ◼
+  05   ◀   (Q)                              ◼

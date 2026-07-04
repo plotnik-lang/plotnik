@@ -55,12 +55,16 @@ impl InferVisitor<'_, '_> {
         let op = self.quantifier_operator(quant);
         let (detail, hint) = if op.starts_with('?') {
             (
-                format!("this `{op}` group doesn't match exactly one node, so there is no single node to bind"),
+                format!(
+                    "this `{op}` group doesn't match exactly one node, so there is no single node to bind"
+                ),
                 "capture individual nodes inside the group: `{(a) @a (b) @b}? @x`".to_string(),
             )
         } else {
             (
-                format!("one repeat of this `{op}` group doesn't match exactly one node, so there is no single node to bind per element"),
+                format!(
+                    "one repeat of this `{op}` group doesn't match exactly one node, so there is no single node to bind per element"
+                ),
                 format!("add internal captures: `{{(a) @a (b) @b}}{op} @items`"),
             )
         };
@@ -103,13 +107,39 @@ impl InferVisitor<'_, '_> {
 
         let related = self.referenced_definition_range(inner);
         let mut builder = self
-            .report(DiagnosticKind::MultiElementScalarCapture, inner.text_range())
+            .report(
+                DiagnosticKind::MultiElementScalarCapture,
+                inner.text_range(),
+            )
             .detail(detail)
             .hint(hint);
         if let Some((src, range)) = related {
             builder = builder.related_to(Span::new(src, range), "defined here");
         }
         builder.emit();
+    }
+
+    /// Report a captured reference whose definition has no value to capture.
+    pub(super) fn report_capture_on_void_ref(
+        &mut self,
+        inner: &Pattern,
+        inner_info: &PatternShape,
+    ) -> bool {
+        if !matches!(inner, Pattern::DefRef(_)) || !inner_info.flow.is_void() {
+            return false;
+        }
+
+        let Some((src, range)) = self.referenced_definition_range(inner) else {
+            return false;
+        };
+        let mut builder = self
+            .report(DiagnosticKind::VoidReferenceCapture, inner.text_range())
+            .detail(
+                "the referenced definition produces no value; add a capture inside it or capture a node pattern directly",
+            );
+        builder = builder.related_to(Span::new(src, range), "defined here");
+        builder.emit();
+        true
     }
 
     /// Report a repeat whose element is a reference that can match zero nodes.

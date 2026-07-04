@@ -5,16 +5,20 @@ use std::collections::HashSet;
 use indexmap::IndexMap;
 
 use crate::bytecode::Nav;
+use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
-use crate::compiler::lower::ir::{InstructionIR, Label, NfaGraph, ReturnIR, TrampolineIR};
+use crate::compiler::lower::ir::{
+    CalleeEntry, EffectIR, InstructionIR, Label, NfaGraph, ReturnAddr, ReturnIR,
+};
 use crate::compiler::parse::ast::Pattern;
 
-use super::capture::PatternCtx;
+use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::AnchorSemantics;
+use super::scope::{CaptureExits, SkipExit, SplitExits, Struct};
 use crate::compiler::analyze::nullability::compute_nullable_defs;
-use super::scope::{CaptureExits, Struct};
+use crate::compiler::analyze::types::type_check::consumable_value_root;
 
 /// NfaBuilder state for Thompson construction.
 pub struct NfaBuilder<'a> {
@@ -23,6 +27,7 @@ pub struct NfaBuilder<'a> {
     pub(super) instructions: Vec<InstructionIR>,
     pub(crate) next_label_id: u32,
     pub(super) def_entries: IndexMap<DefId, Label>,
+    pub(super) def_entries_consuming: IndexMap<DefId, Label>,
     /// Stack of active struct scopes for capture lookup.
     /// Innermost scope is at the end.
     pub(super) scope_stack: Vec<Struct>,
@@ -49,6 +54,7 @@ impl<'a> NfaBuilder<'a> {
             instructions: Vec::new(),
             next_label_id: 0,
             def_entries: IndexMap::new(),
+            def_entries_consuming: IndexMap::new(),
             scope_stack: Vec::new(),
             suppress_depth: 0,
             nullable_defs: compute_nullable_defs(
@@ -74,10 +80,6 @@ impl<'a> NfaBuilder<'a> {
     pub(in crate::compiler::lower) fn build_ir(ctx: &'a LowerInput<'a>) -> NfaGraph {
         let mut compiler = NfaBuilder::new(ctx);
 
-        // Emit universal preamble first: Struct -> Trampoline -> EndStruct -> Return
-        // This wraps any entrypoint to create the top-level scope.
-        let preamble_entry = compiler.emit_preamble();
-
         for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
             let label = compiler.fresh_label();
             compiler.def_entries.insert(def_id, label);
@@ -87,29 +89,51 @@ impl<'a> NfaBuilder<'a> {
             compiler.compile_def(def_id);
         }
 
+        let mut entrypoint_wrappers = IndexMap::new();
+        for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
+            let wrapper = compiler.emit_entrypoint_wrapper(def_id);
+            entrypoint_wrappers.insert(def_id, wrapper);
+        }
+
         NfaGraph {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
-            preamble_entry,
+            def_entries_consuming: compiler.def_entries_consuming,
+            entrypoint_wrappers,
         }
     }
 
-    /// Emit the universal preamble: Struct -> Trampoline -> EndStruct -> Return
-    ///
-    /// The preamble creates a scope for the entrypoint's captures.
-    /// The Trampoline instruction jumps to the actual entrypoint (set via VM context).
-    fn emit_preamble(&mut self) -> Label {
-        // Return (stack is empty after preamble, so this means Accept)
+    fn emit_entrypoint_wrapper(&mut self, def_id: DefId) -> Label {
         let return_label = self.fresh_label();
         self.instructions.push(ReturnIR::new(return_label).into());
 
-        let struct_close_label = self.emit_struct_close_step(return_label);
+        let output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let output_shape = self.ctx.analysis.type_analysis.expect_type_shape(output);
+        let wraps_struct = matches!(output_shape, TypeShape::Struct(_));
 
-        let trampoline_label = self.fresh_label();
-        self.instructions
-            .push(TrampolineIR::new(trampoline_label, struct_close_label).into());
+        let after_body = if wraps_struct {
+            self.emit_struct_close_step(return_label)
+        } else if matches!(output_shape, TypeShape::Node) {
+            self.emit_effects_epsilon(
+                return_label,
+                vec![EffectIR::node()],
+                CaptureEffects::default(),
+            )
+        } else {
+            return_label
+        };
+        let call = self.emit_call(
+            Nav::Stay,
+            None,
+            ReturnAddr(after_body),
+            CalleeEntry(self.def_entries[&def_id]),
+        );
 
-        self.emit_struct_step(trampoline_label)
+        if wraps_struct {
+            self.emit_struct_step(call)
+        } else {
+            call
+        }
     }
 
     /// Generate a fresh label.
@@ -149,13 +173,61 @@ impl<'a> NfaBuilder<'a> {
         let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
         self.inline_stack.push(def_id);
         let body_entry = self.with_scope(type_id, |this| {
-            this.compile_pattern(body, return_label, body_nav)
+            let ctx = if consumable_value_root(body) {
+                PatternCtx::with_value(return_label, body_nav)
+            } else {
+                PatternCtx::with_nav(return_label, body_nav)
+            };
+            this.dispatch_pattern(body, ctx)
         });
         self.inline_stack.pop();
 
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
         }
+    }
+
+    pub(super) fn compile_consuming_def(&mut self, def_id: DefId) -> Label {
+        if let Some(&entry) = self.def_entries_consuming.get(&def_id) {
+            return entry;
+        }
+
+        let entry_label = self.fresh_label();
+        self.def_entries_consuming.insert(def_id, entry_label);
+
+        let name_sym = self.ctx.analysis.dependency_analysis.def_name_sym(def_id);
+        let name = self.ctx.analysis.interner.resolve(name_sym);
+        let body = self
+            .ctx
+            .symbol_table
+            .body(name)
+            .expect("analyzed definition has a body");
+
+        let return_label = self.fresh_label();
+        self.instructions.push(ReturnIR::new(return_label).into());
+
+        let body_nav = Some(Nav::StayExact);
+        let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        self.inline_stack.push(def_id);
+        let body_entry = self.with_scope(type_id, |this| {
+            this.compile_skippable_with_exits(
+                body,
+                SplitExits {
+                    match_exit: return_label,
+                    skip_exit: SkipExit::Fail,
+                },
+                body_nav,
+                CaptureEffects::default(),
+                consumable_value_root(body),
+            )
+        });
+        self.inline_stack.pop();
+
+        if body_entry != entry_label {
+            self.emit_epsilon(entry_label, vec![body_entry]);
+        }
+
+        entry_label
     }
 
     pub(super) fn compile_pattern(
@@ -192,14 +264,22 @@ impl<'a> NfaBuilder<'a> {
                     .type_analysis
                     .expect_pattern_result(pattern)
                     .flow;
-                if matches!(flow, PatternFlow::Value(_)) && !self.is_suppressed() {
+                if ctx.consumes_value()
+                    && matches!(flow, PatternFlow::Value(_))
+                    && !self.is_suppressed()
+                {
                     self.compile_enum(e, ctx)
                 } else {
                     self.compile_degraded_enum(e, ctx)
                 }
             }
             Pattern::CapturedPattern(c) => {
-                let PatternCtx { exit, nav, capture } = ctx;
+                let PatternCtx {
+                    exit,
+                    nav,
+                    capture,
+                    value: _,
+                } = ctx;
                 self.compile_captured(c, c.inner(), nav, capture, CaptureExits::Single(exit))
             }
             Pattern::QuantifiedPattern(q) => self.compile_quantified(q, ctx),

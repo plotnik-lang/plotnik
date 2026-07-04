@@ -5,4 +5,4 @@ export interface Q {
   x: Node;
 }
 
-export type A = undefined;
+export type A = Node;

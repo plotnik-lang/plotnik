@@ -2,7 +2,7 @@
 
 Plotnik is a pattern-matching language for tree-sitter syntax trees. It extends [tree-sitter's query syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with named expressions, recursion, and static type inference.
 
-**Pattern.** A *pattern* is a query matcher over the target syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A node pattern `(kind)` matches a named node; a token pattern `"text"` or `_` matches an anonymous token (or any node); sequences, alternations, quantifiers, fields, and captures are all patterns.
+**Pattern.** A _pattern_ is a query matcher over the target syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A node pattern `(kind)` matches a named node; a token pattern `"text"` or `_` matches an anonymous token (or any node); sequences, alternations, quantifiers, fields, and captures are all patterns.
 
 Tree-sitter predicates (`#eq?`, `#match?`) and directives (`#set!`) are not supported. Plotnik has its own inline predicate syntax (see [Predicates](#predicates)).
 
@@ -211,6 +211,26 @@ The pattern is 4 levels deep, but the output is flat. You're extracting specific
 
 Definitions are the exception: references are **opaque**. A bare `(Item)` matches structurally and produces nothing; `(Item) @item` produces the definition's type. Fields never leak through a reference boundary. See [Type System: Definitions Are Types](type-system.md#definitions-are-types).
 
+### Default Root Values
+
+A capture-less definition returns its root value, like regex group 0:
+
+```
+Program = (program)            ; Program is Node
+MaybeProgram = (program)?      ; MaybeProgram is Node | null
+Expr = [(identifier) (number)] ; Expr is Node
+Pair = {(identifier) (number)} ; Pair is void: no unique root
+```
+
+If the body contains any capture, the captures define the result instead:
+
+```
+Q = (program (identifier) @id) ; Q is { id: Node }, not { $node, id }
+```
+
+Void definitions still match structurally, but they cannot be captured as
+values. Add captures inside the definition, or capture a node pattern directly.
+
 ### Strict Dimensionality
 
 **Quantifiers (`*`, `+`) containing internal captures require a struct capture.**
@@ -267,8 +287,8 @@ key), and a missing list is `[]` (never `null`). The output shape is stable.
 
 Node arrays work when the quantified pattern has **no internal captures**. For patterns with internal captures, use struct arrays:
 
-| Pattern         | Output Type       | Meaning                                 |
-| --------------- | ----------------- | --------------------------------------- |
+| Pattern         | Output Type       | Meaning              |
+| --------------- | ----------------- | -------------------- |
 | `{...}* @items` | `items: T[]`      | zero or more structs |
 | `{...}+ @items` | `items: [T, ...]` | one or more structs  |
 | `{...}? @item`  | `item: T \| null` | nullable struct      |
@@ -341,18 +361,18 @@ Rules:
 
 ### Summary
 
-| Pattern                  | Output                                |
-| ------------------------ | ------------------------------------- |
-| `@name`                  | Field in current scope                |
-| `(x)? @a`                | Optional field                        |
-| `(x)* @a`                | Node array (no internal captures)     |
-| `{...}* @items`          | Struct array (with internal captures) |
-| `{...} @x` / `[...] @x`  | Nested object (new scope)             |
-| `(Def)`                  | Structural match, no output           |
-| `(Def) @x`               | The definition's type                 |
-| `(Def)* @xs`             | Array of the definition's type        |
-| `[...] @_`               | Match and discard                     |
-| `@x :: T`                | Custom type name                      |
+| Pattern                 | Output                                     |
+| ----------------------- | ------------------------------------------ |
+| `@name`                 | Field in current scope                     |
+| `(x)? @a`               | Optional field                             |
+| `(x)* @a`               | Node array (no internal captures)          |
+| `{...}* @items`         | Struct array (with internal captures)      |
+| `{...} @x` / `[...] @x` | Nested object (new scope)                  |
+| `(Def)`                 | Structural match, no output                |
+| `(Def) @x`              | The definition's type, or an error if void |
+| `(Def)* @xs`            | Array of the definition's type             |
+| `[...] @_`              | Match and discard                          |
+| `@x :: T`               | Custom type name                           |
 
 ---
 
@@ -974,10 +994,13 @@ Use as node kinds:
 
 **Encapsulation**: `(Name)` matches but extracts nothing. Capture the reference to get the definition's typed result — `(BinaryOp) @expr` above produces `{ expr: BinaryOp }` where `BinaryOp` is `{ left: Node, op: Node, right: Node }`. This separates structural reuse from data extraction, and it means extracting a pattern into a definition never silently changes your output.
 
-Named expressions define both pattern and type. A definition whose body has no captures is void — useful purely structurally:
+Named expressions define both pattern and type. A capture-less single-node
+definition returns its root node; use a sequence when the definition is meant
+to be purely structural:
 
 ```
-Expr = [(BinaryOp) (UnaryOp) (identifier) (number)]
+Expr = [(identifier) (number)] ; returns Node
+Pair = {(identifier) (number)} ; void: structural only
 (statement (Expr))     ; matches any statement containing an Expr, no output
 ```
 
