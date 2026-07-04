@@ -37,14 +37,14 @@ Two zones, one rule each:
 
 # Commands
 
-| Command               | What it does                                          |
-| --------------------- | ----------------------------------------------------- |
-| `make check`          | `cargo check --workspace --all-targets`               |
-| `make clippy`         | clippy with `-D warnings`                             |
-| `make test`           | full test suite via `cargo nextest`                   |
-| `make shot`           | accept golden fixtures + insta snapshots, then re-run |
-| `make fmt`            | `cargo fmt` + prettier                                |
-| `make coverage-lines` | per-file missing lines for `plotnik-lib`              |
+| Command                  | What it does                                          |
+| ------------------------ | ----------------------------------------------------- |
+| `make check`             | `cargo check --workspace --all-targets`               |
+| `make clippy`            | clippy with `-D warnings`                             |
+| `make test [FILTER=...]` | full test suite via `cargo nextest`                   |
+| `make shot [FILTER=...]` | accept golden fixtures + insta snapshots, then re-run |
+| `make fmt`               | `cargo fmt` + prettier                                |
+| `make coverage-lines`    | per-file missing lines for `plotnik-lib`              |
 
 Check your changes: `make test`
 Before commit: `make fmt`
@@ -195,6 +195,7 @@ cargo run -p plotnik -- lang list                       # languages + aliases
 The golden fixtures have priority over Rust-based tests.
 
 - Run `make shot` to (re)write generated sections
+- Use `FILTER=<name>` with `make test` or `make shot` to run the same filtered fixture subset
 - Name new fixture folders after existing ones in sibling stages
 - Rust `*_tests.rs` are unit-logic only
   - `foo.rs` gets a sibling `foo_tests.rs`, declared as `#[cfg(test)] mod foo_tests;`
