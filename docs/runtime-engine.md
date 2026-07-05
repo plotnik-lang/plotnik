@@ -23,8 +23,11 @@ struct Frame {
 ```
 
 `cursor` is restored through tree-sitter descendant indexes stored in
-checkpoints. `frames` is an arena-backed cactus stack so backtracking can restore
-call stacks without copying them.
+checkpoints. Under sustained wide backtracking, a bounded pool of cursor
+snapshots takes over: the newest checkpoints restore by copying a saved cursor
+(`reset_to`, O(depth)) instead of re-navigating from an index. `frames` is an
+arena-backed cactus stack so backtracking can restore call stacks without
+copying them.
 
 ## Execution Cycle
 
@@ -152,6 +155,10 @@ produce the completed value.
 Void output is represented by an empty stream and materializes as `null`.
 Tag-only enum variants emit no payload effects, so the rendered value has
 `$tag` without `$data`.
+
+Materialized values borrow captured node text from the source and member/tag
+names from the loaded module's string table. Rendering is unchanged; the borrows
+only avoid repeated string allocation and UTF-8 validation.
 
 Load-time validation proves the stream discipline before the VM runs, so these
 materializer assertions are inside-zone invariants.

@@ -12,6 +12,8 @@ categories = ["parsing", "development-tools"]
 # The golden-fixture suite owns its own target wiring (`harness = false`), so we
 # declare every test target by hand instead of letting Cargo autodiscover them.
 autotests = false
+# Criterion owns the bench harness, so the bench target is declared by hand too.
+autobenches = false
 
 [lints]
 workspace = true
@@ -42,6 +44,7 @@ arborium-javascript = "2.18.0"
 arborium-tree-sitter = "2.18.0"
 arborium-typescript = "2.18.0"
 cargo_metadata = "=0.23.1"
+criterion = "=0.8.2"
 insta = { version = "=1.48.0", features = ["yaml"] }
 indoc = "=2.0.7"
 libtest-mimic = "=0.8.2"
@@ -60,3 +63,9 @@ harness = false
 [[test]]
 name = "fuzz_no_panic"
 path = "tests/fuzz_no_panic.rs"
+
+# VM hot-path benchmarks over a synthetic corpus (criterion owns the harness).
+[[bench]]
+name = "vm"
+path = "benches/vm.rs"
+harness = false

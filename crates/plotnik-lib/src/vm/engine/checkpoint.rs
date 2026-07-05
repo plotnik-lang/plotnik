@@ -4,6 +4,8 @@
 //! a checkpoint for each alternative. On failure, it restores the
 //! most recent checkpoint and continues.
 
+use std::num::NonZeroU64;
+
 use crate::core::NodeFieldId;
 
 use super::cursor::SkipPolicy;
@@ -29,7 +31,8 @@ pub struct CallResume {
 /// snapshot at creation and the restore on backtrack in lockstep.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct CheckpointState {
-    /// Cursor position (tree-sitter descendant_index).
+    /// Cursor position (tree-sitter descendant_index) — always present; the
+    /// restore fallback when the pooled snapshot was evicted.
     pub(crate) descendant_index: u32,
     /// Effect stream length at checkpoint.
     pub(crate) effect_watermark: usize,
@@ -54,6 +57,12 @@ pub struct Checkpoint {
     /// the stack. The whole stack's max is therefore the top's `max_frame_idx_below`,
     /// so pruning never has to scan.
     pub(crate) max_frame_idx_below: Option<u32>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct CheckpointSnapshot {
+    stack_index: usize,
+    snapshot: NonZeroU64,
 }
 
 impl Checkpoint {
@@ -89,6 +98,7 @@ impl Checkpoint {
 #[derive(Debug)]
 pub struct CheckpointStack {
     stack: Vec<Checkpoint>,
+    snapshots: Vec<CheckpointSnapshot>,
     /// Highest frame index referenced by any checkpoint.
     max_frame_idx: Option<u32>,
 }
@@ -98,24 +108,64 @@ impl CheckpointStack {
     pub fn new() -> Self {
         Self {
             stack: Vec::new(),
+            snapshots: Vec::new(),
             max_frame_idx: None,
         }
     }
 
     pub fn push(&mut self, mut checkpoint: Checkpoint) {
+        self.push_inner(&mut checkpoint);
+        self.stack.push(checkpoint);
+    }
+
+    pub fn push_with_snapshot(&mut self, mut checkpoint: Checkpoint, snapshot: NonZeroU64) {
+        let stack_index = self.stack.len();
+        self.push_inner(&mut checkpoint);
+        self.stack.push(checkpoint);
+        self.snapshots.push(CheckpointSnapshot {
+            stack_index,
+            snapshot,
+        });
+    }
+
+    fn push_inner(&mut self, checkpoint: &mut Checkpoint) {
         let prev = self.stack.last().and_then(|c| c.max_frame_idx_below);
         checkpoint.max_frame_idx_below = match (checkpoint.state.frame_index, prev) {
             (Some(a), Some(b)) => Some(a.max(b)),
             (a, b) => a.or(b),
         };
         self.max_frame_idx = checkpoint.max_frame_idx_below;
-        self.stack.push(checkpoint);
     }
 
     pub fn pop(&mut self) -> Option<Checkpoint> {
         let cp = self.stack.pop()?;
+        debug_assert!(
+            self.snapshots.is_empty(),
+            "snapshot-aware pop is required once snapshots exist"
+        );
         self.max_frame_idx = self.stack.last().and_then(|c| c.max_frame_idx_below);
         Some(cp)
+    }
+
+    pub fn pop_with_snapshot(&mut self) -> Option<(Checkpoint, Option<NonZeroU64>)> {
+        let stack_index = self.stack.len().checked_sub(1)?;
+        let cp = self.stack.pop()?;
+        let snapshot = if self
+            .snapshots
+            .last()
+            .is_some_and(|snapshot| snapshot.stack_index == stack_index)
+        {
+            Some(
+                self.snapshots
+                    .pop()
+                    .expect("snapshot entry exists")
+                    .snapshot,
+            )
+        } else {
+            None
+        };
+        self.max_frame_idx = self.stack.last().and_then(|c| c.max_frame_idx_below);
+        Some((cp, snapshot))
     }
 
     /// Get the highest frame index referenced by any checkpoint.
@@ -127,7 +177,8 @@ impl CheckpointStack {
     /// Live heap bytes: checkpoint count × checkpoint size.
     #[inline]
     pub fn byte_footprint(&self) -> u64 {
-        (self.stack.len() * std::mem::size_of::<Checkpoint>()) as u64
+        (self.stack.len() * std::mem::size_of::<Checkpoint>()
+            + self.snapshots.len() * std::mem::size_of::<CheckpointSnapshot>()) as u64
     }
 }
 

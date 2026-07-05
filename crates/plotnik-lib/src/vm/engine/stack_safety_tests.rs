@@ -214,7 +214,7 @@ fn deep_value_render_and_drop_do_not_overflow_native_stack() {
                 // Bottom-up so construction itself never recurses.
                 let mut value = Value::Null;
                 for _ in 0..VALUE_DEPTH {
-                    value = Value::Struct(vec![("inner".to_string(), value)]);
+                    value = Value::Struct(vec![("inner", value)]);
                 }
                 let rendered = value.format(false, Colors::new(false));
                 // `value` drops here, on this same tiny stack.

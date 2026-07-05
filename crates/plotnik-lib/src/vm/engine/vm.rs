@@ -1,10 +1,12 @@
 //! Virtual machine for executing compiled Plotnik queries.
 
+use std::num::NonZeroU64;
+
 use arborium_tree_sitter::Tree;
 
 use crate::bytecode::{
-    Call, Effect, EffectKind, Entrypoint, Instruction, Match, Module, Nav, NodeKindConstraint,
-    PredicateOp,
+    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Effect, EffectKind, Entrypoint,
+    Module, Nav, NodeKindConstraint, PredicateOp,
 };
 
 use crate::core::NodeFieldId;
@@ -16,6 +18,11 @@ use super::error::{ControlFlow, RuntimeError, Signal};
 use super::frame::FrameArena;
 use super::limits::{ResolvedRuntimeLimits, RuntimeLimitSpec};
 use super::trace::{NoopTracer, Tracer};
+use super::value::node_text;
+
+/// Bitmask selecting the dispatch steps on which the memory ceiling is
+/// sampled; must be a power of two minus one.
+const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
 /// Virtual machine state for query execution.
 pub struct VM<'t> {
@@ -29,6 +36,7 @@ pub struct VM<'t> {
     pub(crate) steps_used: u64,
     pub(crate) recursion_depth: u32,
     pub(crate) limits: ResolvedRuntimeLimits,
+    pub(crate) snapshot_cursor_active: bool,
 
     /// Suppression nesting on the active match path: when `> 0`, effects are
     /// suppressed (not emitted to the log). `SuppressBegin` increments,
@@ -78,6 +86,7 @@ impl<'t> VMBuilder<'t> {
             steps_used: 0,
             recursion_depth: 0,
             limits: self.spec.resolve(source_nodes),
+            snapshot_cursor_active: false,
             suppress_depth: 0,
             source: self.source,
         }
@@ -101,8 +110,12 @@ impl<'t> VM<'t> {
     }
 
     /// Restore VM state from a checkpoint's snapshot.
-    fn restore_checkpoint_state(&mut self, state: CheckpointState) {
-        self.cursor.goto_descendant(state.descendant_index);
+    fn restore_checkpoint_state(&mut self, state: CheckpointState, snapshot: Option<NonZeroU64>) {
+        if let Some(snapshot) = snapshot {
+            self.cursor.restore(Some(snapshot), state.descendant_index);
+        } else if self.cursor.restore_without_snapshot(state.descendant_index) {
+            self.snapshot_cursor_active = true;
+        }
         self.effects.truncate(state.effect_watermark);
         self.frames.restore(state.frame_index);
         self.recursion_depth = state.recursion_depth;
@@ -136,6 +149,7 @@ impl<'t> VM<'t> {
             checkpoints: _, // the stack this checkpoint was just popped from
             steps_used: _,  // monotonic step counter, never rewound on backtrack
             limits: _,      // immutable execution config
+            snapshot_cursor_active: _, // cumulative optimization state
             source: _,      // immutable input text
         } = self;
 
@@ -164,24 +178,25 @@ impl<'t> VM<'t> {
         );
     }
 
-    /// Checkpoint that resumes a branch alternative at `ip`.
-    fn branch_checkpoint(&self, ip: u16) -> Checkpoint {
-        Checkpoint::branch(self.checkpoint_state(), ip)
-    }
-
     /// Checkpoint that, on backtrack, advances the cursor and re-enters the
     /// callee. `call_ip` is the Call's address (for trace rendering only).
     fn call_retry_checkpoint(&self, call_ip: u16, resume: CallResume) -> Checkpoint {
         Checkpoint::call_retry(self.checkpoint_state(), call_ip, resume)
     }
 
-    /// Live bytes across the three growable runtime arenas (frame, checkpoint,
-    /// and effect heaps) — the quantity the memory ceiling bounds. A sum of
-    /// element-count × element-size; it never allocates.
+    fn cursor_snapshot(&mut self, refs: u32) -> NonZeroU64 {
+        self.cursor
+            .snapshot(refs)
+            .expect("snapshot cursor active flag tracks cursor pool activation")
+    }
+
+    /// Live bytes across the growable runtime arenas — the quantity the memory
+    /// ceiling bounds. A sum of element-count × element-size; it never allocates.
     fn heap_bytes(&self) -> u64 {
         self.frames.byte_footprint()
             + self.checkpoints.byte_footprint()
             + self.effects.byte_footprint()
+            + self.cursor.snapshot_footprint()
     }
 
     /// Execute query from entrypoint, returning effect log.
@@ -208,7 +223,9 @@ impl<'t> VM<'t> {
         tracer: &mut T,
     ) -> Result<EffectLog<'t>, RuntimeError> {
         self.ip = u16::from(entrypoint.target());
-        tracer.trace_enter_entrypoint(self.ip);
+        if T::ENABLED {
+            tracer.trace_enter_entrypoint(self.ip);
+        }
 
         loop {
             // Step ceiling: bound total work. `None` opts out (Unbounded).
@@ -219,10 +236,16 @@ impl<'t> VM<'t> {
             }
             self.steps_used += 1;
 
-            // Memory ceiling: bound the live runtime heap, sampled once per
-            // dispatch. Per-step growth is bounded, so this catches blowup
-            // promptly. `None` opts out (Unbounded).
-            if let Some(max) = self.limits.max_memory {
+            // Memory ceiling: bound the live runtime heap, sampled every
+            // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded
+            // (≤30 checkpoints + ≤15 effects + 1 frame + ≤1 pooled snapshot
+            // ≈ 4.4 KiB), so sampling every 1024 steps bounds the unobserved
+            // overshoot to ~4.5 MiB — noise against the ≥64 MiB auto ceiling.
+            // `None` opts out
+            // (Unbounded).
+            if self.steps_used & MEMORY_SAMPLE_MASK == 0
+                && let Some(max) = self.limits.max_memory
+            {
                 let used = self.heap_bytes();
                 if used > max {
                     return Err(RuntimeError::MemoryLimitExceeded { used, limit: max });
@@ -238,13 +261,16 @@ impl<'t> VM<'t> {
                 "ip {} is not a validated instruction start",
                 self.ip
             );
-            let instr = module.decode_step(self.ip);
-            tracer.trace_instruction(self.ip, &instr);
+            // Tracing renders from the byte-level decoder so trace output stays
+            // identical; the hot path reads the pre-decoded stream.
+            if T::ENABLED {
+                tracer.trace_instruction(self.ip, &module.decode_step(self.ip));
+            }
 
-            let result = match instr {
-                Instruction::Match(m) => self.exec_match(m, module, tracer),
-                Instruction::Call(c) => self.exec_call(c, tracer),
-                Instruction::Return(_) => self.exec_return(tracer),
+            let result = match module.decoded().step(self.ip) {
+                DecodedInstr::Match(m) => self.exec_match(m, module, tracer),
+                DecodedInstr::Call(c) => self.exec_call(c, tracer),
+                DecodedInstr::Return => self.exec_return(tracer),
             };
 
             match result {
@@ -257,7 +283,7 @@ impl<'t> VM<'t> {
 
     fn exec_match<T: Tracer>(
         &mut self,
-        m: Match<'_>,
+        m: DecodedMatch,
         module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
@@ -265,24 +291,28 @@ impl<'t> VM<'t> {
             self.navigate_and_match(m, module, tracer)?;
         }
 
-        for effect_op in m.effects() {
-            self.emit_effect(effect_op, tracer);
+        for &op in module.decoded().effects(&m) {
+            self.emit_effect(op, tracer);
         }
 
-        self.branch_to_successors(m, tracer)
+        self.branch_to_successors(m, module, tracer)
     }
 
     fn navigate_and_match<T: Tracer>(
         &mut self,
-        m: Match<'_>,
+        m: DecodedMatch,
         module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
         let Some(policy) = self.cursor.navigate(m.nav) else {
-            tracer.trace_nav_failure(m.nav);
+            if T::ENABLED {
+                tracer.trace_nav_failure(m.nav);
+            }
             return Err(self.backtrack(tracer));
         };
-        tracer.trace_nav(m.nav, self.cursor.node());
+        if T::ENABLED {
+            tracer.trace_nav(m.nav, self.cursor.node());
+        }
 
         let cont_nav = m.nav.sibling_continuation();
         loop {
@@ -292,40 +322,42 @@ impl<'t> VM<'t> {
             self.advance_or_backtrack(policy, cont_nav, tracer)?;
         }
 
-        tracer.trace_match_success(self.cursor.node());
-        if let Some(field_id) = m.node_field {
+        if T::ENABLED {
+            tracer.trace_match_success(self.cursor.node());
+        }
+        if T::ENABLED
+            && let Some(field_id) = m.node_field
+        {
             tracer.trace_field_success(field_id);
         }
 
         Ok(())
     }
 
-    /// `op` selects the operator (see [`PredicateOp`]); `is_regex` chooses
-    /// RegexTable over StringTable for `value_ref`.
-    fn evaluate_predicate(&self, op: u8, is_regex: bool, value_ref: u16, module: &Module) -> bool {
+    /// `p.is_regex` chooses RegexTable over StringTable for `p.value_ref`.
+    fn evaluate_predicate(&self, p: DecodedPredicate, module: &Module) -> bool {
         let node = self.cursor.node();
-        let node_text = node
-            .utf8_text(self.source.as_bytes())
-            .expect("node source text must be valid UTF-8");
-        let op = PredicateOp::from_byte(op);
+        let node_text = node_text(self.source, &node);
 
-        if is_regex {
+        if p.is_regex {
             // The DFAs are deserialized once at `Module::load` and reused here;
             // `RegexDfas::is_match` upholds the populated-slot invariant that a
             // module passing load guarantees. Deserializing per evaluation, as
             // this once did, re-validated the whole automaton on every predicate
             // test (issue #426).
-            let matched = module.regex_dfas().is_match(value_ref as usize, node_text);
+            let matched = module
+                .regex_dfas()
+                .is_match(p.value_ref as usize, node_text);
 
-            match op {
+            match p.op {
                 PredicateOp::RegexMatch => matched,
                 PredicateOp::RegexNoMatch => !matched,
                 _ => unreachable!("non-regex op with is_regex=true"),
             }
         } else {
-            let target = module.strings().at(value_ref as usize);
+            let target = module.strings().at(p.value_ref as usize);
 
-            match op {
+            match p.op {
                 PredicateOp::Eq => node_text == target,
                 PredicateOp::Ne => node_text != target,
                 PredicateOp::StartsWith => node_text.starts_with(target),
@@ -336,32 +368,47 @@ impl<'t> VM<'t> {
         }
     }
 
-    fn candidate_matches<T: Tracer>(&self, m: Match<'_>, module: &Module, tracer: &mut T) -> bool {
+    fn candidate_matches<T: Tracer>(
+        &self,
+        m: DecodedMatch,
+        module: &Module,
+        tracer: &mut T,
+    ) -> bool {
         let node = self.cursor.node();
 
         match m.node_kind {
             NodeKindConstraint::Any => {}
             NodeKindConstraint::Named(None) => {
                 if !node.is_named() {
-                    tracer.trace_match_failure(node);
+                    if T::ENABLED {
+                        tracer.trace_match_failure(node);
+                    }
                     return false;
                 }
             }
             NodeKindConstraint::Named(Some(expected)) => {
-                if !node.is_named() || node.kind_id() != u16::from(expected) {
-                    tracer.trace_match_failure(node);
+                // kind_id first: it alone rejects most candidates, and each
+                // check is an FFI call.
+                if node.kind_id() != u16::from(expected) || !node.is_named() {
+                    if T::ENABLED {
+                        tracer.trace_match_failure(node);
+                    }
                     return false;
                 }
             }
             NodeKindConstraint::Anonymous(None) => {
                 if node.is_named() {
-                    tracer.trace_match_failure(node);
+                    if T::ENABLED {
+                        tracer.trace_match_failure(node);
+                    }
                     return false;
                 }
             }
             NodeKindConstraint::Anonymous(Some(expected)) => {
-                if node.is_named() || node.kind_id() != u16::from(expected) {
-                    tracer.trace_match_failure(node);
+                if node.kind_id() != u16::from(expected) || node.is_named() {
+                    if T::ENABLED {
+                        tracer.trace_match_failure(node);
+                    }
                     return false;
                 }
             }
@@ -370,23 +417,20 @@ impl<'t> VM<'t> {
         if let Some(expected) = m.node_field
             && self.cursor.field_id() != Some(expected)
         {
-            tracer.trace_field_failure(node);
+            if T::ENABLED {
+                tracer.trace_field_failure(node);
+            }
             return false;
         }
 
-        for field_id in m.neg_fields() {
+        for &field_id in module.decoded().neg_fields(&m) {
             if node.child_by_field_id(u16::from(field_id)).is_some() {
                 return false;
             }
         }
 
-        if let Some(predicate) = m.predicate()
-            && !self.evaluate_predicate(
-                predicate.op,
-                predicate.is_regex,
-                predicate.value_ref,
-                module,
-            )
+        if let Some(p) = m.predicate
+            && !self.evaluate_predicate(p, module)
         {
             return false;
         }
@@ -396,25 +440,45 @@ impl<'t> VM<'t> {
 
     fn branch_to_successors<T: Tracer>(
         &mut self,
-        m: Match<'_>,
+        m: DecodedMatch,
+        module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
-        if m.succ_count() == 0 {
+        let succs = module.decoded().successors(&m);
+        if succs.is_empty() {
             return Err(ControlFlow::Accept.into());
         }
 
-        // Push checkpoints for alternate branches (in reverse order)
-        for i in (1..m.succ_count()).rev() {
-            self.checkpoints
-                .push(self.branch_checkpoint(u16::from(m.successor(i))));
-            tracer.trace_checkpoint_created(self.ip);
+        // Push checkpoints for alternate branches (in reverse order). One state
+        // snapshot serves every push: nothing in the loop moves the cursor or
+        // touches the arenas the snapshot reads.
+        if succs.len() > 1 {
+            let state = self.checkpoint_state();
+            if self.snapshot_cursor_active {
+                let refs = u32::try_from(succs.len() - 1).expect("branch fan-out count fits u32");
+                let snapshot = self.cursor_snapshot(refs);
+                for &alt in succs[1..].iter().rev() {
+                    self.checkpoints
+                        .push_with_snapshot(Checkpoint::branch(state, alt), snapshot);
+                    if T::ENABLED {
+                        tracer.trace_checkpoint_created(self.ip);
+                    }
+                }
+            } else {
+                for &alt in succs[1..].iter().rev() {
+                    self.checkpoints.push(Checkpoint::branch(state, alt));
+                    if T::ENABLED {
+                        tracer.trace_checkpoint_created(self.ip);
+                    }
+                }
+            }
         }
 
-        self.ip = u16::from(m.successor(0));
+        self.ip = succs[0];
         Ok(())
     }
 
-    fn exec_call<T: Tracer>(&mut self, c: Call, tracer: &mut T) -> Result<(), Signal> {
+    fn exec_call<T: Tracer>(&mut self, c: DecodedCall, tracer: &mut T) -> Result<(), Signal> {
         let skip_policy = self.navigate_to_field_with_policy(c.nav, c.node_field, tracer)?;
 
         // A searchable nav leaves a retry checkpoint so the callee can be
@@ -424,23 +488,32 @@ impl<'t> VM<'t> {
             && policy != SkipPolicy::Exact
         {
             let resume = CallResume {
-                target: u16::from(c.target),
-                next: u16::from(c.next),
+                target: c.target,
+                next: c.next,
                 field: c.node_field,
                 policy,
             };
-            self.checkpoints
-                .push(self.call_retry_checkpoint(self.ip, resume));
-            tracer.trace_checkpoint_created(self.ip);
+            let cp = self.call_retry_checkpoint(self.ip, resume);
+            if self.snapshot_cursor_active {
+                let snapshot = self.cursor_snapshot(1);
+                self.checkpoints.push_with_snapshot(cp, snapshot);
+            } else {
+                self.checkpoints.push(cp);
+            }
+            if T::ENABLED {
+                tracer.trace_checkpoint_created(self.ip);
+            }
         }
 
-        self.enter_callee(u16::from(c.target), u16::from(c.next), tracer);
+        self.enter_callee(c.target, c.next, tracer);
         Ok(())
     }
 
     /// Push a frame for `target` (returning to `next`) and jump in.
     fn enter_callee<T: Tracer>(&mut self, target: u16, next: u16, tracer: &mut T) {
-        tracer.trace_call(target);
+        if T::ENABLED {
+            tracer.trace_call(target);
+        }
         self.frames.push(next);
         self.recursion_depth += 1;
         debug_assert_eq!(
@@ -466,10 +539,14 @@ impl<'t> VM<'t> {
         }
 
         let Some(policy) = self.cursor.navigate(nav) else {
-            tracer.trace_nav_failure(nav);
+            if T::ENABLED {
+                tracer.trace_nav_failure(nav);
+            }
             return Err(self.backtrack(tracer));
         };
-        tracer.trace_nav(nav, self.cursor.node());
+        if T::ENABLED {
+            tracer.trace_nav(nav, self.cursor.node());
+        }
 
         let Some(field_id) = field else {
             return Ok(Some(policy));
@@ -478,10 +555,14 @@ impl<'t> VM<'t> {
         let cont_nav = nav.sibling_continuation();
         loop {
             if self.cursor.field_id() == Some(field_id) {
-                tracer.trace_field_success(field_id);
+                if T::ENABLED {
+                    tracer.trace_field_success(field_id);
+                }
                 return Ok(Some(policy));
             }
-            tracer.trace_field_failure(self.cursor.node());
+            if T::ENABLED {
+                tracer.trace_field_failure(self.cursor.node());
+            }
             self.advance_or_backtrack(policy, cont_nav, tracer)?;
         }
     }
@@ -495,15 +576,21 @@ impl<'t> VM<'t> {
             return Ok(());
         };
         if self.cursor.field_id() != Some(field_id) {
-            tracer.trace_field_failure(self.cursor.node());
+            if T::ENABLED {
+                tracer.trace_field_failure(self.cursor.node());
+            }
             return Err(self.backtrack(tracer));
         }
-        tracer.trace_field_success(field_id);
+        if T::ENABLED {
+            tracer.trace_field_success(field_id);
+        }
         Ok(())
     }
 
     fn exec_return<T: Tracer>(&mut self, tracer: &mut T) -> Result<(), Signal> {
-        tracer.trace_return();
+        if T::ENABLED {
+            tracer.trace_return();
+        }
 
         // If no frames, we're returning from top-level entrypoint → Accept
         if self.frames.is_empty() {
@@ -537,11 +624,18 @@ impl<'t> VM<'t> {
     // a resume succeeds or it empties — the loop always terminates.
     fn backtrack<T: Tracer>(&mut self, tracer: &mut T) -> Signal {
         loop {
-            let Some(cp) = self.checkpoints.pop() else {
+            let popped = if self.snapshot_cursor_active {
+                self.checkpoints.pop_with_snapshot()
+            } else {
+                self.checkpoints.pop().map(|checkpoint| (checkpoint, None))
+            };
+            let Some((cp, snapshot)) = popped else {
                 return RuntimeError::NoMatch.into();
             };
-            tracer.trace_backtrack();
-            self.restore_checkpoint_state(cp.state);
+            if T::ENABLED {
+                tracer.trace_backtrack();
+            }
+            self.restore_checkpoint_state(cp.state, snapshot);
 
             let Some(resume) = cp.call_resume else {
                 self.ip = cp.ip;
@@ -553,21 +647,34 @@ impl<'t> VM<'t> {
             if !self.cursor.continue_search(resume.policy) {
                 continue;
             }
-            tracer.trace_nav(Nav::Down.sibling_continuation(), self.cursor.node());
+            if T::ENABLED {
+                tracer.trace_nav(Nav::Down.sibling_continuation(), self.cursor.node());
+            }
 
             // Enforce the field constraint at the new candidate. A mismatch ends
             // this Call's search, exactly like the navigate-time field check.
             if let Some(field_id) = resume.field {
                 if self.cursor.field_id() != Some(field_id) {
-                    tracer.trace_field_failure(self.cursor.node());
+                    if T::ENABLED {
+                        tracer.trace_field_failure(self.cursor.node());
+                    }
                     continue;
                 }
-                tracer.trace_field_success(field_id);
+                if T::ENABLED {
+                    tracer.trace_field_success(field_id);
+                }
             }
 
-            self.checkpoints
-                .push(self.call_retry_checkpoint(cp.ip, resume));
-            tracer.trace_checkpoint_created(cp.ip);
+            let retry = self.call_retry_checkpoint(cp.ip, resume);
+            if self.snapshot_cursor_active {
+                let snapshot = self.cursor_snapshot(1);
+                self.checkpoints.push_with_snapshot(retry, snapshot);
+            } else {
+                self.checkpoints.push(retry);
+            }
+            if T::ENABLED {
+                tracer.trace_checkpoint_created(cp.ip);
+            }
             self.enter_callee(resume.target, resume.next, tracer);
             return ControlFlow::Backtracked.into();
         }
@@ -582,7 +689,9 @@ impl<'t> VM<'t> {
         if !self.cursor.continue_search(policy) {
             return Err(self.backtrack(tracer));
         }
-        tracer.trace_nav(cont_nav, self.cursor.node());
+        if T::ENABLED {
+            tracer.trace_nav(cont_nav, self.cursor.node());
+        }
         Ok(())
     }
 
@@ -591,7 +700,9 @@ impl<'t> VM<'t> {
 
         let effect = match op.kind {
             SuppressBegin => {
-                tracer.trace_suppress_control(SuppressBegin, self.suppress_depth > 0);
+                if T::ENABLED {
+                    tracer.trace_suppress_control(SuppressBegin, self.suppress_depth > 0);
+                }
                 self.suppress_depth += 1;
                 return;
             }
@@ -600,13 +711,17 @@ impl<'t> VM<'t> {
                     .suppress_depth
                     .checked_sub(1)
                     .expect("SuppressEnd without matching SuppressBegin");
-                tracer.trace_suppress_control(SuppressEnd, self.suppress_depth > 0);
+                if T::ENABLED {
+                    tracer.trace_suppress_control(SuppressEnd, self.suppress_depth > 0);
+                }
                 return;
             }
 
             // Skip data effects when suppressing, but trace them
             _ if self.suppress_depth > 0 => {
-                tracer.trace_effect_suppressed(op.kind, op.payload);
+                if T::ENABLED {
+                    tracer.trace_effect_suppressed(op.kind, op.payload);
+                }
                 return;
             }
 
@@ -622,7 +737,9 @@ impl<'t> VM<'t> {
             Null => RuntimeEffect::Null,
         };
 
-        tracer.trace_effect(&effect);
+        if T::ENABLED {
+            tracer.trace_effect(&effect);
+        }
         self.effects.push(effect);
     }
 }

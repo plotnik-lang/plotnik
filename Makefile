@@ -1,4 +1,4 @@
-.PHONY: check clippy test coverage coverage-lines clean
+.PHONY: check clippy test bench coverage coverage-lines clean
 
 check:
 	@cargo check \
@@ -34,6 +34,12 @@ shot:
 		--hide-progress-bar \
 		--status-level none \
 		--failure-output final $(FILTER)
+
+bench:
+	@cargo bench \
+		--package plotnik-lib \
+		--bench vm \
+		-- $(FILTER)
 
 coverage-lines:
 	@cargo llvm-cov \

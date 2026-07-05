@@ -95,8 +95,11 @@ Q:
   12       _                                06, 12
   20  ❮❮❮ 
   18       _                                17, 18
-       ●   ;
+       ●   expression_statement
   17       (expression_statement)           16
+       ●   expression_statement
+  16       (binary_expression)              14
+       ○   identifier
        ○   ;
   18  ❮❮❮ 
   18       _                                17, 18
