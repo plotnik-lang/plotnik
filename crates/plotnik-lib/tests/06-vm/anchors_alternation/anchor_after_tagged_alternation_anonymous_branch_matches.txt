@@ -11,7 +11,7 @@ Q = (program
   )
 )
 --------------------- INPUT ----------------------
-5 + x
+x + y
 --------------------- TYPES ----------------------
 export type QT =
   | { $tag: "A" }
@@ -23,7 +23,7 @@ export interface Q {
 --------------------- OUTPUT ---------------------
 {
   "t": {
-    "$tag": "A"
+    "$tag": "B"
   }
 }
 -------------------- BYTECODE --------------------
@@ -89,11 +89,21 @@ Q:
   20       (binary_expression)              18
        ●   binary_expression
   18       _                                12, 14, 16
-       ●   number
+       ●   identifier
   12       (number) [EnumOpen(M0) EnumClose]  10
-       ●   number
-  10       (identifier) [Set(M2)]           07
+       ○   identifier
+  18  ❮❮❮ 
+  14       "+" [EnumOpen(M1) EnumClose]     08
+       ○   identifier
+  18  ❮❮❮ 
+  16       _                                12, 14, 16
+       ●   +
+  12       (number) [EnumOpen(M0) EnumClose]  10
        ○   +
+  16  ❮❮❮ 
+  14       "+" [EnumOpen(M1) EnumClose]     08
+       ●   +
+  08       (identifier) [Set(M2)]           07
        ●   identifier
   07       _                                06
        ●   program

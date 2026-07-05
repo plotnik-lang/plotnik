@@ -1,13 +1,7 @@
 Q = (binary
-  left: (_) @left :: Node
-  right: (_) @right :: Foo
+  left: (_) @left :: Lhs
+  right: (_) @right :: Rhs
 ) @expr :: BinaryExpr
------------------- DIAGNOSTICS -------------------
-warning: this type annotation `Node` is already the default type; omit it
- --> query.ptk:2:22
-  |
-2 |   left: (_) @left :: Node
-  |                      ^^^^
 ---------------------- CST -----------------------
 # query.ptk
 Root
@@ -29,7 +23,7 @@ Root
           CaptureToken "@left"
           TypeAnnotation
             DoubleColon "::"
-            Id "Node"
+            Id "Lhs"
         Capture
           Field
             Id "right"
@@ -41,7 +35,7 @@ Root
           CaptureToken "@right"
           TypeAnnotation
             DoubleColon "::"
-            Id "Foo"
+            Id "Rhs"
         ParenClose ")"
       CaptureToken "@expr"
       TypeAnnotation
@@ -53,9 +47,9 @@ Root
   Def Q
     CapturedPattern @expr :: BinaryExpr
       NamedNode binary
-        CapturedPattern @left :: Node
+        CapturedPattern @left :: Lhs
           FieldPattern left:
             NamedNode (any)
-        CapturedPattern @right :: Foo
+        CapturedPattern @right :: Rhs
           FieldPattern right:
             NamedNode (any)

@@ -8,13 +8,19 @@ Q = (program
   .!
 )
 --------------------- INPUT ----------------------
-a + b; c;
+c; a + b;
 --------------------- TYPES ----------------------
 export interface Q {
   x: Node;
 }
 --------------------- OUTPUT ---------------------
-<no match>
+{
+  "x": {
+    "kind": "identifier",
+    "text": "b",
+    "span": [7, 8]
+  }
+}
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -70,6 +76,14 @@ Q:
   17       (expression_statement)           16
        ●   expression_statement
   16       (binary_expression)              14
+       ○   identifier
+       ○   ;
+  20  ❮❮❮ 
+  18       _                                17, 18
+       ●   expression_statement
+  17       (expression_statement)           16
+       ●   expression_statement
+  16       (binary_expression)              14
        ●   binary_expression
   14       _                                06, 12
        ●   identifier
@@ -91,12 +105,9 @@ Q:
   09       _                                10
        ●   expression_statement
   10       _                                11
-  12  ❮❮❮ 
-  12       _                                06, 12
-  20  ❮❮❮ 
-  18       _                                17, 18
-       ●   ;
-  17       (expression_statement)           16
-       ○   ;
-  18  ❮❮❮ 
-  18       _                                17, 18
+       ●   program
+  11   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

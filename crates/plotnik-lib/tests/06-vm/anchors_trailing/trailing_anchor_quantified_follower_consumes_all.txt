@@ -7,7 +7,7 @@ Q = (program
   }
 )
 --------------------- INPUT ----------------------
-debugger; foo;
+debugger; debugger;
 --------------------- TYPES ----------------------
 export interface Q {
   a: Node | null;
@@ -16,7 +16,18 @@ export interface Q {
 --------------------- OUTPUT ---------------------
 {
   "a": null,
-  "b": []
+  "b": [
+    {
+      "kind": "debugger_statement",
+      "text": "debugger;",
+      "span": [0, 9]
+    },
+    {
+      "kind": "debugger_statement",
+      "text": "debugger;",
+      "span": [10, 19]
+    }
+  ]
 }
 -------------------- BYTECODE --------------------
 [strings]
@@ -78,9 +89,9 @@ Q:
        ○   debugger_statement
   26  ❮❮❮ 
   24       _                                22, 24
-       ●   expression_statement
+       ●   debugger_statement
   22       (lexical_declaration) [Node Set(M0)]  18
-       ○   expression_statement
+       ○   debugger_statement
   24  ❮❮❮ 
   24       _                                22, 24
   28  ❮❮❮ 
@@ -89,12 +100,12 @@ Q:
   12       (debugger_statement) [Node Push]  14, 06
        ●   debugger_statement
   14       (debugger_statement) [Node Push]  14, 06
-       ○   expression_statement
-  12  ❮❮❮ 
+       ●   debugger_statement
+  14       (debugger_statement) [Node Push]  14, 06
+  14  ❮❮❮ 
   06  -ε-  [ArrayClose Set(M1)]             08
   08       _                                09
-  16  ❮❮❮ 
-  10  -ε-  [ArrayClose Set(M1)]             09
+       ●   program
   09   ◀   (?)                              
 
 Q:

@@ -1,7 +1,7 @@
 Q = (program
   [
-    (((expression_statement) @a) @grp)
-    ((comment) @b)
+    {(expression_statement) @a} @grp
+    (comment) @b
   ] @w
 )
 --------------------- INPUT ----------------------
@@ -19,22 +19,6 @@ export interface QW {
 export interface Q {
   w: QW;
 }
------------------- DIAGNOSTICS -------------------
-warning: parenthesized sequences are tree-sitter syntax
- --> query.ptk:3:5
-  |
-3 |     (((expression_statement) @a) @grp)
-  |     ^
-  |
-help: use `{(a) (b)}` to match a sequence of siblings
-
-warning: parenthesized sequences are tree-sitter syntax
- --> query.ptk:4:5
-  |
-4 |     ((comment) @b)
-  |     ^
-  |
-help: use `{(a) (b)}` to match a sequence of siblings
 --------------------- OUTPUT ---------------------
 {
   "w": {

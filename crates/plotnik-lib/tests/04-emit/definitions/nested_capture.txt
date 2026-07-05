@@ -1,4 +1,5 @@
 Inner = (call_expression (identifier) @name)
+
 Outer = (array
   {
     (Inner) @item

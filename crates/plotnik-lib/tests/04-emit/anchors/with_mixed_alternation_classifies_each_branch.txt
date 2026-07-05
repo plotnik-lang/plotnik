@@ -1,7 +1,10 @@
 Q = {
   (identifier)
   .
-  [(number) "+"]
+  [
+    (number)
+    "+"
+  ]
 }
 -------------------- BYTECODE --------------------
 [strings]

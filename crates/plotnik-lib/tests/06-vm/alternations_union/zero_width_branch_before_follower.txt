@@ -1,6 +1,9 @@
 Q = (program
   {
-    [(identifier)* @ids (empty_statement) @e]
+    [
+      (identifier)* @ids
+      (empty_statement) @e
+    ]
     (debugger_statement) @d
   }
 )

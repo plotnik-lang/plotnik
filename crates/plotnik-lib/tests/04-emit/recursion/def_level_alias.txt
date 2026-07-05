@@ -2,6 +2,7 @@ Rec = [
   A: (program (expression_statement (Rec) @inner))
   B: (identifier) @id
 ]
+
 Q = (Rec)
 -------------------- BYTECODE --------------------
 [strings]

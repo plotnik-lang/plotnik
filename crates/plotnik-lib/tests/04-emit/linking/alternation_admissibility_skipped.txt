@@ -1,5 +1,5 @@
-Q = (function_declaration body:
-  [
+Q = (function_declaration
+  body: [
     (statement_block) @a
     (class_declaration) @b
   ]
