@@ -70,6 +70,12 @@ pub enum ModuleError {
     EffectStackImbalance(u16),
     #[error("cursor depth imbalance at step {0}")]
     DepthImbalance(u16),
+    #[error("invalid span entry at index {0}")]
+    InvalidSpanEntry(usize),
+    #[error("span effect payload out of range at step {0}")]
+    InvalidSpanPayload(u16),
+    #[error("span bracket imbalance at step {0}")]
+    SpanImbalance(u16),
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 }
@@ -822,6 +828,12 @@ impl Module {
                 && op.payload as u16 >= members
             {
                 return Err(ModuleError::MalformedTransitions);
+            }
+            if matches!(
+                op.kind,
+                EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd
+            ) {
+                return Err(ModuleError::InvalidSpanPayload(step));
             }
             Ok(())
         };

@@ -264,5 +264,8 @@ pub fn format_effect(effect: &Effect) -> String {
         EffectKind::Null => "Null".to_string(),
         EffectKind::SuppressBegin => "SuppressBegin".to_string(),
         EffectKind::SuppressEnd => "SuppressEnd".to_string(),
+        EffectKind::SpanStartAt => format!("SpanStartAt#{}", effect.payload),
+        EffectKind::SpanStart => format!("SpanStart#{}", effect.payload),
+        EffectKind::SpanEnd => format!("SpanEnd#{}", effect.payload),
     }
 }

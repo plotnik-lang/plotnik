@@ -716,6 +716,17 @@ impl<'t> VM<'t> {
                 }
                 return;
             }
+            // Span effects bypass suppression: uncaptured `(Foo)` bodies still
+            // produce source hulls even when they carry no output bindings.
+            SpanStartAt => RuntimeEffect::SpanStart {
+                id: op.payload as u16,
+                node: Some(self.cursor.node()),
+            },
+            SpanStart => RuntimeEffect::SpanStart {
+                id: op.payload as u16,
+                node: None,
+            },
+            SpanEnd => RuntimeEffect::SpanEnd(op.payload as u16),
 
             // Skip data effects when suppressing, but trace them
             _ if self.suppress_depth > 0 => {

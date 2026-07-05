@@ -1,4 +1,5 @@
 use super::*;
+use crate::bytecode::effects::EFFECT_PAYLOAD_BITS;
 
 #[test]
 fn roundtrip_with_payload() {
@@ -24,6 +25,26 @@ fn max_payload() {
     let bytes = op.to_bytes();
     let decoded = Effect::from_bytes(bytes);
     assert_eq!(decoded.payload, 1023);
+}
+
+#[test]
+fn span_effects_roundtrip() {
+    for kind in [
+        EffectKind::SpanStartAt,
+        EffectKind::SpanStart,
+        EffectKind::SpanEnd,
+    ] {
+        let op = Effect::new(kind, 7);
+        let decoded = Effect::from_bytes(op.to_bytes());
+        assert_eq!(decoded.kind, kind);
+        assert_eq!(decoded.payload, 7);
+    }
+}
+
+#[test]
+fn reserved_span_extension_kind_is_rejected() {
+    let raw = (15u16 << EFFECT_PAYLOAD_BITS).to_le_bytes();
+    assert!(Effect::try_from_bytes(raw).is_none());
 }
 
 #[test]

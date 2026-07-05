@@ -415,7 +415,7 @@ fn forged_invalid_effect_opcode_is_rejected() {
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let slot = effect_slots(&bytes)[0];
     let existing = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]);
-    let invalid_op = EffectKind::SuppressEnd as u16 + 1;
+    let invalid_op = EffectKind::SpanEnd as u16 + 1;
     let forged = (invalid_op << EFFECT_PAYLOAD_BITS) | (existing & EFFECT_PAYLOAD_MAX as u16);
     bytes[slot..slot + 2].copy_from_slice(&forged.to_le_bytes());
     reseal(&mut bytes);
@@ -424,6 +424,20 @@ fn forged_invalid_effect_opcode_is_rejected() {
     assert!(
         matches!(err, ModuleError::MalformedTransitions),
         "expected MalformedTransitions, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_span_effect_before_spans_section_is_rejected() {
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let slot = effect_slots(&bytes)[0];
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::SpanStart));
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("span effects need a spans section");
+    assert!(
+        matches!(err, ModuleError::InvalidSpanPayload(_)),
+        "expected InvalidSpanPayload, got {err:?}"
     );
 }
 

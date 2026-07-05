@@ -229,6 +229,9 @@ enum TraceEffect {
     EnumOpen(u16),
     EnumClose,
     Null,
+    SpanStartAt(u16),
+    SpanStart(u16),
+    SpanEnd(u16),
 }
 
 impl TraceEffect {
@@ -244,6 +247,14 @@ impl TraceEffect {
             RuntimeEffect::EnumOpen(idx) => Self::EnumOpen(*idx),
             RuntimeEffect::EnumClose => Self::EnumClose,
             RuntimeEffect::Null => Self::Null,
+            RuntimeEffect::SpanStart { id, node } => {
+                if node.is_some() {
+                    Self::SpanStartAt(*id)
+                } else {
+                    Self::SpanStart(*id)
+                }
+            }
+            RuntimeEffect::SpanEnd(id) => Self::SpanEnd(*id),
         }
     }
 
@@ -259,6 +270,9 @@ impl TraceEffect {
             EffectKind::EnumOpen => Self::EnumOpen(payload as u16),
             EffectKind::EnumClose => Self::EnumClose,
             EffectKind::Null => Self::Null,
+            EffectKind::SpanStartAt => Self::SpanStartAt(payload as u16),
+            EffectKind::SpanStart => Self::SpanStart(payload as u16),
+            EffectKind::SpanEnd => Self::SpanEnd(payload as u16),
             EffectKind::SuppressBegin | EffectKind::SuppressEnd => unreachable!(),
         }
     }
@@ -331,6 +345,9 @@ impl<'s> PrintTracer<'s> {
             TraceEffect::EnumOpen(idx) => format!("EnumOpen \"{}\"", self.member_name(idx)),
             TraceEffect::EnumClose => "EnumClose".to_string(),
             TraceEffect::Null => "Null".to_string(),
+            TraceEffect::SpanStartAt(id) => format!("SpanStartAt#{id}"),
+            TraceEffect::SpanStart(id) => format!("SpanStart#{id}"),
+            TraceEffect::SpanEnd(id) => format!("SpanEnd#{id}"),
         }
     }
 

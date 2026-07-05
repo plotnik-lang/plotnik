@@ -225,7 +225,7 @@ mod debug_impl {
 
         for op in ops {
             match op {
-                SemanticOp::Effect(EffectKind::Node, _)
+                SemanticOp::Effect(EffectKind::Node | EffectKind::SpanStartAt, _)
                 | SemanticOp::Call(_)
                 | SemanticOp::Return
                 | SemanticOp::CycleRef
@@ -472,18 +472,20 @@ mod debug_impl {
     /// exhaustive on purpose — a new `EffectKind` cannot compile until it
     /// declares its scope behaviour here.
     enum ScopeRole {
-        Open,
+        Open(EffectKind),
         Close(EffectKind),
     }
 
     fn scope_role(op: EffectKind) -> Option<ScopeRole> {
         use EffectKind::*;
         let role = match op {
-            ArrayOpen | StructOpen | EnumOpen | SuppressBegin => ScopeRole::Open,
+            ArrayOpen | StructOpen | EnumOpen | SuppressBegin => ScopeRole::Open(op),
             ArrayClose => ScopeRole::Close(ArrayOpen),
             StructClose => ScopeRole::Close(StructOpen),
             EnumClose => ScopeRole::Close(EnumOpen),
             SuppressEnd => ScopeRole::Close(SuppressBegin),
+            SpanStartAt | SpanStart => ScopeRole::Open(SpanStart),
+            SpanEnd => ScopeRole::Close(SpanStart),
             Node | Push | Set | Null => return None,
         };
         Some(role)
@@ -502,7 +504,7 @@ mod debug_impl {
             let opcode = *opcode;
             match scope_role(opcode) {
                 None => {}
-                Some(ScopeRole::Open) => stack.push(opcode),
+                Some(ScopeRole::Open(open)) => stack.push(open),
                 Some(ScopeRole::Close(expected)) => match stack.pop() {
                     Some(top) if top == expected => {}
                     Some(top) => {
