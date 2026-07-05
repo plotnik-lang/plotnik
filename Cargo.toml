@@ -25,3 +25,5 @@ unwrap_used = "deny"
 # never silently corrupt downstream offsets/indices.
 [profile.release]
 overflow-checks = true
+lto = "thin"
+codegen-units = 1
