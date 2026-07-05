@@ -1,7 +1,7 @@
 //! Bytecode module with unified storage.
 //!
-//! The [`Module`] struct holds compiled bytecode, decoding instructions lazily
-//! when the VM steps into them.
+//! The [`Module`] struct holds compiled bytecode plus a pre-decoded transition
+//! stream for VM dispatch.
 
 use std::io;
 use std::ops::Deref;
@@ -18,9 +18,13 @@ use super::{
 };
 use crate::bytecode::dfa::RegexDfas;
 
+mod decoded;
 mod effect_stack;
 mod load;
 
+pub(crate) use decoded::{
+    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedProgram,
+};
 pub use load::ModuleError;
 
 /// Append `value` if absent; returns whether it was newly inserted.
@@ -149,6 +153,9 @@ pub struct Module {
     /// VM on every evaluation instead of being rebuilt from the blob each time
     /// (issue #426).
     regex_dfas: RegexDfas,
+    /// Pre-decoded transitions, built at load after validation (the hot loop
+    /// indexes this instead of re-parsing bytes; see `decoded`).
+    decoded: DecodedProgram,
     /// Per-step "is an instruction start" bitmap from load validation
     /// ([`validate_transitions`](Self::validate_transitions)), retained only in
     /// debug builds to back the VM's pre-`decode_step` IP assertion. It does not
@@ -201,6 +208,11 @@ impl Module {
     pub(crate) fn decode_step(&self, step: u16) -> Instruction<'_> {
         let offset = self.offsets.transitions as usize + (step as usize) * STEP_SIZE;
         Instruction::from_bytes(&self.storage[offset..])
+    }
+
+    #[inline]
+    pub(crate) fn decoded(&self) -> &DecodedProgram {
+        &self.decoded
     }
 
     /// Whether `step` is a validated instruction start.
@@ -317,6 +329,12 @@ impl Module {
         let offset = self.offsets.regex_table as usize;
         let count = self.header.regex_table_count as usize;
         &self.storage[offset..offset + (count + 1) * REGEX_TABLE_ENTRY_SIZE]
+    }
+
+    fn transitions_slice(&self) -> &[u8] {
+        let offset = self.offsets.transitions as usize;
+        let len = self.header.transitions_count as usize * STEP_SIZE;
+        &self.storage[offset..offset + len]
     }
 }
 
@@ -544,5 +562,7 @@ impl<'a> EntrypointsView<'a> {
     }
 }
 
+#[cfg(test)]
+mod decoded_tests;
 #[cfg(test)]
 mod load_tests;

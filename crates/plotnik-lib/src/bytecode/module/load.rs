@@ -126,6 +126,7 @@ impl Module {
             header,
             offsets,
             regex_dfas: RegexDfas::default(),
+            decoded: DecodedProgram::default(),
             #[cfg(debug_assertions)]
             instr_start_bitmap: Vec::new(),
         };
@@ -142,6 +143,7 @@ impl Module {
         }
         #[cfg(not(debug_assertions))]
         let _ = is_start;
+        module.decoded = decoded::build(module.transitions_slice());
         Ok(module)
     }
 

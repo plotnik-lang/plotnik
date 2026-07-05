@@ -45,7 +45,10 @@ pub(crate) use ids::StringId;
 pub(crate) use instructions::{
     Call, Match, MatchInstr, MatchPredicate, Return, StepId, select_match_opcode,
 };
-pub(crate) use module::{EntrypointsView, Instruction, StringsView, TypesView};
+pub(crate) use module::{
+    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, EntrypointsView, Instruction,
+    StringsView, TypesView,
+};
 pub(crate) use nav::Nav;
 pub(crate) use node_kind_constraint::NodeKindConstraint;
 pub(crate) use predicate_op::PredicateOp;

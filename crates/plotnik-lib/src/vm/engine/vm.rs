@@ -3,8 +3,8 @@
 use arborium_tree_sitter::Tree;
 
 use crate::bytecode::{
-    Call, Effect, EffectKind, Entrypoint, Instruction, Match, Module, Nav, NodeKindConstraint,
-    PredicateOp,
+    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Effect, EffectKind, Entrypoint,
+    Module, Nav, NodeKindConstraint, PredicateOp,
 };
 
 use crate::core::NodeFieldId;
@@ -244,15 +244,16 @@ impl<'t> VM<'t> {
                 "ip {} is not a validated instruction start",
                 self.ip
             );
-            let instr = module.decode_step(self.ip);
+            // Tracing renders from the byte-level decoder so trace output stays
+            // identical; the hot path reads the pre-decoded stream.
             if T::ENABLED {
-                tracer.trace_instruction(self.ip, &instr);
+                tracer.trace_instruction(self.ip, &module.decode_step(self.ip));
             }
 
-            let result = match instr {
-                Instruction::Match(m) => self.exec_match(m, module, tracer),
-                Instruction::Call(c) => self.exec_call(c, tracer),
-                Instruction::Return(_) => self.exec_return(tracer),
+            let result = match module.decoded().step(self.ip) {
+                DecodedInstr::Match(m) => self.exec_match(m, module, tracer),
+                DecodedInstr::Call(c) => self.exec_call(c, tracer),
+                DecodedInstr::Return => self.exec_return(tracer),
             };
 
             match result {
@@ -265,7 +266,7 @@ impl<'t> VM<'t> {
 
     fn exec_match<T: Tracer>(
         &mut self,
-        m: Match<'_>,
+        m: DecodedMatch,
         module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
@@ -273,16 +274,16 @@ impl<'t> VM<'t> {
             self.navigate_and_match(m, module, tracer)?;
         }
 
-        for effect_op in m.effects() {
-            self.emit_effect(effect_op, tracer);
+        for &op in module.decoded().effects(&m) {
+            self.emit_effect(op, tracer);
         }
 
-        self.branch_to_successors(m, tracer)
+        self.branch_to_successors(m, module, tracer)
     }
 
     fn navigate_and_match<T: Tracer>(
         &mut self,
-        m: Match<'_>,
+        m: DecodedMatch,
         module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
@@ -316,32 +317,32 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    /// `op` selects the operator (see [`PredicateOp`]); `is_regex` chooses
-    /// RegexTable over StringTable for `value_ref`.
-    fn evaluate_predicate(&self, op: u8, is_regex: bool, value_ref: u16, module: &Module) -> bool {
+    /// `p.is_regex` chooses RegexTable over StringTable for `p.value_ref`.
+    fn evaluate_predicate(&self, p: DecodedPredicate, module: &Module) -> bool {
         let node = self.cursor.node();
         let node_text = node
             .utf8_text(self.source.as_bytes())
             .expect("node source text must be valid UTF-8");
-        let op = PredicateOp::from_byte(op);
 
-        if is_regex {
+        if p.is_regex {
             // The DFAs are deserialized once at `Module::load` and reused here;
             // `RegexDfas::is_match` upholds the populated-slot invariant that a
             // module passing load guarantees. Deserializing per evaluation, as
             // this once did, re-validated the whole automaton on every predicate
             // test (issue #426).
-            let matched = module.regex_dfas().is_match(value_ref as usize, node_text);
+            let matched = module
+                .regex_dfas()
+                .is_match(p.value_ref as usize, node_text);
 
-            match op {
+            match p.op {
                 PredicateOp::RegexMatch => matched,
                 PredicateOp::RegexNoMatch => !matched,
                 _ => unreachable!("non-regex op with is_regex=true"),
             }
         } else {
-            let target = module.strings().at(value_ref as usize);
+            let target = module.strings().at(p.value_ref as usize);
 
-            match op {
+            match p.op {
                 PredicateOp::Eq => node_text == target,
                 PredicateOp::Ne => node_text != target,
                 PredicateOp::StartsWith => node_text.starts_with(target),
@@ -352,7 +353,12 @@ impl<'t> VM<'t> {
         }
     }
 
-    fn candidate_matches<T: Tracer>(&self, m: Match<'_>, module: &Module, tracer: &mut T) -> bool {
+    fn candidate_matches<T: Tracer>(
+        &self,
+        m: DecodedMatch,
+        module: &Module,
+        tracer: &mut T,
+    ) -> bool {
         let node = self.cursor.node();
 
         match m.node_kind {
@@ -402,19 +408,14 @@ impl<'t> VM<'t> {
             return false;
         }
 
-        for field_id in m.neg_fields() {
+        for &field_id in module.decoded().neg_fields(&m) {
             if node.child_by_field_id(u16::from(field_id)).is_some() {
                 return false;
             }
         }
 
-        if let Some(predicate) = m.predicate()
-            && !self.evaluate_predicate(
-                predicate.op,
-                predicate.is_regex,
-                predicate.value_ref,
-                module,
-            )
+        if let Some(p) = m.predicate
+            && !self.evaluate_predicate(p, module)
         {
             return false;
         }
@@ -424,32 +425,33 @@ impl<'t> VM<'t> {
 
     fn branch_to_successors<T: Tracer>(
         &mut self,
-        m: Match<'_>,
+        m: DecodedMatch,
+        module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
-        if m.succ_count() == 0 {
+        let succs = module.decoded().successors(&m);
+        if succs.is_empty() {
             return Err(ControlFlow::Accept.into());
         }
 
         // Push checkpoints for alternate branches (in reverse order). One state
         // snapshot serves every push: nothing in the loop moves the cursor or
         // touches the arenas the snapshot reads.
-        if m.succ_count() > 1 {
+        if succs.len() > 1 {
             let state = self.checkpoint_state();
-            for i in (1..m.succ_count()).rev() {
-                self.checkpoints
-                    .push(Checkpoint::branch(state, u16::from(m.successor(i))));
+            for &alt in succs[1..].iter().rev() {
+                self.checkpoints.push(Checkpoint::branch(state, alt));
                 if T::ENABLED {
                     tracer.trace_checkpoint_created(self.ip);
                 }
             }
         }
 
-        self.ip = u16::from(m.successor(0));
+        self.ip = succs[0];
         Ok(())
     }
 
-    fn exec_call<T: Tracer>(&mut self, c: Call, tracer: &mut T) -> Result<(), Signal> {
+    fn exec_call<T: Tracer>(&mut self, c: DecodedCall, tracer: &mut T) -> Result<(), Signal> {
         let skip_policy = self.navigate_to_field_with_policy(c.nav, c.node_field, tracer)?;
 
         // A searchable nav leaves a retry checkpoint so the callee can be
@@ -459,8 +461,8 @@ impl<'t> VM<'t> {
             && policy != SkipPolicy::Exact
         {
             let resume = CallResume {
-                target: u16::from(c.target),
-                next: u16::from(c.next),
+                target: c.target,
+                next: c.next,
                 field: c.node_field,
                 policy,
             };
@@ -471,7 +473,7 @@ impl<'t> VM<'t> {
             }
         }
 
-        self.enter_callee(u16::from(c.target), u16::from(c.next), tracer);
+        self.enter_callee(c.target, c.next, tracer);
         Ok(())
     }
 
