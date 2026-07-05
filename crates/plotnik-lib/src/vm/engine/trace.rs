@@ -75,6 +75,12 @@ pub trait Tracer {
     /// Called after field check fails.
     fn trace_field_failure(&mut self, node: Node<'_>);
 
+    /// Called when a candidate node fails the text predicate.
+    fn trace_predicate_failure(&mut self, node: Node<'_>);
+
+    /// Called when a candidate node fails a negated-field constraint.
+    fn trace_neg_field_failure(&mut self, node: Node<'_>, field: NodeFieldId);
+
     /// Called after emitting an effect.
     fn trace_effect(&mut self, effect: &RuntimeEffect<'_>);
 
@@ -127,6 +133,12 @@ impl Tracer for NoopTracer {
 
     #[inline(always)]
     fn trace_field_failure(&mut self, _node: Node<'_>) {}
+
+    #[inline(always)]
+    fn trace_predicate_failure(&mut self, _node: Node<'_>) {}
+
+    #[inline(always)]
+    fn trace_neg_field_failure(&mut self, _node: Node<'_>, _field: NodeFieldId) {}
 
     #[inline(always)]
     fn trace_effect(&mut self, _effect: &RuntimeEffect<'_>) {}
@@ -532,6 +544,23 @@ impl Tracer for PrintTracer<'_> {
 
     fn trace_field_failure(&mut self, _node: Node<'_>) {
         // Field failures are silent - we just backtrack
+    }
+
+    fn trace_predicate_failure(&mut self, _node: Node<'_>) {
+        if self.verbosity == Verbosity::Default {
+            return;
+        }
+
+        self.add_subline(trace::MATCH_FAILURE, "✗ predicate");
+    }
+
+    fn trace_neg_field_failure(&mut self, _node: Node<'_>, field: NodeFieldId) {
+        if self.verbosity == Verbosity::Default {
+            return;
+        }
+
+        let name = self.node_field_name(field);
+        self.add_subline(trace::MATCH_FAILURE, &format!("✗ -{}", name));
     }
 
     fn trace_effect(&mut self, effect: &RuntimeEffect<'_>) {

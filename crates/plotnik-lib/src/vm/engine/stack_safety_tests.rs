@@ -100,6 +100,12 @@ impl Tracer for DepthProbe {
     fn trace_field_failure(&mut self, _node: Node<'_>) {
         self.boundary();
     }
+    fn trace_predicate_failure(&mut self, _node: Node<'_>) {
+        self.boundary();
+    }
+    fn trace_neg_field_failure(&mut self, _node: Node<'_>, _field: NodeFieldId) {
+        self.boundary();
+    }
     fn trace_effect(&mut self, _effect: &RuntimeEffect<'_>) {
         self.boundary();
     }

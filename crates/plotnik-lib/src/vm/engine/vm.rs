@@ -470,6 +470,9 @@ impl<'t> VM<'t> {
 
         for &field_id in module.decoded().neg_fields(&m) {
             if node.child_by_field_id(u16::from(field_id)).is_some() {
+                if T::ENABLED {
+                    tracer.trace_neg_field_failure(node, field_id);
+                }
                 return false;
             }
         }
@@ -477,6 +480,9 @@ impl<'t> VM<'t> {
         if let Some(p) = m.predicate
             && !self.evaluate_predicate(p, module)
         {
+            if T::ENABLED {
+                tracer.trace_predicate_failure(node);
+            }
             return false;
         }
 
