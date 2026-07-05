@@ -40,7 +40,7 @@ pub fn run(args: InferArgs) -> CliResult {
         "infer",
     )?;
 
-    let compiled = compile_query(loaded.sources, lang, args.color)?;
+    let compiled = compile_query(loaded.sources, lang, args.color, false)?;
 
     let void_type = match args.void_type.as_deref() {
         Some("null") => TypeScriptVoidType::Null,

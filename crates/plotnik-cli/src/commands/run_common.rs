@@ -115,6 +115,7 @@ pub struct ExecRequest<'a> {
     pub lang: Option<&'a str>,
     pub entry: Option<&'a str>,
     pub color: bool,
+    pub inspection: bool,
 }
 
 /// Prepared query ready for execution.
@@ -146,7 +147,7 @@ pub fn plan_exec(input: ExecRequest) -> Result<ExecPlan, CliError> {
         input.source_path,
     )?;
 
-    let compiled = compile_query(loaded.sources, lang, input.color)?;
+    let compiled = compile_query(loaded.sources, lang, input.color, input.inspection)?;
     // Queries conventionally put the top-level definition last.
     let default_entry = compiled.definition_names().last();
     let module = compiled.into_module().expect("dry_run guarantees a module");

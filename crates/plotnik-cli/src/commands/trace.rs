@@ -38,6 +38,7 @@ pub fn run(args: TraceArgs) -> CliResult {
         lang: args.lang.as_deref(),
         entry: args.entry.as_deref(),
         color: args.color,
+        inspection: false,
     })?;
 
     let vm = VM::builder(&source_code, &tree).limits(args.limits).build();
