@@ -21,6 +21,18 @@ pub enum Nav {
     DownSkip,
     DownSkipExtras,
     DownExact,
+    /// Assert the current node has no children beyond trivia, without moving.
+    ///
+    /// The `Childless*` family is the zero-width arm of a leading or trailing
+    /// anchor: when a node's whole child list matches zero-width, the cursor
+    /// never descends, so no `Down*` entry or `Up*` ascent carries the
+    /// anchor's check — either one degrades to "the node has no children the
+    /// anchor's skip policy would reject".
+    ChildlessSkipTrivia,
+    /// Assert the current node has no children beyond extras, without moving.
+    ChildlessSkipExtras,
+    /// Assert the current node has no children at all, without moving.
+    ChildlessExact,
     Up(u8),
     UpSkipTrivia(u8),
     UpSkipExtras(u8),
@@ -52,7 +64,7 @@ impl Nav {
     /// - Bit 7 set — an Up command: bits 6-5 are the mode (`00` Up, `01`
     ///   UpSkipTrivia, `10` UpSkipExtras, `11` UpExact), bits 4-0 the level
     ///   (`1..=31`).
-    /// - Bit 7 clear — a standard command: bits 6-0 are its enum value (`0..=10`).
+    /// - Bit 7 clear — a standard command: bits 6-0 are its enum value (`0..=13`).
     pub fn from_byte(b: u8) -> Self {
         Self::try_from_byte(b).unwrap_or_else(|| panic!("invalid nav byte: {b:#04x}"))
     }
@@ -60,7 +72,7 @@ impl Nav {
     /// Non-panicking nav decode, for validating an untrusted instruction stream
     /// at load time before the VM decodes it. The invalid encodings are an Up
     /// byte with a zero level and a standard byte whose enum value is unassigned
-    /// (`11..=127`).
+    /// (`14..=127`).
     pub fn try_from_byte(b: u8) -> Option<Self> {
         if b & UP_FLAG != 0 {
             let level = b & Self::MAX_UP_LEVEL;
@@ -88,6 +100,9 @@ impl Nav {
             8 => Self::DownSkip,
             9 => Self::DownSkipExtras,
             10 => Self::DownExact,
+            11 => Self::ChildlessSkipTrivia,
+            12 => Self::ChildlessSkipExtras,
+            13 => Self::ChildlessExact,
             _ => return None,
         };
         Some(nav)
@@ -106,6 +121,9 @@ impl Nav {
             Self::DownSkip => 8,
             Self::DownSkipExtras => 9,
             Self::DownExact => 10,
+            Self::ChildlessSkipTrivia => 11,
+            Self::ChildlessSkipExtras => 12,
+            Self::ChildlessExact => 13,
             Self::Up(n) => Self::up_byte(UP_ANY, n),
             Self::UpSkipTrivia(n) => Self::up_byte(UP_SKIP_TRIVIA, n),
             Self::UpSkipExtras(n) => Self::up_byte(UP_SKIP_EXTRAS, n),
@@ -126,7 +144,10 @@ impl Nav {
             | Self::Next
             | Self::NextSkip
             | Self::NextSkipExtras
-            | Self::NextExact => 0,
+            | Self::NextExact
+            | Self::ChildlessSkipTrivia
+            | Self::ChildlessSkipExtras
+            | Self::ChildlessExact => 0,
             Self::Down | Self::DownSkip | Self::DownSkipExtras | Self::DownExact => 1,
             Self::Up(n) | Self::UpSkipTrivia(n) | Self::UpSkipExtras(n) | Self::UpExact(n) => {
                 -(n as i32)
@@ -206,6 +227,9 @@ impl Nav {
             Self::Epsilon
             | Self::Stay
             | Self::StayExact
+            | Self::ChildlessSkipTrivia
+            | Self::ChildlessSkipExtras
+            | Self::ChildlessExact
             | Self::Up(_)
             | Self::UpSkipTrivia(_)
             | Self::UpSkipExtras(_)
@@ -223,7 +247,15 @@ impl Nav {
             Self::Next | Self::NextSkip | Self::NextSkipExtras => Self::NextExact,
             Self::Stay => Self::StayExact,
             Self::Up(n) | Self::UpSkipTrivia(n) | Self::UpSkipExtras(n) => Self::UpExact(n),
-            Self::DownExact | Self::NextExact | Self::StayExact | Self::UpExact(_) => self,
+            // Childless asserts at the current position with no search to strip;
+            // its skip class is the assertion itself, not a search policy.
+            Self::DownExact
+            | Self::NextExact
+            | Self::StayExact
+            | Self::UpExact(_)
+            | Self::ChildlessSkipTrivia
+            | Self::ChildlessSkipExtras
+            | Self::ChildlessExact => self,
         }
     }
 }

@@ -143,19 +143,51 @@ impl NfaBuilder<'_> {
         // With items: nav[entry_effects] → items → Up → [exit_effects] → exit
         let final_exit = self.emit_trailing_effects_exit(exit, exit_effects);
 
-        let up_label = self.fresh_label();
-        let items_entry = self.compile_seq_items(SeqItemsCtx {
-            items: &items,
-            exit: up_label,
-            is_inside_node: true,
-            first_nav: None,
-            capture: CaptureEffects::default(),
-            // Skip exit bypasses Up when Down fails (childless node)
-            skip_exit: Some(SkipExit::To(final_exit)),
-        });
-
-        self.instructions
-            .push(MatchIR::epsilon(up_label, final_exit).nav(up_nav).into());
+        // The skip exit bypasses Up when the whole child list matches
+        // zero-width: nothing was consumed, so the cursor never descended and
+        // there is no child to ascend from. Anchors lose their carrier on that
+        // path — a trailing anchor's "nothing may follow the last match" and a
+        // leading anchor's "the first match comes first" both degrade to "this
+        // node has no children the anchor's skip policy would reject",
+        // asserted by a `Childless*` check. The skip classes nest, so when
+        // both anchors demand one, the tighter check alone suffices.
+        let trailing_childless = has_trailing_anchor.then(|| childless_nav(up_nav));
+        let leading_childless = self
+            .anchor_semantics
+            .check_leading_anchor(&items)
+            .map(childless_nav);
+        let childless = match (trailing_childless, leading_childless) {
+            (Some(a), Some(b)) => Some(tightest_childless(a, b)),
+            (a, b) => a.or(b),
+        };
+        let skip_target = if let Some(nav) = childless {
+            let label = self.fresh_label();
+            self.instructions
+                .push(MatchIR::epsilon(label, final_exit).nav(nav).into());
+            label
+        } else {
+            final_exit
+        };
+        // A body of anchors alone consumes no child, so it is the zero-width
+        // path and nothing else: the childless assertion is the whole
+        // constraint. Compiling the descend/ascend pair around an empty
+        // match would emit a bare ascent (`verify` rightly rejects it).
+        let items_entry = if items_have_patterns(&items) {
+            let up_label = self.fresh_label();
+            let entry = self.compile_seq_items(SeqItemsCtx {
+                items: &items,
+                exit: up_label,
+                is_inside_node: true,
+                first_nav: None,
+                capture: CaptureEffects::default(),
+                skip_exit: Some(SkipExit::To(skip_target)),
+            });
+            self.instructions
+                .push(MatchIR::epsilon(up_label, final_exit).nav(up_nav).into());
+            entry
+        } else {
+            skip_target
+        };
 
         let mut entry_match = MatchIR::epsilon(entry, items_entry)
             .nav(nav)
@@ -180,7 +212,49 @@ impl NfaBuilder<'_> {
             self.emit_effects_epsilon(exit, post, CaptureEffects::default())
         }
     }
+}
 
+/// Whether any item — descending through sequence groups — is a pattern that
+/// consumes a child. A body failing this is anchors alone: one zero-width
+/// match with no descent into the child list.
+fn items_have_patterns(items: &[ast::SeqItem]) -> bool {
+    items.iter().any(|item| match item {
+        ast::SeqItem::Pattern(Pattern::SeqPattern(seq)) => {
+            let inner: Vec<_> = seq.items().collect();
+            items_have_patterns(&inner)
+        }
+        ast::SeqItem::Pattern(_) => true,
+        ast::SeqItem::Anchor(_) => false,
+    })
+}
+
+/// The zero-width counterpart of an anchor's constrained nav: a trailing
+/// anchor's `Up*` lastness mode or a leading anchor's `Down*` entry mode.
+fn childless_nav(anchor_nav: Nav) -> Nav {
+    match anchor_nav {
+        Nav::UpSkipTrivia(_) | Nav::DownSkip => Nav::ChildlessSkipTrivia,
+        Nav::UpSkipExtras(_) | Nav::DownSkipExtras => Nav::ChildlessSkipExtras,
+        Nav::UpExact(_) | Nav::DownExact => Nav::ChildlessExact,
+        _ => {
+            unreachable!("an anchor always lowers to a constrained Up or Down, got {anchor_nav:?}")
+        }
+    }
+}
+
+/// The stricter of two childless checks. Their admitted-child sets nest
+/// (`Exact` ⊂ `SkipExtras` ⊂ `SkipTrivia`), so a node passing the tighter
+/// check passes the looser one — asserting both collapses to asserting one.
+fn tightest_childless(a: Nav, b: Nav) -> Nav {
+    let rank = |nav: Nav| match nav {
+        Nav::ChildlessExact => 0,
+        Nav::ChildlessSkipExtras => 1,
+        Nav::ChildlessSkipTrivia => 2,
+        _ => unreachable!("only childless navs are ranked, got {nav:?}"),
+    };
+    if rank(a) <= rank(b) { a } else { b }
+}
+
+impl NfaBuilder<'_> {
     pub(super) fn compile_token_pattern(
         &mut self,
         node: &ast::TokenPattern,

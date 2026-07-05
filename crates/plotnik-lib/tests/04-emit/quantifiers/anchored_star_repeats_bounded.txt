@@ -29,7 +29,7 @@ Q:
   05                                        ▶
   06                                        ▶
   07  ...
-  08  -ε-  [ArrayClose Set(M0)]             06
+  08  └•┘  _ [ArrayClose Set(M0)]           06
   10  └•─  (identifier) [Node Push]         12, 16
   12  ─•─  (identifier) [Node Push]         12, 16
   14  -ε-  [ArrayOpen]                      10, 08

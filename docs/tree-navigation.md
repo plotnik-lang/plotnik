@@ -47,24 +47,27 @@ The `Node` API's `next_sibling()` is O(siblings) — unacceptable for repeated b
 
 `Nav` is a single byte encoding movement and skip policy. See [06-transitions.md § 3.1](binary-format/06-transitions.md) for bit layout.
 
-| Nav               | Dump Symbol | Movement                                |
-| ----------------- | ----------- | --------------------------------------- |
-| `Epsilon`         | `-ε-`       | Pure control flow                       |
-| `Stay`            | (space)     | No movement                             |
-| `StayExact`       | `!`         | No movement, exact match only           |
-| `Down`            | `└‣─`       | First child, skip any                   |
-| `DownSkip`        | `└•─`       | First child, skip trivia only           |
-| `DownSkipExtras`  | `└◦─`       | First child, skip extras only           |
-| `DownExact`       | `└─!`       | First child, exact                      |
-| `Next`            | `─‣─`       | Next sibling, skip any                  |
-| `NextSkip`        | `─•─`       | Next sibling, skip trivia               |
-| `NextSkipExtras`  | `─◦─`       | Next sibling, skip extras               |
-| `NextExact`       | `──!`       | Next sibling, exact                     |
-| `Up(1)`           | `─‣┘`       | Ascend 1 level                          |
-| `Up(2)`           | `─‣┘²`      | Ascend 2 levels                         |
-| `UpSkipTrivia(2)` | `─•┘²`      | Ascend 2, last non-trivia on each level |
-| `UpSkipExtras(2)` | `─◦┘²`      | Ascend 2, last non-extra on each level  |
-| `UpExact(2)`      | `!─┘²`      | Ascend 2, last child on each level      |
+| Nav                   | Dump Symbol | Movement                                |
+| --------------------- | ----------- | --------------------------------------- |
+| `Epsilon`             | `-ε-`       | Pure control flow                       |
+| `Stay`                | (space)     | No movement                             |
+| `StayExact`           | `!`         | No movement, exact match only           |
+| `Down`                | `└‣─`       | First child, skip any                   |
+| `DownSkip`            | `└•─`       | First child, skip trivia only           |
+| `DownSkipExtras`      | `└◦─`       | First child, skip extras only           |
+| `DownExact`           | `└─!`       | First child, exact                      |
+| `Next`                | `─‣─`       | Next sibling, skip any                  |
+| `NextSkip`            | `─•─`       | Next sibling, skip trivia               |
+| `NextSkipExtras`      | `─◦─`       | Next sibling, skip extras               |
+| `NextExact`           | `──!`       | Next sibling, exact                     |
+| `Up(1)`               | `─‣┘`       | Ascend 1 level                          |
+| `Up(2)`               | `─‣┘²`      | Ascend 2 levels                         |
+| `UpSkipTrivia(2)`     | `─•┘²`      | Ascend 2, last non-trivia on each level |
+| `UpSkipExtras(2)`     | `─◦┘²`      | Ascend 2, last non-extra on each level  |
+| `UpExact(2)`          | `!─┘²`      | Ascend 2, last child on each level      |
+| `ChildlessSkipTrivia` | `└•┘`       | Assert only trivia children, no move    |
+| `ChildlessSkipExtras` | `└◦┘`       | Assert only extra children, no move     |
+| `ChildlessExact`      | `└!┘`       | Assert no children at all, no move      |
 
 ## Search Loop
 
@@ -104,6 +107,24 @@ Each mode defines what happens when a match fails:
 | `UpSkipTrivia(n)` | Each node left must be its parent's last non-trivia child |
 | `UpSkipExtras(n)` | Each node left must be its parent's last non-extra child  |
 | `UpExact(n)`      | Each node left must be its parent's last child            |
+
+**Childless variants** (zero-width anchors):
+
+When a node's whole child list matches zero-width, the cursor never descends,
+so no `Down*` entry carries a leading anchor's first-child check and no `Up*`
+ascent carries a trailing anchor's lastness check. `Childless*` asserts the
+degenerate form of either: the node has no children the anchor's skip policy
+would reject. When both anchors demand one, the tighter check alone is
+emitted (the admitted-child sets nest). A body of anchors alone (`(node .)`)
+always takes this path — there is nothing to descend into, so the childless
+check is the entire compiled body. The cursor does not move; failure
+backtracks like any nav failure.
+
+| Mode                  | Constraint              |
+| --------------------- | ----------------------- |
+| `ChildlessSkipTrivia` | Every child is trivia   |
+| `ChildlessSkipExtras` | Every child is an extra |
+| `ChildlessExact`      | No children at all      |
 
 ### Example: `(foo (bar))` vs `(foo (foo) (foo) (bar))`
 

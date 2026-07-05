@@ -924,6 +924,23 @@ A **trailing anchor** combines with the leading interpretation rather than overr
 
 When `@a` is skipped, `@b` must be both the first child (leading anchor) and the last child (trailing anchor) — so only `debugger;` alone matches, while `foo; debugger;` (not first) and `debugger; foo;` (not last) do not.
 
+### Anchors Over Zero-Width Matches
+
+When every item in a child list is optional and none of them matches, there is no matched child for an anchor to bind to. A leading or trailing anchor then degrades to an assertion about the node itself: it has no children the anchor's skip policy would reject — none beyond trivia for `.`, none at all for `.!` (the policy is chosen the same way as between siblings). When both anchors are present, the stricter one applies.
+
+```
+(program {(debugger_statement)* @b .})
+```
+
+With zero repetitions this matches an empty program or one holding only comments (`b` is `[]`), but not `foo;` — an unskippable child remains.
+
+The degenerate form is a body of anchors alone, which is the idiomatic emptiness check:
+
+```
+(statement_block .)     ; no statements (braces and comments aside)
+(program .!)            ; a completely empty file
+```
+
 ### Output Types
 
 Anchors are structural constraints only — they don't affect output types:
