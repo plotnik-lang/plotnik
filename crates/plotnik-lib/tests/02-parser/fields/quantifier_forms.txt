@@ -1,0 +1,95 @@
+Q = (node
+  a: (x)?
+  b: (x)??
+  c: (x)*
+  d: (x)*?
+  e: (x)+
+  f: (x)+?
+)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "node"
+      Quantifier
+        Field
+          Id "a"
+          Colon ":"
+          NamedNode
+            ParenOpen "("
+            Id "x"
+            ParenClose ")"
+        Question "?"
+      Quantifier
+        Field
+          Id "b"
+          Colon ":"
+          NamedNode
+            ParenOpen "("
+            Id "x"
+            ParenClose ")"
+        QuestionQuestion "??"
+      Quantifier
+        Field
+          Id "c"
+          Colon ":"
+          NamedNode
+            ParenOpen "("
+            Id "x"
+            ParenClose ")"
+        Star "*"
+      Quantifier
+        Field
+          Id "d"
+          Colon ":"
+          NamedNode
+            ParenOpen "("
+            Id "x"
+            ParenClose ")"
+        StarQuestion "*?"
+      Quantifier
+        Field
+          Id "e"
+          Colon ":"
+          NamedNode
+            ParenOpen "("
+            Id "x"
+            ParenClose ")"
+        Plus "+"
+      Quantifier
+        Field
+          Id "f"
+          Colon ":"
+          NamedNode
+            ParenOpen "("
+            Id "x"
+            ParenClose ")"
+        PlusQuestion "+?"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode node
+      QuantifiedPattern ?
+        FieldPattern a:
+          NamedNode x
+      QuantifiedPattern ??
+        FieldPattern b:
+          NamedNode x
+      QuantifiedPattern *
+        FieldPattern c:
+          NamedNode x
+      QuantifiedPattern *?
+        FieldPattern d:
+          NamedNode x
+      QuantifiedPattern +
+        FieldPattern e:
+          NamedNode x
+      QuantifiedPattern +?
+        FieldPattern f:
+          NamedNode x

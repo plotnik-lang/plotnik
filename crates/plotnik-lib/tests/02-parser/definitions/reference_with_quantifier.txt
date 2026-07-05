@@ -1,0 +1,37 @@
+Item = (identifier)
+Q = (list (Item)* @items)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Item"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      ParenClose ")"
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "list"
+      Capture
+        Quantifier
+          DefRef
+            ParenOpen "("
+            Id "Item"
+            ParenClose ")"
+          Star "*"
+        CaptureToken "@items"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Item
+    NamedNode identifier
+  Def Q
+    NamedNode list
+      CapturedPattern @items
+        QuantifiedPattern *
+          Ref Item

@@ -1,0 +1,29 @@
+Q = (a foo: bar: (c))
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "a"
+      Field
+        Id "foo"
+        Colon ":"
+        Field
+          Id "bar"
+          Colon ":"
+          NamedNode
+            ParenOpen "("
+            Id "c"
+            ParenClose ")"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode a
+      FieldPattern foo:
+        FieldPattern bar:
+          NamedNode c

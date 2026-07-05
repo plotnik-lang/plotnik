@@ -1,22 +1,22 @@
-[label:]
+Q = [label:]
 ------------------ DIAGNOSTICS -------------------
 error: branch labels must be PascalCase
- --> query.ptk:1:2
+ --> query.ptk:1:6
   |
-1 | [label:]
-  |  ^^^^^
+1 | Q = [label:]
+  |      ^^^^^
   |
 help: use `Label`
   |
-1 - [label:]
-1 + [Label:]
+1 - Q = [label:]
+1 + Q = [Label:]
   |
 help: branch labels become variants of an enum in the output
 
 error: expected an expression
- --> query.ptk:1:8
+ --> query.ptk:1:12
   |
-1 | [label:]
-  |        ^
+1 | Q = [label:]
+  |            ^
   |
 help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`

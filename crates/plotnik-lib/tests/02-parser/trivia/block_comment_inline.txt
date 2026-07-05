@@ -1,0 +1,26 @@
+Q = (call /* c */ (arguments))
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    NamedNode
+      ParenOpen "("
+      Id "call"
+      Whitespace " "
+      BlockComment "/* c */"
+      Whitespace " "
+      NamedNode
+        ParenOpen "("
+        Id "arguments"
+        ParenClose ")"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode call
+      NamedNode arguments

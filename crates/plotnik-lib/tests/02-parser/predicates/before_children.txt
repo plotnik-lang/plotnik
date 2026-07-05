@@ -1,0 +1,26 @@
+Q = (call *= "foo" (arguments))
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "call"
+      NodePredicate
+        OpContains "*="
+        DoubleQuote "\""
+        StringContent "foo"
+        DoubleQuote "\""
+      NamedNode
+        ParenOpen "("
+        Id "arguments"
+        ParenClose ")"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode call
+      NamedNode arguments

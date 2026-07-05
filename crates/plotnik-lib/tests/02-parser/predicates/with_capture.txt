@@ -1,0 +1,24 @@
+Q = (identifier == "foo") @id
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      NamedNode
+        ParenOpen "("
+        Id "identifier"
+        NodePredicate
+          OpEq "=="
+          DoubleQuote "\""
+          StringContent "foo"
+          DoubleQuote "\""
+        ParenClose ")"
+      CaptureToken "@id"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    CapturedPattern @id
+      NamedNode identifier

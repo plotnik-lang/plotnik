@@ -1,11 +1,11 @@
-(a (b (c
+Q = (a (b (c
 ------------------ DIAGNOSTICS -------------------
 error: missing closing `)`
- --> query.ptk:1:7
+ --> query.ptk:1:11
   |
-1 | (a (b (c
-  |       -^
-  |       |
-  |       node started here
+1 | Q = (a (b (c
+  |           -^
+  |           |
+  |           node started here
   |
 help: add `)` to close the node

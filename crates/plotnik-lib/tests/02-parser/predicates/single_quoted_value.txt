@@ -1,0 +1,21 @@
+Q = (identifier == 'foo')
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      NodePredicate
+        OpEq "=="
+        SingleQuote "'"
+        StringContent "foo"
+        SingleQuote "'"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode identifier

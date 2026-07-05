@@ -1,14 +1,14 @@
-(call foo-bar: (x))
+Q = (call foo-bar: (x))
 ------------------ DIAGNOSTICS -------------------
 error: field names must be snake_case
- --> query.ptk:1:7
+ --> query.ptk:1:11
   |
-1 | (call foo-bar: (x))
-  |       ^^^^^^^
+1 | Q = (call foo-bar: (x))
+  |           ^^^^^^^
   |
 help: use `foo_bar`
   |
-1 - (call foo-bar: (x))
-1 + (call foo_bar: (x))
+1 - Q = (call foo-bar: (x))
+1 + Q = (call foo_bar: (x))
   |
 help: fields come from the grammar and are snake_case

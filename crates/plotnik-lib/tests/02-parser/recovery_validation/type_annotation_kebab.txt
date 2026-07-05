@@ -1,13 +1,13 @@
-(a) @x :: My-Type
+Q = (a) @x :: My-Type
 ------------------ DIAGNOSTICS -------------------
 error: type names must be PascalCase
- --> query.ptk:1:11
+ --> query.ptk:1:15
   |
-1 | (a) @x :: My-Type
-  |           ^^^^^^^
+1 | Q = (a) @x :: My-Type
+  |               ^^^^^^^
   |
 help: use `::MyType`
   |
-1 - (a) @x :: My-Type
-1 + (a) @x :: MyType
+1 - Q = (a) @x :: My-Type
+1 + Q = (a) @x :: MyType
   |

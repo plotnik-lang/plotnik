@@ -1,12 +1,12 @@
-(identifier) @name:Type
+Q = (identifier) @name:Type
 ------------------ DIAGNOSTICS -------------------
 error: type annotations use `::`, not `:`
- --> query.ptk:1:19
+ --> query.ptk:1:23
   |
-1 | (identifier) @name:Type
-  |                   ^
+1 | Q = (identifier) @name:Type
+  |                       ^
   |
 help: use `::`
   |
-1 | (identifier) @name::Type
-  |                    +
+1 | Q = (identifier) @name::Type
+  |                        +

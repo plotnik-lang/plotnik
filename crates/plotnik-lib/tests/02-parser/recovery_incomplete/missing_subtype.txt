@@ -1,9 +1,9 @@
-(expression/)
+Q = (expression/)
 ------------------ DIAGNOSTICS -------------------
 error: expected a subtype after `/`
- --> query.ptk:1:13
+ --> query.ptk:1:17
   |
-1 | (expression/)
-  |             ^
+1 | Q = (expression/)
+  |                 ^
   |
 help: e.g., `expression#binary_expression`

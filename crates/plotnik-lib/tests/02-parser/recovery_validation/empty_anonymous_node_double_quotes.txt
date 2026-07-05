@@ -1,9 +1,9 @@
-(node "")
+Q = (node "")
 ------------------ DIAGNOSTICS -------------------
 error: empty string matches nothing
- --> query.ptk:1:7
+ --> query.ptk:1:11
   |
-1 | (node "")
-  |       ^^
+1 | Q = (node "")
+  |           ^^
   |
 help: anonymous nodes match literal tokens, like `"+"` or `";"`

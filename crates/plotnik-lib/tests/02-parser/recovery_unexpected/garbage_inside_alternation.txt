@@ -1,7 +1,7 @@
-[(a) ^^^ (b)]
+Q = [(a) ^^^ (b)]
 ------------------ DIAGNOSTICS -------------------
 error: expected a branch, or `]` to close
- --> query.ptk:1:6
+ --> query.ptk:1:10
   |
-1 | [(a) ^^^ (b)]
-  |      ^^^
+1 | Q = [(a) ^^^ (b)]
+  |          ^^^

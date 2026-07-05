@@ -1,0 +1,32 @@
+Q = [(a) (b)]*
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Quantifier
+      Alternation
+        BracketOpen "["
+        Branch
+          NamedNode
+            ParenOpen "("
+            Id "a"
+            ParenClose ")"
+        Branch
+          NamedNode
+            ParenOpen "("
+            Id "b"
+            ParenClose ")"
+        BracketClose "]"
+      Star "*"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    QuantifiedPattern *
+      Union
+        Branch
+          NamedNode a
+        Branch
+          NamedNode b

@@ -1,5 +1,6 @@
 Q = (call // inline
-    name: (identifier))
+  name: (identifier)
+)
 ---------------------- CST -----------------------
 # query.ptk
 Root
@@ -14,7 +15,7 @@ Root
       Whitespace " "
       LineComment "// inline"
       Newline "\n"
-      Whitespace "    "
+      Whitespace "  "
       Field
         Id "name"
         Colon ":"
@@ -23,6 +24,7 @@ Root
           ParenOpen "("
           Id "identifier"
           ParenClose ")"
+      Newline "\n"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk

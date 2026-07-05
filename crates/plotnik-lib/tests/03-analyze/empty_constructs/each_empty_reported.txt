@@ -1,0 +1,30 @@
+Q = (foo
+  ()
+  {}
+  []
+)
+------------------ DIAGNOSTICS -------------------
+error: empty `()` matches nothing
+ --> query.ptk:2:3
+  |
+2 |   ()
+  |   ^^
+  |
+help: use `(_)` to match any named node, or `_` for any node
+
+error: empty `{}` matches nothing
+ --> query.ptk:3:3
+  |
+3 |   {}
+  |   ^^
+  |
+help: sequences must contain at least one expression
+
+error: empty `[]` matches nothing
+ --> query.ptk:4:3
+  |
+4 |   []
+  |   ^^
+  |
+help: alternations must contain at least one branch
+-------------------- SYMBOLS ---------------------

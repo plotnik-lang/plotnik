@@ -1,13 +1,13 @@
-(identifier) @foo. bar
+Q = (identifier) @foo. bar
 ------------------ DIAGNOSTICS -------------------
 error: node kinds must be parenthesized
- --> query.ptk:1:20
+ --> query.ptk:1:24
   |
-1 | (identifier) @foo. bar
-  |                    ^^^
+1 | Q = (identifier) @foo. bar
+  |                        ^^^
   |
 help: wrap in parentheses
   |
-1 - (identifier) @foo. bar
-1 + (identifier) @foo. (bar)
+1 - Q = (identifier) @foo. bar
+1 + Q = (identifier) @foo. (bar)
   |

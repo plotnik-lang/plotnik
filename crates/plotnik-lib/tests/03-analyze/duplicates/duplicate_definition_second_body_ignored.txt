@@ -1,0 +1,12 @@
+A = (leaf)
+A = (a (A))
+------------------ DIAGNOSTICS -------------------
+error: `A` is already defined
+ --> query.ptk:2:1
+  |
+1 | A = (leaf)
+  | - first defined here
+2 | A = (a (A))
+  | ^
+-------------------- SYMBOLS ---------------------
+A

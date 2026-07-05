@@ -1,0 +1,8 @@
+Expr = (identifier)
+Q = (Expr == "foo")
+------------------ DIAGNOSTICS -------------------
+error: expected a child node, or `)` to close
+ --> query.ptk:2:11
+  |
+2 | Q = (Expr == "foo")
+  |           ^^

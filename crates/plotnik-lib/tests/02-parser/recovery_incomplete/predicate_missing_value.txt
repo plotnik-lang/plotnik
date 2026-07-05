@@ -1,0 +1,9 @@
+Q = (identifier == )
+------------------ DIAGNOSTICS -------------------
+error: expected a string or regex after the operator
+ --> query.ptk:1:20
+  |
+1 | Q = (identifier == )
+  |                    ^
+  |
+help: e.g., `(identifier == "foo")` or `(identifier =~ /foo/)`

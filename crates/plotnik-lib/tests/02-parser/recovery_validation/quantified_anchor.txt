@@ -1,14 +1,14 @@
-(call (a) . * (b))
+Q = (call (a) . * (b))
 ------------------ DIAGNOSTICS -------------------
 error: anchors cannot be quantified
- --> query.ptk:1:13
+ --> query.ptk:1:17
   |
-1 | (call (a) . * (b))
-  |             ^
+1 | Q = (call (a) . * (b))
+  |                 ^
   |
 help: remove the quantifier
   |
-1 - (call (a) . * (b))
-1 + (call (a) .  (b))
+1 - Q = (call (a) . * (b))
+1 + Q = (call (a) .  (b))
   |
 help: anchors constrain position and produce no value

@@ -1,0 +1,10 @@
+Q = [{. (a)} (c)]
+------------------ DIAGNOSTICS -------------------
+error: anchor needs an enclosing node
+ --> query.ptk:1:7
+  |
+1 | Q = [{. (a)} (c)]
+  |       ^
+  |
+help: wrap in a named node: `(parent . (child))`
+-------------------- SYMBOLS ---------------------

@@ -1,0 +1,7 @@
+Q = (call (arguments) == "x")
+------------------ DIAGNOSTICS -------------------
+error: expected a child node, or `)` to close
+ --> query.ptk:1:23
+  |
+1 | Q = (call (arguments) == "x")
+  |                       ^^

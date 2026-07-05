@@ -1,0 +1,10 @@
+Q = (identifier !~ /foo(?=bar)/)
+------------------ DIAGNOSTICS -------------------
+error: lookahead/lookbehind is not supported in regex
+ --> query.ptk:1:25
+  |
+1 | Q = (identifier !~ /foo(?=bar)/)
+  |                         ^^
+  |
+help: the regex engine cannot match lookaround; match the surrounding context with the query pattern instead
+-------------------- SYMBOLS ---------------------

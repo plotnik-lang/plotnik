@@ -1,0 +1,25 @@
+Q = (binary_expression operator: "+")
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "binary_expression"
+      Field
+        Id "operator"
+        Colon ":"
+        Str
+          DoubleQuote "\""
+          StringContent "+"
+          DoubleQuote "\""
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode binary_expression
+      FieldPattern operator:
+        AnonymousNode "+"

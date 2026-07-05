@@ -1,0 +1,20 @@
+Q = (comment =~ /a\/b/)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "comment"
+      NodePredicate
+        OpRegexMatch "=~"
+        Regex
+          RegexLiteral "/a\\/b/"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode comment

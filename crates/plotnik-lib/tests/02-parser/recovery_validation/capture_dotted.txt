@@ -1,14 +1,14 @@
-(identifier) @foo.bar
+Q = (identifier) @foo.bar
 ------------------ DIAGNOSTICS -------------------
 error: capture names must be snake_case
- --> query.ptk:1:14
+ --> query.ptk:1:18
   |
-1 | (identifier) @foo.bar
-  |              ^^^^^^^^
+1 | Q = (identifier) @foo.bar
+  |                  ^^^^^^^^
   |
 help: use `@foo_bar`
   |
-1 - (identifier) @foo.bar
-1 + (identifier) @foo_bar
+1 - Q = (identifier) @foo.bar
+1 + Q = (identifier) @foo_bar
   |
 help: captures become fields in the output

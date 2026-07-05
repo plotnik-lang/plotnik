@@ -1,0 +1,26 @@
+Q = (pair key: _ @key)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "pair"
+      Capture
+        Field
+          Id "key"
+          Colon ":"
+          Wildcard
+            Underscore "_"
+        CaptureToken "@key"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode pair
+      CapturedPattern @key
+        FieldPattern key:
+          AnonymousNode (any)

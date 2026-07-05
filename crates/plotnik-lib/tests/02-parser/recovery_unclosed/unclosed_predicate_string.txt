@@ -1,0 +1,9 @@
+Q = (identifier == "foo)
+------------------ DIAGNOSTICS -------------------
+error: unterminated string
+ --> query.ptk:1:20
+  |
+1 | Q = (identifier == "foo)
+  |                    ^^^^^
+  |
+help: anonymous nodes match literal tokens; close the quote: `"foo"`

@@ -1,6 +1,0 @@
-Leaf = (identifier)
-Tree = (call (Leaf))
--------------------- SYMBOLS ---------------------
-Leaf
-Tree
-  Leaf

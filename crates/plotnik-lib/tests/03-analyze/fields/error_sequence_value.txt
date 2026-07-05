@@ -1,0 +1,11 @@
+Q = (foo bar: {(a) (b)})
+------------------ DIAGNOSTICS -------------------
+error: field `bar` cannot match a sequence
+ --> query.ptk:1:15
+  |
+1 | Q = (foo bar: {(a) (b)})
+  |               ^^^^^^^^^
+  |
+help: a field holds a single child node; match one pattern, or move the sequence outside the field
+-------------------- SYMBOLS ---------------------
+Q

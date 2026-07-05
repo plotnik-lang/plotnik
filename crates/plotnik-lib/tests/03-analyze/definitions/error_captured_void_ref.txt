@@ -1,14 +1,14 @@
-Foo = {(expression_statement) (expression_statement)}
-Q = (program (Foo) @y)
+Void = {(a) (b)}
+Q = (call (Void) @v)
 ------------------ DIAGNOSTICS -------------------
 error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
- --> query.ptk:2:14
+ --> query.ptk:2:11
   |
-1 | Foo = {(expression_statement) (expression_statement)}
-  |       ----------------------------------------------- defined here
-2 | Q = (program (Foo) @y)
-  |              ^^^^^
+1 | Void = {(a) (b)}
+  |        --------- defined here
+2 | Q = (call (Void) @v)
+  |           ^^^^^^
 -------------------- SYMBOLS ---------------------
-Foo
+Void
 Q
-  Foo
+  Void
