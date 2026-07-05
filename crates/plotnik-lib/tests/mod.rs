@@ -396,8 +396,10 @@ fn render_compile(
     let lang = Lang::resolve(input.and_then(|i| i.ext.as_deref()))?;
     let records = name.contains("/recording/");
     let inspects = name.contains("/inspection/");
+    let strict_lints = name == "04-emit/root-anchoring";
     let compiled = QueryBuilder::new(source_map(query))
         .with_inspection(inspects || records)
+        .with_strict_lints(strict_lints)
         .compile(lang.grammar)
         .expect("query parsing should not exhaust fuel");
     let diagnostics = compiled.diagnostics();

@@ -146,6 +146,108 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         }
     }
 
+    /// Conservative root-entrypoint admissibility: return `false` only when the
+    /// definition's outermost consumed pattern is known not to be the grammar root.
+    pub(super) fn pattern_can_match_root(
+        &self,
+        located: &Located<Pattern>,
+        grammar_root: NodeKindId,
+        seen_refs: &mut HashSet<String>,
+    ) -> bool {
+        match located.node() {
+            Pattern::NodePattern(node) => {
+                self.node_pattern_can_match_root(&located.wrap(node.clone()), grammar_root)
+            }
+            Pattern::TokenPattern(token) => token.is_any(),
+            Pattern::CapturedPattern(cap) => {
+                let Some(inner) = cap.inner() else {
+                    return true;
+                };
+                self.pattern_can_match_root(&located.wrap(inner), grammar_root, seen_refs)
+            }
+            Pattern::QuantifiedPattern(q) => {
+                if q.is_optional() {
+                    return true;
+                }
+                let Some(inner) = q.inner() else {
+                    return true;
+                };
+                self.pattern_can_match_root(&located.wrap(inner), grammar_root, seen_refs)
+            }
+            Pattern::Union(union) => {
+                let mut saw_branch = false;
+                for branch in union.branches() {
+                    saw_branch = true;
+                    if branch.body().is_none_or(|body| {
+                        self.pattern_can_match_root(&located.wrap(body), grammar_root, seen_refs)
+                    }) {
+                        return true;
+                    }
+                }
+                !saw_branch
+            }
+            Pattern::Enum(en) => {
+                let mut saw_branch = false;
+                for branch in en.branches() {
+                    saw_branch = true;
+                    if branch.body().is_none_or(|body| {
+                        self.pattern_can_match_root(&located.wrap(body), grammar_root, seen_refs)
+                    }) {
+                        return true;
+                    }
+                }
+                !saw_branch
+            }
+            Pattern::DefRef(def_ref) => {
+                let Some(name) = def_ref.name() else {
+                    return true;
+                };
+                let name = name.text().to_string();
+                if !seen_refs.insert(name.clone()) {
+                    return true;
+                }
+                let result = self
+                    .symbol_table
+                    .located_definition(&name)
+                    .is_none_or(|target| {
+                        self.pattern_can_match_root(&target, grammar_root, seen_refs)
+                    });
+                seen_refs.remove(&name);
+                result
+            }
+            Pattern::SeqPattern(seq) => {
+                let mut children = seq.children();
+                let Some(first) = children.next() else {
+                    return true;
+                };
+                if children.next().is_some() {
+                    return true;
+                }
+                self.pattern_can_match_root(&located.wrap(first), grammar_root, seen_refs)
+            }
+            // Bare fields are already reported by grammar validation; avoid piling a
+            // root-entrypoint warning onto malformed structure.
+            Pattern::FieldPattern(_) => true,
+        }
+    }
+
+    fn node_pattern_can_match_root(
+        &self,
+        located: &Located<NodePattern>,
+        grammar_root: NodeKindId,
+    ) -> bool {
+        if located.node().is_any() {
+            return true;
+        }
+        let Some(id) = self.resolve_named_node_id(located) else {
+            return true;
+        };
+        if self.grammar.is_supertype(id) {
+            return true;
+        }
+        id == grammar_root
+    }
+
     fn resolve_node_context(&self, located: &Located<NodePattern>) -> Option<ParentNode> {
         let node = located.node();
         if node.is_any() {

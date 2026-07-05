@@ -28,6 +28,7 @@ pub struct QueryBuilder {
     source_map: SourceMap,
     limits: CompilerLimits,
     inspection: bool,
+    strict_lints: bool,
 }
 
 impl QueryBuilder {
@@ -36,6 +37,7 @@ impl QueryBuilder {
             source_map,
             limits: CompilerLimits::default(),
             inspection: false,
+            strict_lints: false,
         }
     }
 
@@ -82,6 +84,12 @@ impl QueryBuilder {
         self
     }
 
+    /// Enable stricter advisory lints that are too noisy for normal compilation.
+    pub fn with_strict_lints(mut self, enabled: bool) -> Self {
+        self.strict_lints = enabled;
+        self
+    }
+
     pub fn analyze(self) -> crate::compiler::QueryResult<Query> {
         self.parse()?.analyze()
     }
@@ -122,6 +130,7 @@ impl QueryBuilder {
             ast_map: ast,
             limits: self.limits,
             inspection: self.inspection,
+            strict_lints: self.strict_lints,
         })
     }
 }
@@ -133,6 +142,7 @@ pub(crate) struct QueryParsed {
     diag: Diagnostics,
     limits: CompilerLimits,
     inspection: bool,
+    strict_lints: bool,
 }
 
 impl QueryParsed {
@@ -333,6 +343,8 @@ impl Query {
             source_map: &analyzed.parsed.source_map,
             ast_map: &analyzed.parsed.ast_map,
             symbol_table: &analyzed.analysis.symbol_table,
+            dependency_analysis: &analyzed.analysis.dependency_analysis,
+            strict_lints: analyzed.parsed.strict_lints,
             satisfiability_limits: analyzed.parsed.limits.satisfiability(),
         }
         .link(&mut output, &mut analyzed.parsed.diag);

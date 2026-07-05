@@ -22,6 +22,8 @@ pub struct DependencyAnalysis {
     defs: Vec<DefInfo>,
 
     recursive_defs: HashSet<DefId>,
+
+    referenced_defs: HashSet<DefId>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -36,6 +38,7 @@ impl DependencyAnalysis {
         def_ids_by_sym: HashMap<Symbol, DefId>,
         defs: Vec<DefInfo>,
         recursive_defs: HashSet<DefId>,
+        referenced_defs: HashSet<DefId>,
     ) -> Self {
         assert_eq!(
             sccs.iter().flatten().count(),
@@ -83,18 +86,31 @@ impl DependencyAnalysis {
                 "recursive DefId must be within defs",
             );
         }
+        for def_id in &referenced_defs {
+            assert!(
+                def_id.index() < defs.len(),
+                "referenced DefId must be within defs",
+            );
+        }
 
         Self {
             sccs,
             def_ids_by_sym,
             defs,
             recursive_defs,
+            referenced_defs,
         }
     }
 
     #[cfg(test)]
     pub(in crate::compiler) fn empty() -> Self {
-        Self::new(Vec::new(), HashMap::new(), Vec::new(), HashSet::new())
+        Self::new(
+            Vec::new(),
+            HashMap::new(),
+            Vec::new(),
+            HashSet::new(),
+            HashSet::new(),
+        )
     }
 
     pub fn def_id_for_sym(&self, sym: Symbol) -> Option<DefId> {
@@ -117,6 +133,10 @@ impl DependencyAnalysis {
     /// True if the definition is in a mutual recursion group (SCC > 1) or references itself.
     pub fn is_recursive_def(&self, id: DefId) -> bool {
         self.recursive_defs.contains(&id)
+    }
+
+    pub fn has_inbound_references(&self, id: DefId) -> bool {
+        self.referenced_defs.contains(&id)
     }
 
     pub fn sccs(&self) -> &[Vec<DefId>] {

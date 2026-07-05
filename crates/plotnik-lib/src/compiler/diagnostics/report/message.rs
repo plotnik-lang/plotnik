@@ -81,6 +81,7 @@ pub enum DiagnosticKind {
     TypeNameConflict,
     RedundantTypeAnnotation,
     InspectionSpansDegraded,
+    EntrypointNeverMatchesRoot,
 
     PredicateOnNonLeaf,
     EmptyRegex,
@@ -118,6 +119,7 @@ impl DiagnosticKind {
             Self::UnusedBranchLabels
             | Self::RedundantTypeAnnotation
             | Self::InspectionSpansDegraded
+            | Self::EntrypointNeverMatchesRoot
             | Self::TreeSitterSequenceSyntaxDeprecated
             | Self::NegationSyntaxDeprecated
             | Self::SupertypeSlashDeprecated => Severity::Warning,
@@ -254,6 +256,9 @@ impl DiagnosticKind {
             Self::RefCannotHaveChildren => {
                 "a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children"
             }
+            Self::EntrypointNeverMatchesRoot => {
+                "wrap the pattern in the grammar's root node, e.g. `(program ...)`"
+            }
             Self::NoEntrypoints => {
                 "every definition must produce a value; `.`, `-field`, and `.!` constrain position but produce nothing"
             }
@@ -332,6 +337,9 @@ impl DiagnosticKind {
             Self::TypeNameConflict => "conflicting type name",
             Self::RedundantTypeAnnotation => "redundant type annotation",
             Self::InspectionSpansDegraded => "query too large for full inspection detail",
+            Self::EntrypointNeverMatchesRoot => {
+                "entrypoint can never match: matching starts at the tree root"
+            }
             Self::PredicateOnNonLeaf => {
                 "predicates match text content, but this node can contain children"
             }

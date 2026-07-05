@@ -73,11 +73,29 @@ pub fn analyze_dependencies(
         scc_ids_by_def.push(scc_ids);
     }
 
+    let mut referenced_defs = HashSet::new();
+    for name in symbol_table.names() {
+        let body = symbol_table
+            .body(name)
+            .expect("symbol-table name must have a body");
+        for ref_name in collect_defined_refs(body, symbol_table) {
+            let sym = interner
+                .get(ref_name)
+                .expect("defined reference must already be interned");
+            let def_id = def_ids_by_sym
+                .get(&sym)
+                .copied()
+                .expect("defined reference must have a DefId");
+            referenced_defs.insert(def_id);
+        }
+    }
+
     Ok(DependencyAnalysis::new(
         scc_ids_by_def,
         def_ids_by_sym,
         defs,
         recursive_defs,
+        referenced_defs,
     ))
 }
 
