@@ -362,7 +362,9 @@ impl<'t> VM<'t> {
                 }
             }
             NodeKindConstraint::Named(Some(expected)) => {
-                if !node.is_named() || node.kind_id() != u16::from(expected) {
+                // kind_id first: it alone rejects most candidates, and each
+                // check is an FFI call.
+                if node.kind_id() != u16::from(expected) || !node.is_named() {
                     if T::ENABLED {
                         tracer.trace_match_failure(node);
                     }
@@ -378,7 +380,7 @@ impl<'t> VM<'t> {
                 }
             }
             NodeKindConstraint::Anonymous(Some(expected)) => {
-                if node.is_named() || node.kind_id() != u16::from(expected) {
+                if node.kind_id() != u16::from(expected) || node.is_named() {
                     if T::ENABLED {
                         tracer.trace_match_failure(node);
                     }
