@@ -23,8 +23,11 @@ struct Frame {
 ```
 
 `cursor` is restored through tree-sitter descendant indexes stored in
-checkpoints. `frames` is an arena-backed cactus stack so backtracking can restore
-call stacks without copying them.
+checkpoints. Under sustained wide backtracking, a bounded pool of cursor
+snapshots takes over: the newest checkpoints restore by copying a saved cursor
+(`reset_to`, O(depth)) instead of re-navigating from an index. `frames` is an
+arena-backed cactus stack so backtracking can restore call stacks without
+copying them.
 
 ## Execution Cycle
 

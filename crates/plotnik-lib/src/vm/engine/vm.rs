@@ -453,11 +453,8 @@ impl<'t> VM<'t> {
         // snapshot serves every push: nothing in the loop moves the cursor or
         // touches the arenas the snapshot reads.
         if succs.len() > 1 {
-            // Trace fixtures pin descendant-index restore's historical cursor
-            // path through anonymous nodes. Noop execution can use exact pooled
-            // snapshots without changing rendered query output.
             let state = self.checkpoint_state();
-            if !T::ENABLED && self.snapshot_cursor_active {
+            if self.snapshot_cursor_active {
                 let refs = u32::try_from(succs.len() - 1).expect("branch fan-out count fits u32");
                 let snapshot = self.cursor_snapshot(refs);
                 for &alt in succs[1..].iter().rev() {
@@ -497,7 +494,7 @@ impl<'t> VM<'t> {
                 policy,
             };
             let cp = self.call_retry_checkpoint(self.ip, resume);
-            if !T::ENABLED && self.snapshot_cursor_active {
+            if self.snapshot_cursor_active {
                 let snapshot = self.cursor_snapshot(1);
                 self.checkpoints.push_with_snapshot(cp, snapshot);
             } else {
@@ -669,7 +666,7 @@ impl<'t> VM<'t> {
             }
 
             let retry = self.call_retry_checkpoint(cp.ip, resume);
-            if !T::ENABLED && self.snapshot_cursor_active {
+            if self.snapshot_cursor_active {
                 let snapshot = self.cursor_snapshot(1);
                 self.checkpoints.push_with_snapshot(retry, snapshot);
             } else {
