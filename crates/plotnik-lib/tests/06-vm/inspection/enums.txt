@@ -122,7 +122,7 @@ Q:
   30  ❮❮❮ 
   24       (number) [SpanStart#1 SpanStart#5 EnumOpen(M3) SpanStartAt#7 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#7 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  14
        ●   number
-  14   ◀   (?)
+  14   ◀   (?)                              
 
 ?:
   09       _ [SpanStart#11 Set(M4) SpanEnd#11 SpanEnd#12]  12

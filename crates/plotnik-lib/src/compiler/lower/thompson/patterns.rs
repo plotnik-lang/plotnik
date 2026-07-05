@@ -7,7 +7,7 @@
 //! - Field constraints: `name: pattern`
 //! - Captured patterns: `@name`, `pattern @name`
 
-use crate::bytecode::{Nav, PredicateOp};
+use crate::bytecode::{Nav, PredicateOp, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
@@ -819,6 +819,7 @@ impl NfaBuilder<'_> {
     }
 
     pub(super) fn compile_field(&mut self, field: &ast::FieldPattern, ctx: PatternCtx) -> Label {
+        let ctx = self.bracket_field_ctx(field, ctx);
         let PatternCtx {
             exit,
             nav: nav_override,
@@ -838,6 +839,7 @@ impl NfaBuilder<'_> {
                 capture,
                 value: value_context,
             };
+            let value_ctx = self.bracket_pattern_ctx(&value, value_ctx);
             return self.compile_ref(r, value_ctx, node_field);
         }
 
@@ -867,6 +869,25 @@ impl NfaBuilder<'_> {
         );
 
         self.attach_field_to_entry_or_wrap(value_entry, node_field)
+    }
+
+    fn bracket_field_ctx(&mut self, field: &ast::FieldPattern, ctx: PatternCtx) -> PatternCtx {
+        let Some(id) = self.span_id(field.syntax(), SpanKind::Field) else {
+            return ctx;
+        };
+
+        let PatternCtx {
+            exit,
+            nav,
+            capture,
+            value,
+        } = ctx;
+        PatternCtx {
+            exit,
+            nav,
+            capture: capture.nest_span(EffectIR::span_start(id.0), EffectIR::span_end(id.0)),
+            value,
+        }
     }
 
     fn field_value_needs_wrapper(value: &Pattern) -> bool {

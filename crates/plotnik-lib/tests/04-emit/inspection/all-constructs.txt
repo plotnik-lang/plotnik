@@ -114,21 +114,18 @@ Q:
   23  ...
   24   !   (number) [SpanStart#1 SpanStart#5 EnumOpen(M3) SpanStartAt#7 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#7 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  13
   30  -ε-  [SpanStart#0]                    16, 24
-  32  -ε-  [SuppressEnd SpanEnd#23 SpanEnd#22 SpanEnd#21]  08
+  32  -ε-  [SuppressEnd SpanEnd#23 SpanEnd#22 SpanEnd#21 SpanEnd#20]  08
   35   !   (@30)                            30 : 32
-  36  -ε-  [SpanStart#21 SpanStart#22 Null Set(M6) SpanStart#23 SuppressBegin]  35
+  36  -ε-  [SpanStart#20 SpanStart#21 SpanStart#22 Null Set(M6) SpanStart#23 SuppressBegin]  35
   39  ...
-  40   !   (string) [SpanStart#21 SpanStart#24 SpanStartAt#26 SpanStart#25 Node Set(M6) SpanEnd#25 SpanEnd#26 SpanEnd#24 SpanEnd#21]  08
-  44  ─‣─  value: _                         36, 40
-  46  ...
-  47  ...
-  48  └‣─  name: (identifier) [SpanStartAt#19 SpanStart#16 Node Set(M5) SpanEnd#16 SpanEnd#19]  44
-  51  └‣─  (variable_declarator) [SpanStartAt#15]  48
-  53  └‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node Set(M4) SpanEnd#13]  51
-  56  ─‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node Set(M4) SpanEnd#13]  51
-  59   !   (expression_statement) [SpanStartAt#12 SpanEnd#12]  61, 56
-  61  ─‣─  _                                59, 61
-  63  ...
-  64  └‣─  _                                59, 61
-  66  -ε-  [SpanStart#11]                   64, 53
+  40   !   (string) [SpanStart#20 SpanStart#21 SpanStart#24 SpanStartAt#26 SpanStart#25 Node Set(M6) SpanEnd#25 SpanEnd#26 SpanEnd#24 SpanEnd#21 SpanEnd#20]  08
+  46  ─‣─  value: _                         36, 40
+  48  └‣─  name: (identifier) [SpanStart#18 SpanStartAt#19 SpanStart#16 Node Set(M5) SpanEnd#16 SpanEnd#19 SpanEnd#18]  46
+  52  └‣─  (variable_declarator) [SpanStartAt#15]  48
+  54  ─‣─  _                                62, 54
+  56  └‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node Set(M4) SpanEnd#13]  52
+  59  ─‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node Set(M4) SpanEnd#13]  52
+  62   !   (expression_statement) [SpanStartAt#12 SpanEnd#12]  54, 59
+  64  └‣─  _                                62, 54
+  66  -ε-  [SpanStart#11]                   64, 56
   68   !   (program) [SpanStart#8 SpanStartAt#9 SpanStart#10]  66

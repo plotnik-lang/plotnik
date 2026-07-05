@@ -47,17 +47,19 @@ P9 pattern    104..116  src0
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@24)                            24 : 03
+  02       (@28)                            28 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-  06                                        ▶
-  07  ...
-  08  ─‣─  right: (identifier) [SpanStartAt#9 SpanStart#7 Node Set(M1) SpanEnd#7 SpanEnd#9]  11
-  11  ─‣┘  _                                12
-  12  ─‣┘  _ [SpanEnd#3]                    14
-  14  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
-  16  └‣─  left: (identifier) [SpanStartAt#6 SpanStart#4 Node Set(M0) SpanEnd#4 SpanEnd#6]  08
-  19  └‣─  (binary_expression) [SpanStartAt#3]  16
-  21  └‣─  (expression_statement) [SpanStartAt#2]  19
+  06  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  16
+  08  ─‣─  right: (identifier) [SpanStart#8 SpanStartAt#9 SpanStart#7 Node Set(M1) SpanEnd#7 SpanEnd#9 SpanEnd#8]  12
+  12  ─‣┘  _                                13
+  13  ─‣┘  _ [SpanEnd#3]                    06
+  15  ...
+  16                                        ▶
+  17  └‣─  left: (identifier) [SpanStart#5 SpanStartAt#6 SpanStart#4 Node Set(M0) SpanEnd#4 SpanEnd#6 SpanEnd#5]  08
+  21  ...
+  22  ...
   23  ...
-  24   !   (program) [SpanStart#0 SpanStartAt#1]  21
+  24  └‣─  (binary_expression) [SpanStartAt#3]  17
+  26  └‣─  (expression_statement) [SpanStartAt#2]  24
+  28   !   (program) [SpanStart#0 SpanStartAt#1]  26

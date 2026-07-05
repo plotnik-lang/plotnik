@@ -63,12 +63,11 @@ Q:
   02       (@34)                            34 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-  06  ...
+  06                                        ▶
   07  ...
-  08  └‣─  name: (identifier) [SpanStartAt#8 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#8]  11
-  11  ─‣┘  _ [SpanEnd#5]                    13
-  13  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          15
-  15                                        ▶
+  08  └‣─  name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#8 SpanEnd#7]  12
+  12  ─‣┘  _ [SpanEnd#5]                    14
+  14  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          06
   16  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#5]  08
   18  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#5]  08
   20  -ε-  [Null Set(M0)]                   16
@@ -100,14 +99,14 @@ Q:
   20  -ε-  [Null Set(M0)]                   16
   16       (function_declaration) [SpanEnd#3 SpanStartAt#5]  08
        ●   function_declaration
-  08       name: (identifier) [SpanStartAt#8 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#8]  11
+  08       name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#8 SpanEnd#7]  12
        ○   function
        ●   identifier
-  11       _ [SpanEnd#5]                    13
+  12       _ [SpanEnd#5]                    14
        ●   function_declaration
-  13       _ [SpanEnd#1 SpanEnd#0]          15
+  14       _ [SpanEnd#1 SpanEnd#0]          06
        ●   program
-  15   ◀   (?)                              
+  06   ◀   (?)                              
 
 Q:
   03  -ε-  [StructClose]                    05

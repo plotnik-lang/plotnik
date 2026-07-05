@@ -48,21 +48,20 @@ Q:
   02       (@35)                            35 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-  06  -ε-  [StructClose Push]               14, 32
-  08  └‣─  name: (identifier) [SpanStartAt#7 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#7]  11
-  11  ─‣┘  _ [SpanEnd#4]                    06
-  13                                        ▶
-  14  ─‣─  _                                19, 14
-  16  -ε-  [SpanEnd#3 ArrayClose SpanStart#2 Set(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
-  19   !   (function_declaration) [StructOpen SpanStartAt#4]  08
-  21  ...
-  22  ...
+  06  ─‣─  _                                21, 06
+  08  └‣─  name: (identifier) [SpanStart#6 SpanStartAt#7 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#7 SpanEnd#6]  12
+  12  ─‣┘  _ [SpanEnd#4]                    19
+  14                                        ▶
+  15  ...
+  16  -ε-  [SpanEnd#3 ArrayClose SpanStart#2 Set(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
+  19  -ε-  [StructClose Push]               06, 32
+  21   !   (function_declaration) [StructOpen SpanStartAt#4]  08
   23  ...
-  24  └‣─  _                                19, 14
+  24  └‣─  _                                21, 06
   26  -ε-  [ArrayOpen SpanStart#3]          24, 16
   28  ...
   29  ...
   30  ...
   31  ...
-  32  ─‣┘  _ [SpanEnd#3 ArrayClose SpanStart#2 Set(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  13
+  32  ─‣┘  _ [SpanEnd#3 ArrayClose SpanStart#2 Set(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
   35   !   (program) [SpanStart#0 SpanStartAt#1]  26

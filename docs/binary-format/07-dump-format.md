@@ -42,6 +42,9 @@ P09 pattern    4..14  src0
 The optional `Txx` / `Txx.Myy` suffix is the type or member binding stored in
 the bytecode entry. The section is omitted when `spans_count == 0`.
 
+For degraded inspection modules, only admitted span ids are printed. Dropped
+detail tiers have no `Pxx` line and no corresponding span effects.
+
 ## Transition Lines
 
 Each transition line uses fixed columns:

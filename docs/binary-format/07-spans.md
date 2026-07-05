@@ -54,6 +54,23 @@ Transitions may carry three span effect kinds:
 
 The effect payload is a `SpanId` and must be `< spans_count`. `SpanStartAt`
 is position-sensitive like `Node`: lowering must place it only where the VM
-cursor already points at the matched node. Load-time effect-stack validation
-tracks span depth, including inside suppression scopes, so malformed bytecode
-with unbalanced span brackets is rejected before execution.
+cursor already points at the matched node. The compiler asserts this on the
+fresh Thompson IR before optimization; later passes may move it only along
+cursor-preserving epsilon chains.
+
+Load-time effect-stack validation tracks span depth, including inside
+suppression scopes, so malformed bytecode with unbalanced span brackets is
+rejected before execution. Span effects are still recorded under runtime
+suppression: a bare `(Foo)` reference suppresses `Foo`'s output values but not
+its inspection hull.
+
+## Degradation
+
+The compiler can emit at most 1024 spans because effect payloads are 10-bit.
+When inspection is enabled and a query has more span-worthy constructs, spans
+are admitted by detail tier. Higher-value tiers such as definitions, captures,
+patterns, and references are kept ahead of lower-value detail such as fields
+and annotations. Each tier is admitted or dropped as a whole; a large dropped
+tier does not prevent a later smaller tier from being admitted if it still
+fits. Dropped tiers are omitted from the Spans section and reported with the
+`inspection_spans_degraded` warning; the module remains executable.
