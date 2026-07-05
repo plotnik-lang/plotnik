@@ -4,7 +4,7 @@
 //! in docs/tree-navigation.md.
 
 use std::collections::VecDeque;
-use std::num::NonZeroU32;
+use std::num::NonZeroU64;
 
 use arborium_tree_sitter::{Node, TreeCursor};
 
@@ -104,12 +104,14 @@ pub struct CursorWrapper<'t> {
 pub(crate) struct SnapshotPool<'t> {
     live: VecDeque<SnapshotEntry<'t>>,
     free: Vec<TreeCursor<'t>>,
-    next_seq: u32,
+    /// u64: one seq per checkpoint push once active — a u32 could plausibly
+    /// wrap within a long unlimited-budget run and panic mid-query.
+    next_seq: u64,
     wide_restore_misses: u32,
 }
 
 struct SnapshotEntry<'t> {
-    seq: NonZeroU32,
+    seq: NonZeroU64,
     /// Checkpoints on the stack still holding this seq. A branch fan-out shares
     /// one snapshot across all its alternative checkpoints.
     refs: u32,
@@ -159,7 +161,7 @@ impl<'t> CursorWrapper<'t> {
     /// Costs one clone the first few times, then one `reset_to` (O(depth) memcpy)
     /// per call.
     #[inline]
-    pub fn snapshot(&mut self, refs: u32) -> Option<NonZeroU32> {
+    pub fn snapshot(&mut self, refs: u32) -> Option<NonZeroU64> {
         if !self.snapshots_active() {
             return None;
         }
@@ -170,7 +172,7 @@ impl<'t> CursorWrapper<'t> {
             .next_seq
             .checked_add(1)
             .expect("snapshot sequence overflow");
-        let seq = NonZeroU32::new(pool.next_seq).expect("seq starts at 1");
+        let seq = NonZeroU64::new(pool.next_seq).expect("seq starts at 1");
         let cursor = match pool.free.pop() {
             Some(mut cursor) => {
                 cursor.reset_to(&self.cursor);
@@ -191,7 +193,7 @@ impl<'t> CursorWrapper<'t> {
     /// Restore to a checkpoint position, using its pooled snapshot when it
     /// survived eviction. Always releases the checkpoint's reference on a hit.
     #[inline(always)]
-    pub fn restore(&mut self, snapshot: Option<NonZeroU32>, index: u32) {
+    pub fn restore(&mut self, snapshot: Option<NonZeroU64>, index: u32) {
         let Some(seq) = snapshot else {
             self.restore_without_snapshot(index);
             return;
@@ -209,7 +211,7 @@ impl<'t> CursorWrapper<'t> {
     }
 
     #[inline(always)]
-    fn restore_snapshot(&mut self, seq: NonZeroU32, index: u32) {
+    fn restore_snapshot(&mut self, seq: NonZeroU64, index: u32) {
         let current_index = self.descendant_index();
         if self.consume_snapshot(seq, index, current_index) {
             return;
@@ -227,7 +229,7 @@ impl<'t> CursorWrapper<'t> {
     }
 
     /// True if the snapshot was found and the cursor restored from it.
-    fn consume_snapshot(&mut self, seq: NonZeroU32, index: u32, current_index: u32) -> bool {
+    fn consume_snapshot(&mut self, seq: NonZeroU64, index: u32, current_index: u32) -> bool {
         let cursor_is_at_index = current_index == index;
         let pool = &mut self.snapshots;
 

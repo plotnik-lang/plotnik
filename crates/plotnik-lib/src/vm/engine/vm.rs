@@ -1,6 +1,6 @@
 //! Virtual machine for executing compiled Plotnik queries.
 
-use std::num::NonZeroU32;
+use std::num::NonZeroU64;
 
 use arborium_tree_sitter::Tree;
 
@@ -110,7 +110,7 @@ impl<'t> VM<'t> {
     }
 
     /// Restore VM state from a checkpoint's snapshot.
-    fn restore_checkpoint_state(&mut self, state: CheckpointState, snapshot: Option<NonZeroU32>) {
+    fn restore_checkpoint_state(&mut self, state: CheckpointState, snapshot: Option<NonZeroU64>) {
         if let Some(snapshot) = snapshot {
             self.cursor.restore(Some(snapshot), state.descendant_index);
         } else if self.cursor.restore_without_snapshot(state.descendant_index) {
@@ -184,7 +184,7 @@ impl<'t> VM<'t> {
         Checkpoint::call_retry(self.checkpoint_state(), call_ip, resume)
     }
 
-    fn cursor_snapshot(&mut self, refs: u32) -> NonZeroU32 {
+    fn cursor_snapshot(&mut self, refs: u32) -> NonZeroU64 {
         self.cursor
             .snapshot(refs)
             .expect("snapshot cursor active flag tracks cursor pool activation")

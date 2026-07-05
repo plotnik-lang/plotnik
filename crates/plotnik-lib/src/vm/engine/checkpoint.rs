@@ -4,7 +4,7 @@
 //! a checkpoint for each alternative. On failure, it restores the
 //! most recent checkpoint and continues.
 
-use std::num::NonZeroU32;
+use std::num::NonZeroU64;
 
 use crate::core::NodeFieldId;
 
@@ -101,7 +101,7 @@ pub struct Checkpoint {
 #[derive(Clone, Copy, Debug)]
 struct CheckpointSnapshot {
     stack_index: usize,
-    snapshot: NonZeroU32,
+    snapshot: NonZeroU64,
 }
 
 impl Checkpoint {
@@ -157,7 +157,7 @@ impl CheckpointStack {
         self.stack.push(checkpoint);
     }
 
-    pub fn push_with_snapshot(&mut self, mut checkpoint: Checkpoint, snapshot: NonZeroU32) {
+    pub fn push_with_snapshot(&mut self, mut checkpoint: Checkpoint, snapshot: NonZeroU64) {
         let stack_index = self.stack.len();
         self.push_inner(&mut checkpoint);
         self.stack.push(checkpoint);
@@ -186,7 +186,7 @@ impl CheckpointStack {
         Some(cp)
     }
 
-    pub fn pop_with_snapshot(&mut self) -> Option<(Checkpoint, Option<NonZeroU32>)> {
+    pub fn pop_with_snapshot(&mut self) -> Option<(Checkpoint, Option<NonZeroU64>)> {
         let stack_index = self.stack.len().checked_sub(1)?;
         let cp = self.stack.pop()?;
         let snapshot = if self
