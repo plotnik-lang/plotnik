@@ -10,8 +10,6 @@ use crate::core::NodeFieldId;
 
 use super::cursor::SkipPolicy;
 
-const NO_FRAME_INDEX: u32 = u32::MAX;
-
 /// Everything needed to re-enter a callee at the next sibling after a Call's
 /// callee fails. Carrying this on the checkpoint (rather than in ambient VM
 /// state) keeps the resume fully self-contained: `backtrack` advances the
@@ -33,54 +31,17 @@ pub struct CallResume {
 /// snapshot at creation and the restore on backtrack in lockstep.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct CheckpointState {
-    /// Effect stream length at checkpoint.
-    pub(crate) effect_watermark: usize,
-    /// Suppression depth at checkpoint (see `VM::suppress_depth` for its bound).
-    pub(crate) suppress_depth: u64,
     /// Cursor position (tree-sitter descendant_index) — always present; the
     /// restore fallback when the pooled snapshot was evicted.
     pub(crate) descendant_index: u32,
-    /// Frame arena state at checkpoint, packed to keep the hot checkpoint
-    /// record dense.
-    frame_index: u32,
+    /// Effect stream length at checkpoint.
+    pub(crate) effect_watermark: usize,
+    /// Frame arena state at checkpoint.
+    pub(crate) frame_index: Option<u32>,
     /// Recursion depth at checkpoint.
     pub(crate) recursion_depth: u32,
-}
-
-impl CheckpointState {
-    pub(crate) fn new(
-        descendant_index: u32,
-        effect_watermark: usize,
-        frame_index: Option<u32>,
-        recursion_depth: u32,
-        suppress_depth: u64,
-    ) -> Self {
-        Self {
-            effect_watermark,
-            suppress_depth,
-            descendant_index,
-            frame_index: pack_frame_index(frame_index),
-            recursion_depth,
-        }
-    }
-
-    pub(crate) fn frame_index(&self) -> Option<u32> {
-        if self.frame_index == NO_FRAME_INDEX {
-            return None;
-        }
-        Some(self.frame_index)
-    }
-}
-
-fn pack_frame_index(frame_index: Option<u32>) -> u32 {
-    let Some(frame_index) = frame_index else {
-        return NO_FRAME_INDEX;
-    };
-    assert_ne!(
-        frame_index, NO_FRAME_INDEX,
-        "frame index must not collide with checkpoint sentinel"
-    );
-    frame_index
+    /// Suppression depth at checkpoint (see `VM::suppress_depth` for its bound).
+    pub(crate) suppress_depth: u64,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -169,7 +130,7 @@ impl CheckpointStack {
 
     fn push_inner(&mut self, checkpoint: &mut Checkpoint) {
         let prev = self.stack.last().and_then(|c| c.max_frame_idx_below);
-        checkpoint.max_frame_idx_below = match (checkpoint.state.frame_index(), prev) {
+        checkpoint.max_frame_idx_below = match (checkpoint.state.frame_index, prev) {
             (Some(a), Some(b)) => Some(a.max(b)),
             (a, b) => a.or(b),
         };

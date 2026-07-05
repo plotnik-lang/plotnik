@@ -100,13 +100,13 @@ impl<'t> VM<'t> {
 
     /// Snapshot the VM state a checkpoint restores on backtrack.
     fn checkpoint_state(&self) -> CheckpointState {
-        CheckpointState::new(
-            self.cursor.descendant_index(),
-            self.effects.len(),
-            self.frames.current(),
-            self.recursion_depth,
-            self.suppress_depth,
-        )
+        CheckpointState {
+            descendant_index: self.cursor.descendant_index(),
+            effect_watermark: self.effects.len(),
+            frame_index: self.frames.current(),
+            recursion_depth: self.recursion_depth,
+            suppress_depth: self.suppress_depth,
+        }
     }
 
     /// Restore VM state from a checkpoint's snapshot.
@@ -117,7 +117,7 @@ impl<'t> VM<'t> {
             self.snapshot_cursor_active = true;
         }
         self.effects.truncate(state.effect_watermark);
-        self.frames.restore(state.frame_index());
+        self.frames.restore(state.frame_index);
         self.recursion_depth = state.recursion_depth;
         self.suppress_depth = state.suppress_depth;
         debug_assert_eq!(
@@ -165,7 +165,7 @@ impl<'t> VM<'t> {
         );
         debug_assert_eq!(
             frames.current(),
-            state.frame_index(),
+            state.frame_index,
             "checkpoint restore: frame index"
         );
         debug_assert_eq!(
