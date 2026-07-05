@@ -2,10 +2,10 @@
 //!
 //! # Design: Zero-Cost Abstraction
 //!
-//! The tracer is designed as a zero-cost abstraction. When `NoopTracer` is used:
-//! - All trait methods are `#[inline(always)]` empty functions
-//! - The compiler eliminates all tracer calls and their arguments
-//! - No tracing-related state exists in core execution structures
+//! VM call sites are gated on `T::ENABLED`. `NoopTracer` sets that constant to
+//! `false`, so tracing work is removed before argument evaluation; this matters
+//! for arguments built from tree-sitter FFI calls such as `cursor.node()`.
+//! Tracing state still lives entirely outside core execution structures.
 //!
 //! # Design: Tracer-Owned State
 //!
@@ -48,6 +48,12 @@ pub enum Verbosity {
 /// All methods receive raw data (IDs, nodes) that the VM already has.
 /// Formatting and name resolution happen in the tracer implementation.
 pub trait Tracer {
+    /// Compile-time switch: when `false`, the VM skips tracer calls entirely,
+    /// including evaluation of their arguments (an eagerly-built `Node` costs a
+    /// real FFI call even when the receiving method body is empty). Defaults to
+    /// `true` so only tracers that opt out lose events.
+    const ENABLED: bool = true;
+
     /// Called before executing an instruction.
     fn trace_instruction(&mut self, ip: u16, instr: &Instruction<'_>);
 
@@ -99,6 +105,8 @@ pub trait Tracer {
 pub struct NoopTracer;
 
 impl Tracer for NoopTracer {
+    const ENABLED: bool = false;
+
     #[inline(always)]
     fn trace_instruction(&mut self, _ip: u16, _instr: &Instruction<'_>) {}
 

@@ -208,7 +208,9 @@ impl<'t> VM<'t> {
         tracer: &mut T,
     ) -> Result<EffectLog<'t>, RuntimeError> {
         self.ip = u16::from(entrypoint.target());
-        tracer.trace_enter_entrypoint(self.ip);
+        if T::ENABLED {
+            tracer.trace_enter_entrypoint(self.ip);
+        }
 
         loop {
             // Step ceiling: bound total work. `None` opts out (Unbounded).
@@ -239,7 +241,9 @@ impl<'t> VM<'t> {
                 self.ip
             );
             let instr = module.decode_step(self.ip);
-            tracer.trace_instruction(self.ip, &instr);
+            if T::ENABLED {
+                tracer.trace_instruction(self.ip, &instr);
+            }
 
             let result = match instr {
                 Instruction::Match(m) => self.exec_match(m, module, tracer),
@@ -279,10 +283,14 @@ impl<'t> VM<'t> {
         tracer: &mut T,
     ) -> Result<(), Signal> {
         let Some(policy) = self.cursor.navigate(m.nav) else {
-            tracer.trace_nav_failure(m.nav);
+            if T::ENABLED {
+                tracer.trace_nav_failure(m.nav);
+            }
             return Err(self.backtrack(tracer));
         };
-        tracer.trace_nav(m.nav, self.cursor.node());
+        if T::ENABLED {
+            tracer.trace_nav(m.nav, self.cursor.node());
+        }
 
         let cont_nav = m.nav.sibling_continuation();
         loop {
@@ -292,8 +300,12 @@ impl<'t> VM<'t> {
             self.advance_or_backtrack(policy, cont_nav, tracer)?;
         }
 
-        tracer.trace_match_success(self.cursor.node());
-        if let Some(field_id) = m.node_field {
+        if T::ENABLED {
+            tracer.trace_match_success(self.cursor.node());
+        }
+        if T::ENABLED
+            && let Some(field_id) = m.node_field
+        {
             tracer.trace_field_success(field_id);
         }
 
@@ -343,25 +355,33 @@ impl<'t> VM<'t> {
             NodeKindConstraint::Any => {}
             NodeKindConstraint::Named(None) => {
                 if !node.is_named() {
-                    tracer.trace_match_failure(node);
+                    if T::ENABLED {
+                        tracer.trace_match_failure(node);
+                    }
                     return false;
                 }
             }
             NodeKindConstraint::Named(Some(expected)) => {
                 if !node.is_named() || node.kind_id() != u16::from(expected) {
-                    tracer.trace_match_failure(node);
+                    if T::ENABLED {
+                        tracer.trace_match_failure(node);
+                    }
                     return false;
                 }
             }
             NodeKindConstraint::Anonymous(None) => {
                 if node.is_named() {
-                    tracer.trace_match_failure(node);
+                    if T::ENABLED {
+                        tracer.trace_match_failure(node);
+                    }
                     return false;
                 }
             }
             NodeKindConstraint::Anonymous(Some(expected)) => {
                 if node.is_named() || node.kind_id() != u16::from(expected) {
-                    tracer.trace_match_failure(node);
+                    if T::ENABLED {
+                        tracer.trace_match_failure(node);
+                    }
                     return false;
                 }
             }
@@ -370,7 +390,9 @@ impl<'t> VM<'t> {
         if let Some(expected) = m.node_field
             && self.cursor.field_id() != Some(expected)
         {
-            tracer.trace_field_failure(node);
+            if T::ENABLED {
+                tracer.trace_field_failure(node);
+            }
             return false;
         }
 
@@ -407,7 +429,9 @@ impl<'t> VM<'t> {
         for i in (1..m.succ_count()).rev() {
             self.checkpoints
                 .push(self.branch_checkpoint(u16::from(m.successor(i))));
-            tracer.trace_checkpoint_created(self.ip);
+            if T::ENABLED {
+                tracer.trace_checkpoint_created(self.ip);
+            }
         }
 
         self.ip = u16::from(m.successor(0));
@@ -431,7 +455,9 @@ impl<'t> VM<'t> {
             };
             self.checkpoints
                 .push(self.call_retry_checkpoint(self.ip, resume));
-            tracer.trace_checkpoint_created(self.ip);
+            if T::ENABLED {
+                tracer.trace_checkpoint_created(self.ip);
+            }
         }
 
         self.enter_callee(u16::from(c.target), u16::from(c.next), tracer);
@@ -440,7 +466,9 @@ impl<'t> VM<'t> {
 
     /// Push a frame for `target` (returning to `next`) and jump in.
     fn enter_callee<T: Tracer>(&mut self, target: u16, next: u16, tracer: &mut T) {
-        tracer.trace_call(target);
+        if T::ENABLED {
+            tracer.trace_call(target);
+        }
         self.frames.push(next);
         self.recursion_depth += 1;
         debug_assert_eq!(
@@ -466,10 +494,14 @@ impl<'t> VM<'t> {
         }
 
         let Some(policy) = self.cursor.navigate(nav) else {
-            tracer.trace_nav_failure(nav);
+            if T::ENABLED {
+                tracer.trace_nav_failure(nav);
+            }
             return Err(self.backtrack(tracer));
         };
-        tracer.trace_nav(nav, self.cursor.node());
+        if T::ENABLED {
+            tracer.trace_nav(nav, self.cursor.node());
+        }
 
         let Some(field_id) = field else {
             return Ok(Some(policy));
@@ -478,10 +510,14 @@ impl<'t> VM<'t> {
         let cont_nav = nav.sibling_continuation();
         loop {
             if self.cursor.field_id() == Some(field_id) {
-                tracer.trace_field_success(field_id);
+                if T::ENABLED {
+                    tracer.trace_field_success(field_id);
+                }
                 return Ok(Some(policy));
             }
-            tracer.trace_field_failure(self.cursor.node());
+            if T::ENABLED {
+                tracer.trace_field_failure(self.cursor.node());
+            }
             self.advance_or_backtrack(policy, cont_nav, tracer)?;
         }
     }
@@ -495,15 +531,21 @@ impl<'t> VM<'t> {
             return Ok(());
         };
         if self.cursor.field_id() != Some(field_id) {
-            tracer.trace_field_failure(self.cursor.node());
+            if T::ENABLED {
+                tracer.trace_field_failure(self.cursor.node());
+            }
             return Err(self.backtrack(tracer));
         }
-        tracer.trace_field_success(field_id);
+        if T::ENABLED {
+            tracer.trace_field_success(field_id);
+        }
         Ok(())
     }
 
     fn exec_return<T: Tracer>(&mut self, tracer: &mut T) -> Result<(), Signal> {
-        tracer.trace_return();
+        if T::ENABLED {
+            tracer.trace_return();
+        }
 
         // If no frames, we're returning from top-level entrypoint → Accept
         if self.frames.is_empty() {
@@ -540,7 +582,9 @@ impl<'t> VM<'t> {
             let Some(cp) = self.checkpoints.pop() else {
                 return RuntimeError::NoMatch.into();
             };
-            tracer.trace_backtrack();
+            if T::ENABLED {
+                tracer.trace_backtrack();
+            }
             self.restore_checkpoint_state(cp.state);
 
             let Some(resume) = cp.call_resume else {
@@ -553,21 +597,29 @@ impl<'t> VM<'t> {
             if !self.cursor.continue_search(resume.policy) {
                 continue;
             }
-            tracer.trace_nav(Nav::Down.sibling_continuation(), self.cursor.node());
+            if T::ENABLED {
+                tracer.trace_nav(Nav::Down.sibling_continuation(), self.cursor.node());
+            }
 
             // Enforce the field constraint at the new candidate. A mismatch ends
             // this Call's search, exactly like the navigate-time field check.
             if let Some(field_id) = resume.field {
                 if self.cursor.field_id() != Some(field_id) {
-                    tracer.trace_field_failure(self.cursor.node());
+                    if T::ENABLED {
+                        tracer.trace_field_failure(self.cursor.node());
+                    }
                     continue;
                 }
-                tracer.trace_field_success(field_id);
+                if T::ENABLED {
+                    tracer.trace_field_success(field_id);
+                }
             }
 
             self.checkpoints
                 .push(self.call_retry_checkpoint(cp.ip, resume));
-            tracer.trace_checkpoint_created(cp.ip);
+            if T::ENABLED {
+                tracer.trace_checkpoint_created(cp.ip);
+            }
             self.enter_callee(resume.target, resume.next, tracer);
             return ControlFlow::Backtracked.into();
         }
@@ -582,7 +634,9 @@ impl<'t> VM<'t> {
         if !self.cursor.continue_search(policy) {
             return Err(self.backtrack(tracer));
         }
-        tracer.trace_nav(cont_nav, self.cursor.node());
+        if T::ENABLED {
+            tracer.trace_nav(cont_nav, self.cursor.node());
+        }
         Ok(())
     }
 
@@ -591,7 +645,9 @@ impl<'t> VM<'t> {
 
         let effect = match op.kind {
             SuppressBegin => {
-                tracer.trace_suppress_control(SuppressBegin, self.suppress_depth > 0);
+                if T::ENABLED {
+                    tracer.trace_suppress_control(SuppressBegin, self.suppress_depth > 0);
+                }
                 self.suppress_depth += 1;
                 return;
             }
@@ -600,13 +656,17 @@ impl<'t> VM<'t> {
                     .suppress_depth
                     .checked_sub(1)
                     .expect("SuppressEnd without matching SuppressBegin");
-                tracer.trace_suppress_control(SuppressEnd, self.suppress_depth > 0);
+                if T::ENABLED {
+                    tracer.trace_suppress_control(SuppressEnd, self.suppress_depth > 0);
+                }
                 return;
             }
 
             // Skip data effects when suppressing, but trace them
             _ if self.suppress_depth > 0 => {
-                tracer.trace_effect_suppressed(op.kind, op.payload);
+                if T::ENABLED {
+                    tracer.trace_effect_suppressed(op.kind, op.payload);
+                }
                 return;
             }
 
@@ -622,7 +682,9 @@ impl<'t> VM<'t> {
             Null => RuntimeEffect::Null,
         };
 
-        tracer.trace_effect(&effect);
+        if T::ENABLED {
+            tracer.trace_effect(&effect);
+        }
         self.effects.push(effect);
     }
 }
