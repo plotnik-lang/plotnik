@@ -1,0 +1,63 @@
+Q = (program
+  {
+    (expression_statement (identifier) @a)
+    (expression_statement (number) @b)
+  }
+)
+------------------- INPUT (ts) -------------------
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "identifier"
+S7 "number"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { a, b }
+
+[type_members]
+M0: S1 → T0  ; a: <Node>
+M1: S2 → T0  ; b: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[spans]
+P0 def        0..104  src0  T1
+P1 pattern    4..104  src0
+P2 sequence   15..102  src0
+P3 pattern    21..59  src0
+P4 capture    56..58  src0  T1.M0
+P5 pattern    43..55  src0
+P6 pattern    64..98  src0
+P7 capture    95..97  src0  T1.M1
+P8 pattern    86..94  src0
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@26)                            26 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  ...
+  07  ...
+  08  └‣─  (number) [SpanStartAt#8 SpanStart#7 Node Set(M1) SpanEnd#7 SpanEnd#8]  11
+  11  ─‣┘  _                                12
+  12  ─‣┘  _ [SpanEnd#6 SpanEnd#2 SpanEnd#1]  14
+  14                                        ▶
+  15  ...
+  16  └‣─  (identifier) [SpanStartAt#5 SpanStart#4 Node Set(M0) SpanEnd#4 SpanEnd#5]  19
+  19  ─‣┘  _                                20
+  20  ─‣─  (expression_statement) [SpanEnd#3 SpanStartAt#6]  08
+  22  ...
+  23  ...
+  24  └‣─  (expression_statement) [SpanStart#2 SpanStartAt#3]  16
+  26   !   (program) [SpanStartAt#1]        24

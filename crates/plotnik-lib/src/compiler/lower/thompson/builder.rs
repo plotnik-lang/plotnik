@@ -322,6 +322,7 @@ impl<'a> NfaBuilder<'a> {
     pub(super) fn bracket_pattern_ctx(&mut self, pattern: &Pattern, ctx: PatternCtx) -> PatternCtx {
         let (kind, start_at) = match pattern {
             Pattern::NodePattern(_) | Pattern::TokenPattern(_) => (SpanKind::Pattern, true),
+            Pattern::SeqPattern(_) => (SpanKind::Sequence, false),
             _ => return ctx,
         };
         let Some(id) = self.span_id(pattern.syntax(), kind) else {

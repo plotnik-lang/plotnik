@@ -100,12 +100,12 @@ Value:
 
 Q:
   02  -ε-  [StructOpen]                     04
-  04       (@54)                            54 : 05
+  04       (@56)                            56 : 05
   05  -ε-  [StructClose]                    07
   07                                        ▶
   08  ─‣┘  _                                09
   09  ─‣┘  _ [SpanEnd#15 SpanEnd#14]        11
-  11  ─‣┘  _ [SpanEnd#9]                    14
+  11  ─‣┘  _ [SpanEnd#10 SpanEnd#9]         14
   13                                        ▶
   14                                        ▶
   15  ...
@@ -125,4 +125,5 @@ Q:
   48   !   (expression_statement) [SpanStartAt#12 SpanEnd#12]  50, 45
   50  ─‣─  _                                48, 50
   52  └‣─  _                                48, 50
-  54   !   (program) [SpanStartAt#9]        52, 42
+  54  -ε-  [SpanStart#10]                   52, 42
+  56   !   (program) [SpanStartAt#9]        54
