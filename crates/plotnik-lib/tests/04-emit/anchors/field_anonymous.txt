@@ -1,9 +1,13 @@
-Q = (pair key: (property_identifier) . value: _)
+Q = (pair
+  key: (property_identifier)
+  .
+  value: _
+)
 ------------------ DIAGNOSTICS -------------------
 error: no `pair` places these children in this adjacency
  --> query.ptk:1:6
   |
-1 | Q = (pair key: (property_identifier) . value: _)
+1 | Q = (pair
   |      ^^^^
   |
 help: here `.` skips extras only because one side can match an anonymous token; use `(_)` for a named node, or drop the anchor to match these children in any positions

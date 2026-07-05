@@ -1,4 +1,10 @@
-Q = (program (if_statement consequence: (statement_block (MISSING "}") @m)))
+Q = (program
+  (if_statement
+    consequence: (statement_block
+      (MISSING "}") @m
+    )
+  )
+)
 --------------------- INPUT ----------------------
 if (x) { y
 --------------------- TYPES ----------------------

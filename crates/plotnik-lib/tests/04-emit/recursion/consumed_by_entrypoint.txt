@@ -1,4 +1,8 @@
-Nested = [(identifier) @leaf (array (Nested) @inner)]
+Nested = [
+  (identifier) @leaf
+  (array (Nested) @inner)
+]
+
 Q = (array (Nested) @top)
 -------------------- BYTECODE --------------------
 [strings]

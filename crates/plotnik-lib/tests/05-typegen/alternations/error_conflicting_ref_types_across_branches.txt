@@ -1,11 +1,25 @@
 Row = (pair key: (_) @key value: (_) @val)
 Name = (property_identifier) @name
-Q = (program (expression_statement (parenthesized_expression (object [(Row) @x (Name) @x]))))
+
+Q = (program
+  (expression_statement
+    (parenthesized_expression
+      (object
+        [
+          (Row) @x
+          (Name) @x
+        ]
+      )
+    )
+  )
+)
 ------------------ DIAGNOSTICS -------------------
 error: capture `@x` has incompatible types across branches
- --> query.ptk:3:77
-  |
-3 | Q = (program (expression_statement (parenthesized_expression (object [(Row) @x (Name) @x]))))
-  |                                                                             ^^        -- and a different type here
-  |
+  --> query.ptk:9:17
+   |
+ 9 |           (Row) @x
+   |                 ^^
+10 |           (Name) @x
+   |                  -- and a different type here
+   |
 help: make every branch produce the same type, or label the branches for an enum

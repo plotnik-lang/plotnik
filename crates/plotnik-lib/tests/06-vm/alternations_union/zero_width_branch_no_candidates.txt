@@ -1,4 +1,9 @@
-Q = (program [(identifier)* @ids (debugger_statement) @d])
+Q = (program
+  [
+    (identifier)* @ids
+    (debugger_statement) @d
+  ]
+)
 --------------------- INPUT ----------------------
 --------------------- TYPES ----------------------
 export interface Q {

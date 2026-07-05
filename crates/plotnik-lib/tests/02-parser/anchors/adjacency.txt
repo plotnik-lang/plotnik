@@ -1,4 +1,8 @@
-Q = (dotted_name (identifier) @a . (identifier) @b)
+Q = (dotted_name
+  (identifier) @a
+  .
+  (identifier) @b
+)
 ---------------------- CST -----------------------
 # query.ptk
 Root

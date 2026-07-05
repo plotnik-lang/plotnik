@@ -1,5 +1,9 @@
 A = (expression_statement)??
-Q = (program (A) (expression_statement) @e)
+
+Q = (program
+  (A)
+  (expression_statement) @e
+)
 --------------------- INPUT ----------------------
 a; b;
 --------------------- TYPES ----------------------

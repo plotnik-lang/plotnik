@@ -1,10 +1,13 @@
-Q = (foo () (Missing))
+Q = (foo
+  ()
+  (Missing)
+)
 ------------------ DIAGNOSTICS -------------------
 error: empty `()` matches nothing
- --> query.ptk:1:10
+ --> query.ptk:2:3
   |
-1 | Q = (foo () (Missing))
-  |          ^^
+2 |   ()
+  |   ^^
   |
 help: use `(_)` to match any named node, or `_` for any node
 -------------------- SYMBOLS ---------------------

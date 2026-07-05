@@ -1,5 +1,13 @@
 Ids = (identifier)+
-Q = (program (expression_statement (array (Ids) @ids (Ids)* @runs)))
+
+Q = (program
+  (expression_statement
+    (array
+      (Ids) @ids
+      (Ids)* @runs
+    )
+  )
+)
 --------------------- TYPES ----------------------
 export interface Q {
   ids: Ids;

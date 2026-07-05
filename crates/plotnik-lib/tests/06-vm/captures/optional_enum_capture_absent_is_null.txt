@@ -1,4 +1,8 @@
-Q = (program [A: (identifier) @a]? @e)
+Q = (program
+  [
+    A: (identifier) @a
+  ]? @e
+)
 --------------------- INPUT ----------------------
 let x
 --------------------- TYPES ----------------------

@@ -1,4 +1,8 @@
-Q = (program [(expression_statement) @expr])
+Q = (program
+  [
+    (expression_statement) @expr
+  ]
+)
 --------------------- INPUT ----------------------
 a;
 --------------------- TYPES ----------------------

@@ -1,4 +1,6 @@
-Q = (program {(lexical_declaration)+? @d})
+Q = (program
+  {(lexical_declaration)+? @d}
+)
 --------------------- INPUT ----------------------
 let a; let b;
 --------------------- TYPES ----------------------

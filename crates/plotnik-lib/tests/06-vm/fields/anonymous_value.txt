@@ -1,4 +1,10 @@
-Q = (program (expression_statement (binary_expression operator: "+" @op)))
+Q = (program
+  (expression_statement
+    (binary_expression
+      operator: "+" @op
+    )
+  )
+)
 --------------------- INPUT ----------------------
 a + b;
 --------------------- TYPES ----------------------

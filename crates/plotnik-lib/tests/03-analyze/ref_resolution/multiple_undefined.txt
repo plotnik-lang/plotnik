@@ -1,41 +1,45 @@
-Q = (foo (X) (Y) (Z))
+Q = (foo
+  (X)
+  (Y)
+  (Z)
+)
 ------------------ DIAGNOSTICS -------------------
 error: `X` is not defined
- --> query.ptk:1:11
+ --> query.ptk:2:4
   |
-1 | Q = (foo (X) (Y) (Z))
-  |           ^
+2 |   (X)
+  |    ^
   |
 help: did you mean `(Q)`?
   |
-1 - Q = (foo (X) (Y) (Z))
-1 + Q = (foo (Q) (Y) (Z))
+2 -   (X)
+2 +   (Q)
   |
 help: `(Name)` uses a definition; define `Name = ...` or check the spelling
 
 error: `Y` is not defined
- --> query.ptk:1:15
+ --> query.ptk:3:4
   |
-1 | Q = (foo (X) (Y) (Z))
-  |               ^
+3 |   (Y)
+  |    ^
   |
 help: did you mean `(Q)`?
   |
-1 - Q = (foo (X) (Y) (Z))
-1 + Q = (foo (X) (Q) (Z))
+3 -   (Y)
+3 +   (Q)
   |
 help: `(Name)` uses a definition; define `Name = ...` or check the spelling
 
 error: `Z` is not defined
- --> query.ptk:1:19
+ --> query.ptk:4:4
   |
-1 | Q = (foo (X) (Y) (Z))
-  |                   ^
+4 |   (Z)
+  |    ^
   |
 help: did you mean `(Q)`?
   |
-1 - Q = (foo (X) (Y) (Z))
-1 + Q = (foo (X) (Y) (Q))
+4 -   (Z)
+4 +   (Q)
   |
 help: `(Name)` uses a definition; define `Name = ...` or check the spelling
 -------------------- SYMBOLS ---------------------

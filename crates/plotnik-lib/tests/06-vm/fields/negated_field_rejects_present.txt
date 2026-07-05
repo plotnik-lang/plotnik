@@ -1,4 +1,11 @@
-Q = (program (lexical_declaration (variable_declarator name: (identifier) @n -value)))
+Q = (program
+  (lexical_declaration
+    (variable_declarator
+      name: (identifier) @n
+      -value
+    )
+  )
+)
 --------------------- INPUT ----------------------
 let x = 1
 --------------------- TYPES ----------------------

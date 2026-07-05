@@ -1,4 +1,10 @@
-Q = (array (array (array (identifier) @d) @c) @b) @a
+Q = (array
+  (array
+    (array
+      (identifier) @d
+    ) @c
+  ) @b
+) @a
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

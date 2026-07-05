@@ -1,5 +1,9 @@
 A = (debugger_statement)?
-Q = (program (A) (expression_statement) @e)
+
+Q = (program
+  (A)
+  (expression_statement) @e
+)
 --------------------- INPUT ----------------------
 y(); g();
 --------------------- TYPES ----------------------

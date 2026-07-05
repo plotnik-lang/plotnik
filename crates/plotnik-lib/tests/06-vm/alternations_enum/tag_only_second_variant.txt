@@ -1,4 +1,9 @@
-Q = (program [A: (debugger_statement)  B: (expression_statement)] @v)
+Q = (program
+  [
+    A: (debugger_statement)
+    B: (expression_statement)
+  ] @v
+)
 --------------------- INPUT ----------------------
 foo;
 --------------------- TYPES ----------------------

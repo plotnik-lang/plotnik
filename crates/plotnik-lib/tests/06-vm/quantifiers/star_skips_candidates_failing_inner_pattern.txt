@@ -1,4 +1,6 @@
-Q = (program (expression_statement (number) @n)* @rows)
+Q = (program
+  (expression_statement (number) @n)* @rows
+)
 --------------------- INPUT ----------------------
 a; 1;
 --------------------- TYPES ----------------------

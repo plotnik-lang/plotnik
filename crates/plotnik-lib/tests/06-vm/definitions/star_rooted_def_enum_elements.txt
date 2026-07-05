@@ -1,6 +1,11 @@
 Entry = [Id: (identifier) @id  Num: (number) @num]
 Items = (Entry)*
-Q = (program (expression_statement (array (Items) @items)))
+
+Q = (program
+  (expression_statement
+    (array (Items) @items)
+  )
+)
 --------------------- INPUT ----------------------
 [a, 1, b];
 --------------------- TYPES ----------------------

@@ -1,4 +1,8 @@
-Q = (array {(identifier)+}*)
+Q = (array
+  {
+    (identifier)+
+  }*
+)
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

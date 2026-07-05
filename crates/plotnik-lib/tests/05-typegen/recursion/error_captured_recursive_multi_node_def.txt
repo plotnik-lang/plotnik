@@ -1,10 +1,19 @@
-A = {(expression_statement) (statement_block (A))?}
+A = {
+  (expression_statement)
+  (statement_block (A))?
+}
+
 Q = (program (A) @x)
 ------------------ DIAGNOSTICS -------------------
 error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
- --> query.ptk:2:14
+ --> query.ptk:6:14
   |
-1 | A = {(expression_statement) (statement_block (A))?}
-  |     ----------------------------------------------- defined here
-2 | Q = (program (A) @x)
-  |              ^^^
+1 |   A = {
+  |  _____-
+2 | |   (expression_statement)
+3 | |   (statement_block (A))?
+4 | | }
+  | |_- defined here
+5 |
+6 |   Q = (program (A) @x)
+  |                ^^^

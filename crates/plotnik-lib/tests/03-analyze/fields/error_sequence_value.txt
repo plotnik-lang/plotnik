@@ -1,10 +1,19 @@
-Q = (foo bar: {(a) (b)})
+Q = (foo
+  bar: {
+    (a)
+    (b)
+  }
+)
 ------------------ DIAGNOSTICS -------------------
 error: field `bar` cannot match a sequence
- --> query.ptk:1:15
+ --> query.ptk:2:8
   |
-1 | Q = (foo bar: {(a) (b)})
-  |               ^^^^^^^^^
+2 |     bar: {
+  |  ________^
+3 | |     (a)
+4 | |     (b)
+5 | |   }
+  | |___^
   |
 help: a field holds a single child node; match one pattern, or move the sequence outside the field
 -------------------- SYMBOLS ---------------------

@@ -1,5 +1,11 @@
-A = (expression_statement (identifier) @id)? @x
-Q = (program (A) @a (debugger_statement) @d)
+A = (expression_statement
+  (identifier) @id
+)? @x
+
+Q = (program
+  (A) @a
+  (debugger_statement) @d
+)
 --------------------- INPUT ----------------------
 debugger;
 --------------------- TYPES ----------------------

@@ -1,10 +1,16 @@
-Q = [{. (a)} (c)]
+Q = [
+  {
+    .
+    (a)
+  }
+  (c)
+]
 ------------------ DIAGNOSTICS -------------------
 error: anchor needs an enclosing node
- --> query.ptk:1:7
+ --> query.ptk:3:5
   |
-1 | Q = [{. (a)} (c)]
-  |       ^
+3 |     .
+  |     ^
   |
 help: wrap in a named node: `(parent . (child))`
 -------------------- SYMBOLS ---------------------

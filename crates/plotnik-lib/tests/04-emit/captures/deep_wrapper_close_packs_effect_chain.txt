@@ -1,4 +1,20 @@
-Q = {{{{{{{{(identifier) @a} @b} @c} @d} @e} @f} @g} @h}
+Q = {
+  {
+    {
+      {
+        {
+          {
+            {
+              {
+                (identifier) @a
+              } @b
+            } @c
+          } @d
+        } @e
+      } @f
+    } @g
+  } @h
+}
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"

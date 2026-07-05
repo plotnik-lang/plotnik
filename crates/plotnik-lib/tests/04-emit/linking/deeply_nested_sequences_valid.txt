@@ -1,4 +1,12 @@
-Q = (statement_block {{{(function_declaration)}}}) @block
+Q = (statement_block
+  {
+    {
+      {
+        (function_declaration)
+      }
+    }
+  }
+) @block
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

@@ -1,5 +1,10 @@
 Row = (pair key: (_) @key value: (_) @val)
-Q = (program (expression_statement (parenthesized_expression (object (Row)? @first))))
+
+Q = (program
+  (expression_statement
+    (parenthesized_expression (object (Row)? @first))
+  )
+)
 --------------------- TYPES ----------------------
 export interface Row {
   key: Node;

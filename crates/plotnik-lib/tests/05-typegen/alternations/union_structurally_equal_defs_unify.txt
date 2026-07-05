@@ -1,6 +1,18 @@
 Row = (pair key: (_) @key value: (_) @val)
 Pair = (pair key: (_) @key value: (_) @val)
-Q = (program (expression_statement (parenthesized_expression (object [(Row) @x (Pair) @x]))))
+
+Q = (program
+  (expression_statement
+    (parenthesized_expression
+      (object
+        [
+          (Row) @x
+          (Pair) @x
+        ]
+      )
+    )
+  )
+)
 --------------------- TYPES ----------------------
 export interface Pair {
   key: Node;

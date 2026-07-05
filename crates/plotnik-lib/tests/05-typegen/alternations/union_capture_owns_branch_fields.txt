@@ -1,4 +1,9 @@
-Q = (program [(expression_statement) @a (debugger_statement) @b] @x)
+Q = (program
+  [
+    (expression_statement) @a
+    (debugger_statement) @b
+  ] @x
+)
 --------------------- TYPES ----------------------
 export interface QX {
   a: Node | null;

@@ -1,5 +1,13 @@
-A = (statement_block . (A) (debugger_statement))?
-Q = (program (A) (expression_statement) @e)
+A = (statement_block
+  .
+  (A)
+  (debugger_statement)
+)?
+
+Q = (program
+  (A)
+  (expression_statement) @e
+)
 --------------------- INPUT ----------------------
 { { debugger; } debugger; } f();
 --------------------- TYPES ----------------------

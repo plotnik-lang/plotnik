@@ -1,12 +1,18 @@
-E = [{(E) (a)} (x)]
+E = [
+  {
+    (E)
+    (a)
+  }
+  (x)
+]
 ------------------ DIAGNOSTICS -------------------
 error: infinite recursion: cycle consumes no input
- --> query.ptk:1:8
+ --> query.ptk:3:6
   |
-1 | E = [{(E) (a)} (x)]
-  |        ^
-  |        |
-  |        references itself
+3 |     (E)
+  |      ^
+  |      |
+  |      references itself
   |
 help: recursive references must consume input before recursing
 -------------------- SYMBOLS ---------------------

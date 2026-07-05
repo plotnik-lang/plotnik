@@ -1,5 +1,8 @@
 Expr = (expression)
-Value = [(Expr) (literal)]
+Value = [
+  (Expr)
+  (literal)
+]
 -------------------- SYMBOLS ---------------------
 Expr
 Value

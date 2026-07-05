@@ -1,4 +1,9 @@
-Q = (program [(lexical_declaration) (expression_statement)]* @all)
+Q = (program
+  [
+    (lexical_declaration)
+    (expression_statement)
+  ]* @all
+)
 --------------------- INPUT ----------------------
 let x; foo;
 --------------------- TYPES ----------------------

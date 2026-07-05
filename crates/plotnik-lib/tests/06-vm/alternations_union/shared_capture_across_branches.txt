@@ -1,4 +1,11 @@
-Q = (program (expression_statement [(identifier) @v (number) @v]))
+Q = (program
+  (expression_statement
+    [
+      (identifier) @v
+      (number) @v
+    ]
+  )
+)
 --------------------- INPUT ----------------------
 42;
 --------------------- TYPES ----------------------

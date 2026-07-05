@@ -1,5 +1,7 @@
 Q = (program
-  {(lexical_declaration (variable_declarator name: (identifier) @n)) @decl}* @rows
+  {
+    (lexical_declaration (variable_declarator name: (identifier) @n)) @decl
+  }* @rows
 )
 --------------------- INPUT ----------------------
 let a; let b;

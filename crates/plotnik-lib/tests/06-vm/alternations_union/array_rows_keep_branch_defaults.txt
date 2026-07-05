@@ -1,4 +1,13 @@
-Q = (program (expression_statement (array [(identifier)? @a (number)? @b]* @items)))
+Q = (program
+  (expression_statement
+    (array
+      [
+        (identifier)? @a
+        (number)? @b
+      ]* @items
+    )
+  )
+)
 --------------------- INPUT ----------------------
 [x, y]
 --------------------- TYPES ----------------------

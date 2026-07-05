@@ -1,4 +1,8 @@
-Q = (program {{(expression_statement) @e} @inner} @outer)
+Q = (program
+  {
+    {(expression_statement) @e} @inner
+  } @outer
+)
 --------------------- INPUT ----------------------
 foo;
 --------------------- TYPES ----------------------

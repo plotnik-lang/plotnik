@@ -1,4 +1,11 @@
-Q = (parent {. (first) (second) .})
+Q = (parent
+  {
+    .
+    (first)
+    (second)
+    .
+  }
+)
 ---------------------- CST -----------------------
 # query.ptk
 Root

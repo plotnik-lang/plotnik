@@ -1,6 +1,13 @@
-Nested = (call_expression function: [(identifier) @name (Nested) @inner])
+Nested = (call_expression
+  function: [
+    (identifier) @name
+    (Nested) @inner
+  ]
+)
 
-Q = (program (expression_statement (Nested) @top))
+Q = (program
+  (expression_statement (Nested) @top)
+)
 --------------------- INPUT ----------------------
 a()();
 --------------------- TYPES ----------------------

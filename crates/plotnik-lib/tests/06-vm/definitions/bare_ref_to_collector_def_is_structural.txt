@@ -1,5 +1,13 @@
 Ids = (identifier)*
-Q = (program (expression_statement (array (Ids) (number) @n)))
+
+Q = (program
+  (expression_statement
+    (array
+      (Ids)
+      (number) @n
+    )
+  )
+)
 --------------------- INPUT ----------------------
 [a, b, 1];
 --------------------- TYPES ----------------------

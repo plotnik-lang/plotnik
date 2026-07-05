@@ -1,4 +1,12 @@
-Q = (function_declaration name: [[[(identifier)]]]) @fn
+Q = (function_declaration
+  name: [
+    [
+      [
+        (identifier)
+      ]
+    ]
+  ]
+) @fn
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

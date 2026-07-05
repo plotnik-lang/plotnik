@@ -1,5 +1,8 @@
 Expr = (expression)
-Pair = {(Expr) (Expr)}
+Pair = {
+  (Expr)
+  (Expr)
+}
 -------------------- SYMBOLS ---------------------
 Expr
 Pair

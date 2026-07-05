@@ -1,5 +1,9 @@
 Inner = (call_expression (identifier) @name)
-Outer = (array {(Inner) @item}* @items)
+Outer = (array
+  {
+    (Inner) @item
+  }* @items
+)
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

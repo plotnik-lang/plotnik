@@ -1,5 +1,12 @@
 Inner = (identifier) @name
-Q = (program (expression_statement [Call: (Inner)] @v))
+
+Q = (program
+  (expression_statement
+    [
+      Call: (Inner)
+    ] @v
+  )
+)
 --------------------- INPUT ----------------------
 x;
 --------------------- TYPES ----------------------
