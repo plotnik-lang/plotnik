@@ -26,6 +26,7 @@ pub(crate) type AstMap = IndexMap<SourceId, Root>;
 pub struct QueryBuilder {
     source_map: SourceMap,
     limits: CompilerLimits,
+    inspection: bool,
 }
 
 impl QueryBuilder {
@@ -33,6 +34,7 @@ impl QueryBuilder {
         Self {
             source_map,
             limits: CompilerLimits::default(),
+            inspection: false,
         }
     }
 
@@ -70,6 +72,12 @@ impl QueryBuilder {
     /// unbounded stretch.
     pub fn with_satisfiability_step_budget(mut self, budget: u64) -> Self {
         self.limits = self.limits.with_satisfiability_step_budget(budget);
+        self
+    }
+
+    /// Compile with inspection spans for playground/debugger joins. Default off.
+    pub fn with_inspection(mut self, enabled: bool) -> Self {
+        self.inspection = enabled;
         self
     }
 
@@ -112,6 +120,7 @@ impl QueryBuilder {
             diag,
             ast_map: ast,
             limits: self.limits,
+            inspection: self.inspection,
         })
     }
 }
@@ -122,6 +131,7 @@ pub(crate) struct QueryParsed {
     ast_map: AstMap,
     diag: Diagnostics,
     limits: CompilerLimits,
+    inspection: bool,
 }
 
 impl QueryParsed {
@@ -188,6 +198,10 @@ impl QueryParsed {
 
     pub(crate) fn ast_map(&self) -> &AstMap {
         &self.ast_map
+    }
+
+    pub(crate) fn inspection(&self) -> bool {
+        self.inspection
     }
 
     pub(crate) fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
@@ -691,6 +705,7 @@ impl LinkedQuery {
         lower_to_nfa(LowerInput {
             analysis: self.analysis_input(),
             symbol_table: self.symbol_table(),
+            inspection: self.analyzed.parsed.inspection(),
         })
     }
 

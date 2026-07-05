@@ -23,6 +23,7 @@ fn lower_no_overflow_unchanged() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     pack_instructions(&mut result);
@@ -43,6 +44,7 @@ fn lower_effects_overflow() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     pack_instructions(&mut result);
@@ -74,6 +76,7 @@ fn lower_neg_fields_overflow() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     pack_instructions(&mut result);
@@ -100,6 +103,7 @@ fn lower_successors_overflow() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     pack_instructions(&mut result);
@@ -126,6 +130,7 @@ fn lower_successors_overflow_preserves_all_successors() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     pack_instructions(&mut result);
@@ -169,6 +174,7 @@ fn lower_successors_with_payload_respect_combined_limit() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     pack_instructions(&mut result);
@@ -215,6 +221,7 @@ fn lower_combined_overflow() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     pack_instructions(&mut result);

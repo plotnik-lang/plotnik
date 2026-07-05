@@ -5,4 +5,6 @@ use crate::compiler::analyze::names::SymbolTable;
 pub(crate) struct LowerInput<'a> {
     pub(crate) analysis: AnalysisArtifacts<'a>,
     pub(crate) symbol_table: &'a SymbolTable,
+    #[allow(dead_code)]
+    pub(crate) inspection: bool,
 }

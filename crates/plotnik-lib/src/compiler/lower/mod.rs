@@ -14,6 +14,7 @@ pub mod epsilon;
 mod input;
 pub mod ir;
 pub mod pack;
+mod spans;
 pub mod thompson;
 mod verify;
 

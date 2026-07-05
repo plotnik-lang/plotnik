@@ -24,6 +24,7 @@ fn collapse_up_single_mode() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -59,6 +60,7 @@ fn collapse_up_chain_of_three() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -89,6 +91,7 @@ fn collapse_up_mixed_modes_no_merge() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -114,6 +117,7 @@ fn collapse_up_skip_trivia_same_mode() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -144,6 +148,7 @@ fn collapse_up_skip_extras_same_mode() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -174,6 +179,7 @@ fn collapse_up_exact_same_mode() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -208,6 +214,7 @@ fn collapse_up_with_effects_no_merge() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -233,6 +240,7 @@ fn collapse_up_merges_up_to_max() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -264,6 +272,7 @@ fn collapse_up_refuses_merge_exceeding_max() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -298,6 +307,7 @@ fn collapse_up_branching_no_merge() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -331,6 +341,7 @@ fn collapse_up_deep_chain_splits_without_dangling() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -380,6 +391,7 @@ fn assert_constraint_chain_splits(make: fn(u8) -> Nav) {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);
@@ -446,6 +458,7 @@ fn collapse_up_no_up_unchanged() {
         def_entries: Default::default(),
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     collapse_up(&mut result);

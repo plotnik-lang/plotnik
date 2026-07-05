@@ -11,6 +11,7 @@ use crate::bytecode::{EffectKind, Nav, PredicateOp, StepAddr, select_match_opcod
 use indexmap::IndexMap;
 
 use crate::compiler::ids::{DefId, TypeId};
+use crate::compiler::lower::spans::SpanTable;
 use crate::core::NodeFieldId;
 
 /// Node kind constraint for Match instructions.
@@ -452,6 +453,9 @@ pub struct NfaGraph {
     pub(in crate::compiler::lower) def_entries_consuming: IndexMap<DefId, Label>,
     /// Entry labels for each emitted entrypoint wrapper, in definition order.
     pub(in crate::compiler::lower) entrypoint_wrappers: IndexMap<DefId, Label>,
+    /// Inspection span table, present iff the query was compiled with inspection.
+    #[allow(dead_code)]
+    pub(in crate::compiler::lower) spans: Option<SpanTable>,
 }
 
 impl NfaGraph {

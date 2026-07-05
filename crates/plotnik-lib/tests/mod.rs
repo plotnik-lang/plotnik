@@ -22,6 +22,9 @@
 //! | `05-typegen` | types                                      |
 //! | `06-vm`      | types, output, bytecode, trace (requires input) |
 //!
+//! Compile-stage fixtures under an `inspection/` folder compile with
+//! `QueryBuilder::with_inspection(true)`.
+//!
 //! The `DIAGNOSTICS` section renders whenever the query produces warnings or errors.
 //! Errors are terminal for the compile stages (bytecode/types/trace/output are
 //! suppressed); for `02-parser` they suppress cst/ast too, matching the recovery
@@ -316,9 +319,9 @@ fn render(
             },
         )),
         "03" => Ok(render_frontend(query, Front::Analyze)),
-        "04" => render_compile(query, input, Compile::Bytecode),
-        "05" => render_compile(query, input, Compile::Types),
-        "06" => render_compile(query, input, Compile::Vm),
+        "04" => render_compile(name, query, input, Compile::Bytecode),
+        "05" => render_compile(name, query, input, Compile::Types),
+        "06" => render_compile(name, query, input, Compile::Vm),
         _ => Err(format!("unknown stage directory `{stage}`")),
     }
 }
@@ -366,12 +369,14 @@ enum Compile {
 }
 
 fn render_compile(
+    name: &str,
     query: &str,
     input: Option<&Input>,
     kind: Compile,
 ) -> Result<Vec<(String, String)>, String> {
     let lang = Lang::resolve(input.and_then(|i| i.ext.as_deref()))?;
     let compiled = QueryBuilder::new(source_map(query))
+        .with_inspection(name.contains("/inspection/"))
         .compile(lang.grammar)
         .expect("query parsing should not exhaust fuel");
     let diagnostics = compiled.diagnostics();

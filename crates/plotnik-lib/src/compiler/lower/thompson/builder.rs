@@ -100,6 +100,7 @@ impl<'a> NfaBuilder<'a> {
             def_entries: compiler.def_entries,
             def_entries_consuming: compiler.def_entries_consuming,
             entrypoint_wrappers,
+            spans: None,
         }
     }
 
