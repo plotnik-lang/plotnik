@@ -1,13 +1,13 @@
 Item = (identifier) @name
 Collect = {(Item) @item}* @items
-Test = (array (Collect))
+Q = (array (Collect))
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "name"
 S2 "item"
 S3 "items"
-S4 "Test"
+S4 "Q"
 S5 "Item"
 S6 "CollectItems"
 S7 "Collect"
@@ -27,7 +27,7 @@ M1: S2 → T1  ; item: Item
 M2: S3 → T3  ; items: T3
 
 [type_names]
-N0: S4 → T0  ; Test
+N0: S4 → T0  ; Q
 N1: S5 → T1  ; Item
 N2: S6 → T2  ; CollectItems
 N3: S7 → T4  ; Collect
@@ -35,7 +35,7 @@ N3: S7 → T4  ; Collect
 [entrypoints]
 Collect = 06 :: T4
 Item    = 00 :: T1
-Test    = 12 :: T0
+Q       = 12 :: T0
 
 [transitions]
 Item:
@@ -50,7 +50,7 @@ Collect:
   09  -ε-  [StructClose]                    11
   11                                        ▶
 
-Test:
+Q:
   12       (@48)                            48 : 13
   13  -ε-  [Node]                           15
   15                                        ▶

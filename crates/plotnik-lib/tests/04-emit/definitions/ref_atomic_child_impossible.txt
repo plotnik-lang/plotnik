@@ -1,10 +1,10 @@
-Q = (program (expression_statement (Impossible) @expr))
 Impossible = (binary_expression right: (_) left: (_))
+Q = (program (expression_statement (Impossible) @expr))
 ------------------ DIAGNOSTICS -------------------
 error: the grammar places `left:` before `right:` in `binary_expression`
- --> query.ptk:2:33
+ --> query.ptk:1:33
   |
-2 | Impossible = (binary_expression right: (_) left: (_))
+1 | Impossible = (binary_expression right: (_) left: (_))
   |               ----------------- ^^^^^^^^^^ --------- `left:` must come before `right:`
   |               |
   |               inside `binary_expression`

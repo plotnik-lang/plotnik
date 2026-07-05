@@ -1,0 +1,61 @@
+Odd = (array (Even) @next)
+
+Even = [
+  (number) @leaf
+  (array (Odd) @next)
+]
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "next"
+S2 "leaf"
+S3 "Even"
+S4 "Odd"
+S5 "array"
+S6 "number"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { next }
+T2 = Struct  M1:2  ; { leaf, next }
+T3 = Optional(T0)  ; <Node>?
+T4 = Optional(T1)  ; Odd?
+
+[type_members]
+M0: S1 → T2  ; next: Even
+M1: S2 → T3  ; leaf: T3
+M2: S1 → T4  ; next: T4
+
+[type_names]
+N0: S3 → T2  ; Even
+N1: S4 → T1  ; Odd
+
+[entrypoints]
+Even = 00 :: T2
+Odd  = 06 :: T1
+
+[transitions]
+Even:
+  00  -ε-  [StructOpen]                     02
+  02       (@27)                            27 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Odd:
+  06  -ε-  [StructOpen]                     08
+  08       (@32)                            32 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  -ε-  [StructClose]                    14
+  14  ─‣┘  _ [Set(M2)]                      20
+  16  -ε-  [StructClose]                    18
+  18  ─‣┘  _ [Set(M0)]                      29
+  20                                        ▶
+  21   !   (number) [Null Set(M2) Node Set(M1)]  20
+  24  └‣─  (@32)                            32 : 12
+  25   !   (array) [Null Set(M1) StructOpen]  24
+  27  -ε-                                   21, 25
+  29                                        ▶
+  30  └‣─  (@27)                            27 : 16
+  31  ...
+  32   !   (array) [StructOpen]             30

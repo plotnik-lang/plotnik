@@ -1,0 +1,48 @@
+Q = (program
+  (expression_statement
+    (parenthesized_expression (binary_expression (identifier) @l))
+  )
+  (debugger_statement) @d
+)
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "l"
+S2 "d"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "parenthesized_expression"
+S7 "binary_expression"
+S8 "identifier"
+S9 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { l, d }
+
+[type_members]
+M0: S1 → T0  ; l: <Node>
+M1: S2 → T0  ; d: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@16)                            16 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  ─‣─  (debugger_statement) [Node Set(M1)]  08
+  08  ─‣┘  _                                12
+  09  └‣─  (identifier) [Node Set(M0)]      11
+  11  ─‣┘³ _                                06
+  12                                        ▶
+  13  └‣─  (binary_expression)              09
+  14  └‣─  (parenthesized_expression)       13
+  15  └‣─  (expression_statement)           14
+  16   !   (program)                        15

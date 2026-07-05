@@ -1,6 +1,6 @@
 Inner = (identifier) @name
 
-Test = [
+Q = [
   A: (Inner)
   B: (number) @b
 ] @item
@@ -13,8 +13,8 @@ S03 "A"
 S04 "B"
 S05 "item"
 S06 "Inner"
-S07 "TestItem"
-S08 "Test"
+S07 "QItem"
+S08 "Q"
 S09 "identifier"
 S10 "number"
 
@@ -31,16 +31,16 @@ M0: S01 → T1  ; name: <Node>
 M1: S02 → T1  ; b: <Node>
 M2: S03 → T0  ; A: <Void>
 M3: S04 → T3  ; B: T3
-M4: S05 → T4  ; item: TestItem
+M4: S05 → T4  ; item: QItem
 
 [type_names]
 N0: S06 → T2  ; Inner
-N1: S07 → T4  ; TestItem
-N2: S08 → T5  ; Test
+N1: S07 → T4  ; QItem
+N2: S08 → T5  ; Q
 
 [entrypoints]
 Inner = 00 :: T2
-Test  = 06 :: T5
+Q     = 06 :: T5
 
 [transitions]
 Inner:
@@ -49,7 +49,7 @@ Inner:
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-Test:
+Q:
   06  -ε-  [StructOpen]                     08
   08       (@24)                            24 : 09
   09  -ε-  [StructClose]                    11

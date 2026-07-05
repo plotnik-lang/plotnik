@@ -1,0 +1,30 @@
+Q = (array (identifier)* .)
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "Q"
+S2 "array"
+S3 "identifier"
+
+[type_defs]
+T0 = <Node>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Q
+
+[entrypoints]
+Q = 00 :: T0
+
+[transitions]
+Q:
+  00       (@12)                            12 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
+  04                                        ▶
+  05   !   (identifier)                     08, 07
+  07  ─•┘  _                                04
+  08  ─‣─  _                                05, 08
+  10  └‣─  _                                05, 08
+  12   !   (array)                          10, 04

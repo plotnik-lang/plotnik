@@ -1,5 +1,5 @@
-Q = (call_expression function:
-  [
+Q = (call_expression
+  function: [
     (identifier) @fn
     (number) @num
   ]

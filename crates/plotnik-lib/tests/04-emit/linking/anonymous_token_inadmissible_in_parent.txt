@@ -1,0 +1,10 @@
+Q = (array "+")
+------------------ DIAGNOSTICS -------------------
+error: the grammar builds no `array` with these children
+ --> query.ptk:1:6
+  |
+1 | Q = (array "+")
+  |      ^^^^^
+  |
+help: `array` allows children `expression` or `spread_element`
+help: each child is admissible here on its own — it is their combination or order the grammar never produces

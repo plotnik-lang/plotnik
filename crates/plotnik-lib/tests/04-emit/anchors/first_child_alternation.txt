@@ -1,4 +1,10 @@
-Q = (program (expression_statement (call_expression arguments: (arguments . [(identifier) @arg]))))
+Q = (program
+  (expression_statement
+    (call_expression
+      arguments: (arguments . [(identifier) @arg])
+    )
+  )
+)
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

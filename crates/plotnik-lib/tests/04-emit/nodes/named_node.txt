@@ -1,10 +1,9 @@
-Q = (array . (identifier))
+Q = (identifier)
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "Q"
-S2 "array"
-S3 "identifier"
+S2 "identifier"
 
 [type_defs]
 T0 = <Node>
@@ -19,10 +18,8 @@ Q = 0 :: T0
 
 [transitions]
 Q:
-  0       (@7)                              7 : 1
+  0       (@5)                              5 : 1
   1  -ε-  [Node]                            3
   3                                         ▶
-  4  └•─  (identifier)                      5
-  5  ─‣┘  _                                 6
-  6                                         ▶
-  7   !   (array)                           4
+  4                                         ▶
+  5   !   (identifier)                      4

@@ -1,4 +1,10 @@
-Q = [(identifier) @a (number) @b (string) @c (binary_expression) @d (call_expression) @e]
+Q = [
+  (identifier) @a
+  (number) @b
+  (string) @c
+  (binary_expression) @d
+  (call_expression) @e
+]
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
