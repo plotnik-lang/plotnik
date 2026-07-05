@@ -1,0 +1,15 @@
+Arr = (array (Obj)? @obj)
+Obj = (object (pair value: (Arr)? @arr))
+Q = (program (expression_statement (Arr) @top))
+--------------------- TYPES ----------------------
+export interface Obj {
+  arr: Arr | null;
+}
+
+export interface Arr {
+  obj: Obj | null;
+}
+
+export interface Q {
+  top: Arr;
+}

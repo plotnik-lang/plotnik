@@ -4,11 +4,17 @@ Q = (program (expression_statement (Arr) @top))
 --------------------- INPUT ----------------------
 [{a: [1]}];
 --------------------- TYPES ----------------------
-export type Obj = Obj;
+export interface Obj {
+  arr: Arr | null;
+}
 
-export type Arr = Arr;
+export interface Arr {
+  obj: Obj | null;
+}
 
-export type Q = Q;
+export interface Q {
+  top: Arr;
+}
 --------------------- OUTPUT ---------------------
 {
   "top": {
