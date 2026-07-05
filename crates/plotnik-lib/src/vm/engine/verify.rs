@@ -171,7 +171,7 @@ impl<'a> TypeVerifier<'a> {
                         let field_name = self.strings.get(member.name_id);
                         let (inner_type, is_optional) = self.types.unwrap_optional(member.type_id);
 
-                        let field_value = fields.iter().find(|(k, _)| k == field_name);
+                        let field_value = fields.iter().find(|(k, _)| *k == field_name);
                         match field_value {
                             Some((_, v)) => {
                                 if is_optional && matches!(v, Value::Null) {
@@ -207,7 +207,7 @@ impl<'a> TypeVerifier<'a> {
                     let variant = self
                         .types
                         .members_of(&type_def)
-                        .find(|m| self.strings.get(m.name_id) == tag);
+                        .find(|m| self.strings.get(m.name_id) == *tag);
 
                     match variant {
                         Some(member) => {

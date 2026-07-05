@@ -9,36 +9,44 @@ use serde::{Serialize, Serializer};
 use crate::core::Colors;
 use crate::core::utils::escape_json_into;
 
-/// Lifetime-free node handle for output.
+/// Node handle for output, borrowing the query source.
 ///
-/// Captures enough information to represent a node without holding
-/// a reference to the tree.
+/// `text` is a span slice of the source — no copy, no per-node UTF-8
+/// re-validation (the source is already `&str`). `kind` points into the
+/// grammar's static symbol table.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NodeHandle {
+pub struct NodeHandle<'s> {
     /// Node kind name (e.g., "identifier"). Tree-sitter kind names live in the
     /// grammar's static symbol table, hence `&'static`.
     pub kind: &'static str,
     /// Source text of the node.
-    pub text: String,
+    pub text: &'s str,
     /// Byte span [start, end).
     pub span: (u32, u32),
 }
 
-impl NodeHandle {
-    pub fn from_node(node: Node<'_>, source: &str) -> Self {
-        let text = node
-            .utf8_text(source.as_bytes())
-            .expect("node source text must be valid UTF-8")
-            .to_owned();
+impl<'s> NodeHandle<'s> {
+    pub fn from_node(node: Node<'_>, source: &'s str) -> Self {
+        let span = (node.start_byte() as u32, node.end_byte() as u32);
         Self {
             kind: node.kind(),
-            text,
-            span: (node.start_byte() as u32, node.end_byte() as u32),
+            text: node_text(source, &node),
+            span,
         }
     }
 }
 
-impl Serialize for NodeHandle {
+/// Slice `node`'s span out of the source. Tree-sitter token boundaries always
+/// fall on character boundaries of the valid-UTF-8 source, so the fallible
+/// `get` turns a violated expectation into a named panic instead of a raw
+/// slice abort.
+pub(crate) fn node_text<'s>(source: &'s str, node: &Node<'_>) -> &'s str {
+    source
+        .get(node.start_byte()..node.end_byte())
+        .expect("node span must lie within source on UTF-8 boundaries")
+}
+
+impl Serialize for NodeHandle<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -52,31 +60,32 @@ impl Serialize for NodeHandle {
     }
 }
 
-/// Self-contained output value.
+/// Self-contained output value, borrowing node text from the query source and
+/// member/tag names from the loaded module (`'s` must outlive both).
 ///
-/// `Struct` uses `Vec<(String, Value)>` to preserve field order from type metadata.
+/// `Struct` uses `Vec<(&str, Value)>` to preserve field order from type metadata.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Value {
+pub enum Value<'s> {
     Null,
-    Node(NodeHandle),
-    Array(Vec<Value>),
+    Node(NodeHandle<'s>),
+    Array(Vec<Value<'s>>),
     /// Struct with ordered fields.
-    Struct(Vec<(String, Value)>),
+    Struct(Vec<(&'s str, Value<'s>)>),
     /// Enum variant. `data` is None for Void payloads.
     Enum {
-        tag: String,
-        data: Option<Box<Value>>,
+        tag: &'s str,
+        data: Option<Box<Value<'s>>>,
     },
 }
 
-impl Drop for Value {
+impl Drop for Value<'_> {
     fn drop(&mut self) {
         // A captured-recursive query nests values as deep as the match, which can
         // exceed any native-stack budget — so the derived recursive drop could
         // overflow. Dismantle level by level instead: move each node's children
         // onto a heap worklist, so every node drops only after it is childless and
         // its own drop is a leaf.
-        let mut worklist: Vec<Value> = Vec::new();
+        let mut worklist: Vec<Value<'_>> = Vec::new();
         take_children(self, &mut worklist);
         while let Some(mut value) = worklist.pop() {
             take_children(&mut value, &mut worklist);
@@ -85,7 +94,7 @@ impl Drop for Value {
 }
 
 /// Move `value`'s direct child values onto `worklist`, leaving `value` childless.
-fn take_children(value: &mut Value, worklist: &mut Vec<Value>) {
+fn take_children<'s>(value: &mut Value<'s>, worklist: &mut Vec<Value<'s>>) {
     match value {
         Value::Array(items) => worklist.append(items),
         Value::Struct(fields) => worklist.extend(fields.drain(..).map(|(_, v)| v)),
@@ -102,7 +111,7 @@ fn take_children(value: &mut Value, worklist: &mut Vec<Value>) {
 // iterative `Value::format`. If a serde-based output path is ever added, give it a
 // depth guard or an iterative serializer first; a captured-recursive query can nest
 // values past the native stack.
-impl Serialize for Value {
+impl Serialize for Value<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -137,7 +146,7 @@ impl Serialize for Value {
     }
 }
 
-impl Value {
+impl Value<'_> {
     /// Format value as colored JSON.
     ///
     /// Color scheme (jq-inspired):
@@ -168,7 +177,7 @@ struct FormatCtx<'a> {
 /// One emission for the iterative formatter's work stack.
 enum Step<'a> {
     /// Render a value: a leaf writes directly, a composite pushes its expansion.
-    Value(&'a Value, usize),
+    Value(&'a Value<'a>, usize),
     /// Write a borrowed slice verbatim. Color codes are `'static`; struct keys and
     /// enum tags borrow the value.
     Str(&'a str),
@@ -184,7 +193,7 @@ enum Step<'a> {
 /// `Unbounded` depth limit lets it exceed any native-stack budget — so the walk
 /// uses an explicit work stack. Emission is byte-identical to the equivalent
 /// recursive printer; the `06-vm` golden fixtures pin that.
-fn format_value(ctx: &mut FormatCtx<'_>, value: &Value, indent: usize) {
+fn format_value<'a>(ctx: &mut FormatCtx<'_>, value: &'a Value<'a>, indent: usize) {
     let mut stack = vec![Step::Value(value, indent)];
     while let Some(step) = stack.pop() {
         match step {
@@ -199,7 +208,7 @@ fn format_value(ctx: &mut FormatCtx<'_>, value: &Value, indent: usize) {
     }
 }
 
-fn format_node_handle(ctx: &mut FormatCtx<'_>, h: &NodeHandle, indent: usize) {
+fn format_node_handle(ctx: &mut FormatCtx<'_>, h: &NodeHandle<'_>, indent: usize) {
     let c = ctx.colors;
     let pretty = ctx.pretty;
     let out = &mut *ctx.out;
@@ -246,7 +255,7 @@ fn format_node_handle(ctx: &mut FormatCtx<'_>, h: &NodeHandle, indent: usize) {
     }
     out.push_str(c.green);
     out.push('"');
-    escape_json_into(out, &h.text);
+    escape_json_into(out, h.text);
     out.push('"');
     out.push_str(c.reset);
 
@@ -293,7 +302,7 @@ fn format_node_handle(ctx: &mut FormatCtx<'_>, h: &NodeHandle, indent: usize) {
 /// nesting is driven by the stack rather than the native call stack.
 fn emit_value<'a>(
     ctx: &mut FormatCtx<'_>,
-    value: &'a Value,
+    value: &'a Value<'a>,
     indent: usize,
     stack: &mut Vec<Step<'a>>,
 ) {

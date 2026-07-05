@@ -1,6 +1,6 @@
 //! Materializes VM effect logs into output values.
 
-use crate::bytecode::{Entrypoint, Module, StringsView, TypesView};
+use crate::bytecode::{Entrypoint, Module};
 use crate::core::Colors;
 
 use super::effect::RuntimeEffect;
@@ -9,22 +9,26 @@ use super::verify::debug_verify_type;
 
 pub struct ValueMaterializer<'a> {
     source: &'a str,
-    types: TypesView<'a>,
-    strings: StringsView<'a>,
+    /// Member names resolved once, indexed by the Set/EnumOpen payload.
+    /// Kills the two-table lookup and the string-table UTF-8 walk per effect.
+    member_names: Box<[&'a str]>,
 }
 
 impl<'a> ValueMaterializer<'a> {
     pub fn new(source: &'a str, module: &'a Module) -> Self {
+        let types = module.types();
+        let strings = module.strings();
+        let member_names = types.members().map(|m| strings.get(m.name_id)).collect();
         Self {
             source,
-            types: module.types(),
-            strings: module.strings(),
+            member_names,
         }
     }
 
-    fn resolve_member_name(&self, idx: u16) -> String {
-        let member = self.types.get_member(idx as usize);
-        self.strings.get(member.name_id).to_owned()
+    fn resolve_member_name(&self, idx: u16) -> &'a str {
+        // Effect payloads are validated at module load; out of bounds here is
+        // a loader bug, and the slice-index panic is the assertion.
+        self.member_names[idx as usize]
     }
 }
 
@@ -35,13 +39,13 @@ impl<'a> ValueMaterializer<'a> {
 /// follow-up: it catches materializer/typegen drift and compiles to a no-op in
 /// release. Folding it in here keeps each call site from re-threading
 /// `result_type` and from materializing a value that silently skips the check.
-pub fn materialize_verified<'t>(
-    source: &'t str,
-    module: &Module,
+pub fn materialize_verified<'s>(
+    source: &'s str,
+    module: &'s Module,
     entrypoint: &Entrypoint,
-    effects: &[RuntimeEffect<'t>],
+    effects: &[RuntimeEffect<'_>],
     colors: Colors,
-) -> Value {
+) -> Value<'s> {
     let materializer = ValueMaterializer::new(source, module);
     let value = materializer.materialize(effects);
     debug_verify_type(&value, entrypoint.result_type(), module, colors);
@@ -49,16 +53,16 @@ pub fn materialize_verified<'t>(
 }
 
 /// Value accumulator for stack-based materialization.
-enum ValueAccumulator {
-    Array(Vec<Value>),
-    Struct(Vec<(String, Value)>),
+enum ValueAccumulator<'s> {
+    Array(Vec<Value<'s>>),
+    Struct(Vec<(&'s str, Value<'s>)>),
     Enum {
-        tag: String,
-        fields: Vec<(String, Value)>,
+        tag: &'s str,
+        fields: Vec<(&'s str, Value<'s>)>,
     },
 }
 
-impl ValueAccumulator {
+impl ValueAccumulator<'_> {
     fn kind(&self) -> &'static str {
         match self {
             ValueAccumulator::Array(_) => "Array",
@@ -68,12 +72,12 @@ impl ValueAccumulator {
     }
 }
 
-impl ValueMaterializer<'_> {
-    pub fn materialize<'t>(&self, effects: &[RuntimeEffect<'t>]) -> Value {
-        let mut stack: Vec<ValueAccumulator> = vec![];
+impl<'a> ValueMaterializer<'a> {
+    pub fn materialize(&self, effects: &[RuntimeEffect<'_>]) -> Value<'a> {
+        let mut stack: Vec<ValueAccumulator<'a>> = vec![];
 
         // Pending value from Node/Null (consumed by Set/Push)
-        let mut pending: Option<Value> = None;
+        let mut pending: Option<Value<'a>> = None;
 
         for (effect_idx, effect) in effects.iter().enumerate() {
             match effect {

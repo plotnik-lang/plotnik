@@ -16,6 +16,7 @@ use super::error::{ControlFlow, RuntimeError, Signal};
 use super::frame::FrameArena;
 use super::limits::{ResolvedRuntimeLimits, RuntimeLimitSpec};
 use super::trace::{NoopTracer, Tracer};
+use super::value::node_text;
 
 /// Bitmask selecting the dispatch steps on which the memory ceiling is
 /// sampled; must be a power of two minus one.
@@ -320,9 +321,7 @@ impl<'t> VM<'t> {
     /// `p.is_regex` chooses RegexTable over StringTable for `p.value_ref`.
     fn evaluate_predicate(&self, p: DecodedPredicate, module: &Module) -> bool {
         let node = self.cursor.node();
-        let node_text = node
-            .utf8_text(self.source.as_bytes())
-            .expect("node source text must be valid UTF-8");
+        let node_text = node_text(self.source, &node);
 
         if p.is_regex {
             // The DFAs are deserialized once at `Module::load` and reused here;
