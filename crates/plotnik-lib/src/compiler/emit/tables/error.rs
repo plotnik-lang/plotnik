@@ -2,7 +2,7 @@
 
 use crate::core::Symbol;
 
-use crate::bytecode::EncodeError;
+use crate::bytecode::{EncodeError, MAX_SPANS};
 
 /// Error during bytecode emission.
 #[derive(Clone, Debug, thiserror::Error)]
@@ -43,6 +43,9 @@ pub(in crate::compiler) enum EmitError {
     /// Too many regexes (exceeds u16 max).
     #[error("too many regexes: {0} (max {max})", max = EmitError::MAX_REGEXES)]
     TooManyRegexes(usize),
+    /// Too many inspection spans (exceeds the span-id payload budget).
+    #[error("too many inspection spans: {0} (max {max})", max = EmitError::MAX_SPANS)]
+    TooManySpans(usize),
     /// String not found in interner.
     #[error("string not found for symbol: {0:?}")]
     StringNotFound(Symbol),
@@ -66,4 +69,5 @@ impl EmitError {
     pub(in crate::compiler) const MAX_ENTRYPOINTS: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_TRANSITIONS: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_REGEXES: usize = u16::MAX as usize;
+    pub(in crate::compiler) const MAX_SPANS: usize = MAX_SPANS;
 }

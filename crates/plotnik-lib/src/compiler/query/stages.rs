@@ -11,6 +11,7 @@ use crate::compiler::analyze::types::check_entrypoints;
 use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
 use crate::compiler::emit::tables::EmitError;
 use crate::compiler::limits::CompilerLimits;
+use crate::compiler::lower::spans::assign_spans;
 use crate::compiler::lower::{LowerInput, lower_to_nfa};
 use crate::compiler::parse::{Parser, Root, SyntaxNode, lex};
 use crate::core::Interner;
@@ -529,6 +530,8 @@ impl LinkOutcome {
             return CompiledQuery::failed(self, diagnostics);
         }
 
+        self.report_inspection_span_degradation(&mut diagnostics);
+
         let bytes = match self.emit() {
             Ok(bytes) => bytes,
             Err(err) => {
@@ -656,6 +659,53 @@ impl LinkOutcome {
         let len = u32::try_from(source.content.len()).unwrap_or(u32::MAX);
         Some((source.id, TextRange::up_to(len.into())))
     }
+
+    fn report_inspection_span_degradation(&self, diagnostics: &mut Diagnostics) {
+        let Some(query) = self.linked() else {
+            return;
+        };
+        if !query.analyzed.parsed.inspection() {
+            return;
+        }
+
+        let assignment = assign_spans(&LowerInput {
+            analysis: query.analysis_input(),
+            symbol_table: query.symbol_table(),
+            inspection: true,
+        });
+        if assignment.dropped_tiers.is_empty() {
+            return;
+        }
+
+        let (source, range) = assignment
+            .first_dropped
+            .expect("dropped span tier must have a first construct");
+        diagnostics
+            .report(
+                DiagnosticKind::InspectionSpansDegraded,
+                Span::new(source, range),
+            )
+            .detail(format!(
+                "inspection spans degraded: dropped {} detail",
+                dropped_tier_names(&assignment.dropped_tiers)
+            ))
+            .emit();
+    }
+}
+
+fn dropped_tier_names(tiers: &[u8]) -> String {
+    let names: Vec<_> = tiers
+        .iter()
+        .map(|tier| match tier {
+            0 => "definition",
+            1 => "capture",
+            2 => "pattern/reference",
+            3 => "structure",
+            4 => "field/annotation",
+            _ => "reserved",
+        })
+        .collect();
+    names.join(", ")
 }
 
 impl LinkedQuery {

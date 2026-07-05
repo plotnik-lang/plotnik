@@ -96,7 +96,6 @@ impl SpanEntry {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_bytes(self) -> [u8; Self::SIZE] {
         let mut bytes = [0u8; Self::SIZE];
         bytes[0..2].copy_from_slice(&self.source.to_le_bytes());

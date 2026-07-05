@@ -454,7 +454,6 @@ pub struct NfaGraph {
     /// Entry labels for each emitted entrypoint wrapper, in definition order.
     pub(in crate::compiler::lower) entrypoint_wrappers: IndexMap<DefId, Label>,
     /// Inspection span table, present iff the query was compiled with inspection.
-    #[allow(dead_code)]
     pub(in crate::compiler::lower) spans: Option<SpanTable>,
 }
 
@@ -465,6 +464,10 @@ impl NfaGraph {
 
     pub(crate) fn entrypoint_wrappers(&self) -> &IndexMap<DefId, Label> {
         &self.entrypoint_wrappers
+    }
+
+    pub(crate) fn spans(&self) -> Option<&SpanTable> {
+        self.spans.as_ref()
     }
 }
 

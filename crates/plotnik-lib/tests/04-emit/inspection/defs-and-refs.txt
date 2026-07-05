@@ -1,0 +1,61 @@
+Ident = (identifier) @name
+Q = (program (expression_statement (Ident) @item))
+------------------- INPUT (ts) -------------------
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "item"
+S3 "Ident"
+S4 "Q"
+S5 "identifier"
+S6 "program"
+S7 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+T2 = Struct  M1:1  ; { item }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+M1: S2 → T1  ; item: Ident
+
+[type_names]
+N0: S3 → T1  ; Ident
+N1: S4 → T2  ; Q
+
+[entrypoints]
+Ident = 00 :: T1
+Q     = 06 :: T2
+
+[spans]
+P0 def        0..26  src0  T1
+P1 capture    21..26  src0
+P2 pattern    8..20  src0
+P3 def        27..77  src0  T2
+P4 pattern    31..77  src0
+P5 pattern    40..76  src0
+P6 capture    70..75  src0
+P7 ref        62..69  src0  T1
+
+[transitions]
+Ident:
+  00  -ε-  [StructOpen]                     02
+  02       (@17)                            17 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06  -ε-  [StructOpen]                     08
+  08       (@23)                            23 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  -ε-  [StructClose]                    14
+  14  ─‣┘² _ [Set(M1)]                      19
+  16                                        ▶
+  17   !   (identifier) [Node Set(M0)]      16
+  19                                        ▶
+  20  └‣─  (@17)                            17 : 12
+  21  └‣─  (expression_statement) [StructOpen]  20
+  23   !   (program)                        21

@@ -7,7 +7,8 @@
 use crate::core::NodeKind;
 
 use crate::bytecode::{
-    Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SymbolNameEntry,
+    Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SPAN_NO_BINDING,
+    SpanEntry, SymbolNameEntry,
 };
 
 use crate::compiler::analyze::AnalysisArtifacts;
@@ -16,6 +17,7 @@ use crate::compiler::emit::tables::{
     ConstantPool, EmitError, StringTableBuilder, TypeTableBuilder,
 };
 use crate::compiler::lower::ir::NfaGraph;
+use crate::compiler::lower::spans::{SpanBindingIR, SpanTable};
 
 /// The node-kind, field, and entrypoint wire tables. Built together because all
 /// three intern their names into the one string table.
@@ -131,7 +133,7 @@ impl<'a> EmitPipeline<'a> {
         let node_kinds_bytes = emit_symbol_name_table(&tables.node_kinds);
         let node_fields_bytes = emit_symbol_name_table(&tables.fields);
         let entrypoints_bytes = emit_entrypoints(&tables.entrypoints);
-        let spans_bytes = Vec::new();
+        let spans_bytes = self.emit_spans()?;
 
         // Section order matches the binary format:
         // Header → StringBlob → RegexBlob → StringTable → RegexTable →
@@ -199,6 +201,11 @@ impl<'a> EmitPipeline<'a> {
             EmitError::MAX_TRANSITIONS,
             EmitError::TooManyTransitions,
         )?;
+        let spans_count = checked_count(
+            spans_count(self.ir.spans()),
+            EmitError::MAX_SPANS,
+            EmitError::TooManySpans,
+        )?;
 
         let mut header = Header {
             str_table_count,
@@ -210,7 +217,7 @@ impl<'a> EmitPipeline<'a> {
             type_names_count,
             entrypoints_count,
             transitions_count,
-            spans_count: 0,
+            spans_count,
             str_blob_size: str_blob.len() as u32,
             regex_blob_size: regex_blob.len() as u32,
             total_size,
@@ -221,6 +228,52 @@ impl<'a> EmitPipeline<'a> {
 
         Ok(writer.into_vec())
     }
+
+    fn emit_spans(&self) -> Result<Vec<u8>, EmitError> {
+        let Some(spans) = self.ir.spans() else {
+            return Ok(Vec::new());
+        };
+
+        let mut bytes = Vec::with_capacity(spans.entries.len() * SpanEntry::SIZE);
+        for entry in &spans.entries {
+            let (type_id, member) = match entry.binding {
+                Some(SpanBindingIR::Type(type_id)) => (
+                    u16::from(self.types.resolve_type(type_id, self.input.type_analysis)?),
+                    SPAN_NO_BINDING,
+                ),
+                Some(SpanBindingIR::Member(member_ref)) => {
+                    let type_id = self
+                        .types
+                        .lookup(member_ref.parent_type)
+                        .expect("span parent type emitted");
+                    let member = self
+                        .types
+                        .member_base(member_ref.parent_type)
+                        .expect("span parent has members")
+                        + member_ref.relative_index;
+                    (u16::from(type_id), member)
+                }
+                None => (SPAN_NO_BINDING, SPAN_NO_BINDING),
+            };
+
+            let source = u16::try_from(entry.source.0).expect("source id must fit in span entry");
+            let span = SpanEntry {
+                source,
+                kind: entry.kind,
+                start: u32::from(entry.range.start()),
+                end: u32::from(entry.range.end()),
+                type_id,
+                member,
+            };
+            bytes.extend_from_slice(&span.to_bytes());
+        }
+
+        Ok(bytes)
+    }
+}
+
+fn spans_count(spans: Option<&SpanTable>) -> usize {
+    spans.map_or(0, |spans| spans.entries.len())
 }
 
 fn checked_count(

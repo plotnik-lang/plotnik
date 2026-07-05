@@ -80,6 +80,7 @@ pub enum DiagnosticKind {
     IncompatibleStructShapes,
     TypeNameConflict,
     RedundantTypeAnnotation,
+    InspectionSpansDegraded,
 
     PredicateOnNonLeaf,
     EmptyRegex,
@@ -116,6 +117,7 @@ impl DiagnosticKind {
         match self {
             Self::UnusedBranchLabels
             | Self::RedundantTypeAnnotation
+            | Self::InspectionSpansDegraded
             | Self::TreeSitterSequenceSyntaxDeprecated
             | Self::NegationSyntaxDeprecated
             | Self::SupertypeSlashDeprecated => Severity::Warning,
@@ -329,6 +331,7 @@ impl DiagnosticKind {
             Self::IncompatibleStructShapes => "incompatible struct shapes",
             Self::TypeNameConflict => "conflicting type name",
             Self::RedundantTypeAnnotation => "redundant type annotation",
+            Self::InspectionSpansDegraded => "query too large for full inspection detail",
             Self::PredicateOnNonLeaf => {
                 "predicates match text content, but this node can contain children"
             }
@@ -379,6 +382,7 @@ impl DiagnosticKind {
                 "type name `{}` is already used for a different type".to_string()
             }
             Self::RedundantTypeAnnotation => "this type annotation {}".to_string(),
+            Self::InspectionSpansDegraded => "{}".to_string(),
             Self::DuplicateCaptureInScope => {
                 "capture `@{}` already defined in this scope".to_string()
             }

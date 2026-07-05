@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use indexmap::IndexMap;
 
-use crate::bytecode::Nav;
+use crate::bytecode::{Nav, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
@@ -12,7 +12,9 @@ use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::{
     CalleeEntry, EffectIR, InstructionIR, Label, NfaGraph, ReturnAddr, ReturnIR,
 };
+use crate::compiler::lower::spans::{SpanBindingIR, SpanId, SpanTable, assign_spans};
 use crate::compiler::parse::ast::Pattern;
+use crate::compiler::parse::cst::SyntaxNode;
 
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::AnchorSemantics;
@@ -44,6 +46,8 @@ pub struct NfaBuilder<'a> {
     /// inlined). A nullable reference back into this set cannot inline again —
     /// it falls back to a guarded call (`compile_ref_guarded_call`).
     pub(super) inline_stack: Vec<DefId>,
+    /// Inspection span table, built before lowering so construct ids are stable.
+    pub(super) spans: Option<SpanTable>,
 }
 
 impl<'a> NfaBuilder<'a> {
@@ -63,6 +67,7 @@ impl<'a> NfaBuilder<'a> {
                 ctx.analysis.dependency_analysis,
             ),
             inline_stack: Vec::new(),
+            spans: None,
         }
     }
 
@@ -77,8 +82,27 @@ impl<'a> NfaBuilder<'a> {
         result
     }
 
+    /// The pre-assigned span id for a construct, or `None` when inspection is off
+    /// or that construct's tier was dropped by the budget ladder.
+    #[allow(dead_code)]
+    pub(super) fn span_id(&self, node: &SyntaxNode, kind: SpanKind) -> Option<SpanId> {
+        self.spans
+            .as_ref()
+            .and_then(|spans| spans.lookup(node, kind))
+    }
+
+    #[allow(dead_code)]
+    pub(super) fn bind_span(&mut self, id: SpanId, binding: SpanBindingIR) {
+        let spans = self
+            .spans
+            .as_mut()
+            .expect("span binding requires inspection span table");
+        spans.bind(id, binding);
+    }
+
     pub(in crate::compiler::lower) fn build_ir(ctx: &'a LowerInput<'a>) -> NfaGraph {
         let mut compiler = NfaBuilder::new(ctx);
+        compiler.spans = ctx.inspection.then(|| assign_spans(ctx).table);
 
         for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
             let label = compiler.fresh_label();
@@ -100,7 +124,7 @@ impl<'a> NfaBuilder<'a> {
             def_entries: compiler.def_entries,
             def_entries_consuming: compiler.def_entries_consuming,
             entrypoint_wrappers,
-            spans: None,
+            spans: compiler.spans,
         }
     }
 
