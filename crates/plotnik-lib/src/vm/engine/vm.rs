@@ -107,7 +107,7 @@ impl<'t> VM<'t> {
 
     /// Restore VM state from a checkpoint's snapshot.
     fn restore_checkpoint_state(&mut self, state: CheckpointState) {
-        self.cursor.goto_descendant(state.descendant_index);
+        self.cursor.restore_to(state.descendant_index);
         self.effects.truncate(state.effect_watermark);
         self.frames.restore(state.frame_index);
         self.recursion_depth = state.recursion_depth;
