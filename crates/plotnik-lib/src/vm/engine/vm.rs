@@ -17,6 +17,10 @@ use super::frame::FrameArena;
 use super::limits::{ResolvedRuntimeLimits, RuntimeLimitSpec};
 use super::trace::{NoopTracer, Tracer};
 
+/// Bitmask selecting the dispatch steps on which the memory ceiling is
+/// sampled; must be a power of two minus one.
+const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
+
 /// Virtual machine state for query execution.
 pub struct VM<'t> {
     pub(crate) cursor: CursorWrapper<'t>,
@@ -216,10 +220,15 @@ impl<'t> VM<'t> {
             }
             self.steps_used += 1;
 
-            // Memory ceiling: bound the live runtime heap, sampled once per
-            // dispatch. Per-step growth is bounded, so this catches blowup
-            // promptly. `None` opts out (Unbounded).
-            if let Some(max) = self.limits.max_memory {
+            // Memory ceiling: bound the live runtime heap, sampled every
+            // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded
+            // (≤30 checkpoints + ≤15 effects + 1 frame ≈ 2.4 KiB), so sampling
+            // every 1024 steps bounds the unobserved overshoot to ~2.5 MiB —
+            // noise against the ≥64 MiB auto ceiling. `None` opts out
+            // (Unbounded).
+            if self.steps_used & MEMORY_SAMPLE_MASK == 0
+                && let Some(max) = self.limits.max_memory
+            {
                 let used = self.heap_bytes();
                 if used > max {
                     return Err(RuntimeError::MemoryLimitExceeded { used, limit: max });
