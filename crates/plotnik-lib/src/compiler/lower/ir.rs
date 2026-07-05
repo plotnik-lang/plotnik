@@ -150,6 +150,30 @@ impl EffectIR {
         Self::literal(EffectKind::SuppressEnd, 0)
     }
 
+    /// Open an inspection span and snapshot the current cursor node.
+    #[allow(dead_code)]
+    pub fn span_start_at(id: u16) -> Self {
+        Self::literal(EffectKind::SpanStartAt, id as usize)
+    }
+
+    /// Open an inspection span without reading the cursor.
+    pub fn span_start(id: u16) -> Self {
+        Self::literal(EffectKind::SpanStart, id as usize)
+    }
+
+    /// Close an inspection span.
+    pub fn span_end(id: u16) -> Self {
+        Self::literal(EffectKind::SpanEnd, id as usize)
+    }
+
+    /// Whether this effect is an inspection span bracket.
+    pub fn is_span_marker(&self) -> bool {
+        matches!(
+            self.kind(),
+            EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd
+        )
+    }
+
     #[inline]
     pub fn payload(&self) -> &EffectArg {
         &self.payload

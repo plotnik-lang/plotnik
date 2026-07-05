@@ -3,12 +3,12 @@
 //! Handles compilation of:
 //! - Sequences: `{a b c}` - siblings matched in order
 
-use crate::bytecode::{EffectKind, Nav};
+use crate::bytecode::Nav;
 use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, SeqItem};
 
 use super::NfaBuilder;
-use super::capture::{CaptureEffects, PatternCtx};
+use super::capture::{CaptureEffects, PatternCtx, first_unmatched_close};
 use super::navigation::{is_down_nav, resumable_search_nav};
 use super::scope::{SkipExit, SplitExits};
 
@@ -29,27 +29,6 @@ fn trailing_anchor_follow_nav(items: &[SeqItem]) -> Option<Nav> {
     }
 }
 
-/// A scope-closing effect (`EndArr`/`EndStruct`/`EndEnum`/`SuppressEnd`).
-///
-/// Used to split a sequence's post-effects when its last item is skippable. The list
-/// is `[value effects…, scope close, consumers of the scope value…]` — e.g.
-/// `[Node, Set]`, `[EndEnum]`, or `[EndEnum, Push]`. From the *first* scope close
-/// onward, the effects belong to the whole sequence (they close its scope and consume
-/// the produced value) and must run on every path, so that contiguous suffix rides a
-/// dominating epsilon. The prefix before it is the item's own value capture — it needs
-/// the item's cursor position and skip-path null injection, so it stays on the item.
-/// Splitting positionally (not by effect kind) keeps a close and its consumer together
-/// and in order.
-fn is_scope_close_effect(e: &EffectIR) -> bool {
-    matches!(
-        e.kind(),
-        EffectKind::ArrayClose
-            | EffectKind::StructClose
-            | EffectKind::EnumClose
-            | EffectKind::SuppressEnd
-    )
-}
-
 struct SequencePostEffects {
     item_post: Vec<EffectIR>,
     exit_post: Vec<EffectIR>,
@@ -57,7 +36,7 @@ struct SequencePostEffects {
 
 fn split_sequence_tail_effects(post: Vec<EffectIR>) -> SequencePostEffects {
     let mut item_post = post;
-    let exit_post = match item_post.iter().position(is_scope_close_effect) {
+    let exit_post = match first_unmatched_close(&item_post) {
         Some(split) => item_post.split_off(split),
         None => vec![],
     };

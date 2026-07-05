@@ -55,7 +55,7 @@ fn post_consumes_call_value(post: &[EffectIR]) -> bool {
 
 impl<'a> CaptureRequest<'a> {
     fn build(
-        compiler: &NfaBuilder<'_>,
+        compiler: &mut NfaBuilder<'_>,
         cap: &ast::CapturedPattern,
         inner: &'a Pattern,
         nav: Option<Nav>,
@@ -126,17 +126,29 @@ impl NfaBuilder<'_> {
         let mut exit_effects = Vec::new();
         let mut iter = capture.post.into_iter().peekable();
         while let Some(eff) = iter.next() {
-            if eff.kind() == EffectKind::Node {
-                entry_effects.push(eff);
-                // Node is always paired with a following Set
-                if iter.peek().is_some_and(|e| e.kind() == EffectKind::Set) {
-                    entry_effects.push(
-                        iter.next()
-                            .expect("peek confirmed the iterator has a next element"),
-                    );
+            match eff.kind() {
+                // A capture unit `[SpanStart, Node, Set, SpanEnd]` moves to
+                // the entry as a whole: the Set must stay adjacent to its
+                // pending Node, and the markers must keep hugging the Set.
+                EffectKind::SpanStart
+                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::Node) =>
+                {
+                    entry_effects.push(eff);
+                    entry_effects.push(iter.next().expect("peeked Node"));
+                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::Set) {
+                        entry_effects.push(iter.next().expect("peeked Set"));
+                    }
+                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::SpanEnd) {
+                        entry_effects.push(iter.next().expect("peeked SpanEnd"));
+                    }
                 }
-            } else {
-                exit_effects.push(eff);
+                EffectKind::Node => {
+                    entry_effects.push(eff);
+                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::Set) {
+                        entry_effects.push(iter.next().expect("peeked Set"));
+                    }
+                }
+                _ => exit_effects.push(eff),
             }
         }
 

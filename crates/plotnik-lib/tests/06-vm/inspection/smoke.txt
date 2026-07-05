@@ -1,5 +1,18 @@
 Q = (program (expression_statement (identifier) @id))
 ------------------- INPUT (ts) -------------------
+x
+--------------------- TYPES ----------------------
+export interface Q {
+  id: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "id": {
+    "kind": "identifier",
+    "text": "x",
+    "span": [0, 1]
+  }
+}
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -42,3 +55,23 @@ Q:
   12                                        ▶
   13  └‣─  (expression_statement)           08
   14   !   (program)                        13
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              14 : 03
+       ▶   (?)
+
+?:
+  14       (program)                        13
+       ●   program
+  13       (expression_statement)           08
+       ●   expression_statement
+  08       (identifier) [SpanStart#3 Node Set(M0) SpanEnd#3]  11
+       ●   identifier
+  11       _                                12
+       ●   program
+  12   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

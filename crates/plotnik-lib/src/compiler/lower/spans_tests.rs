@@ -72,17 +72,18 @@ fn ladder_drops_whole_lower_priority_tiers() {
 }
 
 #[test]
-fn inspection_does_not_change_transition_bytes_yet() {
+fn capture_markers_change_transition_bytes_when_inspection_is_enabled() {
     let src = "Q = (program (expression_statement (identifier) @id))";
     let plain = QueryBuilder::from_inline(src)
         .compile(javascript_grammar())
         .expect("query parsing should not exhaust fuel");
     let inspected = inspected(src);
 
-    assert_eq!(
+    assert_ne!(
         transition_bytes(plain.bytecode().expect("plain bytecode")),
         transition_bytes(inspected.bytecode().expect("inspected bytecode")),
     );
+    assert!(plain.module().expect("plain module").spans().is_empty());
     assert!(
         !inspected
             .module()

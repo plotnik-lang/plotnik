@@ -68,20 +68,20 @@ Value = 00 :: T3
 P00 def        0..55  src0  T3
 P01 enum       8..55  src0
 P02 branch     12..32  src0
-P03 capture    29..32  src0
+P03 capture    29..32  src0  T1.M0
 P04 pattern    16..28  src0
 P05 branch     35..53  src0
-P06 capture    49..53  src0
+P06 capture    49..53  src0  T2.M1
 P07 pattern    40..48  src0
 P08 def        57..262  src0  T5
 P09 pattern    61..262  src0
 P10 sequence   72..260  src0
 P11 quantifier 100..101  src0
 P12 pattern    78..100  src0
-P13 capture    251..256  src0
+P13 capture    251..256  src0  T5.M4
 P14 pattern    109..250  src0
 P15 pattern    136..244  src0
-P16 capture    184..189  src0
+P16 capture    184..189  src0  T5.M5
 P17 annotation 190..197  src0  T4
 P18 field      165..169  src0
 P19 pattern    171..183  src0
@@ -90,7 +90,7 @@ P21 union      213..236  src0
 P22 branch     214..221  src0
 P23 ref        214..221  src0  T3
 P24 branch     222..235  src0
-P25 capture    231..235  src0
+P25 capture    231..235  src0  T5.M6
 P26 pattern    222..230  src0
 
 [transitions]
@@ -100,30 +100,30 @@ Value:
 
 Q:
   02  -ε-  [StructOpen]                     04
-  04       (@46)                            46 : 05
+  04       (@50)                            50 : 05
   05  -ε-  [StructClose]                    07
   07                                        ▶
   08  ─‣┘² _                                09
   09  ─‣┘  _                                14
   10                                        ▶
-  11   !   (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  10
+  11   !   (identifier) [EnumOpen(M2) SpanStart#3 Node Set(M0) SpanEnd#3 EnumClose]  10
   14                                        ▶
   15  ...
-  16   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose]  10
+  16   !   (number) [EnumOpen(M3) SpanStart#6 Node Set(M1) SpanEnd#6 EnumClose]  10
   19  -ε-                                   11, 16
   21  -ε-  [SuppressEnd]                    08
   23  ...
   24   !   (@19)                            19 : 21
   25  -ε-  [Null Set(M6) SuppressBegin]     24
-  27   !   (string) [Node Set(M6)]          08
-  29  ─‣─  value: _                         25, 27
-  31  ...
-  32  └‣─  name: (identifier) [Node Set(M5)]  29
-  34  └‣─  (variable_declarator)            32
-  35  └‣─  (lexical_declaration) [Node Set(M4)]  34
-  37  ─‣─  (lexical_declaration) [Node Set(M4)]  34
+  27   !   (string) [SpanStart#25 Node Set(M6) SpanEnd#25]  08
+  30  ─‣─  value: _                         25, 27
+  32  └‣─  name: (identifier) [SpanStart#16 Node Set(M5) SpanEnd#16]  30
+  35  └‣─  (variable_declarator)            32
+  36  └‣─  (lexical_declaration) [SpanStart#13 Node Set(M4) SpanEnd#13]  35
   39  ...
-  40   !   (expression_statement)           42, 37
-  42  ─‣─  _                                40, 42
-  44  └‣─  _                                40, 42
-  46   !   (program)                        44, 35
+  40  ─‣─  (lexical_declaration) [SpanStart#13 Node Set(M4) SpanEnd#13]  35
+  43   !   (expression_statement)           45, 40
+  45  ─‣─  _                                43, 45
+  47  ...
+  48  └‣─  _                                43, 45
+  50   !   (program)                        48, 36
