@@ -12,9 +12,11 @@ use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, header_byte};
 use super::sections::SymbolNameEntry;
+use super::spans::SpansView;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
-    Entrypoint, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
+    Entrypoint, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STEP_SIZE,
+    STRING_TABLE_ENTRY_SIZE,
 };
 use crate::bytecode::dfa::RegexDfas;
 
@@ -298,6 +300,10 @@ impl Module {
         }
     }
 
+    pub fn spans(&self) -> SpansView<'_> {
+        SpansView::new(self.spans_slice(), self.header.spans_count as usize)
+    }
+
     pub fn entrypoint_count(&self) -> usize {
         self.header.entrypoints_count as usize
     }
@@ -334,6 +340,12 @@ impl Module {
     fn transitions_slice(&self) -> &[u8] {
         let offset = self.offsets.transitions as usize;
         let len = self.header.transitions_count as usize * STEP_SIZE;
+        &self.storage[offset..offset + len]
+    }
+
+    fn spans_slice(&self) -> &[u8] {
+        let offset = self.offsets.spans as usize;
+        let len = self.header.spans_count as usize * SPAN_ENTRY_SIZE;
         &self.storage[offset..offset + len]
     }
 }

@@ -31,7 +31,8 @@ fn header_roundtrip() {
         type_names_count: 4,
         entrypoints_count: 1,
         transitions_count: 15,
-        _reserved: [0; 22],
+        spans_count: 2,
+        _reserved: [0; 20],
     };
 
     let bytes = h.to_bytes();
@@ -58,6 +59,7 @@ fn compute_offsets_empty() {
     assert_eq!(offsets.type_names, 192);
     assert_eq!(offsets.entrypoints, 192);
     assert_eq!(offsets.transitions, 192);
+    assert_eq!(offsets.spans, 192);
 }
 
 #[test]
@@ -72,6 +74,7 @@ fn compute_offsets_with_data() {
         type_names_count: 4,    // 4*4 = 16 bytes
         entrypoints_count: 2,   // 2*8 = 16 bytes
         transitions_count: 20,  // 20*8 = 160 bytes
+        spans_count: 3,         // 3*16 = 48 bytes
         str_blob_size: 100,
         regex_blob_size: 128,
         ..Default::default()
@@ -91,4 +94,5 @@ fn compute_offsets_with_data() {
     assert_eq!(offsets.type_names, 704); // 640 + 48 = 688 → 704
     assert_eq!(offsets.entrypoints, 768); // 704 + 16 = 720 → 768
     assert_eq!(offsets.transitions, 832); // 768 + 16 = 784 → 832
+    assert_eq!(offsets.spans, 1024); // 832 + 160 = 992 → 1024
 }

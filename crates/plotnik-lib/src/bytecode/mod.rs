@@ -21,6 +21,7 @@ mod node_kind_constraint;
 mod predicate_op;
 mod render;
 mod sections;
+mod spans;
 mod type_meta;
 pub mod type_system;
 
@@ -29,11 +30,13 @@ pub use entrypoint::Entrypoint;
 pub use ids::TypeId;
 pub use instructions::{EncodeError, StepAddr};
 pub use module::{Module, ModuleError};
+pub use spans::{SPAN_NO_BINDING, SpanEntry, SpanKind, SpansView};
 pub use type_system::{Arity, PrimitiveType, TypeKind};
 
 pub(crate) use constants::{
-    HEADER_SIZE, MAGIC, MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS,
-    REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE, VERSION,
+    HEADER_SIZE, MAGIC, MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_SPANS,
+    REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
+    VERSION,
 };
 pub(crate) use dfa::deserialize_dfa;
 pub(crate) use effects::{Effect, EffectKind};
@@ -74,5 +77,7 @@ mod instructions_tests;
 mod nav_tests;
 #[cfg(test)]
 mod node_kind_constraint_tests;
+#[cfg(test)]
+mod spans_tests;
 #[cfg(test)]
 mod type_meta_tests;

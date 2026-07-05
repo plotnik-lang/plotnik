@@ -131,11 +131,12 @@ impl<'a> EmitPipeline<'a> {
         let node_kinds_bytes = emit_symbol_name_table(&tables.node_kinds);
         let node_fields_bytes = emit_symbol_name_table(&tables.fields);
         let entrypoints_bytes = emit_entrypoints(&tables.entrypoints);
+        let spans_bytes = Vec::new();
 
         // Section order matches the binary format:
         // Header → StringBlob → RegexBlob → StringTable → RegexTable →
         // NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames →
-        // Entrypoints → Transitions
+        // Entrypoints → Transitions → Spans
         let mut writer = SectionWriter::new();
 
         writer.emit_section(&str_blob);
@@ -149,6 +150,7 @@ impl<'a> EmitPipeline<'a> {
         writer.emit_section(&type_names_bytes);
         writer.emit_section(&entrypoints_bytes);
         writer.emit_section(transitions);
+        writer.emit_section(&spans_bytes);
 
         writer.finish_sections();
         let total_size = writer.len() as u32;
@@ -208,6 +210,7 @@ impl<'a> EmitPipeline<'a> {
             type_names_count,
             entrypoints_count,
             transitions_count,
+            spans_count: 0,
             str_blob_size: str_blob.len() as u32,
             regex_blob_size: regex_blob.len() as u32,
             total_size,

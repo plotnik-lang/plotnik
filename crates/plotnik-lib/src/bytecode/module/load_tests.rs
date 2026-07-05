@@ -23,7 +23,9 @@ use indoc::indoc;
 use super::{ByteStorage, Module, ModuleError};
 use crate::bytecode::effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectKind};
 use crate::bytecode::type_meta::TypeDefKind;
-use crate::bytecode::{Header, Nav, STEP_SIZE};
+use crate::bytecode::{
+    Header, Nav, SPAN_ENTRY_SIZE, SPAN_NO_BINDING, STEP_SIZE, SpanEntry, SpanKind,
+};
 
 fn emit_bytes(query_src: &str) -> Vec<u8> {
     let mut source_map = SourceMap::new();
@@ -263,6 +265,10 @@ fn effect_word(kind: EffectKind) -> [u8; 2] {
     ((kind as u16) << EFFECT_PAYLOAD_BITS).to_le_bytes()
 }
 
+fn effect_word_with_payload(kind: EffectKind, payload: u16) -> [u8; 2] {
+    (((kind as u16) << EFFECT_PAYLOAD_BITS) | payload).to_le_bytes()
+}
+
 fn effect_payload(bytes: &[u8], slot: usize) -> u16 {
     u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & EFFECT_PAYLOAD_MAX as u16
 }
@@ -291,6 +297,7 @@ fn first_section_gap(bytes: &[u8]) -> usize {
         (o.type_names, h.type_names_count as u32 * 4),
         (o.entrypoints, h.entrypoints_count as u32 * 8),
         (o.transitions, h.transitions_count as u32 * 8),
+        (o.spans, h.spans_count as u32 * SPAN_ENTRY_SIZE as u32),
         (h.total_size, 0),
     ];
     sections
@@ -442,6 +449,30 @@ fn forged_span_effect_before_spans_section_is_rejected() {
 }
 
 #[test]
+fn forged_span_effect_payload_out_of_range_is_rejected() {
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let span = SpanEntry {
+        source: 0,
+        kind: SpanKind::Def,
+        start: 0,
+        end: 42,
+        type_id: SPAN_NO_BINDING,
+        member: SPAN_NO_BINDING,
+    };
+    add_single_span(&mut bytes, span.to_bytes());
+
+    let slot = effect_slots(&bytes)[0];
+    bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::SpanStart, 1));
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("span payload must address an existing span");
+    assert!(
+        matches!(err, ModuleError::InvalidSpanPayload(_)),
+        "expected InvalidSpanPayload, got {err:?}"
+    );
+}
+
+#[test]
 fn forged_oob_member_operand_is_rejected() {
     // A `Set`/`EnumOpen` payload indexes the type-member table via the materializer's
     // `get_member`, which asserts the index is in bounds.
@@ -470,6 +501,100 @@ fn forged_oob_member_operand_is_rejected() {
     assert!(
         matches!(err, ModuleError::MalformedTransitions),
         "expected MalformedTransitions, got {err:?}"
+    );
+}
+
+fn add_single_span(bytes: &mut Vec<u8>, span_bytes: [u8; SPAN_ENTRY_SIZE]) {
+    let mut header = Header::from_bytes(&bytes[..64]);
+    header.spans_count = 1;
+    let offsets = header.compute_offsets();
+    let span_off = offsets.spans as usize;
+    bytes.resize(span_off + SPAN_ENTRY_SIZE, 0);
+    bytes[span_off..span_off + SPAN_ENTRY_SIZE].copy_from_slice(&span_bytes);
+    header.total_size = bytes.len() as u32;
+    header.checksum = crc32fast::hash(&bytes[64..]);
+    bytes[..64].copy_from_slice(&header.to_bytes());
+}
+
+#[test]
+fn span_section_view_decodes_valid_entry() {
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let span = SpanEntry {
+        source: 0,
+        kind: SpanKind::Def,
+        start: 0,
+        end: 42,
+        type_id: 0,
+        member: SPAN_NO_BINDING,
+    };
+    add_single_span(&mut bytes, span.to_bytes());
+
+    let module = Module::load(&bytes).expect("valid span entry should load");
+
+    assert_eq!(module.spans().len(), 1);
+    assert_eq!(module.spans().get(0), span);
+}
+
+#[test]
+fn forged_invalid_span_kind_is_rejected() {
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut span = SpanEntry {
+        source: 0,
+        kind: SpanKind::Def,
+        start: 0,
+        end: 42,
+        type_id: SPAN_NO_BINDING,
+        member: SPAN_NO_BINDING,
+    }
+    .to_bytes();
+    span[2] = 99;
+    add_single_span(&mut bytes, span);
+
+    let err = Module::load(&bytes).expect_err("forged span kind must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidSpanEntry(0)),
+        "expected InvalidSpanEntry, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_invalid_span_range_is_rejected() {
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let span = SpanEntry {
+        source: 0,
+        kind: SpanKind::Pattern,
+        start: 42,
+        end: 7,
+        type_id: SPAN_NO_BINDING,
+        member: SPAN_NO_BINDING,
+    };
+    add_single_span(&mut bytes, span.to_bytes());
+
+    let err = Module::load(&bytes).expect_err("forged span range must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidSpanEntry(0)),
+        "expected InvalidSpanEntry, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_invalid_span_binding_is_rejected() {
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let module = Module::load(&bytes).expect("module loads before tampering");
+    let span = SpanEntry {
+        source: 0,
+        kind: SpanKind::Capture,
+        start: 3,
+        end: 8,
+        type_id: module.header().type_defs_count,
+        member: SPAN_NO_BINDING,
+    };
+    add_single_span(&mut bytes, span.to_bytes());
+
+    let err = Module::load(&bytes).expect_err("forged span binding must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidSpanEntry(0)),
+        "expected InvalidSpanEntry, got {err:?}"
     );
 }
 
@@ -1130,7 +1255,7 @@ fn module_with_transitions(transitions: &[u8], transitions_count: u16) -> Vec<u8
 
     let offsets = header.compute_offsets();
     let base = offsets.transitions as usize;
-    let total = base + transitions_count as usize * STEP_SIZE;
+    let total = offsets.spans as usize;
 
     let mut bytes = vec![0u8; total];
     bytes[base..base + transitions.len()].copy_from_slice(transitions);

@@ -14,6 +14,7 @@ The dump follows bytecode section order:
 [type_members]
 [type_names]
 [entrypoints]
+[spans]       ; only when inspection spans exist
 [transitions]
 ```
 
@@ -26,6 +27,20 @@ Indexes are printed with prefixes:
 | `T`    | type defs    |
 | `M`    | type members |
 | `N`    | type names   |
+| `P`    | spans        |
+
+## Span Lines
+
+When present, the `[spans]` section prints one line per span id:
+
+```text
+P00 def        0..42  src0  T03
+P07 capture    12..17  src0  T04.M02
+P09 pattern    4..14  src0
+```
+
+The optional `Txx` / `Txx.Myy` suffix is the type or member binding stored in
+the bytecode entry. The section is omitted when `spans_count == 0`.
 
 ## Transition Lines
 
@@ -60,6 +75,8 @@ mode with no cursor movement or node check.
 
 Effects are shown in one bracket group in execution order. The group appears
 after the node/predicate column and before successors.
+
+Inspection effects render as `SpanStartAt#5`, `SpanStart#5`, and `SpanEnd#5`.
 
 ## Navigation Symbols
 

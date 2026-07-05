@@ -35,6 +35,7 @@ docs/
     ├── 04-types.md      # Type metadata format
     ├── 05-entrypoints.md # Definition table
     ├── 06-transitions.md # VM instructions and data blocks
+    ├── 07-spans.md      # Inspection spans section
     ├── 07-dump-format.md # Bytecode dump output format
     └── 08-trace-format.md # Execution trace output format
 ```

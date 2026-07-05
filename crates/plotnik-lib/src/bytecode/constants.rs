@@ -1,5 +1,7 @@
 //! Bytecode format constants.
 
+use super::effects::EFFECT_PAYLOAD_BITS;
+
 /// Magic bytes identifying a Plotnik bytecode file.
 pub const MAGIC: [u8; 4] = *b"PTKQ";
 
@@ -12,7 +14,8 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// v7: Type kind and effect opcode discriminants renumbered contiguously.
 /// v8: single effects list per Match; per-entrypoint wrappers.
 /// v9: `Childless*` navigation family (anchors over a zero-width child list).
-pub const VERSION: u32 = 9;
+/// v10: inspection spans — three span effect kinds and the `spans` section.
+pub const VERSION: u32 = 10;
 
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;
@@ -32,6 +35,12 @@ pub const STRING_TABLE_ENTRY_SIZE: usize = size_of::<u32>();
 
 /// Regex table entry size: `string_id (u16) | reserved (u16) | offset (u32)`.
 pub const REGEX_TABLE_ENTRY_SIZE: usize = 8;
+
+/// Spans-section entry size in bytes.
+pub const SPAN_ENTRY_SIZE: usize = 16;
+
+/// Hard ceiling on spans per module: span ids live in the effect payload.
+pub const MAX_SPANS: usize = 1 << EFFECT_PAYLOAD_BITS;
 
 /// Maximum payload slots for Match instructions.
 ///
