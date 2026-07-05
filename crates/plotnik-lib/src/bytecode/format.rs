@@ -95,6 +95,9 @@ impl Symbol {
 /// | UpSkipTrivia(n) | ─•┘², ─•┘¹⁰     | Ascend n, last non-trivia on each level |
 /// | UpSkipExtras(n) | ─◦┘², ─◦┘¹⁰     | Ascend n, last non-extra on each level  |
 /// | UpExact(n)      | !─┘², !─┘¹⁰     | Ascend n, last child on each level      |
+/// | ChildlessSkipTrivia | └•┘         | Assert no children beyond trivia        |
+/// | ChildlessSkipExtras | └◦┘         | Assert no children beyond extras        |
+/// | ChildlessExact  | └!┘             | Assert no children at all               |
 pub fn nav_symbol(nav: Nav) -> Symbol {
     match nav {
         Nav::Epsilon => Symbol::EPSILON,
@@ -104,6 +107,9 @@ pub fn nav_symbol(nav: Nav) -> Symbol {
         Nav::DownSkip => Symbol::new(" └", "•", "─ "),
         Nav::DownSkipExtras => Symbol::new(" └", "◦", "─ "),
         Nav::DownExact => Symbol::new(" └", "─", "! "),
+        Nav::ChildlessSkipTrivia => Symbol::new(" └", "•", "┘ "),
+        Nav::ChildlessSkipExtras => Symbol::new(" └", "◦", "┘ "),
+        Nav::ChildlessExact => Symbol::new(" └", "!", "┘ "),
         Nav::Next => Symbol::new(" ─", "‣", "─ "),
         Nav::NextSkip => Symbol::new(" ─", "•", "─ "),
         Nav::NextSkipExtras => Symbol::new(" ─", "◦", "─ "),

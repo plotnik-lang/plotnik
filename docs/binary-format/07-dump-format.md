@@ -63,23 +63,26 @@ after the node/predicate column and before successors.
 
 ## Navigation Symbols
 
-| Nav            | Symbol |
-| -------------- | :----: |
-| Epsilon        |  -ε-   |
-| Stay           |        |
-| StayExact      |   !    |
-| Down           |  └‣─   |
-| DownSkip       |  └•─   |
-| DownSkipExtras |  └◦─   |
-| DownExact      |  └─!   |
-| Next           |  ─‣─   |
-| NextSkip       |  ─•─   |
-| NextSkipExtras |  ─◦─   |
-| NextExact      |  ──!   |
-| Up             |  ─‣┘   |
-| UpSkipTrivia   |  ─•┘   |
-| UpSkipExtras   |  ─◦┘   |
-| UpExact        |  !─┘   |
+| Nav                 | Symbol |
+| ------------------- | :----: |
+| Epsilon             |  -ε-   |
+| Stay                |        |
+| StayExact           |   !    |
+| Down                |  └‣─   |
+| DownSkip            |  └•─   |
+| DownSkipExtras      |  └◦─   |
+| DownExact           |  └─!   |
+| Next                |  ─‣─   |
+| NextSkip            |  ─•─   |
+| NextSkipExtras      |  ─◦─   |
+| NextExact           |  ──!   |
+| Up                  |  ─‣┘   |
+| UpSkipTrivia        |  ─•┘   |
+| UpSkipExtras        |  ─◦┘   |
+| UpExact             |  !─┘   |
+| ChildlessSkipTrivia |  └•┘   |
+| ChildlessSkipExtras |  └◦┘   |
+| ChildlessExact      |  └!┘   |
 
 `Up*` levels greater than one use superscript suffixes, for example `─‣┘²`.
 

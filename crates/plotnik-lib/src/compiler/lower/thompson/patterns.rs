@@ -144,14 +144,30 @@ impl NfaBuilder<'_> {
         let final_exit = self.emit_trailing_effects_exit(exit, exit_effects);
 
         let up_label = self.fresh_label();
+        // The skip exit bypasses Up when the whole child list matches
+        // zero-width: nothing was consumed, so the cursor never descended and
+        // there is no child to ascend from. Without a trailing anchor the
+        // bypass is unconditional; with one, "nothing may follow the last
+        // match" degrades to "this node has no children the anchor's skip
+        // policy would reject", asserted by a `Childless*` check.
+        let skip_target = if has_trailing_anchor {
+            let childless = self.fresh_label();
+            self.instructions.push(
+                MatchIR::epsilon(childless, final_exit)
+                    .nav(childless_nav(up_nav))
+                    .into(),
+            );
+            childless
+        } else {
+            final_exit
+        };
         let items_entry = self.compile_seq_items(SeqItemsCtx {
             items: &items,
             exit: up_label,
             is_inside_node: true,
             first_nav: None,
             capture: CaptureEffects::default(),
-            // Skip exit bypasses Up when Down fails (childless node)
-            skip_exit: Some(SkipExit::To(final_exit)),
+            skip_exit: Some(SkipExit::To(skip_target)),
         });
 
         self.instructions
@@ -180,7 +196,19 @@ impl NfaBuilder<'_> {
             self.emit_effects_epsilon(exit, post, CaptureEffects::default())
         }
     }
+}
 
+/// The zero-width counterpart of a trailing anchor's `Up*` lastness mode.
+fn childless_nav(up_nav: Nav) -> Nav {
+    match up_nav {
+        Nav::UpSkipTrivia(_) => Nav::ChildlessSkipTrivia,
+        Nav::UpSkipExtras(_) => Nav::ChildlessSkipExtras,
+        Nav::UpExact(_) => Nav::ChildlessExact,
+        _ => unreachable!("a trailing anchor always lowers to a constrained Up, got {up_nav:?}"),
+    }
+}
+
+impl NfaBuilder<'_> {
     pub(super) fn compile_token_pattern(
         &mut self,
         node: &ast::TokenPattern,

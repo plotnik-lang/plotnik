@@ -14,6 +14,9 @@ fn nav_standard_roundtrip() {
         Nav::DownSkip,
         Nav::DownSkipExtras,
         Nav::DownExact,
+        Nav::ChildlessSkipTrivia,
+        Nav::ChildlessSkipExtras,
+        Nav::ChildlessExact,
     ] {
         assert_eq!(Nav::from_byte(nav.to_byte()), nav);
     }
@@ -41,6 +44,8 @@ fn nav_byte_encoding() {
     assert_eq!(Nav::NextSkipExtras.to_byte(), 0b0000_0101);
     assert_eq!(Nav::Down.to_byte(), 0b0000_0111);
     assert_eq!(Nav::DownSkipExtras.to_byte(), 0b0000_1001);
+    assert_eq!(Nav::ChildlessSkipTrivia.to_byte(), 0b0000_1011);
+    assert_eq!(Nav::ChildlessExact.to_byte(), 0b0000_1101);
 
     // Up family: bit 7 set, then 2-bit mode (bits 6-5), then 5-bit level (bits 4-0).
     assert_eq!(Nav::Up(5).to_byte(), 0b1000_0101);
@@ -65,8 +70,8 @@ fn nav_invalid_up_zero_panics() {
 
 #[test]
 fn nav_reserved_standard_byte_rejected() {
-    // Standard enum values 11..=127 (bit 7 clear) are unassigned.
-    assert_eq!(Nav::try_from_byte(0b0000_1011), None);
+    // Standard enum values 14..=127 (bit 7 clear) are unassigned.
+    assert_eq!(Nav::try_from_byte(0b0000_1110), None);
     assert_eq!(Nav::try_from_byte(0b0111_1111), None);
 }
 

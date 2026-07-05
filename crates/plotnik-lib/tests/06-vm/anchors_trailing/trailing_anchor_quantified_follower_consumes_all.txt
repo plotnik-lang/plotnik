@@ -64,7 +64,7 @@ Q:
   06  -ε-  [ArrayClose Set(M1)]             08
   08  ─•┘  _                                09
   09                                        ▶
-  10  -ε-  [ArrayClose Set(M1)]             09
+  10  └•┘  _ [ArrayClose Set(M1)]           09
   12  └•─  (debugger_statement) [Node Push]  14, 06
   14  ─•─  (debugger_statement) [Node Push]  14, 06
   16  -ε-  [ArrayOpen]                      12, 10

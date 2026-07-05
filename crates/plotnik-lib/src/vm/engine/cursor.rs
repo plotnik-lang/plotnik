@@ -131,6 +131,15 @@ impl<'t> CursorWrapper<'t> {
             Nav::NextSkip => self.go_next_sibling().then_some(SkipPolicy::Trivia),
             Nav::NextSkipExtras => self.go_next_sibling().then_some(SkipPolicy::Extras),
             Nav::NextExact => self.go_next_sibling().then_some(SkipPolicy::Exact),
+            Nav::ChildlessSkipTrivia => self
+                .childless_holds(SkipClass::Trivia)
+                .then_some(SkipPolicy::Exact),
+            Nav::ChildlessSkipExtras => self
+                .childless_holds(SkipClass::Extras)
+                .then_some(SkipPolicy::Exact),
+            Nav::ChildlessExact => self
+                .childless_holds(SkipClass::Exact)
+                .then_some(SkipPolicy::Exact),
             Nav::Up(n) => self.go_up(n, UpMode::Any).then_some(SkipPolicy::Any),
             Nav::UpSkipTrivia(n) => self.go_up(n, UpMode::SkipTrivia).then_some(SkipPolicy::Any),
             Nav::UpSkipExtras(n) => self.go_up(n, UpMode::SkipExtras).then_some(SkipPolicy::Any),
@@ -140,6 +149,28 @@ impl<'t> CursorWrapper<'t> {
 
     fn go_first_child(&mut self) -> bool {
         self.cursor.goto_first_child()
+    }
+
+    /// Whether every child of the current node is `skip_class`-skippable —
+    /// i.e. the node is childless once trivia/extras are ignored (`Exact`
+    /// admits nothing, so it requires true childlessness). The child scan is
+    /// undone before returning, so the cursor stays on the current node.
+    fn childless_holds(&mut self, skip_class: SkipClass) -> bool {
+        let origin = self.cursor.descendant_index();
+        if !self.cursor.goto_first_child() {
+            return true;
+        }
+        loop {
+            if !skip_class.admits(Self::node_class(&self.cursor.node())) {
+                self.cursor.goto_descendant(origin);
+                return false;
+            }
+            if !self.cursor.goto_next_sibling() {
+                break;
+            }
+        }
+        self.cursor.goto_descendant(origin);
+        true
     }
 
     fn go_next_sibling(&mut self) -> bool {

@@ -58,6 +58,9 @@ standard command.
 | `8`          | `DownSkip`                      |
 | `9`          | `DownSkipExtras`                |
 | `10`         | `DownExact`                     |
+| `11`         | `ChildlessSkipTrivia`           |
+| `12`         | `ChildlessSkipExtras`           |
+| `13`         | `ChildlessExact`                |
 | `0b1mmnnnnn` | `Up*`, mode `mm`, level `nnnnn` |
 
 For `Up*`, level must be `1..=31`; level `0` is invalid. Modes are:

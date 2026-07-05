@@ -11,7 +11,8 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// v6: Reserved bit 7 of a Nav byte for the Up family (uniform 5-bit level).
 /// v7: Type kind and effect opcode discriminants renumbered contiguously.
 /// v8: single effects list per Match; per-entrypoint wrappers.
-pub const VERSION: u32 = 8;
+/// v9: `Childless*` navigation family (trailing anchor over a zero-width child list).
+pub const VERSION: u32 = 9;
 
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;

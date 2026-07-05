@@ -97,7 +97,14 @@ impl GapClass {
             Nav::NextSkip | Nav::DownSkip | Nav::UpSkipTrivia(_) => Self::AnonymousAndExtras,
             Nav::NextSkipExtras | Nav::DownSkipExtras | Nav::UpSkipExtras(_) => Self::ExtrasOnly,
             Nav::NextExact | Nav::DownExact | Nav::UpExact(_) => Self::Nothing,
-            Nav::Epsilon | Nav::Stay | Nav::StayExact => return None,
+            // Childless asserts at the current position without moving; it
+            // opens no sibling gap, like the other stay-in-place navs.
+            Nav::Epsilon
+            | Nav::Stay
+            | Nav::StayExact
+            | Nav::ChildlessSkipTrivia
+            | Nav::ChildlessSkipExtras
+            | Nav::ChildlessExact => return None,
         };
         Some(class)
     }
