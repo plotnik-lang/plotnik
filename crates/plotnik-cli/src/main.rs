@@ -12,8 +12,8 @@ use std::process::ExitCode;
 use clap::ArgMatches;
 
 use cli::{
-    AstOpts, CheckOpts, DumpOpts, InferOpts, LangDumpOpts, RunOpts, TraceOpts, build_cli,
-    route_default_subcommand,
+    AstOpts, CheckOpts, DumpOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts, TraceOpts,
+    build_cli, route_default_subcommand,
 };
 use error::CliResult;
 
@@ -59,6 +59,10 @@ fn dispatch(matches: &ArgMatches) -> CliResult {
         Some(("trace", m)) => {
             let params = TraceOpts::from_matches(m);
             commands::trace::run(params.into())
+        }
+        Some(("inspect", m)) => {
+            let params = InspectOpts::from_matches(m);
+            commands::inspect::run(params.into())
         }
         Some(("lang", m)) => match m.subcommand() {
             Some(("list", _)) => commands::lang::run_list(),

@@ -3,6 +3,7 @@ pub mod check;
 pub mod compile;
 pub mod dump;
 pub mod infer;
+pub mod inspect;
 pub mod lang;
 pub mod lang_resolver;
 pub mod query_loader;

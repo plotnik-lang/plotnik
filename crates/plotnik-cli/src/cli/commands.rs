@@ -73,6 +73,7 @@ Run 'plotnik <command> --help' for examples."#,
         .subcommand(infer_command())
         .subcommand(dump_command())
         .subcommand(trace_command())
+        .subcommand(inspect_command())
         .subcommand(lang_command())
         .subcommand(completions_command())
 }
@@ -277,6 +278,45 @@ pub fn trace_command() -> Command {
         cmd.arg(compact_arg().hide(true))
             .arg(verbose_nodes_arg().hide(true)),
     ))
+}
+
+pub fn inspect_command() -> Command {
+    let cmd = Command::new("inspect")
+        .about("Compile and execute a query, emitting playground inspection data")
+        .override_usage(
+            "\
+  plotnik inspect <QUERY> <SOURCE> [--json]
+  plotnik inspect -q <TEXT> <SOURCE> [--json]
+  plotnik inspect -q <TEXT> -s <TEXT> -l <LANG> [--json]",
+        )
+        .after_help(
+            r#"EXAMPLES:
+  plotnik inspect query.ptk app.js --json
+  plotnik inspect -q 'Q = ...' -s 'let x' -l js --json
+  plotnik inspect query.ptk app.js --json -v  # include recording"#,
+        )
+        .arg(query_path_arg())
+        .arg(source_path_arg())
+        .next_help_heading("Input options")
+        .arg(query_text_arg())
+        .arg(source_text_arg())
+        .arg(lang_arg())
+        .arg(entry_arg())
+        .next_help_heading("Inspect options")
+        .arg(json_arg().help("Output the full inspect bundle as JSON"))
+        .arg(verbose_arg().help("Include VM recording in the JSON bundle"))
+        .next_help_heading("Limit options")
+        .arg(max_steps_arg())
+        .arg(max_memory_arg())
+        .arg(limits_preset_arg())
+        .next_help_heading("Global options")
+        .arg(color_arg());
+
+    with_hidden_ast_args(
+        cmd.arg(compact_arg().hide(true))
+            .arg(verbose_nodes_arg().hide(true))
+            .arg(no_result_arg().hide(true)),
+    )
 }
 
 pub fn lang_command() -> Command {
