@@ -323,6 +323,8 @@ impl<'a> NfaBuilder<'a> {
         let (kind, start_at) = match pattern {
             Pattern::NodePattern(_) | Pattern::TokenPattern(_) => (SpanKind::Pattern, true),
             Pattern::SeqPattern(_) => (SpanKind::Sequence, false),
+            Pattern::Union(_) => (SpanKind::Union, false),
+            Pattern::Enum(_) => (SpanKind::Enum, false),
             _ => return ctx,
         };
         let Some(id) = self.span_id(pattern.syntax(), kind) else {

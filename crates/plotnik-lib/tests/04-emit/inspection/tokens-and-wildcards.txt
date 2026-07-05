@@ -50,20 +50,20 @@ P12 pattern    137..138  src0
 
 [transitions]
 Q:
-  00       (@28)                            28 : 01
+  00       (@30)                            30 : 01
   01  -ε-  [Node]                           03
   03                                        ▶
   04  ─‣─  (_) [SpanStartAt#8 SpanEnd#8]    06
-  06  ─‣┘  _ [SpanEnd#5]                    08
+  06  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  08
   08  ─‣┘  _                                09
   09  ─‣┘  _ [SpanEnd#2 SpanEnd#1]          11
   11                                        ▶
   12  ─‣─  "+" [SpanStartAt#7 SpanEnd#7]    04
   14  └‣─  (identifier) [SpanStartAt#6 SpanEnd#6]  12
-  16   !   (binary_expression) [SpanStartAt#5]  14
-  18   !   (_) [SpanStartAt#10 SpanEnd#10]  08
-  20   !   _ [SpanStartAt#12 SpanEnd#12]    08
-  22  ─‣─  _                                16, 18, 20, 22
-  24  └‣─  _                                16, 18, 20, 22
-  26  └‣─  (expression_statement) [SpanStartAt#2]  24
-  28   !   (program) [SpanStartAt#1]        26
+  16   !   (binary_expression) [SpanStart#3 SpanStart#4 SpanStartAt#5]  14
+  18   !   (_) [SpanStart#3 SpanStart#9 SpanStartAt#10 SpanEnd#10 SpanEnd#9 SpanEnd#3]  08
+  21   !   _ [SpanStart#3 SpanStart#11 SpanStartAt#12 SpanEnd#12 SpanEnd#11 SpanEnd#3]  08
+  24  ─‣─  _                                16, 18, 21, 24
+  26  └‣─  _                                16, 18, 21, 24
+  28  └‣─  (expression_statement) [SpanStartAt#2]  26
+  30   !   (program) [SpanStartAt#1]        28
