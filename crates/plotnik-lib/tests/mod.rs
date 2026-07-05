@@ -55,8 +55,8 @@ use similar::TextDiff;
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    Colors, CompiledQuery, PrintTracer, QueryBuilder, RuntimeError, SourceMap, SourcePath,
-    TypeScriptConfig, VM, Verbosity, extract_inspection, materialize_verified,
+    Colors, CompiledQuery, PrintTracer, QueryBuilder, RecordingTracer, RuntimeError, SourceMap,
+    SourcePath, TypeScriptConfig, VM, Verbosity, extract_inspection, materialize_verified,
 };
 
 mod support;
@@ -263,6 +263,7 @@ fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
             "diagnostics",
             "output",
             "inspection",
+            "recording",
             "bytecode",
             "trace",
         ]),
@@ -295,6 +296,7 @@ fn parse_section_header(line: &str) -> Option<String> {
                 | "trace"
                 | "output"
                 | "inspection"
+                | "recording"
                 | "diagnostics"
         );
     known.then_some(name)
@@ -390,8 +392,10 @@ fn render_compile(
     kind: Compile,
 ) -> Result<Vec<(String, String)>, String> {
     let lang = Lang::resolve(input.and_then(|i| i.ext.as_deref()))?;
+    let records = name.contains("/recording/");
+    let inspects = name.contains("/inspection/");
     let compiled = QueryBuilder::new(source_map(query))
-        .with_inspection(name.contains("/inspection/"))
+        .with_inspection(inspects || records)
         .compile(lang.grammar)
         .expect("query parsing should not exhaust fuel");
     let diagnostics = compiled.diagnostics();
@@ -432,21 +436,20 @@ fn render_compile(
                 .definition_names()
                 .last()
                 .expect("a valid query has at least one named definition");
-            let run = run_vm(
-                &lang,
-                module,
-                &entry,
-                &input.text,
-                name.contains("/inspection/"),
-            )?;
+            let run = run_vm(&lang, module, &entry, &input.text, inspects, records)?;
             out.push(("types".into(), render_types(&compiled)));
             out.extend(diag);
             out.push(("output".into(), run.output));
             if let Some(inspection) = run.inspection {
                 out.push(("inspection".into(), inspection));
             }
+            if let Some(recording) = run.recording {
+                out.push(("recording".into(), recording));
+            }
             out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))));
-            out.push(("trace".into(), run.trace));
+            if let Some(trace) = run.trace {
+                out.push(("trace".into(), trace));
+            }
         }
     }
     Ok(out)
@@ -459,9 +462,10 @@ fn render_types(compiled: &CompiledQuery) -> String {
 }
 
 struct VmRun {
-    trace: String,
+    trace: Option<String>,
     output: String,
     inspection: Option<String>,
+    recording: Option<String>,
 }
 
 fn run_vm(
@@ -470,6 +474,7 @@ fn run_vm(
     entry: &str,
     source: &str,
     inspect: bool,
+    record: bool,
 ) -> Result<VmRun, String> {
     let tree = lang.parse(source);
     let entrypoint = module
@@ -477,6 +482,42 @@ fn run_vm(
         .expect("every named definition is an entrypoint");
 
     let vm = VM::builder(source, &tree).build();
+
+    if record {
+        let mut tracer = RecordingTracer::new(module, 65_536);
+        let result = vm.execute_with(module, &entrypoint, &mut tracer);
+        let recording = tracer.finish();
+        let mut recording_json =
+            serde_json::to_string_pretty(&recording).expect("recording serialization cannot fail");
+        recording_json.push('\n');
+
+        let output = match result {
+            Ok(effects) => {
+                // The verified variant (not plain `materialize`) so a type-unsound emission
+                // panics the fixture in debug; the check compiles out under `--release`.
+                let value = materialize_verified(
+                    source,
+                    module,
+                    &entrypoint,
+                    effects.as_slice(),
+                    Colors::new(false),
+                );
+                value.format(true, Colors::new(false))
+            }
+            Err(RuntimeError::NoMatch) => "<no match>".to_string(),
+            // A no-match is a real outcome worth pinning; step/memory exhaustion is
+            // not — fail the trial rather than accept a resource limit as golden output.
+            Err(err) => return Err(format!("VM run failed for `{entry}`: {err}")),
+        };
+
+        return Ok(VmRun {
+            trace: None,
+            output,
+            inspection: None,
+            recording: Some(recording_json),
+        });
+    }
+
     let mut tracer = PrintTracer::builder(source, module)
         .verbosity(Verbosity::Default)
         .colored(false)
@@ -510,9 +551,10 @@ fn run_vm(
         Err(err) => return Err(format!("VM run failed for `{entry}`: {err}")),
     };
     Ok(VmRun {
-        trace,
+        trace: Some(trace),
         output,
         inspection,
+        recording: None,
     })
 }
 

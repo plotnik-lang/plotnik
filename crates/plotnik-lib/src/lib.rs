@@ -51,10 +51,11 @@ pub use crate::compiler::{
 };
 
 pub use crate::vm::{
-    Binding, EffectLog, Inspection, InspectionEntry, Limit, NodeHandle, NoopTracer, PrintTracer,
-    PrintTracerBuilder, ResolvedRuntimeLimits, RunStats, RuntimeEffect, RuntimeError,
-    RuntimeLimitSpec, Tracer, VM, VMBuilder, Value, ValueMaterializer, Verbosity,
-    debug_verify_type, extract_inspection, materialize_verified,
+    Binding, EffectLog, Inspection, InspectionEntry, Limit, NodeHandle, NodeRef, NoopTracer,
+    PrintTracer, PrintTracerBuilder, Recording, RecordingTracer, ResolvedRuntimeLimits, RunStats,
+    RuntimeEffect, RuntimeError, RuntimeLimitSpec, StepEvent, StepRecord, Tracer, VM, VMBuilder,
+    Value, ValueMaterializer, Verbosity, debug_verify_type, extract_inspection,
+    materialize_verified,
 };
 
 /// Embed bytecode with 64-byte alignment (zero-copy loading).
