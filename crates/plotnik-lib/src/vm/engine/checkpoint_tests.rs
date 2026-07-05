@@ -8,16 +8,7 @@
 use super::checkpoint::{Checkpoint, CheckpointStack, CheckpointState};
 
 fn cp(frame_index: Option<u32>) -> Checkpoint {
-    Checkpoint::branch(
-        CheckpointState {
-            descendant_index: 0,
-            effect_watermark: 0,
-            frame_index,
-            recursion_depth: 0,
-            suppress_depth: 0,
-        },
-        0,
-    )
+    Checkpoint::branch(CheckpointState::new(0, 0, frame_index, 0, 0), 0)
 }
 
 fn brute_force_max(frames: &[Option<u32>]) -> Option<u32> {
@@ -41,7 +32,7 @@ fn check_sequence(frames: &[Option<u32>]) {
     }
 
     while !live.is_empty() {
-        let popped = stack.pop().expect("non-empty").state.frame_index;
+        let popped = stack.pop().expect("non-empty").state.frame_index();
         let expected = live.pop().unwrap();
         assert_eq!(popped, expected, "pop returned the wrong checkpoint");
         assert_eq!(
@@ -113,12 +104,6 @@ fn interleaved_push_pop() {
 /// pinning a value past `u16::MAX` here fails to compile if either narrows again.
 #[test]
 fn suppress_depth_outranges_u16() {
-    let state = CheckpointState {
-        descendant_index: 0,
-        effect_watermark: 0,
-        frame_index: None,
-        recursion_depth: 0,
-        suppress_depth: u16::MAX as u64 + 1,
-    };
+    let state = CheckpointState::new(0, 0, None, 0, u16::MAX as u64 + 1);
     assert_eq!(state.suppress_depth, 65_536);
 }

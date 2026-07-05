@@ -3,10 +3,35 @@
 //! The wrapper handles the search loop and skip policies defined
 //! in docs/tree-navigation.md.
 
+use std::collections::VecDeque;
+use std::num::NonZeroU32;
+
 use arborium_tree_sitter::{Node, TreeCursor};
 
 use crate::bytecode::Nav;
 use crate::core::{NodeClass, NodeFieldId, SkipClass};
+
+/// Upper bound on live snapshots. Restores overwhelmingly hit the newest
+/// checkpoints (LIFO unwinding), so a small window captures nearly all hits
+/// while bounding memory to CAP cursors regardless of checkpoint-stack depth.
+const SNAPSHOT_CAP: usize = 64;
+
+/// Flat per-cursor estimate for the memory ceiling: a cursor's heap is its
+/// entry stack (~28 bytes per tree level, capacity high-watered). 2 KiB covers
+/// ~70 levels; deeper trees under-account, but the CAP bounds the absolute
+/// error to noise against the >=64 MiB ceiling.
+const SNAPSHOT_FOOTPRINT_ESTIMATE: u64 = 2048;
+
+/// Snapshot creation is lazy because match-heavy workloads create many
+/// checkpoints that restore in-place or move only a few nodes. Storms are
+/// distinguished by repeated wide lateral jumps, then get the O(depth)
+/// snapshot path for the hot part of the run.
+const SNAPSHOT_ACTIVATION_WIDE_MISSES: u32 = 32;
+
+/// Below this distance, `goto_descendant` is cheap enough that snapshotting at
+/// creation costs more than it saves. The storm probe averaged 64 descendant
+/// indices per non-same restore; match-heavy workloads stayed near zero.
+const SNAPSHOT_ACTIVATION_MIN_JUMP: u32 = 32;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SkipPolicy {
@@ -62,16 +87,57 @@ impl UpMode {
 
 /// Wrapper around TreeCursor with Plotnik navigation semantics.
 ///
-/// Critical: The cursor is created at tree root and never reset.
-/// The `descendant_index` is relative to this root, enabling O(1)
-/// checkpoint saves and O(depth) restores.
+/// Critical: The cursor is created at tree root; pooled snapshots are clones of
+/// that root-created cursor, and `reset_to` copies the root along with the
+/// stack. Every cursor in play therefore shares a root, so `descendant_index`
+/// stays root-relative for O(1) checkpoint saves and O(depth) restores.
 pub struct CursorWrapper<'t> {
     cursor: TreeCursor<'t>,
+    snapshots: SnapshotPool<'t>,
+}
+
+/// Pool of cursor snapshots keyed by a monotonically increasing sequence
+/// number. `live` is ordered oldest to newest (seq strictly increasing), so the
+/// newest snapshot is at the back, where LIFO restores look. Evicted or
+/// consumed cursors go to `free` and are recycled by `reset_to`, so the pool
+/// stops allocating once warm.
+pub(crate) struct SnapshotPool<'t> {
+    live: VecDeque<SnapshotEntry<'t>>,
+    free: Vec<TreeCursor<'t>>,
+    next_seq: u32,
+    wide_restore_misses: u32,
+}
+
+struct SnapshotEntry<'t> {
+    seq: NonZeroU32,
+    /// Checkpoints on the stack still holding this seq. A branch fan-out shares
+    /// one snapshot across all its alternative checkpoints.
+    refs: u32,
+    cursor: TreeCursor<'t>,
+}
+
+impl<'t> SnapshotPool<'t> {
+    fn new() -> Self {
+        Self {
+            live: VecDeque::new(),
+            free: Vec::new(),
+            next_seq: 0,
+            wide_restore_misses: 0,
+        }
+    }
+
+    /// Bytes charged against the VM memory ceiling (estimate; see constant).
+    fn byte_footprint(&self) -> u64 {
+        (self.live.len() + self.free.len()) as u64 * SNAPSHOT_FOOTPRINT_ESTIMATE
+    }
 }
 
 impl<'t> CursorWrapper<'t> {
     pub fn new(cursor: TreeCursor<'t>) -> Self {
-        Self { cursor }
+        Self {
+            cursor,
+            snapshots: SnapshotPool::new(),
+        }
     }
 
     #[inline]
@@ -89,16 +155,165 @@ impl<'t> CursorWrapper<'t> {
         self.cursor.goto_descendant(index as usize);
     }
 
-    /// Restore the cursor to a checkpoint position. Measured across
-    /// match-heavy workloads, 80–100% of restores target the position the
-    /// cursor is already at, so the equality check pays for itself: one O(1)
-    /// index read instead of goto_descendant's containment-check +
-    /// child-iterator setup.
-    pub fn restore_to(&mut self, index: u32) {
-        if self.descendant_index() == index {
+    /// Snapshot the current position for `refs` checkpoints about to be pushed.
+    /// Costs one clone the first few times, then one `reset_to` (O(depth) memcpy)
+    /// per call.
+    #[inline]
+    pub fn snapshot(&mut self, refs: u32) -> Option<NonZeroU32> {
+        if !self.snapshots_active() {
+            return None;
+        }
+        assert!(refs > 0, "snapshot needs at least one checkpoint reference");
+
+        let pool = &mut self.snapshots;
+        pool.next_seq = pool
+            .next_seq
+            .checked_add(1)
+            .expect("snapshot sequence overflow");
+        let seq = NonZeroU32::new(pool.next_seq).expect("seq starts at 1");
+        let cursor = match pool.free.pop() {
+            Some(mut cursor) => {
+                cursor.reset_to(&self.cursor);
+                cursor
+            }
+            None => self.cursor.clone(),
+        };
+
+        pool.live.push_back(SnapshotEntry { seq, refs, cursor });
+        if pool.live.len() > SNAPSHOT_CAP {
+            let evicted = pool.live.pop_front().expect("len > CAP > 0");
+            pool.free.push(evicted.cursor);
+        }
+
+        Some(seq)
+    }
+
+    /// Restore to a checkpoint position, using its pooled snapshot when it
+    /// survived eviction. Always releases the checkpoint's reference on a hit.
+    #[inline(always)]
+    pub fn restore(&mut self, snapshot: Option<NonZeroU32>, index: u32) {
+        let Some(seq) = snapshot else {
+            self.restore_without_snapshot(index);
+            return;
+        };
+        self.restore_snapshot(seq, index);
+    }
+
+    #[inline(always)]
+    pub fn restore_without_snapshot(&mut self, index: u32) -> bool {
+        let current_index = self.cursor.descendant_index() as u32;
+        if current_index == index {
+            return false;
+        }
+        self.restore_to_from_moved(current_index, index)
+    }
+
+    #[inline(always)]
+    fn restore_snapshot(&mut self, seq: NonZeroU32, index: u32) {
+        let current_index = self.descendant_index();
+        if self.consume_snapshot(seq, index, current_index) {
             return;
         }
+        if current_index == index {
+            return;
+        }
+        self.restore_to_from_moved(current_index, index);
+    }
+
+    /// Bytes charged against the VM memory ceiling for pooled cursor snapshots.
+    #[inline]
+    pub fn snapshot_footprint(&self) -> u64 {
+        self.snapshots.byte_footprint()
+    }
+
+    /// True if the snapshot was found and the cursor restored from it.
+    fn consume_snapshot(&mut self, seq: NonZeroU32, index: u32, current_index: u32) -> bool {
+        let cursor_is_at_index = current_index == index;
+        let pool = &mut self.snapshots;
+
+        // Anything newer than `seq` belongs to checkpoints already popped
+        // (LIFO); their refs must have hit zero. Drain defensively so a
+        // bookkeeping slip degrades to fallback instead of a wrong restore.
+        while let Some(back) = pool.live.back()
+            && back.seq > seq
+        {
+            debug_assert_eq!(
+                back.refs, 0,
+                "snapshot newer than the checkpoint being restored still referenced"
+            );
+            let entry = pool.live.pop_back().expect("back exists");
+            pool.free.push(entry.cursor);
+        }
+
+        let Some(back) = pool.live.back_mut() else {
+            return false;
+        };
+        if back.seq != seq {
+            return false;
+        }
+
+        if !cursor_is_at_index {
+            self.cursor.reset_to(&back.cursor);
+            debug_assert_eq!(
+                self.cursor.descendant_index() as u32,
+                index,
+                "pooled snapshot restored the wrong cursor position"
+            );
+        }
+
+        back.refs = back
+            .refs
+            .checked_sub(1)
+            .expect("snapshot reference released more times than acquired");
+        if back.refs == 0 {
+            let entry = pool.live.pop_back().expect("back exists");
+            pool.free.push(entry.cursor);
+        }
+
+        true
+    }
+
+    #[inline]
+    fn restore_to_from_moved(&mut self, current_index: u32, index: u32) -> bool {
+        let mut activated = false;
+        if current_index.abs_diff(index) >= SNAPSHOT_ACTIVATION_MIN_JUMP {
+            activated = self.record_wide_restore_miss();
+        }
         self.cursor.goto_descendant(index as usize);
+        activated
+    }
+
+    #[inline]
+    pub fn snapshots_active(&self) -> bool {
+        self.snapshots.wide_restore_misses >= SNAPSHOT_ACTIVATION_WIDE_MISSES
+    }
+
+    fn record_wide_restore_miss(&mut self) -> bool {
+        if self.snapshots.wide_restore_misses >= SNAPSHOT_ACTIVATION_WIDE_MISSES {
+            return false;
+        }
+        self.snapshots.wide_restore_misses += 1;
+        self.snapshots.wide_restore_misses == SNAPSHOT_ACTIVATION_WIDE_MISSES
+    }
+
+    #[cfg(test)]
+    pub(crate) fn snapshot_live_len(&self) -> usize {
+        self.snapshots.live.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn activate_snapshots_for_test(&mut self) {
+        self.snapshots.wide_restore_misses = SNAPSHOT_ACTIVATION_WIDE_MISSES;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn snapshot_cap() -> usize {
+        SNAPSHOT_CAP
+    }
+
+    #[cfg(test)]
+    pub(crate) fn snapshot_activation_misses() -> u32 {
+        SNAPSHOT_ACTIVATION_WIDE_MISSES
     }
 
     #[inline]

@@ -1,5 +1,7 @@
 //! Virtual machine for executing compiled Plotnik queries.
 
+use std::num::NonZeroU32;
+
 use arborium_tree_sitter::Tree;
 
 use crate::bytecode::{
@@ -34,6 +36,7 @@ pub struct VM<'t> {
     pub(crate) steps_used: u64,
     pub(crate) recursion_depth: u32,
     pub(crate) limits: ResolvedRuntimeLimits,
+    pub(crate) snapshot_cursor_active: bool,
 
     /// Suppression nesting on the active match path: when `> 0`, effects are
     /// suppressed (not emitted to the log). `SuppressBegin` increments,
@@ -83,6 +86,7 @@ impl<'t> VMBuilder<'t> {
             steps_used: 0,
             recursion_depth: 0,
             limits: self.spec.resolve(source_nodes),
+            snapshot_cursor_active: false,
             suppress_depth: 0,
             source: self.source,
         }
@@ -96,20 +100,24 @@ impl<'t> VM<'t> {
 
     /// Snapshot the VM state a checkpoint restores on backtrack.
     fn checkpoint_state(&self) -> CheckpointState {
-        CheckpointState {
-            descendant_index: self.cursor.descendant_index(),
-            effect_watermark: self.effects.len(),
-            frame_index: self.frames.current(),
-            recursion_depth: self.recursion_depth,
-            suppress_depth: self.suppress_depth,
-        }
+        CheckpointState::new(
+            self.cursor.descendant_index(),
+            self.effects.len(),
+            self.frames.current(),
+            self.recursion_depth,
+            self.suppress_depth,
+        )
     }
 
     /// Restore VM state from a checkpoint's snapshot.
-    fn restore_checkpoint_state(&mut self, state: CheckpointState) {
-        self.cursor.restore_to(state.descendant_index);
+    fn restore_checkpoint_state(&mut self, state: CheckpointState, snapshot: Option<NonZeroU32>) {
+        if let Some(snapshot) = snapshot {
+            self.cursor.restore(Some(snapshot), state.descendant_index);
+        } else if self.cursor.restore_without_snapshot(state.descendant_index) {
+            self.snapshot_cursor_active = true;
+        }
         self.effects.truncate(state.effect_watermark);
-        self.frames.restore(state.frame_index);
+        self.frames.restore(state.frame_index());
         self.recursion_depth = state.recursion_depth;
         self.suppress_depth = state.suppress_depth;
         debug_assert_eq!(
@@ -141,6 +149,7 @@ impl<'t> VM<'t> {
             checkpoints: _, // the stack this checkpoint was just popped from
             steps_used: _,  // monotonic step counter, never rewound on backtrack
             limits: _,      // immutable execution config
+            snapshot_cursor_active: _, // cumulative optimization state
             source: _,      // immutable input text
         } = self;
 
@@ -156,7 +165,7 @@ impl<'t> VM<'t> {
         );
         debug_assert_eq!(
             frames.current(),
-            state.frame_index,
+            state.frame_index(),
             "checkpoint restore: frame index"
         );
         debug_assert_eq!(
@@ -175,13 +184,19 @@ impl<'t> VM<'t> {
         Checkpoint::call_retry(self.checkpoint_state(), call_ip, resume)
     }
 
-    /// Live bytes across the three growable runtime arenas (frame, checkpoint,
-    /// and effect heaps) — the quantity the memory ceiling bounds. A sum of
-    /// element-count × element-size; it never allocates.
+    fn cursor_snapshot(&mut self, refs: u32) -> NonZeroU32 {
+        self.cursor
+            .snapshot(refs)
+            .expect("snapshot cursor active flag tracks cursor pool activation")
+    }
+
+    /// Live bytes across the growable runtime arenas — the quantity the memory
+    /// ceiling bounds. A sum of element-count × element-size; it never allocates.
     fn heap_bytes(&self) -> u64 {
         self.frames.byte_footprint()
             + self.checkpoints.byte_footprint()
             + self.effects.byte_footprint()
+            + self.cursor.snapshot_footprint()
     }
 
     /// Execute query from entrypoint, returning effect log.
@@ -223,9 +238,10 @@ impl<'t> VM<'t> {
 
             // Memory ceiling: bound the live runtime heap, sampled every
             // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded
-            // (≤30 checkpoints + ≤15 effects + 1 frame ≈ 2.4 KiB), so sampling
-            // every 1024 steps bounds the unobserved overshoot to ~2.5 MiB —
-            // noise against the ≥64 MiB auto ceiling. `None` opts out
+            // (≤30 checkpoints + ≤15 effects + 1 frame + ≤1 pooled snapshot
+            // ≈ 4.4 KiB), so sampling every 1024 steps bounds the unobserved
+            // overshoot to ~4.5 MiB — noise against the ≥64 MiB auto ceiling.
+            // `None` opts out
             // (Unbounded).
             if self.steps_used & MEMORY_SAMPLE_MASK == 0
                 && let Some(max) = self.limits.max_memory
@@ -437,11 +453,26 @@ impl<'t> VM<'t> {
         // snapshot serves every push: nothing in the loop moves the cursor or
         // touches the arenas the snapshot reads.
         if succs.len() > 1 {
+            // Trace fixtures pin descendant-index restore's historical cursor
+            // path through anonymous nodes. Noop execution can use exact pooled
+            // snapshots without changing rendered query output.
             let state = self.checkpoint_state();
-            for &alt in succs[1..].iter().rev() {
-                self.checkpoints.push(Checkpoint::branch(state, alt));
-                if T::ENABLED {
-                    tracer.trace_checkpoint_created(self.ip);
+            if !T::ENABLED && self.snapshot_cursor_active {
+                let refs = u32::try_from(succs.len() - 1).expect("branch fan-out count fits u32");
+                let snapshot = self.cursor_snapshot(refs);
+                for &alt in succs[1..].iter().rev() {
+                    self.checkpoints
+                        .push_with_snapshot(Checkpoint::branch(state, alt), snapshot);
+                    if T::ENABLED {
+                        tracer.trace_checkpoint_created(self.ip);
+                    }
+                }
+            } else {
+                for &alt in succs[1..].iter().rev() {
+                    self.checkpoints.push(Checkpoint::branch(state, alt));
+                    if T::ENABLED {
+                        tracer.trace_checkpoint_created(self.ip);
+                    }
                 }
             }
         }
@@ -465,8 +496,13 @@ impl<'t> VM<'t> {
                 field: c.node_field,
                 policy,
             };
-            self.checkpoints
-                .push(self.call_retry_checkpoint(self.ip, resume));
+            let cp = self.call_retry_checkpoint(self.ip, resume);
+            if !T::ENABLED && self.snapshot_cursor_active {
+                let snapshot = self.cursor_snapshot(1);
+                self.checkpoints.push_with_snapshot(cp, snapshot);
+            } else {
+                self.checkpoints.push(cp);
+            }
             if T::ENABLED {
                 tracer.trace_checkpoint_created(self.ip);
             }
@@ -591,13 +627,18 @@ impl<'t> VM<'t> {
     // a resume succeeds or it empties — the loop always terminates.
     fn backtrack<T: Tracer>(&mut self, tracer: &mut T) -> Signal {
         loop {
-            let Some(cp) = self.checkpoints.pop() else {
+            let popped = if self.snapshot_cursor_active {
+                self.checkpoints.pop_with_snapshot()
+            } else {
+                self.checkpoints.pop().map(|checkpoint| (checkpoint, None))
+            };
+            let Some((cp, snapshot)) = popped else {
                 return RuntimeError::NoMatch.into();
             };
             if T::ENABLED {
                 tracer.trace_backtrack();
             }
-            self.restore_checkpoint_state(cp.state);
+            self.restore_checkpoint_state(cp.state, snapshot);
 
             let Some(resume) = cp.call_resume else {
                 self.ip = cp.ip;
@@ -627,8 +668,13 @@ impl<'t> VM<'t> {
                 }
             }
 
-            self.checkpoints
-                .push(self.call_retry_checkpoint(cp.ip, resume));
+            let retry = self.call_retry_checkpoint(cp.ip, resume);
+            if !T::ENABLED && self.snapshot_cursor_active {
+                let snapshot = self.cursor_snapshot(1);
+                self.checkpoints.push_with_snapshot(retry, snapshot);
+            } else {
+                self.checkpoints.push(retry);
+            }
             if T::ENABLED {
                 tracer.trace_checkpoint_created(cp.ip);
             }

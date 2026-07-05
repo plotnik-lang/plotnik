@@ -56,6 +56,136 @@ fn text<'a>(w: &CursorWrapper<'_>, source: &'a str) -> &'a str {
 }
 
 #[test]
+fn snapshot_restore_returns_to_saved_position() {
+    let source = "[1, 2]";
+    let tree = parse_js(source);
+    let mut w = CursorWrapper::new(tree.walk());
+    let saved = leaf_index(&tree, source, "1");
+    let away = leaf_index(&tree, source, "2");
+    w.activate_snapshots_for_test();
+    w.goto_descendant(saved);
+    let snapshot = w.snapshot(1);
+
+    w.goto_descendant(away);
+    w.restore(snapshot, saved);
+
+    assert_eq!(w.descendant_index(), saved);
+    assert_eq!(text(&w, source), "1");
+    assert_eq!(w.snapshot_live_len(), 0, "single-use snapshot is freed");
+}
+
+#[test]
+fn snapshot_restore_falls_back_after_eviction() {
+    let source = "[1, 2]";
+    let tree = parse_js(source);
+    let mut w = CursorWrapper::new(tree.walk());
+    let saved = leaf_index(&tree, source, "1");
+    let away = leaf_index(&tree, source, "2");
+    w.activate_snapshots_for_test();
+    w.goto_descendant(saved);
+    let evicted = w.snapshot(1);
+    let mut newer = Vec::new();
+
+    for _ in 0..CursorWrapper::snapshot_cap() {
+        newer.push(w.snapshot(1));
+    }
+    assert_eq!(
+        w.snapshot_live_len(),
+        CursorWrapper::snapshot_cap(),
+        "oldest snapshot was evicted once the cap was exceeded"
+    );
+
+    for snapshot in newer.into_iter().rev() {
+        w.restore(snapshot, saved);
+    }
+    assert_eq!(w.snapshot_live_len(), 0);
+
+    w.goto_descendant(away);
+    w.restore(evicted, saved);
+
+    assert_eq!(w.descendant_index(), saved);
+    assert_eq!(text(&w, source), "1");
+}
+
+#[test]
+fn snapshot_refs_are_shared_across_fanout() {
+    let source = "[1, 2, 3, 4]";
+    let tree = parse_js(source);
+    let mut w = CursorWrapper::new(tree.walk());
+    let saved = leaf_index(&tree, source, "1");
+    w.activate_snapshots_for_test();
+    w.goto_descendant(saved);
+    let snapshot = w.snapshot(3);
+
+    for (i, away) in ["2", "3", "4"].into_iter().enumerate() {
+        let away = leaf_index(&tree, source, away);
+        w.goto_descendant(away);
+        w.restore(snapshot, saved);
+
+        assert_eq!(w.descendant_index(), saved);
+        assert_eq!(text(&w, source), "1");
+        let expected_live = if i == 2 { 0 } else { 1 };
+        assert_eq!(
+            w.snapshot_live_len(),
+            expected_live,
+            "shared snapshot should survive until its last reference"
+        );
+    }
+}
+
+#[test]
+fn same_position_snapshot_restore_releases_reference() {
+    let source = "[1]";
+    let tree = parse_js(source);
+    let mut w = CursorWrapper::new(tree.walk());
+    let saved = leaf_index(&tree, source, "1");
+    w.activate_snapshots_for_test();
+    w.goto_descendant(saved);
+    let snapshot = w.snapshot(1);
+
+    w.restore(snapshot, saved);
+
+    assert_eq!(w.descendant_index(), saved);
+    assert_eq!(text(&w, source), "1");
+    assert_eq!(
+        w.snapshot_live_len(),
+        0,
+        "same-position restore still consumes the checkpoint reference"
+    );
+}
+
+#[test]
+fn snapshots_activate_after_lateral_restore_pressure() {
+    let source = format!(
+        "[{}]",
+        (0..80)
+            .map(|n| n.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    let tree = parse_js(&source);
+    let mut w = CursorWrapper::new(tree.walk());
+    let saved = leaf_index(&tree, &source, "0");
+    let away = leaf_index(&tree, &source, "79");
+    w.goto_descendant(saved);
+
+    assert!(
+        w.snapshot(1).is_none(),
+        "cold scans should not pay snapshot creation cost"
+    );
+
+    for _ in 0..CursorWrapper::snapshot_activation_misses() {
+        w.goto_descendant(away);
+        w.restore(None, saved);
+    }
+
+    assert!(
+        w.snapshot(1).is_some(),
+        "lateral restore pressure should activate snapshot creation"
+    );
+}
+
+#[test]
 fn go_up_skip_trivia_rejects_when_a_parent_is_not_last_child() {
     // `1` is the last non-trivia child of the inner array, but the inner array is
     // NOT the last non-trivia child of the outer array (`x` follows). A per-level
