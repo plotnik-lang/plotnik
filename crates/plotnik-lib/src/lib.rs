@@ -45,7 +45,7 @@ pub use crate::core::Colors;
 
 pub use crate::compiler::{
     CheckedQuery, CompiledQuery, Query, QueryBuilder, Source, SourceId, SourceKind, SourceMap,
-    SourcePath,
+    SourcePath, TokenSpan, tokenize,
 };
 pub use crate::compiler::{
     DiagnosticBuilder, DiagnosticKind, Diagnostics, Error, QueryResult, Severity, Span,
