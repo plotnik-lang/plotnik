@@ -1,0 +1,9 @@
+Q = (array
+  (identifier)+? @many
+  (number)?? @one
+)
+--------------------- TYPES ----------------------
+export interface Q {
+  many: [Node, ...Node[]];
+  one: Node | null;
+}

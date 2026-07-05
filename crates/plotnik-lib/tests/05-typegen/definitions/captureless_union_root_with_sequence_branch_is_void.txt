@@ -1,0 +1,9 @@
+Q = [
+  (identifier)
+  {
+    (identifier)
+    (number)
+  }
+]
+--------------------- TYPES ----------------------
+export type Q = undefined;

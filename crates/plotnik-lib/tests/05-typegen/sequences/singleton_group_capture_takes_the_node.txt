@@ -1,5 +1,5 @@
-Q = (identifier) @name
+Q = (program {(expression_statement)} @x)
 --------------------- TYPES ----------------------
 export interface Q {
-  name: Node;
+  x: Node;
 }

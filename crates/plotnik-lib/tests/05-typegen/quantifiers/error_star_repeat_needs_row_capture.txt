@@ -1,0 +1,10 @@
+Q = (program {(expression_statement) @s}*)
+------------------ DIAGNOSTICS -------------------
+error: captures `@s` repeat with `*` but aren't collected into a list
+ --> query.ptk:1:14
+  |
+1 | Q = (program {(expression_statement) @s}*)
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: add a row capture so each repeat becomes one element: `{...}* @items`
+help: or discard the captures if only the structure matters: `{...}* @_`

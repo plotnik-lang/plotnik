@@ -1,5 +1,5 @@
-Q = (identifier)+ @names
+Q = (identifier)+ @ids
 --------------------- TYPES ----------------------
 export interface Q {
-  names: [Node, ...Node[]];
+  ids: [Node, ...Node[]];
 }

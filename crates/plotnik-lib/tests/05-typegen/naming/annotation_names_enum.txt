@@ -1,0 +1,12 @@
+Q = (program [
+  A: (expression_statement)
+  B: (debugger_statement)
+] @kind :: Kind)
+--------------------- TYPES ----------------------
+export type Kind =
+  | { $tag: "A" }
+  | { $tag: "B" };
+
+export interface Q {
+  kind: Kind;
+}

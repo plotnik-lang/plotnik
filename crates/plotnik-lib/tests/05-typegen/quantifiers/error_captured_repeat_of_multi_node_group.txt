@@ -1,16 +1,17 @@
-Bad = {
-  (identifier)
-  (number)
-}* @items
+Q = (program
+  {
+    (expression_statement)
+    (debugger_statement)
+  }* @rows
+)
 ------------------ DIAGNOSTICS -------------------
 error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
- --> query.ptk:1:7
+ --> query.ptk:2:3
   |
-1 |   Bad = {
-  |  _______^
-2 | |   (identifier)
-3 | |   (number)
-4 | | }* @items
-  | |__^
+2 | /   {
+3 | |     (expression_statement)
+4 | |     (debugger_statement)
+5 | |   }* @rows
+  | |____^
   |
 help: add internal captures: `{(a) @a (b) @b}* @items`

@@ -1,0 +1,15 @@
+Q = (program
+  {
+    (lexical_declaration) @decl
+    (debugger_statement) @dbg
+  }? @attrs
+)
+--------------------- TYPES ----------------------
+export interface QAttrs {
+  dbg: Node;
+  decl: Node;
+}
+
+export interface Q {
+  attrs: QAttrs | null;
+}

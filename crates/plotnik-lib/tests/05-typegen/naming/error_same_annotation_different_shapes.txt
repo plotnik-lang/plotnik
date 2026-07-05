@@ -1,0 +1,12 @@
+Q = (program
+  {(expression_statement) @stmt} @a :: Info
+  {(lexical_declaration) @decl} @b :: Info
+)
+------------------ DIAGNOSTICS -------------------
+error: type name `Info` is already used for a different type
+ --> query.ptk:3:39
+  |
+2 |   {(expression_statement) @stmt} @a :: Info
+  |                                        ---- already used here
+3 |   {(lexical_declaration) @decl} @b :: Info
+  |                                       ^^^^

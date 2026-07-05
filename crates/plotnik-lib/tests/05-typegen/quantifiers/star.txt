@@ -1,8 +1,5 @@
-A = (identifier)??
-Q = (A) @x
+Q = (identifier)* @ids
 --------------------- TYPES ----------------------
 export interface Q {
-  x: A;
+  ids: Node[];
 }
-
-export type A = Node | null;

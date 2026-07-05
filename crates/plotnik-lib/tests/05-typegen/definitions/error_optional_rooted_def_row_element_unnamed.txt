@@ -1,16 +1,9 @@
-Q = {
-  (identifier) @mod
-  (decorator) @dec
-}?
+Bad = (expression_statement (identifier) @id)?
 ------------------ DIAGNOSTICS -------------------
 error: the definition names the optional itself, so each `?` element — a row of captures — is left without a type name
- --> query.ptk:1:5
+ --> query.ptk:1:7
   |
-1 |   Q = {
-  |  _____^
-2 | |   (identifier) @mod
-3 | |   (decorator) @dec
-4 | | }?
-  | |__^
+1 | Bad = (expression_statement (identifier) @id)?
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: name the element type in its own definition, then quantify a reference to it: `Elem = ...` and `(Elem)?`

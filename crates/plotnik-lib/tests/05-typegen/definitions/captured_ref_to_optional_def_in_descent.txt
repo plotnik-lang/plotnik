@@ -1,8 +1,0 @@
-A = (identifier)??
-Q = (program (A) @x)
---------------------- TYPES ----------------------
-export interface Q {
-  x: A;
-}
-
-export type A = Node | null;

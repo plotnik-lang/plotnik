@@ -1,5 +1,5 @@
-Q = (decorator)? @dec
+Q = (identifier)? @id
 --------------------- TYPES ----------------------
 export interface Q {
-  dec: Node | null;
+  id: Node | null;
 }

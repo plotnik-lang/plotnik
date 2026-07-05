@@ -1,0 +1,15 @@
+Foo = {
+  (expression_statement)
+  (debugger_statement)
+}
+
+Q = (program {(lexical_declaration) @d} @x :: Foo)
+------------------ DIAGNOSTICS -------------------
+error: type name `Foo` is already used for a different type
+ --> query.ptk:6:47
+  |
+1 | Foo = {
+  | --- already used here
+...
+6 | Q = (program {(lexical_declaration) @d} @x :: Foo)
+  |                                               ^^^

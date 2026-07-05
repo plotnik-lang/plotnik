@@ -1,0 +1,10 @@
+Foo = (expression_statement (identifier) @id)
+Q = (program {(debugger_statement) @d} @x :: Foo)
+------------------ DIAGNOSTICS -------------------
+error: type name `Foo` is already used for a different type
+ --> query.ptk:2:46
+  |
+1 | Foo = (expression_statement (identifier) @id)
+  | --- already used here
+2 | Q = (program {(debugger_statement) @d} @x :: Foo)
+  |                                              ^^^

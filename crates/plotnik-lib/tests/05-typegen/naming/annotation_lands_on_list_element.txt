@@ -1,0 +1,9 @@
+Q = (program {(expression_statement) @s}* @rows :: Row)
+--------------------- TYPES ----------------------
+export interface Row {
+  s: Node;
+}
+
+export interface Q {
+  rows: Row[];
+}

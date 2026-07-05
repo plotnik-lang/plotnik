@@ -1,0 +1,8 @@
+Q = (variable_declarator
+  -value
+  name: (identifier) @name
+)
+--------------------- TYPES ----------------------
+export interface Q {
+  name: Node;
+}

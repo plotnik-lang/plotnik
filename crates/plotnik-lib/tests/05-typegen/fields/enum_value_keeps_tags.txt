@@ -1,0 +1,14 @@
+Q = (call_expression
+  function: [
+    Id: (identifier)
+    Member: (member_expression)
+  ] @fn
+)
+--------------------- TYPES ----------------------
+export type QFn =
+  | { $tag: "Id" }
+  | { $tag: "Member" };
+
+export interface Q {
+  fn: QFn;
+}

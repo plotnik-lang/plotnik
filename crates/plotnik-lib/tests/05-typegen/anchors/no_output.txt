@@ -1,0 +1,5 @@
+Q = (program (expression_statement (array . (identifier) @first)))
+--------------------- TYPES ----------------------
+export interface Q {
+  first: Node;
+}

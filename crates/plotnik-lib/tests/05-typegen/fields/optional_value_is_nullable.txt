@@ -1,5 +1,5 @@
-Q = (decorator)* @decorators
+Q = (variable_declarator value: (number)? @init)
 --------------------- TYPES ----------------------
 export interface Q {
-  decorators: Node[];
+  init: Node | null;
 }

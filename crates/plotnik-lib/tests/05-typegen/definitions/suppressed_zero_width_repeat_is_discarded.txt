@@ -1,0 +1,6 @@
+MaybeId = (identifier)?
+Q = (program (expression_statement (array (MaybeId)* @_)))
+--------------------- TYPES ----------------------
+export type MaybeId = Node | null;
+
+export type Q = undefined;

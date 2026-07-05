@@ -1,0 +1,3 @@
+Q = (program (expression_statement (identifier) @id) @_)
+--------------------- TYPES ----------------------
+export type Q = undefined;
