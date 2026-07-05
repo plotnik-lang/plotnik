@@ -77,3 +77,31 @@ jobs:
 
       - name: All-features workspace
         run: cargo check --workspace --all-targets --all-features
+
+  wasm:
+    runs-on: ubuntu-latest
+    env:
+      LLVM_PREFIX: /usr/lib/llvm-18
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install LLVM 18
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 llvm-18
+
+      - name: Using Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          cache-all-crates: "true"
+          cache-on-failure: "true"
+          prefix-key: v0-rust-wasm
+
+      - name: Check wasm
+        run: make check-wasm
