@@ -1,0 +1,121 @@
+Inner = (identifier) @name
+Q = (program (expression_statement [Call: (Inner) @data] @v))
+--------------------- INPUT ----------------------
+x;
+--------------------- TYPES ----------------------
+export type QV =
+  | { $tag: "Call"; $data: { data: Inner } };
+
+export interface Q {
+  v: QV;
+}
+
+export interface Inner {
+  name: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "v": {
+    "$tag": "Call",
+    "$data": {
+      "data": {
+        "name": {
+          "kind": "identifier",
+          "text": "x",
+          "span": [0, 1]
+        }
+      }
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "name"
+S02 "data"
+S03 "Call"
+S04 "v"
+S05 "Inner"
+S06 "QV"
+S07 "Q"
+S08 "identifier"
+S09 "program"
+S10 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+T2 = Struct  M1:1  ; { data }
+T3 = Enum    M2:1  ; Call
+T4 = Struct  M3:1  ; { v }
+
+[type_members]
+M0: S01 → T0  ; name: <Node>
+M1: S02 → T1  ; data: Inner
+M2: S03 → T2  ; Call: T2
+M3: S04 → T3  ; v: QV
+
+[type_names]
+N0: S05 → T1  ; Inner
+N1: S06 → T3  ; QV
+N2: S07 → T4  ; Q
+
+[entrypoints]
+Inner = 00 :: T1
+Q     = 06 :: T4
+
+[transitions]
+Inner:
+  00  -ε-  [StructOpen]                     02
+  02       (@17)                            17 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06  -ε-  [StructOpen]                     08
+  08       (@29)                            29 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  -ε-  [StructClose Set(M1) EnumClose]  14
+  14  ─‣┘² _ [Set(M3)]                      19
+  16                                        ▶
+  17   !   (identifier) [Node Set(M0)]      16
+  19                                        ▶
+  20   !   (@17)                            17 : 12
+  21  -ε-  [EnumOpen(M2) StructOpen]        20
+  23  ...
+  24  ─‣─  _                                21, 24
+  26  └‣─  _                                21, 24
+  28  └‣─  (expression_statement)           26
+  29   !   (program)                        28
+--------------------- TRACE ----------------------
+Q:
+  06  -ε-  [StructOpen]                     08
+  08       (?)                              29 : 09
+       ▶   (?)
+
+?:
+  29       (program)                        28
+       ●   program
+  28       (expression_statement)           26
+       ●   expression_statement
+  26       _                                21, 24
+       ●   identifier
+  21  -ε-  [EnumOpen(M2) StructOpen]        20
+  20       (?)                              17 : 12
+       ▶   (?)
+
+?:
+  17       (identifier) [Node Set(M0)]      16
+       ●   identifier
+  16   ◀   (?)                              
+
+?:
+  12  -ε-  [StructClose Set(M1) EnumClose]  14
+  14       _ [Set(M3)]                      19
+       ●   program
+  19   ◀   (?)                              
+
+Q:
+  09  -ε-  [StructClose]                    11
+  11   ◀   (Q)                              ◼

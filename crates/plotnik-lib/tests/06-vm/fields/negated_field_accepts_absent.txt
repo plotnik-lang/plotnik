@@ -1,44 +1,39 @@
-Q = (program (function_declaration name: (identifier) @name) @fn)
+Q = (program (lexical_declaration (variable_declarator name: (identifier) @n -value)))
 --------------------- INPUT ----------------------
-function foo() {}
+let x
 --------------------- TYPES ----------------------
 export interface Q {
-  fn: Node;
-  name: Node;
+  n: Node;
 }
 --------------------- OUTPUT ---------------------
 {
-  "fn": {
-    "kind": "function_declaration",
-    "text": "function foo() {}",
-    "span": [0, 17]
-  },
-  "name": {
+  "n": {
     "kind": "identifier",
-    "text": "foo",
-    "span": [9, 12]
+    "text": "x",
+    "span": [4, 5]
   }
 }
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "fn"
-S2 "name"
-S3 "Q"
-S4 "program"
-S5 "function_declaration"
+S1 "n"
+S2 "Q"
+S3 "program"
+S4 "lexical_declaration"
+S5 "variable_declarator"
 S6 "identifier"
+S7 "value"
+S8 "name"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { fn, name }
+T1 = Struct  M0:1  ; { n }
 
 [type_members]
-M0: S1 → T0  ; fn: <Node>
-M1: S2 → T0  ; name: <Node>
+M0: S1 → T0  ; n: <Node>
 
 [type_names]
-N0: S3 → T1  ; Q
+N0: S2 → T1  ; Q
 
 [entrypoints]
 Q = 00 :: T1
@@ -46,27 +41,30 @@ Q = 00 :: T1
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@12)                            12 : 03
+  02       (@13)                            13 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-  06  └‣─  name: (identifier) [Node Set(M1)]  08
-  08  ─‣┘² _                                09
+  06  └‣─  name: (identifier) [Node Set(M0)]  08
+  08  ─‣┘³ _                                09
   09                                        ▶
-  10  └‣─  (function_declaration) [Node Set(M0)]  06
-  12   !   (program)                        10
+  10  └‣─  -value (variable_declarator)     06
+  12  └‣─  (lexical_declaration)            10
+  13   !   (program)                        12
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              12 : 03
+  02       (?)                              13 : 03
        ▶   (?)
 
 ?:
-  12       (program)                        10
+  13       (program)                        12
        ●   program
-  10       (function_declaration) [Node Set(M0)]  06
-       ●   function_declaration
-  06       name: (identifier) [Node Set(M1)]  08
-       ○   function
+  12       (lexical_declaration)            10
+       ●   lexical_declaration
+  10       -value (variable_declarator)     06
+       ○   let
+       ●   variable_declarator
+  06       name: (identifier) [Node Set(M0)]  08
        ●   identifier
   08       _                                09
        ●   program

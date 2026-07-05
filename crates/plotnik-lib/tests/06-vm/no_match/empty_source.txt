@@ -1,0 +1,49 @@
+Q = (program (expression_statement) @e)
+--------------------- INPUT ----------------------
+--------------------- TYPES ----------------------
+export interface Q {
+  e: Node;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "e"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { e }
+
+[type_members]
+M0: S1 → T0  ; e: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@10)                            10 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  └‣─  (expression_statement) [Node Set(M0)]  08
+  08  ─‣┘  _                                09
+  09                                        ▶
+  10   !   (program)                        06
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              10 : 03
+       ▶   (?)
+
+?:
+  10       (program)                        06
+       ●   program
+  06       (expression_statement) [Node Set(M0)]  08

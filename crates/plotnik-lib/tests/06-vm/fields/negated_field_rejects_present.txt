@@ -1,0 +1,59 @@
+Q = (program (lexical_declaration (variable_declarator name: (identifier) @n -value)))
+--------------------- INPUT ----------------------
+let x = 1
+--------------------- TYPES ----------------------
+export interface Q {
+  n: Node;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "n"
+S2 "Q"
+S3 "program"
+S4 "lexical_declaration"
+S5 "variable_declarator"
+S6 "identifier"
+S7 "value"
+S8 "name"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { n }
+
+[type_members]
+M0: S1 → T0  ; n: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@13)                            13 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  └‣─  name: (identifier) [Node Set(M0)]  08
+  08  ─‣┘³ _                                09
+  09                                        ▶
+  10  └‣─  -value (variable_declarator)     06
+  12  └‣─  (lexical_declaration)            10
+  13   !   (program)                        12
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              13 : 03
+       ▶   (?)
+
+?:
+  13       (program)                        12
+       ●   program
+  12       (lexical_declaration)            10
+       ●   lexical_declaration
+  10       -value (variable_declarator)     06
+       ○   let

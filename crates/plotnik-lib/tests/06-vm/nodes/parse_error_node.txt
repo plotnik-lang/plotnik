@@ -1,0 +1,63 @@
+Q = (program (ERROR) @err)
+--------------------- INPUT ----------------------
+);
+--------------------- TYPES ----------------------
+export interface Q {
+  err: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "err": {
+    "kind": "ERROR",
+    "text": ")",
+    "span": [0, 1]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "err"
+S2 "Q"
+S3 "program"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { err }
+
+[type_members]
+M0: S1 → T0  ; err: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@10)                            10 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  └‣─  (_) [Node Set(M0)]               08
+  08  ─‣┘  _                                09
+  09                                        ▶
+  10   !   (program)                        06
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              10 : 03
+       ▶   (?)
+
+?:
+  10       (program)                        06
+       ●   program
+  06       (_) [Node Set(M0)]               08
+       ●   ERROR
+  08       _                                09
+       ●   program
+  09   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

@@ -1,8 +1,5 @@
 Q = (program
-  [
-    A: (expression_statement)
-    B: (debugger_statement)
-  ] @_
+  (expression_statement) @_first
   (debugger_statement) @d
 )
 --------------------- INPUT ----------------------
@@ -44,28 +41,23 @@ Q = 00 :: T1
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@16)                            16 : 03
+  02       (@11)                            11 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06  ─‣─  (debugger_statement) [Node Set(M0)]  08
   08  ─‣┘  _                                09
   09                                        ▶
-  10   !   (expression_statement)           06
-  11   !   (debugger_statement)             06
-  12  ─‣─  _                                10, 11, 12
-  14  └‣─  _                                10, 11, 12
-  16   !   (program)                        14
+  10  └‣─  (expression_statement)           06
+  11   !   (program)                        10
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              16 : 03
+  02       (?)                              11 : 03
        ▶   (?)
 
 ?:
-  16       (program)                        14
+  11       (program)                        10
        ●   program
-  14       _                                10, 11, 12
-       ●   expression_statement
   10       (expression_statement)           06
        ●   expression_statement
   06       (debugger_statement) [Node Set(M0)]  08

@@ -1,0 +1,74 @@
+Q = (program (lexical_declaration (variable_declarator name: (identifier) @n)))
+--------------------- INPUT ----------------------
+let x
+--------------------- TYPES ----------------------
+export interface Q {
+  n: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "n": {
+    "kind": "identifier",
+    "text": "x",
+    "span": [4, 5]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "n"
+S2 "Q"
+S3 "program"
+S4 "lexical_declaration"
+S5 "variable_declarator"
+S6 "identifier"
+S7 "name"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { n }
+
+[type_members]
+M0: S1 → T0  ; n: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@12)                            12 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  └‣─  name: (identifier) [Node Set(M0)]  08
+  08  ─‣┘³ _                                09
+  09                                        ▶
+  10  └‣─  (variable_declarator)            06
+  11  └‣─  (lexical_declaration)            10
+  12   !   (program)                        11
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              12 : 03
+       ▶   (?)
+
+?:
+  12       (program)                        11
+       ●   program
+  11       (lexical_declaration)            10
+       ●   lexical_declaration
+  10       (variable_declarator)            06
+       ○   let
+       ●   variable_declarator
+  06       name: (identifier) [Node Set(M0)]  08
+       ●   identifier
+  08       _                                09
+       ●   program
+  09   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

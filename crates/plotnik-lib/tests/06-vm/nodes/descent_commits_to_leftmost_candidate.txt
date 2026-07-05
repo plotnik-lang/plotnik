@@ -1,0 +1,56 @@
+Q = (program (expression_statement (number) @n))
+--------------------- INPUT ----------------------
+a; 1;
+--------------------- TYPES ----------------------
+export interface Q {
+  n: Node;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "n"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "number"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { n }
+
+[type_members]
+M0: S1 → T0  ; n: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@11)                            11 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  └‣─  (number) [Node Set(M0)]          08
+  08  ─‣┘² _                                09
+  09                                        ▶
+  10  └‣─  (expression_statement)           06
+  11   !   (program)                        10
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              11 : 03
+       ▶   (?)
+
+?:
+  11       (program)                        10
+       ●   program
+  10       (expression_statement)           06
+       ●   expression_statement
+  06       (number) [Node Set(M0)]          08
+       ○   identifier
+       ○   ;

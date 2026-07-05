@@ -1,8 +1,5 @@
 Q = (program
-  [
-    A: (expression_statement)
-    B: (debugger_statement)
-  ] @_
+  {(expression_statement (identifier) @_inner)} @_outer
   (debugger_statement) @d
 )
 --------------------- INPUT ----------------------
@@ -26,7 +23,8 @@ S1 "d"
 S2 "Q"
 S3 "program"
 S4 "expression_statement"
-S5 "debugger_statement"
+S5 "identifier"
+S6 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
@@ -44,35 +42,36 @@ Q = 00 :: T1
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@16)                            16 : 03
+  02       (@13)                            13 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06  ─‣─  (debugger_statement) [Node Set(M0)]  08
-  08  ─‣┘  _                                09
-  09                                        ▶
-  10   !   (expression_statement)           06
-  11   !   (debugger_statement)             06
-  12  ─‣─  _                                10, 11, 12
-  14  └‣─  _                                10, 11, 12
-  16   !   (program)                        14
+  08  ─‣┘  _                                11
+  09  └‣─  (identifier)                     10
+  10  ─‣┘  _                                06
+  11                                        ▶
+  12  └‣─  (expression_statement)           09
+  13   !   (program)                        12
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              16 : 03
+  02       (?)                              13 : 03
        ▶   (?)
 
 ?:
-  16       (program)                        14
+  13       (program)                        12
        ●   program
-  14       _                                10, 11, 12
+  12       (expression_statement)           09
        ●   expression_statement
-  10       (expression_statement)           06
+  09       (identifier)                     10
+       ●   identifier
+  10       _                                06
        ●   expression_statement
   06       (debugger_statement) [Node Set(M0)]  08
        ●   debugger_statement
-  08       _                                09
+  08       _                                11
        ●   program
-  09   ◀   (?)                              
+  11   ◀   (?)                              
 
 Q:
   03  -ε-  [StructClose]                    05

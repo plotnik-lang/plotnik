@@ -1,0 +1,113 @@
+E = (expression_statement (number) @n)
+Q = (program (E) @e)
+--------------------- INPUT ----------------------
+a; 1;
+--------------------- TYPES ----------------------
+export interface E {
+  n: Node;
+}
+
+export interface Q {
+  e: E;
+}
+--------------------- OUTPUT ---------------------
+{
+  "e": {
+    "n": {
+      "kind": "number",
+      "text": "1",
+      "span": [3, 4]
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "n"
+S2 "e"
+S3 "E"
+S4 "Q"
+S5 "expression_statement"
+S6 "number"
+S7 "program"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { n }
+T2 = Struct  M1:1  ; { e }
+
+[type_members]
+M0: S1 → T0  ; n: <Node>
+M1: S2 → T1  ; e: E
+
+[type_names]
+N0: S3 → T1  ; E
+N1: S4 → T2  ; Q
+
+[entrypoints]
+E = 00 :: T1
+Q = 06 :: T2
+
+[transitions]
+E:
+  00  -ε-  [StructOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06  -ε-  [StructOpen]                     08
+  08       (@24)                            24 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  └‣─  (number) [Node Set(M0)]          14
+  14  ─‣┘  _                                15
+  15                                        ▶
+  16  -ε-  [StructClose]                    18
+  18  ─‣┘  _ [Set(M1)]                      21
+  20   !   (expression_statement)           12
+  21                                        ▶
+  22  └‣─  (@20)                            20 : 16
+  23  ...
+  24   !   (program) [StructOpen]           22
+--------------------- TRACE ----------------------
+Q:
+  06  -ε-  [StructOpen]                     08
+  08       (?)                              24 : 09
+       ▶   (?)
+
+?:
+  24       (program) [StructOpen]           22
+       ●   program
+  22       (?)                              20 : 16
+       ▶   (?)
+
+?:
+  20       (expression_statement)           12
+       ●   expression_statement
+  12       (number) [Node Set(M0)]          14
+       ○   identifier
+       ○   ;
+  22  ❮❮❮ 
+       ▶   (?)
+
+?:
+  20       (expression_statement)           12
+       ●   expression_statement
+  12       (number) [Node Set(M0)]          14
+       ●   number
+  14       _                                15
+       ●   expression_statement
+  15   ◀   (?)                              
+
+?:
+  16  -ε-  [StructClose]                    18
+  18       _ [Set(M1)]                      21
+       ●   program
+  21   ◀   (?)                              
+
+?:
+  09  -ε-  [StructClose]                    11
+  11   ◀   (?)                              
+
+Q:

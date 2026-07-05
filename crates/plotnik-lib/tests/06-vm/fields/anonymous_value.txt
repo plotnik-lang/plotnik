@@ -1,0 +1,74 @@
+Q = (program (expression_statement (binary_expression operator: "+" @op)))
+--------------------- INPUT ----------------------
+a + b;
+--------------------- TYPES ----------------------
+export interface Q {
+  op: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "op": {
+    "kind": "+",
+    "text": "+",
+    "span": [2, 3]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "op"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "binary_expression"
+S6 "+"
+S7 "operator"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { op }
+
+[type_members]
+M0: S1 → T0  ; op: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@12)                            12 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  └‣─  operator: "+" [Node Set(M0)]     08
+  08  ─‣┘³ _                                09
+  09                                        ▶
+  10  └‣─  (binary_expression)              06
+  11  └‣─  (expression_statement)           10
+  12   !   (program)                        11
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              12 : 03
+       ▶   (?)
+
+?:
+  12       (program)                        11
+       ●   program
+  11       (expression_statement)           10
+       ●   expression_statement
+  10       (binary_expression)              06
+       ●   binary_expression
+  06       operator: "+" [Node Set(M0)]     08
+       ○   identifier
+       ●   +
+  08       _                                09
+       ●   program
+  09   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

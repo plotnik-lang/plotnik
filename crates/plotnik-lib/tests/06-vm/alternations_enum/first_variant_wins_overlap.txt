@@ -1,0 +1,83 @@
+Q = (program (expression_statement [A: (_)  B: (identifier)] @v))
+--------------------- INPUT ----------------------
+x;
+--------------------- TYPES ----------------------
+export type QV =
+  | { $tag: "A" }
+  | { $tag: "B" };
+
+export interface Q {
+  v: QV;
+}
+--------------------- OUTPUT ---------------------
+{
+  "v": {
+    "$tag": "A"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "A"
+S2 "B"
+S3 "v"
+S4 "QV"
+S5 "Q"
+S6 "program"
+S7 "expression_statement"
+S8 "identifier"
+
+[type_defs]
+T0 = <Void>
+T1 = Enum    M0:2  ; A | B
+T2 = Struct  M2:1  ; { v }
+
+[type_members]
+M0: S1 → T0  ; A: <Void>
+M1: S2 → T0  ; B: <Void>
+M2: S3 → T1  ; v: QV
+
+[type_names]
+N0: S4 → T1  ; QV
+N1: S5 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@19)                            19 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08   !   (_) [EnumOpen(M0) EnumClose]     16
+  10   !   (identifier) [EnumOpen(M1) EnumClose]  16
+  12  ─‣─  _                                08, 10, 12
+  14  └‣─  _                                08, 10, 12
+  16  ─‣┘² _ [Set(M2)]                      06
+  18  └‣─  (expression_statement)           14
+  19   !   (program)                        18
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              19 : 03
+       ▶   (?)
+
+?:
+  19       (program)                        18
+       ●   program
+  18       (expression_statement)           14
+       ●   expression_statement
+  14       _                                08, 10, 12
+       ●   identifier
+  08       (_) [EnumOpen(M0) EnumClose]     16
+       ●   identifier
+  16       _ [Set(M2)]                      06
+       ●   program
+  06   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼
