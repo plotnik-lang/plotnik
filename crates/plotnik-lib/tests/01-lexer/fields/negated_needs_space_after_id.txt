@@ -1,0 +1,11 @@
+(a -b)
+(a-b)
+--------------------- TOKENS ---------------------
+ParenOpen "("
+Id "a"
+Minus "-"
+Id "b"
+ParenClose ")"
+ParenOpen "("
+Id "a-b"
+ParenClose ")"

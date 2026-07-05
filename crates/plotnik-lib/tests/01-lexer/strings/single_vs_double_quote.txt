@@ -1,8 +1,0 @@
-'single' "double"
---------------------- TOKENS ---------------------
-SingleQuote "'"
-StringContent "single"
-SingleQuote "'"
-DoubleQuote "\""
-StringContent "double"
-DoubleQuote "\""

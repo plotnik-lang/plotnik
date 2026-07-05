@@ -1,4 +1,4 @@
-( ) [ ] { } : = ! ~ _ . .!
+( ) [ ] { } :: : = ! - ~ _ , | / #
 --------------------- TOKENS ---------------------
 ParenOpen "("
 ParenClose ")"
@@ -6,10 +6,14 @@ BracketOpen "["
 BracketClose "]"
 BraceOpen "{"
 BraceClose "}"
+DoubleColon "::"
 Colon ":"
 Equals "="
 Negation "!"
+Minus "-"
 Tilde "~"
 Underscore "_"
-Dot "."
-DotBang ".!"
+Comma ","
+Pipe "|"
+Slash "/"
+Hash "#"

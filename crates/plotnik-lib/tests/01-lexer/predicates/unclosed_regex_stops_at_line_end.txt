@@ -1,0 +1,8 @@
+=~ /abc
+(x)
+--------------------- TOKENS ---------------------
+OpRegexMatch "=~"
+RegexLiteral "/abc"
+ParenOpen "("
+Id "x"
+ParenClose ")"

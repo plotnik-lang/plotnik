@@ -1,5 +1,0 @@
-@_ @_name @name
---------------------- TOKENS ---------------------
-SuppressiveCapture "@_"
-SuppressiveCapture "@_name"
-CaptureToken "@name"

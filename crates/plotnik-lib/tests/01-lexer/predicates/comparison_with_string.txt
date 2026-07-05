@@ -1,0 +1,9 @@
+(identifier == "foo")
+--------------------- TOKENS ---------------------
+ParenOpen "("
+Id "identifier"
+OpEq "=="
+DoubleQuote "\""
+StringContent "foo"
+DoubleQuote "\""
+ParenClose ")"

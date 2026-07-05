@@ -1,0 +1,6 @@
+#!/usr/bin/env -S plotnik run -l javascript
+(a)
+--------------------- TOKENS ---------------------
+ParenOpen "("
+Id "a"
+ParenClose ")"

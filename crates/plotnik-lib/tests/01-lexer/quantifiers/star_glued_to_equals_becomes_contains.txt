@@ -1,7 +1,6 @@
-(expression/binary_expression)
+(a)*=
 --------------------- TOKENS ---------------------
 ParenOpen "("
-Id "expression"
-Slash "/"
-Id "binary_expression"
+Id "a"
 ParenClose ")"
+OpContains "*="

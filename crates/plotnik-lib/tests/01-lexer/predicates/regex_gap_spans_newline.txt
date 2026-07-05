@@ -1,0 +1,5 @@
+=~
+/foo/
+--------------------- TOKENS ---------------------
+OpRegexMatch "=~"
+RegexLiteral "/foo/"

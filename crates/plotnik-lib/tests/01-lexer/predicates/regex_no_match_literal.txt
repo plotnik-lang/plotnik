@@ -1,0 +1,4 @@
+!~ /bar/
+--------------------- TOKENS ---------------------
+OpRegexNoMatch "!~"
+RegexLiteral "/bar/"

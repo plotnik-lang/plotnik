@@ -1,0 +1,12 @@
+=== !== ^== $== *==
+--------------------- TOKENS ---------------------
+OpEq "=="
+Equals "="
+OpNe "!="
+Equals "="
+OpStartsWith "^="
+Equals "="
+OpEndsWith "$="
+Equals "="
+OpContains "*="
+Equals "="

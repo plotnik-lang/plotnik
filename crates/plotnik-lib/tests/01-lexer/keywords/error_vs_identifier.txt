@@ -1,5 +1,5 @@
-ERROR ERRORx Errors
+ERROR ERRORx error
 --------------------- TOKENS ---------------------
 KwError "ERROR"
 Id "ERRORx"
-Id "Errors"
+Id "error"

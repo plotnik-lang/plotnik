@@ -1,6 +1,0 @@
-Foo Bar baz test_case
---------------------- TOKENS ---------------------
-Id "Foo"
-Id "Bar"
-Id "baz"
-Id "test_case"
