@@ -276,6 +276,30 @@ impl<'a> AnchorSemantics<'a> {
         (false, None)
     }
 
+    /// The anchored entry nav a leading anchor imposes on the first pattern, or
+    /// `None` when the item list has no leading anchor. Descends into a sole-child
+    /// sequence like [`check_trailing_anchor`](Self::check_trailing_anchor), and
+    /// reads the nav off [`compute_nav_modes`](Self::compute_nav_modes) so the
+    /// zero-width arm of the anchor cannot drift from the arm that matches.
+    pub fn check_leading_anchor(&self, items: &[SeqItem]) -> Option<Nav> {
+        if items.len() == 1
+            && let Some(SeqItem::Pattern(Pattern::SeqPattern(seq))) = items.first()
+        {
+            let seq_items: Vec<_> = seq.items().collect();
+            return self.check_leading_anchor(&seq_items);
+        }
+
+        let is_inside_node = true;
+        let (_, nav) = self
+            .compute_nav_modes(items, is_inside_node)
+            .into_iter()
+            .next()?;
+        match nav {
+            Some(nav @ (Nav::DownExact | Nav::DownSkip | Nav::DownSkipExtras)) => Some(nav),
+            _ => None,
+        }
+    }
+
     pub fn compute_nav_modes(
         &self,
         items: &[SeqItem],

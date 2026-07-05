@@ -146,18 +146,26 @@ impl NfaBuilder<'_> {
         let up_label = self.fresh_label();
         // The skip exit bypasses Up when the whole child list matches
         // zero-width: nothing was consumed, so the cursor never descended and
-        // there is no child to ascend from. Without a trailing anchor the
-        // bypass is unconditional; with one, "nothing may follow the last
-        // match" degrades to "this node has no children the anchor's skip
-        // policy would reject", asserted by a `Childless*` check.
-        let skip_target = if has_trailing_anchor {
-            let childless = self.fresh_label();
-            self.instructions.push(
-                MatchIR::epsilon(childless, final_exit)
-                    .nav(childless_nav(up_nav))
-                    .into(),
-            );
-            childless
+        // there is no child to ascend from. Anchors lose their carrier on that
+        // path — a trailing anchor's "nothing may follow the last match" and a
+        // leading anchor's "the first match comes first" both degrade to "this
+        // node has no children the anchor's skip policy would reject",
+        // asserted by a `Childless*` check. The skip classes nest, so when
+        // both anchors demand one, the tighter check alone suffices.
+        let trailing_childless = has_trailing_anchor.then(|| childless_nav(up_nav));
+        let leading_childless = self
+            .anchor_semantics
+            .check_leading_anchor(&items)
+            .map(childless_nav);
+        let childless = match (trailing_childless, leading_childless) {
+            (Some(a), Some(b)) => Some(tightest_childless(a, b)),
+            (a, b) => a.or(b),
+        };
+        let skip_target = if let Some(nav) = childless {
+            let label = self.fresh_label();
+            self.instructions
+                .push(MatchIR::epsilon(label, final_exit).nav(nav).into());
+            label
         } else {
             final_exit
         };
@@ -198,14 +206,30 @@ impl NfaBuilder<'_> {
     }
 }
 
-/// The zero-width counterpart of a trailing anchor's `Up*` lastness mode.
-fn childless_nav(up_nav: Nav) -> Nav {
-    match up_nav {
-        Nav::UpSkipTrivia(_) => Nav::ChildlessSkipTrivia,
-        Nav::UpSkipExtras(_) => Nav::ChildlessSkipExtras,
-        Nav::UpExact(_) => Nav::ChildlessExact,
-        _ => unreachable!("a trailing anchor always lowers to a constrained Up, got {up_nav:?}"),
+/// The zero-width counterpart of an anchor's constrained nav: a trailing
+/// anchor's `Up*` lastness mode or a leading anchor's `Down*` entry mode.
+fn childless_nav(anchor_nav: Nav) -> Nav {
+    match anchor_nav {
+        Nav::UpSkipTrivia(_) | Nav::DownSkip => Nav::ChildlessSkipTrivia,
+        Nav::UpSkipExtras(_) | Nav::DownSkipExtras => Nav::ChildlessSkipExtras,
+        Nav::UpExact(_) | Nav::DownExact => Nav::ChildlessExact,
+        _ => {
+            unreachable!("an anchor always lowers to a constrained Up or Down, got {anchor_nav:?}")
+        }
     }
+}
+
+/// The stricter of two childless checks. Their admitted-child sets nest
+/// (`Exact` ⊂ `SkipExtras` ⊂ `SkipTrivia`), so a node passing the tighter
+/// check passes the looser one — asserting both collapses to asserting one.
+fn tightest_childless(a: Nav, b: Nav) -> Nav {
+    let rank = |nav: Nav| match nav {
+        Nav::ChildlessExact => 0,
+        Nav::ChildlessSkipExtras => 1,
+        Nav::ChildlessSkipTrivia => 2,
+        _ => unreachable!("only childless navs are ranked, got {nav:?}"),
+    };
+    if rank(a) <= rank(b) { a } else { b }
 }
 
 impl NfaBuilder<'_> {

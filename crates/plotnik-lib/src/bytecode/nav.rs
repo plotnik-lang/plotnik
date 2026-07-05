@@ -23,11 +23,11 @@ pub enum Nav {
     DownExact,
     /// Assert the current node has no children beyond trivia, without moving.
     ///
-    /// The `Childless*` family is the zero-width arm of a trailing anchor:
-    /// when a node's whole child list matches zero-width, the cursor never
-    /// descends, so there is no `Up*` ascent to carry the lastness check —
-    /// "nothing may follow the last match" degrades to "the node has no
-    /// children the anchor's skip policy would reject".
+    /// The `Childless*` family is the zero-width arm of a leading or trailing
+    /// anchor: when a node's whole child list matches zero-width, the cursor
+    /// never descends, so no `Down*` entry or `Up*` ascent carries the
+    /// anchor's check — either one degrades to "the node has no children the
+    /// anchor's skip policy would reject".
     ChildlessSkipTrivia,
     /// Assert the current node has no children beyond extras, without moving.
     ChildlessSkipExtras,

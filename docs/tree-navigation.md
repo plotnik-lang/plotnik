@@ -108,13 +108,15 @@ Each mode defines what happens when a match fails:
 | `UpSkipExtras(n)` | Each node left must be its parent's last non-extra child  |
 | `UpExact(n)`      | Each node left must be its parent's last child            |
 
-**Childless variants** (zero-width trailing anchor):
+**Childless variants** (zero-width anchors):
 
 When a node's whole child list matches zero-width, the cursor never descends,
-so there is no `Up*` ascent to carry the trailing anchor's lastness check.
-`Childless*` asserts the degenerate form of "nothing may follow the last
-match": the node has no children the anchor's skip policy would reject. The
-cursor does not move; failure backtracks like any nav failure.
+so no `Down*` entry carries a leading anchor's first-child check and no `Up*`
+ascent carries a trailing anchor's lastness check. `Childless*` asserts the
+degenerate form of either: the node has no children the anchor's skip policy
+would reject. When both anchors demand one, the tighter check alone is
+emitted (the admitted-child sets nest). The cursor does not move; failure
+backtracks like any nav failure.
 
 | Mode                  | Constraint              |
 | --------------------- | ----------------------- |
