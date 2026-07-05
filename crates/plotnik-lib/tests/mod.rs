@@ -55,8 +55,9 @@ use similar::TextDiff;
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    Colors, CompiledQuery, PrintTracer, QueryBuilder, RecordingTracer, RuntimeError, SourceMap,
-    SourcePath, TypeScriptConfig, VM, Verbosity, extract_inspection, materialize_verified,
+    Colors, CompiledQuery, DtsRange, PrintTracer, QueryBuilder, RecordingTracer, RuntimeError,
+    SourceMap, SourcePath, TypeScriptConfig, VM, Verbosity, extract_inspection,
+    materialize_verified,
 };
 
 mod support;
@@ -257,7 +258,7 @@ fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
         "02" => Some(&["diagnostics", "cst", "ast"]),
         "03" => Some(&["diagnostics", "symbols"]),
         "04" => Some(&["diagnostics", "bytecode"]),
-        "05" => Some(&["diagnostics", "types"]),
+        "05" => Some(&["diagnostics", "types", "mapped"]),
         "06" => Some(&[
             "types",
             "diagnostics",
@@ -292,6 +293,7 @@ fn parse_section_header(line: &str) -> Option<String> {
                 | "ast"
                 | "symbols"
                 | "bytecode"
+                | "mapped"
                 | "types"
                 | "trace"
                 | "output"
@@ -426,7 +428,15 @@ fn render_compile(
         }
         Compile::Types => {
             out.extend(diag);
-            out.push(("types".into(), render_types(&compiled)));
+            let types = render_types(&compiled);
+            out.push(("types".into(), types.clone()));
+            if name.contains("/mapped/") {
+                let (mapped_types, ranges) = compiled
+                    .to_typescript_mapped(typegen_config())
+                    .expect("valid query should compile to a module");
+                assert_eq!(types, mapped_types, "mapped d.ts must match normal d.ts");
+                out.push(("mapped".into(), render_mapped(&mapped_types, &ranges)));
+            }
         }
         Compile::Vm => {
             let input = input.ok_or_else(|| {
@@ -457,8 +467,33 @@ fn render_compile(
 
 fn render_types(compiled: &CompiledQuery) -> String {
     compiled
-        .to_typescript(TypeScriptConfig::new().emit_node_interface(false))
+        .to_typescript(typegen_config())
         .expect("valid query should compile to a module")
+}
+
+fn typegen_config() -> TypeScriptConfig {
+    TypeScriptConfig::new().emit_node_interface(false)
+}
+
+fn render_mapped(dts: &str, ranges: &[DtsRange]) -> String {
+    let mut out = String::new();
+    for range in ranges {
+        let start = range.start as usize;
+        let end = range.end as usize;
+        let member = range
+            .member
+            .map(|idx| format!(".M{idx}"))
+            .unwrap_or_default();
+        out.push_str(&format!(
+            "{}..{} T{}{} {:?}\n",
+            range.start,
+            range.end,
+            range.type_id,
+            member,
+            &dts[start..end]
+        ));
+    }
+    out
 }
 
 struct VmRun {

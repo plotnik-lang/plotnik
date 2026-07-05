@@ -231,7 +231,7 @@ impl Module {
             .unwrap_or(false)
     }
 
-    pub(crate) fn strings(&self) -> StringsView<'_> {
+    pub fn strings(&self) -> StringsView<'_> {
         StringsView {
             blob: &self.storage[self.offsets.str_blob as usize..],
             table: self.string_table_slice(),
@@ -271,7 +271,7 @@ impl Module {
         &self.regex_dfas
     }
 
-    pub(crate) fn types(&self) -> TypesView<'_> {
+    pub fn types(&self) -> TypesView<'_> {
         let defs_offset = self.offsets.type_defs as usize;
         let defs_count = self.header.type_defs_count as usize;
         let members_offset = self.offsets.type_members as usize;
@@ -291,7 +291,7 @@ impl Module {
         }
     }
 
-    pub(crate) fn entrypoints(&self) -> EntrypointsView<'_> {
+    pub fn entrypoints(&self) -> EntrypointsView<'_> {
         let offset = self.offsets.entrypoints as usize;
         let count = self.header.entrypoints_count as usize;
         EntrypointsView {
@@ -562,6 +562,10 @@ impl<'a> EntrypointsView<'a> {
     /// Number of entrypoints.
     pub fn len(&self) -> usize {
         self.count
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
     }
 
     pub fn iter(&self) -> impl ExactSizeIterator<Item = Entrypoint> + '_ {

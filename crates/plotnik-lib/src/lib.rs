@@ -25,6 +25,7 @@ pub use crate::bytecode::type_system;
 pub use crate::core::colors;
 pub use crate::core::grammar;
 pub use crate::core::utils as text_utils;
+pub use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
 
 pub mod diagnostics {
     pub use crate::compiler::diagnostics::report::{
@@ -37,7 +38,7 @@ pub mod diagnostics {
 }
 
 pub use crate::compiler::typegen::typescript::{
-    Config as TypeScriptConfig, VoidType as TypeScriptVoidType,
+    Config as TypeScriptConfig, DtsRange, VoidType as TypeScriptVoidType,
 };
 
 pub use crate::core::Colors;

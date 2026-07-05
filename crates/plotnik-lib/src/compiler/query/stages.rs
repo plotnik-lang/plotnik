@@ -482,6 +482,14 @@ impl CompiledQuery {
         self.module()
             .map(|module| crate::compiler::typegen::typescript::emit(module, config))
     }
+
+    pub fn to_typescript_mapped(
+        &self,
+        config: crate::compiler::typegen::typescript::Config,
+    ) -> Option<(String, Vec<crate::compiler::typegen::typescript::DtsRange>)> {
+        self.module()
+            .map(|module| crate::compiler::typegen::typescript::emit_mapped(module, config))
+    }
 }
 
 impl LinkOutcome {
