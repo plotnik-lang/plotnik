@@ -115,7 +115,9 @@ so no `Down*` entry carries a leading anchor's first-child check and no `Up*`
 ascent carries a trailing anchor's lastness check. `Childless*` asserts the
 degenerate form of either: the node has no children the anchor's skip policy
 would reject. When both anchors demand one, the tighter check alone is
-emitted (the admitted-child sets nest). The cursor does not move; failure
+emitted (the admitted-child sets nest). A body of anchors alone (`(node .)`)
+always takes this path — there is nothing to descend into, so the childless
+check is the entire compiled body. The cursor does not move; failure
 backtracks like any nav failure.
 
 | Mode                  | Constraint              |
