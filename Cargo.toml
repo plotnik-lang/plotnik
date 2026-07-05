@@ -27,3 +27,8 @@ unwrap_used = "deny"
 overflow-checks = true
 lto = "thin"
 codegen-units = 1
+
+# Benches inherit release; line tables let profilers (samply, Instruments)
+# symbolicate the inlined hot loop at zero runtime cost.
+[profile.bench]
+debug = "line-tables-only"
