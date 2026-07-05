@@ -13,6 +13,82 @@ export interface Q {
     "span": [0, 1]
   }
 }
+------------------- INSPECTION -------------------
+{
+  "v": 1,
+  "entries": [
+    {
+      "span_id": 0,
+      "parent": null,
+      "hull": [
+        0,
+        1
+      ],
+      "bindings": [],
+      "effect_range": [
+        1,
+        12
+      ]
+    },
+    {
+      "span_id": 1,
+      "parent": 0,
+      "hull": [
+        0,
+        1
+      ],
+      "bindings": [],
+      "effect_range": [
+        2,
+        11
+      ]
+    },
+    {
+      "span_id": 2,
+      "parent": 1,
+      "hull": [
+        0,
+        1
+      ],
+      "bindings": [],
+      "effect_range": [
+        3,
+        10
+      ]
+    },
+    {
+      "span_id": 4,
+      "parent": 2,
+      "hull": [
+        0,
+        1
+      ],
+      "bindings": [],
+      "effect_range": [
+        4,
+        9
+      ]
+    },
+    {
+      "span_id": 3,
+      "parent": 3,
+      "hull": [
+        0,
+        1
+      ],
+      "bindings": [
+        {
+          "path": "/id",
+          "effect_idx": 7
+        }
+      ],
+      "effect_range": [
+        5,
+        8
+      ]
+    }
+  ]
+}
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

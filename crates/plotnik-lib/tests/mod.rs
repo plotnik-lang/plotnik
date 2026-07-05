@@ -20,7 +20,7 @@
 //! | `03-analyze` | symbols                                    |
 //! | `04-emit`    | bytecode                                   |
 //! | `05-typegen` | types                                      |
-//! | `06-vm`      | types, output, bytecode, trace (requires input) |
+//! | `06-vm`      | types, output, inspection if enabled, bytecode, trace (requires input) |
 //!
 //! Compile-stage fixtures under an `inspection/` folder compile with
 //! `QueryBuilder::with_inspection(true)`.
@@ -56,7 +56,7 @@ use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
     Colors, CompiledQuery, PrintTracer, QueryBuilder, RuntimeError, SourceMap, SourcePath,
-    TypeScriptConfig, VM, Verbosity, materialize_verified,
+    TypeScriptConfig, VM, Verbosity, extract_inspection, materialize_verified,
 };
 
 mod support;
@@ -258,7 +258,14 @@ fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
         "03" => Some(&["diagnostics", "symbols"]),
         "04" => Some(&["diagnostics", "bytecode"]),
         "05" => Some(&["diagnostics", "types"]),
-        "06" => Some(&["types", "diagnostics", "output", "bytecode", "trace"]),
+        "06" => Some(&[
+            "types",
+            "diagnostics",
+            "output",
+            "inspection",
+            "bytecode",
+            "trace",
+        ]),
         _ => None,
     }
 }
@@ -280,7 +287,15 @@ fn parse_section_header(line: &str) -> Option<String> {
         || name.starts_with("input.")
         || matches!(
             name.as_str(),
-            "cst" | "ast" | "symbols" | "bytecode" | "types" | "trace" | "output" | "diagnostics"
+            "cst"
+                | "ast"
+                | "symbols"
+                | "bytecode"
+                | "types"
+                | "trace"
+                | "output"
+                | "inspection"
+                | "diagnostics"
         );
     known.then_some(name)
 }
@@ -417,12 +432,21 @@ fn render_compile(
                 .definition_names()
                 .last()
                 .expect("a valid query has at least one named definition");
-            let (trace, output) = run_vm(&lang, module, &entry, &input.text)?;
+            let run = run_vm(
+                &lang,
+                module,
+                &entry,
+                &input.text,
+                name.contains("/inspection/"),
+            )?;
             out.push(("types".into(), render_types(&compiled)));
             out.extend(diag);
-            out.push(("output".into(), output));
+            out.push(("output".into(), run.output));
+            if let Some(inspection) = run.inspection {
+                out.push(("inspection".into(), inspection));
+            }
             out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))));
-            out.push(("trace".into(), trace));
+            out.push(("trace".into(), run.trace));
         }
     }
     Ok(out)
@@ -434,12 +458,19 @@ fn render_types(compiled: &CompiledQuery) -> String {
         .expect("valid query should compile to a module")
 }
 
+struct VmRun {
+    trace: String,
+    output: String,
+    inspection: Option<String>,
+}
+
 fn run_vm(
     lang: &Lang,
     module: &Module,
     entry: &str,
     source: &str,
-) -> Result<(String, String), String> {
+    inspect: bool,
+) -> Result<VmRun, String> {
     let tree = lang.parse(source);
     let entrypoint = module
         .entrypoint(entry)
@@ -453,8 +484,15 @@ fn run_vm(
 
     let result = vm.execute_with(module, &entrypoint, &mut tracer);
     let trace = tracer.render();
-    let output = match result {
+    let (output, inspection) = match result {
         Ok(effects) => {
+            let inspection = inspect.then(|| {
+                let inspection = extract_inspection(effects.as_slice(), module);
+                let mut rendered = serde_json::to_string_pretty(&inspection)
+                    .expect("inspection serialization cannot fail");
+                rendered.push('\n');
+                rendered
+            });
             // The verified variant (not plain `materialize`) so a type-unsound emission
             // panics the fixture in debug; the check compiles out under `--release`.
             let value = materialize_verified(
@@ -464,14 +502,18 @@ fn run_vm(
                 effects.as_slice(),
                 Colors::new(false),
             );
-            value.format(true, Colors::new(false))
+            (value.format(true, Colors::new(false)), inspection)
         }
-        Err(RuntimeError::NoMatch) => "<no match>".to_string(),
+        Err(RuntimeError::NoMatch) => ("<no match>".to_string(), None),
         // A no-match is a real outcome worth pinning; step/memory exhaustion is
         // not — fail the trial rather than accept a resource limit as golden output.
         Err(err) => return Err(format!("VM run failed for `{entry}`: {err}")),
     };
-    Ok((trace, output))
+    Ok(VmRun {
+        trace,
+        output,
+        inspection,
+    })
 }
 
 struct Lang {

@@ -29,6 +29,120 @@ export interface Q {
     }
   ]
 }
+------------------- INSPECTION -------------------
+{
+  "v": 1,
+  "entries": [
+    {
+      "span_id": 0,
+      "parent": null,
+      "hull": [
+        0,
+        5
+      ],
+      "bindings": [],
+      "effect_range": [
+        1,
+        23
+      ]
+    },
+    {
+      "span_id": 1,
+      "parent": 0,
+      "hull": [
+        0,
+        5
+      ],
+      "bindings": [],
+      "effect_range": [
+        2,
+        22
+      ]
+    },
+    {
+      "span_id": 3,
+      "parent": 1,
+      "hull": [
+        0,
+        5
+      ],
+      "bindings": [],
+      "effect_range": [
+        4,
+        17
+      ]
+    },
+    {
+      "span_id": 4,
+      "parent": 2,
+      "hull": [
+        0,
+        1
+      ],
+      "bindings": [
+        {
+          "path": "/0",
+          "effect_idx": 7
+        }
+      ],
+      "effect_range": [
+        5,
+        8
+      ]
+    },
+    {
+      "span_id": 4,
+      "parent": 2,
+      "hull": [
+        2,
+        3
+      ],
+      "bindings": [
+        {
+          "path": "/1",
+          "effect_idx": 11
+        }
+      ],
+      "effect_range": [
+        9,
+        12
+      ]
+    },
+    {
+      "span_id": 4,
+      "parent": 2,
+      "hull": [
+        4,
+        5
+      ],
+      "bindings": [
+        {
+          "path": "/2",
+          "effect_idx": 15
+        }
+      ],
+      "effect_range": [
+        13,
+        16
+      ]
+    },
+    {
+      "span_id": 2,
+      "parent": 1,
+      "hull": null,
+      "bindings": [
+        {
+          "path": "/stmts",
+          "effect_idx": 20
+        }
+      ],
+      "effect_range": [
+        19,
+        21
+      ]
+    }
+  ]
+}
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
