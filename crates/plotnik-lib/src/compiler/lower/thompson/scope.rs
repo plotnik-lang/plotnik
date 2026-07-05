@@ -87,6 +87,7 @@ pub(super) struct CaptureRequest<'a> {
 /// two same-type slices can't be transposed at a call site.
 #[derive(Clone, Copy)]
 pub(super) struct ScopeCloseEffects<'a> {
+    pub leading: &'a [EffectIR],
     pub capture: &'a [EffectIR],
     pub outer: &'a [EffectIR],
 }
@@ -94,6 +95,7 @@ pub(super) struct ScopeCloseEffects<'a> {
 impl ScopeCloseEffects<'_> {
     pub(super) fn none() -> Self {
         Self {
+            leading: &[],
             capture: &[],
             outer: &[],
         }
@@ -184,6 +186,7 @@ impl NfaBuilder<'_> {
             .type_id();
 
         let end_effects = ScopeCloseEffects {
+            leading: &[],
             capture: &capture_effects,
             outer: &outer_capture.post,
         };
@@ -310,6 +313,7 @@ impl NfaBuilder<'_> {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, exit)
+                .append_effects(effects.leading.iter().cloned())
                 .append_effect(EffectIR::end_arr())
                 .append_effects(effects.capture.iter().cloned())
                 .append_effects(effects.outer.iter().cloned())
@@ -341,6 +345,7 @@ impl NfaBuilder<'_> {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, exit)
+                .append_effects(effects.leading.iter().cloned())
                 .append_effect(EffectIR::end_struct())
                 .append_effects(effects.capture.iter().cloned())
                 .append_effects(effects.outer.iter().cloned())
@@ -354,12 +359,14 @@ impl NfaBuilder<'_> {
         &mut self,
         successor: Label,
         leading_effects: Vec<EffectIR>,
+        trailing_effects: Vec<EffectIR>,
     ) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, successor)
                 .prepend_effect(EffectIR::start_arr())
                 .prepend_effects(leading_effects)
+                .append_effects(trailing_effects)
                 .into(),
         );
         label

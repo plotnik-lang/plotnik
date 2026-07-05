@@ -1,0 +1,170 @@
+Maybe = (program (expression_statement)? @stmt)
+Many = (program (expression_statement)* @stmts)
+Some = (program (expression_statement)+ @stmts)
+Lazy = (program (expression_statement)*? @stmts)
+Funcs = (program
+  (function_declaration
+    name: (identifier) @name
+  )* @funcs
+)
+------------------- INPUT (ts) -------------------
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "stmt"
+S02 "stmts"
+S03 "name"
+S04 "funcs"
+S05 "Maybe"
+S06 "Many"
+S07 "Some"
+S08 "Lazy"
+S09 "FuncsFuncs"
+S10 "Funcs"
+S11 "program"
+S12 "expression_statement"
+S13 "function_declaration"
+S14 "identifier"
+
+[type_defs]
+T00 = <Node>
+T01 = Struct  M0:1  ; { stmt }
+T02 = ArrayStar(T00)  ; <Node>*
+T03 = Struct  M1:1  ; { stmts }
+T04 = ArrayPlus(T00)  ; <Node>+
+T05 = Struct  M2:1  ; { stmts }
+T06 = Struct  M3:1  ; { stmts }
+T07 = Struct  M4:1  ; { name }
+T08 = ArrayStar(T07)  ; FuncsFuncs*
+T09 = Struct  M5:1  ; { funcs }
+T10 = Optional(T00)  ; <Node>?
+
+[type_members]
+M0: S01 → T10  ; stmt: T10
+M1: S02 → T02  ; stmts: T02
+M2: S02 → T04  ; stmts: T04
+M3: S02 → T02  ; stmts: T02
+M4: S03 → T00  ; name: <Node>
+M5: S04 → T08  ; funcs: T08
+
+[type_names]
+N0: S05 → T01  ; Maybe
+N1: S06 → T03  ; Many
+N2: S07 → T05  ; Some
+N3: S08 → T06  ; Lazy
+N4: S09 → T07  ; FuncsFuncs
+N5: S10 → T09  ; Funcs
+
+[entrypoints]
+Funcs = 024 :: T09
+Lazy  = 019 :: T06
+Many  = 006 :: T03
+Maybe = 000 :: T01
+Some  = 012 :: T05
+
+[spans]
+P00 def        0..47  src0  T01
+P01 pattern    8..47  src0
+P02 capture    41..46  src0  T01.M0
+P03 quantifier 39..40  src0
+P04 pattern    17..39  src0
+P05 def        48..95  src0  T03
+P06 pattern    55..95  src0
+P07 capture    88..94  src0  T03.M1
+P08 quantifier 86..87  src0
+P09 pattern    64..86  src0
+P10 def        96..143  src0  T05
+P11 pattern    103..143  src0
+P12 capture    136..142  src0  T05.M2
+P13 quantifier 134..135  src0
+P14 pattern    112..134  src0
+P15 def        144..192  src0  T06
+P16 pattern    151..192  src0
+P17 capture    185..191  src0  T06.M3
+P18 quantifier 182..184  src0
+P19 pattern    160..182  src0
+P20 def        193..276  src0  T09
+P21 pattern    201..276  src0
+P22 capture    268..274  src0  T09.M5
+P23 quantifier 266..267  src0
+P24 pattern    212..266  src0
+P25 capture    257..262  src0  T07.M4
+P26 field      238..242  src0
+P27 pattern    244..256  src0
+
+[transitions]
+Maybe:
+  000  -ε-  [StructOpen]                    002
+  002       (@052)                          052 : 003
+  003  -ε-  [StructClose]                   005
+  005                                       ▶
+
+Many:
+  006  -ε-  [StructOpen]                    008
+  008       (@072)                          072 : 009
+  009  -ε-  [StructClose]                   011
+  011                                       ▶
+
+Some:
+  012  -ε-  [StructOpen]                    014
+  014       (@085)                          085 : 016
+  015                                       ▶
+  016  -ε-  [StructClose]                   018
+  018                                       ▶
+
+Lazy:
+  019  -ε-  [StructOpen]                    021
+  021       (@104)                          104 : 022
+  022  -ε-  [StructClose]                   015
+
+Funcs:
+  024  -ε-  [StructOpen]                    026
+  026       (@123)                          123 : 027
+  027  -ε-  [StructClose]                   029
+  029                                       ▶
+  030                                       ▶
+  031  ...
+  032   !   (expression_statement) [SpanStartAt#4 SpanStart#2 Node Set(M0) SpanEnd#2 SpanEnd#4]  035
+  035  ─‣┘  _ [SpanEnd#3 SpanEnd#1]         030
+  037  └‣─  name: (identifier) [SpanStartAt#27 SpanStart#25 Node Set(M4) SpanEnd#25 SpanEnd#27]  040
+  040  ─‣┘  _ [SpanEnd#24]                  110
+  042  -ε-  [Null Set(M0) SpanEnd#3 SpanEnd#1]  030
+  045  ─‣─  _                               032, 045
+  047  ...
+  048  └‣─  _                               032, 045
+  050  -ε-  [SpanStart#3]                   048, 042
+  052   !   (program) [SpanStartAt#1]       050
+  054                                       ▶
+  055  ...
+  056  -ε-  [SpanEnd#8 ArrayClose SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#6]  054
+  059   !   (expression_statement) [SpanStartAt#9 Node Push SpanEnd#9]  062, 068
+  062  ─‣─  _                               059, 062
+  064  └‣─  _                               059, 062
+  066  -ε-  [ArrayOpen SpanStart#8]         064, 056
+  068  ─‣┘  _ [SpanEnd#8 ArrayClose SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#6]  054
+  071  ...
+  072   !   (program) [SpanStartAt#6]       066
+  074                                       ▶
+  075   !   (expression_statement) [SpanStartAt#14 Node Push SpanEnd#14]  078, 082
+  078  ─‣─  _                               075, 078
+  080  └‣─  _ [ArrayOpen SpanStart#13]      075, 078
+  082  ─‣┘  _ [SpanEnd#13 ArrayClose SpanStart#12 Set(M2) SpanEnd#12 SpanEnd#11]  074
+  085   !   (program) [SpanStartAt#11]      080
+  087                                       ▶
+  088  -ε-  [SpanEnd#18 ArrayClose SpanStart#17 Set(M3) SpanEnd#17 SpanEnd#16]  087
+  091   !   (expression_statement) [SpanStartAt#19 Node Push SpanEnd#19]  100, 094
+  094  ─‣─  _                               091, 094
+  096  └‣─  _                               091, 094
+  098  -ε-  [ArrayOpen SpanStart#18]        088, 096
+  100  ─‣┘  _ [SpanEnd#18 ArrayClose SpanStart#17 Set(M3) SpanEnd#17 SpanEnd#16]  087
+  103  ...
+  104   !   (program) [SpanStartAt#16]      098
+  106                                       ▶
+  107  -ε-  [SpanEnd#23 ArrayClose SpanStart#22 Set(M5) SpanEnd#22 SpanEnd#21]  106
+  110  -ε-  [StructClose Push]              114, 120
+  112   !   (function_declaration) [StructOpen SpanStartAt#24]  037
+  114  ─‣─  _                               112, 114
+  116  └‣─  _                               112, 114
+  118  -ε-  [ArrayOpen SpanStart#23]        116, 107
+  120  ─‣┘  _ [SpanEnd#23 ArrayClose SpanStart#22 Set(M5) SpanEnd#22 SpanEnd#21]  106
+  123   !   (program) [SpanStartAt#21]      118

@@ -64,23 +64,26 @@ LeadingSkip:
 
 TrailingSkip:
   06  -ε-  [StructOpen]                     08
-  08       (@44)                            44 : 09
+  08       (@48)                            48 : 09
   09  -ε-  [StructClose]                    11
   11                                        ▶
   12                                        ▶
-  13  └‣─  (function_declaration) [SpanStartAt#6 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#6]  28
-  16  ─‣─  (function_declaration) [SpanStartAt#6 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#6]  28
+  13  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#6]  28
+  16  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#6]  28
   19   !   (expression_statement) [SpanStartAt#4 SpanEnd#4]  16
   21  ─‣─  _                                19, 21
   23  ...
   24  └‣─  _                                19, 21
-  26  -ε-  [SpanStart#2]                    24, 13
+  26  -ε-  [SpanStart#3]                    24, 13
   28  ─‣┘  _ [SpanEnd#2 SpanEnd#1]          12
-  30   !   (program) [SpanStartAt#1]        26
+  30   !   (program) [SpanStartAt#1 SpanStart#2]  26
   32                                        ▶
-  33   !   (expression_statement) [SpanStartAt#13 SpanEnd#13]  37
-  35  ─‣─  _                                33, 35
-  37  ─‣┘  _ [SpanEnd#9 SpanEnd#8]          32
+  33  -ε-  [SpanEnd#12]                     45
+  35   !   (expression_statement) [SpanStartAt#13 SpanEnd#13 SpanEnd#12]  45
+  37  ─‣─  _                                35, 37
   39  ...
-  40  └‣─  (function_declaration) [SpanStart#9 SpanStartAt#11 SpanStart#10 Node Set(M1) SpanEnd#10 SpanEnd#11]  35, 37
-  44   !   (program) [SpanStartAt#8]        40
+  40  -ε-  [SpanStart#12]                   37, 33
+  42  └‣─  (function_declaration) [SpanStart#9 SpanStartAt#11 SpanStart#10 Node Set(M1) SpanEnd#10 SpanEnd#11]  40
+  45  ─‣┘  _ [SpanEnd#9 SpanEnd#8]          32
+  47  ...
+  48   !   (program) [SpanStartAt#8]        42

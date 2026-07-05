@@ -125,11 +125,11 @@ Q:
   47  ...
   48  └‣─  name: (identifier) [SpanStartAt#19 SpanStart#16 Node Set(M5) SpanEnd#16 SpanEnd#19]  44
   51  └‣─  (variable_declarator) [SpanStartAt#15]  48
-  53  └‣─  (lexical_declaration) [SpanStartAt#14 SpanStart#13 Node Set(M4) SpanEnd#13]  51
-  56  ─‣─  (lexical_declaration) [SpanStartAt#14 SpanStart#13 Node Set(M4) SpanEnd#13]  51
+  53  └‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node Set(M4) SpanEnd#13]  51
+  56  ─‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node Set(M4) SpanEnd#13]  51
   59   !   (expression_statement) [SpanStartAt#12 SpanEnd#12]  61, 56
   61  ─‣─  _                                59, 61
   63  ...
   64  └‣─  _                                59, 61
-  66  -ε-  [SpanStart#10]                   64, 53
-  68   !   (program) [SpanStartAt#9]        66
+  66  -ε-  [SpanStart#11]                   64, 53
+  68   !   (program) [SpanStartAt#9 SpanStart#10]  66

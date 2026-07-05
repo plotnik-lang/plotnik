@@ -661,6 +661,7 @@ impl NfaBuilder<'_> {
             // Set; both continuations close it (a zero-width body still
             // produced its row of skip-path values, e.g. `{x: null}`).
             let end = ScopeCloseEffects {
+                leading: &[],
                 capture: &post,
                 outer: &[],
             };

@@ -4,14 +4,16 @@
 //! `compile_quantified_unified` entry point so greediness and search-nav logic
 //! stay in one place.
 
-use crate::bytecode::{EffectKind, Nav};
+use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label};
 use crate::compiler::parse::ast::{self, Pattern, QuantifierKind, QuantifierOperator};
 
 use super::NfaBuilder;
-use super::capture::{CaptureEffects, PatternCtx, needs_struct_wrapper, row_type_id};
+use super::capture::{
+    CaptureEffects, PatternCtx, first_unmatched_close, needs_struct_wrapper, row_type_id,
+};
 use super::navigation::resumable_search_nav;
 use super::nfa_emit::{BranchTargets, Greediness};
 use super::scope::{CaptureExits, CaptureRequest, ScopeCloseEffects, SkipExit, SplitExits};
@@ -154,6 +156,14 @@ struct ExitNav {
     nav: Nav,
 }
 
+struct QuantBrackets {
+    inner_capture: CaptureEffects,
+    exit: Label,
+    entry_pre: Vec<EffectIR>,
+    span_id: Option<u16>,
+    closes: Vec<EffectIR>,
+}
+
 impl ExitNav {
     fn new(exit: Label, nav: Nav) -> Self {
         Self { exit, nav }
@@ -174,6 +184,54 @@ pub(super) struct QuantifierConfig<'a> {
 }
 
 impl NfaBuilder<'_> {
+    fn bracket_quantifier(
+        &mut self,
+        quant: &ast::QuantifiedPattern,
+        capture: CaptureEffects,
+        exit: Label,
+    ) -> QuantBrackets {
+        let Some(span_id) = self.span_id(quant.syntax(), SpanKind::Quantifier) else {
+            return QuantBrackets {
+                inner_capture: capture,
+                exit,
+                entry_pre: vec![],
+                span_id: None,
+                closes: vec![],
+            };
+        };
+
+        let mut post = capture.post;
+        let closes = match first_unmatched_close(&post) {
+            Some(split) => post.split_off(split),
+            None => vec![],
+        };
+        let id = span_id.0;
+        let exit = self.quant_end_step(id, &closes, exit);
+        let mut entry_pre = capture.pre;
+        entry_pre.push(EffectIR::span_start(id));
+
+        QuantBrackets {
+            inner_capture: CaptureEffects::new(vec![], post),
+            exit,
+            entry_pre,
+            span_id: Some(id),
+            closes,
+        }
+    }
+
+    fn quant_end_for(&mut self, brackets: &QuantBrackets, exit: Label) -> Label {
+        let Some(id) = brackets.span_id else {
+            return exit;
+        };
+        self.quant_end_step(id, &brackets.closes, exit)
+    }
+
+    fn quant_end_step(&mut self, id: u16, closes: &[EffectIR], exit: Label) -> Label {
+        let mut effects = vec![EffectIR::span_end(id)];
+        effects.extend(closes.iter().cloned());
+        self.emit_effects_epsilon(exit, effects, CaptureEffects::default())
+    }
+
     /// Whether this quantifier's value is observed by its continuation. The
     /// inferred `Value` flow is necessary but not enough: nested bare values are
     /// structural unless a root/capture/ref context consumes the pending value.
@@ -221,16 +279,19 @@ impl NfaBuilder<'_> {
             );
         }
 
+        let brackets = self.bracket_quantifier(quant, capture, exit);
+
         let config = QuantifierConfig {
             inner: &inner,
             kind,
             first_nav: nav_override,
             array_context: ArrayContext::Standalone,
-            element_capture: capture,
-            exits: CaptureExits::Single(exit),
+            element_capture: brackets.inner_capture,
+            exits: CaptureExits::Single(brackets.exit),
         };
 
-        self.compile_quantified_unified(config)
+        let entry = self.compile_quantified_unified(config);
+        self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
     /// Compile a quantified pattern for array capture with element-level effects.
@@ -439,9 +500,13 @@ impl NfaBuilder<'_> {
             );
         }
 
+        let brackets = self.bracket_quantifier(quant, capture, match_exit);
+
         let skip_exit = match skip_exit {
             SkipExit::To(skip) => {
-                let skip_with_null = self.emit_null_for_skip_path(skip, &capture);
+                let end_step = self.quant_end_for(&brackets, skip);
+                let skip_with_null =
+                    self.emit_null_for_skip_path(end_step, &brackets.inner_capture);
                 SkipExit::To(self.emit_null_for_internal_captures(skip_with_null, &inner))
             }
             SkipExit::Fail => SkipExit::Fail,
@@ -452,14 +517,15 @@ impl NfaBuilder<'_> {
             kind,
             first_nav: nav_override,
             array_context: ArrayContext::Standalone,
-            element_capture: capture,
+            element_capture: brackets.inner_capture,
             exits: CaptureExits::Split {
-                match_exit,
+                match_exit: brackets.exit,
                 skip_exit,
             },
         };
 
-        self.compile_quantified_unified(config)
+        let entry = self.compile_quantified_unified(config);
+        self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
     /// Compile a struct-mechanism capture whose inner is an optional quantifier
@@ -494,18 +560,20 @@ impl NfaBuilder<'_> {
                 skip_exit,
             } => (match_exit, skip_exit),
         };
+        let brackets = self.bracket_quantifier(quant, outer_capture, match_exit);
 
         // Skip: the row is absent — null the capture; the enclosing scope's
         // trailing effects still run, as they do on the match path.
         let skip_target = match skip_exit {
             SkipExit::To(skip) => {
+                let end_step = self.quant_end_for(&brackets, skip);
                 let mut skip_effects: Vec<EffectIR> = capture_effects
                     .iter()
                     .filter(|eff| eff.kind() == EffectKind::Set)
                     .flat_map(|set_eff| [EffectIR::null(), set_eff.clone()])
                     .collect();
-                skip_effects.extend(outer_capture.post.iter().cloned());
-                Some(self.emit_effects_if_nonempty(skip, skip_effects))
+                skip_effects.extend(brackets.inner_capture.post.iter().cloned());
+                Some(self.emit_effects_if_nonempty(end_step, skip_effects))
             }
             SkipExit::Fail => None,
         };
@@ -520,12 +588,13 @@ impl NfaBuilder<'_> {
             .type_id();
 
         let end_effects = ScopeCloseEffects {
+            leading: &[],
             capture: &capture_effects,
-            outer: &outer_capture.post,
+            outer: &brackets.inner_capture.post,
         };
         let iterate = self.emit_iteration(
             nav_override.unwrap_or(Nav::Down),
-            match_exit,
+            brackets.exit,
             |this, target| {
                 let ExitNav { exit, nav } = target;
                 let struct_close = this.emit_struct_close_step_with_effects(end_effects, exit);
@@ -550,7 +619,7 @@ impl NfaBuilder<'_> {
             // Pruned: the row must match — a zero-width outcome backtracks.
             None => iterate,
         };
-        self.wrap_entry_pre(entry, outer_capture.pre)
+        self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
     /// Compile an array capture (`(x)* @cap`) — `Arr → quantifier (with Push)
@@ -578,7 +647,17 @@ impl NfaBuilder<'_> {
                 vec![EffectIR::push()]
             });
 
+        let mut quant_start = Vec::new();
+        let mut quant_end = Vec::new();
+        if let Pattern::QuantifiedPattern(quant) = inner
+            && let Some(id) = self.span_id(quant.syntax(), SpanKind::Quantifier)
+        {
+            quant_start.push(EffectIR::span_start(id.0));
+            quant_end.push(EffectIR::span_end(id.0));
+        }
+
         let end_effects = ScopeCloseEffects {
+            leading: &quant_end,
             capture: &capture_effects,
             outer: &outer_capture.post,
         };
@@ -613,7 +692,7 @@ impl NfaBuilder<'_> {
         };
 
         // Emit Arr step at entry (with outer pre-effects like Enum)
-        self.emit_arr_step(inner_entry, outer_capture.pre)
+        self.emit_arr_step(inner_entry, outer_capture.pre, quant_start)
     }
 
     fn compile_star_for_array_with_exits(
@@ -914,7 +993,7 @@ impl NfaBuilder<'_> {
                 self.compile_array_capture(req, exits)
             }
             QuantifierKind::Optional => {
-                self.compile_valued_optional(&inner, kind, exits, nav_override, outer)
+                self.compile_valued_optional(quant, &inner, kind, exits, nav_override, outer)
             }
         }
     }
@@ -928,6 +1007,7 @@ impl NfaBuilder<'_> {
     /// elements leave their own value pending.
     fn compile_valued_optional(
         &mut self,
+        quant: &ast::QuantifiedPattern,
         inner: &Pattern,
         kind: QuantifierOperator,
         exits: CaptureExits,
@@ -941,18 +1021,20 @@ impl NfaBuilder<'_> {
                 skip_exit,
             } => (match_exit, skip_exit),
         };
-        let CaptureEffects { pre, post } = outer;
+        let brackets = self.bracket_quantifier(quant, outer, match_exit);
 
         // Skip: the value is a bare null; enclosing-scope effects still run.
         let skip_target = match skip_exit {
             SkipExit::To(skip) => {
+                let end_step = self.quant_end_for(&brackets, skip);
                 let mut skip_effects = vec![EffectIR::null()];
-                skip_effects.extend(post.iter().cloned());
-                Some(self.emit_effects_if_nonempty(skip, skip_effects))
+                skip_effects.extend(brackets.inner_capture.post.iter().cloned());
+                Some(self.emit_effects_if_nonempty(end_step, skip_effects))
             }
             SkipExit::Fail => None,
         };
-        let match_target = self.emit_effects_if_nonempty(match_exit, post);
+        let match_target =
+            self.emit_effects_if_nonempty(brackets.exit, brackets.inner_capture.post.clone());
 
         // A field constraint is navigation on the element, not structure.
         let (element, field_override) = match inner {
@@ -1022,7 +1104,7 @@ impl NfaBuilder<'_> {
             // Pruned: the value must match — a zero-width outcome backtracks.
             None => iterate,
         };
-        self.wrap_entry_pre(entry, pre)
+        self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
     /// Compile one quantifier-iteration element. A nullable element compiles

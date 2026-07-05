@@ -1,0 +1,107 @@
+Q = (program
+  (expression_statement)* @stmts
+)
+------------------- INPUT (ts) -------------------
+a
+b
+c
+--------------------- TYPES ----------------------
+export interface Q {
+  stmts: Node[];
+}
+--------------------- OUTPUT ---------------------
+{
+  "stmts": [
+    {
+      "kind": "expression_statement",
+      "text": "a",
+      "span": [0, 1]
+    },
+    {
+      "kind": "expression_statement",
+      "text": "b",
+      "span": [2, 3]
+    },
+    {
+      "kind": "expression_statement",
+      "text": "c",
+      "span": [4, 5]
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "stmts"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { stmts }
+
+[type_members]
+M0: S1 → T1  ; stmts: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[spans]
+P0 def        0..47  src0  T2
+P1 pattern    4..47  src0
+P2 capture    39..45  src0  T2.M0
+P3 quantifier 37..38  src0
+P4 pattern    15..37  src0
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@24)                            24 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [SpanEnd#3 ArrayClose SpanStart#2 Set(M0) SpanEnd#2 SpanEnd#1]  06
+  11   !   (expression_statement) [SpanStartAt#4 Node Push SpanEnd#4]  14, 20
+  14  ─‣─  _                                11, 14
+  16  └‣─  _                                11, 14
+  18  -ε-  [ArrayOpen SpanStart#3]          16, 08
+  20  ─‣┘  _ [SpanEnd#3 ArrayClose SpanStart#2 Set(M0) SpanEnd#2 SpanEnd#1]  06
+  23  ...
+  24   !   (program) [SpanStartAt#1]        18
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              24 : 03
+       ▶   (?)
+
+?:
+  24       (program) [SpanStartAt#1]        18
+       ●   program
+  18  -ε-  [ArrayOpen SpanStart#3]          16, 08
+  16       _                                11, 14
+       ●   expression_statement
+  11       (expression_statement) [SpanStartAt#4 Node Push SpanEnd#4]  14, 20
+       ●   expression_statement
+  14       _                                11, 14
+       ●   expression_statement
+  11       (expression_statement) [SpanStartAt#4 Node Push SpanEnd#4]  14, 20
+       ●   expression_statement
+  14       _                                11, 14
+       ●   expression_statement
+  11       (expression_statement) [SpanStartAt#4 Node Push SpanEnd#4]  14, 20
+       ●   expression_statement
+  14       _                                11, 14
+  11  ❮❮❮ 
+  20       _ [SpanEnd#3 ArrayClose SpanStart#2 Set(M0) SpanEnd#2 SpanEnd#1]  06
+       ●   program
+  06   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼
