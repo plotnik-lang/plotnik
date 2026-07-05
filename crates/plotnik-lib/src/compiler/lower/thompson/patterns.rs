@@ -673,18 +673,25 @@ impl NfaBuilder<'_> {
                 }
                 SkipExit::Fail => SkipExit::Fail,
             };
+            let (body_match_exit, def_span) = self.bracket_def_body_exit(body, close_match);
+            let body_skip_exit = match close_skip {
+                SkipExit::To(skip) if skip == close_match => SkipExit::To(body_match_exit),
+                SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
+                SkipExit::Fail => SkipExit::Fail,
+            };
             let body_entry = self.with_scope(def_output_id, |this| {
                 this.compile_skippable_with_exits(
                     body,
                     SplitExits {
-                        match_exit: close_match,
-                        skip_exit: close_skip,
+                        match_exit: body_match_exit,
+                        skip_exit: body_skip_exit,
                     },
                     nav_override,
                     CaptureEffects::default(),
                     false,
                 )
             });
+            let body_entry = self.wrap_def_body_entry(body_entry, def_span);
             self.emit_struct_step_with_pre(body_entry, pre)
         } else if is_captured {
             // Scalar-valued (enum) body: it leaves its value pending; the
@@ -695,18 +702,25 @@ impl NfaBuilder<'_> {
                 SkipExit::To(skip) => SkipExit::To(self.emit_effects_if_nonempty(skip, post)),
                 SkipExit::Fail => SkipExit::Fail,
             };
+            let (body_match_exit, def_span) = self.bracket_def_body_exit(body, set_match);
+            let body_skip_exit = match set_skip {
+                SkipExit::To(skip) if skip == set_match => SkipExit::To(body_match_exit),
+                SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
+                SkipExit::Fail => SkipExit::Fail,
+            };
             let body_entry = self.with_scope(def_output_id, |this| {
                 this.compile_skippable_with_exits(
                     body,
                     SplitExits {
-                        match_exit: set_match,
-                        skip_exit: set_skip,
+                        match_exit: body_match_exit,
+                        skip_exit: body_skip_exit,
                     },
                     nav_override,
                     CaptureEffects::default(),
                     true,
                 )
             });
+            let body_entry = self.wrap_def_body_entry(body_entry, def_span);
             self.wrap_entry_pre(body_entry, pre)
         } else {
             // Bare reference: opaque, so the body compiles structurally.
@@ -721,18 +735,25 @@ impl NfaBuilder<'_> {
                 SkipExit::To(skip) => SkipExit::To(self.emit_effects_if_nonempty(skip, post)),
                 SkipExit::Fail => SkipExit::Fail,
             };
+            let (body_match_exit, def_span) = self.bracket_def_body_exit(body, end_match);
+            let body_skip_exit = match end_skip {
+                SkipExit::To(skip) if skip == end_match => SkipExit::To(body_match_exit),
+                SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
+                SkipExit::Fail => SkipExit::Fail,
+            };
             let body_entry = self.with_suppression(|this| {
                 this.compile_skippable_with_exits(
                     body,
                     SplitExits {
-                        match_exit: end_match,
-                        skip_exit: end_skip,
+                        match_exit: body_match_exit,
+                        skip_exit: body_skip_exit,
                     },
                     nav_override,
                     CaptureEffects::default(),
                     false,
                 )
             });
+            let body_entry = self.wrap_def_body_entry(body_entry, def_span);
             self.wrap_entry_pre(body_entry, pre)
         };
         self.inline_stack.pop();

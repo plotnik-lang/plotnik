@@ -90,18 +90,17 @@ Q:
   05  -ε-  [StructClose]                    07
   07                                        ▶
   08  └‣─  (@30)                            30 : 09
-  09  ─‣┘  _ [SpanStart#11 Set(M4) SpanEnd#11]  11
-  11  ─‣┘  _ [SpanEnd#10 SpanEnd#9]         22
-  13                                        ▶
-  14  ...
+  09  ─‣┘  _ [SpanStart#11 Set(M4) SpanEnd#11 SpanEnd#12]  12
+  12  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  22
+  14                                        ▶
   15  ...
-  16   !   (identifier) [SpanStart#1 SpanStart#2 EnumOpen(M2) SpanStartAt#4 SpanStart#3 Node Set(M0) SpanEnd#3 SpanEnd#4 EnumClose SpanEnd#2 SpanEnd#1]  13
+  16   !   (identifier) [SpanStart#1 SpanStart#2 EnumOpen(M2) SpanStartAt#4 SpanStart#3 Node Set(M0) SpanEnd#3 SpanEnd#4 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
   22                                        ▶
   23  ...
-  24   !   (number) [SpanStart#1 SpanStart#5 EnumOpen(M3) SpanStartAt#7 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#7 EnumClose SpanEnd#5 SpanEnd#1]  13
-  30  -ε-                                   16, 24
-  32  └‣─  (expression_statement) [SpanStartAt#10]  08
-  34   !   (program) [SpanStartAt#9]        32
+  24   !   (number) [SpanStart#1 SpanStart#5 EnumOpen(M3) SpanStartAt#7 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#7 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  14
+  30  -ε-  [SpanStart#0]                    16, 24
+  32  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  08
+  34   !   (program) [SpanStart#8 SpanStartAt#9]  32
 --------------------- TRACE ----------------------
 Q:
   02  -ε-  [StructOpen]                     04
@@ -109,26 +108,26 @@ Q:
        ▶   (?)
 
 ?:
-  34       (program) [SpanStartAt#9]        32
+  34       (program) [SpanStart#8 SpanStartAt#9]  32
        ●   program
-  32       (expression_statement) [SpanStartAt#10]  08
+  32       (expression_statement) [SpanStartAt#10 SpanStart#12]  08
        ●   expression_statement
   08       (?)                              30 : 09
        ▶   (?)
 
 ?:
-  30  -ε-                                   16, 24
-  16       (identifier) [SpanStart#1 SpanStart#2 EnumOpen(M2) SpanStartAt#4 SpanStart#3 Node Set(M0) SpanEnd#3 SpanEnd#4 EnumClose SpanEnd#2 SpanEnd#1]  13
+  30  -ε-  [SpanStart#0]                    16, 24
+  16       (identifier) [SpanStart#1 SpanStart#2 EnumOpen(M2) SpanStartAt#4 SpanStart#3 Node Set(M0) SpanEnd#3 SpanEnd#4 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
        ○   number
   30  ❮❮❮ 
-  24       (number) [SpanStart#1 SpanStart#5 EnumOpen(M3) SpanStartAt#7 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#7 EnumClose SpanEnd#5 SpanEnd#1]  13
+  24       (number) [SpanStart#1 SpanStart#5 EnumOpen(M3) SpanStartAt#7 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#7 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  14
        ●   number
-  13   ◀   (?)                              
+  14   ◀   (?)
 
 ?:
-  09       _ [SpanStart#11 Set(M4) SpanEnd#11]  11
+  09       _ [SpanStart#11 Set(M4) SpanEnd#11 SpanEnd#12]  12
        ●   expression_statement
-  11       _ [SpanEnd#10 SpanEnd#9]         22
+  12       _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  22
        ●   program
   22   ◀   (?)                              
 

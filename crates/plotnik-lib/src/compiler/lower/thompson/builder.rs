@@ -13,7 +13,8 @@ use crate::compiler::lower::ir::{
     CalleeEntry, EffectIR, InstructionIR, Label, NfaGraph, ReturnAddr, ReturnIR,
 };
 use crate::compiler::lower::spans::{SpanBindingIR, SpanId, SpanTable, assign_spans};
-use crate::compiler::parse::ast::Pattern;
+use crate::compiler::lower::verify::verify_fresh_build;
+use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::parse::cst::SyntaxNode;
 
 use super::capture::{CaptureEffects, PatternCtx};
@@ -119,6 +120,8 @@ impl<'a> NfaBuilder<'a> {
             entrypoint_wrappers.insert(def_id, wrapper);
         }
 
+        verify_fresh_build(&compiler.instructions);
+
         NfaGraph {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
@@ -196,16 +199,20 @@ impl<'a> NfaBuilder<'a> {
         // The inline-stack entry keeps a nullable self-reference inside this
         // body (`A = (x (A) (y))?`) from inlining itself endlessly.
         let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let (body_exit, def_span) = self.bracket_def_body_exit(body, return_label);
+
         self.inline_stack.push(def_id);
         let body_entry = self.with_scope(type_id, |this| {
             let ctx = if consumable_value_root(body) {
-                PatternCtx::with_value(return_label, body_nav)
+                PatternCtx::with_value(body_exit, body_nav)
             } else {
-                PatternCtx::with_nav(return_label, body_nav)
+                PatternCtx::with_nav(body_exit, body_nav)
             };
             this.dispatch_pattern(body, ctx)
         });
         self.inline_stack.pop();
+
+        let body_entry = self.wrap_def_body_entry(body_entry, def_span);
 
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
@@ -233,12 +240,14 @@ impl<'a> NfaBuilder<'a> {
 
         let body_nav = Some(Nav::StayExact);
         let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let (body_match_exit, def_span) = self.bracket_def_body_exit(body, return_label);
+
         self.inline_stack.push(def_id);
         let body_entry = self.with_scope(type_id, |this| {
             this.compile_skippable_with_exits(
                 body,
                 SplitExits {
-                    match_exit: return_label,
+                    match_exit: body_match_exit,
                     skip_exit: SkipExit::Fail,
                 },
                 body_nav,
@@ -247,6 +256,8 @@ impl<'a> NfaBuilder<'a> {
             )
         });
         self.inline_stack.pop();
+
+        let body_entry = self.wrap_def_body_entry(body_entry, def_span);
 
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
@@ -325,6 +336,7 @@ impl<'a> NfaBuilder<'a> {
             Pattern::SeqPattern(_) => (SpanKind::Sequence, false),
             Pattern::Union(_) => (SpanKind::Union, false),
             Pattern::Enum(_) => (SpanKind::Enum, false),
+            Pattern::DefRef(_) => (SpanKind::Ref, false),
             _ => return ctx,
         };
         let Some(id) = self.span_id(pattern.syntax(), kind) else {
@@ -348,5 +360,39 @@ impl<'a> NfaBuilder<'a> {
             capture: capture.nest_span(start, EffectIR::span_end(id.0)),
             value,
         }
+    }
+
+    pub(super) fn bracket_def_body_exit(
+        &mut self,
+        body: &Pattern,
+        exit: Label,
+    ) -> (Label, Option<SpanId>) {
+        let Some(id) = self.def_body_span_id(body) else {
+            return (exit, None);
+        };
+
+        let close = self.emit_effects_epsilon(
+            exit,
+            vec![EffectIR::span_end(id.0)],
+            CaptureEffects::default(),
+        );
+        (close, Some(id))
+    }
+
+    pub(super) fn wrap_def_body_entry(&mut self, entry: Label, span_id: Option<SpanId>) -> Label {
+        let Some(id) = span_id else {
+            return entry;
+        };
+
+        self.wrap_entry_pre(entry, vec![EffectIR::span_start(id.0)])
+    }
+
+    fn def_body_span_id(&self, body: &Pattern) -> Option<SpanId> {
+        let def = body
+            .syntax()
+            .parent()
+            .and_then(ast::Def::cast)
+            .expect("definition body must have a Def parent");
+        self.span_id(def.syntax(), SpanKind::Def)
     }
 }

@@ -1,0 +1,98 @@
+MaybeName = (identifier)? @name
+Q = (program
+  {
+    (expression_statement (MaybeName) @first)
+    (expression_statement (MaybeName) @second)
+  }
+)
+------------------- INPUT (ts) -------------------
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "first"
+S3 "second"
+S4 "MaybeName"
+S5 "Q"
+S6 "identifier"
+S7 "program"
+S8 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+T2 = Struct  M1:2  ; { first, second }
+T3 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T3  ; name: T3
+M1: S2 → T1  ; first: MaybeName
+M2: S3 → T1  ; second: MaybeName
+
+[type_names]
+N0: S4 → T1  ; MaybeName
+N1: S5 → T2  ; Q
+
+[entrypoints]
+MaybeName = 00 :: T1
+Q         = 06 :: T2
+
+[spans]
+P00 def        0..31  src0  T1
+P01 capture    26..31  src0  T1.M0
+P02 quantifier 24..25  src0
+P03 pattern    12..24  src0
+P04 def        32..147  src0  T2
+P05 pattern    36..147  src0
+P06 sequence   47..145  src0
+P07 pattern    53..94  src0
+P08 capture    87..93  src0  T2.M1
+P09 ref        75..86  src0  T1
+P10 pattern    99..141  src0
+P11 capture    133..140  src0  T2.M2
+P12 ref        121..132  src0  T1
+
+[transitions]
+MaybeName:
+  00  -ε-  [StructOpen]                     02
+  02       (@42)                            42 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06  -ε-  [StructOpen]                     08
+  08       (@80)                            80 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12   !   (identifier) [SpanStartAt#3 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  16
+  16  ─‣┘  _ [StructClose SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  45
+  19   !   (identifier) [SpanStartAt#3 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  24
+  23  ...
+  24  ─‣┘  _ [StructClose SpanStart#8 Set(M1) SpanEnd#8 SpanEnd#9]  58
+  27                                        ▶
+  28  -ε-  [Null Set(M0) SpanEnd#2 SpanEnd#0]  27
+  31  ...
+  32   !   (identifier) [SpanStartAt#3 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  27
+  36  ─‣─  _                                32, 36
+  38   !   _                                32, 36
+  40  -ε-  [SpanStart#2]                    38, 28
+  42  -ε-  [SpanStart#0]                    40
+  44                                        ▶
+  45  ─‣┘  _ [SpanEnd#10 SpanEnd#6 SpanEnd#5 SpanEnd#4]  44
+  48  -ε-  [Null Set(M0) SpanEnd#2 SpanEnd#0 StructClose SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  45
+  52  ─‣─  _                                12, 52
+  54  └‣─  _                                12, 52
+  56  -ε-  [SpanStart#2]                    54, 48
+  58  ─‣─  (expression_statement) [SpanEnd#7 SpanStartAt#10 SpanStart#12 StructOpen SpanStart#0]  56
+  61  ...
+  62  ...
+  63  ...
+  64  -ε-  [Null Set(M0) SpanEnd#2 SpanEnd#0 StructClose SpanStart#8 Set(M1) SpanEnd#8 SpanEnd#9]  58
+  68  ─‣─  _                                19, 68
+  70  └‣─  _                                19, 68
+  72  -ε-  [SpanStart#2]                    70, 64
+  74  └‣─  (expression_statement) [SpanStart#6 SpanStartAt#7 SpanStart#9 StructOpen SpanStart#0]  72
+  77  ...
+  78  ...
+  79  ...
+  80   !   (program) [SpanStart#4 SpanStartAt#5]  74

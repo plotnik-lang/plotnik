@@ -125,46 +125,46 @@ Funcs:
   030                                       ▶
   031  ...
   032   !   (expression_statement) [SpanStartAt#4 SpanStart#2 Node Set(M0) SpanEnd#2 SpanEnd#4]  035
-  035  ─‣┘  _ [SpanEnd#3 SpanEnd#1]         030
+  035  ─‣┘  _ [SpanEnd#3 SpanEnd#1 SpanEnd#0]  030
   037  └‣─  name: (identifier) [SpanStartAt#27 SpanStart#25 Node Set(M4) SpanEnd#25 SpanEnd#27]  040
   040  ─‣┘  _ [SpanEnd#24]                  110
-  042  -ε-  [Null Set(M0) SpanEnd#3 SpanEnd#1]  030
+  042  -ε-  [Null Set(M0) SpanEnd#3 SpanEnd#1 SpanEnd#0]  030
   045  ─‣─  _                               032, 045
   047  ...
   048  └‣─  _                               032, 045
   050  -ε-  [SpanStart#3]                   048, 042
-  052   !   (program) [SpanStartAt#1]       050
+  052   !   (program) [SpanStart#0 SpanStartAt#1]  050
   054                                       ▶
   055  ...
-  056  -ε-  [SpanEnd#8 ArrayClose SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#6]  054
+  056  -ε-  [SpanEnd#8 ArrayClose SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  054
   059   !   (expression_statement) [SpanStartAt#9 Node Push SpanEnd#9]  062, 068
   062  ─‣─  _                               059, 062
   064  └‣─  _                               059, 062
   066  -ε-  [ArrayOpen SpanStart#8]         064, 056
-  068  ─‣┘  _ [SpanEnd#8 ArrayClose SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#6]  054
+  068  ─‣┘  _ [SpanEnd#8 ArrayClose SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  054
   071  ...
-  072   !   (program) [SpanStartAt#6]       066
+  072   !   (program) [SpanStart#5 SpanStartAt#6]  066
   074                                       ▶
   075   !   (expression_statement) [SpanStartAt#14 Node Push SpanEnd#14]  078, 082
   078  ─‣─  _                               075, 078
   080  └‣─  _ [ArrayOpen SpanStart#13]      075, 078
-  082  ─‣┘  _ [SpanEnd#13 ArrayClose SpanStart#12 Set(M2) SpanEnd#12 SpanEnd#11]  074
-  085   !   (program) [SpanStartAt#11]      080
+  082  ─‣┘  _ [SpanEnd#13 ArrayClose SpanStart#12 Set(M2) SpanEnd#12 SpanEnd#11 SpanEnd#10]  074
+  085   !   (program) [SpanStart#10 SpanStartAt#11]  080
   087                                       ▶
-  088  -ε-  [SpanEnd#18 ArrayClose SpanStart#17 Set(M3) SpanEnd#17 SpanEnd#16]  087
+  088  -ε-  [SpanEnd#18 ArrayClose SpanStart#17 Set(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  087
   091   !   (expression_statement) [SpanStartAt#19 Node Push SpanEnd#19]  100, 094
   094  ─‣─  _                               091, 094
   096  └‣─  _                               091, 094
   098  -ε-  [ArrayOpen SpanStart#18]        088, 096
-  100  ─‣┘  _ [SpanEnd#18 ArrayClose SpanStart#17 Set(M3) SpanEnd#17 SpanEnd#16]  087
+  100  ─‣┘  _ [SpanEnd#18 ArrayClose SpanStart#17 Set(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  087
   103  ...
-  104   !   (program) [SpanStartAt#16]      098
+  104   !   (program) [SpanStart#15 SpanStartAt#16]  098
   106                                       ▶
-  107  -ε-  [SpanEnd#23 ArrayClose SpanStart#22 Set(M5) SpanEnd#22 SpanEnd#21]  106
+  107  -ε-  [SpanEnd#23 ArrayClose SpanStart#22 Set(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  106
   110  -ε-  [StructClose Push]              114, 120
   112   !   (function_declaration) [StructOpen SpanStartAt#24]  037
   114  ─‣─  _                               112, 114
   116  └‣─  _                               112, 114
   118  -ε-  [ArrayOpen SpanStart#23]        116, 107
-  120  ─‣┘  _ [SpanEnd#23 ArrayClose SpanStart#22 Set(M5) SpanEnd#22 SpanEnd#21]  106
-  123   !   (program) [SpanStartAt#21]      118
+  120  ─‣┘  _ [SpanEnd#23 ArrayClose SpanStart#22 Set(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  106
+  123   !   (program) [SpanStart#20 SpanStartAt#21]  118

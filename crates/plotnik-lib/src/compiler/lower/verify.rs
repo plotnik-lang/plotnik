@@ -28,10 +28,10 @@
 //! any real path), so debug builds stay usable on large queries.
 
 #[cfg(debug_assertions)]
-pub use debug_impl::{run_verified, verify_constructed};
+pub use debug_impl::{run_verified, verify_constructed, verify_fresh_build};
 
 #[cfg(not(debug_assertions))]
-pub use release_impl::{run_verified, verify_constructed};
+pub use release_impl::{run_verified, verify_constructed, verify_fresh_build};
 
 #[cfg(all(test, debug_assertions))]
 #[path = "verify_tests.rs"]
@@ -40,7 +40,7 @@ mod verify_tests;
 #[cfg(not(debug_assertions))]
 mod release_impl {
     use crate::compiler::lower::LowerInput;
-    use crate::compiler::lower::ir::NfaGraph;
+    use crate::compiler::lower::ir::{InstructionIR, NfaGraph};
 
     /// Run a pass. Verification is compiled out in release builds.
     #[inline(always)]
@@ -56,6 +56,10 @@ mod release_impl {
     /// No-op in release builds.
     #[inline(always)]
     pub fn verify_constructed(_nfa: &NfaGraph, _ctx: &LowerInput) {}
+
+    /// No-op in release builds.
+    #[inline(always)]
+    pub fn verify_fresh_build(_instructions: &[InstructionIR]) {}
 }
 
 #[cfg(debug_assertions)]
@@ -594,6 +598,26 @@ mod debug_impl {
         Ok(())
     }
 
+    fn check_span_start_at_placement(instructions: &[InstructionIR]) -> Result<(), String> {
+        for instr in instructions {
+            let InstructionIR::Match(m) = instr else {
+                continue;
+            };
+            if m.effects
+                .iter()
+                .any(|effect| effect.kind() == EffectKind::SpanStartAt)
+                && m.is_epsilon()
+            {
+                return Err(format!(
+                    "SpanStartAt emitted on epsilon match {:?}; it must start on a consuming match",
+                    m.label
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
     fn check_zero_width_root(
         root: WalkRoot,
         entry: Label,
@@ -837,6 +861,15 @@ mod debug_impl {
             if let Err(e) = walk.check_scopes(entry) {
                 panic!("[verify] construction produced unbalanced scope effects for {key:?}:\n{e}");
             }
+        }
+    }
+
+    /// Check invariants that are only true for brand-new Thompson IR. Later
+    /// passes may legitimately move effects across epsilon chains while
+    /// preserving the semantic fingerprint.
+    pub fn verify_fresh_build(instructions: &[InstructionIR]) {
+        if let Err(e) = check_span_start_at_placement(instructions) {
+            panic!("[verify] fresh Thompson build misplaced cursor-reading span marker: {e}");
         }
     }
 

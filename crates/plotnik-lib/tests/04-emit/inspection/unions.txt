@@ -62,7 +62,7 @@ Q:
   14  ─‣┘  _                                22
   15  ...
   16   !   (number) [SpanStart#3 SpanStart#7 Null Set(M0) SpanStartAt#9 SpanStart#8 Node Set(M1) SpanEnd#8 SpanEnd#9 SpanEnd#7 SpanEnd#3]  14
-  22  ─‣┘  _ [SpanEnd#2 SpanEnd#1]          06
+  22  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
   24   !   (string) [SpanStartAt#12 SpanEnd#12 SpanEnd#11 SpanEnd#10 SpanEnd#3]  14
   27  ─‣─  _                                24, 27
   29   !   _ [SpanStart#11]                 24, 27
@@ -76,4 +76,4 @@ Q:
   45  ...
   46  ...
   47  ...
-  48   !   (program) [SpanStartAt#1]        42
+  48   !   (program) [SpanStart#0 SpanStartAt#1]  42

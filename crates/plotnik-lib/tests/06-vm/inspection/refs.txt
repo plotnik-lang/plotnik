@@ -1,0 +1,98 @@
+Name = (identifier) @name
+Q = (program (expression_statement (Name)))
+------------------- INPUT (ts) -------------------
+x
+--------------------- TYPES ----------------------
+export interface Name {
+  name: Node;
+}
+
+export type Q = Node;
+--------------------- OUTPUT ---------------------
+{
+  "kind": "program",
+  "text": "x",
+  "span": [0, 1]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "Q"
+S3 "Name"
+S4 "identifier"
+S5 "program"
+S6 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+
+[type_names]
+N0: S2 → T0  ; Q
+N1: S3 → T1  ; Name
+
+[entrypoints]
+Name = 00 :: T1
+Q    = 06 :: T0
+
+[spans]
+P0 def        0..25  src0  T1
+P1 capture    20..25  src0  T1.M0
+P2 pattern    7..19  src0
+P3 def        26..69  src0  T0
+P4 pattern    30..69  src0
+P5 pattern    39..68  src0
+P6 ref        61..67  src0  T1
+
+[transitions]
+Name:
+  00  -ε-  [StructOpen]                     02
+  02       (@17)                            17 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06       (@24)                            24 : 08
+  07                                        ▶
+  08  -ε-  [Node]                           10
+  10                                        ▶
+  11  └‣─  (@17)                            17 : 12
+  12  ─‣┘  _ [SuppressEnd SpanEnd#6]        14
+  14  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  07
+  16                                        ▶
+  17   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  16
+  21  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  11
+  23  ...
+  24   !   (program) [SpanStart#3 SpanStartAt#4]  21
+--------------------- TRACE ----------------------
+Q:
+  06       (?)                              24 : 08
+       ▶   (?)
+
+?:
+  24       (program) [SpanStart#3 SpanStartAt#4]  21
+       ●   program
+  21       (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  11
+       ●   expression_statement
+  11       (?)                              17 : 12
+       ▶   (?)
+
+?:
+  17       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  16
+       ●   identifier
+  16   ◀   (?)                              
+
+?:
+  12       _ [SuppressEnd SpanEnd#6]        14
+       ●   expression_statement
+  14       _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  07
+       ●   program
+  07   ◀   (?)                              
+
+Q:
+  08  -ε-  [Node]                           10
+  10   ◀   (Q)                              ◼

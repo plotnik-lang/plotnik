@@ -66,14 +66,14 @@ Q:
   05                                        ▶
   06                                        ▶
   07  ...
-  08  -ε-  [SpanEnd#3 ArrayClose SpanStart#2 Set(M0) SpanEnd#2 SpanEnd#1]  06
+  08  -ε-  [SpanEnd#3 ArrayClose SpanStart#2 Set(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
   11   !   (expression_statement) [SpanStartAt#4 Node Push SpanEnd#4]  14, 20
   14  ─‣─  _                                11, 14
   16  └‣─  _                                11, 14
   18  -ε-  [ArrayOpen SpanStart#3]          16, 08
-  20  ─‣┘  _ [SpanEnd#3 ArrayClose SpanStart#2 Set(M0) SpanEnd#2 SpanEnd#1]  06
+  20  ─‣┘  _ [SpanEnd#3 ArrayClose SpanStart#2 Set(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
   23  ...
-  24   !   (program) [SpanStartAt#1]        18
+  24   !   (program) [SpanStart#0 SpanStartAt#1]  18
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
@@ -81,7 +81,7 @@ Q:
        ▶   (?)
 
 ?:
-  24       (program) [SpanStartAt#1]        18
+  24       (program) [SpanStart#0 SpanStartAt#1]  18
        ●   program
   18  -ε-  [ArrayOpen SpanStart#3]          16, 08
   16       _                                11, 14
@@ -98,7 +98,7 @@ Q:
        ●   expression_statement
   14       _                                11, 14
   11  ❮❮❮ 
-  20       _ [SpanEnd#3 ArrayClose SpanStart#2 Set(M0) SpanEnd#2 SpanEnd#1]  06
+  20       _ [SpanEnd#3 ArrayClose SpanStart#2 Set(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
        ●   program
   06   ◀   (?)                              
 

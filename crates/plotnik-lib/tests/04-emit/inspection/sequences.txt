@@ -51,13 +51,12 @@ Q:
   07  ...
   08  └‣─  (number) [SpanStartAt#8 SpanStart#7 Node Set(M1) SpanEnd#7 SpanEnd#8]  11
   11  ─‣┘  _                                12
-  12  ─‣┘  _ [SpanEnd#6 SpanEnd#2 SpanEnd#1]  14
-  14                                        ▶
-  15  ...
+  12  ─‣┘  _ [SpanEnd#6 SpanEnd#2 SpanEnd#1 SpanEnd#0]  15
+  15                                        ▶
   16  └‣─  (identifier) [SpanStartAt#5 SpanStart#4 Node Set(M0) SpanEnd#4 SpanEnd#5]  19
   19  ─‣┘  _                                20
   20  ─‣─  (expression_statement) [SpanEnd#3 SpanStartAt#6]  08
   22  ...
   23  ...
   24  └‣─  (expression_statement) [SpanStart#2 SpanStartAt#3]  16
-  26   !   (program) [SpanStartAt#1]        24
+  26   !   (program) [SpanStart#0 SpanStartAt#1]  24

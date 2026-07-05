@@ -55,9 +55,9 @@ Q:
   08  ─‣─  right: (identifier) [SpanStartAt#9 SpanStart#7 Node Set(M1) SpanEnd#7 SpanEnd#9]  11
   11  ─‣┘  _                                12
   12  ─‣┘  _ [SpanEnd#3]                    14
-  14  ─‣┘  _ [SpanEnd#2 SpanEnd#1]          06
+  14  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
   16  └‣─  left: (identifier) [SpanStartAt#6 SpanStart#4 Node Set(M0) SpanEnd#4 SpanEnd#6]  08
   19  └‣─  (binary_expression) [SpanStartAt#3]  16
   21  └‣─  (expression_statement) [SpanStartAt#2]  19
   23  ...
-  24   !   (program) [SpanStartAt#1]        21
+  24   !   (program) [SpanStart#0 SpanStartAt#1]  21

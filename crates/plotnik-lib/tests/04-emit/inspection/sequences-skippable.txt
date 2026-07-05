@@ -75,8 +75,8 @@ TrailingSkip:
   23  ...
   24  └‣─  _                                19, 21
   26  -ε-  [SpanStart#3]                    24, 13
-  28  ─‣┘  _ [SpanEnd#2 SpanEnd#1]          12
-  30   !   (program) [SpanStartAt#1 SpanStart#2]  26
+  28  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  12
+  30   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  26
   32                                        ▶
   33  -ε-  [SpanEnd#12]                     45
   35   !   (expression_statement) [SpanStartAt#13 SpanEnd#13 SpanEnd#12]  45
@@ -84,6 +84,6 @@ TrailingSkip:
   39  ...
   40  -ε-  [SpanStart#12]                   37, 33
   42  └‣─  (function_declaration) [SpanStart#9 SpanStartAt#11 SpanStart#10 Node Set(M1) SpanEnd#10 SpanEnd#11]  40
-  45  ─‣┘  _ [SpanEnd#9 SpanEnd#8]          32
+  45  ─‣┘  _ [SpanEnd#9 SpanEnd#8 SpanEnd#7]  32
   47  ...
-  48   !   (program) [SpanStartAt#8]        42
+  48   !   (program) [SpanStart#7 SpanStartAt#8]  42

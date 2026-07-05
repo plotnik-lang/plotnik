@@ -56,7 +56,7 @@ Q:
   04  ─‣─  (_) [SpanStartAt#8 SpanEnd#8]    06
   06  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  08
   08  ─‣┘  _                                09
-  09  ─‣┘  _ [SpanEnd#2 SpanEnd#1]          11
+  09  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  11
   11                                        ▶
   12  ─‣─  "+" [SpanStartAt#7 SpanEnd#7]    04
   14  └‣─  (identifier) [SpanStartAt#6 SpanEnd#6]  12
@@ -66,4 +66,4 @@ Q:
   24  ─‣─  _                                16, 18, 21, 24
   26  └‣─  _                                16, 18, 21, 24
   28  └‣─  (expression_statement) [SpanStartAt#2]  26
-  30   !   (program) [SpanStartAt#1]        28
+  30   !   (program) [SpanStart#0 SpanStartAt#1]  28

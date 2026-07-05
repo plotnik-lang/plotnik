@@ -67,7 +67,7 @@ Q:
   07  ...
   08  └‣─  name: (identifier) [SpanStartAt#8 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#8]  11
   11  ─‣┘  _ [SpanEnd#5]                    13
-  13  ─‣┘  _ [SpanEnd#1]                    15
+  13  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          15
   15                                        ▶
   16  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#5]  08
   18  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#5]  08
@@ -79,7 +79,7 @@ Q:
   29  └‣─  _                                24, 27
   31  ...
   32  -ε-  [SpanStart#3]                    29, 20
-  34   !   (program) [SpanStartAt#1]        32
+  34   !   (program) [SpanStart#0 SpanStartAt#1]  32
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
@@ -87,7 +87,7 @@ Q:
        ▶   (?)
 
 ?:
-  34       (program) [SpanStartAt#1]        32
+  34       (program) [SpanStart#0 SpanStartAt#1]  32
        ●   program
   32  -ε-  [SpanStart#3]                    29, 20
   29       _                                24, 27
@@ -105,7 +105,7 @@ Q:
        ●   identifier
   11       _ [SpanEnd#5]                    13
        ●   function_declaration
-  13       _ [SpanEnd#1]                    15
+  13       _ [SpanEnd#1 SpanEnd#0]          15
        ●   program
   15   ◀   (?)                              
 
