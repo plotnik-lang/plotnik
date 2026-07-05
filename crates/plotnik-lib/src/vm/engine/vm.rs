@@ -164,11 +164,6 @@ impl<'t> VM<'t> {
         );
     }
 
-    /// Checkpoint that resumes a branch alternative at `ip`.
-    fn branch_checkpoint(&self, ip: u16) -> Checkpoint {
-        Checkpoint::branch(self.checkpoint_state(), ip)
-    }
-
     /// Checkpoint that, on backtrack, advances the cursor and re-enters the
     /// callee. `call_ip` is the Call's address (for trace rendering only).
     fn call_retry_checkpoint(&self, call_ip: u16, resume: CallResume) -> Checkpoint {
@@ -427,12 +422,17 @@ impl<'t> VM<'t> {
             return Err(ControlFlow::Accept.into());
         }
 
-        // Push checkpoints for alternate branches (in reverse order)
-        for i in (1..m.succ_count()).rev() {
-            self.checkpoints
-                .push(self.branch_checkpoint(u16::from(m.successor(i))));
-            if T::ENABLED {
-                tracer.trace_checkpoint_created(self.ip);
+        // Push checkpoints for alternate branches (in reverse order). One state
+        // snapshot serves every push: nothing in the loop moves the cursor or
+        // touches the arenas the snapshot reads.
+        if m.succ_count() > 1 {
+            let state = self.checkpoint_state();
+            for i in (1..m.succ_count()).rev() {
+                self.checkpoints
+                    .push(Checkpoint::branch(state, u16::from(m.successor(i))));
+                if T::ENABLED {
+                    tracer.trace_checkpoint_created(self.ip);
+                }
             }
         }
 
