@@ -143,7 +143,6 @@ impl NfaBuilder<'_> {
         // With items: nav[entry_effects] → items → Up → [exit_effects] → exit
         let final_exit = self.emit_trailing_effects_exit(exit, exit_effects);
 
-        let up_label = self.fresh_label();
         // The skip exit bypasses Up when the whole child list matches
         // zero-width: nothing was consumed, so the cursor never descended and
         // there is no child to ascend from. Anchors lose their carrier on that
@@ -169,17 +168,26 @@ impl NfaBuilder<'_> {
         } else {
             final_exit
         };
-        let items_entry = self.compile_seq_items(SeqItemsCtx {
-            items: &items,
-            exit: up_label,
-            is_inside_node: true,
-            first_nav: None,
-            capture: CaptureEffects::default(),
-            skip_exit: Some(SkipExit::To(skip_target)),
-        });
-
-        self.instructions
-            .push(MatchIR::epsilon(up_label, final_exit).nav(up_nav).into());
+        // A body of anchors alone consumes no child, so it is the zero-width
+        // path and nothing else: the childless assertion is the whole
+        // constraint. Compiling the descend/ascend pair around an empty
+        // match would emit a bare ascent (`verify` rightly rejects it).
+        let items_entry = if items_have_patterns(&items) {
+            let up_label = self.fresh_label();
+            let entry = self.compile_seq_items(SeqItemsCtx {
+                items: &items,
+                exit: up_label,
+                is_inside_node: true,
+                first_nav: None,
+                capture: CaptureEffects::default(),
+                skip_exit: Some(SkipExit::To(skip_target)),
+            });
+            self.instructions
+                .push(MatchIR::epsilon(up_label, final_exit).nav(up_nav).into());
+            entry
+        } else {
+            skip_target
+        };
 
         let mut entry_match = MatchIR::epsilon(entry, items_entry)
             .nav(nav)
@@ -204,6 +212,20 @@ impl NfaBuilder<'_> {
             self.emit_effects_epsilon(exit, post, CaptureEffects::default())
         }
     }
+}
+
+/// Whether any item — descending through sequence groups — is a pattern that
+/// consumes a child. A body failing this is anchors alone: one zero-width
+/// match with no descent into the child list.
+fn items_have_patterns(items: &[ast::SeqItem]) -> bool {
+    items.iter().any(|item| match item {
+        ast::SeqItem::Pattern(Pattern::SeqPattern(seq)) => {
+            let inner: Vec<_> = seq.items().collect();
+            items_have_patterns(&inner)
+        }
+        ast::SeqItem::Pattern(_) => true,
+        ast::SeqItem::Anchor(_) => false,
+    })
 }
 
 /// The zero-width counterpart of an anchor's constrained nav: a trailing

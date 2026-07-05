@@ -1,0 +1,26 @@
+Q = (program .)
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "Q"
+S2 "program"
+
+[type_defs]
+T0 = <Node>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Q
+
+[entrypoints]
+Q = 0 :: T0
+
+[transitions]
+Q:
+  0       (@6)                              6 : 1
+  1  -ε-  [Node]                            3
+  3                                         ▶
+  4                                         ▶
+  5  └•┘  _                                 4
+  6   !   (program)                         5
