@@ -1,0 +1,6 @@
+"a
+b"
+--------------------- TOKENS ---------------------
+DoubleQuote "\""
+StringContent "a\nb"
+DoubleQuote "\""

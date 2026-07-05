@@ -1,0 +1,7 @@
+name: (identifier)
+--------------------- TOKENS ---------------------
+Id "name"
+Colon ":"
+ParenOpen "("
+Id "identifier"
+ParenClose ")"

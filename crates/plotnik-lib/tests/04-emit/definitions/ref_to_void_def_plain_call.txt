@@ -1,0 +1,38 @@
+Blank = (identifier)
+Q = (expression_statement (Blank))
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "Q"
+S2 "identifier"
+S3 "expression_statement"
+S4 "Blank"
+
+[type_defs]
+T0 = <Node>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Q
+
+[entrypoints]
+Blank = 00 :: T0
+Q     = 04 :: T0
+
+[transitions]
+Blank:
+  00       (@11)                            11 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
+
+Q:
+  04       (@13)                            13 : 05
+  05  -ε-  [Node]                           07
+  07                                        ▶
+  08  └‣─  (@11)                            11 : 09
+  09  ─‣┘  _                                12
+  10                                        ▶
+  11   !   (identifier)                     10
+  12                                        ▶
+  13   !   (expression_statement)           08

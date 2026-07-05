@@ -1,4 +1,6 @@
-Q = {{(identifier) @id} @inner}? @outer
+Q = {
+  {(identifier) @id} @inner
+}? @outer
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

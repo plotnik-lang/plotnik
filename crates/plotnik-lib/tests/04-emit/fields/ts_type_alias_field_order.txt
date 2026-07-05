@@ -1,12 +1,17 @@
-Q = (type_alias_declaration type_parameters: (type_parameters) @tp name: (type_identifier) @name)
+Q = (type_alias_declaration
+  type_parameters: (type_parameters) @tp
+  name: (type_identifier) @name
+)
 ------------------- INPUT (ts) -------------------
 ------------------ DIAGNOSTICS -------------------
 error: the grammar places `name:` before `type_parameters:` in `type_alias_declaration`
- --> query.ptk:1:29
+ --> query.ptk:2:3
   |
-1 | Q = (type_alias_declaration type_parameters: (type_parameters) @tp name: (type_identifier) @name)
-  |      ---------------------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ----------------------------- `name:` must come before `type_parameters:`
-  |      |
-  |      inside `type_alias_declaration`
+1 | Q = (type_alias_declaration
+  |      ---------------------- inside `type_alias_declaration`
+2 |   type_parameters: (type_parameters) @tp
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 |   name: (type_identifier) @name
+  |   ----------------------------- `name:` must come before `type_parameters:`
   |
 help: write `name:` before `type_parameters:`

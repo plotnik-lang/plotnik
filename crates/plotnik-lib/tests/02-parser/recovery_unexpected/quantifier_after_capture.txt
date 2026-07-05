@@ -1,0 +1,9 @@
+Q = (a) @x*
+------------------ DIAGNOSTICS -------------------
+error: expected a pattern
+ --> query.ptk:1:11
+  |
+1 | Q = (a) @x*
+  |           ^
+  |
+help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`

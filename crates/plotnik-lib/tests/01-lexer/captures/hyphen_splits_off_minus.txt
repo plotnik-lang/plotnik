@@ -1,0 +1,5 @@
+@foo-bar
+--------------------- TOKENS ---------------------
+CaptureToken "@foo"
+Minus "-"
+Id "bar"

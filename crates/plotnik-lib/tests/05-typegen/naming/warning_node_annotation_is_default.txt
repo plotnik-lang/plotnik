@@ -1,0 +1,11 @@
+Q = (identifier) @x :: Node
+------------------ DIAGNOSTICS -------------------
+warning: this type annotation `Node` is already the default type; omit it
+ --> query.ptk:1:24
+  |
+1 | Q = (identifier) @x :: Node
+  |                        ^^^^
+--------------------- TYPES ----------------------
+export interface Q {
+  x: Node;
+}

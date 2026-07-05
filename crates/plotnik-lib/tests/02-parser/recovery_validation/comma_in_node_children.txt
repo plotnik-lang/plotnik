@@ -1,13 +1,13 @@
-(node (a), (b))
+Q = (node (a), (b))
 ------------------ DIAGNOSTICS -------------------
 error: patterns are separated by whitespace
- --> query.ptk:1:10
+ --> query.ptk:1:14
   |
-1 | (node (a), (b))
-  |          ^
+1 | Q = (node (a), (b))
+  |              ^
   |
 help: remove the `,`
   |
-1 - (node (a), (b))
-1 + (node (a) (b))
+1 - Q = (node (a), (b))
+1 + Q = (node (a) (b))
   |

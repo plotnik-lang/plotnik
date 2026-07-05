@@ -1,9 +1,0 @@
-Q = (call_expression
-  function: (member_expression
-    object: (identifier) @target
-  )
-)
---------------------- TYPES ----------------------
-export interface Q {
-  target: Node;
-}

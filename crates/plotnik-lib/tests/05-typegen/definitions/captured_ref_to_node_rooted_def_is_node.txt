@@ -1,0 +1,8 @@
+A = (identifier)
+Q = (program (expression_statement (A) @x))
+--------------------- TYPES ----------------------
+export interface Q {
+  x: Node;
+}
+
+export type A = Node;

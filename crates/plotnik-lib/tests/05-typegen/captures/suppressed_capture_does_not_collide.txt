@@ -1,0 +1,8 @@
+Q = (program
+  (expression_statement (identifier) @x) @_
+  (debugger_statement) @x
+)
+--------------------- TYPES ----------------------
+export interface Q {
+  x: Node;
+}

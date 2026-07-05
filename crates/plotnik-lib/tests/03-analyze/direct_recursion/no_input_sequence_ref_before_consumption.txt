@@ -1,0 +1,20 @@
+E = [
+  {
+    (E)
+    (a)
+  }
+  (x)
+]
+------------------ DIAGNOSTICS -------------------
+error: infinite recursion: cycle consumes no input
+ --> query.ptk:3:6
+  |
+3 |     (E)
+  |      ^
+  |      |
+  |      references itself
+  |
+help: recursive references must consume input before recursing
+-------------------- SYMBOLS ---------------------
+E
+  E (cycle)

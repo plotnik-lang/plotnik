@@ -1,0 +1,5 @@
+Q = (identifier)+ @ids
+--------------------- TYPES ----------------------
+export interface Q {
+  ids: [Node, ...Node[]];
+}

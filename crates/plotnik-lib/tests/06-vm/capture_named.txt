@@ -1,4 +1,8 @@
-Q = (program (function_declaration name: (identifier) @name) @fn)
+Q = (program
+  (function_declaration
+    name: (identifier) @name
+  ) @fn
+)
 --------------------- INPUT ----------------------
 function foo() {}
 --------------------- TYPES ----------------------

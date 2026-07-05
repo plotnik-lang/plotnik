@@ -1,0 +1,121 @@
+Q = (program (expression_statement (array ","* @commas)))
+--------------------- INPUT ----------------------
+[1, 2, 3];
+--------------------- TYPES ----------------------
+export interface Q {
+  commas: Node[];
+}
+--------------------- OUTPUT ---------------------
+{
+  "commas": [
+    {
+      "kind": ",",
+      "text": ",",
+      "span": [2, 3]
+    },
+    {
+      "kind": ",",
+      "text": ",",
+      "span": [5, 6]
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "commas"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "array"
+S6 ","
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { commas }
+
+[type_members]
+M0: S1 → T1  ; commas: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@22)                            22 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘² _                                06
+  08  -ε-  [ArrayClose Set(M0)]             07
+  10   !   "," [Node Push]                  12, 18
+  12  ─‣─  _                                10, 12
+  14  └‣─  _                                10, 12
+  16  -ε-  [ArrayOpen]                      14, 08
+  18  ─‣┘  _ [ArrayClose Set(M0)]           07
+  20  └‣─  (array)                          16
+  21  └‣─  (expression_statement)           20
+  22   !   (program)                        21
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              22 : 03
+       ▶   (?)
+
+?:
+  22       (program)                        21
+       ●   program
+  21       (expression_statement)           20
+       ●   expression_statement
+  20       (array)                          16
+       ●   array
+  16  -ε-  [ArrayOpen]                      14, 08
+  14       _                                10, 12
+       ●   [
+  10       "," [Node Push]                  12, 18
+       ○   [
+  14  ❮❮❮ 
+  12       _                                10, 12
+       ●   number
+  10       "," [Node Push]                  12, 18
+       ○   number
+  12  ❮❮❮ 
+  12       _                                10, 12
+       ●   ,
+  10       "," [Node Push]                  12, 18
+       ●   ,
+  12       _                                10, 12
+       ●   number
+  10       "," [Node Push]                  12, 18
+       ○   number
+  12  ❮❮❮ 
+  12       _                                10, 12
+       ●   ,
+  10       "," [Node Push]                  12, 18
+       ●   ,
+  12       _                                10, 12
+       ●   number
+  10       "," [Node Push]                  12, 18
+       ○   number
+  12  ❮❮❮ 
+  12       _                                10, 12
+       ●   ]
+  10       "," [Node Push]                  12, 18
+       ○   ]
+  12  ❮❮❮ 
+  12       _                                10, 12
+  10  ❮❮❮ 
+  18       _ [ArrayClose Set(M0)]           07
+       ●   array
+  07       _                                06
+       ●   program
+  06   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

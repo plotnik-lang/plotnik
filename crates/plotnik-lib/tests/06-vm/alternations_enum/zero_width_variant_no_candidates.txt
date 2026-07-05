@@ -1,4 +1,9 @@
-Q = (program [A: (identifier)? @id  B: (debugger_statement) @d] @x)
+Q = (program
+  [
+    A: (identifier)? @id
+    B: (debugger_statement) @d
+  ] @x
+)
 --------------------- INPUT ----------------------
 --------------------- TYPES ----------------------
 export type QX =

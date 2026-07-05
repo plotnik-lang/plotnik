@@ -1,0 +1,21 @@
+#!/usr/bin/env -S plotnik run
+Q = (identifier)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Shebang "#!/usr/bin/env -S plotnik run"
+  Newline "\n"
+  Def
+    Id "Q"
+    Whitespace " "
+    Equals "="
+    Whitespace " "
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode identifier

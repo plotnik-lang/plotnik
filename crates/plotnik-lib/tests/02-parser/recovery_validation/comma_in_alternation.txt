@@ -1,25 +1,25 @@
-[(a), (b), (c)]
+Q = [(a), (b), (c)]
 ------------------ DIAGNOSTICS -------------------
 error: patterns are separated by whitespace
- --> query.ptk:1:5
+ --> query.ptk:1:9
   |
-1 | [(a), (b), (c)]
-  |     ^
+1 | Q = [(a), (b), (c)]
+  |         ^
   |
 help: remove the `,`
   |
-1 - [(a), (b), (c)]
-1 + [(a) (b), (c)]
+1 - Q = [(a), (b), (c)]
+1 + Q = [(a) (b), (c)]
   |
 
 error: patterns are separated by whitespace
- --> query.ptk:1:10
+ --> query.ptk:1:14
   |
-1 | [(a), (b), (c)]
-  |          ^
+1 | Q = [(a), (b), (c)]
+  |              ^
   |
 help: remove the `,`
   |
-1 - [(a), (b), (c)]
-1 + [(a), (b) (c)]
+1 - Q = [(a), (b), (c)]
+1 + Q = [(a), (b) (c)]
   |

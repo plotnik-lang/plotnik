@@ -1,0 +1,17 @@
+Q = (program
+  {
+    (expression_statement)
+    (debugger_statement)
+  }? @x
+)
+------------------ DIAGNOSTICS -------------------
+error: this `?` group doesn't match exactly one node, so there is no single node to bind
+ --> query.ptk:2:3
+  |
+2 | /   {
+3 | |     (expression_statement)
+4 | |     (debugger_statement)
+5 | |   }? @x
+  | |____^
+  |
+help: capture individual nodes inside the group: `{(a) @a (b) @b}? @x`

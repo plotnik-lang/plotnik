@@ -1,0 +1,5 @@
+Q = (program {(expression_statement)} @x)
+--------------------- TYPES ----------------------
+export interface Q {
+  x: Node;
+}

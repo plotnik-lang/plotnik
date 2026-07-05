@@ -1,14 +1,14 @@
-(node) @foo.bar name: (other)
+Q = (node (a) @foo.bar name: (other))
 ------------------ DIAGNOSTICS -------------------
 error: capture names must be snake_case
- --> query.ptk:1:8
+ --> query.ptk:1:15
   |
-1 | (node) @foo.bar name: (other)
-  |        ^^^^^^^^
+1 | Q = (node (a) @foo.bar name: (other))
+  |               ^^^^^^^^
   |
 help: use `@foo_bar`
   |
-1 - (node) @foo.bar name: (other)
-1 + (node) @foo_bar name: (other)
+1 - Q = (node (a) @foo.bar name: (other))
+1 + Q = (node (a) @foo_bar name: (other))
   |
 help: captures become fields in the output

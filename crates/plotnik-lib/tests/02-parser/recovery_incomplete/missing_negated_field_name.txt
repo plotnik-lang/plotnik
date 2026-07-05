@@ -1,9 +1,9 @@
-(call -)
+Q = (call -)
 ------------------ DIAGNOSTICS -------------------
 error: expected a field name
- --> query.ptk:1:8
+ --> query.ptk:1:12
   |
-1 | (call -)
-  |        ^
+1 | Q = (call -)
+  |            ^
   |
 help: e.g., `-value`

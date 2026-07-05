@@ -1,0 +1,17 @@
+Q = (program [
+  Stmt: (expression_statement [
+    Yes: (identifier)
+    No: (number)
+  ] @kind)
+] @item)
+--------------------- TYPES ----------------------
+export type QItem =
+  | { $tag: "Stmt"; $data: { kind: QItemStmtKind } };
+
+export interface Q {
+  item: QItem;
+}
+
+export type QItemStmtKind =
+  | { $tag: "Yes" }
+  | { $tag: "No" };

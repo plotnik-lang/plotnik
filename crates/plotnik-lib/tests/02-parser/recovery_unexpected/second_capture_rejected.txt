@@ -1,0 +1,7 @@
+Q = (a (b) @x @y)
+------------------ DIAGNOSTICS -------------------
+error: expected a child node, or `)` to close
+ --> query.ptk:1:15
+  |
+1 | Q = (a (b) @x @y)
+  |               ^^

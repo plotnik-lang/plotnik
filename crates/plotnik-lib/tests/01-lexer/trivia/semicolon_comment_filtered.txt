@@ -1,0 +1,5 @@
+foo ; comment
+bar
+--------------------- TOKENS ---------------------
+Id "foo"
+Id "bar"

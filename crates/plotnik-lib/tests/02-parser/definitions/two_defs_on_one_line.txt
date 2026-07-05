@@ -1,0 +1,25 @@
+A = (a) B = (b)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "A"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "a"
+      ParenClose ")"
+  Def
+    Id "B"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "b"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def A
+    NamedNode a
+  Def B
+    NamedNode b

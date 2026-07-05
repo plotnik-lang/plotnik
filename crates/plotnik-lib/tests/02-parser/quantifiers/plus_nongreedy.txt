@@ -1,0 +1,19 @@
+Q = (statement)+?
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Quantifier
+      NamedNode
+        ParenOpen "("
+        Id "statement"
+        ParenClose ")"
+      PlusQuestion "+?"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    QuantifiedPattern +?
+      NamedNode statement

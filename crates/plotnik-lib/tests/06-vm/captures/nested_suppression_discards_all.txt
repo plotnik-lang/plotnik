@@ -1,0 +1,78 @@
+Q = (program
+  {(expression_statement (identifier) @_inner)} @_outer
+  (debugger_statement) @d
+)
+--------------------- INPUT ----------------------
+foo; debugger;
+--------------------- TYPES ----------------------
+export interface Q {
+  d: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "d": {
+    "kind": "debugger_statement",
+    "text": "debugger;",
+    "span": [5, 14]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "d"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "identifier"
+S6 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { d }
+
+[type_members]
+M0: S1 → T0  ; d: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@13)                            13 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  ─‣─  (debugger_statement) [Node Set(M0)]  08
+  08  ─‣┘  _                                11
+  09  └‣─  (identifier)                     10
+  10  ─‣┘  _                                06
+  11                                        ▶
+  12  └‣─  (expression_statement)           09
+  13   !   (program)                        12
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              13 : 03
+       ▶   (?)
+
+?:
+  13       (program)                        12
+       ●   program
+  12       (expression_statement)           09
+       ●   expression_statement
+  09       (identifier)                     10
+       ●   identifier
+  10       _                                06
+       ●   expression_statement
+  06       (debugger_statement) [Node Set(M0)]  08
+       ●   debugger_statement
+  08       _                                11
+       ●   program
+  11   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

@@ -1,0 +1,21 @@
+Q = (program [
+  A: (expression_statement) @e
+  B: (debugger_statement) @d
+])
+------------------ DIAGNOSTICS -------------------
+warning: branch labels have no effect without capture
+ --> query.ptk:1:14
+  |
+1 |   Q = (program [
+  |  ______________^
+2 | |   A: (expression_statement) @e
+3 | |   B: (debugger_statement) @d
+4 | | ])
+  | |_^
+  |
+help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
+--------------------- TYPES ----------------------
+export interface Q {
+  d: Node | null;
+  e: Node | null;
+}

@@ -1,0 +1,67 @@
+Q = (program
+  (expression_statement
+    (array
+      .
+      (number) @first
+    )
+  )
+)
+--------------------- INPUT ----------------------
+[x, 1];
+--------------------- TYPES ----------------------
+export interface Q {
+  first: Node;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "first"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "array"
+S6 "number"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { first }
+
+[type_members]
+M0: S1 → T0  ; first: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@12)                            12 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  └•─  (number) [Node Set(M0)]          08
+  08  ─‣┘³ _                                09
+  09                                        ▶
+  10  └‣─  (array)                          06
+  11  └‣─  (expression_statement)           10
+  12   !   (program)                        11
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              12 : 03
+       ▶   (?)
+
+?:
+  12       (program)                        11
+       ●   program
+  11       (expression_statement)           10
+       ●   expression_statement
+  10       (array)                          06
+       ●   array
+  06       (number) [Node Set(M0)]          08
+       ○   [
+       ○   identifier

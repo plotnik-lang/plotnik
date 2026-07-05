@@ -1,0 +1,1084 @@
+Q = (program
+  {
+    (expression_statement)*
+    (expression_statement)*
+    (expression_statement)*
+    (debugger_statement) @d
+  }
+)
+--------------------- INPUT ----------------------
+a; b; c; d;
+--------------------- TYPES ----------------------
+export interface Q {
+  d: Node;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "d"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { d }
+
+[type_members]
+M0: S1 → T0  ; d: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@42)                            42 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08  └‣─  (debugger_statement) [Node Set(M0)]  07
+  10  ─‣─  (debugger_statement) [Node Set(M0)]  07
+  12   !   (expression_statement)           14, 10
+  14  ─‣─  _                                12, 14
+  16  └‣─  _                                12, 14
+  18   !   (expression_statement)           20, 10
+  20  ─‣─  _                                18, 20
+  22   !   (expression_statement)           24, 20, 10
+  24  ─‣─  _                                22, 24
+  26  └‣─  _                                22, 24
+  28   !   (expression_statement)           30, 10
+  30  ─‣─  _                                28, 30
+  32   !   (expression_statement)           34, 30, 10
+  34  ─‣─  _                                32, 34
+  36   !   (expression_statement)           38, 34, 30, 10
+  38  ─‣─  _                                36, 38
+  40  └‣─  _                                36, 38
+  42   !   (program)                        40, 26, 16, 08
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              42 : 03
+       ▶   (?)
+
+?:
+  42       (program)                        40, 26, 16, 08
+       ●   program
+  40       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  38  ❮❮❮ 
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  38  ❮❮❮ 
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  38  ❮❮❮ 
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  34  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  30  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+  38  ❮❮❮ 
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  38  ❮❮❮ 
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  38  ❮❮❮ 
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  38  ❮❮❮ 
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  34  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  30  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+  34  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  34  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  30  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+  30  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  30  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+       ○   expression_statement
+  40  ❮❮❮ 
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  38  ❮❮❮ 
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  38  ❮❮❮ 
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  38  ❮❮❮ 
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  34  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  30  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+  38  ❮❮❮ 
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  38  ❮❮❮ 
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement)           34, 30, 10
+       ●   expression_statement
+  34       _                                32, 34
+  32  ❮❮❮ 
+  30       _                                28, 30
+  32  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  34  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+       ●   expression_statement
+  28       (expression_statement)           30, 10
+       ●   expression_statement
+  30       _                                28, 30
+  28  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  30  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  38  ❮❮❮ 
+  38       _                                36, 38
+       ●   expression_statement
+  36       (expression_statement)           38, 34, 30, 10
+       ●   expression_statement
+  38       _                                36, 38
+  36  ❮❮❮ 
+  34       _                                32, 34
+  36  ❮❮❮ 
+  30       _                                28, 30
+  36  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  38  ❮❮❮ 
+  38       _                                36, 38
+  42  ❮❮❮ 
+  26       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  24  ❮❮❮ 
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  24  ❮❮❮ 
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  24  ❮❮❮ 
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  20  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+  24  ❮❮❮ 
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  24  ❮❮❮ 
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  24  ❮❮❮ 
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  24  ❮❮❮ 
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  20  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+  20  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  20  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+       ○   expression_statement
+  26  ❮❮❮ 
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  24  ❮❮❮ 
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  24  ❮❮❮ 
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  24  ❮❮❮ 
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  20  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+  24  ❮❮❮ 
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  24  ❮❮❮ 
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+       ●   expression_statement
+  18       (expression_statement)           20, 10
+       ●   expression_statement
+  20       _                                18, 20
+  18  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  20  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  24  ❮❮❮ 
+  24       _                                22, 24
+       ●   expression_statement
+  22       (expression_statement)           24, 20, 10
+       ●   expression_statement
+  24       _                                22, 24
+  22  ❮❮❮ 
+  20       _                                18, 20
+  22  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  24  ❮❮❮ 
+  24       _                                22, 24
+  42  ❮❮❮ 
+  16       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  14  ❮❮❮ 
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  14  ❮❮❮ 
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  14  ❮❮❮ 
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+  14  ❮❮❮ 
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  14  ❮❮❮ 
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  14  ❮❮❮ 
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  14  ❮❮❮ 
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+       ○   expression_statement
+  16  ❮❮❮ 
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  14  ❮❮❮ 
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  14  ❮❮❮ 
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  14  ❮❮❮ 
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+  14  ❮❮❮ 
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  14  ❮❮❮ 
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+  14  ❮❮❮ 
+  14       _                                12, 14
+       ●   expression_statement
+  12       (expression_statement)           14, 10
+       ●   expression_statement
+  14       _                                12, 14
+  12  ❮❮❮ 
+  10       (debugger_statement) [Node Set(M0)]  07
+  14  ❮❮❮ 
+  14       _                                12, 14
+  42  ❮❮❮ 
+  08       (debugger_statement) [Node Set(M0)]  07
+       ○   expression_statement
+       ○   expression_statement
+       ○   expression_statement
+       ○   expression_statement

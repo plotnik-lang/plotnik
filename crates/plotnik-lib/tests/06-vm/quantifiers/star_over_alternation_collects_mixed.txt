@@ -1,0 +1,96 @@
+Q = (program
+  [
+    (lexical_declaration)
+    (expression_statement)
+  ]* @all
+)
+--------------------- INPUT ----------------------
+let x; foo;
+--------------------- TYPES ----------------------
+export interface Q {
+  all: Node[];
+}
+--------------------- OUTPUT ---------------------
+{
+  "all": [
+    {
+      "kind": "lexical_declaration",
+      "text": "let x;",
+      "span": [0, 6]
+    },
+    {
+      "kind": "expression_statement",
+      "text": "foo;",
+      "span": [7, 11]
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "all"
+S2 "Q"
+S3 "program"
+S4 "lexical_declaration"
+S5 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { all }
+
+[type_members]
+M0: S1 → T1  ; all: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@22)                            22 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [ArrayClose Set(M0)]             06
+  10   !   (lexical_declaration) [Node Push]  14, 20
+  12   !   (expression_statement) [Node Push]  14, 20
+  14  ─‣─  _                                10, 12, 14
+  16  └‣─  _                                10, 12, 14
+  18  -ε-  [ArrayOpen]                      16, 08
+  20  ─‣┘  _ [ArrayClose Set(M0)]           06
+  22   !   (program)                        18
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              22 : 03
+       ▶   (?)
+
+?:
+  22       (program)                        18
+       ●   program
+  18  -ε-  [ArrayOpen]                      16, 08
+  16       _                                10, 12, 14
+       ●   lexical_declaration
+  10       (lexical_declaration) [Node Push]  14, 20
+       ●   lexical_declaration
+  14       _                                10, 12, 14
+       ●   expression_statement
+  10       (lexical_declaration) [Node Push]  14, 20
+       ○   expression_statement
+  14  ❮❮❮ 
+  12       (expression_statement) [Node Push]  14, 20
+       ●   expression_statement
+  14       _                                10, 12, 14
+  12  ❮❮❮ 
+  20       _ [ArrayClose Set(M0)]           06
+       ●   program
+  06   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

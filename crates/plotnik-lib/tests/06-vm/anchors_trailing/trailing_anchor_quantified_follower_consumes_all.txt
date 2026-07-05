@@ -1,0 +1,113 @@
+Q = (program
+  {
+    (lexical_declaration)? @a
+    .
+    (debugger_statement)* @b
+    .
+  }
+)
+--------------------- INPUT ----------------------
+debugger; debugger;
+--------------------- TYPES ----------------------
+export interface Q {
+  a: Node | null;
+  b: Node[];
+}
+--------------------- OUTPUT ---------------------
+{
+  "a": null,
+  "b": [
+    {
+      "kind": "debugger_statement",
+      "text": "debugger;",
+      "span": [0, 9]
+    },
+    {
+      "kind": "debugger_statement",
+      "text": "debugger;",
+      "span": [10, 19]
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "Q"
+S4 "program"
+S5 "lexical_declaration"
+S6 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:2  ; { a, b }
+T3 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T3  ; a: T3
+M1: S2 → T1  ; b: T1
+
+[type_names]
+N0: S3 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@28)                            28 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  -ε-  [ArrayClose Set(M1)]             08
+  08  ─•┘  _                                09
+  09                                        ▶
+  10  -ε-  [ArrayClose Set(M1)]             09
+  12  └•─  (debugger_statement) [Node Push]  14, 06
+  14  ─•─  (debugger_statement) [Node Push]  14, 06
+  16  -ε-  [ArrayOpen]                      12, 10
+  18  -ε-  [ArrayOpen]                      14, 06
+  20  -ε-  [Null Set(M0)]                   16
+  22   !   (lexical_declaration) [Node Set(M0)]  18
+  24  ─‣─  _                                22, 24
+  26  └‣─  _                                22, 24
+  28   !   (program)                        26, 20
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              28 : 03
+       ▶   (?)
+
+?:
+  28       (program)                        26, 20
+       ●   program
+  26       _                                22, 24
+       ●   debugger_statement
+  22       (lexical_declaration) [Node Set(M0)]  18
+       ○   debugger_statement
+  26  ❮❮❮ 
+  24       _                                22, 24
+       ●   debugger_statement
+  22       (lexical_declaration) [Node Set(M0)]  18
+       ○   debugger_statement
+  24  ❮❮❮ 
+  24       _                                22, 24
+  28  ❮❮❮ 
+  20  -ε-  [Null Set(M0)]                   16
+  16  -ε-  [ArrayOpen]                      12, 10
+  12       (debugger_statement) [Node Push]  14, 06
+       ●   debugger_statement
+  14       (debugger_statement) [Node Push]  14, 06
+       ●   debugger_statement
+  14       (debugger_statement) [Node Push]  14, 06
+  14  ❮❮❮ 
+  06  -ε-  [ArrayClose Set(M1)]             08
+  08       _                                09
+       ●   program
+  09   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

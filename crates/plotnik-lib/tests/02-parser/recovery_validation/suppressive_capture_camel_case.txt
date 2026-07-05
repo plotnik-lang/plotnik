@@ -1,14 +1,14 @@
-(a) @_fooBar
+Q = (a) @_fooBar
 ------------------ DIAGNOSTICS -------------------
 error: capture names must be snake_case
- --> query.ptk:1:5
+ --> query.ptk:1:9
   |
-1 | (a) @_fooBar
-  |     ^^^^^^^^
+1 | Q = (a) @_fooBar
+  |         ^^^^^^^^
   |
 help: use `@_foo_bar`
   |
-1 - (a) @_fooBar
-1 + (a) @_foo_bar
+1 - Q = (a) @_fooBar
+1 + Q = (a) @_foo_bar
   |
 help: captures become fields in the output

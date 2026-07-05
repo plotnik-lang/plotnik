@@ -1,0 +1,23 @@
+A = [
+  Base: (identifier) @id
+  Nest: (array (B) @b)
+]
+
+B = [
+  Leaf: (number) @n
+  Wrap: (parenthesized_expression (A) @a)
+]
+
+Q = (program (expression_statement (A) @root))
+--------------------- TYPES ----------------------
+export type B =
+  | { $tag: "Leaf"; $data: { n: Node } }
+  | { $tag: "Wrap"; $data: { a: A } };
+
+export type A =
+  | { $tag: "Base"; $data: { id: Node } }
+  | { $tag: "Nest"; $data: { b: B } };
+
+export interface Q {
+  root: A;
+}

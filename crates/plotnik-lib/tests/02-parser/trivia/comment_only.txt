@@ -1,9 +1,0 @@
-// just a comment
------------------- DIAGNOSTICS -------------------
-error: query defines nothing
- --> query.ptk:1:1
-  |
-1 | // just a comment
-  | ^^^^^^^^^^^^^^^^^
-  |
-help: add a definition, e.g. `Q = (identifier) @id`

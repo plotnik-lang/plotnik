@@ -1,25 +1,25 @@
-(a | b)
+Q = (a | b)
 ------------------ DIAGNOSTICS -------------------
 error: patterns are separated by whitespace
- --> query.ptk:1:4
+ --> query.ptk:1:8
   |
-1 | (a | b)
-  |    ^
+1 | Q = (a | b)
+  |        ^
   |
 help: remove the `|`
   |
-1 - (a | b)
-1 + (a  b)
+1 - Q = (a | b)
+1 + Q = (a  b)
   |
 
 error: node kinds must be parenthesized
- --> query.ptk:1:6
+ --> query.ptk:1:10
   |
-1 | (a | b)
-  |      ^
+1 | Q = (a | b)
+  |          ^
   |
 help: wrap in parentheses
   |
-1 - (a | b)
-1 + (a | (b))
+1 - Q = (a | b)
+1 + Q = (a | (b))
   |

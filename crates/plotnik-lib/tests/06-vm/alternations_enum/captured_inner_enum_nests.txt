@@ -1,4 +1,10 @@
-Q = (program [Tag: [In: (expression_statement) @a] @y])
+Q = (program
+  [
+    Tag: [
+      In: (expression_statement) @a
+    ] @y
+  ]
+)
 --------------------- INPUT ----------------------
 a;
 --------------------- TYPES ----------------------
@@ -10,10 +16,14 @@ export interface Q {
 }
 ------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
- --> query.ptk:1:14
+ --> query.ptk:2:3
   |
-1 | Q = (program [Tag: [In: (expression_statement) @a] @y])
-  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 | /   [
+3 | |     Tag: [
+4 | |       In: (expression_statement) @a
+5 | |     ] @y
+6 | |   ]
+  | |___^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
 --------------------- OUTPUT ---------------------

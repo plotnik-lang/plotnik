@@ -1,4 +1,8 @@
-Q = (program [A: (comment)? @c]* @items)
+Q = (program
+  [
+    A: (comment)? @c
+  ]* @items
+)
 --------------------- INPUT ----------------------
 // c
 x;

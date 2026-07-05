@@ -1,0 +1,6 @@
+=~ "foo"
+--------------------- TOKENS ---------------------
+OpRegexMatch "=~"
+DoubleQuote "\""
+StringContent "foo"
+DoubleQuote "\""

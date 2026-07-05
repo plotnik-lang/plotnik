@@ -1,4 +1,8 @@
-Q = (program [Tag: ((expression_statement) @a) @x])
+Q = (program
+  [
+    Tag: ((expression_statement) @a) @x
+  ]
+)
 --------------------- INPUT ----------------------
 a;
 --------------------- TYPES ----------------------
@@ -11,18 +15,20 @@ export interface Q {
 }
 ------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
- --> query.ptk:1:14
+ --> query.ptk:2:3
   |
-1 | Q = (program [Tag: ((expression_statement) @a) @x])
-  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 | /   [
+3 | |     Tag: ((expression_statement) @a) @x
+4 | |   ]
+  | |___^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
 
 warning: parenthesized sequences are tree-sitter syntax
- --> query.ptk:1:20
+ --> query.ptk:3:10
   |
-1 | Q = (program [Tag: ((expression_statement) @a) @x])
-  |                    ^
+3 |     Tag: ((expression_statement) @a) @x
+  |          ^
   |
 help: use `{(a) (b)}` to match a sequence of siblings
 --------------------- OUTPUT ---------------------

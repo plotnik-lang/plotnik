@@ -61,6 +61,12 @@ impl Emitter<'_> {
         // Kahn's algorithm. Ready types are kept in a max-heap keyed by raw id
         // (TypeId is not Ord) so each step deterministically takes the largest
         // available id, matching the previous sort-then-pop-last ordering.
+        //
+        // Mutually recursive types never become ready — each waits on the
+        // other — so plain Kahn's would drop them (and everything downstream)
+        // from the result. TypeScript declarations may reference each other in
+        // any order, so when the queue runs dry early a pending type is forced
+        // out to break the cycle, and the drain continues from there.
         let mut result = Vec::with_capacity(types.len());
         let mut queue: BinaryHeap<u16> = deps
             .iter()
@@ -68,8 +74,14 @@ impl Emitter<'_> {
             .map(|(&tid, _)| u16::from(tid))
             .collect();
 
-        while let Some(raw) = queue.pop() {
-            let tid = TypeId::from(raw);
+        while result.len() < types.len() {
+            let tid = match queue.pop() {
+                Some(raw) => TypeId::from(raw),
+                None => pick_cycle_breaker(&deps),
+            };
+            // Completed entries leave the map so a forced type can't be
+            // re-queued when its own dependencies drain later.
+            deps.remove(&tid);
             result.push(tid);
             if let Some(dependents) = rdeps.get(&tid) {
                 for &dependent in dependents {
@@ -201,4 +213,20 @@ impl Emitter<'_> {
             TypeDefKind::Struct { .. } | TypeDefKind::Enum { .. } => vec![type_id],
         }
     }
+}
+
+/// Choose which pending type to emit when Kahn's queue runs dry, i.e. every
+/// pending type still waits on another (a dependency cycle). Prefer a type
+/// some other pending type waits on: emitting it unblocks its dependents, so
+/// everything outside the cycle keeps its topological order. Types merely
+/// downstream of a cycle never qualify — nothing pending depends on them.
+/// Largest raw id wins for determinism, matching the heap's ordering.
+fn pick_cycle_breaker(deps: &HashMap<TypeId, HashSet<TypeId>>) -> TypeId {
+    let raw = deps
+        .values()
+        .flatten()
+        .map(|&tid| u16::from(tid))
+        .max()
+        .expect("pending types always wait on another pending type when the queue is dry");
+    TypeId::from(raw)
 }

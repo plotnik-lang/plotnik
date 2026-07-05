@@ -1,12 +1,17 @@
-A = [(B) (x)]
+A = [
+  (B)
+  (x)
+]
+
 B = (A)
 ------------------ DIAGNOSTICS -------------------
 error: infinite recursion: cycle consumes no input
- --> query.ptk:2:6
+ --> query.ptk:6:6
   |
-1 | A = [(B) (x)]
-  |       - references B (completing cycle)
-2 | B = (A)
+2 |   (B)
+  |    - references B (completing cycle)
+...
+6 | B = (A)
   | -    ^
   | |    |
   | |    references A

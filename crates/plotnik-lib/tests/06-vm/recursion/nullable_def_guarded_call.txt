@@ -1,0 +1,123 @@
+A = (statement_block
+  (A)
+  (debugger_statement)
+)?
+
+Q = (program
+  (A)
+  (expression_statement) @e
+)
+--------------------- INPUT ----------------------
+{ { debugger; } debugger; } f();
+--------------------- TYPES ----------------------
+export interface Q {
+  e: Node;
+}
+
+export type A = Node | null;
+--------------------- OUTPUT ---------------------
+{
+  "e": {
+    "kind": "expression_statement",
+    "text": "f();",
+    "span": [28, 32]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "e"
+S2 "A"
+S3 "Q"
+S4 "statement_block"
+S5 "debugger_statement"
+S6 "program"
+S7 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Optional(T0)  ; <Node>?
+T2 = Struct  M0:1  ; { e }
+
+[type_members]
+M0: S1 → T0  ; e: <Node>
+
+[type_names]
+N0: S2 → T1  ; A
+N1: S3 → T2  ; Q
+
+[entrypoints]
+A = 00 :: T1
+Q = 02 :: T2
+
+[transitions]
+A:
+  00       (@38)                            38 : 01
+  01                                        ▶
+
+Q:
+  02  -ε-  [StructOpen]                     04
+  04       (@59)                            59 : 05
+  05  -ε-  [StructClose]                    07
+  07                                        ▶
+  08                                        ▶
+  09  -ε-  [Null]                           08
+  11  └‣─  (debugger_statement)             31
+  12  ─‣─  (debugger_statement) [SuppressEnd]  31
+  14                                        ▶
+  15  └‣─  (debugger_statement)             21
+  16  ─‣─  (debugger_statement) [SuppressEnd]  21
+  18  └‣─  (@26)                            26 : 16
+  19  -ε-  [SuppressBegin]                  18
+  21  ─‣┘  _                                14
+  22   !   (statement_block) [Node]         15, 19
+  24  ─‣─  _                                22, 24
+  26   !   _                                22, 24
+  28  └‣─  (@26)                            26 : 12
+  29  -ε-  [SuppressBegin]                  28
+  31  ─‣┘  _                                08
+  32   !   (statement_block) [Node]         11, 29
+  34  ─‣─  _                                32, 34
+  36   !   _                                32, 34
+  38  -ε-                                   36, 09
+  40                                        ▶
+  41  └‣─  (expression_statement) [Node Set(M0)]  58
+  43  ─‣─  (expression_statement) [Node Set(M0)]  58
+  45  └‣─  (debugger_statement)             51
+  46  ─‣─  (debugger_statement) [SuppressEnd]  51
+  48  └‣─  (@26)                            26 : 46
+  49  -ε-  [SuppressBegin]                  48
+  51  ─‣┘  _                                43
+  52   !   (statement_block)                45, 49
+  54  ─‣─  _                                52, 54
+  56  └‣─  _                                52, 54
+  58  ─‣┘  _                                40
+  59   !   (program)                        56, 41
+--------------------- TRACE ----------------------
+Q:
+  02  -ε-  [StructOpen]                     04
+  04       (?)                              59 : 05
+       ▶   (?)
+
+?:
+  59       (program)                        56, 41
+       ●   program
+  56       _                                52, 54
+       ●   statement_block
+  52       (statement_block)                45, 49
+       ●   statement_block
+  45       (debugger_statement)             51
+       ○   {
+       ○   statement_block
+       ●   debugger_statement
+  51       _                                43
+       ●   statement_block
+  43       (expression_statement) [Node Set(M0)]  58
+       ●   expression_statement
+  58       _                                40
+       ●   program
+  40   ◀   (?)                              
+
+Q:
+  05  -ε-  [StructClose]                    07
+  07   ◀   (Q)                              ◼

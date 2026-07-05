@@ -1,4 +1,4 @@
-[
+Q = [
   left: (a)
   right: (b)
 ]

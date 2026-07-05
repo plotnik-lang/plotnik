@@ -1,14 +1,14 @@
-A = (identifier)*
+Q = (identifier)*
 --------------------- INPUT ----------------------
 x;
 --------------------- TYPES ----------------------
-export type A = Node[];
+export type Q = Node[];
 --------------------- OUTPUT ---------------------
 []
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "A"
+S1 "Q"
 S2 "identifier"
 
 [type_defs]
@@ -18,13 +18,13 @@ T1 = ArrayStar(T0)  ; <Node>*
 [type_members]
 
 [type_names]
-N0: S1 → T1  ; A
+N0: S1 → T1  ; Q
 
 [entrypoints]
-A = 00 :: T1
+Q = 00 :: T1
 
 [transitions]
-A:
+Q:
   00       (@12)                            12 : 01
   01                                        ▶
   02                                        ▶
@@ -35,7 +35,7 @@ A:
   10   !   _                                05, 08
   12  -ε-  [ArrayOpen]                      10, 03
 --------------------- TRACE ----------------------
-A:
+Q:
   00       (?)                              12 : 01
        ▶   (?)
 
@@ -51,5 +51,5 @@ A:
   03  -ε-  [ArrayClose]                     02
   02   ◀   (?)                              
 
-A:
-  01   ◀   (A)                              ◼
+Q:
+  01   ◀   (Q)                              ◼

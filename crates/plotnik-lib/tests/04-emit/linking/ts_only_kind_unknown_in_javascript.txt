@@ -1,0 +1,7 @@
+Q = (interface_declaration) @decl
+------------------ DIAGNOSTICS -------------------
+error: `interface_declaration` is not a valid node kind
+ --> query.ptk:1:6
+  |
+1 | Q = (interface_declaration) @decl
+  |      ^^^^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,5 @@
+"ab\"cd"
+--------------------- TOKENS ---------------------
+DoubleQuote "\""
+StringContent "ab\\\"cd"
+DoubleQuote "\""

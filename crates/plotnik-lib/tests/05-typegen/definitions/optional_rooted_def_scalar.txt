@@ -1,0 +1,8 @@
+MaybeId = (identifier)?
+Q = (program (expression_statement (array (MaybeId) @first)))
+--------------------- TYPES ----------------------
+export interface Q {
+  first: MaybeId;
+}
+
+export type MaybeId = Node | null;

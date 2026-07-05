@@ -1,0 +1,21 @@
+Q = (_ (identifier))
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Underscore "_"
+      NamedNode
+        ParenOpen "("
+        Id "identifier"
+        ParenClose ")"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode (any)
+      NamedNode identifier

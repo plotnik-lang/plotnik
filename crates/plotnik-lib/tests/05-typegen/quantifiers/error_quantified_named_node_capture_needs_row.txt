@@ -1,9 +1,0 @@
-Bad = (array (identifier) @name)*
------------------- DIAGNOSTICS -------------------
-error: the definition names the list itself, so each `*` element — a row of captures — is left without a type name
- --> query.ptk:1:7
-  |
-1 | Bad = (array (identifier) @name)*
-  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-help: name the element type in its own definition, then quantify a reference to it: `Elem = ...` and `(Elem)*`

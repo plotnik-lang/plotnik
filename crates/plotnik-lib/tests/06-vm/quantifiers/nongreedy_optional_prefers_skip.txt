@@ -1,0 +1,77 @@
+Q = (program
+  (expression_statement)?? @e
+  (expression_statement) @f
+)
+--------------------- INPUT ----------------------
+a; b;
+--------------------- TYPES ----------------------
+export interface Q {
+  e: Node | null;
+  f: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "e": null,
+  "f": {
+    "kind": "expression_statement",
+    "text": "a;",
+    "span": [0, 2]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "e"
+S2 "f"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { e, f }
+T2 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T2  ; e: T2
+M1: S2 → T0  ; f: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08  └‣─  (expression_statement) [Null Set(M0) Node Set(M1)]  07
+  11  ─‣─  (expression_statement) [Node Set(M1)]  07
+  13   !   (expression_statement) [Node Set(M0)]  11
+  15  ...
+  16  ─‣─  _                                13, 16
+  18  └‣─  _                                13, 16
+  20   !   (program)                        08, 18
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              20 : 03
+       ▶   (?)
+
+?:
+  20       (program)                        08, 18
+       ●   program
+  08       (expression_statement) [Null Set(M0) Node Set(M1)]  07
+       ●   expression_statement
+  07       _                                06
+       ●   program
+  06   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

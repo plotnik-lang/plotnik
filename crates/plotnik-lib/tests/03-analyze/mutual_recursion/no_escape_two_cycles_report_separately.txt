@@ -1,0 +1,43 @@
+A = (a (B))
+B = (b (A))
+C = (c (D))
+D = (d (C))
+------------------ DIAGNOSTICS -------------------
+error: infinite recursion: no escape path
+ --> query.ptk:2:9
+  |
+1 | A = (a (B))
+  |         - references B (completing cycle)
+2 | B = (b (A))
+  | -       ^
+  | |       |
+  | |       references A
+  | B is defined here
+  |
+help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
+
+error: infinite recursion: no escape path
+ --> query.ptk:4:9
+  |
+3 | C = (c (D))
+  |         - references D (completing cycle)
+4 | D = (d (C))
+  | -       ^
+  | |       |
+  | |       references C
+  | D is defined here
+  |
+help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
+-------------------- SYMBOLS ---------------------
+A
+  B
+    A (cycle)
+B
+  A
+    B (cycle)
+C
+  D
+    C (cycle)
+D
+  C
+    D (cycle)

@@ -1,4 +1,8 @@
-Q = (program (comment)? (comment)? (comment)?)
+Q = (program
+  (comment)?
+  (comment)?
+  (comment)?
+)
 --------------------- INPUT ----------------------
 // c
 --------------------- TYPES ----------------------

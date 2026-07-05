@@ -1,0 +1,9 @@
+(program (identifier) @id)
+------------------ DIAGNOSTICS -------------------
+error: definition must be named
+ --> query.ptk:1:1
+  |
+1 | (program (identifier) @id)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: give it a name like `Name = (program (identifier) @id)`

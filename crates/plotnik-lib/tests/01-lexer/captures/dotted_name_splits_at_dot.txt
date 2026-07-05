@@ -1,0 +1,5 @@
+@function.name
+--------------------- TOKENS ---------------------
+CaptureToken "@function"
+Dot "."
+Id "name"

@@ -1,7 +1,0 @@
-(expression/binary_expression)
---------------------- TOKENS ---------------------
-ParenOpen "("
-Id "expression"
-Slash "/"
-Id "binary_expression"
-ParenClose ")"

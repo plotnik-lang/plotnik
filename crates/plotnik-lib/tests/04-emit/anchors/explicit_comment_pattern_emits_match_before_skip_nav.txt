@@ -1,6 +1,7 @@
 Q = (program
   {
-    (comment) @c .
+    (comment) @c
+    .
     (function_declaration) @f
   }
 )

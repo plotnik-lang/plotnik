@@ -1,6 +1,10 @@
 B = (expression_statement)?
 A = (B)
-Q = (program (A) (debugger_statement) @d)
+
+Q = (program
+  (A)
+  (debugger_statement) @d
+)
 --------------------- INPUT ----------------------
 debugger;
 --------------------- TYPES ----------------------

@@ -1,0 +1,21 @@
+Q = (a) :: Foo
+------------------ DIAGNOSTICS -------------------
+error: expected a pattern
+ --> query.ptk:1:9
+  |
+1 | Q = (a) :: Foo
+  |         ^^
+  |
+help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`
+
+error: references must be parenthesized
+ --> query.ptk:1:12
+  |
+1 | Q = (a) :: Foo
+  |            ^^^
+  |
+help: wrap in parentheses
+  |
+1 - Q = (a) :: Foo
+1 + Q = (a) :: (Foo)
+  |

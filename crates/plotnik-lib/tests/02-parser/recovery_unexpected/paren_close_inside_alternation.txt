@@ -1,17 +1,17 @@
-[(a) ) (b)]
+Q = [(a) ) (b)]
 ------------------ DIAGNOSTICS -------------------
 error: missing closing `]`
- --> query.ptk:1:6
+ --> query.ptk:1:10
   |
-1 | [(a) ) (b)]
-  |      ^
+1 | Q = [(a) ) (b)]
+  |          ^
   |
 help: add `]` to close the alternation
 
 error: expected a pattern
- --> query.ptk:1:11
+ --> query.ptk:1:15
   |
-1 | [(a) ) (b)]
-  |           ^
+1 | Q = [(a) ) (b)]
+  |               ^
   |
 help: try `(node)`, `[a b]`, `{a b}`, `"literal"`, or `_`

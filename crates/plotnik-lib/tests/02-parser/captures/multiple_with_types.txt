@@ -1,0 +1,55 @@
+Q = (binary
+  left: (_) @left :: Lhs
+  right: (_) @right :: Rhs
+) @expr :: BinaryExpr
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      NamedNode
+        ParenOpen "("
+        Id "binary"
+        Capture
+          Field
+            Id "left"
+            Colon ":"
+            NamedNode
+              ParenOpen "("
+              Underscore "_"
+              ParenClose ")"
+          CaptureToken "@left"
+          TypeAnnotation
+            DoubleColon "::"
+            Id "Lhs"
+        Capture
+          Field
+            Id "right"
+            Colon ":"
+            NamedNode
+              ParenOpen "("
+              Underscore "_"
+              ParenClose ")"
+          CaptureToken "@right"
+          TypeAnnotation
+            DoubleColon "::"
+            Id "Rhs"
+        ParenClose ")"
+      CaptureToken "@expr"
+      TypeAnnotation
+        DoubleColon "::"
+        Id "BinaryExpr"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    CapturedPattern @expr :: BinaryExpr
+      NamedNode binary
+        CapturedPattern @left :: Lhs
+          FieldPattern left:
+            NamedNode (any)
+        CapturedPattern @right :: Rhs
+          FieldPattern right:
+            NamedNode (any)

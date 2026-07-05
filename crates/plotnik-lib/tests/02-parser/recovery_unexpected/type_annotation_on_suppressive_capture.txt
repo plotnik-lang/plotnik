@@ -1,0 +1,19 @@
+Q = (a (b) @_ :: Foo)
+------------------ DIAGNOSTICS -------------------
+error: expected a child node, or `)` to close
+ --> query.ptk:1:15
+  |
+1 | Q = (a (b) @_ :: Foo)
+  |               ^^
+
+error: references must be parenthesized
+ --> query.ptk:1:18
+  |
+1 | Q = (a (b) @_ :: Foo)
+  |                  ^^^
+  |
+help: wrap in parentheses
+  |
+1 - Q = (a (b) @_ :: Foo)
+1 + Q = (a (b) @_ :: (Foo))
+  |

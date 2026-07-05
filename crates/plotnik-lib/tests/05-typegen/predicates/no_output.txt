@@ -1,0 +1,5 @@
+Q = (program (expression_statement (identifier == "foo") @id))
+--------------------- TYPES ----------------------
+export interface Q {
+  id: Node;
+}

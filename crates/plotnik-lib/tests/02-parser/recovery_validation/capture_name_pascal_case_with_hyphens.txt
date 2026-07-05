@@ -1,14 +1,14 @@
-(a) @My-Name
+Q = (a) @My-Name
 ------------------ DIAGNOSTICS -------------------
 error: capture names must be snake_case
- --> query.ptk:1:5
+ --> query.ptk:1:9
   |
-1 | (a) @My-Name
-  |     ^^^^^^^^
+1 | Q = (a) @My-Name
+  |         ^^^^^^^^
   |
 help: use `@my_name`
   |
-1 - (a) @My-Name
-1 + (a) @my_name
+1 - Q = (a) @My-Name
+1 + Q = (a) @my_name
   |
 help: captures become fields in the output

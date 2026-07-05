@@ -1,0 +1,21 @@
+Q = (identifier != "bar")
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "identifier"
+      NodePredicate
+        OpNe "!="
+        DoubleQuote "\""
+        StringContent "bar"
+        DoubleQuote "\""
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode identifier

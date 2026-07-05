@@ -1,0 +1,17 @@
+Q = _ @any
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    Capture
+      Wildcard
+        Underscore "_"
+      CaptureToken "@any"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    CapturedPattern @any
+      AnonymousNode (any)

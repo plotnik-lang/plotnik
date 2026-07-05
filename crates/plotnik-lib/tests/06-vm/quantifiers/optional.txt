@@ -1,0 +1,86 @@
+Q = (program
+  (lexical_declaration)? @decl
+  (debugger_statement) @d
+)
+--------------------- INPUT ----------------------
+let x; debugger;
+--------------------- TYPES ----------------------
+export interface Q {
+  d: Node;
+  decl: Node | null;
+}
+--------------------- OUTPUT ---------------------
+{
+  "decl": {
+    "kind": "lexical_declaration",
+    "text": "let x;",
+    "span": [0, 6]
+  },
+  "d": {
+    "kind": "debugger_statement",
+    "text": "debugger;",
+    "span": [7, 16]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "decl"
+S2 "d"
+S3 "Q"
+S4 "program"
+S5 "lexical_declaration"
+S6 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { decl, d }
+T2 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T2  ; decl: T2
+M1: S2 → T0  ; d: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08  └‣─  (debugger_statement) [Null Set(M0) Node Set(M1)]  07
+  11  ─‣─  (debugger_statement) [Node Set(M1)]  07
+  13   !   (lexical_declaration) [Node Set(M0)]  11
+  15  ...
+  16  ─‣─  _                                13, 16
+  18  └‣─  _                                13, 16
+  20   !   (program)                        18, 08
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              20 : 03
+       ▶   (?)
+
+?:
+  20       (program)                        18, 08
+       ●   program
+  18       _                                13, 16
+       ●   lexical_declaration
+  13       (lexical_declaration) [Node Set(M0)]  11
+       ●   lexical_declaration
+  11       (debugger_statement) [Node Set(M1)]  07
+       ●   debugger_statement
+  07       _                                06
+       ●   program
+  06   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

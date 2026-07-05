@@ -1,0 +1,6 @@
+Q = (call (Later))
+Later = (leaf)
+-------------------- SYMBOLS ---------------------
+Q
+  Later
+Later

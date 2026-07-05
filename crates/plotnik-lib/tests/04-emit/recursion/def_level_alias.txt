@@ -1,0 +1,62 @@
+Rec = [
+  A: (program (expression_statement (Rec) @inner))
+  B: (identifier) @id
+]
+
+Q = (Rec)
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "inner"
+S2 "id"
+S3 "A"
+S4 "B"
+S5 "Rec"
+S6 "program"
+S7 "expression_statement"
+S8 "identifier"
+S9 "Q"
+
+[type_defs]
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { inner }
+T3 = Struct  M1:1  ; { id }
+T4 = Enum    M2:2  ; A | B
+
+[type_members]
+M0: S1 → T4  ; inner: Rec
+M1: S2 → T1  ; id: <Node>
+M2: S3 → T2  ; A: T2
+M3: S4 → T3  ; B: T3
+
+[type_names]
+N0: S5 → T4  ; Rec
+
+[entrypoints]
+Q   = 02 :: T0
+Rec = 00 :: T4
+
+[transitions]
+Rec:
+  00       (@19)                            19 : 01
+  01                                        ▶
+
+Q:
+  02       (@25)                            25 : 03
+  03                                        ▶
+  04  └‣─  (@19)                            19 : 05
+  05  ─‣┘  _ [Set(M0)]                      08
+  07  ...
+  08  ─‣┘  _ [EnumClose]                    10
+  10                                        ▶
+  11  └‣─  (expression_statement)           04
+  12   !   (program) [EnumOpen(M2)]         11
+  14  ...
+  15  ...
+  16   !   (identifier) [EnumOpen(M3) Node Set(M1) EnumClose]  10
+  19  -ε-                                   12, 16
+  21                                        ▶
+  22  -ε-  [SuppressEnd]                    21
+  24   !   (@19)                            19 : 22
+  25  -ε-  [SuppressBegin]                  24

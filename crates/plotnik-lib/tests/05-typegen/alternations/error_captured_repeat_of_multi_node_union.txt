@@ -1,0 +1,21 @@
+Q = (program [
+  (expression_statement)
+  {
+    (lexical_declaration)
+    (debugger_statement)
+  }
+]* @items)
+------------------ DIAGNOSTICS -------------------
+error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
+ --> query.ptk:1:14
+  |
+1 |   Q = (program [
+  |  ______________^
+2 | |   (expression_statement)
+3 | |   {
+4 | |     (lexical_declaration)
+... |
+7 | | ]* @items)
+  | |__^
+  |
+help: add internal captures: `{(a) @a (b) @b}* @items`

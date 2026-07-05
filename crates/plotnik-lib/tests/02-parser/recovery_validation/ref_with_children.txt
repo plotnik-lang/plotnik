@@ -1,15 +1,15 @@
 Expr = (identifier)
-(Expr (child))
+Q = (Expr (child))
 ------------------ DIAGNOSTICS -------------------
 error: `Expr` is a reference and cannot have children
- --> query.ptk:2:7
+ --> query.ptk:2:11
   |
-2 | (Expr (child))
-  |       ^^^^^^^
+2 | Q = (Expr (child))
+  |           ^^^^^^^
   |
 help: remove the children
   |
-2 - (Expr (child))
-2 + (Expr )
+2 - Q = (Expr (child))
+2 + Q = (Expr )
   |
 help: a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children

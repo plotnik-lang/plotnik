@@ -1,0 +1,21 @@
+Row = {
+  (identifier)
+  (number)
+}
+
+Q = (variable_declarator name: (Row))
+------------------ DIAGNOSTICS -------------------
+error: field `name` cannot match a sequence
+ --> query.ptk:6:32
+  |
+1 |   Row = {
+  |  _______-
+2 | |   (identifier)
+3 | |   (number)
+4 | | }
+  | |_- defined here
+5 |
+6 |   Q = (variable_declarator name: (Row))
+  |                                  ^^^^^
+  |
+help: a field holds a single child node; match one pattern, or move the sequence outside the field

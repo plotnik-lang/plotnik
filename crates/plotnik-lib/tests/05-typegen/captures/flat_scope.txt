@@ -1,0 +1,9 @@
+Q = (program
+  (expression_statement (identifier) @deep)
+  (debugger_statement) @shallow
+)
+--------------------- TYPES ----------------------
+export interface Q {
+  deep: Node;
+  shallow: Node;
+}

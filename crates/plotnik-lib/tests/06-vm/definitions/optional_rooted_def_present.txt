@@ -1,5 +1,13 @@
 MaybeId = (identifier)?
-Q = (program (expression_statement (array (MaybeId) @first (number) @n)))
+
+Q = (program
+  (expression_statement
+    (array
+      (MaybeId) @first
+      (number) @n
+    )
+  )
+)
 --------------------- INPUT ----------------------
 [a, 1];
 --------------------- TYPES ----------------------

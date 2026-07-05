@@ -1,14 +1,14 @@
-(ERROR (something))
+Q = (ERROR (something))
 ------------------ DIAGNOSTICS -------------------
 error: `(ERROR)` cannot have children
- --> query.ptk:1:8
+ --> query.ptk:1:12
   |
-1 | (ERROR (something))
-  |        ^^^^^^^^^^^
+1 | Q = (ERROR (something))
+  |            ^^^^^^^^^^^
   |
 help: remove the children
   |
-1 - (ERROR (something))
-1 + (ERROR )
+1 - Q = (ERROR (something))
+1 + Q = (ERROR )
   |
 help: `(ERROR)` matches any error node as a leaf; use `(MISSING "x")` to match a missing token

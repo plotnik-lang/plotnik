@@ -1,9 +1,9 @@
-(RefName/subtype)
+Q = (RefName/subtype)
 ------------------ DIAGNOSTICS -------------------
 error: references cannot have supertypes
- --> query.ptk:1:9
+ --> query.ptk:1:13
   |
-1 | (RefName/subtype)
-  |         ^
+1 | Q = (RefName/subtype)
+  |             ^
   |
 help: supertypes refine node kinds, not references: write `(supertype#subtype)` or just `(RefName)`

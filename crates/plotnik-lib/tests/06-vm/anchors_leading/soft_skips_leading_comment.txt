@@ -1,0 +1,68 @@
+Q = (program
+  .
+  (debugger_statement) @d
+)
+--------------------- INPUT ----------------------
+/* c */ debugger;
+--------------------- TYPES ----------------------
+export interface Q {
+  d: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "d": {
+    "kind": "debugger_statement",
+    "text": "debugger;",
+    "span": [8, 17]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "d"
+S2 "Q"
+S3 "program"
+S4 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { d }
+
+[type_members]
+M0: S1 → T0  ; d: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@10)                            10 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  └•─  (debugger_statement) [Node Set(M0)]  08
+  08  ─‣┘  _                                09
+  09                                        ▶
+  10   !   (program)                        06
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              10 : 03
+       ▶   (?)
+
+?:
+  10       (program)                        06
+       ●   program
+  06       (debugger_statement) [Node Set(M0)]  08
+       ○   comment
+       ●   debugger_statement
+  08       _                                09
+       ●   program
+  09   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

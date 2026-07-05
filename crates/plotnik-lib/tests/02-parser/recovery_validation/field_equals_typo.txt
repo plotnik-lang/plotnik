@@ -1,13 +1,13 @@
-(node name = (identifier))
+Q = (node name = (identifier))
 ------------------ DIAGNOSTICS -------------------
 error: fields use `:`, not `=`
- --> query.ptk:1:12
+ --> query.ptk:1:16
   |
-1 | (node name = (identifier))
-  |            ^
+1 | Q = (node name = (identifier))
+  |                ^
   |
 help: use `:`
   |
-1 - (node name = (identifier))
-1 + (node name : (identifier))
+1 - Q = (node name = (identifier))
+1 + Q = (node name : (identifier))
   |

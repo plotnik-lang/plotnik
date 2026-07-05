@@ -1,0 +1,29 @@
+Row = (pair key: (_) @key value: (_) @val)
+Pair = (pair key: (_) @key value: (_) @val)
+
+Q = (program
+  (expression_statement
+    (parenthesized_expression
+      (object
+        [
+          (Row) @x
+          (Pair) @x
+        ]
+      )
+    )
+  )
+)
+--------------------- TYPES ----------------------
+export interface Pair {
+  key: Node;
+  val: Node;
+}
+
+export interface Row {
+  key: Node;
+  val: Node;
+}
+
+export interface Q {
+  x: Row;
+}

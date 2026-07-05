@@ -1,9 +1,9 @@
-[Label:]
+Q = [Label:]
 ------------------ DIAGNOSTICS -------------------
 error: expected an expression
- --> query.ptk:1:8
+ --> query.ptk:1:12
   |
-1 | [Label:]
-  |        ^
+1 | Q = [Label:]
+  |            ^
   |
 help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`

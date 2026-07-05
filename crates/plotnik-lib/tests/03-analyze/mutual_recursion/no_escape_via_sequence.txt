@@ -1,12 +1,19 @@
-A = (foo {(x) (B)})
+A = (foo
+  {
+    (x)
+    (B)
+  }
+)
+
 B = (bar (A))
 ------------------ DIAGNOSTICS -------------------
 error: infinite recursion: no escape path
- --> query.ptk:2:11
+ --> query.ptk:8:11
   |
-1 | A = (foo {(x) (B)})
-  |                - references B (completing cycle)
-2 | B = (bar (A))
+4 |     (B)
+  |      - references B (completing cycle)
+...
+8 | B = (bar (A))
   | -         ^
   | |         |
   | |         references A

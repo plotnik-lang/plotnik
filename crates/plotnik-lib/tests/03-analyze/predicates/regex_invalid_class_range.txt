@@ -1,0 +1,8 @@
+Q = (identifier =~ /[z-a]/)
+------------------ DIAGNOSTICS -------------------
+error: invalid regex syntax: invalid character class range, the start must be <= the end
+ --> query.ptk:1:22
+  |
+1 | Q = (identifier =~ /[z-a]/)
+  |                      ^^^
+-------------------- SYMBOLS ---------------------

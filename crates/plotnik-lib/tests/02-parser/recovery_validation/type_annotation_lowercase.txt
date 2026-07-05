@@ -1,0 +1,13 @@
+Q = (a) @x :: foo
+------------------ DIAGNOSTICS -------------------
+error: type names must be PascalCase
+ --> query.ptk:1:15
+  |
+1 | Q = (a) @x :: foo
+  |               ^^^
+  |
+help: use `::Foo`
+  |
+1 - Q = (a) @x :: foo
+1 + Q = (a) @x :: Foo
+  |

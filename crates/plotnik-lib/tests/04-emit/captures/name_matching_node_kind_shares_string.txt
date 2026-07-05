@@ -1,0 +1,29 @@
+Q = (identifier) @identifier
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "identifier"
+S2 "Q"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { identifier }
+
+[type_members]
+M0: S1 → T0  ; identifier: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 0 :: T1
+
+[transitions]
+Q:
+  0  -ε-  [StructOpen]                      2
+  2       (@8)                              8 : 3
+  3  -ε-  [StructClose]                     5
+  5                                         ▶
+  6                                         ▶
+  7  ...
+  8   !   (identifier) [Node Set(M0)]       6

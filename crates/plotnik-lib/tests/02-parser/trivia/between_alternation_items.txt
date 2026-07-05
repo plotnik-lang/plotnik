@@ -1,6 +1,6 @@
 Q = [
-    (a)
-    (b)
+  (a)
+  (b)
 ]
 ---------------------- CST -----------------------
 # query.ptk
@@ -13,14 +13,14 @@ Root
     Alternation
       BracketOpen "["
       Newline "\n"
-      Whitespace "    "
+      Whitespace "  "
       Branch
         NamedNode
           ParenOpen "("
           Id "a"
           ParenClose ")"
       Newline "\n"
-      Whitespace "    "
+      Whitespace "  "
       Branch
         NamedNode
           ParenOpen "("

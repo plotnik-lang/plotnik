@@ -1,16 +1,16 @@
-[
-    (a)
-    (b)
+Q = [
+  (a)
+  (b)
 ------------------ DIAGNOSTICS -------------------
 error: missing closing `]`
- --> query.ptk:1:1
+ --> query.ptk:1:5
   |
-1 |   [
-  |   ^ alternation started here
-  |  _|
+1 |   Q = [
+  |       ^ alternation started here
+  |  _____|
   | |
-2 | |     (a)
-3 | |     (b)
-  | |_______^
+2 | |   (a)
+3 | |   (b)
+  | |_____^
   |
 help: add `]` to close the alternation

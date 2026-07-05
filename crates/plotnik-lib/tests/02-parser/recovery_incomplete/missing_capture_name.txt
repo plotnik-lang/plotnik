@@ -1,9 +1,9 @@
-(identifier) @
+Q = (identifier) @
 ------------------ DIAGNOSTICS -------------------
 error: expected a capture name after `@`
- --> query.ptk:1:14
+ --> query.ptk:1:18
   |
-1 | (identifier) @
-  |              ^
+1 | Q = (identifier) @
+  |                  ^
   |
 help: captures attach to the pattern before them: `(node) @name`

@@ -1,0 +1,5 @@
+Q = (variable_declarator value: (number)? @init)
+--------------------- TYPES ----------------------
+export interface Q {
+  init: Node | null;
+}

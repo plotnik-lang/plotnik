@@ -1,0 +1,54 @@
+Q = [
+  (identifier) @a
+  (number) @b
+  (string) @c
+  (binary_expression) @d
+  (call_expression) @e
+]
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "a"
+S02 "b"
+S03 "c"
+S04 "d"
+S05 "e"
+S06 "Q"
+S07 "identifier"
+S08 "number"
+S09 "string"
+S10 "binary_expression"
+S11 "call_expression"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:5  ; { a, b, c, d, e }
+T2 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S01 → T2  ; a: T2
+M1: S02 → T2  ; b: T2
+M2: S03 → T2  ; c: T2
+M3: S04 → T2  ; d: T2
+M4: S05 → T2  ; e: T2
+
+[type_names]
+N0: S06 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@28)                            28 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08   !   (identifier) [Null Set(M1) Null Set(M2) Null Set(M3) Null Set(M4) Node Set(M0)]  06
+  12   !   (number) [Null Set(M0) Null Set(M2) Null Set(M3) Null Set(M4) Node Set(M1)]  06
+  16   !   (string) [Null Set(M0) Null Set(M1) Null Set(M3) Null Set(M4) Node Set(M2)]  06
+  20   !   (binary_expression) [Null Set(M0) Null Set(M1) Null Set(M2) Null Set(M4) Node Set(M3)]  06
+  24   !   (call_expression) [Null Set(M0) Null Set(M1) Null Set(M2) Null Set(M3) Node Set(M4)]  06
+  28  -ε-                                   08, 12, 16, 20, 24

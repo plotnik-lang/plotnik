@@ -1,14 +1,14 @@
-[first: (a) Second: (b)]
+Q = [first: (a) Second: (b)]
 ------------------ DIAGNOSTICS -------------------
 error: branch labels must be PascalCase
- --> query.ptk:1:2
+ --> query.ptk:1:6
   |
-1 | [first: (a) Second: (b)]
-  |  ^^^^^
+1 | Q = [first: (a) Second: (b)]
+  |      ^^^^^
   |
 help: use `First`
   |
-1 - [first: (a) Second: (b)]
-1 + [First: (a) Second: (b)]
+1 - Q = [first: (a) Second: (b)]
+1 + Q = [First: (a) Second: (b)]
   |
 help: branch labels become variants of an enum in the output

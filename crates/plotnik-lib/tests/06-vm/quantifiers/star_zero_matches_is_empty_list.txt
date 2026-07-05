@@ -1,0 +1,71 @@
+Q = (program (expression_statement)* @stmts)
+--------------------- INPUT ----------------------
+let x
+--------------------- TYPES ----------------------
+export interface Q {
+  stmts: Node[];
+}
+--------------------- OUTPUT ---------------------
+{
+  "stmts": []
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "stmts"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { stmts }
+
+[type_members]
+M0: S1 → T1  ; stmts: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [ArrayClose Set(M0)]             06
+  10   !   (expression_statement) [Node Push]  12, 18
+  12  ─‣─  _                                10, 12
+  14  └‣─  _                                10, 12
+  16  -ε-  [ArrayOpen]                      14, 08
+  18  ─‣┘  _ [ArrayClose Set(M0)]           06
+  20   !   (program)                        16
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              20 : 03
+       ▶   (?)
+
+?:
+  20       (program)                        16
+       ●   program
+  16  -ε-  [ArrayOpen]                      14, 08
+  14       _                                10, 12
+       ●   lexical_declaration
+  10       (expression_statement) [Node Push]  12, 18
+       ○   lexical_declaration
+  14  ❮❮❮ 
+  12       _                                10, 12
+  16  ❮❮❮ 
+  08  -ε-  [ArrayClose Set(M0)]             06
+  06   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

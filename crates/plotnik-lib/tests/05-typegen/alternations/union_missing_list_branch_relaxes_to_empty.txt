@@ -1,0 +1,9 @@
+Q = (program [
+  {(expression_statement)+ @stmts}
+  (debugger_statement) @d
+])
+--------------------- TYPES ----------------------
+export interface Q {
+  d: Node | null;
+  stmts: Node[];
+}

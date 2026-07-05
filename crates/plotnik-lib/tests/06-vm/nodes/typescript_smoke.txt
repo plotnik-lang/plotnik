@@ -1,0 +1,98 @@
+Q = (program
+  (interface_declaration
+    name: (type_identifier) @name
+    body: (interface_body
+      (property_signature name: (property_identifier) @prop)
+    )
+  )
+)
+------------------- INPUT (ts) -------------------
+interface I { a: string }
+--------------------- TYPES ----------------------
+export interface Q {
+  name: Node;
+  prop: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "name": {
+    "kind": "type_identifier",
+    "text": "I",
+    "span": [10, 11]
+  },
+  "prop": {
+    "kind": "property_identifier",
+    "text": "a",
+    "span": [14, 15]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "name"
+S02 "prop"
+S03 "Q"
+S04 "program"
+S05 "interface_declaration"
+S06 "type_identifier"
+S07 "interface_body"
+S08 "property_signature"
+S09 "property_identifier"
+S10 "body"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { name, prop }
+
+[type_members]
+M0: S01 → T0  ; name: <Node>
+M1: S02 → T0  ; prop: <Node>
+
+[type_names]
+N0: S03 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@15)                            15 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  └‣─  name: (property_identifier) [Node Set(M1)]  08
+  08  ─‣┘⁴ _                                09
+  09                                        ▶
+  10  └‣─  (property_signature)             06
+  11  ─‣─  body: (interface_body)           10
+  12  └‣─  name: (type_identifier) [Node Set(M0)]  11
+  14  └‣─  (interface_declaration)          12
+  15   !   (program)                        14
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              15 : 03
+       ▶   (?)
+
+?:
+  15       (program)                        14
+       ●   program
+  14       (interface_declaration)          12
+       ●   interface_declaration
+  12       name: (type_identifier) [Node Set(M0)]  11
+       ○   interface
+       ●   type_identifier
+  11       body: (interface_body)           10
+       ●   interface_body
+  10       (property_signature)             06
+       ○   {
+       ●   property_signature
+  06       name: (property_identifier) [Node Set(M1)]  08
+       ●   property_identifier
+  08       _                                09
+       ●   program
+  09   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

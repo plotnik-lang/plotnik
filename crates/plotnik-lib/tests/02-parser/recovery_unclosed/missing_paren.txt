@@ -1,11 +1,11 @@
-(identifier
+Q = (identifier
 ------------------ DIAGNOSTICS -------------------
 error: missing closing `)`
- --> query.ptk:1:1
+ --> query.ptk:1:5
   |
-1 | (identifier
-  | -^^^^^^^^^^
-  | |
-  | node started here
+1 | Q = (identifier
+  |     -^^^^^^^^^^
+  |     |
+  |     node started here
   |
 help: add `)` to close the node

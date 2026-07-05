@@ -1,4 +1,8 @@
-Q = (binary_expression (identifier) . ["+"])
+Q = (binary_expression
+  (identifier)
+  .
+  ["+"]
+)
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

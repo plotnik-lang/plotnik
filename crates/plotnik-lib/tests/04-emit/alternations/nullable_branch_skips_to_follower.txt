@@ -1,0 +1,49 @@
+Q = (array
+  [
+    (identifier)?
+    (number)
+  ]
+  (string) @s
+)
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "s"
+S2 "Q"
+S3 "array"
+S4 "identifier"
+S5 "number"
+S6 "string"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { s }
+
+[type_members]
+M0: S1 → T0  ; s: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@24)                            24 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08  └‣─  (string) [Node Set(M0)]          07
+  10  ─‣─  (string) [Node Set(M0)]          07
+  12   !   (identifier)                     10
+  13  ─‣─  _                                12, 13
+  15  ...
+  16   !   _                                12, 13
+  18   !   (number)                         10
+  19  ─‣─  _                                16, 18, 19
+  21  └‣─  _                                16, 18, 19
+  23  ...
+  24   !   (array)                          21, 08

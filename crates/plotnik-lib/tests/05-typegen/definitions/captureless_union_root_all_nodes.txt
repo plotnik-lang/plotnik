@@ -1,0 +1,3 @@
+Q = [(identifier) (number)]
+--------------------- TYPES ----------------------
+export type Q = Node;

@@ -1,14 +1,14 @@
-(call (a) . @x (b))
+Q = (call (a) . @x (b))
 ------------------ DIAGNOSTICS -------------------
 error: anchors cannot be captured
- --> query.ptk:1:13
+ --> query.ptk:1:17
   |
-1 | (call (a) . @x (b))
-  |             ^^
+1 | Q = (call (a) . @x (b))
+  |                 ^^
   |
 help: remove the capture
   |
-1 - (call (a) . @x (b))
-1 + (call (a) .  (b))
+1 - Q = (call (a) . @x (b))
+1 + Q = (call (a) .  (b))
   |
 help: anchors constrain position and produce no value

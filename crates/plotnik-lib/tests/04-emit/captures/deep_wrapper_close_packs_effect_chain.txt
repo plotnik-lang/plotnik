@@ -1,0 +1,83 @@
+Q = {
+  {
+    {
+      {
+        {
+          {
+            {
+              {
+                (identifier) @a
+              } @b
+            } @c
+          } @d
+        } @e
+      } @f
+    } @g
+  } @h
+}
+-------------------- BYTECODE --------------------
+[strings]
+S00 "Beauty will save the world"
+S01 "a"
+S02 "b"
+S03 "c"
+S04 "d"
+S05 "e"
+S06 "f"
+S07 "g"
+S08 "h"
+S09 "QHGFEDCB"
+S10 "QHGFEDC"
+S11 "QHGFED"
+S12 "QHGFE"
+S13 "QHGF"
+S14 "QHG"
+S15 "QH"
+S16 "Q"
+S17 "identifier"
+
+[type_defs]
+T00 = <Node>
+T01 = Struct  M0:1  ; { a }
+T02 = Struct  M1:1  ; { b }
+T03 = Struct  M2:1  ; { c }
+T04 = Struct  M3:1  ; { d }
+T05 = Struct  M4:1  ; { e }
+T06 = Struct  M5:1  ; { f }
+T07 = Struct  M6:1  ; { g }
+T08 = Struct  M7:1  ; { h }
+
+[type_members]
+M0: S01 → T00  ; a: <Node>
+M1: S02 → T01  ; b: QHGFEDCB
+M2: S03 → T02  ; c: QHGFEDC
+M3: S04 → T03  ; d: QHGFED
+M4: S05 → T04  ; e: QHGFE
+M5: S06 → T05  ; f: QHGF
+M6: S07 → T06  ; g: QHG
+M7: S08 → T07  ; h: QH
+
+[type_names]
+N0: S09 → T01  ; QHGFEDCB
+N1: S10 → T02  ; QHGFEDC
+N2: S11 → T03  ; QHGFED
+N3: S12 → T04  ; QHGFE
+N4: S13 → T05  ; QHGF
+N5: S14 → T06  ; QHG
+N6: S15 → T07  ; QH
+N7: S16 → T08  ; Q
+
+[entrypoints]
+Q = 00 :: T08
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@16)                            16 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [StructClose Set(M7)]            06
+  10   !   (identifier) [StructOpen Node Set(M0) StructClose Set(M1) StructClose Set(M2) StructClose Set(M3) StructClose Set(M4) StructClose Set(M5) StructClose Set(M6)]  08
+  16  -ε-  [StructOpen StructOpen StructOpen StructOpen StructOpen StructOpen]  10

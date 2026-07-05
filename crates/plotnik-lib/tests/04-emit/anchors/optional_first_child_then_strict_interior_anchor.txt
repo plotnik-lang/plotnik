@@ -1,6 +1,7 @@
-Q = (program 
+Q = (program
   {
-    (lexical_declaration)? @a .!
+    (lexical_declaration)? @a
+    .!
     (debugger_statement) @b
   }
 )

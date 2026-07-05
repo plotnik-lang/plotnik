@@ -1,9 +1,9 @@
-(identifier) @name ::
+Q = (identifier) @name ::
 ------------------ DIAGNOSTICS -------------------
 error: expected a type name after `::`
- --> query.ptk:1:22
+ --> query.ptk:1:26
   |
-1 | (identifier) @name ::
-  |                      ^
+1 | Q = (identifier) @name ::
+  |                          ^
   |
 help: e.g., `::MyType`

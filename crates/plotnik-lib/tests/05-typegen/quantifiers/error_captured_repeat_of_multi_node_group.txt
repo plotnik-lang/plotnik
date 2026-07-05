@@ -1,0 +1,17 @@
+Q = (program
+  {
+    (expression_statement)
+    (debugger_statement)
+  }* @rows
+)
+------------------ DIAGNOSTICS -------------------
+error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
+ --> query.ptk:2:3
+  |
+2 | /   {
+3 | |     (expression_statement)
+4 | |     (debugger_statement)
+5 | |   }* @rows
+  | |____^
+  |
+help: add internal captures: `{(a) @a (b) @b}* @items`

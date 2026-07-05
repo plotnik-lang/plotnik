@@ -1,11 +1,11 @@
-{(a) (b)
+Q = {(a) (b)
 ------------------ DIAGNOSTICS -------------------
 error: missing closing `}`
- --> query.ptk:1:1
+ --> query.ptk:1:5
   |
-1 | {(a) (b)
-  | -^^^^^^^
-  | |
-  | sequence started here
+1 | Q = {(a) (b)
+  |     -^^^^^^^
+  |     |
+  |     sequence started here
   |
 help: add `}` to close the sequence

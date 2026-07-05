@@ -1,0 +1,130 @@
+Q = (program
+  {
+    (expression_statement)* @a
+    (expression_statement)* @b
+    (debugger_statement) @d
+  }
+)
+--------------------- INPUT ----------------------
+a; b; debugger;
+--------------------- TYPES ----------------------
+export interface Q {
+  a: Node[];
+  b: Node[];
+  d: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "a": [
+    {
+      "kind": "expression_statement",
+      "text": "a;",
+      "span": [0, 2]
+    },
+    {
+      "kind": "expression_statement",
+      "text": "b;",
+      "span": [3, 5]
+    }
+  ],
+  "b": [],
+  "d": {
+    "kind": "debugger_statement",
+    "text": "debugger;",
+    "span": [6, 15]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a"
+S2 "b"
+S3 "d"
+S4 "Q"
+S5 "program"
+S6 "expression_statement"
+S7 "debugger_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:3  ; { a, b, d }
+
+[type_members]
+M0: S1 → T1  ; a: T1
+M1: S2 → T1  ; b: T1
+M2: S3 → T0  ; d: <Node>
+
+[type_names]
+N0: S4 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@40)                            40 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘  _                                06
+  08  └‣─  (debugger_statement) [ArrayClose Set(M1) Node Set(M2)]  07
+  11  ─‣─  (debugger_statement) [ArrayClose Set(M1) Node Set(M2)]  07
+  14   !   (expression_statement) [Node Push]  16, 11
+  16  ─‣─  _                                14, 16
+  18  └‣─  _                                14, 16
+  20  -ε-  [ArrayOpen]                      18, 08
+  22   !   (expression_statement) [Node Push]  24, 11
+  24  ─‣─  _                                22, 24
+  26  -ε-  [ArrayOpen]                      24, 11
+  28  -ε-  [ArrayClose Set(M0)]             26
+  30  -ε-  [ArrayClose Set(M0)]             20
+  32   !   (expression_statement) [Node Push]  34, 28
+  34  ─‣─  _                                32, 34
+  36  └‣─  _                                32, 34
+  38  -ε-  [ArrayOpen]                      36, 30
+  40   !   (program)                        38
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              40 : 03
+       ▶   (?)
+
+?:
+  40       (program)                        38
+       ●   program
+  38  -ε-  [ArrayOpen]                      36, 30
+  36       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement) [Node Push]  34, 28
+       ●   expression_statement
+  34       _                                32, 34
+       ●   expression_statement
+  32       (expression_statement) [Node Push]  34, 28
+       ●   expression_statement
+  34       _                                32, 34
+       ●   debugger_statement
+  32       (expression_statement) [Node Push]  34, 28
+       ○   debugger_statement
+  34  ❮❮❮ 
+  34       _                                32, 34
+  32  ❮❮❮ 
+  28  -ε-  [ArrayClose Set(M0)]             26
+  26  -ε-  [ArrayOpen]                      24, 11
+  24       _                                22, 24
+       ●   debugger_statement
+  22       (expression_statement) [Node Push]  24, 11
+       ○   debugger_statement
+  24  ❮❮❮ 
+  24       _                                22, 24
+  26  ❮❮❮ 
+  11       (debugger_statement) [ArrayClose Set(M1) Node Set(M2)]  07
+       ●   debugger_statement
+  07       _                                06
+       ●   program
+  06   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

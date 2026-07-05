@@ -1,4 +1,8 @@
-Q = (program (expression_statement {(identifier) @id}? @outer))
+Q = (program
+  (expression_statement
+    {(identifier) @id}? @outer
+  )
+)
 --------------------- INPUT ----------------------
 a;
 --------------------- TYPES ----------------------

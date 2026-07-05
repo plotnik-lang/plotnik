@@ -1,7 +1,7 @@
-(a : (b))
+Q = (a : (b))
 ------------------ DIAGNOSTICS -------------------
 error: expected a child node, or `)` to close
- --> query.ptk:1:4
+ --> query.ptk:1:8
   |
-1 | (a : (b))
-  |    ^
+1 | Q = (a : (b))
+  |        ^

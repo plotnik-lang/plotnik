@@ -3,10 +3,7 @@ A = [
   Y: (number)
 ]
 
-Q = (program
-  (expression_statement (A) @a)
-  (debugger_statement) @name
-)
+Q = (program (expression_statement (A) @a))
 --------------------- TYPES ----------------------
 export type A =
   | { $tag: "X" }
@@ -14,5 +11,4 @@ export type A =
 
 export interface Q {
   a: A;
-  name: Node;
 }

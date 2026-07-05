@@ -1,3 +1,7 @@
-Q = (program {(expression_statement) @s}* @_)
+Q = (program
+  {
+    (expression_statement) @s
+  }* @_
+)
 --------------------- TYPES ----------------------
 export type Q = undefined;

@@ -1,0 +1,17 @@
+Q = [
+  A: [
+    B: (b)
+    (c)
+  ]
+]
+------------------ DIAGNOSTICS -------------------
+error: cannot mix enum and union branches
+ --> query.ptk:4:5
+  |
+3 |     B: (b)
+  |     - enum branch here
+4 |     (c)
+  |     ^^^
+  |
+help: use all labels for an enum, or none for a merged struct
+-------------------- SYMBOLS ---------------------

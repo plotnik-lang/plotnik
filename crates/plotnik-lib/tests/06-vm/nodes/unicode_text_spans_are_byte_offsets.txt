@@ -1,0 +1,68 @@
+Q = (program (expression_statement (identifier) @id))
+--------------------- INPUT ----------------------
+π;
+--------------------- TYPES ----------------------
+export interface Q {
+  id: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "id": {
+    "kind": "identifier",
+    "text": "π",
+    "span": [0, 2]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "id"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+S5 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { id }
+
+[type_members]
+M0: S1 → T0  ; id: <Node>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@11)                            11 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  └‣─  (identifier) [Node Set(M0)]      08
+  08  ─‣┘² _                                09
+  09                                        ▶
+  10  └‣─  (expression_statement)           06
+  11   !   (program)                        10
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              11 : 03
+       ▶   (?)
+
+?:
+  11       (program)                        10
+       ●   program
+  10       (expression_statement)           06
+       ●   expression_statement
+  06       (identifier) [Node Set(M0)]      08
+       ●   identifier
+  08       _                                09
+       ●   program
+  09   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

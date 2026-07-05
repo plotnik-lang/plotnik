@@ -1,9 +1,9 @@
-(call name:)
+Q = (call name:)
 ------------------ DIAGNOSTICS -------------------
 error: expected an expression
- --> query.ptk:1:12
+ --> query.ptk:1:16
   |
-1 | (call name:)
-  |            ^
+1 | Q = (call name:)
+  |                ^
   |
 help: an expression is a node `(kind)`, anonymous node `"text"`, sequence `{...}`, or alternation `[...]`

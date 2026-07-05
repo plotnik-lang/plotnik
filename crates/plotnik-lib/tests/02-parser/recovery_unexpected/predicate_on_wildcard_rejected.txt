@@ -1,0 +1,7 @@
+Q = (_ == "x")
+------------------ DIAGNOSTICS -------------------
+error: expected a child node, or `)` to close
+ --> query.ptk:1:8
+  |
+1 | Q = (_ == "x")
+  |        ^^

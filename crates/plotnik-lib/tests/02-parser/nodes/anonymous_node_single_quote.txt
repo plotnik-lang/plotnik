@@ -1,21 +1,16 @@
-Q = (node 'if')
+Q = 'if'
 ---------------------- CST -----------------------
 # query.ptk
 Root
   Def
     Id "Q"
     Equals "="
-    NamedNode
-      ParenOpen "("
-      Id "node"
-      Str
-        SingleQuote "'"
-        StringContent "if"
-        SingleQuote "'"
-      ParenClose ")"
+    Str
+      SingleQuote "'"
+      StringContent "if"
+      SingleQuote "'"
 ---------------------- AST -----------------------
 # query.ptk
 Root
   Def Q
-    NamedNode node
-      AnonymousNode "if"
+    AnonymousNode "if"

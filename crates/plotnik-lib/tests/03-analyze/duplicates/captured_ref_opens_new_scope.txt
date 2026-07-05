@@ -1,0 +1,10 @@
+Inner = (pair (a) @x)
+
+Q = (foo
+  (Inner) @i
+  (b) @x
+)
+-------------------- SYMBOLS ---------------------
+Inner
+Q
+  Inner

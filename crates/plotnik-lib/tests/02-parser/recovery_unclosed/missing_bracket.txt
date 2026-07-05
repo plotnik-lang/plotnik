@@ -1,11 +1,11 @@
-[(identifier) (string)
+Q = [(identifier) (string)
 ------------------ DIAGNOSTICS -------------------
 error: missing closing `]`
- --> query.ptk:1:1
+ --> query.ptk:1:5
   |
-1 | [(identifier) (string)
-  | -^^^^^^^^^^^^^^^^^^^^^
-  | |
-  | alternation started here
+1 | Q = [(identifier) (string)
+  |     -^^^^^^^^^^^^^^^^^^^^^
+  |     |
+  |     alternation started here
   |
 help: add `]` to close the alternation
