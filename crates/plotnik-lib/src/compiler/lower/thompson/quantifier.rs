@@ -284,6 +284,20 @@ impl NfaBuilder<'_> {
             match_exit,
             skip_exit,
         } = exits;
+        let PatternCtx {
+            exit: match_exit,
+            nav: nav_override,
+            capture,
+            value: value_context,
+        } = self.bracket_pattern_ctx(
+            pattern,
+            PatternCtx {
+                exit: match_exit,
+                nav: nav_override,
+                capture,
+                value: value_context,
+            },
+        );
         // A captured optional/star at this navigating position shares the single
         // mechanism dispatch with the ordinary capture path (`compile_captured`),
         // split exits and all, so the two can never drift — the gap behind both

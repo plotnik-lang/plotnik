@@ -119,7 +119,6 @@ impl CaptureEffects {
     /// Wrap this channel in a construct's span brackets. The start runs after
     /// enclosing opens, and the end runs before the first close that belongs to
     /// an enclosing scope.
-    #[allow(dead_code)]
     pub(super) fn nest_span(mut self, start: EffectIR, end: EffectIR) -> Self {
         self.pre.push(start);
         let pos = first_unmatched_close(&self.post).unwrap_or(self.post.len());

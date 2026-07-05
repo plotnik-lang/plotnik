@@ -272,6 +272,7 @@ impl<'a> NfaBuilder<'a> {
     /// - Alternations: effects go on each branch
     /// - Other wrappers: effects propagate through
     pub(super) fn dispatch_pattern(&mut self, pattern: &Pattern, ctx: PatternCtx) -> Label {
+        let ctx = self.bracket_pattern_ctx(pattern, ctx);
         match pattern {
             Pattern::NodePattern(n) => self.compile_node_pattern(n, ctx),
             Pattern::TokenPattern(n) => self.compile_token_pattern(n, ctx),
@@ -310,6 +311,39 @@ impl<'a> NfaBuilder<'a> {
             Pattern::QuantifiedPattern(q) => self.compile_quantified(q, ctx),
             Pattern::FieldPattern(f) => self.compile_field(f, ctx),
             Pattern::DefRef(r) => self.compile_ref(r, ctx, None),
+        }
+    }
+
+    /// Wrap this pattern's capture channel in inspection span brackets.
+    ///
+    /// Node and token patterns use `SpanStartAt` because their `pre` effects land
+    /// on the consuming match instruction. Epsilon-entered constructs are enabled
+    /// in later commits with pure marker starts.
+    pub(super) fn bracket_pattern_ctx(&mut self, pattern: &Pattern, ctx: PatternCtx) -> PatternCtx {
+        let (kind, start_at) = match pattern {
+            Pattern::NodePattern(_) | Pattern::TokenPattern(_) => (SpanKind::Pattern, true),
+            _ => return ctx,
+        };
+        let Some(id) = self.span_id(pattern.syntax(), kind) else {
+            return ctx;
+        };
+
+        let start = if start_at {
+            EffectIR::span_start_at(id.0)
+        } else {
+            EffectIR::span_start(id.0)
+        };
+        let PatternCtx {
+            exit,
+            nav,
+            capture,
+            value,
+        } = ctx;
+        PatternCtx {
+            exit,
+            nav,
+            capture: capture.nest_span(start, EffectIR::span_end(id.0)),
+            value,
         }
     }
 }

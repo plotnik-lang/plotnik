@@ -151,7 +151,6 @@ impl EffectIR {
     }
 
     /// Open an inspection span and snapshot the current cursor node.
-    #[allow(dead_code)]
     pub fn span_start_at(id: u16) -> Self {
         Self::literal(EffectKind::SpanStartAt, id as usize)
     }

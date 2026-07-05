@@ -1,0 +1,69 @@
+Q = (program
+  (expression_statement
+    [
+      (binary_expression
+        (identifier)
+        "+"
+        (_)
+      )
+      (_)
+      _
+    ]
+  )
+)
+------------------- INPUT (ts) -------------------
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "Q"
+S2 "program"
+S3 "expression_statement"
+S4 "binary_expression"
+S5 "identifier"
+S6 "+"
+
+[type_defs]
+T0 = <Node>
+
+[type_members]
+
+[type_names]
+N0: S1 → T0  ; Q
+
+[entrypoints]
+Q = 00 :: T0
+
+[spans]
+P00 def        0..150  src0  T0
+P01 pattern    4..150  src0
+P02 pattern    15..148  src0
+P03 union      41..144  src0
+P04 branch     49..120  src0
+P05 pattern    49..120  src0
+P06 pattern    76..88  src0
+P07 pattern    97..100  src0
+P08 pattern    109..112  src0
+P09 branch     127..130  src0
+P10 pattern    127..130  src0
+P11 branch     137..138  src0
+P12 pattern    137..138  src0
+
+[transitions]
+Q:
+  00       (@28)                            28 : 01
+  01  -ε-  [Node]                           03
+  03                                        ▶
+  04  ─‣─  (_) [SpanStartAt#8 SpanEnd#8]    06
+  06  ─‣┘  _ [SpanEnd#5]                    08
+  08  ─‣┘  _                                09
+  09  ─‣┘  _ [SpanEnd#2 SpanEnd#1]          11
+  11                                        ▶
+  12  ─‣─  "+" [SpanStartAt#7 SpanEnd#7]    04
+  14  └‣─  (identifier) [SpanStartAt#6 SpanEnd#6]  12
+  16   !   (binary_expression) [SpanStartAt#5]  14
+  18   !   (_) [SpanStartAt#10 SpanEnd#10]  08
+  20   !   _ [SpanStartAt#12 SpanEnd#12]    08
+  22  ─‣─  _                                16, 18, 20, 22
+  24  └‣─  _                                16, 18, 20, 22
+  26  └‣─  (expression_statement) [SpanStartAt#2]  24
+  28   !   (program) [SpanStartAt#1]        26

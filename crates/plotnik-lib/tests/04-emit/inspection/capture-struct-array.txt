@@ -45,19 +45,24 @@ P7 pattern    47..59  src0
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@29)                            29 : 03
+  02       (@35)                            35 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-  06  -ε-  [StructClose Push]               18, 26
-  08  └‣─  name: (identifier) [SpanStart#5 Node Set(M0) SpanEnd#5]  11
-  11  ─‣┘  _                                06
-  12                                        ▶
-  13  -ε-  [ArrayClose SpanStart#2 Set(M1) SpanEnd#2]  12
-  16   !   (function_declaration) [StructOpen]  08
-  18  ─‣─  _                                16, 18
-  20  └‣─  _                                16, 18
+  06  -ε-  [StructClose Push]               14, 32
+  08  └‣─  name: (identifier) [SpanStartAt#7 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#7]  11
+  11  ─‣┘  _ [SpanEnd#4]                    06
+  13                                        ▶
+  14  ─‣─  _                                19, 14
+  16  -ε-  [ArrayClose SpanStart#2 Set(M1) SpanEnd#2 SpanEnd#1]  13
+  19   !   (function_declaration) [StructOpen SpanStartAt#4]  08
+  21  ...
   22  ...
   23  ...
-  24  -ε-  [ArrayOpen]                      20, 13
-  26  ─‣┘  _ [ArrayClose SpanStart#2 Set(M1) SpanEnd#2]  12
-  29   !   (program)                        24
+  24  └‣─  _                                19, 14
+  26  -ε-  [ArrayOpen]                      24, 16
+  28  ...
+  29  ...
+  30  ...
+  31  ...
+  32  ─‣┘  _ [ArrayClose SpanStart#2 Set(M1) SpanEnd#2 SpanEnd#1]  13
+  35   !   (program) [SpanStartAt#1]        26

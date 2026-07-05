@@ -1,0 +1,63 @@
+Q = (program
+  (expression_statement
+    (binary_expression
+      left: (identifier) @left
+      right: (identifier) @right
+    )
+  )
+)
+------------------- INPUT (ts) -------------------
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "left"
+S2 "right"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "binary_expression"
+S7 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { left, right }
+
+[type_members]
+M0: S1 → T0  ; left: <Node>
+M1: S2 → T0  ; right: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[spans]
+P0 def        0..135  src0  T1
+P1 pattern    4..135  src0
+P2 pattern    15..133  src0
+P3 pattern    41..129  src0
+P4 capture    85..90  src0  T1.M0
+P5 field      66..70  src0
+P6 pattern    72..84  src0
+P7 capture    117..123  src0  T1.M1
+P8 field      97..102  src0
+P9 pattern    104..116  src0
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@24)                            24 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  ─‣─  right: (identifier) [SpanStartAt#9 SpanStart#7 Node Set(M1) SpanEnd#7 SpanEnd#9]  11
+  11  ─‣┘  _                                12
+  12  ─‣┘  _ [SpanEnd#3]                    14
+  14  ─‣┘  _ [SpanEnd#2 SpanEnd#1]          06
+  16  └‣─  left: (identifier) [SpanStartAt#6 SpanStart#4 Node Set(M0) SpanEnd#4 SpanEnd#6]  08
+  19  └‣─  (binary_expression) [SpanStartAt#3]  16
+  21  └‣─  (expression_statement) [SpanStartAt#2]  19
+  23  ...
+  24   !   (program) [SpanStartAt#1]        21
