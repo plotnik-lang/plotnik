@@ -434,9 +434,14 @@ impl<'t> CursorWrapper<'t> {
         match mode {
             UpMode::Any => true,
             UpMode::Exact => {
-                // Must be the last child — no next sibling at all.
+                // Must be the last child — no next sibling at all. The probe is
+                // undone with goto_descendant, not goto_previous_sibling: the
+                // latter can rebuild the cursor entry with an off-by-one
+                // descendant index when a hidden supertype sits between parent
+                // and child, silently skewing every index-based restore after it.
+                let saved = self.descendant_index();
                 if self.cursor.goto_next_sibling() {
-                    self.cursor.goto_previous_sibling();
+                    self.goto_descendant(saved);
                     return false;
                 }
                 true
