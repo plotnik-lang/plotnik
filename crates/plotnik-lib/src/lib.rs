@@ -25,7 +25,7 @@ pub use crate::bytecode::type_system;
 pub use crate::core::colors;
 pub use crate::core::grammar;
 pub use crate::core::utils as text_utils;
-pub use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
+pub use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId, tree_to_json};
 
 pub mod diagnostics {
     pub use crate::compiler::diagnostics::report::{

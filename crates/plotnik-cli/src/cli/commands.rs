@@ -93,8 +93,11 @@ pub fn ast_command() -> Command {
   plotnik ast app.ts                  # source AST (tree-sitter)
   plotnik ast query.ptk app.ts        # both ASTs
   plotnik ast query.ptk app.ts --raw  # CST / include anonymous nodes
+  plotnik ast app.ts --json           # source AST as JSON
   plotnik ast -q '(id) @x'            # inline query AST
-  plotnik ast -s 'let x = 1' -l js    # inline source AST"#,
+  plotnik ast -s 'let x = 1' -l js    # inline source AST
+
+With --json, only the source tree is emitted; query AST output is skipped."#,
         )
         .arg(query_path_arg())
         .arg(source_path_arg())
@@ -104,12 +107,11 @@ pub fn ast_command() -> Command {
         .arg(lang_arg())
         .next_help_heading("Output options")
         .arg(raw_arg())
+        .arg(json_arg().help("Output source tree as JSON"))
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_trace_args(
-        with_hidden_exec_args(cmd),
-    )))
+    with_hidden_runtime_limit_args(with_hidden_trace_args(with_hidden_exec_args(cmd)))
 }
 
 pub fn check_command() -> Command {

@@ -590,6 +590,14 @@ fn ast_help_shows_raw_flag() {
 }
 
 #[test]
+fn ast_help_shows_json_flag() {
+    let mut cmd = ast_command();
+    let help = cmd.render_help().to_string();
+
+    assert!(help.contains("--json"), "ast help should show --json");
+}
+
+#[test]
 fn ast_help_hides_unified_flags() {
     let mut cmd = ast_command();
     let help = cmd.render_help().to_string();
@@ -630,6 +638,7 @@ fn ast_params_extracts_all_fields() {
         "-l",
         "typescript",
         "--raw",
+        "--json",
         "--color",
         "always",
     ]);
@@ -642,6 +651,7 @@ fn ast_params_extracts_all_fields() {
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
     assert_eq!(params.lang, Some("typescript".to_string()));
     assert!(params.raw);
+    assert!(params.json);
     assert!(matches!(params.color, ColorChoice::Always));
 }
 

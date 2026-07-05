@@ -27,6 +27,7 @@ pub struct AstOpts {
     pub source_text: Option<String>,
     pub lang: Option<String>,
     pub raw: bool,
+    pub json: bool,
     pub color: ColorChoice,
 }
 
@@ -49,6 +50,7 @@ impl AstOpts {
             source_text: m.get_one::<String>("source_text").cloned(),
             lang: m.get_one::<String>("lang").cloned(),
             raw: m.get_flag("raw"),
+            json: m.get_flag("json"),
             color: ColorChoice::from_matches(m),
         }
     }
@@ -63,6 +65,7 @@ impl From<AstOpts> for AstArgs {
             source_text: p.source_text,
             lang: p.lang,
             raw: p.raw,
+            json: p.json,
             color: p.color.should_colorize(),
         }
     }

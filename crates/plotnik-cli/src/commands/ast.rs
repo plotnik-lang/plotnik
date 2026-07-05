@@ -4,7 +4,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use arborium_tree_sitter as tree_sitter;
-use plotnik_lib::QueryBuilder;
+use plotnik_lib::{QueryBuilder, tree_to_json};
+use serde_json::json;
 
 use super::lang_resolver::reconcile_lang;
 use super::query_loader::load_query;
@@ -18,6 +19,7 @@ pub struct AstArgs {
     pub source_text: Option<String>,
     pub lang: Option<String>,
     pub raw: bool,
+    pub json: bool,
     pub color: bool,
 }
 
@@ -27,6 +29,18 @@ pub fn run(args: AstArgs) -> CliResult {
 
     if !has_query && !has_source {
         return Err(CliError::fatal("query or source required"));
+    }
+    if args.json {
+        if !has_source {
+            return Err(CliError::fatal("--json requires source input"));
+        }
+        let declared_lang = if has_query {
+            query_declared_lang(&args)?
+        } else {
+            None
+        };
+        print_source_ast(&args, declared_lang.as_deref())?;
+        return Ok(());
     }
 
     let show_headers = has_query && has_source;
@@ -47,6 +61,18 @@ pub fn run(args: AstArgs) -> CliResult {
     }
 
     Ok(())
+}
+
+/// Reads query metadata needed by source AST rendering; no query AST is emitted.
+fn query_declared_lang(args: &AstArgs) -> Result<Option<String>, CliError> {
+    let loaded = load_query(args.query_path.as_deref(), args.query_text.as_deref())?;
+
+    if loaded.sources.is_empty() {
+        return Err(CliError::fatal("query cannot be empty"));
+    }
+
+    reconcile_lang(args.lang.as_deref(), loaded.shebang.lang.as_deref())?;
+    Ok(loaded.shebang.lang)
 }
 
 /// Prints the query AST; returns the shebang-declared language, if any.
@@ -95,6 +121,17 @@ fn print_source_ast(args: &AstArgs, declared_lang: Option<&str>) -> CliResult {
         args.source_path.as_deref(),
     )?;
     let tree = lang.parse_source(&source);
+    if args.json {
+        let output = json!({
+            "source": tree_to_json(&tree, &source, args.raw),
+        });
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&output).expect("source tree JSON serializes")
+        );
+        return Ok(());
+    }
+
     print!("{}", dump_tree(&tree, &source, args.raw));
 
     Ok(())
