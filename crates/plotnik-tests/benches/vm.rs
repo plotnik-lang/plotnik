@@ -18,17 +18,17 @@
 //!   an explicit step budget — pure dispatch + backtracking, zero output.
 //!
 //! Run: `make bench` (or `make bench FILTER=scan_rows`).
-//! Save/compare: `cargo bench -p plotnik-lib --bench vm -- --save-baseline
+//! Save/compare: `cargo bench -p plotnik-tests --bench vm -- --save-baseline
 //! <name>`, then `critcmp <a> <b>`.
-//! Profile: `samply record cargo bench -p plotnik-lib --bench vm --
+//! Profile: `samply record cargo bench -p plotnik-tests --bench vm --
 //! --profile-time 15 scan_rows` (bench profile keeps line tables).
 
 use std::hint::black_box;
 use std::sync::LazyLock;
 
-use arborium_tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use indoc::indoc;
+use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 
 use plotnik_lib::bytecode::Module;
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};

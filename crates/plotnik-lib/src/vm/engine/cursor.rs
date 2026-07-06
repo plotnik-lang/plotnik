@@ -6,7 +6,7 @@
 use std::collections::VecDeque;
 use std::num::NonZeroU64;
 
-use arborium_tree_sitter::{Node, TreeCursor};
+use tree_sitter::{Node, TreeCursor};
 
 use crate::bytecode::Nav;
 use crate::core::{NodeClass, NodeFieldId, SkipClass};
@@ -296,26 +296,6 @@ impl<'t> CursorWrapper<'t> {
         }
         self.snapshots.wide_restore_misses += 1;
         self.snapshots.wide_restore_misses == SNAPSHOT_ACTIVATION_WIDE_MISSES
-    }
-
-    #[cfg(test)]
-    pub(crate) fn snapshot_live_len(&self) -> usize {
-        self.snapshots.live.len()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn activate_snapshots_for_test(&mut self) {
-        self.snapshots.wide_restore_misses = SNAPSHOT_ACTIVATION_WIDE_MISSES;
-    }
-
-    #[cfg(test)]
-    pub(crate) fn snapshot_cap() -> usize {
-        SNAPSHOT_CAP
-    }
-
-    #[cfg(test)]
-    pub(crate) fn snapshot_activation_misses() -> u32 {
-        SNAPSHOT_ACTIVATION_WIDE_MISSES
     }
 
     #[inline]

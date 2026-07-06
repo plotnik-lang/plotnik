@@ -1,7 +1,7 @@
 use indoc::indoc;
 
 use crate::bytecode::PredicateOp;
-use crate::compiler::test_utils::javascript_grammar as javascript;
+use crate::compiler::test_utils::synthetic_grammar as grammar;
 use crate::compiler::{QueryBuilder, SourceMap, SourcePath};
 
 use super::{DecodedInstr, Instruction, Module};
@@ -10,7 +10,7 @@ fn compile_module(query_src: &str) -> Module {
     let mut source_map = SourceMap::new();
     source_map.add_file(SourcePath::new("query.ptk"), query_src);
     let compiled = QueryBuilder::new(source_map)
-        .compile(javascript())
+        .compile(grammar())
         .expect("query parsing should not exhaust fuel");
     assert!(compiled.is_valid(), "query should compile: {query_src}");
     Module::load(compiled.bytecode().expect("compiled query has bytecode"))

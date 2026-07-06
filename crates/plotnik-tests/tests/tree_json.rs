@@ -1,12 +1,12 @@
-use arborium_tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
-use serde_json::{Map, Value};
+mod support;
 
-use super::tree_to_json;
+use plotnik_lib::tree_to_json;
+use serde_json::{Map, Value};
 
 #[test]
 fn tree_to_json_named_mode_omits_anonymous_nodes_and_keeps_fields() {
     let source = "let x = 1;";
-    let tree = parse_js(source);
+    let tree = support::parse_javascript(source);
 
     let json = tree_to_json(&tree, source, false);
 
@@ -30,7 +30,7 @@ fn tree_to_json_named_mode_omits_anonymous_nodes_and_keeps_fields() {
 #[test]
 fn tree_to_json_raw_mode_includes_anonymous_nodes() {
     let source = "let x = 1;";
-    let tree = parse_js(source);
+    let tree = support::parse_javascript(source);
 
     let json = tree_to_json(&tree, source, true);
 
@@ -44,13 +44,6 @@ fn tree_to_json_raw_mode_includes_anonymous_nodes() {
             && field_bool_object(object, "named") == Some(false)
             && range_is(object, 9, 10)
     }));
-}
-
-fn parse_js(source: &str) -> Tree {
-    let mut parser = TsParser::new();
-    let lang: TsLanguage = arborium_javascript::language().into();
-    parser.set_language(&lang).expect("set javascript language");
-    parser.parse(source, None).expect("parse javascript source")
 }
 
 fn has_node(value: &Value, matches: &dyn Fn(&Map<String, Value>) -> bool) -> bool {

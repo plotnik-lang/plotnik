@@ -2,7 +2,7 @@
 
 use std::num::NonZeroU64;
 
-use arborium_tree_sitter::Tree;
+use tree_sitter::Tree;
 
 use crate::bytecode::{
     DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Effect, EffectKind, Entrypoint,

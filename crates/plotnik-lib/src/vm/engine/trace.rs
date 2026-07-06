@@ -19,7 +19,7 @@
 //! `NoopTracer` ignores these calls (optimized away), while `PrintTracer`
 //! maintains parallel state for display purposes.
 
-use arborium_tree_sitter::Node;
+use tree_sitter::Node;
 
 use crate::bytecode::{
     EffectKind, Instruction, LineBuilder, Match, Module, ModuleRenderContext, Nav, SECTION_ALIGN,

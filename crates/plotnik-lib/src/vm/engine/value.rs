@@ -2,9 +2,9 @@
 
 use std::fmt::Write as _;
 
-use arborium_tree_sitter::Node;
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
+use tree_sitter::Node;
 
 use crate::core::Colors;
 use crate::core::utils::escape_json_into;

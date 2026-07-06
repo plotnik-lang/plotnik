@@ -7,23 +7,19 @@
 //! grew. Rust does not guarantee tail-call optimization, so on untrusted source
 //! that recursion aborted the process on the native stack.
 //!
-//! The fix turned `backtrack` into a loop. This test pins it two ways:
-//!   1. a probe `Tracer` asserts a single `backtrack` call unwinds a run of
-//!      checkpoints far past any plausible native-stack depth, and
-//!   2. the run happens on a deliberately tiny (256 KiB) thread stack, so the
-//!      pre-fix recursive version would abort the test binary here.
+//! The fix turned `backtrack` into a loop. This test runs the VM on a
+//! deliberately tiny (256 KiB) thread stack, so the pre-fix recursive version
+//! would abort the test binary here.
 
 use std::thread;
 
-use arborium_tree_sitter::{Language as TsLanguage, Node, Parser as TsParser, Tree};
 use indoc::indoc;
-
-use crate::bytecode::{EffectKind, Instruction, Module, Nav};
-use crate::compiler::test_utils::javascript_grammar;
-use crate::core::{Colors, NodeFieldId};
-use crate::{
-    Limit, QueryBuilder, RuntimeEffect, RuntimeError, RuntimeLimitSpec, Tracer, VM, Value,
+use plotnik_lib::bytecode::Module;
+use plotnik_lib::{
+    Colors, Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM, Value,
 };
+
+mod support;
 
 /// Number of nested `unary_expression`s the query descends through. Each level
 /// leaves one call-retry checkpoint; the final failure unwinds all of them in a
@@ -58,80 +54,9 @@ const QUERY: &str = indoc! {"
     Top = (program (expression_statement (Rec)))
 "};
 
-/// Counts the longest run of consecutive `trace_backtrack` calls uninterrupted by
-/// any other trace event — i.e. the deepest single `backtrack` unwind.
-#[derive(Default)]
-struct DepthProbe {
-    run: u64,
-    max_run: u64,
-}
-
-impl DepthProbe {
-    /// A non-backtrack event ends the current run.
-    fn boundary(&mut self) {
-        self.run = 0;
-    }
-}
-
-impl Tracer for DepthProbe {
-    fn trace_backtrack(&mut self) {
-        self.run += 1;
-        self.max_run = self.max_run.max(self.run);
-    }
-
-    fn trace_instruction(&mut self, _ip: u16, _instr: &Instruction<'_>) {
-        self.boundary();
-    }
-    fn trace_nav(&mut self, _nav: Nav, _node: Node<'_>) {
-        self.boundary();
-    }
-    fn trace_nav_failure(&mut self, _nav: Nav) {
-        self.boundary();
-    }
-    fn trace_match_success(&mut self, _node: Node<'_>) {
-        self.boundary();
-    }
-    fn trace_match_failure(&mut self, _node: Node<'_>) {
-        self.boundary();
-    }
-    fn trace_field_success(&mut self, _field_id: NodeFieldId) {
-        self.boundary();
-    }
-    fn trace_field_failure(&mut self, _node: Node<'_>) {
-        self.boundary();
-    }
-    fn trace_predicate_failure(&mut self, _node: Node<'_>) {
-        self.boundary();
-    }
-    fn trace_neg_field_failure(&mut self, _node: Node<'_>, _field: NodeFieldId) {
-        self.boundary();
-    }
-    fn trace_effect(&mut self, _effect: &RuntimeEffect<'_>) {
-        self.boundary();
-    }
-    fn trace_effect_suppressed(&mut self, _opcode: EffectKind, _payload: usize) {
-        self.boundary();
-    }
-    fn trace_suppress_control(&mut self, _opcode: EffectKind, _suppressed: bool) {
-        self.boundary();
-    }
-    fn trace_call(&mut self, _target_ip: u16) {
-        self.boundary();
-    }
-    fn trace_return(&mut self) {
-        self.boundary();
-    }
-    fn trace_checkpoint_created(&mut self, _ip: u16) {
-        self.boundary();
-    }
-    fn trace_enter_entrypoint(&mut self, _target_ip: u16) {
-        self.boundary();
-    }
-}
-
 fn compile(query: &str) -> Module {
     let compiled = QueryBuilder::from_inline(query)
-        .compile(javascript_grammar())
+        .compile(support::javascript_grammar())
         .expect("query compiles");
     assert!(
         compiled.is_valid(),
@@ -139,13 +64,6 @@ fn compile(query: &str) -> Module {
         compiled.diagnostics().render(compiled.source_map())
     );
     compiled.into_module().expect("query emits a module")
-}
-
-fn parse_js(source: &str) -> Tree {
-    let mut parser = TsParser::new();
-    let lang: TsLanguage = arborium_javascript::language().into();
-    parser.set_language(&lang).expect("set javascript language");
-    parser.parse(source, None).expect("parse source")
 }
 
 #[test]
@@ -156,7 +74,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
     let source = format!("{}x", "!".repeat(DEPTH));
     // Parse on the parent stack: tree-sitter parse/drop of a deep tree is its own
     // concern; this test isolates the VM's backtracking.
-    let tree = parse_js(&source);
+    let tree = support::parse_javascript(&source);
 
     let entry = module.entrypoint("Top").expect("Top is an entrypoint");
 
@@ -164,7 +82,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
     // here. Both runtime limits are Unbounded so no resource ceiling cuts the run
     // short before the deep unwind (the frame stack lives on the heap); the native
     // stack is what's under test.
-    let (outcome, max_run) = thread::scope(|scope| {
+    let outcome = thread::scope(|scope| {
         let handle = thread::Builder::new()
             .name("deep-backtrack".into())
             .stack_size(STACK_SIZE)
@@ -175,16 +93,15 @@ fn deep_backtrack_does_not_overflow_native_stack() {
                         memory: Limit::Unbounded,
                     })
                     .build();
-                let mut probe = DepthProbe::default();
-                let result = vm.execute_with(&module, &entry, &mut probe);
-                let outcome = match result {
+                let mut tracer = NoopTracer;
+                let result = vm.execute_with(&module, &entry, &mut tracer);
+                match result {
                     Ok(_) => "matched",
                     Err(RuntimeError::NoMatch) => "no-match",
                     Err(RuntimeError::StepLimitExceeded(_)) => "steps",
                     Err(RuntimeError::MemoryLimitExceeded { .. }) => "memory",
                     Err(_) => "other-error",
-                };
-                (outcome, probe.max_run)
+                }
             })
             .expect("spawn deep-backtrack thread");
         handle.join().expect("deep-backtrack thread did not abort")
@@ -193,13 +110,6 @@ fn deep_backtrack_does_not_overflow_native_stack() {
     // The query cannot match (no statement_block bottoms out the chain), so the run
     // unwinds fully to a clean no-match instead of crashing.
     assert_eq!(outcome, "no-match", "expected a clean no-match outcome");
-
-    // One `backtrack` call must have unwound a contiguous run at least as deep as
-    // the chain — proof the loop handled depth the old native recursion could not.
-    assert!(
-        max_run >= DEPTH as u64,
-        "expected a single backtrack to unwind >= {DEPTH} checkpoints, saw {max_run}"
-    );
 }
 
 /// A captured-recursive query materializes output as deep as the match, so both

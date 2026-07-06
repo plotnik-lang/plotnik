@@ -1,7 +1,7 @@
 //! Extract inspection joins from a winning VM effect log.
 
-use arborium_tree_sitter::Node;
 use serde::Serialize;
+use tree_sitter::Node;
 
 use crate::bytecode::Module;
 

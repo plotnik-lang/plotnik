@@ -465,7 +465,7 @@ fn grammar_admits_every_field_and_child_in_real_trees() {
 ))]
 fn check_real_tree_admissibility(
     grammar: &plotnik_lib::grammar::Grammar,
-    node: arborium_tree_sitter::Node<'_>,
+    node: tree_sitter::Node<'_>,
     lang: &str,
     checked: &mut usize,
     violations: &mut Vec<String>,

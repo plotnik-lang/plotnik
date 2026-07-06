@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/plotnik-cli",
     "crates/plotnik-lib",
+    "crates/plotnik-tests",
     "crates/plotnik-wasm",
 ]
 

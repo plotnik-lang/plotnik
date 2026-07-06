@@ -19,12 +19,6 @@ mod vm;
 
 #[cfg(test)]
 mod checkpoint_tests;
-#[cfg(test)]
-mod cursor_tests;
-#[cfg(test)]
-mod inspect_tests;
-#[cfg(test)]
-mod vm_tests;
 
 pub use effect::{EffectLog, RuntimeEffect};
 pub use error::RuntimeError;
@@ -36,6 +30,3 @@ pub use trace::{NoopTracer, PrintTracer, PrintTracerBuilder, Tracer, Verbosity};
 pub use value::{NodeHandle, Value};
 pub use verify::debug_verify_type;
 pub use vm::{RunStats, VM, VMBuilder};
-
-#[cfg(test)]
-mod stack_safety_tests;
