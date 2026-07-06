@@ -1,0 +1,27 @@
+/* Minimal reset. The design (tokens, type, color, layout) starts fresh —
+   add it here or in per-component styles. */
+
+:root {
+  /* Lets light-dark() resolve; the highlighter below relies on it. */
+  color-scheme: light dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+/* Syntax-highlighter support (src/lib/highlight.ts). highlight() runs with
+   defaultColor:false, so each token carries --shiki-light / --shiki-dark and
+   the color is resolved per scheme here. Keep while the highlighter stays
+   wired for light + dark. */
+.shiki,
+.shiki span {
+  color: light-dark(var(--shiki-light), var(--shiki-dark));
+  background: transparent !important;
+}

@@ -32,3 +32,8 @@ lcov.info
 *.profdata
 /target/llvm-cov-target/
 /target/coverage/
+
+# Impeccable
+PRODUCT.md
+.impeccable/
+/.github/hooks/impeccable.json
