@@ -1,0 +1,120 @@
+Q = (program [
+  A: (expression_statement)* @stmts
+  B: (debugger_statement)
+] @x)
+--------------------- INPUT ----------------------
+a; b;
+--------------------- TYPES ----------------------
+export type QX =
+  | { $tag: "A"; $data: { stmts: Node[] } }
+  | { $tag: "B" };
+
+export interface Q {
+  x: QX;
+}
+--------------------- OUTPUT ---------------------
+{
+  "x": {
+    "$tag": "A",
+    "$data": {
+      "stmts": [
+        {
+          "kind": "expression_statement",
+          "text": "a;",
+          "span": [0, 2]
+        },
+        {
+          "kind": "expression_statement",
+          "text": "b;",
+          "span": [3, 5]
+        }
+      ]
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "stmts"
+S2 "A"
+S3 "B"
+S4 "x"
+S5 "QX"
+S6 "Q"
+S7 "program"
+S8 "expression_statement"
+S9 "debugger_statement"
+
+[type_defs]
+T0 = <Void>
+T1 = <Node>
+T2 = ArrayStar(T1)  ; <Node>*
+T3 = Struct  M0:1  ; { stmts }
+T4 = Enum    M1:2  ; A | B
+T5 = Struct  M3:1  ; { x }
+
+[type_members]
+M0: S1 → T2  ; stmts: T2
+M1: S2 → T3  ; A: T3
+M2: S3 → T0  ; B: <Void>
+M3: S4 → T4  ; x: QX
+
+[type_names]
+N0: S5 → T4  ; QX
+N1: S6 → T5  ; Q
+
+[entrypoints]
+Q = 00 :: T5
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@32)                            32 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [ArrayClose Set(M0) EnumClose Set(M3)]  23
+  11   !   (expression_statement) [Node Push]  13, 08
+  13  ─‣─  _                                11, 13
+  15  ...
+  16   !   _ [ArrayOpen]                    11, 13
+  18  -ε-  [EnumOpen(M1)]                   16
+  20  -ε-  [EnumOpen(M1) ArrayOpen ArrayClose Set(M0) EnumClose Set(M3)]  06
+  23  ─‣┘  _                                06
+  24   !   (debugger_statement) [EnumOpen(M2) EnumClose Set(M3)]  23
+  26  ─‣─  _                                18, 24, 26
+  28  └‣─  _                                18, 24, 26
+  30  ...
+  31  ...
+  32   !   (program)                        28, 20
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              32 : 03
+       ▶   (?)
+
+?:
+  32       (program)                        28, 20
+       ●   program
+  28       _                                18, 24, 26
+       ●   expression_statement
+  18  -ε-  [EnumOpen(M1)]                   16
+  16       _ [ArrayOpen]                    11, 13
+       ●   expression_statement
+  11       (expression_statement) [Node Push]  13, 08
+       ●   expression_statement
+  13       _                                11, 13
+       ●   expression_statement
+  11       (expression_statement) [Node Push]  13, 08
+       ●   expression_statement
+  13       _                                11, 13
+  11  ❮❮❮ 
+  08  -ε-  [ArrayClose Set(M0) EnumClose Set(M3)]  23
+  23       _                                06
+       ●   program
+  06   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼
