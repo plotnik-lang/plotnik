@@ -25,6 +25,7 @@ use crate::compiler::parse::ast::{
     self, NodePattern, Pattern, QuantifierKind, SeqItem, TokenPattern, token_src,
 };
 use crate::compiler::parse::cst::SyntaxKind;
+use crate::compiler::parse::strings::unescape;
 use crate::core::grammar::Grammar;
 use crate::core::{NodeFieldId, NodeKindId};
 
@@ -698,8 +699,8 @@ impl<'a, 'b> Builder<'a, 'b> {
         let Some(value_token) = token.value() else {
             return KindConstraint::Unconstrained;
         };
-        let text = token_src(&value_token, self.ctx.content(source));
-        KindConstraint::Exact(checked_anonymous_node(self.ctx, text))
+        let text = unescape(token_src(&value_token, self.ctx.content(source))).0;
+        KindConstraint::Exact(checked_anonymous_node(self.ctx, &text))
     }
 }
 

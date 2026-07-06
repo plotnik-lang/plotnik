@@ -480,6 +480,23 @@ Output type:
 }
 ```
 
+### String Escapes
+
+String literals — anonymous nodes and predicate values alike — support these escapes:
+
+| Escape  | Meaning                                      |
+| ------- | -------------------------------------------- |
+| `\n`    | newline                                      |
+| `\r`    | carriage return                              |
+| `\t`    | tab                                          |
+| `\\`    | backslash                                    |
+| `\"`    | double quote                                 |
+| `\'`    | single quote                                 |
+| `\u{…}` | Unicode scalar, 1-6 hex digits (`\u{1F600}`) |
+
+Any other `\` sequence is a compile-time error. Regex literals are unaffected — `/…/`
+patterns follow regex escaping rules.
+
 ### Wildcards
 
 | Syntax | Matches                       |

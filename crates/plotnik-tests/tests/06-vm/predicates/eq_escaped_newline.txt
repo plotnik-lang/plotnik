@@ -1,0 +1,88 @@
+Q = (program
+  (lexical_declaration
+    (variable_declarator
+      value: (template_string (string_fragment == "a\nb") @frag))))
+--------------------- INPUT ----------------------
+const s = `a
+b`;
+--------------------- TYPES ----------------------
+export interface Q {
+  frag: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "frag": {
+    "kind": "string_fragment",
+    "text": "a\nb",
+    "span": [11, 14]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "a\nb"
+S2 "frag"
+S3 "Q"
+S4 "program"
+S5 "lexical_declaration"
+S6 "variable_declarator"
+S7 "template_string"
+S8 "string_fragment"
+S9 "value"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { frag }
+
+[type_members]
+M0: S2 → T0  ; frag: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@16)                            16 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  ...
+  07  ...
+  08  └‣─  (string_fragment) [Node Set(M0)] == "a\nb"  11
+  11  ─‣┘⁴ _                                12
+  12                                        ▶
+  13  └‣─  value: (template_string)         08
+  14  └‣─  (variable_declarator)            13
+  15  └‣─  (lexical_declaration)            14
+  16   !   (program)                        15
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              16 : 03
+       ▶   (?)
+
+?:
+  16       (program)                        15
+       ●   program
+  15       (lexical_declaration)            14
+       ●   lexical_declaration
+  14       (variable_declarator)            13
+       ○   const
+       ●   variable_declarator
+  13       value: (template_string)         08
+       ○   identifier
+       ○   =
+       ●   template_string
+  08       (string_fragment) [Node Set(M0)] == "a\nb"  11
+       ○   `
+       ●   string_fragment
+  11       _                                12
+       ●   program
+  12   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

@@ -21,6 +21,7 @@ use crate::compiler::analyze::anchors::{AnchorSemantics, GapClass};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics, Span};
 use crate::compiler::parse::ast::{self, NodePattern, Pattern, SeqItem};
 use crate::compiler::parse::cst::SyntaxNode;
+use crate::compiler::parse::strings::unescape;
 use crate::core::{NodeFieldId, NodeKindId};
 
 use super::automaton::AutomatonContext;
@@ -631,7 +632,10 @@ fn query_demand(ctx: AutomatonContext<'_>, pattern: &Located<Pattern>) -> Option
             }
             token
                 .value()
-                .and_then(|value| ctx.grammar.resolve_anonymous_node(value.text()))
+                .and_then(|value| {
+                    ctx.grammar
+                        .resolve_anonymous_node(&unescape(value.text()).0)
+                })
                 .map(ChildDemand::Kind)
         }
         Pattern::DefRef(def_ref) => match Goal::from_def_ref(ctx, def_ref) {

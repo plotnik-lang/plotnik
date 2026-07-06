@@ -26,6 +26,7 @@ pub use crate::compiler::diagnostics::Error;
 pub(crate) mod ast;
 pub(crate) mod cst;
 mod lexer;
+pub(crate) mod strings;
 mod token_set;
 
 mod grammar;
@@ -40,6 +41,8 @@ mod cst_tests;
 mod lexer_tests;
 #[cfg(test)]
 mod parser_tests;
+#[cfg(test)]
+mod strings_tests;
 #[cfg(test)]
 mod token_set_tests;
 #[cfg(test)]

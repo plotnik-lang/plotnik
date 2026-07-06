@@ -91,6 +91,8 @@ pub enum DiagnosticKind {
     EntrypointNeverMatchesRoot,
 
     PredicateOnNonLeaf,
+    UnknownStringEscape,
+    InvalidUnicodeEscape,
     EmptyRegex,
     RegexBackreference,
     RegexLookaround,
@@ -257,6 +259,12 @@ impl DiagnosticKind {
             Self::PredicateOnNonLeaf => {
                 "predicates match text content; apply them to a leaf node or an anonymous node like `\"foo\"`"
             }
+            Self::UnknownStringEscape => {
+                r#"supported escapes: `\n`, `\r`, `\t`, `\\`, `\"`, `\'`, `\u{…}`; write `\\` to match a literal backslash"#
+            }
+            Self::InvalidUnicodeEscape => {
+                r"write `\u{…}` with 1-6 hex digits naming a Unicode scalar value"
+            }
             Self::EmptyRegex => {
                 "put a pattern between the slashes, e.g. `=~ /^foo/`, or use a string predicate like `== \"foo\"`"
             }
@@ -379,6 +387,8 @@ impl DiagnosticKind {
             Self::PredicateOnNonLeaf => {
                 "predicates match text content, but this node can contain children"
             }
+            Self::UnknownStringEscape => "unknown escape sequence in string",
+            Self::InvalidUnicodeEscape => "invalid unicode escape",
             Self::EmptyRegex => "empty regex pattern",
             Self::RegexBackreference => "backreferences are not supported in regex",
             Self::RegexLookaround => "lookahead/lookbehind is not supported in regex",

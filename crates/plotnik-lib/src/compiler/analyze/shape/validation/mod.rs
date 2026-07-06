@@ -5,6 +5,7 @@
 //! - Anchor placement rules (anchors)
 //! - Empty constructs (empty_constructs)
 //! - Predicate regex patterns (predicates)
+//! - String escape sequences (strings)
 
 use indexmap::IndexMap;
 
@@ -17,6 +18,7 @@ pub mod alt_kinds;
 pub mod anchors;
 pub mod empty_constructs;
 pub mod predicates;
+pub mod strings;
 
 /// Inputs for the AST-only validation passes (alt kinds, anchors, empty
 /// constructs).
@@ -102,6 +104,11 @@ pub fn validate_ast<'q>(input: ShapeValidationInput<'q, '_>) -> Option<Validated
             source_id: source.id,
             ast,
             source_content: source.content,
+            diag: &mut *input.diag,
+        });
+        strings::validate_strings(ValidationInput {
+            source_id: source.id,
+            ast,
             diag: &mut *input.diag,
         });
     }
