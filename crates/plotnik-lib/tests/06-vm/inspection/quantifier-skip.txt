@@ -1,0 +1,217 @@
+Q = (program
+  (expression_statement)? @stmt
+  (function_declaration
+    name: (identifier) @name
+  )
+)
+------------------- INPUT (ts) -------------------
+function f() {}
+--------------------- TYPES ----------------------
+export interface Q {
+  name: Node;
+  stmt: Node | null;
+}
+--------------------- OUTPUT ---------------------
+{
+  "stmt": null,
+  "name": {
+    "kind": "identifier",
+    "text": "f",
+    "span": [9, 10]
+  }
+}
+------------------- INSPECTION -------------------
+{
+  "v": 1,
+  "entries": [
+    {
+      "span_id": 0,
+      "parent": null,
+      "hull": [
+        0,
+        15
+      ],
+      "bindings": [],
+      "effect_range": [
+        1,
+        18
+      ]
+    },
+    {
+      "span_id": 1,
+      "parent": 0,
+      "hull": [
+        0,
+        15
+      ],
+      "bindings": [],
+      "effect_range": [
+        2,
+        17
+      ]
+    },
+    {
+      "span_id": 3,
+      "parent": 1,
+      "hull": null,
+      "bindings": [
+        {
+          "path": "/stmt",
+          "effect_idx": 5
+        }
+      ],
+      "effect_range": [
+        3,
+        6
+      ]
+    },
+    {
+      "span_id": 5,
+      "parent": 1,
+      "hull": [
+        0,
+        15
+      ],
+      "bindings": [],
+      "effect_range": [
+        7,
+        16
+      ]
+    },
+    {
+      "span_id": 7,
+      "parent": 3,
+      "hull": [
+        9,
+        10
+      ],
+      "bindings": [],
+      "effect_range": [
+        8,
+        15
+      ]
+    },
+    {
+      "span_id": 8,
+      "parent": 4,
+      "hull": [
+        9,
+        10
+      ],
+      "bindings": [],
+      "effect_range": [
+        9,
+        14
+      ]
+    },
+    {
+      "span_id": 6,
+      "parent": 5,
+      "hull": [
+        9,
+        10
+      ],
+      "bindings": [
+        {
+          "path": "/name",
+          "effect_idx": 12
+        }
+      ],
+      "effect_range": [
+        10,
+        13
+      ]
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "stmt"
+S2 "name"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "function_declaration"
+S7 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:2  ; { stmt, name }
+T2 = Optional(T0)  ; <Node>?
+
+[type_members]
+M0: S1 → T2  ; stmt: T2
+M1: S2 → T0  ; name: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[spans]
+P0 def        0..103  src0  T1
+P1 pattern    4..103  src0
+P2 capture    39..44  src0  T1.M0
+P3 quantifier 37..38  src0
+P4 pattern    15..37  src0
+P5 pattern    47..101  src0
+P6 capture    92..97  src0  T1.M1
+P7 field      73..77  src0
+P8 pattern    79..91  src0
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@34)                            34 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  └‣─  name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#8 SpanEnd#7]  12
+  12  ─‣┘  _ [SpanEnd#5]                    14
+  14  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          06
+  16  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#5]  08
+  18  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#5]  08
+  20  -ε-  [Null Set(M0)]                   16
+  22  ...
+  23  ...
+  24   !   (expression_statement) [SpanStartAt#4 SpanStart#2 Node Set(M0) SpanEnd#2 SpanEnd#4]  18
+  27  ─‣─  _                                24, 27
+  29  └‣─  _                                24, 27
+  31  ...
+  32  -ε-  [SpanStart#3]                    29, 20
+  34   !   (program) [SpanStart#0 SpanStartAt#1]  32
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              34 : 03
+       ▶   (?)
+
+?:
+  34       (program) [SpanStart#0 SpanStartAt#1]  32
+       ●   program
+  32  -ε-  [SpanStart#3]                    29, 20
+  29       _                                24, 27
+       ●   function_declaration
+  24       (expression_statement) [SpanStartAt#4 SpanStart#2 Node Set(M0) SpanEnd#2 SpanEnd#4]  18
+       ○   function_declaration
+  29  ❮❮❮ 
+  27       _                                24, 27
+  32  ❮❮❮ 
+  20  -ε-  [Null Set(M0)]                   16
+  16       (function_declaration) [SpanEnd#3 SpanStartAt#5]  08
+       ●   function_declaration
+  08       name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#8 SpanEnd#7]  12
+       ○   function
+       ●   identifier
+  12       _ [SpanEnd#5]                    14
+       ●   function_declaration
+  14       _ [SpanEnd#1 SpanEnd#0]          06
+       ●   program
+  06   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

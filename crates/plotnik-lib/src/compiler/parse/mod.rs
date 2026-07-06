@@ -42,6 +42,8 @@ mod lexer_tests;
 mod parser_tests;
 #[cfg(test)]
 mod token_set_tests;
+#[cfg(test)]
+mod tokenize_tests;
 
 pub use cst::{SyntaxKind, SyntaxNode};
 
@@ -50,3 +52,81 @@ pub use ast::{Anchor, Branch, Def, NegatedField, Pattern, Root};
 pub use parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser};
 
 pub use lexer::lex;
+
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+pub struct TokenSpan {
+    /// Stable lowercase token class for editor/highlighter consumers.
+    pub kind: &'static str,
+    /// Start byte offset in the query text.
+    pub start: u32,
+    /// End byte offset in the query text.
+    pub end: u32,
+}
+
+/// Editor-grade tokenization from the real query lexer.
+///
+/// Tokenization is total: malformed input is represented with `error` spans.
+pub fn tokenize(text: &str) -> Vec<TokenSpan> {
+    lex(text)
+        .into_iter()
+        .map(|token| {
+            let range = std::ops::Range::<usize>::from(token.span);
+            TokenSpan {
+                kind: class_name(token.kind),
+                start: u32::try_from(range.start).expect("token start byte fits in u32"),
+                end: u32::try_from(range.end).expect("token end byte fits in u32"),
+            }
+        })
+        .collect()
+}
+
+fn class_name(kind: SyntaxKind) -> &'static str {
+    match kind {
+        SyntaxKind::Whitespace | SyntaxKind::Newline => "whitespace",
+        SyntaxKind::LineComment | SyntaxKind::BlockComment | SyntaxKind::Shebang => "comment",
+        SyntaxKind::DoubleQuote
+        | SyntaxKind::SingleQuote
+        | SyntaxKind::StringContent
+        | SyntaxKind::StringLiteral
+        | SyntaxKind::UnterminatedString => "string",
+        SyntaxKind::RegexLiteral
+        | SyntaxKind::RegexPredicateMatch
+        | SyntaxKind::RegexPredicateNoMatch => "regex",
+        SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture | SyntaxKind::At => "capture",
+        SyntaxKind::Id | SyntaxKind::KwError | SyntaxKind::KwMissing => "ident",
+        SyntaxKind::Garbage | SyntaxKind::Error => "error",
+        SyntaxKind::ParenOpen
+        | SyntaxKind::ParenClose
+        | SyntaxKind::BracketOpen
+        | SyntaxKind::BracketClose
+        | SyntaxKind::BraceOpen
+        | SyntaxKind::BraceClose
+        | SyntaxKind::DoubleColon
+        | SyntaxKind::Colon
+        | SyntaxKind::Equals
+        | SyntaxKind::Negation
+        | SyntaxKind::Minus
+        | SyntaxKind::Tilde
+        | SyntaxKind::Underscore
+        | SyntaxKind::Star
+        | SyntaxKind::Plus
+        | SyntaxKind::Question
+        | SyntaxKind::StarQuestion
+        | SyntaxKind::PlusQuestion
+        | SyntaxKind::QuestionQuestion
+        | SyntaxKind::Slash
+        | SyntaxKind::Hash
+        | SyntaxKind::Comma
+        | SyntaxKind::Pipe
+        | SyntaxKind::DotBang
+        | SyntaxKind::Dot
+        | SyntaxKind::OpEq
+        | SyntaxKind::OpNe
+        | SyntaxKind::OpStartsWith
+        | SyntaxKind::OpEndsWith
+        | SyntaxKind::OpContains
+        | SyntaxKind::OpRegexMatch
+        | SyntaxKind::OpRegexNoMatch => "punct",
+        _ => "error",
+    }
+}

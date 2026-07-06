@@ -25,6 +25,7 @@ pub use crate::bytecode::type_system;
 pub use crate::core::colors;
 pub use crate::core::grammar;
 pub use crate::core::utils as text_utils;
+pub use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId, tree_to_json};
 
 pub mod diagnostics {
     pub use crate::compiler::diagnostics::report::{
@@ -37,23 +38,25 @@ pub mod diagnostics {
 }
 
 pub use crate::compiler::typegen::typescript::{
-    Config as TypeScriptConfig, VoidType as TypeScriptVoidType,
+    Config as TypeScriptConfig, DtsRange, VoidType as TypeScriptVoidType,
 };
 
 pub use crate::core::Colors;
 
 pub use crate::compiler::{
     CheckedQuery, CompiledQuery, Query, QueryBuilder, Source, SourceId, SourceKind, SourceMap,
-    SourcePath,
+    SourcePath, TokenSpan, tokenize,
 };
 pub use crate::compiler::{
     DiagnosticBuilder, DiagnosticKind, Diagnostics, Error, QueryResult, Severity, Span,
 };
 
 pub use crate::vm::{
-    EffectLog, Limit, NodeHandle, NoopTracer, PrintTracer, PrintTracerBuilder,
-    ResolvedRuntimeLimits, RuntimeEffect, RuntimeError, RuntimeLimitSpec, Tracer, VM, VMBuilder,
-    Value, ValueMaterializer, Verbosity, debug_verify_type, materialize_verified,
+    Binding, EffectLog, Inspection, InspectionEntry, Limit, NodeHandle, NodeRef, NoopTracer,
+    PrintTracer, PrintTracerBuilder, Recording, RecordingTracer, ResolvedRuntimeLimits, RunStats,
+    RuntimeEffect, RuntimeError, RuntimeLimitSpec, StepEvent, StepRecord, Tracer, VM, VMBuilder,
+    Value, ValueMaterializer, Verbosity, debug_verify_type, extract_inspection,
+    materialize_verified,
 };
 
 /// Embed bytecode with 64-byte alignment (zero-copy loading).

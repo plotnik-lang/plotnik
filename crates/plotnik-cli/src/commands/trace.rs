@@ -3,12 +3,15 @@
 use std::path::PathBuf;
 
 use plotnik_lib::{
-    Colors, PrintTracer, RuntimeError, RuntimeLimitSpec, VM, Verbosity, materialize_verified,
+    Colors, PrintTracer, RecordingTracer, RuntimeError, RuntimeLimitSpec, VM, Verbosity,
+    materialize_verified,
 };
 
 use super::run_common::{self, ExecPlan, ExecRequest};
 use super::runtime_report::render_runtime_error;
 use crate::error::{CliError, CliResult};
+
+const DEFAULT_MAX_RECORDS: usize = 65_536;
 
 pub struct TraceArgs {
     pub query_path: Option<PathBuf>,
@@ -38,9 +41,33 @@ pub fn run(args: TraceArgs) -> CliResult {
         lang: args.lang.as_deref(),
         entry: args.entry.as_deref(),
         color: args.color,
+        inspection: args.json,
     })?;
 
     let vm = VM::builder(&source_code, &tree).limits(args.limits).build();
+
+    if args.json {
+        let mut tracer = RecordingTracer::new(&module, DEFAULT_MAX_RECORDS);
+        let (result, stats) = vm.execute_with_stats(&module, &entrypoint, &mut tracer);
+        let recording = tracer.finish();
+        println!(
+            "{}",
+            serde_json::json!({
+                "recording": recording,
+                "stats": stats,
+            })
+        );
+
+        return match result {
+            Ok(_) => Ok(()),
+            Err(RuntimeError::NoMatch) => Err(CliError::No),
+            Err(e) => {
+                eprintln!("{}", render_runtime_error(&e, true));
+                Err(CliError::FatalRendered)
+            }
+        };
+    }
+
     let colors = Colors::new(args.color);
     let mut tracer = PrintTracer::builder(&source_code, &module)
         .verbosity(args.verbosity)

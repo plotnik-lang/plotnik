@@ -28,10 +28,10 @@
 //! any real path), so debug builds stay usable on large queries.
 
 #[cfg(debug_assertions)]
-pub use debug_impl::{run_verified, verify_constructed};
+pub use debug_impl::{run_verified, verify_constructed, verify_fresh_build};
 
 #[cfg(not(debug_assertions))]
-pub use release_impl::{run_verified, verify_constructed};
+pub use release_impl::{run_verified, verify_constructed, verify_fresh_build};
 
 #[cfg(all(test, debug_assertions))]
 #[path = "verify_tests.rs"]
@@ -40,7 +40,7 @@ mod verify_tests;
 #[cfg(not(debug_assertions))]
 mod release_impl {
     use crate::compiler::lower::LowerInput;
-    use crate::compiler::lower::ir::NfaGraph;
+    use crate::compiler::lower::ir::{InstructionIR, NfaGraph};
 
     /// Run a pass. Verification is compiled out in release builds.
     #[inline(always)]
@@ -56,6 +56,10 @@ mod release_impl {
     /// No-op in release builds.
     #[inline(always)]
     pub fn verify_constructed(_nfa: &NfaGraph, _ctx: &LowerInput) {}
+
+    /// No-op in release builds.
+    #[inline(always)]
+    pub fn verify_fresh_build(_instructions: &[InstructionIR]) {}
 }
 
 #[cfg(debug_assertions)]
@@ -225,7 +229,7 @@ mod debug_impl {
 
         for op in ops {
             match op {
-                SemanticOp::Effect(EffectKind::Node, _)
+                SemanticOp::Effect(EffectKind::Node | EffectKind::SpanStartAt, _)
                 | SemanticOp::Call(_)
                 | SemanticOp::Return
                 | SemanticOp::CycleRef
@@ -472,18 +476,20 @@ mod debug_impl {
     /// exhaustive on purpose — a new `EffectKind` cannot compile until it
     /// declares its scope behaviour here.
     enum ScopeRole {
-        Open,
+        Open(EffectKind),
         Close(EffectKind),
     }
 
     fn scope_role(op: EffectKind) -> Option<ScopeRole> {
         use EffectKind::*;
         let role = match op {
-            ArrayOpen | StructOpen | EnumOpen | SuppressBegin => ScopeRole::Open,
+            ArrayOpen | StructOpen | EnumOpen | SuppressBegin => ScopeRole::Open(op),
             ArrayClose => ScopeRole::Close(ArrayOpen),
             StructClose => ScopeRole::Close(StructOpen),
             EnumClose => ScopeRole::Close(EnumOpen),
             SuppressEnd => ScopeRole::Close(SuppressBegin),
+            SpanStartAt | SpanStart => ScopeRole::Open(SpanStart),
+            SpanEnd => ScopeRole::Close(SpanStart),
             Node | Push | Set | Null => return None,
         };
         Some(role)
@@ -502,7 +508,7 @@ mod debug_impl {
             let opcode = *opcode;
             match scope_role(opcode) {
                 None => {}
-                Some(ScopeRole::Open) => stack.push(opcode),
+                Some(ScopeRole::Open(open)) => stack.push(open),
                 Some(ScopeRole::Close(expected)) => match stack.pop() {
                     Some(top) if top == expected => {}
                     Some(top) => {
@@ -589,6 +595,26 @@ mod debug_impl {
         for (root, entry) in entries(nfa) {
             check_zero_width_root(root, entry, &instr_map)?;
         }
+        Ok(())
+    }
+
+    fn check_span_start_at_placement(instructions: &[InstructionIR]) -> Result<(), String> {
+        for instr in instructions {
+            let InstructionIR::Match(m) = instr else {
+                continue;
+            };
+            if m.effects
+                .iter()
+                .any(|effect| effect.kind() == EffectKind::SpanStartAt)
+                && m.is_epsilon()
+            {
+                return Err(format!(
+                    "SpanStartAt emitted on epsilon match {:?}; it must start on a consuming match",
+                    m.label
+                ));
+            }
+        }
+
         Ok(())
     }
 
@@ -835,6 +861,15 @@ mod debug_impl {
             if let Err(e) = walk.check_scopes(entry) {
                 panic!("[verify] construction produced unbalanced scope effects for {key:?}:\n{e}");
             }
+        }
+    }
+
+    /// Check invariants that are only true for brand-new Thompson IR. Later
+    /// passes may legitimately move effects across epsilon chains while
+    /// preserving the semantic fingerprint.
+    pub fn verify_fresh_build(instructions: &[InstructionIR]) {
+        if let Err(e) = check_span_start_at_placement(instructions) {
+            panic!("[verify] fresh Thompson build misplaced cursor-reading span marker: {e}");
         }
     }
 

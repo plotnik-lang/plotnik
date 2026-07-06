@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::bytecode::{EffectKind, Nav};
+use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::analyze::types::type_shape::FieldInfo;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
@@ -8,6 +8,7 @@ use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{
     EffectIR, InstructionIR, Label, MatchIR, MemberRef, NodeKindConstraint,
 };
+use crate::compiler::lower::spans::SpanBindingIR;
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::core::Symbol;
 
@@ -356,17 +357,25 @@ impl NfaBuilder<'_> {
 
             let branch_nav =
                 nav_for_alt_branch(first_nav, branch_search, &body, &self.anchor_semantics);
+            let branch_span = self.span_id(branch.syntax(), SpanKind::Branch);
             let branch_entry = if self.pattern_is_nullable(&body) {
                 any_nullable = true;
+                let branch_capture = if let Some(id) = branch_span {
+                    capture
+                        .clone()
+                        .nest_span(EffectIR::span_start(id.0), EffectIR::span_end(id.0))
+                } else {
+                    capture.clone()
+                };
                 // Pruned body: merged effects stay on dominating epsilons —
                 // the body's partial-skip paths must not drop them.
-                let exit = if capture.post.is_empty() {
+                let exit = if branch_capture.post.is_empty() {
                     branch_exit
                 } else {
                     self.emit_effects_epsilon(
                         branch_exit,
                         vec![],
-                        CaptureEffects::new_post(capture.post.clone()),
+                        CaptureEffects::new_post(branch_capture.post.clone()),
                     )
                 };
                 let entry = self.compile_skippable_with_exits(
@@ -379,11 +388,18 @@ impl NfaBuilder<'_> {
                     CaptureEffects::default(),
                     false,
                 );
-                let mut pre = capture.pre.clone();
+                let mut pre = branch_capture.pre;
                 pre.extend(null_effects);
                 self.wrap_entry_pre(entry, pre)
             } else {
-                let branch_capture = capture.clone().with_pre_values(null_effects);
+                let branch_capture = if let Some(id) = branch_span {
+                    capture
+                        .clone()
+                        .nest_span(EffectIR::span_start(id.0), EffectIR::span_end(id.0))
+                        .with_pre_values(null_effects)
+                } else {
+                    capture.clone().with_pre_values(null_effects)
+                };
                 self.dispatch_pattern(
                     &body,
                     PatternCtx {
@@ -585,13 +601,26 @@ impl NfaBuilder<'_> {
                 EffectKind::EnumOpen,
                 MemberRef::new(enum_type_id, variant_idx),
             );
+            let branch_span = self.span_id(branch.syntax(), SpanKind::Branch);
+            if let Some(id) = branch_span {
+                self.bind_span(
+                    id,
+                    SpanBindingIR::Member(MemberRef::new(enum_type_id, variant_idx)),
+                );
+            }
+            let branch_start = branch_span.map(|id| EffectIR::span_start(id.0));
+            let branch_end = branch_span.map(|id| EffectIR::span_end(id.0));
 
             let branch_nullable = self.pattern_is_nullable(&body);
             let body_entry = self.with_scope(payload_type_id, |this| {
                 if branch_nullable {
+                    let mut close_effects = vec![EffectIR::end_enum()];
+                    if let Some(end) = branch_end.clone() {
+                        close_effects.push(end);
+                    }
                     let close_exit = this.emit_effects_epsilon(
                         branch_exit,
-                        vec![EffectIR::end_enum()],
+                        close_effects,
                         CaptureEffects::new_post(capture.post.clone()),
                     );
                     let inner_entry = this.compile_skippable_with_exits(
@@ -605,12 +634,24 @@ impl NfaBuilder<'_> {
                         true,
                     );
                     let mut entry_pre = capture.pre.clone();
+                    if let Some(start) = branch_start.clone() {
+                        entry_pre.push(start);
+                    }
                     entry_pre.push(e_effect.clone());
                     this.wrap_entry_pre(inner_entry, entry_pre)
                 } else {
-                    let branch_capture = capture
-                        .clone()
-                        .nest_scope(e_effect.clone(), EffectIR::end_enum());
+                    let branch_capture = if let (Some(start), Some(end)) =
+                        (branch_start.clone(), branch_end.clone())
+                    {
+                        capture
+                            .clone()
+                            .nest_span(start, end)
+                            .nest_scope(e_effect.clone(), EffectIR::end_enum())
+                    } else {
+                        capture
+                            .clone()
+                            .nest_scope(e_effect.clone(), EffectIR::end_enum())
+                    };
                     this.dispatch_pattern(
                         &body,
                         PatternCtx {
@@ -627,9 +668,15 @@ impl NfaBuilder<'_> {
 
             if branch_nullable && let SkipExit::To(skip) = skip_exit {
                 let mut pre = capture.pre.clone();
+                if let Some(start) = branch_start {
+                    pre.push(start);
+                }
                 pre.push(e_effect);
                 pre.extend(self.payload_default_effects(payload_type_id));
                 let mut post = vec![EffectIR::end_enum()];
+                if let Some(end) = branch_end {
+                    post.push(end);
+                }
                 post.extend(capture.post.iter().cloned());
                 zero_width.push(self.emit_zero_width_step(skip, pre, post));
             }

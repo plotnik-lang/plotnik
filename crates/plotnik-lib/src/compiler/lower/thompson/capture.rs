@@ -5,10 +5,11 @@
 
 use std::collections::HashSet;
 
-use crate::bytecode::{EffectKind, Nav};
+use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::types::{CaptureKind, TypeAnalysis, TypeShape};
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::ir::{EffectIR, Label};
+use crate::compiler::lower::spans::SpanBindingIR;
 use crate::compiler::parse::ast::{self, Pattern};
 
 use super::NfaBuilder;
@@ -110,9 +111,41 @@ impl CaptureEffects {
 
     pub fn effects_consume_value(effects: &[EffectIR]) -> bool {
         effects
-            .first()
+            .iter()
+            .find(|e| !e.is_span_marker())
             .is_some_and(|e| matches!(e.kind(), EffectKind::Set | EffectKind::Push))
     }
+
+    /// Wrap this channel in a construct's span brackets. The start runs after
+    /// enclosing opens, and the end runs before the first close that belongs to
+    /// an enclosing scope.
+    pub(super) fn nest_span(mut self, start: EffectIR, end: EffectIR) -> Self {
+        self.pre.push(start);
+        let pos = first_unmatched_close(&self.post).unwrap_or(self.post.len());
+        self.post.insert(pos, end);
+        self
+    }
+}
+
+pub(super) fn first_unmatched_close(post: &[EffectIR]) -> Option<usize> {
+    let mut span_depth: u32 = 0;
+    for (i, effect) in post.iter().enumerate() {
+        match effect.kind() {
+            EffectKind::SpanStart | EffectKind::SpanStartAt => span_depth += 1,
+            EffectKind::SpanEnd => {
+                if span_depth == 0 {
+                    return Some(i);
+                }
+                span_depth -= 1;
+            }
+            EffectKind::ArrayClose
+            | EffectKind::StructClose
+            | EffectKind::EnumClose
+            | EffectKind::SuppressEnd => return Some(i),
+            _ => {}
+        }
+    }
+    None
 }
 
 /// The backbone calling convention threaded through the `dispatch_pattern` family.
@@ -162,11 +195,12 @@ impl NfaBuilder<'_> {
     /// The caller already classifies the inner to dispatch, so it passes the
     /// mechanism in rather than have this re-classify the same inner.
     pub(super) fn build_capture_effects(
-        &self,
+        &mut self,
         cap: &ast::CapturedPattern,
         mechanism: Option<CaptureKind>,
     ) -> Vec<EffectIR> {
-        let mut effects = Vec::with_capacity(2);
+        let mut effects = Vec::with_capacity(4);
+        let mut member_ref = None;
 
         // Only the `Node` mechanism captures the matched node directly. Every
         // other mechanism (struct scope, pass-through ref/enum/forward, array)
@@ -194,11 +228,20 @@ impl NfaBuilder<'_> {
                     .struct_fields(type_id)
                     .is_some()
             {
-                let member_ref = self
+                let member = self
                     .lookup_member(capture_name, type_id)
                     .expect("captured field must resolve in the current scope");
-                effects.push(EffectIR::with_member(EffectKind::Set, member_ref));
+                effects.push(EffectIR::with_member(EffectKind::Set, member));
+                member_ref = Some(member);
             }
+        }
+
+        if let Some(id) = self.span_id(cap.syntax(), SpanKind::Capture) {
+            if let Some(member_ref) = member_ref {
+                self.bind_span(id, SpanBindingIR::Member(member_ref));
+            }
+            effects.insert(0, EffectIR::span_start(id.0));
+            effects.push(EffectIR::span_end(id.0));
         }
 
         effects

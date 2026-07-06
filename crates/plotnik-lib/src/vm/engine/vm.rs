@@ -24,6 +24,14 @@ use super::value::node_text;
 /// sampled; must be a power of two minus one.
 const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
+/// Resource usage observed during one VM run.
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+pub struct RunStats {
+    pub steps_used: u64,
+    /// Peak live runtime heap observed at memory-sampling points and run exit.
+    pub heap_high_water: u64,
+}
+
 /// Virtual machine state for query execution.
 pub struct VM<'t> {
     pub(crate) cursor: CursorWrapper<'t>,
@@ -217,22 +225,36 @@ impl<'t> VM<'t> {
     /// while `PrintTracer` calls collect execution trace.
     ///
     pub fn execute_with<T: Tracer>(
-        mut self,
+        self,
         module: &Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> Result<EffectLog<'t>, RuntimeError> {
+        let (result, _) = self.execute_with_stats(module, entrypoint, tracer);
+        result
+    }
+
+    /// Execute query with a tracer and report run statistics.
+    pub fn execute_with_stats<T: Tracer>(
+        mut self,
+        module: &Module,
+        entrypoint: &Entrypoint,
+        tracer: &mut T,
+    ) -> (Result<EffectLog<'t>, RuntimeError>, RunStats) {
         self.ip = u16::from(entrypoint.target());
         if T::ENABLED {
             tracer.trace_enter_entrypoint(self.ip);
         }
+
+        let mut heap_high_water = self.heap_bytes();
 
         loop {
             // Step ceiling: bound total work. `None` opts out (Unbounded).
             if let Some(max) = self.limits.max_steps
                 && self.steps_used >= max
             {
-                return Err(RuntimeError::StepLimitExceeded(max));
+                let stats = self.finish_stats(&mut heap_high_water);
+                return (Err(RuntimeError::StepLimitExceeded(max)), stats);
             }
             self.steps_used += 1;
 
@@ -241,14 +263,18 @@ impl<'t> VM<'t> {
             // (≤30 checkpoints + ≤15 effects + 1 frame + ≤1 pooled snapshot
             // ≈ 4.4 KiB), so sampling every 1024 steps bounds the unobserved
             // overshoot to ~4.5 MiB — noise against the ≥64 MiB auto ceiling.
-            // `None` opts out
-            // (Unbounded).
-            if self.steps_used & MEMORY_SAMPLE_MASK == 0
-                && let Some(max) = self.limits.max_memory
-            {
+            // `None` opts out (Unbounded), but the sample still feeds stats.
+            if self.steps_used & MEMORY_SAMPLE_MASK == 0 {
                 let used = self.heap_bytes();
-                if used > max {
-                    return Err(RuntimeError::MemoryLimitExceeded { used, limit: max });
+                heap_high_water = heap_high_water.max(used);
+                if let Some(max) = self.limits.max_memory
+                    && used > max
+                {
+                    let stats = self.finish_stats_with(&mut heap_high_water, used);
+                    return (
+                        Err(RuntimeError::MemoryLimitExceeded { used, limit: max }),
+                        stats,
+                    );
                 }
             }
 
@@ -275,9 +301,28 @@ impl<'t> VM<'t> {
 
             match result {
                 Ok(()) | Err(Signal::Flow(ControlFlow::Backtracked)) => continue,
-                Err(Signal::Flow(ControlFlow::Accept)) => return Ok(self.effects),
-                Err(Signal::Error(e)) => return Err(e),
+                Err(Signal::Flow(ControlFlow::Accept)) => {
+                    let stats = self.finish_stats(&mut heap_high_water);
+                    return (Ok(self.effects), stats);
+                }
+                Err(Signal::Error(e)) => {
+                    let stats = self.finish_stats(&mut heap_high_water);
+                    return (Err(e), stats);
+                }
             }
+        }
+    }
+
+    fn finish_stats(&self, heap_high_water: &mut u64) -> RunStats {
+        let used = self.heap_bytes();
+        self.finish_stats_with(heap_high_water, used)
+    }
+
+    fn finish_stats_with(&self, heap_high_water: &mut u64, used: u64) -> RunStats {
+        *heap_high_water = (*heap_high_water).max(used);
+        RunStats {
+            steps_used: self.steps_used,
+            heap_high_water: *heap_high_water,
         }
     }
 
@@ -425,6 +470,9 @@ impl<'t> VM<'t> {
 
         for &field_id in module.decoded().neg_fields(&m) {
             if node.child_by_field_id(u16::from(field_id)).is_some() {
+                if T::ENABLED {
+                    tracer.trace_neg_field_failure(node, field_id);
+                }
                 return false;
             }
         }
@@ -432,6 +480,9 @@ impl<'t> VM<'t> {
         if let Some(p) = m.predicate
             && !self.evaluate_predicate(p, module)
         {
+            if T::ENABLED {
+                tracer.trace_predicate_failure(node);
+            }
             return false;
         }
 
@@ -716,6 +767,17 @@ impl<'t> VM<'t> {
                 }
                 return;
             }
+            // Span effects bypass suppression: uncaptured `(Foo)` bodies still
+            // produce source hulls even when they carry no output bindings.
+            SpanStartAt => RuntimeEffect::SpanStart {
+                id: op.payload as u16,
+                node: Some(self.cursor.node()),
+            },
+            SpanStart => RuntimeEffect::SpanStart {
+                id: op.payload as u16,
+                node: None,
+            },
+            SpanEnd => RuntimeEffect::SpanEnd(op.payload as u16),
 
             // Skip data effects when suppressing, but trace them
             _ if self.suppress_depth > 0 => {

@@ -18,8 +18,10 @@ pub fn compile_query(
     sources: SourceMap,
     lang: &Lang,
     color: bool,
+    inspection: bool,
 ) -> Result<CompiledQuery, CliError> {
     let compiled = QueryBuilder::new(sources)
+        .with_inspection(inspection)
         .compile(lang.grammar())
         .map_err(|e| CliError::fatal(e.to_string()))?;
 
@@ -36,6 +38,6 @@ pub fn compile_query(
 }
 
 pub fn compile_module(sources: SourceMap, lang: &Lang, color: bool) -> Result<Module, CliError> {
-    let compiled = compile_query(sources, lang, color)?;
+    let compiled = compile_query(sources, lang, color, false)?;
     Ok(compiled.into_module().expect("dry_run guarantees a module"))
 }

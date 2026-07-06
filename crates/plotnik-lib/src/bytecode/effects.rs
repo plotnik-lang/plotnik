@@ -22,6 +22,12 @@ pub enum EffectKind {
     Null = 9,
     SuppressBegin = 10,
     SuppressEnd = 11,
+    /// Open an inspection span and snapshot the current cursor node.
+    SpanStartAt = 12,
+    /// Open an inspection span without reading the cursor.
+    SpanStart = 13,
+    /// Close the innermost inspection span.
+    SpanEnd = 14,
 }
 
 impl EffectKind {
@@ -45,6 +51,9 @@ impl EffectKind {
             9 => Self::Null,
             10 => Self::SuppressBegin,
             11 => Self::SuppressEnd,
+            12 => Self::SpanStartAt,
+            13 => Self::SpanStart,
+            14 => Self::SpanEnd,
             _ => return None,
         };
         Some(op)

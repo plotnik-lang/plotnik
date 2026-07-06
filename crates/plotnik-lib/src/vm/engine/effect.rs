@@ -27,6 +27,10 @@ pub enum RuntimeEffect<'t> {
     EnumClose,
     /// Null placeholder (for optional/alternation).
     Null,
+    /// Open an inspection span. `node` is present only for cursor-snapshot starts.
+    SpanStart { id: u16, node: Option<Node<'t>> },
+    /// Close an inspection span.
+    SpanEnd(u16),
 }
 
 /// Effect log with truncation support for backtracking.

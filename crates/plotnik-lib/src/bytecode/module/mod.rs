@@ -12,9 +12,11 @@ use super::header::{Header, SectionOffsets};
 use super::ids::{StringId, TypeId};
 use super::instructions::{Call, Match, Opcode, Return, header_byte};
 use super::sections::SymbolNameEntry;
+use super::spans::SpansView;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
-    Entrypoint, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
+    Entrypoint, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STEP_SIZE,
+    STRING_TABLE_ENTRY_SIZE,
 };
 use crate::bytecode::dfa::RegexDfas;
 
@@ -229,7 +231,7 @@ impl Module {
             .unwrap_or(false)
     }
 
-    pub(crate) fn strings(&self) -> StringsView<'_> {
+    pub fn strings(&self) -> StringsView<'_> {
         StringsView {
             blob: &self.storage[self.offsets.str_blob as usize..],
             table: self.string_table_slice(),
@@ -269,7 +271,7 @@ impl Module {
         &self.regex_dfas
     }
 
-    pub(crate) fn types(&self) -> TypesView<'_> {
+    pub fn types(&self) -> TypesView<'_> {
         let defs_offset = self.offsets.type_defs as usize;
         let defs_count = self.header.type_defs_count as usize;
         let members_offset = self.offsets.type_members as usize;
@@ -289,13 +291,17 @@ impl Module {
         }
     }
 
-    pub(crate) fn entrypoints(&self) -> EntrypointsView<'_> {
+    pub fn entrypoints(&self) -> EntrypointsView<'_> {
         let offset = self.offsets.entrypoints as usize;
         let count = self.header.entrypoints_count as usize;
         EntrypointsView {
             bytes: &self.storage[offset..offset + count * Entrypoint::SIZE],
             count,
         }
+    }
+
+    pub fn spans(&self) -> SpansView<'_> {
+        SpansView::new(self.spans_slice(), self.header.spans_count as usize)
     }
 
     pub fn entrypoint_count(&self) -> usize {
@@ -334,6 +340,12 @@ impl Module {
     fn transitions_slice(&self) -> &[u8] {
         let offset = self.offsets.transitions as usize;
         let len = self.header.transitions_count as usize * STEP_SIZE;
+        &self.storage[offset..offset + len]
+    }
+
+    fn spans_slice(&self) -> &[u8] {
+        let offset = self.offsets.spans as usize;
+        let len = self.header.spans_count as usize * SPAN_ENTRY_SIZE;
         &self.storage[offset..offset + len]
     }
 }
@@ -550,6 +562,10 @@ impl<'a> EntrypointsView<'a> {
     /// Number of entrypoints.
     pub fn len(&self) -> usize {
         self.count
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
     }
 
     pub fn iter(&self) -> impl ExactSizeIterator<Item = Entrypoint> + '_ {

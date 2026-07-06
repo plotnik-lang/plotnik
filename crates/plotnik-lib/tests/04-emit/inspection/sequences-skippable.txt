@@ -1,0 +1,89 @@
+LeadingSkip = (program
+  {
+    (expression_statement)?
+    (function_declaration) @fn
+  }
+)
+
+TrailingSkip = (program
+  {
+    (function_declaration) @fn
+    (expression_statement)?
+  }
+)
+------------------- INPUT (ts) -------------------
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "fn"
+S2 "LeadingSkip"
+S3 "TrailingSkip"
+S4 "program"
+S5 "expression_statement"
+S6 "function_declaration"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { fn }
+T2 = Struct  M1:1  ; { fn }
+
+[type_members]
+M0: S1 → T0  ; fn: <Node>
+M1: S1 → T0  ; fn: <Node>
+
+[type_names]
+N0: S2 → T1  ; LeadingSkip
+N1: S3 → T2  ; TrailingSkip
+
+[entrypoints]
+LeadingSkip  = 00 :: T1
+TrailingSkip = 06 :: T2
+
+[spans]
+P00 def        0..91  src0  T1
+P01 pattern    14..91  src0
+P02 sequence   25..89  src0
+P03 quantifier 53..54  src0
+P04 pattern    31..53  src0
+P05 capture    82..85  src0  T1.M0
+P06 pattern    59..81  src0
+P07 def        93..185  src0  T2
+P08 pattern    108..185  src0
+P09 sequence   119..183  src0
+P10 capture    148..151  src0  T2.M1
+P11 pattern    125..147  src0
+P12 quantifier 178..179  src0
+P13 pattern    156..178  src0
+
+[transitions]
+LeadingSkip:
+  00  -ε-  [StructOpen]                     02
+  02       (@30)                            30 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+TrailingSkip:
+  06  -ε-  [StructOpen]                     08
+  08       (@48)                            48 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12                                        ▶
+  13  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#6]  28
+  16  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#6]  28
+  19   !   (expression_statement) [SpanStartAt#4 SpanEnd#4]  16
+  21  ─‣─  _                                19, 21
+  23  ...
+  24  └‣─  _                                19, 21
+  26  -ε-  [SpanStart#3]                    24, 13
+  28  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  12
+  30   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  26
+  32                                        ▶
+  33  -ε-  [SpanEnd#12]                     45
+  35   !   (expression_statement) [SpanStartAt#13 SpanEnd#13 SpanEnd#12]  45
+  37  ─‣─  _                                35, 37
+  39  ...
+  40  -ε-  [SpanStart#12]                   37, 33
+  42  └‣─  (function_declaration) [SpanStart#9 SpanStartAt#11 SpanStart#10 Node Set(M1) SpanEnd#10 SpanEnd#11]  40
+  45  ─‣┘  _ [SpanEnd#9 SpanEnd#8 SpanEnd#7]  32
+  47  ...
+  48   !   (program) [SpanStart#7 SpanStartAt#8]  42

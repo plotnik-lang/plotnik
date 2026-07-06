@@ -20,7 +20,10 @@
 //! | `03-analyze` | symbols                                    |
 //! | `04-emit`    | bytecode                                   |
 //! | `05-typegen` | types                                      |
-//! | `06-vm`      | types, output, bytecode, trace (requires input) |
+//! | `06-vm`      | types, output, inspection if enabled, bytecode, trace (requires input) |
+//!
+//! Compile-stage fixtures under an `inspection/` folder compile with
+//! `QueryBuilder::with_inspection(true)`.
 //!
 //! The `DIAGNOSTICS` section renders whenever the query produces warnings or errors.
 //! Errors are terminal for the compile stages (bytecode/types/trace/output are
@@ -52,8 +55,9 @@ use similar::TextDiff;
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    Colors, CompiledQuery, PrintTracer, QueryBuilder, RuntimeError, SourceMap, SourcePath,
-    TypeScriptConfig, VM, Verbosity, materialize_verified,
+    Colors, CompiledQuery, DtsRange, PrintTracer, QueryBuilder, RecordingTracer, RuntimeError,
+    SourceMap, SourcePath, TypeScriptConfig, VM, Verbosity, extract_inspection,
+    materialize_verified,
 };
 
 mod support;
@@ -254,8 +258,16 @@ fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
         "02" => Some(&["diagnostics", "cst", "ast"]),
         "03" => Some(&["diagnostics", "symbols"]),
         "04" => Some(&["diagnostics", "bytecode"]),
-        "05" => Some(&["diagnostics", "types"]),
-        "06" => Some(&["types", "diagnostics", "output", "bytecode", "trace"]),
+        "05" => Some(&["diagnostics", "types", "mapped"]),
+        "06" => Some(&[
+            "types",
+            "diagnostics",
+            "output",
+            "inspection",
+            "recording",
+            "bytecode",
+            "trace",
+        ]),
         _ => None,
     }
 }
@@ -277,7 +289,17 @@ fn parse_section_header(line: &str) -> Option<String> {
         || name.starts_with("input.")
         || matches!(
             name.as_str(),
-            "cst" | "ast" | "symbols" | "bytecode" | "types" | "trace" | "output" | "diagnostics"
+            "cst"
+                | "ast"
+                | "symbols"
+                | "bytecode"
+                | "mapped"
+                | "types"
+                | "trace"
+                | "output"
+                | "inspection"
+                | "recording"
+                | "diagnostics"
         );
     known.then_some(name)
 }
@@ -316,9 +338,9 @@ fn render(
             },
         )),
         "03" => Ok(render_frontend(query, Front::Analyze)),
-        "04" => render_compile(query, input, Compile::Bytecode),
-        "05" => render_compile(query, input, Compile::Types),
-        "06" => render_compile(query, input, Compile::Vm),
+        "04" => render_compile(name, query, input, Compile::Bytecode),
+        "05" => render_compile(name, query, input, Compile::Types),
+        "06" => render_compile(name, query, input, Compile::Vm),
         _ => Err(format!("unknown stage directory `{stage}`")),
     }
 }
@@ -366,12 +388,18 @@ enum Compile {
 }
 
 fn render_compile(
+    name: &str,
     query: &str,
     input: Option<&Input>,
     kind: Compile,
 ) -> Result<Vec<(String, String)>, String> {
     let lang = Lang::resolve(input.and_then(|i| i.ext.as_deref()))?;
+    let records = name.contains("/recording/");
+    let inspects = name.contains("/inspection/");
+    let strict_lints = name.contains("/lints/");
     let compiled = QueryBuilder::new(source_map(query))
+        .with_inspection(inspects || records)
+        .with_strict_lints(strict_lints)
         .compile(lang.grammar)
         .expect("query parsing should not exhaust fuel");
     let diagnostics = compiled.diagnostics();
@@ -402,7 +430,15 @@ fn render_compile(
         }
         Compile::Types => {
             out.extend(diag);
-            out.push(("types".into(), render_types(&compiled)));
+            let types = render_types(&compiled);
+            out.push(("types".into(), types.clone()));
+            if name.contains("/mapped/") {
+                let (mapped_types, ranges) = compiled
+                    .to_typescript_mapped(typegen_config())
+                    .expect("valid query should compile to a module");
+                assert_eq!(types, mapped_types, "mapped d.ts must match normal d.ts");
+                out.push(("mapped".into(), render_mapped(&mapped_types, &ranges)));
+            }
         }
         Compile::Vm => {
             let input = input.ok_or_else(|| {
@@ -412,12 +448,20 @@ fn render_compile(
                 .definition_names()
                 .last()
                 .expect("a valid query has at least one named definition");
-            let (trace, output) = run_vm(&lang, module, &entry, &input.text)?;
+            let run = run_vm(&lang, module, &entry, &input.text, inspects, records)?;
             out.push(("types".into(), render_types(&compiled)));
             out.extend(diag);
-            out.push(("output".into(), output));
+            out.push(("output".into(), run.output));
+            if let Some(inspection) = run.inspection {
+                out.push(("inspection".into(), inspection));
+            }
+            if let Some(recording) = run.recording {
+                out.push(("recording".into(), recording));
+            }
             out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))));
-            out.push(("trace".into(), trace));
+            if let Some(trace) = run.trace {
+                out.push(("trace".into(), trace));
+            }
         }
     }
     Ok(out)
@@ -425,8 +469,40 @@ fn render_compile(
 
 fn render_types(compiled: &CompiledQuery) -> String {
     compiled
-        .to_typescript(TypeScriptConfig::new().emit_node_interface(false))
+        .to_typescript(typegen_config())
         .expect("valid query should compile to a module")
+}
+
+fn typegen_config() -> TypeScriptConfig {
+    TypeScriptConfig::new().emit_node_interface(false)
+}
+
+fn render_mapped(dts: &str, ranges: &[DtsRange]) -> String {
+    let mut out = String::new();
+    for range in ranges {
+        let start = range.start as usize;
+        let end = range.end as usize;
+        let member = range
+            .member
+            .map(|idx| format!(".M{idx}"))
+            .unwrap_or_default();
+        out.push_str(&format!(
+            "{}..{} T{}{} {:?}\n",
+            range.start,
+            range.end,
+            range.type_id,
+            member,
+            &dts[start..end]
+        ));
+    }
+    out
+}
+
+struct VmRun {
+    trace: Option<String>,
+    output: String,
+    inspection: Option<String>,
+    recording: Option<String>,
 }
 
 fn run_vm(
@@ -434,13 +510,51 @@ fn run_vm(
     module: &Module,
     entry: &str,
     source: &str,
-) -> Result<(String, String), String> {
+    inspect: bool,
+    record: bool,
+) -> Result<VmRun, String> {
     let tree = lang.parse(source);
     let entrypoint = module
         .entrypoint(entry)
         .expect("every named definition is an entrypoint");
 
     let vm = VM::builder(source, &tree).build();
+
+    if record {
+        let mut tracer = RecordingTracer::new(module, 65_536);
+        let result = vm.execute_with(module, &entrypoint, &mut tracer);
+        let recording = tracer.finish();
+        let mut recording_json =
+            serde_json::to_string_pretty(&recording).expect("recording serialization cannot fail");
+        recording_json.push('\n');
+
+        let output = match result {
+            Ok(effects) => {
+                // The verified variant (not plain `materialize`) so a type-unsound emission
+                // panics the fixture in debug; the check compiles out under `--release`.
+                let value = materialize_verified(
+                    source,
+                    module,
+                    &entrypoint,
+                    effects.as_slice(),
+                    Colors::new(false),
+                );
+                value.format(true, Colors::new(false))
+            }
+            Err(RuntimeError::NoMatch) => "<no match>".to_string(),
+            // A no-match is a real outcome worth pinning; step/memory exhaustion is
+            // not — fail the trial rather than accept a resource limit as golden output.
+            Err(err) => return Err(format!("VM run failed for `{entry}`: {err}")),
+        };
+
+        return Ok(VmRun {
+            trace: None,
+            output,
+            inspection: None,
+            recording: Some(recording_json),
+        });
+    }
+
     let mut tracer = PrintTracer::builder(source, module)
         .verbosity(Verbosity::Default)
         .colored(false)
@@ -448,8 +562,15 @@ fn run_vm(
 
     let result = vm.execute_with(module, &entrypoint, &mut tracer);
     let trace = tracer.render();
-    let output = match result {
+    let (output, inspection) = match result {
         Ok(effects) => {
+            let inspection = inspect.then(|| {
+                let inspection = extract_inspection(effects.as_slice(), module);
+                let mut rendered = serde_json::to_string_pretty(&inspection)
+                    .expect("inspection serialization cannot fail");
+                rendered.push('\n');
+                rendered
+            });
             // The verified variant (not plain `materialize`) so a type-unsound emission
             // panics the fixture in debug; the check compiles out under `--release`.
             let value = materialize_verified(
@@ -459,14 +580,19 @@ fn run_vm(
                 effects.as_slice(),
                 Colors::new(false),
             );
-            value.format(true, Colors::new(false))
+            (value.format(true, Colors::new(false)), inspection)
         }
-        Err(RuntimeError::NoMatch) => "<no match>".to_string(),
+        Err(RuntimeError::NoMatch) => ("<no match>".to_string(), None),
         // A no-match is a real outcome worth pinning; step/memory exhaustion is
         // not — fail the trial rather than accept a resource limit as golden output.
         Err(err) => return Err(format!("VM run failed for `{entry}`: {err}")),
     };
-    Ok((trace, output))
+    Ok(VmRun {
+        trace: Some(trace),
+        output,
+        inspection,
+        recording: None,
+    })
 }
 
 struct Lang {

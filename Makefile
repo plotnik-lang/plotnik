@@ -1,4 +1,8 @@
-.PHONY: check clippy test bench coverage coverage-lines clean
+.PHONY: check clippy test bench coverage coverage-lines check-wasm clean
+
+LLVM_PREFIX ?= /opt/homebrew/opt/llvm
+WASM_CC ?= $(LLVM_PREFIX)/bin/clang
+WASM_AR ?= $(LLVM_PREFIX)/bin/llvm-ar
 
 check:
 	@cargo check \
@@ -47,6 +51,18 @@ coverage-lines:
 		--text \
 		--show-missing-lines \
 		2>/dev/null | grep '\.rs: [0-9]' | sed 's|.*/crates/|crates/|'
+
+check-wasm:
+	@CC_wasm32_unknown_unknown="$(WASM_CC)" \
+		AR_wasm32_unknown_unknown="$(WASM_AR)" \
+		cargo check \
+		--package plotnik-lib \
+		--target wasm32-unknown-unknown
+	@CC_wasm32_unknown_unknown="$(WASM_CC)" \
+		AR_wasm32_unknown_unknown="$(WASM_AR)" \
+		cargo check \
+		--package plotnik-wasm \
+		--target wasm32-unknown-unknown
 
 coverage:
 	@cargo +nightly llvm-cov \

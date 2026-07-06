@@ -9,10 +9,20 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::bytecode::{EntrypointsView, Module, StringsView, TypeId, TypesView};
+use crate::bytecode::{
+    EntrypointsView, Module, StringsView, TypeDef, TypeId, TypeMember, TypesView,
+};
 use crate::core::Colors;
 
 use super::Config;
+
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+pub struct DtsRange {
+    pub start: u32,
+    pub end: u32,
+    pub type_id: u16,
+    pub member: Option<u16>,
+}
 
 pub struct Emitter<'a> {
     pub(super) types: TypesView<'a>,
@@ -31,6 +41,8 @@ pub struct Emitter<'a> {
     /// Cycle guard for `mark_node_type_usage`.
     pub(super) node_scan_seen: HashSet<TypeId>,
     pub(super) output: String,
+    pub(super) ranges: Vec<DtsRange>,
+    pub(super) map_enabled: bool,
 }
 
 impl<'a> Emitter<'a> {
@@ -46,6 +58,8 @@ impl<'a> Emitter<'a> {
             emitted_types: HashSet::new(),
             node_scan_seen: HashSet::new(),
             output: String::new(),
+            ranges: Vec::new(),
+            map_enabled: false,
         }
     }
 
@@ -54,6 +68,18 @@ impl<'a> Emitter<'a> {
     }
 
     pub fn emit(mut self) -> String {
+        self.emit_body();
+        self.finish_output()
+    }
+
+    pub fn emit_mapped(mut self) -> (String, Vec<DtsRange>) {
+        self.map_enabled = true;
+        self.emit_body();
+        let output = self.finish_output();
+        (output, self.ranges)
+    }
+
+    fn emit_body(&mut self) {
         self.load_names();
         self.mark_node_type_usage();
         if self.config.emit_node_interface && self.needs_node_type {
@@ -69,7 +95,6 @@ impl<'a> Emitter<'a> {
         }
 
         self.emit_undeclared_entrypoints();
-        self.finish_output()
     }
 
     fn load_names(&mut self) {
@@ -93,13 +118,51 @@ impl<'a> Emitter<'a> {
         for (name, type_id) in remaining {
             let body = self.render_ty(type_id);
             self.declared_names.insert(name.clone());
-            self.emit_type_decl(&name, &body);
+            self.emit_type_decl(&name, type_id, &body);
         }
     }
 
-    fn finish_output(mut self) -> String {
+    fn finish_output(&mut self) -> String {
         self.output.truncate(self.output.trim_end().len());
         self.output.push('\n');
-        self.output
+        std::mem::take(&mut self.output)
+    }
+
+    pub(super) fn push_mapped(&mut self, text: &str, type_id: TypeId, member: Option<u16>) {
+        let start = self.output.len();
+        self.output.push_str(text);
+        let end = self.output.len();
+        self.record_range(start, end, type_id, member);
+    }
+
+    pub(super) fn record_range(
+        &mut self,
+        start: usize,
+        end: usize,
+        type_id: TypeId,
+        member: Option<u16>,
+    ) {
+        if !self.map_enabled {
+            return;
+        }
+        self.ranges.push(DtsRange {
+            start: u32::try_from(start).expect("d.ts range start fits in u32"),
+            end: u32::try_from(end).expect("d.ts range end fits in u32"),
+            type_id: u16::from(type_id),
+            member,
+        });
+    }
+
+    pub(super) fn members_of_with_indices(
+        &self,
+        def: &TypeDef,
+    ) -> impl Iterator<Item = (u16, TypeMember)> + '_ {
+        let (start, count) = def.member_range();
+        (0..count).map(move |i| {
+            let idx = start
+                .checked_add(u16::from(i))
+                .expect("type member index fits in u16");
+            (idx, self.types.get_member(idx as usize))
+        })
     }
 }

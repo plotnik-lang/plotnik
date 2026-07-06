@@ -8,7 +8,9 @@
 mod engine;
 
 pub use engine::{
-    EffectLog, Limit, NodeHandle, NoopTracer, PrintTracer, PrintTracerBuilder,
-    ResolvedRuntimeLimits, RuntimeEffect, RuntimeError, RuntimeLimitSpec, Tracer, VM, VMBuilder,
-    Value, ValueMaterializer, Verbosity, debug_verify_type, materialize_verified,
+    Binding, EffectLog, Inspection, InspectionEntry, Limit, NodeHandle, NodeRef, NoopTracer,
+    PrintTracer, PrintTracerBuilder, Recording, RecordingTracer, ResolvedRuntimeLimits, RunStats,
+    RuntimeEffect, RuntimeError, RuntimeLimitSpec, StepEvent, StepRecord, Tracer, VM, VMBuilder,
+    Value, ValueMaterializer, Verbosity, debug_verify_type, extract_inspection,
+    materialize_verified,
 };

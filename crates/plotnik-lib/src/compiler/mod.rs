@@ -26,4 +26,5 @@ pub use crate::compiler::diagnostics::{
     DiagnosticBuilder, DiagnosticKind, Diagnostics, Error, QueryResult, Severity, Source, SourceId,
     SourceKind, SourceMap, SourcePath, Span,
 };
+pub use parse::{TokenSpan, tokenize};
 pub use query::{CheckedQuery, CompiledQuery, Query, QueryBuilder};

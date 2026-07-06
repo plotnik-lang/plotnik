@@ -2,7 +2,10 @@
 
 use std::path::PathBuf;
 
-use plotnik_lib::{Colors, RuntimeError, RuntimeLimitSpec, VM, materialize_verified};
+use plotnik_lib::{
+    Colors, NoopTracer, RuntimeError, RuntimeLimitSpec, VM, extract_inspection,
+    materialize_verified,
+};
 
 use super::run_common::{self, ExecPlan, ExecRequest};
 use super::runtime_report::render_runtime_error;
@@ -35,9 +38,53 @@ pub fn run(args: RunArgs) -> CliResult {
         lang: args.lang.as_deref(),
         entry: args.entry.as_deref(),
         color: args.color,
+        inspection: args.json,
     })?;
 
     let vm = VM::builder(&source_code, &tree).limits(args.limits).build();
+    if args.json {
+        let mut tracer = NoopTracer;
+        let (result, stats) = vm.execute_with_stats(&module, &entrypoint, &mut tracer);
+        let effects = match result {
+            Ok(effects) => effects,
+            Err(RuntimeError::NoMatch) => {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "value": null,
+                        "error": "no match",
+                        "stats": stats,
+                    })
+                );
+                return Err(CliError::No);
+            }
+            Err(e) => {
+                eprintln!("{}", render_runtime_error(&e, true));
+                return Err(CliError::FatalRendered);
+            }
+        };
+
+        let colors = Colors::new(false);
+        let value = materialize_verified(
+            &source_code,
+            &module,
+            &entrypoint,
+            effects.as_slice(),
+            colors,
+        );
+        let inspection =
+            (!module.spans().is_empty()).then(|| extract_inspection(effects.as_slice(), &module));
+        println!(
+            "{}",
+            serde_json::json!({
+                "value": value,
+                "inspection": inspection,
+                "stats": stats,
+            })
+        );
+        return Ok(());
+    }
+
     let effects = match vm.execute(&module, &entrypoint) {
         Ok(effects) => effects,
         Err(RuntimeError::NoMatch) => {

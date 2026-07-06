@@ -190,6 +190,9 @@ fn arb_effect() -> impl Strategy<Value = Effect> {
         EffectKind::Null,
         EffectKind::SuppressBegin,
         EffectKind::SuppressEnd,
+        EffectKind::SpanStartAt,
+        EffectKind::SpanStart,
+        EffectKind::SpanEnd,
     ]);
     (kind, 0usize..=0x3FF).prop_map(|(kind, payload)| Effect::new(kind, payload))
 }

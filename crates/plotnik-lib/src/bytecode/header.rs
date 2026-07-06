@@ -3,26 +3,27 @@
 //! Offsets are computed from counts + SECTION_ALIGN (64 bytes); no stored offsets.
 //! Section order: Header → StringBlob → RegexBlob → StringTable → RegexTable →
 //! NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
-//! Transitions
+//! Transitions → Spans
 
 use super::entrypoint::Entrypoint;
 use super::sections::SymbolNameEntry;
 use super::type_meta::{TypeDef, TypeMember, TypeNameEntry};
 use super::{
-    HEADER_SIZE, MAGIC, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
-    VERSION,
+    HEADER_SIZE, MAGIC, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STEP_SIZE,
+    STRING_TABLE_ENTRY_SIZE, VERSION,
 };
 
 /// Number of sections after the header, in layout order. The single descriptor
 /// of that layout is [`Header::section_data_sizes`].
-pub(crate) const SECTION_COUNT: usize = 11;
+pub(crate) const SECTION_COUNT: usize = 12;
 
 /// File header - first 64 bytes of the bytecode file.
 ///
 /// Layout (offsets computed from counts):
 /// - 0-23: identity and sizes (magic, version, checksum, total_size, str_blob_size, regex_blob_size)
 /// - 24-41: counts (9 × u16) — order matches section order
-/// - 42-63: reserved
+/// - 42-43: spans_count
+/// - 44-63: reserved
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C, align(64))]
 pub struct Header {
@@ -51,8 +52,11 @@ pub struct Header {
     pub entrypoints_count: u16,
     pub transitions_count: u16,
 
-    // Bytes 42-63: Reserved (public for cross-crate struct initialization)
-    pub _reserved: [u8; 22],
+    // Bytes 42-43: Spans section count.
+    pub spans_count: u16,
+
+    // Bytes 44-63: Reserved (public for cross-crate struct initialization)
+    pub _reserved: [u8; 20],
 }
 
 const _: () = assert!(std::mem::size_of::<Header>() == HEADER_SIZE);
@@ -75,7 +79,8 @@ impl Default for Header {
             type_names_count: 0,
             entrypoints_count: 0,
             transitions_count: 0,
-            _reserved: [0; 22],
+            spans_count: 0,
+            _reserved: [0; 20],
         }
     }
 }
@@ -83,7 +88,7 @@ impl Default for Header {
 /// Computed section offsets derived from header counts.
 ///
 /// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeKinds →
-/// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints → Transitions
+/// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints → Transitions → Spans
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SectionOffsets {
     pub(crate) str_blob: u32,
@@ -97,6 +102,7 @@ pub struct SectionOffsets {
     pub(crate) type_names: u32,
     pub(crate) entrypoints: u32,
     pub(crate) transitions: u32,
+    pub(crate) spans: u32,
 }
 
 impl SectionOffsets {
@@ -114,6 +120,7 @@ impl SectionOffsets {
             type_names: o[8],
             entrypoints: o[9],
             transitions: o[10],
+            spans: o[11],
         }
     }
 
@@ -131,6 +138,7 @@ impl SectionOffsets {
             self.type_names,
             self.entrypoints,
             self.transitions,
+            self.spans,
         ]
     }
 }
@@ -139,8 +147,8 @@ impl Header {
     pub fn from_bytes(bytes: &[u8]) -> Self {
         assert!(bytes.len() >= HEADER_SIZE, "header too short");
 
-        let mut reserved = [0u8; 22];
-        reserved.copy_from_slice(&bytes[42..HEADER_SIZE]);
+        let mut reserved = [0u8; 20];
+        reserved.copy_from_slice(&bytes[44..HEADER_SIZE]);
 
         Self {
             magic: [bytes[0], bytes[1], bytes[2], bytes[3]],
@@ -158,6 +166,7 @@ impl Header {
             type_names_count: u16::from_le_bytes([bytes[36], bytes[37]]),
             entrypoints_count: u16::from_le_bytes([bytes[38], bytes[39]]),
             transitions_count: u16::from_le_bytes([bytes[40], bytes[41]]),
+            spans_count: u16::from_le_bytes([bytes[42], bytes[43]]),
             _reserved: reserved,
         }
     }
@@ -179,7 +188,8 @@ impl Header {
         bytes[36..38].copy_from_slice(&self.type_names_count.to_le_bytes());
         bytes[38..40].copy_from_slice(&self.entrypoints_count.to_le_bytes());
         bytes[40..42].copy_from_slice(&self.transitions_count.to_le_bytes());
-        bytes[42..HEADER_SIZE].copy_from_slice(&self._reserved);
+        bytes[42..44].copy_from_slice(&self.spans_count.to_le_bytes());
+        bytes[44..HEADER_SIZE].copy_from_slice(&self._reserved);
         bytes
     }
 
@@ -199,7 +209,8 @@ impl Header {
     /// Widened to `u64` so a corrupt header cannot overflow a running layout.
     ///
     /// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeKinds →
-    /// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints → Transitions
+    /// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
+    /// Transitions → Spans
     pub(crate) fn section_data_sizes(&self) -> [u64; SECTION_COUNT] {
         // Tables carry a trailing sentinel entry, hence the `+ 1`.
         [
@@ -214,6 +225,7 @@ impl Header {
             self.type_names_count as u64 * TypeNameEntry::SIZE as u64,
             self.entrypoints_count as u64 * Entrypoint::SIZE as u64,
             self.transitions_count as u64 * STEP_SIZE as u64,
+            self.spans_count as u64 * SPAN_ENTRY_SIZE as u64,
         ]
     }
 

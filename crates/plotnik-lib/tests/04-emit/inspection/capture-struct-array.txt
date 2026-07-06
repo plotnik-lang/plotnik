@@ -1,0 +1,67 @@
+Q = (program
+  (function_declaration
+    name: (identifier) @name
+  )* @funcs
+)
+------------------- INPUT (ts) -------------------
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "funcs"
+S3 "QFuncs"
+S4 "Q"
+S5 "program"
+S6 "function_declaration"
+S7 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+T2 = ArrayStar(T1)  ; QFuncs*
+T3 = Struct  M1:1  ; { funcs }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+M1: S2 → T2  ; funcs: T2
+
+[type_names]
+N0: S3 → T1  ; QFuncs
+N1: S4 → T3  ; Q
+
+[entrypoints]
+Q = 00 :: T3
+
+[spans]
+P0 def        0..79  src0  T3
+P1 pattern    4..79  src0
+P2 capture    71..77  src0  T3.M1
+P3 quantifier 69..70  src0
+P4 pattern    15..69  src0
+P5 capture    60..65  src0  T1.M0
+P6 field      41..45  src0
+P7 pattern    47..59  src0
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@35)                            35 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  ─‣─  _                                21, 06
+  08  └‣─  name: (identifier) [SpanStart#6 SpanStartAt#7 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#7 SpanEnd#6]  12
+  12  ─‣┘  _ [SpanEnd#4]                    19
+  14                                        ▶
+  15  ...
+  16  -ε-  [SpanEnd#3 ArrayClose SpanStart#2 Set(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
+  19  -ε-  [StructClose Push]               06, 32
+  21   !   (function_declaration) [StructOpen SpanStartAt#4]  08
+  23  ...
+  24  └‣─  _                                21, 06
+  26  -ε-  [ArrayOpen SpanStart#3]          24, 16
+  28  ...
+  29  ...
+  30  ...
+  31  ...
+  32  ─‣┘  _ [SpanEnd#3 ArrayClose SpanStart#2 Set(M1) SpanEnd#2 SpanEnd#1 SpanEnd#0]  14
+  35   !   (program) [SpanStart#0 SpanStartAt#1]  26

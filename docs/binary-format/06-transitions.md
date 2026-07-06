@@ -97,9 +97,13 @@ EffectOp (u16)
 | 9      | `Null`          | -             |
 | 10     | `SuppressBegin` | -             |
 | 11     | `SuppressEnd`   | -             |
+| 12     | `SpanStartAt`   | Span index    |
+| 13     | `SpanStart`     | Span index    |
+| 14     | `SpanEnd`       | Span index    |
 
 Match effects execute only after navigation and all match checks succeed, in
-the list order encoded on that instruction.
+the list order encoded on that instruction. Span payloads index the Spans
+section and must be `< spans_count`.
 
 ## Match8
 
@@ -210,6 +214,9 @@ The loader verifies:
 - reserved header/count/padding bits are zero;
 - every target and successor lands on an instruction boundary;
 - effect, predicate, member, type, node-kind, and field operands are in range;
+- span effect operands address a real span entry;
 - calls and returns uphold cursor-depth neutrality;
 - the committed effect stream cannot underflow the materializer stack or
-  suppression depth.
+  suppression depth;
+- the committed effect stream cannot underflow or mis-nest the inspection span
+  stack.

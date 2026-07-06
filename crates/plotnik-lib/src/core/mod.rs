@@ -8,15 +8,19 @@ pub mod colors;
 pub mod grammar;
 mod interner;
 mod invariants;
+mod tree_json;
 pub mod utils;
 
 #[cfg(test)]
 mod interner_tests;
 #[cfg(test)]
+mod tree_json_tests;
+#[cfg(test)]
 mod utils_tests;
 
 pub use colors::Colors;
 pub use interner::{Interner, Symbol};
+pub use tree_json::tree_to_json;
 
 /// Runtime/analyzer view of a tree node for sibling-skipping decisions.
 ///

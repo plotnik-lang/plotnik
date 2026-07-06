@@ -12,7 +12,8 @@ use plotnik_lib::Limit;
 
 use super::*;
 use crate::cli::commands::{
-    ast_command, check_command, dump_command, infer_command, run_command, trace_command,
+    ast_command, check_command, dump_command, infer_command, inspect_command, run_command,
+    trace_command,
 };
 
 #[test]
@@ -590,6 +591,14 @@ fn ast_help_shows_raw_flag() {
 }
 
 #[test]
+fn ast_help_shows_json_flag() {
+    let mut cmd = ast_command();
+    let help = cmd.render_help().to_string();
+
+    assert!(help.contains("--json"), "ast help should show --json");
+}
+
+#[test]
 fn ast_help_hides_unified_flags() {
     let mut cmd = ast_command();
     let help = cmd.render_help().to_string();
@@ -630,6 +639,7 @@ fn ast_params_extracts_all_fields() {
         "-l",
         "typescript",
         "--raw",
+        "--json",
         "--color",
         "always",
     ]);
@@ -642,6 +652,7 @@ fn ast_params_extracts_all_fields() {
     assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
     assert_eq!(params.lang, Some("typescript".to_string()));
     assert!(params.raw);
+    assert!(params.json);
     assert!(matches!(params.color, ColorChoice::Always));
 }
 
@@ -793,6 +804,48 @@ fn run_help_hides_json_flag() {
     let help = cmd.render_help().to_string();
 
     assert!(!help.contains("--json"), "run help should hide --json");
+}
+
+#[test]
+fn inspect_help_shows_json_and_verbose_flags() {
+    let mut cmd = inspect_command();
+    let help = cmd.render_help().to_string();
+
+    assert!(help.contains("--json"), "inspect help should show --json");
+    assert!(help.contains("-v"), "inspect help should show -v");
+}
+
+#[test]
+fn inspect_params_extracts_all_fields() {
+    let cmd = inspect_command();
+    let result = cmd.try_get_matches_from([
+        "inspect",
+        "query.ptk",
+        "app.js",
+        "-l",
+        "typescript",
+        "--entry",
+        "Q",
+        "--json",
+        "-v",
+        "--max-steps",
+        "500",
+        "--color",
+        "never",
+    ]);
+    assert!(result.is_ok());
+
+    let m = result.unwrap();
+    let params = InspectOpts::from_matches(&m);
+
+    assert_eq!(params.query_path, Some(PathBuf::from("query.ptk")));
+    assert_eq!(params.source_path, Some(PathBuf::from("app.js")));
+    assert_eq!(params.lang, Some("typescript".to_string()));
+    assert_eq!(params.entry, Some("Q".to_string()));
+    assert!(params.json);
+    assert_eq!(params.verbose, 1);
+    assert!(matches!(params.limits.steps, Limit::Of(500)));
+    assert!(matches!(params.color, ColorChoice::Never));
 }
 
 #[test]

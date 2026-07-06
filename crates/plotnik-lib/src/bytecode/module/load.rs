@@ -17,7 +17,9 @@ use super::super::nav::Nav;
 use super::super::node_kind_constraint::NodeKindConstraint;
 use super::super::sections::SymbolNameEntry;
 use super::super::type_meta::{TypeDefKind, TypeMember, TypeNameEntry};
-use super::super::{HEADER_SIZE, SECTION_ALIGN, VERSION};
+use super::super::{
+    HEADER_SIZE, MAX_SPANS, SECTION_ALIGN, SPAN_ENTRY_SIZE, SPAN_NO_BINDING, SpanKind, VERSION,
+};
 use super::*;
 use crate::bytecode::predicate_op::PredicateOp;
 
@@ -70,6 +72,12 @@ pub enum ModuleError {
     EffectStackImbalance(u16),
     #[error("cursor depth imbalance at step {0}")]
     DepthImbalance(u16),
+    #[error("invalid span entry at index {0}")]
+    InvalidSpanEntry(usize),
+    #[error("span effect payload out of range at step {0}")]
+    InvalidSpanPayload(u16),
+    #[error("span bracket imbalance at step {0}")]
+    SpanImbalance(u16),
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 }
@@ -169,7 +177,7 @@ impl Module {
     /// access regardless of how it was crafted.
     fn validate(&self) -> Result<(RegexDfas, Vec<bool>), ModuleError> {
         // Reserved header bytes are not covered by the CRC; v6 fixes them at zero.
-        if self.header._reserved != [0u8; 22] {
+        if self.header._reserved != [0u8; 20] {
             return Err(ModuleError::MalformedHeader);
         }
 
@@ -187,6 +195,7 @@ impl Module {
         let regex_dfas = self.load_regex_dfas()?;
         self.validate_type_defs()?;
         self.validate_type_names()?;
+        self.validate_spans()?;
         // Bound every embedded `StringId` before any later check constructs a
         // (`NonZero`) `StringId` from one — e.g. `validate_entrypoints` builds an
         // `Entrypoint`, which would otherwise panic on a forged zero name.
@@ -204,12 +213,12 @@ impl Module {
     }
 
     /// Recompute the section layout in `u64` (no overflow) and ensure every
-    /// section, up to and including Transitions, fits inside the file.
+    /// section, up to and including the final one (Spans), fits inside the file.
     ///
     /// Runs on the raw header *before* [`Header::compute_offsets`], so a corrupt
     /// header cannot drive that u32 arithmetic to overflow. Sections are laid
     /// out consecutively with alignment padding, so verifying the final
-    /// Transitions end also bounds every earlier section. Passing this check
+    /// section's end also bounds every earlier section. Passing this check
     /// also proves the `u32` [`SectionOffsets`] will not wrap, so the view
     /// methods can trust them.
     fn validate_section_bounds(h: &Header) -> Result<(), ModuleError> {
@@ -218,20 +227,20 @@ impl Module {
         let oob = || ModuleError::SectionOutOfBounds { total };
 
         let sizes = h.section_data_sizes();
-        let (transitions, rest) = sizes
+        let (last, rest) = sizes
             .split_last()
             .expect("section layout has at least one section");
 
-        // Every section but the last (Transitions) is alignment-padded; folding
-        // them leaves the cursor at the start of Transitions, whose unaligned end
+        // Every section but the last is alignment-padded; folding them leaves
+        // the cursor at the start of the final section, whose unaligned end
         // bounds the file.
         let mut cursor = HEADER_SIZE as u64; // sections begin right after the header
         for &size in rest {
             cursor = align_up_u64(cursor + size, align);
         }
-        let transitions_end = cursor + transitions;
+        let end = cursor + last;
 
-        if transitions_end > total as u64 {
+        if end > total as u64 {
             return Err(oob());
         }
         Ok(())
@@ -406,6 +415,44 @@ impl Module {
         for i in 0..types.names_count() {
             if u16::from(types.name_type_id(i)) >= type_defs {
                 return Err(ModuleError::InvalidTypeName(i));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_spans(&self) -> Result<(), ModuleError> {
+        if self.header.spans_count as usize > MAX_SPANS {
+            return Err(ModuleError::InvalidSpanEntry(0));
+        }
+
+        let bytes = self.spans_slice();
+        let type_defs = self.header.type_defs_count;
+        let type_members = self.header.type_members_count;
+        for i in 0..self.header.spans_count as usize {
+            let off = i * SPAN_ENTRY_SIZE;
+            let entry = &bytes[off..off + SPAN_ENTRY_SIZE];
+            if SpanKind::try_from_u8(entry[2]).is_none() || entry[3] != 0 {
+                return Err(ModuleError::InvalidSpanEntry(i));
+            }
+
+            let start = u32::from_le_bytes([entry[4], entry[5], entry[6], entry[7]]);
+            let end = u32::from_le_bytes([entry[8], entry[9], entry[10], entry[11]]);
+            if start > end {
+                return Err(ModuleError::InvalidSpanEntry(i));
+            }
+
+            let type_id = u16::from_le_bytes([entry[12], entry[13]]);
+            let member = u16::from_le_bytes([entry[14], entry[15]]);
+            if type_id != SPAN_NO_BINDING && type_id >= type_defs {
+                return Err(ModuleError::InvalidSpanEntry(i));
+            }
+            if member != SPAN_NO_BINDING && member >= type_members {
+                return Err(ModuleError::InvalidSpanEntry(i));
+            }
+            // A member without a type is smuggled state: the emitter never
+            // writes it and every consumer keys the binding off `type_id`.
+            if type_id == SPAN_NO_BINDING && member != SPAN_NO_BINDING {
+                return Err(ModuleError::InvalidSpanEntry(i));
             }
         }
         Ok(())
@@ -822,6 +869,13 @@ impl Module {
                 && op.payload as u16 >= members
             {
                 return Err(ModuleError::MalformedTransitions);
+            }
+            if matches!(
+                op.kind,
+                EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd
+            ) && op.payload as u16 >= self.header.spans_count
+            {
+                return Err(ModuleError::InvalidSpanPayload(step));
             }
             Ok(())
         };

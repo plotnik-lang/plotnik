@@ -18,8 +18,11 @@
 //! `Match`'s effects across `Call`/`Return` boundaries, with the VM's suppression
 //! filter applied: `SuppressBegin`/`SuppressEnd` adjust a counter and, while it
 //! is positive, every data effect is dropped before the log. So the abstract
-//! state is `(stack, suppress, pending)`: a builder-frame stack, a suppression
-//! depth, and whether the materializer's pending-value register is full. The
+//! state is `(stack, suppress, span_stack, pending)`: a builder-frame stack, a
+//! suppression depth, the stack of open inspection span ids, and whether the
+//! materializer's pending-value register is full. Tracking span *ids* (not just
+//! a depth) proves every `SpanEnd` closes the span the matching bracket opened,
+//! so inspection extraction can assert pairing instead of re-validating. The
 //! walk starts from each entrypoint wrapper and follows `Match` successors,
 //! descending through `Call` and resuming at its return address — exactly the
 //! edge set that orders effects at runtime.
@@ -190,8 +193,9 @@ struct Analysis {
 }
 
 /// Per-step abstract state at instruction entry: the builder frames pushed so
-/// far (relative to this body's entry), suppression depth, and pending register.
-type FrameState = (Vec<FrameKind>, i32, PendingState);
+/// far (relative to this body's entry), suppression depth, open span ids, and
+/// pending register.
+type FrameState = (Vec<FrameKind>, i32, Vec<u16>, PendingState);
 
 /// Walk one body, computing its `entry_tos` and verifying its structural
 /// invariants. When `final_check` is set, also verify each call site against
@@ -210,13 +214,16 @@ fn analyze(
     // state refines that placeholder. Two different known states are a real
     // confluence/back-edge disagreement and are rejected.
     let mut memo: HashMap<u16, FrameState> = HashMap::new();
-    let mut work: Vec<(u16, Vec<FrameKind>, i32, PendingState)> =
-        vec![(entry, Vec::new(), 0, PendingState::Empty)];
+    let mut work: Vec<(u16, FrameState)> =
+        vec![(entry, (Vec::new(), 0, Vec::new(), PendingState::Empty))];
 
-    while let Some((step, stack, suppress, pending)) = work.pop() {
-        if let Some((seen_stack, seen_suppress, seen_pending)) = memo.get(&step) {
+    while let Some((step, (stack, suppress, span_stack, pending))) = work.pop() {
+        if let Some((seen_stack, seen_suppress, seen_span_stack, seen_pending)) = memo.get(&step) {
             if seen_stack != &stack || *seen_suppress != suppress {
                 return Err(ModuleError::EffectStackImbalance(step));
+            }
+            if seen_span_stack != &span_stack {
+                return Err(ModuleError::SpanImbalance(step));
             }
             if *seen_pending == pending || pending == PendingState::Unknown {
                 continue;
@@ -225,35 +232,56 @@ fn analyze(
                 return Err(ModuleError::EffectStackImbalance(step));
             }
         }
-        memo.insert(step, (stack.clone(), suppress, pending));
+        memo.insert(step, (stack.clone(), suppress, span_stack.clone(), pending));
 
         let mut stack = stack;
         let mut suppress = suppress;
+        let mut span_stack = span_stack;
         let mut pending = pending;
 
         match module.decode_step(step) {
             Instruction::Return(_) => {
-                record_exit(&stack, suppress, pending, &mut returns_pending, step)?;
+                record_exit(
+                    &stack,
+                    suppress,
+                    &span_stack,
+                    pending,
+                    &mut returns_pending,
+                    step,
+                )?;
             }
             Instruction::Match(m) => {
                 for eff in m.effects() {
                     apply_effect(
                         module,
                         eff,
-                        &mut stack,
-                        &mut suppress,
-                        &mut pending,
-                        &mut entry_tos,
+                        EffectState {
+                            stack: &mut stack,
+                            suppress: &mut suppress,
+                            span_stack: &mut span_stack,
+                            pending: &mut pending,
+                            entry_tos: &mut entry_tos,
+                        },
                         step,
                     )?;
                 }
                 if m.succ_count() == 0 {
                     // A successor-less match accepts (unwinds to the top); the
                     // surviving stack must be balanced.
-                    record_exit(&stack, suppress, pending, &mut returns_pending, step)?;
+                    record_exit(
+                        &stack,
+                        suppress,
+                        &span_stack,
+                        pending,
+                        &mut returns_pending,
+                        step,
+                    )?;
                 } else {
                     for succ in m.successors() {
-                        work.push((u16::from(succ), stack.clone(), suppress, pending));
+                        work.push((
+                            u16::from(succ),
+                            (stack.clone(), suppress, span_stack.clone(), pending),
+                        ));
                     }
                 }
             }
@@ -272,7 +300,7 @@ fn analyze(
                     final_check,
                     step,
                 )?;
-                work.push((u16::from(c.next), stack, suppress, pending));
+                work.push((u16::from(c.next), (stack, suppress, span_stack, pending)));
             }
         }
     }
@@ -290,20 +318,19 @@ fn analyze(
 fn apply_effect(
     module: &Module,
     effect: Effect,
-    stack: &mut Vec<FrameKind>,
-    suppress: &mut i32,
-    pending: &mut PendingState,
-    entry_tos: &mut u8,
+    state: EffectState<'_>,
     step: u16,
 ) -> Result<(), ModuleError> {
     use EffectKind::*;
 
-    // Suppression brackets act regardless of depth; everything else is dropped
-    // by the VM while suppressed and so must not touch the builder stack here.
-    if *suppress > 0 {
+    // Suppression and span brackets act regardless of depth; data effects are
+    // dropped by the VM while suppressed and so must not touch the builder stack.
+    if *state.suppress > 0 {
         match effect.kind {
-            SuppressBegin => *suppress += 1,
-            SuppressEnd => *suppress -= 1,
+            SuppressBegin => *state.suppress += 1,
+            SuppressEnd => *state.suppress -= 1,
+            SpanStartAt | SpanStart => state.span_stack.push(effect.payload as u16),
+            SpanEnd => close_span(state.span_stack, effect.payload as u16, step)?,
             _ => {}
         }
         return Ok(());
@@ -312,75 +339,77 @@ fn apply_effect(
     let err = || ModuleError::EffectStackImbalance(step);
     match effect.kind {
         Node | Null => {
-            if *pending == PendingState::Full {
+            if *state.pending == PendingState::Full {
                 return Err(err());
             }
-            *pending = PendingState::Full;
+            *state.pending = PendingState::Full;
         }
-        SuppressBegin => *suppress += 1,
+        SuppressBegin => *state.suppress += 1,
         // At depth 0 a `SuppressEnd` would drive the counter negative — the
         // exact underflow the VM panics on.
         SuppressEnd => return Err(err()),
+        SpanStartAt | SpanStart => state.span_stack.push(effect.payload as u16),
+        SpanEnd => close_span(state.span_stack, effect.payload as u16, step)?,
         ArrayOpen => {
-            if *pending == PendingState::Full {
+            if *state.pending == PendingState::Full {
                 return Err(err());
             }
-            stack.push(FrameKind::Array);
+            state.stack.push(FrameKind::Array);
         }
         StructOpen => {
-            if *pending == PendingState::Full {
+            if *state.pending == PendingState::Full {
                 return Err(err());
             }
-            stack.push(FrameKind::Struct);
+            state.stack.push(FrameKind::Struct);
         }
         EnumOpen => {
-            if *pending == PendingState::Full {
+            if *state.pending == PendingState::Full {
                 return Err(err());
             }
-            stack.push(FrameKind::Enum {
+            state.stack.push(FrameKind::Enum {
                 member: effect.payload as u16,
                 got_data: false,
             });
         }
         Push => {
-            if *pending == PendingState::Empty {
+            if *state.pending == PendingState::Empty {
                 return Err(err());
             }
-            match stack.last() {
+            match state.stack.last() {
                 Some(FrameKind::Array) => {}
                 Some(_) => return Err(err()),
-                None => *entry_tos &= KS_ARRAY,
+                None => *state.entry_tos &= KS_ARRAY,
             }
-            *pending = PendingState::Empty;
+            *state.pending = PendingState::Empty;
         }
         Set => {
-            if *pending == PendingState::Empty {
+            if *state.pending == PendingState::Empty {
                 return Err(err());
             }
-            match stack.last_mut() {
+            match state.stack.last_mut() {
                 Some(FrameKind::Struct) => {}
                 Some(FrameKind::Enum { got_data, .. }) => *got_data = true,
                 Some(FrameKind::Array) => return Err(err()),
-                None => *entry_tos &= KS_SET,
+                None => *state.entry_tos &= KS_SET,
             }
-            *pending = PendingState::Empty;
+            *state.pending = PendingState::Empty;
         }
-        ArrayClose => match stack.pop() {
-            Some(FrameKind::Array) if *pending != PendingState::Full => {
-                *pending = PendingState::Full
+        ArrayClose => match state.stack.pop() {
+            Some(FrameKind::Array) if *state.pending != PendingState::Full => {
+                *state.pending = PendingState::Full
             }
             _ => return Err(err()),
         },
-        StructClose => match stack.pop() {
-            Some(FrameKind::Struct) if *pending != PendingState::Full => {
-                *pending = PendingState::Full
+        StructClose => match state.stack.pop() {
+            Some(FrameKind::Struct) if *state.pending != PendingState::Full => {
+                *state.pending = PendingState::Full
             }
             _ => return Err(err()),
         },
-        EnumClose => match stack.pop() {
+        EnumClose => match state.stack.pop() {
             Some(FrameKind::Enum { member, got_data }) => {
                 let is_void = enum_member_is_void(module, member, step)?;
-                let data_pending = match *pending {
+                let data_pending = match *state.pending {
                     PendingState::Full => true,
                     PendingState::Empty => false,
                     PendingState::Unknown => !got_data && !is_void,
@@ -392,12 +421,29 @@ fn apply_effect(
                 if data_present == is_void {
                     return Err(err());
                 }
-                *pending = PendingState::Full;
+                *state.pending = PendingState::Full;
             }
             _ => return Err(err()),
         },
     }
     Ok(())
+}
+
+struct EffectState<'a> {
+    stack: &'a mut Vec<FrameKind>,
+    suppress: &'a mut i32,
+    span_stack: &'a mut Vec<u16>,
+    pending: &'a mut PendingState,
+    entry_tos: &'a mut u8,
+}
+
+/// A `SpanEnd` must close the innermost open span, with the id the matching
+/// bracket opened — a lone or mis-paired close is a forged module.
+fn close_span(span_stack: &mut Vec<u16>, id: u16, step: u16) -> Result<(), ModuleError> {
+    match span_stack.pop() {
+        Some(open) if open == id => Ok(()),
+        _ => Err(ModuleError::SpanImbalance(step)),
+    }
 }
 
 /// Apply a callee summary at a call site: net-neutral on the builder stack, but
@@ -452,12 +498,16 @@ struct CallState<'a> {
 fn record_exit(
     stack: &[FrameKind],
     suppress: i32,
+    span_stack: &[u16],
     pending: PendingState,
     returns_pending: &mut Option<bool>,
     step: u16,
 ) -> Result<(), ModuleError> {
     if !stack.is_empty() || suppress != 0 {
         return Err(ModuleError::EffectStackImbalance(step));
+    }
+    if !span_stack.is_empty() {
+        return Err(ModuleError::SpanImbalance(step));
     }
 
     if let Some(pending) = pending.known() {

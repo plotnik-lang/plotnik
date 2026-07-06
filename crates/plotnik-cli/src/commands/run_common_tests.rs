@@ -13,6 +13,7 @@ fn exec_plan(query: &str, entry: Option<&str>) -> ExecPlan {
         lang: Some("javascript"),
         entry,
         color: false,
+        inspection: false,
     })
     .expect("query compiles and an entrypoint resolves")
 }

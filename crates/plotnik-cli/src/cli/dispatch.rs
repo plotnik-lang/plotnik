@@ -17,6 +17,7 @@ use crate::commands::ast::AstArgs;
 use crate::commands::check::CheckArgs;
 use crate::commands::dump::DumpArgs;
 use crate::commands::infer::InferArgs;
+use crate::commands::inspect::InspectArgs;
 use crate::commands::run::RunArgs;
 use crate::commands::trace::TraceArgs;
 
@@ -27,6 +28,7 @@ pub struct AstOpts {
     pub source_text: Option<String>,
     pub lang: Option<String>,
     pub raw: bool,
+    pub json: bool,
     pub color: ColorChoice,
 }
 
@@ -49,6 +51,7 @@ impl AstOpts {
             source_text: m.get_one::<String>("source_text").cloned(),
             lang: m.get_one::<String>("lang").cloned(),
             raw: m.get_flag("raw"),
+            json: m.get_flag("json"),
             color: ColorChoice::from_matches(m),
         }
     }
@@ -63,6 +66,7 @@ impl From<AstOpts> for AstArgs {
             source_text: p.source_text,
             lang: p.lang,
             raw: p.raw,
+            json: p.json,
             color: p.color.should_colorize(),
         }
     }
@@ -303,6 +307,60 @@ impl From<TraceOpts> for TraceArgs {
             no_result: p.no_result,
             limits: p.limits,
             json: p.json,
+            color: p.color.should_colorize(),
+        }
+    }
+}
+
+pub struct InspectOpts {
+    pub query_path: Option<PathBuf>,
+    pub query_text: Option<String>,
+    pub source_path: Option<PathBuf>,
+    pub source_text: Option<String>,
+    pub lang: Option<String>,
+    pub entry: Option<String>,
+    pub verbose: u8,
+    pub limits: RuntimeLimitSpec,
+    pub json: bool,
+    pub color: ColorChoice,
+}
+
+impl InspectOpts {
+    pub fn from_matches(m: &ArgMatches) -> Self {
+        let query_path = m.get_one::<PathBuf>("query_path").cloned();
+        let query_text = m.get_one::<String>("query_text").cloned();
+        let source_path = m.get_one::<PathBuf>("source_path").cloned();
+
+        let (query_path, source_path) =
+            shift_positional_to_source(query_text.is_some(), query_path, source_path);
+
+        Self {
+            query_path,
+            query_text,
+            source_path,
+            source_text: m.get_one::<String>("source_text").cloned(),
+            lang: m.get_one::<String>("lang").cloned(),
+            entry: m.get_one::<String>("entry").cloned(),
+            verbose: m.get_count("verbose"),
+            limits: resolve_limit_spec(m),
+            json: m.get_flag("json"),
+            color: ColorChoice::from_matches(m),
+        }
+    }
+}
+
+impl From<InspectOpts> for InspectArgs {
+    fn from(p: InspectOpts) -> Self {
+        Self {
+            query_path: p.query_path,
+            query_text: p.query_text,
+            source_path: p.source_path,
+            source_text: p.source_text,
+            lang: p.lang,
+            entry: p.entry,
+            limits: p.limits,
+            json: p.json,
+            trace: p.verbose > 0,
             color: p.color.should_colorize(),
         }
     }

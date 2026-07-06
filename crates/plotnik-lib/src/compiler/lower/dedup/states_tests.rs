@@ -17,6 +17,7 @@ fn graph(instructions: Vec<InstructionIR>, entry: u32) -> NfaGraph {
             m.insert(DefId::from_raw(0), Label(entry));
             m
         },
+        spans: None,
     }
 }
 

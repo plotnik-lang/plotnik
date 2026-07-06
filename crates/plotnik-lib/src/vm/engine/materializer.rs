@@ -87,6 +87,7 @@ impl<'a> ValueMaterializer<'a> {
                 RuntimeEffect::Null => {
                     pending = Some(Value::Null);
                 }
+                RuntimeEffect::SpanStart { .. } | RuntimeEffect::SpanEnd(_) => {}
                 RuntimeEffect::ArrayOpen => {
                     stack.push(ValueAccumulator::Array(vec![]));
                 }

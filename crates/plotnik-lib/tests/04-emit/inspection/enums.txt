@@ -1,0 +1,69 @@
+Expr = [
+  Id: (identifier) @id
+  Num: (number) @num
+  Str: (string)
+]
+------------------- INPUT (ts) -------------------
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "id"
+S2 "num"
+S3 "Id"
+S4 "Num"
+S5 "Str"
+S6 "Expr"
+S7 "identifier"
+S8 "number"
+S9 "string"
+
+[type_defs]
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { id }
+T3 = Struct  M1:1  ; { num }
+T4 = Enum    M2:3  ; Id | Num | Str
+
+[type_members]
+M0: S1 → T1  ; id: <Node>
+M1: S2 → T1  ; num: <Node>
+M2: S3 → T2  ; Id: T2
+M3: S4 → T3  ; Num: T3
+M4: S5 → T0  ; Str: <Void>
+
+[type_names]
+N0: S6 → T4  ; Expr
+
+[entrypoints]
+Expr = 00 :: T4
+
+[spans]
+P0 def        0..70  src0  T4
+P1 enum       7..70  src0
+P2 branch     11..31  src0  T4.M2
+P3 capture    28..31  src0  T2.M0
+P4 pattern    15..27  src0
+P5 branch     34..52  src0  T4.M3
+P6 capture    48..52  src0  T3.M1
+P7 pattern    39..47  src0
+P8 branch     55..68  src0  T4.M4
+P9 pattern    60..68  src0
+
+[transitions]
+Expr:
+  00       (@28)                            28 : 01
+  01                                        ▶
+  02                                        ▶
+  03  ...
+  04  ...
+  05  ...
+  06  ...
+  07  ...
+  08   !   (identifier) [SpanStart#1 SpanStart#2 EnumOpen(M2) SpanStartAt#4 SpanStart#3 Node Set(M0) SpanEnd#3 SpanEnd#4 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  02
+  14  ...
+  15  ...
+  16   !   (number) [SpanStart#1 SpanStart#5 EnumOpen(M3) SpanStartAt#7 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#7 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  02
+  22  ...
+  23  ...
+  24   !   (string) [SpanStart#1 SpanStart#8 EnumOpen(M4) SpanStartAt#9 SpanEnd#9 EnumClose SpanEnd#8 SpanEnd#1 SpanEnd#0]  02
+  28  -ε-  [SpanStart#0]                    08, 16, 24

@@ -11,6 +11,7 @@ use crate::bytecode::{EffectKind, Nav, PredicateOp, StepAddr, select_match_opcod
 use indexmap::IndexMap;
 
 use crate::compiler::ids::{DefId, TypeId};
+use crate::compiler::lower::spans::SpanTable;
 use crate::core::NodeFieldId;
 
 /// Node kind constraint for Match instructions.
@@ -147,6 +148,29 @@ impl EffectIR {
     /// End suppression.
     pub fn suppress_end() -> Self {
         Self::literal(EffectKind::SuppressEnd, 0)
+    }
+
+    /// Open an inspection span and snapshot the current cursor node.
+    pub fn span_start_at(id: u16) -> Self {
+        Self::literal(EffectKind::SpanStartAt, id as usize)
+    }
+
+    /// Open an inspection span without reading the cursor.
+    pub fn span_start(id: u16) -> Self {
+        Self::literal(EffectKind::SpanStart, id as usize)
+    }
+
+    /// Close an inspection span.
+    pub fn span_end(id: u16) -> Self {
+        Self::literal(EffectKind::SpanEnd, id as usize)
+    }
+
+    /// Whether this effect is an inspection span bracket.
+    pub fn is_span_marker(&self) -> bool {
+        matches!(
+            self.kind(),
+            EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd
+        )
     }
 
     #[inline]
@@ -452,6 +476,8 @@ pub struct NfaGraph {
     pub(in crate::compiler::lower) def_entries_consuming: IndexMap<DefId, Label>,
     /// Entry labels for each emitted entrypoint wrapper, in definition order.
     pub(in crate::compiler::lower) entrypoint_wrappers: IndexMap<DefId, Label>,
+    /// Inspection span table, present iff the query was compiled with inspection.
+    pub(in crate::compiler::lower) spans: Option<SpanTable>,
 }
 
 impl NfaGraph {
@@ -461,6 +487,10 @@ impl NfaGraph {
 
     pub(crate) fn entrypoint_wrappers(&self) -> &IndexMap<DefId, Label> {
         &self.entrypoint_wrappers
+    }
+
+    pub(crate) fn spans(&self) -> Option<&SpanTable> {
+        self.spans.as_ref()
     }
 }
 

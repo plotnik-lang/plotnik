@@ -36,6 +36,7 @@ fn resolve_anonymous_node_kind_uses_anonymous_namespace() {
             grammar: &grammar,
         },
         symbol_table: &symbol_table,
+        inspection: false,
     };
     let mut compiler = NfaBuilder::new(&ctx);
 
@@ -62,6 +63,7 @@ fn resolve_anonymous_node_kind_requires_linked_binding() {
             grammar: &grammar,
         },
         symbol_table: &symbol_table,
+        inspection: false,
     };
     let mut compiler = NfaBuilder::new(&ctx);
 
@@ -85,6 +87,7 @@ fn resolve_field_by_name_requires_linked_binding() {
             grammar: &grammar,
         },
         symbol_table: &symbol_table,
+        inspection: false,
     };
     let mut compiler = NfaBuilder::new(&ctx);
 

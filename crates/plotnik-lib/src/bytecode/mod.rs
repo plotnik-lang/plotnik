@@ -21,19 +21,23 @@ mod node_kind_constraint;
 mod predicate_op;
 mod render;
 mod sections;
+mod spans;
 mod type_meta;
 pub mod type_system;
 
 pub use dump::dump;
 pub use entrypoint::Entrypoint;
-pub use ids::TypeId;
+pub use ids::{StringId, TypeId};
 pub use instructions::{EncodeError, StepAddr};
-pub use module::{Module, ModuleError};
+pub use module::{EntrypointsView, Module, ModuleError, StringsView, TypesView};
+pub use spans::{SPAN_NO_BINDING, SpanEntry, SpanKind, SpansView};
+pub use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
 pub use type_system::{Arity, PrimitiveType, TypeKind};
 
 pub(crate) use constants::{
-    HEADER_SIZE, MAGIC, MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS,
-    REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, STEP_SIZE, STRING_TABLE_ENTRY_SIZE, VERSION,
+    HEADER_SIZE, MAGIC, MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_SPANS,
+    REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
+    VERSION,
 };
 pub(crate) use dfa::deserialize_dfa;
 pub(crate) use effects::{Effect, EffectKind};
@@ -41,20 +45,15 @@ pub(crate) use format::{
     LineBuilder, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
 };
 pub(crate) use header::Header;
-pub(crate) use ids::StringId;
 pub(crate) use instructions::{
     Call, Match, MatchInstr, MatchPredicate, Return, StepId, select_match_opcode,
 };
-pub(crate) use module::{
-    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, EntrypointsView, Instruction,
-    StringsView, TypesView,
-};
+pub(crate) use module::{DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Instruction};
 pub(crate) use nav::Nav;
 pub(crate) use node_kind_constraint::NodeKindConstraint;
 pub(crate) use predicate_op::PredicateOp;
 pub(crate) use render::ModuleRenderContext;
 pub(crate) use sections::{FieldEntry, NodeKindEntry, SymbolNameEntry};
-pub(crate) use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
 
 #[cfg(test)]
 mod aligned_vec_tests;
@@ -74,5 +73,7 @@ mod instructions_tests;
 mod nav_tests;
 #[cfg(test)]
 mod node_kind_constraint_tests;
+#[cfg(test)]
+mod spans_tests;
 #[cfg(test)]
 mod type_meta_tests;

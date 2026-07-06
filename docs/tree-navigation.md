@@ -179,7 +179,7 @@ The split fires when the alternation's exit is the follower's own single `Match`
 
 ### Compilation Examples
 
-Using dump format from [07-dump-format.md](binary-format/07-dump-format.md):
+Using dump format from [08-dump-format.md](binary-format/08-dump-format.md):
 
 > These examples show the _logical_ anchor lowering — the nav mode each anchor produces. An item that must be located among its siblings (an unpinned first item, or any item reached past a skipping anchor) additionally compiles to a small search wrapper: a branch into the candidate plus an advance-and-retry edge, converging on the anchored continuation. The wrapper is uniform across alternations, anchors, and quantifiers (one `emit_position_search` combinator). Run `dump` for the exact instructions; the rows below omit the wrapper for readability.
 

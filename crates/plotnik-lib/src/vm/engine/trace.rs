@@ -75,6 +75,12 @@ pub trait Tracer {
     /// Called after field check fails.
     fn trace_field_failure(&mut self, node: Node<'_>);
 
+    /// Called when a candidate node fails the text predicate.
+    fn trace_predicate_failure(&mut self, node: Node<'_>);
+
+    /// Called when a candidate node fails a negated-field constraint.
+    fn trace_neg_field_failure(&mut self, node: Node<'_>, field: NodeFieldId);
+
     /// Called after emitting an effect.
     fn trace_effect(&mut self, effect: &RuntimeEffect<'_>);
 
@@ -127,6 +133,12 @@ impl Tracer for NoopTracer {
 
     #[inline(always)]
     fn trace_field_failure(&mut self, _node: Node<'_>) {}
+
+    #[inline(always)]
+    fn trace_predicate_failure(&mut self, _node: Node<'_>) {}
+
+    #[inline(always)]
+    fn trace_neg_field_failure(&mut self, _node: Node<'_>, _field: NodeFieldId) {}
 
     #[inline(always)]
     fn trace_effect(&mut self, _effect: &RuntimeEffect<'_>) {}
@@ -229,6 +241,9 @@ enum TraceEffect {
     EnumOpen(u16),
     EnumClose,
     Null,
+    SpanStartAt(u16),
+    SpanStart(u16),
+    SpanEnd(u16),
 }
 
 impl TraceEffect {
@@ -244,6 +259,14 @@ impl TraceEffect {
             RuntimeEffect::EnumOpen(idx) => Self::EnumOpen(*idx),
             RuntimeEffect::EnumClose => Self::EnumClose,
             RuntimeEffect::Null => Self::Null,
+            RuntimeEffect::SpanStart { id, node } => {
+                if node.is_some() {
+                    Self::SpanStartAt(*id)
+                } else {
+                    Self::SpanStart(*id)
+                }
+            }
+            RuntimeEffect::SpanEnd(id) => Self::SpanEnd(*id),
         }
     }
 
@@ -259,6 +282,9 @@ impl TraceEffect {
             EffectKind::EnumOpen => Self::EnumOpen(payload as u16),
             EffectKind::EnumClose => Self::EnumClose,
             EffectKind::Null => Self::Null,
+            EffectKind::SpanStartAt => Self::SpanStartAt(payload as u16),
+            EffectKind::SpanStart => Self::SpanStart(payload as u16),
+            EffectKind::SpanEnd => Self::SpanEnd(payload as u16),
             EffectKind::SuppressBegin | EffectKind::SuppressEnd => unreachable!(),
         }
     }
@@ -331,6 +357,9 @@ impl<'s> PrintTracer<'s> {
             TraceEffect::EnumOpen(idx) => format!("EnumOpen \"{}\"", self.member_name(idx)),
             TraceEffect::EnumClose => "EnumClose".to_string(),
             TraceEffect::Null => "Null".to_string(),
+            TraceEffect::SpanStartAt(id) => format!("SpanStartAt#{id}"),
+            TraceEffect::SpanStart(id) => format!("SpanStart#{id}"),
+            TraceEffect::SpanEnd(id) => format!("SpanEnd#{id}"),
         }
     }
 
@@ -515,6 +544,23 @@ impl Tracer for PrintTracer<'_> {
 
     fn trace_field_failure(&mut self, _node: Node<'_>) {
         // Field failures are silent - we just backtrack
+    }
+
+    fn trace_predicate_failure(&mut self, _node: Node<'_>) {
+        if self.verbosity == Verbosity::Default {
+            return;
+        }
+
+        self.add_subline(trace::MATCH_FAILURE, "✗ predicate");
+    }
+
+    fn trace_neg_field_failure(&mut self, _node: Node<'_>, field: NodeFieldId) {
+        if self.verbosity == Verbosity::Default {
+            return;
+        }
+
+        let name = self.node_field_name(field);
+        self.add_subline(trace::MATCH_FAILURE, &format!("✗ -{}", name));
     }
 
     fn trace_effect(&mut self, effect: &RuntimeEffect<'_>) {

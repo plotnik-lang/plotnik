@@ -11,6 +11,7 @@ use crate::compiler::analyze::types::check_entrypoints;
 use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
 use crate::compiler::emit::tables::EmitError;
 use crate::compiler::limits::CompilerLimits;
+use crate::compiler::lower::spans::assign_spans;
 use crate::compiler::lower::{LowerInput, lower_to_nfa};
 use crate::compiler::parse::{Parser, Root, SyntaxNode, lex};
 use crate::core::Interner;
@@ -26,6 +27,8 @@ pub(crate) type AstMap = IndexMap<SourceId, Root>;
 pub struct QueryBuilder {
     source_map: SourceMap,
     limits: CompilerLimits,
+    inspection: bool,
+    strict_lints: bool,
 }
 
 impl QueryBuilder {
@@ -33,6 +36,8 @@ impl QueryBuilder {
         Self {
             source_map,
             limits: CompilerLimits::default(),
+            inspection: false,
+            strict_lints: false,
         }
     }
 
@@ -70,6 +75,18 @@ impl QueryBuilder {
     /// unbounded stretch.
     pub fn with_satisfiability_step_budget(mut self, budget: u64) -> Self {
         self.limits = self.limits.with_satisfiability_step_budget(budget);
+        self
+    }
+
+    /// Compile with inspection spans for playground/debugger joins. Default off.
+    pub fn with_inspection(mut self, enabled: bool) -> Self {
+        self.inspection = enabled;
+        self
+    }
+
+    /// Enable stricter advisory lints that are too noisy for normal compilation.
+    pub fn with_strict_lints(mut self, enabled: bool) -> Self {
+        self.strict_lints = enabled;
         self
     }
 
@@ -112,6 +129,8 @@ impl QueryBuilder {
             diag,
             ast_map: ast,
             limits: self.limits,
+            inspection: self.inspection,
+            strict_lints: self.strict_lints,
         })
     }
 }
@@ -122,6 +141,8 @@ pub(crate) struct QueryParsed {
     ast_map: AstMap,
     diag: Diagnostics,
     limits: CompilerLimits,
+    inspection: bool,
+    strict_lints: bool,
 }
 
 impl QueryParsed {
@@ -188,6 +209,10 @@ impl QueryParsed {
 
     pub(crate) fn ast_map(&self) -> &AstMap {
         &self.ast_map
+    }
+
+    pub(crate) fn inspection(&self) -> bool {
+        self.inspection
     }
 
     pub(crate) fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
@@ -318,6 +343,8 @@ impl Query {
             source_map: &analyzed.parsed.source_map,
             ast_map: &analyzed.parsed.ast_map,
             symbol_table: &analyzed.analysis.symbol_table,
+            dependency_analysis: &analyzed.analysis.dependency_analysis,
+            strict_lints: analyzed.parsed.strict_lints,
             satisfiability_limits: analyzed.parsed.limits.satisfiability(),
         }
         .link(&mut output, &mut analyzed.parsed.diag);
@@ -467,6 +494,14 @@ impl CompiledQuery {
         self.module()
             .map(|module| crate::compiler::typegen::typescript::emit(module, config))
     }
+
+    pub fn to_typescript_mapped(
+        &self,
+        config: crate::compiler::typegen::typescript::Config,
+    ) -> Option<(String, Vec<crate::compiler::typegen::typescript::DtsRange>)> {
+        self.module()
+            .map(|module| crate::compiler::typegen::typescript::emit_mapped(module, config))
+    }
 }
 
 impl LinkOutcome {
@@ -514,6 +549,8 @@ impl LinkOutcome {
         if diagnostics.has_errors() {
             return CompiledQuery::failed(self, diagnostics);
         }
+
+        self.report_inspection_span_degradation(&mut diagnostics);
 
         let bytes = match self.emit() {
             Ok(bytes) => bytes,
@@ -642,6 +679,57 @@ impl LinkOutcome {
         let len = u32::try_from(source.content.len()).unwrap_or(u32::MAX);
         Some((source.id, TextRange::up_to(len.into())))
     }
+
+    fn report_inspection_span_degradation(&self, diagnostics: &mut Diagnostics) {
+        let Some(query) = self.linked() else {
+            return;
+        };
+        if !query.analyzed.parsed.inspection() {
+            return;
+        }
+
+        // Recomputes the same deterministic assignment lowering will build —
+        // deliberately: threading it into `LowerInput` would couple the
+        // diagnostics stage to lowering internals to save one cheap pre-walk
+        // on the inspection-only path.
+        let assignment = assign_spans(&LowerInput {
+            analysis: query.analysis_input(),
+            symbol_table: query.symbol_table(),
+            inspection: true,
+        });
+        if assignment.dropped_tiers.is_empty() {
+            return;
+        }
+
+        let (source, range) = assignment
+            .first_dropped
+            .expect("dropped span tier must have a first construct");
+        diagnostics
+            .report(
+                DiagnosticKind::InspectionSpansDegraded,
+                Span::new(source, range),
+            )
+            .detail(format!(
+                "inspection spans degraded: dropped {} detail",
+                dropped_tier_names(&assignment.dropped_tiers)
+            ))
+            .emit();
+    }
+}
+
+fn dropped_tier_names(tiers: &[u8]) -> String {
+    let names: Vec<_> = tiers
+        .iter()
+        .map(|tier| match tier {
+            0 => "definition",
+            1 => "capture",
+            2 => "pattern/reference",
+            3 => "structure",
+            4 => "field/annotation",
+            _ => "reserved",
+        })
+        .collect();
+    names.join(", ")
 }
 
 impl LinkedQuery {
@@ -691,6 +779,7 @@ impl LinkedQuery {
         lower_to_nfa(LowerInput {
             analysis: self.analysis_input(),
             symbol_table: self.symbol_table(),
+            inspection: self.analyzed.parsed.inspection(),
         })
     }
 

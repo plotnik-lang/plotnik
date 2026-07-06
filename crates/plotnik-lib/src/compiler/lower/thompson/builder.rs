@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use indexmap::IndexMap;
 
-use crate::bytecode::Nav;
+use crate::bytecode::{Nav, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
@@ -12,7 +12,10 @@ use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::{
     CalleeEntry, EffectIR, InstructionIR, Label, NfaGraph, ReturnAddr, ReturnIR,
 };
-use crate::compiler::parse::ast::Pattern;
+use crate::compiler::lower::spans::{SpanBindingIR, SpanId, SpanTable, assign_spans};
+use crate::compiler::lower::verify::verify_fresh_build;
+use crate::compiler::parse::ast::{self, Pattern};
+use crate::compiler::parse::cst::SyntaxNode;
 
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::AnchorSemantics;
@@ -44,6 +47,8 @@ pub struct NfaBuilder<'a> {
     /// inlined). A nullable reference back into this set cannot inline again —
     /// it falls back to a guarded call (`compile_ref_guarded_call`).
     pub(super) inline_stack: Vec<DefId>,
+    /// Inspection span table, built before lowering so construct ids are stable.
+    pub(super) spans: Option<SpanTable>,
 }
 
 impl<'a> NfaBuilder<'a> {
@@ -63,6 +68,7 @@ impl<'a> NfaBuilder<'a> {
                 ctx.analysis.dependency_analysis,
             ),
             inline_stack: Vec::new(),
+            spans: None,
         }
     }
 
@@ -77,8 +83,25 @@ impl<'a> NfaBuilder<'a> {
         result
     }
 
+    /// The pre-assigned span id for a construct, or `None` when inspection is off
+    /// or that construct's tier was dropped by the budget ladder.
+    pub(super) fn span_id(&self, node: &SyntaxNode, kind: SpanKind) -> Option<SpanId> {
+        self.spans
+            .as_ref()
+            .and_then(|spans| spans.lookup(node, kind))
+    }
+
+    pub(super) fn bind_span(&mut self, id: SpanId, binding: SpanBindingIR) {
+        let spans = self
+            .spans
+            .as_mut()
+            .expect("span binding requires inspection span table");
+        spans.bind(id, binding);
+    }
+
     pub(in crate::compiler::lower) fn build_ir(ctx: &'a LowerInput<'a>) -> NfaGraph {
         let mut compiler = NfaBuilder::new(ctx);
+        compiler.spans = ctx.inspection.then(|| assign_spans(ctx).table);
 
         for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
             let label = compiler.fresh_label();
@@ -95,11 +118,14 @@ impl<'a> NfaBuilder<'a> {
             entrypoint_wrappers.insert(def_id, wrapper);
         }
 
+        verify_fresh_build(&compiler.instructions);
+
         NfaGraph {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
             def_entries_consuming: compiler.def_entries_consuming,
             entrypoint_wrappers,
+            spans: compiler.spans,
         }
     }
 
@@ -171,16 +197,20 @@ impl<'a> NfaBuilder<'a> {
         // The inline-stack entry keeps a nullable self-reference inside this
         // body (`A = (x (A) (y))?`) from inlining itself endlessly.
         let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let (body_exit, def_span) = self.bracket_def_body_exit(body, return_label);
+
         self.inline_stack.push(def_id);
         let body_entry = self.with_scope(type_id, |this| {
             let ctx = if consumable_value_root(body) {
-                PatternCtx::with_value(return_label, body_nav)
+                PatternCtx::with_value(body_exit, body_nav)
             } else {
-                PatternCtx::with_nav(return_label, body_nav)
+                PatternCtx::with_nav(body_exit, body_nav)
             };
             this.dispatch_pattern(body, ctx)
         });
         self.inline_stack.pop();
+
+        let body_entry = self.wrap_def_body_entry(body_entry, def_span);
 
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
@@ -208,12 +238,14 @@ impl<'a> NfaBuilder<'a> {
 
         let body_nav = Some(Nav::StayExact);
         let type_id = self.ctx.analysis.type_analysis.expect_def_output(def_id);
+        let (body_match_exit, def_span) = self.bracket_def_body_exit(body, return_label);
+
         self.inline_stack.push(def_id);
         let body_entry = self.with_scope(type_id, |this| {
             this.compile_skippable_with_exits(
                 body,
                 SplitExits {
-                    match_exit: return_label,
+                    match_exit: body_match_exit,
                     skip_exit: SkipExit::Fail,
                 },
                 body_nav,
@@ -222,6 +254,8 @@ impl<'a> NfaBuilder<'a> {
             )
         });
         self.inline_stack.pop();
+
+        let body_entry = self.wrap_def_body_entry(body_entry, def_span);
 
         if body_entry != entry_label {
             self.emit_epsilon(entry_label, vec![body_entry]);
@@ -247,6 +281,7 @@ impl<'a> NfaBuilder<'a> {
     /// - Alternations: effects go on each branch
     /// - Other wrappers: effects propagate through
     pub(super) fn dispatch_pattern(&mut self, pattern: &Pattern, ctx: PatternCtx) -> Label {
+        let ctx = self.bracket_pattern_ctx(pattern, ctx);
         match pattern {
             Pattern::NodePattern(n) => self.compile_node_pattern(n, ctx),
             Pattern::TokenPattern(n) => self.compile_token_pattern(n, ctx),
@@ -286,5 +321,76 @@ impl<'a> NfaBuilder<'a> {
             Pattern::FieldPattern(f) => self.compile_field(f, ctx),
             Pattern::DefRef(r) => self.compile_ref(r, ctx, None),
         }
+    }
+
+    /// Wrap this pattern's capture channel in inspection span brackets.
+    ///
+    /// Node and token patterns use `SpanStartAt` because their `pre` effects land
+    /// on the consuming match instruction; epsilon-entered constructs use pure
+    /// marker starts.
+    pub(super) fn bracket_pattern_ctx(&mut self, pattern: &Pattern, ctx: PatternCtx) -> PatternCtx {
+        let (kind, start_at) = match pattern {
+            Pattern::NodePattern(_) | Pattern::TokenPattern(_) => (SpanKind::Pattern, true),
+            Pattern::SeqPattern(_) => (SpanKind::Sequence, false),
+            Pattern::Union(_) => (SpanKind::Union, false),
+            Pattern::Enum(_) => (SpanKind::Enum, false),
+            Pattern::DefRef(_) => (SpanKind::Ref, false),
+            _ => return ctx,
+        };
+        let Some(id) = self.span_id(pattern.syntax(), kind) else {
+            return ctx;
+        };
+
+        let start = if start_at {
+            EffectIR::span_start_at(id.0)
+        } else {
+            EffectIR::span_start(id.0)
+        };
+        let PatternCtx {
+            exit,
+            nav,
+            capture,
+            value,
+        } = ctx;
+        PatternCtx {
+            exit,
+            nav,
+            capture: capture.nest_span(start, EffectIR::span_end(id.0)),
+            value,
+        }
+    }
+
+    pub(super) fn bracket_def_body_exit(
+        &mut self,
+        body: &Pattern,
+        exit: Label,
+    ) -> (Label, Option<SpanId>) {
+        let Some(id) = self.def_body_span_id(body) else {
+            return (exit, None);
+        };
+
+        let close = self.emit_effects_epsilon(
+            exit,
+            vec![EffectIR::span_end(id.0)],
+            CaptureEffects::default(),
+        );
+        (close, Some(id))
+    }
+
+    pub(super) fn wrap_def_body_entry(&mut self, entry: Label, span_id: Option<SpanId>) -> Label {
+        let Some(id) = span_id else {
+            return entry;
+        };
+
+        self.wrap_entry_pre(entry, vec![EffectIR::span_start(id.0)])
+    }
+
+    fn def_body_span_id(&self, body: &Pattern) -> Option<SpanId> {
+        let def = body
+            .syntax()
+            .parent()
+            .and_then(ast::Def::cast)
+            .expect("definition body must have a Def parent");
+        self.span_id(def.syntax(), SpanKind::Def)
     }
 }

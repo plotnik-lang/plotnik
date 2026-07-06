@@ -131,11 +131,13 @@ impl MatchEdit {
     }
 }
 
-/// Whether any effect reads the VM cursor (`Node`). Such effects are
+/// Whether any effect reads the VM cursor (`Node`, `SpanStartAt`). Such effects are
 /// position-sensitive: their meaning depends on the current cursor node, so
 /// they cannot be reordered across a navigation.
 fn reads_cursor(effects: &[EffectIR]) -> bool {
-    effects.iter().any(|e| e.kind() == EffectKind::Node)
+    effects
+        .iter()
+        .any(|e| matches!(e.kind(), EffectKind::Node | EffectKind::SpanStartAt))
 }
 
 /// Phase A: Forward migration.

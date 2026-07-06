@@ -7,7 +7,7 @@
 //! - Field constraints: `name: pattern`
 //! - Captured patterns: `@name`, `pattern @name`
 
-use crate::bytecode::{Nav, PredicateOp};
+use crate::bytecode::{Nav, PredicateOp, SpanKind};
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
@@ -55,7 +55,7 @@ fn post_consumes_call_value(post: &[EffectIR]) -> bool {
 
 impl<'a> CaptureRequest<'a> {
     fn build(
-        compiler: &NfaBuilder<'_>,
+        compiler: &mut NfaBuilder<'_>,
         cap: &ast::CapturedPattern,
         inner: &'a Pattern,
         nav: Option<Nav>,
@@ -126,17 +126,29 @@ impl NfaBuilder<'_> {
         let mut exit_effects = Vec::new();
         let mut iter = capture.post.into_iter().peekable();
         while let Some(eff) = iter.next() {
-            if eff.kind() == EffectKind::Node {
-                entry_effects.push(eff);
-                // Node is always paired with a following Set
-                if iter.peek().is_some_and(|e| e.kind() == EffectKind::Set) {
-                    entry_effects.push(
-                        iter.next()
-                            .expect("peek confirmed the iterator has a next element"),
-                    );
+            match eff.kind() {
+                // A capture unit `[SpanStart, Node, Set, SpanEnd]` moves to
+                // the entry as a whole: the Set must stay adjacent to its
+                // pending Node, and the markers must keep hugging the Set.
+                EffectKind::SpanStart
+                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::Node) =>
+                {
+                    entry_effects.push(eff);
+                    entry_effects.push(iter.next().expect("peeked Node"));
+                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::Set) {
+                        entry_effects.push(iter.next().expect("peeked Set"));
+                    }
+                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::SpanEnd) {
+                        entry_effects.push(iter.next().expect("peeked SpanEnd"));
+                    }
                 }
-            } else {
-                exit_effects.push(eff);
+                EffectKind::Node => {
+                    entry_effects.push(eff);
+                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::Set) {
+                        entry_effects.push(iter.next().expect("peeked Set"));
+                    }
+                }
+                _ => exit_effects.push(eff),
             }
         }
 
@@ -649,6 +661,7 @@ impl NfaBuilder<'_> {
             // Set; both continuations close it (a zero-width body still
             // produced its row of skip-path values, e.g. `{x: null}`).
             let end = ScopeCloseEffects {
+                leading: &[],
                 capture: &post,
                 outer: &[],
             };
@@ -660,18 +673,25 @@ impl NfaBuilder<'_> {
                 }
                 SkipExit::Fail => SkipExit::Fail,
             };
+            let (body_match_exit, def_span) = self.bracket_def_body_exit(body, close_match);
+            let body_skip_exit = match close_skip {
+                SkipExit::To(skip) if skip == close_match => SkipExit::To(body_match_exit),
+                SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
+                SkipExit::Fail => SkipExit::Fail,
+            };
             let body_entry = self.with_scope(def_output_id, |this| {
                 this.compile_skippable_with_exits(
                     body,
                     SplitExits {
-                        match_exit: close_match,
-                        skip_exit: close_skip,
+                        match_exit: body_match_exit,
+                        skip_exit: body_skip_exit,
                     },
                     nav_override,
                     CaptureEffects::default(),
                     false,
                 )
             });
+            let body_entry = self.wrap_def_body_entry(body_entry, def_span);
             self.emit_struct_step_with_pre(body_entry, pre)
         } else if is_captured {
             // Scalar-valued (enum) body: it leaves its value pending; the
@@ -682,18 +702,25 @@ impl NfaBuilder<'_> {
                 SkipExit::To(skip) => SkipExit::To(self.emit_effects_if_nonempty(skip, post)),
                 SkipExit::Fail => SkipExit::Fail,
             };
+            let (body_match_exit, def_span) = self.bracket_def_body_exit(body, set_match);
+            let body_skip_exit = match set_skip {
+                SkipExit::To(skip) if skip == set_match => SkipExit::To(body_match_exit),
+                SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
+                SkipExit::Fail => SkipExit::Fail,
+            };
             let body_entry = self.with_scope(def_output_id, |this| {
                 this.compile_skippable_with_exits(
                     body,
                     SplitExits {
-                        match_exit: set_match,
-                        skip_exit: set_skip,
+                        match_exit: body_match_exit,
+                        skip_exit: body_skip_exit,
                     },
                     nav_override,
                     CaptureEffects::default(),
                     true,
                 )
             });
+            let body_entry = self.wrap_def_body_entry(body_entry, def_span);
             self.wrap_entry_pre(body_entry, pre)
         } else {
             // Bare reference: opaque, so the body compiles structurally.
@@ -708,18 +735,25 @@ impl NfaBuilder<'_> {
                 SkipExit::To(skip) => SkipExit::To(self.emit_effects_if_nonempty(skip, post)),
                 SkipExit::Fail => SkipExit::Fail,
             };
+            let (body_match_exit, def_span) = self.bracket_def_body_exit(body, end_match);
+            let body_skip_exit = match end_skip {
+                SkipExit::To(skip) if skip == end_match => SkipExit::To(body_match_exit),
+                SkipExit::To(skip) => SkipExit::To(self.bracket_def_body_exit(body, skip).0),
+                SkipExit::Fail => SkipExit::Fail,
+            };
             let body_entry = self.with_suppression(|this| {
                 this.compile_skippable_with_exits(
                     body,
                     SplitExits {
-                        match_exit: end_match,
-                        skip_exit: end_skip,
+                        match_exit: body_match_exit,
+                        skip_exit: body_skip_exit,
                     },
                     nav_override,
                     CaptureEffects::default(),
                     false,
                 )
             });
+            let body_entry = self.wrap_def_body_entry(body_entry, def_span);
             self.wrap_entry_pre(body_entry, pre)
         };
         self.inline_stack.pop();
@@ -785,6 +819,7 @@ impl NfaBuilder<'_> {
     }
 
     pub(super) fn compile_field(&mut self, field: &ast::FieldPattern, ctx: PatternCtx) -> Label {
+        let ctx = self.bracket_field_ctx(field, ctx);
         let PatternCtx {
             exit,
             nav: nav_override,
@@ -804,6 +839,7 @@ impl NfaBuilder<'_> {
                 capture,
                 value: value_context,
             };
+            let value_ctx = self.bracket_pattern_ctx(&value, value_ctx);
             return self.compile_ref(r, value_ctx, node_field);
         }
 
@@ -833,6 +869,25 @@ impl NfaBuilder<'_> {
         );
 
         self.attach_field_to_entry_or_wrap(value_entry, node_field)
+    }
+
+    fn bracket_field_ctx(&mut self, field: &ast::FieldPattern, ctx: PatternCtx) -> PatternCtx {
+        let Some(id) = self.span_id(field.syntax(), SpanKind::Field) else {
+            return ctx;
+        };
+
+        let PatternCtx {
+            exit,
+            nav,
+            capture,
+            value,
+        } = ctx;
+        PatternCtx {
+            exit,
+            nav,
+            capture: capture.nest_span(EffectIR::span_start(id.0), EffectIR::span_end(id.0)),
+            value,
+        }
     }
 
     fn field_value_needs_wrapper(value: &Pattern) -> bool {

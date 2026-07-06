@@ -1,6 +1,6 @@
 //! Human-readable bytecode dump for debugging and documentation.
 //!
-//! See `docs/binary-format/07-dump-format.md` for the output format specification.
+//! See `docs/binary-format/08-dump-format.md` for the output format specification.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -15,7 +15,7 @@ use super::nav::Nav;
 use super::node_kind_constraint::NodeKindConstraint;
 use super::render::ModuleRenderContext;
 use super::type_meta::{TypeDefKind, TypeKind};
-use super::{Call, Match, Return};
+use super::{Call, Match, Return, SPAN_NO_BINDING};
 use crate::bytecode::type_system::TYPE_CUSTOM_START;
 
 /// Generate a human-readable dump of the bytecode module.
@@ -29,6 +29,7 @@ pub fn dump(module: &Module, colors: Colors) -> String {
     dump_types_members(&mut out, module, &ctx);
     dump_types_names(&mut out, module, &ctx);
     dump_entrypoints(&mut out, module, &ctx);
+    dump_spans(&mut out, module, &ctx);
     dump_code(&mut out, module, &ctx);
 
     out
@@ -309,6 +310,40 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
             c.reset,
             target,
             width = max_len
+        )
+        .expect("writing to a String is infallible");
+    }
+    out.push('\n');
+}
+
+fn dump_spans(out: &mut String, module: &Module, ctx: &DumpContext) {
+    let spans = module.spans();
+    if spans.is_empty() {
+        return;
+    }
+
+    let c = &ctx.colors;
+    let pw = width_for_count(spans.len());
+    let tw = ctx.type_width;
+    let mw = ctx.member_width;
+
+    writeln!(out, "{}[spans]{}", c.blue, c.reset).expect("writing to a String is infallible");
+    for (i, span) in spans.iter().enumerate() {
+        let binding = if span.type_id == SPAN_NO_BINDING {
+            String::new()
+        } else if span.member == SPAN_NO_BINDING {
+            format!("  T{:0tw$}", span.type_id)
+        } else {
+            format!("  T{:0tw$}.M{:0mw$}", span.type_id, span.member)
+        };
+        writeln!(
+            out,
+            "P{i:0pw$} {:<10} {}..{}  src{}{}",
+            span.kind.name(),
+            span.start,
+            span.end,
+            span.source,
+            binding
         )
         .expect("writing to a String is infallible");
     }

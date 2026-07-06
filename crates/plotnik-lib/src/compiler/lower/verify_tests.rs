@@ -18,6 +18,7 @@ fn unbalanced_body_depth_panics() {
         },
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     super::debug_impl::assert_depth_neutrality(&nfa, "test");
@@ -40,6 +41,7 @@ fn zero_width_node_effect_panics() {
         },
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
+        spans: None,
     };
 
     super::debug_impl::assert_no_node_on_zero_width_paths(&nfa, "test");
