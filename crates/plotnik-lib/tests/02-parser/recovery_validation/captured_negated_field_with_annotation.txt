@@ -1,0 +1,32 @@
+Q = (pair -key @x :: T)
+------------------ DIAGNOSTICS -------------------
+error: negated fields cannot be captured
+ --> query.ptk:1:16
+  |
+1 | Q = (pair -key @x :: T)
+  |                ^^
+  |
+help: remove the capture
+  |
+1 - Q = (pair -key @x :: T)
+1 + Q = (pair -key  :: T)
+  |
+help: a negated field asserts absence and produces no value
+
+error: expected a child node, or `)` to close
+ --> query.ptk:1:19
+  |
+1 | Q = (pair -key @x :: T)
+  |                   ^^
+
+error: references must be parenthesized
+ --> query.ptk:1:22
+  |
+1 | Q = (pair -key @x :: T)
+  |                      ^
+  |
+help: wrap in parentheses
+  |
+1 - Q = (pair -key @x :: T)
+1 + Q = (pair -key @x :: (T))
+  |

@@ -1,0 +1,13 @@
+Q = (MISSING identifier extra)
+------------------ DIAGNOSTICS -------------------
+error: node kinds must be parenthesized
+ --> query.ptk:1:25
+  |
+1 | Q = (MISSING identifier extra)
+  |                         ^^^^^
+  |
+help: wrap in parentheses
+  |
+1 - Q = (MISSING identifier extra)
+1 + Q = (MISSING identifier (extra))
+  |

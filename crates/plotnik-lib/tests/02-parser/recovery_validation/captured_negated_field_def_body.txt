@@ -1,0 +1,14 @@
+Q = -key @x
+------------------ DIAGNOSTICS -------------------
+error: negated fields cannot be captured
+ --> query.ptk:1:10
+  |
+1 | Q = -key @x
+  |          ^^
+  |
+help: remove the capture
+  |
+1 - Q = -key @x
+1 + Q = -key 
+  |
+help: a negated field asserts absence and produces no value

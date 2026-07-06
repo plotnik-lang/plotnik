@@ -1,0 +1,14 @@
+Q = (MISSING (something))
+------------------ DIAGNOSTICS -------------------
+error: `(MISSING)` takes at most a node kind or a quoted token
+ --> query.ptk:1:14
+  |
+1 | Q = (MISSING (something))
+  |              ^^^^^^^^^^^
+  |
+help: remove the children
+  |
+1 - Q = (MISSING (something))
+1 + Q = (MISSING )
+  |
+help: a missing node is a zero-width token inserted by error recovery; write `(MISSING)`, `(MISSING kind)`, or `(MISSING ";")`
