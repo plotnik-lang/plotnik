@@ -4,7 +4,6 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 
-use arborium_tree_sitter as tree_sitter;
 use plotnik_lib::bytecode::{Entrypoint, Module};
 use plotnik_lib::text_utils::find_similar;
 

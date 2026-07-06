@@ -1,7 +1,7 @@
 //! Structured VM run recording for debugger-oriented trace output.
 
-use arborium_tree_sitter::Node;
 use serde::Serialize;
+use tree_sitter::Node;
 
 use crate::bytecode::{EffectKind, Instruction, Module, ModuleRenderContext, Nav};
 use crate::core::NodeFieldId;

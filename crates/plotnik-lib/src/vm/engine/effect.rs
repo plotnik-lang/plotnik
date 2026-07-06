@@ -3,7 +3,7 @@
 //! Runtime effects carry actual node references, unlike bytecode `Effect`
 //! which only stores kind + payload.
 
-use arborium_tree_sitter::Node;
+use tree_sitter::Node;
 
 #[derive(Debug)]
 pub enum RuntimeEffect<'t> {

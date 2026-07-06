@@ -159,7 +159,7 @@ fn run_module(
     module: &Module,
     entrypoint: &plotnik_lib::bytecode::Entrypoint,
     source_code: &str,
-    tree: &arborium_tree_sitter::Tree,
+    tree: &tree_sitter::Tree,
     limits: RuntimeLimitSpec,
     trace: bool,
 ) -> RunPayload {

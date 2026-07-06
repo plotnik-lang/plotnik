@@ -10,7 +10,7 @@ use crate::bytecode::{EncodeError, Module};
 
 use super::EmitError;
 use crate::compiler::query::QueryBuilder;
-use crate::compiler::test_utils::javascript_grammar as javascript;
+use crate::compiler::test_utils::synthetic_grammar as grammar;
 use crate::compiler::{SourceMap, SourcePath};
 
 /// Link `src` (which must be valid — capacity limits live at emit, not link) and
@@ -20,7 +20,7 @@ fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
     let mut source_map = SourceMap::new();
     source_map.add_file(SourcePath::new("query.ptk"), src);
     let query = QueryBuilder::new(source_map)
-        .link(javascript())
+        .link(grammar())
         .expect("query parses");
     assert!(query.is_valid(), "query should link:\n{src}");
     query.emit()

@@ -1,0 +1,53 @@
+[package]
+name = "plotnik-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Workspace-internal integration tests and benchmarks"
+publish = false
+autotests = false
+autobenches = false
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+plotnik-lib = { workspace = true }
+arborium-dart = "2.18.0"
+arborium-javascript = "2.18.0"
+arborium-typescript = "2.18.0"
+cargo_metadata = "=0.23.1"
+criterion = "=0.8.2"
+indoc = "=2.0.7"
+libtest-mimic = "=0.8.2"
+proptest = "=1.11.0"
+serde_json = "=1.0.150"
+similar = "=3.1.1"
+tree-sitter = "=0.26.10"
+
+[[test]]
+name = "snapshots"
+path = "tests/mod.rs"
+harness = false
+
+[[test]]
+name = "fuzz_no_panic"
+path = "tests/fuzz_no_panic.rs"
+
+[[test]]
+name = "vm_stats"
+path = "tests/vm_stats.rs"
+
+[[test]]
+name = "stack_safety"
+path = "tests/stack_safety.rs"
+
+[[test]]
+name = "tree_json"
+path = "tests/tree_json.rs"
+
+[[bench]]
+name = "vm"
+path = "benches/vm.rs"
+harness = false

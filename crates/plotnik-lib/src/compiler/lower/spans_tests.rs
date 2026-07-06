@@ -2,7 +2,7 @@ use std::fmt::Write as _;
 
 use crate::bytecode::{HEADER_SIZE, Header, SPAN_NO_BINDING, STEP_SIZE, SpanEntry, SpanKind};
 use crate::compiler::diagnostics::DiagnosticKind;
-use crate::compiler::test_utils::javascript_grammar;
+use crate::compiler::test_utils::synthetic_grammar;
 use crate::compiler::{CompiledQuery, QueryBuilder};
 
 #[test]
@@ -75,7 +75,7 @@ fn ladder_drops_whole_lower_priority_tiers() {
 fn capture_markers_change_transition_bytes_when_inspection_is_enabled() {
     let src = "Q = (program (expression_statement (identifier) @id))";
     let plain = QueryBuilder::from_inline(src)
-        .compile(javascript_grammar())
+        .compile(synthetic_grammar())
         .expect("query parsing should not exhaust fuel");
     let inspected = inspected(src);
 
@@ -109,7 +109,7 @@ fn exact_range_query() -> &'static str {
 fn inspected(src: &str) -> CompiledQuery {
     let compiled = QueryBuilder::from_inline(src)
         .with_inspection(true)
-        .compile(javascript_grammar())
+        .compile(synthetic_grammar())
         .expect("query parsing should not exhaust fuel");
     assert!(
         compiled.is_valid(),

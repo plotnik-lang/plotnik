@@ -1,12 +1,11 @@
-use arborium_tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
+mod support;
 
-use crate::bytecode::{Entrypoint, Module};
-use crate::compiler::test_utils::javascript_grammar;
-use crate::{Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM};
+use plotnik_lib::bytecode::{Entrypoint, Module};
+use plotnik_lib::{Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM};
 
 fn compile(src: &str) -> Module {
     let compiled = QueryBuilder::from_inline(src)
-        .compile(javascript_grammar())
+        .compile(support::javascript_grammar())
         .expect("query parsing should not exhaust fuel");
     assert!(
         compiled.is_valid(),
@@ -14,13 +13,6 @@ fn compile(src: &str) -> Module {
         compiled.diagnostics().render(compiled.source_map())
     );
     compiled.into_module().expect("valid query emits module")
-}
-
-fn parse_js(source: &str) -> Tree {
-    let mut parser = TsParser::new();
-    let lang: TsLanguage = arborium_javascript::language().into();
-    parser.set_language(&lang).expect("set javascript language");
-    parser.parse(source, None).expect("parse javascript source")
 }
 
 fn module_and_entry() -> (Module, Entrypoint) {
@@ -33,7 +25,7 @@ fn module_and_entry() -> (Module, Entrypoint) {
 fn execute_with_stats_reports_success_usage() {
     let (module, entry) = module_and_entry();
     let source = "x";
-    let tree = parse_js(source);
+    let tree = support::parse_javascript(source);
     let vm = VM::builder(source, &tree).build();
     let mut tracer = NoopTracer;
 
@@ -48,7 +40,7 @@ fn execute_with_stats_reports_success_usage() {
 fn execute_with_stats_reports_step_limit_usage() {
     let (module, entry) = module_and_entry();
     let source = "x";
-    let tree = parse_js(source);
+    let tree = support::parse_javascript(source);
     let vm = VM::builder(source, &tree)
         .limits(RuntimeLimitSpec {
             steps: Limit::Of(1),

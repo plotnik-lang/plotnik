@@ -9,7 +9,7 @@ const FIXTURE_EXT: &str = "txt";
 
 #[test]
 fn lexer_fixtures() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/01-lexer");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("test_data/01-lexer");
     let mut fixtures = Vec::new();
     discover(&root, &mut fixtures);
     fixtures.sort();

@@ -3,7 +3,6 @@
 #[cfg(any(feature = "lang-javascript", feature = "lang-typescript"))]
 use std::sync::LazyLock;
 
-use arborium_tree_sitter::{Language, Parser, Tree};
 use plotnik_lib::bytecode::{Entrypoint, Module, SPAN_NO_BINDING};
 use plotnik_lib::grammar::Grammar;
 #[cfg(any(feature = "lang-javascript", feature = "lang-typescript"))]
@@ -14,6 +13,7 @@ use plotnik_lib::{
     tree_to_json,
 };
 use serde_json::{Map, Value as JsonValue, json};
+use tree_sitter::{Language, Parser, Tree};
 use wasm_bindgen::prelude::*;
 
 macro_rules! json_value {

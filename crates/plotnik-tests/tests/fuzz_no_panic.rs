@@ -16,15 +16,12 @@
 //! This guards against the *next* recursion or unbounded-heap hole, not just the
 //! ones already fixed.
 
-use std::sync::LazyLock;
-
-use arborium_tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 use indoc::indoc;
 use proptest::prelude::*;
 use proptest::sample::select;
+use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 
 use plotnik_lib::bytecode::Module;
-use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{Colors, QueryBuilder, VM, materialize_verified};
 
 mod support;
@@ -53,21 +50,11 @@ const TEMPLATES: &[&str] = &[
     ),
 ];
 
-fn javascript_grammar() -> &'static Grammar {
-    static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw =
-            RawGrammar::from_json(&support::load_arborium_grammar_json("arborium-javascript"))
-                .expect("javascript grammar fixture");
-        Grammar::from_raw(&raw).expect("javascript grammar metadata")
-    });
-    &GRAMMAR
-}
-
 /// Compile a query without ever panicking: `None` if it does not parse, link
 /// cleanly, or emit. Mirrors the production `run` path (validity gate + `emit`).
 fn try_compile(query: &str) -> Option<Vec<u8>> {
     let compiled = QueryBuilder::from_inline(query)
-        .compile(javascript_grammar())
+        .compile(support::javascript_grammar())
         .ok()?;
     if !compiled.is_valid() {
         return None;

@@ -1,6 +1,5 @@
 //! JSON rendering for parsed source trees.
 
-use arborium_tree_sitter as tree_sitter;
 use serde_json::{Map, Value};
 
 /// Serialize a tree-sitter tree as editor-friendly JSON.

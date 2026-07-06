@@ -14,8 +14,6 @@ pub mod utils;
 #[cfg(test)]
 mod interner_tests;
 #[cfg(test)]
-mod tree_json_tests;
-#[cfg(test)]
 mod utils_tests;
 
 pub use colors::Colors;

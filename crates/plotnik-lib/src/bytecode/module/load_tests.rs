@@ -14,9 +14,9 @@
 //! external integration test cannot reach. Minting a real module needs the
 //! compiler, which depends on this crate — a cycle that is fine through a
 //! `[dev-dependencies]` edge, since it never enters the build graph. The test
-//! helper loads the JavaScript `grammar.json` the fixtures link against.
+//! helper links against a small synthetic grammar instead of a real language package.
 
-use crate::compiler::test_utils::javascript_grammar as javascript;
+use crate::compiler::test_utils::synthetic_grammar as grammar;
 use crate::compiler::{QueryBuilder, SourceMap, SourcePath};
 use indoc::indoc;
 
@@ -32,7 +32,7 @@ fn emit_bytes(query_src: &str) -> Vec<u8> {
     let mut source_map = SourceMap::new();
     source_map.add_file(SourcePath::new("query.ptk"), query_src);
     let compiled = QueryBuilder::new(source_map)
-        .compile(javascript())
+        .compile(grammar())
         .expect("query parsing should not exhaust fuel");
     assert!(compiled.is_valid(), "query should compile: {query_src}");
     compiled
@@ -607,7 +607,7 @@ fn emit_inspection_bytes(query_src: &str) -> Vec<u8> {
     source_map.add_file(SourcePath::new("query.ptk"), query_src);
     let compiled = QueryBuilder::new(source_map)
         .with_inspection(true)
-        .compile(javascript())
+        .compile(grammar())
         .expect("query parsing should not exhaust fuel");
     assert!(compiled.is_valid(), "query should compile: {query_src}");
     compiled

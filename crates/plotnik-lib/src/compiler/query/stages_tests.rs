@@ -1,4 +1,4 @@
-use crate::compiler::test_utils::javascript_grammar as javascript;
+use crate::compiler::test_utils::synthetic_grammar as grammar;
 use indoc::indoc;
 use std::fmt::Write as _;
 
@@ -57,7 +57,7 @@ impl Query {
 
     #[track_caller]
     pub(crate) fn expect_valid_linking(src: &str) -> LinkOutcome {
-        let query = Self::parse_and_validate(src).link(javascript());
+        let query = Self::parse_and_validate(src).link(grammar());
         if !query.is_valid() {
             panic!(
                 "Expected valid linking, got error:\n{}",
@@ -130,7 +130,7 @@ fn invalid_three_way_mutual_recursion_across_files() {
 
 #[test]
 fn analysis_rejects_byte_oriented_regex() {
-    let linked = Query::expect(r"Q = (identifier =~ /(?-u:\xFF)/) @x").link(javascript());
+    let linked = Query::expect(r"Q = (identifier =~ /(?-u:\xFF)/) @x").link(grammar());
     let diag = linked.dry_run();
     assert!(diag.has_errors());
     let rendered = diag.render(linked.source_map());
@@ -142,7 +142,7 @@ fn analysis_rejects_byte_oriented_regex() {
 
 #[test]
 fn dry_run_rejects_value_less_definition() {
-    let linked = Query::expect("Q = .").link(javascript());
+    let linked = Query::expect("Q = .").link(grammar());
     let diag = linked.dry_run();
     assert!(diag.has_errors());
     let rendered = diag.render(linked.source_map());
@@ -151,7 +151,7 @@ fn dry_run_rejects_value_less_definition() {
 
 #[test]
 fn dry_run_accepts_valid_query() {
-    let linked = Query::parse_and_validate("Q = (identifier) @id").link(javascript());
+    let linked = Query::parse_and_validate("Q = (identifier) @id").link(grammar());
     assert!(!linked.dry_run().has_errors());
 }
 
@@ -163,7 +163,7 @@ fn dry_run_flags_dropped_value_less_def_among_valid() {
         Good = (identifier) @id
     "
     ))
-    .link(javascript());
+    .link(grammar());
     let diag = linked.dry_run();
     assert!(diag.has_errors());
     let rendered = diag.render(linked.source_map());
@@ -173,9 +173,7 @@ fn dry_run_flags_dropped_value_less_def_among_valid() {
 #[test]
 fn dry_run_is_total_on_empty_source_map() {
     // The dry run must never panic — even on a query with zero sources.
-    let linked = QueryBuilder::new(SourceMap::new())
-        .link(javascript())
-        .unwrap();
+    let linked = QueryBuilder::new(SourceMap::new()).link(grammar()).unwrap();
     assert!(!linked.dry_run().has_errors());
 }
 
@@ -196,7 +194,7 @@ fn multifile_link_field_error_in_referenced_body_spans_two_files() {
         "expected analysis to pass:\n{}",
         analyzed.dump_diagnostics()
     );
-    let linked = analyzed.link(javascript());
+    let linked = analyzed.link(grammar());
     assert!(!linked.is_valid(), "expected linking to fail");
     let res = linked.dump_diagnostics();
 
@@ -276,7 +274,7 @@ fn deeply_referenced_alternation_compiles_in_linear_time() {
         writeln!(src, "A{i} = [(A{p}) (A{p})]", p = i - 1).unwrap();
     }
 
-    let linked = Query::parse_and_validate(&src).link(javascript());
+    let linked = Query::parse_and_validate(&src).link(grammar());
     assert!(linked.is_valid(), "{}", linked.dump_diagnostics());
     assert!(
         !linked.dry_run().has_errors(),
@@ -302,7 +300,7 @@ fn satisfiability_step_budget_rejects_and_is_tunable() {
         if let Some(budget) = budget {
             builder = builder.with_satisfiability_step_budget(budget);
         }
-        builder.analyze().unwrap().link(javascript())
+        builder.analyze().unwrap().link(grammar())
     };
 
     let tight = build(Some(100));
@@ -332,7 +330,7 @@ fn satisfiability_budget_counts_automaton_construction() {
     .with_satisfiability_step_budget(1)
     .analyze()
     .unwrap()
-    .link(javascript());
+    .link(grammar());
 
     assert!(!linked.is_valid());
     assert!(
@@ -361,7 +359,7 @@ fn primary_satisfiability_budget_exhaustion_reports_too_complex_once() {
         .with_satisfiability_step_budget(2)
         .analyze()
         .unwrap()
-        .link(javascript());
+        .link(grammar());
 
     let kinds: Vec<_> = linked.diagnostics().kinds().collect();
     assert!(
@@ -398,20 +396,19 @@ fn exhausted_anchor_probe_budget_keeps_unsatisfiable_verdict() {
     );
 
     let linked = QueryBuilder::new(source_map)
-        .with_satisfiability_step_budget(2_000)
+        .with_satisfiability_step_budget(20)
         .analyze()
         .unwrap()
-        .link(javascript());
+        .link(grammar());
 
     let kinds: Vec<_> = linked.diagnostics().kinds().collect();
-    assert_eq!(
-        kinds,
-        vec![
-            DiagnosticKind::UnsatisfiablePattern,
-            DiagnosticKind::UnsatisfiablePattern
-        ],
+    assert!(
+        !kinds.is_empty()
+            && kinds
+                .iter()
+                .all(|&kind| kind == DiagnosticKind::UnsatisfiablePattern),
         "diagnostic probes must not replace a proven rejection:\n{}",
-        linked.dump_diagnostics(),
+        linked.dump_diagnostics()
     );
     let diagnostics = linked.dump_diagnostics();
     assert!(

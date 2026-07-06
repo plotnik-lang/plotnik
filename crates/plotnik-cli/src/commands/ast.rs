@@ -3,7 +3,6 @@
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use arborium_tree_sitter as tree_sitter;
 use plotnik_lib::{QueryBuilder, tree_to_json};
 use serde_json::json;
 

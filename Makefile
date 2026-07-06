@@ -41,13 +41,13 @@ shot:
 
 bench:
 	@cargo bench \
-		--package plotnik-lib \
+		--package plotnik-tests \
 		--bench vm \
 		-- $(FILTER)
 
 coverage-lines:
 	@cargo llvm-cov \
-		--package plotnik-lib \
+		--workspace \
 		--text \
 		--show-missing-lines \
 		2>/dev/null | grep '\.rs: [0-9]' | sed 's|.*/crates/|crates/|'

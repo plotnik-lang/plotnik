@@ -48,9 +48,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-use arborium_tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 use libtest_mimic::{Arguments, Failed, Trial};
 use similar::TextDiff;
+use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
