@@ -43,10 +43,10 @@ const editorTheme = EditorView.theme({
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground":
     {
       backgroundColor:
-        "color-mix(in oklch, var(--color-primary) 18%, transparent)",
+        "color-mix(in oklch, var(--color-ring) 24%, transparent)",
     },
   ".cm-activeLine": {
-    backgroundColor: "color-mix(in oklch, var(--color-muted) 45%, transparent)",
+    backgroundColor: "color-mix(in oklch, var(--color-muted) 65%, transparent)",
   },
   ".cm-gutters": {
     backgroundColor: "transparent",

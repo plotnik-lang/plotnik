@@ -5,41 +5,47 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Palette source: the jrnv Zed theme (~/.config/zed/themes/jrnv.json), UI and
+   syntax alike. Hex comments name the original value; two deviations for WCAG
+   AA are marked where they occur. */
 :root {
   /* Lets light-dark() resolve; the highlighter below relies on it. */
   color-scheme: light dark;
   --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --foreground: oklch(0 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --popover-foreground: oklch(0 0 0);
+  /* #0068d6 (terminal blue), not #007aff: white-on-blue fills need 4.5:1. */
+  --primary: oklch(0.5339 0.1875 256.73);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.9683 0.0069 247.9); /* #f1f5f9 active line */
+  --secondary-foreground: oklch(0 0 0);
+  --muted: oklch(0.9683 0.0069 247.9);
+  --muted-foreground: oklch(0.5436 0.023 250.56); /* #66717d text.muted */
+  --accent: oklch(0.9287 0.0357 249.52); /* element.hover flattened on white */
+  --accent-foreground: oklch(0 0 0);
+  /* #db0a37 error, darkened to #d00934 for 4.5:1 on the /10 badge tint. */
+  --destructive: oklch(0.5444 0.2157 20.81);
+  --border: oklch(0.8929 0.0175 248.02); /* #d3dde7 border.variant */
+  --input: oklch(0.713 0.0252 250.16); /* #97a4b2 border */
+  --ring: oklch(0.6028 0.2177 257.42); /* #007aff border.focused */
+  /* The accents row of the theme: blue, green, yellow, red, purple. */
+  --chart-1: oklch(0.6028 0.2177 257.42);
+  --chart-2: oklch(0.5723 0.1529 138.25);
+  --chart-3: oklch(0.7134 0.1133 73.51);
+  --chart-4: oklch(0.5042 0.1516 26.97);
+  --chart-5: oklch(0.4828 0.1545 311.07);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.9842 0.0034 247.86); /* #f8fafc panel.background */
+  --sidebar-foreground: oklch(0 0 0);
+  --sidebar-primary: oklch(0.5339 0.1875 256.73);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.9493 0.0103 247.94); /* #e9eff5 */
+  --sidebar-accent-foreground: oklch(0 0 0);
+  --sidebar-border: oklch(0.8929 0.0175 248.02);
+  --sidebar-ring: oklch(0.6028 0.2177 257.42);
 }
 
 /* Syntax-highlighter support (src/lib/highlight.ts). highlight() runs with
@@ -64,14 +70,25 @@
 /* Editor syntax palette, shared between the lezer languages in the source
    and output panes (`tok-*`, via classHighlighter) and the plotnik query
    tokens (`ptk-*`, via the real lexer over the worker). One role, one color,
-   in both schemes. */
-.tok-keyword {
-  color: light-dark(#cf222e, #ff7b72);
+   in both schemes.
+
+   The jrnv syntax scheme: keywords and operators stay ink (the theme's
+   signature restraint), field/property names a calmer ink, definitions and
+   types blue, strings green, constants and captures purple, everything
+   structural muted. Light string green is #3e8123 (theme's #448c27 is
+   4.18:1 on white, short of AA). */
+.tok-keyword,
+.tok-operator {
+  color: var(--color-foreground);
+}
+.tok-propertyName {
+  color: light-dark(#454c54, #95a3b0);
 }
 .tok-string,
 .tok-string2,
-.ptk-string {
-  color: light-dark(#0a3069, #a5d6ff);
+.ptk-string,
+.ptk-regex {
+  color: light-dark(#3e8123, #82b56d);
 }
 .tok-comment,
 .ptk-comment {
@@ -80,27 +97,14 @@
 }
 .tok-number,
 .tok-bool,
-.tok-atom {
-  color: light-dark(#0550ae, #79c0ff);
+.tok-atom,
+.ptk-capture {
+  color: light-dark(#7a3e9d, #b49bd8);
 }
 .tok-typeName,
-.tok-className {
-  color: light-dark(#953800, #ffa657);
-}
-.tok-propertyName {
-  color: light-dark(#0550ae, #79c0ff);
-}
+.tok-className,
 .tok-definition.tok-variableName {
-  color: light-dark(#8250df, #d2a8ff);
-}
-.tok-operator {
-  color: light-dark(#cf222e, #ff7b72);
-}
-.ptk-capture {
-  color: light-dark(#8250df, #d2a8ff);
-}
-.ptk-regex {
-  color: light-dark(#116329, #7ee787);
+  color: light-dark(#325cc0, #7aa7e6);
 }
 .ptk-punct {
   color: var(--color-muted-foreground);
@@ -153,37 +157,38 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: oklch(0.1889 0.0145 253.19); /* #0f141a */
+  --foreground: oklch(0.8935 0.0129 244.27); /* #d5dde4 */
+  --card: oklch(0.2483 0.0207 251.65); /* #1a222b elevated_surface */
+  --card-foreground: oklch(0.8935 0.0129 244.27);
+  --popover: oklch(0.2483 0.0207 251.65);
+  --popover-foreground: oklch(0.8935 0.0129 244.27);
+  /* #409cff text.accent; dark ink on it clears 4.5:1, white would not. */
+  --primary: oklch(0.6854 0.1699 252.99);
+  --primary-foreground: oklch(0.1889 0.0145 253.19);
+  --secondary: oklch(0.289 0.0223 251.29); /* #232c36 */
+  --secondary-foreground: oklch(0.8935 0.0129 244.27);
+  --muted: oklch(0.2483 0.0207 251.65);
+  --muted-foreground: oklch(0.6439 0.0246 248.21); /* #828f9c text.muted */
+  --accent: oklch(0.281 0.0649 252.51); /* element.hover flattened on bg */
+  --accent-foreground: oklch(0.8935 0.0129 244.27);
+  --destructive: oklch(0.6863 0.1331 15.92); /* #e0757e error */
+  --border: oklch(0.3095 0.0234 253.63); /* #28313c border.variant */
+  --input: oklch(0.4324 0.0272 248.46); /* #45525f border */
+  --ring: oklch(0.6243 0.2056 255.49); /* #0a84ff border.focused */
+  --chart-1: oklch(0.6854 0.1699 252.99);
+  --chart-2: oklch(0.7313 0.1225 140.17);
+  --chart-3: oklch(0.7475 0.1007 84.34);
+  --chart-4: oklch(0.6863 0.1331 15.92);
+  --chart-5: oklch(0.7332 0.0905 303);
+  --sidebar: oklch(0.2193 0.0165 252.49); /* #151b22 panel.background */
+  --sidebar-foreground: oklch(0.8935 0.0129 244.27);
+  --sidebar-primary: oklch(0.6854 0.1699 252.99);
+  --sidebar-primary-foreground: oklch(0.1889 0.0145 253.19);
+  --sidebar-accent: oklch(0.2483 0.0207 251.65);
+  --sidebar-accent-foreground: oklch(0.8935 0.0129 244.27);
+  --sidebar-border: oklch(0.3095 0.0234 253.63);
+  --sidebar-ring: oklch(0.6243 0.2056 255.49);
 }
 
 @layer base {

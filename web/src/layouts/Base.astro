@@ -19,10 +19,15 @@ const { title, description } = Astro.props;
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
     <script is:inline>
-      // shadcn themes by `.dark` class; follow the system before first paint.
-      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-        document.documentElement.classList.add("dark");
-      }
+      // shadcn themes by `.dark` class; follow the system before first paint
+      // and keep following it while the page is open. No manual toggle.
+      (() => {
+        const query = window.matchMedia("(prefers-color-scheme: dark)");
+        const apply = () =>
+          document.documentElement.classList.toggle("dark", query.matches);
+        apply();
+        query.addEventListener("change", apply);
+      })();
     </script>
   </head>
   <body>

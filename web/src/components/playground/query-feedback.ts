@@ -5,7 +5,9 @@ import { setTokenDecorations, type TokenRange } from "./code-editor";
 import type { TokenSpan, WireDiagnostic } from "./protocol";
 
 /* Idents and whitespace keep the default ink; everything else gets a class
-   styled in global.css next to the lezer `tok-*` palette. */
+   styled in global.css next to the lezer `tok-*` palette. Field names are
+   the exception: the lexer calls them plain idents, so they are recovered
+   below and get the calmer `tok-propertyName` ink, matching the AST pane. */
 const TOKEN_CLASS: Partial<Record<TokenSpan["kind"], string>> = {
   comment: "ptk-comment",
   string: "ptk-string",
@@ -14,6 +16,33 @@ const TOKEN_CLASS: Partial<Record<TokenSpan["kind"], string>> = {
   punct: "ptk-punct",
   error: "ptk-error",
 };
+
+/* An ident is a field name when a bare `:` follows (variant tags are
+   PascalCase and `::` annotations follow captures, so lowercase + single
+   colon is exact), or when it is glued to a leading `-` (negated field). */
+function isFieldName(
+  tokens: TokenSpan[],
+  index: number,
+  text: (token: TokenSpan) => string,
+): boolean {
+  const ident = tokens[index];
+  if (!/^[a-z_]/.test(text(ident))) return false;
+  const prev = tokens[index - 1];
+  if (
+    prev !== undefined &&
+    prev.kind === "punct" &&
+    prev.end === ident.start &&
+    text(prev) === "-"
+  ) {
+    return true;
+  }
+  for (let j = index + 1; j < tokens.length; j++) {
+    const next = tokens[j];
+    if (next.kind === "whitespace" || next.kind === "comment") continue;
+    return next.kind === "punct" && text(next) === ":";
+  }
+  return false;
+}
 
 /**
  * Apply a compile round's feedback (squiggles + token colors) to the query
@@ -62,9 +91,16 @@ export function pushQueryFeedback(
     };
   });
 
+  const tokenText = (token: TokenSpan) =>
+    compiledText.slice(b2u(token.start), b2u(token.end));
+
   const ranges: TokenRange[] = [];
-  for (const token of tokens) {
-    const cls = TOKEN_CLASS[token.kind];
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    const cls =
+      token.kind === "ident" && isFieldName(tokens, i, tokenText)
+        ? "tok-propertyName"
+        : TOKEN_CLASS[token.kind];
     if (!cls || token.start === token.end) continue;
     ranges.push({ from: b2u(token.start), to: b2u(token.end), cls });
   }

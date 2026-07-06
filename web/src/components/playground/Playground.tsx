@@ -200,7 +200,7 @@ export default function Playground() {
 
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground">
-      <header className="flex items-center gap-3 border-b px-4 py-2">
+      <header className="flex items-center gap-3 border-b bg-sidebar px-4 py-2">
         <a href="/" className="text-sm font-semibold">
           plotnik
         </a>
@@ -358,7 +358,7 @@ export default function Playground() {
 
 function PaneLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-center gap-2 border-b px-3 py-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+    <div className="flex items-center gap-2 border-b bg-sidebar px-3 py-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
       {children}
     </div>
   );
@@ -381,7 +381,7 @@ function AstToggle({
       onClick={onToggle}
       aria-expanded={open}
       className={cn(
-        "flex w-full items-center gap-2 px-3 py-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase transition-colors hover:bg-muted/50",
+        "flex w-full items-center gap-2 bg-sidebar px-3 py-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase transition-colors hover:bg-sidebar-accent",
         open && "border-b",
         className,
       )}
