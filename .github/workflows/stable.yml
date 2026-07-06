@@ -6,11 +6,15 @@ on:
     branches:
       - master
   pull_request:
-    types:
-      - opened
-      - synchronize
     branches:
       - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   RUST_BACKTRACE: 1
@@ -20,6 +24,7 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -35,15 +40,12 @@ jobs:
           cache-all-crates: "true"
           cache-on-failure: "true"
           prefix-key: v0-rust-stable
+          save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install cargo-nextest
-        uses: baptiste0928/cargo-install@f204293d9709061b7bc1756fec3ec4e2cd57dec0 # v3.4.0
+        uses: taiki-e/install-action@4684b8405694ae9dd42c9f39ba901a70ae83f4a3 # v2.82.9
         with:
-          crate: cargo-nextest
-          locked: true
-
-      - name: Check
-        run: make check
+          tool: cargo-nextest
 
       - name: Clippy
         run: make clippy
@@ -53,6 +55,7 @@ jobs:
 
   feature-flags:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -68,6 +71,7 @@ jobs:
           cache-all-crates: "true"
           cache-on-failure: "true"
           prefix-key: v0-rust-stable
+          save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: No-default-features langs
         run: cargo clippy -p plotnik --no-default-features -- -D warnings
@@ -80,6 +84,7 @@ jobs:
 
   wasm:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       LLVM_PREFIX: /usr/lib/llvm-18
     steps:
@@ -102,6 +107,7 @@ jobs:
           cache-all-crates: "true"
           cache-on-failure: "true"
           prefix-key: v0-rust-wasm
+          save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Check wasm
         run: make check-wasm

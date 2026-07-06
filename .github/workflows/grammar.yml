@@ -6,15 +6,20 @@ on:
     branches:
       - master
   pull_request:
-    types:
-      - opened
-      - synchronize
     branches:
       - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   tree-sitter:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: tree-sitter-plotnik
