@@ -1,0 +1,14 @@
+Q = (program (ERROR !name))
+------------------ DIAGNOSTICS -------------------
+error: `(ERROR)` cannot have children
+ --> query.ptk:1:21
+  |
+1 | Q = (program (ERROR !name))
+  |                     ^^^^^
+  |
+help: remove the children
+  |
+1 - Q = (program (ERROR !name))
+1 + Q = (program (ERROR ))
+  |
+help: `(ERROR)` matches any error node as a leaf; use `(MISSING "x")` to match a missing token

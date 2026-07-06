@@ -1,0 +1,9 @@
+Q = (ERROR ;x
+------------------ DIAGNOSTICS -------------------
+error: missing closing `)`
+ --> query.ptk:1:14
+  |
+1 | Q = (ERROR ;x
+  |              ^
+  |
+help: add `)` to close the node

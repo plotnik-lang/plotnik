@@ -1,0 +1,12 @@
+Q = [
+  Foo: .
+  Bar: (pair)
+]
+------------------ DIAGNOSTICS -------------------
+error: anchors cannot appear directly in alternations
+ --> query.ptk:2:8
+  |
+2 |   Foo: .
+  |        ^
+  |
+help: use `[{(a) . (b)} (c)]` to anchor within a branch

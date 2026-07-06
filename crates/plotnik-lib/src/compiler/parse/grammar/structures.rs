@@ -1,6 +1,7 @@
 use rowan::{Checkpoint, TextRange};
 
 use crate::compiler::diagnostics::report::DiagnosticKind;
+use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::Parser;
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::parse::token_set::{
@@ -375,16 +376,8 @@ impl<'q> Parser<'q, '_> {
     fn parse_error_node(&mut self, checkpoint: Checkpoint) {
         self.start_node_at(checkpoint, SyntaxKind::NamedNode);
         self.bump();
-        if !self.at(SyntaxKind::ParenClose) {
-            let children_start = self.current_span().start();
-            self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY_TOKENS);
-            let children_end = self.last_non_trivia_end().unwrap_or(children_start);
-            let children_span = TextRange::new(children_start, children_end);
-            if let Some(report) =
-                self.report_at(DiagnosticKind::ErrorTakesNoArguments, children_span)
-            {
-                report.fix("remove the children", "").emit();
-            }
+        if !self.at(SyntaxKind::ParenClose) && !self.eof() {
+            self.parse_forbidden_children(DiagnosticKind::ErrorTakesNoArguments);
         }
         self.pop_delimiter();
         self.expect_close(SyntaxKind::ParenClose, DiagnosticKind::UnclosedTree);
@@ -401,25 +394,58 @@ impl<'q> Parser<'q, '_> {
             SyntaxKind::SingleQuote | SyntaxKind::DoubleQuote => {
                 self.skip_string_tokens();
             }
-            SyntaxKind::ParenClose => {}
-            _ => {
-                self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY_TOKENS);
-            }
+            _ => {}
+        }
+        // A missing node is a zero-width token, so children could never
+        // match anything; only the optional kind argument above is legal.
+        if !self.at(SyntaxKind::ParenClose) && !self.eof() {
+            self.parse_forbidden_children(DiagnosticKind::MissingTakesNoChildren);
         }
         self.pop_delimiter();
         self.expect_close(SyntaxKind::ParenClose, DiagnosticKind::UnclosedTree);
         self.finish_node();
     }
 
+    /// Parse children where none are allowed (`(ERROR ...)` / `(MISSING ...)`),
+    /// then report `kind` spanning everything consumed.
+    fn parse_forbidden_children(&mut self, kind: DiagnosticKind) {
+        let children_start = self.current_span().start();
+        self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY_TOKENS);
+        // `parse_children` can bail without consuming (a fatal error, or
+        // trivia was all that remained), leaving the last non-trivia end
+        // before `children_start`; degrade to an empty span rather than an
+        // inverted one.
+        let children_end = self
+            .last_non_trivia_end()
+            .map_or(children_start, |end| end.max(children_start));
+        let children_span = TextRange::new(children_start, children_end);
+        // Reported past `report_at`: the parse above may already have
+        // reported at this exact offset (e.g. the `!field` deprecation
+        // warning), and the parser's one-diagnostic-per-offset dedup would
+        // swallow this error — the one that actually gates the pipeline.
+        self.diagnostics
+            .report(kind, Span::new(self.source_id, children_span))
+            .fix("remove the children", "")
+            .emit();
+    }
+
     fn finish_named_node_parsing(&mut self, checkpoint: Checkpoint, head: ParenHead<'q>) {
-        let has_children = !self.at(SyntaxKind::ParenClose);
+        // At EOF there are no children, only an unclosed tree; without this
+        // check the DefRef arm below would report phantom children there.
+        let has_children = !self.at(SyntaxKind::ParenClose) && !self.eof();
 
         match head {
             ParenHead::DefRef(name) if has_children => {
                 self.start_node_at(checkpoint, SyntaxKind::NamedNode);
                 let children_start = self.current_span().start();
                 self.parse_children(SyntaxKind::ParenClose, NODE_RECOVERY_TOKENS);
-                let children_end = self.last_non_trivia_end().unwrap_or(children_start);
+                // `parse_children` can bail without consuming (a fatal error,
+                // or trivia was all that remained), leaving the last
+                // non-trivia end before `children_start`; degrade to an empty
+                // span rather than an inverted one.
+                let children_end = self
+                    .last_non_trivia_end()
+                    .map_or(children_start, |end| end.max(children_start));
                 let children_span = TextRange::new(children_start, children_end);
 
                 if let Some(report) =
@@ -463,6 +489,15 @@ impl<'q> Parser<'q, '_> {
             }
             if self.at_ts(SEPARATORS) {
                 self.error_skip_separator();
+                continue;
+            }
+            // A sequence only groups siblings; a negated field constrains the
+            // enclosing node and is only consumed as a node's direct child —
+            // inside `{...}` it would be dropped on the floor.
+            if until == SyntaxKind::BraceClose
+                && matches!(self.current(), SyntaxKind::Minus | SyntaxKind::Negation)
+            {
+                self.parse_rejected_positional(DiagnosticKind::NegatedFieldInSequence);
                 continue;
             }
             if self.at_ts(PATTERN_FIRST_TOKENS) {
@@ -542,9 +577,15 @@ impl<'q> Parser<'q, '_> {
                 }
                 continue;
             }
-            // Anchors cannot appear directly in alternations - they create empty branches
+            // Anchors and negated fields cannot form branches — a branch must
+            // be a pattern, and these are zero-width assertions. Parse them
+            // anyway (with their suffix rejection) and report on the spot.
             if matches!(self.current(), SyntaxKind::Dot | SyntaxKind::DotBang) {
-                self.error_and_bump(DiagnosticKind::AnchorInAlternation);
+                self.parse_rejected_positional(DiagnosticKind::AnchorInAlternation);
+                continue;
+            }
+            if matches!(self.current(), SyntaxKind::Minus | SyntaxKind::Negation) {
+                self.parse_rejected_positional(DiagnosticKind::NegatedFieldInAlternation);
                 continue;
             }
             if self.at_ts_predicate() {
@@ -614,7 +655,7 @@ impl<'q> Parser<'q, '_> {
 
         self.expect(SyntaxKind::Colon, "':' after branch label");
 
-        self.parse_required_pattern();
+        self.parse_branch_body();
 
         self.finish_node();
     }
@@ -634,7 +675,7 @@ impl<'q> Parser<'q, '_> {
         self.bump();
         self.expect(SyntaxKind::Colon, "':' after branch label");
 
-        self.parse_required_pattern();
+        self.parse_branch_body();
 
         self.finish_node();
     }

@@ -1,0 +1,9 @@
+Q = (pair key: .)
+------------------ DIAGNOSTICS -------------------
+error: an anchor cannot be a field value
+ --> query.ptk:1:16
+  |
+1 | Q = (pair key: .)
+  |                ^
+  |
+help: anchors order siblings: `(parent (a) . (b))`; a field needs a pattern to match

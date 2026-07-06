@@ -1,0 +1,9 @@
+Q = (pair {(string) !key})
+------------------ DIAGNOSTICS -------------------
+error: negated fields cannot appear in sequences
+ --> query.ptk:1:21
+  |
+1 | Q = (pair {(string) !key})
+  |                     ^^^^
+  |
+help: a negated field applies to the enclosing node; make it a direct child: `(node -field {...})`
