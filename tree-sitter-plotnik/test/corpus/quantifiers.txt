@@ -1,0 +1,100 @@
+================================================================================
+Greedy quantifiers
+================================================================================
+Q = (p (a)? (b)* (c)+)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (quantified_pattern
+        (named_node
+          (identifier))
+        (quantifier))
+      (quantified_pattern
+        (named_node
+          (identifier))
+        (quantifier))
+      (quantified_pattern
+        (named_node
+          (identifier))
+        (quantifier)))))
+
+================================================================================
+Non-greedy quantifiers
+================================================================================
+Q = (p (a)?? (b)*? (c)+?)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (quantified_pattern
+        (named_node
+          (identifier))
+        (quantifier))
+      (quantified_pattern
+        (named_node
+          (identifier))
+        (quantifier))
+      (quantified_pattern
+        (named_node
+          (identifier))
+        (quantifier)))))
+
+================================================================================
+Quantifiers on strings, sequences, alternations, refs
+================================================================================
+Q = (p "x"? {(a) (b)}* [(c) (d)]+ (Ref)*)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (quantified_pattern
+        (string
+          (string_content))
+        (quantifier))
+      (quantified_pattern
+        (sequence
+          (named_node
+            (identifier))
+          (named_node
+            (identifier)))
+        (quantifier))
+      (quantified_pattern
+        (alternation
+          (branch
+            (named_node
+              (identifier)))
+          (branch
+            (named_node
+              (identifier))))
+        (quantifier))
+      (quantified_pattern
+        (def_ref
+          (type_identifier))
+        (quantifier)))))
+
+================================================================================
+Quantifier separated by whitespace still binds
+================================================================================
+Q = (p (a)
+  *)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (quantified_pattern
+        (named_node
+          (identifier))
+        (quantifier)))))

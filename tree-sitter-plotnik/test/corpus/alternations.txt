@@ -1,0 +1,167 @@
+================================================================================
+Union
+================================================================================
+Q = (p [
+  (identifier) @name
+  (string) @name
+])
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (alternation
+        (branch
+          (captured_pattern
+            (named_node
+              (identifier))
+            (capture)))
+        (branch
+          (captured_pattern
+            (named_node
+              (identifier))
+            (capture)))))))
+
+================================================================================
+Enum with labels
+================================================================================
+Stmt = [
+  Assign: (assignment_expression left: (identifier) @left)
+  Call: (call_expression function: (identifier) @func)
+]
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (alternation
+      (branch
+        (type_identifier)
+        (named_node
+          (identifier)
+          (captured_pattern
+            (field
+              (identifier)
+              (named_node
+                (identifier)))
+            (capture))))
+      (branch
+        (type_identifier)
+        (named_node
+          (identifier)
+          (captured_pattern
+            (field
+              (identifier)
+              (named_node
+                (identifier)))
+            (capture)))))))
+
+================================================================================
+Quantified and captured branches
+================================================================================
+Q = (p [(a)* @xs (b) @_ {(c) . (d)}])
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (alternation
+        (branch
+          (captured_pattern
+            (quantified_pattern
+              (named_node
+                (identifier))
+              (quantifier))
+            (capture)))
+        (branch
+          (captured_pattern
+            (named_node
+              (identifier))
+            (suppressive_capture)))
+        (branch
+          (sequence
+            (named_node
+              (identifier))
+            (anchor)
+            (named_node
+              (identifier))))))))
+
+================================================================================
+Labeled branch body: field constraint
+================================================================================
+Q = (p [A: f: (x) @v B: (y)])
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (alternation
+        (branch
+          (type_identifier)
+          (captured_pattern
+            (field
+              (identifier)
+              (named_node
+                (identifier)))
+            (capture)))
+        (branch
+          (type_identifier)
+          (named_node
+            (identifier)))))))
+
+================================================================================
+Empty alternation
+================================================================================
+Q = (p [])
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (alternation))))
+
+================================================================================
+Recursive enum from the docs
+================================================================================
+MemberChain = [
+  Base: (identifier) @name
+  Access: (member_expression
+    object: (MemberChain) @object
+    property: (property_identifier) @property)
+]
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (alternation
+      (branch
+        (type_identifier)
+        (captured_pattern
+          (named_node
+            (identifier))
+          (capture)))
+      (branch
+        (type_identifier)
+        (named_node
+          (identifier)
+          (captured_pattern
+            (field
+              (identifier)
+              (def_ref
+                (type_identifier)))
+            (capture))
+          (captured_pattern
+            (field
+              (identifier)
+              (named_node
+                (identifier)))
+            (capture)))))))

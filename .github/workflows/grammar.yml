@@ -1,0 +1,32 @@
+name: grammar
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+    types:
+      - opened
+      - synchronize
+    branches:
+      - master
+
+jobs:
+  tree-sitter:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tree-sitter-plotnik
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Install tree-sitter CLI
+        run: npm install -g tree-sitter-cli@0.26.10
+
+      - name: Generate parser
+        run: tree-sitter generate
+
+      - name: Test grammar
+        run: tree-sitter test
