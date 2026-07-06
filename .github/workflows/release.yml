@@ -10,6 +10,7 @@ env:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -25,14 +26,16 @@ jobs:
         with:
           cache-all-crates: "true"
 
-      - name: Check
-        run: cargo check --workspace --all-targets
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@4684b8405694ae9dd42c9f39ba901a70ae83f4a3 # v2.82.9
+        with:
+          tool: cargo-nextest
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: make clippy
 
       - name: Test
-        run: cargo test --workspace
+        run: make test
 
   publish:
     needs: verify

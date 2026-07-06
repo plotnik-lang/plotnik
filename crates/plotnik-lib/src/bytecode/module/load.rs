@@ -70,6 +70,8 @@ pub enum ModuleError {
     MalformedTransitions,
     #[error("effect stack imbalance at step {0}")]
     EffectStackImbalance(u16),
+    #[error("effect stack analysis budget exceeded at step {0}")]
+    EffectStackBudget(u16),
     #[error("cursor depth imbalance at step {0}")]
     DepthImbalance(u16),
     #[error("invalid span entry at index {0}")]

@@ -4,8 +4,10 @@
 //! sequence of the winning path. Five of its operations panic on an ill-shaped
 //! builder stack — `Push`/`ArrayClose` want an `Array` on top, `Set` a `Struct` or
 //! `Enum`, `StructClose` a `Struct`, `EnumClose` an `Enum`
-//! (`crates/plotnik-lib/src/vm/engine/materializer.rs`) — and the VM's `emit_effect`
-//! panics if a `SuppressEnd` underflows the suppression counter
+//! (`crates/plotnik-lib/src/vm/engine/materializer.rs`) — plus `EnumClose`
+//! panics when a payload arrives both as the pending value and as direct
+//! fields, the end-of-log assert panics on unclosed frames, and the VM's
+//! `emit_effect` panics if a `SuppressEnd` underflows the suppression counter
 //! (`crates/plotnik-lib/src/vm/engine/vm.rs`). On compiler output these are
 //! unreachable by construction; on a forged module that swaps one effect they
 //! are not. This pass proves them unreachable for *any* module that passes
@@ -27,6 +29,38 @@
 //! descending through `Call` and resuming at its return address — exactly the
 //! edge set that orders effects at runtime.
 //!
+//! ## Why state *sets* (collecting semantics)
+//!
+//! The panic-freedom property is per *path*: every graph path must replay to a
+//! well-shaped effect sequence. Distinct paths may legally reach the same step
+//! with different abstract states — the dedup pass hash-conses structurally
+//! identical branch tails, so e.g. two enum branches share one `EnumClose`
+//! step, reached once under `Enum(A)` and once under `Enum(B)`. Each arrival
+//! is individually sound (dedup is a bisimulation quotient: it preserves the
+//! op-labeled path set exactly), so the walk keeps a *set* of states per step
+//! and verifies every effect against every state that reaches it. Requiring a
+//! single state per step — as this pass once did — rejected modules the
+//! compiler itself emitted.
+//!
+//! Termination against forged modules cannot rely on the state sets converging
+//! on their own — a net-growing cycle would mint a deeper stack every lap. Two
+//! bounds close that off, both loose enough that compiler output never trips
+//! them:
+//!
+//! - **Derived depth bounds.** A state's frame stack can never legitimately be
+//!   deeper than the total number of frame-opening effects on the steps the
+//!   walk has visited: every push comes from a visited step, and revisiting a
+//!   step at a strictly greater depth proves a net-positive cycle, which can
+//!   never rebalance — every exit requires an empty local stack, so some path
+//!   through such a cycle is provably ill-formed. The suppression counter and
+//!   span stack get the same treatment against their own opener counts.
+//! - **A state budget.** Frame payloads (enum member, `got_data`, pending) are
+//!   finite but can multiply across nesting; a hard cap on states explored per
+//!   body bounds load time on adversarial input. Compiler output stays far
+//!   below it: the states at a merged step correspond to the pre-dedup twins,
+//!   and step addresses are `u16`, so a body contributes at most tens of
+//!   thousands of states in total.
+//!
 //! ## Why summaries
 //!
 //! Inlining does not terminate: captured recursion grows the builder stack one
@@ -34,17 +68,43 @@
 //! definition body is, by the compiler's scope discipline, *net-neutral* on the
 //! builder stack (it closes every frame it opens) and reads at most the caller's
 //! top frame before pushing one of its own. So a body's whole interprocedural
-//! effect collapses to a single constraint — the set of caller-top kinds it
-//! tolerates (`entry_tos`) — plus the verified facts that it is net-neutral and
-//! suppression-balanced. Calls apply that constraint instead of inlining, which
-//! both terminates and stays sound. The constraints are computed by a monotone
-//! fixpoint (a callee that reads its caller's top before pushing propagates the
-//! constraint up to its own callers), then a final pass checks every call site
-//! and every entrypoint wrapper against the stabilized constraints.
+//! effect collapses to a small summary — the set of caller-top kinds it
+//! tolerates (`entry_tos`), whether it may `Set` into the caller's top frame
+//! (`sets_caller_top`), and the pending state it returns — plus the verified
+//! facts that it is net-neutral and suppression-balanced. Calls apply that
+//! summary instead of inlining, which both terminates and stays sound. The
+//! summaries are computed by a monotone fixpoint (a callee that reads its
+//! caller's top before pushing propagates the constraint up to its own
+//! callers), then a final pass checks every call site and every entrypoint
+//! wrapper against the stabilized summaries.
+//!
+//! `sets_caller_top` exists because a below-entry `Set` mutates state the
+//! caller's walk otherwise cannot see: setting a field on the caller's *enum*
+//! frame flips the data the frame will carry at its `EnumClose`. A call site
+//! whose local top is an enum therefore forks the state — one branch assumes
+//! the write happened, one that it did not — so a stale `got_data` can never
+//! smuggle a "payload arrived both as pending value and as direct fields"
+//! panic past the check.
+//!
+//! A successor-less `Match` accepts the *whole run* from any call depth,
+//! freezing the log with every caller frame still open. Inside an entrypoint
+//! wrapper the local stack is the global stack, so the existing exit check is
+//! exact; inside a body reachable through `Call` the caller's frames are
+//! invisible here, so such accepts are rejected outright — the compiler ends
+//! every definition body with `Return` and only accepts at wrapper level.
 //!
 //! Net-neutrality, no popping below entry, and suppression balance are not
 //! assumed — they are verified, so a forged body that violates them is rejected
 //! rather than silently mismodeled.
+//!
+//! ## Scope
+//!
+//! This pass proves the release-build panic surface unreachable, plus the
+//! span-pairing and enum void/data-consistency assertions. Full agreement
+//! between materialized values and the declared type tables (checked by
+//! `debug_verify_type` in debug builds) is a compiler self-check, not a load
+//! guarantee: a forged module can still declare types its effects do not
+//! produce.
 
 use std::collections::HashMap;
 
@@ -74,6 +134,12 @@ impl FrameKind {
 enum PendingState {
     Empty,
     Full,
+    /// Produced by calls whose callee summary has not converged (recursion
+    /// mid-fixpoint) or never converges. The latter means no exit of the
+    /// callee ever has a known pending — every exit sits behind an unresolved
+    /// recursive call — so the callee can never actually return at runtime
+    /// and the states downstream of the call are unreachable; validating them
+    /// permissively is sound.
     Unknown,
 }
 
@@ -100,10 +166,20 @@ const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_ENUM;
 /// `Set` targets — a `Struct` or an `Enum` frame.
 const KS_SET: u8 = KS_STRUCT | KS_ENUM;
 
+/// Hard cap on abstract states explored per body walk. Compiler output is
+/// bounded by the pre-dedup instruction count (`u16` step space); only a
+/// forged module engineering a combinatorial frame-payload blowup can get
+/// near this, and rejecting it bounds load time.
+const STATE_BUDGET: usize = 1 << 18;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct DefSummary {
     entry_tos: u8,
     returns_pending: Option<bool>,
+    /// Some path in the body `Set`s the caller's top frame (directly or via a
+    /// transitive callee). Call sites must account for the write both having
+    /// and not having happened.
+    sets_caller_top: bool,
 }
 
 impl DefSummary {
@@ -111,6 +187,7 @@ impl DefSummary {
         Self {
             entry_tos: KS_ANY,
             returns_pending: None,
+            sets_caller_top: false,
         }
     }
 }
@@ -128,11 +205,16 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     for entrypoint in entrypoints.iter() {
         push_unique(&mut defs, u16::from(entrypoint.target()));
     }
+    // Entries reached through a `Call` — these run with caller frames live, so
+    // a whole-run accept inside them is banned (see module docs).
+    let mut called: Vec<u16> = Vec::new();
 
     let mut summaries: DefSummaries = defs.iter().map(|&d| (d, DefSummary::unknown())).collect();
 
-    // Monotone fixpoint: `entry_tos` only ever shrinks (intersection), and the
-    // definition set only grows, both within finite bounds, so this terminates.
+    // Monotone fixpoint: `entry_tos` only ever shrinks (intersection),
+    // `sets_caller_top` only flips on, `returns_pending` only becomes known,
+    // and the definition/called sets only grow, all within finite bounds, so
+    // this terminates.
     loop {
         let mut changed = false;
         let mut i = 0;
@@ -140,10 +222,14 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
             let entry = defs[i];
             i += 1;
 
-            let analysis = analyze(module, &summaries, entry, false)?;
+            let is_called = called.contains(&entry);
+            let analysis = analyze(module, &summaries, entry, is_called, false)?;
             for target in analysis.discovered {
                 if push_unique(&mut defs, target) {
                     summaries.insert(target, DefSummary::unknown());
+                    changed = true;
+                }
+                if push_unique(&mut called, target) {
                     changed = true;
                 }
             }
@@ -151,6 +237,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
             let next = DefSummary {
                 entry_tos: analysis.entry_tos,
                 returns_pending: analysis.returns_pending,
+                sets_caller_top: analysis.sets_caller_top,
             };
             let slot = summaries.entry(entry).or_insert(DefSummary::unknown());
             if *slot != next {
@@ -166,7 +253,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     // Final pass: with stabilized constraints, check every call site (membership
     // of the caller's top in the callee's `entry_tos`) inside each body...
     for &entry in &defs {
-        analyze(module, &summaries, entry, true)?;
+        analyze(module, &summaries, entry, called.contains(&entry), true)?;
     }
 
     // ...and every entrypoint wrapper. A wrapper has no caller, so a residual
@@ -174,7 +261,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     // wrapper itself opened and hit the materializer's result root frame.
     for entrypoint in entrypoints.iter() {
         let target = u16::from(entrypoint.target());
-        let wrapper = analyze(module, &summaries, target, true)?;
+        let wrapper = analyze(module, &summaries, target, called.contains(&target), true)?;
         if wrapper.entry_tos != KS_ANY {
             return Err(ModuleError::EffectStackImbalance(target));
         }
@@ -188,58 +275,102 @@ struct Analysis {
     entry_tos: u8,
     /// Whether every exit from this body leaves a pending value.
     returns_pending: Option<bool>,
+    /// Whether some path `Set`s into the caller's top frame.
+    sets_caller_top: bool,
     /// Call targets reached — definitions to summarize.
     discovered: Vec<u16>,
 }
 
-/// Per-step abstract state at instruction entry: the builder frames pushed so
-/// far (relative to this body's entry), suppression depth, open span ids, and
+/// Abstract state at instruction entry: the builder frames pushed so far
+/// (relative to this body's entry), suppression depth, open span ids, and
 /// pending register.
-type FrameState = (Vec<FrameKind>, i32, Vec<u16>, PendingState);
+#[derive(Clone, PartialEq, Eq)]
+struct AbsState {
+    stack: Vec<FrameKind>,
+    suppress: i32,
+    span_stack: Vec<u16>,
+    pending: PendingState,
+}
 
-/// Walk one body, computing its `entry_tos` and verifying its structural
-/// invariants. When `final_check` is set, also verify each call site against
-/// `summaries`.
+impl AbsState {
+    fn initial() -> Self {
+        Self {
+            stack: Vec::new(),
+            suppress: 0,
+            span_stack: Vec::new(),
+            pending: PendingState::Empty,
+        }
+    }
+}
+
+/// Walk one body, computing its summary facts and verifying its structural
+/// invariants against every abstract state that reaches each step. When
+/// `final_check` is set, also verify each call site against `summaries`.
 fn analyze(
     module: &Module,
     summaries: &DefSummaries,
     entry: u16,
+    is_called: bool,
     final_check: bool,
 ) -> Result<Analysis, ModuleError> {
     let mut entry_tos = KS_ANY;
     let mut returns_pending = None;
+    let mut sets_caller_top = false;
     let mut discovered = Vec::new();
-    // Each step is processed once at a concrete abstract state. Recursive calls
-    // can temporarily return `Unknown` while summaries converge; a later known
-    // state refines that placeholder. Two different known states are a real
-    // confluence/back-edge disagreement and are rejected.
-    let mut memo: HashMap<u16, FrameState> = HashMap::new();
-    let mut work: Vec<(u16, FrameState)> =
-        vec![(entry, (Vec::new(), 0, Vec::new(), PendingState::Empty))];
 
-    while let Some((step, (stack, suppress, span_stack, pending))) = work.pop() {
-        if let Some((seen_stack, seen_suppress, seen_span_stack, seen_pending)) = memo.get(&step) {
-            if seen_stack != &stack || *seen_suppress != suppress {
-                return Err(ModuleError::EffectStackImbalance(step));
+    // Collecting semantics: every distinct abstract state a step is reached
+    // with is kept and processed once. The opener tallies accumulate, per
+    // visited step, how many frame/suppression/span openers exist — a state
+    // outgrowing them proves a net-positive cycle (see module docs).
+    let mut memo: HashMap<u16, Vec<AbsState>> = HashMap::new();
+    let mut states_spent: usize = 0;
+    let mut frame_openers: usize = 0;
+    let mut suppress_openers: i32 = 0;
+    let mut span_openers: usize = 0;
+
+    let mut work: Vec<(u16, AbsState)> = vec![(entry, AbsState::initial())];
+
+    while let Some((step, state)) = work.pop() {
+        let instruction = module.decode_step(step);
+
+        let seen = memo.entry(step).or_insert_with(|| {
+            if let Instruction::Match(m) = &instruction {
+                for eff in m.effects() {
+                    match eff.kind {
+                        EffectKind::ArrayOpen | EffectKind::StructOpen | EffectKind::EnumOpen => {
+                            frame_openers += 1;
+                        }
+                        EffectKind::SuppressBegin => suppress_openers += 1,
+                        EffectKind::SpanStartAt | EffectKind::SpanStart => span_openers += 1,
+                        _ => {}
+                    }
+                }
             }
-            if seen_span_stack != &span_stack {
-                return Err(ModuleError::SpanImbalance(step));
-            }
-            if *seen_pending == pending || pending == PendingState::Unknown {
-                continue;
-            }
-            if *seen_pending != PendingState::Unknown {
-                return Err(ModuleError::EffectStackImbalance(step));
-            }
+            Vec::new()
+        });
+        if seen.contains(&state) {
+            continue;
         }
-        memo.insert(step, (stack.clone(), suppress, span_stack.clone(), pending));
+        if state.stack.len() > frame_openers || state.suppress > suppress_openers {
+            return Err(ModuleError::EffectStackImbalance(step));
+        }
+        if state.span_stack.len() > span_openers {
+            return Err(ModuleError::SpanImbalance(step));
+        }
+        states_spent += 1;
+        if states_spent > STATE_BUDGET {
+            return Err(ModuleError::EffectStackBudget(step));
+        }
+        seen.push(state.clone());
 
-        let mut stack = stack;
-        let mut suppress = suppress;
-        let mut span_stack = span_stack;
-        let mut pending = pending;
+        let AbsState {
+            mut stack,
+            mut suppress,
+            mut span_stack,
+            mut pending,
+        } = state;
 
-        match module.decode_step(step) {
+        match instruction {
             Instruction::Return(_) => {
                 record_exit(
                     &stack,
@@ -261,26 +392,35 @@ fn analyze(
                             span_stack: &mut span_stack,
                             pending: &mut pending,
                             entry_tos: &mut entry_tos,
+                            sets_caller_top: &mut sets_caller_top,
                         },
                         step,
                     )?;
                 }
                 if m.succ_count() == 0 {
-                    // A successor-less match accepts (unwinds to the top); the
-                    // surviving stack must be balanced.
-                    record_exit(
-                        &stack,
-                        suppress,
-                        &span_stack,
-                        pending,
-                        &mut returns_pending,
-                        step,
-                    )?;
+                    // A successor-less match accepts the whole run. At wrapper
+                    // level the local stack is the global stack, so balance
+                    // here is exact; under a `Call` the caller's frames are
+                    // still open in the log, so this is never sound.
+                    if is_called {
+                        return Err(ModuleError::EffectStackImbalance(step));
+                    }
+                    if !stack.is_empty() || suppress != 0 {
+                        return Err(ModuleError::EffectStackImbalance(step));
+                    }
+                    if !span_stack.is_empty() {
+                        return Err(ModuleError::SpanImbalance(step));
+                    }
                 } else {
                     for succ in m.successors() {
                         work.push((
                             u16::from(succ),
-                            (stack.clone(), suppress, span_stack.clone(), pending),
+                            AbsState {
+                                stack: stack.clone(),
+                                suppress,
+                                span_stack: span_stack.clone(),
+                                pending,
+                            },
                         ));
                     }
                 }
@@ -288,19 +428,84 @@ fn analyze(
             Instruction::Call(c) => {
                 let target = u16::from(c.target);
                 discovered.push(target);
-                apply_call(
-                    summaries,
-                    target,
-                    CallState {
-                        stack: &stack,
+                let next = u16::from(c.next);
+
+                if suppress > 0 {
+                    // A suppressed callee is frozen: all its data effects are
+                    // dropped, so it is a no-op on the builder stack.
+                    work.push((
+                        next,
+                        AbsState {
+                            stack,
+                            suppress,
+                            span_stack,
+                            pending,
+                        },
+                    ));
+                    continue;
+                }
+                if pending == PendingState::Full {
+                    return Err(ModuleError::EffectStackImbalance(step));
+                }
+
+                let summary = summaries
+                    .get(&target)
+                    .copied()
+                    .unwrap_or_else(DefSummary::unknown);
+                match stack.last() {
+                    Some(&k) => {
+                        if final_check && k.bit() & summary.entry_tos == 0 {
+                            return Err(ModuleError::EffectStackImbalance(step));
+                        }
+                    }
+                    None => {
+                        // The callee's reads and writes land on *our* caller's
+                        // top frame: inherit the constraint and the write flag.
+                        entry_tos &= summary.entry_tos;
+                        if summary.sets_caller_top {
+                            sets_caller_top = true;
+                        }
+                    }
+                }
+
+                let post_pending = summary
+                    .returns_pending
+                    .map(PendingState::from_bool)
+                    .unwrap_or(PendingState::Unknown);
+
+                // A callee that may `Set` our top enum frame forks the state:
+                // the continuation must be sound whether or not the write
+                // happened, or a stale `got_data` would mask the materializer's
+                // pending-plus-fields panic at the eventual `EnumClose`.
+                if summary.sets_caller_top
+                    && let Some(FrameKind::Enum {
+                        got_data: false, ..
+                    }) = stack.last()
+                {
+                    let mut written = stack.clone();
+                    if let Some(FrameKind::Enum { got_data, .. }) = written.last_mut() {
+                        *got_data = true;
+                    }
+                    work.push((
+                        next,
+                        AbsState {
+                            stack: written,
+                            suppress,
+                            span_stack: span_stack.clone(),
+                            pending: post_pending,
+                        },
+                    ));
+                }
+
+                work.push((
+                    next,
+                    AbsState {
+                        stack,
                         suppress,
-                        pending: &mut pending,
-                        entry_tos: &mut entry_tos,
+                        span_stack,
+                        pending: post_pending,
                     },
-                    final_check,
-                    step,
-                )?;
-                work.push((u16::from(c.next), (stack, suppress, span_stack, pending)));
+                ));
             }
         }
     }
@@ -308,6 +513,7 @@ fn analyze(
     Ok(Analysis {
         entry_tos,
         returns_pending,
+        sets_caller_top,
         discovered,
     })
 }
@@ -390,7 +596,10 @@ fn apply_effect(
                 Some(FrameKind::Struct) => {}
                 Some(FrameKind::Enum { got_data, .. }) => *got_data = true,
                 Some(FrameKind::Array) => return Err(err()),
-                None => *state.entry_tos &= KS_SET,
+                None => {
+                    *state.entry_tos &= KS_SET;
+                    *state.sets_caller_top = true;
+                }
             }
             *state.pending = PendingState::Empty;
         }
@@ -435,6 +644,7 @@ struct EffectState<'a> {
     span_stack: &'a mut Vec<u16>,
     pending: &'a mut PendingState,
     entry_tos: &'a mut u8,
+    sets_caller_top: &'a mut bool,
 }
 
 /// A `SpanEnd` must close the innermost open span, with the id the matching
@@ -444,53 +654,6 @@ fn close_span(span_stack: &mut Vec<u16>, id: u16, step: u16) -> Result<(), Modul
         Some(open) if open == id => Ok(()),
         _ => Err(ModuleError::SpanImbalance(step)),
     }
-}
-
-/// Apply a callee summary at a call site: net-neutral on the builder stack, but
-/// the callee may read the frame on top before pushing its own. With an own
-/// frame on top, check it against the callee's `entry_tos`; with none, the read
-/// reaches this body's caller, so propagate the constraint up.
-fn apply_call(
-    summaries: &DefSummaries,
-    target: u16,
-    state: CallState<'_>,
-    final_check: bool,
-    step: u16,
-) -> Result<(), ModuleError> {
-    if state.suppress > 0 {
-        // A suppressed callee is frozen: all its data effects are dropped, so it
-        // is a no-op on the builder stack.
-        return Ok(());
-    }
-    if *state.pending == PendingState::Full {
-        return Err(ModuleError::EffectStackImbalance(step));
-    }
-
-    let summary = summaries
-        .get(&target)
-        .copied()
-        .unwrap_or_else(DefSummary::unknown);
-    let constraint = summary.entry_tos;
-    match state.stack.last() {
-        Some(&k) => {
-            if final_check && k.bit() & constraint == 0 {
-                return Err(ModuleError::EffectStackImbalance(step));
-            }
-        }
-        None => *state.entry_tos &= constraint,
-    }
-    *state.pending = summary
-        .returns_pending
-        .map(PendingState::from_bool)
-        .unwrap_or(PendingState::Unknown);
-    Ok(())
-}
-
-struct CallState<'a> {
-    stack: &'a [FrameKind],
-    suppress: i32,
-    pending: &'a mut PendingState,
-    entry_tos: &'a mut u8,
 }
 
 /// A body must close every frame it opens and balance every suppression bracket

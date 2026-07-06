@@ -23,6 +23,7 @@ use indoc::indoc;
 use super::{ByteStorage, Module, ModuleError};
 use crate::bytecode::effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectKind};
 use crate::bytecode::type_meta::TypeDefKind;
+use crate::bytecode::type_system::TypeKind;
 use crate::bytecode::{
     Header, Nav, SPAN_ENTRY_SIZE, SPAN_NO_BINDING, STEP_SIZE, SpanEntry, SpanKind,
 };
@@ -1002,6 +1003,114 @@ fn forged_suppress_underflow_is_rejected() {
     reseal(&mut bytes);
 
     let err = Module::load(&bytes).expect_err("forged SuppressEnd underflow must be rejected");
+    assert!(
+        matches!(err, ModuleError::EffectStackImbalance(_)),
+        "expected EffectStackImbalance, got {err:?}"
+    );
+}
+
+/// Step index of the last `Return` instruction in the transitions stream.
+fn last_return_step(bytes: &[u8]) -> u16 {
+    let (base, steps) = transitions(bytes);
+    let mut found = None;
+    let mut step = 0u16;
+    while step < steps {
+        let off = base + step as usize * 8;
+        let opcode = bytes[off] & 0x0F;
+        if opcode == 0x7 {
+            found = Some(step);
+        }
+        step += (instr_size(opcode) / 8) as u16;
+    }
+    found.expect("no Return in transitions")
+}
+
+/// Byte offset of the `n`th (0-based) effect slot whose opcode satisfies `want`.
+fn nth_effect_op(bytes: &[u8], n: usize, want: impl Fn(u16) -> bool) -> usize {
+    effect_slots(bytes)
+        .into_iter()
+        .filter(|&off| {
+            want(u16::from_le_bytes([bytes[off], bytes[off + 1]]) >> EFFECT_PAYLOAD_BITS)
+        })
+        .nth(n)
+        .expect("no matching effect slot in transitions")
+}
+
+#[test]
+fn forged_accept_inside_called_def_is_rejected() {
+    // Zero the `next` of the Match8 that flows into the definition body's
+    // `Return`, turning it into a terminal (accepting) match. A successor-less
+    // match accepts the whole run from any call depth, so the wrapper's root
+    // `StructOpen` would still be open in the committed log and the
+    // materializer's end-of-log balance assert would panic. The body is locally
+    // balanced at that point — only the rule that called bodies must not
+    // contain accepts catches it.
+    let mut bytes = emit_bytes(r#"Q = (program (expression_statement (identifier) @name))"#);
+
+    let def_return = last_return_step(&bytes);
+    let (base, steps) = transitions(&bytes);
+    let mut step = 0u16;
+    let mut patched = false;
+    while step < steps {
+        let off = base + step as usize * 8;
+        let opcode = bytes[off] & 0x0F;
+        if opcode == 0x0 && u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]) == def_return {
+            bytes[off + 6..off + 8].copy_from_slice(&0u16.to_le_bytes());
+            patched = true;
+            break;
+        }
+        step += (instr_size(opcode) / 8) as u16;
+    }
+    assert!(patched, "no Match8 flows into the def body's Return");
+    reseal(&mut bytes);
+
+    let err =
+        Module::load(&bytes).expect_err("forged accept inside a called body must be rejected");
+    assert!(
+        matches!(err, ModuleError::EffectStackImbalance(_)),
+        "expected EffectStackImbalance, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_enum_wrapper_hiding_callee_write_is_rejected() {
+    // A definition body `Set`s its capture below entry, into the frame its
+    // wrapper opened. Retarget that write: swap the wrapper's root
+    // `StructOpen`/`StructClose` for `EnumOpen`/`EnumClose` on a void
+    // (tag-only) member borrowed from the other entrypoint. The callee's
+    // below-entry `Set` then lands data on a void variant — invisible to the
+    // wrapper's own walk, because the write happens inside the callee. Only a
+    // call site that forks on the callee's may-write (`sets_caller_top`)
+    // rejects it; a stale `got_data` would let it load and mis-materialize.
+    let mut bytes = emit_bytes(indoc! {r#"
+        A = (program [T: (comment)] @e)
+        Z = (program (function_declaration) @fn)
+    "#});
+
+    let void_member = {
+        let m = Module::load(&bytes).expect("module loads before tampering");
+        let types = m.types();
+        (0..m.header().type_members_count)
+            .find(|&i| {
+                types
+                    .get(types.member_type_id(i as usize))
+                    .is_some_and(|def| {
+                        matches!(def.decode(), TypeDefKind::Primitive(TypeKind::Void))
+                    })
+            })
+            .expect("query must emit a void (tag-only) enum member")
+    };
+
+    // Both wrappers precede the bodies and only wrappers open frames, so slot
+    // order is A's pair then Z's pair; forge Z's.
+    let open_slot = nth_effect_op(&bytes, 1, |op| op == EffectKind::StructOpen as u16);
+    let close_slot = nth_effect_op(&bytes, 1, |op| op == EffectKind::StructClose as u16);
+    bytes[open_slot..open_slot + 2]
+        .copy_from_slice(&effect_word_with_payload(EffectKind::EnumOpen, void_member));
+    bytes[close_slot..close_slot + 2].copy_from_slice(&effect_word(EffectKind::EnumClose));
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("forged void-variant callee write must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"

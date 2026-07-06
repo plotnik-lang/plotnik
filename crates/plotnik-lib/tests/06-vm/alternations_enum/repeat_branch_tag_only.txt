@@ -1,0 +1,99 @@
+Q = (program [
+  A: (expression_statement)+
+  B: (debugger_statement)
+] @x)
+--------------------- INPUT ----------------------
+a; b; c;
+--------------------- TYPES ----------------------
+export type QX =
+  | { $tag: "A" }
+  | { $tag: "B" };
+
+export interface Q {
+  x: QX;
+}
+--------------------- OUTPUT ---------------------
+{
+  "x": {
+    "$tag": "A"
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "A"
+S2 "B"
+S3 "x"
+S4 "QX"
+S5 "Q"
+S6 "program"
+S7 "expression_statement"
+S8 "debugger_statement"
+
+[type_defs]
+T0 = <Void>
+T1 = Enum    M0:2  ; A | B
+T2 = Struct  M2:1  ; { x }
+
+[type_members]
+M0: S1 → T0  ; A: <Void>
+M1: S2 → T0  ; B: <Void>
+M2: S3 → T1  ; x: QX
+
+[type_names]
+N0: S4 → T1  ; QX
+N1: S5 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@24)                            24 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [EnumClose]                      22
+  10   !   (expression_statement)           12, 08
+  12  ─‣─  _                                10, 12
+  14   !   _ [EnumOpen(M0)]                 10, 12
+  16   !   (debugger_statement) [EnumOpen(M1) EnumClose]  22
+  18  ─‣─  _                                14, 16, 18
+  20  └‣─  _                                14, 16, 18
+  22  ─‣┘  _ [Set(M2)]                      06
+  24   !   (program)                        20
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (?)                              24 : 03
+       ▶   (?)
+
+?:
+  24       (program)                        20
+       ●   program
+  20       _                                14, 16, 18
+       ●   expression_statement
+  14       _ [EnumOpen(M0)]                 10, 12
+       ●   expression_statement
+  10       (expression_statement)           12, 08
+       ●   expression_statement
+  12       _                                10, 12
+       ●   expression_statement
+  10       (expression_statement)           12, 08
+       ●   expression_statement
+  12       _                                10, 12
+       ●   expression_statement
+  10       (expression_statement)           12, 08
+       ●   expression_statement
+  12       _                                10, 12
+  10  ❮❮❮ 
+  08  -ε-  [EnumClose]                      22
+  22       _ [Set(M2)]                      06
+       ●   program
+  06   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

@@ -184,52 +184,52 @@ pub(super) struct QuantifierConfig<'a> {
 }
 
 impl NfaBuilder<'_> {
+    /// Split the incoming capture into loop-invariant brackets and per-iteration
+    /// effects. `pre` (enclosing opens, null defaults) runs once before the
+    /// first iteration; everything from the first unmatched close in `post`
+    /// (closes of scopes this quantifier did not open) runs once after the
+    /// last. Only the remaining `post` prefix — this level's own value effects —
+    /// stays on each iteration. Without this split, an enum branch like
+    /// `[A: (x)+ ...]` would re-open its variant scope on every loop pass and
+    /// close it over the previous pass's pending value.
     fn bracket_quantifier(
         &mut self,
         quant: &ast::QuantifiedPattern,
         capture: CaptureEffects,
         exit: Label,
     ) -> QuantBrackets {
-        let Some(span_id) = self.span_id(quant.syntax(), SpanKind::Quantifier) else {
-            return QuantBrackets {
-                inner_capture: capture,
-                exit,
-                entry_pre: vec![],
-                span_id: None,
-                closes: vec![],
-            };
-        };
+        let span_id = self
+            .span_id(quant.syntax(), SpanKind::Quantifier)
+            .map(|id| id.0);
 
         let mut post = capture.post;
         let closes = match first_unmatched_close(&post) {
             Some(split) => post.split_off(split),
             None => vec![],
         };
-        let id = span_id.0;
-        let exit = self.quant_end_step(id, &closes, exit);
         let mut entry_pre = capture.pre;
-        entry_pre.push(EffectIR::span_start(id));
+        if let Some(id) = span_id {
+            entry_pre.push(EffectIR::span_start(id));
+        }
+        let exit = self.quant_end_step(span_id, &closes, exit);
 
         QuantBrackets {
             inner_capture: CaptureEffects::new(vec![], post),
             exit,
             entry_pre,
-            span_id: Some(id),
+            span_id,
             closes,
         }
     }
 
     fn quant_end_for(&mut self, brackets: &QuantBrackets, exit: Label) -> Label {
-        let Some(id) = brackets.span_id else {
-            return exit;
-        };
-        self.quant_end_step(id, &brackets.closes, exit)
+        self.quant_end_step(brackets.span_id, &brackets.closes, exit)
     }
 
-    fn quant_end_step(&mut self, id: u16, closes: &[EffectIR], exit: Label) -> Label {
-        let mut effects = vec![EffectIR::span_end(id)];
+    fn quant_end_step(&mut self, span_id: Option<u16>, closes: &[EffectIR], exit: Label) -> Label {
+        let mut effects: Vec<EffectIR> = span_id.map(EffectIR::span_end).into_iter().collect();
         effects.extend(closes.iter().cloned());
-        self.emit_effects_epsilon(exit, effects, CaptureEffects::default())
+        self.emit_effects_if_nonempty(exit, effects)
     }
 
     /// Whether this quantifier's value is observed by its continuation. The
