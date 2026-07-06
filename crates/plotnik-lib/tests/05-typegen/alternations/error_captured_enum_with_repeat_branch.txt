@@ -3,7 +3,7 @@ Q = (program [
   B: (debugger_statement)
 ] @x)
 ------------------ DIAGNOSTICS -------------------
-error: effect stack imbalance at step 10
+error: effect stack imbalance at step 8
  --> query.ptk:1:1
   |
 1 | / Q = (program [
