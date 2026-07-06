@@ -688,6 +688,10 @@ impl LinkOutcome {
             return;
         }
 
+        // Recomputes the same deterministic assignment lowering will build —
+        // deliberately: threading it into `LowerInput` would couple the
+        // diagnostics stage to lowering internals to save one cheap pre-walk
+        // on the inspection-only path.
         let assignment = assign_spans(&LowerInput {
             analysis: query.analysis_input(),
             symbol_table: query.symbol_table(),

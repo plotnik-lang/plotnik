@@ -85,14 +85,12 @@ impl<'a> NfaBuilder<'a> {
 
     /// The pre-assigned span id for a construct, or `None` when inspection is off
     /// or that construct's tier was dropped by the budget ladder.
-    #[allow(dead_code)]
     pub(super) fn span_id(&self, node: &SyntaxNode, kind: SpanKind) -> Option<SpanId> {
         self.spans
             .as_ref()
             .and_then(|spans| spans.lookup(node, kind))
     }
 
-    #[allow(dead_code)]
     pub(super) fn bind_span(&mut self, id: SpanId, binding: SpanBindingIR) {
         let spans = self
             .spans
@@ -328,8 +326,8 @@ impl<'a> NfaBuilder<'a> {
     /// Wrap this pattern's capture channel in inspection span brackets.
     ///
     /// Node and token patterns use `SpanStartAt` because their `pre` effects land
-    /// on the consuming match instruction. Epsilon-entered constructs are enabled
-    /// in later commits with pure marker starts.
+    /// on the consuming match instruction; epsilon-entered constructs use pure
+    /// marker starts.
     pub(super) fn bracket_pattern_ctx(&mut self, pattern: &Pattern, ctx: PatternCtx) -> PatternCtx {
         let (kind, start_at) = match pattern {
             Pattern::NodePattern(_) | Pattern::TokenPattern(_) => (SpanKind::Pattern, true),

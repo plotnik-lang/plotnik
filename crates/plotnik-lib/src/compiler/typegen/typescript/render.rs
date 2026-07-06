@@ -135,77 +135,92 @@ impl Emitter<'_> {
         let last = variants.len().saturating_sub(1);
         for (i, (variant_name, payload_type, member_idx)) in variants.into_iter().enumerate() {
             let terminator = if i == last { ";" } else { "" };
-            let variant = self.render_variant(&variant_name, payload_type);
             self.output.push_str(&format!("  {}|{} ", c.dim, c.reset));
-            let variant_start = self.output.len();
-            self.output.push_str(&variant);
-            self.record_variant_ranges(
-                variant_start,
-                &variant,
-                type_id,
-                member_idx,
-                &variant_name,
-                payload_type,
-            );
+            self.emit_variant(&variant_name, payload_type, type_id, member_idx);
             self.output
                 .push_str(&format!("{}{}{}\n", c.dim, terminator, c.reset));
         }
         self.output.push('\n');
     }
 
-    fn record_variant_ranges(
+    /// Emit one variant literal, byte-identical to
+    /// [`render_variant`](Self::render_variant), but writing through
+    /// `push_mapped` so the tag and payload field ranges are recorded at push
+    /// time. Re-finding names in rendered text by substring scan is not sound —
+    /// a field name that collides with `$tag:`/`$data:` text binds to the
+    /// wrong offset.
+    fn emit_variant(
         &mut self,
-        variant_start: usize,
-        variant: &str,
-        enum_type: TypeId,
-        variant_member: u16,
         variant_name: &str,
         payload_type: TypeId,
+        enum_type: TypeId,
+        variant_member: u16,
     ) {
-        if !self.map_enabled {
+        let c = self.colors();
+        self.output.push_str(&format!(
+            "{}{{{} $tag{}:{} {}\"",
+            c.dim, c.reset, c.dim, c.reset, c.green
+        ));
+        self.push_mapped(variant_name, enum_type, Some(variant_member));
+        self.output.push_str(&format!("\"{}", c.reset));
+
+        if self.is_void_type(payload_type) {
+            self.output.push_str(&format!(" {}}}{}", c.dim, c.reset));
             return;
         }
 
-        let tag_needle = format!("\"{variant_name}\"");
-        let tag_quote = variant
-            .find(&tag_needle)
-            .expect("rendered enum variant must contain its tag");
-        let tag_start = variant_start + tag_quote + 1;
-        self.record_range(
-            tag_start,
-            tag_start + variant_name.len(),
-            enum_type,
-            Some(variant_member),
-        );
+        self.output
+            .push_str(&format!("{}; $data{}:{} ", c.dim, c.dim, c.reset));
+        self.emit_variant_payload(payload_type);
+        self.output.push_str(&format!(" {}}}{}", c.dim, c.reset));
+    }
 
-        let Some(payload_def) = self.types.get(payload_type) else {
-            return;
-        };
-        if !matches!(payload_def.decode(), TypeDefKind::Struct { .. }) {
+    /// Mapped twin of [`inline_variant_payload`](Self::inline_variant_payload):
+    /// a struct payload inlines with mapped field names, everything else
+    /// renders unmapped.
+    fn emit_variant_payload(&mut self, payload_type: TypeId) {
+        if let Some(type_def) = self.types.get(payload_type)
+            && matches!(type_def.decode(), TypeDefKind::Struct { .. })
+        {
+            self.emit_inline_struct_mapped(&type_def, payload_type);
             return;
         }
+        let rendered = self.render_ty(payload_type);
+        self.output.push_str(&rendered);
+    }
 
-        let mut fields: Vec<(String, u16)> = self
-            .members_of_with_indices(&payload_def)
-            .map(|(idx, member)| (self.strings.get(member.name_id).to_string(), idx))
+    /// Mapped twin of [`inline_struct`](Self::inline_struct) — same bytes,
+    /// field names recorded as they are written.
+    fn emit_inline_struct_mapped(&mut self, type_def: &TypeDef, type_id: TypeId) {
+        let c = self.colors();
+        let mut fields: Vec<(String, TypeId, u16)> = self
+            .members_of_with_indices(type_def)
+            .map(|(idx, member)| {
+                (
+                    self.strings.get(member.name_id).to_string(),
+                    member.type_id,
+                    idx,
+                )
+            })
             .collect();
+        if fields.is_empty() {
+            self.output.push_str(&format!("{}{{}}{}", c.dim, c.reset));
+            return;
+        }
         fields.sort_by(|a, b| a.0.cmp(&b.0));
 
-        let mut cursor = 0;
-        for (field_name, member_idx) in fields {
-            let field_needle = format!("{field_name}:");
-            let rel = variant[cursor..]
-                .find(&field_needle)
-                .unwrap_or_else(|| panic!("rendered variant payload must contain {field_name}"));
-            let field_start = variant_start + cursor + rel;
-            self.record_range(
-                field_start,
-                field_start + field_name.len(),
-                payload_type,
-                Some(member_idx),
-            );
-            cursor += rel + field_needle.len();
+        self.output.push_str(&format!("{}{{{} ", c.dim, c.reset));
+        let last = fields.len() - 1;
+        for (i, (field_name, field_type, member_idx)) in fields.into_iter().enumerate() {
+            self.push_mapped(&field_name, type_id, Some(member_idx));
+            let ts_type = self.render_ty(field_type);
+            self.output
+                .push_str(&format!("{}:{} {}", c.dim, c.reset, ts_type));
+            if i != last {
+                self.output.push_str(&format!("{}; ", c.dim));
+            }
         }
+        self.output.push_str(&format!(" {}}}{}", c.dim, c.reset));
     }
 
     pub(super) fn emit_node_interface(&mut self) {

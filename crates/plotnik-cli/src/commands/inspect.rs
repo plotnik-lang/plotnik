@@ -47,12 +47,12 @@ pub fn run(args: InspectArgs) -> CliResult {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let tokens = loaded
+    let source = loaded
         .sources
         .iter()
         .next()
-        .map(|source| tokenize(source.content))
-        .unwrap_or_default();
+        .expect("non-empty query has a source");
+    let tokens = tokenize(source.content);
     let declared_lang = loaded.shebang.lang.clone();
     let shebang_entry = loaded.shebang.entry.clone();
 

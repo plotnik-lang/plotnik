@@ -30,4 +30,4 @@ wasm-bindgen = "0.2"
 
 [build-dependencies]
 cargo_metadata = "0.23"
-plotnik-lib = { path = "../plotnik-lib", version = "0.3.3", default-features = false }
+plotnik-lib.workspace = true

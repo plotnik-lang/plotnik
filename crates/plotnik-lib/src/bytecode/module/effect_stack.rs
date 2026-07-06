@@ -18,9 +18,11 @@
 //! `Match`'s effects across `Call`/`Return` boundaries, with the VM's suppression
 //! filter applied: `SuppressBegin`/`SuppressEnd` adjust a counter and, while it
 //! is positive, every data effect is dropped before the log. So the abstract
-//! state is `(stack, suppress, span_depth, pending)`: a builder-frame stack, a
-//! suppression depth, the inspection span bracket depth, and whether the
-//! materializer's pending-value register is full. The
+//! state is `(stack, suppress, span_stack, pending)`: a builder-frame stack, a
+//! suppression depth, the stack of open inspection span ids, and whether the
+//! materializer's pending-value register is full. Tracking span *ids* (not just
+//! a depth) proves every `SpanEnd` closes the span the matching bracket opened,
+//! so inspection extraction can assert pairing instead of re-validating. The
 //! walk starts from each entrypoint wrapper and follows `Match` successors,
 //! descending through `Call` and resuming at its return address — exactly the
 //! edge set that orders effects at runtime.
@@ -191,9 +193,9 @@ struct Analysis {
 }
 
 /// Per-step abstract state at instruction entry: the builder frames pushed so
-/// far (relative to this body's entry), suppression depth, span depth, and
+/// far (relative to this body's entry), suppression depth, open span ids, and
 /// pending register.
-type FrameState = (Vec<FrameKind>, i32, u32, PendingState);
+type FrameState = (Vec<FrameKind>, i32, Vec<u16>, PendingState);
 
 /// Walk one body, computing its `entry_tos` and verifying its structural
 /// invariants. When `final_check` is set, also verify each call site against
@@ -212,15 +214,15 @@ fn analyze(
     // state refines that placeholder. Two different known states are a real
     // confluence/back-edge disagreement and are rejected.
     let mut memo: HashMap<u16, FrameState> = HashMap::new();
-    let mut work: Vec<(u16, Vec<FrameKind>, i32, u32, PendingState)> =
-        vec![(entry, Vec::new(), 0, 0, PendingState::Empty)];
+    let mut work: Vec<(u16, FrameState)> =
+        vec![(entry, (Vec::new(), 0, Vec::new(), PendingState::Empty))];
 
-    while let Some((step, stack, suppress, span_depth, pending)) = work.pop() {
-        if let Some((seen_stack, seen_suppress, seen_span_depth, seen_pending)) = memo.get(&step) {
+    while let Some((step, (stack, suppress, span_stack, pending))) = work.pop() {
+        if let Some((seen_stack, seen_suppress, seen_span_stack, seen_pending)) = memo.get(&step) {
             if seen_stack != &stack || *seen_suppress != suppress {
                 return Err(ModuleError::EffectStackImbalance(step));
             }
-            if *seen_span_depth != span_depth {
+            if seen_span_stack != &span_stack {
                 return Err(ModuleError::SpanImbalance(step));
             }
             if *seen_pending == pending || pending == PendingState::Unknown {
@@ -230,11 +232,11 @@ fn analyze(
                 return Err(ModuleError::EffectStackImbalance(step));
             }
         }
-        memo.insert(step, (stack.clone(), suppress, span_depth, pending));
+        memo.insert(step, (stack.clone(), suppress, span_stack.clone(), pending));
 
         let mut stack = stack;
         let mut suppress = suppress;
-        let mut span_depth = span_depth;
+        let mut span_stack = span_stack;
         let mut pending = pending;
 
         match module.decode_step(step) {
@@ -242,7 +244,7 @@ fn analyze(
                 record_exit(
                     &stack,
                     suppress,
-                    span_depth,
+                    &span_stack,
                     pending,
                     &mut returns_pending,
                     step,
@@ -256,7 +258,7 @@ fn analyze(
                         EffectState {
                             stack: &mut stack,
                             suppress: &mut suppress,
-                            span_depth: &mut span_depth,
+                            span_stack: &mut span_stack,
                             pending: &mut pending,
                             entry_tos: &mut entry_tos,
                         },
@@ -269,7 +271,7 @@ fn analyze(
                     record_exit(
                         &stack,
                         suppress,
-                        span_depth,
+                        &span_stack,
                         pending,
                         &mut returns_pending,
                         step,
@@ -278,10 +280,7 @@ fn analyze(
                     for succ in m.successors() {
                         work.push((
                             u16::from(succ),
-                            stack.clone(),
-                            suppress,
-                            span_depth,
-                            pending,
+                            (stack.clone(), suppress, span_stack.clone(), pending),
                         ));
                     }
                 }
@@ -301,7 +300,7 @@ fn analyze(
                     final_check,
                     step,
                 )?;
-                work.push((u16::from(c.next), stack, suppress, span_depth, pending));
+                work.push((u16::from(c.next), (stack, suppress, span_stack, pending)));
             }
         }
     }
@@ -330,13 +329,8 @@ fn apply_effect(
         match effect.kind {
             SuppressBegin => *state.suppress += 1,
             SuppressEnd => *state.suppress -= 1,
-            SpanStartAt | SpanStart => *state.span_depth += 1,
-            SpanEnd => {
-                if *state.span_depth == 0 {
-                    return Err(ModuleError::SpanImbalance(step));
-                }
-                *state.span_depth -= 1;
-            }
+            SpanStartAt | SpanStart => state.span_stack.push(effect.payload as u16),
+            SpanEnd => close_span(state.span_stack, effect.payload as u16, step)?,
             _ => {}
         }
         return Ok(());
@@ -354,13 +348,8 @@ fn apply_effect(
         // At depth 0 a `SuppressEnd` would drive the counter negative — the
         // exact underflow the VM panics on.
         SuppressEnd => return Err(err()),
-        SpanStartAt | SpanStart => *state.span_depth += 1,
-        SpanEnd => {
-            if *state.span_depth == 0 {
-                return Err(ModuleError::SpanImbalance(step));
-            }
-            *state.span_depth -= 1;
-        }
+        SpanStartAt | SpanStart => state.span_stack.push(effect.payload as u16),
+        SpanEnd => close_span(state.span_stack, effect.payload as u16, step)?,
         ArrayOpen => {
             if *state.pending == PendingState::Full {
                 return Err(err());
@@ -443,9 +432,18 @@ fn apply_effect(
 struct EffectState<'a> {
     stack: &'a mut Vec<FrameKind>,
     suppress: &'a mut i32,
-    span_depth: &'a mut u32,
+    span_stack: &'a mut Vec<u16>,
     pending: &'a mut PendingState,
     entry_tos: &'a mut u8,
+}
+
+/// A `SpanEnd` must close the innermost open span, with the id the matching
+/// bracket opened — a lone or mis-paired close is a forged module.
+fn close_span(span_stack: &mut Vec<u16>, id: u16, step: u16) -> Result<(), ModuleError> {
+    match span_stack.pop() {
+        Some(open) if open == id => Ok(()),
+        _ => Err(ModuleError::SpanImbalance(step)),
+    }
 }
 
 /// Apply a callee summary at a call site: net-neutral on the builder stack, but
@@ -500,7 +498,7 @@ struct CallState<'a> {
 fn record_exit(
     stack: &[FrameKind],
     suppress: i32,
-    span_depth: u32,
+    span_stack: &[u16],
     pending: PendingState,
     returns_pending: &mut Option<bool>,
     step: u16,
@@ -508,7 +506,7 @@ fn record_exit(
     if !stack.is_empty() || suppress != 0 {
         return Err(ModuleError::EffectStackImbalance(step));
     }
-    if span_depth != 0 {
+    if !span_stack.is_empty() {
         return Err(ModuleError::SpanImbalance(step));
     }
 

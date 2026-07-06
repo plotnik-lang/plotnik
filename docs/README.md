@@ -36,8 +36,8 @@ docs/
     ├── 05-entrypoints.md # Definition table
     ├── 06-transitions.md # VM instructions and data blocks
     ├── 07-spans.md      # Inspection spans section
-    ├── 07-dump-format.md # Bytecode dump output format
-    └── 08-trace-format.md # Execution trace output format
+    ├── 08-dump-format.md # Bytecode dump output format
+    └── 09-trace-format.md # Execution trace output format
 ```
 
 ## Reading Order
@@ -53,8 +53,8 @@ Building tooling:
 1. `binary-format/01-overview.md` → through `06-transitions.md`
 2. `runtime-engine.md`
 3. `tree-navigation.md`
-4. `binary-format/07-dump-format.md` — Understanding bytecode dumps
-5. `binary-format/08-trace-format.md` — Debugging with execution traces
+4. `binary-format/08-dump-format.md` — Understanding bytecode dumps
+5. `binary-format/09-trace-format.md` — Debugging with execution traces
 
 Contributing:
 

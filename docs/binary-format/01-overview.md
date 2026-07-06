@@ -116,7 +116,7 @@ Validation, in order:
 2. **Reserved bytes** — bytes 44–63 must be zero (the checksum does not cover the
    header, so these are checked explicitly).
 3. **Section bounds** — the section layout is recomputed in 64-bit arithmetic; the
-   Transitions section (and therefore every earlier section) must fit within
+   final section, Spans (and therefore every earlier section), must fit within
    `total_size`.
 4. **Checksum** — CRC32 of everything after the 64-byte header must equal
    `checksum`. This catches accidental corruption of the body.
@@ -126,12 +126,13 @@ Validation, in order:
    deserialize, so the VM's per-evaluation deserialize is a sound invariant.
 7. **TypeDefs** — each kind byte must be known, and every Struct/Enum member range
    (`data + count`) must stay within `type_members_count`.
-8. **String IDs** — every _required_ embedded `StringId` (entrypoint, node/field
+8. **Spans** — each span entry has a known kind, zero flags, `start <= end`, and
+   type/member bindings that are either `0xFFFF` or in range (a live member with
+   no type is rejected). Span effect payloads in transitions must address this
+   table.
+9. **String IDs** — every _required_ embedded `StringId` (entrypoint, node/field
    symbol, type, member, and regex pattern names) must address a real string-table
    entry (`1..str_table_count`), so the `NonZeroU16` accessors never panic.
-9. **Spans** — each span entry has a known kind, zero flags, `start <= end`, and
-   type/member bindings that are either `0xFFFF` or in range. Span effect
-   payloads in transitions must address this table.
 10. **Transitions** — the instruction stream is walked twice. Pass 1 decodes each
     instruction's fixed-size slot, validating opcode, segment, nav, node kind,
     effect opcodes, `Set`/`EnumOpen` member operands, and predicate operands, and

@@ -5,7 +5,9 @@ intended for golden fixtures and debugging compiler output.
 
 ## Sections
 
-The dump follows bytecode section order:
+The dump prints sections in this fixed order (matching the wire layout, except
+`[spans]` — the final wire section — which is grouped with the other tables so
+`[transitions]` stays last):
 
 ```text
 [strings]

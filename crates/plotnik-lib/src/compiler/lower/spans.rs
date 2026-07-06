@@ -18,7 +18,6 @@ pub(crate) struct SpanId(pub(crate) u16);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SpanBindingIR {
     Type(TypeId),
-    #[allow(dead_code)]
     Member(MemberRef),
 }
 

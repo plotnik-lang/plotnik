@@ -1,7 +1,5 @@
 //! Structured VM run recording for debugger-oriented trace output.
 
-use std::marker::PhantomData;
-
 use arborium_tree_sitter::Node;
 use serde::Serialize;
 
@@ -57,10 +55,11 @@ pub struct NodeRef {
 
 struct Shadow {
     span_depth: usize,
+    effect_len: u32,
     record_idx: u32,
 }
 
-pub struct RecordingTracer<'m> {
+pub struct RecordingTracer {
     render: ModuleRenderContext,
     steps: Vec<StepRecord>,
     span_stack: Vec<u16>,
@@ -70,11 +69,10 @@ pub struct RecordingTracer<'m> {
     current_ip: u16,
     effect_len: u32,
     records_seen: u32,
-    _module: PhantomData<&'m Module>,
 }
 
-impl<'m> RecordingTracer<'m> {
-    pub fn new(module: &'m Module, max_records: usize) -> Self {
+impl RecordingTracer {
+    pub fn new(module: &Module, max_records: usize) -> Self {
         Self {
             render: ModuleRenderContext::new(module),
             steps: Vec::new(),
@@ -85,7 +83,6 @@ impl<'m> RecordingTracer<'m> {
             current_ip: 0,
             effect_len: 0,
             records_seen: 0,
-            _module: PhantomData,
         }
     }
 
@@ -121,6 +118,13 @@ impl<'m> RecordingTracer<'m> {
         }
 
         record_idx
+    }
+
+    /// Whether the next record still lands in the buffer. Once saturated,
+    /// formatting effect strings would be wasted allocation — `add_record`
+    /// drops the event anyway.
+    fn keeps_records(&self) -> bool {
+        self.steps.len() < self.max_records
     }
 
     fn bump_effect_len(&mut self) {
@@ -190,7 +194,7 @@ impl<'m> RecordingTracer<'m> {
     }
 }
 
-impl Tracer for RecordingTracer<'_> {
+impl Tracer for RecordingTracer {
     fn trace_instruction(&mut self, ip: u16, _instr: &Instruction<'_>) {
         self.current_ip = ip;
         self.add_record(StepEvent::Instruction, None);
@@ -229,7 +233,11 @@ impl Tracer for RecordingTracer<'_> {
     }
 
     fn trace_effect(&mut self, effect: &RuntimeEffect<'_>) {
-        let effect_name = self.format_runtime_effect(effect);
+        let effect_name = if self.keeps_records() {
+            self.format_runtime_effect(effect)
+        } else {
+            String::new()
+        };
         let node = Self::effect_node(effect);
         self.bump_effect_len();
 
@@ -268,12 +276,20 @@ impl Tracer for RecordingTracer<'_> {
     }
 
     fn trace_effect_suppressed(&mut self, opcode: EffectKind, payload: usize) {
-        let effect = self.format_opcode(opcode, payload);
+        let effect = if self.keeps_records() {
+            self.format_opcode(opcode, payload)
+        } else {
+            String::new()
+        };
         self.add_record(StepEvent::SuppressedEffect { effect }, None);
     }
 
     fn trace_suppress_control(&mut self, opcode: EffectKind, suppressed: bool) {
-        let effect = self.format_opcode(opcode, 0);
+        let effect = if self.keeps_records() {
+            self.format_opcode(opcode, 0)
+        } else {
+            String::new()
+        };
         let event = if suppressed {
             StepEvent::SuppressedEffect { effect }
         } else {
@@ -294,6 +310,7 @@ impl Tracer for RecordingTracer<'_> {
         let record_idx = self.add_record_at(ip, StepEvent::CheckpointNew, None);
         self.shadow.push(Shadow {
             span_depth: self.span_stack.len(),
+            effect_len: self.effect_len,
             record_idx,
         });
     }
@@ -304,6 +321,9 @@ impl Tracer for RecordingTracer<'_> {
             .pop()
             .expect("trace_backtrack requires a matching checkpoint");
         self.span_stack.truncate(shadow.span_depth);
+        // The VM truncates its effect log to the checkpoint's watermark on
+        // restore; mirror that so effect_len keeps indexing the real log.
+        self.effect_len = shadow.effect_len;
         self.add_record(
             StepEvent::Backtrack {
                 to_step: shadow.record_idx,

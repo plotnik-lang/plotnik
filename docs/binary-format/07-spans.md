@@ -18,8 +18,9 @@ Each entry is 16 bytes, little-endian:
 | 12     | 2    | `type_id` | Type binding, or `0xFFFF` for none      |
 | 14     | 2    | `member`  | TypeMembers index, or `0xFFFF` for none |
 
-`start <= end`. `type_id` and `member` are validated independently: any value
-other than `0xFFFF` must be in range for its table.
+`start <= end`. Any binding value other than `0xFFFF` must be in range for its
+table, and a live `member` requires a live `type_id` — a member with no type is
+rejected at load.
 
 ## Kinds
 

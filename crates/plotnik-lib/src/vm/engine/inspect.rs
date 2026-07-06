@@ -24,6 +24,12 @@ pub struct InspectionEntry {
 
 #[derive(Debug, Serialize)]
 pub struct Binding {
+    /// JSON-pointer-style path of the bound value, relative to the builder
+    /// frames open when the binding effect fired. Not absolute: a container
+    /// assigned after its close (`Set`/`Push` following `ArrayClose` etc.)
+    /// binds on its own entry, while the elements bound under indices on the
+    /// entries active during construction — a consumer absolutizes by joining
+    /// paths down the entry parent chain.
     pub path: String,
     pub effect_idx: u32,
 }
@@ -31,7 +37,7 @@ pub struct Binding {
 enum Frame {
     Array { len: u32 },
     Struct,
-    Enum { _tag: String, got_data: bool },
+    Enum,
 }
 
 pub fn extract_inspection(effects: &[RuntimeEffect<'_>], module: &Module) -> Inspection {
@@ -102,7 +108,7 @@ impl<'m> Inspector<'m> {
                 },
                 RuntimeEffect::EnumOpen(member) => self.open_enum(*member, effect_idx),
                 RuntimeEffect::EnumClose => match self.frames.pop() {
-                    Some(Frame::Enum { .. }) => {}
+                    Some(Frame::Enum) => {}
                     other => panic!(
                         "EnumClose expects Enum on inspection frame stack, found {:?}",
                         frame_kind(other.as_ref())
@@ -163,24 +169,13 @@ impl<'m> Inspector<'m> {
         let mut path = path_for_frames(&self.frames);
         push_segment(&mut path, self.resolve_member_name(member));
         self.bind_current(path, effect_idx);
-
-        for frame in self.frames.iter_mut().rev() {
-            if let Frame::Enum { got_data, .. } = frame {
-                *got_data = true;
-                break;
-            }
-        }
     }
 
-    fn open_enum(&mut self, member: u16, effect_idx: u32) {
-        let tag = self.resolve_member_name(member).to_string();
+    fn open_enum(&mut self, _member: u16, effect_idx: u32) {
         let mut path = path_for_frames(&self.frames);
         push_segment(&mut path, "$tag");
         self.bind_current(path, effect_idx);
-        self.frames.push(Frame::Enum {
-            _tag: tag,
-            got_data: false,
-        });
+        self.frames.push(Frame::Enum);
     }
 
     fn bind_current(&mut self, path: String, effect_idx: u32) {
@@ -231,7 +226,7 @@ fn path_for_frames(frames: &[Frame]) -> String {
         match frame {
             Frame::Array { len } => push_segment(&mut path, &len.to_string()),
             Frame::Struct => {}
-            Frame::Enum { .. } => push_segment(&mut path, "$data"),
+            Frame::Enum => push_segment(&mut path, "$data"),
         }
     }
     path
@@ -252,6 +247,6 @@ fn frame_kind(frame: Option<&Frame>) -> Option<&'static str> {
     frame.map(|frame| match frame {
         Frame::Array { .. } => "Array",
         Frame::Struct => "Struct",
-        Frame::Enum { .. } => "Enum",
+        Frame::Enum => "Enum",
     })
 }

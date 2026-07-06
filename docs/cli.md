@@ -33,6 +33,7 @@ plotnik lang dump typescript
 | `infer`       | query | Generate type definitions       | Required                              |
 | `dump`        | query | Show bytecode                   | Optional (enables linking)            |
 | `trace`       | both  | Trace query execution           | Shebang or extension                  |
+| `inspect`     | both  | Emit playground inspection JSON | Shebang or extension                  |
 | `lang list`   | —     | List supported languages        | —                                     |
 | `lang dump`   | —     | Dump grammar for a language     | —                                     |
 | `completions` | —     | Generate shell completions      | —                                     |
@@ -62,13 +63,17 @@ plotnik ast query.ptk app.ts
 
 # Include anonymous nodes (literals, punctuation)
 plotnik ast app.ts --raw
+
+# Source tree as JSON (query AST output is skipped)
+plotnik ast app.ts --json
 ```
 
 **Flags:**
 
-| Flag    | Purpose                                         |
-| ------- | ----------------------------------------------- |
-| `--raw` | Include anonymous nodes (literals, punctuation) |
+| Flag     | Purpose                                         |
+| -------- | ----------------------------------------------- |
+| `--raw`  | Include anonymous nodes (literals, punctuation) |
+| `--json` | Output source tree as JSON                      |
 
 ---
 
@@ -271,9 +276,41 @@ plotnik trace query.ptk app.js -vv  # very verbose
 
 ---
 
+### inspect
+
+Compile and execute a query, emitting the playground inspection bundle: query
+tokens, diagnostics, generated types with source ranges, the match value,
+span/binding joins, and run stats in one JSON document.
+
+```sh
+plotnik inspect query.ptk app.js --json
+
+# All inline
+plotnik inspect -q 'Q = (program (expression_statement (identifier) @id))' -s 'x' -l js --json
+
+# Include the step-by-step VM recording in the bundle
+plotnik inspect query.ptk app.js --json -v
+```
+
+**Flags:**
+
+| Flag           | Purpose                                 |
+| -------------- | --------------------------------------- |
+| `--json`       | Output the full inspect bundle as JSON  |
+| `-v`           | Include VM recording in the JSON bundle |
+| `--entry NAME` | Start from specific definition          |
+| `--max-steps`  | Work limit (see Execution Limits)       |
+| `--max-memory` | Memory limit (see Execution Limits)     |
+| `--limits`     | Limit preset (`auto`/`unbounded`)       |
+
+Exit codes follow `run`: `0` match, `1` no match or invalid query (the bundle is
+still printed, with diagnostics), `2` couldn't answer.
+
+---
+
 ## Execution Limits
 
-`run` and `trace` bound a run by two orthogonal resources, on by default and
+`run`, `trace`, and `inspect` bound a run by two orthogonal resources, on by default and
 sized from the input so they stay invisible to legitimate queries:
 
 | Flag           | Accepts                              | Default |

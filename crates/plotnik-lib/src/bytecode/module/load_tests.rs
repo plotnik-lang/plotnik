@@ -578,6 +578,121 @@ fn forged_invalid_span_range_is_rejected() {
 }
 
 #[test]
+fn forged_member_binding_without_type_is_rejected() {
+    // The emitter never writes a live member with no type; consumers key the
+    // whole binding off `type_id`, so this combination is smuggled state.
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let span = SpanEntry {
+        source: 0,
+        kind: SpanKind::Capture,
+        start: 3,
+        end: 8,
+        type_id: SPAN_NO_BINDING,
+        member: 0,
+    };
+    add_single_span(&mut bytes, span.to_bytes());
+
+    let err = Module::load(&bytes).expect_err("member binding without type must be rejected");
+    assert!(
+        matches!(err, ModuleError::InvalidSpanEntry(0)),
+        "expected InvalidSpanEntry, got {err:?}"
+    );
+}
+
+/// Like [`emit_bytes`], but with inspection spans compiled in — the module
+/// carries a spans section and real span-bracket effects to tamper with.
+fn emit_inspection_bytes(query_src: &str) -> Vec<u8> {
+    let mut source_map = SourceMap::new();
+    source_map.add_file(SourcePath::new("query.ptk"), query_src);
+    let compiled = QueryBuilder::new(source_map)
+        .with_inspection(true)
+        .compile(javascript())
+        .expect("query parsing should not exhaust fuel");
+    assert!(compiled.is_valid(), "query should compile: {query_src}");
+    compiled
+        .bytecode()
+        .expect("compiled query has bytecode")
+        .to_vec()
+}
+
+/// Effect slots holding one of the given opcodes, in transition order.
+fn effect_slots_of(bytes: &[u8], kinds: &[EffectKind]) -> Vec<usize> {
+    effect_slots(bytes)
+        .into_iter()
+        .filter(|&off| {
+            let e = u16::from_le_bytes([bytes[off], bytes[off + 1]]);
+            EffectKind::try_from_u8((e >> EFFECT_PAYLOAD_BITS) as u8)
+                .is_some_and(|k| kinds.contains(&k))
+        })
+        .collect()
+}
+
+#[test]
+fn forged_unclosed_span_bracket_is_rejected() {
+    // Rewriting a SpanEnd into a SpanStart leaves its span open (and mis-pairs
+    // every close after it); the balance verifier must reject the module.
+    let mut bytes = emit_inspection_bytes(STRUCT_QUERY);
+    let slot = *effect_slots_of(&bytes, &[EffectKind::SpanEnd])
+        .first()
+        .expect("inspection module must emit a SpanEnd");
+    let payload = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & EFFECT_PAYLOAD_MAX as u16;
+    bytes[slot..slot + 2]
+        .copy_from_slice(&effect_word_with_payload(EffectKind::SpanStart, payload));
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("unclosed span bracket must be rejected");
+    assert!(
+        matches!(err, ModuleError::SpanImbalance(_)),
+        "expected SpanImbalance, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_unopened_span_close_is_rejected() {
+    // Rewriting the first span open into a SpanEnd makes some path close a span
+    // that was never opened.
+    let mut bytes = emit_inspection_bytes(STRUCT_QUERY);
+    let slot = *effect_slots_of(&bytes, &[EffectKind::SpanStart, EffectKind::SpanStartAt])
+        .first()
+        .expect("inspection module must emit a span open");
+    let payload = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & EFFECT_PAYLOAD_MAX as u16;
+    bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::SpanEnd, payload));
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("unopened span close must be rejected");
+    assert!(
+        matches!(err, ModuleError::SpanImbalance(_)),
+        "expected SpanImbalance, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_mispaired_span_ids_are_rejected() {
+    // Depth stays balanced, but a SpanEnd names a different span than the
+    // matching open — inspection extraction asserts pairing, so the loader must
+    // prove it.
+    let mut bytes = emit_inspection_bytes(STRUCT_QUERY);
+    let spans_count = Module::load(&bytes)
+        .expect("module loads before tampering")
+        .header()
+        .spans_count;
+    assert!(spans_count >= 2, "test needs two spans to mis-pair");
+    let slot = *effect_slots_of(&bytes, &[EffectKind::SpanEnd])
+        .first()
+        .expect("inspection module must emit a SpanEnd");
+    let payload = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & EFFECT_PAYLOAD_MAX as u16;
+    let other = (payload + 1) % spans_count;
+    bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::SpanEnd, other));
+    reseal(&mut bytes);
+
+    let err = Module::load(&bytes).expect_err("mis-paired span ids must be rejected");
+    assert!(
+        matches!(err, ModuleError::SpanImbalance(_)),
+        "expected SpanImbalance, got {err:?}"
+    );
+}
+
+#[test]
 fn forged_invalid_span_binding_is_rejected() {
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let module = Module::load(&bytes).expect("module loads before tampering");

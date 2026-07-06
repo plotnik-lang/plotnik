@@ -213,12 +213,12 @@ impl Module {
     }
 
     /// Recompute the section layout in `u64` (no overflow) and ensure every
-    /// section, up to and including Transitions, fits inside the file.
+    /// section, up to and including the final one (Spans), fits inside the file.
     ///
     /// Runs on the raw header *before* [`Header::compute_offsets`], so a corrupt
     /// header cannot drive that u32 arithmetic to overflow. Sections are laid
     /// out consecutively with alignment padding, so verifying the final
-    /// Transitions end also bounds every earlier section. Passing this check
+    /// section's end also bounds every earlier section. Passing this check
     /// also proves the `u32` [`SectionOffsets`] will not wrap, so the view
     /// methods can trust them.
     fn validate_section_bounds(h: &Header) -> Result<(), ModuleError> {
@@ -447,6 +447,11 @@ impl Module {
                 return Err(ModuleError::InvalidSpanEntry(i));
             }
             if member != SPAN_NO_BINDING && member >= type_members {
+                return Err(ModuleError::InvalidSpanEntry(i));
+            }
+            // A member without a type is smuggled state: the emitter never
+            // writes it and every consumer keys the binding off `type_id`.
+            if type_id == SPAN_NO_BINDING && member != SPAN_NO_BINDING {
                 return Err(ModuleError::InvalidSpanEntry(i));
             }
         }

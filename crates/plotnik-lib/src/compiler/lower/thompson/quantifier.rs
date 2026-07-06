@@ -459,17 +459,12 @@ impl NfaBuilder<'_> {
             });
         }
 
-        // Must be a QuantifiedPattern at this point
+        // Must be a QuantifiedPattern at this point: every caller passes a
+        // nullable pattern, and every other nullable form early-returned above.
+        // Falling through to `dispatch_pattern` here would bracket the pattern's
+        // inspection span a second time (it was already bracketed on entry).
         let Pattern::QuantifiedPattern(quant) = pattern else {
-            return self.dispatch_pattern(
-                pattern,
-                PatternCtx {
-                    exit: match_exit,
-                    nav: nav_override,
-                    capture,
-                    value: value_context,
-                },
-            );
+            unreachable!("skippable dispatch fell through for non-nullable pattern kind");
         };
 
         let (inner, kind) = match classify_quantifier(quant) {
