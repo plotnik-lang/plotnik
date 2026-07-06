@@ -8,6 +8,7 @@ pub mod colors;
 pub mod grammar;
 mod interner;
 mod invariants;
+mod tree_dump;
 mod tree_json;
 pub mod utils;
 
@@ -18,6 +19,7 @@ mod utils_tests;
 
 pub use colors::Colors;
 pub use interner::{Interner, Symbol};
+pub use tree_dump::{DumpChunk, DumpChunkKind, dump_tree_chunks, dump_tree_text};
 pub use tree_json::tree_to_json;
 
 /// Runtime/analyzer view of a tree node for sibling-skipping decisions.

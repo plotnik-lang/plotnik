@@ -9,8 +9,8 @@ use plotnik_lib::grammar::Grammar;
 use plotnik_lib::grammar::raw::RawGrammar;
 use plotnik_lib::{
     Colors, NoopTracer, QueryBuilder, RecordingTracer, RuntimeError, RuntimeLimitSpec,
-    TypeScriptConfig, VM, extract_inspection, materialize_verified, tokenize as query_tokenize,
-    tree_to_json,
+    TypeScriptConfig, VM, dump_tree_chunks, extract_inspection, materialize_verified,
+    tokenize as query_tokenize,
 };
 use serde_json::{Map, Value as JsonValue, json};
 use tree_sitter::{Language, Parser, Tree};
@@ -93,7 +93,8 @@ pub fn ast(source: &str, lang: &str, raw: bool) -> JsValue {
     let value = match resolve_lang(lang) {
         Ok(lang) => {
             let tree = lang.parse_source(source);
-            tree_to_json(&tree, source, raw)
+            let chunks = dump_tree_chunks(&tree, source, lang.grammar(), raw);
+            json!({ "chunks": json_value!(chunks) })
         }
         Err(error) => error_json(error),
     };

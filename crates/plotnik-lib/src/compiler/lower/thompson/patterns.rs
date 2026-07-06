@@ -16,6 +16,7 @@ use crate::compiler::lower::ir::{
 };
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
+use crate::compiler::parse::strings::unescape;
 use crate::core::NodeFieldId;
 
 use crate::compiler::analyze::types::CaptureKind;
@@ -282,7 +283,7 @@ impl NfaBuilder<'_> {
         let nav = nav_override.unwrap_or(Nav::Next);
 
         let node_kind = match node.value() {
-            Some(token) => self.resolve_anonymous_node_kind(token.text()),
+            Some(token) => self.resolve_anonymous_node_kind(&unescape(token.text()).0),
             None => NodeKindConstraint::Any, // `_` wildcard matches any node
         };
 
@@ -1307,7 +1308,7 @@ impl NfaBuilder<'_> {
         let op = lower_predicate_op(pred.operator()?);
 
         if let Some(str_token) = pred.string_value() {
-            return Some(PredicateIR::string(op, str_token.text()));
+            return Some(PredicateIR::string(op, unescape(str_token.text()).0));
         }
 
         if let Some(regex) = pred.regex() {

@@ -1,0 +1,10 @@
+Q = (identifier == "a\u{d800}b")
+------------------ DIAGNOSTICS -------------------
+error: invalid unicode escape
+ --> query.ptk:1:22
+  |
+1 | Q = (identifier == "a\u{d800}b")
+  |                      ^^^^^^^^
+  |
+help: write `\u{…}` with 1-6 hex digits naming a Unicode scalar value
+-------------------- SYMBOLS ---------------------

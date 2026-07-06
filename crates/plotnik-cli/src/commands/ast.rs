@@ -1,9 +1,8 @@
 //! Show AST of query and/or source file.
 
-use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use plotnik_lib::{QueryBuilder, tree_to_json};
+use plotnik_lib::{QueryBuilder, dump_tree_text, tree_to_json};
 use serde_json::json;
 
 use super::lang_resolver::reconcile_lang;
@@ -131,127 +130,10 @@ fn print_source_ast(args: &AstArgs, declared_lang: Option<&str>) -> CliResult {
         return Ok(());
     }
 
-    print!("{}", dump_tree(&tree, &source, args.raw));
+    print!(
+        "{}",
+        dump_tree_text(&tree, &source, lang.grammar(), args.raw)
+    );
 
     Ok(())
-}
-
-/// One emission for the iterative tree dumper's work stack.
-enum Step<'a> {
-    /// Render a node: its indent, optional field, and `(kind …)` body.
-    Node {
-        node: tree_sitter::Node<'a>,
-        field: Option<&'a str>,
-        depth: usize,
-    },
-    /// Write a literal verbatim (newlines between children, the closing paren).
-    Lit(&'static str),
-}
-
-/// Dump a parsed tree as indented S-expressions, iteratively.
-///
-/// The source tree is untrusted and can nest past any native-stack budget (a long
-/// unary/parenthesis chain, say), so the walk uses an explicit work stack rather
-/// than native recursion.
-fn dump_tree(tree: &tree_sitter::Tree, source: &str, raw: bool) -> String {
-    let mut out = String::new();
-    let mut stack = vec![Step::Node {
-        node: tree.root_node(),
-        field: None,
-        depth: 0,
-    }];
-    while let Some(step) = stack.pop() {
-        let (node, field, depth) = match step {
-            Step::Lit(s) => {
-                out.push_str(s);
-                continue;
-            }
-            Step::Node { node, field, depth } => (node, field, depth),
-        };
-
-        // Anonymous nodes are dropped unless `--raw`. Children are pre-filtered
-        // below, so this only guards a (hypothetical) anonymous root.
-        if !raw && !node.is_named() {
-            continue;
-        }
-
-        for _ in 0..depth {
-            out.push_str("  ");
-        }
-        if let Some(f) = field {
-            let _ = write!(out, "{}: ", f);
-        }
-        let kind = node.kind();
-
-        let children = collect_children(node, raw);
-        if children.is_empty() {
-            let text = node
-                .utf8_text(source.as_bytes())
-                .unwrap_or("<invalid utf8>");
-            if text == kind {
-                out.push_str("(\"");
-                escape_string_into(&mut out, kind);
-                out.push_str("\")");
-            } else {
-                let _ = write!(out, "({} \"", kind);
-                escape_string_into(&mut out, text);
-                out.push_str("\")");
-            }
-            continue;
-        }
-
-        let _ = write!(out, "({}", kind);
-        // Queue, in source order, a newline + each child, then the closing paren.
-        let mut deferred = Vec::with_capacity(children.len() * 2 + 1);
-        for (child, child_field) in children {
-            deferred.push(Step::Lit("\n"));
-            deferred.push(Step::Node {
-                node: child,
-                field: child_field,
-                depth: depth + 1,
-            });
-        }
-        deferred.push(Step::Lit(")"));
-        stack.extend(deferred.into_iter().rev());
-    }
-    out.push('\n');
-    out
-}
-
-/// Collect a node's children, keeping anonymous ones only in `raw` mode, paired
-/// with their field names.
-fn collect_children<'a>(
-    node: tree_sitter::Node<'a>,
-    raw: bool,
-) -> Vec<(tree_sitter::Node<'a>, Option<&'a str>)> {
-    let mut cursor = node.walk();
-    let mut result = Vec::new();
-    if cursor.goto_first_child() {
-        loop {
-            let child = cursor.node();
-            if raw || child.is_named() {
-                result.push((child, cursor.field_name()));
-            }
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-    result
-}
-
-fn escape_string_into(out: &mut String, s: &str) {
-    for c in s.chars() {
-        match c {
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            '\\' => out.push_str("\\\\"),
-            '"' => out.push_str("\\\""),
-            c if c.is_control() => {
-                let _ = write!(out, "\\u{{{:04x}}}", c as u32);
-            }
-            c => out.push(c),
-        }
-    }
 }

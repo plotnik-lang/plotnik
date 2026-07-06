@@ -5,6 +5,7 @@ use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::ast::token_src;
 use crate::compiler::parse::ast::{self, NodePattern};
 use crate::compiler::parse::cst::{SyntaxKind, SyntaxToken};
+use crate::compiler::parse::strings::unescape;
 use crate::core::{NodeKind, NodeKindId};
 
 use super::link::GrammarLinker;
@@ -151,17 +152,17 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
         let Some(value_token) = token.value() else {
             return;
         };
-        let value = value_token.text();
+        let value = unescape(value_token.text()).0;
         let key = NodeKind::Anonymous(token_src(&value_token, self.linker.content(home)));
         if self.linker.node_kind_ids.contains_key(&key) {
             return;
         }
 
-        let resolved = self.linker.grammar.resolve_anonymous_node(value);
+        let resolved = self.linker.grammar.resolve_anonymous_node(&value);
         self.linker.node_kind_ids.insert(key, resolved);
 
         if let Some(id) = resolved {
-            let sym = self.linker.interner.intern(value);
+            let sym = self.linker.interner.intern(&value);
             self.linker
                 .output
                 .insert_node_kind_id(NodeKind::Anonymous(sym), id);
@@ -174,7 +175,7 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
                 DiagnosticKind::UnknownNodeKind,
                 node.span_of(value_token.text_range()),
             )
-            .detail(value)
+            .detail(value.into_owned())
             .emit();
     }
 

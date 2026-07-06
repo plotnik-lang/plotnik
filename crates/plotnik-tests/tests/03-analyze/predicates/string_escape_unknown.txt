@@ -1,0 +1,10 @@
+Q = (identifier == "a\qb")
+------------------ DIAGNOSTICS -------------------
+error: unknown escape sequence in string
+ --> query.ptk:1:22
+  |
+1 | Q = (identifier == "a\qb")
+  |                      ^^
+  |
+help: supported escapes: `\n`, `\r`, `\t`, `\\`, `\"`, `\'`, `\u{…}`; write `\\` to match a literal backslash
+-------------------- SYMBOLS ---------------------
