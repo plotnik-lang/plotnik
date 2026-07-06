@@ -2145,6 +2145,7 @@ dependencies = [
  "arborium-typescript",
  "cargo_metadata",
  "plotnik-lib",
+ "serde",
  "serde-wasm-bindgen",
  "serde_json",
  "tree-sitter",

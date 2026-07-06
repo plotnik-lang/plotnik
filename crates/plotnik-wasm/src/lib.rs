@@ -1,5 +1,8 @@
 //! WebAssembly bindings for playground and editor integrations.
 
+#[cfg(target_family = "wasm")]
+mod libc_shims;
+
 #[cfg(any(feature = "lang-javascript", feature = "lang-typescript"))]
 use std::sync::LazyLock;
 
@@ -426,5 +429,12 @@ fn entrypoint_names(module: &Module) -> Vec<String> {
 }
 
 fn to_js(value: &JsonValue) -> JsValue {
-    serde_wasm_bindgen::to_value(value).expect("JSON value converts to JsValue")
+    use serde::Serialize;
+
+    // The default serializer turns JSON objects into ES Maps; json_compatible
+    // produces plain objects, which is what the playground consumes.
+    let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+    value
+        .serialize(&serializer)
+        .expect("JSON value converts to JsValue")
 }

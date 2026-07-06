@@ -1,3 +1,16 @@
+## Playground wasm
+
+The playground imports generated bindings from `src/lib/plotnik-wasm/`
+(gitignored). On a fresh checkout, or after changing `crates/plotnik-wasm`,
+regenerate them before `astro dev`/`astro build`:
+
+```
+make -C .. wasm-web
+```
+
+Requires the wasm toolchain from the root Makefile (Homebrew LLVM +
+`wasm-bindgen-cli` matching the `wasm-bindgen` version in `Cargo.lock`).
+
 ## Development
 
 When starting the dev server, use background mode:

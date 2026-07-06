@@ -169,8 +169,7 @@ const highlighterPromise = createHighlighter({
 
 /** A decorated range: an exact substring (nth occurrence) or a byte span. */
 export type MarkSpec = { class?: string } & (
-  | { find: string; occurrence?: number | "all" }
-  | { start: number; end: number }
+  { find: string; occurrence?: number | "all" } | { start: number; end: number }
 );
 
 function markDecorations(code: string, marks: MarkSpec[]): DecorationItem[] {

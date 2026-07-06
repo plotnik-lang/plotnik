@@ -18,6 +18,12 @@ const { title, description } = Astro.props;
     {description && <meta name="description" content={description} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
+    <script is:inline>
+      // shadcn themes by `.dark` class; follow the system before first paint.
+      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        document.documentElement.classList.add("dark");
+      }
+    </script>
   </head>
   <body>
     <slot />
