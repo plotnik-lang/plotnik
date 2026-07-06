@@ -1,0 +1,90 @@
+================================================================================
+Position and adjacency anchors
+================================================================================
+Q = (array . (identifier) @first (dotted_name (a) @a . (b) @b) (_) @last .)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (anchor)
+      (captured_pattern
+        (named_node
+          (identifier))
+        (capture))
+      (named_node
+        (identifier)
+        (captured_pattern
+          (named_node
+            (identifier))
+          (capture))
+        (anchor)
+        (captured_pattern
+          (named_node
+            (identifier))
+          (capture)))
+      (captured_pattern
+        (named_node
+          (wildcard))
+        (capture))
+      (anchor))))
+
+================================================================================
+Exact anchor
+================================================================================
+Q = (call_expression (identifier) @fn .! "(")
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (captured_pattern
+        (named_node
+          (identifier))
+        (capture))
+      (anchor)
+      (string
+        (string_content)))))
+
+================================================================================
+Anchor-only bodies
+================================================================================
+A = (statement_block .)
+B = (program .!)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (anchor)))
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (anchor))))
+
+================================================================================
+Anchor tight against a closing paren
+================================================================================
+Q = (p (a). (b).!(c))
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (named_node
+        (identifier))
+      (anchor)
+      (named_node
+        (identifier))
+      (anchor)
+      (named_node
+        (identifier)))))

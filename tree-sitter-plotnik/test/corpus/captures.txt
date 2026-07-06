@@ -1,0 +1,144 @@
+================================================================================
+Captures on nodes and quantified patterns
+================================================================================
+Q = (function_declaration (decorator)* @decorators name: (identifier) @name)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (captured_pattern
+        (quantified_pattern
+          (named_node
+            (identifier))
+          (quantifier))
+        (capture))
+      (captured_pattern
+        (field
+          (identifier)
+          (named_node
+            (identifier)))
+        (capture)))))
+
+================================================================================
+Suppressive captures
+================================================================================
+Q = (program
+  (expression_statement (identifier) @x) @_
+  (debugger_statement) @_dbg
+)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (captured_pattern
+        (named_node
+          (identifier)
+          (captured_pattern
+            (named_node
+              (identifier))
+            (capture)))
+        (suppressive_capture))
+      (captured_pattern
+        (named_node
+          (identifier))
+        (suppressive_capture)))))
+
+================================================================================
+Type annotations
+================================================================================
+Q = (p
+  (a) @x :: Type
+  {(b) @inner}+ @rows :: Row
+  [(c) (d)] @choice::Pick
+)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (captured_pattern
+        (named_node
+          (identifier))
+        (capture)
+        (type_annotation
+          (type_identifier)))
+      (captured_pattern
+        (quantified_pattern
+          (sequence
+            (captured_pattern
+              (named_node
+                (identifier))
+              (capture)))
+          (quantifier))
+        (capture)
+        (type_annotation
+          (type_identifier)))
+      (captured_pattern
+        (alternation
+          (branch
+            (named_node
+              (identifier)))
+          (branch
+            (named_node
+              (identifier))))
+        (capture)
+        (type_annotation
+          (type_identifier))))))
+
+================================================================================
+Capture names with digits and underscores
+================================================================================
+Q = (p (a) @func_body2)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (captured_pattern
+        (named_node
+          (identifier))
+        (capture)))))
+
+================================================================================
+Sequence capture creates scope
+================================================================================
+Q = {
+  (function_declaration
+    name: (identifier) @name
+    body: (_) @body
+  ) @node
+} @func
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (captured_pattern
+      (sequence
+        (captured_pattern
+          (named_node
+            (identifier)
+            (captured_pattern
+              (field
+                (identifier)
+                (named_node
+                  (identifier)))
+              (capture))
+            (captured_pattern
+              (field
+                (identifier)
+                (named_node
+                  (wildcard)))
+              (capture)))
+          (capture)))
+      (capture))))

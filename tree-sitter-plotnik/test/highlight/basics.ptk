@@ -1,0 +1,20 @@
+Q = (program (identifier) @id)
+; <- @type
+;   ^ @punctuation.bracket
+;    ^ @tag
+;                         ^ @label
+
+Fn = (function_declaration name: (identifier) @name -body)
+;                          ^ @property
+;                                                   ^ @operator
+;                                                    ^ @property
+
+Pred = (identifier =~ /^get/) @fn :: Getter
+;                  ^ @operator
+;                     ^ @string.special
+;                                 ^ @punctuation.delimiter
+;                                    ^ @type
+
+Missing = (statement_block (MISSING ";"))
+;                           ^ @keyword
+;                                   ^ @string

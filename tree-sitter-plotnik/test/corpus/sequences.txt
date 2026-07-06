@@ -1,0 +1,67 @@
+================================================================================
+Sequence of siblings
+================================================================================
+Q = (program {
+  (comment)
+  (function_declaration) @fn
+})
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (sequence
+        (named_node
+          (identifier))
+        (captured_pattern
+          (named_node
+            (identifier))
+          (capture))))))
+
+================================================================================
+Nested and empty sequences
+================================================================================
+Q = (p {(number) {"," (number)}* {}})
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (sequence
+        (named_node
+          (identifier))
+        (quantified_pattern
+          (sequence
+            (string
+              (string_content))
+            (named_node
+              (identifier)))
+          (quantifier))
+        (sequence)))))
+
+================================================================================
+Sequence items: anchors and fields
+================================================================================
+Q = (p {. (a) name: (b) (c) .})
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (sequence
+        (anchor)
+        (named_node
+          (identifier))
+        (field
+          (identifier)
+          (named_node
+            (identifier)))
+        (named_node
+          (identifier))
+        (anchor)))))

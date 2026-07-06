@@ -1,0 +1,146 @@
+================================================================================
+Single definition
+================================================================================
+Q = (identifier)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier))))
+
+================================================================================
+Multiple definitions
+================================================================================
+Ident = (identifier)
+
+DeepSearch = [
+    (Ident) @target
+    (_ (DeepSearch)*)
+]
+
+AllIdentifiers = (program (DeepSearch)* @found)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)))
+  (definition
+    (type_identifier)
+    (alternation
+      (branch
+        (captured_pattern
+          (def_ref
+            (type_identifier))
+          (capture)))
+      (branch
+        (named_node
+          (wildcard)
+          (quantified_pattern
+            (def_ref
+              (type_identifier))
+            (quantifier))))))
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (captured_pattern
+        (quantified_pattern
+          (def_ref
+            (type_identifier))
+          (quantifier))
+        (capture)))))
+
+================================================================================
+Shebang
+================================================================================
+#!/usr/bin/env -S plotnik run -l typescript
+Q = (program)
+--------------------------------------------------------------------------------
+
+(source_file
+  (shebang)
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier))))
+
+================================================================================
+Empty file
+================================================================================
+
+--------------------------------------------------------------------------------
+
+(source_file)
+
+================================================================================
+Definition bodies of every pattern kind
+================================================================================
+Node = (identifier)
+Ref = (Node)
+Str = "return"
+Wild = _
+Seq = {(a) (b)}
+Alt = [(a) (b)]
+Field = name: (identifier)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)))
+  (definition
+    (type_identifier)
+    (def_ref
+      (type_identifier)))
+  (definition
+    (type_identifier)
+    (string
+      (string_content)))
+  (definition
+    (type_identifier)
+    (wildcard))
+  (definition
+    (type_identifier)
+    (sequence
+      (named_node
+        (identifier))
+      (named_node
+        (identifier))))
+  (definition
+    (type_identifier)
+    (alternation
+      (branch
+        (named_node
+          (identifier)))
+      (branch
+        (named_node
+          (identifier)))))
+  (definition
+    (type_identifier)
+    (field
+      (identifier)
+      (named_node
+        (identifier)))))
+
+================================================================================
+Definition body with suffixes
+================================================================================
+Q = (comment)+ @comments :: CommentList
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (captured_pattern
+      (quantified_pattern
+        (named_node
+          (identifier))
+        (quantifier))
+      (capture)
+      (type_annotation
+        (type_identifier)))))

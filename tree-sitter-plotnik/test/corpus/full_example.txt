@@ -1,0 +1,104 @@
+================================================================================
+Full example from the language reference
+================================================================================
+Statement = [
+  Assign: (assignment_expression
+    left: (identifier) @target
+    right: (Expression) @value)
+  Call: (call_expression
+    function: (identifier) @func
+    arguments: (arguments (Expression)* @args))
+  Return: (return_statement
+    (Expression)? @value)
+]
+
+Expression = [
+  Ident: (identifier) @name
+  Num: (number) @value
+  Str: (string) @value
+]
+
+Root = (program (Statement)+ @statements)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (alternation
+      (branch
+        (type_identifier)
+        (named_node
+          (identifier)
+          (captured_pattern
+            (field
+              (identifier)
+              (named_node
+                (identifier)))
+            (capture))
+          (captured_pattern
+            (field
+              (identifier)
+              (def_ref
+                (type_identifier)))
+            (capture))))
+      (branch
+        (type_identifier)
+        (named_node
+          (identifier)
+          (captured_pattern
+            (field
+              (identifier)
+              (named_node
+                (identifier)))
+            (capture))
+          (field
+            (identifier)
+            (named_node
+              (identifier)
+              (captured_pattern
+                (quantified_pattern
+                  (def_ref
+                    (type_identifier))
+                  (quantifier))
+                (capture))))))
+      (branch
+        (type_identifier)
+        (named_node
+          (identifier)
+          (captured_pattern
+            (quantified_pattern
+              (def_ref
+                (type_identifier))
+              (quantifier))
+            (capture))))))
+  (definition
+    (type_identifier)
+    (alternation
+      (branch
+        (type_identifier)
+        (captured_pattern
+          (named_node
+            (identifier))
+          (capture)))
+      (branch
+        (type_identifier)
+        (captured_pattern
+          (named_node
+            (identifier))
+          (capture)))
+      (branch
+        (type_identifier)
+        (captured_pattern
+          (named_node
+            (identifier))
+          (capture)))))
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (captured_pattern
+        (quantified_pattern
+          (def_ref
+            (type_identifier))
+          (quantifier))
+        (capture)))))

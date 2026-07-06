@@ -1,0 +1,58 @@
+================================================================================
+Comment styles
+================================================================================
+; semicolon line comment
+// double-slash line comment
+/* block
+   comment */
+Q = (a) /* inline */ ; trailing
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (comment)
+  (comment)
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)))
+  (comment)
+  (comment))
+
+================================================================================
+Comments inside patterns
+================================================================================
+Q = (p ; after kind
+  (a) // after child
+  [/* in alternation */ (b)]
+)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (comment)
+      (named_node
+        (identifier))
+      (comment)
+      (alternation
+        (comment)
+        (branch
+          (named_node
+            (identifier)))))))
+
+================================================================================
+Block comment with inner stars
+================================================================================
+/** doc */
+Q = (a)
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier))))

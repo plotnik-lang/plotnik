@@ -1,0 +1,159 @@
+================================================================================
+Named node with children
+================================================================================
+Q = (binary_expression (identifier) (number))
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (named_node
+        (identifier))
+      (named_node
+        (identifier)))))
+
+================================================================================
+Deep nesting
+================================================================================
+Q = (program (lexical_declaration (variable_declarator name: (identifier) @id)))
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (named_node
+        (identifier)
+        (named_node
+          (identifier)
+          (captured_pattern
+            (field
+              (identifier)
+              (named_node
+                (identifier)))
+            (capture)))))))
+
+================================================================================
+Wildcards
+================================================================================
+Q = (call_expression (_) _ (_ (a)))
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (named_node
+        (wildcard))
+      (wildcard)
+      (named_node
+        (wildcard)
+        (named_node
+          (identifier))))))
+
+================================================================================
+Empty tree
+================================================================================
+Q = ()
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node)))
+
+================================================================================
+Node kinds with dots and hyphens
+================================================================================
+Q = (foo.bar (baz-qux))
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (named_node
+        (identifier)))))
+
+================================================================================
+Definition reference
+================================================================================
+Q = (return_statement (BinaryOp) @expr)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (captured_pattern
+        (def_ref
+          (type_identifier))
+        (capture)))))
+
+================================================================================
+Reference-looking kind starting with ERROR prefix
+================================================================================
+Q = (ERRORS)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (def_ref
+      (type_identifier))))
+
+================================================================================
+ERROR node
+================================================================================
+Q = (program (ERROR) @syntax_error)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (captured_pattern
+        (error_node)
+        (capture)))))
+
+================================================================================
+MISSING variants
+================================================================================
+A = (program (MISSING))
+B = (program (MISSING identifier))
+C = (program (MISSING ";"))
+D = (program (MISSING Sub))
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (missing_node)))
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (missing_node
+        (identifier))))
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (missing_node
+        (string
+          (string_content)))))
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (missing_node
+        (type_identifier)))))

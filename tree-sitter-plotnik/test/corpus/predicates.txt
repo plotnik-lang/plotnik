@@ -1,0 +1,145 @@
+================================================================================
+String operators
+================================================================================
+Q = (p
+  (a == "foo")
+  (b != "bar")
+  (c ^= "get")
+  (d $= "_id")
+  (e *= "test")
+)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (named_node
+        (identifier)
+        (predicate
+          (string
+            (string_content))))
+      (named_node
+        (identifier)
+        (predicate
+          (string
+            (string_content))))
+      (named_node
+        (identifier)
+        (predicate
+          (string
+            (string_content))))
+      (named_node
+        (identifier)
+        (predicate
+          (string
+            (string_content))))
+      (named_node
+        (identifier)
+        (predicate
+          (string
+            (string_content)))))))
+
+================================================================================
+Regex operators
+================================================================================
+Q = (p (identifier =~ /^[A-Z]/) (identifier !~ /^_/))
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (named_node
+        (identifier)
+        (predicate
+          (regex)))
+      (named_node
+        (identifier)
+        (predicate
+          (regex))))))
+
+================================================================================
+Regex with escaped slash and comment lookalikes
+================================================================================
+Q = (p (a =~ /x\/y/) (b =~ /;z/) (c =~ /*w*/))
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (named_node
+        (identifier)
+        (predicate
+          (regex)))
+      (named_node
+        (identifier)
+        (predicate
+          (regex)))
+      (named_node
+        (identifier)
+        (predicate
+          (regex))))))
+
+================================================================================
+Predicate with no surrounding spaces
+================================================================================
+Q = (p (a=="x")(b=~/y/))
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (named_node
+        (identifier)
+        (predicate
+          (string
+            (string_content))))
+      (named_node
+        (identifier)
+        (predicate
+          (regex))))))
+
+================================================================================
+Predicate before children and capture
+================================================================================
+Q = (call (identifier ^= "get") (arguments) @args)
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (named_node
+        (identifier)
+        (predicate
+          (string
+            (string_content))))
+      (captured_pattern
+        (named_node
+          (identifier))
+        (capture)))))
+
+================================================================================
+Single-quoted predicate value
+================================================================================
+Q = (p (a == 'x'))
+--------------------------------------------------------------------------------
+
+(source_file
+  (definition
+    (type_identifier)
+    (named_node
+      (identifier)
+      (named_node
+        (identifier)
+        (predicate
+          (string
+            (string_content)))))))
