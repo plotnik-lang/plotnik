@@ -40,10 +40,17 @@ pub enum DiagnosticKind {
     AnchorInAlternation,
     QuantifiedAnchor,
     CapturedAnchor,
+    AnchorAsFieldValue,
+    NegatedFieldInAlternation,
+    NegatedFieldInSequence,
+    QuantifiedNegatedField,
+    CapturedNegatedField,
+    NegatedFieldAsFieldValue,
     InvalidFieldEquals,
     InvalidSupertypeSyntax,
     InvalidTypeAnnotationSyntax,
     ErrorTakesNoArguments,
+    MissingTakesNoChildren,
     RefCannotHaveChildren,
     ErrorMissingOutsideParens,
     UnsupportedPredicate,
@@ -204,6 +211,21 @@ impl DiagnosticKind {
             Self::QuantifiedAnchor | Self::CapturedAnchor => {
                 "anchors constrain position and produce no value"
             }
+            Self::AnchorAsFieldValue => {
+                "anchors order siblings: `(parent (a) . (b))`; a field needs a pattern to match"
+            }
+            Self::NegatedFieldInAlternation => {
+                "negate the field inside a node branch: `[(a -field) (b)]`"
+            }
+            Self::NegatedFieldInSequence => {
+                "a negated field applies to the enclosing node; make it a direct child: `(node -field {...})`"
+            }
+            Self::QuantifiedNegatedField | Self::CapturedNegatedField => {
+                "a negated field asserts absence and produces no value"
+            }
+            Self::NegatedFieldAsFieldValue => {
+                "a negated field stands alone as a child: `(node -field)`"
+            }
             Self::UnusedBranchLabels => {
                 "capture the alternation (`[...] @name`) to make the labels enum variants, or remove them"
             }
@@ -249,6 +271,9 @@ impl DiagnosticKind {
             Self::ErrorTakesNoArguments => {
                 "`(ERROR)` matches any error node as a leaf; use `(MISSING \"x\")` to match a missing token"
             }
+            Self::MissingTakesNoChildren => {
+                "a missing node is a zero-width token inserted by error recovery; write `(MISSING)`, `(MISSING kind)`, or `(MISSING \";\")`"
+            }
             Self::RefCannotHaveChildren => {
                 "a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children"
             }
@@ -286,10 +311,21 @@ impl DiagnosticKind {
             Self::AnchorInAlternation => "anchors cannot appear directly in alternations",
             Self::QuantifiedAnchor => "anchors cannot be quantified",
             Self::CapturedAnchor => "anchors cannot be captured",
+            Self::AnchorAsFieldValue => "an anchor cannot be a field value",
+            Self::NegatedFieldInAlternation => {
+                "negated fields cannot appear directly in alternations"
+            }
+            Self::NegatedFieldInSequence => "negated fields cannot appear in sequences",
+            Self::QuantifiedNegatedField => "negated fields cannot be quantified",
+            Self::CapturedNegatedField => "negated fields cannot be captured",
+            Self::NegatedFieldAsFieldValue => "a negated field cannot be a field value",
             Self::InvalidFieldEquals => "fields use `:`, not `=`",
             Self::InvalidSupertypeSyntax => "references cannot have supertypes",
             Self::InvalidTypeAnnotationSyntax => "type annotations use `::`, not `:`",
             Self::ErrorTakesNoArguments => "`(ERROR)` cannot have children",
+            Self::MissingTakesNoChildren => {
+                "`(MISSING)` takes at most a node kind or a quoted token"
+            }
             Self::RefCannotHaveChildren => "references cannot have children",
             Self::ErrorMissingOutsideParens => "`ERROR` and `MISSING` must be parenthesized",
             Self::UnsupportedPredicate => "tree-sitter predicates are not supported",

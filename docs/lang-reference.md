@@ -499,6 +499,9 @@ Output type:
 - `(MISSING identifier)` — matches a specific missing node kind
 - `(MISSING ";")` — matches a missing anonymous node
 
+Both match as leaves: a missing node is a zero-width token, so neither
+`ERROR` nor `MISSING` accepts children.
+
 ```
 (ERROR) @syntax_error
 (MISSING ";") @missing_semicolon

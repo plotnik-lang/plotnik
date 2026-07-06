@@ -1,0 +1,9 @@
+Q = (pair key: !value)
+------------------ DIAGNOSTICS -------------------
+error: a negated field cannot be a field value
+ --> query.ptk:1:16
+  |
+1 | Q = (pair key: !value)
+  |                ^^^^^^
+  |
+help: a negated field stands alone as a child: `(node -field)`
