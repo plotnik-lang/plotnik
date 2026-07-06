@@ -1,0 +1,12 @@
+Q = (program [
+  A: (expression_statement)+
+  B: (debugger_statement)
+] @x)
+--------------------- TYPES ----------------------
+export type QX =
+  | { $tag: "A" }
+  | { $tag: "B" };
+
+export interface Q {
+  x: QX;
+}
