@@ -36,6 +36,13 @@ pub struct InspectArgs {
 }
 
 pub fn run(args: InspectArgs) -> CliResult {
+    run_common::reject_ambiguous_inputs(
+        args.query_text.as_deref(),
+        args.query_path.as_deref(),
+        args.source_text.as_deref(),
+        args.source_path.as_deref(),
+    )?;
+
     if args.source_path.is_none() && args.source_text.is_none() {
         return Err(CliError::fatal(
             "source is required: use positional argument or -s/--source",

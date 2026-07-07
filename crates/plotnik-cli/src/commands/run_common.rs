@@ -40,6 +40,32 @@ pub fn load_source(
     unreachable!("validation ensures source input exists")
 }
 
+/// Reject an input supplied two ways at once. clap fills the query slot from
+/// the first positional and the source slot from the second; when `-q`/`-s`
+/// also supplies that role inline, the loaders below silently prefer the text
+/// and drop the positional. The query+source commands (run/trace/inspect/ast)
+/// refuse to guess. Query-only commands (check/dump/infer) do not call this:
+/// they deliberately ignore an extra positional so a run-shaped command line
+/// still works.
+pub fn reject_ambiguous_inputs(
+    query_text: Option<&str>,
+    query_path: Option<&Path>,
+    source_text: Option<&str>,
+    source_path: Option<&Path>,
+) -> Result<(), CliError> {
+    if query_text.is_some() && query_path.is_some() {
+        return Err(CliError::fatal(
+            "query supplied twice: pass either -q/--query or a positional path, not both",
+        ));
+    }
+    if source_text.is_some() && source_path.is_some() {
+        return Err(CliError::fatal(
+            "source supplied twice: pass either -s/--source or a positional path, not both",
+        ));
+    }
+    Ok(())
+}
+
 /// Resolve the source language.
 /// Priority: explicit `-l` (must agree with shebang) > shebang > source extension.
 pub fn resolve_run_lang(
@@ -126,6 +152,13 @@ pub struct ExecPlan {
 }
 
 pub fn plan_exec(input: ExecRequest) -> Result<ExecPlan, CliError> {
+    reject_ambiguous_inputs(
+        input.query_text,
+        input.query_path,
+        input.source_text,
+        input.source_path,
+    )?;
+
     let loaded = load_query(input.query_path, input.query_text)?;
 
     require_source_input(

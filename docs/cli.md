@@ -376,6 +376,10 @@ These commands can take query, source, or both inputs. Use any combination:
 
 **Key rule**: When `-q` is provided with one positional, it becomes SOURCE.
 
+Supplying the same input both ways is a usage error (exit 2): `-q` with a
+query positional, or `-s` with a source positional, is rejected rather than
+silently dropping the positional.
+
 ### Language Detection
 
 Priority: explicit `-l` (must agree with the shebang) > shebang declaration >
