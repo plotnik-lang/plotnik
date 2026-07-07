@@ -84,6 +84,38 @@ impl CandidateFailure {
     }
 }
 
+struct CallArmPlan<'a> {
+    state: &'a str,
+    target: &'a str,
+    next: &'a str,
+    nav: Nav,
+    field: Option<NodeFieldId>,
+    policy: SkipPolicy,
+    stays_on_current_node: bool,
+}
+
+impl<'a> CallArmPlan<'a> {
+    fn new(generator: &'a Generator<'_>, c: &CallIR) -> Self {
+        Self {
+            state: generator.state(c.label).const_name.as_str(),
+            target: generator.state(c.target).const_name.as_str(),
+            next: generator.state(c.next).const_name.as_str(),
+            nav: c.nav,
+            field: c.node_field,
+            policy: c.nav.skip_policy(),
+            stays_on_current_node: matches!(c.nav, Nav::Stay | Nav::StayExact),
+        }
+    }
+
+    fn opens_labeled_block(&self) -> bool {
+        !self.stays_on_current_node || self.field.is_some()
+    }
+
+    fn pushes_retry(&self) -> bool {
+        !self.stays_on_current_node && self.policy != SkipPolicy::Exact
+    }
+}
+
 struct Generator<'a> {
     graph: &'a NfaGraph,
     dumper: NfaDumper<'a>,
@@ -703,71 +735,85 @@ impl<'a> Generator<'a> {
     /// constraint, leave a call-retry checkpoint when the nav owns a search,
     /// then enter the callee.
     fn call_arm(&self, out: &mut String, c: &CallIR) {
-        let info = self.state(c.label);
-        let target = &self.state(c.target).const_name;
-        let next = &self.state(c.next).const_name;
-        let stay = matches!(c.nav, Nav::Stay | Nav::StayExact);
-        let policy = c.nav.skip_policy();
-        let retries = !stay && policy != SkipPolicy::Exact;
-        let needs_label = !stay || c.node_field.is_some();
+        let plan = CallArmPlan::new(self, c);
 
-        if needs_label {
-            let _ = writeln!(out, "        {} => 'state: {{", info.const_name);
+        if plan.opens_labeled_block() {
+            let _ = writeln!(out, "        {} => 'state: {{", plan.state);
         } else {
-            let _ = writeln!(out, "        {} => {{", info.const_name);
+            let _ = writeln!(out, "        {} => {{", plan.state);
         }
 
-        if stay {
-            if let Some(field) = c.node_field {
-                splice(
-                    out,
-                    "            ",
-                    CALL_FIELD_CHECK,
-                    &[("FIELD", &self.field_const(field))],
-                );
-            }
-        } else {
-            splice(
-                out,
-                "            ",
-                NAVIGATE_OR_BACKTRACK,
-                &[("NAV", &nav_expr(c.nav))],
-            );
-            if let Some(field) = c.node_field {
-                splice(
-                    out,
-                    "            ",
-                    CALL_FIELD_SCAN,
-                    &[
-                        ("FIELD", &self.field_const(field)),
-                        ("POLICY", &policy_expr(policy)),
-                    ],
-                );
-            }
-        }
+        self.call_candidate_setup(out, &plan);
+        self.call_retry_checkpoint(out, &plan);
 
-        if retries {
-            let field = match c.node_field {
-                Some(field) => format!("Some({})", self.field_const(field)),
-                None => "None".to_string(),
-            };
-            splice(
-                out,
-                "            ",
-                CALL_RETRY_PUSH,
-                &[
-                    ("STATE", &info.const_name),
-                    ("TARGET", target),
-                    ("NEXT", next),
-                    ("FIELD", &field),
-                    ("POLICY", &policy_expr(policy)),
-                ],
-            );
-        }
-
-        let _ = writeln!(out, "            eng.enter_frame({next});");
-        let _ = writeln!(out, "            Flow::Jump({target})");
+        let _ = writeln!(out, "            eng.enter_frame({});", plan.next);
+        let _ = writeln!(out, "            Flow::Jump({})", plan.target);
         out.push_str("        }\n");
+    }
+
+    fn call_candidate_setup(&self, out: &mut String, plan: &CallArmPlan<'_>) {
+        if plan.stays_on_current_node {
+            self.call_field_check(out, plan.field);
+            return;
+        }
+
+        splice(
+            out,
+            "            ",
+            NAVIGATE_OR_BACKTRACK,
+            &[("NAV", &nav_expr(plan.nav))],
+        );
+        self.call_field_scan(out, plan.field, plan.policy);
+    }
+
+    fn call_field_check(&self, out: &mut String, field: Option<NodeFieldId>) {
+        let Some(field) = field else {
+            return;
+        };
+        splice(
+            out,
+            "            ",
+            CALL_FIELD_CHECK,
+            &[("FIELD", &self.field_const(field))],
+        );
+    }
+
+    fn call_field_scan(&self, out: &mut String, field: Option<NodeFieldId>, policy: SkipPolicy) {
+        let Some(field) = field else {
+            return;
+        };
+        splice(
+            out,
+            "            ",
+            CALL_FIELD_SCAN,
+            &[
+                ("FIELD", &self.field_const(field)),
+                ("POLICY", &policy_expr(policy)),
+            ],
+        );
+    }
+
+    fn call_retry_checkpoint(&self, out: &mut String, plan: &CallArmPlan<'_>) {
+        if !plan.pushes_retry() {
+            return;
+        }
+
+        let field = match plan.field {
+            Some(field) => format!("Some({})", self.field_const(field)),
+            None => "None".to_string(),
+        };
+        splice(
+            out,
+            "            ",
+            CALL_RETRY_PUSH,
+            &[
+                ("STATE", plan.state),
+                ("TARGET", plan.target),
+                ("NEXT", plan.next),
+                ("FIELD", &field),
+                ("POLICY", &policy_expr(plan.policy)),
+            ],
+        );
     }
 
     fn cand_fns(&self, out: &mut String) {
