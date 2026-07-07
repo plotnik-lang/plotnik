@@ -299,14 +299,19 @@ fn find_grammar_jsons(root: &Path) -> Vec<PathBuf> {
             let path = entry.path();
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if path.is_dir() {
-                if name.starts_with('.') || name == "node_modules" || name == "target" {
-                    continue;
+
+            if !path.is_dir() {
+                if name == "grammar.json" {
+                    found.push(path);
                 }
-                walk(&path, depth + 1, found);
-            } else if name == "grammar.json" {
-                found.push(path);
+                continue;
             }
+
+            if is_ignored_package_dir(&name) {
+                continue;
+            }
+
+            walk(&path, depth + 1, found);
         }
     }
 
@@ -314,6 +319,10 @@ fn find_grammar_jsons(root: &Path) -> Vec<PathBuf> {
     walk(root, 0, &mut found);
     found.sort();
     found
+}
+
+fn is_ignored_package_dir(name: &str) -> bool {
+    name.starts_with('.') || name == "node_modules" || name == "target"
 }
 
 /// The `name` field of a grammar.json — how subgrammars are told apart.
