@@ -182,8 +182,8 @@ Q:
   07  ...
   08  -ε-  [SpanEnd#3 ArrayClose SpanStart#2 Set(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
   11   !   (expression_statement) [SpanStartAt#4 Node Push SpanEnd#4]  14, 20
-  14  ─‣─  _                                11, 14
-  16  └‣─  _                                11, 14
+  14  ──!  _                                11, 14
+  16  └─!  _                                11, 14
   18  -ε-  [ArrayOpen SpanStart#3]          16, 08
   20  ─‣┘  _ [SpanEnd#3 ArrayClose SpanStart#2 Set(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
   23  ...

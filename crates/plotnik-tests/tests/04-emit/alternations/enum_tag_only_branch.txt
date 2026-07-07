@@ -15,8 +15,8 @@ Q:
   03  ─‣┘  _ [Set(kind)]                    01
   05   !   (identifier) [EnumOpen(A) Node Set(id) EnumClose]  03
   06   !   (number) [EnumOpen(B) EnumClose]  03
-  09  ─‣─  _                                05, 06, 09
-  10  └‣─  _                                05, 06, 09
+  09  ──!  _                                05, 06, 09
+  10  └─!  _                                05, 06, 09
 
 Q (entrypoint):
   11                                        ▶
@@ -66,8 +66,8 @@ Q:
   07  ...
   08   !   (identifier) [EnumOpen(M1) Node Set(M0) EnumClose]  18
   11   !   (number) [EnumOpen(M2) EnumClose]  18
-  13  ─‣─  _                                08, 11, 13
+  13  ──!  _                                08, 11, 13
   15  ...
-  16  └‣─  _                                08, 11, 13
+  16  └─!  _                                08, 11, 13
   18  ─‣┘  _ [Set(M3)]                      06
   20   !   (expression_statement)           16

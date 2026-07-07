@@ -11,8 +11,8 @@ Q:
   04  └‣─  (number) [ArrayClose Set(ids) Node Set(n)]  03
   05  ─‣─  (number) [ArrayClose Set(ids) Node Set(n)]  03
   09   !   (identifier) [Node Push]         11, 05
-  11  ─‣─  _                                09, 11
-  12  └‣─  _                                09, 11
+  11  ──!  _                                09, 11
+  12  └─!  _                                09, 11
   17  -ε-  [ArrayOpen]                      12, 04
 
 Q (entrypoint):
@@ -56,7 +56,7 @@ Q:
   08  └‣─  (number) [ArrayClose Set(M0) Node Set(M1)]  07
   11  ─‣─  (number) [ArrayClose Set(M0) Node Set(M1)]  07
   14   !   (identifier) [Node Push]         16, 11
-  16  ─‣─  _                                14, 16
-  18  └‣─  _                                14, 16
+  16  ──!  _                                14, 16
+  18  └─!  _                                14, 16
   20  -ε-  [ArrayOpen]                      18, 08
   22   !   (array)                          20

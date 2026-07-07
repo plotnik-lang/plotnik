@@ -6,9 +6,7 @@
 
 use std::num::NonZeroU64;
 
-use crate::NodeFieldId;
-
-use crate::cursor::SkipPolicy;
+use crate::{NodeFieldId, SkipPolicy};
 
 /// Everything needed to re-enter a callee at the next sibling after a Call's
 /// callee fails. Carrying this on the checkpoint (rather than in ambient VM
@@ -24,6 +22,26 @@ pub struct CallResume {
     pub field: Option<NodeFieldId>,
     /// How to advance to the next candidate.
     pub policy: SkipPolicy,
+}
+
+/// What backtracking does after restoring a checkpoint's state. Every point
+/// with alternatives leaves a checkpoint whose resume says how to take the
+/// next one — branch alternatives jump, sibling searches (Match or Call)
+/// advance the cursor and re-try. This uniform discipline is what makes every
+/// candidate acceptance revisitable; a search with no live resume checkpoint
+/// would silently commit (the historical sibling-retry hole).
+#[derive(Clone, Copy, Debug)]
+pub enum Resume {
+    /// Plain branch alternative: resume dispatch at the checkpoint's `ip`.
+    Branch,
+    /// Call retry: advance the cursor to the next admissible candidate and
+    /// re-enter the callee, without re-running the Call's navigation.
+    Call(CallResume),
+    /// Match retry: the checkpoint's `ip` addresses a Match whose sibling
+    /// search accepted the checkpointed candidate. Advance past it (per the
+    /// nav's skip policy, re-derived from the instruction) and re-run the
+    /// candidate search from there.
+    Match,
 }
 
 /// The VM state a checkpoint snapshots and later restores: everything shared
@@ -48,11 +66,11 @@ pub struct CheckpointState {
 pub struct Checkpoint {
     /// VM state to restore on backtrack.
     pub state: CheckpointState,
-    /// Resume point for a plain (branch) checkpoint (raw step index).
+    /// Branch resume target, or the owning instruction's own address for
+    /// Call/Match retries (re-decoded on resume; also used for tracing).
     pub ip: u16,
-    /// If set, this is a Call retry: advance the cursor and re-enter the
-    /// callee instead of resuming at `ip`.
-    pub call_resume: Option<CallResume>,
+    /// How backtracking continues after restoring `state`.
+    pub resume: Resume,
     /// Maximum `frame_index` over this checkpoint and everything beneath it on
     /// the stack. The whole stack's max is therefore the top's `max_frame_idx_below`,
     /// so pruning never has to scan.
@@ -71,7 +89,7 @@ impl Checkpoint {
         Self {
             state,
             ip,
-            call_resume: None,
+            resume: Resume::Branch,
             max_frame_idx_below: None,
         }
     }
@@ -83,7 +101,20 @@ impl Checkpoint {
         Self {
             state,
             ip: call_ip,
-            call_resume: Some(call_resume),
+            resume: Resume::Call(call_resume),
+            max_frame_idx_below: None,
+        }
+    }
+
+    /// Create a Match retry checkpoint: `state` snapshots the accepted
+    /// candidate, `match_ip` addresses the owning Match instruction. On
+    /// backtrack the engine advances past the candidate and re-runs the
+    /// match's sibling search from there.
+    pub fn match_retry(state: CheckpointState, match_ip: u16) -> Self {
+        Self {
+            state,
+            ip: match_ip,
+            resume: Resume::Match,
             max_frame_idx_below: None,
         }
     }

@@ -67,12 +67,12 @@ Q:
   13  -ε-  [ArrayClose Set(M0)]             11
   15  ...
   16   !   (identifier) [Node Push]         18, 13
-  18  ─‣─  _                                16, 18
+  18  ──!  _                                16, 18
   20   !   _ [ArrayOpen]                    16, 18
   22  -ε-  [Null Set(M1)]                   20
   24   !   (empty_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  11
-  27  ─‣─  _                                22, 24, 27
-  29  └‣─  _                                22, 24, 27
+  27  ──!  _                                22, 24, 27
+  29  └─!  _                                22, 24, 27
   31  ...
   32   !   (program)                        29, 08
 --------------------- TRACE ----------------------

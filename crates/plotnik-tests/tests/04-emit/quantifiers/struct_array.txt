@@ -17,8 +17,8 @@ Q:
   07  -ε-  [StructClose Push]               12, 03
   08  ─‣─  (number) [Node Set(b)]           07
   09   !   (identifier) [StructOpen Node Set(a)]  08
-  12  ─‣─  _                                09, 12
-  13  └‣─  _                                09, 12
+  12  ──!  _                                09, 12
+  13  └─!  _                                09, 12
   18  -ε-  [ArrayOpen]                      13, 05
 
 Q (entrypoint):
@@ -68,8 +68,8 @@ Q:
   10  -ε-  [StructClose Push]               16, 22
   12  ─‣─  (number) [Node Set(M1)]          10
   14   !   (identifier) [StructOpen Node Set(M0)]  12
-  16  ─‣─  _                                14, 16
-  18  └‣─  _                                14, 16
+  16  ──!  _                                14, 16
+  18  └─!  _                                14, 16
   20  -ε-  [ArrayOpen]                      18, 08
   22  ─‣┘  _ [ArrayClose Set(M2)]           06
   24   !   (array)                          20

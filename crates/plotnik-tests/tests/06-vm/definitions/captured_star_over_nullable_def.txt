@@ -97,7 +97,7 @@ Q:
   21  -ε-  [Null Set(M1)]                   20
   23  ...
   24   !   (expression_statement) [StructOpen]  12
-  26  ─‣─  _                                24, 26
+  26  ──!  _                                24, 26
   28   !   _                                24, 26
   30  -ε-                                   28, 21
   32                                        ▶
@@ -105,10 +105,10 @@ Q:
   35  -ε-  [StructClose Push]               44, 50
   37   !   (expression_statement) [StructOpen]  16
   39  ...
-  40  ─‣─  _                                37, 40
+  40  ──!  _                                37, 40
   42   !   _ [StructOpen]                   37, 40
-  44  ─‣─  _                                42, 44
-  46  └‣─  _                                42, 44
+  44  ──!  _                                42, 44
+  46  └─!  _                                42, 44
   48  -ε-  [ArrayOpen]                      46, 33
   50  ─‣┘  _ [ArrayClose Set(M2)]           32
   52   !   (program)                        48

@@ -66,8 +66,8 @@ Q:
   07  ─‣┘  _                                06
   08   !   (expression_statement) [Null Set(M1) Node Set(M0)]  07
   11   !   (debugger_statement) [Null Set(M0) Node Set(M1)]  07
-  14  ─‣─  _                                08, 11, 14
-  16  └‣─  _                                08, 11, 14
+  14  ──!  _                                08, 11, 14
+  16  └─!  _                                08, 11, 14
   18   !   (program)                        16
 --------------------- TRACE ----------------------
 Q:

@@ -49,7 +49,7 @@ Q:
   08  ─‣┘  _                                12, 15
   10                                        ▶
   11   !   (debugger_statement)             15
-  12  ─‣─  _                                11, 12
+  12  ──!  _                                11, 12
   14  └‣─  (expression_statement)           06
   15  ─‣┘  _                                10
   16   !   (program)                        14

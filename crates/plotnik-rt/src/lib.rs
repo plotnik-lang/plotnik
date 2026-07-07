@@ -43,13 +43,13 @@ pub use dfa::{RegexDfas, deserialize_dfa};
 pub use frame::{Frame, FrameArena};
 pub use ids::{NodeFieldId, NodeKindId, ZeroIdError};
 pub use limits::{Limit, ResolvedRuntimeLimits, RuntimeLimitSpec};
-pub use nav::Nav;
+pub use nav::{Nav, SkipPolicy};
 pub use node_class::{NodeClass, SkipClass};
 
 #[cfg(feature = "tree-sitter")]
-pub use checkpoint::{CallResume, Checkpoint, CheckpointStack, CheckpointState};
+pub use checkpoint::{CallResume, Checkpoint, CheckpointStack, CheckpointState, Resume};
 #[cfg(feature = "tree-sitter")]
-pub use cursor::{CursorWrapper, SkipPolicy};
+pub use cursor::CursorWrapper;
 #[cfg(feature = "tree-sitter")]
 pub use effect::{EffectLog, RuntimeEffect};
 #[cfg(feature = "serde")]

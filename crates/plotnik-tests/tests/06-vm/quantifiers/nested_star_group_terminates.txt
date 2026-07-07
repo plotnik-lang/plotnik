@@ -49,10 +49,10 @@ Q:
   08  └‣─  (debugger_statement) [Node Set(M0)]  07
   10  ─‣─  (debugger_statement) [Node Set(M0)]  07
   12   !   (expression_statement)           14, 18, 10
-  14  ─‣─  _                                12, 14
+  14  ──!  _                                12, 14
   16   !   _                                12, 14
-  18  ─‣─  _                                16, 18
-  20  └‣─  _                                16, 18
+  18  ──!  _                                16, 18
+  20  └─!  _                                16, 18
   22  ...
   23  ...
   24   !   (program)                        20, 08

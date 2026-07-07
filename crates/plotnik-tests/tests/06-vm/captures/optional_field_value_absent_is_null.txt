@@ -61,7 +61,7 @@ Q:
   07  ─‣┘³ _                                06
   08  -ε-  [Null Set(M1)]                   07
   10   !   value: (number) [Node Set(M1)]   07
-  12  ─‣─  _                                10, 12
+  12  ──!  _                                10, 12
   14  └‣─  name: (identifier) [Node Set(M0)]  12, 08
   16  └‣─  (variable_declarator)            14
   17  └‣─  (lexical_declaration)            16

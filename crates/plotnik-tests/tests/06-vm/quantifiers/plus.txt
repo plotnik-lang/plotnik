@@ -51,8 +51,8 @@ Q:
   06                                        ▶
   07  ...
   08   !   (expression_statement) [Node Push]  10, 14
-  10  ─‣─  _                                08, 10
-  12  └‣─  _ [ArrayOpen]                    08, 10
+  10  ──!  _                                08, 10
+  12  └─!  _ [ArrayOpen]                    08, 10
   14  ─‣┘  _ [ArrayClose Set(M0)]           06
   16   !   (program)                        12
 --------------------- TRACE ----------------------

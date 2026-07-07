@@ -16,7 +16,7 @@ Q:
   06  ─‣─  (number) [Node Set(num) StructClose Set(row)]  04
   07   !   (identifier) [StructOpen Node Set(id)]  06
   09  -ε-  [StructOpen]                     07
-  11  ─‣─  _                                09, 11
+  11  ──!  _                                09, 11
   12   !   _                                09, 11
   17  -ε-  [ArrayOpen]                      12, 02
 
@@ -73,6 +73,6 @@ Q:
   15  ...
   16   !   (identifier) [StructOpen Node Set(M0)]  12
   18  -ε-  [StructOpen]                     16
-  20  ─‣─  _                                18, 20
+  20  ──!  _                                18, 20
   22   !   _                                18, 20
   24  -ε-  [ArrayOpen]                      22, 08

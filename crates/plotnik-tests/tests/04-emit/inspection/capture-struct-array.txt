@@ -18,8 +18,8 @@ Q:
   10   !   (function_declaration) [StructOpen SpanStartAt#4]  13
   12  ─‣┘  _ [SpanEnd#4]                    09
   13  └‣─  name: (identifier) [SpanStart#6 SpanStartAt#7 SpanStart#5 Node Set(name) SpanEnd#5 SpanEnd#7 SpanEnd#6]  12
-  16  ─‣─  _                                10, 16
-  17  └‣─  _                                10, 16
+  16  ──!  _                                10, 16
+  17  └─!  _                                10, 16
   22  -ε-  [ArrayOpen SpanStart#3]          17, 07
 
 Q (entrypoint):
@@ -71,7 +71,7 @@ Q:
   02       (@35)                            35 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-  06  ─‣─  _                                21, 06
+  06  ──!  _                                21, 06
   08  └‣─  name: (identifier) [SpanStart#6 SpanStartAt#7 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#7 SpanEnd#6]  12
   12  ─‣┘  _ [SpanEnd#4]                    19
   14                                        ▶
@@ -80,7 +80,7 @@ Q:
   19  -ε-  [StructClose Push]               06, 32
   21   !   (function_declaration) [StructOpen SpanStartAt#4]  08
   23  ...
-  24  └‣─  _                                21, 06
+  24  └─!  _                                21, 06
   26  -ε-  [ArrayOpen SpanStart#3]          24, 16
   28  ...
   29  ...

@@ -76,8 +76,8 @@ Q:
   06   !   (expression_statement) [StructOpen Node Set(M0)]  08
   08  ─‣┘  _ [StructClose Set(M1)]          10
   10                                        ▶
-  11  ─‣─  _                                06, 11
-  13  └‣─  _                                06, 11
+  11  ──!  _                                06, 11
+  13  └─!  _                                06, 11
   15   !   (program)                        13
 --------------------- TRACE ----------------------
 Q:

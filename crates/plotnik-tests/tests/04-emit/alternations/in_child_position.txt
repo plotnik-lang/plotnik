@@ -9,8 +9,8 @@ Q:
   02   !   (program)                        07
   03  ─‣┘  _                                01
   04   !   (expression_statement) [Node Set(expr)]  03
-  06  ─‣─  _                                04, 06
-  07  └‣─  _                                04, 06
+  06  ──!  _                                04, 06
+  07  └─!  _                                04, 06
 
 Q (entrypoint):
   08                                        ▶
@@ -47,6 +47,6 @@ Q:
   06   !   (expression_statement) [Node Set(M0)]  08
   08  ─‣┘  _                                09
   09                                        ▶
-  10  ─‣─  _                                06, 10
-  12  └‣─  _                                06, 10
+  10  ──!  _                                06, 10
+  12  └─!  _                                06, 10
   14   !   (program)                        12

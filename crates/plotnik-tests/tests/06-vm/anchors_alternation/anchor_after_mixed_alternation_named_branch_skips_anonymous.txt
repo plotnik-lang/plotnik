@@ -69,8 +69,8 @@ Q:
   10  ─•─  (identifier) [Node Set(M1)]      07
   12   !   (identifier) [Node Set(M0)]      10
   14   !   ";" [Null Set(M0)]               08
-  16  ─‣─  _                                12, 14, 16
-  18  └‣─  _                                12, 14, 16
+  16  ──!  _                                12, 14, 16
+  18  └─!  _                                12, 14, 16
   20  └‣─  (binary_expression)              18
   21  └‣─  (expression_statement)           20
   22   !   (program)                        21

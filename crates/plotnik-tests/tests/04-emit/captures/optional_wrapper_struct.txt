@@ -12,7 +12,7 @@ Q:
   02  -ε-  [Null Set(outer)]                01
   05   !   (identifier) [StructOpen Node Set(id) StructClose Set(inner) StructClose Set(outer)]  01
   07  -ε-  [StructOpen]                     05
-  09  ─‣─  _                                07, 09
+  09  ──!  _                                07, 09
   10   !   _                                07, 09
 
 Q (entrypoint):
@@ -63,6 +63,6 @@ Q:
   10   !   (identifier) [StructOpen Node Set(M0) StructClose Set(M1) StructClose Set(M2)]  06
   13  -ε-  [StructOpen]                     10
   15  ...
-  16  ─‣─  _                                13, 16
+  16  ──!  _                                13, 16
   18   !   _                                13, 16
   20  -ε-                                   18, 08

@@ -14,8 +14,8 @@ Q:
   04  └‣─  (number) [Node Set(n)]           03
   05  ─‣─  (number) [Node Set(n)]           03
   07   !   (identifier)                     09, 05
-  09  ─‣─  _                                07, 09
-  10  └‣─  _                                07, 09
+  09  ──!  _                                07, 09
+  10  └─!  _                                07, 09
 
 Q (entrypoint):
   15                                        ▶
@@ -55,6 +55,6 @@ Q:
   08  └‣─  (number) [Node Set(M0)]          07
   10  ─‣─  (number) [Node Set(M0)]          07
   12   !   (identifier)                     14, 10
-  14  ─‣─  _                                12, 14
-  16  └‣─  _                                12, 14
+  14  ──!  _                                12, 14
+  16  └─!  _                                12, 14
   18   !   (array)                          16, 08

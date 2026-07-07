@@ -16,8 +16,8 @@ Q:
   06  ─‣┘  _ [ArrayClose Set(funcs)]        04
   09  -ε-  [Node Push]                      12, 06
   10   !   (Func)                           03 : 09
-  12  ─‣─  _                                10, 12
-  13  └‣─  _ [ArrayOpen]                    10, 12
+  12  ──!  _                                10, 12
+  13  └─!  _ [ArrayOpen]                    10, 12
 
 Func (entrypoint):
   18                                        ▶
@@ -71,7 +71,7 @@ Q:
   13                                        ▶
   14  -ε-  [Node Push]                      17, 21
   16   !   (@12)                            12 : 14
-  17  ─‣─  _                                16, 17
-  19  └‣─  _ [ArrayOpen]                    16, 17
+  17  ──!  _                                16, 17
+  19  └─!  _ [ArrayOpen]                    16, 17
   21  ─‣┘  _ [ArrayClose Set(M0)]           13
   23   !   (program)                        19

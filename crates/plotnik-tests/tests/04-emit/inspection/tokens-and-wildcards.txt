@@ -30,8 +30,8 @@ Q:
   14  └‣─  (identifier) [SpanStartAt#6 SpanEnd#6]  13
   15   !   (_) [SpanStart#3 SpanStart#9 SpanStartAt#10 SpanEnd#10 SpanEnd#9 SpanEnd#3]  08
   16   !   _ [SpanStart#3 SpanStart#11 SpanStartAt#12 SpanEnd#12 SpanEnd#11 SpanEnd#3]  08
-  19  ─‣─  _                                09, 15, 16, 19
-  20  └‣─  _                                09, 15, 16, 19
+  19  ──!  _                                09, 15, 16, 19
+  20  └─!  _                                09, 15, 16, 19
 
 Q (entrypoint):
   22                                        ▶
@@ -88,7 +88,7 @@ Q:
   16   !   (binary_expression) [SpanStart#3 SpanStart#4 SpanStartAt#5]  14
   18   !   (_) [SpanStart#3 SpanStart#9 SpanStartAt#10 SpanEnd#10 SpanEnd#9 SpanEnd#3]  08
   21   !   _ [SpanStart#3 SpanStart#11 SpanStartAt#12 SpanEnd#12 SpanEnd#11 SpanEnd#3]  08
-  24  ─‣─  _                                16, 18, 21, 24
-  26  └‣─  _                                16, 18, 21, 24
+  24  ──!  _                                16, 18, 21, 24
+  26  └─!  _                                16, 18, 21, 24
   28  └‣─  (expression_statement) [SpanStartAt#2]  26
   30   !   (program) [SpanStart#0 SpanStartAt#1]  28

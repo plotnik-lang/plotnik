@@ -8,7 +8,7 @@ Q:
   01                                        ▶
   02  -ε-  [ArrayClose Set(items)]          01
   04   !   (identifier) [Node Push]         02, 06
-  06  ─‣─  _                                04, 06
+  06  ──!  _                                04, 06
   07   !   _                                04, 06
   12  -ε-  [ArrayOpen]                      02, 07
 
@@ -48,6 +48,6 @@ Q:
   07  ...
   08  -ε-  [ArrayClose Set(M0)]             06
   10   !   (identifier) [Node Push]         08, 12
-  12  ─‣─  _                                10, 12
+  12  ──!  _                                10, 12
   14   !   _                                10, 12
   16  -ε-  [ArrayOpen]                      08, 14

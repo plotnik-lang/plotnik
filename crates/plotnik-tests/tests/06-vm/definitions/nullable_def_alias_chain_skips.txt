@@ -70,12 +70,12 @@ Q:
   11                                        ▶
   12  -ε-  [Null]                           11
   14   !   (expression_statement) [Node]    11
-  16  ─‣─  _                                14, 16
+  16  ──!  _                                14, 16
   18   !   _                                14, 16
   20  -ε-                                   18, 12
   22                                        ▶
   23   !   (expression_statement)           22
-  24  ─‣─  _                                23, 24
+  24  ──!  _                                23, 24
   26   !   _                                23, 24
   28  -ε-                                   26, 22
   30                                        ▶
@@ -83,9 +83,9 @@ Q:
   32  └‣─  (debugger_statement) [Node Set(M0)]  31
   34  ─‣─  (debugger_statement) [Node Set(M0)]  31
   36   !   (expression_statement)           34
-  37  ─‣─  _                                36, 37
+  37  ──!  _                                36, 37
   39  ...
-  40  └‣─  _                                36, 37
+  40  └─!  _                                36, 37
   42   !   (program)                        40, 32
 --------------------- TRACE ----------------------
 Q:

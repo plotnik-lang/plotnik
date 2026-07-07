@@ -6,7 +6,13 @@ export interface Q {
   n: Node;
 }
 --------------------- OUTPUT ---------------------
-<no match>
+{
+  "n": {
+    "kind": "number",
+    "text": "1",
+    "span": [3, 4]
+  }
+}
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -54,3 +60,14 @@ Q:
   06       (number) [Node Set(M0)]          08
        ○   identifier
        ○   ;
+  10  ❮❮❮ 
+       ●   expression_statement
+  06       (number) [Node Set(M0)]          08
+       ●   number
+  08       _                                09
+       ●   program
+  09   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

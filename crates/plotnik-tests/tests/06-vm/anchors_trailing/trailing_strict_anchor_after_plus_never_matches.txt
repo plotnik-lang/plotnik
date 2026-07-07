@@ -52,8 +52,8 @@ Q:
   08  ─‣┘³ _                                09
   09                                        ▶
   10   !   (identifier) [Node Push]         12, 06
-  12  ─‣─  _                                10, 12
-  14  └‣─  _ [ArrayOpen]                    10, 12
+  12  ──!  _                                10, 12
+  14  └─!  _ [ArrayOpen]                    10, 12
   16  └‣─  right: (array)                   14
   17  └‣─  (assignment_expression)          16
   18  └‣─  (expression_statement)           17
@@ -99,3 +99,6 @@ Q:
        ○   ]
   12  ❮❮❮ 
   12       _                                10, 12
+  16  ❮❮❮ 
+  17  ❮❮❮ 
+  18  ❮❮❮ 

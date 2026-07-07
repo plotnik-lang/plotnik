@@ -59,8 +59,8 @@ Q:
   07  ...
   08   !   (debugger_statement) [EnumOpen(M0) EnumClose]  16
   10   !   (expression_statement) [EnumOpen(M1) EnumClose]  16
-  12  ─‣─  _                                08, 10, 12
-  14  └‣─  _                                08, 10, 12
+  12  ──!  _                                08, 10, 12
+  14  └─!  _                                08, 10, 12
   16  ─‣┘  _ [Set(M2)]                      06
   18   !   (program)                        14
 --------------------- TRACE ----------------------

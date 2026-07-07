@@ -64,3 +64,4 @@ Q:
        ●   lexical_declaration
   10       -value (variable_declarator)     06
        ○   let
+  12  ❮❮❮ 

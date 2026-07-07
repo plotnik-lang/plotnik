@@ -61,8 +61,8 @@ Q:
   08  └‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
   11  ─‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
   14   !   (lexical_declaration) [Node Push]  16, 11
-  16  ─‣─  _                                14, 16
-  18  └‣─  _                                14, 16
+  16  ──!  _                                14, 16
+  18  └─!  _                                14, 16
   20  -ε-  [ArrayOpen]                      18, 08
   22   !   (program)                        20
 --------------------- TRACE ----------------------

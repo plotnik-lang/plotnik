@@ -116,3 +116,58 @@ fn nav_with_up_level_preserves_mode() {
 fn nav_with_up_level_on_non_up_panics() {
     Nav::Next.with_up_level(2);
 }
+
+#[test]
+fn nav_skip_policy_mapping() {
+    assert_eq!(Nav::Down.skip_policy(), SkipPolicy::Any);
+    assert_eq!(Nav::Next.skip_policy(), SkipPolicy::Any);
+    assert_eq!(Nav::Stay.skip_policy(), SkipPolicy::Any);
+    assert_eq!(Nav::DownSkip.skip_policy(), SkipPolicy::Trivia);
+    assert_eq!(Nav::NextSkip.skip_policy(), SkipPolicy::Trivia);
+    assert_eq!(Nav::DownSkipExtras.skip_policy(), SkipPolicy::Extras);
+    assert_eq!(Nav::NextSkipExtras.skip_policy(), SkipPolicy::Extras);
+    assert_eq!(Nav::DownExact.skip_policy(), SkipPolicy::Exact);
+    assert_eq!(Nav::NextExact.skip_policy(), SkipPolicy::Exact);
+    assert_eq!(Nav::StayExact.skip_policy(), SkipPolicy::Exact);
+    assert_eq!(Nav::ChildlessExact.skip_policy(), SkipPolicy::Exact);
+    assert_eq!(Nav::Up(2).skip_policy(), SkipPolicy::Any);
+}
+
+/// The engine-owned searches are exactly the non-exact `Down*`/`Next*` navs.
+/// Two invariants hang off this set: acceptance there pushes a match-retry
+/// checkpoint, and lowering's `to_exact` (applied to every NFA-loop-internal
+/// step) must map every member out of the set — otherwise a search would have
+/// two retry owners and backtracking would enumerate candidates twice.
+#[test]
+fn nav_sibling_search_set() {
+    let searching = [
+        Nav::Down,
+        Nav::DownSkip,
+        Nav::DownSkipExtras,
+        Nav::Next,
+        Nav::NextSkip,
+        Nav::NextSkipExtras,
+    ];
+    for nav in searching {
+        assert!(nav.is_sibling_search(), "{nav:?}");
+        assert!(!nav.to_exact().is_sibling_search(), "{nav:?}");
+        assert_ne!(nav.skip_policy(), SkipPolicy::Exact, "{nav:?}");
+    }
+
+    for nav in [
+        Nav::Epsilon,
+        Nav::Stay,
+        Nav::StayExact,
+        Nav::DownExact,
+        Nav::NextExact,
+        Nav::ChildlessSkipTrivia,
+        Nav::ChildlessSkipExtras,
+        Nav::ChildlessExact,
+        Nav::Up(1),
+        Nav::UpSkipTrivia(1),
+        Nav::UpSkipExtras(1),
+        Nav::UpExact(1),
+    ] {
+        assert!(!nav.is_sibling_search(), "{nav:?}");
+    }
+}

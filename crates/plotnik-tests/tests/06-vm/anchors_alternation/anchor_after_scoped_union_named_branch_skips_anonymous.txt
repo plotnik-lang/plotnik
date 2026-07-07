@@ -74,8 +74,8 @@ Q:
   12   !   (number) [Node Set(M0)]          10
   14   !   "+" [Null Set(M0)]               08
   16  -ε-  [StructOpen]                     12, 14
-  18  ─‣─  _                                16, 18
-  20  └‣─  _                                16, 18
+  18  ──!  _                                16, 18
+  20  └─!  _                                16, 18
   22  └‣─  (binary_expression)              20
   23  ...
   24  └‣─  (expression_statement)           22

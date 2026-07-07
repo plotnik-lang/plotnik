@@ -69,8 +69,8 @@ Q:
   07  ─‣┘² _                                06
   08   !   (number) [Null Set(M2) Node Set(M1)]  07
   11   !   (identifier) [Null Set(M1) StructOpen Node Set(M0) StructClose Set(M2)]  07
-  14  ─‣─  _                                08, 11, 14
-  16  └‣─  _                                08, 11, 14
+  14  ──!  _                                08, 11, 14
+  16  └─!  _                                08, 11, 14
   18  └‣─  (expression_statement)           16
   19   !   (program)                        18
 --------------------- TRACE ----------------------

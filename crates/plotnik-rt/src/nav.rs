@@ -2,6 +2,36 @@
 //!
 //! Navigation determines how the VM moves through the tree-sitter AST.
 
+use crate::SkipClass;
+
+/// What a sibling search may step over while looking for (or retrying past) a
+/// candidate. Derived from the instruction's [`Nav`] via [`Nav::skip_policy`];
+/// the engine consults it both when scanning forward to a first candidate and
+/// when resuming a search past a failed one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkipPolicy {
+    /// Skip any nodes until match.
+    Any,
+    /// Skip trivia only (fail if non-trivia must be skipped).
+    Trivia,
+    /// Skip tree-sitter extras only (fail if a regular anonymous token must be skipped).
+    Extras,
+    /// No skipping allowed (exact match required).
+    Exact,
+}
+
+impl SkipPolicy {
+    /// The [`SkipClass`] of nodes this policy may step over.
+    pub fn skip_class(self) -> SkipClass {
+        match self {
+            Self::Any => SkipClass::Any,
+            Self::Trivia => SkipClass::Trivia,
+            Self::Extras => SkipClass::Extras,
+            Self::Exact => SkipClass::Exact,
+        }
+    }
+}
+
 /// Navigation command for VM execution.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub enum Nav {
@@ -208,6 +238,57 @@ impl Nav {
             Self::UpExact(_) => Self::UpExact(level),
             _ => panic!("with_up_level on non-Up nav: {self:?}"),
         }
+    }
+
+    /// The skip policy this nav's match attempt runs under — the single source
+    /// of truth for what a search may step over (`CursorWrapper::navigate`
+    /// returns it after moving; backtrack resume re-derives it from the
+    /// re-decoded instruction).
+    ///
+    /// Non-searching navs (`Stay`, `Up*`) report `Any`: their match runs at a
+    /// position chosen by someone else, so the policy is only consulted if the
+    /// constraint fails and the engine wanders — pre-existing semantics kept
+    /// as-is. `Childless*` and the `*Exact` family report `Exact`: they have
+    /// exactly one candidate.
+    pub fn skip_policy(self) -> SkipPolicy {
+        match self {
+            Self::Epsilon | Self::Stay | Self::Next | Self::Down => SkipPolicy::Any,
+            Self::NextSkip | Self::DownSkip => SkipPolicy::Trivia,
+            Self::NextSkipExtras | Self::DownSkipExtras => SkipPolicy::Extras,
+            Self::StayExact
+            | Self::NextExact
+            | Self::DownExact
+            | Self::ChildlessSkipTrivia
+            | Self::ChildlessSkipExtras
+            | Self::ChildlessExact => SkipPolicy::Exact,
+            Self::Up(_) | Self::UpSkipTrivia(_) | Self::UpSkipExtras(_) | Self::UpExact(_) => {
+                SkipPolicy::Any
+            }
+        }
+    }
+
+    /// Whether this nav performs a sibling search the *engine* owns: it moves
+    /// to a first candidate (`Down*`/`Next*`) and may step past rejected ones
+    /// per its skip policy. Acceptance at such a position is a choice point —
+    /// the engine leaves a resume checkpoint so a later failure retries the
+    /// search from the next admissible candidate.
+    ///
+    /// The `*Exact` members navigate but have a single candidate, and
+    /// `Stay`/`StayExact` matches run at positions owned by an outer search
+    /// (a position-search loop, a Call's retry checkpoint) — none of them are
+    /// engine-owned searches. Lowering upholds the complement: every nav step
+    /// internal to an NFA-level retry loop is emitted exact
+    /// (`emit_wildcard_nav`), so a search always has exactly one retry owner.
+    pub fn is_sibling_search(self) -> bool {
+        matches!(
+            self,
+            Self::Down
+                | Self::DownSkip
+                | Self::DownSkipExtras
+                | Self::Next
+                | Self::NextSkip
+                | Self::NextSkipExtras
+        )
     }
 
     /// Navigation that advances to the next sibling while preserving this nav's

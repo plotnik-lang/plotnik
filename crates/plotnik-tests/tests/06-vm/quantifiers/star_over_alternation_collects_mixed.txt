@@ -59,8 +59,8 @@ Q:
   08  -ε-  [ArrayClose Set(M0)]             06
   10   !   (lexical_declaration) [Node Push]  14, 20
   12   !   (expression_statement) [Node Push]  14, 20
-  14  ─‣─  _                                10, 12, 14
-  16  └‣─  _                                10, 12, 14
+  14  ──!  _                                10, 12, 14
+  16  └─!  _                                10, 12, 14
   18  -ε-  [ArrayOpen]                      16, 08
   20  ─‣┘  _ [ArrayClose Set(M0)]           06
   22   !   (program)                        18

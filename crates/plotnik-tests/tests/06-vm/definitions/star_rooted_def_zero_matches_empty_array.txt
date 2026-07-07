@@ -60,15 +60,15 @@ Q:
   13  -ε-  [ArrayClose]                     12
   15  ─‣┘² _                                24
   16   !   (identifier) [Node Push]         18, 13
-  18  ─‣─  _                                16, 18
+  18  ──!  _                                16, 18
   20   !   _                                16, 18
   22  -ε-  [ArrayOpen]                      20, 13
   24                                        ▶
   25  -ε-  [ArrayClose Set(M0)]             15
   27   !   (identifier) [Node Push]         29, 08
-  29  ─‣─  _                                27, 29
+  29  ──!  _                                27, 29
   31  ...
-  32  └‣─  _                                27, 29
+  32  └─!  _                                27, 29
   34  -ε-  [ArrayOpen]                      32, 25
   36  └‣─  (array)                          34
   37  └‣─  (expression_statement)           36

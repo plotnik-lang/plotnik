@@ -17,8 +17,8 @@ Q:
   04  └─!  (debugger_statement) [Null Set(a) Node Set(b)]  03
   05  ──!  (debugger_statement) [Node Set(b)]  03
   07   !   (lexical_declaration) [Node Set(a)]  05
-  09  ─‣─  _                                07, 09
-  10  └‣─  _                                07, 09
+  09  ──!  _                                07, 09
+  10  └─!  _                                07, 09
 
 Q (entrypoint):
   12                                        ▶
@@ -62,6 +62,6 @@ Q:
   11  ──!  (debugger_statement) [Node Set(M1)]  07
   13   !   (lexical_declaration) [Node Set(M0)]  11
   15  ...
-  16  ─‣─  _                                13, 16
-  18  └‣─  _                                13, 16
+  16  ──!  _                                13, 16
+  18  └─!  _                                13, 16
   20   !   (program)                        18, 08

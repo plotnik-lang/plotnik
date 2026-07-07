@@ -6,7 +6,13 @@ export interface Q {
   id: Node;
 }
 --------------------- OUTPUT ---------------------
-<no match>
+{
+  "id": {
+    "kind": "identifier",
+    "text": "b",
+    "span": [3, 4]
+  }
+}
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -56,3 +62,14 @@ Q:
        ●   expression_statement
   08       (identifier) [Node Set(M0)] == "b"  11
        ○   ;
+  13  ❮❮❮ 
+       ●   expression_statement
+  08       (identifier) [Node Set(M0)] == "b"  11
+       ●   identifier
+  11       _                                12
+       ●   program
+  12   ◀   (?)                              
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

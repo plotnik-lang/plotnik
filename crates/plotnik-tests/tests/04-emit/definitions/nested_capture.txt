@@ -26,8 +26,8 @@ Outer:
   14  -ε-  [StructClose Set(item)]          12
   15   !   (Inner)                          03 : 14
   17  -ε-  [StructOpen StructOpen]          15
-  19  ─‣─  _                                17, 19
-  20  └‣─  _                                17, 19
+  19  ──!  _                                17, 19
+  20  └─!  _                                17, 19
   25  -ε-  [ArrayOpen]                      20, 10
 
 Inner (entrypoint):
@@ -97,8 +97,8 @@ Outer:
   22  -ε-  [StructClose Set(M1)]            20
   24   !   (@16)                            16 : 22
   25  -ε-  [StructOpen StructOpen]          24
-  27  ─‣─  _                                25, 27
-  29  └‣─  _                                25, 27
+  27  ──!  _                                25, 27
+  29  └─!  _                                25, 27
   31  ...
   32  -ε-  [ArrayOpen]                      29, 18
   34  ─‣┘  _ [ArrayClose Set(M2)]           17

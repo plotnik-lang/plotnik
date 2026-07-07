@@ -47,20 +47,20 @@ Q:
   08  └‣─  (debugger_statement) [Node Set(M0)]  07
   10  ─‣─  (debugger_statement) [Node Set(M0)]  07
   12   !   (expression_statement)           14, 10
-  14  ─‣─  _                                12, 14
-  16  └‣─  _                                12, 14
+  14  ──!  _                                12, 14
+  16  └─!  _                                12, 14
   18   !   (expression_statement)           20, 10
-  20  ─‣─  _                                18, 20
+  20  ──!  _                                18, 20
   22   !   (expression_statement)           24, 20, 10
-  24  ─‣─  _                                22, 24
-  26  └‣─  _                                22, 24
+  24  ──!  _                                22, 24
+  26  └─!  _                                22, 24
   28   !   (expression_statement)           30, 10
-  30  ─‣─  _                                28, 30
+  30  ──!  _                                28, 30
   32   !   (expression_statement)           34, 30, 10
-  34  ─‣─  _                                32, 34
+  34  ──!  _                                32, 34
   36   !   (expression_statement)           38, 34, 30, 10
-  38  ─‣─  _                                36, 38
-  40  └‣─  _                                36, 38
+  38  ──!  _                                36, 38
+  40  └─!  _                                36, 38
   42   !   (program)                        40, 26, 16, 08
 --------------------- TRACE ----------------------
 Q:

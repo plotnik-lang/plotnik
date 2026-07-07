@@ -43,8 +43,8 @@ Q:
   27  └‣─  name: (identifier) [SpanStart#18 SpanStartAt#19 SpanStart#16 Node Set(name) SpanEnd#16 SpanEnd#19 SpanEnd#18]  26
   28  ─‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node Set(decl) SpanEnd#13]  17
   45   !   (expression_statement) [SpanStartAt#12 SpanEnd#12]  47, 28
-  47  ─‣─  _                                45, 47
-  48  └‣─  _                                45, 47
+  47  ──!  _                                45, 47
+  48  └─!  _                                45, 47
   53  -ε-  [SpanStart#11]                   48, 14
 
 Value (entrypoint):
@@ -163,10 +163,10 @@ Q:
   46  ─‣─  value: _                         36, 40
   48  └‣─  name: (identifier) [SpanStart#18 SpanStartAt#19 SpanStart#16 Node Set(M5) SpanEnd#16 SpanEnd#19 SpanEnd#18]  46
   52  └‣─  (variable_declarator) [SpanStartAt#15]  48
-  54  ─‣─  _                                62, 54
+  54  ──!  _                                62, 54
   56  └‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node Set(M4) SpanEnd#13]  52
   59  ─‣─  (lexical_declaration) [SpanEnd#11 SpanStartAt#14 SpanStart#13 Node Set(M4) SpanEnd#13]  52
   62   !   (expression_statement) [SpanStartAt#12 SpanEnd#12]  54, 59
-  64  └‣─  _                                62, 54
+  64  └─!  _                                62, 54
   66  -ε-  [SpanStart#11]                   64, 56
   68   !   (program) [SpanStart#8 SpanStartAt#9 SpanStart#10]  66

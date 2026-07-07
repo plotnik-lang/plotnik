@@ -13,7 +13,7 @@ use crate::core::NodeFieldId;
 
 use plotnik_rt::{
     CallResume, Checkpoint, CheckpointStack, CheckpointState, CursorWrapper, EffectLog, FrameArena,
-    ResolvedRuntimeLimits, RuntimeEffect, RuntimeLimitSpec, SkipPolicy,
+    ResolvedRuntimeLimits, Resume, RuntimeEffect, RuntimeLimitSpec, SkipPolicy,
 };
 
 use super::error::{ControlFlow, RuntimeError, Signal};
@@ -153,12 +153,12 @@ impl<'t> VM<'t> {
             recursion_depth,
             suppress_depth,
             // Deliberately outside `CheckpointState`:
-            ip: _,          // resumed separately by `backtrack` (cp.ip / call_resume)
-            checkpoints: _, // the stack this checkpoint was just popped from
-            steps_used: _,  // monotonic step counter, never rewound on backtrack
-            limits: _,      // immutable execution config
+            ip: _,                     // resumed separately by `backtrack` (cp.ip / cp.resume)
+            checkpoints: _,            // the stack this checkpoint was just popped from
+            steps_used: _,             // monotonic step counter, never rewound on backtrack
+            limits: _,                 // immutable execution config
             snapshot_cursor_active: _, // cumulative optimization state
-            source: _,      // immutable input text
+            source: _,                 // immutable input text
         } = self;
 
         debug_assert_eq!(
@@ -295,7 +295,7 @@ impl<'t> VM<'t> {
 
             let result = match module.decoded().step(self.ip) {
                 DecodedInstr::Match(m) => self.exec_match(m, module, tracer),
-                DecodedInstr::Call(c) => self.exec_call(c, tracer),
+                DecodedInstr::Call(c) => self.exec_call(c, module, tracer),
                 DecodedInstr::Return => self.exec_return(tracer),
             };
 
@@ -336,6 +336,19 @@ impl<'t> VM<'t> {
             self.navigate_and_match(m, module, tracer)?;
         }
 
+        self.finish_match(m, module, tracer)
+    }
+
+    /// The post-acceptance half of a Match: run its effects, then branch.
+    /// Shared by the dispatch path and the match-retry resume in
+    /// [`Self::backtrack`], so a resumed candidate replays exactly what the
+    /// original acceptance would have.
+    fn finish_match<T: Tracer>(
+        &mut self,
+        m: DecodedMatch,
+        module: &Module,
+        tracer: &mut T,
+    ) -> Result<(), Signal> {
         for &op in module.decoded().effects(&m) {
             self.emit_effect(op, tracer);
         }
@@ -353,7 +366,7 @@ impl<'t> VM<'t> {
             if T::ENABLED {
                 tracer.trace_nav_failure(m.nav);
             }
-            return Err(self.backtrack(tracer));
+            return Err(self.backtrack(module, tracer));
         };
         if T::ENABLED {
             tracer.trace_nav(m.nav, self.cursor.node());
@@ -364,7 +377,7 @@ impl<'t> VM<'t> {
             if self.candidate_matches(m, module, tracer) {
                 break;
             }
-            self.advance_or_backtrack(policy, cont_nav, tracer)?;
+            self.advance_or_backtrack(policy, cont_nav, module, tracer)?;
         }
 
         if T::ENABLED {
@@ -376,7 +389,39 @@ impl<'t> VM<'t> {
             tracer.trace_field_success(field_id);
         }
 
+        self.push_match_retry_if_resumable(m, policy, tracer);
+
         Ok(())
+    }
+
+    /// Accepting a candidate in an engine-owned sibling search is a choice
+    /// point: leave a resume checkpoint so a later failure retries the search
+    /// past this candidate. Skipped when the search cannot legally step over
+    /// the accepted node — either the nav owns no sibling search
+    /// ([`Nav::is_sibling_search`]; NFA-level retry loops are compiled with
+    /// exact navs precisely to opt out here), or the skip policy does not
+    /// admit the node into the pattern's gap (e.g. a named candidate under a
+    /// soft anchor is the only legal candidate).
+    fn push_match_retry_if_resumable<T: Tracer>(
+        &mut self,
+        m: DecodedMatch,
+        policy: SkipPolicy,
+        tracer: &mut T,
+    ) {
+        if !m.nav.is_sibling_search() || !policy.admits(&self.cursor.node()) {
+            return;
+        }
+
+        let cp = Checkpoint::match_retry(self.checkpoint_state(), self.ip);
+        if self.snapshot_cursor_active {
+            let snapshot = self.cursor_snapshot(1);
+            self.checkpoints.push_with_snapshot(cp, snapshot);
+        } else {
+            self.checkpoints.push(cp);
+        }
+        if T::ENABLED {
+            tracer.trace_checkpoint_created(self.ip);
+        }
     }
 
     /// `p.is_regex` chooses RegexTable over StringTable for `p.value_ref`.
@@ -529,8 +574,14 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn exec_call<T: Tracer>(&mut self, c: DecodedCall, tracer: &mut T) -> Result<(), Signal> {
-        let skip_policy = self.navigate_to_field_with_policy(c.nav, c.node_field, tracer)?;
+    fn exec_call<T: Tracer>(
+        &mut self,
+        c: DecodedCall,
+        module: &Module,
+        tracer: &mut T,
+    ) -> Result<(), Signal> {
+        let skip_policy =
+            self.navigate_to_field_with_policy(c.nav, c.node_field, module, tracer)?;
 
         // A searchable nav leaves a retry checkpoint so the callee can be
         // re-tried at later siblings if it fails. Exact/Stay navs have a fixed
@@ -582,10 +633,11 @@ impl<'t> VM<'t> {
         &mut self,
         nav: Nav,
         field: Option<NodeFieldId>,
+        module: &Module,
         tracer: &mut T,
     ) -> Result<Option<SkipPolicy>, Signal> {
         if nav == Nav::Stay || nav == Nav::StayExact {
-            self.check_field(field, tracer)?;
+            self.check_field(field, module, tracer)?;
             return Ok(None);
         }
 
@@ -593,7 +645,7 @@ impl<'t> VM<'t> {
             if T::ENABLED {
                 tracer.trace_nav_failure(nav);
             }
-            return Err(self.backtrack(tracer));
+            return Err(self.backtrack(module, tracer));
         };
         if T::ENABLED {
             tracer.trace_nav(nav, self.cursor.node());
@@ -614,13 +666,14 @@ impl<'t> VM<'t> {
             if T::ENABLED {
                 tracer.trace_field_failure(self.cursor.node());
             }
-            self.advance_or_backtrack(policy, cont_nav, tracer)?;
+            self.advance_or_backtrack(policy, cont_nav, module, tracer)?;
         }
     }
 
     fn check_field<T: Tracer>(
         &mut self,
         field: Option<NodeFieldId>,
+        module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
         let Some(field_id) = field else {
@@ -630,7 +683,7 @@ impl<'t> VM<'t> {
             if T::ENABLED {
                 tracer.trace_field_failure(self.cursor.node());
             }
-            return Err(self.backtrack(tracer));
+            return Err(self.backtrack(module, tracer));
         }
         if T::ENABLED {
             tracer.trace_field_success(field_id);
@@ -666,15 +719,15 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    // Loops rather than self-recurses: a run of contiguous call-retry checkpoints
+    // Loops rather than self-recurses: a run of contiguous retry checkpoints
     // with exhausted siblings (or failed field constraints) is unwound here in one
     // call. The depth of that run is set by the source-tree shape and is decoupled
     // from call depth, so tail-recursion would let untrusted source abort the
     // process on the native stack (Rust does not guarantee TCO). The `continue`
     // paths pop without re-pushing, so the checkpoint stack strictly shrinks until
     // a resume succeeds or it empties — the loop always terminates.
-    fn backtrack<T: Tracer>(&mut self, tracer: &mut T) -> Signal {
-        loop {
+    fn backtrack<T: Tracer>(&mut self, module: &Module, tracer: &mut T) -> Signal {
+        'unwind: loop {
             let popped = if self.snapshot_cursor_active {
                 self.checkpoints.pop_with_snapshot()
             } else {
@@ -688,46 +741,111 @@ impl<'t> VM<'t> {
             }
             self.restore_checkpoint_state(cp.state, snapshot);
 
-            let Some(resume) = cp.call_resume else {
-                self.ip = cp.ip;
-                return ControlFlow::Backtracked.into();
-            };
+            match cp.resume {
+                Resume::Branch => {
+                    self.ip = cp.ip;
+                    return ControlFlow::Backtracked.into();
+                }
 
-            // Call retry: advance to the next candidate, then re-enter the callee.
-            // If siblings are exhausted, keep backtracking to an earlier checkpoint.
-            if !self.cursor.continue_search(resume.policy) {
-                continue;
-            }
-            if T::ENABLED {
-                tracer.trace_nav(Nav::Down.sibling_continuation(), self.cursor.node());
-            }
-
-            // Enforce the field constraint at the new candidate. A mismatch ends
-            // this Call's search, exactly like the navigate-time field check.
-            if let Some(field_id) = resume.field {
-                if self.cursor.field_id() != Some(field_id) {
-                    if T::ENABLED {
-                        tracer.trace_field_failure(self.cursor.node());
+                // Call retry: advance to the next candidate satisfying the field
+                // constraint, then re-enter the callee. The scan mirrors the
+                // navigate-time field search: non-field siblings the policy admits
+                // are stepped over, so a retry sees exactly the candidate set the
+                // original navigation saw. If siblings are exhausted, keep
+                // backtracking to an earlier checkpoint.
+                Resume::Call(resume) => {
+                    if !self.cursor.continue_search(resume.policy) {
+                        continue 'unwind;
                     }
-                    continue;
-                }
-                if T::ENABLED {
-                    tracer.trace_field_success(field_id);
-                }
-            }
+                    if T::ENABLED {
+                        tracer.trace_nav(Nav::Down.sibling_continuation(), self.cursor.node());
+                    }
 
-            let retry = self.call_retry_checkpoint(cp.ip, resume);
-            if self.snapshot_cursor_active {
-                let snapshot = self.cursor_snapshot(1);
-                self.checkpoints.push_with_snapshot(retry, snapshot);
-            } else {
-                self.checkpoints.push(retry);
+                    if let Some(field_id) = resume.field {
+                        loop {
+                            if self.cursor.field_id() == Some(field_id) {
+                                if T::ENABLED {
+                                    tracer.trace_field_success(field_id);
+                                }
+                                break;
+                            }
+                            if T::ENABLED {
+                                tracer.trace_field_failure(self.cursor.node());
+                            }
+                            if !self.cursor.continue_search(resume.policy) {
+                                continue 'unwind;
+                            }
+                            if T::ENABLED {
+                                tracer.trace_nav(
+                                    Nav::Down.sibling_continuation(),
+                                    self.cursor.node(),
+                                );
+                            }
+                        }
+                    }
+
+                    let retry = self.call_retry_checkpoint(cp.ip, resume);
+                    if self.snapshot_cursor_active {
+                        let snapshot = self.cursor_snapshot(1);
+                        self.checkpoints.push_with_snapshot(retry, snapshot);
+                    } else {
+                        self.checkpoints.push(retry);
+                    }
+                    if T::ENABLED {
+                        tracer.trace_checkpoint_created(cp.ip);
+                    }
+                    self.enter_callee(resume.target, resume.next, tracer);
+                    return ControlFlow::Backtracked.into();
+                }
+
+                // Match retry: the checkpoint sits at the accepted-but-failed
+                // candidate of an engine-owned sibling search. Step past it (the
+                // push gate proved the policy admits it into the gap) and re-run
+                // the same instruction's candidate search from there; acceptance
+                // replays the match — fresh retry checkpoint, effects, branches —
+                // exactly as the dispatch path would.
+                Resume::Match => {
+                    let DecodedInstr::Match(m) = module.decoded().step(cp.ip) else {
+                        unreachable!("match-retry checkpoint ip must address a Match");
+                    };
+                    let policy = m.nav.skip_policy();
+                    if !self.cursor.continue_search(policy) {
+                        continue 'unwind;
+                    }
+                    let cont_nav = m.nav.sibling_continuation();
+                    if T::ENABLED {
+                        tracer.trace_nav(cont_nav, self.cursor.node());
+                    }
+
+                    loop {
+                        if self.candidate_matches(m, module, tracer) {
+                            break;
+                        }
+                        if !self.cursor.continue_search(policy) {
+                            continue 'unwind;
+                        }
+                        if T::ENABLED {
+                            tracer.trace_nav(cont_nav, self.cursor.node());
+                        }
+                    }
+
+                    if T::ENABLED {
+                        tracer.trace_match_success(self.cursor.node());
+                    }
+                    if T::ENABLED
+                        && let Some(field_id) = m.node_field
+                    {
+                        tracer.trace_field_success(field_id);
+                    }
+
+                    self.ip = cp.ip;
+                    self.push_match_retry_if_resumable(m, policy, tracer);
+                    return match self.finish_match(m, module, tracer) {
+                        Ok(()) => ControlFlow::Backtracked.into(),
+                        Err(signal) => signal,
+                    };
+                }
             }
-            if T::ENABLED {
-                tracer.trace_checkpoint_created(cp.ip);
-            }
-            self.enter_callee(resume.target, resume.next, tracer);
-            return ControlFlow::Backtracked.into();
         }
     }
 
@@ -735,10 +853,11 @@ impl<'t> VM<'t> {
         &mut self,
         policy: SkipPolicy,
         cont_nav: Nav,
+        module: &Module,
         tracer: &mut T,
     ) -> Result<(), Signal> {
         if !self.cursor.continue_search(policy) {
-            return Err(self.backtrack(tracer));
+            return Err(self.backtrack(module, tracer));
         }
         if T::ENABLED {
             tracer.trace_nav(cont_nav, self.cursor.node());

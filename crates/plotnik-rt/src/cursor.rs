@@ -8,7 +8,7 @@ use std::num::NonZeroU64;
 
 use tree_sitter::{Node, TreeCursor};
 
-use crate::{Nav, NodeClass, NodeFieldId, SkipClass};
+use crate::{Nav, NodeClass, NodeFieldId, SkipClass, SkipPolicy};
 
 /// Upper bound on live snapshots. Restores overwhelmingly hit the newest
 /// checkpoints (LIFO unwinding), so a small window captures nearly all hits
@@ -32,29 +32,12 @@ const SNAPSHOT_ACTIVATION_WIDE_MISSES: u32 = 32;
 /// indices per non-same restore; match-heavy workloads stayed near zero.
 const SNAPSHOT_ACTIVATION_MIN_JUMP: u32 = 32;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SkipPolicy {
-    /// Skip any nodes until match.
-    Any,
-    /// Skip trivia only (fail if non-trivia must be skipped).
-    Trivia,
-    /// Skip tree-sitter extras only (fail if a regular anonymous token must be skipped).
-    Extras,
-    /// No skipping allowed (exact match required).
-    Exact,
-}
-
 impl SkipPolicy {
-    fn skip_class(self) -> SkipClass {
-        match self {
-            Self::Any => SkipClass::Any,
-            Self::Trivia => SkipClass::Trivia,
-            Self::Extras => SkipClass::Extras,
-            Self::Exact => SkipClass::Exact,
-        }
-    }
-
-    fn admits(self, node: &Node<'_>) -> bool {
+    /// Whether a sibling search under this policy may step over `node` — both
+    /// when scanning forward past a rejected candidate and when resuming past
+    /// an accepted-but-failed one (the node then sits in the pattern's gap,
+    /// which must admit it).
+    pub fn admits(self, node: &Node<'_>) -> bool {
         self.skip_class().admits(CursorWrapper::node_class(node))
     }
 }
@@ -317,42 +300,35 @@ impl<'t> CursorWrapper<'t> {
 
     /// Navigate according to Nav command, preparing for match attempt.
     ///
-    /// Returns the skip policy to use for the subsequent match attempt,
+    /// Returns the skip policy to use for the subsequent match attempt
+    /// ([`Nav::skip_policy`] — the single source of the nav→policy mapping),
     /// or None if navigation failed (no children/siblings).
     pub fn navigate(&mut self, nav: Nav) -> Option<SkipPolicy> {
-        match nav {
+        let moved = match nav {
             // Epsilon should never reach here - VM skips navigate for epsilon
             Nav::Epsilon => {
                 debug_assert!(
                     false,
                     "navigate called with Epsilon - should be skipped by VM"
                 );
-                Some(SkipPolicy::Any)
+                true
             }
-            Nav::Stay => Some(SkipPolicy::Any),
-            Nav::StayExact => Some(SkipPolicy::Exact),
-            Nav::Down => self.go_first_child().then_some(SkipPolicy::Any),
-            Nav::DownSkip => self.go_first_child().then_some(SkipPolicy::Trivia),
-            Nav::DownSkipExtras => self.go_first_child().then_some(SkipPolicy::Extras),
-            Nav::DownExact => self.go_first_child().then_some(SkipPolicy::Exact),
-            Nav::Next => self.go_next_sibling().then_some(SkipPolicy::Any),
-            Nav::NextSkip => self.go_next_sibling().then_some(SkipPolicy::Trivia),
-            Nav::NextSkipExtras => self.go_next_sibling().then_some(SkipPolicy::Extras),
-            Nav::NextExact => self.go_next_sibling().then_some(SkipPolicy::Exact),
-            Nav::ChildlessSkipTrivia => self
-                .childless_holds(SkipClass::Trivia)
-                .then_some(SkipPolicy::Exact),
-            Nav::ChildlessSkipExtras => self
-                .childless_holds(SkipClass::Extras)
-                .then_some(SkipPolicy::Exact),
-            Nav::ChildlessExact => self
-                .childless_holds(SkipClass::Exact)
-                .then_some(SkipPolicy::Exact),
-            Nav::Up(n) => self.go_up(n, UpMode::Any).then_some(SkipPolicy::Any),
-            Nav::UpSkipTrivia(n) => self.go_up(n, UpMode::SkipTrivia).then_some(SkipPolicy::Any),
-            Nav::UpSkipExtras(n) => self.go_up(n, UpMode::SkipExtras).then_some(SkipPolicy::Any),
-            Nav::UpExact(n) => self.go_up(n, UpMode::Exact).then_some(SkipPolicy::Any),
-        }
+            Nav::Stay | Nav::StayExact => true,
+            Nav::Down | Nav::DownSkip | Nav::DownSkipExtras | Nav::DownExact => {
+                self.go_first_child()
+            }
+            Nav::Next | Nav::NextSkip | Nav::NextSkipExtras | Nav::NextExact => {
+                self.go_next_sibling()
+            }
+            Nav::ChildlessSkipTrivia => self.childless_holds(SkipClass::Trivia),
+            Nav::ChildlessSkipExtras => self.childless_holds(SkipClass::Extras),
+            Nav::ChildlessExact => self.childless_holds(SkipClass::Exact),
+            Nav::Up(n) => self.go_up(n, UpMode::Any),
+            Nav::UpSkipTrivia(n) => self.go_up(n, UpMode::SkipTrivia),
+            Nav::UpSkipExtras(n) => self.go_up(n, UpMode::SkipExtras),
+            Nav::UpExact(n) => self.go_up(n, UpMode::Exact),
+        };
+        moved.then_some(nav.skip_policy())
     }
 
     fn go_first_child(&mut self) -> bool {

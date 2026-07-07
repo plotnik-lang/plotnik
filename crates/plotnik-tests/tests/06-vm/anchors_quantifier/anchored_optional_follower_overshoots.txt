@@ -64,8 +64,8 @@ Q:
   20  ─•─  (debugger_statement) [Node Set(M1)]  14
   22  -ε-  [Null Set(M0)]                   16, 11
   24   !   (lexical_declaration) [Node Set(M0)]  20, 18
-  26  ─‣─  _                                24, 26
-  28  └‣─  _                                24, 26
+  26  ──!  _                                24, 26
+  28  └─!  _                                24, 26
   30   !   (program)                        28, 22
 --------------------- TRACE ----------------------
 Q:

@@ -56,14 +56,14 @@ Q:
   06                                        ▶
   07  ─‣┘  _                                06
   08   !   (variable_declarator) [Node Push]  10, 14
-  10  ─‣─  _                                08, 10
-  12  └‣─  _ [ArrayOpen]                    08, 10
+  10  ──!  _                                08, 10
+  12  └─!  _ [ArrayOpen]                    08, 10
   14  ─‣┘  _ [ArrayClose Set(M0)]           07
   16   !   (lexical_declaration) [Null Set(M1)]  12
   18   !   (expression_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  07
-  21  ─‣─  _                                16, 18, 21
+  21  ──!  _                                16, 18, 21
   23  ...
-  24  └‣─  _                                16, 18, 21
+  24  └─!  _                                16, 18, 21
   26   !   (program)                        24
 --------------------- TRACE ----------------------
 Q:

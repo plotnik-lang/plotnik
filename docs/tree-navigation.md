@@ -19,12 +19,12 @@ struct Checkpoint {
     descendant_index: u32,             // cursor position (4 bytes)
     effect_watermark: usize,           // effect log length
     frame_index: Option<u32>,          // call stack state
-    ip: StepId,                        // resume point (plain branch)
-    call_resume: Option<CallResume>,   // if set: advance + re-enter a callee
+    ip: StepId,                        // branch target, or the owning Call/Match
+    resume: Resume,                    // Branch | Call(CallResume) | Match
 }
 ```
 
-A plain (branch) checkpoint resumes at `ip`. A `call_resume` checkpoint instead carries everything needed to retry a `Call` at a later sibling — callee entry, return address, field constraint, and skip policy — so backtracking advances the cursor and re-enters the callee without re-running the `Call`'s navigation. Keeping this on the checkpoint, rather than in ambient VM state, is what gives Call-driven sibling search the same backtracking power as in-pattern search (see [Call Navigation](#call-navigation)).
+A `Branch` checkpoint resumes dispatch at `ip`. A `Call` resume carries everything needed to retry a `Call` at a later sibling — callee entry, return address, field constraint, and skip policy — so backtracking advances the cursor and re-enters the callee without re-running the `Call`'s navigation. A `Match` resume marks the accepted candidate of an in-pattern sibling search: backtracking advances past it (per the skip policy re-derived from the instruction at `ip`) and re-runs the same match's candidate search from there. Keeping resume state on the checkpoint, rather than in ambient VM state, is what gives every sibling search — Call-driven or in-pattern — the same backtracking power (see [Call Navigation](#call-navigation)).
 
 **Critical constraint**: The cursor must be created at the tree root and never call `reset()`. The `descendant_index` is relative to the cursor's root — `reset(node)` would invalidate all checkpoints.
 
@@ -98,6 +98,16 @@ Each mode defines what happens when a match fails:
 | `•` (trivia) | If current is non-trivia → fail; else retry |
 | `◦` (extras) | If current is non-extra → fail; else retry  |
 | `!` (exact)  | Fail immediately                            |
+
+The same policy governs match **acceptance**: a candidate accepted by a
+non-exact `Down*`/`Next*` search leaves a match-retry checkpoint whenever the
+policy would admit that node as a skipped gap filler (any node under `‣`, only
+trivia/extras under `•`/`◦`). A later failure — even deep inside the accepted
+candidate's subtree — then resumes the search at the next admissible sibling
+instead of silently committing. Steps internal to a compiled retry loop
+(`emit_position_search` wrappers) are emitted with exact navs precisely to opt
+out of this: every search has exactly one retry owner, either the engine's
+in-instruction search or the NFA loop, never both.
 
 **Up variants** (exit validation):
 

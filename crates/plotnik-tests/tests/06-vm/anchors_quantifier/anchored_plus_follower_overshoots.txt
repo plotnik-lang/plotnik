@@ -66,8 +66,8 @@ Q:
   21  ─•─  (debugger_statement) [ArrayOpen Node Push]  19, 11
   24  -ε-  [Null Set(M0)]                   16
   26   !   (lexical_declaration) [Node Set(M0)]  21
-  28  ─‣─  _                                26, 28
-  30  └‣─  _                                26, 28
+  28  ──!  _                                26, 28
+  30  └─!  _                                26, 28
   32   !   (program)                        30, 24
 --------------------- TRACE ----------------------
 Q:

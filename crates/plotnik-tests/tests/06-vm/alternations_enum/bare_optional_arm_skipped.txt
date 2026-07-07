@@ -43,7 +43,7 @@ Q:
   01                                        ▶
   02                                        ▶
   03   !   (identifier) [Node Set(M0) EnumClose]  02
-  05  ─‣─  _                                03, 05
+  05  ──!  _                                03, 05
   07  ...
   08   !   _ [EnumOpen(M1)]                 03, 05
   10  -ε-  [EnumOpen(M1) Null Set(M0) EnumClose]  02

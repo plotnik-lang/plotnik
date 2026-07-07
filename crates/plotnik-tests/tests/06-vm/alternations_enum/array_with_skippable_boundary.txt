@@ -89,11 +89,11 @@ Q:
   08  -ε-  [ArrayClose Set(M1)]             06
   10  -ε-  [StructClose Push]               19, 26
   12   !   (comment)                        10
-  13  ─‣─  _                                12, 13
+  13  ──!  _                                12, 13
   15  ...
   16   !   (expression_statement) [StructOpen Node Set(M0)]  13, 10
-  19  ─‣─  _                                16, 19
-  21  └‣─  _                                16, 19
+  19  ──!  _                                16, 19
+  21  └─!  _                                16, 19
   23  ...
   24  -ε-  [ArrayOpen]                      21, 08
   26  ─‣┘  _ [ArrayClose Set(M1)]           06

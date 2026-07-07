@@ -53,12 +53,12 @@ Q:
   08  └‣─  (debugger_statement) [Node Set(M0)]  07
   10  ─‣─  (debugger_statement) [Node Set(M0)]  07
   12   !   (empty_statement)                10
-  13  ─‣─  _                                12, 13
+  13  ──!  _                                12, 13
   15  ...
-  16  └‣─  _                                12, 13
+  16  └─!  _                                12, 13
   18   !   (expression_statement)           13, 10
-  20  ─‣─  _                                18, 20
-  22  └‣─  _                                18, 20
+  20  ──!  _                                18, 20
+  22  └─!  _                                18, 20
   24   !   (program)                        22, 16, 08
 --------------------- TRACE ----------------------
 Q:

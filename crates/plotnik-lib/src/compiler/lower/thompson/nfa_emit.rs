@@ -184,9 +184,20 @@ impl NfaBuilder<'_> {
     /// Used for skip-retry logic in quantifiers: navigates to the next position
     /// and matches any node there. If navigation fails (no more siblings/children),
     /// the VM backtracks automatically.
+    ///
+    /// The nav is emitted exact: a wildcard step is always internal to an
+    /// NFA-level retry loop (position search), and that loop owns the sibling
+    /// search. The engine treats a non-exact `Down*`/`Next*` match acceptance
+    /// as a choice point and leaves a resume checkpoint
+    /// (`Nav::is_sibling_search`); an exact nav opts these steps out, keeping
+    /// every search under exactly one retry owner. Behavior is otherwise
+    /// identical — with an `Any` constraint the skip policy is never consulted.
     pub(super) fn emit_wildcard_nav(&mut self, label: Label, nav: Nav, successor: Label) {
-        self.instructions
-            .push(MatchIR::epsilon(label, successor).nav(nav).into());
+        self.instructions.push(
+            MatchIR::epsilon(label, successor)
+                .nav(nav.to_exact())
+                .into(),
+        );
     }
 
     /// Emit an epsilon branch preferring `targets.prefer` when greedy,
