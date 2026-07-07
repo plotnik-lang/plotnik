@@ -80,19 +80,24 @@ tree-sitter-javascript = "0.25"
 ```
 
 ```rust
+// `query!` defines types, so invoke it at module scope — not inside a function.
 plotnik::query! {
-    grammar = "tree-sitter-javascript",
     r#"
     Q = (program (expression_statement (identifier) @id))
-    "#
+    "#,
+    grammar = "tree-sitter-javascript",
 }
 
-let source = "x;";
-let mut parser = plotnik::tree_sitter::Parser::new();
-parser.set_language(&tree_sitter_javascript::LANGUAGE.into()).unwrap();
-let tree = parser.parse(source, None).unwrap();
+fn main() {
+    let source = "x;";
+    let mut parser = plotnik::tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_javascript::LANGUAGE.into()).unwrap();
+    let tree = parser.parse(source, None).unwrap();
 
-let q = Q::parse(&tree, source).expect("matches"); // q.id: Node
+    // `parse` is the trusted-input path; for untrusted source use `Q::try_parse`,
+    // which runs under the compiled-in step/memory/depth limits.
+    let q = Q::parse(&tree, source).expect("matches"); // q.id: Node
+}
 ```
 
 There is no built-in language list: `grammar = "..."` names any dependency

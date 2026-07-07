@@ -21,10 +21,10 @@ mod grammar_source_tests;
 ///
 /// ```ignore
 /// plotnik::query! {
-///     grammar = "tree-sitter-javascript",
 ///     r#"
 ///     Q = (program (expression_statement (identifier) @id))
-///     "#
+///     "#,
+///     grammar = "tree-sitter-javascript",
 /// }
 /// ```
 ///

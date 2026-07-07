@@ -21,29 +21,29 @@ fn js() -> Language {
 // `mod matcher`) never collide.
 mod queries {
     plotnik::query! {
-        grammar = "arborium-javascript",
         r#"
         Idents = (program (expression_statement (identifier) @id))
-        "#
+        "#,
+        grammar = "arborium-javascript",
     }
 
     plotnik::query! {
+        "Probe = {(program)}",
         grammar = "arborium-javascript",
-        "Probe = {(program)}"
     }
 }
 
 mod vanilla {
     plotnik::query! {
+        "Q = (program (expression_statement (identifier) @id))",
         grammar = "tree-sitter-javascript",
-        "Q = (program (expression_statement (identifier) @id))"
     }
 }
 
 mod tsx {
     plotnik::query! {
+        "Q = (program (expression_statement (identifier) @id))",
         grammar = "tree-sitter-typescript/tsx",
-        "Q = (program (expression_statement (identifier) @id))"
     }
 }
 
@@ -56,9 +56,9 @@ mod from_file {
 
 mod limited {
     plotnik::query! {
+        "Q = (program (expression_statement (identifier) @id))",
         grammar = "arborium-javascript",
         steps = 1,
-        "Q = (program (expression_statement (identifier) @id))"
     }
 }
 
@@ -66,17 +66,17 @@ mod limited {
 // struct), so a depth policy of 1 must trip the metered path.
 mod depth_limited {
     plotnik::query! {
+        "Q = (program (expression_statement (identifier) @id)* @rows)",
         grammar = "arborium-javascript",
         depth = 1,
-        "Q = (program (expression_statement (identifier) @id)* @rows)"
     }
 }
 
 mod repointed {
     plotnik::query! {
+        "Q = (program (expression_statement (identifier) @id))",
         grammar = "arborium-javascript",
         crate = ::plotnik::rt,
-        "Q = (program (expression_statement (identifier) @id))"
     }
 }
 
@@ -84,8 +84,8 @@ mod repointed {
 // wrong-language one, and the language check is once-per-module.
 mod skew {
     plotnik::query! {
+        "Q = (program (expression_statement (identifier) @id))",
         grammar = "arborium-javascript",
-        "Q = (program (expression_statement (identifier) @id))"
     }
 }
 

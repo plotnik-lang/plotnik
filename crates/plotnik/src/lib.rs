@@ -5,19 +5,23 @@
 //! `parse`/`matches` entry points — no bytecode, no dynamic values.
 //!
 //! ```ignore
+//! // `query!` defines types, so invoke it at module scope — not inside a function.
 //! plotnik::query! {
-//!     grammar = "tree-sitter-javascript",
 //!     r#"
 //!     Q = (program (expression_statement (identifier) @id))
-//!     "#
+//!     "#,
+//!     grammar = "tree-sitter-javascript",
 //! }
 //!
-//! let language = tree_sitter_javascript::LANGUAGE.into();
-//! let mut parser = plotnik::tree_sitter::Parser::new();
-//! parser.set_language(&language).unwrap();
-//! let source = "x;";
-//! let tree = parser.parse(source, None).unwrap();
-//! let q = Q::parse(&tree, source).expect("matches");
+//! fn main() {
+//!     let language = tree_sitter_javascript::LANGUAGE.into();
+//!     let mut parser = plotnik::tree_sitter::Parser::new();
+//!     parser.set_language(&language).unwrap();
+//!     let source = "x;";
+//!     let tree = parser.parse(source, None).unwrap();
+//!     // `parse` is the trusted-input path; use `Q::try_parse` for untrusted source.
+//!     let q = Q::parse(&tree, source).expect("matches");
+//! }
 //! ```
 //!
 //! There is no built-in language list: `grammar = "..."` names any package in

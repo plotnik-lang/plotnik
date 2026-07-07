@@ -2,13 +2,13 @@
 // generated internals (the `rt` alias, `mod matcher`) from colliding.
 
 plotnik::query! {
+    "A = (program (expression_statement (identifier) @id))",
     grammar = "arborium-javascript",
-    "A = (program (expression_statement (identifier) @id))"
 }
 
 plotnik::query! {
+    "B = {(program)}",
     grammar = "arborium-javascript",
-    "B = {(program)}"
 }
 
 fn main() {}
