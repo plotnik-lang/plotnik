@@ -58,12 +58,36 @@ pub struct ResolvedGrammar {
     pub path: PathBuf,
 }
 
+impl ResolvedGrammar {
+    fn read(path: PathBuf) -> Result<Self, String> {
+        let json = read(&path)?;
+        Ok(Self { json, path })
+    }
+}
+
+struct NamedGrammar {
+    name: String,
+    resolved: ResolvedGrammar,
+}
+
+impl NamedGrammar {
+    fn read(path: PathBuf) -> Result<Self, String> {
+        let resolved = ResolvedGrammar::read(path)?;
+        let name = grammar_name(&resolved.json).ok_or_else(|| {
+            format!(
+                "`{}` has no top-level `name` field; not a tree-sitter grammar.json?",
+                resolved.path.display()
+            )
+        })?;
+        Ok(Self { name, resolved })
+    }
+}
+
 pub fn resolve(spec: &GrammarSpec<'_>, base_dir: Option<&Path>) -> Result<ResolvedGrammar, String> {
     match spec {
         GrammarSpec::Path(raw) => {
             let path = resolve_relative(raw, base_dir)?;
-            let json = read(&path)?;
-            Ok(ResolvedGrammar { json, path })
+            ResolvedGrammar::read(path)
         }
         GrammarSpec::Package { name, subgrammar } => resolve_package(name, *subgrammar),
     }
@@ -178,40 +202,29 @@ fn resolve_package(name: &str, subgrammar: Option<&str>) -> Result<ResolvedGramm
     // stable across crate layouts.
     if candidates.len() == 1 && subgrammar.is_none() {
         let path = candidates.into_iter().next().expect("checked non-empty");
-        let json = read(&path)?;
-        return Ok(ResolvedGrammar { json, path });
+        return ResolvedGrammar::read(path);
     }
 
     let mut named = Vec::new();
     for path in candidates {
-        let json = read(&path)?;
-        let grammar_name = grammar_name(&json).ok_or_else(|| {
-            format!(
-                "`{}` has no top-level `name` field; not a tree-sitter grammar.json?",
-                path.display()
-            )
-        })?;
-        named.push((grammar_name, json, path));
+        named.push(NamedGrammar::read(path)?);
     }
 
     let Some(wanted) = subgrammar else {
         let names = named
             .iter()
-            .map(|(grammar_name, ..)| grammar_name.as_str())
+            .map(|grammar| grammar.name.as_str())
             .collect::<Vec<_>>()
             .join("`, `");
         return Err(format!(
             "package `{name}` ships several grammars (`{names}`); pick one with \
              `grammar = \"{name}/{}\"`",
-            named[0].0
+            named[0].name
         ));
     };
 
-    match named
-        .into_iter()
-        .find(|(grammar_name, ..)| grammar_name == wanted)
-    {
-        Some((_, json, path)) => Ok(ResolvedGrammar { json, path }),
+    match named.into_iter().find(|grammar| grammar.name == wanted) {
+        Some(grammar) => Ok(grammar.resolved),
         None => Err(format!(
             "package `{name}` ships no grammar named `{wanted}`"
         )),
