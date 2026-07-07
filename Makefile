@@ -28,8 +28,9 @@ test:
 
 shot:
 	@# See AGENTS.md for diagnostic guidelines
-	@# SHOT=1 accepts the golden-fixture suite (tests/0N-*); cargo insta accept does the rest.
-	@SHOT=1 cargo nextest run \
+	@# SHOT=1 accepts the golden-fixture suite (tests/0N-*); TRYBUILD=overwrite
+	@# refreshes the macro_ui .stderr goldens; cargo insta accept does the rest.
+	@SHOT=1 TRYBUILD=overwrite cargo nextest run \
 		--no-fail-fast \
 		--hide-progress-bar \
 		--status-level none \

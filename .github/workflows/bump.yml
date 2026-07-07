@@ -56,9 +56,13 @@ jobs:
           tomato set workspace.package.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-lib.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-rt.version "$next" Cargo.toml
-          # explicit default-features = false overrides need local version bumps too
+          # explicit path+version dependencies (default-features / feature overrides
+          # that can't inherit from the workspace) need local version bumps too
           tomato set dependencies.plotnik-lib.version "$next" crates/plotnik-cli/Cargo.toml
           tomato set build-dependencies.plotnik-lib.version "$next" crates/plotnik-cli/Cargo.toml
+          tomato set dependencies.plotnik-lib.version "$next" crates/plotnik-macros/Cargo.toml
+          tomato set dependencies.plotnik-macros.version "$next" crates/plotnik/Cargo.toml
+          tomato set dependencies.plotnik-rt.version "$next" crates/plotnik/Cargo.toml
 
       - name: Update lockfile
         run: cargo check --workspace
@@ -71,7 +75,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "bump/v$next"
-          git add Cargo.toml Cargo.lock crates/plotnik-cli/Cargo.toml
+          git add Cargo.toml Cargo.lock crates/plotnik-cli/Cargo.toml crates/plotnik-macros/Cargo.toml crates/plotnik/Cargo.toml
           git commit -m "chore: Bump version to \`$next\`"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}"
           git push -u origin "bump/v$next"

@@ -1876,6 +1876,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
+name = "litrs"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e4cf394bcd88ba72eb3b2862e21ef6458b0e1586654e213b0176e667bb9d19e"
+
+[[package]]
 name = "log"
 version = "0.4.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1974,6 +1980,15 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "plotnik"
+version = "0.3.3"
+dependencies = [
+ "plotnik-macros",
+ "plotnik-rt",
+ "tree-sitter",
+]
+
+[[package]]
+name = "plotnik-cli"
 version = "0.3.3"
 dependencies = [
  "arborium-ada",
@@ -2127,6 +2142,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "plotnik-macros"
+version = "0.3.3"
+dependencies = [
+ "cargo_metadata",
+ "crc32fast",
+ "litrs",
+ "plotnik-lib",
+ "plotnik-rt",
+ "serde_json",
+]
+
+[[package]]
 name = "plotnik-rt"
 version = "0.3.3"
 dependencies = [
@@ -2146,12 +2173,15 @@ dependencies = [
  "criterion",
  "indoc",
  "libtest-mimic",
+ "plotnik",
  "plotnik-lib",
  "plotnik-rt",
  "proptest",
  "serde_json",
  "similar 3.1.1",
  "tree-sitter",
+ "tree-sitter-javascript",
+ "tree-sitter-typescript",
  "trybuild",
 ]
 
@@ -2667,10 +2697,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "tree-sitter-javascript"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68204f2abc0627a90bdf06e605f5c470aa26fdcb2081ea553a04bdad756693f5"
+dependencies = [
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
 name = "tree-sitter-language"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "009994f150cc0cd50ff54917d5bc8bffe8cad10ca10d81c34da2ec421ae61782"
+
+[[package]]
+name = "tree-sitter-typescript"
+version = "0.23.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c5f76ed8d947a75cc446d5fccd8b602ebf0cde64ccf2ffa434d873d7a575eff"
+dependencies = [
+ "cc",
+ "tree-sitter-language",
+]
 
 [[package]]
 name = "trybuild"

@@ -74,13 +74,13 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: No-default-features langs
-        run: cargo clippy -p plotnik --no-default-features -- -D warnings
+        run: cargo clippy -p plotnik-cli --no-default-features -- -D warnings
 
       - name: No-default-features lib (C-free compiler)
         run: cargo clippy -p plotnik-lib --no-default-features --all-targets -- -D warnings
 
       - name: Single non-default language
-        run: cargo check -p plotnik --no-default-features --features lang-styx
+        run: cargo check -p plotnik-cli --no-default-features --features lang-styx
 
       - name: All-features workspace
         run: cargo check --workspace --all-targets --all-features

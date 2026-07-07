@@ -52,19 +52,19 @@ Tree-sitter gives you the syntax tree. Extracting structured data from it still 
 ## Installation
 
 ```sh
-cargo install plotnik
+cargo install plotnik-cli
 ```
 
 By default, 15 common languages are included. To add specific languages:
 
 ```sh
-cargo install plotnik --features lang-ruby,lang-elixir
+cargo install plotnik-cli --features lang-ruby,lang-elixir
 ```
 
 Or with all 80+ languages:
 
 ```sh
-cargo install plotnik --features all-languages
+cargo install plotnik-cli --features all-languages
 ```
 
 ## Example

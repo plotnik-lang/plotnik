@@ -1,8 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/plotnik",
     "crates/plotnik-cli",
     "crates/plotnik-lib",
+    "crates/plotnik-macros",
     "crates/plotnik-rt",
     "crates/plotnik-tests",
     "crates/plotnik-wasm",

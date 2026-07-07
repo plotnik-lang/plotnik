@@ -82,6 +82,12 @@ struct Generator<'a> {
     states: BTreeMap<Label, StateInfo>,
     /// Field-id consts: `F_{NAME}` → raw id.
     fields: BTreeMap<String, u16>,
+    /// Kind ids baked into candidate checks → `(grammar name, is_named)`,
+    /// for the generated language-skew assert. The builtin `ERROR` id is
+    /// grammar-independent and carries no skew signal, so it is skipped.
+    expect_kinds: BTreeMap<u16, (String, bool)>,
+    /// Field ids baked into field checks → grammar name, same purpose.
+    expect_fields: BTreeMap<u16, String>,
     /// Regex predicates in first-appearance (label) order: pattern → (index, DFA bytes).
     regexes: BTreeMap<String, (usize, Vec<u8>)>,
     /// Whether any candidate check reads node text (predicates exist).
@@ -116,6 +122,8 @@ impl<'a> Generator<'a> {
             sorted,
             states: BTreeMap::new(),
             fields: BTreeMap::new(),
+            expect_kinds: BTreeMap::new(),
+            expect_fields: BTreeMap::new(),
             regexes: BTreeMap::new(),
             any_predicate: false,
             any_retry_predicate: false,
@@ -164,6 +172,7 @@ impl<'a> Generator<'a> {
         for instr in sorted {
             match instr {
                 InstructionIR::Match(m) => {
+                    self.record_kind(m.node_kind);
                     if let Some(field) = m.node_field {
                         self.record_field(field);
                     }
@@ -196,8 +205,23 @@ impl<'a> Generator<'a> {
     }
 
     fn record_field(&mut self, field: NodeFieldId) {
-        let name = format!("F_{}", shouty_ident(&self.dumper.field_display_name(field)));
+        let display = self.dumper.field_display_name(field);
+        let name = format!("F_{}", shouty_ident(&display));
         self.fields.insert(name, u16::from(field));
+        self.expect_fields.insert(u16::from(field), display);
+    }
+
+    fn record_kind(&mut self, constraint: NodeKindConstraint) {
+        let (id, named) = match constraint {
+            NodeKindConstraint::Named(Some(id)) => (id, true),
+            NodeKindConstraint::Anonymous(Some(id)) => (id, false),
+            _ => return,
+        };
+        if id == crate::core::NodeKindId::ERROR {
+            return;
+        }
+        self.expect_kinds
+            .insert(u16::from(id), (self.dumper.kind_display_name(id), named));
     }
 
     fn state(&self, label: Label) -> &StateInfo {
@@ -256,6 +280,7 @@ impl<'a> Generator<'a> {
 
         let mut machinery = String::new();
         self.mod_header(&mut machinery);
+        self.language_check(&mut machinery);
         self.field_consts(&mut machinery);
         self.regex_statics(&mut machinery);
         self.state_consts(&mut machinery);
@@ -316,6 +341,39 @@ impl<'a> Generator<'a> {
                 ("MEMORY", &limit_expr(self.config.limits.memory)),
             ],
         );
+    }
+
+    /// The language-skew tables and their assert: every kind and field id in
+    /// this module is a numeric bake of the generation-time grammar, so the
+    /// first run checks each one against the tree's live language.
+    fn language_check(&self, out: &mut String) {
+        out.push('\n');
+        out.push_str(
+            "/// Node-kind ids baked into the candidate checks: `(id, name, is_named)`\n\
+             /// as the generation-time grammar defines them.\n",
+        );
+        if self.expect_kinds.is_empty() {
+            out.push_str("const EXPECTED_KINDS: &[(u16, &str, bool)] = &[];\n");
+        } else {
+            out.push_str("const EXPECTED_KINDS: &[(u16, &str, bool)] = &[\n");
+            for (id, (name, named)) in &self.expect_kinds {
+                let _ = writeln!(out, "    ({id}, {name:?}, {named}),");
+            }
+            out.push_str("];\n");
+        }
+        out.push('\n');
+        out.push_str("/// Field ids baked into the field checks: `(id, name)`.\n");
+        if self.expect_fields.is_empty() {
+            out.push_str("const EXPECTED_FIELDS: &[(u16, &str)] = &[];\n");
+        } else {
+            out.push_str("const EXPECTED_FIELDS: &[(u16, &str)] = &[\n");
+            for (id, name) in &self.expect_fields {
+                let _ = writeln!(out, "    ({id}, {name:?}),");
+            }
+            out.push_str("];\n");
+        }
+        out.push('\n');
+        splice(out, "", VERIFY_LANGUAGE, &[]);
     }
 
     fn field_consts(&self, out: &mut String) {
@@ -1046,6 +1104,44 @@ fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
 }
 "#;
 
+const VERIFY_LANGUAGE: &str = r#"
+/// One-shot gate for [`verify_language`]: the first `run` in the process
+/// checks the tree's language, later runs skip the walk. A failed check
+/// panics before the gate is set, so every later call re-reports the
+/// mismatch instead of tripping over a poisoned gate.
+static LANGUAGE_OK: ::std::sync::OnceLock<()> = ::std::sync::OnceLock::new();
+
+/// A parser built from any other grammar version could renumber the baked
+/// kind/field ids and silently mis-match, so mismatches panic: version skew
+/// between the generation-time grammar and the runtime parser is a build
+/// mistake, not a runtime condition to recover from.
+fn verify_language(tree: &rt::Tree) {
+    let language = tree.language();
+    for &(id, name, named) in EXPECTED_KINDS {
+        let found = language.node_kind_for_id(id);
+        if found != Some(name) || language.node_kind_is_named(id) != named {
+            panic!(
+                "grammar version skew: this query module was generated against a \
+                 grammar where node kind {id} is {name:?}, but the tree's language \
+                 says {found:?} — rebuild the module with the grammar of the parser \
+                 that produced the tree",
+            );
+        }
+    }
+    for &(id, name) in EXPECTED_FIELDS {
+        let found = language.field_name_for_id(id);
+        if found != Some(name) {
+            panic!(
+                "grammar version skew: this query module was generated against a \
+                 grammar where field {id} is {name:?}, but the tree's language \
+                 says {found:?} — rebuild the module with the grammar of the parser \
+                 that produced the tree",
+            );
+        }
+    }
+}
+"#;
+
 const ENTRY_FN: &str = r#"
 /// Match the `@DEF@` entrypoint against `tree`. `Some` carries the committed
 /// capture trace — the same effect stream the VM commits for this query.
@@ -1093,6 +1189,7 @@ fn run<'t, const METERED: bool>(
     entry: u16,
     limits: rt::ResolvedRuntimeLimits,
 ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitError> {
+    LANGUAGE_OK.get_or_init(|| verify_language(tree));
     let mut eng = rt::Engine::new(tree.walk());
     let mut steps: u64 = 0;
     let mut ip = entry;

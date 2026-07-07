@@ -1,11 +1,11 @@
 [package]
-name = "plotnik"
+name = "plotnik-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "CLI for plotnik - typed query language for tree-sitter AST"
-documentation = "https://docs.rs/plotnik"
+documentation = "https://docs.rs/plotnik-cli"
 keywords = ["tree-sitter", "query", "ast", "parser", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "../../README.md"

@@ -1,0 +1,9 @@
+error: missing the query: pass a string literal or `file = "..."`
+ --> tests/macro_ui/fail/missing_query.rs:1:1
+  |
+1 | / plotnik::query! {
+2 | |     grammar = "arborium-javascript",
+3 | | }
+  | |_^
+  |
+  = note: this error originates in the macro `plotnik::query` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -99,6 +99,57 @@ mod matcher {
         LIMITS.resolve(source_nodes)
     }
 
+    /// Node-kind ids baked into the candidate checks: `(id, name, is_named)`
+    /// as the generation-time grammar defines them.
+    const EXPECTED_KINDS: &[(u16, &str, bool)] = &[
+        (1, "identifier", true),
+        (134, "program", true),
+        (152, "lexical_declaration", true),
+        (154, "variable_declarator", true),
+    ];
+
+    /// Field ids baked into the field checks: `(id, name)`.
+    const EXPECTED_FIELDS: &[(u16, &str)] = &[
+        (25, "name"),
+        (36, "value"),
+    ];
+
+    /// One-shot gate for [`verify_language`]: the first `run` in the process
+    /// checks the tree's language, later runs skip the walk. A failed check
+    /// panics before the gate is set, so every later call re-reports the
+    /// mismatch instead of tripping over a poisoned gate.
+    static LANGUAGE_OK: ::std::sync::OnceLock<()> = ::std::sync::OnceLock::new();
+
+    /// A parser built from any other grammar version could renumber the baked
+    /// kind/field ids and silently mis-match, so mismatches panic: version skew
+    /// between the generation-time grammar and the runtime parser is a build
+    /// mistake, not a runtime condition to recover from.
+    fn verify_language(tree: &rt::Tree) {
+        let language = tree.language();
+        for &(id, name, named) in EXPECTED_KINDS {
+            let found = language.node_kind_for_id(id);
+            if found != Some(name) || language.node_kind_is_named(id) != named {
+                panic!(
+                    "grammar version skew: this query module was generated against a \
+                     grammar where node kind {id} is {name:?}, but the tree's language \
+                     says {found:?} — rebuild the module with the grammar of the parser \
+                     that produced the tree",
+                );
+            }
+        }
+        for &(id, name) in EXPECTED_FIELDS {
+            let found = language.field_name_for_id(id);
+            if found != Some(name) {
+                panic!(
+                    "grammar version skew: this query module was generated against a \
+                     grammar where field {id} is {name:?}, but the tree's language \
+                     says {found:?} — rebuild the module with the grammar of the parser \
+                     that produced the tree",
+                );
+            }
+        }
+    }
+
     const F_NAME: rt::NodeFieldId = rt::NodeFieldId::from_raw(25);
     const F_VALUE: rt::NodeFieldId = rt::NodeFieldId::from_raw(36);
 
@@ -157,6 +208,7 @@ mod matcher {
         entry: u16,
         limits: rt::ResolvedRuntimeLimits,
     ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitError> {
+        LANGUAGE_OK.get_or_init(|| verify_language(tree));
         let mut eng = rt::Engine::new(tree.walk());
         let mut steps: u64 = 0;
         let mut ip = entry;

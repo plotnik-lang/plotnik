@@ -53,6 +53,8 @@ Before commit: `make fmt`
 
 ```
 crates/
+  plotnik/                     # facade: query! + rt + tree_sitter re-exports
+  plotnik-macros/              # proc-macro shell: args, grammar resolution, expansion
   plotnik-cli/
     src/cli/                   # clap defs, dispatch, shebang, limit flags
     src/commands/              # one module per CLI subcommand
@@ -66,10 +68,13 @@ crates/
       lower/                   # Thompson NFA build + optimization passes
       emit/                    # IR → binary module
       query/                   # facade: Query, QueryBuilder, CheckedQuery, CompiledQuery
-      typegen/                 # bytecode → TypeScript .d.ts
+      typegen/                 # bytecode → TypeScript .d.ts / Rust types
+      codegen/                 # fork-point NFA → generated Rust matcher
       diagnostics/             # user-facing error reporting
     src/core/                  # grammar metadata, node-kind database, interner
     src/vm/                    # runtime engine, backtracking, materialization
+  plotnik-rt/                  # shared runtime engine (VM + generated matchers)
+  plotnik-tests/
     tests/                     # golden fixtures
       mod.rs                   # test harness + docs
       01-lexer/
@@ -78,6 +83,7 @@ crates/
       04-emit/
       05-typegen/
       06-vm/
+      07-codegen/
 docs/                          # specs: language, type system, CLI, runtime, binary format
 ```
 
@@ -174,16 +180,16 @@ Expr = [
 
 # Running queries
 
-`cargo run -p plotnik -- <command>`. Full reference: `docs/cli.md`.
+`cargo run -p plotnik-cli -- <command>`. Full reference: `docs/cli.md`.
 
 ```sh
-cargo run -p plotnik -- run query.ptk app.ts
-cargo run -p plotnik -- run -q 'Q = (program (expression_statement (identifier) @id))' -s 'x' -l javascript
-cargo run -p plotnik -- check query.ptk -l typescript   # silent on success; --json, --strict
-cargo run -p plotnik -- infer query.ptk -l typescript   # emit TypeScript types
-cargo run -p plotnik -- ast app.ts                      # tree-sitter AST of source
-cargo run -p plotnik -- trace query.ptk app.ts -vv      # step-by-step execution
-cargo run -p plotnik -- lang list                       # languages + aliases
+cargo run -p plotnik-cli -- run query.ptk app.ts
+cargo run -p plotnik-cli -- run -q 'Q = (program (expression_statement (identifier) @id))' -s 'x' -l javascript
+cargo run -p plotnik-cli -- check query.ptk -l typescript   # silent on success; --json, --strict
+cargo run -p plotnik-cli -- infer query.ptk -l typescript   # emit TypeScript types
+cargo run -p plotnik-cli -- ast app.ts                      # tree-sitter AST of source
+cargo run -p plotnik-cli -- trace query.ptk app.ts -vv      # step-by-step execution
+cargo run -p plotnik-cli -- lang list                       # languages + aliases
 ```
 
 - Exit codes:
