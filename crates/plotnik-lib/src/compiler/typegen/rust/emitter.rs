@@ -60,6 +60,46 @@ pub(crate) enum ItemKind {
     VoidDef,
 }
 
+impl Item {
+    fn output(name: Symbol, ty: TypeId, shape: &TypeShape) -> Self {
+        Self {
+            name,
+            ty,
+            kind: ItemKind::from_output_shape(shape),
+        }
+    }
+
+    fn void_definition(name: Symbol) -> Self {
+        Self {
+            name,
+            ty: TYPE_VOID,
+            kind: ItemKind::VoidDef,
+        }
+    }
+
+    pub(crate) fn is_composite(&self) -> bool {
+        matches!(self.kind, ItemKind::Struct | ItemKind::Enum)
+    }
+
+    pub(crate) fn is_struct(&self) -> bool {
+        self.kind == ItemKind::Struct
+    }
+
+    pub(crate) fn has_reader(&self) -> bool {
+        self.kind != ItemKind::VoidDef
+    }
+}
+
+impl ItemKind {
+    fn from_output_shape(shape: &TypeShape) -> Self {
+        match shape {
+            TypeShape::Struct(_) => ItemKind::Struct,
+            TypeShape::Enum(_) => ItemKind::Enum,
+            _ => ItemKind::Alias,
+        }
+    }
+}
+
 impl<'a> Emitter<'a> {
     pub(super) fn new(
         types: &'a TypeAnalysis,
@@ -133,7 +173,7 @@ impl<'a> Emitter<'a> {
         }
         if self.config.serde {
             for item in self.items.clone() {
-                if matches!(item.kind, ItemKind::Struct | ItemKind::Enum) {
+                if item.is_composite() {
                     sections.push(self.serde_impl(&item));
                 }
             }
@@ -154,11 +194,7 @@ impl<'a> Emitter<'a> {
         for (def_id, output) in defs {
             let name = self.deps.def_name_sym(def_id);
             if output == TYPE_VOID {
-                self.items.push(Item {
-                    name,
-                    ty: output,
-                    kind: ItemKind::VoidDef,
-                });
+                self.items.push(Item::void_definition(name));
                 continue;
             }
             self.add_item(name, output);
@@ -172,12 +208,9 @@ impl<'a> Emitter<'a> {
             return;
         }
 
-        let kind = match self.types.expect_type_shape(ty) {
-            TypeShape::Struct(_) => ItemKind::Struct,
-            TypeShape::Enum(_) => ItemKind::Enum,
-            _ => ItemKind::Alias,
-        };
-        self.items.push(Item { name, ty, kind });
+        let item = Item::output(name, ty, self.types.expect_type_shape(ty));
+        let kind = item.kind;
+        self.items.push(item);
 
         match kind {
             ItemKind::Struct | ItemKind::Enum => self.collect_composite_children(ty),

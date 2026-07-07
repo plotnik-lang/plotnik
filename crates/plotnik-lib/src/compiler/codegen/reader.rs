@@ -70,7 +70,7 @@ impl<'a> ReaderGen<'a> {
         let mut taken = HashSet::new();
         let mut twins: HashMap<Symbol, Vec<TypeId>> = HashMap::new();
         for item in model.items() {
-            if item.kind == ItemKind::VoidDef {
+            if !item.has_reader() {
                 continue;
             }
             let mut name = format!(
@@ -82,7 +82,7 @@ impl<'a> ReaderGen<'a> {
             }
             reader_fns.insert(item.name, name);
 
-            if matches!(item.kind, ItemKind::Struct | ItemKind::Enum) {
+            if item.is_composite() {
                 twins.insert(item.name, collect_twins(types, table, item));
             }
         }
@@ -601,7 +601,7 @@ impl<'a> Scope<'a> {
 /// kind. Structural identity is enforced upstream (same name ⇒ same shape),
 /// so twins differ only in their member-run offsets.
 fn collect_twins(types: &TypeAnalysis, table: &TypeTableBuilder, item: &Item) -> Vec<TypeId> {
-    let wants_struct = item.kind == ItemKind::Struct;
+    let wants_struct = item.is_struct();
     let mut out: BTreeSet<TypeId> = BTreeSet::new();
     for (ty, name) in types.iter_type_names() {
         if name != item.name {
