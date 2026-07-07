@@ -1,6 +1,12 @@
 MaybeId = (identifier)?
 Q = (program (expression_statement (array (MaybeId)*)))
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type MaybeId = Node | null;
 
 export type Q = Node;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+pub type MaybeId<'t> = ::core::option::Option<Node<'t>>;
+
+pub type Q<'t> = Node<'t>;

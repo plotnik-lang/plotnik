@@ -2,11 +2,22 @@ Q = (program [
   Stmt: (expression_statement)
   Decl: (lexical_declaration)
 ] @kind)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QKind =
   | { $tag: "Stmt" }
   | { $tag: "Decl" };
 
 export interface Q {
   kind: QKind;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q {
+    pub kind: QKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum QKind {
+    Stmt,
+    Decl,
 }

@@ -2,7 +2,7 @@ A = (lexical_declaration)
 Q = (program (A) @a)
 --------------------- INPUT ----------------------
 let x;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   a: Node;
 }

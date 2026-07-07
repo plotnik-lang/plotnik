@@ -1,3 +1,7 @@
 Q = [(identifier) (number)]
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Q = Node;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+pub type Q<'t> = Node<'t>;

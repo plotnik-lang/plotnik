@@ -1,7 +1,7 @@
 Q = (program (expression_statement (identifier == "b") @id))
 --------------------- INPUT ----------------------
 a; b;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   id: Node;
 }

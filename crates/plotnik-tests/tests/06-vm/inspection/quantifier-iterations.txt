@@ -5,7 +5,7 @@ Q = (program
 a
 b
 c
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   stmts: Node[];
 }

@@ -10,7 +10,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [x, y]
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QItems {
   a: Node | null;
   b: Node | null;

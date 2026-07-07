@@ -1,5 +1,10 @@
 Item = (array (Item)* @children)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Item {
   children: Item[];
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Item {
+    pub children: ::std::vec::Vec<Item>,
 }

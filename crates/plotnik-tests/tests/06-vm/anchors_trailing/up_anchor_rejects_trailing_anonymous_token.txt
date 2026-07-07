@@ -1,7 +1,7 @@
 Q = (program (debugger_statement "debugger" .))
 --------------------- INPUT ----------------------
 debugger;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Q = Node;
 --------------------- OUTPUT ---------------------
 <no match>

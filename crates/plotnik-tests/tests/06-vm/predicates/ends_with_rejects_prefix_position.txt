@@ -1,7 +1,7 @@
 Q = (program (expression_statement (identifier $= "foo") @id))
 --------------------- INPUT ----------------------
 foobar;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   id: Node;
 }

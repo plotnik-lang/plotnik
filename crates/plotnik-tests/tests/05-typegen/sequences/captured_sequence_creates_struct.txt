@@ -2,7 +2,7 @@ Q = {
   (identifier) @a
   (number) @b
 } @row
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QRow {
   a: Node;
   b: Node;
@@ -10,4 +10,17 @@ export interface QRow {
 
 export interface Q {
   row: QRow;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub row: QRow<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QRow<'t> {
+    pub a: Node<'t>,
+    pub b: Node<'t>,
 }

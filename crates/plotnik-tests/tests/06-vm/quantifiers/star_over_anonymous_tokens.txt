@@ -1,7 +1,7 @@
 Q = (program (expression_statement (array ","* @commas)))
 --------------------- INPUT ----------------------
 [1, 2, 3];
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   commas: Node[];
 }

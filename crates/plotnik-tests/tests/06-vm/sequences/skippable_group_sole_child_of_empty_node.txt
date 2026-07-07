@@ -6,7 +6,7 @@ Q = (program
   (debugger_statement)? @d
 )
 --------------------- INPUT ----------------------
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   d: Node | null;
 }

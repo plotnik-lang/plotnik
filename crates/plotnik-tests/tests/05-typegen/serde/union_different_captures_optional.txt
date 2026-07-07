@@ -1,0 +1,35 @@
+Q = [
+  (identifier) @a
+  (number) @b
+]
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  a: Node | null;
+  b: Node | null;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub a: ::core::option::Option<Node<'t>>,
+    pub b: ::core::option::Option<Node<'t>>,
+}
+
+impl ::plotnik_rt::SerializeWithSource for Q<'_> {
+    fn serialize_with_source<S>(
+        &self,
+        source: &str,
+        serializer: S,
+    ) -> ::core::result::Result<S::Ok, S::Error>
+    where
+        S: ::plotnik_rt::serde::Serializer,
+    {
+        use ::plotnik_rt::serde::ser::SerializeMap as _;
+
+        let mut map = serializer.serialize_map(Some(2))?;
+        map.serialize_entry("a", &::plotnik_rt::WithSource::new(&self.a, source))?;
+        map.serialize_entry("b", &::plotnik_rt::WithSource::new(&self.b, source))?;
+        map.end()
+    }
+}

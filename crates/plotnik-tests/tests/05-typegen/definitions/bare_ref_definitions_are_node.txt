@@ -1,7 +1,7 @@
 Id = (identifier) @id
 Foo = (function_declaration name: (Id))
 Bar = (class_declaration name: (Id))
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Id {
   id: Node;
 }
@@ -9,3 +9,14 @@ export interface Id {
 export type Foo = Node;
 
 export type Bar = Node;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Id<'t> {
+    pub id: Node<'t>,
+}
+
+pub type Foo<'t> = Node<'t>;
+
+pub type Bar<'t> = Node<'t>;

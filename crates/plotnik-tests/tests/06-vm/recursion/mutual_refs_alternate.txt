@@ -3,7 +3,7 @@ Obj = (object (pair value: (Arr)? @arr))
 Q = (program (expression_statement (Arr) @top))
 --------------------- INPUT ----------------------
 [{a: [1]}];
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Obj {
   arr: Arr | null;
 }

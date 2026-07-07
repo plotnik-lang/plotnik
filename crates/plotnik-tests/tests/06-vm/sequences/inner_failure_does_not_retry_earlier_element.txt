@@ -6,7 +6,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 1; foo; debugger;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   a: Node;
   d: Node;

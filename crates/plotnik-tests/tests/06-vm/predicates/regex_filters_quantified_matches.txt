@@ -1,7 +1,7 @@
 Q = (program (expression_statement (identifier =~ /^x/) @id)* @rows)
 --------------------- INPUT ----------------------
 x1; ax; x3;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QRows {
   id: Node;
 }

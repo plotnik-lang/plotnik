@@ -8,7 +8,7 @@ Q = (program
 )
 ------------------- INPUT (ts) -------------------
 interface I { a: string }
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   name: Node;
   prop: Node;

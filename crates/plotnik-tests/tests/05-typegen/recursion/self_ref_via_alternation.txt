@@ -5,7 +5,15 @@ Expr = [
     right: (Expr) @right
   )
 ]
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Expr =
   | { $tag: "Lit"; $data: { value: Node } }
   | { $tag: "Binary"; $data: { left: Expr; right: Expr } };
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Expr<'t> {
+    Lit { value: Node<'t> },
+    Binary { left: ::std::boxed::Box<Expr<'t>>, right: ::std::boxed::Box<Expr<'t>> },
+}

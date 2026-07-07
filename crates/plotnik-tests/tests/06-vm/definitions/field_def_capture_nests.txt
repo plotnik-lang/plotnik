@@ -7,7 +7,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 function foo(){}
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Name {
   text: Node;
 }

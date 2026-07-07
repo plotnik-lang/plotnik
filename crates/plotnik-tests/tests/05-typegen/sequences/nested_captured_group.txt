@@ -5,7 +5,7 @@ Q = {
     (number) @v
   } @pair
 }
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QPair {
   k: Node;
   v: Node;
@@ -14,4 +14,18 @@ export interface QPair {
 export interface Q {
   name: Node;
   pair: QPair;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub name: Node<'t>,
+    pub pair: QPair<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QPair<'t> {
+    pub k: Node<'t>,
+    pub v: Node<'t>,
 }

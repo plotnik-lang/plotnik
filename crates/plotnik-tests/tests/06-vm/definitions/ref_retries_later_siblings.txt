@@ -2,7 +2,7 @@ E = (expression_statement (number) @n)
 Q = (program (E) @e)
 --------------------- INPUT ----------------------
 a; 1;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface E {
   n: Node;
 }

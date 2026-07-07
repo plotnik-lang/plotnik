@@ -2,9 +2,19 @@ Q = [
   Str: (string) @s :: Foo
   Num: (number) @n
 ]
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Q =
   | { $tag: "Str"; $data: { s: Foo } }
   | { $tag: "Num"; $data: { n: Node } };
 
 export type Foo = Node;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Q<'t> {
+    Str { s: Foo<'t> },
+    Num { n: Node<'t> },
+}
+
+pub type Foo<'t> = Node<'t>;

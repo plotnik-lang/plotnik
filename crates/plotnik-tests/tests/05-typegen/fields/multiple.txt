@@ -2,8 +2,16 @@ Q = (function_declaration
   name: (identifier) @name
   body: (statement_block) @body
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   body: Node;
   name: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub name: Node<'t>,
+    pub body: Node<'t>,
 }

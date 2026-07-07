@@ -1,8 +1,17 @@
 A = (parenthesized_expression (A)?)
 Q = (expression_statement (A) @x)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   x: Node;
 }
 
 export type A = Node;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+pub type A<'t> = Node<'t>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub x: A<'t>,
+}

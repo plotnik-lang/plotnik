@@ -8,7 +8,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [a, 1, b];
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Entry =
   | { $tag: "Id"; $data: { id: Node } }
   | { $tag: "Num"; $data: { num: Node } };

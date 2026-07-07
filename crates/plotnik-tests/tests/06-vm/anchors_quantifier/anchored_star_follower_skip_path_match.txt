@@ -9,7 +9,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 debugger; debugger; foo;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   a: Node | null;
   b: Node[];

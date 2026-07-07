@@ -1,7 +1,7 @@
 Q = (program (expression_statement)* @stmts)
 --------------------- INPUT ----------------------
 let x
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   stmts: Node[];
 }

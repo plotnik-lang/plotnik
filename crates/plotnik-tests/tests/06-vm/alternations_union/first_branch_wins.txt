@@ -8,7 +8,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 x;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   any: Node | null;
   id: Node | null;

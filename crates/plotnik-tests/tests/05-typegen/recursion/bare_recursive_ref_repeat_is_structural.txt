@@ -4,9 +4,19 @@ Expr = [
 ]
 
 Q = (expression_statement (Expr)*)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Expr =
   | { $tag: "Lit"; $data: { n: Node } }
   | { $tag: "Rec" };
 
 export type Q = Node;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Expr<'t> {
+    Lit { n: Node<'t> },
+    Rec,
+}
+
+pub type Q<'t> = Node<'t>;

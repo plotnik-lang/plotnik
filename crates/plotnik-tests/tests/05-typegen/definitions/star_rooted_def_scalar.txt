@@ -1,8 +1,17 @@
 Ids = (identifier)*
 Q = (program (expression_statement (array (Ids) @ids)))
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   ids: Ids;
 }
 
 export type Ids = Node[];
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+pub type Ids<'t> = ::std::vec::Vec<Node<'t>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub ids: ::std::vec::Vec<Node<'t>>,
+}

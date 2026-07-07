@@ -1,7 +1,7 @@
 Q = (program (expression_statement (string "\"" (string_fragment) @s "\"")))
 --------------------- INPUT ----------------------
 "hi";
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   s: Node;
 }

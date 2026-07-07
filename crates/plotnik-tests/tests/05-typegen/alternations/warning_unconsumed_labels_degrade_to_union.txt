@@ -14,8 +14,16 @@ warning: branch labels have no effect without capture
   | |_^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   d: Node | null;
   e: Node | null;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub e: ::core::option::Option<Node<'t>>,
+    pub d: ::core::option::Option<Node<'t>>,
 }

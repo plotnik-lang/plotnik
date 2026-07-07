@@ -1,6 +1,6 @@
 Q = (program (expression_statement) @e)
 --------------------- INPUT ----------------------
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   e: Node;
 }

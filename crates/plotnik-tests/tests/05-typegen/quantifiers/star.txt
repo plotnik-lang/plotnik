@@ -1,5 +1,12 @@
 Q = (identifier)* @ids
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   ids: Node[];
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub ids: ::std::vec::Vec<Node<'t>>,
 }

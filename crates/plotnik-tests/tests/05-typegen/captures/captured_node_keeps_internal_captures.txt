@@ -2,7 +2,7 @@ Q = (function_declaration
   name: (identifier) @name
   body: (statement_block) @body
 ) @func :: FunctionInfo
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type FunctionInfo = Node;
 
 export interface Q {
@@ -10,3 +10,14 @@ export interface Q {
   func: FunctionInfo;
   name: Node;
 }
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub func: FunctionInfo<'t>,
+    pub name: Node<'t>,
+    pub body: Node<'t>,
+}
+
+pub type FunctionInfo<'t> = Node<'t>;

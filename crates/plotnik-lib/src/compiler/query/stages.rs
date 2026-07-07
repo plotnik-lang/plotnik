@@ -503,6 +503,20 @@ impl CompiledQuery {
             .map(|module| crate::compiler::typegen::typescript::emit_mapped(module, config))
     }
 
+    /// Render Rust output types for the query's definitions (the proc-macro
+    /// backend's typegen). `None` when the query didn't compile, mirroring
+    /// [`Self::module`].
+    pub fn to_rust(&self, config: crate::compiler::typegen::rust::Config) -> Option<String> {
+        self.compiled.as_ref()?;
+        let linked = self.checked.query.linked()?;
+        Some(crate::compiler::typegen::rust::emit(
+            linked.type_analysis(),
+            linked.dependency_analysis(),
+            linked.interner(),
+            &config,
+        ))
+    }
+
     /// Render the optimized pre-pack NFA — the IR every backend consumes — in
     /// the bytecode dump format (label space, with definition provenance).
     /// `None` when the query didn't compile, mirroring [`Self::module`].

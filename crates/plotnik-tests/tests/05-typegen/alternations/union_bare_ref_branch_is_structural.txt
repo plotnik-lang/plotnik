@@ -7,7 +7,7 @@ Q = [
   (A)
   (number) @b
 ]
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   b: Node | null;
 }
@@ -15,3 +15,16 @@ export interface Q {
 export type A =
   | { $tag: "X"; $data: { x: Node } }
   | { $tag: "Y"; $data: { y: Node } };
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum A<'t> {
+    X { x: Node<'t> },
+    Y { y: Node<'t> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub b: ::core::option::Option<Node<'t>>,
+}

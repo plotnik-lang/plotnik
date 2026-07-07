@@ -8,7 +8,15 @@ warning: this type annotation a reference keeps its definition's type name; omit
   |
 3 |   Rec: (parenthesized_expression (Expr) @inner :: Foo)
   |                                                   ^^^
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Expr =
   | { $tag: "Lit"; $data: { n: Node } }
   | { $tag: "Rec"; $data: { inner: Expr } };
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Expr<'t> {
+    Lit { n: Node<'t> },
+    Rec { inner: ::std::boxed::Box<Expr<'t>> },
+}

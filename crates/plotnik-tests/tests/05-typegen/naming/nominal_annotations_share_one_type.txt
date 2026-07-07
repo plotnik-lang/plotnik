@@ -2,7 +2,7 @@ Q = (program
   {(expression_statement) @stmt} @a :: Info
   {(expression_statement) @stmt} @b :: Info
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Info {
   stmt: Node;
 }
@@ -10,4 +10,17 @@ export interface Info {
 export interface Q {
   a: Info;
   b: Info;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub a: Info<'t>,
+    pub b: Info<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Info<'t> {
+    pub stmt: Node<'t>,
 }

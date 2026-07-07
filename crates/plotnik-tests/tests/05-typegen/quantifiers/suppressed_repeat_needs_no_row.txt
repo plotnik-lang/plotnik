@@ -3,5 +3,7 @@ Q = (program
     (expression_statement) @s
   }* @_
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Q = undefined;
+---------------------- RUST ----------------------
+// `Q` matches without producing data; no output type.

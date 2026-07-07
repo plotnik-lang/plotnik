@@ -2,7 +2,7 @@ Q = (program [
   Stmt: (expression_statement {(identifier) @name} @info)
   DECL: (lexical_declaration) @node
 ] @item)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QItem =
   | { $tag: "Stmt"; $data: { info: QItemStmtInfo } }
   | { $tag: "DECL"; $data: { node: Node } };
@@ -13,4 +13,22 @@ export interface Q {
 
 export interface QItemStmtInfo {
   name: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub item: QItem<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum QItem<'t> {
+    Stmt { info: QItemStmtInfo<'t> },
+    DECL { node: Node<'t> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QItemStmtInfo<'t> {
+    pub name: Node<'t>,
 }

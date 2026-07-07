@@ -6,7 +6,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 foo;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   d: Node | null;
   e: Node | null;

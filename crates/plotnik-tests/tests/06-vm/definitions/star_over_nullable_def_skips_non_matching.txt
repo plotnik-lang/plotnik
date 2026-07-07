@@ -2,7 +2,7 @@ A = (expression_statement (identifier) @id)? @x
 Q = (program (A)* @xs)
 --------------------- INPUT ----------------------
 a; debugger; b;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface AX {
   id: Node;
 }

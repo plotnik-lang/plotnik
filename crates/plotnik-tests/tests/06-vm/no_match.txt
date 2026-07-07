@@ -1,7 +1,7 @@
 Q = (program (class_declaration) @cls)
 --------------------- INPUT ----------------------
 function foo() {}
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   cls: Node;
 }

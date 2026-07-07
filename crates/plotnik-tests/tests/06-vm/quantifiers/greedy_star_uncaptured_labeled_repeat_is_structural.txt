@@ -4,7 +4,7 @@ Q = (program [
 ]*)
 --------------------- INPUT ----------------------
 foo(); let x
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Q = Node;
 ------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture

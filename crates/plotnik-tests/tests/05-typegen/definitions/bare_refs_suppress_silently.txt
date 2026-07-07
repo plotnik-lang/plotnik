@@ -1,7 +1,7 @@
 A = [X: (expression_statement) @s]
 B = [Y: (lexical_declaration) @d]
 Q = (program (A) (B))
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type B =
   | { $tag: "Y"; $data: { d: Node } };
 
@@ -9,3 +9,17 @@ export type A =
   | { $tag: "X"; $data: { s: Node } };
 
 export type Q = Node;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum A<'t> {
+    X { s: Node<'t> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum B<'t> {
+    Y { d: Node<'t> },
+}
+
+pub type Q<'t> = Node<'t>;

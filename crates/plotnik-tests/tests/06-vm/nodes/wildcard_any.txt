@@ -1,7 +1,7 @@
 Q = (program (expression_statement (array _ @tok)))
 --------------------- INPUT ----------------------
 [a];
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   tok: Node;
 }

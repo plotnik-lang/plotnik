@@ -4,7 +4,7 @@ Q = (program
     (debugger_statement) @dbg
   }? @attrs
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QAttrs {
   dbg: Node;
   decl: Node;
@@ -12,4 +12,17 @@ export interface QAttrs {
 
 export interface Q {
   attrs: QAttrs | null;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub attrs: ::core::option::Option<QAttrs<'t>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QAttrs<'t> {
+    pub decl: Node<'t>,
+    pub dbg: Node<'t>,
 }

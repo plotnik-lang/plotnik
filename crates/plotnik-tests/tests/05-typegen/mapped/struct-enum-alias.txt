@@ -4,7 +4,7 @@ Expr = [
   Num: (number) @value
 ]
 Q = (program (expression_statement (Expr) @expr))
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Expr =
   | { $tag: "Id"; $data: { name: Ident } }
   | { $tag: "Num"; $data: { value: Node } };
@@ -16,6 +16,23 @@ export interface Q {
 export type Ident = Node;
 
 export type Alias = Node;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+pub type Alias<'t> = Node<'t>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Expr<'t> {
+    Id { name: Ident<'t> },
+    Num { value: Node<'t> },
+}
+
+pub type Ident<'t> = Node<'t>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub expr: Expr<'t>,
+}
 --------------------- MAPPED ---------------------
 12..16 T4 "Expr"
 32..34 T4.M2 "Id"

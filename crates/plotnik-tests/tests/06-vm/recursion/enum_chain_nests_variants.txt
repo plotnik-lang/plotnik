@@ -6,7 +6,7 @@ Chain = [
 Q = (program (expression_statement (Chain) @top))
 --------------------- INPUT ----------------------
 a()();
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Chain =
   | { $tag: "Base"; $data: { name: Node } }
   | { $tag: "Step"; $data: { inner: Chain } };

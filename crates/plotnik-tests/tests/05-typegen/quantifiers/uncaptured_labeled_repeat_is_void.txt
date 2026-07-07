@@ -14,5 +14,9 @@ warning: branch labels have no effect without capture
   | |_^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Q = Node;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+pub type Q<'t> = Node<'t>;

@@ -1,7 +1,7 @@
 Q = (program (lexical_declaration)+ @decls)
 --------------------- INPUT ----------------------
 foo;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   decls: [Node, ...Node[]];
 }

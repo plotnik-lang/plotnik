@@ -5,7 +5,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 let a; let b;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QRows {
   decl: Node;
   n: Node;

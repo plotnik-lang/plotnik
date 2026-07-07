@@ -2,5 +2,7 @@ Q = (program [
   A: (expression_statement)
   B: (debugger_statement)
 ] @_)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Q = undefined;
+---------------------- RUST ----------------------
+// `Q` matches without producing data; no output type.

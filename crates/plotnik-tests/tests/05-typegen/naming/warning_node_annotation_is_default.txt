@@ -5,7 +5,14 @@ warning: this type annotation `Node` is already the default type; omit it
   |
 1 | Q = (identifier) @x :: Node
   |                        ^^^^
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   x: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub x: Node<'t>,
 }

@@ -4,9 +4,19 @@ Rec = [
 ]
 
 Q = (Rec)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Rec =
   | { $tag: "A"; $data: { inner: Rec } }
   | { $tag: "B"; $data: { id: Node } };
 
 export type Q = undefined;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Rec<'t> {
+    A { inner: ::std::boxed::Box<Rec<'t>> },
+    B { id: Node<'t> },
+}
+
+// `Q` matches without producing data; no output type.

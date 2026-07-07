@@ -1,7 +1,7 @@
 Q = (program (debugger_statement) @d)
 --------------------- INPUT ----------------------
 debugger;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   d: Node;
 }

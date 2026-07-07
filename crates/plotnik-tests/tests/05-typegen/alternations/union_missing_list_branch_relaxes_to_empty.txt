@@ -2,8 +2,16 @@ Q = (program [
   {(expression_statement)+ @stmts}
   (debugger_statement) @d
 ])
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   d: Node | null;
   stmts: Node[];
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub stmts: ::std::vec::Vec<Node<'t>>,
+    pub d: ::core::option::Option<Node<'t>>,
 }

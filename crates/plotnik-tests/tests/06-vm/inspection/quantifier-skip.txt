@@ -6,7 +6,7 @@ Q = (program
 )
 ------------------- INPUT (ts) -------------------
 function f() {}
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   name: Node;
   stmt: Node | null;

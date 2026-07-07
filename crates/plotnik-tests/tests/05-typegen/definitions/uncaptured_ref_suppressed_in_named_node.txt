@@ -4,9 +4,19 @@ A = [
 ]
 
 Q = (expression_statement (A))
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type A =
   | { $tag: "X"; $data: { x: Node } }
   | { $tag: "Y"; $data: { y: Node } };
 
 export type Q = Node;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum A<'t> {
+    X { x: Node<'t> },
+    Y { y: Node<'t> },
+}
+
+pub type Q<'t> = Node<'t>;

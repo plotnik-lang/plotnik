@@ -7,7 +7,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 let x; let y; foo;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   a: Node;
   b: Node;

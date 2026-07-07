@@ -1,7 +1,7 @@
 Arr = (array (Obj)? @obj)
 Obj = (object (pair value: (Arr)? @arr))
 Q = (program (expression_statement (Arr) @top))
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Obj {
   arr: Arr | null;
 }
@@ -12,4 +12,19 @@ export interface Arr {
 
 export interface Q {
   top: Arr;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Obj {
+    pub arr: ::core::option::Option<::std::boxed::Box<Arr>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Arr {
+    pub obj: ::core::option::Option<::std::boxed::Box<Obj>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q {
+    pub top: ::std::boxed::Box<Arr>,
 }

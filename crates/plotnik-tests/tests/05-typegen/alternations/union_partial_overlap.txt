@@ -5,8 +5,16 @@ Q = [
   }
   {(identifier) @x}
 ]
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   x: Node;
   y: Node | null;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub x: Node<'t>,
+    pub y: ::core::option::Option<Node<'t>>,
 }

@@ -8,7 +8,7 @@ Nested = (call_expression
 Q = (program (expression_statement (Nested) @c))
 --------------------- INPUT ----------------------
 a()()
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Nested {
   name: Node | null;
 }

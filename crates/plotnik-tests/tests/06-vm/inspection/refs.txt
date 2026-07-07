@@ -2,7 +2,7 @@ Name = (identifier) @name
 Q = (program (expression_statement (Name)))
 ------------------- INPUT (ts) -------------------
 x
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Name {
   name: Node;
 }

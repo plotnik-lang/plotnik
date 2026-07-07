@@ -6,7 +6,7 @@ Expr = [
 Q = (program (expression_statement (Expr) @expr))
 ------------------- INPUT (ts) -------------------
 42
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Expr =
   | { $tag: "Id"; $data: { id: Node } }
   | { $tag: "Num"; $data: { num: Node } };

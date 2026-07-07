@@ -42,6 +42,7 @@ pub mod diagnostics {
     };
 }
 
+pub use crate::compiler::typegen::rust::Config as RustConfig;
 pub use crate::compiler::typegen::typescript::{
     Config as TypeScriptConfig, DtsRange, VoidType as TypeScriptVoidType,
 };

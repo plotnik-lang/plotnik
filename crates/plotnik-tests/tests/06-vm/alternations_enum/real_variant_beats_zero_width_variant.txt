@@ -6,7 +6,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 debugger;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QX =
   | { $tag: "A"; $data: { id: Node | null } }
   | { $tag: "B"; $data: { d: Node } };

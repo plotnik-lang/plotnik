@@ -5,7 +5,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Q = undefined;
 ------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture

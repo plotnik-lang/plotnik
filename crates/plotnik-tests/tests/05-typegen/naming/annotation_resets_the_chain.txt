@@ -3,7 +3,7 @@ Foo = (function_declaration
     (expression_statement {(identifier) @v} @inner)
   } @outer :: Bar)
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface BarInner {
   v: Node;
 }
@@ -14,4 +14,21 @@ export interface Bar {
 
 export interface Foo {
   outer: Bar;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Foo<'t> {
+    pub outer: Bar<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Bar<'t> {
+    pub inner: BarInner<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BarInner<'t> {
+    pub v: Node<'t>,
 }

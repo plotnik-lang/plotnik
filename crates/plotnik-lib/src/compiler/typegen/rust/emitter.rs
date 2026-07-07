@@ -1,0 +1,392 @@
+//! Item collection and rendering.
+//!
+//! One item per named type: every non-void definition (struct, enum, or a
+//! `pub type` alias for scalar/wrapper outputs), plus every named composite
+//! its output reaches, emitted parent-first right after their owner. Names
+//! come verbatim from the naming pass; the only unnamed composites are enum
+//! variant payload structs, which render inline as struct variants.
+//!
+//! `Option`/`Vec`/`Box` are spelled absolutely (`::core::option::Option`)
+//! because a definition may legitimately be named `Option` and item
+//! declarations shadow the prelude inside the generated module. `Node` alone
+//! can stay bare: the naming pass reserves it.
+
+use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
+
+use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::types::TypeAnalysis;
+use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::ids::DefId;
+use crate::core::{Interner, Symbol};
+
+use super::Config;
+use super::analysis::TypeFacts;
+use super::idents::scope_idents;
+
+const DERIVES: &str = "#[derive(Debug, Clone, PartialEq, Eq, Hash)]";
+
+pub(super) struct Emitter<'a> {
+    pub(super) types: &'a TypeAnalysis,
+    pub(super) deps: &'a DependencyAnalysis,
+    pub(super) interner: &'a Interner,
+    pub(super) config: &'a Config,
+    pub(super) facts: TypeFacts,
+    /// Names assigned by the naming pass. Consulted only for nominal shapes
+    /// (struct/enum, fresh ids) and `Custom` (interned per symbol) — entries
+    /// for shared builtin/wrapper ids are definition-name noise.
+    type_names: HashMap<TypeId, Symbol>,
+    declared: HashSet<Symbol>,
+    items: Vec<Item>,
+    /// Hygienic module-scope identifier for every declared item name.
+    item_idents: HashMap<Symbol, String>,
+    uses_node: bool,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct Item {
+    pub(super) name: Symbol,
+    pub(super) ty: TypeId,
+    pub(super) kind: ItemKind,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub(super) enum ItemKind {
+    Struct,
+    Enum,
+    Alias,
+    /// A void definition: matches without producing data, so no type. Renders
+    /// as a marker comment so the definition doesn't silently vanish.
+    VoidDef,
+}
+
+impl<'a> Emitter<'a> {
+    pub(super) fn new(
+        types: &'a TypeAnalysis,
+        deps: &'a DependencyAnalysis,
+        interner: &'a Interner,
+        config: &'a Config,
+    ) -> Self {
+        Self {
+            types,
+            deps,
+            interner,
+            config,
+            facts: TypeFacts::compute(types),
+            type_names: types.iter_type_names().collect(),
+            declared: HashSet::new(),
+            items: Vec::new(),
+            item_idents: HashMap::new(),
+            uses_node: false,
+        }
+    }
+
+    pub(super) fn emit(mut self) -> String {
+        self.collect();
+        self.assign_item_idents();
+
+        let mut sections: Vec<String> = Vec::new();
+        for item in self.items.clone() {
+            sections.push(self.render_item(&item));
+        }
+        if self.config.serde {
+            for item in self.items.clone() {
+                if matches!(item.kind, ItemKind::Struct | ItemKind::Enum) {
+                    sections.push(self.serde_impl(&item));
+                }
+            }
+        }
+
+        let mut out = String::new();
+        if self.uses_node {
+            let rt = &self.config.rt_crate;
+            out.push_str(&format!("use {rt}::Node;\n\n"));
+        }
+        out.push_str(&sections.join("\n\n"));
+        out.push('\n');
+        out
+    }
+
+    fn collect(&mut self) {
+        let defs: Vec<(DefId, TypeId)> = self.types.iter_def_output().collect();
+        for (def_id, output) in defs {
+            let name = self.deps.def_name_sym(def_id);
+            if output == TYPE_VOID {
+                self.items.push(Item {
+                    name,
+                    ty: output,
+                    kind: ItemKind::VoidDef,
+                });
+                continue;
+            }
+            self.add_item(name, output);
+        }
+    }
+
+    fn add_item(&mut self, name: Symbol, ty: TypeId) {
+        // The same name recurs only for structurally identical types (nominal
+        // twins from repeated annotations); one declaration serves them all.
+        if !self.declared.insert(name) {
+            return;
+        }
+
+        let kind = match self.types.expect_type_shape(ty) {
+            TypeShape::Struct(_) => ItemKind::Struct,
+            TypeShape::Enum(_) => ItemKind::Enum,
+            _ => ItemKind::Alias,
+        };
+        self.items.push(Item { name, ty, kind });
+
+        match kind {
+            ItemKind::Struct | ItemKind::Enum => self.collect_composite_children(ty),
+            ItemKind::Alias => self.collect_alias_interior(ty),
+            ItemKind::VoidDef => unreachable!("void definitions never become named items"),
+        }
+    }
+
+    fn collect_composite_children(&mut self, ty: TypeId) {
+        let types = self.types;
+        match types.expect_type_shape(ty) {
+            TypeShape::Struct(fields) => {
+                for info in fields.values() {
+                    self.collect_position(info.type_id);
+                }
+            }
+            TypeShape::Enum(variants) => {
+                for &payload in variants.values() {
+                    if payload == TYPE_VOID {
+                        continue;
+                    }
+                    let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
+                        unreachable!("enum variant payload is void or an anonymous struct");
+                    };
+                    for info in fields.values() {
+                        self.collect_position(info.type_id);
+                    }
+                }
+            }
+            _ => unreachable!("children collection runs on composites only"),
+        }
+    }
+
+    /// Discover the named item (if any) behind a use-site position.
+    fn collect_position(&mut self, ty: TypeId) {
+        let types = self.types;
+        match types.expect_type_shape(ty) {
+            TypeShape::Struct(_) | TypeShape::Enum(_) => {
+                let name = *self
+                    .type_names
+                    .get(&ty)
+                    .expect("naming pass names every composite outside enum-variant payloads");
+                self.add_item(name, ty);
+            }
+            // A named `Custom` is a `:: TypeName` alias of Node; a `:: Node`
+            // restatement stays unnamed and renders as plain `Node`.
+            TypeShape::Custom(_) => {
+                if let Some(&name) = self.type_names.get(&ty) {
+                    self.add_item(name, ty);
+                }
+            }
+            TypeShape::Array { element, .. } => self.collect_position(*element),
+            TypeShape::Optional(inner) => self.collect_position(*inner),
+            // A ref's target declares its own item via its definition.
+            TypeShape::Node | TypeShape::Ref(_) => {}
+            TypeShape::Void => unreachable!("void cannot appear in an output position"),
+        }
+    }
+
+    /// An alias item's body can still reach named composites through wrappers
+    /// (`Items = (Entry)*` aliases `Vec<Entry>`).
+    fn collect_alias_interior(&mut self, ty: TypeId) {
+        let types = self.types;
+        match types.expect_type_shape(ty) {
+            TypeShape::Array { element, .. } => self.collect_position(*element),
+            TypeShape::Optional(inner) => self.collect_position(*inner),
+            TypeShape::Node | TypeShape::Custom(_) | TypeShape::Ref(_) => {}
+            TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Void => {
+                unreachable!("alias items cover non-composite outputs only")
+            }
+        }
+    }
+
+    fn assign_item_idents(&mut self) {
+        let interner = self.interner;
+        let idents = scope_idents(self.items.iter().map(|item| interner.resolve(item.name)));
+        for (item, ident) in self.items.iter().zip(idents) {
+            self.item_idents.insert(item.name, ident);
+        }
+    }
+
+    pub(super) fn item_ident(&self, name: Symbol) -> &str {
+        self.item_idents
+            .get(&name)
+            .expect("every declared item name has an identifier")
+    }
+
+    fn render_item(&mut self, item: &Item) -> String {
+        match item.kind {
+            ItemKind::Struct => self.render_struct(item),
+            ItemKind::Enum => self.render_enum(item),
+            ItemKind::Alias => self.render_alias(item),
+            ItemKind::VoidDef => format!(
+                "// `{}` matches without producing data; no output type.",
+                self.interner.resolve(item.name)
+            ),
+        }
+    }
+
+    fn render_struct(&mut self, item: &Item) -> String {
+        let types = self.types;
+        let interner = self.interner;
+        let TypeShape::Struct(fields) = types.expect_type_shape(item.ty) else {
+            unreachable!("struct item must have a struct shape");
+        };
+        let field_idents = scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
+        let ident = self.item_ident(item.name).to_string();
+        let lt = self.lifetime_args(item.ty);
+
+        let mut out = format!("{DERIVES}\npub struct {ident}{lt} {{\n");
+        for (info, field_ident) in fields.values().zip(&field_idents) {
+            let field_ty = self.field_type(info);
+            writeln!(out, "    pub {field_ident}: {field_ty},")
+                .expect("writing to a String is infallible");
+        }
+        out.push('}');
+        out
+    }
+
+    fn render_enum(&mut self, item: &Item) -> String {
+        let types = self.types;
+        let interner = self.interner;
+        let TypeShape::Enum(variants) = types.expect_type_shape(item.ty) else {
+            unreachable!("enum item must have an enum shape");
+        };
+        let variant_idents = scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
+        let ident = self.item_ident(item.name).to_string();
+        let lt = self.lifetime_args(item.ty);
+
+        let mut out = format!("{DERIVES}\npub enum {ident}{lt} {{\n");
+        for ((_, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
+            if payload == TYPE_VOID {
+                writeln!(out, "    {variant_ident},").expect("writing to a String is infallible");
+                continue;
+            }
+            let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
+                unreachable!("enum variant payload is void or an anonymous struct");
+            };
+            let field_idents = scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
+            let rendered: Vec<String> = fields
+                .values()
+                .zip(&field_idents)
+                .map(|(info, field_ident)| format!("{field_ident}: {}", self.field_type(info)))
+                .collect();
+            writeln!(out, "    {variant_ident} {{ {} }},", rendered.join(", "))
+                .expect("writing to a String is infallible");
+        }
+        out.push('}');
+        out
+    }
+
+    fn render_alias(&mut self, item: &Item) -> String {
+        let ident = self.item_ident(item.name).to_string();
+        let lt = self.lifetime_args(item.ty);
+        let body = self.alias_body(item.ty);
+        format!("pub type {ident}{lt} = {body};")
+    }
+
+    /// An alias item's body: one shape level rendered structurally (the
+    /// item's own name must not win), positions below it render as usual.
+    fn alias_body(&mut self, ty: TypeId) -> String {
+        let types = self.types;
+        match types.expect_type_shape(ty) {
+            TypeShape::Node | TypeShape::Custom(_) => self.node_type(),
+            TypeShape::Array { element, .. } => {
+                format!("::std::vec::Vec<{}>", self.position_type(*element))
+            }
+            TypeShape::Optional(inner) => {
+                format!("::core::option::Option<{}>", self.position_type(*inner))
+            }
+            TypeShape::Ref(def_id) => self.ref_type(*def_id, ty),
+            TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Void => {
+                unreachable!("alias items cover non-composite outputs only")
+            }
+        }
+    }
+
+    /// A field's rendered type: the capture-level `optional` flag wraps one
+    /// more `Option` around the base, composing with an already-optional base
+    /// exactly like the bytecode type table does (two nulls from two distinct
+    /// syntax sites legitimately nest).
+    pub(super) fn field_type(&mut self, info: &FieldInfo) -> String {
+        let base = self.position_type(info.type_id);
+        if info.optional {
+            format!("::core::option::Option<{base}>")
+        } else {
+            base
+        }
+    }
+
+    /// Render a type at a use site: named types by name, wrappers inline.
+    pub(super) fn position_type(&mut self, ty: TypeId) -> String {
+        let types = self.types;
+        match types.expect_type_shape(ty) {
+            TypeShape::Node => self.node_type(),
+            TypeShape::Custom(_) => match self.type_names.get(&ty) {
+                Some(&name) => self.named_type(name, ty),
+                None => self.node_type(),
+            },
+            TypeShape::Struct(_) | TypeShape::Enum(_) => {
+                let name = *self
+                    .type_names
+                    .get(&ty)
+                    .expect("naming pass names every composite outside enum-variant payloads");
+                self.named_type(name, ty)
+            }
+            TypeShape::Array { element, .. } => {
+                format!("::std::vec::Vec<{}>", self.position_type(*element))
+            }
+            TypeShape::Optional(inner) => {
+                format!("::core::option::Option<{}>", self.position_type(*inner))
+            }
+            TypeShape::Ref(def_id) => self.ref_type(*def_id, ty),
+            TypeShape::Void => unreachable!("void cannot appear in an output position"),
+        }
+    }
+
+    fn node_type(&mut self) -> String {
+        self.uses_node = true;
+        "Node<'t>".to_string()
+    }
+
+    fn named_type(&self, name: Symbol, ty: TypeId) -> String {
+        let ident = self.item_ident(name);
+        let lt = self.lifetime_args(ty);
+        format!("{ident}{lt}")
+    }
+
+    /// A reference renders as its target definition's type name, boxed when
+    /// this occurrence closes a by-value cycle. A void target contributes no
+    /// value, so the capture holds the matched node itself.
+    fn ref_type(&mut self, def_id: DefId, ref_ty: TypeId) -> String {
+        let target = self.types.expect_def_output(def_id);
+        if target == TYPE_VOID {
+            return self.node_type();
+        }
+
+        let name = self.deps.def_name_sym(def_id);
+        let base = self.named_type(name, target);
+        if self.facts.is_boxed(ref_ty) {
+            format!("::std::boxed::Box<{base}>")
+        } else {
+            base
+        }
+    }
+
+    pub(super) fn lifetime_args(&self, ty: TypeId) -> &'static str {
+        if self.facts.needs_lifetime(ty) {
+            "<'t>"
+        } else {
+            ""
+        }
+    }
+}

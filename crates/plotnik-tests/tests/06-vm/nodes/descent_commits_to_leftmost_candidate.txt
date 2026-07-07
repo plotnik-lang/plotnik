@@ -1,7 +1,7 @@
 Q = (program (expression_statement (number) @n))
 --------------------- INPUT ----------------------
 a; 1;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   n: Node;
 }

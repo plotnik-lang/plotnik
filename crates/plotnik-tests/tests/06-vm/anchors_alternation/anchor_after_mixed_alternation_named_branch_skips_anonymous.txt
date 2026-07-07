@@ -12,7 +12,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a + /* c */ b
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   left: Node | null;
   right: Node;

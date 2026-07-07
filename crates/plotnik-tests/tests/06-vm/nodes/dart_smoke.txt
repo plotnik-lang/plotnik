@@ -1,7 +1,7 @@
 Q = (program (function_signature name: (identifier) @name))
 ------------------ INPUT (dart) ------------------
 void f() {}
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   name: Node;
 }

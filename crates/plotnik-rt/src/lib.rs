@@ -28,6 +28,8 @@ mod checkpoint;
 mod cursor;
 #[cfg(feature = "tree-sitter")]
 mod effect;
+#[cfg(feature = "serde")]
+mod serialize;
 
 #[cfg(test)]
 #[cfg(feature = "tree-sitter")]
@@ -50,3 +52,17 @@ pub use checkpoint::{CallResume, Checkpoint, CheckpointStack, CheckpointState};
 pub use cursor::{CursorWrapper, SkipPolicy};
 #[cfg(feature = "tree-sitter")]
 pub use effect::{EffectLog, RuntimeEffect};
+#[cfg(feature = "serde")]
+pub use serialize::{SerializeWithSource, WithSource};
+
+/// The node handle generated query outputs are built from. Re-exported so
+/// generated code and user code can name it without depending on tree-sitter
+/// directly — which also guarantees they see the same tree-sitter version the
+/// engine was built against.
+#[cfg(feature = "tree-sitter")]
+pub use tree_sitter::Node;
+
+/// Generated `SerializeWithSource` impls spell serde paths through this
+/// re-export, so user crates don't need their own serde dependency.
+#[cfg(feature = "serde")]
+pub use serde;
