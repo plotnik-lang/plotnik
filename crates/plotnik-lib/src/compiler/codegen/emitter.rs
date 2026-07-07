@@ -188,37 +188,48 @@ impl<'a> Generator<'a> {
         let sorted = self.sorted.clone();
         for instr in sorted {
             match instr {
-                InstructionIR::Match(m) => {
-                    self.record_kind(m.node_kind);
-                    if let Some(field) = m.node_field {
-                        self.record_field(field);
-                    }
-                    for &field in &m.neg_fields {
-                        self.record_field(field);
-                    }
-                    if let Some(pred) = &m.predicate {
-                        self.any_predicate = true;
-                        if is_retryable(m) {
-                            self.any_retry_predicate = true;
-                        }
-                        if let PredicateValueIR::Regex(pattern) = &pred.value {
-                            let next_index = self.regexes.len();
-                            self.regexes.entry(pattern.to_string()).or_insert_with(|| {
-                                let bytes = compile_dfa_bytes(pattern)
-                                    .expect("regex predicate compiled during emit");
-                                (next_index, bytes)
-                            });
-                        }
-                    }
-                }
-                InstructionIR::Call(c) => {
-                    if let Some(field) = c.node_field {
-                        self.record_field(field);
-                    }
-                }
+                InstructionIR::Match(m) => self.record_match_operands(m),
+                InstructionIR::Call(c) => self.record_call_operands(c),
                 InstructionIR::Return(_) => {}
             }
         }
+    }
+
+    fn record_match_operands(&mut self, m: &MatchIR) {
+        self.record_kind(m.node_kind);
+        if let Some(field) = m.node_field {
+            self.record_field(field);
+        }
+        for &field in &m.neg_fields {
+            self.record_field(field);
+        }
+        if let Some(pred) = &m.predicate {
+            self.record_predicate(m, pred);
+        }
+    }
+
+    fn record_call_operands(&mut self, c: &CallIR) {
+        if let Some(field) = c.node_field {
+            self.record_field(field);
+        }
+    }
+
+    fn record_predicate(&mut self, m: &MatchIR, pred: &PredicateIR) {
+        self.any_predicate = true;
+        if is_retryable(m) {
+            self.any_retry_predicate = true;
+        }
+        if let PredicateValueIR::Regex(pattern) = &pred.value {
+            self.record_regex(pattern);
+        }
+    }
+
+    fn record_regex(&mut self, pattern: &str) {
+        let next_index = self.regexes.len();
+        self.regexes.entry(pattern.to_string()).or_insert_with(|| {
+            let bytes = compile_dfa_bytes(pattern).expect("regex predicate compiled during emit");
+            (next_index, bytes)
+        });
     }
 
     fn record_field(&mut self, field: NodeFieldId) {
