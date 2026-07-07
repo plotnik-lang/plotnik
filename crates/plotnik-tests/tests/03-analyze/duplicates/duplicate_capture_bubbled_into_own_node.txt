@@ -1,0 +1,11 @@
+Q = (foo (a) @x) @x
+------------------ DIAGNOSTICS -------------------
+error: capture `@x` already defined in this scope
+ --> query.ptk:1:18
+  |
+1 | Q = (foo (a) @x) @x
+  |                  ^^
+  |
+help: rename one capture, or use an enum if they are mutually exclusive branches
+-------------------- SYMBOLS ---------------------
+Q

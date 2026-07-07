@@ -536,8 +536,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let base = self.captured_base_type(inner.node(), &inner_info, should_merge_fields);
         let field_info =
             self.captured_field_info(base, annotation, captured_inner.makes_field_optional);
-        let flow =
-            self.captured_field_flow(capture_name, field_info, &inner_info, should_merge_fields);
+        let flow = self.captured_field_flow(
+            capture_name,
+            field_info,
+            &inner_info,
+            should_merge_fields,
+            name_tok.text_range(),
+        );
 
         PatternShape::new(inner_info.arity, flow)
     }
@@ -631,6 +636,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         field_info: FieldInfo,
         inner_info: &PatternShape,
         should_merge_fields: bool,
+        range: TextRange,
     ) -> PatternFlow {
         if !should_merge_fields {
             return PatternFlow::Fields(
@@ -649,7 +655,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .in_progress()
             .expect_struct_fields(*type_id)
             .clone();
-        fields.insert(capture_name, field_info);
+        // The node binds its own capture alongside the children bubbling up from
+        // inside it (`(named (child) @x) @x`); a clash between the two is a
+        // duplicate capture in this scope.
+        self.insert_scope_field(&mut fields, capture_name, field_info, range);
 
         PatternFlow::Fields(self.ctx.type_ctx.intern_struct(fields))
     }
