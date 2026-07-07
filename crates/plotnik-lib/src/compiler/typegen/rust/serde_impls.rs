@@ -19,6 +19,36 @@ use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
 use super::emitter::{Emitter, Item, ItemKind, TypeContext};
 use super::idents::scope_idents;
 
+struct EnumVariant<'a> {
+    item_ty: TypeId,
+    payload: TypeId,
+    enum_ident: &'a str,
+    variant_ident: &'a str,
+    label: &'a str,
+}
+
+impl<'a> EnumVariant<'a> {
+    fn new(
+        item_ty: TypeId,
+        payload: TypeId,
+        enum_ident: &'a str,
+        variant_ident: &'a str,
+        label: &'a str,
+    ) -> Self {
+        Self {
+            item_ty,
+            payload,
+            enum_ident,
+            variant_ident,
+            label,
+        }
+    }
+
+    fn has_payload(&self) -> bool {
+        self.payload != TYPE_VOID
+    }
+}
+
 impl Emitter<'_> {
     pub(super) fn serde_impl(&mut self, item: &Item) -> String {
         let rt = self.config.rt_crate.clone();
@@ -96,10 +126,11 @@ impl Emitter<'_> {
         let mut out = String::from("        match self {\n");
         for ((&label_sym, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
             let label = interner.resolve(label_sym).to_owned();
-            let arm = if payload == TYPE_VOID {
-                unit_arm(ident, variant_ident, &label)
+            let variant = EnumVariant::new(item.ty, payload, ident, variant_ident, &label);
+            let arm = if variant.has_payload() {
+                self.payload_arm(&variant)
             } else {
-                self.payload_arm(item.ty, payload, ident, variant_ident, &label)
+                unit_arm(&variant)
             };
             out.push_str(&arm);
         }
@@ -107,18 +138,11 @@ impl Emitter<'_> {
         out
     }
 
-    fn payload_arm(
-        &mut self,
-        item_ty: TypeId,
-        payload: TypeId,
-        ident: &str,
-        variant_ident: &str,
-        label: &str,
-    ) -> String {
+    fn payload_arm(&mut self, variant: &EnumVariant<'_>) -> String {
         let types = self.types;
         let interner = self.interner;
         let rt = self.config.rt_crate.clone();
-        let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
+        let TypeShape::Struct(fields) = types.expect_type_shape(variant.payload) else {
             unreachable!("enum variant payload is void or an anonymous struct");
         };
         let field_idents = scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
@@ -136,7 +160,7 @@ impl Emitter<'_> {
         for (index, (&name_sym, info)) in fields.iter().enumerate() {
             // The helper borrows the enum's actual field, so its type must be
             // spelled with the declaration's own cut context.
-            let field_ty = self.field_type(TypeContext::item(item_ty), info);
+            let field_ty = self.field_type(TypeContext::item(variant.item_ty), info);
             writeln!(data_fields, "                    v{index}: &'a {field_ty},")
                 .expect("writing to a String is infallible");
             let key = interner.resolve(name_sym);
@@ -156,6 +180,9 @@ impl Emitter<'_> {
         let data_inits: Vec<String> = (0..fields.len()).map(|i| format!("v{i}")).collect();
         let data_inits = data_inits.join(", ");
         let field_count = fields.len();
+        let ident = variant.enum_ident;
+        let variant_ident = variant.variant_ident;
+        let label = variant.label;
 
         format!(
             "            {ident}::{variant_ident} {{ {binding_list} }} => {{
@@ -187,7 +214,10 @@ impl Emitter<'_> {
     }
 }
 
-fn unit_arm(ident: &str, variant_ident: &str, label: &str) -> String {
+fn unit_arm(variant: &EnumVariant<'_>) -> String {
+    let ident = variant.enum_ident;
+    let variant_ident = variant.variant_ident;
+    let label = variant.label;
     format!(
         "            {ident}::{variant_ident} => {{
                 let mut map = serializer.serialize_map(Some(1))?;
