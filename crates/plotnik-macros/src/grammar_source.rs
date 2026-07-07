@@ -241,7 +241,9 @@ fn dependency_closure(
     metadata: &cargo_metadata::Metadata,
 ) -> Option<std::collections::HashSet<&cargo_metadata::PackageId>> {
     let resolve = metadata.resolve.as_ref()?;
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok()?;
+    let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") else {
+        return None;
+    };
     let manifest = Path::new(&manifest_dir).join("Cargo.toml");
     let root = metadata
         .packages
@@ -327,6 +329,11 @@ fn is_ignored_package_dir(name: &str) -> bool {
 
 /// The `name` field of a grammar.json — how subgrammars are told apart.
 fn grammar_name(json: &str) -> Option<String> {
-    let value: serde_json::Value = serde_json::from_str(json).ok()?;
-    Some(value.get("name")?.as_str()?.to_string())
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else {
+        return None;
+    };
+    let Some(name) = value.get("name").and_then(|name| name.as_str()) else {
+        return None;
+    };
+    Some(name.to_string())
 }
