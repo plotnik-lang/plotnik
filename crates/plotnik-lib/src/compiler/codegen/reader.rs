@@ -484,7 +484,7 @@ impl<'a> ReaderGen<'a> {
                 self.interner.resolve(name)
             );
         }
-        let _ = writeln!(out, "{p}while !t.{}() {{", scope.close);
+        let _ = writeln!(out, "{p}while !t.{}() {{", scope.close.probe());
         let _ = writeln!(out, "{p}    match t.peek_set() {{");
         for (k, (&name, info)) in fields.iter().enumerate() {
             let indices = arm_pattern(indices_of(k));
@@ -654,17 +654,40 @@ impl ReadContext {
 /// the terminator probe, and the display name its panics cite.
 struct Scope<'a> {
     context: ReadContext,
-    close: &'a str,
+    close: ScopeClose,
     name: &'a str,
+}
+
+#[derive(Clone, Copy)]
+enum ScopeClose {
+    Struct,
+    Enum,
+}
+
+impl ScopeClose {
+    fn probe(self) -> &'static str {
+        match self {
+            ScopeClose::Struct => "at_struct_close",
+            ScopeClose::Enum => "at_enum_close",
+        }
+    }
 }
 
 impl<'a> Scope<'a> {
     fn struct_body(owner: TypeId, name: &'a str) -> Self {
-        Self::new(owner, 1, "at_struct_close", name)
+        Self {
+            context: ReadContext::item(owner, 1),
+            close: ScopeClose::Struct,
+            name,
+        }
     }
 
     fn enum_payload(owner: TypeId, name: &'a str) -> Self {
-        Self::new(owner, 3, "at_enum_close", name)
+        Self {
+            context: ReadContext::item(owner, 3),
+            close: ScopeClose::Enum,
+            name,
+        }
     }
 
     fn field_context(&self) -> ReadContext {
@@ -673,14 +696,6 @@ impl<'a> Scope<'a> {
 
     fn level(&self) -> usize {
         self.context.level
-    }
-
-    fn new(owner: TypeId, level: usize, close: &'a str, name: &'a str) -> Self {
-        Self {
-            context: ReadContext::item(owner, level),
-            close,
-            name,
-        }
     }
 }
 
