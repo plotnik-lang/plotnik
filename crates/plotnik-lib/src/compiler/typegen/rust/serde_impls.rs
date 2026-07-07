@@ -14,7 +14,7 @@
 
 use std::fmt::Write as _;
 
-use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
 
 use super::emitter::{Emitter, Item, ItemKind, TypeContext};
 use super::idents::scope_idents;
@@ -83,6 +83,30 @@ impl<'a> EnumSerdeContext<'a> {
 impl EnumVariant<'_> {
     fn has_payload(&self) -> bool {
         self.payload != TYPE_VOID
+    }
+}
+
+struct PayloadAdapterSignature {
+    decl_generics: &'static str,
+    impl_generics: &'static str,
+}
+
+impl PayloadAdapterSignature {
+    fn from_fields<'a>(
+        mut fields: impl Iterator<Item = &'a FieldInfo>,
+        facts: &super::analysis::TypeFacts,
+    ) -> Self {
+        let needs_lifetime = fields.any(|info| facts.needs_lifetime(info.type_id));
+        if needs_lifetime {
+            return Self {
+                decl_generics: "<'a, 't>",
+                impl_generics: "<'_, '_>",
+            };
+        }
+        Self {
+            decl_generics: "<'a>",
+            impl_generics: "<'_>",
+        }
     }
 }
 
@@ -190,14 +214,7 @@ impl Emitter<'_> {
             unreachable!("enum variant payload is void or an anonymous struct");
         };
         let field_idents = scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
-        let payload_lt = fields
-            .values()
-            .any(|info| self.facts.needs_lifetime(info.type_id));
-        let (decl_lt, impl_lt) = if payload_lt {
-            ("<'a, 't>", "<'_, '_>")
-        } else {
-            ("<'a>", "<'_>")
-        };
+        let sig = PayloadAdapterSignature::from_fields(fields.values(), &self.facts);
 
         let mut data_fields = String::new();
         let mut data_entries = String::new();
@@ -230,10 +247,10 @@ impl Emitter<'_> {
 
         format!(
             "            {ident}::{variant_ident} {{ {binding_list} }} => {{
-                struct Data{decl_lt} {{
+                struct Data{} {{
 {data_fields}                    source: &'a str,
                 }}
-                impl {rt}::serde::Serialize for Data{impl_lt} {{
+                impl {rt}::serde::Serialize for Data{} {{
                     fn serialize<S>(
                         &self,
                         serializer: S,
@@ -253,7 +270,8 @@ impl Emitter<'_> {
                 map.serialize_entry(\"$data\", &Data {{ {data_inits}, source }})?;
                 map.end()
             }}
-"
+",
+            sig.decl_generics, sig.impl_generics
         )
     }
 }
