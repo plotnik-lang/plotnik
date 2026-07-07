@@ -31,6 +31,11 @@ struct QueryInput {
     span: Span,
 }
 
+struct StrictQuery {
+    compiled: CompiledQuery,
+    span: Span,
+}
+
 struct RebuildAnchors {
     lines: Vec<String>,
 }
@@ -99,29 +104,39 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
 
     // Mirror `plotnik check --strict`: a compile-time-committed query must be
     // clean — proc macros have no warning channel, so warnings fail too.
-    let compiled = QueryBuilder::new(query.source_map)
-        .with_strict_lints(true)
-        .compile(&loaded_grammar.grammar)
-        .map_err(|error| ExpandError::new(query.span, error.to_string()))?;
-    let diagnostics = compiled.diagnostics();
-    if diagnostics.has_errors() || diagnostics.has_warnings() {
-        let rendered = diagnostics.render_colored(compiled.source_map(), false);
-        // The message lands under rustc's own `error:` heading; the first
-        // rendered severity tag would double it, so it hands that role over.
-        let message = rendered.strip_prefix("error: ").unwrap_or(&rendered);
-        return Err(ExpandError::new(query.span, message));
-    }
-
-    reject_colliding_entry_names(&compiled, query.span)?;
+    let query = compile_strict_query(query, &loaded_grammar.grammar)?;
+    reject_colliding_entry_names(&query.compiled, query.span)?;
 
     let config = MatcherConfig::new()
         .rt_crate(args.rt_crate.unwrap_or_else(|| "::plotnik::rt".to_string()))
         .serde(cfg!(feature = "serde"))
         .limits(runtime_limits(&args.limits))
         .depth(replay_depth(&args.limits));
-    Ok(compiled
+    Ok(query
+        .compiled
         .to_rust_matcher(config)
         .expect("a diagnostics-clean query generates a module"))
+}
+
+fn compile_strict_query(
+    query: QueryInput,
+    grammar: &plotnik_lib::grammar::Grammar,
+) -> Result<StrictQuery, ExpandError> {
+    let span = query.span;
+    let compiled = QueryBuilder::new(query.source_map)
+        .with_strict_lints(true)
+        .compile(grammar)
+        .map_err(|error| ExpandError::new(span, error.to_string()))?;
+    let diagnostics = compiled.diagnostics();
+    if diagnostics.has_errors() || diagnostics.has_warnings() {
+        let rendered = diagnostics.render_colored(compiled.source_map(), false);
+        // The message lands under rustc's own `error:` heading; the first
+        // rendered severity tag would double it, so it hands that role over.
+        let message = rendered.strip_prefix("error: ").unwrap_or(&rendered);
+        return Err(ExpandError::new(span, message));
+    }
+
+    Ok(StrictQuery { compiled, span })
 }
 
 /// Every definition becomes snake_case items (`{def}_trace`, the
