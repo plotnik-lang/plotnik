@@ -148,6 +148,18 @@ impl<'a> CallArmPlan<'a> {
     }
 }
 
+struct RegexStatic {
+    index: usize,
+    bytes: Vec<u8>,
+}
+
+impl RegexStatic {
+    fn compile(index: usize, pattern: &str) -> Self {
+        let bytes = compile_dfa_bytes(pattern).expect("regex predicate compiled during emit");
+        Self { index, bytes }
+    }
+}
+
 struct Generator<'a> {
     graph: &'a NfaGraph,
     dumper: NfaDumper<'a>,
@@ -170,7 +182,7 @@ struct Generator<'a> {
     /// Field ids baked into field checks → grammar name, same purpose.
     expect_fields: BTreeMap<u16, String>,
     /// Regex predicates in first-appearance (label) order: pattern → (index, DFA bytes).
-    regexes: BTreeMap<String, (usize, Vec<u8>)>,
+    regexes: BTreeMap<String, RegexStatic>,
     /// Whether any candidate check reads node text (predicates exist).
     any_predicate: bool,
     /// Whether any *retryable* state has a predicate (match_retry reads text).
@@ -290,10 +302,9 @@ impl<'a> Generator<'a> {
 
     fn record_regex(&mut self, pattern: &str) {
         let next_index = self.regexes.len();
-        self.regexes.entry(pattern.to_string()).or_insert_with(|| {
-            let bytes = compile_dfa_bytes(pattern).expect("regex predicate compiled during emit");
-            (next_index, bytes)
-        });
+        self.regexes
+            .entry(pattern.to_string())
+            .or_insert_with(|| RegexStatic::compile(next_index, pattern));
     }
 
     fn record_field(&mut self, field: NodeFieldId) {
@@ -337,11 +348,11 @@ impl<'a> Generator<'a> {
     }
 
     fn regex_static(&self, pattern: &str) -> String {
-        let (index, _) = self
+        let regex = self
             .regexes
             .get(pattern)
             .expect("regex collected before rendering");
-        format!("RE_{index}")
+        format!("RE_{}", regex.index)
     }
 
     /// The absolute member-table index this effect's payload resolves to —
@@ -495,16 +506,17 @@ impl<'a> Generator<'a> {
     }
 
     fn regex_statics(&self, out: &mut String) {
-        let mut ordered: Vec<(&String, &(usize, Vec<u8>))> = self.regexes.iter().collect();
-        ordered.sort_by_key(|(_, (index, _))| *index);
-        for (pattern, (index, bytes)) in ordered {
+        let mut ordered: Vec<(&String, &RegexStatic)> = self.regexes.iter().collect();
+        ordered.sort_by_key(|(_, regex)| regex.index);
+        for (pattern, regex) in ordered {
             out.push('\n');
             let _ = writeln!(out, "// /{pattern}/ — serialized sparse DFA");
             let _ = writeln!(
                 out,
-                "static RE_{index}: rt::StaticDfa = rt::StaticDfa::new(&["
+                "static RE_{}: rt::StaticDfa = rt::StaticDfa::new(&[",
+                regex.index
             );
-            for chunk in bytes.chunks(16) {
+            for chunk in regex.bytes.chunks(16) {
                 let line = chunk
                     .iter()
                     .map(|b| b.to_string())
