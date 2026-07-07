@@ -1,0 +1,9 @@
+Q = (MISSING binary_expression) @m
+------------------ DIAGNOSTICS -------------------
+error: `binary_expression` has children — only leaf tokens can be missing nodes
+ --> query.ptk:1:14
+  |
+1 | Q = (MISSING binary_expression) @m
+  |              ^^^^^^^^^^^^^^^^^
+  |
+help: use a token kind like `(MISSING identifier)`, a quoted literal like `(MISSING ";")`, or bare `(MISSING)`

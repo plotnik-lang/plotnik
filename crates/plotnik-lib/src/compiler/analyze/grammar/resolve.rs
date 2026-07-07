@@ -3,7 +3,7 @@ use crate::compiler::analyze::visitor::{Visitor, walk};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Span};
 use crate::compiler::diagnostics::source::SourceId;
 use crate::compiler::parse::ast::token_src;
-use crate::compiler::parse::ast::{self, NodePattern};
+use crate::compiler::parse::ast::{self, MissingArg, NodePattern};
 use crate::compiler::parse::cst::{SyntaxKind, SyntaxToken};
 use crate::compiler::parse::strings::unescape;
 use crate::core::{NodeKind, NodeKindId};
@@ -25,40 +25,109 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
         let Some(type_token) = node.kind_token() else {
             return;
         };
-        if matches!(
-            type_token.kind(),
-            SyntaxKind::KwError | SyntaxKind::KwMissing
-        ) {
+        if type_token.kind() == SyntaxKind::KwError {
             return;
         }
-        let type_name = type_token.text();
-        let key = NodeKind::Named(token_src(&type_token, self.content(located.source())));
-        if self.node_kind_ids.contains_key(&key) {
+        if type_token.kind() == SyntaxKind::KwMissing {
+            self.resolve_missing_node(located);
             return;
+        }
+        self.bind_named_kind(located.source(), &type_token);
+    }
+
+    /// Validate the optional kind argument of `(MISSING …)`. The argument resolves
+    /// like a normal named/anonymous kind (unknown → `UnknownNodeKind`); a named
+    /// argument must additionally be a leaf token, since tree-sitter's error
+    /// recovery only ever inserts tokens as missing nodes — `(MISSING binary_expression)`
+    /// names a kind with children, can never match, and is rejected here.
+    fn resolve_missing_node(&mut self, located: &Located<NodePattern>) {
+        let source = located.source();
+        match located.node().missing_arg() {
+            None => {}
+            Some(MissingArg::Named(id_tok)) => {
+                let Some(id) = self.bind_named_kind(source, &id_tok) else {
+                    return;
+                };
+                if self.grammar.has_declared_child_structure(id) {
+                    self.diag
+                        .report(
+                            DiagnosticKind::MissingKindNotToken,
+                            Span::new(source, id_tok.text_range()),
+                        )
+                        .detail(id_tok.text())
+                        .emit();
+                }
+            }
+            Some(MissingArg::Anonymous(content)) => {
+                // Anonymous kinds are literal tokens by definition, so the leaf check
+                // the named arm performs is always satisfied here.
+                self.bind_anonymous_kind(source, &content);
+            }
+        }
+    }
+
+    /// Resolve and bind a named node kind named by `token`, recording the id for
+    /// lowering and reporting `UnknownNodeKind` (with a suggestion) when the grammar
+    /// has no such kind. Returns the resolved id, or `None` if unknown. Idempotent:
+    /// a repeated name hits the resolution cache and neither re-binds nor re-reports.
+    fn bind_named_kind(&mut self, source: SourceId, token: &SyntaxToken) -> Option<NodeKindId> {
+        let type_name = token.text();
+        let key = NodeKind::Named(token_src(token, self.content(source)));
+        if let Some(&cached) = self.node_kind_ids.get(&key) {
+            return cached;
         }
         let resolved = self.grammar.resolve_named_node(type_name);
         self.node_kind_ids.insert(key, resolved);
         if let Some(id) = resolved {
             let sym = self.interner.intern(type_name);
             self.output.insert_node_kind_id(NodeKind::Named(sym), id);
+            return Some(id);
         }
-        if resolved.is_none() {
-            let all_types = self.grammar.all_named_node_kinds();
-            let suggestion = find_similar(type_name, &all_types);
-
-            let mut builder = self
-                .diag
-                .report(
-                    DiagnosticKind::UnknownNodeKind,
-                    located.span_of(type_token.text_range()),
-                )
-                .detail(type_name);
-
-            if let Some(similar) = suggestion {
-                builder = builder.fix(format!("did you mean `{}`?", similar), similar);
-            }
-            builder.emit();
+        let all_types = self.grammar.all_named_node_kinds();
+        let suggestion = find_similar(type_name, &all_types);
+        let mut builder = self
+            .diag
+            .report(
+                DiagnosticKind::UnknownNodeKind,
+                Span::new(source, token.text_range()),
+            )
+            .detail(type_name);
+        if let Some(similar) = suggestion {
+            builder = builder.fix(format!("did you mean `{}`?", similar), similar);
         }
+        builder.emit();
+        None
+    }
+
+    /// Resolve and bind an anonymous (literal-token) kind from `value_token`,
+    /// reporting `UnknownNodeKind` when the grammar has no such token. Returns the
+    /// resolved id, or `None` if unknown. Caches identically to [`Self::bind_named_kind`].
+    fn bind_anonymous_kind(
+        &mut self,
+        source: SourceId,
+        value_token: &SyntaxToken,
+    ) -> Option<NodeKindId> {
+        let value = unescape(value_token.text()).0;
+        let key = NodeKind::Anonymous(token_src(value_token, self.content(source)));
+        if let Some(&cached) = self.node_kind_ids.get(&key) {
+            return cached;
+        }
+        let resolved = self.grammar.resolve_anonymous_node(&value);
+        self.node_kind_ids.insert(key, resolved);
+        if let Some(id) = resolved {
+            let sym = self.interner.intern(&value);
+            self.output
+                .insert_node_kind_id(NodeKind::Anonymous(sym), id);
+            return Some(id);
+        }
+        self.diag
+            .report(
+                DiagnosticKind::UnknownNodeKind,
+                Span::new(source, value_token.text_range()),
+            )
+            .detail(value.into_owned())
+            .emit();
+        None
     }
 
     fn resolve_field_by_token(&mut self, source: SourceId, name_token: Option<SyntaxToken>) {
@@ -144,7 +213,6 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
     }
 
     fn visit_token_pattern(&mut self, node: &Located<ast::TokenPattern>) {
-        let home = node.source();
         let token = node.node();
         if token.is_any() {
             return;
@@ -152,31 +220,7 @@ impl Visitor for GrammarSymbolResolver<'_, '_, '_> {
         let Some(value_token) = token.value() else {
             return;
         };
-        let value = unescape(value_token.text()).0;
-        let key = NodeKind::Anonymous(token_src(&value_token, self.linker.content(home)));
-        if self.linker.node_kind_ids.contains_key(&key) {
-            return;
-        }
-
-        let resolved = self.linker.grammar.resolve_anonymous_node(&value);
-        self.linker.node_kind_ids.insert(key, resolved);
-
-        if let Some(id) = resolved {
-            let sym = self.linker.interner.intern(&value);
-            self.linker
-                .output
-                .insert_node_kind_id(NodeKind::Anonymous(sym), id);
-            return;
-        }
-
-        self.linker
-            .diag
-            .report(
-                DiagnosticKind::UnknownNodeKind,
-                node.span_of(value_token.text_range()),
-            )
-            .detail(value.into_owned())
-            .emit();
+        self.linker.bind_anonymous_kind(node.source(), &value_token);
     }
 
     fn visit_field_pattern(&mut self, field: &Located<ast::FieldPattern>) {

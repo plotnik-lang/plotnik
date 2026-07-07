@@ -1,0 +1,7 @@
+Q = (MISSING xyzzy_not_a_kind) @m
+------------------ DIAGNOSTICS -------------------
+error: `xyzzy_not_a_kind` is not a valid node kind
+ --> query.ptk:1:14
+  |
+1 | Q = (MISSING xyzzy_not_a_kind) @m
+  |              ^^^^^^^^^^^^^^^^

@@ -281,6 +281,8 @@ pub struct MatchIR {
     pub node_kind: NodeKindConstraint,
     /// Field constraint (None = wildcard).
     pub node_field: Option<NodeFieldId>,
+    /// Node must be a tree-sitter MISSING node — the `(MISSING …)` constraint.
+    pub missing: bool,
     /// Effects to execute after a successful match, in bytecode order.
     pub effects: Vec<EffectIR>,
     /// Fields that must NOT be present on the node.
@@ -299,6 +301,7 @@ impl MatchIR {
             nav: Nav::Epsilon,
             node_kind: NodeKindConstraint::Any,
             node_field: None,
+            missing: false,
             effects: vec![],
             neg_fields: vec![],
             predicate: None,
@@ -318,6 +321,11 @@ impl MatchIR {
 
     pub fn node_kind(mut self, t: NodeKindConstraint) -> Self {
         self.node_kind = t;
+        self
+    }
+
+    pub fn missing(mut self, missing: bool) -> Self {
+        self.missing = missing;
         self
     }
 

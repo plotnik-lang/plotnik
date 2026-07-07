@@ -1,0 +1,7 @@
+Q = (MISSING "zzzznotoken") @m
+------------------ DIAGNOSTICS -------------------
+error: `zzzznotoken` is not a valid node kind
+ --> query.ptk:1:15
+  |
+1 | Q = (MISSING "zzzznotoken") @m
+  |               ^^^^^^^^^^^

@@ -82,6 +82,7 @@ fn resolve_match(
         nav: m.nav,
         node_kind: m.node_kind,
         node_field: m.node_field,
+        missing: m.missing,
         effects,
         neg_fields: m.neg_fields.clone(),
         predicate,

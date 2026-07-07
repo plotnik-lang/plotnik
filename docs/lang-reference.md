@@ -512,12 +512,14 @@ patterns follow regex escaping rules.
 ### Special Nodes
 
 - `(ERROR)` — matches parser error nodes
-- `(MISSING)` — matches nodes inserted by error recovery
-- `(MISSING identifier)` — matches a specific missing node kind
-- `(MISSING ";")` — matches a missing anonymous node
+- `(MISSING)` — matches any node inserted by error recovery
+- `(MISSING identifier)` — matches a specific missing token kind
+- `(MISSING ";")` — matches a missing anonymous token
 
 Both match as leaves: a missing node is a zero-width token, so neither
-`ERROR` nor `MISSING` accepts children.
+`ERROR` nor `MISSING` accepts children. Because error recovery only ever inserts
+tokens, a `(MISSING kind)` argument must name a leaf token — a kind with children
+like `(MISSING binary_expression)` can never match and is rejected at compile time.
 
 ```
 (ERROR) @syntax_error

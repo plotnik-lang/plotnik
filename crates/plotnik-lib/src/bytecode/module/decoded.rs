@@ -26,6 +26,8 @@ pub(crate) struct DecodedMatch {
     pub(crate) nav: Nav,
     pub(crate) node_kind: NodeKindConstraint,
     pub(crate) node_field: Option<NodeFieldId>,
+    /// Node must be a tree-sitter MISSING node — the `(MISSING …)` constraint.
+    pub(crate) missing: bool,
     pub(crate) predicate: Option<DecodedPredicate>,
     effects_base: u32,
     neg_base: u32,
@@ -123,6 +125,7 @@ pub(crate) fn build(transitions: &[u8]) -> DecodedProgram {
                     nav: m.nav,
                     node_kind: m.node_kind,
                     node_field: m.node_field,
+                    missing: m.missing(),
                     predicate,
                     effects_base,
                     neg_base,

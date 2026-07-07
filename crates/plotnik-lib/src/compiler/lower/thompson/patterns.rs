@@ -14,7 +14,7 @@ use crate::compiler::lower::ir::{
     CalleeEntry, EffectIR, InstructionIR, Label, MatchIR, NodeKindConstraint, PredicateIR,
     ReturnAddr,
 };
-use crate::compiler::parse::ast::{self, Pattern};
+use crate::compiler::parse::ast::{self, MissingArg, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::parse::strings::unescape;
 use crate::core::{NodeFieldId, NodeKindId};
@@ -86,6 +86,9 @@ impl NfaBuilder<'_> {
         } = ctx;
         let entry = self.fresh_label();
         let node_kind = self.resolve_node_kind(node);
+        // MISSING nodes take no children, so the flag only ever rides the empty-items
+        // (leaf) branch below; the with-items branch never sees a missing node.
+        let missing = node.is_missing();
         let nav = nav_override.unwrap_or(Nav::Stay);
 
         let items: Vec<_> = node.items().collect();
@@ -96,6 +99,7 @@ impl NfaBuilder<'_> {
             let mut m = MatchIR::epsilon(entry, exit)
                 .nav(nav)
                 .node_kind(node_kind)
+                .missing(missing)
                 .neg_fields(neg_fields)
                 .prepend_effects(capture.pre)
                 .append_effects(capture.post);
@@ -1255,10 +1259,28 @@ impl NfaBuilder<'_> {
         if type_token.kind() == SyntaxKind::KwError {
             return NodeKindConstraint::Named(Some(NodeKindId::ERROR));
         }
-        // `(MISSING)` is an orthogonal flag on a node of some kind, not a kind of
-        // its own; still lowered as a wildcard until the missing constraint lands.
+        // `(MISSING …)` sets the orthogonal `missing` flag (see `compile_node_pattern`);
+        // the kind here only narrows WHICH missing node. Bare `(MISSING)` matches any
+        // missing node — named or anonymous — so it is a full wildcard (`Any`), not
+        // `Named(None)` which would exclude a missing anonymous token like `(MISSING ";")`.
         if type_token.kind() == SyntaxKind::KwMissing {
-            return NodeKindConstraint::Named(None);
+            return match node.missing_arg() {
+                None => NodeKindConstraint::Any,
+                Some(MissingArg::Named(id_tok)) => {
+                    let sym = self
+                        .ctx
+                        .analysis
+                        .interner
+                        .get(id_tok.text())
+                        .expect("linked missing kind must be interned");
+                    NodeKindConstraint::Named(Some(
+                        self.ctx.analysis.grammar.expect_named_kind(sym),
+                    ))
+                }
+                Some(MissingArg::Anonymous(content)) => {
+                    self.resolve_anonymous_node_kind(&unescape(content.text()).0)
+                }
+            };
         }
         let type_name = type_token.text();
 

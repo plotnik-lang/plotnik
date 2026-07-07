@@ -837,8 +837,9 @@ impl Module {
         let storage: &[u8] = &self.storage;
 
         let counts = read_transition_u16(storage, instr_off + 6)?;
-        // Bits 2-0 of the counts word are reserved; the decoder never reads
-        // them, so a forged set bit would load unnoticed.
+        // Bits 1-0 of the counts word are reserved (bit 2 is the `missing` flag,
+        // which the decoder does read); the decoder never reads the reserved bits,
+        // so a forged set bit would load unnoticed.
         if MatchCounts::reserved_bits_set(counts) {
             return Err(ModuleError::MalformedTransitions);
         }

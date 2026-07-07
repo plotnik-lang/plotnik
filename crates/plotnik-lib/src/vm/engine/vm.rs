@@ -504,6 +504,16 @@ impl<'t> VM<'t> {
             }
         }
 
+        // `(MISSING …)`: the node kind above is checked as usual, but the node
+        // must also be one the parser inserted during error recovery. Missing-ness
+        // is an orthogonal runtime flag, not a kind, so it gets its own gate.
+        if m.missing && !node.is_missing() {
+            if T::ENABLED {
+                tracer.trace_match_failure(node);
+            }
+            return false;
+        }
+
         if let Some(expected) = m.node_field
             && self.cursor.field_id() != Some(expected)
         {

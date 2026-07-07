@@ -212,6 +212,7 @@ fn arb_match_instr() -> impl Strategy<Value = MatchInstr> {
         arb_nav(),
         arb_node_type(),
         prop::option::of((1u16..=u16::MAX).prop_map(|n| NodeFieldId::try_from(n).unwrap())),
+        any::<bool>(),
         prop::collection::vec(arb_effect(), 0..=15),
         prop::collection::vec(
             (1u16..=u16::MAX).prop_map(|n| NodeFieldId::try_from(n).unwrap()),
@@ -224,14 +225,17 @@ fn arb_match_instr() -> impl Strategy<Value = MatchInstr> {
         ),
     )
         .prop_map(
-            |(nav, node_kind, node_field, effects, neg_fields, predicate, successors)| MatchInstr {
-                nav,
-                node_kind,
-                node_field,
-                effects,
-                neg_fields,
-                predicate,
-                successors,
+            |(nav, node_kind, node_field, missing, effects, neg_fields, predicate, successors)| {
+                MatchInstr {
+                    nav,
+                    node_kind,
+                    node_field,
+                    missing,
+                    effects,
+                    neg_fields,
+                    predicate,
+                    successors,
+                }
             },
         )
 }

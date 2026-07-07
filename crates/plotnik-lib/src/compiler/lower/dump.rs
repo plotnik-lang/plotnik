@@ -196,6 +196,11 @@ impl NfaDumper<'_> {
             result.push_str(": ");
         }
 
+        if m.missing {
+            result.push_str(&self.missing_pattern(m.node_kind));
+            return result;
+        }
+
         match m.node_kind {
             NodeKindConstraint::Any => result.push('_'),
             NodeKindConstraint::Named(None) => result.push_str("(_)"),
@@ -252,6 +257,21 @@ impl NfaDumper<'_> {
         .expect("member ref parent must be a struct or enum containing the indexed member");
 
         self.artifacts.interner.resolve(*sym).to_string()
+    }
+
+    /// Render a `(MISSING …)` constraint. `Any` is bare `(MISSING)`; a named or
+    /// anonymous kind names the specific missing token.
+    fn missing_pattern(&self, kind: NodeKindConstraint) -> String {
+        match kind {
+            NodeKindConstraint::Any => "(MISSING)".to_string(),
+            NodeKindConstraint::Named(Some(id)) => format!("(MISSING {})", self.kind_name(id)),
+            NodeKindConstraint::Anonymous(Some(id)) => {
+                format!("(MISSING \"{}\")", self.kind_name(id))
+            }
+            NodeKindConstraint::Named(None) | NodeKindConstraint::Anonymous(None) => {
+                unreachable!("MISSING resolves to a concrete kind or Any")
+            }
+        }
     }
 
     fn kind_name(&self, id: NodeKindId) -> String {
