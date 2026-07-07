@@ -1,4 +1,4 @@
-.PHONY: check clippy test bench coverage coverage-lines check-wasm clean
+.PHONY: check clippy test bench coverage coverage-lines check-wasm wasm-web clean
 
 LLVM_PREFIX ?= /opt/homebrew/opt/llvm
 WASM_CC ?= $(LLVM_PREFIX)/bin/clang
@@ -63,6 +63,18 @@ check-wasm:
 		cargo check \
 		--package plotnik-wasm \
 		--target wasm32-unknown-unknown
+
+wasm-web:
+	@CC_wasm32_unknown_unknown="$(WASM_CC)" \
+		AR_wasm32_unknown_unknown="$(WASM_AR)" \
+		cargo build \
+		--package plotnik-wasm \
+		--target wasm32-unknown-unknown \
+		--release
+	@wasm-bindgen \
+		--target web \
+		--out-dir web/src/lib/plotnik-wasm \
+		target/wasm32-unknown-unknown/release/plotnik_wasm.wasm
 
 coverage:
 	@cargo +nightly llvm-cov \

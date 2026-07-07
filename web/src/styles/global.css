@@ -1,19 +1,63 @@
-/* Minimal reset. The design (tokens, type, color, layout) starts fresh —
-   add it here or in per-component styles. */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
 
+@custom-variant dark (&:is(.dark *));
+
+/* Palette source: the jrnv Zed theme (~/.config/zed/themes/jrnv.json), UI and
+   syntax alike. Hex comments name the original value; two deviations for WCAG
+   AA are marked where they occur. */
 :root {
   /* Lets light-dark() resolve; the highlighter below relies on it. */
   color-scheme: light dark;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-* {
-  margin: 0;
+  /* Neutral surfaces, chroma-0 so the theme's slate never reads blue-ish at
+     canvas size. --background is the shadcn base: near-white, the surface
+     active tabs / cards / popovers sit on. --editor is the editors' reading
+     surface a step below it; the frame bars (--sidebar) sit lower still. The
+     hover spotlight then lifts a focused region to pure white above --editor,
+     with a veil that matches --editor so a dimmed region never drops below the
+     frame around it (the whole point of the rework). */
+  --background: oklch(0.99 0 0);
+  --editor: oklch(0.967 0 0);
+  --foreground: oklch(0 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0 0 0);
+  /* #0068d6 (terminal blue), not #007aff: white-on-blue fills need 4.5:1. */
+  --primary: oklch(0.5339 0.1875 256.73);
+  --primary-foreground: oklch(1 0 0);
+  /* Recessed neutrals a step below --editor: tab tracks, secondary badges,
+     the active-line wash. Chroma-0 to match the rest of the light surfaces. */
+  --secondary: oklch(0.95 0 0);
+  --secondary-foreground: oklch(0 0 0);
+  --muted: oklch(0.95 0 0);
+  --muted-foreground: oklch(0.5436 0.023 250.56); /* #66717d text.muted */
+  --accent: oklch(0.93 0 0); /* hover surface */
+  --accent-foreground: oklch(0 0 0);
+  /* #db0a37 error, darkened to #d00934 for 4.5:1 on the /10 badge tint. */
+  --destructive: oklch(0.5444 0.2157 20.81);
+  --border: oklch(0.8929 0.0175 248.02); /* #d3dde7 border.variant */
+  --input: oklch(0.713 0.0252 250.16); /* #97a4b2 border */
+  --ring: oklch(0.6028 0.2177 257.42); /* #007aff border.focused */
+  /* The accents row of the theme: blue, green, yellow, red, purple. */
+  --chart-1: oklch(0.6028 0.2177 257.42);
+  --chart-2: oklch(0.5723 0.1529 138.25);
+  --chart-3: oklch(0.7134 0.1133 73.51);
+  --chart-4: oklch(0.5042 0.1516 26.97);
+  --chart-5: oklch(0.4828 0.1545 311.07);
+  --radius: 0.625rem;
+  /* Frame bars (header, pane labels): the darkest neutral, a step below the
+     app background so the toolbars read as chrome under the editor surfaces. */
+  --sidebar: oklch(0.92 0 0);
+  --sidebar-foreground: oklch(0 0 0);
+  --sidebar-primary: oklch(0.5339 0.1875 256.73);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.892 0 0); /* hover on the frame bars */
+  --sidebar-accent-foreground: oklch(0 0 0);
+  --sidebar-border: oklch(0.8929 0.0175 248.02);
+  --sidebar-ring: oklch(0.6028 0.2177 257.42);
 }
 
 /* Syntax-highlighter support (src/lib/highlight.ts). highlight() runs with
@@ -24,4 +68,203 @@
 .shiki span {
   color: light-dark(var(--shiki-light), var(--shiki-dark));
   background: transparent !important;
+}
+
+@theme inline {
+  --font-code:
+    "PragmataPro VF Mono Liga", "PragmataPro Mono Liga", "PragmataPro VF Mono",
+    "PragmataPro Mono", "Berkeley Mono", "Berkeley Mono Variable", "TX-02",
+    "MonoLisa Code", "MonoLisa", "Cascadia Code", "JetBrains Mono", "Fira Code",
+    "Iosevka", "IBM Plex Mono", "Source Code Pro", "SFMono-Regular", Menlo,
+    Consolas, ui-monospace, monospace;
+}
+
+/* Editor syntax palette, shared between the lezer languages in the source
+   and output panes (`tok-*`, via classHighlighter) and the plotnik query
+   tokens (`ptk-*`, via the real lexer over the worker). One role, one color,
+   in both schemes.
+
+   The jrnv syntax scheme: keywords and operators stay ink (the theme's
+   signature restraint), field/property names a calmer ink, definitions and
+   types blue, strings green, constants and captures purple, everything
+   structural muted. Light string green is #3e8123 (theme's #448c27 is
+   4.18:1 on white, short of AA). */
+.tok-keyword,
+.tok-operator {
+  color: var(--color-foreground);
+}
+.tok-propertyName {
+  color: light-dark(#454c54, #95a3b0);
+}
+.tok-string,
+.tok-string2,
+.ptk-string,
+.ptk-regex {
+  color: light-dark(#3e8123, #82b56d);
+}
+.tok-comment,
+.ptk-comment {
+  color: var(--color-muted-foreground);
+  font-style: italic;
+}
+.tok-number,
+.tok-bool,
+.tok-atom,
+.ptk-capture {
+  color: light-dark(#7a3e9d, #b49bd8);
+}
+.tok-typeName,
+.tok-className,
+.tok-definition.tok-variableName {
+  color: light-dark(#325cc0, #7aa7e6);
+}
+.ptk-punct {
+  color: var(--color-muted-foreground);
+}
+.ptk-error {
+  color: var(--color-destructive);
+}
+
+/* Spotlight hover (spotlight.ts): the focused region reads as lit, everything
+   else recedes. Two mechanisms, split so light and dark each use the headroom
+   they have:
+
+   - lift (--spotlight-lift): raises the region's own background. Light lifts it
+     to pure white above the --editor canvas; dark has almost no room above its
+     canvas, so it skips the lift (transparent) and leans on the veil instead.
+   - veil (--spotlight-veil): covers everything outside the hole. Light tints it
+     the --editor color, so the surrounding background stays put and only the
+     ink washes out — a dimmed region never drops below the frame, which was the
+     old annoyance. Dark tints it toward black, darkening background and ink
+     together, because there the wash is what makes the region pop.
+   - edge (--spotlight-edge): a hairline around the region, subtle in both. */
+:root {
+  --spotlight-veil: light-dark(
+    oklch(0.967 0 0 / 0.62),
+    oklch(0.09 0.012 253 / 0.65)
+  );
+  --spotlight-lift: light-dark(oklch(1 0 0), transparent);
+  --spotlight-edge: light-dark(
+    oklch(0.82 0 0 / 0.9),
+    oklch(0.38 0.03 253 / 0.6)
+  );
+}
+
+.spotlight-overlay,
+.spotlight-lift {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.spotlight-overlay {
+  z-index: 300; /* above the text and CodeMirror's sticky gutters */
+}
+
+.spotlight-lift {
+  z-index: -1; /* below the text, above the editor surface */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-overlay,
+  .spotlight-lift {
+    transition: none;
+  }
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Geist Variable", sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-editor: var(--editor);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.dark {
+  --background: oklch(0.1889 0.0145 253.19); /* #0f141a */
+  /* Dark keeps its darkening veil rather than a lift, so the editor surface
+     matches the frame; the region pops by washing the surrounding ink. */
+  --editor: oklch(0.1889 0.0145 253.19);
+  --foreground: oklch(0.8935 0.0129 244.27); /* #d5dde4 */
+  --card: oklch(0.2483 0.0207 251.65); /* #1a222b elevated_surface */
+  --card-foreground: oklch(0.8935 0.0129 244.27);
+  --popover: oklch(0.2483 0.0207 251.65);
+  --popover-foreground: oklch(0.8935 0.0129 244.27);
+  /* #409cff text.accent; dark ink on it clears 4.5:1, white would not. */
+  --primary: oklch(0.6854 0.1699 252.99);
+  --primary-foreground: oklch(0.1889 0.0145 253.19);
+  --secondary: oklch(0.289 0.0223 251.29); /* #232c36 */
+  --secondary-foreground: oklch(0.8935 0.0129 244.27);
+  --muted: oklch(0.2483 0.0207 251.65);
+  --muted-foreground: oklch(0.6439 0.0246 248.21); /* #828f9c text.muted */
+  --accent: oklch(0.281 0.0649 252.51); /* element.hover flattened on bg */
+  --accent-foreground: oklch(0.8935 0.0129 244.27);
+  --destructive: oklch(0.6863 0.1331 15.92); /* #e0757e error */
+  --border: oklch(0.3095 0.0234 253.63); /* #28313c border.variant */
+  --input: oklch(0.4324 0.0272 248.46); /* #45525f border */
+  --ring: oklch(0.6243 0.2056 255.49); /* #0a84ff border.focused */
+  --chart-1: oklch(0.6854 0.1699 252.99);
+  --chart-2: oklch(0.7313 0.1225 140.17);
+  --chart-3: oklch(0.7475 0.1007 84.34);
+  --chart-4: oklch(0.6863 0.1331 15.92);
+  --chart-5: oklch(0.7332 0.0905 303);
+  --sidebar: oklch(0.2193 0.0165 252.49); /* #151b22 panel.background */
+  --sidebar-foreground: oklch(0.8935 0.0129 244.27);
+  --sidebar-primary: oklch(0.6854 0.1699 252.99);
+  --sidebar-primary-foreground: oklch(0.1889 0.0145 253.19);
+  --sidebar-accent: oklch(0.2483 0.0207 251.65);
+  --sidebar-accent-foreground: oklch(0.8935 0.0129 244.27);
+  --sidebar-border: oklch(0.3095 0.0234 253.63);
+  --sidebar-ring: oklch(0.6243 0.2056 255.49);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }

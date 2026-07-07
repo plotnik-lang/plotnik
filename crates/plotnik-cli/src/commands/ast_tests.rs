@@ -88,6 +88,40 @@ fn error_leaf_keeps_text_in_comment() {
 }
 
 #[test]
+fn node_table_maps_dump_ranges_to_source_ranges() {
+    let lang = language_registry::from_name("javascript").expect("javascript is enabled");
+    let source = "const version = 1;\n";
+    let tree = lang.parse_source(source);
+
+    let dump = plotnik_lib::dump_tree(&tree, source, lang.grammar(), false);
+    let text: String = dump
+        .chunks
+        .iter()
+        .map(|chunk| chunk.text.as_str())
+        .collect();
+
+    // program, lexical_declaration, variable_declarator, identifier, number.
+    assert_eq!(dump.nodes.len(), 5);
+    let root = dump.nodes[0];
+    assert_eq!(root.dump_start, 0);
+    assert_eq!(&text[root.dump_start..root.dump_end], text.trim_end());
+    let ident = dump.nodes[3];
+    assert_eq!(
+        &text[ident.dump_start..ident.dump_end],
+        r#"name: (identifier == "version")"#
+    );
+    assert_eq!(&source[ident.src_start..ident.src_end], "version");
+    // Pre-order, nested inside the root: the playground's hover targeting
+    // (innermost node containing an offset) relies on both.
+    for pair in dump.nodes.windows(2) {
+        assert!(pair[0].dump_start < pair[1].dump_start);
+    }
+    for node in &dump.nodes[1..] {
+        assert!(node.dump_start >= root.dump_start && node.dump_end <= root.dump_end);
+    }
+}
+
+#[test]
 fn raw_mode_renders_anonymous_tokens_as_strings() {
     let dump = dump_js("1;\n", true);
 

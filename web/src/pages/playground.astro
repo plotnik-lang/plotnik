@@ -1,0 +1,12 @@
+---
+import Base from "../layouts/Base.astro";
+import Playground from "../components/playground/Playground";
+import "@fontsource/iosevka";
+---
+
+<Base
+  title="plotnik playground"
+  description="Run plotnik queries against real source code, in the browser."
+>
+  <Playground client:only="react" />
+</Base>

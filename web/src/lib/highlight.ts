@@ -5,47 +5,52 @@ import {
 } from "shiki";
 import { plotnikGrammar } from "./plotnik-grammar";
 
-/* Placeholder syntax roles. The scope→role mapping in makeTheme below is the
-   part worth keeping: which TextMate scopes share a color, across the plotnik
-   grammar plus TypeScript and JSON. The color values here are deliberately
-   provisional neutrals — the old brand-tuned palette was removed with the rest
-   of the design. When the new design lands, give capture/type/value/op distinct
-   hues (and re-check contrast against whatever the pane background becomes). */
+/* Syntax roles, colored from the jrnv Zed theme so the static panes match
+   the CodeMirror `tok-*`/`ptk-*` classes in global.css: one role, one color,
+   in both schemes. Keywords, operators, and field/property names stay ink
+   (the theme's signature), types are blue, strings green, constants/captures
+   purple, structure muted. Light string green is #3e8123 (theme's #448c27
+   misses AA on white). */
 interface SyntaxRoles {
-  /** Default code ink (node kinds, plain identifiers). */
+  /** Default code ink (node kinds, plain identifiers, keywords, operators). */
   fg: string;
-  /** Softer structural ink (keywords, field names). */
-  fgSoft: string;
+  /** Field names: a calmer ink, matching `tok-propertyName`. */
+  field: string;
   /** Punctuation and brackets. */
   punct: string;
   /** Comments. */
   comment: string;
   capture: string;
   type: string;
+  /** String and regex literals. */
   value: string;
+  /** Numeric and boolean literals. */
+  num: string;
   op: string;
 }
 
 const rolesDark: SyntaxRoles = {
-  fg: "#e6e6e6",
-  fgSoft: "#b9b9b9",
-  punct: "#8f8f8f",
-  comment: "#8f8f8f",
-  capture: "#e6e6e6",
-  type: "#e6e6e6",
-  value: "#e6e6e6",
-  op: "#e6e6e6",
+  fg: "#d5dde4",
+  field: "#95a3b0",
+  punct: "#828f9c",
+  comment: "#828f9c",
+  capture: "#b49bd8",
+  type: "#7aa7e6",
+  value: "#82b56d",
+  num: "#b49bd8",
+  op: "#d5dde4",
 };
 
 const rolesLight: SyntaxRoles = {
-  fg: "#2a2a2a",
-  fgSoft: "#4a4a4a",
-  punct: "#6a6a6a",
-  comment: "#6a6a6a",
-  capture: "#2a2a2a",
-  type: "#2a2a2a",
-  value: "#2a2a2a",
-  op: "#2a2a2a",
+  fg: "#000000",
+  field: "#454c54",
+  punct: "#66717d",
+  comment: "#66717d",
+  capture: "#7a3e9d",
+  type: "#325cc0",
+  value: "#3e8123",
+  num: "#7a3e9d",
+  op: "#000000",
 };
 
 /* One semantic role per color, the same in every pane, so the eye can follow
@@ -72,10 +77,10 @@ function makeTheme(
         scope: ["string", "punctuation.definition.string", "string.regexp"],
         settings: { foreground: p.value },
       },
-      { scope: ["constant.numeric"], settings: { foreground: p.value } },
+      { scope: ["constant.numeric"], settings: { foreground: p.num } },
       {
         scope: ["constant.language"],
-        settings: { foreground: p.fgSoft },
+        settings: { foreground: p.num },
       },
       {
         scope: [
@@ -84,7 +89,7 @@ function makeTheme(
           "storage.modifier",
           "keyword.operator",
         ],
-        settings: { foreground: p.fgSoft },
+        settings: { foreground: p.fg },
       },
       {
         scope: ["punctuation", "meta.brace", "punctuation.bracket"],
@@ -111,7 +116,7 @@ function makeTheme(
       },
       {
         scope: ["variable.other.member.plotnik"],
-        settings: { foreground: p.fgSoft },
+        settings: { foreground: p.field },
       },
       {
         scope: [
@@ -137,7 +142,7 @@ function makeTheme(
       },
       {
         scope: ["entity.name.function"],
-        settings: { foreground: p.fg },
+        settings: { foreground: p.type },
       },
 
       /* JSON: keys mirror the query's captures; span offsets stay quiet */
@@ -169,8 +174,7 @@ const highlighterPromise = createHighlighter({
 
 /** A decorated range: an exact substring (nth occurrence) or a byte span. */
 export type MarkSpec = { class?: string } & (
-  | { find: string; occurrence?: number | "all" }
-  | { start: number; end: number }
+  { find: string; occurrence?: number | "all" } | { start: number; end: number }
 );
 
 function markDecorations(code: string, marks: MarkSpec[]): DecorationItem[] {
