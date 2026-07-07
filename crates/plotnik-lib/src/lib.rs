@@ -26,8 +26,8 @@ pub use crate::core::colors;
 pub use crate::core::grammar;
 pub use crate::core::utils as text_utils;
 pub use crate::core::{
-    Cardinality, DumpChunk, DumpChunkKind, NodeFieldId, NodeKind, NodeKindId, dump_tree_chunks,
-    dump_tree_text, tree_to_json,
+    Cardinality, DumpChunk, DumpChunkKind, DumpNode, NodeFieldId, NodeKind, NodeKindId, TreeDump,
+    dump_tree, dump_tree_text, tree_to_json,
 };
 
 pub mod diagnostics {

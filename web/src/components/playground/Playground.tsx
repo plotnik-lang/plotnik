@@ -33,13 +33,27 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import type { Range16 } from "./ast-index";
 import { AstView } from "./ast-view";
-import { createPlotnikClient, type PlotnikClient } from "./client";
+import { setSpotlight, spotlightExtension } from "./cm-spotlight";
 import { CodeEditor } from "./code-editor";
 import { OutputPanel } from "./output-panel";
 import { decodePermalink, encodePermalink } from "./permalink";
-import type { AstResult, RunResult, SessionInfo } from "./protocol";
 import { pushQueryFeedback } from "./query-feedback";
+import { usePlaygroundSession } from "./use-session";
+
+/* The playground shell: owns the user's inputs (query / source / lang /
+   entrypoint choice), feeds them to the session hook, and lays the panes
+   out. All engine orchestration lives in use-session.ts; all wire types in
+   protocol.ts.
+
+   Two mediator duties live here and nowhere else:
+   - editor feedback: pushing each compile's diagnostics/tokens into the
+     query editor;
+   - cross-pane highlighting: panes report hovers upward, Playground routes
+     them to their targets (today: AST hover → source spotlight). New hover
+     edges belong here, never wired pane-to-pane — this is the seed of the
+     N-way fan-out in docs/wip/playground-design.md §3. */
 
 const LANGS = [
   { value: "javascript", label: "JavaScript" },
@@ -65,9 +79,6 @@ function add(a, b) {
 const version = 1;
 `;
 
-const COMPILE_DEBOUNCE_MS = 250;
-const RUN_DEBOUNCE_MS = 150;
-
 export default function Playground() {
   const initial = useMemo(
     () => decodePermalink(window.location.hash),
@@ -78,104 +89,32 @@ export default function Playground() {
   const [lang, setLang] = useState(initial?.l ?? "javascript");
   const [query, setQuery] = useState(initial?.q ?? DEFAULT_QUERY);
   const [source, setSource] = useState(initial?.s ?? DEFAULT_SOURCE);
-  const [entry, setEntry] = useState<string | null>(null);
-  const [info, setInfo] = useState<SessionInfo | null>(null);
-  const [fatal, setFatal] = useState<string | null>(null);
-  const [runResult, setRunResult] = useState<RunResult | null>(null);
-  const [astResult, setAstResult] = useState<AstResult | null>(null);
+  const [entryChoice, setEntryChoice] = useState<string | null>(null);
   const [astOpen, setAstOpen] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const clientRef = useRef<PlotnikClient | null>(null);
   const queryViewRef = useRef<EditorView | null>(null);
-  const compileSeq = useRef(0);
-  const runSeq = useRef(0);
-  const astSeq = useRef(0);
-  /* The run target lags the latest compile: run only after the session
-     actually swapped (compiledGen bumps on every successful compile call). */
-  const [compiledGen, setCompiledGen] = useState(0);
+  const sourceViewRef = useRef<EditorView | null>(null);
+
+  const session = usePlaygroundSession({
+    query,
+    source,
+    lang,
+    entry: entryChoice,
+  });
+  const { compiled } = session;
 
   useEffect(() => {
-    const client = createPlotnikClient();
-    clientRef.current = client;
-    let cancelled = false;
-    client.ready().then(() => {
-      if (!cancelled) setReady(true);
-    });
-    return () => {
-      cancelled = true;
-      clientRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-    const client = clientRef.current;
-    if (!client) return;
-    const seq = ++compileSeq.current;
-    setBusy(true);
-    const timer = setTimeout(async () => {
-      const result = await client.compile(query, lang);
-      if (seq !== compileSeq.current) return;
-      setBusy(false);
-      if (result.fatal !== undefined) {
-        setFatal(result.fatal);
-        return;
-      }
-      setFatal(null);
-      setInfo(result.info);
-      setEntry((prev) =>
-        prev !== null && result.info.entrypoints.includes(prev) ? prev : null,
+    const view = queryViewRef.current;
+    if (view && compiled) {
+      pushQueryFeedback(
+        view,
+        compiled.query,
+        compiled.info.diagnostics,
+        compiled.info.tokens,
       );
-      setCompiledGen((gen) => gen + 1);
-      const view = queryViewRef.current;
-      if (view) {
-        pushQueryFeedback(
-          view,
-          query,
-          result.info.diagnostics,
-          result.info.tokens,
-        );
-      }
-    }, COMPILE_DEBOUNCE_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [ready, query, lang]);
-
-  const hasModule = info !== null && info.bytecode_size !== null;
-
-  useEffect(() => {
-    if (!ready || !hasModule) return;
-    const client = clientRef.current;
-    if (!client) return;
-    const seq = ++runSeq.current;
-    const timer = setTimeout(async () => {
-      const result = await client.run(source, entry ?? undefined);
-      if (seq !== runSeq.current) return;
-      setRunResult(result);
-    }, RUN_DEBOUNCE_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [ready, hasModule, compiledGen, source, entry]);
-
-  useEffect(() => {
-    if (!ready) return;
-    const client = clientRef.current;
-    if (!client) return;
-    const seq = ++astSeq.current;
-    const timer = setTimeout(async () => {
-      const result = await client.ast(source, lang);
-      if (seq !== astSeq.current) return;
-      setAstResult(result);
-    }, RUN_DEBOUNCE_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [ready, source, lang]);
+    }
+  }, [compiled]);
 
   const share = useCallback(async () => {
     const hash = encodePermalink({ q: query, s: source, l: lang });
@@ -188,15 +127,28 @@ export default function Playground() {
   }, [query, source, lang]);
 
   const errorCount =
-    info?.diagnostics.filter((d) => d.severity.toLowerCase() !== "warning")
-      .length ?? 0;
-  const warningCount = (info?.diagnostics.length ?? 0) - errorCount;
-  const stale = runResult !== null && info !== null && !hasModule;
+    compiled?.info.diagnostics.filter(
+      (d) => d.severity.toLowerCase() !== "warning",
+    ).length ?? 0;
+  const warningCount = (compiled?.info.diagnostics.length ?? 0) - errorCount;
+  const bytecodeSize = compiled?.info.bytecode_size ?? null;
 
   const sourceExtensions = useMemo(
-    () => [javascript({ typescript: lang === "typescript" })],
+    () => [
+      javascript({ typescript: lang === "typescript" }),
+      spotlightExtension(),
+    ],
     [lang],
   );
+
+  /* Hovering an AST node spotlights its source range in the editor. The
+     range is in the snapshot's coordinates; the spotlight field maps it
+     through any edits made since. */
+  const handleAstHover = useCallback((src: Range16 | null) => {
+    sourceViewRef.current?.dispatch({
+      effects: setSpotlight.of(src === null ? null : [src]),
+    });
+  }, []);
 
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground">
@@ -205,17 +157,17 @@ export default function Playground() {
           plotnik
         </a>
         <Badge variant="secondary">playground</Badge>
-        {!ready && (
+        {!session.ready && (
           <span className="flex items-center gap-2 text-sm text-muted-foreground">
             <Spinner />
             loading engine…
           </span>
         )}
         <div className="ms-auto flex items-center gap-2">
-          {busy && ready && <Spinner />}
-          {info?.bytecode_size != null && (
+          {session.compiling && session.ready && <Spinner />}
+          {bytecodeSize !== null && (
             <Badge variant="outline">
-              {(info.bytecode_size / 1024).toFixed(1)} KiB bytecode
+              {(bytecodeSize / 1024).toFixed(1)} KiB bytecode
             </Badge>
           )}
           <Select
@@ -236,17 +188,17 @@ export default function Playground() {
               </SelectGroup>
             </SelectContent>
           </Select>
-          {info !== null && info.entrypoints.length > 1 && (
+          {session.entrypoints.length > 1 && (
             <Select
-              value={entry ?? info.entrypoints[info.entrypoints.length - 1]}
-              onValueChange={(v) => v && setEntry(v)}
+              value={session.entry ?? ""}
+              onValueChange={(v) => v && setEntryChoice(v)}
             >
               <SelectTrigger size="sm" className="w-32" aria-label="entrypoint">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  {info.entrypoints.map((name) => (
+                  {session.entrypoints.map((name) => (
                     <SelectItem key={name} value={name}>
                       {name}
                     </SelectItem>
@@ -278,10 +230,12 @@ export default function Playground() {
                   <PaneLabel>source</PaneLabel>
                   <div className="min-h-0 flex-1">
                     <CodeEditor
-                      key={lang}
                       value={source}
                       onChange={setSource}
                       extensions={sourceExtensions}
+                      onView={(view) => {
+                        sourceViewRef.current = view;
+                      }}
                       aria-label="source code"
                     />
                   </div>
@@ -294,7 +248,7 @@ export default function Playground() {
                     <div className="flex h-full min-h-0 flex-col">
                       <AstToggle open onToggle={() => setAstOpen(false)} />
                       <div className="min-h-0 flex-1 overflow-auto">
-                        <AstView result={astResult} />
+                        <AstView ast={session.ast} onHover={handleAstHover} />
                       </div>
                     </div>
                   </ResizablePanel>
@@ -334,12 +288,12 @@ export default function Playground() {
                     aria-label="plotnik query"
                   />
                 </div>
-                {fatal !== null && (
+                {session.fatal !== null && (
                   <div className="border-t p-3">
                     <Alert variant="destructive">
                       <CircleAlertIcon />
                       <AlertTitle>Compiler gave up</AlertTitle>
-                      <AlertDescription>{fatal}</AlertDescription>
+                      <AlertDescription>{session.fatal}</AlertDescription>
                     </Alert>
                   </div>
                 )}
@@ -347,7 +301,11 @@ export default function Playground() {
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize="45%" minSize="15%">
-              <OutputPanel info={info} runResult={runResult} stale={stale} />
+              <OutputPanel
+                info={compiled?.info ?? null}
+                runResult={session.runResult}
+                stale={session.stale}
+              />
             </ResizablePanel>
           </ResizablePanelGroup>
         </ResizablePanel>

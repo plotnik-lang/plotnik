@@ -3,6 +3,10 @@ import * as Comlink from "comlink";
 import init, { Session, ast, tokenize } from "@/lib/plotnik-wasm/plotnik_wasm";
 import type { PlotnikApi, SessionInfo, TokenSpan } from "./protocol";
 
+/* The engine side of the playground: owns the wasm instance and the one
+   compiled session. Deliberately a dumb pass-through — policy (debounce,
+   ordering, stale results) lives on the main thread in use-session.ts. */
+
 const wasmReady = init().then(() => undefined);
 
 /* The session survives failed recompiles: a query that stops compiling
@@ -34,9 +38,17 @@ const api: PlotnikApi = {
     return session.run(source, entry ?? null);
   },
 
-  async ast(source: string, lang: string) {
+  async trace(source: string, entry: string | undefined, maxRecords: number) {
     await wasmReady;
-    return ast(source, lang, false);
+    if (!session) {
+      return { error: "no compiled query" };
+    }
+    return session.trace(source, entry ?? null, maxRecords);
+  },
+
+  async ast(source: string, lang: string, raw: boolean) {
+    await wasmReady;
+    return ast(source, lang, raw);
   },
 
   async tokenize(query: string) {

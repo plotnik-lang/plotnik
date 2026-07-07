@@ -15,6 +15,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CodeEditor } from "./code-editor";
 import type { RunResult, SessionInfo } from "./protocol";
 
+/* Stable identities: CodeEditor reconfigures whenever the extensions array
+   changes, so inline literals would re-init the language on every render. */
+const JSON_EXTENSIONS = [json()];
+const DTS_EXTENSIONS = [javascript({ typescript: true })];
+
 interface OutputPanelProps {
   info: SessionInfo | null;
   runResult: RunResult | null;
@@ -73,7 +78,7 @@ function OutputBody({
         <CodeEditor
           value={JSON.stringify(runResult.value, null, 2)}
           readOnly
-          extensions={[json()]}
+          extensions={JSON_EXTENSIONS}
           aria-label="query output"
         />
       </div>
@@ -107,7 +112,7 @@ function TypesBody({ info }: { info: SessionInfo | null }) {
     <CodeEditor
       value={info.dts}
       readOnly
-      extensions={[javascript({ typescript: true })]}
+      extensions={DTS_EXTENSIONS}
       aria-label="inferred TypeScript types"
     />
   );
@@ -116,7 +121,7 @@ function TypesBody({ info }: { info: SessionInfo | null }) {
 export function OutputPanel({ info, runResult, stale }: OutputPanelProps) {
   return (
     <Tabs defaultValue="output" className="flex h-full min-h-0 flex-col gap-0">
-      <div className="flex items-center border-b px-2 py-1.5">
+      <div className="flex items-center border-b bg-sidebar px-2 py-1.5">
         <TabsList>
           <TabsTrigger value="output">Output</TabsTrigger>
           <TabsTrigger value="types">Types</TabsTrigger>

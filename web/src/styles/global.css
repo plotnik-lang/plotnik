@@ -11,7 +11,15 @@
 :root {
   /* Lets light-dark() resolve; the highlighter below relies on it. */
   color-scheme: light dark;
-  --background: oklch(1 0 0);
+  /* Neutral surfaces, chroma-0 so the theme's slate never reads blue-ish at
+     canvas size. --background is the shadcn base: near-white, the surface
+     active tabs / cards / popovers sit on. --editor is the editors' reading
+     surface a step below it; the frame bars (--sidebar) sit lower still. The
+     hover spotlight then lifts a focused region to pure white above --editor,
+     with a veil that matches --editor so a dimmed region never drops below the
+     frame around it (the whole point of the rework). */
+  --background: oklch(0.99 0 0);
+  --editor: oklch(0.967 0 0);
   --foreground: oklch(0 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0 0 0);
@@ -20,11 +28,13 @@
   /* #0068d6 (terminal blue), not #007aff: white-on-blue fills need 4.5:1. */
   --primary: oklch(0.5339 0.1875 256.73);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.9683 0.0069 247.9); /* #f1f5f9 active line */
+  /* Recessed neutrals a step below --editor: tab tracks, secondary badges,
+     the active-line wash. Chroma-0 to match the rest of the light surfaces. */
+  --secondary: oklch(0.95 0 0);
   --secondary-foreground: oklch(0 0 0);
-  --muted: oklch(0.9683 0.0069 247.9);
+  --muted: oklch(0.95 0 0);
   --muted-foreground: oklch(0.5436 0.023 250.56); /* #66717d text.muted */
-  --accent: oklch(0.9287 0.0357 249.52); /* element.hover flattened on white */
+  --accent: oklch(0.93 0 0); /* hover surface */
   --accent-foreground: oklch(0 0 0);
   /* #db0a37 error, darkened to #d00934 for 4.5:1 on the /10 badge tint. */
   --destructive: oklch(0.5444 0.2157 20.81);
@@ -38,11 +48,13 @@
   --chart-4: oklch(0.5042 0.1516 26.97);
   --chart-5: oklch(0.4828 0.1545 311.07);
   --radius: 0.625rem;
-  --sidebar: oklch(0.9842 0.0034 247.86); /* #f8fafc panel.background */
+  /* Frame bars (header, pane labels): the darkest neutral, a step below the
+     app background so the toolbars read as chrome under the editor surfaces. */
+  --sidebar: oklch(0.92 0 0);
   --sidebar-foreground: oklch(0 0 0);
   --sidebar-primary: oklch(0.5339 0.1875 256.73);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.9493 0.0103 247.94); /* #e9eff5 */
+  --sidebar-accent: oklch(0.892 0 0); /* hover on the frame bars */
   --sidebar-accent-foreground: oklch(0 0 0);
   --sidebar-border: oklch(0.8929 0.0175 248.02);
   --sidebar-ring: oklch(0.6028 0.2177 257.42);
@@ -113,6 +125,56 @@
   color: var(--color-destructive);
 }
 
+/* Spotlight hover (spotlight.ts): the focused region reads as lit, everything
+   else recedes. Two mechanisms, split so light and dark each use the headroom
+   they have:
+
+   - lift (--spotlight-lift): raises the region's own background. Light lifts it
+     to pure white above the --editor canvas; dark has almost no room above its
+     canvas, so it skips the lift (transparent) and leans on the veil instead.
+   - veil (--spotlight-veil): covers everything outside the hole. Light tints it
+     the --editor color, so the surrounding background stays put and only the
+     ink washes out — a dimmed region never drops below the frame, which was the
+     old annoyance. Dark tints it toward black, darkening background and ink
+     together, because there the wash is what makes the region pop.
+   - edge (--spotlight-edge): a hairline around the region, subtle in both. */
+:root {
+  --spotlight-veil: light-dark(
+    oklch(0.967 0 0 / 0.62),
+    oklch(0.09 0.012 253 / 0.65)
+  );
+  --spotlight-lift: light-dark(oklch(1 0 0), transparent);
+  --spotlight-edge: light-dark(
+    oklch(0.82 0 0 / 0.9),
+    oklch(0.38 0.03 253 / 0.6)
+  );
+}
+
+.spotlight-overlay,
+.spotlight-lift {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.spotlight-overlay {
+  z-index: 300; /* above the text and CodeMirror's sticky gutters */
+}
+
+.spotlight-lift {
+  z-index: -1; /* below the text, above the editor surface */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-overlay,
+  .spotlight-lift {
+    transition: none;
+  }
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: "Geist Variable", sans-serif;
@@ -147,6 +209,7 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
+  --color-editor: var(--editor);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -158,6 +221,9 @@
 
 .dark {
   --background: oklch(0.1889 0.0145 253.19); /* #0f141a */
+  /* Dark keeps its darkening veil rather than a lift, so the editor surface
+     matches the frame; the region pops by washing the surrounding ink. */
+  --editor: oklch(0.1889 0.0145 253.19);
   --foreground: oklch(0.8935 0.0129 244.27); /* #d5dde4 */
   --card: oklch(0.2483 0.0207 251.65); /* #1a222b elevated_surface */
   --card-foreground: oklch(0.8935 0.0129 244.27);

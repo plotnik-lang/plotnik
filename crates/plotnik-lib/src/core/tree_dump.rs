@@ -39,6 +39,28 @@ pub struct DumpChunk {
     pub text: String,
 }
 
+/// One tree node's footprint, for mapping the dump back to the source.
+///
+/// `dump_*` offsets cover the node's rendering in the concatenated chunk
+/// text, including its `field: ` label but not the indentation before it
+/// (whitespace between siblings belongs to the parent). Nodes are emitted
+/// in pre-order, so ranges of a node's descendants nest inside its own.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct DumpNode {
+    /// Byte range in the source text.
+    pub src_start: usize,
+    pub src_end: usize,
+    /// Byte range in the concatenated dump text.
+    pub dump_start: usize,
+    pub dump_end: usize,
+}
+
+#[derive(Debug, Default)]
+pub struct TreeDump {
+    pub chunks: Vec<DumpChunk>,
+    pub nodes: Vec<DumpNode>,
+}
+
 /// One emission for the iterative dumper's work stack.
 enum Step<'t> {
     Node {
@@ -47,19 +69,20 @@ enum Step<'t> {
         depth: usize,
     },
     Chunk(DumpChunkKind, &'static str),
+    /// Emit the closing paren and seal `nodes[index]`'s dump range.
+    Close {
+        index: usize,
+    },
 }
 
-/// Dump a parsed tree as chunks of Plotnik pattern syntax.
+/// Dump a parsed tree as chunks of Plotnik pattern syntax, plus a node table
+/// mapping each rendered node back to its source range.
 ///
 /// The source tree is untrusted and can nest past any native-stack budget, so
 /// the walk uses an explicit work stack rather than native recursion.
-pub fn dump_tree_chunks(
-    tree: &tree_sitter::Tree,
-    source: &str,
-    grammar: &Grammar,
-    raw: bool,
-) -> Vec<DumpChunk> {
+pub fn dump_tree(tree: &tree_sitter::Tree, source: &str, grammar: &Grammar, raw: bool) -> TreeDump {
     let mut out = ChunkWriter::default();
+    let mut nodes: Vec<DumpNode> = Vec::new();
     let mut stack = vec![Step::Node {
         node: tree.root_node(),
         field: None,
@@ -70,6 +93,11 @@ pub fn dump_tree_chunks(
         let (node, field, depth) = match step {
             Step::Chunk(kind, text) => {
                 out.push(kind, text);
+                continue;
+            }
+            Step::Close { index } => {
+                out.push(DumpChunkKind::Punct, ")");
+                nodes[index].dump_end = out.len();
                 continue;
             }
             Step::Node { node, field, depth } => (node, field, depth),
@@ -84,6 +112,13 @@ pub fn dump_tree_chunks(
         if depth > 0 {
             out.push(DumpChunkKind::Text, "  ".repeat(depth));
         }
+        let index = nodes.len();
+        nodes.push(DumpNode {
+            src_start: node.start_byte(),
+            src_end: node.end_byte(),
+            dump_start: out.len(),
+            dump_end: 0,
+        });
         if let Some(f) = field {
             out.push(DumpChunkKind::Field, f);
             out.push(DumpChunkKind::Punct, ": ");
@@ -92,6 +127,7 @@ pub fn dump_tree_chunks(
         let children = collect_children(node, raw);
         if children.is_empty() {
             dump_leaf(&mut out, node, source, grammar);
+            nodes[index].dump_end = out.len();
             continue;
         }
 
@@ -107,12 +143,15 @@ pub fn dump_tree_chunks(
                 depth: depth + 1,
             });
         }
-        deferred.push(Step::Chunk(DumpChunkKind::Punct, ")"));
+        deferred.push(Step::Close { index });
         stack.extend(deferred.into_iter().rev());
     }
 
     out.push(DumpChunkKind::Text, "\n");
-    out.finish()
+    TreeDump {
+        chunks: out.finish(),
+        nodes,
+    }
 }
 
 /// Plain-text dump: the chunk texts concatenated (what the CLI prints).
@@ -122,7 +161,8 @@ pub fn dump_tree_text(
     grammar: &Grammar,
     raw: bool,
 ) -> String {
-    dump_tree_chunks(tree, source, grammar, raw)
+    dump_tree(tree, source, grammar, raw)
+        .chunks
         .into_iter()
         .map(|chunk| chunk.text)
         .collect()
@@ -203,14 +243,19 @@ fn quoted(s: &str) -> String {
 #[derive(Default)]
 struct ChunkWriter {
     chunks: Vec<DumpChunk>,
+    len: usize,
 }
 
 impl ChunkWriter {
     fn push(&mut self, kind: DumpChunkKind, text: impl Into<String>) {
-        self.chunks.push(DumpChunk {
-            kind,
-            text: text.into(),
-        });
+        let text = text.into();
+        self.len += text.len();
+        self.chunks.push(DumpChunk { kind, text });
+    }
+
+    /// Byte length of everything written so far.
+    fn len(&self) -> usize {
+        self.len
     }
 
     fn finish(self) -> Vec<DumpChunk> {
