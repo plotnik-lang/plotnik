@@ -100,6 +100,21 @@ impl ItemKind {
     }
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct TypeContext {
+    cut: Option<TypeId>,
+}
+
+impl TypeContext {
+    pub(super) fn item(item_ty: TypeId) -> Self {
+        Self { cut: Some(item_ty) }
+    }
+
+    fn array_element(self) -> Self {
+        Self { cut: None }
+    }
+}
+
 impl<'a> Emitter<'a> {
     pub(super) fn new(
         types: &'a TypeAnalysis,
@@ -322,7 +337,7 @@ impl<'a> Emitter<'a> {
 
         let mut out = format!("{DERIVES}\npub struct {ident}{lt} {{\n");
         for (info, field_ident) in fields.values().zip(&field_idents) {
-            let field_ty = self.field_type(Some(item.ty), info);
+            let field_ty = self.field_type(TypeContext::item(item.ty), info);
             writeln!(out, "    pub {field_ident}: {field_ty},")
                 .expect("writing to a String is infallible");
         }
@@ -354,7 +369,10 @@ impl<'a> Emitter<'a> {
                 .values()
                 .zip(&field_idents)
                 .map(|(info, field_ident)| {
-                    format!("{field_ident}: {}", self.field_type(Some(item.ty), info))
+                    format!(
+                        "{field_ident}: {}",
+                        self.field_type(TypeContext::item(item.ty), info)
+                    )
                 })
                 .collect();
             writeln!(out, "    {variant_ident} {{ {} }},", rendered.join(", "))
@@ -367,7 +385,7 @@ impl<'a> Emitter<'a> {
     fn render_alias(&mut self, item: &Item) -> String {
         let ident = self.item_ident(item.name).to_string();
         let lt = self.lifetime_args(item.ty);
-        let body = self.alias_body(Some(item.ty), item.ty);
+        let body = self.alias_body(TypeContext::item(item.ty), item.ty);
         format!("pub type {ident}{lt} = {body};")
     }
 
@@ -378,20 +396,23 @@ impl<'a> Emitter<'a> {
     /// by-value path from this position is still inside — the context
     /// [`Self::is_boxed_ref`] keys on. Descending into an array element
     /// clears it: `Vec` indirects, so no cycle below is by-value.
-    fn alias_body(&mut self, cut: Option<TypeId>, ty: TypeId) -> String {
+    fn alias_body(&mut self, context: TypeContext, ty: TypeId) -> String {
         let types = self.types;
         match types.expect_type_shape(ty) {
             TypeShape::Node | TypeShape::Custom(_) => self.node_type(),
             TypeShape::Array { element, .. } => {
-                format!("::std::vec::Vec<{}>", self.position_type(None, *element))
+                format!(
+                    "::std::vec::Vec<{}>",
+                    self.position_type(context.array_element(), *element)
+                )
             }
             TypeShape::Optional(inner) => {
                 format!(
                     "::core::option::Option<{}>",
-                    self.position_type(cut, *inner)
+                    self.position_type(context, *inner)
                 )
             }
-            TypeShape::Ref(def_id) => self.ref_type(cut, *def_id, ty),
+            TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
             TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Void => {
                 unreachable!("alias items cover non-composite outputs only")
             }
@@ -402,8 +423,8 @@ impl<'a> Emitter<'a> {
     /// more `Option` around the base, composing with an already-optional base
     /// exactly like the bytecode type table does (two nulls from two distinct
     /// syntax sites legitimately nest).
-    pub(super) fn field_type(&mut self, cut: Option<TypeId>, info: &FieldInfo) -> String {
-        let base = self.position_type(cut, info.type_id);
+    pub(super) fn field_type(&mut self, context: TypeContext, info: &FieldInfo) -> String {
+        let base = self.position_type(context, info.type_id);
         if info.optional {
             format!("::core::option::Option<{base}>")
         } else {
@@ -412,7 +433,7 @@ impl<'a> Emitter<'a> {
     }
 
     /// Render a type at a use site: named types by name, wrappers inline.
-    pub(super) fn position_type(&mut self, cut: Option<TypeId>, ty: TypeId) -> String {
+    pub(super) fn position_type(&mut self, context: TypeContext, ty: TypeId) -> String {
         let types = self.types;
         match types.expect_type_shape(ty) {
             TypeShape::Node => self.node_type(),
@@ -428,15 +449,18 @@ impl<'a> Emitter<'a> {
                 self.named_type(name, ty)
             }
             TypeShape::Array { element, .. } => {
-                format!("::std::vec::Vec<{}>", self.position_type(None, *element))
+                format!(
+                    "::std::vec::Vec<{}>",
+                    self.position_type(context.array_element(), *element)
+                )
             }
             TypeShape::Optional(inner) => {
                 format!(
                     "::core::option::Option<{}>",
-                    self.position_type(cut, *inner)
+                    self.position_type(context, *inner)
                 )
             }
-            TypeShape::Ref(def_id) => self.ref_type(cut, *def_id, ty),
+            TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
             TypeShape::Void => unreachable!("void cannot appear in an output position"),
         }
     }
@@ -456,7 +480,7 @@ impl<'a> Emitter<'a> {
     /// this occurrence closes a by-value cycle through the enclosing item's
     /// declaration. A void target contributes no value, so the capture holds
     /// the matched node itself.
-    fn ref_type(&mut self, cut: Option<TypeId>, def_id: DefId, ref_ty: TypeId) -> String {
+    fn ref_type(&mut self, context: TypeContext, def_id: DefId, ref_ty: TypeId) -> String {
         let target = self.types.expect_def_output(def_id);
         if target == TYPE_VOID {
             return self.node_type();
@@ -464,7 +488,7 @@ impl<'a> Emitter<'a> {
 
         let name = self.deps.def_name_sym(def_id);
         let base = self.named_type(name, target);
-        if self.is_boxed_ref(cut, ref_ty) {
+        if self.is_boxed_ref(context.cut, ref_ty) {
             format!("::std::boxed::Box<{base}>")
         } else {
             base

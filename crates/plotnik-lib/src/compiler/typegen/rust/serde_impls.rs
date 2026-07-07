@@ -16,7 +16,7 @@ use std::fmt::Write as _;
 
 use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
 
-use super::emitter::{Emitter, Item, ItemKind};
+use super::emitter::{Emitter, Item, ItemKind, TypeContext};
 use super::idents::scope_idents;
 
 impl Emitter<'_> {
@@ -136,7 +136,7 @@ impl Emitter<'_> {
         for (index, (&name_sym, info)) in fields.iter().enumerate() {
             // The helper borrows the enum's actual field, so its type must be
             // spelled with the declaration's own cut context.
-            let field_ty = self.field_type(Some(item_ty), info);
+            let field_ty = self.field_type(TypeContext::item(item_ty), info);
             writeln!(data_fields, "                    v{index}: &'a {field_ty},")
                 .expect("writing to a String is infallible");
             let key = interner.resolve(name_sym);
