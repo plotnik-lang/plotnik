@@ -80,8 +80,10 @@ struct Generator<'a> {
     /// Instructions in label order (the dump's order).
     sorted: Vec<&'a InstructionIR>,
     states: BTreeMap<Label, StateInfo>,
-    /// Field-id consts: `F_{NAME}` → raw id.
-    fields: BTreeMap<String, u16>,
+    /// Field-id consts: raw id → `F_{NAME}` const name. Keyed by id and
+    /// collision-suffixed at insert, so the const namespace stays injective
+    /// even if two grammar field names collapse to one SHOUTY form.
+    fields: BTreeMap<u16, String>,
     /// Kind ids baked into candidate checks → `(grammar name, is_named)`,
     /// for the generated language-skew assert. The builtin `ERROR` id is
     /// grammar-independent and carries no skew signal, so it is skipped.
@@ -205,10 +207,20 @@ impl<'a> Generator<'a> {
     }
 
     fn record_field(&mut self, field: NodeFieldId) {
+        let id = u16::from(field);
         let display = self.dumper.field_display_name(field);
-        let name = format!("F_{}", shouty_ident(&display));
-        self.fields.insert(name, u16::from(field));
-        self.expect_fields.insert(u16::from(field), display);
+        self.expect_fields.insert(id, display.clone());
+        if self.fields.contains_key(&id) {
+            return;
+        }
+        // Distinct grammar field names can collapse to one SHOUTY form
+        // (`fooBar` / `foo_bar`); suffix until free so a collision can never
+        // silently alias two ids under one const.
+        let mut name = format!("F_{}", shouty_ident(&display));
+        while self.fields.values().any(|taken| *taken == name) {
+            let _ = write!(name, "_{id}");
+        }
+        self.fields.insert(id, name);
     }
 
     fn record_kind(&mut self, constraint: NodeKindConstraint) {
@@ -231,7 +243,10 @@ impl<'a> Generator<'a> {
     }
 
     fn field_const(&self, field: NodeFieldId) -> String {
-        format!("F_{}", shouty_ident(&self.dumper.field_display_name(field)))
+        self.fields
+            .get(&u16::from(field))
+            .expect("every rendered field was recorded during operand collection")
+            .clone()
     }
 
     fn regex_static(&self, pattern: &str) -> String {
@@ -339,6 +354,7 @@ impl<'a> Generator<'a> {
                 ("RT", &self.config.rt_crate),
                 ("STEPS", &limit_expr(self.config.limits.steps)),
                 ("MEMORY", &limit_expr(self.config.limits.memory)),
+                ("DEPTH", &depth_expr(self.config.depth)),
             ],
         );
     }
@@ -381,7 +397,7 @@ impl<'a> Generator<'a> {
             return;
         }
         out.push('\n');
-        for (name, id) in &self.fields {
+        for (id, name) in &self.fields {
             let _ = writeln!(
                 out,
                 "const {name}: rt::NodeFieldId = rt::NodeFieldId::from_raw({id});"
@@ -1018,6 +1034,17 @@ pub(super) fn limit_expr(limit: Limit) -> String {
     format!("rt::Limit::{limit:?}")
 }
 
+/// The replay-depth policy as the generated `MAX_REPLAY_DEPTH` initializer.
+/// Resolved at generation time — the ceiling guards the native stack, which
+/// does not scale with the input, so there is nothing to resolve per run.
+pub(super) fn depth_expr(limit: Limit) -> String {
+    match limit {
+        Limit::Auto => "Some(rt::REPLAY_DEPTH_AUTO)".to_string(),
+        Limit::Of(n) => format!("Some({n})"),
+        Limit::Unbounded => "None".to_string(),
+    }
+}
+
 /// Split camel/Pascal humps: a boundary opens before an uppercase following a
 /// non-uppercase, and before the last uppercase of an acronym run
 /// (`HTTPServer` → `HTTP`, `Server`).
@@ -1096,6 +1123,13 @@ const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
 /// sampled; must be a power of two minus one. Twin of the VM's constant.
 const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
+/// Ceiling on the committed value's nesting for the `try_*` entry points
+/// (`None` opts out). The typed replay recurses once per nested value, so
+/// this bounds its native-stack use — a resource of the generated executor,
+/// not of the VM, whose output rendering is iterative. The unmetered entry
+/// points run without it, like every other limit.
+const MAX_REPLAY_DEPTH: Option<u64> = @DEPTH@;
+
 /// Resolve [`LIMITS`] against this input's node count, exactly like
 /// `VM::builder(...).build()` resolves the VM's.
 fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
@@ -1105,16 +1139,15 @@ fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
 "#;
 
 const VERIFY_LANGUAGE: &str = r#"
-/// One-shot gate for [`verify_language`]: the first `run` in the process
-/// checks the tree's language, later runs skip the walk. A failed check
-/// panics before the gate is set, so every later call re-reports the
-/// mismatch instead of tripping over a poisoned gate.
-static LANGUAGE_OK: ::std::sync::OnceLock<()> = ::std::sync::OnceLock::new();
-
 /// A parser built from any other grammar version could renumber the baked
 /// kind/field ids and silently mis-match, so mismatches panic: version skew
 /// between the generation-time grammar and the runtime parser is a build
 /// mistake, not a runtime condition to recover from.
+///
+/// Every `run` checks its own tree — the walk is a handful of id lookups,
+/// noise next to a match — so the guarantee holds per call, not per process:
+/// a process that mixes languages (or grammar versions of one language) must
+/// fail on the wrong tree, not only on the first one it ever saw.
 fn verify_language(tree: &rt::Tree) {
     let language = tree.language();
     for &(id, name, named) in EXPECTED_KINDS {
@@ -1189,7 +1222,7 @@ fn run<'t, const METERED: bool>(
     entry: u16,
     limits: rt::ResolvedRuntimeLimits,
 ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitError> {
-    LANGUAGE_OK.get_or_init(|| verify_language(tree));
+    verify_language(tree);
     let mut eng = rt::Engine::new(tree.walk());
     let mut steps: u64 = 0;
     let mut ip = entry;
@@ -1202,6 +1235,15 @@ fn run<'t, const METERED: bool>(
                 }
             }
             steps += 1;
+            // Replay-depth ceiling: refuse a match nesting past the bound
+            // before the typed replay (one native frame per nested value)
+            // could risk the stack. Checked every dispatch; one dispatch
+            // opens at most a per-query constant of scopes.
+            if let Some(max) = MAX_REPLAY_DEPTH {
+                if eng.effect_depth() > max {
+                    return Err(rt::LimitError::Depth(max));
+                }
+            }
             // Memory ceiling: the live runtime heap, sampled every
             // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded,
             // so the unobserved overshoot is noise (see the VM loop).

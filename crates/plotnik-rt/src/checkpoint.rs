@@ -54,6 +54,10 @@ pub struct CheckpointState {
     pub descendant_index: u32,
     /// Effect stream length at checkpoint.
     pub effect_watermark: usize,
+    /// Open data-scope depth of the effect log at checkpoint. Truncating the
+    /// log to `effect_watermark` implies exactly this depth; it is snapshotted
+    /// because recomputing it would mean rescanning the log.
+    pub effect_depth: u64,
     /// Frame arena state at checkpoint.
     pub frame_index: Option<u32>,
     /// Recursion depth at checkpoint.

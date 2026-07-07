@@ -45,6 +45,7 @@ pub struct MacroArgs {
     pub rt_crate: Option<String>,
     pub steps: Option<LimitArg>,
     pub memory: Option<LimitArg>,
+    pub depth: Option<LimitArg>,
 }
 
 pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
@@ -56,6 +57,7 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
     let mut rt_crate: Option<String> = None;
     let mut steps: Option<LimitArg> = None;
     let mut memory: Option<LimitArg> = None;
+    let mut depth: Option<LimitArg> = None;
 
     let mut pos = 0;
     while pos < tokens.len() {
@@ -106,12 +108,17 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                         let value = take_limit(&tokens, &mut pos, key_span, &key)?;
                         put(&mut memory, value, key_span, &key)?;
                     }
+                    "depth" => {
+                        let value = take_limit(&tokens, &mut pos, key_span, &key)?;
+                        put(&mut depth, value, key_span, &key)?;
+                    }
                     other => {
                         return Err(ExpandError::new(
                             key_span,
                             format!(
                                 "unknown argument `{other}`; `query!` accepts `grammar`, \
-                                 `file`, `crate`, `steps`, `memory`, and the query string"
+                                 `file`, `crate`, `steps`, `memory`, `depth`, and the \
+                                 query string"
                             ),
                         ));
                     }
@@ -157,6 +164,7 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
         rt_crate,
         steps,
         memory,
+        depth,
     })
 }
 

@@ -7,11 +7,19 @@
 //! against the source's node count yields the concrete [`ResolvedRuntimeLimits`]
 //! the VM enforces.
 //!
-//! Two orthogonal resources are enough. Steps bound time-like blowup
-//! (catastrophic backtracking); memory bounds space-like blowup (unbounded
-//! checkpoint or effect growth). Call depth needs no ceiling of its own:
-//! backtracking and output rendering are iterative, so depth is pure heap — the
-//! frame arena, already part of the memory sum — not a native-stack risk.
+//! Steps bound time-like blowup (catastrophic backtracking); memory bounds
+//! space-like blowup (unbounded checkpoint or effect growth). *Call* depth
+//! needs no ceiling of its own: backtracking is iterative, so it is pure heap —
+//! the frame arena, already part of the memory sum — not a native-stack risk.
+//!
+//! Generated matchers meter one more resource the VM does not: **replay
+//! depth**, the nesting of the committed value (`Engine::effect_depth`,
+//! ceiling [`REPLAY_DEPTH_AUTO`]). The VM materializes output iteratively, but
+//! the generated typed replay recurses — one native frame per nested value —
+//! so its metered entry points refuse a match that nests past the compiled-in
+//! bound *before* replay puts the native stack at risk. Unmetered entry points
+//! skip this check like every other: they are the caller's declaration that
+//! the input is trusted.
 
 /// A metered run exceeded one of its resolved ceilings.
 ///
@@ -28,6 +36,13 @@ pub enum LimitError {
     /// geometrically it can overshoot `limit` by up to a doubling, so it is
     /// reported alongside the ceiling to make the limit tunable.
     Memory { used: u64, limit: u64 },
+    /// The committed value's nesting exceeded the replay-depth ceiling.
+    /// Reported only by generated matchers (the VM renders output
+    /// iteratively and has no such ceiling): their typed replay recurses,
+    /// so the metered path refuses the match before replay could exhaust
+    /// the native stack. Raise the module's `depth` policy — and run with a
+    /// stack to match — if values this deep are expected.
+    Depth(u64),
 }
 
 impl std::fmt::Display for LimitError {
@@ -41,6 +56,9 @@ impl std::fmt::Display for LimitError {
                     f,
                     "exceeded the memory limit of {limit} bytes (used {used} bytes)"
                 )
+            }
+            LimitError::Depth(max) => {
+                write!(f, "exceeded the replay depth limit of {max} nested values")
             }
         }
     }
@@ -116,6 +134,13 @@ pub struct ResolvedRuntimeLimits {
 // stays invisible to it while still catching super-linear blowup (catastrophic
 // backtracking for steps, unbounded checkpoint growth for memory). The constants
 // are generous headroom over measured legitimate usage, not tight targets.
+
+/// The `Auto` replay-depth ceiling generated matchers compile in. Flat, not
+/// input-scaled: it guards the *native stack*, a per-process resource that
+/// does not grow with the input. 1024 nested values times a generous
+/// per-reader frame estimate stays comfortably inside even a 2 MiB worker
+/// stack, while real code rarely nests output past a few hundred levels.
+pub const REPLAY_DEPTH_AUTO: u64 = 1024;
 
 const STEPS_BASE: u64 = 1_000_000;
 const STEPS_PER_NODE: u64 = 1_024;

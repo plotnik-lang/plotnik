@@ -24,8 +24,8 @@
 //! your own dependency graph that ships a `grammar.json` (`tree-sitter-*`,
 //! `arborium-*`, or your own grammar crate), so the baked grammar is exactly
 //! the version your lockfile resolves — the same package whose parser you
-//! link at runtime. The generated module double-checks that on first use and
-//! panics on version skew.
+//! link at runtime. The generated module double-checks every tree it is
+//! handed against that grammar and panics on version skew.
 //!
 //! For the dynamic side of Plotnik (running query files against sources,
 //! inspecting ASTs, tracing execution), use the `plotnik-cli` crate.

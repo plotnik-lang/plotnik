@@ -11,8 +11,12 @@
 //! New source kinds (an env override, a workspace-level grammar map, ...)
 //! are one more [`GrammarSpec`] variant plus a [`resolve`] arm.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
+
+use plotnik_lib::grammar::Grammar;
+use plotnik_lib::grammar::raw::RawGrammar;
 
 #[derive(Debug, PartialEq)]
 pub enum GrammarSpec<'a> {
@@ -65,6 +69,40 @@ pub fn resolve(spec: &GrammarSpec<'_>, base_dir: Option<&Path>) -> Result<Resolv
     }
 }
 
+/// Resolve and parse the grammar, cached by resolved path for the life of
+/// the rustc process. Expansion is not incremental — every check of the
+/// using crate re-runs every `query!` in it — and a grammar.json can be
+/// megabytes (tree-sitter-typescript), so re-parsing it once per invocation
+/// is real build time. Files are stable within one compiler process; edits
+/// between processes are what the `include_bytes!` rebuild anchors track.
+pub fn load(
+    spec: &GrammarSpec<'_>,
+    base_dir: Option<&Path>,
+) -> Result<(Arc<Grammar>, PathBuf), String> {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, Arc<Grammar>>>> = OnceLock::new();
+
+    let resolved = resolve(spec, base_dir)?;
+    let cache = CACHE.get_or_init(Mutex::default);
+    if let Some(grammar) = cache
+        .lock()
+        .expect("grammar cache lock is never poisoned")
+        .get(&resolved.path)
+    {
+        return Ok((Arc::clone(grammar), resolved.path));
+    }
+
+    let raw = RawGrammar::from_json(&resolved.json)
+        .map_err(|error| format!("invalid grammar `{}`: {error}", resolved.path.display()))?;
+    let grammar = Grammar::from_raw(&raw)
+        .map_err(|error| format!("invalid grammar `{}`: {error}", resolved.path.display()))?;
+    let grammar = Arc::new(grammar);
+    cache
+        .lock()
+        .expect("grammar cache lock is never poisoned")
+        .insert(resolved.path.clone(), Arc::clone(&grammar));
+    Ok((grammar, resolved.path))
+}
+
 /// Resolve a user-written path the way `include_str!` would: absolute paths
 /// as-is, relative ones against the invoking file's directory.
 pub fn resolve_relative(raw: &str, base_dir: Option<&Path>) -> Result<PathBuf, String> {
@@ -88,10 +126,16 @@ fn read(path: &Path) -> Result<String, String> {
 
 fn resolve_package(name: &str, subgrammar: Option<&str>) -> Result<ResolvedGrammar, String> {
     let metadata = metadata()?;
+    let closure = dependency_closure(metadata);
     let packages: Vec<&cargo_metadata::Package> = metadata
         .packages
         .iter()
         .filter(|package| package.name.as_str() == name)
+        .filter(|package| {
+            closure
+                .as_ref()
+                .is_none_or(|reachable| reachable.contains(&package.id))
+        })
         .collect();
 
     let package = match packages.as_slice() {
@@ -172,6 +216,38 @@ fn resolve_package(name: &str, subgrammar: Option<&str>) -> Result<ResolvedGramm
             "package `{name}` ships no grammar named `{wanted}`"
         )),
     }
+}
+
+/// Package ids reachable from the invoking crate in the resolved dependency
+/// graph — the set `grammar = "package"` may name; the whole workspace graph
+/// would also admit packages only some *other* workspace member depends on.
+/// `None` when the walk isn't possible (no resolve section, invoking package
+/// not identifiable): the caller then falls back to the whole graph, and the
+/// generated module's language-skew check still backstops a wrong pick.
+fn dependency_closure(
+    metadata: &cargo_metadata::Metadata,
+) -> Option<std::collections::HashSet<&cargo_metadata::PackageId>> {
+    let resolve = metadata.resolve.as_ref()?;
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok()?;
+    let manifest = Path::new(&manifest_dir).join("Cargo.toml");
+    let root = metadata
+        .packages
+        .iter()
+        .find(|package| package.manifest_path.as_std_path() == manifest)?;
+
+    let nodes: HashMap<&cargo_metadata::PackageId, &cargo_metadata::Node> =
+        resolve.nodes.iter().map(|node| (&node.id, node)).collect();
+    let mut reachable = std::collections::HashSet::new();
+    let mut stack = vec![&root.id];
+    while let Some(id) = stack.pop() {
+        if !reachable.insert(id) {
+            continue;
+        }
+        if let Some(node) = nodes.get(id) {
+            stack.extend(node.deps.iter().map(|dep| &dep.pkg));
+        }
+    }
+    Some(reachable)
 }
 
 /// The caller's resolved dependency graph, computed once per rustc process.

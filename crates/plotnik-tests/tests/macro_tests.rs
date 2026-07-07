@@ -62,6 +62,16 @@ mod limited {
     }
 }
 
+// Rows nest the committed value three scopes deep (struct, array, row
+// struct), so a depth policy of 1 must trip the metered path.
+mod depth_limited {
+    plotnik::query! {
+        grammar = "arborium-javascript",
+        depth = 1,
+        "Q = (program (expression_statement (identifier) @id)* @rows)"
+    }
+}
+
 mod repointed {
     plotnik::query! {
         grammar = "arborium-javascript",
@@ -136,6 +146,18 @@ fn compiled_in_step_limit_trips_try_parse_only() {
     assert!(matches!(
         limited::Q::try_parse(&tree, source),
         Err(LimitError::Steps(1))
+    ));
+}
+
+#[test]
+fn compiled_in_depth_limit_trips_try_parse_only() {
+    let source = "x;";
+    let tree = parse(&js(), source);
+
+    assert!(depth_limited::Q::parse(&tree, source).is_some());
+    assert!(matches!(
+        depth_limited::Q::try_parse(&tree, source),
+        Err(LimitError::Depth(1))
     ));
 }
 

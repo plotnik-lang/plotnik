@@ -1,4 +1,4 @@
-error: error: `no_such_node_kind` is not a valid node kind
+error: `no_such_node_kind` is not a valid node kind
          |
        1 | Q = (program (no_such_node_kind) @x)
          |               ^^^^^^^^^^^^^^^^^

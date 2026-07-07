@@ -49,7 +49,7 @@ mod trace_tests;
 pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
 pub use frame::{Frame, FrameArena};
 pub use ids::{NodeFieldId, NodeKindId, ZeroIdError};
-pub use limits::{Limit, LimitError, ResolvedRuntimeLimits, RuntimeLimitSpec};
+pub use limits::{Limit, LimitError, REPLAY_DEPTH_AUTO, ResolvedRuntimeLimits, RuntimeLimitSpec};
 pub use nav::{Nav, SkipPolicy};
 pub use node_class::{NodeClass, SkipClass};
 

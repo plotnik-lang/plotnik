@@ -99,7 +99,7 @@ impl Emitter<'_> {
             let arm = if payload == TYPE_VOID {
                 unit_arm(ident, variant_ident, &label)
             } else {
-                self.payload_arm(payload, ident, variant_ident, &label)
+                self.payload_arm(item.ty, payload, ident, variant_ident, &label)
             };
             out.push_str(&arm);
         }
@@ -109,6 +109,7 @@ impl Emitter<'_> {
 
     fn payload_arm(
         &mut self,
+        item_ty: TypeId,
         payload: TypeId,
         ident: &str,
         variant_ident: &str,
@@ -133,7 +134,9 @@ impl Emitter<'_> {
         let mut data_fields = String::new();
         let mut data_entries = String::new();
         for (index, (&name_sym, info)) in fields.iter().enumerate() {
-            let field_ty = self.field_type(info);
+            // The helper borrows the enum's actual field, so its type must be
+            // spelled with the declaration's own cut context.
+            let field_ty = self.field_type(Some(item_ty), info);
             writeln!(data_fields, "                    v{index}: &'a {field_ty},")
                 .expect("writing to a String is infallible");
             let key = interner.resolve(name_sym);

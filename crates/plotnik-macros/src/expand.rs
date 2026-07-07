@@ -15,12 +15,11 @@
 //! pub use self::__plotnik_1a2b3c4d::*;
 //! ```
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
-use plotnik_lib::grammar::Grammar;
-use plotnik_lib::grammar::raw::RawGrammar;
 use plotnik_lib::{MatcherConfig, QueryBuilder, SourceMap, SourcePath};
 use plotnik_rt::{Limit, RuntimeLimitSpec};
 
@@ -69,25 +68,12 @@ fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, E
     };
 
     let spec = grammar_source::parse_spec(&args.grammar);
-    let resolved = grammar_source::resolve(&spec, base_dir.as_deref())
+    let (grammar, grammar_path) = grammar_source::load(&spec, base_dir.as_deref())
         .map_err(|message| ExpandError::new(args.grammar_span, message))?;
     anchors.push(format!(
         "const _: &[u8] = ::core::include_bytes!({:?});",
-        anchor_path(&spec, &args.grammar, &resolved.path)
+        anchor_path(&spec, &args.grammar, &grammar_path)
     ));
-
-    let raw = RawGrammar::from_json(&resolved.json).map_err(|error| {
-        ExpandError::new(
-            args.grammar_span,
-            format!("invalid grammar `{}`: {error}", resolved.path.display()),
-        )
-    })?;
-    let grammar = Grammar::from_raw(&raw).map_err(|error| {
-        ExpandError::new(
-            args.grammar_span,
-            format!("invalid grammar `{}`: {error}", resolved.path.display()),
-        )
-    })?;
 
     // Mirror `plotnik check --strict`: a compile-time-committed query must be
     // clean — proc macros have no warning channel, so warnings fail too.
@@ -97,10 +83,31 @@ fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, E
         .map_err(|error| ExpandError::new(query_span, error.to_string()))?;
     let diagnostics = compiled.diagnostics();
     if diagnostics.has_errors() || diagnostics.has_warnings() {
-        return Err(ExpandError::new(
-            query_span,
-            diagnostics.render_colored(compiled.source_map(), false),
-        ));
+        let rendered = diagnostics.render_colored(compiled.source_map(), false);
+        // The message lands under rustc's own `error:` heading; the first
+        // rendered severity tag would double it, so it hands that role over.
+        let message = rendered.strip_prefix("error: ").unwrap_or(&rendered);
+        return Err(ExpandError::new(query_span, message));
+    }
+
+    // Every definition becomes snake_case items (`{def}_trace`, the
+    // `parse`/`matches` surface). Distinct PascalCase names can collapse to
+    // one snake form (`HTTPServer` / `HttpServer`); generated code would
+    // then fail with a bare rustc duplicate-definition error, so refuse the
+    // query with the real diagnosis instead.
+    let mut entry_names: HashMap<String, String> = HashMap::new();
+    for def in compiled.definition_names() {
+        let entry = plotnik_lib::matcher_entry_fn_name(&def);
+        if let Some(previous) = entry_names.insert(entry.clone(), def.clone()) {
+            return Err(ExpandError::new(
+                query_span,
+                format!(
+                    "definitions `{previous}` and `{def}` collide in generated code: \
+                     both would be spelled `{entry}`; rename one so their snake_case \
+                     forms differ"
+                ),
+            ));
+        }
     }
 
     let config = MatcherConfig::new()
@@ -109,7 +116,8 @@ fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, E
         .limits(RuntimeLimitSpec {
             steps: limit(args.steps),
             memory: limit(args.memory),
-        });
+        })
+        .depth(limit(args.depth));
     Ok(compiled
         .to_rust_matcher(config)
         .expect("a diagnostics-clean query generates a module"))

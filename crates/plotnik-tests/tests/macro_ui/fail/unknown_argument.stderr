@@ -1,4 +1,4 @@
-error: unknown argument `flavor`; `query!` accepts `grammar`, `file`, `crate`, `steps`, `memory`, and the query string
+error: unknown argument `flavor`; `query!` accepts `grammar`, `file`, `crate`, `steps`, `memory`, `depth`, and the query string
  --> tests/macro_ui/fail/unknown_argument.rs:3:5
   |
 3 |     flavor = "spicy",

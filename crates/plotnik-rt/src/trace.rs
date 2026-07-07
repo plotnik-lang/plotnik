@@ -14,16 +14,27 @@ use tree_sitter::Node;
 
 use crate::{EffectLog, RuntimeEffect};
 
+/// `set_index` sentinel: no `Set` closes a value starting at this position.
+const NO_SET: u32 = u32::MAX;
+
 pub struct TraceReader<'a, 't> {
     entries: &'a [RuntimeEffect<'t>],
     pos: usize,
+    /// For each position, where the `Set` that closes a field value starting
+    /// there sits — [`Self::peek_set`]'s answer, precomputed. One backward
+    /// pass at construction keeps replay linear; peeking on demand would
+    /// rescan every nested composite once per enclosing scope, going
+    /// quadratic on deep recursive values.
+    set_index: Vec<u32>,
 }
 
 impl<'a, 't> TraceReader<'a, 't> {
     pub fn new(log: &'a EffectLog<'t>) -> Self {
+        let entries = log.as_slice();
         Self {
-            entries: log.as_slice(),
+            entries,
             pos: 0,
+            set_index: build_set_index(entries),
         }
     }
 
@@ -56,30 +67,23 @@ impl<'a, 't> TraceReader<'a, 't> {
     /// value-first: the entries of a field's value arrive *before* the `Set`
     /// that names the field, and sibling fields of one struct can differ in
     /// type — so the reader peeks ahead to pick the right typed reader, then
-    /// consumes the value linearly. The scan skips balanced composite values;
-    /// the first `Set` at depth zero is the one that owns the cursor's value.
+    /// consumes the value linearly. The answer — the first `Set` past the
+    /// cursor's balanced composite values — comes from the precomputed
+    /// [`Self::set_index`].
     pub fn peek_set(&self) -> u16 {
-        let mut depth = 0usize;
-        for entry in &self.entries[self.pos..] {
-            match entry {
-                RuntimeEffect::ArrayOpen
-                | RuntimeEffect::StructOpen
-                | RuntimeEffect::EnumOpen(_) => depth += 1,
-                RuntimeEffect::ArrayClose
-                | RuntimeEffect::StructClose
-                | RuntimeEffect::EnumClose => {
-                    depth = depth
-                        .checked_sub(1)
-                        .expect("trace reader: close below the field value being peeked");
-                }
-                RuntimeEffect::Set(index) if depth == 0 => return *index,
-                _ => {}
-            }
-        }
-        panic!(
+        let set_pos = *self
+            .set_index
+            .get(self.pos)
+            .expect("trace reader: peeked past the end of the committed trace");
+        assert!(
+            set_pos != NO_SET,
             "trace reader: no Set closes the field value at {}",
             self.pos
-        )
+        );
+        match &self.entries[set_pos as usize] {
+            RuntimeEffect::Set(index) => *index,
+            other => unreachable!("set_index addresses Set entries, found {other:?}"),
+        }
     }
 
     /// Consume a `Null` if it is next. How optional values read: `Null` is the
@@ -173,4 +177,46 @@ impl<'a, 't> TraceReader<'a, 't> {
             self.pos - 1,
         )
     }
+}
+
+/// For each position, the position of the first `Set` past the balanced
+/// composite values starting there — the `Set` that closes a field value
+/// beginning at that entry, or [`NO_SET`] where none does (positions no
+/// reader ever peeks at: closes, and value starts whose `Set` lives in an
+/// enclosing scope).
+///
+/// One backward pass. `cur` is the answer for the level being scanned;
+/// meeting a `*Close` right-to-left *enters* that group, so the outer level's
+/// answer is parked on `outer` and `cur` restarts; meeting the matching
+/// `*Open` leaves the group, and the parked answer — the first `Set` after
+/// the group — is exactly the answer *at* the open (a composite field value
+/// starts there) and for whatever precedes it on the outer level.
+fn build_set_index(entries: &[RuntimeEffect<'_>]) -> Vec<u32> {
+    assert!(
+        u32::try_from(entries.len()).is_ok_and(|len| len < NO_SET),
+        "trace length fits the u32 index space"
+    );
+    let mut index = vec![NO_SET; entries.len()];
+    let mut cur = NO_SET;
+    let mut outer: Vec<u32> = Vec::new();
+    for (i, entry) in entries.iter().enumerate().rev() {
+        match entry {
+            RuntimeEffect::Set(_) => {
+                cur = i as u32;
+                index[i] = cur;
+            }
+            RuntimeEffect::ArrayClose | RuntimeEffect::StructClose | RuntimeEffect::EnumClose => {
+                outer.push(cur);
+                cur = NO_SET;
+            }
+            RuntimeEffect::ArrayOpen | RuntimeEffect::StructOpen | RuntimeEffect::EnumOpen(_) => {
+                cur = outer
+                    .pop()
+                    .expect("open/close balance proven by the effect-stack validation");
+                index[i] = cur;
+            }
+            _ => index[i] = cur,
+        }
+    }
+    index
 }

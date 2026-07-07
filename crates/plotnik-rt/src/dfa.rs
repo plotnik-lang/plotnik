@@ -6,15 +6,16 @@ use regex_automata::Input;
 use regex_automata::dfa::Automaton;
 use regex_automata::dfa::sparse::DFA;
 
-/// `DFA::from_bytes` validates the entire serialized automaton, so this doubles
-/// as the load-time gate that proves a module's regex blob is well-formed.
-/// [`RegexDfas`] keeps the validated automaton instead of re-deserializing it.
+/// `DFA::from_bytes` validates the entire serialized automaton (no unsafe
+/// trust involved), so this doubles as the load-time gate that proves a
+/// module's regex blob is well-formed. [`RegexDfas`] keeps the validated
+/// automaton instead of re-deserializing it.
 ///
-/// # Safety
-/// The bytes must have been produced by `DFA::to_bytes_little_endian()`.
+/// The compiler serializes with `to_bytes_little_endian`, and the validation
+/// also rejects an endianness or regex-automata version mismatch — which is
+/// how a big-endian target or a skewed dependency graph surfaces: as an
+/// `Err` here, not as silent misbehavior.
 pub fn deserialize_dfa(bytes: &[u8]) -> Result<DFA<&[u8]>, String> {
-    // SAFETY: We only serialize DFAs we built, and the format is stable
-    // within the same regex-automata version.
     DFA::from_bytes(bytes)
         .map(|(dfa, _)| dfa)
         .map_err(|e| e.to_string())
@@ -95,7 +96,14 @@ impl StaticDfa {
     /// Whether the pattern matches anywhere in `text`.
     pub fn is_match(&self, text: &str) -> bool {
         let dfa = self.dfa.get_or_init(|| {
-            deserialize_dfa(self.bytes).expect("embedded DFA bytes were serialized by the compiler")
+            deserialize_dfa(self.bytes).unwrap_or_else(|error| {
+                panic!(
+                    "embedded regex DFA failed to load: {error}; the bytes were \
+                     serialized little-endian at generation time, so a big-endian \
+                     target or a regex-automata version skew between compiler and \
+                     runtime cannot run this module"
+                )
+            })
         });
         dfa.try_search_fwd(&Input::new(text))
             .expect("regex DFA search failed")

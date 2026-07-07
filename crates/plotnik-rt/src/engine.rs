@@ -41,6 +41,14 @@ pub struct Engine<'t> {
     /// recursion overflowed it at 65_536); `u64` cannot overflow before the
     /// frame arena does.
     suppress_depth: u64,
+    /// Open data-scope depth of the effect log: `*Open` data effects
+    /// increment, `*Close` decrement, suppressed effects leave it untouched
+    /// (it mirrors the log, and replay reads the log). The maximum over a
+    /// winning run is the recursion depth the generated typed replay will
+    /// need, which is why metered generated matchers bound it
+    /// ([`crate::LimitError::Depth`]); the VM tracks it for free and ignores
+    /// it (its materializer is iterative).
+    effect_depth: u64,
     /// Whether the cursor's lazy snapshot pool has activated (see
     /// [`CursorWrapper::snapshot`]); once true, every checkpoint push pairs
     /// with a pooled cursor snapshot.
@@ -58,6 +66,7 @@ impl<'t> Engine<'t> {
             effects: EffectLog::new(),
             recursion_depth: 0,
             suppress_depth: 0,
+            effect_depth: 0,
             snapshot_cursor_active: false,
         }
     }
@@ -95,6 +104,7 @@ impl<'t> Engine<'t> {
         CheckpointState {
             descendant_index: self.cursor.descendant_index(),
             effect_watermark: self.effects.len(),
+            effect_depth: self.effect_depth,
             frame_index: self.frames.current(),
             recursion_depth: self.recursion_depth,
             suppress_depth: self.suppress_depth,
@@ -113,6 +123,7 @@ impl<'t> Engine<'t> {
             self.snapshot_cursor_active = true;
         }
         self.effects.truncate(state.effect_watermark);
+        self.effect_depth = state.effect_depth;
         self.frames.restore(state.frame_index);
         self.recursion_depth = state.recursion_depth;
         self.suppress_depth = state.suppress_depth;
@@ -141,6 +152,7 @@ impl<'t> Engine<'t> {
             effects,
             recursion_depth,
             suppress_depth,
+            effect_depth,
             // Deliberately outside `CheckpointState`:
             checkpoints: _, // the stack this checkpoint was just popped from
             snapshot_cursor_active: _, // cumulative optimization state
@@ -168,6 +180,10 @@ impl<'t> Engine<'t> {
         debug_assert_eq!(
             *suppress_depth, state.suppress_depth,
             "checkpoint restore: suppress depth"
+        );
+        debug_assert_eq!(
+            *effect_depth, state.effect_depth,
+            "checkpoint restore: effect depth"
         );
     }
 
@@ -284,8 +300,28 @@ impl<'t> Engine<'t> {
         if self.suppress_depth > 0 {
             return None;
         }
-        self.effects.push(make(&self.cursor));
+        let effect = make(&self.cursor);
+        match effect {
+            RuntimeEffect::ArrayOpen | RuntimeEffect::StructOpen | RuntimeEffect::EnumOpen(_) => {
+                self.effect_depth += 1;
+            }
+            RuntimeEffect::ArrayClose | RuntimeEffect::StructClose | RuntimeEffect::EnumClose => {
+                self.effect_depth = self
+                    .effect_depth
+                    .checked_sub(1)
+                    .expect("data-scope close below open depth");
+            }
+            _ => {}
+        }
+        self.effects.push(effect);
         Some(self.effects.as_slice().last().expect("just pushed"))
+    }
+
+    /// Open data-scope depth of the effect log — the recursion depth the
+    /// typed replay of the log-so-far would need (see the field's doc).
+    #[inline]
+    pub fn effect_depth(&self) -> u64 {
+        self.effect_depth
     }
 
     /// Emit an inspection-span effect, bypassing suppression: uncaptured

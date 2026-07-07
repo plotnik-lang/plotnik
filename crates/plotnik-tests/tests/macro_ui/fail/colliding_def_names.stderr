@@ -1,0 +1,8 @@
+error: definitions `HTTPServer` and `HttpServer` collide in generated code: both would be spelled `http_server_trace`; rename one so their snake_case forms differ
+  --> tests/macro_ui/fail/colliding_def_names.rs:7:5
+   |
+ 7 | /     r#"
+ 8 | |     HTTPServer = (program)
+ 9 | |     HttpServer = (program)
+10 | |     "#
+   | |______^

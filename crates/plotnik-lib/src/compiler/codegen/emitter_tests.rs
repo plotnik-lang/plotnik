@@ -1,6 +1,6 @@
 use plotnik_rt::{Limit, Nav};
 
-use super::emitter::{limit_expr, nav_expr, shouty_ident, snake_ident};
+use super::emitter::{depth_expr, limit_expr, nav_expr, shouty_ident, snake_ident};
 
 #[test]
 fn shouty_splits_pascal_humps() {
@@ -33,4 +33,11 @@ fn limit_expr_matches_debug() {
     assert_eq!(limit_expr(Limit::Auto), "rt::Limit::Auto");
     assert_eq!(limit_expr(Limit::Of(3)), "rt::Limit::Of(3)");
     assert_eq!(limit_expr(Limit::Unbounded), "rt::Limit::Unbounded");
+}
+
+#[test]
+fn depth_expr_resolves_at_generation_time() {
+    assert_eq!(depth_expr(Limit::Auto), "Some(rt::REPLAY_DEPTH_AUTO)");
+    assert_eq!(depth_expr(Limit::Of(8)), "Some(8)");
+    assert_eq!(depth_expr(Limit::Unbounded), "None");
 }

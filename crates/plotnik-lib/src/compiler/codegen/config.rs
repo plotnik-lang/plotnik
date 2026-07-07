@@ -17,6 +17,11 @@ pub struct Config {
     /// trusted, the input is not, and the query's author is the one who knows
     /// the budget it deserves.
     pub(crate) limits: RuntimeLimitSpec,
+    /// The replay-depth policy for the `try_*` entry points. Not part of
+    /// [`RuntimeLimitSpec`] — that spec is shared with the VM, whose output
+    /// rendering is iterative; replay depth is a generated-executor resource
+    /// (its typed replay recurses once per nested value).
+    pub(crate) depth: Limit,
 }
 
 impl Default for Config {
@@ -28,6 +33,7 @@ impl Default for Config {
                 steps: Limit::Auto,
                 memory: Limit::Auto,
             },
+            depth: Limit::Auto,
         }
     }
 }
@@ -51,6 +57,13 @@ impl Config {
     /// Override the compiled-in limit policy for the `try_*` entry points.
     pub fn limits(mut self, limits: RuntimeLimitSpec) -> Self {
         self.limits = limits;
+        self
+    }
+
+    /// Override the compiled-in replay-depth policy for the `try_*` entry
+    /// points (see the field's doc for why it lives outside the shared spec).
+    pub fn depth(mut self, depth: Limit) -> Self {
+        self.depth = depth;
         self
     }
 }

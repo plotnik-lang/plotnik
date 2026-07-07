@@ -142,6 +142,13 @@ mod matcher {
     /// sampled; must be a power of two minus one. Twin of the VM's constant.
     const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
+    /// Ceiling on the committed value's nesting for the `try_*` entry points
+    /// (`None` opts out). The typed replay recurses once per nested value, so
+    /// this bounds its native-stack use — a resource of the generated executor,
+    /// not of the VM, whose output rendering is iterative. The unmetered entry
+    /// points run without it, like every other limit.
+    const MAX_REPLAY_DEPTH: Option<u64> = Some(rt::REPLAY_DEPTH_AUTO);
+
     /// Resolve [`LIMITS`] against this input's node count, exactly like
     /// `VM::builder(...).build()` resolves the VM's.
     fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
@@ -160,16 +167,15 @@ mod matcher {
     /// Field ids baked into the field checks: `(id, name)`.
     const EXPECTED_FIELDS: &[(u16, &str)] = &[];
 
-    /// One-shot gate for [`verify_language`]: the first `run` in the process
-    /// checks the tree's language, later runs skip the walk. A failed check
-    /// panics before the gate is set, so every later call re-reports the
-    /// mismatch instead of tripping over a poisoned gate.
-    static LANGUAGE_OK: ::std::sync::OnceLock<()> = ::std::sync::OnceLock::new();
-
     /// A parser built from any other grammar version could renumber the baked
     /// kind/field ids and silently mis-match, so mismatches panic: version skew
     /// between the generation-time grammar and the runtime parser is a build
     /// mistake, not a runtime condition to recover from.
+    ///
+    /// Every `run` checks its own tree — the walk is a handful of id lookups,
+    /// noise next to a match — so the guarantee holds per call, not per process:
+    /// a process that mixes languages (or grammar versions of one language) must
+    /// fail on the wrong tree, not only on the first one it ever saw.
     fn verify_language(tree: &rt::Tree) {
         let language = tree.language();
         for &(id, name, named) in EXPECTED_KINDS {
@@ -278,7 +284,7 @@ mod matcher {
         entry: u16,
         limits: rt::ResolvedRuntimeLimits,
     ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitError> {
-        LANGUAGE_OK.get_or_init(|| verify_language(tree));
+        verify_language(tree);
         let mut eng = rt::Engine::new(tree.walk());
         let mut steps: u64 = 0;
         let mut ip = entry;
@@ -291,6 +297,15 @@ mod matcher {
                     }
                 }
                 steps += 1;
+                // Replay-depth ceiling: refuse a match nesting past the bound
+                // before the typed replay (one native frame per nested value)
+                // could risk the stack. Checked every dispatch; one dispatch
+                // opens at most a per-query constant of scopes.
+                if let Some(max) = MAX_REPLAY_DEPTH {
+                    if eng.effect_depth() > max {
+                        return Err(rt::LimitError::Depth(max));
+                    }
+                }
                 // Memory ceiling: the live runtime heap, sampled every
                 // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded,
                 // so the unobserved overshoot is noise (see the VM loop).

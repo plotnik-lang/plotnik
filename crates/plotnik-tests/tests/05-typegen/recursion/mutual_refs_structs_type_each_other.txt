@@ -26,5 +26,5 @@ pub struct Arr {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q {
-    pub top: ::std::boxed::Box<Arr>,
+    pub top: Arr,
 }

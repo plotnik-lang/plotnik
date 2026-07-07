@@ -38,5 +38,5 @@ pub enum A<'t> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'t> {
-    pub root: ::std::boxed::Box<A<'t>>,
+    pub root: A<'t>,
 }

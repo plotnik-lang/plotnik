@@ -11,6 +11,9 @@ use crate::core::Interner;
 struct Fixture {
     types: TypeAnalysis,
     ref_ty: TypeId,
+    /// The recursive definition's own output — the item declaration the ref
+    /// is rendered inside.
+    item_ty: TypeId,
 }
 
 /// One definition whose output is an enum with a `Ref` back to itself, the
@@ -36,30 +39,17 @@ fn recursive_def(wrap: impl FnOnce(&mut TypeAnalysisBuilder, TypeId) -> TypeId) 
     Fixture {
         types: builder.finish(),
         ref_ty,
+        item_ty: enum_ty,
     }
 }
 
 #[test]
-fn direct_recursive_ref_is_boxed() {
+fn direct_recursive_ref_is_boxed_in_its_own_item() {
     let fx = recursive_def(|_, ref_ty| ref_ty);
 
     let facts = TypeFacts::compute(&fx.types);
 
-    assert!(facts.is_boxed(fx.ref_ty));
-}
-
-#[test]
-fn ref_under_array_is_not_boxed() {
-    let fx = recursive_def(|builder, ref_ty| {
-        builder.intern_type(TypeShape::Array {
-            element: ref_ty,
-            non_empty: false,
-        })
-    });
-
-    let facts = TypeFacts::compute(&fx.types);
-
-    assert!(!facts.is_boxed(fx.ref_ty));
+    assert!(facts.is_boxed_in(fx.item_ty, fx.ref_ty));
 }
 
 #[test]
@@ -68,7 +58,79 @@ fn ref_under_optional_is_boxed() {
 
     let facts = TypeFacts::compute(&fx.types);
 
-    assert!(facts.is_boxed(fx.ref_ty));
+    assert!(facts.is_boxed_in(fx.item_ty, fx.ref_ty));
+}
+
+/// The flagship occurrence-precision case: one interned `Ref` node used both
+/// inside its target's own (recursive) declaration and from an off-cycle
+/// item. Only the on-cycle rendering boxes; keying on the ref node alone
+/// would drag the box into the off-cycle item too.
+#[test]
+fn shared_ref_node_boxes_only_inside_the_cycle() {
+    let mut interner = Interner::new();
+    let mut builder = TypeAnalysisBuilder::new();
+    let expr_def = DefId::from_raw(0);
+    let top_def = DefId::from_raw(1);
+
+    let ref_ty = builder.intern_type(TypeShape::Ref(expr_def));
+    let payload = builder.intern_struct(BTreeMap::from([(
+        interner.intern("inner"),
+        FieldInfo::required(ref_ty),
+    )]));
+    let variants = BTreeMap::from([
+        (interner.intern("Leaf"), TYPE_VOID),
+        (interner.intern("Rec"), payload),
+    ]);
+    let enum_ty = builder.intern_type(TypeShape::Enum(variants));
+    builder.record_def_output(expr_def, enum_ty);
+    let top_struct = builder.intern_struct(BTreeMap::from([(
+        interner.intern("expr"),
+        FieldInfo::required(ref_ty),
+    )]));
+    builder.record_def_output(top_def, top_struct);
+    let types = builder.finish();
+
+    let facts = TypeFacts::compute(&types);
+
+    assert!(facts.is_boxed_in(enum_ty, ref_ty));
+    assert!(!facts.is_boxed_in(top_struct, ref_ty));
+}
+
+/// A cycle whose only closing path runs through an array is not a by-value
+/// cycle: `Vec` already indirects, so the by-value closure stops at the
+/// array and neither declaration boxes.
+#[test]
+fn cycle_through_an_array_boxes_nothing() {
+    let mut interner = Interner::new();
+    let mut builder = TypeAnalysisBuilder::new();
+    let a_def = DefId::from_raw(0);
+    let b_def = DefId::from_raw(1);
+
+    let ref_to_b = builder.intern_type(TypeShape::Ref(b_def));
+    let list_of_b = builder.intern_type(TypeShape::Array {
+        element: ref_to_b,
+        non_empty: false,
+    });
+    let a_struct = builder.intern_struct(BTreeMap::from([(
+        interner.intern("items"),
+        FieldInfo::required(list_of_b),
+    )]));
+    builder.record_def_output(a_def, a_struct);
+    let ref_to_a = builder.intern_type(TypeShape::Ref(a_def));
+    let b_struct = builder.intern_struct(BTreeMap::from([(
+        interner.intern("parent"),
+        FieldInfo::required(ref_to_a),
+    )]));
+    builder.record_def_output(b_def, b_struct);
+    let types = builder.finish();
+
+    let facts = TypeFacts::compute(&types);
+
+    // `B.parent: A` is by-value, but `A` reaches back only through its
+    // array, so no by-value cycle closes through `B`'s declaration. (The
+    // `Vec<B>` occurrence inside `A` never even asks: renderers drop the
+    // cut context under arrays.)
+    assert!(!facts.is_boxed_in(b_struct, ref_to_a));
 }
 
 #[test]
@@ -93,9 +155,12 @@ fn ref_from_outside_the_cycle_is_not_boxed() {
 
     let facts = TypeFacts::compute(&types);
 
-    assert!(!facts.is_boxed(ref_ty));
+    assert!(!facts.is_boxed_in(top_struct, ref_ty));
 }
 
+/// Every declaration a genuine by-value cycle passes through cuts its ref
+/// edge — deliberately *not* a minimal cut, which would be order-dependent;
+/// boxing every on-cycle edge keeps the decision local and stable.
 #[test]
 fn mutual_recursion_boxes_both_edges() {
     let mut interner = Interner::new();
@@ -121,8 +186,8 @@ fn mutual_recursion_boxes_both_edges() {
 
     let facts = TypeFacts::compute(&types);
 
-    assert!(facts.is_boxed(ref_to_a));
-    assert!(facts.is_boxed(ref_to_b));
+    assert!(facts.is_boxed_in(b_struct, ref_to_a));
+    assert!(facts.is_boxed_in(a_struct, ref_to_b));
 }
 
 #[test]
