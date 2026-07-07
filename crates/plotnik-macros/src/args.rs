@@ -53,6 +53,18 @@ pub struct LimitArgs {
     pub depth: Option<LimitArg>,
 }
 
+impl LimitArgs {
+    fn put_named(&mut self, key: &str, value: LimitArg, span: Span) -> Result<(), ExpandError> {
+        let slot = match key {
+            "steps" => &mut self.steps,
+            "memory" => &mut self.memory,
+            "depth" => &mut self.depth,
+            _ => unreachable!("caller checked the limit key"),
+        };
+        put(slot, value, span, key)
+    }
+}
+
 #[derive(Default)]
 struct ArgSlots {
     grammar: Option<(String, Span)>,
@@ -234,17 +246,9 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                         let value = cursor.take_path(key_span)?;
                         put(&mut args.rt_crate, value, key_span, &key)?;
                     }
-                    "steps" => {
+                    "steps" | "memory" | "depth" => {
                         let value = cursor.take_limit(key_span, &key)?;
-                        put(&mut args.limits.steps, value, key_span, &key)?;
-                    }
-                    "memory" => {
-                        let value = cursor.take_limit(key_span, &key)?;
-                        put(&mut args.limits.memory, value, key_span, &key)?;
-                    }
-                    "depth" => {
-                        let value = cursor.take_limit(key_span, &key)?;
-                        put(&mut args.limits.depth, value, key_span, &key)?;
+                        args.limits.put_named(&key, value, key_span)?;
                     }
                     other => {
                         return Err(ExpandError::new(
