@@ -6,6 +6,24 @@ Q = {
   .
   (identifier)
 }
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 12
+
+[transitions]
+Q:
+  00  -ε-                                   06, 07
+  01                                        ▶
+  02  ─◦─  (identifier) [Set(t)]            01
+  04  ─•─  (identifier) [Set(t)]            01
+  06   !   (number) [EnumOpen(A) EnumClose]  04
+  07   !   "+" [EnumOpen(B) EnumClose]      02
+
+Q (entrypoint):
+  09                                        ▶
+  10  -ε-  [StructClose]                    09
+  11       (Q)                              00 : 10
+  12  -ε-  [StructOpen]                     11
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

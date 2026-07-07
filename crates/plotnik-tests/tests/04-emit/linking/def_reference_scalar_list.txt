@@ -1,5 +1,34 @@
 Func = (function_declaration)
 Q = (program (Func)+ @funcs)
+---------------------- NFA -----------------------
+[entrypoints]
+Func = 20
+Q    = 24
+
+[transitions]
+Func:
+  02                                        ▶
+  03   !   (function_declaration)           02
+
+Q:
+  04                                        ▶
+  05   !   (program)                        13
+  06  ─‣┘  _ [ArrayClose Set(funcs)]        04
+  09  -ε-  [Node Push]                      12, 06
+  10   !   (Func)                           03 : 09
+  12  ─‣─  _                                10, 12
+  13  └‣─  _ [ArrayOpen]                    10, 12
+
+Func (entrypoint):
+  18                                        ▶
+  19  -ε-  [Node]                           18
+  20       (Func)                           03 : 19
+
+Q (entrypoint):
+  21                                        ▶
+  22  -ε-  [StructClose]                    21
+  23       (Q)                              05 : 22
+  24  -ε-  [StructOpen]                     23
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

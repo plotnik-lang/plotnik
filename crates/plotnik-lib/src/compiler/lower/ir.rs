@@ -465,6 +465,26 @@ impl From<ReturnIR> for InstructionIR {
     }
 }
 
+/// Which compilation window a label was allocated in — per-instruction
+/// provenance for dumps and generated-code comments.
+///
+/// Attribution is by *physical* location: labels created while a nullable ref
+/// is inlined into a host definition belong to the host (the instruction lives
+/// in the host's body). Post-build passes only delete and rewire instructions,
+/// never renumber labels, so an origin recorded at allocation stays valid for
+/// every surviving label. Labels minted later by `pack_instructions` have no
+/// origin — they are wire-format artifacts with no source correspondence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LabelOrigin {
+    /// Allocated while compiling this definition's body.
+    Def(DefId),
+    /// Allocated while compiling this definition's consuming-only body variant
+    /// (used by guarded recursive nullable calls).
+    ConsumingDef(DefId),
+    /// Allocated for this definition's entrypoint wrapper.
+    Wrapper(DefId),
+}
+
 /// Compiled query IR plus entry labels produced by the compile stage.
 #[derive(Clone, Debug)]
 pub struct NfaGraph {
@@ -478,6 +498,8 @@ pub struct NfaGraph {
     pub(in crate::compiler::lower) entrypoint_wrappers: IndexMap<DefId, Label>,
     /// Inspection span table, present iff the query was compiled with inspection.
     pub(in crate::compiler::lower) spans: Option<SpanTable>,
+    /// Origin per label id (index = `Label.0`), recorded at allocation.
+    pub(in crate::compiler::lower) label_origins: Vec<Option<LabelOrigin>>,
 }
 
 impl NfaGraph {
@@ -491,6 +513,40 @@ impl NfaGraph {
 
     pub(crate) fn spans(&self) -> Option<&SpanTable> {
         self.spans.as_ref()
+    }
+
+    /// The compilation window `label` was allocated in, or `None` for labels
+    /// minted by post-build passes (pack cascades).
+    pub(crate) fn origin(&self, label: Label) -> Option<LabelOrigin> {
+        self.label_origins.get(label.0 as usize).copied().flatten()
+    }
+}
+
+/// The optimized NFA before wire packing — the last pipeline artifact every
+/// backend shares.
+///
+/// This is the fork point between executors: the bytecode path packs it for
+/// the wire (`pack_instructions` splits instructions that exceed wire slot
+/// limits into epsilon cascades); code generation consumes it directly, with
+/// symbolic labels and provenance intact. Everything semantic — anchors,
+/// nullable inlining, null-defaulting, greediness, dedup — has already
+/// happened by this point.
+#[derive(Clone, Debug)]
+pub struct SemanticNfa {
+    raw: NfaGraph,
+}
+
+impl SemanticNfa {
+    pub(super) fn new(raw: NfaGraph) -> Self {
+        Self { raw }
+    }
+
+    pub(crate) fn raw(&self) -> &NfaGraph {
+        &self.raw
+    }
+
+    pub(super) fn into_raw(self) -> NfaGraph {
+        self.raw
     }
 }
 

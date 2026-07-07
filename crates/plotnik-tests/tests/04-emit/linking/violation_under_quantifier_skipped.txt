@@ -1,4 +1,27 @@
 Q = (program (function_declaration (class_declaration))* @x)
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 22
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (program)                        18
+  03  ─‣┘  _ [ArrayClose Set(x)]            01
+  05  -ε-  [ArrayClose Set(x)]              01
+  07   !   (function_declaration) [Node]    10
+  08  -ε-  [Push]                           12, 03
+  09  ─‣┘  _                                08
+  10  └‣─  (class_declaration)              09
+  12  ─‣─  _                                07, 12
+  13  └‣─  _                                07, 12
+  18  -ε-  [ArrayOpen]                      13, 05
+
+Q (entrypoint):
+  19                                        ▶
+  20  -ε-  [StructClose]                    19
+  21       (Q)                              02 : 20
+  22  -ε-  [StructOpen]                     21
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

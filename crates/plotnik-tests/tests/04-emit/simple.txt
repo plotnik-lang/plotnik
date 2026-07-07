@@ -1,4 +1,18 @@
 Q = (identifier) @id
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 6
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (identifier) [Node Set(id)]       1
+
+Q (entrypoint):
+  3                                         ▶
+  4  -ε-  [StructClose]                     3
+  5       (Q)                               2 : 4
+  6  -ε-  [StructOpen]                      5
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

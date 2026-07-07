@@ -1,5 +1,31 @@
 Inner = (identifier) @name
 Q = (expression_statement (Inner))
+---------------------- NFA -----------------------
+[entrypoints]
+Inner = 13
+Q     = 16
+
+[transitions]
+Inner:
+  02                                        ▶
+  03   !   (identifier) [Node Set(name)]    02
+
+Q:
+  04                                        ▶
+  05   !   (expression_statement) [SuppressBegin]  08
+  06  ─‣┘  _ [SuppressEnd]                  04
+  08  └‣─  (Inner)                          03 : 06
+
+Inner (entrypoint):
+  10                                        ▶
+  11  -ε-  [StructClose]                    10
+  12       (Inner)                          03 : 11
+  13  -ε-  [StructOpen]                     12
+
+Q (entrypoint):
+  14                                        ▶
+  15  -ε-  [Node]                           14
+  16       (Q)                              05 : 15
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

@@ -4,6 +4,24 @@ Q = (call_expression
     (number) @num
   ]
 )
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 11
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (call_expression)                07
+  03  ─‣┘  _                                01
+  04   !   (identifier) [Null Set(num) Node Set(fn)]  03
+  05   !   (number) [Null Set(fn) Node Set(num)]  03
+  07  └‣─  function: _                      04, 05
+
+Q (entrypoint):
+  08                                        ▶
+  09  -ε-  [StructClose]                    08
+  10       (Q)                              02 : 09
+  11  -ε-  [StructOpen]                     10
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

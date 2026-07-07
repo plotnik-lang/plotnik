@@ -2,6 +2,23 @@ Q = [
   (identifier (number))
   (number)
 ]
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 9
+
+[transitions]
+Q:
+  0  -ε-                                    2, 5
+  1                                         ▶
+  2   !   (identifier)                      4
+  3  ─‣┘  _                                 1
+  4  └‣─  (number)                          3
+  5   !   (number)                          1
+
+Q (entrypoint):
+  7                                         ▶
+  8  -ε-  [Node]                            7
+  9       (Q)                               0 : 8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

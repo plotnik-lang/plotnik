@@ -4,6 +4,29 @@ Q = (program
   )* @funcs
 )
 ------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 27
+
+[transitions]
+Q:
+  01                                        ▶
+  03   !   (program) [SpanStart#0 SpanStartAt#1]  22
+  05  ─‣┘  _ [SpanEnd#3 ArrayClose SpanStart#2 Set(funcs) SpanEnd#2 SpanEnd#1 SpanEnd#0]  01
+  07  -ε-  [SpanEnd#3 ArrayClose SpanStart#2 Set(funcs) SpanEnd#2 SpanEnd#1 SpanEnd#0]  01
+  09  -ε-  [StructClose Push]               16, 05
+  10   !   (function_declaration) [StructOpen SpanStartAt#4]  13
+  12  ─‣┘  _ [SpanEnd#4]                    09
+  13  └‣─  name: (identifier) [SpanStart#6 SpanStartAt#7 SpanStart#5 Node Set(name) SpanEnd#5 SpanEnd#7 SpanEnd#6]  12
+  16  ─‣─  _                                10, 16
+  17  └‣─  _                                10, 16
+  22  -ε-  [ArrayOpen SpanStart#3]          17, 07
+
+Q (entrypoint):
+  24                                        ▶
+  25  -ε-  [StructClose]                    24
+  26       (Q)                              03 : 25
+  27  -ε-  [StructOpen]                     26
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

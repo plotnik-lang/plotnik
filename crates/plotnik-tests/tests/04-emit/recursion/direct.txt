@@ -5,6 +5,23 @@ Expr = [
     arguments: (Expr) @inner
   )
 ]
+---------------------- NFA -----------------------
+[entrypoints]
+Expr = 11
+
+[transitions]
+Expr:
+  00  -ε-                                   02, 03
+  01                                        ▶
+  02   !   (number) [EnumOpen(Lit) Node Set(value) EnumClose]  01
+  03   !   (call_expression) [EnumOpen(Rec)]  08
+  05  ─‣┘  _ [Set(inner) EnumClose]         01
+  07  ─‣─  arguments: (Expr)                00 : 05
+  08  └‣─  function: (identifier) [Node Set(fn)]  07
+
+Expr (entrypoint):
+  10                                        ▶
+  11       (Expr)                           00 : 10
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"

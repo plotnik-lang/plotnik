@@ -1,4 +1,19 @@
 Q = (debugger_statement (_))
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 7
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (debugger_statement)              4
+  3  ─‣┘  _                                 1
+  4  └‣─  (_)                               3
+
+Q (entrypoint):
+  5                                         ▶
+  6  -ε-  [Node]                            5
+  7       (Q)                               2 : 6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

@@ -1,5 +1,36 @@
 A = (parenthesized_expression (A)?)
 Q = (expression_statement (A) @x)
+---------------------- NFA -----------------------
+[entrypoints]
+A = 17
+Q = 21
+
+[transitions]
+A:
+  02                                        ▶
+  03   !   (parenthesized_expression)       08, 02
+  04  ─‣┘  _                                02
+  05   !   (A)                              03 : 04
+  07  ─‣─  _                                05, 07
+  08  └‣─  _                                05, 07
+
+Q:
+  10                                        ▶
+  11   !   (expression_statement)           14
+  12  ─‣┘  _                                10
+  13  -ε-  [Node Set(x)]                    12
+  14  └‣─  (A)                              03 : 13
+
+A (entrypoint):
+  15                                        ▶
+  16  -ε-  [Node]                           15
+  17       (A)                              03 : 16
+
+Q (entrypoint):
+  18                                        ▶
+  19  -ε-  [StructClose]                    18
+  20       (Q)                              11 : 19
+  21  -ε-  [StructOpen]                     20
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

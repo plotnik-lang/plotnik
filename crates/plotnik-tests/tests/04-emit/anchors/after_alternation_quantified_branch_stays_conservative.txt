@@ -6,6 +6,29 @@ Q = (array
   .
   (identifier) @y
 )
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 20
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (array)                          15, 04
+  03  ─‣┘  _                                01
+  04  └•─  (identifier) [Null Set(x) Node Set(y)]  03
+  05  ─◦─  (identifier) [Node Set(y)]       03
+  06   !   (identifier) [Node Set(x)]       05
+  08  ─‣─  _                                06, 08
+  09   !   _                                06, 08
+  10   !   ";" [Null Set(x)]                05
+  14  ─‣─  _                                09, 10, 14
+  15  └‣─  _                                09, 10, 14
+
+Q (entrypoint):
+  17                                        ▶
+  18  -ε-  [StructClose]                    17
+  19       (Q)                              02 : 18
+  20  -ε-  [StructOpen]                     19
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

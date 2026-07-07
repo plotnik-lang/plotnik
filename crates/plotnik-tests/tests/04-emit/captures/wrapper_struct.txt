@@ -4,6 +4,27 @@ Q = {
     (number) @num
   } @row
 }* @rows
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 21
+
+[transitions]
+Q:
+  01                                        ▶
+  02  -ε-  [ArrayClose Set(rows)]           01
+  04  -ε-  [StructClose Push]               11, 02
+  06  ─‣─  (number) [Node Set(num) StructClose Set(row)]  04
+  07   !   (identifier) [StructOpen Node Set(id)]  06
+  09  -ε-  [StructOpen]                     07
+  11  ─‣─  _                                09, 11
+  12   !   _                                09, 11
+  17  -ε-  [ArrayOpen]                      12, 02
+
+Q (entrypoint):
+  18                                        ▶
+  19  -ε-  [StructClose]                    18
+  20       (Q)                              17 : 19
+  21  -ε-  [StructOpen]                     20
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

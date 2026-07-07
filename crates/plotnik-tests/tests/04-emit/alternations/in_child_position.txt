@@ -1,4 +1,22 @@
 Q = (program [(expression_statement) @expr])
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 11
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (program)                        07
+  03  ─‣┘  _                                01
+  04   !   (expression_statement) [Node Set(expr)]  03
+  06  ─‣─  _                                04, 06
+  07  └‣─  _                                04, 06
+
+Q (entrypoint):
+  08                                        ▶
+  09  -ε-  [StructClose]                    08
+  10       (Q)                              02 : 09
+  11  -ε-  [StructOpen]                     10
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

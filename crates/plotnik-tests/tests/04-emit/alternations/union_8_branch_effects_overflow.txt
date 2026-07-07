@@ -8,6 +8,28 @@ Q = [
   (array) @g
   (object) @h
 ]
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 14
+
+[transitions]
+Q:
+  00  -ε-                                   02, 03, 04, 05, 06, 07, 08, 09
+  01                                        ▶
+  02   !   (identifier) [Null Set(b) Null Set(c) Null Set(d) Null Set(e) Null Set(f) Null Set(g) Null Set(h) Node Set(a)]  01
+  03   !   (number) [Null Set(a) Null Set(c) Null Set(d) Null Set(e) Null Set(f) Null Set(g) Null Set(h) Node Set(b)]  01
+  04   !   (string) [Null Set(a) Null Set(b) Null Set(d) Null Set(e) Null Set(f) Null Set(g) Null Set(h) Node Set(c)]  01
+  05   !   (binary_expression) [Null Set(a) Null Set(b) Null Set(c) Null Set(e) Null Set(f) Null Set(g) Null Set(h) Node Set(d)]  01
+  06   !   (call_expression) [Null Set(a) Null Set(b) Null Set(c) Null Set(d) Null Set(f) Null Set(g) Null Set(h) Node Set(e)]  01
+  07   !   (member_expression) [Null Set(a) Null Set(b) Null Set(c) Null Set(d) Null Set(e) Null Set(g) Null Set(h) Node Set(f)]  01
+  08   !   (array) [Null Set(a) Null Set(b) Null Set(c) Null Set(d) Null Set(e) Null Set(f) Null Set(h) Node Set(g)]  01
+  09   !   (object) [Null Set(a) Null Set(b) Null Set(c) Null Set(d) Null Set(e) Null Set(f) Null Set(g) Node Set(h)]  01
+
+Q (entrypoint):
+  11                                        ▶
+  12  -ε-  [StructClose]                    11
+  13       (Q)                              00 : 12
+  14  -ε-  [StructOpen]                     13
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"

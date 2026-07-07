@@ -18,7 +18,7 @@
 //! | ------------ | ------------------------------------------ |
 //! | `02-parser`  | cst, ast                                   |
 //! | `03-analyze` | symbols                                    |
-//! | `04-emit`    | bytecode                                   |
+//! | `04-emit`    | nfa, bytecode                              |
 //! | `05-typegen` | types                                      |
 //! | `06-vm`      | types, output, inspection if enabled, bytecode, trace (requires input) |
 //!
@@ -257,7 +257,7 @@ fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
     match stage.split('-').next().unwrap_or("") {
         "02" => Some(&["diagnostics", "cst", "ast"]),
         "03" => Some(&["diagnostics", "symbols"]),
-        "04" => Some(&["diagnostics", "bytecode"]),
+        "04" => Some(&["diagnostics", "nfa", "bytecode"]),
         "05" => Some(&["diagnostics", "types", "mapped"]),
         "06" => Some(&[
             "types",
@@ -292,6 +292,7 @@ fn parse_section_header(line: &str) -> Option<String> {
             "cst"
                 | "ast"
                 | "symbols"
+                | "nfa"
                 | "bytecode"
                 | "mapped"
                 | "types"
@@ -426,6 +427,10 @@ fn render_compile(
     match kind {
         Compile::Bytecode => {
             out.extend(diag);
+            let nfa = compiled
+                .dump_nfa(Colors::new(false))
+                .expect("valid query should compile to a module");
+            out.push(("nfa".into(), nfa));
             out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))));
         }
         Compile::Types => {

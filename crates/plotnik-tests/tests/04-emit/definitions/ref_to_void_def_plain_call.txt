@@ -1,5 +1,30 @@
 Blank = (identifier)
 Q = (expression_statement (Blank))
+---------------------- NFA -----------------------
+[entrypoints]
+Blank = 10
+Q     = 13
+
+[transitions]
+Blank:
+  02                                        ▶
+  03   !   (identifier)                     02
+
+Q:
+  04                                        ▶
+  05   !   (expression_statement)           07
+  06  ─‣┘  _                                04
+  07  └‣─  (Blank)                          03 : 06
+
+Blank (entrypoint):
+  08                                        ▶
+  09  -ε-  [Node]                           08
+  10       (Blank)                          03 : 09
+
+Q (entrypoint):
+  11                                        ▶
+  12  -ε-  [Node]                           11
+  13       (Q)                              05 : 12
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

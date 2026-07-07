@@ -2,6 +2,24 @@ Q = [
   (object (pair))
   (object (spread_element))
 ]
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 11
+
+[transitions]
+Q:
+  00  -ε-                                   02, 05
+  01                                        ▶
+  02   !   (object)                         04
+  03  ─‣┘  _                                01
+  04  └‣─  (pair)                           03
+  05   !   (object)                         07
+  07  └‣─  (spread_element)                 03
+
+Q (entrypoint):
+  09                                        ▶
+  10  -ε-  [Node]                           09
+  11       (Q)                              00 : 10
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

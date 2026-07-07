@@ -4,6 +4,27 @@ Q = (program
   )
   (debugger_statement) @d
 )
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 15
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (program)                        05
+  03  ─‣┘  _                                01
+  04  ─‣─  (debugger_statement) [Node Set(d)]  03
+  05  └‣─  (expression_statement)           07
+  07  └‣─  (parenthesized_expression)       09
+  09  └‣─  (binary_expression)              11
+  10  ─‣┘³ _                                04
+  11  └‣─  (identifier) [Node Set(l)]       10
+
+Q (entrypoint):
+  12                                        ▶
+  13  -ε-  [StructClose]                    12
+  14       (Q)                              02 : 13
+  15  -ε-  [StructOpen]                     14
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

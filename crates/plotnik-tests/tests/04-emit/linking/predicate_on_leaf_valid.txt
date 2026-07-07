@@ -1,4 +1,17 @@
 Q = (identifier == "foo")
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 5
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (identifier) == "foo"             1
+
+Q (entrypoint):
+  3                                         ▶
+  4  -ε-  [Node]                            3
+  5       (Q)                               2 : 4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

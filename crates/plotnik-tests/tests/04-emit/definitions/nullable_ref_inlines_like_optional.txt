@@ -1,5 +1,38 @@
 MaybeId = (identifier)?
 Q = (array (MaybeId) (number) @n)
+---------------------- NFA -----------------------
+[entrypoints]
+MaybeId = 20
+Q       = 24
+
+[transitions]
+MaybeId:
+  00  -ε-                                   07, 03
+  02                                        ▶
+  03  -ε-  [Null]                           02
+  04   !   (identifier) [Node]              02
+  06  ─‣─  _                                04, 06
+  07   !   _                                04, 06
+
+Q:
+  09                                        ▶
+  10   !   (array)                          17, 12
+  11  ─‣┘  _                                09
+  12  └‣─  (number) [Node Set(n)]           11
+  13  ─‣─  (number) [Node Set(n)]           11
+  14   !   (identifier)                     13
+  16  ─‣─  _                                14, 16
+  17  └‣─  _                                14, 16
+
+MaybeId (entrypoint):
+  19                                        ▶
+  20       (MaybeId)                        00 : 19
+
+Q (entrypoint):
+  21                                        ▶
+  22  -ε-  [StructClose]                    21
+  23       (Q)                              10 : 22
+  24  -ε-  [StructOpen]                     23
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

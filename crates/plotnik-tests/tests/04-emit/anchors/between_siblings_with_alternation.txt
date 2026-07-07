@@ -7,6 +7,27 @@ Q = (program
     )
   )
 )
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 16
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (program)                        04
+  04  └‣─  (expression_statement)           06
+  06  └‣─  (binary_expression)              12
+  07  ─‣┘³ _                                01
+  08  ─•─  (identifier) [Node Set(right)]   07
+  09   !   (identifier) [Node Set(left)]    08
+  11  ─‣─  _                                09, 11
+  12  └‣─  _                                09, 11
+
+Q (entrypoint):
+  13                                        ▶
+  14  -ε-  [StructClose]                    13
+  15       (Q)                              02 : 14
+  16  -ε-  [StructOpen]                     15
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

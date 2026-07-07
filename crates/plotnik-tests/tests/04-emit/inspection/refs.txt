@@ -2,6 +2,50 @@ Name = (identifier) @name
 Bare = (program (expression_statement (Name)))
 Captured = (program (expression_statement (Name) @item))
 ------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Bare     = 40
+Captured = 44
+Name     = 37
+
+[transitions]
+Name:
+  03                                        ▶
+  05   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(name) SpanEnd#1 SpanEnd#2 SpanEnd#0]  03
+
+Bare:
+  07                                        ▶
+  09   !   (program) [SpanStart#3 SpanStartAt#4]  12
+  11  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  07
+  12  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  16
+  14  ─‣┘  _ [SuppressEnd SpanEnd#6]        11
+  16  └‣─  (Name)                           05 : 14
+
+Captured:
+  20                                        ▶
+  22   !   (program) [SpanStart#7 SpanStartAt#8]  25
+  24  ─‣┘  _ [SpanEnd#9 SpanEnd#8 SpanEnd#7]  20
+  25  └‣─  (expression_statement) [SpanStartAt#9 SpanStart#11 StructOpen]  30
+  27  ─‣┘  _ [SpanStart#10 Set(item) SpanEnd#10 SpanEnd#11]  24
+  29  -ε-  [StructClose]                    27
+  30  └‣─  (Name)                           05 : 29
+
+Name (entrypoint):
+  34                                        ▶
+  35  -ε-  [StructClose]                    34
+  36       (Name)                           05 : 35
+  37  -ε-  [StructOpen]                     36
+
+Bare (entrypoint):
+  38                                        ▶
+  39  -ε-  [Node]                           38
+  40       (Bare)                           09 : 39
+
+Captured (entrypoint):
+  41                                        ▶
+  42  -ε-  [StructClose]                    41
+  43       (Captured)                       22 : 42
+  44  -ε-  [StructOpen]                     43
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

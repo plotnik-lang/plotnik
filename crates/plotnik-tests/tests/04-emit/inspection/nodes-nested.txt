@@ -7,6 +7,27 @@ Q = (program
   )
 )
 ------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 18
+
+[transitions]
+Q:
+  01                                        ▶
+  03   !   (program) [SpanStart#0 SpanStartAt#1]  06
+  05  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  01
+  06  └‣─  (expression_statement) [SpanStartAt#2]  09
+  08  ─‣┘  _ [SpanEnd#3]                    05
+  09  └‣─  (binary_expression) [SpanStartAt#3]  13
+  11  ─‣┘  _                                08
+  12  ─‣─  right: (identifier) [SpanStart#8 SpanStartAt#9 SpanStart#7 Node Set(right) SpanEnd#7 SpanEnd#9 SpanEnd#8]  11
+  13  └‣─  left: (identifier) [SpanStart#5 SpanStartAt#6 SpanStart#4 Node Set(left) SpanEnd#4 SpanEnd#6 SpanEnd#5]  12
+
+Q (entrypoint):
+  15                                        ▶
+  16  -ε-  [StructClose]                    15
+  17       (Q)                              03 : 16
+  18  -ε-  [StructOpen]                     17
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

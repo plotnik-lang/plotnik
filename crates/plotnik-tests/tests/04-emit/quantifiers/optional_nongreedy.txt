@@ -1,4 +1,23 @@
 Q = (function_declaration (decorator)?? @dec)
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 13
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (function_declaration)           04, 08
+  03  ─‣┘  _                                01
+  04  -ε-  [Null Set(dec)]                  01
+  05   !   (decorator) [Node Set(dec)]      03
+  07  ─‣─  _                                05, 07
+  08  └‣─  _                                05, 07
+
+Q (entrypoint):
+  10                                        ▶
+  11  -ε-  [StructClose]                    10
+  12       (Q)                              02 : 11
+  13  -ε-  [StructOpen]                     12
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

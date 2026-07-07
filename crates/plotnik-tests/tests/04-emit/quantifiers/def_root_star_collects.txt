@@ -1,4 +1,20 @@
 Q = (identifier)*
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 14
+
+[transitions]
+Q:
+  01                                        ▶
+  02  -ε-  [ArrayClose]                     01
+  04   !   (identifier) [Node Push]         06, 02
+  06  ─‣─  _                                04, 06
+  07   !   _                                04, 06
+  12  -ε-  [ArrayOpen]                      07, 02
+
+Q (entrypoint):
+  13                                        ▶
+  14       (Q)                              12 : 13
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

@@ -12,10 +12,10 @@ use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
 use crate::compiler::emit::tables::EmitError;
 use crate::compiler::limits::CompilerLimits;
 use crate::compiler::lower::spans::assign_spans;
-use crate::compiler::lower::{LowerInput, lower_to_nfa};
+use crate::compiler::lower::{LowerInput, lower_semantic, lower_to_nfa};
 use crate::compiler::parse::{Parser, Root, SyntaxNode, lex};
-use crate::core::Interner;
 use crate::core::grammar::Grammar;
+use crate::core::{Colors, Interner};
 
 use crate::bytecode::Module;
 use crate::compiler::Diagnostics;
@@ -502,6 +502,15 @@ impl CompiledQuery {
         self.module()
             .map(|module| crate::compiler::typegen::typescript::emit_mapped(module, config))
     }
+
+    /// Render the optimized pre-pack NFA — the IR every backend consumes — in
+    /// the bytecode dump format (label space, with definition provenance).
+    /// `None` when the query didn't compile, mirroring [`Self::module`].
+    pub fn dump_nfa(&self, colors: Colors) -> Option<String> {
+        self.compiled.as_ref()?;
+        let linked = self.checked.query.linked()?;
+        Some(linked.dump_nfa(colors))
+    }
 }
 
 impl LinkOutcome {
@@ -776,11 +785,21 @@ impl LinkedQuery {
     }
 
     fn compile(&self) -> crate::compiler::lower::ir::LoweredNfa {
-        lower_to_nfa(LowerInput {
+        lower_to_nfa(self.lower_input())
+    }
+
+    fn dump_nfa(&self, colors: Colors) -> String {
+        let input = self.lower_input();
+        let semantic = lower_semantic(&input);
+        crate::compiler::lower::dump::dump_nfa(&semantic, input.analysis, colors)
+    }
+
+    fn lower_input(&self) -> LowerInput<'_> {
+        LowerInput {
             analysis: self.analysis_input(),
             symbol_table: self.symbol_table(),
             inspection: self.analyzed.parsed.inspection(),
-        })
+        }
     }
 
     fn analysis_input(&self) -> AnalysisArtifacts<'_> {
