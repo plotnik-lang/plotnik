@@ -166,6 +166,43 @@ impl TraceReaderSignature {
     }
 }
 
+struct ParseReplay<'a> {
+    indent: &'a str,
+    reader: &'a str,
+}
+
+impl<'a> ParseReplay<'a> {
+    fn new(indent: &'a str, reader: &'a str) -> Self {
+        Self { indent, reader }
+    }
+
+    fn emit_unmetered(&self, out: &mut String, trace: &str) {
+        let indent = self.indent;
+        let _ = writeln!(out, "{indent}let log = {trace}(tree, source)?;");
+        self.emit_value(out, "Some(value)");
+    }
+
+    fn emit_metered(&self, out: &mut String, metered: &str) {
+        let indent = self.indent;
+        let _ = writeln!(
+            out,
+            "{indent}let Some(log) = matcher::{metered}(tree, source)? else {{"
+        );
+        let _ = writeln!(out, "{indent}    return Ok(None);");
+        let _ = writeln!(out, "{indent}}};");
+        self.emit_value(out, "Ok(Some(value))");
+    }
+
+    fn emit_value(&self, out: &mut String, result: &str) {
+        let indent = self.indent;
+        let reader = self.reader;
+        let _ = writeln!(out, "{indent}let mut t = rt::TraceReader::new(&log);");
+        let _ = writeln!(out, "{indent}let value = {reader}(&mut t);");
+        let _ = writeln!(out, "{indent}t.finish();");
+        let _ = writeln!(out, "{indent}{result}");
+    }
+}
+
 impl<'a> ReaderGen<'a> {
     pub(super) fn new(
         artifacts: AnalysisArtifacts<'a>,
@@ -259,6 +296,7 @@ impl<'a> ReaderGen<'a> {
     fn parse_impl(&self, out: &mut String, def: &str, item: &Item) {
         let sig = InherentParseSignature::for_item(&self.model, item);
         let reader = self.reader_fn(item.name);
+        let replay = ParseReplay::new("        ", reader);
         let trace = entry_fn_name(def);
         let metered = metered_entry_fn_name(def);
         let _ = writeln!(
@@ -279,11 +317,7 @@ impl<'a> ReaderGen<'a> {
             "    pub fn parse(tree: {}, source: &str) -> ::core::option::Option<Self> {{",
             sig.tree_ref
         );
-        let _ = writeln!(out, "        let log = {trace}(tree, source)?;");
-        let _ = writeln!(out, "        let mut t = rt::TraceReader::new(&log);");
-        let _ = writeln!(out, "        let value = {reader}(&mut t);");
-        let _ = writeln!(out, "        t.finish();");
-        let _ = writeln!(out, "        Some(value)");
+        replay.emit_unmetered(out, &trace);
         let _ = writeln!(out, "    }}");
         let _ = writeln!(out);
         let _ = writeln!(
@@ -301,16 +335,7 @@ impl<'a> ReaderGen<'a> {
             out,
             "    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitError> {{"
         );
-        let _ = writeln!(
-            out,
-            "        let Some(log) = matcher::{metered}(tree, source)? else {{"
-        );
-        let _ = writeln!(out, "            return Ok(None);");
-        let _ = writeln!(out, "        }};");
-        let _ = writeln!(out, "        let mut t = rt::TraceReader::new(&log);");
-        let _ = writeln!(out, "        let value = {reader}(&mut t);");
-        let _ = writeln!(out, "        t.finish();");
-        let _ = writeln!(out, "        Ok(Some(value))");
+        replay.emit_metered(out, &metered);
         let _ = writeln!(out, "    }}");
         let _ = writeln!(out, "}}");
     }
@@ -321,6 +346,7 @@ impl<'a> ReaderGen<'a> {
         let sig = FreeParseSignature::for_item(&self.model, item);
         let snake = snake_ident(def);
         let reader = self.reader_fn(item.name);
+        let replay = ParseReplay::new("    ", reader);
         let trace = entry_fn_name(def);
         let metered = metered_entry_fn_name(def);
         let _ = writeln!(
@@ -337,11 +363,7 @@ impl<'a> ReaderGen<'a> {
         let _ = writeln!(out, "    tree: {},", sig.tree_ref);
         let _ = writeln!(out, "    source: &str,");
         let _ = writeln!(out, ") -> ::core::option::Option<{}> {{", sig.return_type);
-        let _ = writeln!(out, "    let log = {trace}(tree, source)?;");
-        let _ = writeln!(out, "    let mut t = rt::TraceReader::new(&log);");
-        let _ = writeln!(out, "    let value = {reader}(&mut t);");
-        let _ = writeln!(out, "    t.finish();");
-        let _ = writeln!(out, "    Some(value)");
+        replay.emit_unmetered(out, &trace);
         let _ = writeln!(out, "}}");
         let _ = writeln!(out);
         let _ = writeln!(
@@ -356,16 +378,7 @@ impl<'a> ReaderGen<'a> {
             ") -> ::core::result::Result<::core::option::Option<{}>, rt::LimitError> {{",
             sig.return_type
         );
-        let _ = writeln!(
-            out,
-            "    let Some(log) = matcher::{metered}(tree, source)? else {{"
-        );
-        let _ = writeln!(out, "        return Ok(None);");
-        let _ = writeln!(out, "    }};");
-        let _ = writeln!(out, "    let mut t = rt::TraceReader::new(&log);");
-        let _ = writeln!(out, "    let value = {reader}(&mut t);");
-        let _ = writeln!(out, "    t.finish();");
-        let _ = writeln!(out, "    Ok(Some(value))");
+        replay.emit_metered(out, &metered);
         let _ = writeln!(out, "}}");
     }
 
