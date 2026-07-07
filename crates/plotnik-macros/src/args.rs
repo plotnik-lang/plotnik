@@ -99,48 +99,151 @@ impl ArgSlots {
     }
 }
 
+struct ArgCursor {
+    tokens: Vec<TokenTree>,
+    pos: usize,
+}
+
+impl ArgCursor {
+    fn new(input: TokenStream) -> Self {
+        Self {
+            tokens: input.into_iter().collect(),
+            pos: 0,
+        }
+    }
+
+    fn current(&self) -> Option<&TokenTree> {
+        self.tokens.get(self.pos)
+    }
+
+    fn advance(&mut self) {
+        self.pos += 1;
+    }
+
+    fn expect_eq_after_key(&mut self, key_span: Span, key: &str) -> Result<(), ExpandError> {
+        match self.tokens.get(self.pos + 1) {
+            Some(TokenTree::Punct(p)) if p.as_char() == '=' => {
+                self.pos += 2;
+                Ok(())
+            }
+            _ => Err(ExpandError::new(
+                key_span,
+                format!("expected `{key} = ...`"),
+            )),
+        }
+    }
+
+    fn consume_separator(&mut self) -> Result<(), ExpandError> {
+        let Some(token) = self.current() else {
+            return Ok(());
+        };
+        match token {
+            TokenTree::Punct(p) if p.as_char() == ',' => {
+                self.advance();
+                Ok(())
+            }
+            other => Err(ExpandError::new(other.span(), "expected `,` here")),
+        }
+    }
+
+    fn take_string(&mut self, key_span: Span, key: &str) -> Result<(String, Span), ExpandError> {
+        let Some(token) = self.current().cloned() else {
+            return Err(ExpandError::new(
+                key_span,
+                format!("`{key}` needs a string value"),
+            ));
+        };
+        self.advance();
+        string_value(&token)
+    }
+
+    /// `crate = ::some::path` — collect tokens up to the next top-level comma
+    /// and splice them verbatim into generated code. Absolute paths only: the
+    /// text is spliced into several nested modules, where a relative path
+    /// would resolve differently in each.
+    fn take_path(&mut self, key_span: Span) -> Result<String, ExpandError> {
+        let mut path = String::new();
+        while let Some(token) = self.current() {
+            if let TokenTree::Punct(p) = token
+                && p.as_char() == ','
+            {
+                break;
+            }
+            path.push_str(&token.to_string());
+            self.advance();
+        }
+        if path.is_empty() {
+            return Err(ExpandError::new(key_span, "`crate` needs a path value"));
+        }
+        if !is_absolute_path(&path) {
+            return Err(ExpandError::new(
+                key_span,
+                format!(
+                    "`crate = {path}` must be an absolute module path like \
+                     `::my_facade::rt` or `::plotnik_rt`"
+                ),
+            ));
+        }
+        Ok(path)
+    }
+
+    fn take_limit(&mut self, key_span: Span, key: &str) -> Result<LimitArg, ExpandError> {
+        let Some(token) = self.current().cloned() else {
+            return Err(ExpandError::new(
+                key_span,
+                format!("`{key}` needs a value: an integer, `auto`, or `unbounded`"),
+            ));
+        };
+        self.advance();
+        match &token {
+            TokenTree::Ident(ident) if ident.to_string() == "auto" => Ok(LimitArg::Auto),
+            TokenTree::Ident(ident) if ident.to_string() == "unbounded" => Ok(LimitArg::Unbounded),
+            TokenTree::Literal(_) => take_integer_limit(&token, key),
+            other => Err(invalid_limit_value(other.span(), key)),
+        }
+    }
+}
+
 pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
-    let tokens: Vec<TokenTree> = input.into_iter().collect();
+    let mut cursor = ArgCursor::new(input);
     let call_span = Span::call_site();
     let mut args = ArgSlots::default();
 
-    let mut pos = 0;
-    while pos < tokens.len() {
-        match &tokens[pos] {
+    while let Some(token) = cursor.current().cloned() {
+        match &token {
             // The one positional argument: the query string.
             TokenTree::Literal(lit) => {
-                let (text, span) = string_value(&tokens[pos])?;
+                let (text, span) = string_value(&token)?;
                 args.put_query(QuerySource::Inline { text, span }, lit.span())?;
-                pos += 1;
+                cursor.advance();
             }
             TokenTree::Ident(ident) => {
                 let key = ident.to_string();
                 let key_span = ident.span();
-                expect_eq(&tokens, pos + 1, key_span, &key)?;
-                pos += 2;
+                cursor.expect_eq_after_key(key_span, &key)?;
                 match key.as_str() {
                     "grammar" => {
-                        let value = take_string(&tokens, &mut pos, key_span, &key)?;
+                        let value = cursor.take_string(key_span, &key)?;
                         put(&mut args.grammar, value, key_span, &key)?;
                     }
                     "file" => {
-                        let (path, span) = take_string(&tokens, &mut pos, key_span, &key)?;
+                        let (path, span) = cursor.take_string(key_span, &key)?;
                         args.put_query(QuerySource::File { path, span }, span)?;
                     }
                     "crate" => {
-                        let value = take_path(&tokens, &mut pos, key_span)?;
+                        let value = cursor.take_path(key_span)?;
                         put(&mut args.rt_crate, value, key_span, &key)?;
                     }
                     "steps" => {
-                        let value = take_limit(&tokens, &mut pos, key_span, &key)?;
+                        let value = cursor.take_limit(key_span, &key)?;
                         put(&mut args.limits.steps, value, key_span, &key)?;
                     }
                     "memory" => {
-                        let value = take_limit(&tokens, &mut pos, key_span, &key)?;
+                        let value = cursor.take_limit(key_span, &key)?;
                         put(&mut args.limits.memory, value, key_span, &key)?;
                     }
                     "depth" => {
-                        let value = take_limit(&tokens, &mut pos, key_span, &key)?;
+                        let value = cursor.take_limit(key_span, &key)?;
                         put(&mut args.limits.depth, value, key_span, &key)?;
                     }
                     other => {
@@ -164,14 +267,7 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
         }
 
         // Between arguments: a comma, or the end. A trailing comma is fine.
-        if pos < tokens.len() {
-            match &tokens[pos] {
-                TokenTree::Punct(p) if p.as_char() == ',' => pos += 1,
-                other => {
-                    return Err(ExpandError::new(other.span(), "expected `,` here"));
-                }
-            }
-        }
+        cursor.consume_separator()?;
     }
     args.finish(call_span)
 }
@@ -187,37 +283,6 @@ fn put<T>(slot: &mut Option<T>, value: T, span: Span, key: &str) -> Result<(), E
     Ok(())
 }
 
-fn expect_eq(
-    tokens: &[TokenTree],
-    pos: usize,
-    key_span: Span,
-    key: &str,
-) -> Result<(), ExpandError> {
-    match tokens.get(pos) {
-        Some(TokenTree::Punct(p)) if p.as_char() == '=' => Ok(()),
-        _ => Err(ExpandError::new(
-            key_span,
-            format!("expected `{key} = ...`"),
-        )),
-    }
-}
-
-fn take_string(
-    tokens: &[TokenTree],
-    pos: &mut usize,
-    key_span: Span,
-    key: &str,
-) -> Result<(String, Span), ExpandError> {
-    let Some(token) = tokens.get(*pos) else {
-        return Err(ExpandError::new(
-            key_span,
-            format!("`{key}` needs a string value"),
-        ));
-    };
-    *pos += 1;
-    string_value(token)
-}
-
 fn string_value(token: &TokenTree) -> Result<(String, Span), ExpandError> {
     let text = token.to_string();
     match litrs::StringLit::parse(text) {
@@ -227,36 +292,6 @@ fn string_value(token: &TokenTree) -> Result<(String, Span), ExpandError> {
             "expected a string literal here",
         )),
     }
-}
-
-/// `crate = ::some::path` — collect tokens up to the next top-level comma and
-/// splice them verbatim into generated code. Absolute paths only: the text is
-/// spliced into several nested modules, where a relative path would resolve
-/// differently in each.
-fn take_path(tokens: &[TokenTree], pos: &mut usize, key_span: Span) -> Result<String, ExpandError> {
-    let mut path = String::new();
-    while let Some(token) = tokens.get(*pos) {
-        if let TokenTree::Punct(p) = token
-            && p.as_char() == ','
-        {
-            break;
-        }
-        path.push_str(&token.to_string());
-        *pos += 1;
-    }
-    if path.is_empty() {
-        return Err(ExpandError::new(key_span, "`crate` needs a path value"));
-    }
-    if !is_absolute_path(&path) {
-        return Err(ExpandError::new(
-            key_span,
-            format!(
-                "`crate = {path}` must be an absolute module path like \
-                 `::my_facade::rt` or `::plotnik_rt`"
-            ),
-        ));
-    }
-    Ok(path)
 }
 
 /// The collected `crate` text is spliced verbatim into generated code, so it
@@ -287,27 +322,6 @@ fn strip_ident(text: &str) -> &str {
         .find(|&(_, c)| !(c == '_' || c.is_alphanumeric()))
         .map_or(body.len(), |(index, _)| index);
     &body[end..]
-}
-
-fn take_limit(
-    tokens: &[TokenTree],
-    pos: &mut usize,
-    key_span: Span,
-    key: &str,
-) -> Result<LimitArg, ExpandError> {
-    let Some(token) = tokens.get(*pos) else {
-        return Err(ExpandError::new(
-            key_span,
-            format!("`{key}` needs a value: an integer, `auto`, or `unbounded`"),
-        ));
-    };
-    *pos += 1;
-    match token {
-        TokenTree::Ident(ident) if ident.to_string() == "auto" => Ok(LimitArg::Auto),
-        TokenTree::Ident(ident) if ident.to_string() == "unbounded" => Ok(LimitArg::Unbounded),
-        TokenTree::Literal(_) => take_integer_limit(token, key),
-        other => Err(invalid_limit_value(other.span(), key)),
-    }
 }
 
 fn take_integer_limit(token: &TokenTree, key: &str) -> Result<LimitArg, ExpandError> {
