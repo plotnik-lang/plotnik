@@ -48,16 +48,60 @@ pub struct MacroArgs {
     pub depth: Option<LimitArg>,
 }
 
+#[derive(Default)]
+struct ArgSlots {
+    grammar: Option<(String, Span)>,
+    query: Option<QuerySource>,
+    rt_crate: Option<String>,
+    steps: Option<LimitArg>,
+    memory: Option<LimitArg>,
+    depth: Option<LimitArg>,
+}
+
+impl ArgSlots {
+    fn put_query(&mut self, source: QuerySource, span: Span) -> Result<(), ExpandError> {
+        if self.query.is_some() {
+            return Err(ExpandError::new(
+                span,
+                "the query is already given; `query!` takes one query string \
+                 (or one `file = \"...\"`)",
+            ));
+        }
+        self.query = Some(source);
+        Ok(())
+    }
+
+    fn finish(self, call_span: Span) -> Result<MacroArgs, ExpandError> {
+        let Some((grammar, grammar_span)) = self.grammar else {
+            return Err(ExpandError::new(
+                call_span,
+                "missing `grammar = \"...\"`: name a dependency that ships a grammar \
+                 (e.g. `grammar = \"tree-sitter-javascript\"`) or a grammar.json path",
+            ));
+        };
+        let Some(query) = self.query else {
+            return Err(ExpandError::new(
+                call_span,
+                "missing the query: pass a string literal or `file = \"...\"`",
+            ));
+        };
+
+        Ok(MacroArgs {
+            grammar,
+            grammar_span,
+            query,
+            rt_crate: self.rt_crate,
+            steps: self.steps,
+            memory: self.memory,
+            depth: self.depth,
+        })
+    }
+}
+
 pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
     let tokens: Vec<TokenTree> = input.into_iter().collect();
     let call_span = Span::call_site();
-
-    let mut grammar: Option<(String, Span)> = None;
-    let mut query: Option<QuerySource> = None;
-    let mut rt_crate: Option<String> = None;
-    let mut steps: Option<LimitArg> = None;
-    let mut memory: Option<LimitArg> = None;
-    let mut depth: Option<LimitArg> = None;
+    let mut args = ArgSlots::default();
 
     let mut pos = 0;
     while pos < tokens.len() {
@@ -65,14 +109,7 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
             // The one positional argument: the query string.
             TokenTree::Literal(lit) => {
                 let (text, span) = string_value(&tokens[pos])?;
-                if query.is_some() {
-                    return Err(ExpandError::new(
-                        lit.span(),
-                        "the query is already given; `query!` takes one query string \
-                         (or one `file = \"...\"`)",
-                    ));
-                }
-                query = Some(QuerySource::Inline { text, span });
+                args.put_query(QuerySource::Inline { text, span }, lit.span())?;
                 pos += 1;
             }
             TokenTree::Ident(ident) => {
@@ -83,34 +120,27 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                 match key.as_str() {
                     "grammar" => {
                         let value = take_string(&tokens, &mut pos, key_span, &key)?;
-                        put(&mut grammar, value, key_span, &key)?;
+                        put(&mut args.grammar, value, key_span, &key)?;
                     }
                     "file" => {
                         let (path, span) = take_string(&tokens, &mut pos, key_span, &key)?;
-                        if query.is_some() {
-                            return Err(ExpandError::new(
-                                span,
-                                "the query is already given; `query!` takes one query string \
-                                 (or one `file = \"...\"`)",
-                            ));
-                        }
-                        query = Some(QuerySource::File { path, span });
+                        args.put_query(QuerySource::File { path, span }, span)?;
                     }
                     "crate" => {
                         let value = take_path(&tokens, &mut pos, key_span)?;
-                        put(&mut rt_crate, value, key_span, &key)?;
+                        put(&mut args.rt_crate, value, key_span, &key)?;
                     }
                     "steps" => {
                         let value = take_limit(&tokens, &mut pos, key_span, &key)?;
-                        put(&mut steps, value, key_span, &key)?;
+                        put(&mut args.steps, value, key_span, &key)?;
                     }
                     "memory" => {
                         let value = take_limit(&tokens, &mut pos, key_span, &key)?;
-                        put(&mut memory, value, key_span, &key)?;
+                        put(&mut args.memory, value, key_span, &key)?;
                     }
                     "depth" => {
                         let value = take_limit(&tokens, &mut pos, key_span, &key)?;
-                        put(&mut depth, value, key_span, &key)?;
+                        put(&mut args.depth, value, key_span, &key)?;
                     }
                     other => {
                         return Err(ExpandError::new(
@@ -142,30 +172,7 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
             }
         }
     }
-
-    let Some((grammar, grammar_span)) = grammar else {
-        return Err(ExpandError::new(
-            call_span,
-            "missing `grammar = \"...\"`: name a dependency that ships a grammar \
-             (e.g. `grammar = \"tree-sitter-javascript\"`) or a grammar.json path",
-        ));
-    };
-    let Some(query) = query else {
-        return Err(ExpandError::new(
-            call_span,
-            "missing the query: pass a string literal or `file = \"...\"`",
-        ));
-    };
-
-    Ok(MacroArgs {
-        grammar,
-        grammar_span,
-        query,
-        rt_crate,
-        steps,
-        memory,
-        depth,
-    })
+    args.finish(call_span)
 }
 
 fn put<T>(slot: &mut Option<T>, value: T, span: Span, key: &str) -> Result<(), ExpandError> {
