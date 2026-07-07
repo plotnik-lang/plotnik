@@ -23,7 +23,7 @@ use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenSt
 use plotnik_lib::{MatcherConfig, QueryBuilder, SourceMap, SourcePath};
 use plotnik_rt::{Limit, RuntimeLimitSpec};
 
-use crate::args::{self, ExpandError, LimitArg, QuerySource};
+use crate::args::{self, ExpandError, LimitArg, LimitArgs, QuerySource};
 use crate::grammar_source;
 
 pub fn expand(input: TokenStream) -> TokenStream {
@@ -113,11 +113,8 @@ fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, E
     let config = MatcherConfig::new()
         .rt_crate(args.rt_crate.unwrap_or_else(|| "::plotnik::rt".to_string()))
         .serde(cfg!(feature = "serde"))
-        .limits(RuntimeLimitSpec {
-            steps: limit(args.steps),
-            memory: limit(args.memory),
-        })
-        .depth(limit(args.depth));
+        .limits(runtime_limits(&args.limits))
+        .depth(replay_depth(&args.limits));
     Ok(compiled
         .to_rust_matcher(config)
         .expect("a diagnostics-clean query generates a module"))
@@ -144,11 +141,22 @@ fn invoking_dir() -> Option<PathBuf> {
     Some(file.parent()?.to_path_buf())
 }
 
-fn limit(arg: Option<LimitArg>) -> Limit {
+fn runtime_limits(args: &LimitArgs) -> RuntimeLimitSpec {
+    RuntimeLimitSpec {
+        steps: limit(&args.steps),
+        memory: limit(&args.memory),
+    }
+}
+
+fn replay_depth(args: &LimitArgs) -> Limit {
+    limit(&args.depth)
+}
+
+fn limit(arg: &Option<LimitArg>) -> Limit {
     match arg {
         None | Some(LimitArg::Auto) => Limit::Auto,
         Some(LimitArg::Unbounded) => Limit::Unbounded,
-        Some(LimitArg::Of(value)) => Limit::Of(value),
+        Some(LimitArg::Of(value)) => Limit::Of(*value),
     }
 }
 

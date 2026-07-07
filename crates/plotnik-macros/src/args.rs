@@ -43,6 +43,11 @@ pub struct MacroArgs {
     /// The `crate = ::path` override, stringified; `None` means the default
     /// facade path.
     pub rt_crate: Option<String>,
+    pub limits: LimitArgs,
+}
+
+#[derive(Default)]
+pub struct LimitArgs {
     pub steps: Option<LimitArg>,
     pub memory: Option<LimitArg>,
     pub depth: Option<LimitArg>,
@@ -53,9 +58,7 @@ struct ArgSlots {
     grammar: Option<(String, Span)>,
     query: Option<QuerySource>,
     rt_crate: Option<String>,
-    steps: Option<LimitArg>,
-    memory: Option<LimitArg>,
-    depth: Option<LimitArg>,
+    limits: LimitArgs,
 }
 
 impl ArgSlots {
@@ -91,9 +94,7 @@ impl ArgSlots {
             grammar_span,
             query,
             rt_crate: self.rt_crate,
-            steps: self.steps,
-            memory: self.memory,
-            depth: self.depth,
+            limits: self.limits,
         })
     }
 }
@@ -132,15 +133,15 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                     }
                     "steps" => {
                         let value = take_limit(&tokens, &mut pos, key_span, &key)?;
-                        put(&mut args.steps, value, key_span, &key)?;
+                        put(&mut args.limits.steps, value, key_span, &key)?;
                     }
                     "memory" => {
                         let value = take_limit(&tokens, &mut pos, key_span, &key)?;
-                        put(&mut args.memory, value, key_span, &key)?;
+                        put(&mut args.limits.memory, value, key_span, &key)?;
                     }
                     "depth" => {
                         let value = take_limit(&tokens, &mut pos, key_span, &key)?;
-                        put(&mut args.depth, value, key_span, &key)?;
+                        put(&mut args.limits.depth, value, key_span, &key)?;
                     }
                     other => {
                         return Err(ExpandError::new(
