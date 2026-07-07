@@ -69,6 +69,21 @@ struct StateInfo {
     fn_stem: String,
 }
 
+#[derive(Clone, Copy)]
+enum CandidateFailure {
+    StateBacktrack,
+    RetryExhausted,
+}
+
+impl CandidateFailure {
+    fn code(self) -> &'static str {
+        match self {
+            CandidateFailure::StateBacktrack => "break 'state Flow::Backtrack;",
+            CandidateFailure::RetryExhausted => "return None;",
+        }
+    }
+}
+
 struct Generator<'a> {
     graph: &'a NfaGraph,
     dumper: NfaDumper<'a>,
@@ -528,7 +543,7 @@ impl<'a> Generator<'a> {
             );
         }
 
-        self.candidate_search(out, m, "            ", "break 'state Flow::Backtrack;");
+        self.candidate_search(out, m, "            ", CandidateFailure::StateBacktrack);
         self.retry_checkpoint(out, m, "            ");
 
         if is_retryable(m) {
@@ -542,11 +557,18 @@ impl<'a> Generator<'a> {
     /// The candidate loop: try the current node, step past rejected ones per
     /// the nav's skip policy. An `Exact` policy has exactly one candidate, so
     /// the loop degenerates to a single check.
-    fn candidate_search(&self, out: &mut String, m: &MatchIR, indent: &str, fail: &str) {
+    fn candidate_search(
+        &self,
+        out: &mut String,
+        m: &MatchIR,
+        indent: &str,
+        failure: CandidateFailure,
+    ) {
         if !has_candidate_checks(m) {
             return;
         }
         let call = self.cand_call(m);
+        let fail = failure.code();
         if m.nav.skip_policy() == SkipPolicy::Exact {
             splice(
                 out,
@@ -954,7 +976,7 @@ impl<'a> Generator<'a> {
                 RETRY_ADVANCE,
                 &[("POLICY", &policy_expr(m.nav.skip_policy()))],
             );
-            self.candidate_search(out, m, "            ", "return None;");
+            self.candidate_search(out, m, "            ", CandidateFailure::RetryExhausted);
             self.retry_checkpoint(out, m, "            ");
             let _ = writeln!(out, "            Some(finish_{}(eng))", info.fn_stem);
             out.push_str("        }\n");
