@@ -182,18 +182,7 @@ impl<'a> Emitter<'a> {
         self.collect();
         self.assign_item_idents();
 
-        let mut sections: Vec<String> = Vec::new();
-        for item in self.items.clone() {
-            sections.push(self.render_item(&item));
-        }
-        if self.config.serde {
-            for item in self.items.clone() {
-                if item.is_composite() {
-                    sections.push(self.serde_impl(&item));
-                }
-            }
-        }
-
+        let sections = self.render_sections();
         let mut out = String::new();
         if self.uses_node {
             let rt = &self.config.rt_crate;
@@ -202,6 +191,25 @@ impl<'a> Emitter<'a> {
         out.push_str(&sections.join("\n\n"));
         out.push('\n');
         out
+    }
+
+    fn render_sections(&mut self) -> Vec<String> {
+        let mut sections: Vec<String> = Vec::new();
+        for item in self.items.clone() {
+            sections.push(self.render_item(&item));
+        }
+
+        if !self.config.serde {
+            return sections;
+        }
+
+        for item in self.items.clone() {
+            if !item.is_composite() {
+                continue;
+            }
+            sections.push(self.serde_impl(&item));
+        }
+        sections
     }
 
     fn collect(&mut self) {
