@@ -53,26 +53,34 @@ struct EnumVariant<'a> {
     payload: TypeId,
     enum_ident: &'a str,
     variant_ident: &'a str,
-    label: &'a str,
+    label: String,
 }
 
-impl<'a> EnumVariant<'a> {
-    fn new(
-        item_ty: TypeId,
-        payload: TypeId,
-        enum_ident: &'a str,
-        variant_ident: &'a str,
-        label: &'a str,
-    ) -> Self {
+struct EnumSerdeContext<'a> {
+    item_ty: TypeId,
+    ident: &'a str,
+}
+
+impl<'a> EnumSerdeContext<'a> {
+    fn for_item(item: &Item, ident: &'a str) -> Self {
         Self {
-            item_ty,
+            item_ty: item.ty,
+            ident,
+        }
+    }
+
+    fn variant(&self, payload: TypeId, variant_ident: &'a str, label: String) -> EnumVariant<'a> {
+        EnumVariant {
+            item_ty: self.item_ty,
             payload,
-            enum_ident,
+            enum_ident: self.ident,
             variant_ident,
             label,
         }
     }
+}
 
+impl EnumVariant<'_> {
     fn has_payload(&self) -> bool {
         self.payload != TYPE_VOID
     }
@@ -148,12 +156,16 @@ impl Emitter<'_> {
             unreachable!("enum item must have an enum shape");
         };
         let variant_idents = scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
+        let enum_context = EnumSerdeContext::for_item(item, ident);
 
         let mut out = String::from("        match self {\n");
         let mut uses_source = false;
         for ((&label_sym, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
-            let label = interner.resolve(label_sym).to_owned();
-            let variant = EnumVariant::new(item.ty, payload, ident, variant_ident, &label);
+            let variant = enum_context.variant(
+                payload,
+                variant_ident,
+                interner.resolve(label_sym).to_owned(),
+            );
             let arm = if variant.has_payload() {
                 uses_source = true;
                 self.payload_arm(&variant)
@@ -214,7 +226,7 @@ impl Emitter<'_> {
         let field_count = fields.len();
         let ident = variant.enum_ident;
         let variant_ident = variant.variant_ident;
-        let label = variant.label;
+        let label = &variant.label;
 
         format!(
             "            {ident}::{variant_ident} {{ {binding_list} }} => {{
@@ -249,7 +261,7 @@ impl Emitter<'_> {
 fn unit_arm(variant: &EnumVariant<'_>) -> String {
     let ident = variant.enum_ident;
     let variant_ident = variant.variant_ident;
-    let label = variant.label;
+    let label = &variant.label;
     format!(
         "            {ident}::{variant_ident} => {{
                 let mut map = serializer.serialize_map(Some(1))?;
