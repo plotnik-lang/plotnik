@@ -84,6 +84,20 @@ impl CandidateFailure {
     }
 }
 
+struct CandidateCheck {
+    comment: String,
+    fail: String,
+}
+
+impl CandidateCheck {
+    fn new(comment: impl Into<String>, fail: impl Into<String>) -> Self {
+        Self {
+            comment: comment.into(),
+            fail: fail.into(),
+        }
+    }
+}
+
 struct ExpectedKind {
     id: NodeKindId,
     name: String,
@@ -896,38 +910,37 @@ impl<'a> Generator<'a> {
         if needs_node_binding(m) {
             out.push_str("    let node = eng.node();\n");
         }
-        for (comment, fail) in self.candidate_checks(m) {
+        for check in self.candidate_checks(m) {
             splice(
                 out,
                 "    ",
                 CHECK,
-                &[("COMMENT", &comment), ("FAIL", &fail)],
+                &[("COMMENT", &check.comment), ("FAIL", &check.fail)],
             );
         }
         out.push_str("    true\n}\n");
     }
 
-    /// Every check as a `(comment, failure condition)` pair, in the VM's
-    /// `candidate_matches` order.
-    fn candidate_checks(&self, m: &MatchIR) -> Vec<(String, String)> {
+    /// Every check in the VM's `candidate_matches` order.
+    fn candidate_checks(&self, m: &MatchIR) -> Vec<CandidateCheck> {
         let mut checks = Vec::new();
 
         match m.node_kind {
             NodeKindConstraint::Any => {}
             NodeKindConstraint::Named(None) => {
-                checks.push(("(_)".to_string(), "!node.is_named()".to_string()));
+                checks.push(CandidateCheck::new("(_)", "!node.is_named()"));
             }
             NodeKindConstraint::Named(Some(id)) => {
-                checks.push((
+                checks.push(CandidateCheck::new(
                     format!("({})", self.dumper.kind_display_name(id)),
                     format!("node.kind_id() != {} || !node.is_named()", u16::from(id)),
                 ));
             }
             NodeKindConstraint::Anonymous(None) => {
-                checks.push(("\"_\"".to_string(), "node.is_named()".to_string()));
+                checks.push(CandidateCheck::new("\"_\"", "node.is_named()"));
             }
             NodeKindConstraint::Anonymous(Some(id)) => {
-                checks.push((
+                checks.push(CandidateCheck::new(
                     format!("\"{}\"", self.dumper.kind_display_name(id)),
                     format!("node.kind_id() != {} || node.is_named()", u16::from(id)),
                 ));
@@ -935,14 +948,14 @@ impl<'a> Generator<'a> {
         }
 
         if m.missing {
-            checks.push((
+            checks.push(CandidateCheck::new(
                 "(MISSING …): only nodes the parser inserted during error recovery".to_string(),
                 "!node.is_missing()".to_string(),
             ));
         }
 
         if let Some(field) = m.node_field {
-            checks.push((
+            checks.push(CandidateCheck::new(
                 format!("{}:", self.dumper.field_display_name(field)),
                 format!(
                     "eng.cursor().field_id() != Some({})",
@@ -952,7 +965,7 @@ impl<'a> Generator<'a> {
         }
 
         for &field in &m.neg_fields {
-            checks.push((
+            checks.push(CandidateCheck::new(
                 format!("-{}", self.dumper.field_display_name(field)),
                 format!(
                     "node.child_by_field_id(u16::from({})).is_some()",
@@ -968,7 +981,7 @@ impl<'a> Generator<'a> {
         checks
     }
 
-    fn predicate_check(&self, pred: &PredicateIR) -> (String, String) {
+    fn predicate_check(&self, pred: &PredicateIR) -> CandidateCheck {
         let text = "rt::node_text(source, &node)";
         match &pred.value {
             PredicateValueIR::String(value) => {
@@ -983,7 +996,7 @@ impl<'a> Generator<'a> {
                         unreachable!("regex predicate carries a regex value")
                     }
                 };
-                (format!("{} {lit}", pred.op.as_str()), fail)
+                CandidateCheck::new(format!("{} {lit}", pred.op.as_str()), fail)
             }
             PredicateValueIR::Regex(pattern) => {
                 let re = self.regex_static(pattern);
@@ -992,7 +1005,7 @@ impl<'a> Generator<'a> {
                     PredicateOp::RegexNoMatch => format!("{re}.is_match({text})"),
                     _ => unreachable!("string predicate carries a string value"),
                 };
-                (format!("{} /{pattern}/", pred.op.as_str()), fail)
+                CandidateCheck::new(format!("{} /{pattern}/", pred.op.as_str()), fail)
             }
         }
     }
