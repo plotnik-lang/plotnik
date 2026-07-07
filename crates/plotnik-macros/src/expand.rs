@@ -31,6 +31,41 @@ struct QueryInput {
     span: Span,
 }
 
+struct RebuildAnchors {
+    lines: Vec<String>,
+}
+
+impl RebuildAnchors {
+    fn new() -> Self {
+        Self { lines: Vec::new() }
+    }
+
+    fn query_file(&mut self, path: &str) {
+        self.lines
+            .push(format!("const _: &str = ::core::include_str!({path:?});"));
+    }
+
+    fn grammar(
+        &mut self,
+        spec: &grammar_source::GrammarSpec<'_>,
+        as_written: &str,
+        resolved: &Path,
+    ) {
+        self.lines.push(format!(
+            "const _: &[u8] = ::core::include_bytes!({:?});",
+            anchor_path(spec, as_written, resolved)
+        ));
+    }
+
+    fn generated_source(&self) -> String {
+        self.lines.join("\n")
+    }
+
+    fn lines(&self) -> impl Iterator<Item = &str> {
+        self.lines.iter().map(String::as_str)
+    }
+}
+
 pub fn expand(input: TokenStream) -> TokenStream {
     // The wrapper-module name comes from the raw input: same invocation, same
     // name (deterministic output); different queries in one module never
@@ -40,19 +75,19 @@ pub fn expand(input: TokenStream) -> TokenStream {
 
     // Rebuild anchors for everything read from disk, emitted on success *and*
     // failure: a broken query file must retrigger expansion when edited.
-    let mut anchors: Vec<String> = Vec::new();
+    let mut anchors = RebuildAnchors::new();
 
     match try_expand(input, &mut anchors) {
         Ok(code) => assemble(fingerprint, &anchors, &code),
         Err(error) => {
             let mut out = compile_error(&error);
-            out.extend(parse_generated(&anchors.join("\n")));
+            out.extend(parse_generated(&anchors.generated_source()));
             out
         }
     }
 }
 
-fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, ExpandError> {
+fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String, ExpandError> {
     let args = args::parse(input)?;
     let base_dir = invoking_dir();
     let query = load_query_input(&args.query, base_dir.as_deref(), anchors)?;
@@ -60,10 +95,7 @@ fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, E
     let spec = grammar_source::parse_spec(&args.grammar);
     let loaded_grammar = grammar_source::load(&spec, base_dir.as_deref())
         .map_err(|message| ExpandError::new(args.grammar_span, message))?;
-    anchors.push(format!(
-        "const _: &[u8] = ::core::include_bytes!({:?});",
-        anchor_path(&spec, &args.grammar, &loaded_grammar.path)
-    ));
+    anchors.grammar(&spec, &args.grammar, &loaded_grammar.path);
 
     // Mirror `plotnik check --strict`: a compile-time-committed query must be
     // clean — proc macros have no warning channel, so warnings fail too.
@@ -120,7 +152,7 @@ fn reject_colliding_entry_names(compiled: &CompiledQuery, span: Span) -> Result<
 fn load_query_input(
     source: &QuerySource,
     base_dir: Option<&Path>,
-    anchors: &mut Vec<String>,
+    anchors: &mut RebuildAnchors,
 ) -> Result<QueryInput, ExpandError> {
     match source {
         QuerySource::Inline { text, span } => Ok(QueryInput {
@@ -133,7 +165,7 @@ fn load_query_input(
             let content = std::fs::read_to_string(&resolved).map_err(|error| {
                 ExpandError::new(*span, format!("failed to read `{path}`: {error}"))
             })?;
-            anchors.push(format!("const _: &str = ::core::include_str!({path:?});"));
+            anchors.query_file(path);
 
             let mut source_map = SourceMap::new();
             source_map.add_file(SourcePath::new(path), &content);
@@ -185,11 +217,11 @@ fn limit(arg: &Option<LimitArg>) -> Limit {
     }
 }
 
-fn assemble(fingerprint: u32, anchors: &[String], code: &str) -> TokenStream {
+fn assemble(fingerprint: u32, anchors: &RebuildAnchors, code: &str) -> TokenStream {
     let mod_name = format!("__plotnik_{fingerprint:08x}");
     let mut text = String::new();
     text.push_str(&format!("mod {mod_name} {{\n"));
-    for anchor in anchors {
+    for anchor in anchors.lines() {
         text.push_str(anchor);
         text.push('\n');
     }
