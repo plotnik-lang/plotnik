@@ -50,8 +50,12 @@ name = "tree_json"
 path = "tests/tree_json.rs"
 
 [[test]]
-name = "rust_typegen_compile"
-path = "tests/rust_typegen_compile.rs"
+name = "rust_sections_compile"
+path = "tests/rust_sections_compile.rs"
+
+[[test]]
+name = "codegen_conformance"
+path = "tests/codegen_conformance.rs"
 
 [[bench]]
 name = "vm"

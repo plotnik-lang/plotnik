@@ -1,0 +1,294 @@
+Q = (program
+  .
+  (expression_statement) @first
+  (expression_statement) @second
+)
+-------------------- MATCHER ---------------------
+// Generated Plotnik matcher — one dispatch state per optimized-NFA instruction.
+// `S{label}_{DEF}` mirrors the NFA dump's labels 1:1, and every arm carries its
+// instruction in the dump format (docs/binary-format/08-dump-format.md).
+
+use ::plotnik_rt as rt;
+
+// Dense runtime state ids, in NFA label order.
+// Q:
+const S01_Q: u16 = 0;
+const S02_Q: u16 = 1;
+const S04_Q: u16 = 2;
+const S05_Q: u16 = 3;
+const S06_Q: u16 = 4;
+const S07_Q_EP: u16 = 5;
+const S08_Q_EP: u16 = 6;
+const S09_Q_EP: u16 = 7;
+const S10_Q_EP: u16 = 8;
+
+/// Match the `Q` entrypoint against `tree`. `Some` carries the committed
+/// capture trace — the same effect stream the VM commits for this query.
+pub fn q_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
+    run(tree, source, S10_Q_EP)
+}
+
+/// What a dispatched state hands back to the driver loop.
+enum Flow {
+    /// Continue at this state.
+    Jump(u16),
+    /// The entrypoint accepted; the effect log is the committed trace.
+    Accept,
+    /// The state failed; unwind the checkpoint stack.
+    Backtrack,
+}
+
+/// How the backtrack unwind resumed execution.
+enum Unwound {
+    Resumed(u16),
+    Accepted,
+    NoMatch,
+}
+
+/// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
+fn run<'t>(tree: &'t rt::Tree, source: &str, entry: u16) -> Option<rt::EffectLog<'t>> {
+    let mut eng = rt::Engine::new(tree.walk());
+    let mut ip = entry;
+    loop {
+        match step(&mut eng, source, ip) {
+            Flow::Jump(next) => ip = next,
+            Flow::Accept => return Some(eng.into_effects()),
+            Flow::Backtrack => match backtrack(&mut eng, source) {
+                Unwound::Resumed(next) => ip = next,
+                Unwound::Accepted => return Some(eng.into_effects()),
+                Unwound::NoMatch => return None,
+            },
+        }
+    }
+}
+
+fn step<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
+    match ip {
+        //   01                                        ▶
+        S01_Q => {
+            if eng.frames_empty() {
+                Flow::Accept
+            } else {
+                Flow::Jump(eng.exit_frame())
+            }
+        }
+        //   02   !   (program)                        06
+        S02_Q => 'state: {
+            if !cand_s02_q(eng) {
+                break 'state Flow::Backtrack;
+            }
+            Flow::Jump(S06_Q)
+        }
+        //   04  ─‣┘  _                                01
+        S04_Q => 'state: {
+            if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
+                break 'state Flow::Backtrack;
+            }
+            Flow::Jump(S01_Q)
+        }
+        //   05  ─‣─  (expression_statement) [Node Set(second)]  04
+        S05_Q => 'state: {
+            if eng.cursor_mut().navigate(rt::Nav::Next).is_none() {
+                break 'state Flow::Backtrack;
+            }
+            loop {
+                if cand_s05_q(eng) {
+                    break;
+                }
+                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                    break 'state Flow::Backtrack;
+                }
+            }
+            if rt::SkipPolicy::Any.admits(&eng.node()) {
+                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_Q));
+            }
+            finish_s05_q(eng)
+        }
+        //   06  └•─  (expression_statement) [Node Set(first)]  05
+        S06_Q => 'state: {
+            if eng.cursor_mut().navigate(rt::Nav::DownSkip).is_none() {
+                break 'state Flow::Backtrack;
+            }
+            loop {
+                if cand_s06_q(eng) {
+                    break;
+                }
+                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Trivia) {
+                    break 'state Flow::Backtrack;
+                }
+            }
+            if rt::SkipPolicy::Trivia.admits(&eng.node()) {
+                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S06_Q));
+            }
+            finish_s06_q(eng)
+        }
+        //   07                                        ▶
+        S07_Q_EP => {
+            if eng.frames_empty() {
+                Flow::Accept
+            } else {
+                Flow::Jump(eng.exit_frame())
+            }
+        }
+        //   08  -ε-  [StructClose]                    07
+        S08_Q_EP => {
+            eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+            Flow::Jump(S07_Q_EP)
+        }
+        //   09       (Q)                              02 : 08
+        S09_Q_EP => {
+            eng.enter_frame(S08_Q_EP);
+            Flow::Jump(S02_Q)
+        }
+        //   10  -ε-  [StructOpen]                     09
+        S10_Q_EP => {
+            eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+            Flow::Jump(S09_Q_EP)
+        }
+        _ => unreachable!("ip {ip} is not a generated state"),
+    }
+}
+
+/// `S02_Q` candidate: `(program)`.
+#[inline]
+fn cand_s02_q(eng: &rt::Engine<'_>) -> bool {
+    let node = eng.node();
+    // (program)
+    if node.kind_id() != 134 || !node.is_named() {
+        return false;
+    }
+    true
+}
+
+/// `S05_Q` candidate: `(expression_statement)`.
+#[inline]
+fn cand_s05_q(eng: &rt::Engine<'_>) -> bool {
+    let node = eng.node();
+    // (expression_statement)
+    if node.kind_id() != 150 || !node.is_named() {
+        return false;
+    }
+    true
+}
+
+/// `S06_Q` candidate: `(expression_statement)`.
+#[inline]
+fn cand_s06_q(eng: &rt::Engine<'_>) -> bool {
+    let node = eng.node();
+    // (expression_statement)
+    if node.kind_id() != 150 || !node.is_named() {
+        return false;
+    }
+    true
+}
+
+/// `S05_Q` post-acceptance: effects, then branch. Shared by the dispatch
+/// path and the match-retry resume, so a retried candidate replays exactly
+/// what the original acceptance would have.
+#[inline]
+fn finish_s05_q(eng: &mut rt::Engine<'_>) -> Flow {
+    eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
+    eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(second)
+    Flow::Jump(S04_Q)
+}
+
+/// `S06_Q` post-acceptance: effects, then branch. Shared by the dispatch
+/// path and the match-retry resume, so a retried candidate replays exactly
+/// what the original acceptance would have.
+#[inline]
+fn finish_s06_q(eng: &mut rt::Engine<'_>) -> Flow {
+    eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
+    eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(first)
+    Flow::Jump(S05_Q)
+}
+
+/// Unwind the checkpoint stack: branch alternatives resume dispatch, Call and
+/// Match checkpoints advance their sibling search and re-enter. Loops, never
+/// recurses — a run of exhausted retries unwinds in one call.
+fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
+    'unwind: loop {
+        let Some((cp, snapshot)) = eng.pop_checkpoint() else {
+            return Unwound::NoMatch;
+        };
+        eng.restore_checkpoint_state(cp.state, snapshot);
+
+        match cp.resume {
+            rt::Resume::Branch => return Unwound::Resumed(cp.ip),
+
+            // Call retry: advance to the next candidate satisfying the field
+            // constraint, then re-enter the callee. Exhausted siblings keep
+            // unwinding to an earlier checkpoint.
+            rt::Resume::Call(resume) => {
+                if !eng.cursor_mut().continue_search(resume.policy) {
+                    continue 'unwind;
+                }
+                if let Some(field_id) = resume.field {
+                    loop {
+                        if eng.cursor().field_id() == Some(field_id) {
+                            break;
+                        }
+                        if !eng.cursor_mut().continue_search(resume.policy) {
+                            continue 'unwind;
+                        }
+                    }
+                }
+                eng.push_checkpoint(rt::Checkpoint::call_retry(
+                    eng.checkpoint_state(),
+                    cp.ip,
+                    resume,
+                ));
+                eng.enter_frame(resume.next);
+                return Unwound::Resumed(resume.target);
+            }
+
+            // Match retry: step past the accepted-but-failed candidate and
+            // re-run that state's sibling search from there.
+            rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
+                Some(Flow::Jump(next)) => return Unwound::Resumed(next),
+                Some(Flow::Accept) => return Unwound::Accepted,
+                Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
+                None => continue 'unwind,
+            },
+        }
+    }
+}
+
+fn match_retry<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Option<Flow> {
+    match ip {
+        S05_Q => {
+            if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                return None;
+            }
+            loop {
+                if cand_s05_q(eng) {
+                    break;
+                }
+                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                    return None;
+                }
+            }
+            if rt::SkipPolicy::Any.admits(&eng.node()) {
+                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_Q));
+            }
+            Some(finish_s05_q(eng))
+        }
+        S06_Q => {
+            if !eng.cursor_mut().continue_search(rt::SkipPolicy::Trivia) {
+                return None;
+            }
+            loop {
+                if cand_s06_q(eng) {
+                    break;
+                }
+                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Trivia) {
+                    return None;
+                }
+            }
+            if rt::SkipPolicy::Trivia.admits(&eng.node()) {
+                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S06_Q));
+            }
+            Some(finish_s06_q(eng))
+        }
+        _ => unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match"),
+    }
+}

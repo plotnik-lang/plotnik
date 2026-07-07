@@ -27,18 +27,8 @@ pub(crate) fn dump_nfa(
     colors: Colors,
 ) -> String {
     let graph = nfa.raw();
-    let max_label = graph
-        .instructions()
-        .iter()
-        .map(|i| i.label().0)
-        .max()
-        .unwrap_or(0);
-    let dumper = NfaDumper {
-        graph,
-        artifacts,
-        colors,
-        label_width: width_for_count(max_label as usize + 1),
-    };
+    let mut dumper = NfaDumper::new(graph, artifacts);
+    dumper.colors = colors;
 
     let mut out = String::new();
     dumper.dump_entrypoints(&mut out);
@@ -46,11 +36,69 @@ pub(crate) fn dump_nfa(
     out
 }
 
-struct NfaDumper<'a> {
+/// Renders instructions in the dump format. Besides the full [`dump_nfa`]
+/// output, codegen borrows this per-instruction: each generated state arm
+/// carries its instruction as a comment in this exact format, so generated
+/// code lines up with the NFA dump 1:1.
+pub(crate) struct NfaDumper<'a> {
     graph: &'a NfaGraph,
     artifacts: AnalysisArtifacts<'a>,
     colors: Colors,
     label_width: usize,
+}
+
+impl<'a> NfaDumper<'a> {
+    pub(crate) fn new(graph: &'a NfaGraph, artifacts: AnalysisArtifacts<'a>) -> Self {
+        let max_label = graph
+            .instructions()
+            .iter()
+            .map(|i| i.label().0)
+            .max()
+            .unwrap_or(0);
+        Self {
+            graph,
+            artifacts,
+            colors: Colors::new(false),
+            label_width: width_for_count(max_label as usize + 1),
+        }
+    }
+
+    /// One instruction in dump format (label, nav glyph, content, successors).
+    pub(crate) fn render_instruction(&self, instr: &InstructionIR) -> String {
+        match instr {
+            InstructionIR::Match(m) => self.format_match(m),
+            InstructionIR::Call(call) => self.format_call(call),
+            InstructionIR::Return(r) => self.format_return(r.label),
+        }
+    }
+
+    pub(crate) fn label_width(&self) -> usize {
+        self.label_width
+    }
+
+    pub(crate) fn def_name_of(&self, label: Label) -> &str {
+        match self.origin_of(label) {
+            LabelOrigin::Def(id) | LabelOrigin::ConsumingDef(id) | LabelOrigin::Wrapper(id) => {
+                self.def_name(id)
+            }
+        }
+    }
+
+    pub(crate) fn field_display_name(&self, id: NodeFieldId) -> String {
+        self.field_name(id)
+    }
+
+    pub(crate) fn kind_display_name(&self, id: NodeKindId) -> String {
+        self.kind_name(id)
+    }
+
+    pub(crate) fn effect_display(&self, e: &EffectIR) -> String {
+        self.effect(e)
+    }
+
+    pub(crate) fn node_pattern_display(&self, m: &MatchIR) -> String {
+        self.node_pattern(m)
+    }
 }
 
 impl NfaDumper<'_> {

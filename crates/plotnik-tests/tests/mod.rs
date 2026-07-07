@@ -55,9 +55,9 @@ use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    Colors, CompiledQuery, DtsRange, PrintTracer, QueryBuilder, RecordingTracer, RuntimeError,
-    RustConfig, SourceMap, SourcePath, TypeScriptConfig, VM, Verbosity, extract_inspection,
-    materialize_verified,
+    Colors, CompiledQuery, DtsRange, MatcherConfig, PrintTracer, QueryBuilder, RecordingTracer,
+    RuntimeError, RustConfig, SourceMap, SourcePath, TypeScriptConfig, VM, Verbosity,
+    extract_inspection, materialize_verified,
 };
 
 mod support;
@@ -259,6 +259,7 @@ fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
         "03" => Some(&["diagnostics", "symbols"]),
         "04" => Some(&["diagnostics", "nfa", "bytecode"]),
         "05" => Some(&["diagnostics", "typescript", "rust", "mapped"]),
+        "07" => Some(&["diagnostics", "matcher"]),
         "06" => Some(&[
             "typescript",
             "diagnostics",
@@ -297,6 +298,7 @@ fn parse_section_header(line: &str) -> Option<String> {
                 | "mapped"
                 | "typescript"
                 | "rust"
+                | "matcher"
                 | "trace"
                 | "output"
                 | "inspection"
@@ -343,6 +345,7 @@ fn render(
         "04" => render_compile(name, query, input, Compile::Bytecode),
         "05" => render_compile(name, query, input, Compile::Typegen),
         "06" => render_compile(name, query, input, Compile::Vm),
+        "07" => render_compile(name, query, input, Compile::Matcher),
         _ => Err(format!("unknown stage directory `{stage}`")),
     }
 }
@@ -387,6 +390,7 @@ enum Compile {
     Bytecode,
     Typegen,
     Vm,
+    Matcher,
 }
 
 fn render_compile(
@@ -453,6 +457,13 @@ fn render_compile(
                 );
                 out.push(("mapped".into(), render_mapped(&mapped_types, &ranges)));
             }
+        }
+        Compile::Matcher => {
+            out.extend(diag);
+            let matcher = compiled
+                .to_rust_matcher(MatcherConfig::new())
+                .expect("valid query should compile to a module");
+            out.push(("matcher".into(), matcher));
         }
         Compile::Vm => {
             let input = input.ok_or_else(|| {

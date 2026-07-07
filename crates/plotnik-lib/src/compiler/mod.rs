@@ -6,6 +6,7 @@
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+pub(crate) mod codegen;
 pub(crate) mod diagnostics;
 mod ids;
 pub(crate) mod limits;

@@ -28,6 +28,8 @@ mod checkpoint;
 mod cursor;
 #[cfg(feature = "tree-sitter")]
 mod effect;
+#[cfg(feature = "tree-sitter")]
+mod engine;
 #[cfg(feature = "serde")]
 mod serialize;
 
@@ -39,7 +41,7 @@ mod dfa_tests;
 #[cfg(test)]
 mod nav_tests;
 
-pub use dfa::{RegexDfas, deserialize_dfa};
+pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
 pub use frame::{Frame, FrameArena};
 pub use ids::{NodeFieldId, NodeKindId, ZeroIdError};
 pub use limits::{Limit, ResolvedRuntimeLimits, RuntimeLimitSpec};
@@ -51,16 +53,19 @@ pub use checkpoint::{CallResume, Checkpoint, CheckpointStack, CheckpointState, R
 #[cfg(feature = "tree-sitter")]
 pub use cursor::CursorWrapper;
 #[cfg(feature = "tree-sitter")]
-pub use effect::{EffectLog, RuntimeEffect};
+pub use effect::{EffectLog, RuntimeEffect, node_text};
+#[cfg(feature = "tree-sitter")]
+pub use engine::Engine;
 #[cfg(feature = "serde")]
 pub use serialize::{SerializeWithSource, WithSource};
 
-/// The node handle generated query outputs are built from. Re-exported so
-/// generated code and user code can name it without depending on tree-sitter
-/// directly — which also guarantees they see the same tree-sitter version the
-/// engine was built against.
+/// The node handle generated query outputs are built from (plus the parse
+/// tree it borrows from). Re-exported so generated code and user code can
+/// name them without depending on tree-sitter directly — which also
+/// guarantees they see the same tree-sitter version the engine was built
+/// against.
 #[cfg(feature = "tree-sitter")]
-pub use tree_sitter::Node;
+pub use tree_sitter::{Node, Tree};
 
 /// Generated `SerializeWithSource` impls spell serde paths through this
 /// re-export, so user crates don't need their own serde dependency.

@@ -1,5 +1,7 @@
 //! Sparse DFA storage and deserialization for regex predicates.
 
+use std::sync::OnceLock;
+
 use regex_automata::Input;
 use regex_automata::dfa::Automaton;
 use regex_automata::dfa::sparse::DFA;
@@ -65,6 +67,46 @@ impl std::fmt::Debug for RegexDfas {
         // the enclosing `Module`'s derived `Debug` meaningful.
         f.debug_struct("RegexDfas")
             .field("count", &self.dfas.len())
+            .finish()
+    }
+}
+
+/// A regex predicate embedded in generated code as serialized sparse-DFA
+/// bytes — the generated-matcher analogue of [`RegexDfas`]' load-once
+/// discipline. `DFA::from_bytes` validates the whole automaton, so the first
+/// use doubles as the validation gate; every later search reuses the
+/// deserialized automaton.
+pub struct StaticDfa {
+    bytes: &'static [u8],
+    dfa: OnceLock<DFA<&'static [u8]>>,
+}
+
+impl StaticDfa {
+    /// `bytes` must come from the compiler's own DFA serialization (the emit
+    /// pipeline's `to_bytes_little_endian`); generated code bakes them as a
+    /// static.
+    pub const fn new(bytes: &'static [u8]) -> Self {
+        Self {
+            bytes,
+            dfa: OnceLock::new(),
+        }
+    }
+
+    /// Whether the pattern matches anywhere in `text`.
+    pub fn is_match(&self, text: &str) -> bool {
+        let dfa = self.dfa.get_or_init(|| {
+            deserialize_dfa(self.bytes).expect("embedded DFA bytes were serialized by the compiler")
+        });
+        dfa.try_search_fwd(&Input::new(text))
+            .expect("regex DFA search failed")
+            .is_some()
+    }
+}
+
+impl std::fmt::Debug for StaticDfa {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StaticDfa")
+            .field("bytes", &self.bytes.len())
             .finish()
     }
 }

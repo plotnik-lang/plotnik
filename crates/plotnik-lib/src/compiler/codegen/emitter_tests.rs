@@ -1,0 +1,27 @@
+use plotnik_rt::Nav;
+
+use super::emitter::{nav_expr, shouty_ident, snake_ident};
+
+#[test]
+fn shouty_splits_pascal_humps() {
+    assert_eq!(shouty_ident("FooBar"), "FOO_BAR");
+    assert_eq!(shouty_ident("Q"), "Q");
+    assert_eq!(shouty_ident("HTTPServer"), "HTTP_SERVER");
+    assert_eq!(shouty_ident("Foo2Bar"), "FOO2_BAR");
+}
+
+#[test]
+fn snake_splits_pascal_humps() {
+    assert_eq!(snake_ident("FooBar"), "foo_bar");
+    assert_eq!(snake_ident("Q"), "q");
+    assert_eq!(snake_ident("HTTPServer"), "http_server");
+}
+
+#[test]
+fn nav_expr_matches_debug() {
+    // Generated code spells navs via their Debug form; pin that Debug output
+    // stays valid variant syntax, including the tuple variants.
+    assert_eq!(nav_expr(Nav::DownSkip), "rt::Nav::DownSkip");
+    assert_eq!(nav_expr(Nav::Up(2)), "rt::Nav::Up(2)");
+    assert_eq!(nav_expr(Nav::UpSkipTrivia(31)), "rt::Nav::UpSkipTrivia(31)");
+}

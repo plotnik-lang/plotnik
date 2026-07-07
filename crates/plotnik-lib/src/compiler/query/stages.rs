@@ -525,6 +525,15 @@ impl CompiledQuery {
         let linked = self.checked.query.linked()?;
         Some(linked.dump_nfa(colors))
     }
+
+    /// Render the generated Rust matcher — the compiled-code executor the
+    /// proc-macro backend embeds. `None` when the query didn't compile,
+    /// mirroring [`Self::module`].
+    pub fn to_rust_matcher(&self, config: crate::compiler::codegen::Config) -> Option<String> {
+        self.compiled.as_ref()?;
+        let linked = self.checked.query.linked()?;
+        Some(linked.to_rust_matcher(&config))
+    }
 }
 
 impl LinkOutcome {
@@ -806,6 +815,12 @@ impl LinkedQuery {
         let input = self.lower_input();
         let semantic = lower_semantic(&input);
         crate::compiler::lower::dump::dump_nfa(&semantic, input.analysis, colors)
+    }
+
+    fn to_rust_matcher(&self, config: &crate::compiler::codegen::Config) -> String {
+        let input = self.lower_input();
+        let semantic = lower_semantic(&input);
+        crate::compiler::codegen::generate(&semantic, input.analysis, config)
     }
 
     fn lower_input(&self) -> LowerInput<'_> {

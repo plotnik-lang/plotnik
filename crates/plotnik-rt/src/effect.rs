@@ -5,7 +5,10 @@
 
 use tree_sitter::Node;
 
-#[derive(Debug)]
+/// `PartialEq` compares `Node`s by tree-sitter identity (same node in the same
+/// tree), which is exactly what conformance harnesses need: two executors run
+/// over one parse tree must produce identical streams, node-for-node.
+#[derive(Debug, PartialEq)]
 pub enum RuntimeEffect<'t> {
     /// Capture a node reference.
     Node(Node<'t>),
@@ -82,4 +85,17 @@ impl Default for EffectLog<'_> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// The text a node spans in `source` — what string and regex predicates
+/// compare against. Shared by the VM and generated matchers so both slice
+/// identically.
+///
+/// tree-sitter byte offsets fall on character boundaries of the valid-UTF-8
+/// source, so the fallible `get` turns a violated expectation into a named
+/// panic instead of a raw slice abort.
+pub fn node_text<'s>(source: &'s str, node: &Node<'_>) -> &'s str {
+    source
+        .get(node.start_byte()..node.end_byte())
+        .expect("node span must lie within source on UTF-8 boundaries")
 }

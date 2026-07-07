@@ -1,4 +1,5 @@
-//! Compile-checks the golden `rust` sections of the 05-typegen corpus.
+//! Compile-checks the golden Rust sections: `RUST` (05-typegen output types)
+//! and `MATCHER` (07-codegen generated matchers).
 //!
 //! The snapshot harness (`tests/mod.rs`) keeps the sections up to date; this
 //! test proves the committed goldens are valid Rust against the real
@@ -14,10 +15,11 @@ use std::path::Path;
 
 #[test]
 fn golden_rust_sections_compile() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/05-typegen");
+    let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
     let mut mods = Vec::new();
-    collect(&root, &root, &mut mods);
-    assert!(!mods.is_empty(), "no RUST sections found under 05-typegen");
+    collect(&tests, &tests.join("05-typegen"), "RUST", &mut mods);
+    collect(&tests, &tests.join("07-codegen"), "MATCHER", &mut mods);
+    assert!(!mods.is_empty(), "no Rust sections found in the corpus");
     mods.sort();
 
     let mut program = String::from("#![allow(dead_code)]\n");
@@ -28,14 +30,14 @@ fn golden_rust_sections_compile() {
 
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("golden-rust");
     fs::create_dir_all(&dir).expect("create trybuild scratch dir");
-    let file = dir.join("all_typegen_fixtures.rs");
+    let file = dir.join("all_rust_sections.rs");
     fs::write(&file, program).expect("write generated program");
 
     let cases = trybuild::TestCases::new();
     cases.pass(&file);
 }
 
-fn collect(root: &Path, dir: &Path, out: &mut Vec<(String, String)>) {
+fn collect(root: &Path, dir: &Path, label: &str, out: &mut Vec<(String, String)>) {
     let entries =
         fs::read_dir(dir).unwrap_or_else(|e| panic!("read fixture dir {}: {e}", dir.display()));
     for entry in entries {
@@ -43,7 +45,7 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<(String, String)>) {
             entry.unwrap_or_else(|e| panic!("read fixture entry in {}: {e}", dir.display()));
         let path = entry.path();
         if path.is_dir() {
-            collect(root, &path, out);
+            collect(root, &path, label, out);
             continue;
         }
         if path.extension().and_then(|e| e.to_str()) != Some("txt") {
@@ -51,35 +53,35 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<(String, String)>) {
         }
         let text = fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("read fixture {}: {e}", path.display()));
-        // Diagnostics-only fixtures render no `rust` section; nothing to compile.
-        let Some(body) = rust_section(&text) else {
+        // Diagnostics-only fixtures render no Rust section; nothing to compile.
+        let Some(body) = section(&text, label) else {
             continue;
         };
         let rel = path
             .strip_prefix(root)
-            .expect("fixture path is under the stage root")
+            .expect("fixture path is under the tests root")
             .with_extension("");
         out.push((mod_ident(&rel.to_string_lossy()), body));
     }
 }
 
-/// Body of the `RUST` section: the lines between its rule and the next rule.
-fn rust_section(text: &str) -> Option<String> {
+/// Body of the `label` section: the lines between its rule and the next rule.
+fn section(text: &str, label: &str) -> Option<String> {
     let mut body = String::new();
-    let mut in_rust = false;
+    let mut inside = false;
     for line in text.lines() {
         match rule_label(line) {
-            Some("RUST") => in_rust = true,
-            Some(_) if in_rust => break,
+            Some(found) if found == label => inside = true,
+            Some(_) if inside => break,
             Some(_) => {}
-            None if in_rust => {
+            None if inside => {
                 body.push_str(line);
                 body.push('\n');
             }
             None => {}
         }
     }
-    in_rust.then_some(body)
+    inside.then_some(body)
 }
 
 /// Same rule shape `tests/mod.rs` emits: a label centered in dashes with one
@@ -98,8 +100,8 @@ fn rule_label(line: &str) -> Option<&str> {
     (!label.is_empty()).then_some(label)
 }
 
-/// `serde/enum` → `fx_serde_enum`. The `fx_` prefix keeps keywords and
-/// leading digits out of play.
+/// `05-typegen/serde/enum` → `fx_05_typegen_serde_enum`. The `fx_` prefix
+/// keeps keywords and leading digits out of play.
 fn mod_ident(rel: &str) -> String {
     let mut out = String::from("fx_");
     out.extend(

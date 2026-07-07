@@ -78,3 +78,15 @@ impl NodeKindId {
 pub struct NodeFieldId(NonZeroU16);
 
 nonzero_u16_id!(NodeFieldId);
+
+impl NodeFieldId {
+    /// Const constructor for generated code, which bakes linked field ids as
+    /// literals. A zero id fails at *build* time of the generated crate (const
+    /// evaluation), never at runtime.
+    pub const fn from_raw(id: u16) -> Self {
+        match NonZeroU16::new(id) {
+            Some(id) => Self(id),
+            None => panic!("field id must be non-zero"),
+        }
+    }
+}
