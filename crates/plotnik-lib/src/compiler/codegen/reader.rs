@@ -44,12 +44,45 @@ pub(super) struct ReaderGen<'a> {
     deps: &'a DependencyAnalysis,
     interner: &'a Interner,
     table: &'a TypeTableBuilder,
+    tables: ReaderTables,
+}
+
+struct ReaderTables {
     /// Item name → reader fn ident, uniqued in item order (nominally distinct
     /// names can share a snake form, e.g. `HTTPServer` / `HttpServer`).
     reader_fns: HashMap<Symbol, String>,
     /// Item name → every table-reachable analysis type carrying it (nominal
     /// twins). The item's own type is always among them.
     twins: HashMap<Symbol, Vec<TypeId>>,
+}
+
+impl ReaderTables {
+    fn collect(
+        model: &TypeModel<'_>,
+        types: &TypeAnalysis,
+        table: &TypeTableBuilder,
+        interner: &Interner,
+    ) -> Self {
+        let mut reader_fns = HashMap::new();
+        let mut taken = HashSet::new();
+        let mut twins: HashMap<Symbol, Vec<TypeId>> = HashMap::new();
+        for item in model.items() {
+            if !item.has_reader() {
+                continue;
+            }
+            let mut name = format!("read_{}", snake_ident(interner.resolve(item.name)));
+            while !taken.insert(name.clone()) {
+                name.push('_');
+            }
+            reader_fns.insert(item.name, name);
+
+            if item.is_composite() {
+                twins.insert(item.name, collect_twins(types, table, item));
+            }
+        }
+
+        Self { reader_fns, twins }
+    }
 }
 
 impl<'a> ReaderGen<'a> {
@@ -65,27 +98,7 @@ impl<'a> ReaderGen<'a> {
             artifacts.interner,
             config,
         );
-
-        let mut reader_fns = HashMap::new();
-        let mut taken = HashSet::new();
-        let mut twins: HashMap<Symbol, Vec<TypeId>> = HashMap::new();
-        for item in model.items() {
-            if !item.has_reader() {
-                continue;
-            }
-            let mut name = format!(
-                "read_{}",
-                snake_ident(artifacts.interner.resolve(item.name))
-            );
-            while !taken.insert(name.clone()) {
-                name.push('_');
-            }
-            reader_fns.insert(item.name, name);
-
-            if item.is_composite() {
-                twins.insert(item.name, collect_twins(types, table, item));
-            }
-        }
+        let tables = ReaderTables::collect(&model, types, table, artifacts.interner);
 
         Self {
             model,
@@ -93,13 +106,13 @@ impl<'a> ReaderGen<'a> {
             deps: artifacts.dependency_analysis,
             interner: artifacts.interner,
             table,
-            reader_fns,
-            twins,
+            tables,
         }
     }
 
     fn reader_fn(&self, name: Symbol) -> &str {
-        self.reader_fns
+        self.tables
+            .reader_fns
             .get(&name)
             .expect("every non-void item has a reader")
     }
@@ -314,7 +327,7 @@ impl<'a> ReaderGen<'a> {
             unreachable!("struct item must have a struct shape");
         };
         let ident = self.model.item_ident(item.name).to_string();
-        let twins = &self.twins[&item.name];
+        let twins = &self.tables.twins[&item.name];
         out.push('\n');
         self.reader_open(out, item);
         out.push_str("    t.expect_struct_open();\n");
@@ -332,7 +345,7 @@ impl<'a> ReaderGen<'a> {
             unreachable!("enum item must have an enum shape");
         };
         let ident = self.model.item_ident(item.name).to_string();
-        let twins = &self.twins[&item.name];
+        let twins = &self.tables.twins[&item.name];
         let variant_idents = scope_idents(variants.keys().map(|&sym| self.interner.resolve(sym)));
         out.push('\n');
         self.reader_open(out, item);
