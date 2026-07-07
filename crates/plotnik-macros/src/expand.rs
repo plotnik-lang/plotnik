@@ -26,6 +26,11 @@ use plotnik_rt::{Limit, RuntimeLimitSpec};
 use crate::args::{self, ExpandError, LimitArg, LimitArgs, QuerySource};
 use crate::grammar_source;
 
+struct QueryInput {
+    source_map: SourceMap,
+    span: Span,
+}
+
 pub fn expand(input: TokenStream) -> TokenStream {
     // The wrapper-module name comes from the raw input: same invocation, same
     // name (deterministic output); different queries in one module never
@@ -50,22 +55,7 @@ pub fn expand(input: TokenStream) -> TokenStream {
 fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, ExpandError> {
     let args = args::parse(input)?;
     let base_dir = invoking_dir();
-
-    // The query text, with diagnostics attributed to the file when there is one.
-    let (source_map, query_span) = match &args.query {
-        QuerySource::Inline { text, span } => (SourceMap::from_inline(text), *span),
-        QuerySource::File { path, span } => {
-            let resolved = grammar_source::resolve_relative(path, base_dir.as_deref())
-                .map_err(|message| ExpandError::new(*span, message))?;
-            let content = std::fs::read_to_string(&resolved).map_err(|error| {
-                ExpandError::new(*span, format!("failed to read `{path}`: {error}"))
-            })?;
-            anchors.push(format!("const _: &str = ::core::include_str!({path:?});"));
-            let mut map = SourceMap::new();
-            map.add_file(SourcePath::new(path), &content);
-            (map, *span)
-        }
-    };
+    let query = load_query_input(&args.query, base_dir.as_deref(), anchors)?;
 
     let spec = grammar_source::parse_spec(&args.grammar);
     let (grammar, grammar_path) = grammar_source::load(&spec, base_dir.as_deref())
@@ -77,17 +67,17 @@ fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, E
 
     // Mirror `plotnik check --strict`: a compile-time-committed query must be
     // clean — proc macros have no warning channel, so warnings fail too.
-    let compiled = QueryBuilder::new(source_map)
+    let compiled = QueryBuilder::new(query.source_map)
         .with_strict_lints(true)
         .compile(&grammar)
-        .map_err(|error| ExpandError::new(query_span, error.to_string()))?;
+        .map_err(|error| ExpandError::new(query.span, error.to_string()))?;
     let diagnostics = compiled.diagnostics();
     if diagnostics.has_errors() || diagnostics.has_warnings() {
         let rendered = diagnostics.render_colored(compiled.source_map(), false);
         // The message lands under rustc's own `error:` heading; the first
         // rendered severity tag would double it, so it hands that role over.
         let message = rendered.strip_prefix("error: ").unwrap_or(&rendered);
-        return Err(ExpandError::new(query_span, message));
+        return Err(ExpandError::new(query.span, message));
     }
 
     // Every definition becomes snake_case items (`{def}_trace`, the
@@ -100,7 +90,7 @@ fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, E
         let entry = plotnik_lib::matcher_entry_fn_name(&def);
         if let Some(previous) = entry_names.insert(entry.clone(), def.clone()) {
             return Err(ExpandError::new(
-                query_span,
+                query.span,
                 format!(
                     "definitions `{previous}` and `{def}` collide in generated code: \
                      both would be spelled `{entry}`; rename one so their snake_case \
@@ -118,6 +108,36 @@ fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, E
     Ok(compiled
         .to_rust_matcher(config)
         .expect("a diagnostics-clean query generates a module"))
+}
+
+/// The query text and diagnostic span, with file sources anchored so edits
+/// retrigger expansion even when the query is currently invalid.
+fn load_query_input(
+    source: &QuerySource,
+    base_dir: Option<&Path>,
+    anchors: &mut Vec<String>,
+) -> Result<QueryInput, ExpandError> {
+    match source {
+        QuerySource::Inline { text, span } => Ok(QueryInput {
+            source_map: SourceMap::from_inline(text),
+            span: *span,
+        }),
+        QuerySource::File { path, span } => {
+            let resolved = grammar_source::resolve_relative(path, base_dir)
+                .map_err(|message| ExpandError::new(*span, message))?;
+            let content = std::fs::read_to_string(&resolved).map_err(|error| {
+                ExpandError::new(*span, format!("failed to read `{path}`: {error}"))
+            })?;
+            anchors.push(format!("const _: &str = ::core::include_str!({path:?});"));
+
+            let mut source_map = SourceMap::new();
+            source_map.add_file(SourcePath::new(path), &content);
+            Ok(QueryInput {
+                source_map,
+                span: *span,
+            })
+        }
+    }
 }
 
 /// The `include_bytes!` path for the grammar anchor. A path argument is
