@@ -54,14 +54,42 @@ pub struct LimitArgs {
 }
 
 impl LimitArgs {
-    fn put_named(&mut self, key: &str, value: LimitArg, span: Span) -> Result<(), ExpandError> {
-        let slot = match key {
-            "steps" => &mut self.steps,
-            "memory" => &mut self.memory,
-            "depth" => &mut self.depth,
-            _ => unreachable!("caller checked the limit key"),
-        };
-        put(slot, value, span, key)
+    fn put(&mut self, key: LimitKey, value: LimitArg, span: Span) -> Result<(), ExpandError> {
+        put(key.slot(self), value, span, key.name())
+    }
+}
+
+#[derive(Clone, Copy)]
+enum LimitKey {
+    Steps,
+    Memory,
+    Depth,
+}
+
+impl LimitKey {
+    fn parse(name: &str) -> Option<Self> {
+        match name {
+            "steps" => Some(Self::Steps),
+            "memory" => Some(Self::Memory),
+            "depth" => Some(Self::Depth),
+            _ => None,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Steps => "steps",
+            Self::Memory => "memory",
+            Self::Depth => "depth",
+        }
+    }
+
+    fn slot(self, args: &mut LimitArgs) -> &mut Option<LimitArg> {
+        match self {
+            Self::Steps => &mut args.steps,
+            Self::Memory => &mut args.memory,
+            Self::Depth => &mut args.depth,
+        }
     }
 }
 
@@ -246,19 +274,19 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                         let value = cursor.take_path(key_span)?;
                         put(&mut args.rt_crate, value, key_span, &key)?;
                     }
-                    "steps" | "memory" | "depth" => {
-                        let value = cursor.take_limit(key_span, &key)?;
-                        args.limits.put_named(&key, value, key_span)?;
-                    }
                     other => {
-                        return Err(ExpandError::new(
-                            key_span,
-                            format!(
-                                "unknown argument `{other}`; `query!` accepts `grammar`, \
-                                 `file`, `crate`, `steps`, `memory`, `depth`, and the \
-                                 query string"
-                            ),
-                        ));
+                        let Some(limit_key) = LimitKey::parse(other) else {
+                            return Err(ExpandError::new(
+                                key_span,
+                                format!(
+                                    "unknown argument `{other}`; `query!` accepts `grammar`, \
+                                     `file`, `crate`, `steps`, `memory`, `depth`, and the \
+                                     query string"
+                                ),
+                            ));
+                        };
+                        let value = cursor.take_limit(key_span, limit_key.name())?;
+                        args.limits.put(limit_key, value, key_span)?;
                     }
                 }
             }
