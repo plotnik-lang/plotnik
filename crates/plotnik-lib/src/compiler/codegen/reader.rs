@@ -85,6 +85,87 @@ impl ReaderTables {
     }
 }
 
+struct InherentParseSignature {
+    ident: String,
+    impl_generics: &'static str,
+    type_generics: &'static str,
+    tree_ref: &'static str,
+}
+
+impl InherentParseSignature {
+    fn for_item(model: &TypeModel<'_>, item: &Item) -> Self {
+        let ident = model.item_ident(item.name).to_string();
+        if model.needs_lifetime(item.ty) {
+            return Self {
+                ident,
+                impl_generics: "<'t>",
+                type_generics: "<'t>",
+                tree_ref: "&'t rt::Tree",
+            };
+        }
+        Self {
+            ident,
+            impl_generics: "",
+            type_generics: "",
+            tree_ref: "&rt::Tree",
+        }
+    }
+}
+
+struct FreeParseSignature {
+    ident: String,
+    fn_generics: &'static str,
+    tree_ref: &'static str,
+    return_type: String,
+}
+
+impl FreeParseSignature {
+    fn for_item(model: &TypeModel<'_>, item: &Item) -> Self {
+        let ident = model.item_ident(item.name).to_string();
+        if model.needs_lifetime(item.ty) {
+            return Self {
+                ident: ident.clone(),
+                fn_generics: "<'t>",
+                tree_ref: "&'t rt::Tree",
+                return_type: format!("{ident}<'t>"),
+            };
+        }
+        Self {
+            return_type: ident.clone(),
+            ident,
+            fn_generics: "",
+            tree_ref: "&rt::Tree",
+        }
+    }
+}
+
+struct TraceReaderSignature {
+    ident: String,
+    fn_generics: &'static str,
+    reader_generics: &'static str,
+    return_type: String,
+}
+
+impl TraceReaderSignature {
+    fn for_item(model: &TypeModel<'_>, item: &Item) -> Self {
+        let ident = model.item_ident(item.name).to_string();
+        if model.needs_lifetime(item.ty) {
+            return Self {
+                ident: ident.clone(),
+                fn_generics: "<'t>",
+                reader_generics: "<'_, 't>",
+                return_type: format!("{ident}<'t>"),
+            };
+        }
+        Self {
+            return_type: ident.clone(),
+            ident,
+            fn_generics: "",
+            reader_generics: "<'_, '_>",
+        }
+    }
+}
+
 impl<'a> ReaderGen<'a> {
     pub(super) fn new(
         artifacts: AnalysisArtifacts<'a>,
@@ -176,17 +257,15 @@ impl<'a> ReaderGen<'a> {
 
     /// Inherent `parse`/`try_parse` on a nominal (struct/enum) output type.
     fn parse_impl(&self, out: &mut String, def: &str, item: &Item) {
-        let ident = self.model.item_ident(item.name).to_string();
-        let lt = self.model.needs_lifetime(item.ty);
-        let (impl_lt, generics, tree_ref) = if lt {
-            ("<'t> ", "<'t>", "&'t rt::Tree")
-        } else {
-            (" ", "", "&rt::Tree")
-        };
+        let sig = InherentParseSignature::for_item(&self.model, item);
         let reader = self.reader_fn(item.name);
         let trace = entry_fn_name(def);
         let metered = metered_entry_fn_name(def);
-        let _ = writeln!(out, "impl{impl_lt}{ident}{generics} {{");
+        let _ = writeln!(
+            out,
+            "impl{} {}{} {{",
+            sig.impl_generics, sig.ident, sig.type_generics
+        );
         let _ = writeln!(
             out,
             "    /// Match `{def}` against `tree` and replay the committed trace into"
@@ -197,7 +276,8 @@ impl<'a> ReaderGen<'a> {
         );
         let _ = writeln!(
             out,
-            "    pub fn parse(tree: {tree_ref}, source: &str) -> ::core::option::Option<Self> {{"
+            "    pub fn parse(tree: {}, source: &str) -> ::core::option::Option<Self> {{",
+            sig.tree_ref
         );
         let _ = writeln!(out, "        let log = {trace}(tree, source)?;");
         let _ = writeln!(out, "        let mut t = rt::TraceReader::new(&log);");
@@ -215,7 +295,7 @@ impl<'a> ReaderGen<'a> {
             "    /// total work, memory bounds live backtracking state)."
         );
         let _ = writeln!(out, "    pub fn try_parse(");
-        let _ = writeln!(out, "        tree: {tree_ref},");
+        let _ = writeln!(out, "        tree: {},", sig.tree_ref);
         let _ = writeln!(out, "        source: &str,");
         let _ = writeln!(
             out,
@@ -238,14 +318,8 @@ impl<'a> ReaderGen<'a> {
     /// Free `parse` fns for an alias output — `impl` blocks cannot attach to
     /// a `pub type` alias of a non-local type.
     fn parse_free_fns(&self, out: &mut String, def: &str, item: &Item) {
-        let ident = self.model.item_ident(item.name).to_string();
+        let sig = FreeParseSignature::for_item(&self.model, item);
         let snake = snake_ident(def);
-        let lt = self.model.needs_lifetime(item.ty);
-        let (fn_lt, tree_ref, ty) = if lt {
-            ("<'t>", "&'t rt::Tree", format!("{ident}<'t>"))
-        } else {
-            ("", "&rt::Tree", ident.clone())
-        };
         let reader = self.reader_fn(item.name);
         let trace = entry_fn_name(def);
         let metered = metered_entry_fn_name(def);
@@ -255,13 +329,14 @@ impl<'a> ReaderGen<'a> {
         );
         let _ = writeln!(
             out,
-            "/// typed output (`{ident}` aliases a non-nominal type, so `parse` is a"
+            "/// typed output (`{}` aliases a non-nominal type, so `parse` is a",
+            sig.ident
         );
         let _ = writeln!(out, "/// free function). `None` is the no-match outcome.");
-        let _ = writeln!(out, "pub fn {snake}_parse{fn_lt}(");
-        let _ = writeln!(out, "    tree: {tree_ref},");
+        let _ = writeln!(out, "pub fn {snake}_parse{}(", sig.fn_generics);
+        let _ = writeln!(out, "    tree: {},", sig.tree_ref);
         let _ = writeln!(out, "    source: &str,");
-        let _ = writeln!(out, ") -> ::core::option::Option<{ty}> {{");
+        let _ = writeln!(out, ") -> ::core::option::Option<{}> {{", sig.return_type);
         let _ = writeln!(out, "    let log = {trace}(tree, source)?;");
         let _ = writeln!(out, "    let mut t = rt::TraceReader::new(&log);");
         let _ = writeln!(out, "    let value = {reader}(&mut t);");
@@ -273,12 +348,13 @@ impl<'a> ReaderGen<'a> {
             out,
             "/// [`{snake}_parse`] under the module's compiled-in limits."
         );
-        let _ = writeln!(out, "pub fn {snake}_try_parse{fn_lt}(");
-        let _ = writeln!(out, "    tree: {tree_ref},");
+        let _ = writeln!(out, "pub fn {snake}_try_parse{}(", sig.fn_generics);
+        let _ = writeln!(out, "    tree: {},", sig.tree_ref);
         let _ = writeln!(out, "    source: &str,");
         let _ = writeln!(
             out,
-            ") -> ::core::result::Result<::core::option::Option<{ty}>, rt::LimitError> {{"
+            ") -> ::core::result::Result<::core::option::Option<{}>, rt::LimitError> {{",
+            sig.return_type
         );
         let _ = writeln!(
             out,
@@ -308,17 +384,13 @@ impl<'a> ReaderGen<'a> {
     }
 
     fn reader_open(&self, out: &mut String, item: &Item) {
-        let ident = self.model.item_ident(item.name).to_string();
+        let sig = TraceReaderSignature::for_item(&self.model, item);
         let reader = self.reader_fn(item.name);
-        let (fn_lt, reader_lt, ret) = if self.model.needs_lifetime(item.ty) {
-            ("<'t>", "<'_, 't>", format!("{ident}<'t>"))
-        } else {
-            ("", "<'_, '_>", ident.clone())
-        };
-        let _ = writeln!(out, "/// Replay one committed `{ident}` value.");
+        let _ = writeln!(out, "/// Replay one committed `{}` value.", sig.ident);
         let _ = writeln!(
             out,
-            "fn {reader}{fn_lt}(t: &mut rt::TraceReader{reader_lt}) -> {ret} {{"
+            "fn {reader}{}(t: &mut rt::TraceReader{}) -> {} {{",
+            sig.fn_generics, sig.reader_generics, sig.return_type
         );
     }
 
