@@ -305,22 +305,25 @@ fn take_limit(
     match token {
         TokenTree::Ident(ident) if ident.to_string() == "auto" => Ok(LimitArg::Auto),
         TokenTree::Ident(ident) if ident.to_string() == "unbounded" => Ok(LimitArg::Unbounded),
-        TokenTree::Literal(_) => {
-            let text = token.to_string();
-            let value = litrs::IntegerLit::parse(text)
-                .ok()
-                .and_then(|lit| lit.value::<u64>());
-            match value {
-                Some(value) => Ok(LimitArg::Of(value)),
-                None => Err(ExpandError::new(
-                    token.span(),
-                    format!("`{key}` needs an unsigned integer, `auto`, or `unbounded`"),
-                )),
-            }
-        }
-        other => Err(ExpandError::new(
-            other.span(),
-            format!("`{key}` needs an unsigned integer, `auto`, or `unbounded`"),
-        )),
+        TokenTree::Literal(_) => take_integer_limit(token, key),
+        other => Err(invalid_limit_value(other.span(), key)),
     }
+}
+
+fn take_integer_limit(token: &TokenTree, key: &str) -> Result<LimitArg, ExpandError> {
+    let text = token.to_string();
+    let Ok(lit) = litrs::IntegerLit::parse(text) else {
+        return Err(invalid_limit_value(token.span(), key));
+    };
+    let Some(value) = lit.value::<u64>() else {
+        return Err(invalid_limit_value(token.span(), key));
+    };
+    Ok(LimitArg::Of(value))
+}
+
+fn invalid_limit_value(span: Span, key: &str) -> ExpandError {
+    ExpandError::new(
+        span,
+        format!("`{key}` needs an unsigned integer, `auto`, or `unbounded`"),
+    )
 }
