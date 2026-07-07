@@ -186,10 +186,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              34 : 03
-       ▶   (?)
+  02       (@34)                            34 : 03
+       ▶   (@34)
 
-?:
+@34:
   34       (program) [SpanStart#0 SpanStartAt#1]  32
        ●   program
   32  -ε-  [SpanStart#3]                    29, 20
@@ -210,7 +210,7 @@ Q:
        ●   function_declaration
   14       _ [SpanEnd#1 SpanEnd#0]          06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@34)                            
 
 Q:
   03  -ε-  [StructClose]                    05

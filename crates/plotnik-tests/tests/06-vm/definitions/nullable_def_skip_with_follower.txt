@@ -75,17 +75,17 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   02  -ε-  [StructOpen]                     04
-  04       (?)                              32 : 05
-       ▶   (?)
+  04       (@32)                            32 : 05
+       ▶   (@32)
 
-?:
+@32:
   32       (program)                        21, 29
        ●   program
   21       (debugger_statement) [Node Set(M0)]  23
        ●   debugger_statement
   23       _                                20
        ●   program
-  20   ◀   (?)                              
+  20   ◀   (@32)                            
 
 Q:
   05  -ε-  [StructClose]                    07

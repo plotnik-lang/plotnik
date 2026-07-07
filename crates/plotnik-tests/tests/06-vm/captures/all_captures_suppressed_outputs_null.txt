@@ -32,17 +32,17 @@ Q:
   5   !   (program)                         2
 --------------------- TRACE ----------------------
 Q:
-  0       (?)                               05 : 01
-      ▶   (?)
+  0       (@5)                              05 : 01
+      ▶   (@5)
 
-?:
+@5:
   5       (program)                         02
       ●   program
   2       (expression_statement)            03
       ●   expression_statement
   3       _                                 04
       ●   program
-  4   ◀   (?)                               
+  4   ◀   (@5)                              
 
 Q:
   1   ◀   (Q)                               ◼

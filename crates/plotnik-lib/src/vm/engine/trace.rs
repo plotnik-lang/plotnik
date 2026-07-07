@@ -100,8 +100,9 @@ pub trait Tracer {
     /// Called when a checkpoint is created.
     fn trace_checkpoint_created(&mut self, ip: u16);
 
-    /// Called when backtracking occurs.
-    fn trace_backtrack(&mut self);
+    /// Called when backtracking occurs, with the call depth being restored to
+    /// (the checkpoint's `recursion_depth`, before the cursor/frames are reset).
+    fn trace_backtrack(&mut self, depth: u32);
 
     /// Called when entering an entrypoint (for section labels).
     fn trace_enter_entrypoint(&mut self, target_ip: u16);
@@ -159,7 +160,7 @@ impl Tracer for NoopTracer {
     fn trace_checkpoint_created(&mut self, _ip: u16) {}
 
     #[inline(always)]
-    fn trace_backtrack(&mut self) {}
+    fn trace_backtrack(&mut self, _depth: u32) {}
 
     #[inline(always)]
     fn trace_enter_entrypoint(&mut self, _target_ip: u16) {}
@@ -304,8 +305,15 @@ impl<'s> PrintTracer<'s> {
         self.render.member_name(idx).unwrap_or("?")
     }
 
-    fn entrypoint_name(&self, ip: u16) -> &str {
-        self.render.entrypoint_name(ip).unwrap_or("?")
+    /// The definition name for a call or entry target. Only entrypoints carry a
+    /// name; a call into an internal body (or an entry that isn't a named
+    /// definition) falls back to its address `@{ip}`, exactly as the bytecode
+    /// dump renders the same target.
+    fn def_ref_name(&self, ip: u16) -> String {
+        self.render
+            .entrypoint_name(ip)
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("@{:0w$}", ip, w = self.step_width))
     }
 
     /// Format kind without text content.
@@ -483,8 +491,8 @@ impl Tracer for PrintTracer<'_> {
                 self.add_instruction(ip, symbol, &content, &successors);
             }
             Instruction::Call(c) => {
-                let name = self.entrypoint_name(u16::from(c.target));
-                let content = self.format_def_ref(name);
+                let name = self.def_ref_name(u16::from(c.target));
+                let content = self.format_def_ref(&name);
                 let successors = format!("{:02} : {:02}", u16::from(c.target), u16::from(c.next));
                 self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
             }
@@ -600,7 +608,7 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_call(&mut self, target_ip: u16) {
-        let name = self.entrypoint_name(target_ip).to_string();
+        let name = self.def_ref_name(target_ip);
         self.add_subline(trace::CALL, &self.format_def_ref(&name));
         self.push_def_header(&name);
         self.call_stack.push(name);
@@ -629,11 +637,17 @@ impl Tracer for PrintTracer<'_> {
         self.checkpoint_creation_ips.push(ip);
     }
 
-    fn trace_backtrack(&mut self) {
+    fn trace_backtrack(&mut self, depth: u32) {
         let created_at = self
             .checkpoint_creation_ips
             .pop()
             .expect("backtrack without checkpoint");
+        // The VM restores its frame arena to the checkpoint's depth in one bulk
+        // move, emitting no per-frame return. Mirror it by dropping the call-stack
+        // frames pushed since, so later headers and returns resolve against the
+        // definition actually being resumed. Slot 0 is the entrypoint header, so a
+        // depth-`d` restore keeps `d + 1` frames.
+        self.call_stack.truncate(depth as usize + 1);
         let line = format!(
             "  {:0sw$} {}",
             created_at,
@@ -644,7 +658,7 @@ impl Tracer for PrintTracer<'_> {
     }
 
     fn trace_enter_entrypoint(&mut self, target_ip: u16) {
-        let name = self.entrypoint_name(target_ip).to_string();
+        let name = self.def_ref_name(target_ip);
         self.push_def_header(&name);
         self.call_stack.push(name);
     }

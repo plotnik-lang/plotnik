@@ -101,31 +101,31 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   04  -ε-  [StructOpen]                     06
-  06       (?)                              36 : 08
-       ▶   (?)
+  06       (@36)                            36 : 08
+       ▶   (@36)
 
-?:
+@36:
   36       (program)                        34
        ●   program
   34       _                                25, 29, 32
        ●   expression_statement
   25       (expression_statement) [EnumOpen(M2)]  24
        ●   expression_statement
-  24       (?)                              20 : 21
-       ▶   (?)
+  24       (@20)                            20 : 21
+       ▶   (@20)
 
-?:
+@20:
   20       (identifier)                     19
        ●   identifier
-  19   ◀   (?)                              
+  19   ◀   (@20)                            
 
-?:
+@36:
   21  -ε-  [Node Set(M0)]                   11
   11       _ [EnumClose]                    13
        ●   expression_statement
   13       _ [Set(M4)]                      15
        ●   program
-  15   ◀   (?)                              
+  15   ◀   (@36)                            
 
 Q:
   08  -ε-  [StructClose]                    10

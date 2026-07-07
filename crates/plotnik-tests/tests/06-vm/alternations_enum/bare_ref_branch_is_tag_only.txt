@@ -87,10 +87,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   06  -ε-  [StructOpen]                     08
-  08       (?)                              29 : 09
-       ▶   (?)
+  08       (@29)                            29 : 09
+       ▶   (@29)
 
-?:
+@29:
   29       (program)                        28
        ●   program
   28       (expression_statement)           26
@@ -98,19 +98,19 @@ Q:
   26       _                                21, 24
        ●   identifier
   21  -ε-  [EnumOpen(M1) SuppressBegin]     20
-  20       (?)                              17 : 12
-       ▶   (?)
+  20       (@17)                            17 : 12
+       ▶   (@17)
 
-?:
+@17:
   17       (identifier) [Node Set(M0)]      16
        ●   identifier
-  16   ◀   (?)                              
+  16   ◀   (@17)                            
 
-?:
+@29:
   12  -ε-  [SuppressEnd EnumClose]          14
   14       _ [Set(M2)]                      19
        ●   program
-  19   ◀   (?)                              
+  19   ◀   (@29)                            
 
 Q:
   09  -ε-  [StructClose]                    11

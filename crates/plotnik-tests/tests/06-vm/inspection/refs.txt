@@ -164,28 +164,28 @@ Q:
   24   !   (program) [SpanStart#3 SpanStartAt#4]  21
 --------------------- TRACE ----------------------
 Q:
-  06       (?)                              24 : 08
-       ▶   (?)
+  06       (@24)                            24 : 08
+       ▶   (@24)
 
-?:
+@24:
   24       (program) [SpanStart#3 SpanStartAt#4]  21
        ●   program
   21       (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  11
        ●   expression_statement
-  11       (?)                              17 : 12
-       ▶   (?)
+  11       (@17)                            17 : 12
+       ▶   (@17)
 
-?:
+@17:
   17       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  16
        ●   identifier
-  16   ◀   (?)                              
+  16   ◀   (@17)                            
 
-?:
+@24:
   12       _ [SuppressEnd SpanEnd#6]        14
        ●   expression_statement
   14       _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  07
        ●   program
-  07   ◀   (?)                              
+  07   ◀   (@24)                            
 
 Q:
   08  -ε-  [Node]                           10

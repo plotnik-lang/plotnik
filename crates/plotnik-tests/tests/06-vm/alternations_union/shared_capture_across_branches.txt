@@ -60,10 +60,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              17 : 03
-       ▶   (?)
+  02       (@17)                            17 : 03
+       ▶   (@17)
 
-?:
+@17:
   17       (program)                        16
        ●   program
   16       (expression_statement)           14
@@ -77,7 +77,7 @@ Q:
        ●   number
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@17)                            
 
 Q:
   03  -ε-  [StructClose]                    05

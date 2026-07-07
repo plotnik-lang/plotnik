@@ -75,17 +75,17 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              14 : 03
-       ▶   (?)
+  02       (@14)                            14 : 03
+       ▶   (@14)
 
-?:
+@14:
   14       (program) [StructOpen]           08
        ●   program
   08       (expression_statement) [StructOpen Node Set(M0) StructClose Set(M1)]  11
        ●   expression_statement
   11       _ [StructClose Set(M2)]          13
        ●   program
-  13   ◀   (?)                              
+  13   ◀   (@14)                            
 
 Q:
   03  -ε-  [StructClose]                    05

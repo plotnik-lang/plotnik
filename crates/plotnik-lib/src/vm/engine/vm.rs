@@ -737,7 +737,7 @@ impl<'t> VM<'t> {
                 return RuntimeError::NoMatch.into();
             };
             if T::ENABLED {
-                tracer.trace_backtrack();
+                tracer.trace_backtrack(cp.state.recursion_depth);
             }
             self.restore_checkpoint_state(cp.state, snapshot);
 

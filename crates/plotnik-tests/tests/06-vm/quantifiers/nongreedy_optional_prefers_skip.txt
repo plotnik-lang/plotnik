@@ -60,17 +60,17 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              20 : 03
-       ▶   (?)
+  02       (@20)                            20 : 03
+       ▶   (@20)
 
-?:
+@20:
   20       (program)                        08, 18
        ●   program
   08       (expression_statement) [Null Set(M0) Node Set(M1)]  07
        ●   expression_statement
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@20)                            
 
 Q:
   03  -ε-  [StructClose]                    05

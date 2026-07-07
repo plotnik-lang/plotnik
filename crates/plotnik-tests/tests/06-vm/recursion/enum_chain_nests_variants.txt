@@ -100,57 +100,57 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   02  -ε-  [StructOpen]                     04
-  04       (?)                              25 : 05
-       ▶   (?)
+  04       (@25)                            25 : 05
+       ▶   (@25)
 
-?:
+@25:
   25       (program)                        24
        ●   program
   24       (expression_statement)           11
        ●   expression_statement
-  11       (?)                              21 : 12
-       ▶   (?)
+  11       (@21)                            21 : 12
+       ▶   (@21)
 
-?:
+@21:
   21  -ε-                                   16, 19
   16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  14
        ○   call_expression
   21  ❮❮❮ 
   19       (call_expression) [EnumOpen(M3)]  08
        ●   call_expression
-  08       (?)                              21 : 09
-       ▶   (?)
+  08       (@21)                            21 : 09
+       ▶   (@21)
 
-?:
+@21:
   21  -ε-                                   16, 19
   16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  14
        ○   call_expression
   21  ❮❮❮ 
   19       (call_expression) [EnumOpen(M3)]  08
        ●   call_expression
-  08       (?)                              21 : 09
-       ▶   (?)
+  08       (@21)                            21 : 09
+       ▶   (@21)
 
-?:
+@21:
   21  -ε-                                   16, 19
   16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  14
        ●   identifier
-  14   ◀   (?)                              
+  14   ◀   (@21)                            
 
-?:
+@21:
   09       _ [Set(M1) EnumClose]            14
        ●   call_expression
-  14   ◀   (?)                              
+  14   ◀   (@21)                            
 
-?:
+@21:
   09       _ [Set(M1) EnumClose]            14
        ●   call_expression
-  14   ◀   (?)                              
+  14   ◀   (@21)                            
 
-?:
+@25:
   12       _ [Set(M4)]                      15
        ●   program
-  15   ◀   (?)                              
+  15   ◀   (@25)                            
 
 Q:
   05  -ε-  [StructClose]                    07

@@ -138,10 +138,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   04  -ε-  [StructOpen]                     06
-  06       (?)                              52 : 08
-       ▶   (?)
+  06       (@52)                            52 : 08
+       ▶   (@52)
 
-?:
+@52:
   52       (program)                        51
        ●   program
   51       (expression_statement)           50
@@ -151,10 +151,10 @@ Q:
   48  -ε-  [ArrayOpen]                      45, 37
   45       _                                42, 43
        ●   [
-  42       (?)                              22 : 40
-       ▶   (?)
+  42       (@22)                            22 : 40
+       ▶   (@22)
 
-?:
+@22:
   22  -ε-                                   16, 19
   16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ○   [
@@ -164,23 +164,23 @@ Q:
   45  ❮❮❮ 
   43       _                                42, 43
        ●   identifier
-  42       (?)                              22 : 40
-       ▶   (?)
+  42       (@22)                            22 : 40
+       ▶   (@22)
 
-?:
+@22:
   22  -ε-                                   16, 19
   16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ●   identifier
-  15   ◀   (?)                              
+  15   ◀   (@22)                            
 
-?:
+@52:
   40  -ε-  [Push]                           43, 11
   43       _                                42, 43
        ●   ,
-  42       (?)                              22 : 40
-       ▶   (?)
+  42       (@22)                            22 : 40
+       ▶   (@22)
 
-?:
+@22:
   22  -ε-                                   16, 19
   16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ○   ,
@@ -190,26 +190,26 @@ Q:
   43  ❮❮❮ 
   43       _                                42, 43
        ●   number
-  42       (?)                              22 : 40
-       ▶   (?)
+  42       (@22)                            22 : 40
+       ▶   (@22)
 
-?:
+@22:
   22  -ε-                                   16, 19
   16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ○   number
   22  ❮❮❮ 
   19       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
        ●   number
-  15   ◀   (?)                              
+  15   ◀   (@22)                            
 
-?:
+@52:
   40  -ε-  [Push]                           43, 11
   43       _                                42, 43
        ●   ,
-  42       (?)                              22 : 40
-       ▶   (?)
+  42       (@22)                            22 : 40
+       ▶   (@22)
 
-?:
+@22:
   22  -ε-                                   16, 19
   16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ○   ,
@@ -219,23 +219,23 @@ Q:
   43  ❮❮❮ 
   43       _                                42, 43
        ●   identifier
-  42       (?)                              22 : 40
-       ▶   (?)
+  42       (@22)                            22 : 40
+       ▶   (@22)
 
-?:
+@22:
   22  -ε-                                   16, 19
   16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ●   identifier
-  15   ◀   (?)                              
+  15   ◀   (@22)                            
 
-?:
+@52:
   40  -ε-  [Push]                           43, 11
   43       _                                42, 43
        ●   ]
-  42       (?)                              22 : 40
-       ▶   (?)
+  42       (@22)                            22 : 40
+       ▶   (@22)
 
-?:
+@22:
   22  -ε-                                   16, 19
   16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
        ○   ]
@@ -250,10 +250,8 @@ Q:
        ●   array
   39       _                                36
        ●   program
-  36   ◀   (?)                              
+  36   ◀   (@52)                            
 
-?:
+Q:
   08  -ε-  [StructClose]                    10
-  10   ◀   (?)                              
-
-?:
+  10   ◀   (Q)                              ◼

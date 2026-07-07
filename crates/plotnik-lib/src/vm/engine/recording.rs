@@ -315,7 +315,7 @@ impl Tracer for RecordingTracer {
         });
     }
 
-    fn trace_backtrack(&mut self) {
+    fn trace_backtrack(&mut self, _depth: u32) {
         let shadow = self
             .shadow
             .pop()

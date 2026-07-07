@@ -83,10 +83,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              21 : 03
-       ▶   (?)
+  02       (@21)                            21 : 03
+       ▶   (@21)
 
-?:
+@21:
   21       (program)                        20
        ●   program
   20       (expression_statement)           16
@@ -97,7 +97,7 @@ Q:
        ●   identifier
   18       _ [Set(M4)]                      06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@21)                            
 
 Q:
   03  -ε-  [StructClose]                    05

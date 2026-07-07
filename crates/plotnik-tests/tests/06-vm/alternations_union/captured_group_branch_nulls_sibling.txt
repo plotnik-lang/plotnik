@@ -85,10 +85,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              20 : 03
-       ▶   (?)
+  02       (@20)                            20 : 03
+       ▶   (@20)
 
-?:
+@20:
   20       (program)                        16
        ●   program
   16       _ [StructOpen]                   08, 11, 14
@@ -97,7 +97,7 @@ Q:
        ●   expression_statement
   18       _ [StructClose Set(M3)]          06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@20)                            
 
 Q:
   03  -ε-  [StructClose]                    05

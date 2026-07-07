@@ -67,24 +67,24 @@ Q:
   22   !   (program)                        20
 --------------------- TRACE ----------------------
 Q:
-  02       (?)                              22 : 03
-       ▶   (?)
+  02       (@22)                            22 : 03
+       ▶   (@22)
 
-?:
+@22:
   22       (program)                        20
        ●   program
   20       _                                16, 18
        ●   expression_statement
   16  -ε-  [SuppressBegin]                  14
-  14       (?)                              09 : 12
-       ▶   (?)
+  14       (@09)                            09 : 12
+       ▶   (@09)
 
-?:
+@09:
   09       (expression_statement) [EnumOpen(M0) EnumClose]  08
        ●   expression_statement
-  08   ◀   (?)                              
+  08   ◀   (@09)                            
 
-?:
+@22:
   12  -ε-  [SuppressEnd]                    06, 18
   06       (debugger_statement)             07
        ○   expression_statement
@@ -92,21 +92,21 @@ Q:
   18       _                                16, 18
        ●   expression_statement
   16  -ε-  [SuppressBegin]                  14
-  14       (?)                              09 : 12
-       ▶   (?)
+  14       (@09)                            09 : 12
+       ▶   (@09)
 
-?:
+@09:
   09       (expression_statement) [EnumOpen(M0) EnumClose]  08
        ●   expression_statement
-  08   ◀   (?)                              
+  08   ◀   (@09)                            
 
-?:
+@22:
   12  -ε-  [SuppressEnd]                    06, 18
   06       (debugger_statement)             07
        ●   debugger_statement
   07       _                                11
        ●   program
-  11   ◀   (?)                              
+  11   ◀   (@22)                            
 
 Q:
   03  -ε-  [Node]                           05

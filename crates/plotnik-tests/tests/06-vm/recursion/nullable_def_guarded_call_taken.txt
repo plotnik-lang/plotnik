@@ -97,10 +97,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   02  -ε-  [StructOpen]                     04
-  04       (?)                              59 : 05
-       ▶   (?)
+  04       (@59)                            59 : 05
+       ▶   (@59)
 
-?:
+@59:
   59       (program)                        56, 41
        ●   program
   56       _                                52, 54
@@ -112,10 +112,10 @@ Q:
        ○   statement_block
   52  ❮❮❮ 
   49  -ε-  [SuppressBegin]                  48
-  48       (?)                              26 : 46
-       ▶   (?)
+  48       (@26)                            26 : 46
+       ▶   (@26)
 
-?:
+@26:
   26       _                                22, 24
        ●   {
   22       (statement_block) [Node]         15, 19
@@ -130,9 +130,9 @@ Q:
        ●   debugger_statement
   21       _                                14
        ●   statement_block
-  14   ◀   (?)                              
+  14   ◀   (@26)                            
 
-?:
+@59:
   46       (debugger_statement) [SuppressEnd]  51
        ●   debugger_statement
   51       _                                43
@@ -141,7 +141,7 @@ Q:
        ●   expression_statement
   58       _                                40
        ●   program
-  40   ◀   (?)                              
+  40   ◀   (@59)                            
 
 Q:
   05  -ε-  [StructClose]                    07

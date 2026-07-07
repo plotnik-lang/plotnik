@@ -73,41 +73,39 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   06  -ε-  [StructOpen]                     08
-  08       (?)                              24 : 09
-       ▶   (?)
+  08       (@24)                            24 : 09
+       ▶   (@24)
 
-?:
+@24:
   24       (program) [StructOpen]           22
        ●   program
-  22       (?)                              20 : 16
-       ▶   (?)
+  22       (@20)                            20 : 16
+       ▶   (@20)
 
-?:
+@20:
   20       (expression_statement)           12
        ●   expression_statement
   12       (number) [Node Set(M0)]          14
        ○   identifier
        ○   ;
   22  ❮❮❮ 
-       ▶   (?)
+       ▶   (@20)
 
-?:
+@20:
   20       (expression_statement)           12
        ●   expression_statement
   12       (number) [Node Set(M0)]          14
        ●   number
   14       _                                15
        ●   expression_statement
-  15   ◀   (?)                              
+  15   ◀   (@20)                            
 
-?:
+@24:
   16  -ε-  [StructClose]                    18
   18       _ [Set(M1)]                      21
        ●   program
-  21   ◀   (?)                              
-
-?:
-  09  -ε-  [StructClose]                    11
-  11   ◀   (?)                              
+  21   ◀   (@24)                            
 
 Q:
+  09  -ε-  [StructClose]                    11
+  11   ◀   (Q)                              ◼

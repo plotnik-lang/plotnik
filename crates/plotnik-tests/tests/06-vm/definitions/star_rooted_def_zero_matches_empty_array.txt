@@ -76,10 +76,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   02  -ε-  [StructOpen]                     04
-  04       (?)                              38 : 05
-       ▶   (?)
+  04       (@38)                            38 : 05
+       ▶   (@38)
 
-?:
+@38:
   38       (program)                        37
        ●   program
   37       (expression_statement)           36
@@ -107,7 +107,7 @@ Q:
   25  -ε-  [ArrayClose Set(M0)]             15
   15       _                                24
        ●   program
-  24   ◀   (?)                              
+  24   ◀   (@38)                            
 
 Q:
   05  -ε-  [StructClose]                    07
