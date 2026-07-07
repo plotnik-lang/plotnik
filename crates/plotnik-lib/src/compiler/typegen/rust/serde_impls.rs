@@ -218,7 +218,11 @@ impl Emitter<'_> {
 
         let mut data_fields = String::new();
         let mut data_entries = String::new();
-        for (index, (&name_sym, info)) in fields.iter().enumerate() {
+        let mut bindings = Vec::new();
+        let mut data_inits = Vec::new();
+        for (index, ((&name_sym, info), field_ident)) in
+            fields.iter().zip(&field_idents).enumerate()
+        {
             // The helper borrows the enum's actual field, so its type must be
             // spelled with the declaration's own cut context.
             let field_ty = self.field_type(TypeContext::item(variant.item_ty), info);
@@ -230,15 +234,11 @@ impl Emitter<'_> {
                 "                        map.serialize_entry({key:?}, &{rt}::WithSource::new(self.v{index}, self.source))?;"
             )
             .expect("writing to a String is infallible");
+            bindings.push(format!("{field_ident}: v{index}"));
+            data_inits.push(format!("v{index}"));
         }
 
-        let bindings: Vec<String> = field_idents
-            .iter()
-            .enumerate()
-            .map(|(index, field_ident)| format!("{field_ident}: v{index}"))
-            .collect();
         let binding_list = bindings.join(", ");
-        let data_inits: Vec<String> = (0..fields.len()).map(|i| format!("v{i}")).collect();
         let data_inits = data_inits.join(", ");
         let field_count = fields.len();
         let ident = variant.enum_ident;
