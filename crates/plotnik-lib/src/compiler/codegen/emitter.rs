@@ -36,7 +36,7 @@ use crate::compiler::lower::ir::{
     NodeKindConstraint, PredicateIR, PredicateValueIR, SemanticNfa,
 };
 use crate::compiler::typegen::rust::Config as RustTypesConfig;
-use crate::core::NodeFieldId;
+use crate::core::{NodeFieldId, NodeKindId};
 use plotnik_rt::{Limit, Nav, SkipPolicy};
 
 /// Generate the Rust query module for a compiled query's fork-point NFA.
@@ -81,6 +81,38 @@ impl CandidateFailure {
             CandidateFailure::StateBacktrack => "break 'state Flow::Backtrack;",
             CandidateFailure::RetryExhausted => "return None;",
         }
+    }
+}
+
+struct ExpectedKind {
+    id: NodeKindId,
+    name: String,
+    named: bool,
+}
+
+impl ExpectedKind {
+    fn from_constraint(constraint: NodeKindConstraint, dumper: &NfaDumper<'_>) -> Option<Self> {
+        match constraint {
+            NodeKindConstraint::Named(Some(id)) => Some(Self::new(id, dumper, true)),
+            NodeKindConstraint::Anonymous(Some(id)) => Some(Self::new(id, dumper, false)),
+            _ => None,
+        }
+    }
+
+    fn new(id: NodeKindId, dumper: &NfaDumper<'_>, named: bool) -> Self {
+        Self {
+            id,
+            name: dumper.kind_display_name(id),
+            named,
+        }
+    }
+
+    fn is_builtin_error(&self) -> bool {
+        self.id == NodeKindId::ERROR
+    }
+
+    fn raw_id(&self) -> u16 {
+        u16::from(self.id)
     }
 }
 
@@ -134,7 +166,7 @@ struct Generator<'a> {
     /// Kind ids baked into candidate checks → `(grammar name, is_named)`,
     /// for the generated language-skew assert. The builtin `ERROR` id is
     /// grammar-independent and carries no skew signal, so it is skipped.
-    expect_kinds: BTreeMap<u16, (String, bool)>,
+    expect_kinds: BTreeMap<u16, ExpectedKind>,
     /// Field ids baked into field checks → grammar name, same purpose.
     expect_fields: BTreeMap<u16, String>,
     /// Regex predicates in first-appearance (label) order: pattern → (index, DFA bytes).
@@ -282,16 +314,13 @@ impl<'a> Generator<'a> {
     }
 
     fn record_kind(&mut self, constraint: NodeKindConstraint) {
-        let (id, named) = match constraint {
-            NodeKindConstraint::Named(Some(id)) => (id, true),
-            NodeKindConstraint::Anonymous(Some(id)) => (id, false),
-            _ => return,
+        let Some(expected) = ExpectedKind::from_constraint(constraint, &self.dumper) else {
+            return;
         };
-        if id == crate::core::NodeKindId::ERROR {
+        if expected.is_builtin_error() {
             return;
         }
-        self.expect_kinds
-            .insert(u16::from(id), (self.dumper.kind_display_name(id), named));
+        self.expect_kinds.insert(expected.raw_id(), expected);
     }
 
     fn state(&self, label: Label) -> &StateInfo {
@@ -430,7 +459,9 @@ impl<'a> Generator<'a> {
             out.push_str("const EXPECTED_KINDS: &[(u16, &str, bool)] = &[];\n");
         } else {
             out.push_str("const EXPECTED_KINDS: &[(u16, &str, bool)] = &[\n");
-            for (id, (name, named)) in &self.expect_kinds {
+            for (id, expected) in &self.expect_kinds {
+                let name = &expected.name;
+                let named = expected.named;
                 let _ = writeln!(out, "    ({id}, {name:?}, {named}),");
             }
             out.push_str("];\n");
