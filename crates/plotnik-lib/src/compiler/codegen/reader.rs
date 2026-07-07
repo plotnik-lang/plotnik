@@ -347,18 +347,20 @@ impl<'a> ReaderGen<'a> {
             if payload == TYPE_VOID {
                 let _ = writeln!(out, "            t.expect_enum_close();");
                 let _ = writeln!(out, "            {ident}::{variant_ident}");
-            } else {
-                let TypeShape::Struct(fields) = self.types.expect_type_shape(payload) else {
-                    unreachable!("enum variant payload is void or an anonymous struct");
-                };
-                let payloads = payload_twins(self.types, twins, k);
-                let scope = Scope::enum_payload(item.ty, &ident);
-                self.field_scope(out, &scope, fields, |j| {
-                    member_indices(self.table, &payloads, j)
-                });
-                out.push_str("            t.expect_enum_close();\n");
-                self.construct(out, 3, &format!("{ident}::{variant_ident}"), fields);
+                out.push_str("        }\n");
+                continue;
             }
+
+            let TypeShape::Struct(fields) = self.types.expect_type_shape(payload) else {
+                unreachable!("enum variant payload is void or an anonymous struct");
+            };
+            let payloads = payload_twins(self.types, twins, k);
+            let scope = Scope::enum_payload(item.ty, &ident);
+            self.field_scope(out, &scope, fields, |j| {
+                member_indices(self.table, &payloads, j)
+            });
+            out.push_str("            t.expect_enum_close();\n");
+            self.construct(out, 3, &format!("{ident}::{variant_ident}"), fields);
             out.push_str("        }\n");
         }
         let _ = writeln!(
@@ -612,9 +614,13 @@ fn collect_twins(types: &TypeAnalysis, table: &TypeTableBuilder, item: &Item) ->
             TypeShape::Enum(_) => !wants_struct,
             _ => false,
         };
-        if matches_kind && table.member_base(ty).is_some() {
-            out.insert(ty);
+        if !matches_kind {
+            continue;
         }
+        if table.member_base(ty).is_none() {
+            continue;
+        }
+        out.insert(ty);
     }
     out.insert(item.ty);
     out.into_iter().collect()
