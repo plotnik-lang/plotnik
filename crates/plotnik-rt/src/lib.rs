@@ -32,6 +32,8 @@ mod effect;
 mod engine;
 #[cfg(feature = "serde")]
 mod serialize;
+#[cfg(feature = "tree-sitter")]
+mod trace;
 
 #[cfg(test)]
 #[cfg(feature = "tree-sitter")]
@@ -40,11 +42,14 @@ mod checkpoint_tests;
 mod dfa_tests;
 #[cfg(test)]
 mod nav_tests;
+#[cfg(test)]
+#[cfg(feature = "tree-sitter")]
+mod trace_tests;
 
 pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
 pub use frame::{Frame, FrameArena};
 pub use ids::{NodeFieldId, NodeKindId, ZeroIdError};
-pub use limits::{Limit, ResolvedRuntimeLimits, RuntimeLimitSpec};
+pub use limits::{Limit, LimitError, ResolvedRuntimeLimits, RuntimeLimitSpec};
 pub use nav::{Nav, SkipPolicy};
 pub use node_class::{NodeClass, SkipClass};
 
@@ -58,6 +63,8 @@ pub use effect::{EffectLog, RuntimeEffect, node_text};
 pub use engine::Engine;
 #[cfg(feature = "serde")]
 pub use serialize::{SerializeWithSource, WithSource};
+#[cfg(feature = "tree-sitter")]
+pub use trace::TraceReader;
 
 /// The node handle generated query outputs are built from (plus the parse
 /// tree it borrows from). Re-exported so generated code and user code can

@@ -13,6 +13,41 @@
 //! backtracking and output rendering are iterative, so depth is pure heap — the
 //! frame arena, already part of the memory sum — not a native-stack risk.
 
+/// A metered run exceeded one of its resolved ceilings.
+///
+/// The generated matchers' `try_*` entry points report through this; the VM
+/// reports the same trips through its own `RuntimeError` (which folds in
+/// interpretation-only failures like module errors). The wording of the two
+/// must stay aligned — both describe the same enforcement.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LimitError {
+    /// The step ceiling was reached before the run finished.
+    Steps(u64),
+    /// A memory sample found the live runtime heap above the ceiling. `used`
+    /// is the measurement at the trip point; because the arenas grow
+    /// geometrically it can overshoot `limit` by up to a doubling, so it is
+    /// reported alongside the ceiling to make the limit tunable.
+    Memory { used: u64, limit: u64 },
+}
+
+impl std::fmt::Display for LimitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LimitError::Steps(max) => {
+                write!(f, "exceeded the step limit of {max} steps")
+            }
+            LimitError::Memory { used, limit } => {
+                write!(
+                    f,
+                    "exceeded the memory limit of {limit} bytes (used {used} bytes)"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for LimitError {}
+
 /// One resource's limit policy, independent of any particular input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Limit {

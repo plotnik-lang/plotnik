@@ -19,6 +19,7 @@
 
 mod config;
 mod emitter;
+mod reader;
 
 #[cfg(test)]
 mod emitter_tests;

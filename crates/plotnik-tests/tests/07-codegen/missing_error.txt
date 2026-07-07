@@ -10,483 +10,667 @@ Q = (program
   )
 )
 -------------------- MATCHER ---------------------
-// Generated Plotnik matcher — one dispatch state per optimized-NFA instruction.
-// `S{label}_{DEF}` mirrors the NFA dump's labels 1:1, and every arm carries its
-// instruction in the dump format (docs/binary-format/08-dump-format.md).
+// Generated Plotnik query module: typed output types, `parse`/`matches` entry
+// points, per-type trace readers, and the compiled matcher (`mod matcher`).
+// Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
+// dispatch arm carries its instruction in the dump format
+// (docs/binary-format/08-dump-format.md).
 
 use ::plotnik_rt as rt;
 
-const F_CONSEQUENCE: rt::NodeFieldId = rt::NodeFieldId::from_raw(9);
+use ::plotnik_rt::Node;
 
-// Dense runtime state ids, in NFA label order.
-// Err:
-const S02_ERR: u16 = 0;
-const S03_ERR: u16 = 1;
-const S04_ERR: u16 = 2;
-const S05_ERR: u16 = 3;
-// Q:
-const S06_Q: u16 = 4;
-const S07_Q: u16 = 5;
-const S09_Q: u16 = 6;
-const S11_Q: u16 = 7;
-const S12_Q: u16 = 8;
-const S13_Q: u16 = 9;
-// Err:
-const S14_ERR_EP: u16 = 10;
-const S15_ERR_EP: u16 = 11;
-const S16_ERR_EP: u16 = 12;
-const S17_ERR_EP: u16 = 13;
-// Q:
-const S18_Q_EP: u16 = 14;
-const S19_Q_EP: u16 = 15;
-const S20_Q_EP: u16 = 16;
-const S21_Q_EP: u16 = 17;
-
-/// Match the `Err` entrypoint against `tree`. `Some` carries the committed
-/// capture trace — the same effect stream the VM commits for this query.
-pub fn err_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
-    run(tree, source, S17_ERR_EP)
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Err<'t> {
+    pub err: Node<'t>,
 }
 
-/// Match the `Q` entrypoint against `tree`. `Some` carries the committed
-/// capture trace — the same effect stream the VM commits for this query.
-pub fn q_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
-    run(tree, source, S21_Q_EP)
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub gap: Node<'t>,
 }
 
-/// What a dispatched state hands back to the driver loop.
-enum Flow {
-    /// Continue at this state.
-    Jump(u16),
-    /// The entrypoint accepted; the effect log is the committed trace.
-    Accept,
-    /// The state failed; unwind the checkpoint stack.
-    Backtrack,
-}
-
-/// How the backtrack unwind resumed execution.
-enum Unwound {
-    Resumed(u16),
-    Accepted,
-    NoMatch,
-}
-
-/// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
-fn run<'t>(tree: &'t rt::Tree, source: &str, entry: u16) -> Option<rt::EffectLog<'t>> {
-    let mut eng = rt::Engine::new(tree.walk());
-    let mut ip = entry;
-    loop {
-        match step(&mut eng, source, ip) {
-            Flow::Jump(next) => ip = next,
-            Flow::Accept => return Some(eng.into_effects()),
-            Flow::Backtrack => match backtrack(&mut eng, source) {
-                Unwound::Resumed(next) => ip = next,
-                Unwound::Accepted => return Some(eng.into_effects()),
-                Unwound::NoMatch => return None,
-            },
-        }
+impl<'t> Err<'t> {
+    /// Match `Err` against `tree` and replay the committed trace into
+    /// the typed output. `None` is the no-match outcome.
+    pub fn parse(tree: &'t rt::Tree, source: &str) -> ::core::option::Option<Self> {
+        let log = err_trace(tree, source)?;
+        let mut t = rt::TraceReader::new(&log);
+        let value = read_err(&mut t);
+        t.finish();
+        Some(value)
     }
-}
 
-fn step<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
-    match ip {
-        //   02                                        ▶
-        S02_ERR => {
-            if eng.frames_empty() {
-                Flow::Accept
-            } else {
-                Flow::Jump(eng.exit_frame())
-            }
-        }
-        //   03   !   (program)                        05
-        S03_ERR => 'state: {
-            if !cand_s03_err(eng) {
-                break 'state Flow::Backtrack;
-            }
-            Flow::Jump(S05_ERR)
-        }
-        //   04  ─‣┘  _                                02
-        S04_ERR => 'state: {
-            if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
-                break 'state Flow::Backtrack;
-            }
-            Flow::Jump(S02_ERR)
-        }
-        //   05  └‣─  (ERROR) [Node Set(err)]          04
-        S05_ERR => 'state: {
-            if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
-                break 'state Flow::Backtrack;
-            }
-            loop {
-                if cand_s05_err(eng) {
-                    break;
-                }
-                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                    break 'state Flow::Backtrack;
-                }
-            }
-            if rt::SkipPolicy::Any.admits(&eng.node()) {
-                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_ERR));
-            }
-            finish_s05_err(eng)
-        }
-        //   06                                        ▶
-        S06_Q => {
-            if eng.frames_empty() {
-                Flow::Accept
-            } else {
-                Flow::Jump(eng.exit_frame())
-            }
-        }
-        //   07   !   (program)                        09
-        S07_Q => 'state: {
-            if !cand_s07_q(eng) {
-                break 'state Flow::Backtrack;
-            }
-            Flow::Jump(S09_Q)
-        }
-        //   09  └‣─  (if_statement)                   11
-        S09_Q => 'state: {
-            if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
-                break 'state Flow::Backtrack;
-            }
-            loop {
-                if cand_s09_q(eng) {
-                    break;
-                }
-                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                    break 'state Flow::Backtrack;
-                }
-            }
-            if rt::SkipPolicy::Any.admits(&eng.node()) {
-                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S09_Q));
-            }
-            finish_s09_q(eng)
-        }
-        //   11  └‣─  consequence: (statement_block)   13
-        S11_Q => 'state: {
-            if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
-                break 'state Flow::Backtrack;
-            }
-            loop {
-                if cand_s11_q(eng) {
-                    break;
-                }
-                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                    break 'state Flow::Backtrack;
-                }
-            }
-            if rt::SkipPolicy::Any.admits(&eng.node()) {
-                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S11_Q));
-            }
-            finish_s11_q(eng)
-        }
-        //   12  ─‣┘³ _                                06
-        S12_Q => 'state: {
-            if eng.cursor_mut().navigate(rt::Nav::Up(3)).is_none() {
-                break 'state Flow::Backtrack;
-            }
-            Flow::Jump(S06_Q)
-        }
-        //   13  └‣─  (MISSING "}") [Node Set(gap)]    12
-        S13_Q => 'state: {
-            if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
-                break 'state Flow::Backtrack;
-            }
-            loop {
-                if cand_s13_q(eng) {
-                    break;
-                }
-                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                    break 'state Flow::Backtrack;
-                }
-            }
-            if rt::SkipPolicy::Any.admits(&eng.node()) {
-                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S13_Q));
-            }
-            finish_s13_q(eng)
-        }
-        //   14                                        ▶
-        S14_ERR_EP => {
-            if eng.frames_empty() {
-                Flow::Accept
-            } else {
-                Flow::Jump(eng.exit_frame())
-            }
-        }
-        //   15  -ε-  [StructClose]                    14
-        S15_ERR_EP => {
-            eng.emit_data(|_| rt::RuntimeEffect::StructClose);
-            Flow::Jump(S14_ERR_EP)
-        }
-        //   16       (Err)                            03 : 15
-        S16_ERR_EP => {
-            eng.enter_frame(S15_ERR_EP);
-            Flow::Jump(S03_ERR)
-        }
-        //   17  -ε-  [StructOpen]                     16
-        S17_ERR_EP => {
-            eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
-            Flow::Jump(S16_ERR_EP)
-        }
-        //   18                                        ▶
-        S18_Q_EP => {
-            if eng.frames_empty() {
-                Flow::Accept
-            } else {
-                Flow::Jump(eng.exit_frame())
-            }
-        }
-        //   19  -ε-  [StructClose]                    18
-        S19_Q_EP => {
-            eng.emit_data(|_| rt::RuntimeEffect::StructClose);
-            Flow::Jump(S18_Q_EP)
-        }
-        //   20       (Q)                              07 : 19
-        S20_Q_EP => {
-            eng.enter_frame(S19_Q_EP);
-            Flow::Jump(S07_Q)
-        }
-        //   21  -ε-  [StructOpen]                     20
-        S21_Q_EP => {
-            eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
-            Flow::Jump(S20_Q_EP)
-        }
-        _ => unreachable!("ip {ip} is not a generated state"),
-    }
-}
-
-/// `S03_ERR` candidate: `(program)`.
-#[inline]
-fn cand_s03_err(eng: &rt::Engine<'_>) -> bool {
-    let node = eng.node();
-    // (program)
-    if node.kind_id() != 134 || !node.is_named() {
-        return false;
-    }
-    true
-}
-
-/// `S05_ERR` candidate: `(ERROR)`.
-#[inline]
-fn cand_s05_err(eng: &rt::Engine<'_>) -> bool {
-    let node = eng.node();
-    // (ERROR)
-    if node.kind_id() != 65535 || !node.is_named() {
-        return false;
-    }
-    true
-}
-
-/// `S07_Q` candidate: `(program)`.
-#[inline]
-fn cand_s07_q(eng: &rt::Engine<'_>) -> bool {
-    let node = eng.node();
-    // (program)
-    if node.kind_id() != 134 || !node.is_named() {
-        return false;
-    }
-    true
-}
-
-/// `S09_Q` candidate: `(if_statement)`.
-#[inline]
-fn cand_s09_q(eng: &rt::Engine<'_>) -> bool {
-    let node = eng.node();
-    // (if_statement)
-    if node.kind_id() != 157 || !node.is_named() {
-        return false;
-    }
-    true
-}
-
-/// `S11_Q` candidate: `consequence: (statement_block)`.
-#[inline]
-fn cand_s11_q(eng: &rt::Engine<'_>) -> bool {
-    let node = eng.node();
-    // (statement_block)
-    if node.kind_id() != 155 || !node.is_named() {
-        return false;
-    }
-    // consequence:
-    if eng.cursor().field_id() != Some(F_CONSEQUENCE) {
-        return false;
-    }
-    true
-}
-
-/// `S13_Q` candidate: `(MISSING "}")`.
-#[inline]
-fn cand_s13_q(eng: &rt::Engine<'_>) -> bool {
-    let node = eng.node();
-    // "}"
-    if node.kind_id() != 9 || node.is_named() {
-        return false;
-    }
-    // (MISSING …): only nodes the parser inserted during error recovery
-    if !node.is_missing() {
-        return false;
-    }
-    true
-}
-
-/// `S05_ERR` post-acceptance: effects, then branch. Shared by the dispatch
-/// path and the match-retry resume, so a retried candidate replays exactly
-/// what the original acceptance would have.
-#[inline]
-fn finish_s05_err(eng: &mut rt::Engine<'_>) -> Flow {
-    eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
-    eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(err)
-    Flow::Jump(S04_ERR)
-}
-
-/// `S09_Q` post-acceptance: effects, then branch. Shared by the dispatch
-/// path and the match-retry resume, so a retried candidate replays exactly
-/// what the original acceptance would have.
-#[inline]
-fn finish_s09_q(_eng: &mut rt::Engine<'_>) -> Flow {
-    Flow::Jump(S11_Q)
-}
-
-/// `S11_Q` post-acceptance: effects, then branch. Shared by the dispatch
-/// path and the match-retry resume, so a retried candidate replays exactly
-/// what the original acceptance would have.
-#[inline]
-fn finish_s11_q(_eng: &mut rt::Engine<'_>) -> Flow {
-    Flow::Jump(S13_Q)
-}
-
-/// `S13_Q` post-acceptance: effects, then branch. Shared by the dispatch
-/// path and the match-retry resume, so a retried candidate replays exactly
-/// what the original acceptance would have.
-#[inline]
-fn finish_s13_q(eng: &mut rt::Engine<'_>) -> Flow {
-    eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
-    eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(gap)
-    Flow::Jump(S12_Q)
-}
-
-/// Unwind the checkpoint stack: branch alternatives resume dispatch, Call and
-/// Match checkpoints advance their sibling search and re-enter. Loops, never
-/// recurses — a run of exhausted retries unwinds in one call.
-fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
-    'unwind: loop {
-        let Some((cp, snapshot)) = eng.pop_checkpoint() else {
-            return Unwound::NoMatch;
+    /// [`Self::parse`] under the module's compiled-in limits (steps bound
+    /// total work, memory bounds live backtracking state).
+    pub fn try_parse(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitError> {
+        let Some(log) = matcher::err_trace_metered(tree, source)? else {
+            return Ok(None);
         };
-        eng.restore_checkpoint_state(cp.state, snapshot);
+        let mut t = rt::TraceReader::new(&log);
+        let value = read_err(&mut t);
+        t.finish();
+        Ok(Some(value))
+    }
+}
 
-        match cp.resume {
-            rt::Resume::Branch => return Unwound::Resumed(cp.ip),
+impl<'t> Q<'t> {
+    /// Match `Q` against `tree` and replay the committed trace into
+    /// the typed output. `None` is the no-match outcome.
+    pub fn parse(tree: &'t rt::Tree, source: &str) -> ::core::option::Option<Self> {
+        let log = q_trace(tree, source)?;
+        let mut t = rt::TraceReader::new(&log);
+        let value = read_q(&mut t);
+        t.finish();
+        Some(value)
+    }
 
-            // Call retry: advance to the next candidate satisfying the field
-            // constraint, then re-enter the callee. Exhausted siblings keep
-            // unwinding to an earlier checkpoint.
-            rt::Resume::Call(resume) => {
-                if !eng.cursor_mut().continue_search(resume.policy) {
-                    continue 'unwind;
+    /// [`Self::parse`] under the module's compiled-in limits (steps bound
+    /// total work, memory bounds live backtracking state).
+    pub fn try_parse(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitError> {
+        let Some(log) = matcher::q_trace_metered(tree, source)? else {
+            return Ok(None);
+        };
+        let mut t = rt::TraceReader::new(&log);
+        let value = read_q(&mut t);
+        t.finish();
+        Ok(Some(value))
+    }
+}
+
+/// Replay one committed `Err` value.
+fn read_err<'t>(t: &mut rt::TraceReader<'_, 't>) -> Err<'t> {
+    t.expect_struct_open();
+    let mut v0 = None; // err
+    while !t.at_struct_close() {
+        match t.peek_set() {
+            // err
+            0 => v0 = Some(t.expect_node()),
+            other => unreachable!("trace shape proven at emit: `Err` has no member index {other}"),
+        }
+        t.expect_set();
+    }
+    t.expect_struct_close();
+    Err {
+        err: v0.expect("field-stability: every accepting path sets `err`"),
+    }
+}
+
+/// Replay one committed `Q` value.
+fn read_q<'t>(t: &mut rt::TraceReader<'_, 't>) -> Q<'t> {
+    t.expect_struct_open();
+    let mut v0 = None; // gap
+    while !t.at_struct_close() {
+        match t.peek_set() {
+            // gap
+            1 => v0 = Some(t.expect_node()),
+            other => unreachable!("trace shape proven at emit: `Q` has no member index {other}"),
+        }
+        t.expect_set();
+    }
+    t.expect_struct_close();
+    Q {
+        gap: v0.expect("field-stability: every accepting path sets `gap`"),
+    }
+}
+
+pub use self::matcher::{err_trace, q_trace};
+
+/// The compiled matcher: engine machinery shielded from the query's
+/// type namespace.
+mod matcher {
+    use ::plotnik_rt as rt;
+
+    /// The limit policy compiled into the `try_*` entry points, resolved against
+    /// each input's node count. Chosen at generation time, never at the call
+    /// site: the query is trusted, the input is not.
+    const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
+        steps: rt::Limit::Auto,
+        memory: rt::Limit::Auto,
+    };
+
+    /// No ceilings — what the unmetered entry points run under.
+    const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
+        max_steps: None,
+        max_memory: None,
+    };
+
+    /// Bitmask selecting the dispatch steps on which the memory ceiling is
+    /// sampled; must be a power of two minus one. Twin of the VM's constant.
+    const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
+
+    /// Resolve [`LIMITS`] against this input's node count, exactly like
+    /// `VM::builder(...).build()` resolves the VM's.
+    fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
+        let source_nodes = u32::try_from(tree.root_node().descendant_count()).unwrap_or(u32::MAX);
+        LIMITS.resolve(source_nodes)
+    }
+
+    const F_CONSEQUENCE: rt::NodeFieldId = rt::NodeFieldId::from_raw(9);
+
+    // Dense runtime state ids, in NFA label order.
+    // Err:
+    const S02_ERR: u16 = 0;
+    const S03_ERR: u16 = 1;
+    const S04_ERR: u16 = 2;
+    const S05_ERR: u16 = 3;
+    // Q:
+    const S06_Q: u16 = 4;
+    const S07_Q: u16 = 5;
+    const S09_Q: u16 = 6;
+    const S11_Q: u16 = 7;
+    const S12_Q: u16 = 8;
+    const S13_Q: u16 = 9;
+    // Err:
+    const S14_ERR_EP: u16 = 10;
+    const S15_ERR_EP: u16 = 11;
+    const S16_ERR_EP: u16 = 12;
+    const S17_ERR_EP: u16 = 13;
+    // Q:
+    const S18_Q_EP: u16 = 14;
+    const S19_Q_EP: u16 = 15;
+    const S20_Q_EP: u16 = 16;
+    const S21_Q_EP: u16 = 17;
+
+    /// Match the `Err` entrypoint against `tree`. `Some` carries the committed
+    /// capture trace — the same effect stream the VM commits for this query.
+    pub fn err_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
+        let outcome = run::<false>(tree, source, S17_ERR_EP, NO_LIMITS);
+        outcome.expect("an unmetered run cannot exceed a limit")
+    }
+
+    /// [`err_trace`] under the module's compiled-in limits ([`LIMITS`]).
+    pub(super) fn err_trace_metered<'t>(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitError> {
+        run::<true>(tree, source, S17_ERR_EP, resolved_limits(tree))
+    }
+
+    /// Match the `Q` entrypoint against `tree`. `Some` carries the committed
+    /// capture trace — the same effect stream the VM commits for this query.
+    pub fn q_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
+        let outcome = run::<false>(tree, source, S21_Q_EP, NO_LIMITS);
+        outcome.expect("an unmetered run cannot exceed a limit")
+    }
+
+    /// [`q_trace`] under the module's compiled-in limits ([`LIMITS`]).
+    pub(super) fn q_trace_metered<'t>(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitError> {
+        run::<true>(tree, source, S21_Q_EP, resolved_limits(tree))
+    }
+
+    /// What a dispatched state hands back to the driver loop.
+    enum Flow {
+        /// Continue at this state.
+        Jump(u16),
+        /// The entrypoint accepted; the effect log is the committed trace.
+        Accept,
+        /// The state failed; unwind the checkpoint stack.
+        Backtrack,
+    }
+
+    /// How the backtrack unwind resumed execution.
+    enum Unwound {
+        Resumed(u16),
+        Accepted,
+        NoMatch,
+    }
+
+    /// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
+    /// `METERED` folds the budget checks away for the unmetered entry points;
+    /// when on, they transcribe the VM's `execute_with_stats` loop head. (No
+    /// let-chains: generated code targets the embedding crate's edition.)
+    fn run<'t, const METERED: bool>(
+        tree: &'t rt::Tree,
+        source: &str,
+        entry: u16,
+        limits: rt::ResolvedRuntimeLimits,
+    ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitError> {
+        let mut eng = rt::Engine::new(tree.walk());
+        let mut steps: u64 = 0;
+        let mut ip = entry;
+        loop {
+            if METERED {
+                // Step ceiling: bound total work. `None` opts out (Unbounded).
+                if let Some(max) = limits.max_steps {
+                    if steps >= max {
+                        return Err(rt::LimitError::Steps(max));
+                    }
                 }
-                if let Some(field_id) = resume.field {
-                    loop {
-                        if eng.cursor().field_id() == Some(field_id) {
-                            break;
-                        }
-                        if !eng.cursor_mut().continue_search(resume.policy) {
-                            continue 'unwind;
+                steps += 1;
+                // Memory ceiling: the live runtime heap, sampled every
+                // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded,
+                // so the unobserved overshoot is noise (see the VM loop).
+                if steps & MEMORY_SAMPLE_MASK == 0 {
+                    let used = eng.heap_bytes();
+                    if let Some(max) = limits.max_memory {
+                        if used > max {
+                            return Err(rt::LimitError::Memory { used, limit: max });
                         }
                     }
                 }
-                eng.push_checkpoint(rt::Checkpoint::call_retry(
-                    eng.checkpoint_state(),
-                    cp.ip,
-                    resume,
-                ));
-                eng.enter_frame(resume.next);
-                return Unwound::Resumed(resume.target);
             }
-
-            // Match retry: step past the accepted-but-failed candidate and
-            // re-run that state's sibling search from there.
-            rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
-                Some(Flow::Jump(next)) => return Unwound::Resumed(next),
-                Some(Flow::Accept) => return Unwound::Accepted,
-                Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
-                None => continue 'unwind,
-            },
+            match step(&mut eng, source, ip) {
+                Flow::Jump(next) => ip = next,
+                Flow::Accept => return Ok(Some(eng.into_effects())),
+                Flow::Backtrack => match backtrack(&mut eng, source) {
+                    Unwound::Resumed(next) => ip = next,
+                    Unwound::Accepted => return Ok(Some(eng.into_effects())),
+                    Unwound::NoMatch => return Ok(None),
+                },
+            }
         }
     }
-}
 
-fn match_retry<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Option<Flow> {
-    match ip {
-        S05_ERR => {
-            if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                return None;
-            }
-            loop {
-                if cand_s05_err(eng) {
-                    break;
+    fn step<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
+        match ip {
+            //   02                                        ▶
+            S02_ERR => {
+                if eng.frames_empty() {
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame())
                 }
+            }
+            //   03   !   (program)                        05
+            S03_ERR => 'state: {
+                if !cand_s03_err(eng) {
+                    break 'state Flow::Backtrack;
+                }
+                Flow::Jump(S05_ERR)
+            }
+            //   04  ─‣┘  _                                02
+            S04_ERR => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                Flow::Jump(S02_ERR)
+            }
+            //   05  └‣─  (ERROR) [Node Set(err)]          04
+            S05_ERR => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                loop {
+                    if cand_s05_err(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        break 'state Flow::Backtrack;
+                    }
+                }
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_ERR));
+                }
+                finish_s05_err(eng)
+            }
+            //   06                                        ▶
+            S06_Q => {
+                if eng.frames_empty() {
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame())
+                }
+            }
+            //   07   !   (program)                        09
+            S07_Q => 'state: {
+                if !cand_s07_q(eng) {
+                    break 'state Flow::Backtrack;
+                }
+                Flow::Jump(S09_Q)
+            }
+            //   09  └‣─  (if_statement)                   11
+            S09_Q => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                loop {
+                    if cand_s09_q(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        break 'state Flow::Backtrack;
+                    }
+                }
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S09_Q));
+                }
+                finish_s09_q(eng)
+            }
+            //   11  └‣─  consequence: (statement_block)   13
+            S11_Q => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                loop {
+                    if cand_s11_q(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        break 'state Flow::Backtrack;
+                    }
+                }
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S11_Q));
+                }
+                finish_s11_q(eng)
+            }
+            //   12  ─‣┘³ _                                06
+            S12_Q => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Up(3)).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                Flow::Jump(S06_Q)
+            }
+            //   13  └‣─  (MISSING "}") [Node Set(gap)]    12
+            S13_Q => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                loop {
+                    if cand_s13_q(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        break 'state Flow::Backtrack;
+                    }
+                }
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S13_Q));
+                }
+                finish_s13_q(eng)
+            }
+            //   14                                        ▶
+            S14_ERR_EP => {
+                if eng.frames_empty() {
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame())
+                }
+            }
+            //   15  -ε-  [StructClose]                    14
+            S15_ERR_EP => {
+                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                Flow::Jump(S14_ERR_EP)
+            }
+            //   16       (Err)                            03 : 15
+            S16_ERR_EP => {
+                eng.enter_frame(S15_ERR_EP);
+                Flow::Jump(S03_ERR)
+            }
+            //   17  -ε-  [StructOpen]                     16
+            S17_ERR_EP => {
+                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                Flow::Jump(S16_ERR_EP)
+            }
+            //   18                                        ▶
+            S18_Q_EP => {
+                if eng.frames_empty() {
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame())
+                }
+            }
+            //   19  -ε-  [StructClose]                    18
+            S19_Q_EP => {
+                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                Flow::Jump(S18_Q_EP)
+            }
+            //   20       (Q)                              07 : 19
+            S20_Q_EP => {
+                eng.enter_frame(S19_Q_EP);
+                Flow::Jump(S07_Q)
+            }
+            //   21  -ε-  [StructOpen]                     20
+            S21_Q_EP => {
+                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                Flow::Jump(S20_Q_EP)
+            }
+            _ => unreachable!("ip {ip} is not a generated state"),
+        }
+    }
+
+    /// `S03_ERR` candidate: `(program)`.
+    #[inline]
+    fn cand_s03_err(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (program)
+        if node.kind_id() != 134 || !node.is_named() {
+            return false;
+        }
+        true
+    }
+
+    /// `S05_ERR` candidate: `(ERROR)`.
+    #[inline]
+    fn cand_s05_err(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (ERROR)
+        if node.kind_id() != 65535 || !node.is_named() {
+            return false;
+        }
+        true
+    }
+
+    /// `S07_Q` candidate: `(program)`.
+    #[inline]
+    fn cand_s07_q(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (program)
+        if node.kind_id() != 134 || !node.is_named() {
+            return false;
+        }
+        true
+    }
+
+    /// `S09_Q` candidate: `(if_statement)`.
+    #[inline]
+    fn cand_s09_q(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (if_statement)
+        if node.kind_id() != 157 || !node.is_named() {
+            return false;
+        }
+        true
+    }
+
+    /// `S11_Q` candidate: `consequence: (statement_block)`.
+    #[inline]
+    fn cand_s11_q(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (statement_block)
+        if node.kind_id() != 155 || !node.is_named() {
+            return false;
+        }
+        // consequence:
+        if eng.cursor().field_id() != Some(F_CONSEQUENCE) {
+            return false;
+        }
+        true
+    }
+
+    /// `S13_Q` candidate: `(MISSING "}")`.
+    #[inline]
+    fn cand_s13_q(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // "}"
+        if node.kind_id() != 9 || node.is_named() {
+            return false;
+        }
+        // (MISSING …): only nodes the parser inserted during error recovery
+        if !node.is_missing() {
+            return false;
+        }
+        true
+    }
+
+    /// `S05_ERR` post-acceptance: effects, then branch. Shared by the dispatch
+    /// path and the match-retry resume, so a retried candidate replays exactly
+    /// what the original acceptance would have.
+    #[inline]
+    fn finish_s05_err(eng: &mut rt::Engine<'_>) -> Flow {
+        eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
+        eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(err)
+        Flow::Jump(S04_ERR)
+    }
+
+    /// `S09_Q` post-acceptance: effects, then branch. Shared by the dispatch
+    /// path and the match-retry resume, so a retried candidate replays exactly
+    /// what the original acceptance would have.
+    #[inline]
+    fn finish_s09_q(_eng: &mut rt::Engine<'_>) -> Flow {
+        Flow::Jump(S11_Q)
+    }
+
+    /// `S11_Q` post-acceptance: effects, then branch. Shared by the dispatch
+    /// path and the match-retry resume, so a retried candidate replays exactly
+    /// what the original acceptance would have.
+    #[inline]
+    fn finish_s11_q(_eng: &mut rt::Engine<'_>) -> Flow {
+        Flow::Jump(S13_Q)
+    }
+
+    /// `S13_Q` post-acceptance: effects, then branch. Shared by the dispatch
+    /// path and the match-retry resume, so a retried candidate replays exactly
+    /// what the original acceptance would have.
+    #[inline]
+    fn finish_s13_q(eng: &mut rt::Engine<'_>) -> Flow {
+        eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
+        eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(gap)
+        Flow::Jump(S12_Q)
+    }
+
+    /// Unwind the checkpoint stack: branch alternatives resume dispatch, Call and
+    /// Match checkpoints advance their sibling search and re-enter. Loops, never
+    /// recurses — a run of exhausted retries unwinds in one call.
+    fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
+        'unwind: loop {
+            let Some((cp, snapshot)) = eng.pop_checkpoint() else {
+                return Unwound::NoMatch;
+            };
+            eng.restore_checkpoint_state(cp.state, snapshot);
+
+            match cp.resume {
+                rt::Resume::Branch => return Unwound::Resumed(cp.ip),
+
+                // Call retry: advance to the next candidate satisfying the field
+                // constraint, then re-enter the callee. Exhausted siblings keep
+                // unwinding to an earlier checkpoint.
+                rt::Resume::Call(resume) => {
+                    if !eng.cursor_mut().continue_search(resume.policy) {
+                        continue 'unwind;
+                    }
+                    if let Some(field_id) = resume.field {
+                        loop {
+                            if eng.cursor().field_id() == Some(field_id) {
+                                break;
+                            }
+                            if !eng.cursor_mut().continue_search(resume.policy) {
+                                continue 'unwind;
+                            }
+                        }
+                    }
+                    eng.push_checkpoint(rt::Checkpoint::call_retry(
+                        eng.checkpoint_state(),
+                        cp.ip,
+                        resume,
+                    ));
+                    eng.enter_frame(resume.next);
+                    return Unwound::Resumed(resume.target);
+                }
+
+                // Match retry: step past the accepted-but-failed candidate and
+                // re-run that state's sibling search from there.
+                rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
+                    Some(Flow::Jump(next)) => return Unwound::Resumed(next),
+                    Some(Flow::Accept) => return Unwound::Accepted,
+                    Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
+                    None => continue 'unwind,
+                },
+            }
+        }
+    }
+
+    fn match_retry<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Option<Flow> {
+        match ip {
+            S05_ERR => {
                 if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
                     return None;
                 }
-            }
-            if rt::SkipPolicy::Any.admits(&eng.node()) {
-                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_ERR));
-            }
-            Some(finish_s05_err(eng))
-        }
-        S09_Q => {
-            if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                return None;
-            }
-            loop {
-                if cand_s09_q(eng) {
-                    break;
+                loop {
+                    if cand_s05_err(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        return None;
+                    }
                 }
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_ERR));
+                }
+                Some(finish_s05_err(eng))
+            }
+            S09_Q => {
                 if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
                     return None;
                 }
-            }
-            if rt::SkipPolicy::Any.admits(&eng.node()) {
-                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S09_Q));
-            }
-            Some(finish_s09_q(eng))
-        }
-        S11_Q => {
-            if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                return None;
-            }
-            loop {
-                if cand_s11_q(eng) {
-                    break;
+                loop {
+                    if cand_s09_q(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        return None;
+                    }
                 }
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S09_Q));
+                }
+                Some(finish_s09_q(eng))
+            }
+            S11_Q => {
                 if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
                     return None;
                 }
-            }
-            if rt::SkipPolicy::Any.admits(&eng.node()) {
-                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S11_Q));
-            }
-            Some(finish_s11_q(eng))
-        }
-        S13_Q => {
-            if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
-                return None;
-            }
-            loop {
-                if cand_s13_q(eng) {
-                    break;
+                loop {
+                    if cand_s11_q(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        return None;
+                    }
                 }
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S11_Q));
+                }
+                Some(finish_s11_q(eng))
+            }
+            S13_Q => {
                 if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
                     return None;
                 }
+                loop {
+                    if cand_s13_q(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        return None;
+                    }
+                }
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S13_Q));
+                }
+                Some(finish_s13_q(eng))
             }
-            if rt::SkipPolicy::Any.admits(&eng.node()) {
-                eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S13_Q));
-            }
-            Some(finish_s13_q(eng))
+            _ => unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match"),
         }
-        _ => unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match"),
     }
 }

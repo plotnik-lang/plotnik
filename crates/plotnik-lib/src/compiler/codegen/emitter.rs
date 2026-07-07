@@ -1,4 +1,10 @@
-//! The matcher emitter: fork-point NFA → Rust source.
+//! The query-module emitter: fork-point NFA → Rust source.
+//!
+//! The output is one self-contained module: typed output structs/enums (the
+//! typegen backend's text, verbatim), the `parse`/`matches` surface and
+//! per-type trace readers (`reader.rs`), and the compiled matcher itself —
+//! shielded inside a nested `mod matcher` so its machinery names (`Flow`,
+//! state consts) can never collide with a query's own type names.
 //!
 //! Emission is deterministic — instructions render in label order, names and
 //! tables come from `BTreeMap`s — so the same query always produces the same
@@ -19,6 +25,7 @@ use std::fmt::Write as _;
 use crate::bytecode::{EffectKind, PredicateOp};
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::codegen::Config;
+use crate::compiler::codegen::reader::ReaderGen;
 use crate::compiler::emit::regex_table::compile_dfa_bytes;
 use crate::compiler::emit::string_table::seed_string_table;
 use crate::compiler::emit::tables::TypeTableBuilder;
@@ -28,10 +35,11 @@ use crate::compiler::lower::ir::{
     CallIR, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin, MatchIR, NfaGraph,
     NodeKindConstraint, PredicateIR, PredicateValueIR, SemanticNfa,
 };
+use crate::compiler::typegen::rust::Config as RustTypesConfig;
 use crate::core::NodeFieldId;
-use plotnik_rt::{Nav, SkipPolicy};
+use plotnik_rt::{Limit, Nav, SkipPolicy};
 
-/// Generate the Rust matcher module for a compiled query's fork-point NFA.
+/// Generate the Rust query module for a compiled query's fork-point NFA.
 ///
 /// The caller guarantees the query compiled successfully (all ids linked, the
 /// emit pipeline accepted the same artifacts) and was built *without*
@@ -65,6 +73,7 @@ struct Generator<'a> {
     graph: &'a NfaGraph,
     dumper: NfaDumper<'a>,
     config: &'a Config,
+    artifacts: AnalysisArtifacts<'a>,
     /// Member-index layout shared with the bytecode emitter, so generated
     /// `Set`/`EnumOpen` payloads equal the VM's byte-for-byte.
     types: TypeTableBuilder,
@@ -102,6 +111,7 @@ impl<'a> Generator<'a> {
             graph,
             dumper,
             config,
+            artifacts,
             types,
             sorted,
             states: BTreeMap::new(),
@@ -226,23 +236,86 @@ impl<'a> Generator<'a> {
     }
 
     fn render(&self) -> String {
+        let rust_config = RustTypesConfig::new()
+            .rt_crate(self.config.rt_crate.clone())
+            .serde(self.config.serde);
+        let readers = ReaderGen::new(self.artifacts, &self.types, &rust_config);
+
         let mut out = String::new();
         self.header(&mut out);
-        self.field_consts(&mut out);
-        self.regex_statics(&mut out);
-        self.state_consts(&mut out);
-        self.entry_fns(&mut out);
-        out.push_str(DRIVER_SKELETON);
-        self.step_fn(&mut out);
-        self.cand_fns(&mut out);
-        self.finish_fns(&mut out);
-        self.backtrack_fn(&mut out);
-        self.match_retry_fn(&mut out);
+        out.push('\n');
+        out.push_str(&crate::compiler::typegen::rust::emit(
+            self.artifacts.type_analysis,
+            self.artifacts.dependency_analysis,
+            self.artifacts.interner,
+            &rust_config,
+        ));
+        out.push_str(&readers.parse_api(self.graph.entrypoint_wrappers().keys().copied()));
+        out.push_str(&readers.readers());
+        self.entry_reexports(&mut out);
+
+        let mut machinery = String::new();
+        self.mod_header(&mut machinery);
+        self.field_consts(&mut machinery);
+        self.regex_statics(&mut machinery);
+        self.state_consts(&mut machinery);
+        self.entry_fns(&mut machinery);
+        machinery.push_str(DRIVER_SKELETON);
+        self.step_fn(&mut machinery);
+        self.cand_fns(&mut machinery);
+        self.finish_fns(&mut machinery);
+        self.backtrack_fn(&mut machinery);
+        self.match_retry_fn(&mut machinery);
+
+        out.push('\n');
+        out.push_str("/// The compiled matcher: engine machinery shielded from the query's\n");
+        out.push_str("/// type namespace.\n");
+        out.push_str("mod matcher {\n");
+        for line in machinery.lines() {
+            if line.is_empty() {
+                out.push('\n');
+            } else {
+                out.push_str("    ");
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+        out.push_str("}\n");
         out
     }
 
     fn header(&self, out: &mut String) {
         splice(out, "", HEADER, &[("RT", &self.config.rt_crate)]);
+    }
+
+    /// `pub use` every trace entry point at module root, so the public
+    /// surface (`{def}_trace`, per [`entry_fn_name`]) doesn't move when the
+    /// machinery does.
+    fn entry_reexports(&self, out: &mut String) {
+        let names: Vec<String> = self
+            .graph
+            .entrypoint_wrappers()
+            .keys()
+            .map(|&def_id| {
+                let sym = self.artifacts.dependency_analysis.def_name_sym(def_id);
+                entry_fn_name(self.artifacts.interner.resolve(sym))
+            })
+            .collect();
+        out.push('\n');
+        let _ = writeln!(out, "pub use self::matcher::{{{}}};", names.join(", "));
+    }
+
+    fn mod_header(&self, out: &mut String) {
+        splice(
+            out,
+            "",
+            MOD_HEADER,
+            &[
+                ("RT", &self.config.rt_crate),
+                ("STEPS", &limit_expr(self.config.limits.steps)),
+                ("MEMORY", &limit_expr(self.config.limits.memory)),
+            ],
+        );
     }
 
     fn field_consts(&self, out: &mut String) {
@@ -300,17 +373,15 @@ impl<'a> Generator<'a> {
         for &label in self.graph.entrypoint_wrappers().values() {
             let def = self.dumper.def_name_of(label);
             let info = self.state(label);
+            let subs = [
+                ("DEF", def),
+                ("FN", &entry_fn_name(def)),
+                ("ENTRY", info.const_name.as_str()),
+            ];
             out.push('\n');
-            splice(
-                out,
-                "",
-                ENTRY_FN,
-                &[
-                    ("DEF", def),
-                    ("FN", &entry_fn_name(def)),
-                    ("ENTRY", &info.const_name),
-                ],
-            );
+            splice(out, "", ENTRY_FN, &subs);
+            out.push('\n');
+            splice(out, "", ENTRY_FN_METERED, &subs);
         }
     }
 
@@ -877,6 +948,18 @@ pub fn entry_fn_name(def_name: &str) -> String {
     format!("{}_trace", snake_ident(def_name))
 }
 
+/// The metered sibling of [`entry_fn_name`], `pub(super)` inside the matcher
+/// module — the `try_*` surface reaches the driver through it.
+pub(super) fn metered_entry_fn_name(def_name: &str) -> String {
+    format!("{}_metered", entry_fn_name(def_name))
+}
+
+/// `Limit` as a generated-code expression; the `Debug` form matches the
+/// variant syntax (`Of(3)`), pinned by `limit_expr_matches_debug` in the tests.
+pub(super) fn limit_expr(limit: Limit) -> String {
+    format!("rt::Limit::{limit:?}")
+}
+
 /// Split camel/Pascal humps: a boundary opens before an uppercase following a
 /// non-uppercase, and before the last uppercase of an acronym run
 /// (`HTTPServer` → `HTTP`, `Server`).
@@ -925,18 +1008,60 @@ fn splice(out: &mut String, indent: &str, template: &str, subs: &[(&str, &str)])
 }
 
 const HEADER: &str = r#"
-// Generated Plotnik matcher — one dispatch state per optimized-NFA instruction.
-// `S{label}_{DEF}` mirrors the NFA dump's labels 1:1, and every arm carries its
-// instruction in the dump format (docs/binary-format/08-dump-format.md).
+// Generated Plotnik query module: typed output types, `parse`/`matches` entry
+// points, per-type trace readers, and the compiled matcher (`mod matcher`).
+// Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
+// dispatch arm carries its instruction in the dump format
+// (docs/binary-format/08-dump-format.md).
 
 use @RT@ as rt;
+"#;
+
+const MOD_HEADER: &str = r#"
+use @RT@ as rt;
+
+/// The limit policy compiled into the `try_*` entry points, resolved against
+/// each input's node count. Chosen at generation time, never at the call
+/// site: the query is trusted, the input is not.
+const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
+    steps: @STEPS@,
+    memory: @MEMORY@,
+};
+
+/// No ceilings — what the unmetered entry points run under.
+const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
+    max_steps: None,
+    max_memory: None,
+};
+
+/// Bitmask selecting the dispatch steps on which the memory ceiling is
+/// sampled; must be a power of two minus one. Twin of the VM's constant.
+const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
+
+/// Resolve [`LIMITS`] against this input's node count, exactly like
+/// `VM::builder(...).build()` resolves the VM's.
+fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
+    let source_nodes = u32::try_from(tree.root_node().descendant_count()).unwrap_or(u32::MAX);
+    LIMITS.resolve(source_nodes)
+}
 "#;
 
 const ENTRY_FN: &str = r#"
 /// Match the `@DEF@` entrypoint against `tree`. `Some` carries the committed
 /// capture trace — the same effect stream the VM commits for this query.
 pub fn @FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
-    run(tree, source, @ENTRY@)
+    let outcome = run::<false>(tree, source, @ENTRY@, NO_LIMITS);
+    outcome.expect("an unmetered run cannot exceed a limit")
+}
+"#;
+
+const ENTRY_FN_METERED: &str = r#"
+/// [`@FN@`] under the module's compiled-in limits ([`LIMITS`]).
+pub(super) fn @FN@_metered<'t>(
+    tree: &'t rt::Tree,
+    source: &str,
+) -> Result<Option<rt::EffectLog<'t>>, rt::LimitError> {
+    run::<true>(tree, source, @ENTRY@, resolved_limits(tree))
 }
 "#;
 
@@ -959,17 +1084,46 @@ enum Unwound {
 }
 
 /// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
-fn run<'t>(tree: &'t rt::Tree, source: &str, entry: u16) -> Option<rt::EffectLog<'t>> {
+/// `METERED` folds the budget checks away for the unmetered entry points;
+/// when on, they transcribe the VM's `execute_with_stats` loop head. (No
+/// let-chains: generated code targets the embedding crate's edition.)
+fn run<'t, const METERED: bool>(
+    tree: &'t rt::Tree,
+    source: &str,
+    entry: u16,
+    limits: rt::ResolvedRuntimeLimits,
+) -> Result<Option<rt::EffectLog<'t>>, rt::LimitError> {
     let mut eng = rt::Engine::new(tree.walk());
+    let mut steps: u64 = 0;
     let mut ip = entry;
     loop {
+        if METERED {
+            // Step ceiling: bound total work. `None` opts out (Unbounded).
+            if let Some(max) = limits.max_steps {
+                if steps >= max {
+                    return Err(rt::LimitError::Steps(max));
+                }
+            }
+            steps += 1;
+            // Memory ceiling: the live runtime heap, sampled every
+            // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded,
+            // so the unobserved overshoot is noise (see the VM loop).
+            if steps & MEMORY_SAMPLE_MASK == 0 {
+                let used = eng.heap_bytes();
+                if let Some(max) = limits.max_memory {
+                    if used > max {
+                        return Err(rt::LimitError::Memory { used, limit: max });
+                    }
+                }
+            }
+        }
         match step(&mut eng, source, ip) {
             Flow::Jump(next) => ip = next,
-            Flow::Accept => return Some(eng.into_effects()),
+            Flow::Accept => return Ok(Some(eng.into_effects())),
             Flow::Backtrack => match backtrack(&mut eng, source) {
                 Unwound::Resumed(next) => ip = next,
-                Unwound::Accepted => return Some(eng.into_effects()),
-                Unwound::NoMatch => return None,
+                Unwound::Accepted => return Ok(Some(eng.into_effects())),
+                Unwound::NoMatch => return Ok(None),
             },
         }
     }

@@ -35,11 +35,19 @@ impl Emitter<'_> {
             _ => unreachable!("serde impls are generated for structs and enums only"),
         };
 
+        // Only payload fields thread the source through; a tags-only enum
+        // never touches it and must not bind it, or the impl warns.
+        let source = if body.contains("source") {
+            "source"
+        } else {
+            "_source"
+        };
+
         format!(
             "impl {rt}::SerializeWithSource for {ident}{args} {{
     fn serialize_with_source<S>(
         &self,
-        source: &str,
+        {source}: &str,
         serializer: S,
     ) -> ::core::result::Result<S::Ok, S::Error>
     where

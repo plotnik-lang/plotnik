@@ -9,8 +9,8 @@
 
 mod analysis;
 mod config;
-mod emitter;
-mod idents;
+pub(crate) mod emitter;
+pub(crate) mod idents;
 mod serde_impls;
 
 #[cfg(test)]

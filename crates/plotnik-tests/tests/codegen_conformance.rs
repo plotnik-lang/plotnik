@@ -1,14 +1,22 @@
-//! Trace conformance: for every runnable 06-vm fixture, the generated Rust
-//! matcher must commit the exact effect stream the bytecode VM commits.
+//! Conformance: for every runnable 06-vm fixture, the generated Rust module
+//! must agree with the bytecode VM at both levels of the contract —
+//!
+//! - **trace**: the matcher's committed effect stream equals the VM's,
+//!   entry for entry;
+//! - **value**: the typed `parse` output, serialized through the serde
+//!   channel, equals the VM's materialized value as JSON (compared as JSON
+//!   values — the two sides legitimately order struct fields differently),
+//!   and the metered `try_parse` twin returns the identical typed value.
 //!
 //! Each fixture's query is compiled twice — to a bytecode module (executed
-//! here, in-process, as the oracle) and to Rust matcher source. The VM's
-//! committed effects are rendered to literal expectation lines and baked into
-//! one generated program alongside every matcher; that program re-parses each
-//! input with the real grammars, runs the matcher, and asserts stream
-//! equality. `trybuild` builds *and runs* it, so this one target proves both
-//! that emitted code compiles and that it behaves like the VM across the
-//! corpus.
+//! here, in-process, as the oracle) and to Rust module source. The VM's
+//! committed effects and materialized value are baked into one generated
+//! program alongside every module; that program re-parses each input with the
+//! real grammars and asserts agreement. `trybuild` builds *and runs* it, so
+//! this one target proves both that emitted code compiles and that it behaves
+//! like the VM across the corpus. A final hand-rolled module pins the
+//! compiled-in limit policy: an `Of(1)` step budget must trip `try_parse`
+//! while the unmetered `parse` still matches.
 //!
 //! Inspection and recording fixtures are excluded: spans and step recordings
 //! are VM-only diagnostic channels the generated matcher deliberately lacks.
@@ -19,12 +27,13 @@ use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
 
-use plotnik_lib::bytecode::Module;
+use plotnik_lib::bytecode::{Module, TypeDefKind, TypeKind};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    MatcherConfig, QueryBuilder, RuntimeError, SourceMap, SourcePath, VM, matcher_entry_fn_name,
+    Colors, MatcherConfig, QueryBuilder, RuntimeError, SourceMap, SourcePath, VM,
+    matcher_entry_fn_name, materialize_verified,
 };
-use plotnik_rt::RuntimeEffect;
+use plotnik_rt::{Limit, RuntimeEffect, RuntimeLimitSpec};
 use tree_sitter::{Language as TsLanguage, Parser as TsParser};
 
 #[path = "../test_support/grammar_loader.rs"]
@@ -58,6 +67,9 @@ fn generated_matchers_replay_vm_traces() {
         "expected the full 06-vm corpus, generated only {} fixture modules",
         runs.len()
     );
+    program.push('\n');
+    program.push_str(&limit_trip_mod());
+    runs.push("limit_trip".to_string());
     let distinct: BTreeSet<&str> = runs.iter().map(String::as_str).collect();
     assert_eq!(distinct.len(), runs.len(), "fixture module names collide");
 
@@ -88,9 +100,10 @@ fn generated_matchers_replay_vm_traces() {
     cases.pass(&file);
 }
 
-/// One conformance module: the fixture's input, the VM's expected stream, the
-/// generated matcher, and a `run()` gluing them together. `None` when the
-/// query has compile errors (a diagnostics fixture — nothing to execute).
+/// One conformance module: the fixture's input, the VM's expected stream and
+/// value, the generated module, and a `run()` gluing them together. `None`
+/// when the query has compile errors (a diagnostics fixture — nothing to
+/// execute).
 fn conformance_mod(fx: &Fixture) -> Option<String> {
     let lang = resolve_lang(fx.ext.as_deref());
     let compiled = QueryBuilder::new(source_map(&fx.query))
@@ -108,23 +121,34 @@ fn conformance_mod(fx: &Fixture) -> Option<String> {
         .expect("a valid query has at least one named definition");
     let expected = vm_expected(&lang, module, &entry, &fx.input, &fx.name);
     let matcher = compiled
-        .to_rust_matcher(MatcherConfig::new())
+        .to_rust_matcher(MatcherConfig::new().serde(true))
         .expect("a query without errors compiles to a matcher");
 
     let mut out = String::new();
     let w = &mut out;
     writeln!(w, "mod {} {{", mod_ident(&fx.name)).expect("writing to a String is infallible");
+    writeln!(w, "    const NAME: &str = {:?};", fx.name)
+        .expect("writing to a String is infallible");
     writeln!(w, "    const SOURCE: &str = {:?};", fx.input)
         .expect("writing to a String is infallible");
     match &expected {
-        Some(lines) => {
+        Some(run) => {
             w.push_str("    const EXPECTED: Option<&[&str]> = Some(&[\n");
-            for line in lines {
+            for line in &run.effects {
                 writeln!(w, "        {line:?},").expect("writing to a String is infallible");
             }
             w.push_str("    ]);\n");
+            writeln!(
+                w,
+                "    const EXPECTED_JSON: Option<&str> = Some({:?});",
+                run.json
+            )
+            .expect("writing to a String is infallible");
         }
-        None => w.push_str("    const EXPECTED: Option<&[&str]> = None;\n"),
+        None => {
+            w.push_str("    const EXPECTED: Option<&[&str]> = None;\n");
+            w.push_str("    const EXPECTED_JSON: Option<&str> = None;\n");
+        }
     }
     w.push_str("\n    mod matcher {\n");
     for line in matcher.lines() {
@@ -144,26 +168,116 @@ fn conformance_mod(fx: &Fixture) -> Option<String> {
     .expect("writing to a String is infallible");
     writeln!(
         w,
-        "        crate::check({:?}, matcher::{}(&tree, SOURCE), EXPECTED);",
-        fx.name,
+        "        crate::check(NAME, matcher::{}(&tree, SOURCE), EXPECTED);",
         matcher_entry_fn_name(&entry),
     )
     .expect("writing to a String is infallible");
+    value_channel(w, module, &entry);
     w.push_str("    }\n}\n");
     Some(out)
 }
 
-/// The oracle: run the bytecode VM over the fixture input and render its
-/// committed effects. `None` is the no-match outcome; resource-limit errors
-/// fail the harness — a fixture that exhausts the VM has no golden behavior
-/// to conform to.
+/// The value-level differential inside a fixture's `run()`: call the typed
+/// entry point matching the definition's output shape, require the metered
+/// twin to agree, and diff the serialized value against the VM's JSON.
+fn value_channel(w: &mut String, module: &Module, entry: &str) {
+    let snake = matcher_entry_fn_name(entry);
+    let snake = snake
+        .strip_suffix("_trace")
+        .expect("entry fn names end in _trace by contract");
+    match entry_shape(module, entry) {
+        EntryShape::Matches => {
+            writeln!(
+                w,
+                "        let matched = matcher::{snake}_matches(&tree, SOURCE);"
+            )
+            .expect("writing to a String is infallible");
+            writeln!(
+                w,
+                "        assert_eq!(matched, EXPECTED.is_some(), \"{{NAME}}: matches() diverges from the VM outcome\");"
+            )
+            .expect("writing to a String is infallible");
+            writeln!(
+                w,
+                "        let metered = matcher::{snake}_try_matches(&tree, SOURCE).expect(\"auto limits fit the corpus\");"
+            )
+            .expect("writing to a String is infallible");
+            w.push_str(
+                "        assert_eq!(matched, metered, \"{NAME}: metered matches() diverges\");\n",
+            );
+        }
+        shape @ (EntryShape::Nominal | EntryShape::Free) => {
+            let (parse, try_parse) = match shape {
+                EntryShape::Nominal => (format!("{entry}::parse"), format!("{entry}::try_parse")),
+                EntryShape::Free => (format!("{snake}_parse"), format!("{snake}_try_parse")),
+                EntryShape::Matches => unreachable!("handled above"),
+            };
+            writeln!(w, "        let parsed = matcher::{parse}(&tree, SOURCE);")
+                .expect("writing to a String is infallible");
+            writeln!(
+                w,
+                "        let metered = matcher::{try_parse}(&tree, SOURCE).expect(\"auto limits fit the corpus\");"
+            )
+            .expect("writing to a String is infallible");
+            w.push_str(
+                "        assert_eq!(parsed, metered, \"{NAME}: metered parse diverges from unmetered\");\n",
+            );
+            w.push_str("        let json = parsed.map(|v| {\n");
+            w.push_str(
+                "            serde_json::to_string(&plotnik_rt::WithSource::new(&v, SOURCE))\n",
+            );
+            w.push_str("                .expect(\"typed output serializes\")\n");
+            w.push_str("        });\n");
+            w.push_str("        crate::check_value(NAME, json.as_deref(), EXPECTED_JSON);\n");
+        }
+    }
+}
+
+/// How a definition's output surfaces in the generated module. Decided from
+/// the bytecode type table — the same partition the emitter draws at the
+/// analysis level (struct/enum are nominal items, everything else an alias).
+enum EntryShape {
+    /// Void output: `{snake}_matches`.
+    Matches,
+    /// Struct/enum output: inherent `{Type}::parse`.
+    Nominal,
+    /// Alias output: free `{snake}_parse`.
+    Free,
+}
+
+fn entry_shape(module: &Module, entry: &str) -> EntryShape {
+    let entrypoint = module
+        .entrypoint(entry)
+        .expect("every named definition is an entrypoint");
+    let def = module
+        .types()
+        .get(entrypoint.result_type())
+        .expect("entry result type is in the type table");
+    match def.decode() {
+        TypeDefKind::Primitive(TypeKind::Void) => EntryShape::Matches,
+        TypeDefKind::Struct { .. } | TypeDefKind::Enum { .. } => EntryShape::Nominal,
+        TypeDefKind::Primitive(_) | TypeDefKind::Wrapper { .. } => EntryShape::Free,
+    }
+}
+
+/// One VM run's observable behavior: the committed effect stream (rendered
+/// to comparison lines) and the materialized value as JSON.
+struct VmRun {
+    effects: Vec<String>,
+    json: String,
+}
+
+/// The oracle: run the bytecode VM over the fixture input, render its
+/// committed effects, and materialize its value. `None` is the no-match
+/// outcome; resource-limit errors fail the harness — a fixture that exhausts
+/// the VM has no golden behavior to conform to.
 fn vm_expected(
     lang: &Lang,
     module: &Module,
     entry: &str,
     source: &str,
     name: &str,
-) -> Option<Vec<String>> {
+) -> Option<VmRun> {
     let mut parser = TsParser::new();
     parser
         .set_language(&lang.ts)
@@ -174,10 +288,61 @@ fn vm_expected(
         .expect("every named definition is an entrypoint");
     let vm = VM::builder(source, &tree).build();
     match vm.execute(module, &entrypoint) {
-        Ok(effects) => Some(effects.as_slice().iter().map(render_effect).collect()),
+        Ok(effects) => {
+            let value =
+                materialize_verified(source, module, &entrypoint, effects.as_slice(), Colors::OFF);
+            VmRun {
+                effects: effects.as_slice().iter().map(render_effect).collect(),
+                json: serde_json::to_string(&value).expect("VM value serializes"),
+            }
+            .into()
+        }
         Err(RuntimeError::NoMatch) => None,
         Err(err) => panic!("{name}: VM oracle failed: {err}"),
     }
+}
+
+/// A module pinning the compiled-in limit policy end to end: with a one-step
+/// budget the metered entry point must trip, while the unmetered `parse` of
+/// the same module still matches.
+fn limit_trip_mod() -> String {
+    let query = "Q = (program (expression_statement (identifier) @id))";
+    let compiled = QueryBuilder::new(source_map(query))
+        .compile(&JS_GRAMMAR)
+        .expect("query parsing should not exhaust fuel");
+    assert!(
+        !compiled.diagnostics().has_errors(),
+        "limit-trip query must compile"
+    );
+    let matcher = compiled
+        .to_rust_matcher(MatcherConfig::new().limits(RuntimeLimitSpec {
+            steps: Limit::Of(1),
+            memory: Limit::Auto,
+        }))
+        .expect("limit-trip query compiles to a matcher");
+
+    let mut out = String::new();
+    let w = &mut out;
+    w.push_str("mod limit_trip {\n");
+    w.push_str("    const SOURCE: &str = \"x;\";\n");
+    w.push_str("\n    mod matcher {\n");
+    for line in matcher.lines() {
+        if line.is_empty() {
+            w.push('\n');
+        } else {
+            writeln!(w, "        {line}").expect("writing to a String is infallible");
+        }
+    }
+    w.push_str("    }\n");
+    w.push_str("\n    pub fn run() {\n");
+    w.push_str("        let tree = crate::parse(crate::Lang::Js, SOURCE);\n");
+    w.push_str("        let parsed = matcher::Q::parse(&tree, SOURCE);\n");
+    w.push_str("        assert!(parsed.is_some(), \"limit_trip: unmetered parse must match\");\n");
+    w.push_str("        let err = matcher::Q::try_parse(&tree, SOURCE)\n");
+    w.push_str("            .expect_err(\"limit_trip: a one-step budget must trip\");\n");
+    w.push_str("        assert_eq!(err, plotnik_rt::LimitError::Steps(1));\n");
+    w.push_str("    }\n}\n");
+    out
 }
 
 /// Renders one effect for comparison. Nodes are identified by kind + byte
@@ -266,6 +431,30 @@ fn check(name: &str, got: Option<rt::EffectLog<'_>>, expected: Option<&[&str]>) 
         }
         (got, expected) => panic!(
             "{name}: outcome diverges — generated matcher: {}, VM: {}",
+            outcome(got.is_some()),
+            outcome(expected.is_some()),
+        ),
+    }
+}
+
+/// Compare serialized typed output against the VM's materialized value as
+/// JSON values, not strings: the VM orders struct fields by effect-firing
+/// order, generated serde impls by declaration order, and both are correct.
+fn check_value(name: &str, got: Option<&str>, expected: Option<&str>) {
+    match (got, expected) {
+        (None, None) => {}
+        (Some(got), Some(expected)) => {
+            let got: serde_json::Value =
+                serde_json::from_str(got).expect("typed output serializes to JSON");
+            let expected: serde_json::Value =
+                serde_json::from_str(expected).expect("VM value serializes to JSON");
+            assert_eq!(
+                got, expected,
+                "{name}: typed output diverges from the VM value"
+            );
+        }
+        (got, expected) => panic!(
+            "{name}: value outcome diverges — typed parse: {}, VM: {}",
             outcome(got.is_some()),
             outcome(expected.is_some()),
         ),

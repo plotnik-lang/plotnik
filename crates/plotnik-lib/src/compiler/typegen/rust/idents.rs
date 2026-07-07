@@ -36,7 +36,7 @@ fn rust_ident(name: &str) -> String {
 /// the module's items), in input order. Underscore-renamed keywords keep
 /// growing underscores until unique, so a scope holding both `self` and
 /// `self_` still renders collision-free.
-pub(super) fn scope_idents<'a>(names: impl Iterator<Item = &'a str>) -> Vec<String> {
+pub(crate) fn scope_idents<'a>(names: impl Iterator<Item = &'a str>) -> Vec<String> {
     let mut taken: HashSet<String> = HashSet::new();
     names
         .map(|name| {

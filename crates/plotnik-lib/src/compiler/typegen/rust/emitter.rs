@@ -26,7 +26,7 @@ use super::idents::scope_idents;
 
 const DERIVES: &str = "#[derive(Debug, Clone, PartialEq, Eq, Hash)]";
 
-pub(super) struct Emitter<'a> {
+pub(crate) struct Emitter<'a> {
     pub(super) types: &'a TypeAnalysis,
     pub(super) deps: &'a DependencyAnalysis,
     pub(super) interner: &'a Interner,
@@ -44,14 +44,14 @@ pub(super) struct Emitter<'a> {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct Item {
-    pub(super) name: Symbol,
-    pub(super) ty: TypeId,
-    pub(super) kind: ItemKind,
+pub(crate) struct Item {
+    pub(crate) name: Symbol,
+    pub(crate) ty: TypeId,
+    pub(crate) kind: ItemKind,
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub(super) enum ItemKind {
+pub(crate) enum ItemKind {
     Struct,
     Enum,
     Alias,
@@ -79,6 +79,44 @@ impl<'a> Emitter<'a> {
             item_idents: HashMap::new(),
             uses_node: false,
         }
+    }
+
+    /// A collected, name-assigned view for sibling backends: the matcher's
+    /// typed-replay readers must spell items and fields exactly as the type
+    /// declarations do, so they consult this model instead of re-deriving
+    /// names. Never call [`Self::emit`] on a model — it collects again.
+    pub(crate) fn model(
+        types: &'a TypeAnalysis,
+        deps: &'a DependencyAnalysis,
+        interner: &'a Interner,
+        config: &'a Config,
+    ) -> Self {
+        let mut emitter = Self::new(types, deps, interner, config);
+        emitter.collect();
+        emitter.assign_item_idents();
+        emitter
+    }
+
+    /// The declared items, in emission order (definitions first, named
+    /// composites parent-first after their owner).
+    pub(crate) fn items(&self) -> &[Item] {
+        &self.items
+    }
+
+    /// Whether the type's rendering mentions `'t` (transitively holds a node).
+    pub(crate) fn needs_lifetime(&self, ty: TypeId) -> bool {
+        self.facts.needs_lifetime(ty)
+    }
+
+    /// Whether this `Ref` occurrence renders as `Box<...>`.
+    pub(crate) fn is_boxed_ref(&self, ref_ty: TypeId) -> bool {
+        self.facts.is_boxed(ref_ty)
+    }
+
+    /// The naming-pass name of a nominal type, when it has one. Trustworthy
+    /// only for the shapes `type_names` covers (see the field's doc).
+    pub(crate) fn type_name_of(&self, ty: TypeId) -> Option<Symbol> {
+        self.type_names.get(&ty).copied()
     }
 
     pub(super) fn emit(mut self) -> String {
@@ -217,7 +255,7 @@ impl<'a> Emitter<'a> {
         }
     }
 
-    pub(super) fn item_ident(&self, name: Symbol) -> &str {
+    pub(crate) fn item_ident(&self, name: Symbol) -> &str {
         self.item_idents
             .get(&name)
             .expect("every declared item name has an identifier")

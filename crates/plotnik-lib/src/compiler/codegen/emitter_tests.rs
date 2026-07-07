@@ -1,6 +1,6 @@
-use plotnik_rt::Nav;
+use plotnik_rt::{Limit, Nav};
 
-use super::emitter::{nav_expr, shouty_ident, snake_ident};
+use super::emitter::{limit_expr, nav_expr, shouty_ident, snake_ident};
 
 #[test]
 fn shouty_splits_pascal_humps() {
@@ -24,4 +24,13 @@ fn nav_expr_matches_debug() {
     assert_eq!(nav_expr(Nav::DownSkip), "rt::Nav::DownSkip");
     assert_eq!(nav_expr(Nav::Up(2)), "rt::Nav::Up(2)");
     assert_eq!(nav_expr(Nav::UpSkipTrivia(31)), "rt::Nav::UpSkipTrivia(31)");
+}
+
+#[test]
+fn limit_expr_matches_debug() {
+    // The compiled-in `LIMITS` const spells limits via their Debug form; pin
+    // that it stays valid variant syntax, including the tuple variant.
+    assert_eq!(limit_expr(Limit::Auto), "rt::Limit::Auto");
+    assert_eq!(limit_expr(Limit::Of(3)), "rt::Limit::Of(3)");
+    assert_eq!(limit_expr(Limit::Unbounded), "rt::Limit::Unbounded");
 }
