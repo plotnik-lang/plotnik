@@ -23,9 +23,22 @@ impl ExpandError {
     }
 }
 
+/// A parsed string literal argument and the token span diagnostics should
+/// underline when that argument is responsible for an error.
+pub struct StringArg {
+    pub value: String,
+    pub span: Span,
+}
+
+impl StringArg {
+    fn new(value: String, span: Span) -> Self {
+        Self { value, span }
+    }
+}
+
 pub enum QuerySource {
-    Inline { text: String, span: Span },
-    File { path: String, span: Span },
+    Inline { literal: StringArg },
+    File { path: StringArg },
 }
 
 /// A limit argument as written; mirrors `plotnik_rt::Limit` without naming it
@@ -37,8 +50,7 @@ pub enum LimitArg {
 }
 
 pub struct MacroArgs {
-    pub grammar: String,
-    pub grammar_span: Span,
+    pub grammar: StringArg,
     pub query: QuerySource,
     /// The `crate = ::path` override, stringified; `None` means the default
     /// facade path.
@@ -95,7 +107,7 @@ impl LimitKey {
 
 #[derive(Default)]
 struct ArgSlots {
-    grammar: Option<(String, Span)>,
+    grammar: Option<StringArg>,
     query: Option<QuerySource>,
     rt_crate: Option<String>,
     limits: LimitArgs,
@@ -115,7 +127,7 @@ impl ArgSlots {
     }
 
     fn finish(self, call_span: Span) -> Result<MacroArgs, ExpandError> {
-        let Some((grammar, grammar_span)) = self.grammar else {
+        let Some(grammar) = self.grammar else {
             return Err(ExpandError::new(
                 call_span,
                 "missing `grammar = \"...\"`: name a dependency that ships a grammar \
@@ -131,7 +143,6 @@ impl ArgSlots {
 
         Ok(MacroArgs {
             grammar,
-            grammar_span,
             query,
             rt_crate: self.rt_crate,
             limits: self.limits,
@@ -186,7 +197,7 @@ impl ArgCursor {
         }
     }
 
-    fn take_string(&mut self, key_span: Span, key: &str) -> Result<(String, Span), ExpandError> {
+    fn take_string(&mut self, key_span: Span, key: &str) -> Result<StringArg, ExpandError> {
         let Some(token) = self.current().cloned() else {
             return Err(ExpandError::new(
                 key_span,
@@ -253,8 +264,8 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
         match &token {
             // The one positional argument: the query string.
             TokenTree::Literal(lit) => {
-                let (text, span) = string_value(&token)?;
-                args.put_query(QuerySource::Inline { text, span }, lit.span())?;
+                let literal = string_value(&token)?;
+                args.put_query(QuerySource::Inline { literal }, lit.span())?;
                 cursor.advance();
             }
             TokenTree::Ident(ident) => {
@@ -267,8 +278,9 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                         put(&mut args.grammar, value, key_span, &key)?;
                     }
                     "file" => {
-                        let (path, span) = cursor.take_string(key_span, &key)?;
-                        args.put_query(QuerySource::File { path, span }, span)?;
+                        let path = cursor.take_string(key_span, &key)?;
+                        let span = path.span;
+                        args.put_query(QuerySource::File { path }, span)?;
                     }
                     "crate" => {
                         let value = cursor.take_path(key_span)?;
@@ -315,10 +327,10 @@ fn put<T>(slot: &mut Option<T>, value: T, span: Span, key: &str) -> Result<(), E
     Ok(())
 }
 
-fn string_value(token: &TokenTree) -> Result<(String, Span), ExpandError> {
+fn string_value(token: &TokenTree) -> Result<StringArg, ExpandError> {
     let text = token.to_string();
     match litrs::StringLit::parse(text) {
-        Ok(lit) => Ok((lit.value().to_string(), token.span())),
+        Ok(lit) => Ok(StringArg::new(lit.value().to_string(), token.span())),
         Err(_) => Err(ExpandError::new(
             token.span(),
             "expected a string literal here",

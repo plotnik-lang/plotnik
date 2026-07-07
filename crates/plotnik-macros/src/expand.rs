@@ -97,10 +97,10 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
     let base_dir = invoking_dir();
     let query = load_query_input(&args.query, base_dir.as_deref(), anchors)?;
 
-    let spec = grammar_source::parse_spec(&args.grammar);
+    let spec = grammar_source::parse_spec(&args.grammar.value);
     let loaded_grammar = grammar_source::load(&spec, base_dir.as_deref())
-        .map_err(|message| ExpandError::new(args.grammar_span, message))?;
-    anchors.grammar(&spec, &args.grammar, &loaded_grammar.path);
+        .map_err(|message| ExpandError::new(args.grammar.span, message))?;
+    anchors.grammar(&spec, &args.grammar.value, &loaded_grammar.path);
 
     // Mirror `plotnik check --strict`: a compile-time-committed query must be
     // clean — proc macros have no warning channel, so warnings fail too.
@@ -170,23 +170,26 @@ fn load_query_input(
     anchors: &mut RebuildAnchors,
 ) -> Result<QueryInput, ExpandError> {
     match source {
-        QuerySource::Inline { text, span } => Ok(QueryInput {
-            source_map: SourceMap::from_inline(text),
-            span: *span,
+        QuerySource::Inline { literal } => Ok(QueryInput {
+            source_map: SourceMap::from_inline(&literal.value),
+            span: literal.span,
         }),
-        QuerySource::File { path, span } => {
-            let resolved = grammar_source::resolve_relative(path, base_dir)
-                .map_err(|message| ExpandError::new(*span, message))?;
+        QuerySource::File { path } => {
+            let resolved = grammar_source::resolve_relative(&path.value, base_dir)
+                .map_err(|message| ExpandError::new(path.span, message))?;
             let content = std::fs::read_to_string(&resolved).map_err(|error| {
-                ExpandError::new(*span, format!("failed to read `{path}`: {error}"))
+                ExpandError::new(
+                    path.span,
+                    format!("failed to read `{}`: {error}", path.value),
+                )
             })?;
-            anchors.query_file(path);
+            anchors.query_file(&path.value);
 
             let mut source_map = SourceMap::new();
-            source_map.add_file(SourcePath::new(path), &content);
+            source_map.add_file(SourcePath::new(&path.value), &content);
             Ok(QueryInput {
                 source_map,
-                span: *span,
+                span: path.span,
             })
         }
     }
