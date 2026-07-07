@@ -19,6 +19,35 @@ use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
 use super::emitter::{Emitter, Item, ItemKind, TypeContext};
 use super::idents::scope_idents;
 
+struct SerdeBody {
+    code: String,
+    uses_source: bool,
+}
+
+impl SerdeBody {
+    fn with_source(code: String) -> Self {
+        Self {
+            code,
+            uses_source: true,
+        }
+    }
+
+    fn without_source(code: String) -> Self {
+        Self {
+            code,
+            uses_source: false,
+        }
+    }
+
+    fn source_param(&self) -> &'static str {
+        if self.uses_source {
+            "source"
+        } else {
+            "_source"
+        }
+    }
+}
+
 struct EnumVariant<'a> {
     item_ty: TypeId,
     payload: TypeId,
@@ -67,11 +96,8 @@ impl Emitter<'_> {
 
         // Only payload fields thread the source through; a tags-only enum
         // never touches it and must not bind it, or the impl warns.
-        let source = if body.contains("source") {
-            "source"
-        } else {
-            "_source"
-        };
+        let source = body.source_param();
+        let body = body.code;
 
         format!(
             "impl {rt}::SerializeWithSource for {ident}{args} {{
@@ -90,7 +116,7 @@ impl Emitter<'_> {
         )
     }
 
-    fn struct_body(&mut self, item: &Item) -> String {
+    fn struct_body(&mut self, item: &Item) -> SerdeBody {
         let types = self.types;
         let interner = self.interner;
         let rt = self.config.rt_crate.clone();
@@ -112,10 +138,10 @@ impl Emitter<'_> {
             .expect("writing to a String is infallible");
         }
         out.push_str("        map.end()\n");
-        out
+        SerdeBody::with_source(out)
     }
 
-    fn enum_body(&mut self, item: &Item, ident: &str) -> String {
+    fn enum_body(&mut self, item: &Item, ident: &str) -> SerdeBody {
         let types = self.types;
         let interner = self.interner;
         let TypeShape::Enum(variants) = types.expect_type_shape(item.ty) else {
@@ -124,10 +150,12 @@ impl Emitter<'_> {
         let variant_idents = scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
 
         let mut out = String::from("        match self {\n");
+        let mut uses_source = false;
         for ((&label_sym, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
             let label = interner.resolve(label_sym).to_owned();
             let variant = EnumVariant::new(item.ty, payload, ident, variant_ident, &label);
             let arm = if variant.has_payload() {
+                uses_source = true;
                 self.payload_arm(&variant)
             } else {
                 unit_arm(&variant)
@@ -135,7 +163,11 @@ impl Emitter<'_> {
             out.push_str(&arm);
         }
         out.push_str("        }\n");
-        out
+        if uses_source {
+            SerdeBody::with_source(out)
+        } else {
+            SerdeBody::without_source(out)
+        }
     }
 
     fn payload_arm(&mut self, variant: &EnumVariant<'_>) -> String {
