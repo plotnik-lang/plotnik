@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
-use plotnik_lib::{MatcherConfig, QueryBuilder, SourceMap, SourcePath};
+use plotnik_lib::{CompiledQuery, MatcherConfig, QueryBuilder, SourceMap, SourcePath};
 use plotnik_rt::{Limit, RuntimeLimitSpec};
 
 use crate::args::{self, ExpandError, LimitArg, LimitArgs, QuerySource};
@@ -80,25 +80,7 @@ fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, E
         return Err(ExpandError::new(query.span, message));
     }
 
-    // Every definition becomes snake_case items (`{def}_trace`, the
-    // `parse`/`matches` surface). Distinct PascalCase names can collapse to
-    // one snake form (`HTTPServer` / `HttpServer`); generated code would
-    // then fail with a bare rustc duplicate-definition error, so refuse the
-    // query with the real diagnosis instead.
-    let mut entry_names: HashMap<String, String> = HashMap::new();
-    for def in compiled.definition_names() {
-        let entry = plotnik_lib::matcher_entry_fn_name(&def);
-        if let Some(previous) = entry_names.insert(entry.clone(), def.clone()) {
-            return Err(ExpandError::new(
-                query.span,
-                format!(
-                    "definitions `{previous}` and `{def}` collide in generated code: \
-                     both would be spelled `{entry}`; rename one so their snake_case \
-                     forms differ"
-                ),
-            ));
-        }
-    }
+    reject_colliding_entry_names(&compiled, query.span)?;
 
     let config = MatcherConfig::new()
         .rt_crate(args.rt_crate.unwrap_or_else(|| "::plotnik::rt".to_string()))
@@ -108,6 +90,29 @@ fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, E
     Ok(compiled
         .to_rust_matcher(config)
         .expect("a diagnostics-clean query generates a module"))
+}
+
+/// Every definition becomes snake_case items (`{def}_trace`, the
+/// `parse`/`matches` surface). Distinct PascalCase names can collapse to one
+/// snake form (`HTTPServer` / `HttpServer`); generated code would then fail
+/// with a bare rustc duplicate-definition error, so refuse the query with the
+/// real diagnosis instead.
+fn reject_colliding_entry_names(compiled: &CompiledQuery, span: Span) -> Result<(), ExpandError> {
+    let mut entry_names: HashMap<String, String> = HashMap::new();
+    for def in compiled.definition_names() {
+        let entry = plotnik_lib::matcher_entry_fn_name(&def);
+        if let Some(previous) = entry_names.insert(entry.clone(), def.clone()) {
+            return Err(ExpandError::new(
+                span,
+                format!(
+                    "definitions `{previous}` and `{def}` collide in generated code: \
+                     both would be spelled `{entry}`; rename one so their snake_case \
+                     forms differ"
+                ),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// The query text and diagnostic span, with file sources anchored so edits
