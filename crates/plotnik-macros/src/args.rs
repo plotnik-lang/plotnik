@@ -41,6 +41,15 @@ pub enum QuerySource {
     File { path: StringArg },
 }
 
+impl QuerySource {
+    fn span(&self) -> Span {
+        match self {
+            Self::Inline { literal } => literal.span,
+            Self::File { path } => path.span,
+        }
+    }
+}
+
 /// A limit argument as written; mirrors `plotnik_rt::Limit` without naming it
 /// (this module stays token-only).
 pub enum LimitArg {
@@ -114,10 +123,10 @@ struct ArgSlots {
 }
 
 impl ArgSlots {
-    fn put_query(&mut self, source: QuerySource, span: Span) -> Result<(), ExpandError> {
+    fn put_query(&mut self, source: QuerySource) -> Result<(), ExpandError> {
         if self.query.is_some() {
             return Err(ExpandError::new(
-                span,
+                source.span(),
                 "the query is already given; `query!` takes one query string \
                  (or one `file = \"...\"`)",
             ));
@@ -263,9 +272,9 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
     while let Some(token) = cursor.current().cloned() {
         match &token {
             // The one positional argument: the query string.
-            TokenTree::Literal(lit) => {
+            TokenTree::Literal(_) => {
                 let literal = string_value(&token)?;
-                args.put_query(QuerySource::Inline { literal }, lit.span())?;
+                args.put_query(QuerySource::Inline { literal })?;
                 cursor.advance();
             }
             TokenTree::Ident(ident) => {
@@ -279,8 +288,7 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                     }
                     "file" => {
                         let path = cursor.take_string(key_span, &key)?;
-                        let span = path.span;
-                        args.put_query(QuerySource::File { path }, span)?;
+                        args.put_query(QuerySource::File { path })?;
                     }
                     "crate" => {
                         let value = cursor.take_path(key_span)?;
