@@ -255,6 +255,10 @@ impl NfaDumper<'_> {
     }
 
     fn kind_name(&self, id: NodeKindId) -> String {
+        // The builtin error symbol has no grammar entry; render `(ERROR)` as written.
+        if id == NodeKindId::ERROR {
+            return "ERROR".to_string();
+        }
         self.artifacts
             .grammar
             .kind_name(id, self.artifacts.interner)

@@ -65,6 +65,13 @@ pub struct NodeKindId(NonZeroU16);
 
 nonzero_u16_id!(NodeKindId);
 
+impl NodeKindId {
+    /// Tree-sitter's builtin error symbol (`ts_builtin_sym_error`, `(TSSymbol)-1`).
+    /// Every grammar shares it for `(ERROR)` nodes, and its metadata is always
+    /// `named`, so a live error node satisfies `is_named() && kind_id() == ERROR`.
+    pub const ERROR: Self = Self(NonZeroU16::new(0xFFFF).expect("0xFFFF is non-zero lol"));
+}
+
 /// Field ID (tree-sitter uses NonZeroU16).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]

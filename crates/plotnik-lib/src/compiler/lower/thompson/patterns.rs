@@ -17,7 +17,7 @@ use crate::compiler::lower::ir::{
 use crate::compiler::parse::ast::{self, Pattern};
 use crate::compiler::parse::cst::SyntaxKind;
 use crate::compiler::parse::strings::unescape;
-use crate::core::NodeFieldId;
+use crate::core::{NodeFieldId, NodeKindId};
 
 use crate::compiler::analyze::types::CaptureKind;
 
@@ -1250,10 +1250,14 @@ impl NfaBuilder<'_> {
         let type_token = node
             .kind_token()
             .expect("validated node pattern must have a kind token");
-        if matches!(
-            type_token.kind(),
-            SyntaxKind::KwError | SyntaxKind::KwMissing
-        ) {
+        // `(ERROR)` is tree-sitter's builtin error symbol, always named — match it
+        // exactly rather than as any named node.
+        if type_token.kind() == SyntaxKind::KwError {
+            return NodeKindConstraint::Named(Some(NodeKindId::ERROR));
+        }
+        // `(MISSING)` is an orthogonal flag on a node of some kind, not a kind of
+        // its own; still lowered as a wildcard until the missing constraint lands.
+        if type_token.kind() == SyntaxKind::KwMissing {
             return NodeKindConstraint::Named(None);
         }
         let type_name = type_token.text();

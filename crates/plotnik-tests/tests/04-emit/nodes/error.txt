@@ -6,7 +6,7 @@ Q = 6
 [transitions]
 Q:
   1                                         ▶
-  2   !   (_) [Node Set(err)]               1
+  2   !   (ERROR) [Node Set(err)]           1
 
 Q (entrypoint):
   3                                         ▶
@@ -40,4 +40,4 @@ Q:
   5                                         ▶
   6                                         ▶
   7  ...
-  8   !   (_) [Node Set(M0)]                6
+  8   !   (ERROR) [Node Set(M0)]            6

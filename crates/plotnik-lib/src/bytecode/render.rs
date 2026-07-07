@@ -194,6 +194,10 @@ impl<'a> MatchRenderer<'a> {
     }
 
     fn format_node_kind_name(&self, id: NodeKindId, dump_prefix: &str) -> String {
+        // The builtin error symbol has no grammar entry; render `(ERROR)` as written.
+        if id == NodeKindId::ERROR {
+            return "ERROR".to_string();
+        }
         match self.context.node_kind_name(id) {
             Some(name) => name.to_string(),
             None => self.missing_symbols.format(dump_prefix, id),
