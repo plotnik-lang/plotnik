@@ -2106,6 +2106,7 @@ dependencies = [
  "insta",
  "log",
  "logos",
+ "plotnik-rt",
  "proptest",
  "regex-automata",
  "regex-syntax",
@@ -2116,6 +2117,14 @@ dependencies = [
  "similar 3.1.1",
  "thiserror",
  "topological-sort",
+ "tree-sitter",
+]
+
+[[package]]
+name = "plotnik-rt"
+version = "0.3.3"
+dependencies = [
+ "regex-automata",
  "tree-sitter",
 ]
 

@@ -8,6 +8,9 @@ check:
 	@cargo check \
 		--workspace \
 		--all-targets
+	@cargo check \
+		--package plotnik-lib \
+		--no-default-features
 
 clippy:
 	@cargo clippy \

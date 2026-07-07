@@ -5,7 +5,7 @@
 //! exactly — including the cases that previously forced an O(n) rescan:
 //! duplicate max-holders and the all-`None` stack.
 
-use super::checkpoint::{Checkpoint, CheckpointStack, CheckpointState};
+use crate::checkpoint::{Checkpoint, CheckpointStack, CheckpointState};
 
 fn cp(frame_index: Option<u32>) -> Checkpoint {
     Checkpoint::branch(

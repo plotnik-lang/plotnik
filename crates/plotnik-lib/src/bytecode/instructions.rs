@@ -13,8 +13,8 @@ use super::constants::{
     MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_SUCCESSORS, STEP_SIZE,
 };
 use super::effects::{EFFECT_PAYLOAD_MAX, Effect};
-use super::nav::Nav;
 use super::node_kind_constraint::NodeKindConstraint;
+use plotnik_rt::Nav;
 
 /// Fixed header bytes before an extended Match's payload — exactly the first
 /// step. Effects, negated fields, an optional predicate, and successors follow,

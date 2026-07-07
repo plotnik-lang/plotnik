@@ -19,15 +19,17 @@
 pub mod bytecode;
 mod compiler;
 mod core;
+#[cfg(feature = "vm")]
 mod vm;
 
 pub use crate::bytecode::type_system;
 pub use crate::core::colors;
 pub use crate::core::grammar;
 pub use crate::core::utils as text_utils;
+pub use crate::core::{Cardinality, NodeFieldId, NodeKind, NodeKindId};
+#[cfg(feature = "vm")]
 pub use crate::core::{
-    Cardinality, DumpChunk, DumpChunkKind, DumpNode, NodeFieldId, NodeKind, NodeKindId, TreeDump,
-    dump_tree, dump_tree_text, tree_to_json,
+    DumpChunk, DumpChunkKind, DumpNode, TreeDump, dump_tree, dump_tree_text, tree_to_json,
 };
 
 pub mod diagnostics {
@@ -54,6 +56,7 @@ pub use crate::compiler::{
     DiagnosticBuilder, DiagnosticKind, Diagnostics, Error, QueryResult, Severity, Span,
 };
 
+#[cfg(feature = "vm")]
 pub use crate::vm::{
     Binding, EffectLog, Inspection, InspectionEntry, Limit, NodeHandle, NodeRef, NoopTracer,
     PrintTracer, PrintTracerBuilder, Recording, RecordingTracer, ResolvedRuntimeLimits, RunStats,

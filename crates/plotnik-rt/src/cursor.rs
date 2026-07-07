@@ -8,8 +8,7 @@ use std::num::NonZeroU64;
 
 use tree_sitter::{Node, TreeCursor};
 
-use crate::bytecode::Nav;
-use crate::core::{NodeClass, NodeFieldId, SkipClass};
+use crate::{Nav, NodeClass, NodeFieldId, SkipClass};
 
 /// Upper bound on live snapshots. Restores overwhelmingly hit the newest
 /// checkpoints (LIFO unwinding), so a small window captures nearly all hits
@@ -63,7 +62,7 @@ impl SkipPolicy {
 /// Exit constraint for Up navigation, checked at *each* level ascended (so
 /// same-mode `Up*` instructions compose; see [`CursorWrapper::go_up`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum UpMode {
+enum UpMode {
     /// No constraint - just ascend.
     Any,
     /// Each node left must be its parent's last non-trivia child.

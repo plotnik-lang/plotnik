@@ -10,7 +10,7 @@ use std::borrow::Cow;
 
 use super::Effect;
 use super::effects::EffectKind;
-use super::nav::Nav;
+use plotnik_rt::Nav;
 
 /// Column widths for instruction line formatting.
 pub mod cols {

@@ -38,7 +38,7 @@ pub struct RegexDfas {
 }
 
 impl RegexDfas {
-    pub(crate) fn new(dfas: Vec<Option<DFA<Vec<u8>>>>) -> Self {
+    pub fn new(dfas: Vec<Option<DFA<Vec<u8>>>>) -> Self {
         Self { dfas }
     }
 

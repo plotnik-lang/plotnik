@@ -54,17 +54,11 @@ jobs:
         run: |
           next="${{ steps.version.outputs.next }}"
           tomato set workspace.package.version "$next" Cargo.toml
-          tomato set workspace.dependencies.plotnik-core.version "$next" Cargo.toml
-          tomato set workspace.dependencies.plotnik-bytecode.version "$next" Cargo.toml
-          tomato set workspace.dependencies.plotnik-compiler.version "$next" Cargo.toml
-          tomato set workspace.dependencies.plotnik-vm.version "$next" Cargo.toml
-          tomato set workspace.dependencies.plotnik-langs.version "$next" Cargo.toml
           tomato set workspace.dependencies.plotnik-lib.version "$next" Cargo.toml
+          tomato set workspace.dependencies.plotnik-rt.version "$next" Cargo.toml
           # explicit default-features = false overrides need local version bumps too
-          tomato set dependencies.plotnik-langs.version "$next" crates/plotnik-compiler/Cargo.toml
-          tomato set dependencies.plotnik-compiler.version "$next" crates/plotnik-lib/Cargo.toml
-          tomato set dependencies.plotnik-langs.version "$next" crates/plotnik-cli/Cargo.toml
           tomato set dependencies.plotnik-lib.version "$next" crates/plotnik-cli/Cargo.toml
+          tomato set build-dependencies.plotnik-lib.version "$next" crates/plotnik-cli/Cargo.toml
 
       - name: Update lockfile
         run: cargo check --workspace

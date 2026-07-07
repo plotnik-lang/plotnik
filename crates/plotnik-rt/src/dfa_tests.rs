@@ -1,6 +1,6 @@
 //! Tests for regex DFA deserialization.
 
-use crate::bytecode::dfa::deserialize_dfa;
+use crate::dfa::deserialize_dfa;
 
 // `Module::load_regex_dfas` no longer pre-checks for empty DFA bytes; it relies
 // on `deserialize_dfa` rejecting empty/garbage input so a forged module with a

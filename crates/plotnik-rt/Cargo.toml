@@ -1,0 +1,22 @@
+[package]
+name = "plotnik-rt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared runtime engine for Plotnik queries"
+documentation = "https://docs.rs/plotnik-rt"
+readme = "../../README.md"
+keywords = ["tree-sitter", "query", "ast", "parser"]
+categories = ["parsing", "development-tools"]
+
+[lints]
+workspace = true
+
+[features]
+default = ["tree-sitter"]
+tree-sitter = ["dep:tree-sitter"]
+
+[dependencies]
+regex-automata = { version = "0.4", features = ["dfa-search"] }
+tree-sitter = { version = "0.26.10", optional = true }

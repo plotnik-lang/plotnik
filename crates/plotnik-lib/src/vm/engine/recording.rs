@@ -6,8 +6,8 @@ use tree_sitter::Node;
 use crate::bytecode::{EffectKind, Instruction, Module, ModuleRenderContext, Nav};
 use crate::core::NodeFieldId;
 
-use super::effect::RuntimeEffect;
 use super::trace::Tracer;
+use plotnik_rt::RuntimeEffect;
 
 #[derive(Debug, Serialize)]
 pub struct Recording {

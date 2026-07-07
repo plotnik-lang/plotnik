@@ -11,8 +11,8 @@ use super::instructions::{
     Call, EncodeError, Match, MatchInstr, MatchPredicate, Opcode, Return, StepId, align_to_section,
     select_match_opcode,
 };
-use super::nav::Nav;
 use super::node_kind_constraint::NodeKindConstraint;
+use plotnik_rt::Nav;
 
 #[test]
 fn from_u8_decodes_known_and_rejects_unknown() {

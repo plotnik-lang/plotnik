@@ -11,12 +11,12 @@ use crate::bytecode::{
 
 use crate::core::NodeFieldId;
 
-use super::checkpoint::{CallResume, Checkpoint, CheckpointStack, CheckpointState};
-use super::cursor::{CursorWrapper, SkipPolicy};
-use super::effect::{EffectLog, RuntimeEffect};
+use plotnik_rt::{
+    CallResume, Checkpoint, CheckpointStack, CheckpointState, CursorWrapper, EffectLog, FrameArena,
+    ResolvedRuntimeLimits, RuntimeEffect, RuntimeLimitSpec, SkipPolicy,
+};
+
 use super::error::{ControlFlow, RuntimeError, Signal};
-use super::frame::FrameArena;
-use super::limits::{ResolvedRuntimeLimits, RuntimeLimitSpec};
 use super::trace::{NoopTracer, Tracer};
 use super::value::node_text;
 

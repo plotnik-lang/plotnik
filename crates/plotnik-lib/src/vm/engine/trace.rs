@@ -27,7 +27,7 @@ use crate::bytecode::{
 };
 use crate::core::{Colors, NodeFieldId};
 
-use super::effect::RuntimeEffect;
+use plotnik_rt::RuntimeEffect;
 
 /// Verbosity level for trace output.
 ///

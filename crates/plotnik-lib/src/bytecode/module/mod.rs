@@ -18,7 +18,7 @@ use super::{
     Entrypoint, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STEP_SIZE,
     STRING_TABLE_ENTRY_SIZE,
 };
-use crate::bytecode::dfa::RegexDfas;
+use plotnik_rt::RegexDfas;
 
 mod decoded;
 mod effect_stack;

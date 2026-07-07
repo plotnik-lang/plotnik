@@ -13,7 +13,6 @@ use super::super::instructions::{
     MATCH_PAYLOAD_START, MatchCounts, MatchPredicate, PAYLOAD_SLOT_SIZE, PREDICATE_SIZE,
     PREDICATE_SLOTS, header_byte,
 };
-use super::super::nav::Nav;
 use super::super::node_kind_constraint::NodeKindConstraint;
 use super::super::sections::SymbolNameEntry;
 use super::super::type_meta::{TypeDefKind, TypeMember, TypeNameEntry};
@@ -22,6 +21,7 @@ use super::super::{
 };
 use super::*;
 use crate::bytecode::predicate_op::PredicateOp;
+use plotnik_rt::Nav;
 
 /// Module load error.
 ///

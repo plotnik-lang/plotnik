@@ -6,9 +6,9 @@
 
 use std::num::NonZeroU64;
 
-use crate::core::NodeFieldId;
+use crate::NodeFieldId;
 
-use super::cursor::SkipPolicy;
+use crate::cursor::SkipPolicy;
 
 /// Everything needed to re-enter a callee at the next sibling after a Call's
 /// callee fails. Carrying this on the checkpoint (rather than in ambient VM
@@ -17,42 +17,42 @@ use super::cursor::SkipPolicy;
 #[derive(Clone, Copy, Debug)]
 pub struct CallResume {
     /// Callee entry (raw step index).
-    pub(crate) target: u16,
+    pub target: u16,
     /// Return address after the callee (raw step index).
-    pub(crate) next: u16,
+    pub next: u16,
     /// Field constraint the next candidate must satisfy, if any.
-    pub(crate) field: Option<NodeFieldId>,
+    pub field: Option<NodeFieldId>,
     /// How to advance to the next candidate.
-    pub(crate) policy: SkipPolicy,
+    pub policy: SkipPolicy,
 }
 
 /// The VM state a checkpoint snapshots and later restores: everything shared
 /// by both branch and Call-retry checkpoints. Bundling these fields keeps the
 /// snapshot at creation and the restore on backtrack in lockstep.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct CheckpointState {
+pub struct CheckpointState {
     /// Cursor position (tree-sitter descendant_index) — always present; the
     /// restore fallback when the pooled snapshot was evicted.
-    pub(crate) descendant_index: u32,
+    pub descendant_index: u32,
     /// Effect stream length at checkpoint.
-    pub(crate) effect_watermark: usize,
+    pub effect_watermark: usize,
     /// Frame arena state at checkpoint.
-    pub(crate) frame_index: Option<u32>,
+    pub frame_index: Option<u32>,
     /// Recursion depth at checkpoint.
-    pub(crate) recursion_depth: u32,
+    pub recursion_depth: u32,
     /// Suppression depth at checkpoint (see `VM::suppress_depth` for its bound).
-    pub(crate) suppress_depth: u64,
+    pub suppress_depth: u64,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Checkpoint {
     /// VM state to restore on backtrack.
-    pub(crate) state: CheckpointState,
+    pub state: CheckpointState,
     /// Resume point for a plain (branch) checkpoint (raw step index).
-    pub(crate) ip: u16,
+    pub ip: u16,
     /// If set, this is a Call retry: advance the cursor and re-enter the
     /// callee instead of resuming at `ip`.
-    pub(crate) call_resume: Option<CallResume>,
+    pub call_resume: Option<CallResume>,
     /// Maximum `frame_index` over this checkpoint and everything beneath it on
     /// the stack. The whole stack's max is therefore the top's `max_frame_idx_below`,
     /// so pruning never has to scan.
