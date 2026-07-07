@@ -58,18 +58,18 @@ fn try_expand(input: TokenStream, anchors: &mut Vec<String>) -> Result<String, E
     let query = load_query_input(&args.query, base_dir.as_deref(), anchors)?;
 
     let spec = grammar_source::parse_spec(&args.grammar);
-    let (grammar, grammar_path) = grammar_source::load(&spec, base_dir.as_deref())
+    let loaded_grammar = grammar_source::load(&spec, base_dir.as_deref())
         .map_err(|message| ExpandError::new(args.grammar_span, message))?;
     anchors.push(format!(
         "const _: &[u8] = ::core::include_bytes!({:?});",
-        anchor_path(&spec, &args.grammar, &grammar_path)
+        anchor_path(&spec, &args.grammar, &loaded_grammar.path)
     ));
 
     // Mirror `plotnik check --strict`: a compile-time-committed query must be
     // clean — proc macros have no warning channel, so warnings fail too.
     let compiled = QueryBuilder::new(query.source_map)
         .with_strict_lints(true)
-        .compile(&grammar)
+        .compile(&loaded_grammar.grammar)
         .map_err(|error| ExpandError::new(query.span, error.to_string()))?;
     let diagnostics = compiled.diagnostics();
     if diagnostics.has_errors() || diagnostics.has_warnings() {

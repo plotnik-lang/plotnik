@@ -65,6 +65,17 @@ impl ResolvedGrammar {
     }
 }
 
+pub struct LoadedGrammar {
+    pub grammar: Arc<Grammar>,
+    pub path: PathBuf,
+}
+
+impl LoadedGrammar {
+    fn new(grammar: Arc<Grammar>, path: PathBuf) -> Self {
+        Self { grammar, path }
+    }
+}
+
 struct NamedGrammar {
     name: String,
     resolved: ResolvedGrammar,
@@ -99,10 +110,7 @@ pub fn resolve(spec: &GrammarSpec<'_>, base_dir: Option<&Path>) -> Result<Resolv
 /// megabytes (tree-sitter-typescript), so re-parsing it once per invocation
 /// is real build time. Files are stable within one compiler process; edits
 /// between processes are what the `include_bytes!` rebuild anchors track.
-pub fn load(
-    spec: &GrammarSpec<'_>,
-    base_dir: Option<&Path>,
-) -> Result<(Arc<Grammar>, PathBuf), String> {
+pub fn load(spec: &GrammarSpec<'_>, base_dir: Option<&Path>) -> Result<LoadedGrammar, String> {
     static CACHE: OnceLock<Mutex<HashMap<PathBuf, Arc<Grammar>>>> = OnceLock::new();
 
     let resolved = resolve(spec, base_dir)?;
@@ -112,7 +120,7 @@ pub fn load(
         .expect("grammar cache lock is never poisoned")
         .get(&resolved.path)
     {
-        return Ok((Arc::clone(grammar), resolved.path));
+        return Ok(LoadedGrammar::new(Arc::clone(grammar), resolved.path));
     }
 
     let raw = RawGrammar::from_json(&resolved.json)
@@ -124,7 +132,7 @@ pub fn load(
         .lock()
         .expect("grammar cache lock is never poisoned")
         .insert(resolved.path.clone(), Arc::clone(&grammar));
-    Ok((grammar, resolved.path))
+    Ok(LoadedGrammar::new(grammar, resolved.path))
 }
 
 /// Resolve a user-written path the way `include_str!` would: absolute paths
