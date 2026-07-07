@@ -318,12 +318,7 @@ impl<'a> ReaderGen<'a> {
         out.push('\n');
         self.reader_open(out, item);
         out.push_str("    t.expect_struct_open();\n");
-        let scope = Scope {
-            cut: Some(item.ty),
-            level: 1,
-            close: "at_struct_close",
-            name: &ident,
-        };
+        let scope = Scope::struct_body(item.ty, &ident);
         self.field_scope(out, &scope, fields, |k| {
             member_indices(self.table, twins, k)
         });
@@ -357,12 +352,7 @@ impl<'a> ReaderGen<'a> {
                     unreachable!("enum variant payload is void or an anonymous struct");
                 };
                 let payloads = payload_twins(self.types, twins, k);
-                let scope = Scope {
-                    cut: Some(item.ty),
-                    level: 3,
-                    close: "at_enum_close",
-                    name: &ident,
-                };
+                let scope = Scope::enum_payload(item.ty, &ident);
                 self.field_scope(out, &scope, fields, |j| {
                     member_indices(self.table, &payloads, j)
                 });
@@ -382,7 +372,7 @@ impl<'a> ReaderGen<'a> {
     fn alias_reader(&self, out: &mut String, item: &Item) {
         out.push('\n');
         self.reader_open(out, item);
-        let expr = self.value_expr(Some(item.ty), item.ty, 1, 0);
+        let expr = self.value_expr(item.ty, ReadContext::item(item.ty, 1));
         let _ = writeln!(out, "    {expr}");
         out.push_str("}\n");
     }
@@ -399,7 +389,7 @@ impl<'a> ReaderGen<'a> {
         fields: &BTreeMap<Symbol, FieldInfo>,
         indices_of: impl Fn(usize) -> Vec<u16>,
     ) {
-        let p = pad(scope.level);
+        let p = pad(scope.level());
         for (k, &name) in fields.keys().enumerate() {
             let _ = writeln!(
                 out,
@@ -411,7 +401,7 @@ impl<'a> ReaderGen<'a> {
         let _ = writeln!(out, "{p}    match t.peek_set() {{");
         for (k, (&name, info)) in fields.iter().enumerate() {
             let indices = arm_pattern(indices_of(k));
-            let expr = self.field_expr(scope.cut, info, scope.level + 2, 0);
+            let expr = self.field_expr(info, scope.field_context());
             let _ = writeln!(out, "{p}        // {}", self.interner.resolve(name));
             let _ = writeln!(out, "{p}        {indices} => v{k} = Some({expr}),");
         }
@@ -451,17 +441,11 @@ impl<'a> ReaderGen<'a> {
     /// A field's read expression: the capture-level `optional` flag wraps one
     /// more null check around the base, exactly like the type wraps one more
     /// `Option`.
-    fn field_expr(
-        &self,
-        cut: Option<TypeId>,
-        info: &FieldInfo,
-        level: usize,
-        depth: usize,
-    ) -> String {
+    fn field_expr(&self, info: &FieldInfo, context: ReadContext) -> String {
         if info.optional {
-            self.nullable_expr(cut, info.type_id, level, depth)
+            self.nullable_expr(info.type_id, context)
         } else {
-            self.value_expr(cut, info.type_id, level, depth)
+            self.value_expr(info.type_id, context)
         }
     }
 
@@ -471,12 +455,12 @@ impl<'a> ReaderGen<'a> {
     /// declaration this position renders inside — the box-placement context,
     /// threaded exactly as the type renderer threads it so `Box::new` sits
     /// precisely where the declared type says `Box`.
-    fn value_expr(&self, cut: Option<TypeId>, ty: TypeId, level: usize, depth: usize) -> String {
+    fn value_expr(&self, ty: TypeId, context: ReadContext) -> String {
         match self.types.expect_type_shape(ty) {
             // A `Custom` is a named alias of Node; the node is the value.
             TypeShape::Node | TypeShape::Custom(_) => "t.expect_node()".to_string(),
-            TypeShape::Optional(inner) => self.nullable_expr(cut, *inner, level, depth),
-            TypeShape::Array { element, .. } => self.array_expr(*element, level, depth),
+            TypeShape::Optional(inner) => self.nullable_expr(*inner, context),
+            TypeShape::Array { element, .. } => self.array_expr(*element, context),
             TypeShape::Struct(_) | TypeShape::Enum(_) => {
                 let name = self
                     .model
@@ -492,7 +476,7 @@ impl<'a> ReaderGen<'a> {
                     return "t.expect_node()".to_string();
                 }
                 let call = format!("{}(t)", self.reader_fn(self.deps.def_name_sym(*def_id)));
-                if self.model.is_boxed_ref(cut, ty) {
+                if self.model.is_boxed_ref(context.cut, ty) {
                     format!("::std::boxed::Box::new({call})")
                 } else {
                     call
@@ -505,15 +489,9 @@ impl<'a> ReaderGen<'a> {
     /// `Null` is the whole absent value — one flat null, however many
     /// `Option` layers the type carries; a present value wraps `Some` at
     /// every layer (the VM never nests nulls).
-    fn nullable_expr(
-        &self,
-        cut: Option<TypeId>,
-        inner: TypeId,
-        level: usize,
-        depth: usize,
-    ) -> String {
-        let p = pad(level);
-        let inner_expr = self.value_expr(cut, inner, level + 1, depth);
+    fn nullable_expr(&self, inner: TypeId, context: ReadContext) -> String {
+        let p = pad(context.level);
+        let inner_expr = self.value_expr(inner, context.in_some_branch());
         let mut out = String::new();
         let _ = writeln!(out, "if t.take_null() {{");
         let _ = writeln!(out, "{p}    None");
@@ -523,11 +501,10 @@ impl<'a> ReaderGen<'a> {
         out
     }
 
-    fn array_expr(&self, element: TypeId, level: usize, depth: usize) -> String {
-        let p = pad(level);
-        let items = format!("items{depth}");
-        // An array element is behind `Vec`'s indirection: no cut context.
-        let elem = self.value_expr(None, element, level + 2, depth + 1);
+    fn array_expr(&self, element: TypeId, context: ReadContext) -> String {
+        let p = pad(context.level);
+        let items = format!("items{}", context.array_depth);
+        let elem = self.value_expr(element, context.array_element());
         let mut out = String::new();
         let _ = writeln!(out, "{{");
         let _ = writeln!(out, "{p}    t.expect_array_open();");
@@ -543,14 +520,81 @@ impl<'a> ReaderGen<'a> {
     }
 }
 
+/// Where a value expression is emitted. `cut` is the owning item declaration
+/// that decides recursive `Box` placement, `level` is the emitted indentation,
+/// and `array_depth` keeps nested array accumulator names distinct.
+#[derive(Clone, Copy)]
+struct ReadContext {
+    cut: Option<TypeId>,
+    level: usize,
+    array_depth: usize,
+}
+
+impl ReadContext {
+    fn item(item_ty: TypeId, level: usize) -> Self {
+        Self {
+            cut: Some(item_ty),
+            level,
+            array_depth: 0,
+        }
+    }
+
+    fn field_value(self) -> Self {
+        Self {
+            level: self.level + 2,
+            ..self
+        }
+    }
+
+    fn in_some_branch(self) -> Self {
+        Self {
+            level: self.level + 1,
+            ..self
+        }
+    }
+
+    fn array_element(self) -> Self {
+        Self {
+            cut: None,
+            level: self.level + 2,
+            array_depth: self.array_depth + 1,
+        }
+    }
+}
+
 /// One struct-like scope as [`ReaderGen::field_scope`] reads it: the
 /// box-placement cut of the owning item, the emitted code's indent level,
 /// the terminator probe, and the display name its panics cite.
 struct Scope<'a> {
-    cut: Option<TypeId>,
-    level: usize,
+    context: ReadContext,
     close: &'a str,
     name: &'a str,
+}
+
+impl<'a> Scope<'a> {
+    fn struct_body(owner: TypeId, name: &'a str) -> Self {
+        Self::new(owner, 1, "at_struct_close", name)
+    }
+
+    fn enum_payload(owner: TypeId, name: &'a str) -> Self {
+        Self::new(owner, 3, "at_enum_close", name)
+    }
+
+    fn field_context(&self) -> ReadContext {
+        self.context.field_value()
+    }
+
+    fn level(&self) -> usize {
+        self.context.level
+    }
+
+    fn new(owner: TypeId, level: usize, close: &'a str, name: &'a str) -> Self {
+        Self {
+            context: ReadContext::item(owner, level),
+            close,
+            name,
+        }
+    }
 }
 
 /// Every table-reachable analysis type sharing this item's name and shape
