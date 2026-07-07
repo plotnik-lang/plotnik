@@ -971,20 +971,25 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Consumption::Plain => self.infer_pattern(&value),
         };
 
-        // A field names exactly one child per match. Quantifiers and captures
-        // on a field value apply to the whole field constraint (`f: (x)*`
-        // repeats the field), so the exactly-one requirement lands on the
-        // pattern under them.
-        if self.field_core_arity(value.node(), &value_info) == Arity::Many {
+        // A field names exactly one child per match. Under any quantifier/capture
+        // wrappers (`f: (x)*` repeats the whole field), the constrained value must
+        // be a single node: a sequence `{...}` never is — even holding one element,
+        // the spec restricts field values to a node, an alternation, or a quantifier
+        // of those — and a value matching many nodes never is either.
+        let core = Self::field_value_core(value.node());
+        if matches!(core, Pattern::SeqPattern(_))
+            || self.core_arity(&core, &value_info) == Arity::Many
+        {
             self.report_field_arity_error(field.node(), value.node());
         }
 
         PatternShape::new(Arity::One, value_info.flow)
     }
 
-    /// The arity of a field value under its capture/quantifier wrappers. The
-    /// core was inferred as part of the value, so its result is cached.
-    fn field_core_arity(&self, value: &Pattern, value_info: &PatternShape) -> Arity {
+    /// The field value under its capture/quantifier wrappers. `f: (x)* @c`
+    /// parses as `(f: (x)) * @c`, so those wrappers bind the field, not the
+    /// value; strip them to reach the pattern the field actually constrains.
+    fn field_value_core(value: &Pattern) -> Pattern {
         let mut core = value.clone();
         loop {
             let inner = match &core {
@@ -994,13 +999,18 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             };
             match inner {
                 Some(inner) => core = inner,
-                None => break,
+                None => return core,
             }
         }
+    }
+
+    /// The arity of an already-inferred field-value core; its result is cached
+    /// from inferring the value.
+    fn core_arity(&self, core: &Pattern, value_info: &PatternShape) -> Arity {
         self.ctx
             .type_ctx
             .in_progress()
-            .pattern_result(&core)
+            .pattern_result(core)
             .map(|info| info.arity)
             .unwrap_or(value_info.arity)
     }
