@@ -421,7 +421,7 @@ impl<'a> ReaderGen<'a> {
             member_indices(self.table, twins, k)
         });
         out.push_str("    t.expect_struct_close();\n");
-        self.construct(out, 1, &ident, fields);
+        self.construct(out, Construction::struct_body(&ident), fields);
         out.push_str("}\n");
     }
 
@@ -458,7 +458,11 @@ impl<'a> ReaderGen<'a> {
                 member_indices(self.table, &payloads, j)
             });
             out.push_str("            t.expect_enum_close();\n");
-            self.construct(out, 3, &format!("{ident}::{variant_ident}"), fields);
+            self.construct(
+                out,
+                Construction::enum_variant(&ident, variant_ident),
+                fields,
+            );
             out.push_str("        }\n");
         }
         let _ = writeln!(
@@ -521,11 +525,11 @@ impl<'a> ReaderGen<'a> {
     fn construct(
         &self,
         out: &mut String,
-        level: usize,
-        head: &str,
+        construction: Construction,
         fields: &BTreeMap<Symbol, FieldInfo>,
     ) {
-        let p = pad(level);
+        let p = pad(construction.level);
+        let head = construction.head;
         let field_idents = scope_idents(fields.keys().map(|&sym| self.interner.resolve(sym)));
         let _ = writeln!(out, "{p}{head} {{");
         for (k, ((&name, _), field_ident)) in fields.iter().zip(&field_idents).enumerate() {
@@ -617,6 +621,27 @@ impl<'a> ReaderGen<'a> {
         let _ = writeln!(out, "{p}    {items}");
         let _ = write!(out, "{p}}}");
         out
+    }
+}
+
+struct Construction {
+    level: usize,
+    head: String,
+}
+
+impl Construction {
+    fn struct_body(ident: &str) -> Self {
+        Self {
+            level: 1,
+            head: ident.to_string(),
+        }
+    }
+
+    fn enum_variant(enum_ident: &str, variant_ident: &str) -> Self {
+        Self {
+            level: 3,
+            head: format!("{enum_ident}::{variant_ident}"),
+        }
     }
 }
 
