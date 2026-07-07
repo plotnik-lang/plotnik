@@ -365,29 +365,36 @@ impl<'a> Emitter<'a> {
 
         let mut out = format!("{DERIVES}\npub enum {ident}{lt} {{\n");
         for ((_, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
-            if payload == TYPE_VOID {
-                writeln!(out, "    {variant_ident},").expect("writing to a String is infallible");
-                continue;
-            }
-            let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
-                unreachable!("enum variant payload is void or an anonymous struct");
-            };
-            let field_idents = scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
-            let rendered: Vec<String> = fields
-                .values()
-                .zip(&field_idents)
-                .map(|(info, field_ident)| {
-                    format!(
-                        "{field_ident}: {}",
-                        self.field_type(TypeContext::item(item.ty), info)
-                    )
-                })
-                .collect();
-            writeln!(out, "    {variant_ident} {{ {} }},", rendered.join(", "))
+            let payload = self.render_variant_payload(item.ty, payload);
+            writeln!(out, "    {variant_ident}{payload},")
                 .expect("writing to a String is infallible");
         }
         out.push('}');
         out
+    }
+
+    fn render_variant_payload(&mut self, item_ty: TypeId, payload: TypeId) -> String {
+        if payload == TYPE_VOID {
+            return String::new();
+        }
+
+        let types = self.types;
+        let interner = self.interner;
+        let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
+            unreachable!("enum variant payload is void or an anonymous struct");
+        };
+        let field_idents = scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
+        let rendered: Vec<String> = fields
+            .values()
+            .zip(&field_idents)
+            .map(|(info, field_ident)| {
+                format!(
+                    "{field_ident}: {}",
+                    self.field_type(TypeContext::item(item_ty), info)
+                )
+            })
+            .collect();
+        format!(" {{ {} }}", rendered.join(", "))
     }
 
     fn render_alias(&mut self, item: &Item) -> String {
