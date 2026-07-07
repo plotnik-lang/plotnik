@@ -150,6 +150,25 @@ fn read(path: &Path) -> Result<String, String> {
 
 fn resolve_package(name: &str, subgrammar: Option<&str>) -> Result<ResolvedGrammar, String> {
     let metadata = metadata()?;
+    let package = select_dependency_package(metadata, name)?;
+    let candidates = package_grammar_jsons(package, name)?;
+
+    // One grammar and no selector: done. Everything else goes through the
+    // `name` field inside each grammar.json, the only spelling that is
+    // stable across crate layouts.
+    if candidates.len() == 1 && subgrammar.is_none() {
+        let path = candidates.into_iter().next().expect("checked non-empty");
+        return ResolvedGrammar::read(path);
+    }
+
+    let named = read_named_grammars(candidates)?;
+    resolve_named_grammar(name, subgrammar, named)
+}
+
+fn select_dependency_package<'a>(
+    metadata: &'a cargo_metadata::Metadata,
+    name: &str,
+) -> Result<&'a cargo_metadata::Package, String> {
     let closure = dependency_closure(metadata);
     let packages: Vec<&cargo_metadata::Package> = metadata
         .packages
@@ -162,28 +181,31 @@ fn resolve_package(name: &str, subgrammar: Option<&str>) -> Result<ResolvedGramm
         })
         .collect();
 
-    let package = match packages.as_slice() {
-        [] => {
-            return Err(format!(
-                "package `{name}` is not in this crate's dependency graph; add it \
+    match packages.as_slice() {
+        [] => Err(format!(
+            "package `{name}` is not in this crate's dependency graph; add it \
                  to [dependencies] — any crate that ships a grammar.json works \
                  (tree-sitter-*, arborium-*, or your own grammar crate)"
-            ));
-        }
-        [package] => package,
+        )),
+        [package] => Ok(*package),
         several => {
             let versions = several
                 .iter()
                 .map(|package| package.version.to_string())
                 .collect::<Vec<_>>()
                 .join(", ");
-            return Err(format!(
+            Err(format!(
                 "several versions of `{name}` are in the dependency graph \
                  ({versions}); the grammar to bake is ambiguous"
-            ));
+            ))
         }
-    };
+    }
+}
 
+fn package_grammar_jsons(
+    package: &cargo_metadata::Package,
+    name: &str,
+) -> Result<Vec<PathBuf>, String> {
     let root = package
         .manifest_path
         .parent()
@@ -196,20 +218,22 @@ fn resolve_package(name: &str, subgrammar: Option<&str>) -> Result<ResolvedGramm
             package.version
         ));
     }
+    Ok(candidates)
+}
 
-    // One grammar and no selector: done. Everything else goes through the
-    // `name` field inside each grammar.json, the only spelling that is
-    // stable across crate layouts.
-    if candidates.len() == 1 && subgrammar.is_none() {
-        let path = candidates.into_iter().next().expect("checked non-empty");
-        return ResolvedGrammar::read(path);
-    }
-
+fn read_named_grammars(candidates: Vec<PathBuf>) -> Result<Vec<NamedGrammar>, String> {
     let mut named = Vec::new();
     for path in candidates {
         named.push(NamedGrammar::read(path)?);
     }
+    Ok(named)
+}
 
+fn resolve_named_grammar(
+    name: &str,
+    subgrammar: Option<&str>,
+    named: Vec<NamedGrammar>,
+) -> Result<ResolvedGrammar, String> {
     let Some(wanted) = subgrammar else {
         let names = named
             .iter()
