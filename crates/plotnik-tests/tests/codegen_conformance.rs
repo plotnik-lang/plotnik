@@ -178,8 +178,9 @@ fn conformance_mod(fx: &Fixture) -> Option<String> {
 }
 
 /// The value-level differential inside a fixture's `run()`: call the typed
-/// entry point matching the definition's output shape, require the metered
-/// twin to agree, and diff the serialized value against the VM's JSON.
+/// entry point matching the definition's output shape. For parsed values,
+/// require the metered twin to agree and diff the serialized value against the
+/// VM's JSON. Void entries expose only the always-metered `matches`.
 fn value_channel(w: &mut String, module: &Module, entry: &str) {
     let snake = matcher_entry_fn_name(entry);
     let snake = snake
@@ -189,7 +190,7 @@ fn value_channel(w: &mut String, module: &Module, entry: &str) {
         EntryShape::Matches => {
             writeln!(
                 w,
-                "        let matched = matcher::{snake}_matches(&tree, SOURCE);"
+                "        let matched = matcher::{entry}::matches(&tree, SOURCE).expect(\"auto limits fit the corpus\");"
             )
             .expect("writing to a String is infallible");
             writeln!(
@@ -197,14 +198,6 @@ fn value_channel(w: &mut String, module: &Module, entry: &str) {
                 "        assert_eq!(matched, EXPECTED.is_some(), \"{{NAME}}: matches() diverges from the VM outcome\");"
             )
             .expect("writing to a String is infallible");
-            writeln!(
-                w,
-                "        let metered = matcher::{snake}_try_matches(&tree, SOURCE).expect(\"auto limits fit the corpus\");"
-            )
-            .expect("writing to a String is infallible");
-            w.push_str(
-                "        assert_eq!(matched, metered, \"{NAME}: metered matches() diverges\");\n",
-            );
         }
         shape @ (EntryShape::Nominal | EntryShape::Free) => {
             let (parse, try_parse) = match shape {
@@ -237,7 +230,7 @@ fn value_channel(w: &mut String, module: &Module, entry: &str) {
 /// the bytecode type table — the same partition the emitter draws at the
 /// analysis level (struct/enum are nominal items, everything else an alias).
 enum EntryShape {
-    /// Void output: `{snake}_matches`.
+    /// Void output: inherent `{Type}::matches`.
     Matches,
     /// Struct/enum output: inherent `{Type}::parse`.
     Nominal,

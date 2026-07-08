@@ -55,8 +55,8 @@ pub(crate) enum ItemKind {
     Struct,
     Enum,
     Alias,
-    /// A void definition: matches without producing data, so no type. Renders
-    /// as a marker comment so the definition doesn't silently vanish.
+    /// A callable void definition: matches without producing data, so it
+    /// renders as a zero-size marker type with a `matches` API in codegen.
     VoidDef,
 }
 
@@ -217,7 +217,9 @@ impl<'a> Emitter<'a> {
         for (def_id, output) in defs {
             let name = self.deps.def_name_sym(def_id);
             if output == TYPE_VOID {
-                self.items.push(Item::void_definition(name));
+                if self.types.is_entrypoint_def(def_id) {
+                    self.items.push(Item::void_definition(name));
+                }
                 continue;
             }
             self.add_item(name, output);
@@ -326,11 +328,13 @@ impl<'a> Emitter<'a> {
             ItemKind::Struct => self.render_struct(item),
             ItemKind::Enum => self.render_enum(item),
             ItemKind::Alias => self.render_alias(item),
-            ItemKind::VoidDef => format!(
-                "// `{}` matches without producing data; no output type.",
-                self.interner.resolve(item.name)
-            ),
+            ItemKind::VoidDef => self.render_void_marker(item),
         }
+    }
+
+    fn render_void_marker(&mut self, item: &Item) -> String {
+        let ident = self.item_ident(item.name).to_string();
+        format!("{DERIVES}\npub struct {ident};")
     }
 
     fn render_struct(&mut self, item: &Item) -> String {

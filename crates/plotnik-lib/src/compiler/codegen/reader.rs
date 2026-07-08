@@ -235,60 +235,53 @@ impl<'a> ReaderGen<'a> {
             .expect("every non-void item has a reader")
     }
 
-    /// The `parse`/`try_parse` (or `matches`/`try_matches`) surface, one
-    /// block per entrypoint definition. Nominal outputs get inherent fns on
-    /// their type; alias outputs and void definitions get free functions.
+    /// The `parse`/`try_parse` or `matches` surface, one block per entrypoint
+    /// definition. Nominal outputs get inherent parse fns on their type, void
+    /// outputs get an inherent safe `matches`, and alias outputs still get free
+    /// parse fns.
     pub(super) fn parse_api(&self, entrypoints: impl Iterator<Item = DefId>) -> String {
         let mut out = String::new();
         for def_id in entrypoints {
             let name = self.deps.def_name_sym(def_id);
             let def = self.interner.resolve(name).to_string();
-            let output = self.types.expect_def_output(def_id);
             out.push('\n');
-            if output == TYPE_VOID {
-                self.matches_fns(&mut out, &def);
-                continue;
-            }
             let item = *self
                 .model
                 .items()
                 .iter()
                 .find(|item| item.name == name)
-                .expect("every data definition declares an item");
+                .expect("every entrypoint definition declares an item");
             match item.kind {
                 ItemKind::Struct | ItemKind::Enum => self.parse_impl(&mut out, &def, &item),
                 ItemKind::Alias => self.parse_free_fns(&mut out, &def, &item),
-                ItemKind::VoidDef => unreachable!("void outputs handled above"),
+                ItemKind::VoidDef => self.matches_impl(&mut out, &def, &item),
             }
         }
         out
     }
 
-    /// `matches` for a void definition: it can only answer matched-or-not.
-    fn matches_fns(&self, out: &mut String, def: &str) {
-        let snake = snake_ident(def);
-        let trace = entry_fn_name(def);
+    /// `matches` for a void definition: it can only answer matched-or-not, and
+    /// the public API is always metered.
+    fn matches_impl(&self, out: &mut String, def: &str, item: &Item) {
+        let ident = self.model.item_ident(item.name);
         let metered = metered_entry_fn_name(def);
+        let _ = writeln!(out, "impl {ident} {{");
         let _ = writeln!(
             out,
-            "/// Whether `{def}` matches `tree` — the definition produces no data."
+            "    /// Whether `{def}` matches `tree` under the module's compiled-in limits."
+        );
+        let _ = writeln!(out, "    pub fn matches(");
+        let _ = writeln!(out, "        tree: &rt::Tree,");
+        let _ = writeln!(out, "        source: &str,");
+        let _ = writeln!(
+            out,
+            "    ) -> ::core::result::Result<bool, rt::LimitError> {{"
         );
         let _ = writeln!(
             out,
-            "pub fn {snake}_matches(tree: &rt::Tree, source: &str) -> bool {{"
+            "        Ok(matcher::{metered}(tree, source)?.is_some())"
         );
-        let _ = writeln!(out, "    {trace}(tree, source).is_some()");
-        let _ = writeln!(out, "}}");
-        let _ = writeln!(out);
-        let _ = writeln!(
-            out,
-            "/// [`{snake}_matches`] under the module's compiled-in limits."
-        );
-        let _ = writeln!(out, "pub fn {snake}_try_matches(");
-        let _ = writeln!(out, "    tree: &rt::Tree,");
-        let _ = writeln!(out, "    source: &str,");
-        let _ = writeln!(out, ") -> ::core::result::Result<bool, rt::LimitError> {{");
-        let _ = writeln!(out, "    Ok(matcher::{metered}(tree, source)?.is_some())");
+        let _ = writeln!(out, "    }}");
         let _ = writeln!(out, "}}");
     }
 

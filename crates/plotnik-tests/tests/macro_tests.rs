@@ -104,7 +104,7 @@ fn void_definition_exposes_matches() {
     let source = "x;";
     let tree = parse(&js(), source);
 
-    assert!(queries::probe_matches(&tree, source));
+    assert!(queries::Probe::matches(&tree, source).expect("auto limits fit"));
 }
 
 #[test]

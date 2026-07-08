@@ -13,4 +13,5 @@ pub enum Item<'t> {
     A { s: Node<'t> },
 }
 
-// `Q` matches without producing data; no output type.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q;

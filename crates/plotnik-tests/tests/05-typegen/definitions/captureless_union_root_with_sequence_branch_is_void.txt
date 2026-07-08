@@ -7,4 +7,3 @@ Q = [
 ]
 ------------------- TYPESCRIPT -------------------
 ---------------------- RUST ----------------------
-// `Q` matches without producing data; no output type.

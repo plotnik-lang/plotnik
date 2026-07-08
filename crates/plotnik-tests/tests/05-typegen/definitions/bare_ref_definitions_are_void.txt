@@ -17,6 +17,8 @@ pub struct Id<'t> {
     pub id: Node<'t>,
 }
 
-// `Foo` matches without producing data; no output type.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Foo;
 
-// `Bar` matches without producing data; no output type.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Bar;
