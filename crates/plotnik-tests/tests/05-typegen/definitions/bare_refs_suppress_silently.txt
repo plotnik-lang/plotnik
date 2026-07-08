@@ -8,7 +8,7 @@ export type B =
 export type A =
   | { $tag: "X"; $data: { s: Node } };
 
-export type Q = Node;
+export type Q = undefined;
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 
@@ -22,4 +22,4 @@ pub enum B<'t> {
     Y { d: Node<'t> },
 }
 
-pub type Q<'t> = Node<'t>;
+// `Q` matches without producing data; no output type.

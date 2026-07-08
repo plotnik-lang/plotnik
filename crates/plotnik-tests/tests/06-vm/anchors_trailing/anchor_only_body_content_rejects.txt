@@ -2,40 +2,38 @@ Q = (program .)
 --------------------- INPUT ----------------------
 foo;
 ------------------- TYPESCRIPT -------------------
-export type Q = Node;
+export type Q = undefined;
 --------------------- OUTPUT ---------------------
 <no match>
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "program"
+S1 "program"
+S2 "Q"
 
 [type_defs]
-T0 = <Node>
+T0 = <Void>
 
 [type_members]
 
 [type_names]
-N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 0 :: T0
 
 [transitions]
 Q:
-  0       (@6)                              6 : 1
-  1  -ε-  [Node]                            3
-  3                                         ▶
-  4                                         ▶
-  5  └•┘  _                                 4
-  6   !   (program)                         5
+  0       (@4)                              4 : 1
+  1                                         ▶
+  2                                         ▶
+  3  └•┘  _                                 2
+  4   !   (program)                         3
 --------------------- TRACE ----------------------
 Q:
-  0       (@6)                              06 : 01
-      ▶   (@6)
+  0       (@4)                              04 : 01
+      ▶   (@4)
 
-@6:
-  6       (program)                         05
+@4:
+  4       (program)                         03
       ●   program
-  5       _                                 04
+  3       _                                 02

@@ -211,15 +211,17 @@ The pattern is 4 levels deep, but the output is flat. You're extracting specific
 
 Definitions are the exception: references are **opaque**. A bare `(Item)` matches structurally and produces nothing; `(Item) @item` produces the definition's type. Fields never leak through a reference boundary. See [Type System: Definitions Are Types](type-system.md#definitions-are-types).
 
-### Default Root Values
+### Capture-Less Definitions
 
-A capture-less definition returns its root value, like regex group 0:
+A capture-less definition with no output syntax is void. To return the matched
+root node, capture it explicitly:
 
 ```
-Program = (program)            ; Program is Node
+Program = (program)            ; Program is void
+ProgramNode = (program) @root  ; ProgramNode is { root: Node }
 MaybeProgram = (program)?      ; MaybeProgram is Node | null
-Expr = [(identifier) (number)] ; Expr is Node
-Pair = {(identifier) (number)} ; Pair is void: no unique root
+Expr = [(identifier) (number)] ; Expr is void
+Pair = {(identifier) (number)} ; Pair is void
 ```
 
 If the body contains any capture, the captures define the result instead:
@@ -1034,12 +1036,12 @@ Use as node kinds:
 **Encapsulation**: `(Name)` matches but extracts nothing. Capture the reference to get the definition's typed result — `(BinaryOp) @expr` above produces `{ expr: BinaryOp }` where `BinaryOp` is `{ left: Node, op: Node, right: Node }`. This separates structural reuse from data extraction, and it means extracting a pattern into a definition never silently changes your output.
 
 Named expressions define both pattern and type. A capture-less single-node
-definition returns its root node; use a sequence when the definition is meant
-to be purely structural:
+definition matches structurally and produces no data; capture the root node
+when the definition is meant to carry a value:
 
 ```
-Expr = [(identifier) (number)] ; returns Node
-Pair = {(identifier) (number)} ; void: structural only
+Expr = [(identifier) (number)] ; void: structural only
+ExprNode = [(identifier) (number)] @expr ; returns { expr: Node }
 (statement (Expr))     ; matches any statement containing an Expr, no output
 ```
 

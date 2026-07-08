@@ -1,7 +1,7 @@
 Q = (function_declaration . (identifier))
 ---------------------- NFA -----------------------
 [entrypoints]
-Q = 8
+Q = 7
 
 [transitions]
 Q:
@@ -12,32 +12,29 @@ Q:
 
 Q (entrypoint):
   6                                         ▶
-  7  -ε-  [Node]                            6
-  8       (Q)                               2 : 7
+  7       (Q)                               2 : 6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "function_declaration"
-S3 "identifier"
+S1 "function_declaration"
+S2 "identifier"
+S3 "Q"
 
 [type_defs]
-T0 = <Node>
+T0 = <Void>
 
 [type_members]
 
 [type_names]
-N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 0 :: T0
 
 [transitions]
 Q:
-  0       (@7)                              7 : 1
-  1  -ε-  [Node]                            3
-  3                                         ▶
-  4  └•─  (identifier)                      5
-  5  ─‣┘  _                                 6
-  6                                         ▶
-  7   !   (function_declaration)            4
+  0       (@5)                              5 : 1
+  1                                         ▶
+  2  └•─  (identifier)                      3
+  3  ─‣┘  _                                 4
+  4                                         ▶
+  5   !   (function_declaration)            2

@@ -11,108 +11,98 @@ a; b; debugger;
 export type A =
   | { $tag: "X" };
 
-export type Q = Node;
+export type Q = undefined;
 --------------------- OUTPUT ---------------------
-{
-  "kind": "program",
-  "text": "a; b; debugger;",
-  "span": [0, 15]
-}
+null
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "X"
-S2 "Q"
-S3 "A"
-S4 "expression_statement"
-S5 "program"
-S6 "debugger_statement"
+S2 "A"
+S3 "expression_statement"
+S4 "program"
+S5 "debugger_statement"
+S6 "Q"
 
 [type_defs]
 T0 = <Void>
-T1 = <Node>
-T2 = Enum    M0:1  ; X
+T1 = Enum    M0:1  ; X
 
 [type_members]
 M0: S1 → T0  ; X: <Void>
 
 [type_names]
-N0: S2 → T1  ; Q
-N1: S3 → T2  ; A
+N0: S2 → T1  ; A
 
 [entrypoints]
-A = 00 :: T2
-Q = 02 :: T1
+A = 00 :: T1
+Q = 02 :: T0
 
 [transitions]
 A:
-  00       (@08)                            08 : 01
+  00       (@05)                            05 : 01
   01                                        ▶
 
 Q:
-  02       (@24)                            24 : 03
-  03  -ε-  [Node]                           05
-  05                                        ▶
-  06                                        ▶
-  07  ─‣┘  _                                10
-  08   !   (expression_statement) [EnumOpen(M0) EnumClose]  06
-  10                                        ▶
-  11  └•─  (debugger_statement)             07
-  12  ─•─  (debugger_statement)             07
-  13  -ε-  [SuppressEnd]                    12, 18
-  15   !   (@08)                            08 : 13
-  16  -ε-  [SuppressBegin]                  15
-  18  ──!  _                                16, 18
-  20  └─!  _                                16, 18
-  22  ...
-  23  ...
-  24   !   (program)                        11, 20
+  02       (@20)                            20 : 03
+  03                                        ▶
+  04                                        ▶
+  05   !   (expression_statement) [EnumOpen(M0) EnumClose]  04
+  07                                        ▶
+  08  └•─  (debugger_statement)             15
+  09  ─•─  (debugger_statement)             15
+  10  -ε-  [SuppressEnd]                    09, 16
+  12   !   (@05)                            05 : 10
+  13  -ε-  [SuppressBegin]                  12
+  15  ─‣┘  _                                07
+  16  ──!  _                                13, 16
+  18  └─!  _                                13, 16
+  20   !   (program)                        08, 18
 --------------------- TRACE ----------------------
 Q:
-  02       (@24)                            24 : 03
-       ▶   (@24)
+  02       (@20)                            20 : 03
+       ▶   (@20)
 
-@24:
-  24       (program)                        11, 20
+@20:
+  20       (program)                        08, 18
        ●   program
-  11       (debugger_statement)             07
+  08       (debugger_statement)             15
        ○   expression_statement
-  24  ❮❮❮ 
-  20       _                                16, 18
+  20  ❮❮❮ 
+  18       _                                13, 16
        ●   expression_statement
-  16  -ε-  [SuppressBegin]                  15
-  15       (@08)                            08 : 13
-       ▶   (@08)
+  13  -ε-  [SuppressBegin]                  12
+  12       (@05)                            05 : 10
+       ▶   (@05)
 
-@08:
-  08       (expression_statement) [EnumOpen(M0) EnumClose]  06
+@05:
+  05       (expression_statement) [EnumOpen(M0) EnumClose]  04
        ●   expression_statement
-  06   ◀   (@08)                            
+  04   ◀   (@05)                            
 
-@24:
-  13  -ε-  [SuppressEnd]                    12, 18
-  12       (debugger_statement)             07
+@20:
+  10  -ε-  [SuppressEnd]                    09, 16
+  09       (debugger_statement)             15
        ○   expression_statement
-  13  ❮❮❮ 
-  18       _                                16, 18
+  10  ❮❮❮ 
+  16       _                                13, 16
        ●   expression_statement
-  16  -ε-  [SuppressBegin]                  15
-  15       (@08)                            08 : 13
-       ▶   (@08)
+  13  -ε-  [SuppressBegin]                  12
+  12       (@05)                            05 : 10
+       ▶   (@05)
 
-@08:
-  08       (expression_statement) [EnumOpen(M0) EnumClose]  06
+@05:
+  05       (expression_statement) [EnumOpen(M0) EnumClose]  04
        ●   expression_statement
-  06   ◀   (@08)                            
+  04   ◀   (@05)                            
 
-@24:
-  13  -ε-  [SuppressEnd]                    12, 18
-  12       (debugger_statement)             07
+@20:
+  10  -ε-  [SuppressEnd]                    09, 16
+  09       (debugger_statement)             15
        ●   debugger_statement
-  07       _                                10
+  15       _                                07
        ●   program
-  10   ◀   (@24)                            
+  07   ◀   (@20)                            
 
 Q:
-  03  -ε-  [Node]                           05
-  05   ◀   (Q)                              ◼
+  03   ◀   (Q)                              ◼

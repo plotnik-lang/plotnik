@@ -1,10 +1,10 @@
-Q = (program .!)
+Q = (program)
 --------------------- INPUT ----------------------
-// note
+x;
 ------------------- TYPESCRIPT -------------------
 export type Q = undefined;
 --------------------- OUTPUT ---------------------
-<no match>
+null
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -23,17 +23,19 @@ Q = 0 :: T0
 
 [transitions]
 Q:
-  0       (@4)                              4 : 1
+  0       (@3)                              3 : 1
   1                                         ▶
   2                                         ▶
-  3  └!┘  _                                 2
-  4   !   (program)                         3
+  3   !   (program)                         2
 --------------------- TRACE ----------------------
 Q:
-  0       (@4)                              04 : 01
-      ▶   (@4)
+  0       (@3)                              03 : 01
+      ▶   (@3)
 
-@4:
-  4       (program)                         03
+@3:
+  3       (program)                         02
       ●   program
-  3       _                                 02
+  2   ◀   (@3)                              
+
+Q:
+  1   ◀   (Q)                               ◼

@@ -6,9 +6,9 @@ export interface Id {
   id: Node;
 }
 
-export type Foo = Node;
+export type Foo = undefined;
 
-export type Bar = Node;
+export type Bar = undefined;
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 
@@ -17,6 +17,6 @@ pub struct Id<'t> {
     pub id: Node<'t>,
 }
 
-pub type Foo<'t> = Node<'t>;
+// `Foo` matches without producing data; no output type.
 
-pub type Bar<'t> = Node<'t>;
+// `Bar` matches without producing data; no output type.

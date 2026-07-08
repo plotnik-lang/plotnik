@@ -3,7 +3,7 @@ Q = (expression_statement (Inner))
 ---------------------- NFA -----------------------
 [entrypoints]
 Inner = 13
-Q     = 16
+Q     = 15
 
 [transitions]
 Inner:
@@ -24,47 +24,45 @@ Inner (entrypoint):
 
 Q (entrypoint):
   14                                        ▶
-  15  -ε-  [Node]                           14
-  16       (Q)                              05 : 15
+  15       (Q)                              05 : 14
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "name"
-S2 "Q"
-S3 "Inner"
-S4 "identifier"
-S5 "expression_statement"
+S2 "Inner"
+S3 "identifier"
+S4 "expression_statement"
+S5 "Q"
 
 [type_defs]
-T0 = <Node>
-T1 = Struct  M0:1  ; { name }
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { name }
 
 [type_members]
-M0: S1 → T0  ; name: <Node>
+M0: S1 → T1  ; name: <Node>
 
 [type_names]
-N0: S2 → T0  ; Q
-N1: S3 → T1  ; Inner
+N0: S2 → T2  ; Inner
 
 [entrypoints]
-Inner = 00 :: T1
+Inner = 00 :: T2
 Q     = 06 :: T0
 
 [transitions]
 Inner:
   00  -ε-  [StructOpen]                     02
-  02       (@16)                            16 : 03
+  02       (@12)                            12 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
 Q:
-  06       (@18)                            18 : 08
-  07  ...
-  08  -ε-  [Node]                           10
-  10                                        ▶
-  11  └‣─  (@16)                            16 : 12
-  12  ─‣┘  _ [SuppressEnd]                  15
+  06       (@16)                            16 : 07
+  07                                        ▶
+  08  └‣─  (@12)                            12 : 09
+  09  ─‣┘  _ [SuppressEnd]                  14
+  11                                        ▶
+  12   !   (identifier) [Node Set(M0)]      11
   14                                        ▶
-  15                                        ▶
-  16   !   (identifier) [Node Set(M0)]      14
-  18   !   (expression_statement) [SuppressBegin]  11
+  15  ...
+  16   !   (expression_statement) [SuppressBegin]  08

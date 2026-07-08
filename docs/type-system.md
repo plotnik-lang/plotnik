@@ -6,21 +6,20 @@ the JSON materializer are pure renderers of that information.
 
 ## The Output Model
 
-**Output exists where output syntax is written, plus the definition root.**
-Five constructs produce output:
+**Output exists where output syntax is written.** Definitions name whatever
+result their body produces, but they do not implicitly capture the matched
+root node. Four constructs produce or name output:
 
 | Syntax        | Output                                       |
 | ------------- | -------------------------------------------- |
 | `@name`       | A field in the enclosing scope               |
-| `Def = ...`   | A named type (the definition's result)       |
+| `Def = ...`   | A named type for the body's result           |
 | `Label:`      | An enum variant (when the value is consumed) |
 | `:: TypeName` | A name for the type at that position         |
-| root pattern  | Default value for a capture-less definition  |
 
 Everything else — nested node patterns, sequences, references, anchors,
 predicates — is structural unless one of those output positions consumes it.
-A capture-less definition is like regex group 0: when its body has a single
-root value, the definition returns that matched root node.
+To return the root node of a definition, capture it explicitly.
 
 ## Definitions Are Types
 
@@ -51,35 +50,34 @@ export interface Item {
   pattern into a definition never silently changes your output shape — you
   always say `@x` where you want the value.
 
-### Default Root Values
+### Capture-Less Definitions
 
-A definition with no captures anywhere in its body is typed by its root value:
+A definition whose body produces no output is void:
 
 - A single node root — named, anonymous, wildcard, with fields, predicates, or
-  anchors — returns `Node`.
-- A `?`, `*`, or `+` root returns the optional/list container described below.
-- A union root returns `Node` only when every branch is a single node root.
-- A sequence root is void because it has no unique root value.
+  anchors — matches structurally and returns no data.
+- A plain union of capture-less node branches also returns no data.
+- A sequence root is void because no output syntax consumes it.
 - A labeled alternation is unchanged: branch labels are explicit output
   syntax, and tag-only variants remain tag-only.
+- A `?`, `*`, or `+` root returns the optional/list container described below.
 
-If the body contains any capture, those captures define the result and the
-default root value disappears; there is no hybrid `{ $node, ... }` output.
+Captures define the result; there is no hybrid `{ $node, ... }` output.
 
 ```
-Program = (program)                         ; Program = Node
+Program = (program)                         ; Program = undefined
+ProgramNode = (program) @root               ; ProgramNode = { root: Node }
 MaybeProgram = (program)?                   ; MaybeProgram = Node | null
-Expr = [(identifier) (number)]              ; Expr = Node
+Expr = [(identifier) (number)]              ; Expr = undefined
 Pair = {(identifier) (number)}              ; Pair = undefined
 Named = (program (identifier) @id)          ; Named = { id: Node }
 ```
 
-A definition is **void** when its root has no value, usually because it is a
-sequence:
+A definition is **void** when its body produces no output:
 
 ```
 Id = (identifier) @id
-Foo = {(function_declaration name: (Id))} ; sequence root → Foo is void
+Foo = (function_declaration name: (Id)) ; bare ref only → Foo is void
 ```
 
 ```typescript
