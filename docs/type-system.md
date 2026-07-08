@@ -130,10 +130,9 @@ Two consequences:
   (`(MaybeId)*`) is rejected: the wrapper's empty case could never occur
   under the repeat, and the intent is clearer with the quantifier in one
   place.
-- A quantifier-rooted definition used as an entrypoint is a **value
-  entrypoint**: `run` outputs a top-level JSON array (or `null`), not an
-  object. A `*`-rooted entrypoint that matches zero times prints `[]` and
-  exits 0 — the zero-iteration match is a successful match.
+- A quantifier-rooted definition is a fragment, not an entrypoint. To run it,
+  nest it under a one-node root and capture the collection:
+  `Q = (program (identifier)* @items)`.
 
 ## Scope Model
 

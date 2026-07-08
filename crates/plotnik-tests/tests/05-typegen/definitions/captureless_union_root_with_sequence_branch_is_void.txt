@@ -6,6 +6,5 @@ Q = [
   }
 ]
 ------------------- TYPESCRIPT -------------------
-export type Q = undefined;
 ---------------------- RUST ----------------------
 // `Q` matches without producing data; no output type.

@@ -11,10 +11,6 @@ debugger;
 export interface Q {
   d: Node;
 }
-
-export type B = Node | null;
-
-export type A = undefined;
 --------------------- OUTPUT ---------------------
 {
   "d": {
@@ -32,7 +28,6 @@ S3 "Q"
 S4 "expression_statement"
 S5 "program"
 S6 "debugger_statement"
-S7 "A"
 
 [type_defs]
 T0 = <Void>
@@ -48,67 +43,55 @@ N0: S2 → T2  ; B
 N1: S3 → T3  ; Q
 
 [entrypoints]
-A = 02 :: T0
-B = 00 :: T2
-Q = 04 :: T3
+Q = 00 :: T3
 
 [transitions]
-B:
-  00       (@20)                            20 : 01
-  01                                        ▶
-
-A:
-  02       (@28)                            28 : 03
-  03                                        ▶
-
 Q:
-  04  -ε-  [StructOpen]                     06
-  06       (@42)                            42 : 08
-  07  ...
-  08  -ε-  [StructClose]                    10
-  10                                        ▶
-  11                                        ▶
-  12  -ε-  [Null]                           11
-  14   !   (expression_statement) [Node]    11
-  16  ──!  _                                14, 16
-  18   !   _                                14, 16
-  20  -ε-                                   18, 12
-  22                                        ▶
-  23   !   (expression_statement)           22
-  24  ──!  _                                23, 24
-  26   !   _                                23, 24
-  28  -ε-                                   26, 22
-  30                                        ▶
-  31  ─‣┘  _                                30
-  32  └‣─  (debugger_statement) [Node Set(M0)]  31
-  34  ─‣─  (debugger_statement) [Node Set(M0)]  31
-  36   !   (expression_statement)           34
-  37  ──!  _                                36, 37
-  39  ...
-  40  └─!  _                                36, 37
-  42   !   (program)                        40, 32
+  00  -ε-  [StructOpen]                     02
+  02       (@36)                            36 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘  _                                26
+  08  -ε-  [Null]                           06
+  10   !   (expression_statement) [Node]    06
+  12  ──!  _                                10, 12
+  14   !   _                                10, 12
+  16  -ε-                                   14, 08
+  18                                        ▶
+  19   !   (expression_statement)           18
+  20  ──!  _                                19, 20
+  22   !   _                                19, 20
+  24  -ε-                                   22, 18
+  26                                        ▶
+  27  └‣─  (debugger_statement) [Node Set(M0)]  07
+  29  ─‣─  (debugger_statement) [Node Set(M0)]  07
+  31   !   (expression_statement)           29
+  32  ──!  _                                31, 32
+  34  └─!  _                                31, 32
+  36   !   (program)                        34, 27
 --------------------- TRACE ----------------------
 Q:
-  04  -ε-  [StructOpen]                     06
-  06       (@42)                            42 : 08
-       ▶   (@42)
+  00  -ε-  [StructOpen]                     02
+  02       (@36)                            36 : 03
+       ▶   (@36)
 
-@42:
-  42       (program)                        40, 32
+@36:
+  36       (program)                        34, 27
        ●   program
-  40       _                                36, 37
+  34       _                                31, 32
        ●   debugger_statement
-  36       (expression_statement)           34
+  31       (expression_statement)           29
        ○   debugger_statement
-  40  ❮❮❮ 
-  37       _                                36, 37
-  42  ❮❮❮ 
-  32       (debugger_statement) [Node Set(M0)]  31
+  34  ❮❮❮ 
+  32       _                                31, 32
+  36  ❮❮❮ 
+  27       (debugger_statement) [Node Set(M0)]  07
        ●   debugger_statement
-  31       _                                30
+  07       _                                26
        ●   program
-  30   ◀   (@42)                            
+  26   ◀   (@36)                            
 
 Q:
-  08  -ε-  [StructClose]                    10
-  10   ◀   (Q)                              ◼
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

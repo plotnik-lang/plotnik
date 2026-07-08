@@ -1,8 +1,5 @@
 Q = (identifier)* @ids
 ------------------- TYPESCRIPT -------------------
-export interface Q {
-  ids: Node[];
-}
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

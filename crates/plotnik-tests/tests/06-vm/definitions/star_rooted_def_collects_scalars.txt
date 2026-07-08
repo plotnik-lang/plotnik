@@ -57,93 +57,88 @@ N0: S2 → T1  ; Ids
 N1: S3 → T2  ; Q
 
 [entrypoints]
-Ids = 00 :: T1
-Q   = 02 :: T2
+Q = 00 :: T2
 
 [transitions]
-Ids:
-  00       (@22)                            22 : 01
-  01                                        ▶
-
 Q:
-  02  -ε-  [StructOpen]                     04
-  04       (@38)                            38 : 05
-  05  -ε-  [StructClose]                    07
-  07                                        ▶
-  08  -ε-  [ArrayClose]                     10
-  10  ─‣┘  _ [Set(M0)]                      15
-  12                                        ▶
-  13  -ε-  [ArrayClose]                     12
-  15  ─‣┘² _                                24
-  16   !   (identifier) [Node Push]         18, 13
-  18  ──!  _                                16, 18
-  20   !   _                                16, 18
-  22  -ε-  [ArrayOpen]                      20, 13
-  24                                        ▶
-  25  -ε-  [ArrayClose Set(M0)]             15
-  27   !   (identifier) [Node Push]         29, 08
-  29  ──!  _                                27, 29
-  31  ...
-  32  └─!  _                                27, 29
-  34  -ε-  [ArrayOpen]                      32, 25
-  36  └‣─  (array)                          34
-  37  └‣─  (expression_statement)           36
-  38   !   (program)                        37
+  00  -ε-  [StructOpen]                     02
+  02       (@36)                            36 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  -ε-  [ArrayClose]                     08
+  08  ─‣┘  _ [Set(M0)]                      15
+  10                                        ▶
+  11  -ε-  [ArrayClose]                     10
+  13   !   (identifier) [Node Push]         16, 11
+  15  ─‣┘² _                                22
+  16  ──!  _                                13, 16
+  18   !   _                                13, 16
+  20  -ε-  [ArrayOpen]                      18, 11
+  22                                        ▶
+  23  ...
+  24  -ε-  [ArrayClose Set(M0)]             15
+  26   !   (identifier) [Node Push]         28, 06
+  28  ──!  _                                26, 28
+  30  └─!  _                                26, 28
+  32  -ε-  [ArrayOpen]                      30, 24
+  34  └‣─  (array)                          32
+  35  └‣─  (expression_statement)           34
+  36   !   (program)                        35
 --------------------- TRACE ----------------------
 Q:
-  02  -ε-  [StructOpen]                     04
-  04       (@38)                            38 : 05
-       ▶   (@38)
+  00  -ε-  [StructOpen]                     02
+  02       (@36)                            36 : 03
+       ▶   (@36)
 
-@38:
-  38       (program)                        37
+@36:
+  36       (program)                        35
        ●   program
-  37       (expression_statement)           36
+  35       (expression_statement)           34
        ●   expression_statement
-  36       (array)                          34
+  34       (array)                          32
        ●   array
-  34  -ε-  [ArrayOpen]                      32, 25
-  32       _                                27, 29
+  32  -ε-  [ArrayOpen]                      30, 24
+  30       _                                26, 28
        ●   [
-  27       (identifier) [Node Push]         29, 08
+  26       (identifier) [Node Push]         28, 06
        ○   [
-  32  ❮❮❮ 
-  29       _                                27, 29
+  30  ❮❮❮ 
+  28       _                                26, 28
        ●   identifier
-  27       (identifier) [Node Push]         29, 08
+  26       (identifier) [Node Push]         28, 06
        ●   identifier
-  29       _                                27, 29
+  28       _                                26, 28
        ●   ,
-  27       (identifier) [Node Push]         29, 08
+  26       (identifier) [Node Push]         28, 06
        ○   ,
-  29  ❮❮❮ 
-  29       _                                27, 29
+  28  ❮❮❮ 
+  28       _                                26, 28
        ●   identifier
-  27       (identifier) [Node Push]         29, 08
+  26       (identifier) [Node Push]         28, 06
        ●   identifier
-  29       _                                27, 29
+  28       _                                26, 28
        ●   ,
-  27       (identifier) [Node Push]         29, 08
+  26       (identifier) [Node Push]         28, 06
        ○   ,
-  29  ❮❮❮ 
-  29       _                                27, 29
+  28  ❮❮❮ 
+  28       _                                26, 28
        ●   identifier
-  27       (identifier) [Node Push]         29, 08
+  26       (identifier) [Node Push]         28, 06
        ●   identifier
-  29       _                                27, 29
+  28       _                                26, 28
        ●   ]
-  27       (identifier) [Node Push]         29, 08
+  26       (identifier) [Node Push]         28, 06
        ○   ]
-  29  ❮❮❮ 
-  29       _                                27, 29
-  27  ❮❮❮ 
-  08  -ε-  [ArrayClose]                     10
-  10       _ [Set(M0)]                      15
+  28  ❮❮❮ 
+  28       _                                26, 28
+  26  ❮❮❮ 
+  06  -ε-  [ArrayClose]                     08
+  08       _ [Set(M0)]                      15
        ●   array
-  15       _                                24
+  15       _                                22
        ●   program
-  24   ◀   (@38)                            
+  22   ◀   (@36)                            
 
 Q:
-  05  -ε-  [StructClose]                    07
-  07   ◀   (Q)                              ◼
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

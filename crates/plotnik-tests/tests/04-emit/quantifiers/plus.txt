@@ -1,21 +1,14 @@
 Q = (identifier)+ @items
 ---------------------- NFA -----------------------
 [entrypoints]
-Q = 15
 
 [transitions]
 Q:
-  01                                        ▶
-  02  -ε-  [ArrayClose Set(items)]          01
-  04   !   (identifier) [Node Push]         06, 02
-  06  ──!  _                                04, 06
-  07   !   _ [ArrayOpen]                    04, 06
-
-Q (entrypoint):
-  12                                        ▶
-  13  -ε-  [StructClose]                    12
-  14       (Q)                              07 : 13
-  15  -ε-  [StructOpen]                     14
+  1                                         ▶
+  2  -ε-  [ArrayClose Set(items)]           1
+  4   !   (identifier) [Node Push]          6, 2
+  6  ──!  _                                 4, 6
+  7   !   _ [ArrayOpen]                     4, 6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -35,17 +28,5 @@ M0: S1 → T1  ; items: T1
 N0: S2 → T2  ; Q
 
 [entrypoints]
-Q = 00 :: T2
 
 [transitions]
-Q:
-  00  -ε-  [StructOpen]                     02
-  02       (@14)                            14 : 03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ...
-  08  -ε-  [ArrayClose Set(M0)]             06
-  10   !   (identifier) [Node Push]         12, 08
-  12  ──!  _                                10, 12
-  14   !   _ [ArrayOpen]                    10, 12

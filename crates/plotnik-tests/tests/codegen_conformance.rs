@@ -58,7 +58,10 @@ fn generated_matchers_replay_vm_traces() {
         }
     }
     if !skipped.is_empty() {
-        eprintln!("skipped (query has errors): {}", skipped.join(", "));
+        eprintln!(
+            "skipped (query has errors or no callable entrypoints): {}",
+            skipped.join(", ")
+        );
     }
     // A collapse of the corpus (mass skip, broken discovery) must fail loudly
     // rather than shrink coverage in silence.
@@ -115,10 +118,7 @@ fn conformance_mod(fx: &Fixture) -> Option<String> {
     let module = compiled
         .module()
         .expect("a query without errors compiles to a module");
-    let entry = compiled
-        .definition_names()
-        .last()
-        .expect("a valid query has at least one named definition");
+    let entry = module.entrypoint_names().last()?.to_string();
     let expected = vm_expected(&lang, module, &entry, &fx.input, &fx.name);
     let matcher = compiled
         .to_rust_matcher(MatcherConfig::new().serde(true))
@@ -248,7 +248,7 @@ enum EntryShape {
 fn entry_shape(module: &Module, entry: &str) -> EntryShape {
     let entrypoint = module
         .entrypoint(entry)
-        .expect("every named definition is an entrypoint");
+        .expect("selected definition must be an entrypoint");
     let def = module
         .types()
         .get(entrypoint.result_type())
@@ -285,7 +285,7 @@ fn vm_expected(
     let tree = parser.parse(source, None).expect("parse fixture input");
     let entrypoint = module
         .entrypoint(entry)
-        .expect("every named definition is an entrypoint");
+        .expect("selected definition must be an entrypoint");
     let vm = VM::builder(source, &tree).build();
     match vm.execute(module, &entrypoint) {
         Ok(effects) => {

@@ -3,10 +3,6 @@ Q = {
   (number) @b
 }
 ------------------- TYPESCRIPT -------------------
-export interface Q {
-  a: Node;
-  b: Node;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

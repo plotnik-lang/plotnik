@@ -1,0 +1,71 @@
+Q = (program (identifier)* @ids)
+--------------------- INPUT ----------------------
+x;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  ids: Node[];
+}
+--------------------- OUTPUT ---------------------
+{
+  "ids": []
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "ids"
+S2 "Q"
+S3 "program"
+S4 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = ArrayStar(T0)  ; <Node>*
+T2 = Struct  M0:1  ; { ids }
+
+[type_members]
+M0: S1 → T1  ; ids: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [ArrayClose Set(M0)]             06
+  10   !   (identifier) [Node Push]         12, 18
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
+  16  -ε-  [ArrayOpen]                      14, 08
+  18  ─‣┘  _ [ArrayClose Set(M0)]           06
+  20   !   (program)                        16
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@20)                            20 : 03
+       ▶   (@20)
+
+@20:
+  20       (program)                        16
+       ●   program
+  16  -ε-  [ArrayOpen]                      14, 08
+  14       _                                10, 12
+       ●   expression_statement
+  10       (identifier) [Node Push]         12, 18
+       ○   expression_statement
+  14  ❮❮❮ 
+  12       _                                10, 12
+  16  ❮❮❮ 
+  08  -ε-  [ArrayClose Set(M0)]             06
+  06   ◀   (@20)                            
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

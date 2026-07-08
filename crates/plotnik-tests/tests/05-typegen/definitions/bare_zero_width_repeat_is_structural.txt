@@ -1,8 +1,6 @@
 MaybeId = (identifier)?
 Q = (program (expression_statement (array (MaybeId)*)))
 ------------------- TYPESCRIPT -------------------
-export type MaybeId = Node | null;
-
 export type Q = undefined;
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;

@@ -469,10 +469,11 @@ fn render_compile(
             let input = input.ok_or_else(|| {
                 "06-vm fixtures require an `INPUT` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
             })?;
-            let entry = compiled
-                .definition_names()
+            let entry = module
+                .entrypoint_names()
                 .last()
-                .expect("a valid query has at least one named definition");
+                .ok_or_else(|| "06-vm fixture produced no callable entrypoints".to_string())?
+                .to_string();
             let run = run_vm(&lang, module, &entry, &input.text, inspects, records)?;
             out.push(("typescript".into(), render_typescript(&compiled)));
             out.extend(diag);
@@ -541,7 +542,7 @@ fn run_vm(
     let tree = lang.parse(source);
     let entrypoint = module
         .entrypoint(entry)
-        .expect("every named definition is an entrypoint");
+        .expect("selected definition must be an entrypoint");
 
     let vm = VM::builder(source, &tree).build();
 

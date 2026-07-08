@@ -3,9 +3,6 @@ Q = [
   {(number)* @xs}
 ]
 ------------------- TYPESCRIPT -------------------
-export interface Q {
-  xs: Node[];
-}
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

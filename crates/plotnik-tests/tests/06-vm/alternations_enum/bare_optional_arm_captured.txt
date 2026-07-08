@@ -1,6 +1,8 @@
-Q = [
-  A: (identifier)? @id
-] @x
+Q = (program
+  [
+    A: (identifier)? @id
+  ] @x
+)
 --------------------- INPUT ----------------------
 let x
 ------------------- TYPESCRIPT -------------------
@@ -27,7 +29,8 @@ S2 "A"
 S3 "x"
 S4 "QX"
 S5 "Q"
-S6 "identifier"
+S6 "program"
+S7 "identifier"
 
 [type_defs]
 T0 = <Node>
@@ -51,34 +54,42 @@ Q = 00 :: T3
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@19)                            19 : 03
+  02       (@24)                            24 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-  06                                        ▶
-  07  ...
-  08   !   (identifier) [Node Set(M0) EnumClose Set(M2)]  06
-  11  ──!  _                                08, 11
-  13   !   _ [EnumOpen(M1)]                 08, 11
+  06   !   (identifier) [Node Set(M0)]      08
+  08  ─‣┘  _ [EnumClose Set(M2)]            10
+  10                                        ▶
+  11  ──!  _                                06, 11
+  13   !   _ [EnumOpen(M1)]                 06, 11
   15  ...
-  16  -ε-  [EnumOpen(M1) Null Set(M0) EnumClose Set(M2)]  06
-  19  -ε-                                   13, 16
+  16  -ε-  [EnumOpen(M1) Null Set(M0) EnumClose Set(M2)]  10
+  19  ──!  _                                13, 19
+  21  └─!  _                                13, 19
+  23  ...
+  24   !   (program)                        21, 16
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@19)                            19 : 03
-       ▶   (@19)
+  02       (@24)                            24 : 03
+       ▶   (@24)
 
-@19:
-  19  -ε-                                   13, 16
-  13       _ [EnumOpen(M1)]                 08, 11
+@24:
+  24       (program)                        21, 16
        ●   program
-  08       (identifier) [Node Set(M0) EnumClose Set(M2)]  06
-       ○   program
+  21       _                                13, 19
+       ●   lexical_declaration
+  13       _ [EnumOpen(M1)]                 06, 11
+       ●   lexical_declaration
+  06       (identifier) [Node Set(M0)]      08
+       ○   lexical_declaration
   13  ❮❮❮ 
-  11       _                                08, 11
-  19  ❮❮❮ 
-  16  -ε-  [EnumOpen(M1) Null Set(M0) EnumClose Set(M2)]  06
-  06   ◀   (@19)                            
+  11       _                                06, 11
+  21  ❮❮❮ 
+  19       _                                13, 19
+  24  ❮❮❮ 
+  16  -ε-  [EnumOpen(M1) Null Set(M0) EnumClose Set(M2)]  10
+  10   ◀   (@24)                            
 
 Q:
   03  -ε-  [StructClose]                    05

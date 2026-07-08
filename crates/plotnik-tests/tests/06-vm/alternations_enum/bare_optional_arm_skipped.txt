@@ -1,69 +1,88 @@
-Q = [
-  A: (identifier)? @id
-]
+Q = (program
+  [
+    A: (identifier)? @id
+  ]
+)
 --------------------- INPUT ----------------------
 let x
 ------------------- TYPESCRIPT -------------------
-export type Q =
-  | { $tag: "A"; $data: { id: Node | null } };
+export interface Q {
+  id: Node | null;
+}
+------------------ DIAGNOSTICS -------------------
+warning: branch labels have no effect without capture
+ --> query.ptk:2:3
+  |
+2 | /   [
+3 | |     A: (identifier)? @id
+4 | |   ]
+  | |___^
+  |
+help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
 --------------------- OUTPUT ---------------------
 {
-  "$tag": "A",
-  "$data": {
-    "id": null
-  }
+  "id": null
 }
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "id"
-S2 "A"
-S3 "Q"
+S2 "Q"
+S3 "program"
 S4 "identifier"
 
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:1  ; { id }
-T2 = Enum    M1:1  ; A
-T3 = Optional(T0)  ; <Node>?
+T2 = Optional(T0)  ; <Node>?
 
 [type_members]
-M0: S1 → T3  ; id: T3
-M1: S2 → T1  ; A: T1
+M0: S1 → T2  ; id: T2
 
 [type_names]
-N0: S3 → T2  ; Q
+N0: S2 → T1  ; Q
 
 [entrypoints]
-Q = 00 :: T2
+Q = 00 :: T1
 
 [transitions]
 Q:
-  00       (@13)                            13 : 01
-  01                                        ▶
-  02                                        ▶
-  03   !   (identifier) [Node Set(M0) EnumClose]  02
-  05  ──!  _                                03, 05
-  07  ...
-  08   !   _ [EnumOpen(M1)]                 03, 05
-  10  -ε-  [EnumOpen(M1) Null Set(M0) EnumClose]  02
-  13  -ε-                                   08, 10
+  00  -ε-  [StructOpen]                     02
+  02       (@20)                            20 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06   !   (identifier) [Node Set(M0)]      08
+  08  ─‣┘  _                                09
+  09                                        ▶
+  10  ──!  _                                06, 10
+  12   !   _                                06, 10
+  14  -ε-  [Null Set(M0)]                   09
+  16  ──!  _                                12, 16
+  18  └─!  _                                12, 16
+  20   !   (program)                        18, 14
 --------------------- TRACE ----------------------
 Q:
-  00       (@13)                            13 : 01
-       ▶   (@13)
+  00  -ε-  [StructOpen]                     02
+  02       (@20)                            20 : 03
+       ▶   (@20)
 
-@13:
-  13  -ε-                                   08, 10
-  08       _ [EnumOpen(M1)]                 03, 05
+@20:
+  20       (program)                        18, 14
        ●   program
-  03       (identifier) [Node Set(M0) EnumClose]  02
-       ○   program
-  08  ❮❮❮ 
-  05       _                                03, 05
-  13  ❮❮❮ 
-  10  -ε-  [EnumOpen(M1) Null Set(M0) EnumClose]  02
-  02   ◀   (@13)                            
+  18       _                                12, 16
+       ●   lexical_declaration
+  12       _                                06, 10
+       ●   lexical_declaration
+  06       (identifier) [Node Set(M0)]      08
+       ○   lexical_declaration
+  12  ❮❮❮ 
+  10       _                                06, 10
+  18  ❮❮❮ 
+  16       _                                12, 16
+  20  ❮❮❮ 
+  14  -ε-  [Null Set(M0)]                   09
+  09   ◀   (@20)                            
 
 Q:
-  01   ◀   (Q)                              ◼
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

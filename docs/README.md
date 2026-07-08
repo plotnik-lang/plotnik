@@ -33,7 +33,7 @@ docs/
     ├── 02-strings.md    # String pool and table
     ├── 03-symbols.md    # Node kinds, fields, trivia
     ├── 04-types.md      # Type metadata format
-    ├── 05-entrypoints.md # Definition table
+    ├── 05-entrypoints.md # Callable definition table
     ├── 06-transitions.md # VM instructions and data blocks
     ├── 07-spans.md      # Inspection spans section
     ├── 08-dump-format.md # Bytecode dump output format

@@ -81,157 +81,149 @@ N1: S05 → T2  ; Rows
 N2: S06 → T3  ; Q
 
 [entrypoints]
-Q    = 08 :: T3
-Row  = 00 :: T1
-Rows = 06 :: T2
+Q   = 06 :: T3
+Row = 00 :: T1
 
 [transitions]
 Row:
   00  -ε-  [StructOpen]                     02
-  02       (@24)                            24 : 03
+  02       (@23)                            23 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-Rows:
-  06       (@40)                            40 : 07
-  07                                        ▶
-
 Q:
-  08  -ε-  [StructOpen]                     10
-  10       (@64)                            64 : 11
-  11  -ε-  [StructClose]                    13
-  13                                        ▶
-  14  ─‣─  value: (_) [Node Set(M1)]        16
-  16  ─‣┘  _                                21
-  17  -ε-  [ArrayClose]                     19
-  19  ─‣┘  _ [Set(M2)]                      39
-  21                                        ▶
-  22  └‣─  key: (_) [Node Set(M0)]          14
-  24   !   (pair)                           22
-  25                                        ▶
-  26  -ε-  [ArrayClose]                     25
-  28  -ε-  [Push]                           35, 26
-  30  -ε-  [StructClose]                    28
-  32   !   (@24)                            24 : 30
-  33  -ε-  [StructOpen]                     32
-  35  ──!  _                                33, 35
-  37   !   _                                33, 35
-  39  ─‣┘³ _                                42
-  40  -ε-  [ArrayOpen]                      37, 26
-  42                                        ▶
-  43  -ε-  [ArrayClose Set(M2)]             39
-  45  -ε-  [Push]                           53, 17
-  47  ...
-  48  -ε-  [StructClose]                    45
-  50   !   (@24)                            24 : 48
-  51  -ε-  [StructOpen]                     50
-  53  ──!  _                                51, 53
-  55  ...
-  56  └─!  _                                51, 53
-  58  -ε-  [ArrayOpen]                      56, 43
-  60  └‣─  (object)                         58
-  61  └‣─  (parenthesized_expression)       60
-  62  └‣─  (expression_statement)           61
-  63  ...
-  64   !   (program)                        62
+  06  -ε-  [StructOpen]                     08
+  08       (@59)                            59 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  ─‣─  value: (_) [Node Set(M1)]        14
+  14  ─‣┘  _                                20
+  15  ─‣┘³ _                                40
+  16  -ε-  [ArrayClose]                     18
+  18  ─‣┘  _ [Set(M2)]                      15
+  20                                        ▶
+  21  └‣─  key: (_) [Node Set(M0)]          12
+  23   !   (pair)                           21
+  24                                        ▶
+  25  -ε-  [ArrayClose]                     24
+  27  -ε-  [Push]                           34, 25
+  29  -ε-  [StructClose]                    27
+  31   !   (@23)                            23 : 29
+  32  -ε-  [StructOpen]                     31
+  34  ──!  _                                32, 34
+  36   !   _                                32, 34
+  38  -ε-  [ArrayOpen]                      36, 25
+  40                                        ▶
+  41  -ε-  [ArrayClose Set(M2)]             15
+  43  -ε-  [Push]                           50, 16
+  45  -ε-  [StructClose]                    43
+  47   !   (@23)                            23 : 45
+  48  -ε-  [StructOpen]                     47
+  50  ──!  _                                48, 50
+  52  └─!  _                                48, 50
+  54  -ε-  [ArrayOpen]                      52, 41
+  56  └‣─  (object)                         54
+  57  └‣─  (parenthesized_expression)       56
+  58  └‣─  (expression_statement)           57
+  59   !   (program)                        58
 --------------------- TRACE ----------------------
 Q:
-  08  -ε-  [StructOpen]                     10
-  10       (@64)                            64 : 11
-       ▶   (@64)
+  06  -ε-  [StructOpen]                     08
+  08       (@59)                            59 : 09
+       ▶   (@59)
 
-@64:
-  64       (program)                        62
+@59:
+  59       (program)                        58
        ●   program
-  62       (expression_statement)           61
+  58       (expression_statement)           57
        ●   expression_statement
-  61       (parenthesized_expression)       60
+  57       (parenthesized_expression)       56
        ●   parenthesized_expression
-  60       (object)                         58
+  56       (object)                         54
        ○   (
        ●   object
-  58  -ε-  [ArrayOpen]                      56, 43
-  56       _                                51, 53
+  54  -ε-  [ArrayOpen]                      52, 41
+  52       _                                48, 50
        ●   {
-  51  -ε-  [StructOpen]                     50
-  50       (@24)                            24 : 48
-       ▶   (@24)
+  48  -ε-  [StructOpen]                     47
+  47       (@23)                            23 : 45
+       ▶   (@23)
 
-@24:
-  24       (pair)                           22
+@23:
+  23       (pair)                           21
        ○   {
-  56  ❮❮❮ 
-  53       _                                51, 53
+  52  ❮❮❮ 
+  50       _                                48, 50
        ●   pair
-  51  -ε-  [StructOpen]                     50
-  50       (@24)                            24 : 48
-       ▶   (@24)
+  48  -ε-  [StructOpen]                     47
+  47       (@23)                            23 : 45
+       ▶   (@23)
 
-@24:
-  24       (pair)                           22
+@23:
+  23       (pair)                           21
        ●   pair
-  22       key: (_) [Node Set(M0)]          14
+  21       key: (_) [Node Set(M0)]          12
        ●   property_identifier
-  14       value: (_) [Node Set(M1)]        16
+  12       value: (_) [Node Set(M1)]        14
        ○   :
        ●   number
-  16       _                                21
+  14       _                                20
        ●   pair
-  21   ◀   (@24)                            
+  20   ◀   (@23)                            
 
-@64:
-  48  -ε-  [StructClose]                    45
-  45  -ε-  [Push]                           53, 17
-  53       _                                51, 53
+@59:
+  45  -ε-  [StructClose]                    43
+  43  -ε-  [Push]                           50, 16
+  50       _                                48, 50
        ●   ,
-  51  -ε-  [StructOpen]                     50
-  50       (@24)                            24 : 48
-       ▶   (@24)
+  48  -ε-  [StructOpen]                     47
+  47       (@23)                            23 : 45
+       ▶   (@23)
 
-@24:
-  24       (pair)                           22
+@23:
+  23       (pair)                           21
        ○   ,
-  53  ❮❮❮ 
-  53       _                                51, 53
+  50  ❮❮❮ 
+  50       _                                48, 50
        ●   pair
-  51  -ε-  [StructOpen]                     50
-  50       (@24)                            24 : 48
-       ▶   (@24)
+  48  -ε-  [StructOpen]                     47
+  47       (@23)                            23 : 45
+       ▶   (@23)
 
-@24:
-  24       (pair)                           22
+@23:
+  23       (pair)                           21
        ●   pair
-  22       key: (_) [Node Set(M0)]          14
+  21       key: (_) [Node Set(M0)]          12
        ●   property_identifier
-  14       value: (_) [Node Set(M1)]        16
+  12       value: (_) [Node Set(M1)]        14
        ○   :
        ●   number
-  16       _                                21
+  14       _                                20
        ●   pair
-  21   ◀   (@24)                            
+  20   ◀   (@23)                            
 
-@64:
-  48  -ε-  [StructClose]                    45
-  45  -ε-  [Push]                           53, 17
-  53       _                                51, 53
+@59:
+  45  -ε-  [StructClose]                    43
+  43  -ε-  [Push]                           50, 16
+  50       _                                48, 50
        ●   }
-  51  -ε-  [StructOpen]                     50
-  50       (@24)                            24 : 48
-       ▶   (@24)
+  48  -ε-  [StructOpen]                     47
+  47       (@23)                            23 : 45
+       ▶   (@23)
 
-@24:
-  24       (pair)                           22
+@23:
+  23       (pair)                           21
        ○   }
-  53  ❮❮❮ 
-  53       _                                51, 53
-  45  ❮❮❮ 
-  17  -ε-  [ArrayClose]                     19
-  19       _ [Set(M2)]                      39
+  50  ❮❮❮ 
+  50       _                                48, 50
+  43  ❮❮❮ 
+  16  -ε-  [ArrayClose]                     18
+  18       _ [Set(M2)]                      15
        ●   object
-  39       _                                42
+  15       _                                40
        ●   program
-  42   ◀   (@64)                            
+  40   ◀   (@59)                            
 
 Q:
-  11  -ε-  [StructClose]                    13
-  13   ◀   (Q)                              ◼
+  09  -ε-  [StructClose]                    11
+  11   ◀   (Q)                              ◼

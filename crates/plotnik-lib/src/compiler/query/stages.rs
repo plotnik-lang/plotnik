@@ -473,6 +473,12 @@ impl CompiledQuery {
         self.checked.definition_names()
     }
 
+    pub fn entrypoint_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.module()
+            .into_iter()
+            .flat_map(|module| module.entrypoint_names().map(str::to_string))
+    }
+
     pub fn bytecode(&self) -> Option<&[u8]> {
         self.compiled
             .as_ref()

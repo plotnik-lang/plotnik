@@ -26,7 +26,7 @@ fn defaults_to_last_definition_when_entry_omitted() {
     let expected = plan
         .module
         .entrypoint("Second")
-        .expect("last definition is an entrypoint candidate");
+        .expect("last callable definition is an entrypoint candidate");
     assert_eq!(plan.entrypoint, expected);
 }
 
@@ -36,7 +36,7 @@ fn explicit_entry_overrides_the_default() {
     let expected = plan
         .module
         .entrypoint("First")
-        .expect("named definition is an entrypoint candidate");
+        .expect("named callable definition is an entrypoint candidate");
     assert_eq!(plan.entrypoint, expected);
 }
 

@@ -6,8 +6,7 @@ Q = (program (expression_statement (Expr) @expr))
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entrypoints]
-Expr = 86
-Q    = 90
+Q = 88
 
 [transitions]
 Expr:
@@ -62,15 +61,11 @@ Q:
   80  └─!  _                                66, 68, 79
   82  -ε-  [SpanStart#0]                    80, 67
 
-Expr (entrypoint):
-  85                                        ▶
-  86       (Expr)                           46 : 85
-
 Q (entrypoint):
-  87                                        ▶
-  88  -ε-  [StructClose]                    87
-  89       (Q)                              49 : 88
-  90  -ε-  [StructOpen]                     89
+  85                                        ▶
+  86  -ε-  [StructClose]                    85
+  87       (Q)                              49 : 86
+  88  -ε-  [StructOpen]                     87
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -99,8 +94,7 @@ N0: S4 → T1  ; Expr
 N1: S5 → T2  ; Q
 
 [entrypoints]
-Expr = 000 :: T1
-Q    = 002 :: T2
+Q = 000 :: T2
 
 [spans]
 P00 def        0..75  src0  T1
@@ -118,44 +112,42 @@ P11 capture    118..123  src0  T2.M2
 P12 ref        111..117  src0  T1
 
 [transitions]
-Expr:
-  000       (@072)                          072 : 001
-  001                                       ▶
-
 Q:
-  002  -ε-  [StructOpen]                    004
-  004       (@112)                          112 : 005
-  005  -ε-  [StructClose]                   007
+  000  -ε-  [StructOpen]                    002
+  002       (@112)                          112 : 003
+  003  -ε-  [StructClose]                   005
+  005                                       ▶
+  006  └‣─  (@061)                          061 : 008
   007                                       ▶
-  008  └‣─  (@061)                          061 : 009
-  009  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  038
-  012  └‣─  (@061)                          061 : 013
-  013  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  020
-  016  └‣─  (@061)                          061 : 017
-  017  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  106
-  020                                       ▶
-  021   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  020
-  024  ──!  _                               021, 024
-  026   !   _ [SpanStart#3]                 021, 024
+  008  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  007
+  011  └‣─  (@061)                          061 : 012
+  012  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  019
+  015  └‣─  (@061)                          061 : 016
+  016  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  106
+  019                                       ▶
+  020   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  019
+  023  ...
+  024  ──!  _                               020, 024
+  026   !   _ [SpanStart#3]                 020, 024
   028  -ε-  [SpanStart#1 SpanStart#2 EnumOpen(M0)]  026
   030  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  074
-  032  -ε-  [SpanStart#1 SpanStart#2 EnumOpen(M0) EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  020
-  035  -ε-  [SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  020
-  038                                       ▶
+  032  -ε-  [SpanStart#1 SpanStart#2 EnumOpen(M0) EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  019
+  035  -ε-  [SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  019
+  038  ...
   039  ...
-  040   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  038
+  040   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  007
   043  ──!  _                               040, 043
   045   !   _ [SpanStart#3]                 040, 043
   047  ...
   048  -ε-  [SpanStart#1 SpanStart#2 EnumOpen(M0)]  045
-  050  -ε-  [SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  038
-  053  -ε-  [SuppressBegin]                 008
+  050  -ε-  [SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  007
+  053  -ε-  [SuppressBegin]                 006
   055  ...
   056  -ε-  [SpanStart#7]                   050, 053
   058   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 EnumOpen(M1) SpanStartAt#6]  056
   061  -ε-  [SpanStart#0]                   048, 058
   063  ...
-  064  -ε-  [SuppressBegin]                 012
+  064  -ε-  [SuppressBegin]                 011
   066  -ε-  [SpanStart#7]                   035, 064
   068   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 EnumOpen(M1) SpanStartAt#6]  066
   071  ...
@@ -167,7 +159,7 @@ Q:
   082  -ε-  [SpanStart#1 SpanStart#2 EnumOpen(M0)]  080
   084  -ε-  [SpanStart#1 SpanStart#2 EnumOpen(M0) EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0 SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  030
   088  -ε-  [SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  106
-  091  -ε-  [SuppressBegin]                 016
+  091  -ε-  [SuppressBegin]                 015
   093  -ε-  [SpanStart#7]                   088, 091
   095  ...
   096   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 EnumOpen(M1) SpanStartAt#6]  093

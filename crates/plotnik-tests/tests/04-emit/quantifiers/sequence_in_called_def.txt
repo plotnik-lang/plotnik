@@ -3,9 +3,8 @@ Collect = {(Item) @item}* @items
 Q = (array (Collect))
 ---------------------- NFA -----------------------
 [entrypoints]
-Collect = 43
-Item    = 39
-Q       = 45
+Item = 39
+Q    = 41
 
 [transitions]
 Item:
@@ -39,15 +38,9 @@ Item (entrypoint):
   38       (Item)                           04 : 37
   39  -ε-  [StructOpen]                     38
 
-Collect (entrypoint):
-  40                                        ▶
-  41  -ε-  [StructClose]                    40
-  42       (Collect)                        21 : 41
-  43  -ε-  [StructOpen]                     42
-
 Q (entrypoint):
-  44                                        ▶
-  45       (Q)                              23 : 44
+  40                                        ▶
+  41       (Q)                              23 : 40
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -80,46 +73,37 @@ N1: S5 → T3  ; CollectItems
 N2: S6 → T5  ; Collect
 
 [entrypoints]
-Collect = 06 :: T5
-Item    = 00 :: T2
-Q       = 12 :: T0
+Item = 00 :: T2
+Q    = 06 :: T0
 
 [transitions]
 Item:
   00  -ε-  [StructOpen]                     02
-  02       (@16)                            16 : 03
+  02       (@09)                            09 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-Collect:
-  06  -ε-  [StructOpen]                     08
-  08       (@34)                            34 : 09
-  09  -ε-  [StructClose]                    11
-  11                                        ▶
-
 Q:
-  12       (@48)                            48 : 13
-  13                                        ▶
-  14                                        ▶
-  15  ...
-  16   !   (identifier) [Node Set(M0)]      14
-  18                                        ▶
-  19  -ε-  [ArrayClose Set(M2)]             18
-  21  -ε-  [StructClose Push]               29, 19
-  23  ...
-  24  -ε-  [StructClose Set(M1)]            21
-  26   !   (@16)                            16 : 24
-  27  -ε-  [StructOpen StructOpen]          26
-  29  ──!  _                                27, 29
-  31  ─‣┘  _                                36
-  32   !   _                                27, 29
-  34  -ε-  [ArrayOpen]                      32, 19
-  36                                        ▶
-  37  -ε-  [SuppressEnd]                    42, 31
-  39   !   (@16)                            16 : 37
-  40  -ε-  [SuppressBegin]                  39
-  42  ──!  _                                40, 42
-  44  └─!  _                                40, 42
-  46  ...
-  47  ...
-  48   !   (array)                          44, 36
+  06       (@40)                            40 : 07
+  07                                        ▶
+  08                                        ▶
+  09   !   (identifier) [Node Set(M0)]      08
+  11                                        ▶
+  12  -ε-  [ArrayClose Set(M2)]             11
+  14  -ε-  [StructClose Push]               21, 12
+  16  -ε-  [StructClose Set(M1)]            14
+  18   !   (@09)                            09 : 16
+  19  -ε-  [StructOpen StructOpen]          18
+  21  ──!  _                                19, 21
+  23  ─‣┘  _                                28
+  24   !   _                                19, 21
+  26  -ε-  [ArrayOpen]                      24, 12
+  28                                        ▶
+  29  -ε-  [SuppressEnd]                    34, 23
+  31   !   (@09)                            09 : 29
+  32  -ε-  [SuppressBegin]                  31
+  34  ──!  _                                32, 34
+  36  └─!  _                                32, 34
+  38  ...
+  39  ...
+  40   !   (array)                          36, 28

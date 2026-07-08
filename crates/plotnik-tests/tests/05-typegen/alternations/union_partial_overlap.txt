@@ -6,10 +6,6 @@ Q = [
   {(identifier) @x}
 ]
 ------------------- TYPESCRIPT -------------------
-export interface Q {
-  x: Node;
-  y: Node | null;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

@@ -146,7 +146,7 @@ fn compile_strict_query(
 /// real diagnosis instead.
 fn reject_colliding_entry_names(compiled: &CompiledQuery, span: Span) -> Result<(), ExpandError> {
     let mut entry_names: HashMap<String, String> = HashMap::new();
-    for def in compiled.definition_names() {
+    for def in compiled.entrypoint_names() {
         let entry = plotnik_lib::matcher_entry_fn_name(&def);
         if let Some(previous) = entry_names.insert(entry.clone(), def.clone()) {
             return Err(ExpandError::new(

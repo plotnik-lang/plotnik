@@ -3,14 +3,6 @@ Q = {
   (number) @v
 }* @rows
 ------------------- TYPESCRIPT -------------------
-export interface QRows {
-  k: Node;
-  v: Node;
-}
-
-export interface Q {
-  rows: QRows[];
-}
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

@@ -6,15 +6,6 @@ Q = {
   } @pair
 }
 ------------------- TYPESCRIPT -------------------
-export interface QPair {
-  k: Node;
-  v: Node;
-}
-
-export interface Q {
-  name: Node;
-  pair: QPair;
-}
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

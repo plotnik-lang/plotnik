@@ -3,13 +3,6 @@ Q = [
   B: (number) @n
 ]* @rows
 ------------------- TYPESCRIPT -------------------
-export type QRows =
-  | { $tag: "A"; $data: { id: Node } }
-  | { $tag: "B"; $data: { n: Node } };
-
-export interface Q {
-  rows: QRows[];
-}
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

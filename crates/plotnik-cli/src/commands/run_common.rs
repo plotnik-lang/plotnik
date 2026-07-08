@@ -180,9 +180,9 @@ pub fn plan_exec(input: ExecRequest) -> Result<ExecPlan, CliError> {
     )?;
 
     let compiled = compile_query(loaded.sources, lang, input.color, input.inspection)?;
-    // Queries conventionally put the top-level definition last.
-    let default_entry = compiled.definition_names().last();
     let module = compiled.into_module().expect("dry_run guarantees a module");
+    // Queries conventionally put the top-level callable definition last.
+    let default_entry = module.entrypoint_names().last().map(str::to_owned);
 
     let entry = input
         .entry
