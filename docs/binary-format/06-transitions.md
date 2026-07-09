@@ -140,16 +140,20 @@ struct MatchHeader {
 
 ```text
 counts (u16)
-┌────────────┬────────┬─────────┬───────────┬─────────────┐
-│ effects(4) │ neg(3) │ succ(5) │ predicate │ reserved(3) │
-└────────────┴────────┴─────────┴───────────┴─────────────┘
- bits 15-12   11-9     8-4       bit 3       bits 2-0
+┌────────────┬────────┬─────────┬───────────┬─────────┬─────────────┐
+│ effects(4) │ neg(3) │ succ(5) │ predicate │ missing │ reserved(2) │
+└────────────┴────────┴─────────┴───────────┴─────────┴─────────────┘
+ bits 15-12   11-9     8-4       bit 3       bit 2     bits 1-0
 ```
 
 - `effects`: number of inline `EffectOp` payload slots, max 15.
 - `neg`: number of negated field IDs, max 7.
 - `succ`: number of successors, max 31.
 - `predicate`: one bit; when set, two payload slots hold the predicate.
+- `missing`: one bit; when set, the node must be a tree-sitter MISSING node (a
+  zero-width node inserted by error recovery) — the `(MISSING …)` constraint.
+  Independent of `predicate`; it forces at least the `Match16` form since the
+  `Match8` fast path has no counts word.
 - `reserved`: must be zero.
 
 ### Payload Order

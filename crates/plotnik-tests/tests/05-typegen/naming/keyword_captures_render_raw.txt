@@ -1,0 +1,21 @@
+Q = (program
+  (expression_statement
+    (binary_expression
+      left: (identifier) @type
+      right: (identifier) @match
+    )
+  )
+)
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  match: Node;
+  type: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub r#type: Node<'t>,
+    pub r#match: Node<'t>,
+}

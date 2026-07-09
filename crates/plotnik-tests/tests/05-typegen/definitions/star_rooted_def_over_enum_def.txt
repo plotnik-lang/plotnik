@@ -1,7 +1,7 @@
 Entry = [Id: (identifier) @id  Num: (number) @num]
 Items = (Entry)*
 Q = (program (expression_statement (array (Items) @items)))
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Entry =
   | { $tag: "Id"; $data: { id: Node } }
   | { $tag: "Num"; $data: { num: Node } };
@@ -11,3 +11,18 @@ export interface Q {
 }
 
 export type Items = Entry[];
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Entry<'t> {
+    Id { id: Node<'t> },
+    Num { num: Node<'t> },
+}
+
+pub type Items<'t> = ::std::vec::Vec<Entry<'t>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub items: ::std::vec::Vec<Entry<'t>>,
+}

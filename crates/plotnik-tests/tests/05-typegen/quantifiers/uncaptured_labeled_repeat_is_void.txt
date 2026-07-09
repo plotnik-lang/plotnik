@@ -14,5 +14,8 @@ warning: branch labels have no effect without capture
   | |_^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
---------------------- TYPES ----------------------
-export type Q = Node;
+------------------- TYPESCRIPT -------------------
+export type Q = undefined;
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q;

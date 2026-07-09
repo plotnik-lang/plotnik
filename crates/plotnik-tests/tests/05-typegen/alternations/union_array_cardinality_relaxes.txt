@@ -2,7 +2,11 @@ Q = [
   {(identifier)+ @xs}
   {(number)* @xs}
 ]
---------------------- TYPES ----------------------
-export interface Q {
-  xs: Node[];
+------------------- TYPESCRIPT -------------------
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub xs: ::std::vec::Vec<Node<'t>>,
 }

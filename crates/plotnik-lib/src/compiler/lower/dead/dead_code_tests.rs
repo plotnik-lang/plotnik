@@ -26,6 +26,7 @@ fn removes_unreachable_instructions() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     remove_unreachable(&mut result);
@@ -61,6 +62,7 @@ fn keeps_all_when_all_reachable() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     remove_unreachable(&mut result);
@@ -90,6 +92,7 @@ fn handles_branching() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     remove_unreachable(&mut result);

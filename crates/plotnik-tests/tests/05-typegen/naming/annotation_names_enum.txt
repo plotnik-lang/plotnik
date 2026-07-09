@@ -2,11 +2,22 @@ Q = (program [
   A: (expression_statement)
   B: (debugger_statement)
 ] @kind :: Kind)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Kind =
   | { $tag: "A" }
   | { $tag: "B" };
 
 export interface Q {
   kind: Kind;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q {
+    pub kind: Kind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Kind {
+    A,
+    B,
 }

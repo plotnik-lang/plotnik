@@ -8,6 +8,95 @@ Funcs = (program
   )* @funcs
 )
 ------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Funcs = 114
+Lazy  = 110
+Many  = 102
+Maybe = 098
+Some  = 106
+
+[transitions]
+Maybe:
+  005                                       ▶
+  007   !   (program) [SpanStart#0 SpanStartAt#1]  018
+  009  ─‣┘  _ [SpanEnd#3 SpanEnd#1 SpanEnd#0]  005
+  012  -ε-  [Null Set(stmt) SpanEnd#3 SpanEnd#1 SpanEnd#0]  005
+  013   !   (expression_statement) [SpanStartAt#4 SpanStart#2 Node Set(stmt) SpanEnd#2 SpanEnd#4]  009
+  015  ──!  _                               013, 015
+  016  └─!  _                               013, 015
+  018  -ε-  [SpanStart#3]                   016, 012
+
+Many:
+  020                                       ▶
+  022   !   (program) [SpanStart#5 SpanStartAt#6]  036
+  024  ─‣┘  _ [SpanEnd#8 ArrayClose SpanStart#7 Set(stmts) SpanEnd#7 SpanEnd#6 SpanEnd#5]  020
+  026  -ε-  [SpanEnd#8 ArrayClose SpanStart#7 Set(stmts) SpanEnd#7 SpanEnd#6 SpanEnd#5]  020
+  028   !   (expression_statement) [SpanStartAt#9 Node Push SpanEnd#9]  030, 024
+  030  ──!  _                               028, 030
+  031  └─!  _                               028, 030
+  036  -ε-  [ArrayOpen SpanStart#8]         031, 026
+
+Some:
+  038                                       ▶
+  040   !   (program) [SpanStart#10 SpanStartAt#11]  048
+  042  ─‣┘  _ [SpanEnd#13 ArrayClose SpanStart#12 Set(stmts) SpanEnd#12 SpanEnd#11 SpanEnd#10]  038
+  045   !   (expression_statement) [SpanStartAt#14 Node Push SpanEnd#14]  047, 042
+  047  ──!  _                               045, 047
+  048  └─!  _ [ArrayOpen SpanStart#13]      045, 047
+
+Lazy:
+  054                                       ▶
+  056   !   (program) [SpanStart#15 SpanStartAt#16]  070
+  058  ─‣┘  _ [SpanEnd#18 ArrayClose SpanStart#17 Set(stmts) SpanEnd#17 SpanEnd#16 SpanEnd#15]  054
+  060  -ε-  [SpanEnd#18 ArrayClose SpanStart#17 Set(stmts) SpanEnd#17 SpanEnd#16 SpanEnd#15]  054
+  062   !   (expression_statement) [SpanStartAt#19 Node Push SpanEnd#19]  058, 064
+  064  ──!  _                               062, 064
+  065  └─!  _                               062, 064
+  070  -ε-  [ArrayOpen SpanStart#18]        060, 065
+
+Funcs:
+  072                                       ▶
+  074   !   (program) [SpanStart#20 SpanStartAt#21]  093
+  076  ─‣┘  _ [SpanEnd#23 ArrayClose SpanStart#22 Set(funcs) SpanEnd#22 SpanEnd#21 SpanEnd#20]  072
+  078  -ε-  [SpanEnd#23 ArrayClose SpanStart#22 Set(funcs) SpanEnd#22 SpanEnd#21 SpanEnd#20]  072
+  080  -ε-  [StructClose Push]              087, 076
+  081   !   (function_declaration) [StructOpen SpanStartAt#24]  084
+  083  ─‣┘  _ [SpanEnd#24]                  080
+  084  └‣─  name: (identifier) [SpanStart#26 SpanStartAt#27 SpanStart#25 Node Set(name) SpanEnd#25 SpanEnd#27 SpanEnd#26]  083
+  087  ──!  _                               081, 087
+  088  └─!  _                               081, 087
+  093  -ε-  [ArrayOpen SpanStart#23]        088, 078
+
+Maybe (entrypoint):
+  095                                       ▶
+  096  -ε-  [StructClose]                   095
+  097       (Maybe)                         007 : 096
+  098  -ε-  [StructOpen]                    097
+
+Many (entrypoint):
+  099                                       ▶
+  100  -ε-  [StructClose]                   099
+  101       (Many)                          022 : 100
+  102  -ε-  [StructOpen]                    101
+
+Some (entrypoint):
+  103                                       ▶
+  104  -ε-  [StructClose]                   103
+  105       (Some)                          040 : 104
+  106  -ε-  [StructOpen]                    105
+
+Lazy (entrypoint):
+  107                                       ▶
+  108  -ε-  [StructClose]                   107
+  109       (Lazy)                          056 : 108
+  110  -ε-  [StructOpen]                    109
+
+Funcs (entrypoint):
+  111                                       ▶
+  112  -ε-  [StructClose]                   111
+  113       (Funcs)                         074 : 112
+  114  -ε-  [StructOpen]                    113
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -132,33 +221,33 @@ Funcs:
   046  ...
   047  ...
   048  -ε-  [Null Set(M0) SpanEnd#3 SpanEnd#1 SpanEnd#0]  030
-  051  ─‣─  _                               032, 051
-  053  └‣─  _                               032, 051
+  051  ──!  _                               032, 051
+  053  └─!  _                               032, 051
   055  ...
   056  -ε-  [SpanStart#3]                   053, 048
   058   !   (program) [SpanStart#0 SpanStartAt#1]  056
   060                                       ▶
   061  -ε-  [SpanEnd#8 ArrayClose SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  060
   064   !   (expression_statement) [SpanStartAt#9 Node Push SpanEnd#9]  067, 074
-  067  ─‣─  _                               064, 067
-  069  └‣─  _                               064, 067
+  067  ──!  _                               064, 067
+  069  └─!  _                               064, 067
   071  ...
   072  -ε-  [ArrayOpen SpanStart#8]         069, 061
   074  ─‣┘  _ [SpanEnd#8 ArrayClose SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#6 SpanEnd#5]  060
   077   !   (program) [SpanStart#5 SpanStartAt#6]  072
   079                                       ▶
   080   !   (expression_statement) [SpanStartAt#14 Node Push SpanEnd#14]  083, 088
-  083  ─‣─  _                               080, 083
-  085  └‣─  _ [ArrayOpen SpanStart#13]      080, 083
+  083  ──!  _                               080, 083
+  085  └─!  _ [ArrayOpen SpanStart#13]      080, 083
   087  ...
   088  ─‣┘  _ [SpanEnd#13 ArrayClose SpanStart#12 Set(M2) SpanEnd#12 SpanEnd#11 SpanEnd#10]  079
   091   !   (program) [SpanStart#10 SpanStartAt#11]  085
   093                                       ▶
-  094  ─‣─  _                               120, 094
+  094  ──!  _                               120, 094
   096  -ε-  [SpanEnd#18 ArrayClose SpanStart#17 Set(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  093
   099   !   (expression_statement) [SpanStartAt#19 Node Push SpanEnd#19]  108, 102
-  102  ─‣─  _                               099, 102
-  104  └‣─  _                               099, 102
+  102  ──!  _                               099, 102
+  104  └─!  _                               099, 102
   106  -ε-  [ArrayOpen SpanStart#18]        096, 104
   108  ─‣┘  _ [SpanEnd#18 ArrayClose SpanStart#17 Set(M3) SpanEnd#17 SpanEnd#16 SpanEnd#15]  093
   111  ...
@@ -167,7 +256,7 @@ Funcs:
   115  -ε-  [SpanEnd#23 ArrayClose SpanStart#22 Set(M5) SpanEnd#22 SpanEnd#21 SpanEnd#20]  114
   118  -ε-  [StructClose Push]              094, 037
   120   !   (function_declaration) [StructOpen SpanStartAt#24]  040
-  122  └‣─  _                               120, 094
+  122  └─!  _                               120, 094
   124  -ε-  [ArrayOpen SpanStart#23]        122, 115
   126  ...
   127  ...

@@ -8,7 +8,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 x
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   args: Node[];
   id: Node | null;
@@ -59,23 +59,23 @@ Q:
   06                                        ▶
   07  ─‣┘² _                                06
   08   !   (identifier) [Node Push]         10, 14
-  10  ─‣─  _                                08, 10
-  12  └‣─  _ [ArrayOpen]                    08, 10
+  10  ──!  _                                08, 10
+  12  └─!  _ [ArrayOpen]                    08, 10
   14  ─‣┘² _ [ArrayClose Set(M0)]           07
   16  └‣─  (arguments)                      12
   17   !   (call_expression) [Null Set(M1)]  16
   19   !   (identifier) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  07
-  22  ─‣─  _                                17, 19, 22
-  24  └‣─  _                                17, 19, 22
+  22  ──!  _                                17, 19, 22
+  24  └─!  _                                17, 19, 22
   26  └‣─  (expression_statement)           24
   27   !   (program)                        26
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              27 : 03
-       ▶   (?)
+  02       (@27)                            27 : 03
+       ▶   (@27)
 
-?:
+@27:
   27       (program)                        26
        ●   program
   26       (expression_statement)           24
@@ -89,7 +89,7 @@ Q:
        ●   identifier
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@27)                            
 
 Q:
   03  -ε-  [StructClose]                    05

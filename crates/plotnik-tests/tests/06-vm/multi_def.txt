@@ -2,7 +2,7 @@ Other = (program (function_declaration) @fn)
 Q = (program (expression_statement (identifier) @name))
 --------------------- INPUT ----------------------
 foo;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   name: Node;
 }
@@ -71,10 +71,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   06  -ε-  [StructOpen]                     08
-  08       (?)                              22 : 09
-       ▶   (?)
+  08       (@22)                            22 : 09
+       ▶   (@22)
 
-?:
+@22:
   22       (program)                        21
        ●   program
   21       (expression_statement)           16
@@ -83,7 +83,7 @@ Q:
        ●   identifier
   18       _                                20
        ●   program
-  20   ◀   (?)                              
+  20   ◀   (@22)                            
 
 Q:
   09  -ε-  [StructClose]                    11

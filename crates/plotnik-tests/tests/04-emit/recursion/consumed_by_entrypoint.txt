@@ -4,6 +4,39 @@ Nested = [
 ]
 
 Q = (array (Nested) @top)
+---------------------- NFA -----------------------
+[entrypoints]
+Nested = 21
+Q      = 25
+
+[transitions]
+Nested:
+  00  -ε-                                   03, 04
+  02                                        ▶
+  03   !   (identifier) [Null Set(inner) Node Set(leaf)]  02
+  04   !   (array) [Null Set(leaf) StructOpen]  08
+  05  ─‣┘  _ [Set(inner)]                   02
+  07  -ε-  [StructClose]                    05
+  08  └‣─  (Nested)                         00 : 07
+
+Q:
+  11                                        ▶
+  12   !   (array) [StructOpen]             16
+  13  ─‣┘  _ [Set(top)]                     11
+  15  -ε-  [StructClose]                    13
+  16  └‣─  (Nested)                         00 : 15
+
+Nested (entrypoint):
+  18                                        ▶
+  19  -ε-  [StructClose]                    18
+  20       (Nested)                         00 : 19
+  21  -ε-  [StructOpen]                     20
+
+Q (entrypoint):
+  22                                        ▶
+  23  -ε-  [StructClose]                    22
+  24       (Q)                              12 : 23
+  25  -ε-  [StructOpen]                     24
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

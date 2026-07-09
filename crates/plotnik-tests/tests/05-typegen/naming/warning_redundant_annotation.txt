@@ -9,11 +9,23 @@ warning: this type annotation matches the generated type name; omit it
   |
 4 |   } @info :: QInfo
   |              ^^^^^
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QInfo {
   stmt: Node;
 }
 
 export interface Q {
   info: QInfo;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub info: QInfo<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QInfo<'t> {
+    pub stmt: Node<'t>,
 }

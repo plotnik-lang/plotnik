@@ -10,9 +10,31 @@ use crate::core::Symbol;
 use super::InferVisitor;
 
 impl InferVisitor<'_, '_> {
-    /// Fold `source` fields into `target` in place, reporting a diagnostic on any
-    /// name collision. Shared by sequences and named nodes so both paths reject
-    /// duplicate captures identically.
+    /// Add one field to a scope, reporting a diagnostic if the name is already
+    /// bound. `range` locates the offending capture for the caret. This is the
+    /// single duplicate-capture gate: sequences call it per child, a named node
+    /// calls it for its own capture bubbling alongside the children.
+    pub(super) fn insert_scope_field(
+        &mut self,
+        target: &mut BTreeMap<Symbol, FieldInfo>,
+        name: Symbol,
+        info: FieldInfo,
+        range: TextRange,
+    ) {
+        match target.entry(name) {
+            Entry::Vacant(e) => {
+                e.insert(info);
+            }
+            Entry::Occupied(_) => {
+                let field = self.ctx.interner.resolve(name).to_string();
+                self.report(DiagnosticKind::DuplicateCaptureInScope, range)
+                    .detail(field)
+                    .emit();
+            }
+        }
+    }
+
+    /// Fold `source` fields into `target` in place, rejecting name collisions.
     pub(super) fn merge_scope_fields(
         &mut self,
         target: &mut BTreeMap<Symbol, FieldInfo>,
@@ -20,17 +42,7 @@ impl InferVisitor<'_, '_> {
         range: TextRange,
     ) {
         for (&name, &info) in source {
-            match target.entry(name) {
-                Entry::Vacant(e) => {
-                    e.insert(info);
-                }
-                Entry::Occupied(_) => {
-                    let field = self.ctx.interner.resolve(name).to_string();
-                    self.report(DiagnosticKind::DuplicateCaptureInScope, range)
-                        .detail(field)
-                        .emit();
-                }
-            }
+            self.insert_scope_field(target, name, info, range);
         }
     }
 }

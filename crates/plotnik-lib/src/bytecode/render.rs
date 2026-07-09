@@ -166,6 +166,11 @@ impl<'a> MatchRenderer<'a> {
             result.push_str(": ");
         }
 
+        if m.missing() {
+            result.push_str(&self.format_missing(m.node_kind));
+            return result;
+        }
+
         match m.node_kind {
             NodeKindConstraint::Any => {
                 result.push('_');
@@ -193,7 +198,28 @@ impl<'a> MatchRenderer<'a> {
         result
     }
 
+    /// Render a `(MISSING …)` constraint. The kind narrows which missing node is
+    /// meant: `Any` is bare `(MISSING)`; a named or anonymous kind names the token.
+    fn format_missing(&self, kind: NodeKindConstraint) -> String {
+        match kind {
+            NodeKindConstraint::Any => "(MISSING)".to_string(),
+            NodeKindConstraint::Named(Some(id)) => {
+                format!("(MISSING {})", self.format_node_kind_name(id, "node"))
+            }
+            NodeKindConstraint::Anonymous(Some(id)) => {
+                format!("(MISSING \"{}\")", self.format_node_kind_name(id, "anon"))
+            }
+            NodeKindConstraint::Named(None) | NodeKindConstraint::Anonymous(None) => {
+                unreachable!("MISSING resolves to a concrete kind or Any")
+            }
+        }
+    }
+
     fn format_node_kind_name(&self, id: NodeKindId, dump_prefix: &str) -> String {
+        // The builtin error symbol has no grammar entry; render `(ERROR)` as written.
+        if id == NodeKindId::ERROR {
+            return "ERROR".to_string();
+        }
         match self.context.node_kind_name(id) {
             Some(name) => name.to_string(),
             None => self.missing_symbols.format(dump_prefix, id),

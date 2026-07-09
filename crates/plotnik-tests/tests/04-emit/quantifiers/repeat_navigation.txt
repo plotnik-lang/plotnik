@@ -1,4 +1,24 @@
 Q = (function_declaration (decorator)* @decs)
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 19
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (function_declaration)           15
+  03  ─‣┘  _ [ArrayClose Set(decs)]         01
+  05  -ε-  [ArrayClose Set(decs)]           01
+  07   !   (decorator) [Node Push]          09, 03
+  09  ──!  _                                07, 09
+  10  └─!  _                                07, 09
+  15  -ε-  [ArrayOpen]                      10, 05
+
+Q (entrypoint):
+  16                                        ▶
+  17  -ε-  [StructClose]                    16
+  18       (Q)                              02 : 17
+  19  -ε-  [StructOpen]                     18
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -31,8 +51,8 @@ Q:
   07  ...
   08  -ε-  [ArrayClose Set(M0)]             06
   10   !   (decorator) [Node Push]          12, 18
-  12  ─‣─  _                                10, 12
-  14  └‣─  _                                10, 12
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
   16  -ε-  [ArrayOpen]                      14, 08
   18  ─‣┘  _ [ArrayClose Set(M0)]           06
   20   !   (function_declaration)           16

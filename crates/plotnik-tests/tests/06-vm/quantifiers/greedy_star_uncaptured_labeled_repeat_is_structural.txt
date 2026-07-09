@@ -4,8 +4,8 @@ Q = (program [
 ]*)
 --------------------- INPUT ----------------------
 foo(); let x
---------------------- TYPES ----------------------
-export type Q = Node;
+------------------- TYPESCRIPT -------------------
+export type Q = undefined;
 ------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
  --> query.ptk:1:14
@@ -19,69 +19,60 @@ warning: branch labels have no effect without capture
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
 --------------------- OUTPUT ---------------------
-{
-  "kind": "program",
-  "text": "foo(); let x",
-  "span": [0, 12]
-}
+null
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "program"
-S3 "expression_statement"
-S4 "lexical_declaration"
+S1 "program"
+S2 "expression_statement"
+S3 "lexical_declaration"
+S4 "Q"
 
 [type_defs]
-T0 = <Node>
+T0 = <Void>
 
 [type_members]
 
 [type_names]
-N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 00 :: T0
 
 [transitions]
 Q:
-  00       (@16)                            16 : 01
-  01  -ε-  [Node]                           03
-  03                                        ▶
-  04                                        ▶
-  05   !   (expression_statement)           10, 07
-  07  ─‣┘  _                                04
-  08   !   (lexical_declaration)            10, 07
-  10  ─‣─  _                                05, 08, 10
-  12  └‣─  _                                05, 08, 10
-  14  ...
-  15  ...
-  16   !   (program)                        12, 04
+  00       (@12)                            12 : 01
+  01                                        ▶
+  02                                        ▶
+  03   !   (expression_statement)           08, 07
+  05   !   (lexical_declaration)            08, 07
+  07  ─‣┘  _                                02
+  08  ──!  _                                03, 05, 08
+  10  └─!  _                                03, 05, 08
+  12   !   (program)                        10, 02
 --------------------- TRACE ----------------------
 Q:
-  00       (?)                              16 : 01
-       ▶   (?)
+  00       (@12)                            12 : 01
+       ▶   (@12)
 
-?:
-  16       (program)                        12, 04
+@12:
+  12       (program)                        10, 02
        ●   program
-  12       _                                05, 08, 10
+  10       _                                03, 05, 08
        ●   expression_statement
-  05       (expression_statement)           10, 07
+  03       (expression_statement)           08, 07
        ●   expression_statement
-  10       _                                05, 08, 10
+  08       _                                03, 05, 08
        ●   lexical_declaration
-  05       (expression_statement)           10, 07
+  03       (expression_statement)           08, 07
        ○   lexical_declaration
-  10  ❮❮❮ 
-  08       (lexical_declaration)            10, 07
-       ●   lexical_declaration
-  10       _                                05, 08, 10
   08  ❮❮❮ 
-  07       _                                04
+  05       (lexical_declaration)            08, 07
+       ●   lexical_declaration
+  08       _                                03, 05, 08
+  05  ❮❮❮ 
+  07       _                                02
        ●   program
-  04   ◀   (?)                              
+  02   ◀   (@12)                            
 
 Q:
-  01  -ε-  [Node]                           03
-  03   ◀   (Q)                              ◼
+  01   ◀   (Q)                              ◼

@@ -3,5 +3,8 @@ Q = (program
     (expression_statement) @s
   }* @_
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Q = undefined;
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q;

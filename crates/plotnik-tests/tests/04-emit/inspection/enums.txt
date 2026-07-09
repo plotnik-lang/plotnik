@@ -4,6 +4,21 @@ Expr = [
   Str: (string)
 ]
 ------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Expr = 9
+
+[transitions]
+Expr:
+  1                                         ▶
+  3   !   (identifier) [SpanStart#1 SpanStart#2 EnumOpen(Id) SpanStartAt#4 SpanStart#3 Node Set(id) SpanEnd#3 SpanEnd#4 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  1
+  4   !   (number) [SpanStart#1 SpanStart#5 EnumOpen(Num) SpanStartAt#7 SpanStart#6 Node Set(num) SpanEnd#6 SpanEnd#7 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  1
+  5   !   (string) [SpanStart#1 SpanStart#8 EnumOpen(Str) SpanStartAt#9 SpanEnd#9 EnumClose SpanEnd#8 SpanEnd#1 SpanEnd#0]  1
+  7  -ε-  [SpanStart#0]                     3, 4, 5
+
+Expr (entrypoint):
+  8                                         ▶
+  9       (Expr)                            7 : 8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

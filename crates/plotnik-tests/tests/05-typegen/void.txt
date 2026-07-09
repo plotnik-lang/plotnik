@@ -2,5 +2,5 @@ Q = {
   (expression_statement)
   (debugger_statement)
 }
---------------------- TYPES ----------------------
-export type Q = undefined;
+------------------- TYPESCRIPT -------------------
+---------------------- RUST ----------------------

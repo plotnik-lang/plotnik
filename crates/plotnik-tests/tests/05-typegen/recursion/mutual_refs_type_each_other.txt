@@ -9,7 +9,7 @@ B = [
 ]
 
 Q = (program (expression_statement (A) @root))
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type B =
   | { $tag: "Leaf"; $data: { n: Node } }
   | { $tag: "Wrap"; $data: { a: A } };
@@ -20,4 +20,23 @@ export type A =
 
 export interface Q {
   root: A;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum B<'t> {
+    Leaf { n: Node<'t> },
+    Wrap { a: ::std::boxed::Box<A<'t>> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum A<'t> {
+    Base { id: Node<'t> },
+    Nest { b: ::std::boxed::Box<B<'t>> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub root: A<'t>,
 }

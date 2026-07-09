@@ -5,7 +5,7 @@ use tree_sitter::Node;
 
 use crate::bytecode::Module;
 
-use super::effect::RuntimeEffect;
+use plotnik_rt::RuntimeEffect;
 
 #[derive(Debug, Serialize)]
 pub struct Inspection {

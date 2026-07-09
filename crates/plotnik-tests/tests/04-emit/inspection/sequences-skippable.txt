@@ -12,6 +12,44 @@ TrailingSkip = (program
   }
 )
 ------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+LeadingSkip  = 38
+TrailingSkip = 42
+
+[transitions]
+LeadingSkip:
+  02                                        ▶
+  04   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  17
+  06  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  02
+  08  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node Set(fn) SpanEnd#5 SpanEnd#6]  06
+  09  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node Set(fn) SpanEnd#5 SpanEnd#6]  06
+  12   !   (expression_statement) [SpanStartAt#4 SpanEnd#4]  09
+  14  ──!  _                                12, 14
+  15  └─!  _                                12, 14
+  17  -ε-  [SpanStart#3]                    15, 08
+
+TrailingSkip:
+  20                                        ▶
+  22   !   (program) [SpanStart#7 SpanStartAt#8]  33
+  24  ─‣┘  _ [SpanEnd#9 SpanEnd#8 SpanEnd#7]  20
+  26  -ε-  [SpanEnd#12]                     24
+  27   !   (expression_statement) [SpanStartAt#13 SpanEnd#13 SpanEnd#12]  24
+  29  ──!  _                                27, 29
+  32  -ε-  [SpanStart#12]                   29, 26
+  33  └‣─  (function_declaration) [SpanStart#9 SpanStartAt#11 SpanStart#10 Node Set(fn) SpanEnd#10 SpanEnd#11]  32
+
+LeadingSkip (entrypoint):
+  35                                        ▶
+  36  -ε-  [StructClose]                    35
+  37       (LeadingSkip)                    04 : 36
+  38  -ε-  [StructOpen]                     37
+
+TrailingSkip (entrypoint):
+  39                                        ▶
+  40  -ε-  [StructClose]                    39
+  41       (TrailingSkip)                   22 : 40
+  42  -ε-  [StructOpen]                     41
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -71,16 +109,16 @@ TrailingSkip:
   13  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#6]  28
   16  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#6]  28
   19   !   (expression_statement) [SpanStartAt#4 SpanEnd#4]  16
-  21  ─‣─  _                                19, 21
+  21  ──!  _                                19, 21
   23  ...
-  24  └‣─  _                                19, 21
+  24  └─!  _                                19, 21
   26  -ε-  [SpanStart#3]                    24, 13
   28  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  12
   30   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  26
   32                                        ▶
   33  -ε-  [SpanEnd#12]                     45
   35   !   (expression_statement) [SpanStartAt#13 SpanEnd#13 SpanEnd#12]  45
-  37  ─‣─  _                                35, 37
+  37  ──!  _                                35, 37
   39  ...
   40  -ε-  [SpanStart#12]                   37, 33
   42  └‣─  (function_declaration) [SpanStart#9 SpanStartAt#11 SpanStart#10 Node Set(M1) SpanEnd#10 SpanEnd#11]  40

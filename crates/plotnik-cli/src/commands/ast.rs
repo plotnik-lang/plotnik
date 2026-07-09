@@ -22,6 +22,13 @@ pub struct AstArgs {
 }
 
 pub fn run(args: AstArgs) -> CliResult {
+    run_common::reject_ambiguous_inputs(
+        args.query_text.as_deref(),
+        args.query_path.as_deref(),
+        args.source_text.as_deref(),
+        args.source_path.as_deref(),
+    )?;
+
     let has_query = args.query_path.is_some() || args.query_text.is_some();
     let has_source = args.source_path.is_some() || args.source_text.is_some();
 

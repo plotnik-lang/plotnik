@@ -1,7 +1,7 @@
 Q = (program (function_signature name: (identifier) @name))
 ------------------ INPUT (dart) ------------------
 void f() {}
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   name: Node;
 }
@@ -49,10 +49,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              11 : 03
-       ▶   (?)
+  02       (@11)                            11 : 03
+       ▶   (@11)
 
-?:
+@11:
   11       (program)                        10
        ●   program
   10       (function_signature)             06
@@ -62,7 +62,7 @@ Q:
        ●   identifier
   08       _                                09
        ●   program
-  09   ◀   (?)                              
+  09   ◀   (@11)                            
 
 Q:
   03  -ε-  [StructClose]                    05

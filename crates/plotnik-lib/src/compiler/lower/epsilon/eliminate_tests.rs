@@ -154,6 +154,7 @@ fn laser_vision_single_succ_absorbs_effects() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     laser_vision(&mut result);
@@ -184,6 +185,7 @@ fn laser_vision_multi_succ_effectless_only() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     laser_vision(&mut result);
@@ -213,6 +215,7 @@ fn laser_vision_epsilon_source_absorbs_chain() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     laser_vision(&mut result);
@@ -242,6 +245,7 @@ fn laser_vision_branching_epsilon_skips_pure_jump() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     laser_vision(&mut result);
@@ -273,6 +277,7 @@ fn epsilon_chain_around_call_coalesces() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     eliminate_epsilons(&mut result);
@@ -306,6 +311,7 @@ fn combined_forward_then_laser() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     forward_migrate(&mut result.instructions);
@@ -352,6 +358,7 @@ fn entry_point_resolution() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     laser_vision(&mut result);
@@ -378,6 +385,7 @@ fn branching_epsilon_preserved_by_laser_vision() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     // laser_vision alone can't see through branching epsilon
@@ -407,6 +415,7 @@ fn expand_branching_epsilon() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     expand_branching_epsilons(&mut result);
@@ -439,6 +448,7 @@ fn expand_branching_multiple_predecessors() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     expand_branching_epsilons(&mut result);
@@ -475,6 +485,7 @@ fn expand_branching_preserves_other_successors() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     expand_branching_epsilons(&mut result);
@@ -503,6 +514,7 @@ fn expand_blocked_by_effects() {
         def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
+        label_origins: Vec::new(),
     };
 
     let changed = expand_branching_epsilons(&mut result);

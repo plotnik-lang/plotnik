@@ -1,5 +1,7 @@
 #![cfg(feature = "lang-javascript")]
 
+use std::path::Path;
+
 use super::run_common::{self, ExecPlan, ExecRequest};
 
 const TWO_DEFS: &str = "First = (identifier) @a\nSecond = (number) @b";
@@ -24,7 +26,7 @@ fn defaults_to_last_definition_when_entry_omitted() {
     let expected = plan
         .module
         .entrypoint("Second")
-        .expect("last definition is an entrypoint candidate");
+        .expect("last callable definition is an entrypoint candidate");
     assert_eq!(plan.entrypoint, expected);
 }
 
@@ -34,6 +36,50 @@ fn explicit_entry_overrides_the_default() {
     let expected = plan
         .module
         .entrypoint("First")
-        .expect("named definition is an entrypoint candidate");
+        .expect("named callable definition is an entrypoint candidate");
     assert_eq!(plan.entrypoint, expected);
+}
+
+#[test]
+fn query_supplied_as_text_and_path_is_rejected() {
+    let err = run_common::reject_ambiguous_inputs(
+        Some("Q = (id)"),
+        Some(Path::new("q.ptk")),
+        None,
+        Some(Path::new("app.js")),
+    )
+    .expect_err("a query given both inline and positionally is ambiguous");
+
+    assert!(format!("{err:?}").contains("query supplied twice"));
+}
+
+#[test]
+fn source_supplied_as_text_and_path_is_rejected() {
+    let err = run_common::reject_ambiguous_inputs(
+        Some("Q = (id)"),
+        None,
+        Some("let x = 1"),
+        Some(Path::new("app.js")),
+    )
+    .expect_err("a source given both inline and positionally is ambiguous");
+
+    assert!(format!("{err:?}").contains("source supplied twice"));
+}
+
+#[test]
+fn inline_query_with_positional_source_is_allowed() {
+    // The `-q TEXT source.js` shape: query inline, source positional.
+    run_common::reject_ambiguous_inputs(Some("Q = (id)"), None, None, Some(Path::new("app.js")))
+        .expect("query inline plus a source path is unambiguous");
+}
+
+#[test]
+fn both_inputs_positional_is_allowed() {
+    run_common::reject_ambiguous_inputs(
+        None,
+        Some(Path::new("q.ptk")),
+        None,
+        Some(Path::new("app.js")),
+    )
+    .expect("query path plus source path is unambiguous");
 }

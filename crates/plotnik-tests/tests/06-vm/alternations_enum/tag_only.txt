@@ -6,7 +6,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 debugger;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QV =
   | { $tag: "A" }
   | { $tag: "B" };
@@ -59,17 +59,17 @@ Q:
   07  ...
   08   !   (debugger_statement) [EnumOpen(M0) EnumClose]  16
   10   !   (expression_statement) [EnumOpen(M1) EnumClose]  16
-  12  ─‣─  _                                08, 10, 12
-  14  └‣─  _                                08, 10, 12
+  12  ──!  _                                08, 10, 12
+  14  └─!  _                                08, 10, 12
   16  ─‣┘  _ [Set(M2)]                      06
   18   !   (program)                        14
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              18 : 03
-       ▶   (?)
+  02       (@18)                            18 : 03
+       ▶   (@18)
 
-?:
+@18:
   18       (program)                        14
        ●   program
   14       _                                08, 10, 12
@@ -78,7 +78,7 @@ Q:
        ●   debugger_statement
   16       _ [Set(M2)]                      06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@18)                            
 
 Q:
   03  -ε-  [StructClose]                    05

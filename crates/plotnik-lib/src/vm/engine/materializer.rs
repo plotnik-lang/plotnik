@@ -3,9 +3,9 @@
 use crate::bytecode::{Entrypoint, Module};
 use crate::core::Colors;
 
-use super::effect::RuntimeEffect;
 use super::value::{NodeHandle, Value};
 use super::verify::debug_verify_type;
+use plotnik_rt::RuntimeEffect;
 
 pub struct ValueMaterializer<'a> {
     source: &'a str,

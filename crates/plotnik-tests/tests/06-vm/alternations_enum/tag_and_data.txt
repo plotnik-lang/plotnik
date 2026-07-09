@@ -8,7 +8,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 foo
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QE =
   | { $tag: "A"; $data: { a: Node } }
   | { $tag: "B"; $data: { b: Node } };
@@ -75,18 +75,18 @@ Q:
   07  ...
   08   !   (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  18
   11   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose]  18
-  14  ─‣─  _                                08, 11, 14
-  16  └‣─  _                                08, 11, 14
+  14  ──!  _                                08, 11, 14
+  16  └─!  _                                08, 11, 14
   18  ─‣┘² _ [Set(M4)]                      06
   20  └‣─  (expression_statement)           16
   21   !   (program)                        20
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              21 : 03
-       ▶   (?)
+  02       (@21)                            21 : 03
+       ▶   (@21)
 
-?:
+@21:
   21       (program)                        20
        ●   program
   20       (expression_statement)           16
@@ -97,7 +97,7 @@ Q:
        ●   identifier
   18       _ [Set(M4)]                      06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@21)                            
 
 Q:
   03  -ε-  [StructClose]                    05

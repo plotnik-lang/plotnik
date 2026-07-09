@@ -1,32 +1,47 @@
 Q = (binary_expression "+" . (identifier))
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 10
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (binary_expression)              08
+  03  ─‣┘  _                                01
+  04  ─◦─  (identifier)                     03
+  05   !   "+"                              04
+  07  ──!  _                                05, 07
+  08  └─!  _                                05, 07
+
+Q (entrypoint):
+  09                                        ▶
+  10       (Q)                              02 : 09
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "binary_expression"
-S3 "+"
-S4 "identifier"
+S1 "binary_expression"
+S2 "+"
+S3 "identifier"
+S4 "Q"
 
 [type_defs]
-T0 = <Node>
+T0 = <Void>
 
 [type_members]
 
 [type_names]
-N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 00 :: T0
 
 [transitions]
 Q:
-  00       (@12)                            12 : 01
-  01  -ε-  [Node]                           03
-  03                                        ▶
-  04  ─◦─  (identifier)                     05
-  05  ─‣┘  _                                06
-  06                                        ▶
-  07   !   "+"                              04
-  08  ─‣─  _                                07, 08
-  10  └‣─  _                                07, 08
-  12   !   (binary_expression)              10
+  00       (@10)                            10 : 01
+  01                                        ▶
+  02  ─◦─  (identifier)                     03
+  03  ─‣┘  _                                04
+  04                                        ▶
+  05   !   "+"                              02
+  06  ──!  _                                05, 06
+  08  └─!  _                                05, 06
+  10   !   (binary_expression)              08

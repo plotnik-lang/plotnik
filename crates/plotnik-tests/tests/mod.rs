@@ -14,20 +14,20 @@
 //! so the body is left empty — the rule is a pure grammar selector. The stage
 //! directory selects which artifacts render:
 //!
-//! | dir          | sections                                   |
-//! | ------------ | ------------------------------------------ |
-//! | `02-parser`  | cst, ast                                   |
-//! | `03-analyze` | symbols                                    |
-//! | `04-emit`    | bytecode                                   |
-//! | `05-typegen` | types                                      |
-//! | `06-vm`      | types, output, inspection if enabled, bytecode, trace (requires input) |
+//! | dir          | sections                                                                     |
+//! | ------------ | ---------------------------------------------------------------------------- |
+//! | `02-parser`  | cst, ast                                                                     |
+//! | `03-analyze` | symbols                                                                      |
+//! | `04-emit`    | nfa, bytecode                                                                |
+//! | `05-typegen` | typescript, rust (serde impls under a `serde/` folder)                      |
+//! | `06-vm`      | typescript, output, inspection if enabled, bytecode, trace (requires input) |
 //!
 //! Compile-stage fixtures under an `inspection/` folder compile with
 //! `QueryBuilder::with_inspection(true)`.
 //!
 //! The `DIAGNOSTICS` section renders whenever the query produces warnings or errors.
-//! Errors are terminal for the compile stages (bytecode/types/trace/output are
-//! suppressed); for `02-parser` they suppress cst/ast too, matching the recovery
+//! Errors are terminal for the compile stages (bytecode/typescript/rust/trace/output
+//! are suppressed); for `02-parser` they suppress cst/ast too, matching the recovery
 //! tests. Warnings coexist with the normal sections.
 //!
 //! The `02-parser/trivia` folder renders its CST with trivia (whitespace/comments)
@@ -55,9 +55,9 @@ use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    Colors, CompiledQuery, DtsRange, PrintTracer, QueryBuilder, RecordingTracer, RuntimeError,
-    SourceMap, SourcePath, TypeScriptConfig, VM, Verbosity, extract_inspection,
-    materialize_verified,
+    Colors, CompiledQuery, DtsRange, MatcherConfig, PrintTracer, QueryBuilder, RecordingTracer,
+    RuntimeError, RustConfig, SourceMap, SourcePath, TypeScriptConfig, VM, Verbosity,
+    extract_inspection, materialize_verified,
 };
 
 mod support;
@@ -257,10 +257,11 @@ fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
     match stage.split('-').next().unwrap_or("") {
         "02" => Some(&["diagnostics", "cst", "ast"]),
         "03" => Some(&["diagnostics", "symbols"]),
-        "04" => Some(&["diagnostics", "bytecode"]),
-        "05" => Some(&["diagnostics", "types", "mapped"]),
+        "04" => Some(&["diagnostics", "nfa", "bytecode"]),
+        "05" => Some(&["diagnostics", "typescript", "rust", "mapped"]),
+        "07" => Some(&["diagnostics", "matcher"]),
         "06" => Some(&[
-            "types",
+            "typescript",
             "diagnostics",
             "output",
             "inspection",
@@ -292,9 +293,12 @@ fn parse_section_header(line: &str) -> Option<String> {
             "cst"
                 | "ast"
                 | "symbols"
+                | "nfa"
                 | "bytecode"
                 | "mapped"
-                | "types"
+                | "typescript"
+                | "rust"
+                | "matcher"
                 | "trace"
                 | "output"
                 | "inspection"
@@ -339,8 +343,9 @@ fn render(
         )),
         "03" => Ok(render_frontend(query, Front::Analyze)),
         "04" => render_compile(name, query, input, Compile::Bytecode),
-        "05" => render_compile(name, query, input, Compile::Types),
+        "05" => render_compile(name, query, input, Compile::Typegen),
         "06" => render_compile(name, query, input, Compile::Vm),
+        "07" => render_compile(name, query, input, Compile::Matcher),
         _ => Err(format!("unknown stage directory `{stage}`")),
     }
 }
@@ -383,8 +388,9 @@ fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
 
 enum Compile {
     Bytecode,
-    Types,
+    Typegen,
     Vm,
+    Matcher,
 }
 
 fn render_compile(
@@ -426,30 +432,50 @@ fn render_compile(
     match kind {
         Compile::Bytecode => {
             out.extend(diag);
+            let nfa = compiled
+                .dump_nfa(Colors::new(false))
+                .expect("valid query should compile to a module");
+            out.push(("nfa".into(), nfa));
             out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))));
         }
-        Compile::Types => {
+        Compile::Typegen => {
             out.extend(diag);
-            let types = render_types(&compiled);
-            out.push(("types".into(), types.clone()));
+            let typescript = render_typescript(&compiled);
+            out.push(("typescript".into(), typescript.clone()));
+            let rust_config = RustConfig::new().serde(name.contains("/serde/"));
+            let rust = compiled
+                .to_rust(rust_config)
+                .expect("valid query should compile to a module");
+            out.push(("rust".into(), rust));
             if name.contains("/mapped/") {
                 let (mapped_types, ranges) = compiled
                     .to_typescript_mapped(typegen_config())
                     .expect("valid query should compile to a module");
-                assert_eq!(types, mapped_types, "mapped d.ts must match normal d.ts");
+                assert_eq!(
+                    typescript, mapped_types,
+                    "mapped d.ts must match normal d.ts"
+                );
                 out.push(("mapped".into(), render_mapped(&mapped_types, &ranges)));
             }
+        }
+        Compile::Matcher => {
+            out.extend(diag);
+            let matcher = compiled
+                .to_rust_matcher(MatcherConfig::new())
+                .expect("valid query should compile to a module");
+            out.push(("matcher".into(), matcher));
         }
         Compile::Vm => {
             let input = input.ok_or_else(|| {
                 "06-vm fixtures require an `INPUT` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
             })?;
-            let entry = compiled
-                .definition_names()
+            let entry = module
+                .entrypoint_names()
                 .last()
-                .expect("a valid query has at least one named definition");
+                .ok_or_else(|| "06-vm fixture produced no callable entrypoints".to_string())?
+                .to_string();
             let run = run_vm(&lang, module, &entry, &input.text, inspects, records)?;
-            out.push(("types".into(), render_types(&compiled)));
+            out.push(("typescript".into(), render_typescript(&compiled)));
             out.extend(diag);
             out.push(("output".into(), run.output));
             if let Some(inspection) = run.inspection {
@@ -467,7 +493,7 @@ fn render_compile(
     Ok(out)
 }
 
-fn render_types(compiled: &CompiledQuery) -> String {
+fn render_typescript(compiled: &CompiledQuery) -> String {
     compiled
         .to_typescript(typegen_config())
         .expect("valid query should compile to a module")
@@ -516,7 +542,7 @@ fn run_vm(
     let tree = lang.parse(source);
     let entrypoint = module
         .entrypoint(entry)
-        .expect("every named definition is an entrypoint");
+        .expect("selected definition must be an entrypoint");
 
     let vm = VM::builder(source, &tree).build();
 

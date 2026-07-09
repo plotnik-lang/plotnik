@@ -11,6 +11,46 @@ warning: entrypoint can never match: matching starts at the tree root
   |       ^^^^^^^^^^^^^^^^^
   |
 help: wrap the pattern in the grammar's root node, e.g. `(program ...)`
+---------------------- NFA -----------------------
+[entrypoints]
+Bad  = 27
+Leaf = 19
+Q    = 23
+
+[transitions]
+Leaf:
+  03                                        ▶
+  04   !   (identifier) [Node Set(id)]      03
+
+Q:
+  05                                        ▶
+  06   !   (program)                        08
+  08  └‣─  (expression_statement) [StructOpen]  12
+  09  ─‣┘² _ [Set(leaf)]                    05
+  11  -ε-  [StructClose]                    09
+  12  └‣─  (Leaf)                           04 : 11
+
+Bad:
+  14                                        ▶
+  15   !   (identifier) [Node Set(bad)]     14
+
+Leaf (entrypoint):
+  16                                        ▶
+  17  -ε-  [StructClose]                    16
+  18       (Leaf)                           04 : 17
+  19  -ε-  [StructOpen]                     18
+
+Q (entrypoint):
+  20                                        ▶
+  21  -ε-  [StructClose]                    20
+  22       (Q)                              06 : 21
+  23  -ε-  [StructOpen]                     22
+
+Bad (entrypoint):
+  24                                        ▶
+  25  -ε-  [StructClose]                    24
+  26       (Bad)                            15 : 25
+  27  -ε-  [StructOpen]                     26
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

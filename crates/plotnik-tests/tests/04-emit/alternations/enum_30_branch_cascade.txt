@@ -10,6 +10,48 @@ Q = [
     A24: (identifier) @x24 A25: (identifier) @x25 A26: (identifier) @x26
     A27: (identifier) @x27 A28: (identifier) @x28 A29: (identifier) @x29
 ]
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 34
+
+[transitions]
+Q:
+  00  -ε-                                   02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+  01                                        ▶
+  02   !   (identifier) [EnumOpen(A0) Node Set(x0) EnumClose]  01
+  03   !   (identifier) [EnumOpen(A1) Node Set(x1) EnumClose]  01
+  04   !   (identifier) [EnumOpen(A2) Node Set(x2) EnumClose]  01
+  05   !   (identifier) [EnumOpen(A3) Node Set(x3) EnumClose]  01
+  06   !   (identifier) [EnumOpen(A4) Node Set(x4) EnumClose]  01
+  07   !   (identifier) [EnumOpen(A5) Node Set(x5) EnumClose]  01
+  08   !   (identifier) [EnumOpen(A6) Node Set(x6) EnumClose]  01
+  09   !   (identifier) [EnumOpen(A7) Node Set(x7) EnumClose]  01
+  10   !   (identifier) [EnumOpen(A8) Node Set(x8) EnumClose]  01
+  11   !   (identifier) [EnumOpen(A9) Node Set(x9) EnumClose]  01
+  12   !   (identifier) [EnumOpen(A10) Node Set(x10) EnumClose]  01
+  13   !   (identifier) [EnumOpen(A11) Node Set(x11) EnumClose]  01
+  14   !   (identifier) [EnumOpen(A12) Node Set(x12) EnumClose]  01
+  15   !   (identifier) [EnumOpen(A13) Node Set(x13) EnumClose]  01
+  16   !   (identifier) [EnumOpen(A14) Node Set(x14) EnumClose]  01
+  17   !   (identifier) [EnumOpen(A15) Node Set(x15) EnumClose]  01
+  18   !   (identifier) [EnumOpen(A16) Node Set(x16) EnumClose]  01
+  19   !   (identifier) [EnumOpen(A17) Node Set(x17) EnumClose]  01
+  20   !   (identifier) [EnumOpen(A18) Node Set(x18) EnumClose]  01
+  21   !   (identifier) [EnumOpen(A19) Node Set(x19) EnumClose]  01
+  22   !   (identifier) [EnumOpen(A20) Node Set(x20) EnumClose]  01
+  23   !   (identifier) [EnumOpen(A21) Node Set(x21) EnumClose]  01
+  24   !   (identifier) [EnumOpen(A22) Node Set(x22) EnumClose]  01
+  25   !   (identifier) [EnumOpen(A23) Node Set(x23) EnumClose]  01
+  26   !   (identifier) [EnumOpen(A24) Node Set(x24) EnumClose]  01
+  27   !   (identifier) [EnumOpen(A25) Node Set(x25) EnumClose]  01
+  28   !   (identifier) [EnumOpen(A26) Node Set(x26) EnumClose]  01
+  29   !   (identifier) [EnumOpen(A27) Node Set(x27) EnumClose]  01
+  30   !   (identifier) [EnumOpen(A28) Node Set(x28) EnumClose]  01
+  31   !   (identifier) [EnumOpen(A29) Node Set(x29) EnumClose]  01
+
+Q (entrypoint):
+  33                                        ▶
+  34       (Q)                              00 : 33
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"

@@ -420,6 +420,15 @@ impl Def {
     }
 }
 
+/// The kind argument of a `(MISSING …)` pattern — the token naming the specific
+/// kind the inserted node stands in for. Bare `(MISSING)` has none.
+pub enum MissingArg {
+    /// `(MISSING identifier)` — the `Id` token of a named kind.
+    Named(SyntaxToken),
+    /// `(MISSING ";")` — the `StringContent` token of an anonymous kind.
+    Anonymous(SyntaxToken),
+}
+
 impl NodePattern {
     pub fn kind_token(&self) -> Option<SyntaxToken> {
         find_token(&self.0, |k| {
@@ -448,6 +457,27 @@ impl NodePattern {
         self.kind_token()
             .map(|t| t.kind() == SyntaxKind::Underscore)
             .unwrap_or(false)
+    }
+
+    pub fn is_missing(&self) -> bool {
+        self.kind_token()
+            .map(|t| t.kind() == SyntaxKind::KwMissing)
+            .unwrap_or(false)
+    }
+
+    /// The kind argument inside `(MISSING <arg>)`, or `None` for bare `(MISSING)`
+    /// and any non-MISSING node. `(MISSING identifier)` yields `Named`, `(MISSING ";")`
+    /// yields `Anonymous`. The argument is a raw token, not a nested pattern (the
+    /// parser forbids MISSING children), so it is read directly off this node.
+    pub fn missing_arg(&self) -> Option<MissingArg> {
+        if !self.is_missing() {
+            return None;
+        }
+        if let Some(id) = find_token(&self.0, |k| k == SyntaxKind::Id) {
+            return Some(MissingArg::Named(id));
+        }
+        let content = find_token(&self.0, |k| k == SyntaxKind::StringContent)?;
+        Some(MissingArg::Anonymous(content))
     }
 
     /// Returns the predicate if present: `(identifier == "foo")`.

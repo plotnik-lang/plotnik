@@ -6,7 +6,7 @@ Q = (program
 --------------------- INPUT ----------------------
 // c
 x;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QItems =
   | { $tag: "A"; $data: { c: Node | null } };
 
@@ -70,20 +70,20 @@ Q:
   08  -ε-  [ArrayClose Set(M2)]             06
   10  -ε-  [EnumClose Push]                 18, 24
   12   !   (comment) [Node Set(M0)]         10
-  14  ─‣─  _                                12, 14
+  14  ──!  _                                12, 14
   16   !   _ [EnumOpen(M1)]                 12, 14
-  18  ─‣─  _                                16, 18
-  20  └‣─  _                                16, 18
+  18  ──!  _                                16, 18
+  20  └─!  _                                16, 18
   22  -ε-  [ArrayOpen]                      20, 08
   24  ─‣┘  _ [ArrayClose Set(M2)]           06
   26   !   (program)                        22
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              26 : 03
-       ▶   (?)
+  02       (@26)                            26 : 03
+       ▶   (@26)
 
-?:
+@26:
   26       (program)                        22
        ●   program
   22  -ε-  [ArrayOpen]                      20, 08
@@ -107,7 +107,7 @@ Q:
   10  ❮❮❮ 
   24       _ [ArrayClose Set(M2)]           06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@26)                            
 
 Q:
   03  -ε-  [StructClose]                    05

@@ -9,7 +9,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a; b;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QLead {
   c: Node;
 }
@@ -92,19 +92,19 @@ Q:
   13   !   (expression_statement) [Null Set(M1) Node Set(M2)]  06
   16  ─‣─  (expression_statement) [StructClose Set(M1) Node Set(M2)]  06
   19   !   (expression_statement) [StructOpen]  09
-  21  ─‣─  _                                19, 21
+  21  ──!  _                                19, 21
   23  ...
   24   !   _                                19, 21
-  26  ─‣─  _                                24, 13, 26
-  28  └‣─  _                                24, 13, 26
+  26  ──!  _                                24, 13, 26
+  28  └─!  _                                24, 13, 26
   30   !   (program)                        28
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              30 : 03
-       ▶   (?)
+  02       (@30)                            30 : 03
+       ▶   (@30)
 
-?:
+@30:
   30       (program)                        28
        ●   program
   28       _                                24, 13, 26
@@ -133,7 +133,7 @@ Q:
        ●   expression_statement
   08       _                                12
        ●   program
-  12   ◀   (?)                              
+  12   ◀   (@30)                            
 
 Q:
   03  -ε-  [StructClose]                    05

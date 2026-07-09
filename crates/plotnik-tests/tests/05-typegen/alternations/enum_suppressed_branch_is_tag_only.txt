@@ -4,7 +4,7 @@ Q = (program [
   Call: (Inner) @_
   Decl: (lexical_declaration) @d
 ] @item)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QItem =
   | { $tag: "Call" }
   | { $tag: "Decl"; $data: { d: Node } };
@@ -15,4 +15,22 @@ export interface Q {
 
 export interface Inner {
   call: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Inner<'t> {
+    pub call: Node<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub item: QItem<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum QItem<'t> {
+    Call,
+    Decl { d: Node<'t> },
 }

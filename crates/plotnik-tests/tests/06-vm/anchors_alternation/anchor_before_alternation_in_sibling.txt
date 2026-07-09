@@ -9,7 +9,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a + b
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   left: Node;
   right: Node;
@@ -62,18 +62,18 @@ Q:
   08  ─‣┘³ _                                09
   09                                        ▶
   10   !   (identifier) [Node Set(M0)]      06
-  12  ─‣─  _                                10, 12
-  14  └‣─  _                                10, 12
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
   16  └‣─  (binary_expression)              14
   17  └‣─  (expression_statement)           16
   18   !   (program)                        17
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              18 : 03
-       ▶   (?)
+  02       (@18)                            18 : 03
+       ▶   (@18)
 
-?:
+@18:
   18       (program)                        17
        ●   program
   17       (expression_statement)           16
@@ -89,7 +89,7 @@ Q:
        ●   identifier
   08       _                                09
        ●   program
-  09   ◀   (?)                              
+  09   ◀   (@18)                            
 
 Q:
   03  -ε-  [StructClose]                    05

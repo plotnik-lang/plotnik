@@ -4,7 +4,7 @@ Q = (program
     (debugger_statement) @b
   ] @x
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QX {
   a: Node | null;
   b: Node | null;
@@ -12,4 +12,17 @@ export interface QX {
 
 export interface Q {
   x: QX;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub x: QX<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QX<'t> {
+    pub a: ::core::option::Option<Node<'t>>,
+    pub b: ::core::option::Option<Node<'t>>,
 }

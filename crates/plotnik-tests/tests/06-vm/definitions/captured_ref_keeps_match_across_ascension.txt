@@ -2,85 +2,11 @@ A = (lexical_declaration)
 Q = (program (A) @a)
 --------------------- INPUT ----------------------
 let x;
---------------------- TYPES ----------------------
-export interface Q {
-  a: Node;
-}
-
-export type A = Node;
---------------------- OUTPUT ---------------------
-{
-  "a": {
-    "kind": "lexical_declaration",
-    "text": "let x;",
-    "span": [0, 6]
-  }
-}
--------------------- BYTECODE --------------------
-[strings]
-S0 "Beauty will save the world"
-S1 "a"
-S2 "A"
-S3 "Q"
-S4 "lexical_declaration"
-S5 "program"
-
-[type_defs]
-T0 = <Node>
-T1 = Struct  M0:1  ; { a }
-
-[type_members]
-M0: S1 → T0  ; a: <Node>
-
-[type_names]
-N0: S2 → T0  ; A
-N1: S3 → T1  ; Q
-
-[entrypoints]
-A = 00 :: T0
-Q = 04 :: T1
-
-[transitions]
-A:
-  00       (@15)                            15 : 01
-  01  -ε-  [Node]                           03
-  03                                        ▶
-
-Q:
-  04  -ε-  [StructOpen]                     06
-  06       (@17)                            17 : 08
-  07                                        ▶
-  08  -ε-  [StructClose]                    10
-  10                                        ▶
-  11  -ε-  [Node Set(M0)]                   13
-  13  ─‣┘  _                                07
-  14                                        ▶
-  15   !   (lexical_declaration)            14
-  16  └‣─  (@15)                            15 : 11
-  17   !   (program)                        16
---------------------- TRACE ----------------------
-Q:
-  04  -ε-  [StructOpen]                     06
-  06       (?)                              17 : 08
-       ▶   (?)
-
-?:
-  17       (program)                        16
-       ●   program
-  16       (?)                              15 : 11
-       ▶   (?)
-
-?:
-  15       (lexical_declaration)            14
-       ●   lexical_declaration
-  14   ◀   (?)                              
-
-?:
-  11  -ε-  [Node Set(M0)]                   13
-  13       _                                07
-       ●   program
-  07   ◀   (?)                              
-
-Q:
-  08  -ε-  [StructClose]                    10
-  10   ◀   (Q)                              ◼
+------------------ DIAGNOSTICS -------------------
+error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+ --> query.ptk:2:14
+  |
+1 | A = (lexical_declaration)
+  |     --------------------- defined here
+2 | Q = (program (A) @a)
+  |              ^^^

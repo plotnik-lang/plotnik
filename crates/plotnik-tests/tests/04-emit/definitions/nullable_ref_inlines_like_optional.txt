@@ -1,5 +1,33 @@
 MaybeId = (identifier)?
 Q = (array (MaybeId) (number) @n)
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 22
+
+[transitions]
+MaybeId:
+  00  -ε-                                   07, 03
+  02                                        ▶
+  03  -ε-  [Null]                           02
+  04   !   (identifier) [Node]              02
+  06  ──!  _                                04, 06
+  07   !   _                                04, 06
+
+Q:
+  09                                        ▶
+  10   !   (array)                          17, 12
+  11  ─‣┘  _                                09
+  12  └‣─  (number) [Node Set(n)]           11
+  13  ─‣─  (number) [Node Set(n)]           11
+  14   !   (identifier)                     13
+  16  ──!  _                                14, 16
+  17  └─!  _                                14, 16
+
+Q (entrypoint):
+  19                                        ▶
+  20  -ε-  [StructClose]                    19
+  21       (Q)                              10 : 20
+  22  -ε-  [StructOpen]                     21
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -23,32 +51,25 @@ N0: S2 → T1  ; MaybeId
 N1: S3 → T2  ; Q
 
 [entrypoints]
-MaybeId = 00 :: T1
-Q       = 02 :: T2
+Q = 00 :: T2
 
 [transitions]
-MaybeId:
-  00       (@18)                            18 : 01
-  01                                        ▶
-
 Q:
-  02  -ε-  [StructOpen]                     04
-  04       (@32)                            32 : 05
-  05  -ε-  [StructClose]                    07
-  07                                        ▶
-  08                                        ▶
-  09  -ε-  [Null]                           08
-  11   !   (identifier) [Node]              08
-  13  ─‣─  _                                11, 13
-  15  ...
-  16   !   _                                11, 13
-  18  -ε-                                   16, 09
-  20                                        ▶
-  21  └‣─  (number) [Node Set(M0)]          23
-  23  ─‣┘  _                                20
-  24  ─‣─  (number) [Node Set(M0)]          23
-  26   !   (identifier)                     24
-  27  ─‣─  _                                26, 27
-  29  └‣─  _                                26, 27
-  31  ...
-  32   !   (array)                          29, 21
+  00  -ε-  [StructOpen]                     02
+  02       (@28)                            28 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘  _                                18
+  08  -ε-  [Null]                           06
+  10   !   (identifier) [Node]              06
+  12  ──!  _                                10, 12
+  14   !   _                                10, 12
+  16  -ε-                                   14, 08
+  18                                        ▶
+  19  └‣─  (number) [Node Set(M0)]          07
+  21  ─‣─  (number) [Node Set(M0)]          07
+  23   !   (identifier)                     21
+  24  ──!  _                                23, 24
+  26  └─!  _                                23, 24
+  28   !   (array)                          26, 19

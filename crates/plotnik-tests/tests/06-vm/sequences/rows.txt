@@ -5,7 +5,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 let a; let b;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QRows {
   decl: Node;
   n: Node;
@@ -89,18 +89,18 @@ Q:
   14  └‣─  (variable_declarator)            06
   15  ...
   16   !   (lexical_declaration) [StructOpen Node Set(M0)]  14
-  18  ─‣─  _                                16, 18
-  20  └‣─  _                                16, 18
+  18  ──!  _                                16, 18
+  20  └─!  _                                16, 18
   22  -ε-  [ArrayOpen]                      20, 10
   24  ─‣┘  _ [ArrayClose Set(M2)]           09
   26   !   (program)                        22
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              26 : 03
-       ▶   (?)
+  02       (@26)                            26 : 03
+       ▶   (@26)
 
-?:
+@26:
   26       (program)                        22
        ●   program
   22  -ε-  [ArrayOpen]                      20, 10
@@ -132,7 +132,7 @@ Q:
   12  ❮❮❮ 
   24       _ [ArrayClose Set(M2)]           09
        ●   program
-  09   ◀   (?)                              
+  09   ◀   (@26)                            
 
 Q:
   03  -ε-  [StructClose]                    05

@@ -5,7 +5,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QOuter {
   id: Node;
 }
@@ -61,18 +61,18 @@ Q:
   08  ─‣┘  _ [StructClose Set(M1)]          15
   10                                        ▶
   11  -ε-  [Null Set(M1)]                   15
-  13  ─‣─  _                                06, 13
+  13  ──!  _                                06, 13
   15  ─‣┘  _                                10
-  16  └‣─  _                                06, 13
+  16  └─!  _                                06, 13
   18  └‣─  (expression_statement)           16, 11
   20   !   (program)                        18
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              20 : 03
-       ▶   (?)
+  02       (@20)                            20 : 03
+       ▶   (@20)
 
-?:
+@20:
   20       (program)                        18
        ●   program
   18       (expression_statement)           16, 11
@@ -85,7 +85,7 @@ Q:
        ●   expression_statement
   15       _                                10
        ●   program
-  10   ◀   (?)                              
+  10   ◀   (@20)                            
 
 Q:
   03  -ε-  [StructClose]                    05

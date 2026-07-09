@@ -8,7 +8,7 @@ Q = (program
 ------------------- INPUT (ts) -------------------
 a
 b
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Name {
   name: Node;
 }
@@ -325,43 +325,43 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   06  -ε-  [StructOpen]                     08
-  08       (?)                              43 : 09
-       ▶   (?)
+  08       (@43)                            43 : 09
+       ▶   (@43)
 
-?:
+@43:
   43       (program) [SpanStart#3 SpanStartAt#4]  40
        ●   program
   40       (expression_statement) [SpanStart#5 SpanStartAt#6 SpanStart#8 StructOpen]  36
        ●   expression_statement
-  36       (?)                              28 : 22
-       ▶   (?)
+  36       (@28)                            28 : 22
+       ▶   (@28)
 
-?:
+@28:
   28       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  27
        ●   identifier
-  27   ◀   (?)                              
+  27   ◀   (@28)                            
 
-?:
+@43:
   22  -ε-  [StructClose]                    24
   24       _ [SpanStart#7 Set(M1) SpanEnd#7 SpanEnd#8]  33
        ●   expression_statement
   33       (expression_statement) [SpanEnd#6 SpanStartAt#9 SpanStart#11 StructOpen]  32
        ●   expression_statement
-  32       (?)                              28 : 12
-       ▶   (?)
+  32       (@28)                            28 : 12
+       ▶   (@28)
 
-?:
+@28:
   28       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  27
        ●   identifier
-  27   ◀   (?)                              
+  27   ◀   (@28)                            
 
-?:
+@43:
   12  -ε-  [StructClose]                    16
   16       _ [SpanStart#10 Set(M2) SpanEnd#10 SpanEnd#11]  19
        ●   expression_statement
   19       _ [SpanEnd#9 SpanEnd#5 SpanEnd#4 SpanEnd#3]  14
        ●   program
-  14   ◀   (?)                              
+  14   ◀   (@43)                            
 
 Q:
   09  -ε-  [StructClose]                    11

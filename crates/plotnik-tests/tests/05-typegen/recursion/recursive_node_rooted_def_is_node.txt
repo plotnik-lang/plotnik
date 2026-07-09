@@ -1,8 +1,0 @@
-A = (parenthesized_expression (A)?)
-Q = (expression_statement (A) @x)
---------------------- TYPES ----------------------
-export interface Q {
-  x: Node;
-}
-
-export type A = Node;

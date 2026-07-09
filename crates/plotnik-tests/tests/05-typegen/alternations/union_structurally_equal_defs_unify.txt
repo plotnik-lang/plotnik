@@ -13,7 +13,7 @@ Q = (program
     )
   )
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Pair {
   key: Node;
   val: Node;
@@ -26,4 +26,23 @@ export interface Row {
 
 export interface Q {
   x: Row;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Row<'t> {
+    pub key: Node<'t>,
+    pub val: Node<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Pair<'t> {
+    pub key: Node<'t>,
+    pub val: Node<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub x: Row<'t>,
 }

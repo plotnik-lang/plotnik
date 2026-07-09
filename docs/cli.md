@@ -227,16 +227,16 @@ plotnik run query.ptk app.js --max-steps unbounded
 
 **Flags:**
 
-| Flag           | Purpose                             |
-| -------------- | ----------------------------------- |
-| `-q, --query`  | Inline query text                   |
-| `-s, --source` | Inline source text                  |
-| `-l, --lang`   | Language (inferred from file ext)   |
-| `--compact`    | Output compact JSON                 |
-| `--entry NAME` | Start from specific definition      |
-| `--max-steps`  | Work limit (see Execution Limits)   |
-| `--max-memory` | Memory limit (see Execution Limits) |
-| `--limits`     | Limit preset (`auto`/`unbounded`)   |
+| Flag           | Purpose                                 |
+| -------------- | --------------------------------------- |
+| `-q, --query`  | Inline query text                       |
+| `-s, --source` | Inline source text                      |
+| `-l, --lang`   | Language (inferred from file ext)       |
+| `--compact`    | Output compact JSON                     |
+| `--entry NAME` | Start from specific callable definition |
+| `--max-steps`  | Work limit (see Execution Limits)       |
+| `--max-memory` | Memory limit (see Execution Limits)     |
+| `--limits`     | Limit preset (`auto`/`unbounded`)       |
 
 ---
 
@@ -264,15 +264,15 @@ plotnik trace query.ptk app.js -vv  # very verbose
 
 **Flags:**
 
-| Flag           | Purpose                             |
-| -------------- | ----------------------------------- |
-| `-v`           | Verbose output                      |
-| `-vv`          | Very verbose output                 |
-| `--no-result`  | Skip materialization                |
-| `--max-steps`  | Work limit (see Execution Limits)   |
-| `--max-memory` | Memory limit (see Execution Limits) |
-| `--limits`     | Limit preset (`auto`/`unbounded`)   |
-| `--entry`      | Start from specific definition      |
+| Flag           | Purpose                                 |
+| -------------- | --------------------------------------- |
+| `-v`           | Verbose output                          |
+| `-vv`          | Very verbose output                     |
+| `--no-result`  | Skip materialization                    |
+| `--max-steps`  | Work limit (see Execution Limits)       |
+| `--max-memory` | Memory limit (see Execution Limits)     |
+| `--limits`     | Limit preset (`auto`/`unbounded`)       |
+| `--entry`      | Start from specific callable definition |
 
 ---
 
@@ -298,7 +298,7 @@ plotnik inspect query.ptk app.js --json -v
 | -------------- | --------------------------------------- |
 | `--json`       | Output the full inspect bundle as JSON  |
 | `-v`           | Include VM recording in the JSON bundle |
-| `--entry NAME` | Start from specific definition          |
+| `--entry NAME` | Start from specific callable definition |
 | `--max-steps`  | Work limit (see Execution Limits)       |
 | `--max-memory` | Memory limit (see Execution Limits)     |
 | `--limits`     | Limit preset (`auto`/`unbounded`)       |
@@ -375,6 +375,10 @@ These commands can take query, source, or both inputs. Use any combination:
 | `run -q '...' -s '...' -l lang` | `-q` flag      | `-s` flag      |
 
 **Key rule**: When `-q` is provided with one positional, it becomes SOURCE.
+
+Supplying the same input both ways is a usage error (exit 2): `-q` with a
+query positional, or `-s` with a source positional, is rejected rather than
+silently dropping the positional.
 
 ### Language Detection
 

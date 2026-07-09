@@ -4,7 +4,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 foo;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   decl: Node | null;
   stmt: Node;
@@ -55,16 +55,16 @@ Q:
   11  ─‣─  (expression_statement) [Node Set(M1)]  07
   13   !   (lexical_declaration) [Node Set(M0)]  11
   15  ...
-  16  ─‣─  _                                13, 16
-  18  └‣─  _                                13, 16
+  16  ──!  _                                13, 16
+  18  └─!  _                                13, 16
   20   !   (program)                        18, 08
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              20 : 03
-       ▶   (?)
+  02       (@20)                            20 : 03
+       ▶   (@20)
 
-?:
+@20:
   20       (program)                        18, 08
        ●   program
   18       _                                13, 16
@@ -78,7 +78,7 @@ Q:
        ●   expression_statement
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@20)                            
 
 Q:
   03  -ε-  [StructClose]                    05

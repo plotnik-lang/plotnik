@@ -7,7 +7,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 debugger;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   d: Node;
   e: Node | null;
@@ -63,23 +63,23 @@ Q:
   11  ─‣─  (debugger_statement) [Node Set(M2)]  07
   13   !   (empty_statement) [Node Set(M1)]  11
   15  ...
-  16  ─‣─  _                                13, 16
-  18  └‣─  _                                13, 16
+  16  ──!  _                                13, 16
+  18  └─!  _                                13, 16
   20  -ε-  [Null Set(M1)]                   11
   22  -ε-  [Null Set(M0)]                   18, 08
   24   !   (expression_statement) [Node Set(M0)]  16, 20
-  26  ─‣─  _                                24, 26
-  28  └‣─  _                                24, 26
+  26  ──!  _                                24, 26
+  28  └─!  _                                24, 26
   30  ...
   31  ...
   32   !   (program)                        28, 22
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              32 : 03
-       ▶   (?)
+  02       (@32)                            32 : 03
+       ▶   (@32)
 
-?:
+@32:
   32       (program)                        28, 22
        ●   program
   28       _                                24, 26
@@ -101,7 +101,7 @@ Q:
        ●   debugger_statement
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@32)                            
 
 Q:
   03  -ε-  [StructClose]                    05

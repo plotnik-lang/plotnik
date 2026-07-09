@@ -1,0 +1,8 @@
+error: `no_such_node_kind` is not a valid node kind
+         |
+       1 | Q = (program (no_such_node_kind) @x)
+         |               ^^^^^^^^^^^^^^^^^
+ --> tests/macro_ui/fail/unknown_node_kind.rs:5:5
+  |
+5 |     "Q = (program (no_such_node_kind) @x)"
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

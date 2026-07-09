@@ -1,26 +1,37 @@
 Q = (program .)
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 5
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (program)                         3
+  3  └•┘  _                                 1
+
+Q (entrypoint):
+  4                                         ▶
+  5       (Q)                               2 : 4
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "program"
+S1 "program"
+S2 "Q"
 
 [type_defs]
-T0 = <Node>
+T0 = <Void>
 
 [type_members]
 
 [type_names]
-N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 0 :: T0
 
 [transitions]
 Q:
-  0       (@6)                              6 : 1
-  1  -ε-  [Node]                            3
-  3                                         ▶
-  4                                         ▶
-  5  └•┘  _                                 4
-  6   !   (program)                         5
+  0       (@4)                              4 : 1
+  1                                         ▶
+  2                                         ▶
+  3  └•┘  _                                 2
+  4   !   (program)                         3

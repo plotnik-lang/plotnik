@@ -8,36 +8,51 @@ Q = (array
     (null)
   }
 )
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 9
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (array)                           7
+  3  ─‣┘  _                                 1
+  4  ─‣─  (null)                            3
+  5  ─‣─  (string)                          4
+  6  ─‣─  (number)                          5
+  7  └‣─  (identifier)                      6
+
+Q (entrypoint):
+  8                                         ▶
+  9       (Q)                               2 : 8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "array"
-S3 "identifier"
-S4 "number"
-S5 "string"
-S6 "null"
+S1 "array"
+S2 "identifier"
+S3 "number"
+S4 "string"
+S5 "null"
+S6 "Q"
 
 [type_defs]
-T0 = <Node>
+T0 = <Void>
 
 [type_members]
 
 [type_names]
-N0: S1 → T0  ; Q
 
 [entrypoints]
-Q = 00 :: T0
+Q = 0 :: T0
 
 [transitions]
 Q:
-  00       (@10)                            10 : 01
-  01  -ε-  [Node]                           03
-  03                                        ▶
-  04  ─‣─  (null)                           05
-  05  ─‣┘  _                                06
-  06                                        ▶
-  07  ─‣─  (string)                         04
-  08  ─‣─  (number)                         07
-  09  └‣─  (identifier)                     08
-  10   !   (array)                          09
+  0       (@8)                              8 : 1
+  1                                         ▶
+  2  ─‣─  (null)                            3
+  3  ─‣┘  _                                 4
+  4                                         ▶
+  5  ─‣─  (string)                          2
+  6  ─‣─  (number)                          5
+  7  └‣─  (identifier)                      6
+  8   !   (array)                           7

@@ -5,7 +5,7 @@ Q = (program
   ]
 )
 --------------------- INPUT ----------------------
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   d: Node | null;
   ids: Node[];
@@ -51,27 +51,27 @@ Q:
   07  ─‣┘  _                                06
   08  -ε-  [ArrayClose Set(M0)]             07
   10   !   (identifier) [Node Push]         12, 08
-  12  ─‣─  _                                10, 12
+  12  ──!  _                                10, 12
   14   !   _ [ArrayOpen]                    10, 12
   16  -ε-  [Null Set(M1)]                   14
   18   !   (debugger_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  07
   21  -ε-  [ArrayOpen ArrayClose Set(M0) Null Set(M1)]  06
-  24  ─‣─  _                                16, 18, 24
-  26  └‣─  _                                16, 18, 24
+  24  ──!  _                                16, 18, 24
+  26  └─!  _                                16, 18, 24
   28   !   (program)                        26, 21
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              28 : 03
-       ▶   (?)
+  02       (@28)                            28 : 03
+       ▶   (@28)
 
-?:
+@28:
   28       (program)                        26, 21
        ●   program
   26       _                                16, 18, 24
   28  ❮❮❮ 
   21  -ε-  [ArrayOpen ArrayClose Set(M0) Null Set(M1)]  06
-  06   ◀   (?)                              
+  06   ◀   (@28)                            
 
 Q:
   03  -ε-  [StructClose]                    05

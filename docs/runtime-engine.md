@@ -40,8 +40,20 @@ A `Match` instruction first applies its `nav`, then checks node kind, field,
 negated fields, and predicate. On success, its single effects list is executed
 in bytecode order. `Node` effects read the current cursor node.
 
+Accepting a candidate found by a searching nav (non-exact `Down*`/`Next*`) is
+a choice point: before proceeding, the VM pushes a match-retry checkpoint so a
+later failure — anywhere downstream, including deep in the candidate's subtree
+— resumes the sibling search past the accepted candidate. The checkpoint is
+pushed only when the skip policy admits the candidate into the pattern's gap
+(always under the default `Any` policy; for anchored searches only when the
+candidate is itself trivia/extra, since a named candidate under a soft anchor
+is the only legal one).
+
 If a match has multiple successors, the VM pushes checkpoints for later
 successors and tries the first successor. A zero-successor match accepts.
+Branch checkpoints stack above the match-retry checkpoint, so all downstream
+alternatives at one candidate are exhausted before the search moves on —
+ordered-choice priority is preserved.
 
 ### Epsilon
 
@@ -94,9 +106,15 @@ struct Checkpoint {
 ```
 
 Backtracking restores cursor position, truncates the effect log, restores the
-frame arena pointer, restores suppression depth, and resumes at the checkpoint
-instruction. Checkpoints also support call retry: a failed call over a searchable
-navigation can advance to the next candidate and re-enter the callee.
+frame arena pointer, restores suppression depth, and then resumes per the
+checkpoint's kind: a branch checkpoint resumes at its recorded instruction; a
+call-retry checkpoint advances to the next candidate satisfying the Call's
+skip policy and field constraint, then re-enters the callee; a match-retry
+checkpoint advances past the accepted-but-failed candidate and re-runs the
+same Match's candidate search from there, replaying effects and branching
+exactly as the original acceptance did. Every point with alternatives leaves a
+checkpoint — which sibling binds a pattern, which branch of a fan-out, whether
+an optional consumes — so no search ever silently commits.
 
 Frame pruning after `Return` keeps the arena bounded by active checkpoints plus
 the current call stack.
@@ -177,8 +195,17 @@ Both `Auto` ceilings scale linearly with the source's node count. Exhaustion
 returns `RuntimeError` (`StepLimitExceeded` or `MemoryLimitExceeded`), never a
 panic.
 
-There is no separate recursion limit. Backtracking is iterative and call depth
-costs heap memory only, which the memory ceiling bounds.
+There is no separate recursion limit _for the VM_. Backtracking is iterative
+and call depth costs heap memory only, which the memory ceiling bounds; the
+materializer renders output iteratively too.
+
+Generated Rust matchers meter one more resource: **replay depth**, the
+recursive typed reader's native-stack use. `Auto` is not input-scaled; the
+emitter estimates the module's widest reader frame and the runtime resolves a
+ceiling from that estimate. Safe `parse` refuses recursive output nesting past
+the bound (`LimitExceeded::Depth`) while `matches` suppresses output and never
+runs typed replay. The VM does not track or enforce replay depth: its
+backtracking and materialization paths are iterative.
 
 ## Trivia Handling
 

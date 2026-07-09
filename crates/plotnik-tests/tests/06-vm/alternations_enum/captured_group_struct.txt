@@ -5,7 +5,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QX {
   a: Node;
 }
@@ -76,16 +76,16 @@ Q:
   06   !   (expression_statement) [StructOpen Node Set(M0)]  08
   08  ─‣┘  _ [StructClose Set(M1)]          10
   10                                        ▶
-  11  ─‣─  _                                06, 11
-  13  └‣─  _                                06, 11
+  11  ──!  _                                06, 11
+  13  └─!  _                                06, 11
   15   !   (program)                        13
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              15 : 03
-       ▶   (?)
+  02       (@15)                            15 : 03
+       ▶   (@15)
 
-?:
+@15:
   15       (program)                        13
        ●   program
   13       _                                06, 11
@@ -94,7 +94,7 @@ Q:
        ●   expression_statement
   08       _ [StructClose Set(M1)]          10
        ●   program
-  10   ◀   (?)                              
+  10   ◀   (@15)                            
 
 Q:
   03  -ε-  [StructClose]                    05

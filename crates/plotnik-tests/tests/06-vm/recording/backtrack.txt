@@ -4,7 +4,7 @@ Q = (program [
 ] @expr)
 ------------------- INPUT (ts) -------------------
 x
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QExpr =
   | { $tag: "Bad"; $data: { bad: Node } }
   | { $tag: "Good"; $data: { good: Node } };
@@ -430,6 +430,15 @@ export interface Q {
     {
       "ip": 16,
       "event": {
+        "kind": "checkpoint_new"
+      },
+      "span": 9,
+      "node": null,
+      "effect_len": 7
+    },
+    {
+      "ip": 16,
+      "event": {
         "kind": "effect",
         "effect": "SpanStartAt#11"
       },
@@ -780,7 +789,7 @@ Q:
   23  ...
   24   !   (expression_statement) [SpanStart#3 SpanStart#4 EnumOpen(M2) SpanStartAt#5]  08
   27   !   (expression_statement) [SpanStart#3 SpanStart#8 EnumOpen(M3) SpanStartAt#9]  16
-  30  ─‣─  _                                24, 27, 30
-  32  └‣─  _                                24, 27, 30
+  30  ──!  _                                24, 27, 30
+  32  └─!  _                                24, 27, 30
   34  ─‣┘  _ [SpanStart#2 Set(M4) SpanEnd#2 SpanEnd#1 SpanEnd#0]  22
   37   !   (program) [SpanStart#0 SpanStartAt#1]  32

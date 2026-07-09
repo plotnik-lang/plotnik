@@ -7,16 +7,16 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 if (x) { y
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   m: Node;
 }
 --------------------- OUTPUT ---------------------
 {
   "m": {
-    "kind": "expression_statement",
-    "text": "y",
-    "span": [9, 10]
+    "kind": "}",
+    "text": "",
+    "span": [10, 10]
   }
 }
 -------------------- BYTECODE --------------------
@@ -27,7 +27,8 @@ S2 "Q"
 S3 "program"
 S4 "if_statement"
 S5 "statement_block"
-S6 "consequence"
+S6 "}"
+S7 "consequence"
 
 [type_defs]
 T0 = <Node>
@@ -48,7 +49,7 @@ Q:
   02       (@12)                            12 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-  06  └‣─  (_) [Node Set(M0)]               08
+  06  └‣─  (MISSING "}") [Node Set(M0)]     08
   08  ─‣┘³ _                                09
   09                                        ▶
   10  └‣─  consequence: (statement_block)   06
@@ -57,10 +58,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              12 : 03
-       ▶   (?)
+  02       (@12)                            12 : 03
+       ▶   (@12)
 
-?:
+@12:
   12       (program)                        11
        ●   program
   11       (if_statement)                   10
@@ -69,12 +70,13 @@ Q:
        ○   if
        ○   parenthesized_expression
        ●   statement_block
-  06       (_) [Node Set(M0)]               08
+  06       (MISSING "}") [Node Set(M0)]     08
        ○   {
-       ●   expression_statement
+       ○   expression_statement
+       ●   }
   08       _                                09
        ●   program
-  09   ◀   (?)                              
+  09   ◀   (@12)                            
 
 Q:
   03  -ε-  [StructClose]                    05

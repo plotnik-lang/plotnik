@@ -2,11 +2,17 @@ Q = [
   A: (identifier) @id
   B: (number) @n
 ]* @rows
---------------------- TYPES ----------------------
-export type QRows =
-  | { $tag: "A"; $data: { id: Node } }
-  | { $tag: "B"; $data: { n: Node } };
+------------------- TYPESCRIPT -------------------
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
 
-export interface Q {
-  rows: QRows[];
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub rows: ::std::vec::Vec<QRows<'t>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum QRows<'t> {
+    A { id: Node<'t> },
+    B { n: Node<'t> },
 }

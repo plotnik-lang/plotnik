@@ -2,8 +2,16 @@ Q = (array
   (identifier)+? @many
   (number)?? @one
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   many: [Node, ...Node[]];
   one: Node | null;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub many: ::std::vec::Vec<Node<'t>>,
+    pub one: ::core::option::Option<Node<'t>>,
 }

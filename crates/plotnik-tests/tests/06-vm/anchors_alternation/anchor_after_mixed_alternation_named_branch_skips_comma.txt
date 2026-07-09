@@ -14,7 +14,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 f(a, b)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   x: Node | null;
   y: Node;
@@ -72,8 +72,8 @@ Q:
   10  ─•─  (identifier) [Node Set(M1)]      07
   12   !   (identifier) [Node Set(M0)]      10
   14   !   ";" [Null Set(M0)]               08
-  16  ─‣─  _                                12, 14, 16
-  18  └‣─  _                                12, 14, 16
+  16  ──!  _                                12, 14, 16
+  18  └─!  _                                12, 14, 16
   20  └‣─  arguments: (arguments)           18
   21  └‣─  (call_expression)                20
   22  └‣─  (expression_statement)           21
@@ -82,10 +82,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              24 : 03
-       ▶   (?)
+  02       (@24)                            24 : 03
+       ▶   (@24)
 
-?:
+@24:
   24       (program)                        22
        ●   program
   22       (expression_statement)           21
@@ -112,7 +112,7 @@ Q:
        ●   identifier
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@24)                            
 
 Q:
   03  -ε-  [StructClose]                    05

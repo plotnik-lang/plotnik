@@ -1,31 +1,45 @@
 Q = (statement_block "}" .)
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 10
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (statement_block)                08
+  04  ─◦┘  _                                01
+  05   !   "}"                              04
+  07  ──!  _                                05, 07
+  08  └─!  _                                05, 07
+
+Q (entrypoint):
+  09                                        ▶
+  10       (Q)                              02 : 09
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "statement_block"
-S3 "}"
+S1 "statement_block"
+S2 "}"
+S3 "Q"
 
 [type_defs]
-T0 = <Node>
+T0 = <Void>
 
 [type_members]
 
 [type_names]
-N0: S1 → T0  ; Q
 
 [entrypoints]
 Q = 00 :: T0
 
 [transitions]
 Q:
-  00       (@12)                            12 : 01
-  01  -ε-  [Node]                           03
-  03                                        ▶
-  04   !   "}"                              05
-  05  ─◦┘  _                                06
-  06                                        ▶
+  00       (@10)                            10 : 01
+  01                                        ▶
+  02   !   "}"                              03
+  03  ─◦┘  _                                04
+  04                                        ▶
+  05  ──!  _                                02, 05
   07  ...
-  08  ─‣─  _                                04, 08
-  10  └‣─  _                                04, 08
-  12   !   (statement_block)                10
+  08  └─!  _                                02, 05
+  10   !   (statement_block)                08

@@ -10,7 +10,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [x, y]
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QItems {
   a: Node | null;
   b: Node | null;
@@ -84,14 +84,14 @@ Q:
   08  -ε-  [ArrayClose Set(M2)]             07
   10  -ε-  [StructClose Push]               26, 32
   12   !   (identifier) [Node Set(M0)]      10
-  14  ─‣─  _                                12, 14
+  14  ──!  _                                12, 14
   16   !   _ [Null Set(M1)]                 12, 14
   18   !   (number) [Node Set(M1)]          10
-  20  ─‣─  _                                18, 20
+  20  ──!  _                                18, 20
   22   !   _ [Null Set(M0)]                 18, 20
   24  -ε-  [StructOpen]                     16, 22
-  26  ─‣─  _                                24, 26
-  28  └‣─  _                                24, 26
+  26  ──!  _                                24, 26
+  28  └─!  _                                24, 26
   30  -ε-  [ArrayOpen]                      28, 08
   32  ─‣┘  _ [ArrayClose Set(M2)]           07
   34  └‣─  (array)                          30
@@ -100,10 +100,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              36 : 03
-       ▶   (?)
+  02       (@36)                            36 : 03
+       ▶   (@36)
 
-?:
+@36:
   36       (program)                        35
        ●   program
   35       (expression_statement)           34
@@ -160,7 +160,7 @@ Q:
        ●   array
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@36)                            
 
 Q:
   03  -ε-  [StructClose]                    05

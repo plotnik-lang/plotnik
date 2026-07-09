@@ -4,7 +4,7 @@ Q = (program [
 ] @item)
 --------------------- INPUT ----------------------
 "s"
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QItem =
   | { $tag: "A"; $data: { x: Node } }
   | { $tag: "B" };
@@ -65,16 +65,16 @@ Q:
   13   !   (expression_statement) [EnumOpen(M1)]  11
   15  └‣─  (string)                         06
   16   !   (expression_statement) [EnumOpen(M2)]  15
-  18  ─‣─  _                                13, 16, 18
-  20  └‣─  _                                13, 16, 18
+  18  ──!  _                                13, 16, 18
+  20  └─!  _                                13, 16, 18
   22   !   (program)                        20
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              22 : 03
-       ▶   (?)
+  02       (@22)                            22 : 03
+       ▶   (@22)
 
-?:
+@22:
   22       (program)                        20
        ●   program
   20       _                                13, 16, 18
@@ -92,7 +92,7 @@ Q:
        ●   expression_statement
   08       _ [Set(M3)]                      10
        ●   program
-  10   ◀   (?)                              
+  10   ◀   (@22)                            
 
 Q:
   03  -ε-  [StructClose]                    05

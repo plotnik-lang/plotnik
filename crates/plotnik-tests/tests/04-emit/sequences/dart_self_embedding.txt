@@ -1,5 +1,22 @@
 Q = (list_literal (list_literal) @outer (list_literal) @inner)
 ------------------ INPUT (dart) ------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 9
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (list_literal)                    5
+  3  ─‣┘  _                                 1
+  4  ─‣─  (list_literal) [Node Set(inner)]  3
+  5  └‣─  (list_literal) [Node Set(outer)]  4
+
+Q (entrypoint):
+  6                                         ▶
+  7  -ε-  [StructClose]                     6
+  8       (Q)                               2 : 7
+  9  -ε-  [StructOpen]                      8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

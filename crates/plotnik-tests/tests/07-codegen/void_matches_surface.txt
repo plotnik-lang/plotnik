@@ -1,0 +1,319 @@
+Probe = (program)
+-------------------- MATCHER ---------------------
+// Generated Plotnik query module: typed output types, `parse`/`matches` entry
+// points, per-type trace readers, and the compiled matcher (`mod matcher`).
+// Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
+// dispatch arm carries its instruction in the dump format
+// (docs/binary-format/08-dump-format.md).
+
+use ::plotnik_rt as rt;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Probe;
+
+impl Probe {
+    /// Whether `Probe` matches `tree` under the module's compiled-in limits.
+    pub fn matches(
+        tree: &rt::Tree,
+        source: &str,
+    ) -> ::core::result::Result<bool, rt::LimitExceeded> {
+        matcher::probe_accepts(tree, source)
+    }
+}
+
+impl rt::Matches for Probe {
+    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
+        Probe::matches(tree, source)
+    }
+}
+
+pub use self::matcher::{probe_trace};
+
+/// The compiled matcher: engine machinery shielded from the query's
+/// type namespace.
+mod matcher {
+    use ::plotnik_rt as rt;
+
+    /// The limit policy compiled into the safe entry points, resolved against
+    /// each input's node count. Chosen at generation time, never at the call
+    /// site: the query is trusted, the input is not.
+    const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
+        steps: rt::Limit::Auto,
+        memory: rt::Limit::Auto,
+    };
+
+    /// No ceilings — what the unmetered trace entry points run under.
+    const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
+        max_steps: None,
+        max_memory: None,
+    };
+
+    /// Bitmask selecting the dispatch steps on which the memory ceiling is
+    /// sampled; must be a power of two minus one. Twin of the VM's constant.
+    const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
+
+    /// Conservative maximum native-stack bytes used by one typed replay reader
+    /// frame before runtime padding.
+    pub(super) const MAX_READER_FRAME_BYTES: u64 = 128;
+
+    /// Ceiling on recursive typed replay for safe `parse` (`None` opts out). The
+    /// matcher itself is iterative; only reader recursion enters this guard.
+    pub(super) const MAX_REPLAY_DEPTH: Option<u64> = Some(rt::replay_depth_auto(128));
+
+    /// Resolve [`LIMITS`] against this input's node count, exactly like
+    /// `VM::builder(...).build()` resolves the VM's.
+    fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
+        let source_nodes = u32::try_from(tree.root_node().descendant_count()).unwrap_or(u32::MAX);
+        LIMITS.resolve(source_nodes)
+    }
+
+    /// Node-kind ids baked into the candidate checks: `(id, name, is_named)`
+    /// as the generation-time grammar defines them.
+    const EXPECTED_KINDS: &[(u16, &str, bool)] = &[
+        (134, "program", true),
+    ];
+
+    /// Field ids baked into the field checks: `(id, name)`.
+    const EXPECTED_FIELDS: &[(u16, &str)] = &[];
+
+    /// A parser built from any other grammar version could renumber the baked
+    /// kind/field ids and silently mis-match, so mismatches panic: version skew
+    /// between the generation-time grammar and the runtime parser is a build
+    /// mistake, not a runtime condition to recover from.
+    ///
+    /// Every `run` checks its own tree — the walk is a handful of id lookups,
+    /// noise next to a match — so the guarantee holds per call, not per process:
+    /// a process that mixes languages (or grammar versions of one language) must
+    /// fail on the wrong tree, not only on the first one it ever saw.
+    fn verify_language(tree: &rt::Tree) {
+        let language = tree.language();
+        for &(id, name, named) in EXPECTED_KINDS {
+            let found = language.node_kind_for_id(id);
+            if found != Some(name) || language.node_kind_is_named(id) != named {
+                panic!(
+                    "grammar version skew: this query module was generated against a \
+                     grammar where node kind {id} is {name:?}, but the tree's language \
+                     says {found:?} — rebuild the module with the grammar of the parser \
+                     that produced the tree",
+                );
+            }
+        }
+        for &(id, name) in EXPECTED_FIELDS {
+            let found = language.field_name_for_id(id);
+            if found != Some(name) {
+                panic!(
+                    "grammar version skew: this query module was generated against a \
+                     grammar where field {id} is {name:?}, but the tree's language \
+                     says {found:?} — rebuild the module with the grammar of the parser \
+                     that produced the tree",
+                );
+            }
+        }
+    }
+
+    // Dense runtime state ids, in NFA label order.
+    // Probe:
+    const S1_PROBE: u16 = 0;
+    const S2_PROBE: u16 = 1;
+    const S3_PROBE_EP: u16 = 2;
+    const S4_PROBE_EP: u16 = 3;
+
+    /// Match the `Probe` entrypoint against `tree`. `Some` carries the committed
+    /// capture trace — the same effect stream the VM commits for this query.
+    pub fn probe_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
+        let outcome = run::<false, false, true>(tree, source, S4_PROBE_EP, NO_LIMITS);
+        outcome.expect("an unmetered run cannot exceed a limit")
+    }
+
+    /// [`probe_trace`] under the module's compiled-in limits ([`LIMITS`]).
+    pub(super) fn probe_safe<'t>(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
+        run::<true, true, true>(tree, source, S4_PROBE_EP, resolved_limits(tree))
+    }
+
+    /// Whether `Probe` accepts, under [`LIMITS`], with data effects suppressed.
+    pub(super) fn probe_accepts(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
+        Ok(run::<true, true, false>(tree, source, S4_PROBE_EP, resolved_limits(tree))?.is_some())
+    }
+
+    /// What a dispatched state hands back to the driver loop.
+    enum Flow {
+        /// Continue at this state.
+        Jump(u16),
+        /// The entrypoint accepted; the effect log is the committed trace.
+        Accept,
+        /// The state failed; unwind the checkpoint stack.
+        Backtrack,
+    }
+
+    /// How the backtrack unwind resumed execution.
+    enum Unwound {
+        Resumed(u16),
+        Accepted,
+        NoMatch,
+    }
+
+    /// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
+    /// `METERED_STEPS` and `METERED_MEMORY` gate the two budget checks
+    /// independently: each folds away when its resource is unbounded, so a fully
+    /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
+    /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
+    /// `TRACE` controls whether data effects are recorded; `matches` disables it to
+    /// avoid output allocation and replay-depth failures. (No let-chains: generated
+    /// code targets the embedding crate's edition.)
+    fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: bool>(
+        tree: &'t rt::Tree,
+        source: &str,
+        entry: u16,
+        limits: rt::ResolvedRuntimeLimits,
+    ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
+        verify_language(tree);
+        let mut eng = if TRACE {
+            rt::Engine::new(tree.walk())
+        } else {
+            rt::Engine::new_data_suppressed(tree.walk())
+        };
+        let mut steps: u64 = 0;
+        let mut ip = entry;
+        loop {
+            if METERED_STEPS || METERED_MEMORY {
+                // Step ceiling: bound total work. Folded out when steps are
+                // unbounded; the counter still advances under a memory-only
+                // policy because the sample cadence below rides on it.
+                if METERED_STEPS {
+                    if let Some(max) = limits.max_steps {
+                        if steps >= max {
+                            return Err(rt::LimitExceeded::Steps(max));
+                        }
+                    }
+                }
+                steps += 1;
+                // Memory ceiling: the live runtime heap, sampled every
+                // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded,
+                // so the unobserved overshoot is noise (see the VM loop). Folded
+                // out when memory is unbounded, so no `heap_bytes` read survives.
+                if METERED_MEMORY && steps & MEMORY_SAMPLE_MASK == 0 {
+                    let used = eng.heap_bytes();
+                    if let Some(max) = limits.max_memory {
+                        if used > max {
+                            return Err(rt::LimitExceeded::Memory { used, limit: max });
+                        }
+                    }
+                }
+            }
+            match step(&mut eng, source, ip) {
+                Flow::Jump(next) => ip = next,
+                Flow::Accept => return Ok(Some(eng.into_effects())),
+                Flow::Backtrack => match backtrack(&mut eng, source) {
+                    Unwound::Resumed(next) => ip = next,
+                    Unwound::Accepted => return Ok(Some(eng.into_effects())),
+                    Unwound::NoMatch => return Ok(None),
+                },
+            }
+        }
+    }
+
+    fn step<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
+        match ip {
+            //   1                                         ▶
+            S1_PROBE => {
+                if eng.frames_empty() {
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame())
+                }
+            }
+            //   2   !   (program)                         1
+            S2_PROBE => 'state: {
+                if !cand_s2_probe(eng) {
+                    break 'state Flow::Backtrack;
+                }
+                Flow::Jump(S1_PROBE)
+            }
+            //   3                                         ▶
+            S3_PROBE_EP => {
+                if eng.frames_empty() {
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame())
+                }
+            }
+            //   4       (Probe)                           2 : 3
+            S4_PROBE_EP => {
+                eng.enter_frame(S3_PROBE_EP);
+                Flow::Jump(S2_PROBE)
+            }
+            _ => unreachable!("ip {ip} is not a generated state"),
+        }
+    }
+
+    /// `S2_PROBE` candidate: `(program)`.
+    #[inline]
+    fn cand_s2_probe(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (program)
+        if node.kind_id() != 134 || !node.is_named() {
+            return false;
+        }
+        true
+    }
+
+    /// Unwind the checkpoint stack: branch alternatives resume dispatch, Call and
+    /// Match checkpoints advance their sibling search and re-enter. Loops, never
+    /// recurses — a run of exhausted retries unwinds in one call.
+    fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
+        'unwind: loop {
+            let Some((cp, snapshot)) = eng.pop_checkpoint() else {
+                return Unwound::NoMatch;
+            };
+            eng.restore_checkpoint_state(cp.state, snapshot);
+
+            match cp.resume {
+                rt::Resume::Branch => return Unwound::Resumed(cp.ip),
+
+                // Call retry: advance to the next candidate satisfying the field
+                // constraint, then re-enter the callee. Exhausted siblings keep
+                // unwinding to an earlier checkpoint.
+                rt::Resume::Call(resume) => {
+                    if !eng.cursor_mut().continue_search(resume.policy) {
+                        continue 'unwind;
+                    }
+                    if let Some(field_id) = resume.field {
+                        loop {
+                            if eng.cursor().field_id() == Some(field_id) {
+                                break;
+                            }
+                            if !eng.cursor_mut().continue_search(resume.policy) {
+                                continue 'unwind;
+                            }
+                        }
+                    }
+                    eng.push_checkpoint(rt::Checkpoint::call_retry(
+                        eng.checkpoint_state(),
+                        cp.ip,
+                        resume,
+                    ));
+                    eng.enter_frame(resume.next);
+                    return Unwound::Resumed(resume.target);
+                }
+
+                // Match retry: step past the accepted-but-failed candidate and
+                // re-run that state's sibling search from there.
+                rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
+                    Some(Flow::Jump(next)) => return Unwound::Resumed(next),
+                    Some(Flow::Accept) => return Unwound::Accepted,
+                    Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
+                    None => continue 'unwind,
+                },
+            }
+        }
+    }
+
+    fn match_retry<'t>(_eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Option<Flow> {
+        match ip {
+            _ => unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match"),
+        }
+    }
+}

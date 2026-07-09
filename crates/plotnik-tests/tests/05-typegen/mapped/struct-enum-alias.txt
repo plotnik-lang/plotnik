@@ -4,25 +4,12 @@ Expr = [
   Num: (number) @value
 ]
 Q = (program (expression_statement (Expr) @expr))
---------------------- TYPES ----------------------
-export type Expr =
-  | { $tag: "Id"; $data: { name: Ident } }
-  | { $tag: "Num"; $data: { value: Node } };
-
-export interface Q {
-  expr: Expr;
-}
-
-export type Ident = Node;
-
-export type Alias = Node;
---------------------- MAPPED ---------------------
-12..16 T4 "Expr"
-32..34 T4.M2 "Id"
-46..50 T2.M0 "name"
-75..78 T4.M3 "Num"
-90..95 T3.M1 "value"
-125..126 T5 "Q"
-131..135 T5.M4 "expr"
-158..163 T1 "Ident"
-185..190 T0 "Alias"
+------------------ DIAGNOSTICS -------------------
+error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+ --> query.ptk:3:7
+  |
+1 | Alias = (identifier)
+  |         ------------ defined here
+2 | Expr = [
+3 |   Id: (Alias) @name :: Ident
+  |       ^^^^^^^

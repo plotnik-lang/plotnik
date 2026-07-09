@@ -13,8 +13,8 @@ use super::constants::{
     MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_SUCCESSORS, STEP_SIZE,
 };
 use super::effects::{EFFECT_PAYLOAD_MAX, Effect};
-use super::nav::Nav;
 use super::node_kind_constraint::NodeKindConstraint;
+use plotnik_rt::Nav;
 
 /// Fixed header bytes before an extended Match's payload — exactly the first
 /// step. Effects, negated fields, an optional predicate, and successors follow,
@@ -69,7 +69,12 @@ pub(crate) mod header_byte {
 }
 
 /// The 16-bit counts word of an extended Match (`Match16`–`Match64`):
-/// `effects(4) | neg(3) | succ(5) | has_predicate(1) | reserved(3)`.
+/// `effects(4) | neg(3) | succ(5) | has_predicate(1) | missing(1) | reserved(2)`.
+///
+/// `missing` and `has_predicate` are independent flags on adjacent bits, not a
+/// 2-bit enum: `missing` (the `(MISSING)` node-nature constraint, checked by the
+/// VM) is orthogonal to `has_predicate` (a payload-framing bit the decoder needs
+/// to size the instruction), so they compose freely.
 ///
 /// Decoded once here so the Match decoder, the encoder, and the load-time
 /// validator share one definition of the field positions.
@@ -79,6 +84,7 @@ pub(crate) struct MatchCounts {
     pub(crate) neg: u8,
     pub(crate) succ: u8,
     pub(crate) has_predicate: bool,
+    pub(crate) missing: bool,
 }
 
 impl MatchCounts {
@@ -89,7 +95,8 @@ impl MatchCounts {
     const COUNT3_MASK: u16 = 0x7;
     const SUCC_MASK: u16 = 0x1F;
     const PREDICATE_BIT: u16 = 1 << 3;
-    const RESERVED_MASK: u16 = 0x7;
+    const MISSING_BIT: u16 = 1 << 2;
+    const RESERVED_MASK: u16 = 0x3;
 
     pub(crate) fn unpack(w: u16) -> Self {
         Self {
@@ -97,6 +104,7 @@ impl MatchCounts {
             neg: ((w >> Self::NEG_SHIFT) & Self::COUNT3_MASK) as u8,
             succ: ((w >> Self::SUCC_SHIFT) & Self::SUCC_MASK) as u8,
             has_predicate: w & Self::PREDICATE_BIT != 0,
+            missing: w & Self::MISSING_BIT != 0,
         }
     }
 
@@ -109,9 +117,10 @@ impl MatchCounts {
             } else {
                 0
             }
+            | if self.missing { Self::MISSING_BIT } else { 0 }
     }
 
-    /// Whether any reserved bit (bits 2-0) is set; load-time validation rejects it.
+    /// Whether any reserved bit (bits 1-0) is set; load-time validation rejects it.
     pub(crate) fn reserved_bits_set(w: u16) -> bool {
         w & Self::RESERVED_MASK != 0
     }
@@ -307,6 +316,7 @@ enum MatchLayout {
         neg_count: u8,
         succ_count: u8,
         has_predicate: bool,
+        missing: bool,
     },
 }
 
@@ -344,6 +354,7 @@ impl<'a> Match<'a> {
                 neg_count: c.neg,
                 succ_count: c.succ,
                 has_predicate: c.has_predicate,
+                missing: c.missing,
             }
         };
 
@@ -447,6 +458,14 @@ impl<'a> Match<'a> {
         )
     }
 
+    /// Whether the matched node must be a tree-sitter MISSING node (a zero-width
+    /// node the parser inserts during error recovery). Only extended Matches can
+    /// carry it — the `Match8` fast path has no counts word.
+    #[inline]
+    pub fn missing(&self) -> bool {
+        matches!(self.layout, MatchLayout::Extended { missing: true, .. })
+    }
+
     /// Get predicate data if present.
     pub fn predicate(&self) -> Option<MatchPredicate> {
         if !self.has_predicate() {
@@ -510,6 +529,7 @@ impl<'a> Match<'a> {
             nav: self.nav,
             node_kind: self.node_kind,
             node_field: self.node_field,
+            missing: self.missing(),
             effects: self.effects().collect(),
             neg_fields: self.neg_fields().collect(),
             predicate: self.predicate(),
@@ -566,6 +586,8 @@ pub struct MatchInstr {
     pub nav: Nav,
     pub node_kind: NodeKindConstraint,
     pub node_field: Option<NodeFieldId>,
+    /// Node must be a tree-sitter MISSING node — the `(MISSING …)` constraint.
+    pub missing: bool,
     pub effects: Vec<Effect>,
     pub neg_fields: Vec<NodeFieldId>,
     pub predicate: Option<MatchPredicate>,
@@ -609,6 +631,7 @@ impl MatchInstr {
         let can_use_match8 = self.effects.is_empty()
             && self.neg_fields.is_empty()
             && self.predicate.is_none()
+            && !self.missing
             && self.successors.len() <= 1;
 
         if can_use_match8 {
@@ -641,7 +664,14 @@ impl MatchInstr {
             0
         };
         let slots = effects + neg + predicate_slots + succ;
-        let opcode = select_match_opcode(slots).ok_or(EncodeError::PayloadTooLarge(slots))?;
+        let opcode = match select_match_opcode(slots) {
+            // A missing-only terminal has no payload slots but still needs the
+            // counts word (for its `missing` bit), which the `Match8` fast path
+            // lacks — floor it to the smallest extended variant.
+            Some(Opcode::Match8) => Opcode::Match16,
+            Some(op) => op,
+            None => return Err(EncodeError::PayloadTooLarge(slots)),
+        };
 
         let mut bytes = vec![0u8; opcode.size()];
         bytes[0] = header_byte::pack(0, node_class, opcode);
@@ -654,6 +684,7 @@ impl MatchInstr {
             neg: neg as u8,
             succ: succ as u8,
             has_predicate: self.predicate.is_some(),
+            missing: self.missing,
         };
         bytes[6..8].copy_from_slice(&counts.pack().to_le_bytes());
 

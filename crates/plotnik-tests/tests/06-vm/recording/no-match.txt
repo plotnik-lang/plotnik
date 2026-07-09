@@ -1,7 +1,7 @@
 Q = (program (expression_statement (number) @n))
 ------------------- INPUT (ts) -------------------
 x
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   n: Node;
 }
@@ -156,6 +156,15 @@ export interface Q {
     {
       "ip": 16,
       "event": {
+        "kind": "checkpoint_new"
+      },
+      "span": 1,
+      "node": null,
+      "effect_len": 3
+    },
+    {
+      "ip": 16,
+      "event": {
         "kind": "effect",
         "effect": "SpanStartAt#2"
       },
@@ -201,6 +210,16 @@ export interface Q {
         "end": 1
       },
       "effect_len": 4
+    },
+    {
+      "ip": 8,
+      "event": {
+        "kind": "backtrack",
+        "to_step": 13
+      },
+      "span": 1,
+      "node": null,
+      "effect_len": 3
     }
   ],
   "truncated": false

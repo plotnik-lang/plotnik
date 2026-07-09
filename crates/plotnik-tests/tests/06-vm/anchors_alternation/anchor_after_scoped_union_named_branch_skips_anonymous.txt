@@ -12,7 +12,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 5 * x
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QT {
   n: Node | null;
 }
@@ -74,8 +74,8 @@ Q:
   12   !   (number) [Node Set(M0)]          10
   14   !   "+" [Null Set(M0)]               08
   16  -ε-  [StructOpen]                     12, 14
-  18  ─‣─  _                                16, 18
-  20  └‣─  _                                16, 18
+  18  ──!  _                                16, 18
+  20  └─!  _                                16, 18
   22  └‣─  (binary_expression)              20
   23  ...
   24  └‣─  (expression_statement)           22
@@ -83,10 +83,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              25 : 03
-       ▶   (?)
+  02       (@25)                            25 : 03
+       ▶   (@25)
 
-?:
+@25:
   25       (program)                        24
        ●   program
   24       (expression_statement)           22
@@ -103,7 +103,7 @@ Q:
        ●   identifier
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@25)                            
 
 Q:
   03  -ε-  [StructClose]                    05

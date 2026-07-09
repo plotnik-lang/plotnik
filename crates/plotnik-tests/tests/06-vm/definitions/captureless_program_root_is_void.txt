@@ -1,0 +1,41 @@
+Q = (program)
+--------------------- INPUT ----------------------
+x;
+------------------- TYPESCRIPT -------------------
+export type Q = undefined;
+--------------------- OUTPUT ---------------------
+null
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "program"
+S2 "Q"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+
+[entrypoints]
+Q = 0 :: T0
+
+[transitions]
+Q:
+  0       (@3)                              3 : 1
+  1                                         ▶
+  2                                         ▶
+  3   !   (program)                         2
+--------------------- TRACE ----------------------
+Q:
+  0       (@3)                              03 : 01
+      ▶   (@3)
+
+@3:
+  3       (program)                         02
+      ●   program
+  2   ◀   (@3)                              
+
+Q:
+  1   ◀   (Q)                               ◼

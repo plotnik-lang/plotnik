@@ -4,7 +4,7 @@ Q = (program [
 ] @x)
 --------------------- INPUT ----------------------
 a; b;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QX =
   | { $tag: "A"; $data: { stmts: Node[] } }
   | { $tag: "B" };
@@ -76,25 +76,25 @@ Q:
   07  ...
   08  -ε-  [ArrayClose Set(M0) EnumClose Set(M3)]  23
   11   !   (expression_statement) [Node Push]  13, 08
-  13  ─‣─  _                                11, 13
+  13  ──!  _                                11, 13
   15  ...
   16   !   _ [ArrayOpen]                    11, 13
   18  -ε-  [EnumOpen(M1)]                   16
   20  -ε-  [EnumOpen(M1) ArrayOpen ArrayClose Set(M0) EnumClose Set(M3)]  06
   23  ─‣┘  _                                06
   24   !   (debugger_statement) [EnumOpen(M2) EnumClose Set(M3)]  23
-  26  ─‣─  _                                18, 24, 26
-  28  └‣─  _                                18, 24, 26
+  26  ──!  _                                18, 24, 26
+  28  └─!  _                                18, 24, 26
   30  ...
   31  ...
   32   !   (program)                        28, 20
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              32 : 03
-       ▶   (?)
+  02       (@32)                            32 : 03
+       ▶   (@32)
 
-?:
+@32:
   32       (program)                        28, 20
        ●   program
   28       _                                18, 24, 26
@@ -113,7 +113,7 @@ Q:
   08  -ε-  [ArrayClose Set(M0) EnumClose Set(M3)]  23
   23       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@32)                            
 
 Q:
   03  -ε-  [StructClose]                    05

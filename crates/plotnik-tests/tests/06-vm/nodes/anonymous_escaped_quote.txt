@@ -1,7 +1,7 @@
 Q = (program (expression_statement (string "\"" (string_fragment) @s "\"")))
 --------------------- INPUT ----------------------
 "hi";
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   s: Node;
 }
@@ -54,10 +54,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              14 : 03
-       ▶   (?)
+  02       (@14)                            14 : 03
+       ▶   (@14)
 
-?:
+@14:
   14       (program)                        13
        ●   program
   13       (expression_statement)           12
@@ -72,7 +72,7 @@ Q:
        ●   "
   07       _                                08
        ●   program
-  08   ◀   (?)                              
+  08   ◀   (@14)                            
 
 Q:
   03  -ε-  [StructClose]                    05

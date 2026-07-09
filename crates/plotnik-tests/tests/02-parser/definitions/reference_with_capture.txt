@@ -1,4 +1,4 @@
-Expr = (identifier)
+Expr = (identifier) @id
 Q = (call (Expr) @inner)
 ---------------------- CST -----------------------
 # query.ptk
@@ -6,10 +6,12 @@ Root
   Def
     Id "Expr"
     Equals "="
-    NamedNode
-      ParenOpen "("
-      Id "identifier"
-      ParenClose ")"
+    Capture
+      NamedNode
+        ParenOpen "("
+        Id "identifier"
+        ParenClose ")"
+      CaptureToken "@id"
   Def
     Id "Q"
     Equals "="
@@ -27,7 +29,8 @@ Root
 # query.ptk
 Root
   Def Expr
-    NamedNode identifier
+    CapturedPattern @id
+      NamedNode identifier
   Def Q
     NamedNode call
       CapturedPattern @inner

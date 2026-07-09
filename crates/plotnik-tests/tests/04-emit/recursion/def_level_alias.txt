@@ -4,6 +4,39 @@ Rec = [
 ]
 
 Q = (Rec)
+---------------------- NFA -----------------------
+[entrypoints]
+Q   = 19
+Rec = 17
+
+[transitions]
+Rec:
+  00  -ε-                                   03, 10
+
+Q:
+  01  -ε-  [SuppressBegin]                  14
+
+Rec:
+  02                                        ▶
+  03   !   (program) [EnumOpen(A)]          06
+  05  ─‣┘  _ [EnumClose]                    02
+  06  └‣─  (expression_statement)           09
+  07  ─‣┘  _ [Set(inner)]                   05
+  09  └‣─  (Rec)                            00 : 07
+  10   !   (identifier) [EnumOpen(B) Node Set(id) EnumClose]  02
+
+Q:
+  12                                        ▶
+  13  -ε-  [SuppressEnd]                    12
+  14   !   (Rec)                            00 : 13
+
+Rec (entrypoint):
+  16                                        ▶
+  17       (Rec)                            00 : 16
+
+Q (entrypoint):
+  18                                        ▶
+  19       (Q)                              01 : 18
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

@@ -5,7 +5,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 function foo() {}
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   fn: Node;
   name: Node;
@@ -61,10 +61,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              12 : 03
-       ▶   (?)
+  02       (@12)                            12 : 03
+       ▶   (@12)
 
-?:
+@12:
   12       (program)                        10
        ●   program
   10       (function_declaration) [Node Set(M0)]  06
@@ -74,7 +74,7 @@ Q:
        ●   identifier
   08       _                                09
        ●   program
-  09   ◀   (?)                              
+  09   ◀   (@12)                            
 
 Q:
   03  -ε-  [StructClose]                    05

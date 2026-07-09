@@ -1,7 +1,7 @@
 Q = (program (lexical_declaration)+ @decls)
 --------------------- INPUT ----------------------
 foo;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   decls: [Node, ...Node[]];
 }
@@ -38,17 +38,17 @@ Q:
   06                                        ▶
   07  ...
   08   !   (lexical_declaration) [Node Push]  10, 14
-  10  ─‣─  _                                08, 10
-  12  └‣─  _ [ArrayOpen]                    08, 10
+  10  ──!  _                                08, 10
+  12  └─!  _ [ArrayOpen]                    08, 10
   14  ─‣┘  _ [ArrayClose Set(M0)]           06
   16   !   (program)                        12
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              16 : 03
-       ▶   (?)
+  02       (@16)                            16 : 03
+       ▶   (@16)
 
-?:
+@16:
   16       (program)                        12
        ●   program
   12       _ [ArrayOpen]                    08, 10

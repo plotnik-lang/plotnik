@@ -100,6 +100,7 @@ pub enum DiagnosticKind {
     RegexSyntaxError,
 
     UnknownNodeKind,
+    MissingKindNotToken,
     UnknownField,
     FieldNotOnNodeKind,
     InvalidFieldChildType,
@@ -286,6 +287,9 @@ impl DiagnosticKind {
             Self::MissingTakesNoChildren => {
                 "a missing node is a zero-width token inserted by error recovery; write `(MISSING)`, `(MISSING kind)`, or `(MISSING \";\")`"
             }
+            Self::MissingKindNotToken => {
+                "use a token kind like `(MISSING identifier)`, a quoted literal like `(MISSING \";\")`, or bare `(MISSING)`"
+            }
             Self::RefCannotHaveChildren => {
                 "a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children"
             }
@@ -395,6 +399,7 @@ impl DiagnosticKind {
             Self::RegexNamedCapture => "named captures are not supported in regex",
             Self::RegexSyntaxError => "invalid regex syntax",
             Self::UnknownNodeKind => "unknown node kind",
+            Self::MissingKindNotToken => "this kind is never inserted as a missing node",
             Self::UnknownField => "unknown field",
             Self::FieldNotOnNodeKind => "field not valid on this node kind",
             Self::InvalidFieldChildType => "node kind not valid for this field",
@@ -447,6 +452,9 @@ impl DiagnosticKind {
                 "capture `@{}` has incompatible struct fields across branches".to_string()
             }
             Self::UnknownNodeKind => "`{}` is not a valid node kind".to_string(),
+            Self::MissingKindNotToken => {
+                "`{}` has children — only leaf tokens can be missing nodes".to_string()
+            }
             Self::UnknownField => "`{}` is not a valid field".to_string(),
             Self::FieldNotOnNodeKind => "field `{}` is not valid on this node kind".to_string(),
             Self::InvalidFieldChildType => "{}".to_string(),

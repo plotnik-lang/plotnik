@@ -18,6 +18,7 @@ fn graph(instructions: Vec<InstructionIR>, entry: u32) -> NfaGraph {
             m
         },
         spans: None,
+        label_origins: Vec::new(),
     }
 }
 

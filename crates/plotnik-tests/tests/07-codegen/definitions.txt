@@ -1,0 +1,647 @@
+Inner = (expression_statement
+  (identifier) @id
+)
+
+Q = (program
+  (Inner)
+  (Inner) @second
+)
+-------------------- MATCHER ---------------------
+// Generated Plotnik query module: typed output types, `parse`/`matches` entry
+// points, per-type trace readers, and the compiled matcher (`mod matcher`).
+// Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
+// dispatch arm carries its instruction in the dump format
+// (docs/binary-format/08-dump-format.md).
+
+use ::plotnik_rt as rt;
+
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Inner<'t> {
+    pub id: Node<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub second: Inner<'t>,
+}
+
+impl<'t> Inner<'t> {
+    /// Match `Inner` against `tree` and replay the committed trace into
+    /// the typed output. `None` is the no-match outcome.
+    /// The module's compiled-in limits bound total work, live
+    /// backtracking state, and typed replay depth.
+    pub fn parse(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        let Some(log) = matcher::inner_safe(tree, source)? else {
+            return Ok(None);
+        };
+        let mut t = rt::TraceReader::new(&log);
+        let value = read_inner(&mut t);
+        t.finish();
+        Ok(Some(value))
+    }
+
+    /// Whether `Inner` matches `tree` under the module's compiled-in limits.
+    pub fn matches(
+        tree: &rt::Tree,
+        source: &str,
+    ) -> ::core::result::Result<bool, rt::LimitExceeded> {
+        matcher::inner_accepts(tree, source)
+    }
+}
+
+impl<'t> rt::Matches for Inner<'t> {
+    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
+        Inner::matches(tree, source)
+    }
+}
+
+impl<'t> rt::Parse<'t> for Inner<'t> {
+    fn parse(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        Inner::parse(tree, source)
+    }
+}
+
+impl<'t> Q<'t> {
+    /// Match `Q` against `tree` and replay the committed trace into
+    /// the typed output. `None` is the no-match outcome.
+    /// The module's compiled-in limits bound total work, live
+    /// backtracking state, and typed replay depth.
+    pub fn parse(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        let Some(log) = matcher::q_safe(tree, source)? else {
+            return Ok(None);
+        };
+        let mut t = rt::TraceReader::new(&log);
+        let value = read_q(&mut t);
+        t.finish();
+        Ok(Some(value))
+    }
+
+    /// Whether `Q` matches `tree` under the module's compiled-in limits.
+    pub fn matches(
+        tree: &rt::Tree,
+        source: &str,
+    ) -> ::core::result::Result<bool, rt::LimitExceeded> {
+        matcher::q_accepts(tree, source)
+    }
+}
+
+impl<'t> rt::Matches for Q<'t> {
+    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
+        Q::matches(tree, source)
+    }
+}
+
+impl<'t> rt::Parse<'t> for Q<'t> {
+    fn parse(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
+        Q::parse(tree, source)
+    }
+}
+
+/// Replay one committed `Inner` value.
+fn read_inner<'t>(t: &mut rt::TraceReader<'_, 't>) -> Inner<'t> {
+    t.expect_struct_open();
+    let mut v0 = None; // id
+    while !t.at_struct_close() {
+        match t.peek_set() {
+            // id
+            0 => v0 = Some(t.expect_node()),
+            other => unreachable!("trace shape proven at emit: `Inner` has no member index {other}"),
+        }
+        t.expect_set();
+    }
+    t.expect_struct_close();
+    Inner {
+        id: v0.expect("field-stability: every accepting path sets `id`"),
+    }
+}
+
+/// Replay one committed `Q` value.
+fn read_q<'t>(t: &mut rt::TraceReader<'_, 't>) -> Q<'t> {
+    t.expect_struct_open();
+    let mut v0 = None; // second
+    while !t.at_struct_close() {
+        match t.peek_set() {
+            // second
+            1 => v0 = Some(read_inner(t)),
+            other => unreachable!("trace shape proven at emit: `Q` has no member index {other}"),
+        }
+        t.expect_set();
+    }
+    t.expect_struct_close();
+    Q {
+        second: v0.expect("field-stability: every accepting path sets `second`"),
+    }
+}
+
+pub use self::matcher::{inner_trace, q_trace};
+
+/// The compiled matcher: engine machinery shielded from the query's
+/// type namespace.
+mod matcher {
+    use ::plotnik_rt as rt;
+
+    /// The limit policy compiled into the safe entry points, resolved against
+    /// each input's node count. Chosen at generation time, never at the call
+    /// site: the query is trusted, the input is not.
+    const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
+        steps: rt::Limit::Auto,
+        memory: rt::Limit::Auto,
+    };
+
+    /// No ceilings — what the unmetered trace entry points run under.
+    const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
+        max_steps: None,
+        max_memory: None,
+    };
+
+    /// Bitmask selecting the dispatch steps on which the memory ceiling is
+    /// sampled; must be a power of two minus one. Twin of the VM's constant.
+    const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
+
+    /// Conservative maximum native-stack bytes used by one typed replay reader
+    /// frame before runtime padding.
+    pub(super) const MAX_READER_FRAME_BYTES: u64 = 232;
+
+    /// Ceiling on recursive typed replay for safe `parse` (`None` opts out). The
+    /// matcher itself is iterative; only reader recursion enters this guard.
+    pub(super) const MAX_REPLAY_DEPTH: Option<u64> = Some(rt::replay_depth_auto(232));
+
+    /// Resolve [`LIMITS`] against this input's node count, exactly like
+    /// `VM::builder(...).build()` resolves the VM's.
+    fn resolved_limits(tree: &rt::Tree) -> rt::ResolvedRuntimeLimits {
+        let source_nodes = u32::try_from(tree.root_node().descendant_count()).unwrap_or(u32::MAX);
+        LIMITS.resolve(source_nodes)
+    }
+
+    /// Node-kind ids baked into the candidate checks: `(id, name, is_named)`
+    /// as the generation-time grammar defines them.
+    const EXPECTED_KINDS: &[(u16, &str, bool)] = &[
+        (1, "identifier", true),
+        (134, "program", true),
+        (150, "expression_statement", true),
+    ];
+
+    /// Field ids baked into the field checks: `(id, name)`.
+    const EXPECTED_FIELDS: &[(u16, &str)] = &[];
+
+    /// A parser built from any other grammar version could renumber the baked
+    /// kind/field ids and silently mis-match, so mismatches panic: version skew
+    /// between the generation-time grammar and the runtime parser is a build
+    /// mistake, not a runtime condition to recover from.
+    ///
+    /// Every `run` checks its own tree — the walk is a handful of id lookups,
+    /// noise next to a match — so the guarantee holds per call, not per process:
+    /// a process that mixes languages (or grammar versions of one language) must
+    /// fail on the wrong tree, not only on the first one it ever saw.
+    fn verify_language(tree: &rt::Tree) {
+        let language = tree.language();
+        for &(id, name, named) in EXPECTED_KINDS {
+            let found = language.node_kind_for_id(id);
+            if found != Some(name) || language.node_kind_is_named(id) != named {
+                panic!(
+                    "grammar version skew: this query module was generated against a \
+                     grammar where node kind {id} is {name:?}, but the tree's language \
+                     says {found:?} — rebuild the module with the grammar of the parser \
+                     that produced the tree",
+                );
+            }
+        }
+        for &(id, name) in EXPECTED_FIELDS {
+            let found = language.field_name_for_id(id);
+            if found != Some(name) {
+                panic!(
+                    "grammar version skew: this query module was generated against a \
+                     grammar where field {id} is {name:?}, but the tree's language \
+                     says {found:?} — rebuild the module with the grammar of the parser \
+                     that produced the tree",
+                );
+            }
+        }
+    }
+
+    // Dense runtime state ids, in NFA label order.
+    // Inner:
+    const S02_INNER: u16 = 0;
+    const S03_INNER: u16 = 1;
+    const S04_INNER: u16 = 2;
+    const S05_INNER: u16 = 3;
+    // Q:
+    const S06_Q: u16 = 4;
+    const S07_Q: u16 = 5;
+    const S08_Q: u16 = 6;
+    const S10_Q: u16 = 7;
+    const S11_Q: u16 = 8;
+    const S13_Q: u16 = 9;
+    const S14_Q: u16 = 10;
+    // Inner:
+    const S16_INNER_EP: u16 = 11;
+    const S17_INNER_EP: u16 = 12;
+    const S18_INNER_EP: u16 = 13;
+    const S19_INNER_EP: u16 = 14;
+    // Q:
+    const S20_Q_EP: u16 = 15;
+    const S21_Q_EP: u16 = 16;
+    const S22_Q_EP: u16 = 17;
+    const S23_Q_EP: u16 = 18;
+
+    /// Match the `Inner` entrypoint against `tree`. `Some` carries the committed
+    /// capture trace — the same effect stream the VM commits for this query.
+    pub fn inner_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
+        let outcome = run::<false, false, true>(tree, source, S19_INNER_EP, NO_LIMITS);
+        outcome.expect("an unmetered run cannot exceed a limit")
+    }
+
+    /// [`inner_trace`] under the module's compiled-in limits ([`LIMITS`]).
+    pub(super) fn inner_safe<'t>(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
+        run::<true, true, true>(tree, source, S19_INNER_EP, resolved_limits(tree))
+    }
+
+    /// Whether `Inner` accepts, under [`LIMITS`], with data effects suppressed.
+    pub(super) fn inner_accepts(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
+        Ok(run::<true, true, false>(tree, source, S19_INNER_EP, resolved_limits(tree))?.is_some())
+    }
+
+    /// Match the `Q` entrypoint against `tree`. `Some` carries the committed
+    /// capture trace — the same effect stream the VM commits for this query.
+    pub fn q_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
+        let outcome = run::<false, false, true>(tree, source, S23_Q_EP, NO_LIMITS);
+        outcome.expect("an unmetered run cannot exceed a limit")
+    }
+
+    /// [`q_trace`] under the module's compiled-in limits ([`LIMITS`]).
+    pub(super) fn q_safe<'t>(
+        tree: &'t rt::Tree,
+        source: &str,
+    ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
+        run::<true, true, true>(tree, source, S23_Q_EP, resolved_limits(tree))
+    }
+
+    /// Whether `Q` accepts, under [`LIMITS`], with data effects suppressed.
+    pub(super) fn q_accepts(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
+        Ok(run::<true, true, false>(tree, source, S23_Q_EP, resolved_limits(tree))?.is_some())
+    }
+
+    /// What a dispatched state hands back to the driver loop.
+    enum Flow {
+        /// Continue at this state.
+        Jump(u16),
+        /// The entrypoint accepted; the effect log is the committed trace.
+        Accept,
+        /// The state failed; unwind the checkpoint stack.
+        Backtrack,
+    }
+
+    /// How the backtrack unwind resumed execution.
+    enum Unwound {
+        Resumed(u16),
+        Accepted,
+        NoMatch,
+    }
+
+    /// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
+    /// `METERED_STEPS` and `METERED_MEMORY` gate the two budget checks
+    /// independently: each folds away when its resource is unbounded, so a fully
+    /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
+    /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
+    /// `TRACE` controls whether data effects are recorded; `matches` disables it to
+    /// avoid output allocation and replay-depth failures. (No let-chains: generated
+    /// code targets the embedding crate's edition.)
+    fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: bool>(
+        tree: &'t rt::Tree,
+        source: &str,
+        entry: u16,
+        limits: rt::ResolvedRuntimeLimits,
+    ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
+        verify_language(tree);
+        let mut eng = if TRACE {
+            rt::Engine::new(tree.walk())
+        } else {
+            rt::Engine::new_data_suppressed(tree.walk())
+        };
+        let mut steps: u64 = 0;
+        let mut ip = entry;
+        loop {
+            if METERED_STEPS || METERED_MEMORY {
+                // Step ceiling: bound total work. Folded out when steps are
+                // unbounded; the counter still advances under a memory-only
+                // policy because the sample cadence below rides on it.
+                if METERED_STEPS {
+                    if let Some(max) = limits.max_steps {
+                        if steps >= max {
+                            return Err(rt::LimitExceeded::Steps(max));
+                        }
+                    }
+                }
+                steps += 1;
+                // Memory ceiling: the live runtime heap, sampled every
+                // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded,
+                // so the unobserved overshoot is noise (see the VM loop). Folded
+                // out when memory is unbounded, so no `heap_bytes` read survives.
+                if METERED_MEMORY && steps & MEMORY_SAMPLE_MASK == 0 {
+                    let used = eng.heap_bytes();
+                    if let Some(max) = limits.max_memory {
+                        if used > max {
+                            return Err(rt::LimitExceeded::Memory { used, limit: max });
+                        }
+                    }
+                }
+            }
+            match step(&mut eng, source, ip) {
+                Flow::Jump(next) => ip = next,
+                Flow::Accept => return Ok(Some(eng.into_effects())),
+                Flow::Backtrack => match backtrack(&mut eng, source) {
+                    Unwound::Resumed(next) => ip = next,
+                    Unwound::Accepted => return Ok(Some(eng.into_effects())),
+                    Unwound::NoMatch => return Ok(None),
+                },
+            }
+        }
+    }
+
+    fn step<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
+        match ip {
+            //   02                                        ▶
+            S02_INNER => {
+                if eng.frames_empty() {
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame())
+                }
+            }
+            //   03   !   (expression_statement)           05
+            S03_INNER => 'state: {
+                if !cand_s03_inner(eng) {
+                    break 'state Flow::Backtrack;
+                }
+                Flow::Jump(S05_INNER)
+            }
+            //   04  ─‣┘  _                                02
+            S04_INNER => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                Flow::Jump(S02_INNER)
+            }
+            //   05  └‣─  (identifier) [Node Set(id)]      04
+            S05_INNER => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                loop {
+                    if cand_s05_inner(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        break 'state Flow::Backtrack;
+                    }
+                }
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_INNER));
+                }
+                finish_s05_inner(eng)
+            }
+            //   06                                        ▶
+            S06_Q => {
+                if eng.frames_empty() {
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame())
+                }
+            }
+            //   07   !   (program) [SuppressBegin]        14
+            S07_Q => 'state: {
+                if !cand_s07_q(eng) {
+                    break 'state Flow::Backtrack;
+                }
+                eng.suppress_begin();
+                Flow::Jump(S14_Q)
+            }
+            //   08  ─‣┘  _ [Set(second)]                  06
+            S08_Q => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(second)
+                Flow::Jump(S06_Q)
+            }
+            //   10  -ε-  [StructClose]                    08
+            S10_Q => {
+                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                Flow::Jump(S08_Q)
+            }
+            //   11  ─‣─  (Inner)                          03 : 10
+            S11_Q => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Next).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                eng.push_checkpoint(rt::Checkpoint::call_retry(
+                    eng.checkpoint_state(),
+                    S11_Q,
+                    rt::CallResume { target: S03_INNER, next: S10_Q, field: None, policy: rt::SkipPolicy::Any },
+                ));
+                eng.enter_frame(S10_Q);
+                Flow::Jump(S03_INNER)
+            }
+            //   13  -ε-  [SuppressEnd StructOpen]         11
+            S13_Q => {
+                eng.suppress_end();
+                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                Flow::Jump(S11_Q)
+            }
+            //   14  └‣─  (Inner)                          03 : 13
+            S14_Q => 'state: {
+                if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
+                    break 'state Flow::Backtrack;
+                }
+                eng.push_checkpoint(rt::Checkpoint::call_retry(
+                    eng.checkpoint_state(),
+                    S14_Q,
+                    rt::CallResume { target: S03_INNER, next: S13_Q, field: None, policy: rt::SkipPolicy::Any },
+                ));
+                eng.enter_frame(S13_Q);
+                Flow::Jump(S03_INNER)
+            }
+            //   16                                        ▶
+            S16_INNER_EP => {
+                if eng.frames_empty() {
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame())
+                }
+            }
+            //   17  -ε-  [StructClose]                    16
+            S17_INNER_EP => {
+                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                Flow::Jump(S16_INNER_EP)
+            }
+            //   18       (Inner)                          03 : 17
+            S18_INNER_EP => {
+                eng.enter_frame(S17_INNER_EP);
+                Flow::Jump(S03_INNER)
+            }
+            //   19  -ε-  [StructOpen]                     18
+            S19_INNER_EP => {
+                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                Flow::Jump(S18_INNER_EP)
+            }
+            //   20                                        ▶
+            S20_Q_EP => {
+                if eng.frames_empty() {
+                    Flow::Accept
+                } else {
+                    Flow::Jump(eng.exit_frame())
+                }
+            }
+            //   21  -ε-  [StructClose]                    20
+            S21_Q_EP => {
+                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                Flow::Jump(S20_Q_EP)
+            }
+            //   22       (Q)                              07 : 21
+            S22_Q_EP => {
+                eng.enter_frame(S21_Q_EP);
+                Flow::Jump(S07_Q)
+            }
+            //   23  -ε-  [StructOpen]                     22
+            S23_Q_EP => {
+                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                Flow::Jump(S22_Q_EP)
+            }
+            _ => unreachable!("ip {ip} is not a generated state"),
+        }
+    }
+
+    /// `S03_INNER` candidate: `(expression_statement)`.
+    #[inline]
+    fn cand_s03_inner(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (expression_statement)
+        if node.kind_id() != 150 || !node.is_named() {
+            return false;
+        }
+        true
+    }
+
+    /// `S05_INNER` candidate: `(identifier)`.
+    #[inline]
+    fn cand_s05_inner(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (identifier)
+        if node.kind_id() != 1 || !node.is_named() {
+            return false;
+        }
+        true
+    }
+
+    /// `S07_Q` candidate: `(program)`.
+    #[inline]
+    fn cand_s07_q(eng: &rt::Engine<'_>) -> bool {
+        let node = eng.node();
+        // (program)
+        if node.kind_id() != 134 || !node.is_named() {
+            return false;
+        }
+        true
+    }
+
+    /// `S05_INNER` post-acceptance: effects, then branch. Shared by the dispatch
+    /// path and the match-retry resume, so a retried candidate replays exactly
+    /// what the original acceptance would have.
+    #[inline]
+    fn finish_s05_inner(eng: &mut rt::Engine<'_>) -> Flow {
+        eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
+        eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(id)
+        Flow::Jump(S04_INNER)
+    }
+
+    /// Unwind the checkpoint stack: branch alternatives resume dispatch, Call and
+    /// Match checkpoints advance their sibling search and re-enter. Loops, never
+    /// recurses — a run of exhausted retries unwinds in one call.
+    fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
+        'unwind: loop {
+            let Some((cp, snapshot)) = eng.pop_checkpoint() else {
+                return Unwound::NoMatch;
+            };
+            eng.restore_checkpoint_state(cp.state, snapshot);
+
+            match cp.resume {
+                rt::Resume::Branch => return Unwound::Resumed(cp.ip),
+
+                // Call retry: advance to the next candidate satisfying the field
+                // constraint, then re-enter the callee. Exhausted siblings keep
+                // unwinding to an earlier checkpoint.
+                rt::Resume::Call(resume) => {
+                    if !eng.cursor_mut().continue_search(resume.policy) {
+                        continue 'unwind;
+                    }
+                    if let Some(field_id) = resume.field {
+                        loop {
+                            if eng.cursor().field_id() == Some(field_id) {
+                                break;
+                            }
+                            if !eng.cursor_mut().continue_search(resume.policy) {
+                                continue 'unwind;
+                            }
+                        }
+                    }
+                    eng.push_checkpoint(rt::Checkpoint::call_retry(
+                        eng.checkpoint_state(),
+                        cp.ip,
+                        resume,
+                    ));
+                    eng.enter_frame(resume.next);
+                    return Unwound::Resumed(resume.target);
+                }
+
+                // Match retry: step past the accepted-but-failed candidate and
+                // re-run that state's sibling search from there.
+                rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
+                    Some(Flow::Jump(next)) => return Unwound::Resumed(next),
+                    Some(Flow::Accept) => return Unwound::Accepted,
+                    Some(Flow::Backtrack) => unreachable!("finish never backtracks"),
+                    None => continue 'unwind,
+                },
+            }
+        }
+    }
+
+    fn match_retry<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Option<Flow> {
+        match ip {
+            S05_INNER => {
+                if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                    return None;
+                }
+                loop {
+                    if cand_s05_inner(eng) {
+                        break;
+                    }
+                    if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
+                        return None;
+                    }
+                }
+                if rt::SkipPolicy::Any.admits(&eng.node()) {
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_INNER));
+                }
+                Some(finish_s05_inner(eng))
+            }
+            _ => unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match"),
+        }
+    }
+}

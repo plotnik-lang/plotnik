@@ -8,7 +8,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 let x = 1
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   n: Node;
 }
@@ -54,13 +54,14 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              13 : 03
-       ▶   (?)
+  02       (@13)                            13 : 03
+       ▶   (@13)
 
-?:
+@13:
   13       (program)                        12
        ●   program
   12       (lexical_declaration)            10
        ●   lexical_declaration
   10       -value (variable_declarator)     06
        ○   let
+  12  ❮❮❮ 

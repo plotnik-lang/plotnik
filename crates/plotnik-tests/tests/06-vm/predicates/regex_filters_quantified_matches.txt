@@ -1,7 +1,7 @@
 Q = (program (expression_statement (identifier =~ /^x/) @id)* @rows)
 --------------------- INPUT ----------------------
 x1; ax; x3;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QRows {
   id: Node;
 }
@@ -74,17 +74,17 @@ Q:
   15  ...
   16  -ε-  [StructClose Push]               20, 06
   18   !   (expression_statement) [StructOpen]  08
-  20  ─‣─  _                                18, 20
-  22  └‣─  _                                18, 20
+  20  ──!  _                                18, 20
+  22  └─!  _                                18, 20
   24  -ε-  [ArrayOpen]                      22, 13
   26   !   (program)                        24
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              26 : 03
-       ▶   (?)
+  02       (@26)                            26 : 03
+       ▶   (@26)
 
-?:
+@26:
   26       (program)                        24
        ●   program
   24  -ε-  [ArrayOpen]                      22, 13
@@ -117,7 +117,7 @@ Q:
   16  ❮❮❮ 
   06       _ [ArrayClose Set(M1)]           12
        ●   program
-  12   ◀   (?)                              
+  12   ◀   (@26)                            
 
 Q:
   03  -ε-  [StructClose]                    05

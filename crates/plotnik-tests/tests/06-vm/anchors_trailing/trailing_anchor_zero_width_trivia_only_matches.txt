@@ -6,7 +6,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 // note
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   b: Node[];
 }
@@ -46,18 +46,18 @@ Q:
   07  ...
   08  └•┘  _ [ArrayClose Set(M0)]           06
   10   !   (debugger_statement) [Node Push]  12, 18
-  12  ─‣─  _                                10, 12
-  14  └‣─  _                                10, 12
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
   16  -ε-  [ArrayOpen]                      14, 08
   18  ─•┘  _ [ArrayClose Set(M0)]           06
   20   !   (program)                        16
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              20 : 03
-       ▶   (?)
+  02       (@20)                            20 : 03
+       ▶   (@20)
 
-?:
+@20:
   20       (program)                        16
        ●   program
   16  -ε-  [ArrayOpen]                      14, 08
@@ -70,7 +70,7 @@ Q:
   16  ❮❮❮ 
   08       _ [ArrayClose Set(M0)]           06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@20)                            
 
 Q:
   03  -ε-  [StructClose]                    05

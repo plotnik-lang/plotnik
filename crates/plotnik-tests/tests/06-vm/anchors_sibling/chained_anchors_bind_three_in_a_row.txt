@@ -9,7 +9,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 let x; ; debugger;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   a: Node;
   b: Node;
@@ -71,16 +71,16 @@ Q:
   09                                        ▶
   10  ─•─  (empty_statement) [Node Set(M1)]  06
   12   !   (lexical_declaration) [Node Set(M0)]  10
-  14  ─‣─  _                                12, 14
-  16  └‣─  _                                12, 14
+  14  ──!  _                                12, 14
+  16  └─!  _                                12, 14
   18   !   (program)                        16
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              18 : 03
-       ▶   (?)
+  02       (@18)                            18 : 03
+       ▶   (@18)
 
-?:
+@18:
   18       (program)                        16
        ●   program
   16       _                                12, 14
@@ -93,7 +93,7 @@ Q:
        ●   debugger_statement
   08       _                                09
        ●   program
-  09   ◀   (?)                              
+  09   ◀   (@18)                            
 
 Q:
   03  -ε-  [StructClose]                    05

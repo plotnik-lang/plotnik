@@ -1,4 +1,4 @@
-//! Entrypoint admissibility checks derived from inferred definition types.
+//! Definition-output checks derived from inferred types.
 
 use std::collections::HashSet;
 
@@ -13,7 +13,7 @@ use crate::compiler::parse::ast::Root;
 
 use super::type_check::TypeAnalysis;
 
-/// Report every definition that compiles to no entrypoint.
+/// Report every definition that produces no inferred output.
 ///
 /// Value-less bodies (`.`, `-field`, `.!`) produce no type, so they are absent
 /// from `TypeAnalysis::iter_def_output()`. The AST is the source of truth for the
@@ -26,7 +26,7 @@ pub fn check_entrypoints(
     dependency_analysis: &DependencyAnalysis,
     diag: &mut Diagnostics,
 ) {
-    let typed: HashSet<Symbol> = type_analysis
+    let output_defs: HashSet<Symbol> = type_analysis
         .iter_def_output()
         .map(|(def_id, _)| dependency_analysis.def_name_sym(def_id))
         .collect();
@@ -36,10 +36,10 @@ pub fn check_entrypoints(
         for def in root.defs() {
             any_defs = true;
             let Some(name) = def.name() else { continue };
-            let has_entrypoint = interner
+            let has_output = interner
                 .get(name.text())
-                .is_some_and(|sym| typed.contains(&sym));
-            if !has_entrypoint {
+                .is_some_and(|sym| output_defs.contains(&sym));
+            if !has_output {
                 diag.report(
                     DiagnosticKind::NoEntrypoints,
                     Span::new(*source_id, name.text_range()),

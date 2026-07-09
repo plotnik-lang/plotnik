@@ -1,0 +1,5 @@
+error: package `plotnik-no-such-grammar-package` is not in this crate's dependency graph; add it to [dependencies] — any crate that ships a grammar.json works (tree-sitter-*, arborium-*, or your own grammar crate)
+ --> tests/macro_ui/fail/unknown_package.rs:2:15
+  |
+2 |     grammar = "plotnik-no-such-grammar-package",
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

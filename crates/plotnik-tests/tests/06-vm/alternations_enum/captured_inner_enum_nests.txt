@@ -7,7 +7,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QY =
   | { $tag: "In"; $data: { a: Node } };
 
@@ -79,16 +79,16 @@ Q:
   08   !   (expression_statement) [EnumOpen(M1) Node Set(M0) EnumClose]  11
   11  ─‣┘  _ [Set(M2)]                      13
   13                                        ▶
-  14  ─‣─  _                                08, 14
-  16  └‣─  _                                08, 14
+  14  ──!  _                                08, 14
+  16  └─!  _                                08, 14
   18   !   (program)                        16
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              18 : 03
-       ▶   (?)
+  02       (@18)                            18 : 03
+       ▶   (@18)
 
-?:
+@18:
   18       (program)                        16
        ●   program
   16       _                                08, 14
@@ -97,7 +97,7 @@ Q:
        ●   expression_statement
   11       _ [Set(M2)]                      13
        ●   program
-  13   ◀   (?)                              
+  13   ◀   (@18)                            
 
 Q:
   03  -ε-  [StructClose]                    05

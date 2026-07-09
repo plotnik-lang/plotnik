@@ -1,9 +1,21 @@
 Q = (program {(expression_statement) @s} @x)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface QX {
   s: Node;
 }
 
 export interface Q {
   x: QX;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub x: QX<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QX<'t> {
+    pub s: Node<'t>,
 }

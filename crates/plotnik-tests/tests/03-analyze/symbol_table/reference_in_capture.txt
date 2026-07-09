@@ -1,4 +1,4 @@
-Expr = (expression)
+Expr = (expression) @expr
 Named = (Expr) @e
 -------------------- SYMBOLS ---------------------
 Expr

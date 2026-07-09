@@ -1,0 +1,105 @@
+Q = (program
+  (expression_statement {(identifier) @v} @a :: Pair)
+  (expression_statement {(identifier) @v} @b :: Pair)
+)
+--------------------- INPUT ----------------------
+x;
+y;
+------------------- TYPESCRIPT -------------------
+export interface Pair {
+  v: Node;
+}
+
+export interface Q {
+  a: Pair;
+  b: Pair;
+}
+--------------------- OUTPUT ---------------------
+{
+  "a": {
+    "v": {
+      "kind": "identifier",
+      "text": "x",
+      "span": [0, 1]
+    }
+  },
+  "b": {
+    "v": {
+      "kind": "identifier",
+      "text": "y",
+      "span": [3, 4]
+    }
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "v"
+S2 "a"
+S3 "b"
+S4 "Pair"
+S5 "Q"
+S6 "program"
+S7 "expression_statement"
+S8 "identifier"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { v }
+T2 = Struct  M1:1  ; { v }
+T3 = Struct  M2:2  ; { a, b }
+
+[type_members]
+M0: S1 → T0  ; v: <Node>
+M1: S1 → T0  ; v: <Node>
+M2: S2 → T1  ; a: Pair
+M3: S3 → T2  ; b: Pair
+
+[type_names]
+N0: S4 → T1  ; Pair
+N1: S4 → T2  ; Pair
+N2: S5 → T3  ; Q
+
+[entrypoints]
+Q = 00 :: T3
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@17)                            17 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  └‣─  (identifier) [StructOpen Node Set(M1)]  08
+  08  ─‣┘² _ [StructClose Set(M3)]          14
+  10  └‣─  (identifier) [StructOpen Node Set(M0)]  12
+  12  ─‣┘  _ [StructClose Set(M2)]          15
+  14                                        ▶
+  15  ─‣─  (expression_statement)           06
+  16  └‣─  (expression_statement)           10
+  17   !   (program)                        16
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@17)                            17 : 03
+       ▶   (@17)
+
+@17:
+  17       (program)                        16
+       ●   program
+  16       (expression_statement)           10
+       ●   expression_statement
+  10       (identifier) [StructOpen Node Set(M0)]  12
+       ●   identifier
+  12       _ [StructClose Set(M2)]          15
+       ●   expression_statement
+  15       (expression_statement)           06
+       ●   expression_statement
+  06       (identifier) [StructOpen Node Set(M1)]  08
+       ●   identifier
+  08       _ [StructClose Set(M3)]          14
+       ●   program
+  14   ◀   (@17)                            
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

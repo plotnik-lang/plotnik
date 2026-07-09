@@ -12,10 +12,10 @@ use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
 use crate::compiler::emit::tables::EmitError;
 use crate::compiler::limits::CompilerLimits;
 use crate::compiler::lower::spans::assign_spans;
-use crate::compiler::lower::{LowerInput, lower_to_nfa};
+use crate::compiler::lower::{LowerInput, lower_semantic, lower_to_nfa};
 use crate::compiler::parse::{Parser, Root, SyntaxNode, lex};
-use crate::core::Interner;
 use crate::core::grammar::Grammar;
+use crate::core::{Colors, Interner};
 
 use crate::bytecode::Module;
 use crate::compiler::Diagnostics;
@@ -473,6 +473,12 @@ impl CompiledQuery {
         self.checked.definition_names()
     }
 
+    pub fn entrypoint_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.module()
+            .into_iter()
+            .flat_map(|module| module.entrypoint_names().map(str::to_string))
+    }
+
     pub fn bytecode(&self) -> Option<&[u8]> {
         self.compiled
             .as_ref()
@@ -501,6 +507,38 @@ impl CompiledQuery {
     ) -> Option<(String, Vec<crate::compiler::typegen::typescript::DtsRange>)> {
         self.module()
             .map(|module| crate::compiler::typegen::typescript::emit_mapped(module, config))
+    }
+
+    /// Render Rust output types for the query's definitions (the proc-macro
+    /// backend's typegen). `None` when the query didn't compile, mirroring
+    /// [`Self::module`].
+    pub fn to_rust(&self, config: crate::compiler::typegen::rust::Config) -> Option<String> {
+        self.compiled.as_ref()?;
+        let linked = self.checked.query.linked()?;
+        Some(crate::compiler::typegen::rust::emit(
+            linked.type_analysis(),
+            linked.dependency_analysis(),
+            linked.interner(),
+            &config,
+        ))
+    }
+
+    /// Render the optimized pre-pack NFA — the IR every backend consumes — in
+    /// the bytecode dump format (label space, with definition provenance).
+    /// `None` when the query didn't compile, mirroring [`Self::module`].
+    pub fn dump_nfa(&self, colors: Colors) -> Option<String> {
+        self.compiled.as_ref()?;
+        let linked = self.checked.query.linked()?;
+        Some(linked.dump_nfa(colors))
+    }
+
+    /// Render the generated Rust matcher — the compiled-code executor the
+    /// proc-macro backend embeds. `None` when the query didn't compile,
+    /// mirroring [`Self::module`].
+    pub fn to_rust_matcher(&self, config: crate::compiler::codegen::Config) -> Option<String> {
+        self.compiled.as_ref()?;
+        let linked = self.checked.query.linked()?;
+        Some(linked.to_rust_matcher(&config))
     }
 }
 
@@ -776,11 +814,27 @@ impl LinkedQuery {
     }
 
     fn compile(&self) -> crate::compiler::lower::ir::LoweredNfa {
-        lower_to_nfa(LowerInput {
+        lower_to_nfa(self.lower_input())
+    }
+
+    fn dump_nfa(&self, colors: Colors) -> String {
+        let input = self.lower_input();
+        let semantic = lower_semantic(&input);
+        crate::compiler::lower::dump::dump_nfa(&semantic, input.analysis, colors)
+    }
+
+    fn to_rust_matcher(&self, config: &crate::compiler::codegen::Config) -> String {
+        let input = self.lower_input();
+        let semantic = lower_semantic(&input);
+        crate::compiler::codegen::generate(&semantic, input.analysis, config)
+    }
+
+    fn lower_input(&self) -> LowerInput<'_> {
+        LowerInput {
             analysis: self.analysis_input(),
             symbol_table: self.symbol_table(),
             inspection: self.analyzed.parsed.inspection(),
-        })
+        }
     }
 
     fn analysis_input(&self) -> AnalysisArtifacts<'_> {

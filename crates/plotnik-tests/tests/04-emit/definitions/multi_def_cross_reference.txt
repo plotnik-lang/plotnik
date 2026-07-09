@@ -9,6 +9,47 @@ Assignment = (assignment_expression
   left: (identifier) @target
   right: (Expression) @value
 )
+---------------------- NFA -----------------------
+[entrypoints]
+Assignment = 24
+Expression = 20
+Ident      = 18
+
+[transitions]
+Expression:
+  01  -ε-                                   06, 07
+
+Ident:
+  03                                        ▶
+  04   !   (identifier) [Node Set(name)]    03
+
+Expression:
+  05                                        ▶
+  06   !   (number) [EnumOpen(Literal) Node Set(value) EnumClose]  05
+  07   !   (identifier) [EnumOpen(Variable) Node Set(name) EnumClose]  05
+
+Assignment:
+  09                                        ▶
+  10   !   (assignment_expression)          14
+  11  ─‣┘  _ [Set(value)]                   09
+  13  ─‣─  right: (Expression)              01 : 11
+  14  └‣─  left: (identifier) [Node Set(target)]  13
+
+Ident (entrypoint):
+  15                                        ▶
+  16  -ε-  [StructClose]                    15
+  17       (Ident)                          04 : 16
+  18  -ε-  [StructOpen]                     17
+
+Expression (entrypoint):
+  19                                        ▶
+  20       (Expression)                     01 : 19
+
+Assignment (entrypoint):
+  21                                        ▶
+  22  -ε-  [StructClose]                    21
+  23       (Assignment)                     10 : 22
+  24  -ε-  [StructOpen]                     23
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"

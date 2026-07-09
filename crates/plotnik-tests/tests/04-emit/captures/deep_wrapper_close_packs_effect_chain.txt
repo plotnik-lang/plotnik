@@ -15,6 +15,21 @@ Q = {
     } @g
   } @h
 }
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 20
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen StructOpen StructOpen StructOpen StructOpen StructOpen]  09
+  01                                        ▶
+  09   !   (identifier) [StructOpen Node Set(a) StructClose Set(b) StructClose Set(c) StructClose Set(d) StructClose Set(e) StructClose Set(f) StructClose Set(g) StructClose Set(h)]  01
+
+Q (entrypoint):
+  17                                        ▶
+  18  -ε-  [StructClose]                    17
+  19       (Q)                              00 : 18
+  20  -ε-  [StructOpen]                     19
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"

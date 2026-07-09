@@ -9,7 +9,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 /* c */ debugger; foo;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   a: Node | null;
   b: Node[];
@@ -83,16 +83,16 @@ Q:
   26  -ε-  [ArrayOpen]                      21, 16
   28  -ε-  [Null Set(M0)]                   24
   30   !   (lexical_declaration) [Node Set(M0)]  26
-  32  ─‣─  _                                30, 32
-  34  └‣─  _                                30, 32
+  32  ──!  _                                30, 32
+  34  └─!  _                                30, 32
   36   !   (program)                        34, 28
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              36 : 03
-       ▶   (?)
+  02       (@36)                            36 : 03
+       ▶   (@36)
 
-?:
+@36:
   36       (program)                        34, 28
        ●   program
   34       _                                30, 32
@@ -128,7 +128,7 @@ Q:
        ●   expression_statement
   09       _                                10
        ●   program
-  10   ◀   (?)                              
+  10   ◀   (@36)                            
 
 Q:
   03  -ε-  [StructClose]                    05

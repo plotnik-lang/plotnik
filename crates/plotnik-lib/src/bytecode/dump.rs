@@ -11,12 +11,12 @@ use super::format::{LineBuilder, Symbol, nav_symbol, width_for_count};
 use super::ids::TypeId;
 use super::instructions::StepId;
 use super::module::{Instruction, Module};
-use super::nav::Nav;
 use super::node_kind_constraint::NodeKindConstraint;
 use super::render::ModuleRenderContext;
 use super::type_meta::{TypeDefKind, TypeKind};
 use super::{Call, Match, Return, SPAN_NO_BINDING};
 use crate::bytecode::type_system::TYPE_CUSTOM_START;
+use plotnik_rt::Nav;
 
 /// Generate a human-readable dump of the bytecode module.
 pub fn dump(module: &Module, colors: Colors) -> String {

@@ -20,6 +20,7 @@ crc32fast = "1.4"
 indexmap = { version = "2", features = ["serde"] }
 log = "0.4"
 logos = "0.16.0"
+plotnik-rt = { workspace = true }
 regex-automata = { version = "0.4", features = ["dfa-search"] }
 regex-syntax = "0.8"
 rowan = "0.16.1"
@@ -28,10 +29,14 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 thiserror = "2.0.17"
 topological-sort = "0.2"
-tree-sitter = "0.26.10"
+tree-sitter = { version = "0.26.10", optional = true }
 
 [features]
-default = []
+default = ["vm"]
+# The runtime engine: bytecode execution, materialization, and the tree
+# renderers — everything that touches a live tree-sitter tree. Disabling it
+# builds the compiler without linking tree-sitter's C runtime.
+vm = ["dep:tree-sitter", "plotnik-rt/tree-sitter"]
 
 [dev-dependencies]
 insta = { version = "=1.48.0", features = ["yaml"] }

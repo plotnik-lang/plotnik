@@ -1,6 +1,18 @@
 Q = {
   {(identifier) @id} @inner
 }? @outer
+---------------------- NFA -----------------------
+[entrypoints]
+
+[transitions]
+Q:
+  00  -ε-                                   10, 02
+  01                                        ▶
+  02  -ε-  [Null Set(outer)]                01
+  05   !   (identifier) [StructOpen Node Set(id) StructClose Set(inner) StructClose Set(outer)]  01
+  07  -ε-  [StructOpen]                     05
+  09  ──!  _                                07, 09
+  10   !   _                                07, 09
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -30,20 +42,5 @@ N1: S5 → T2  ; QOuter
 N2: S6 → T3  ; Q
 
 [entrypoints]
-Q = 00 :: T3
 
 [transitions]
-Q:
-  00  -ε-  [StructOpen]                     02
-  02       (@20)                            20 : 03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ...
-  08  -ε-  [Null Set(M2)]                   06
-  10   !   (identifier) [StructOpen Node Set(M0) StructClose Set(M1) StructClose Set(M2)]  06
-  13  -ε-  [StructOpen]                     10
-  15  ...
-  16  ─‣─  _                                13, 16
-  18   !   _                                13, 16
-  20  -ε-                                   18, 08

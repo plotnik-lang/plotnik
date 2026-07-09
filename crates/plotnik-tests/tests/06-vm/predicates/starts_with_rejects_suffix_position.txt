@@ -1,7 +1,7 @@
 Q = (program (expression_statement (identifier ^= "foo") @id))
 --------------------- INPUT ----------------------
 barfoo;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   id: Node;
 }
@@ -46,13 +46,14 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              14 : 03
-       ▶   (?)
+  02       (@14)                            14 : 03
+       ▶   (@14)
 
-?:
+@14:
   14       (program)                        13
        ●   program
   13       (expression_statement)           08
        ●   expression_statement
   08       (identifier) [Node Set(M0)] ^= "foo"  11
        ○   ;
+  13  ❮❮❮ 

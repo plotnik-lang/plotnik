@@ -5,7 +5,7 @@ Q = (program
 --------------------- INPUT ----------------------
 const s = `a
 b`;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   frag: Node;
 }
@@ -61,10 +61,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              16 : 03
-       ▶   (?)
+  02       (@16)                            16 : 03
+       ▶   (@16)
 
-?:
+@16:
   16       (program)                        15
        ●   program
   15       (lexical_declaration)            14
@@ -81,7 +81,7 @@ Q:
        ●   string_fragment
   11       _                                12
        ●   program
-  12   ◀   (?)                              
+  12   ◀   (@16)                            
 
 Q:
   03  -ε-  [StructClose]                    05

@@ -6,7 +6,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a; b; debugger;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   d: Node;
   init: Node[];
@@ -56,17 +56,17 @@ Q:
   08  └‣─  (debugger_statement) [ArrayClose Set(M0) Node Set(M1)]  07
   11  ─‣─  (debugger_statement) [ArrayClose Set(M0) Node Set(M1)]  07
   14   !   (expression_statement) [Node Push]  11, 16
-  16  ─‣─  _                                14, 16
-  18  └‣─  _                                14, 16
+  16  ──!  _                                14, 16
+  18  └─!  _                                14, 16
   20  -ε-  [ArrayOpen]                      08, 18
   22   !   (program)                        20
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              22 : 03
-       ▶   (?)
+  02       (@22)                            22 : 03
+       ▶   (@22)
 
-?:
+@22:
   22       (program)                        20
        ●   program
   20  -ε-  [ArrayOpen]                      08, 18
@@ -76,7 +76,7 @@ Q:
        ●   debugger_statement
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@22)                            
 
 Q:
   03  -ε-  [StructClose]                    05

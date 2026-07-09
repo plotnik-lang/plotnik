@@ -12,7 +12,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 x + y
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QT =
   | { $tag: "A" }
   | { $tag: "B" };
@@ -70,18 +70,18 @@ Q:
   10  ─•─  (identifier) [Set(M2)]           07
   12   !   (number) [EnumOpen(M0) EnumClose]  10
   14   !   "+" [EnumOpen(M1) EnumClose]     08
-  16  ─‣─  _                                12, 14, 16
-  18  └‣─  _                                12, 14, 16
+  16  ──!  _                                12, 14, 16
+  18  └─!  _                                12, 14, 16
   20  └‣─  (binary_expression)              18
   21  └‣─  (expression_statement)           20
   22   !   (program)                        21
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              22 : 03
-       ▶   (?)
+  02       (@22)                            22 : 03
+       ▶   (@22)
 
-?:
+@22:
   22       (program)                        21
        ●   program
   21       (expression_statement)           20
@@ -107,7 +107,7 @@ Q:
        ●   identifier
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@22)                            
 
 Q:
   03  -ε-  [StructClose]                    05

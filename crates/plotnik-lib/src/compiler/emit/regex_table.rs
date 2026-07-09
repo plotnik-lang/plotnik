@@ -54,6 +54,15 @@ pub(super) fn intern(
         return Ok(id);
     }
 
+    let bytes =
+        compile_dfa_bytes(pattern).map_err(|e| EmitError::RegexCompile(pattern.to_string(), e))?;
+    regexes.push_dfa(string_id, bytes)
+}
+
+/// Compile `pattern` to serialized sparse-DFA bytes. The one compilation path
+/// shared by the bytecode emitter and the Rust code generator, so a DFA
+/// embedded in generated code is bit-identical to the wire's.
+pub(in crate::compiler) fn compile_dfa_bytes(pattern: &str) -> Result<Vec<u8>, String> {
     let dense = dense::DFA::builder()
         .configure(
             dense::DFA::config()
@@ -61,11 +70,8 @@ pub(super) fn intern(
                 .minimize(true),
         )
         .build(pattern)
-        .map_err(|e| EmitError::RegexCompile(pattern.to_string(), e.to_string()))?;
+        .map_err(|e| e.to_string())?;
 
-    let sparse = dense
-        .to_sparse()
-        .map_err(|e| EmitError::RegexCompile(pattern.to_string(), e.to_string()))?;
-
-    regexes.push_dfa(string_id, sparse.to_bytes_little_endian())
+    let sparse = dense.to_sparse().map_err(|e| e.to_string())?;
+    Ok(sparse.to_bytes_little_endian())
 }

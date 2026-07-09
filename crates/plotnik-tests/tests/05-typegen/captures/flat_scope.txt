@@ -2,8 +2,16 @@ Q = (program
   (expression_statement (identifier) @deep)
   (debugger_statement) @shallow
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   deep: Node;
   shallow: Node;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub deep: Node<'t>,
+    pub shallow: Node<'t>,
 }

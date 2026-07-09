@@ -536,8 +536,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let base = self.captured_base_type(inner.node(), &inner_info, should_merge_fields);
         let field_info =
             self.captured_field_info(base, annotation, captured_inner.makes_field_optional);
-        let flow =
-            self.captured_field_flow(capture_name, field_info, &inner_info, should_merge_fields);
+        let flow = self.captured_field_flow(
+            capture_name,
+            field_info,
+            &inner_info,
+            should_merge_fields,
+            name_tok.text_range(),
+        );
 
         PatternShape::new(inner_info.arity, flow)
     }
@@ -631,6 +636,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         field_info: FieldInfo,
         inner_info: &PatternShape,
         should_merge_fields: bool,
+        range: TextRange,
     ) -> PatternFlow {
         if !should_merge_fields {
             return PatternFlow::Fields(
@@ -649,7 +655,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .in_progress()
             .expect_struct_fields(*type_id)
             .clone();
-        fields.insert(capture_name, field_info);
+        // The node binds its own capture alongside the children bubbling up from
+        // inside it (`(named (child) @x) @x`); a clash between the two is a
+        // duplicate capture in this scope.
+        self.insert_scope_field(&mut fields, capture_name, field_info, range);
 
         PatternFlow::Fields(self.ctx.type_ctx.intern_struct(fields))
     }
@@ -962,20 +971,25 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Consumption::Plain => self.infer_pattern(&value),
         };
 
-        // A field names exactly one child per match. Quantifiers and captures
-        // on a field value apply to the whole field constraint (`f: (x)*`
-        // repeats the field), so the exactly-one requirement lands on the
-        // pattern under them.
-        if self.field_core_arity(value.node(), &value_info) == Arity::Many {
+        // A field names exactly one child per match. Under any quantifier/capture
+        // wrappers (`f: (x)*` repeats the whole field), the constrained value must
+        // be a single node: a sequence `{...}` never is — even holding one element,
+        // the spec restricts field values to a node, an alternation, or a quantifier
+        // of those — and a value matching many nodes never is either.
+        let core = Self::field_value_core(value.node());
+        if matches!(core, Pattern::SeqPattern(_))
+            || self.core_arity(&core, &value_info) == Arity::Many
+        {
             self.report_field_arity_error(field.node(), value.node());
         }
 
         PatternShape::new(Arity::One, value_info.flow)
     }
 
-    /// The arity of a field value under its capture/quantifier wrappers. The
-    /// core was inferred as part of the value, so its result is cached.
-    fn field_core_arity(&self, value: &Pattern, value_info: &PatternShape) -> Arity {
+    /// The field value under its capture/quantifier wrappers. `f: (x)* @c`
+    /// parses as `(f: (x)) * @c`, so those wrappers bind the field, not the
+    /// value; strip them to reach the pattern the field actually constrains.
+    fn field_value_core(value: &Pattern) -> Pattern {
         let mut core = value.clone();
         loop {
             let inner = match &core {
@@ -985,13 +999,18 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             };
             match inner {
                 Some(inner) => core = inner,
-                None => break,
+                None => return core,
             }
         }
+    }
+
+    /// The arity of an already-inferred field-value core; its result is cached
+    /// from inferring the value.
+    fn core_arity(&self, core: &Pattern, value_info: &PatternShape) -> Arity {
         self.ctx
             .type_ctx
             .in_progress()
-            .pattern_result(&core)
+            .pattern_result(core)
             .map(|info| info.arity)
             .unwrap_or(value_info.arity)
     }
@@ -1039,52 +1058,6 @@ pub(crate) fn consumable_value_root(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::Enum(_) | Pattern::QuantifiedPattern(_) => true,
         Pattern::FieldPattern(f) => f.value().is_some_and(|v| consumable_value_root(&v)),
-        _ => false,
-    }
-}
-
-fn captureless_root_default(pattern: &Pattern) -> Option<TypeId> {
-    if contains_capture(pattern) {
-        return None;
-    }
-
-    root_matches_single_node(pattern).then_some(TYPE_NODE)
-}
-
-fn contains_capture(pattern: &Pattern) -> bool {
-    if matches!(pattern, Pattern::CapturedPattern(_)) {
-        return true;
-    }
-
-    pattern.children().any(|child| contains_capture(&child))
-}
-
-fn root_matches_single_node(pattern: &Pattern) -> bool {
-    match pattern {
-        Pattern::NodePattern(_) | Pattern::TokenPattern(_) => true,
-        Pattern::FieldPattern(f) => f.value().is_some_and(|v| root_matches_single_node(&v)),
-        Pattern::Union(u) => {
-            let mut saw_branch = false;
-
-            for branch in u.branches() {
-                let Some(body) = branch.body() else {
-                    return false;
-                };
-                if !root_matches_single_node(&body) {
-                    return false;
-                }
-                saw_branch = true;
-            }
-
-            for pattern in u.patterns() {
-                if !root_matches_single_node(&pattern) {
-                    return false;
-                }
-                saw_branch = true;
-            }
-
-            saw_branch
-        }
         _ => false,
     }
 }
@@ -1203,7 +1176,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
         };
 
         let type_id = match &info.flow {
-            PatternFlow::Void => captureless_root_default(&body).unwrap_or(TYPE_VOID),
+            PatternFlow::Void => TYPE_VOID,
             PatternFlow::Fields(t) => *t,
             // A root value is the definition's result only when the root is a
             // consuming position: a labeled alternation (its labels are output

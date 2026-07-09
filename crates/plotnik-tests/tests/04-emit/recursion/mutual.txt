@@ -4,6 +4,39 @@ Even = [
   (number) @leaf
   (array (Odd) @next)
 ]
+---------------------- NFA -----------------------
+[entrypoints]
+Even = 21
+Odd  = 25
+
+[transitions]
+Even:
+  00  -ε-                                   03, 04
+  02                                        ▶
+  03   !   (number) [Null Set(next) Node Set(leaf)]  02
+  04   !   (array) [Null Set(leaf) StructOpen]  08
+  05  ─‣┘  _ [Set(next)]                    02
+  07  -ε-  [StructClose]                    05
+  08  └‣─  (Odd)                            12 : 07
+
+Odd:
+  11                                        ▶
+  12   !   (array) [StructOpen]             16
+  13  ─‣┘  _ [Set(next)]                    11
+  15  -ε-  [StructClose]                    13
+  16  └‣─  (Even)                           00 : 15
+
+Even (entrypoint):
+  18                                        ▶
+  19  -ε-  [StructClose]                    18
+  20       (Even)                           00 : 19
+  21  -ε-  [StructOpen]                     20
+
+Odd (entrypoint):
+  22                                        ▶
+  23  -ε-  [StructClose]                    22
+  24       (Odd)                            12 : 23
+  25  -ε-  [StructOpen]                     24
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

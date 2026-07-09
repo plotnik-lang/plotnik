@@ -7,7 +7,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 a; b; debugger;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   a: Node[];
   b: Node[];
@@ -72,26 +72,26 @@ Q:
   08  └‣─  (debugger_statement) [ArrayClose Set(M1) Node Set(M2)]  07
   11  ─‣─  (debugger_statement) [ArrayClose Set(M1) Node Set(M2)]  07
   14   !   (expression_statement) [Node Push]  16, 11
-  16  ─‣─  _                                14, 16
-  18  └‣─  _                                14, 16
+  16  ──!  _                                14, 16
+  18  └─!  _                                14, 16
   20  -ε-  [ArrayOpen]                      18, 08
   22   !   (expression_statement) [Node Push]  24, 11
-  24  ─‣─  _                                22, 24
+  24  ──!  _                                22, 24
   26  -ε-  [ArrayOpen]                      24, 11
   28  -ε-  [ArrayClose Set(M0)]             26
   30  -ε-  [ArrayClose Set(M0)]             20
   32   !   (expression_statement) [Node Push]  34, 28
-  34  ─‣─  _                                32, 34
-  36  └‣─  _                                32, 34
+  34  ──!  _                                32, 34
+  36  └─!  _                                32, 34
   38  -ε-  [ArrayOpen]                      36, 30
   40   !   (program)                        38
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              40 : 03
-       ▶   (?)
+  02       (@40)                            40 : 03
+       ▶   (@40)
 
-?:
+@40:
   40       (program)                        38
        ●   program
   38  -ε-  [ArrayOpen]                      36, 30
@@ -123,7 +123,7 @@ Q:
        ●   debugger_statement
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@40)                            
 
 Q:
   03  -ε-  [StructClose]                    05

@@ -2,6 +2,23 @@ Q = (binary_expression
   left: (identifier =~ /foo/) @l
   right: (identifier =~ /foo/) @r
 )
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 9
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (binary_expression)               5
+  3  ─‣┘  _                                 1
+  4  ─‣─  right: (identifier) [Node Set(r)] =~ /foo/  3
+  5  └‣─  left: (identifier) [Node Set(l)] =~ /foo/  4
+
+Q (entrypoint):
+  6                                         ▶
+  7  -ε-  [StructClose]                     6
+  8       (Q)                               2 : 7
+  9  -ε-  [StructOpen]                      8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

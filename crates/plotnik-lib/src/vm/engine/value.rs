@@ -36,15 +36,9 @@ impl<'s> NodeHandle<'s> {
     }
 }
 
-/// Slice `node`'s span out of the source. Tree-sitter token boundaries always
-/// fall on character boundaries of the valid-UTF-8 source, so the fallible
-/// `get` turns a violated expectation into a named panic instead of a raw
-/// slice abort.
-pub(crate) fn node_text<'s>(source: &'s str, node: &Node<'_>) -> &'s str {
-    source
-        .get(node.start_byte()..node.end_byte())
-        .expect("node span must lie within source on UTF-8 boundaries")
-}
+/// Slice `node`'s span out of the source. Lives in `plotnik_rt` so generated
+/// matchers slice predicate text identically to the VM.
+pub(crate) use plotnik_rt::node_text;
 
 impl Serialize for NodeHandle<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

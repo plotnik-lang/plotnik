@@ -8,7 +8,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 [a, 1, b];
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Entry =
   | { $tag: "Id"; $data: { id: Node } }
   | { $tag: "Num"; $data: { num: Node } };
@@ -92,168 +92,160 @@ N2: S08 → T5  ; Q
 
 [entrypoints]
 Entry = 00 :: T3
-Items = 02 :: T4
-Q     = 04 :: T5
+Q     = 02 :: T5
 
 [transitions]
 Entry:
-  00       (@22)                            22 : 01
+  00       (@19)                            19 : 01
   01                                        ▶
 
-Items:
-  02       (@34)                            34 : 03
-  03                                        ▶
-
 Q:
-  04  -ε-  [StructOpen]                     06
-  06       (@52)                            52 : 08
-  07  ...
-  08  -ε-  [StructClose]                    10
-  10                                        ▶
-  11  -ε-  [ArrayClose]                     13
-  13  ─‣┘  _ [Set(M4)]                      39
-  15                                        ▶
-  16   !   (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
-  19   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
-  22  -ε-                                   16, 19
-  24                                        ▶
-  25  -ε-  [ArrayClose]                     24
-  27  -ε-  [Push]                           30, 25
-  29   !   (@22)                            22 : 27
-  30  ─‣─  _                                29, 30
-  32   !   _                                29, 30
-  34  -ε-  [ArrayOpen]                      32, 25
-  36                                        ▶
-  37  -ε-  [ArrayClose Set(M4)]             39
-  39  ─‣┘² _                                36
-  40  -ε-  [Push]                           43, 11
-  42   !   (@22)                            22 : 40
-  43  ─‣─  _                                42, 43
-  45  └‣─  _                                42, 43
+  02  -ε-  [StructOpen]                     04
+  04       (@49)                            49 : 05
+  05  -ε-  [StructClose]                    07
+  07                                        ▶
+  08  -ε-  [ArrayClose]                     10
+  10  ─‣┘  _ [Set(M4)]                      31
+  12                                        ▶
+  13   !   (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+  16   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
+  19  -ε-                                   13, 16
+  21                                        ▶
+  22  -ε-  [ArrayClose]                     21
+  24  -ε-  [Push]                           27, 22
+  26   !   (@19)                            19 : 24
+  27  ──!  _                                26, 27
+  29   !   _                                26, 27
+  31  ─‣┘² _                                34
+  32  -ε-  [ArrayOpen]                      29, 22
+  34                                        ▶
+  35  -ε-  [ArrayClose Set(M4)]             31
+  37  -ε-  [Push]                           40, 08
+  39   !   (@19)                            19 : 37
+  40  ──!  _                                39, 40
+  42  └─!  _                                39, 40
+  44  -ε-  [ArrayOpen]                      42, 35
+  46  └‣─  (array)                          44
   47  ...
-  48  -ε-  [ArrayOpen]                      45, 37
-  50  └‣─  (array)                          48
-  51  └‣─  (expression_statement)           50
-  52   !   (program)                        51
+  48  └‣─  (expression_statement)           46
+  49   !   (program)                        48
 --------------------- TRACE ----------------------
 Q:
-  04  -ε-  [StructOpen]                     06
-  06       (?)                              52 : 08
-       ▶   (?)
+  02  -ε-  [StructOpen]                     04
+  04       (@49)                            49 : 05
+       ▶   (@49)
 
-?:
-  52       (program)                        51
+@49:
+  49       (program)                        48
        ●   program
-  51       (expression_statement)           50
+  48       (expression_statement)           46
        ●   expression_statement
-  50       (array)                          48
+  46       (array)                          44
        ●   array
-  48  -ε-  [ArrayOpen]                      45, 37
-  45       _                                42, 43
+  44  -ε-  [ArrayOpen]                      42, 35
+  42       _                                39, 40
        ●   [
-  42       (?)                              22 : 40
-       ▶   (?)
+  39       (@19)                            19 : 37
+       ▶   (@19)
 
-?:
-  22  -ε-                                   16, 19
-  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
        ○   [
-  22  ❮❮❮ 
-  19       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
+  19  ❮❮❮ 
+  16       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
        ○   [
-  45  ❮❮❮ 
-  43       _                                42, 43
+  42  ❮❮❮ 
+  40       _                                39, 40
        ●   identifier
-  42       (?)                              22 : 40
-       ▶   (?)
+  39       (@19)                            19 : 37
+       ▶   (@19)
 
-?:
-  22  -ε-                                   16, 19
-  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
        ●   identifier
-  15   ◀   (?)                              
+  12   ◀   (@19)                            
 
-?:
-  40  -ε-  [Push]                           43, 11
-  43       _                                42, 43
+@49:
+  37  -ε-  [Push]                           40, 08
+  40       _                                39, 40
        ●   ,
-  42       (?)                              22 : 40
-       ▶   (?)
+  39       (@19)                            19 : 37
+       ▶   (@19)
 
-?:
-  22  -ε-                                   16, 19
-  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
        ○   ,
-  22  ❮❮❮ 
-  19       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
+  19  ❮❮❮ 
+  16       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
        ○   ,
-  43  ❮❮❮ 
-  43       _                                42, 43
-       ●   number
-  42       (?)                              22 : 40
-       ▶   (?)
-
-?:
-  22  -ε-                                   16, 19
-  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
-       ○   number
-  22  ❮❮❮ 
-  19       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
-       ●   number
-  15   ◀   (?)                              
-
-?:
-  40  -ε-  [Push]                           43, 11
-  43       _                                42, 43
-       ●   ,
-  42       (?)                              22 : 40
-       ▶   (?)
-
-?:
-  22  -ε-                                   16, 19
-  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
-       ○   ,
-  22  ❮❮❮ 
-  19       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
-       ○   ,
-  43  ❮❮❮ 
-  43       _                                42, 43
-       ●   identifier
-  42       (?)                              22 : 40
-       ▶   (?)
-
-?:
-  22  -ε-                                   16, 19
-  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
-       ●   identifier
-  15   ◀   (?)                              
-
-?:
-  40  -ε-  [Push]                           43, 11
-  43       _                                42, 43
-       ●   ]
-  42       (?)                              22 : 40
-       ▶   (?)
-
-?:
-  22  -ε-                                   16, 19
-  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  15
-       ○   ]
-  22  ❮❮❮ 
-  19       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  15
-       ○   ]
-  43  ❮❮❮ 
-  43       _                                42, 43
   40  ❮❮❮ 
-  11  -ε-  [ArrayClose]                     13
-  13       _ [Set(M4)]                      39
+  40       _                                39, 40
+       ●   number
+  39       (@19)                            19 : 37
+       ▶   (@19)
+
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+       ○   number
+  19  ❮❮❮ 
+  16       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
+       ●   number
+  12   ◀   (@19)                            
+
+@49:
+  37  -ε-  [Push]                           40, 08
+  40       _                                39, 40
+       ●   ,
+  39       (@19)                            19 : 37
+       ▶   (@19)
+
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+       ○   ,
+  19  ❮❮❮ 
+  16       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
+       ○   ,
+  40  ❮❮❮ 
+  40       _                                39, 40
+       ●   identifier
+  39       (@19)                            19 : 37
+       ▶   (@19)
+
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+       ●   identifier
+  12   ◀   (@19)                            
+
+@49:
+  37  -ε-  [Push]                           40, 08
+  40       _                                39, 40
+       ●   ]
+  39       (@19)                            19 : 37
+       ▶   (@19)
+
+@19:
+  19  -ε-                                   13, 16
+  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+       ○   ]
+  19  ❮❮❮ 
+  16       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
+       ○   ]
+  40  ❮❮❮ 
+  40       _                                39, 40
+  37  ❮❮❮ 
+  08  -ε-  [ArrayClose]                     10
+  10       _ [Set(M4)]                      31
        ●   array
-  39       _                                36
+  31       _                                34
        ●   program
-  36   ◀   (?)                              
+  34   ◀   (@49)                            
 
-?:
-  08  -ε-  [StructClose]                    10
-  10   ◀   (?)                              
-
-?:
+Q:
+  05  -ε-  [StructClose]                    07
+  07   ◀   (Q)                              ◼

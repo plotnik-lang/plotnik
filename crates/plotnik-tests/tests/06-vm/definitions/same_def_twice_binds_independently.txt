@@ -6,7 +6,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 x; y;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Id {
   name: Node;
 }
@@ -89,41 +89,41 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   06  -ε-  [StructOpen]                     08
-  08       (?)                              30 : 09
-       ▶   (?)
+  08       (@30)                            30 : 09
+       ▶   (@30)
 
-?:
+@30:
   30       (program)                        28
        ●   program
   28       (expression_statement) [StructOpen]  27
        ●   expression_statement
-  27       (?)                              21 : 16
-       ▶   (?)
+  27       (@21)                            21 : 16
+       ▶   (@21)
 
-?:
+@21:
   21       (identifier) [Node Set(M0)]      20
        ●   identifier
-  20   ◀   (?)                              
+  20   ◀   (@21)                            
 
-?:
+@30:
   16  -ε-  [StructClose]                    18
   18       _ [Set(M1)]                      25
        ●   expression_statement
   25       (expression_statement) [StructOpen]  24
        ●   expression_statement
-  24       (?)                              21 : 12
-       ▶   (?)
+  24       (@21)                            21 : 12
+       ▶   (@21)
 
-?:
+@21:
   21       (identifier) [Node Set(M0)]      20
        ●   identifier
-  20   ◀   (?)                              
+  20   ◀   (@21)                            
 
-?:
+@30:
   12  -ε-  [StructClose]                    14
   14       _ [Set(M2)]                      23
        ●   program
-  23   ◀   (?)                              
+  23   ◀   (@30)                            
 
 Q:
   09  -ε-  [StructClose]                    11

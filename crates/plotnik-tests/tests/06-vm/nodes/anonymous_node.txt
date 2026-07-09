@@ -1,7 +1,7 @@
 Q = (program (expression_statement (binary_expression "+" @op)))
 --------------------- INPUT ----------------------
 a + b;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   op: Node;
 }
@@ -51,10 +51,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              12 : 03
-       ▶   (?)
+  02       (@12)                            12 : 03
+       ▶   (@12)
 
-?:
+@12:
   12       (program)                        11
        ●   program
   11       (expression_statement)           10
@@ -66,7 +66,7 @@ Q:
        ●   +
   08       _                                09
        ●   program
-  09   ◀   (?)                              
+  09   ◀   (@12)                            
 
 Q:
   03  -ε-  [StructClose]                    05

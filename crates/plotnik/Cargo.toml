@@ -1,0 +1,25 @@
+[package]
+name = "plotnik"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Typed tree-sitter queries: the query! macro and its runtime"
+documentation = "https://docs.rs/plotnik"
+readme = "../../README.md"
+keywords = ["tree-sitter", "query", "ast", "parser"]
+categories = ["development-tools", "parsing"]
+include = ["src/**/*", "Cargo.toml"]
+
+[lints]
+workspace = true
+
+[features]
+# Serde support end to end: the macro emits `SerializeWithSource` impls and
+# the runtime provides the trait. One flag so they can never drift apart.
+serde = ["plotnik-macros/serde", "plotnik-rt/serde"]
+
+[dependencies]
+plotnik-macros = { path = "../plotnik-macros", version = "0.3.3" }
+plotnik-rt = { path = "../plotnik-rt", version = "0.3.3" }
+tree-sitter = "0.26.10"

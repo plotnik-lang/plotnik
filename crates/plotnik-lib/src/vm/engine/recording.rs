@@ -6,8 +6,8 @@ use tree_sitter::Node;
 use crate::bytecode::{EffectKind, Instruction, Module, ModuleRenderContext, Nav};
 use crate::core::NodeFieldId;
 
-use super::effect::RuntimeEffect;
 use super::trace::Tracer;
+use plotnik_rt::RuntimeEffect;
 
 #[derive(Debug, Serialize)]
 pub struct Recording {
@@ -315,7 +315,7 @@ impl Tracer for RecordingTracer {
         });
     }
 
-    fn trace_backtrack(&mut self) {
+    fn trace_backtrack(&mut self, _depth: u32) {
         let shadow = self
             .shadow
             .pop()

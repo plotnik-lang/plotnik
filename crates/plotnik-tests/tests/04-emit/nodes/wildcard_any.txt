@@ -1,4 +1,20 @@
 Q = (pair key: _ @key)
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 8
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (pair)                            4
+  3  ─‣┘  _                                 1
+  4  └‣─  key: _ [Node Set(key)]            3
+
+Q (entrypoint):
+  5                                         ▶
+  6  -ε-  [StructClose]                     5
+  7       (Q)                               2 : 6
+  8  -ε-  [StructOpen]                      7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

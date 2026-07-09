@@ -1,7 +1,7 @@
 Q = (program (expression_statement (array ","* @commas)))
 --------------------- INPUT ----------------------
 [1, 2, 3];
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   commas: Node[];
 }
@@ -54,8 +54,8 @@ Q:
   07  ─‣┘² _                                06
   08  -ε-  [ArrayClose Set(M0)]             07
   10   !   "," [Node Push]                  12, 18
-  12  ─‣─  _                                10, 12
-  14  └‣─  _                                10, 12
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
   16  -ε-  [ArrayOpen]                      14, 08
   18  ─‣┘  _ [ArrayClose Set(M0)]           07
   20  └‣─  (array)                          16
@@ -64,10 +64,10 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              22 : 03
-       ▶   (?)
+  02       (@22)                            22 : 03
+       ▶   (@22)
 
-?:
+@22:
   22       (program)                        21
        ●   program
   21       (expression_statement)           20
@@ -114,7 +114,7 @@ Q:
        ●   array
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@22)                            
 
 Q:
   03  -ε-  [StructClose]                    05

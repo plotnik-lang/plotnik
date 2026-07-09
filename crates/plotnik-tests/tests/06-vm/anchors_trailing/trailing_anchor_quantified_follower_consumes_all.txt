@@ -8,7 +8,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 debugger; debugger;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   a: Node | null;
   b: Node[];
@@ -71,16 +71,16 @@ Q:
   18  -ε-  [ArrayOpen]                      14, 06
   20  -ε-  [Null Set(M0)]                   16
   22   !   (lexical_declaration) [Node Set(M0)]  18
-  24  ─‣─  _                                22, 24
-  26  └‣─  _                                22, 24
+  24  ──!  _                                22, 24
+  26  └─!  _                                22, 24
   28   !   (program)                        26, 20
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              28 : 03
-       ▶   (?)
+  02       (@28)                            28 : 03
+       ▶   (@28)
 
-?:
+@28:
   28       (program)                        26, 20
        ●   program
   26       _                                22, 24
@@ -106,7 +106,7 @@ Q:
   06  -ε-  [ArrayClose Set(M1)]             08
   08       _                                09
        ●   program
-  09   ◀   (?)                              
+  09   ◀   (@28)                            
 
 Q:
   03  -ε-  [StructClose]                    05

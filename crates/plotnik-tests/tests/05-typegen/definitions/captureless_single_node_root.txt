@@ -1,3 +1,6 @@
 Q = (program)
---------------------- TYPES ----------------------
-export type Q = Node;
+------------------- TYPESCRIPT -------------------
+export type Q = undefined;
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q;

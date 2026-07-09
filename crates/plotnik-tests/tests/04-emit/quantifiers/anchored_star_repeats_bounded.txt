@@ -1,4 +1,23 @@
 Q = (array . (identifier)* @ids)
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 15
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (array)                          11
+  03  └•┘  _ [ArrayClose Set(ids)]          01
+  04  ─‣┘  _ [ArrayClose Set(ids)]          01
+  08  └•─  (identifier) [Node Push]         09, 04
+  09  ─•─  (identifier) [Node Push]         09, 04
+  11  -ε-  [ArrayOpen]                      08, 03
+
+Q (entrypoint):
+  12                                        ▶
+  13  -ε-  [StructClose]                    12
+  14       (Q)                              02 : 13
+  15  -ε-  [StructOpen]                     14
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

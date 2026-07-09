@@ -7,6 +7,39 @@ Expr = [
 ]
 
 Test = (program (expression_statement (Expr) @expr))
+---------------------- NFA -----------------------
+[entrypoints]
+Expr = 21
+Test = 25
+
+[transitions]
+Expr:
+  00  -ε-                                   03, 04
+  02                                        ▶
+  03   !   (number) [EnumOpen(Lit) Node Set(value) EnumClose]  02
+  04   !   (call_expression) [EnumOpen(Nested)]  11
+  06  ─‣┘  _ [EnumClose]                    02
+  07  ─‣─  arguments: (arguments)           10
+  08  ─‣┘  _ [Set(inner)]                   06
+  10  └‣─  (Expr)                           00 : 08
+  11  └‣─  function: (identifier) [Node Set(fn)]  07
+
+Test:
+  13                                        ▶
+  14   !   (program)                        16
+  16  └‣─  (expression_statement)           19
+  17  ─‣┘² _ [Set(expr)]                    13
+  19  └‣─  (Expr)                           00 : 17
+
+Expr (entrypoint):
+  20                                        ▶
+  21       (Expr)                           00 : 20
+
+Test (entrypoint):
+  22                                        ▶
+  23  -ε-  [StructClose]                    22
+  24       (Test)                           14 : 23
+  25  -ε-  [StructOpen]                     24
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"

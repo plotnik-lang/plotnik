@@ -10,7 +10,7 @@ use crate::compiler::analyze::types::type_shape::PatternFlow;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::LowerInput;
 use crate::compiler::lower::ir::{
-    CalleeEntry, EffectIR, InstructionIR, Label, NfaGraph, ReturnAddr, ReturnIR,
+    CalleeEntry, EffectIR, InstructionIR, Label, LabelOrigin, NfaGraph, ReturnAddr, ReturnIR,
 };
 use crate::compiler::lower::spans::{SpanBindingIR, SpanId, SpanTable, assign_spans};
 use crate::compiler::lower::verify::verify_fresh_build;
@@ -29,6 +29,10 @@ pub struct NfaBuilder<'a> {
     pub(super) anchor_semantics: AnchorSemantics<'a>,
     pub(super) instructions: Vec<InstructionIR>,
     pub(crate) next_label_id: u32,
+    /// Compilation window every fresh label is attributed to (see [`LabelOrigin`]).
+    current_origin: Option<LabelOrigin>,
+    /// Origin per allocated label id (index = `Label.0`), moved into the graph.
+    label_origins: Vec<Option<LabelOrigin>>,
     pub(super) def_entries: IndexMap<DefId, Label>,
     pub(super) def_entries_consuming: IndexMap<DefId, Label>,
     /// Stack of active struct scopes for capture lookup.
@@ -58,6 +62,8 @@ impl<'a> NfaBuilder<'a> {
             anchor_semantics: AnchorSemantics::new(ctx.symbol_table),
             instructions: Vec::new(),
             next_label_id: 0,
+            current_origin: None,
+            label_origins: Vec::new(),
             def_entries: IndexMap::new(),
             def_entries_consuming: IndexMap::new(),
             scope_stack: Vec::new(),
@@ -104,21 +110,29 @@ impl<'a> NfaBuilder<'a> {
         compiler.spans = ctx.inspection.then(|| assign_spans(ctx).table);
 
         for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
+            compiler.current_origin = Some(LabelOrigin::Def(def_id));
             let label = compiler.fresh_label();
             compiler.def_entries.insert(def_id, label);
         }
 
         for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
+            compiler.current_origin = Some(LabelOrigin::Def(def_id));
             compiler.compile_def(def_id);
         }
 
         let mut entrypoint_wrappers = IndexMap::new();
-        for (def_id, _) in ctx.analysis.type_analysis.iter_def_output() {
+        for (def_id, _) in ctx.analysis.type_analysis.iter_entrypoint_output() {
+            compiler.current_origin = Some(LabelOrigin::Wrapper(def_id));
             let wrapper = compiler.emit_entrypoint_wrapper(def_id);
             entrypoint_wrappers.insert(def_id, wrapper);
         }
 
         verify_fresh_build(&compiler.instructions);
+        debug_assert_eq!(
+            compiler.label_origins.len(),
+            compiler.next_label_id as usize,
+            "every label must be minted through fresh_label, or origins desync"
+        );
 
         NfaGraph {
             instructions: compiler.instructions,
@@ -126,6 +140,7 @@ impl<'a> NfaBuilder<'a> {
             def_entries_consuming: compiler.def_entries_consuming,
             entrypoint_wrappers,
             spans: compiler.spans,
+            label_origins: compiler.label_origins,
         }
     }
 
@@ -162,10 +177,11 @@ impl<'a> NfaBuilder<'a> {
         }
     }
 
-    /// Generate a fresh label.
+    /// Generate a fresh label, attributing it to the active compilation window.
     pub(super) fn fresh_label(&mut self) -> Label {
         let l = Label(self.next_label_id);
         self.next_label_id += 1;
+        self.label_origins.push(self.current_origin);
         l
     }
 
@@ -222,6 +238,12 @@ impl<'a> NfaBuilder<'a> {
             return entry;
         }
 
+        // Compiled on demand from inside the host definition's window; swap the
+        // origin for the consuming body's duration and restore it on the way out.
+        let prev_origin = self
+            .current_origin
+            .replace(LabelOrigin::ConsumingDef(def_id));
+
         let entry_label = self.fresh_label();
         self.def_entries_consuming.insert(def_id, entry_label);
 
@@ -261,6 +283,7 @@ impl<'a> NfaBuilder<'a> {
             self.emit_epsilon(entry_label, vec![body_entry]);
         }
 
+        self.current_origin = prev_origin;
         entry_label
     }
 

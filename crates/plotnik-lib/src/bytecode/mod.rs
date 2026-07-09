@@ -4,10 +4,15 @@
 //! format specified in `docs/binary-format/`.
 
 #![allow(clippy::comparison_chain)]
+// Without the `vm` feature the engine-serving half of this module (the
+// pre-decoded transition stream, trace rendering) has no callers. It stays
+// compiled anyway so `Module` is the same object in every configuration —
+// load-time validation must not drift between the compiler-only build and the
+// executing one.
+#![cfg_attr(not(feature = "vm"), allow(dead_code, unused_imports))]
 
 mod aligned_vec;
 mod constants;
-mod dfa;
 mod dump;
 mod effects;
 mod entrypoint;
@@ -16,7 +21,6 @@ mod header;
 mod ids;
 mod instructions;
 mod module;
-mod nav;
 mod node_kind_constraint;
 mod predicate_op;
 mod render;
@@ -39,7 +43,6 @@ pub(crate) use constants::{
     REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
     VERSION,
 };
-pub(crate) use dfa::deserialize_dfa;
 pub(crate) use effects::{Effect, EffectKind};
 pub(crate) use format::{
     LineBuilder, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
@@ -49,16 +52,16 @@ pub(crate) use instructions::{
     Call, Match, MatchInstr, MatchPredicate, Return, StepId, select_match_opcode,
 };
 pub(crate) use module::{DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Instruction};
-pub(crate) use nav::Nav;
 pub(crate) use node_kind_constraint::NodeKindConstraint;
+// Nav and the regex DFA runtime live in `plotnik-rt` (shared with generated
+// code); re-exported here because they are part of the bytecode vocabulary.
+pub(crate) use plotnik_rt::{Nav, deserialize_dfa};
 pub(crate) use predicate_op::PredicateOp;
 pub(crate) use render::ModuleRenderContext;
 pub(crate) use sections::{FieldEntry, NodeKindEntry, SymbolNameEntry};
 
 #[cfg(test)]
 mod aligned_vec_tests;
-#[cfg(test)]
-mod dfa_tests;
 #[cfg(test)]
 mod effects_tests;
 #[cfg(test)]
@@ -69,8 +72,6 @@ mod format_tests;
 mod header_tests;
 #[cfg(test)]
 mod instructions_tests;
-#[cfg(test)]
-mod nav_tests;
 #[cfg(test)]
 mod node_kind_constraint_tests;
 #[cfg(test)]

@@ -1,7 +1,7 @@
 //! `TypeAnalysis`: the frozen result of type inference.
 //!
-//! Holds the interned type registry, each definition's output type, the
-//! per-pattern inference results, and explicit type aliases. It is built
+//! Holds the interned type registry, each definition's output type and arity,
+//! the per-pattern inference results, and explicit type aliases. It is built
 //! incrementally by [`TypeAnalysisBuilder`] and frozen with
 //! [`TypeAnalysisBuilder::finish`]; past that boundary it is immutable and its
 //! accessors are trusted (a structural miss is a compiler bug, not a query
@@ -41,10 +41,16 @@ pub struct TypeAnalysis {
 
     /// Each definition's output type, keyed by `DefId`. `BTreeMap` so iteration
     /// is in `DefId` order — the SCC/emission order entrypoints rely on. Total
-    /// over every scheduled definition: a value-less body (`.`, `-field`) maps to
-    /// `TYPE_VOID`, so a lookup for any real `DefId` hits. `finish` admits the map
-    /// only after checking its type ids and every `Ref` target are consistent.
+    /// over every scheduled definition: a captureless structural body maps to
+    /// `TYPE_VOID`, so a lookup for any admitted `DefId` hits. `finish` admits
+    /// the map only after checking its type ids and every `Ref` target are
+    /// consistent.
     def_output: BTreeMap<DefId, TypeId>,
+
+    /// Each definition's structural arity. `Arity::One` definitions are
+    /// callable entrypoints; `Arity::Many` definitions are fragments that can be
+    /// referenced or nested but get no top-level entry surface.
+    def_arity: BTreeMap<DefId, Arity>,
 
     pattern_result: HashMap<Pattern, PatternShape>,
 
@@ -132,6 +138,19 @@ impl TypeAnalysis {
             .expect("admitted definition must have an inferred output type")
     }
 
+    pub fn def_arity(&self, def_id: DefId) -> Option<Arity> {
+        self.def_arity.get(&def_id).copied()
+    }
+
+    pub fn expect_def_arity(&self, def_id: DefId) -> Arity {
+        self.def_arity(def_id)
+            .expect("admitted definition must have an inferred arity")
+    }
+
+    pub fn is_entrypoint_def(&self, def_id: DefId) -> bool {
+        self.expect_def_arity(def_id) == Arity::One
+    }
+
     /// Follow a `Ref` chain to the underlying materialized type; non-ref types
     /// resolve to themselves. The accessor type-table emission uses to map a
     /// query type to the concrete shape it stands for.
@@ -154,6 +173,12 @@ impl TypeAnalysis {
     /// order, which corresponds to SCC processing order (leaves first).
     pub fn iter_def_output(&self) -> impl Iterator<Item = (DefId, TypeId)> + '_ {
         self.def_output.iter().map(|(&id, &type_id)| (id, type_id))
+    }
+
+    /// Iterate over callable definition outputs in definition order.
+    pub fn iter_entrypoint_output(&self) -> impl Iterator<Item = (DefId, TypeId)> + '_ {
+        self.iter_def_output()
+            .filter(|&(def_id, _)| self.is_entrypoint_def(def_id))
     }
 
     /// Iterate all named types in `TypeId` order (deterministic).
@@ -190,6 +215,24 @@ impl TypeAnalysis {
 
         for &type_id in self.def_output.values() {
             self.assert_type_id_registered(type_id, "def output type id out of range");
+        }
+
+        assert_eq!(
+            self.def_output.len(),
+            self.def_arity.len(),
+            "definition output and arity tables must cover the same definitions",
+        );
+        for def_id in self.def_output.keys() {
+            assert!(
+                self.def_arity.contains_key(def_id),
+                "every definition output must have an inferred arity",
+            );
+        }
+        for def_id in self.def_arity.keys() {
+            assert!(
+                self.def_output.contains_key(def_id),
+                "every definition arity must have an inferred output",
+            );
         }
 
         for info in self.pattern_result.values() {
@@ -242,11 +285,6 @@ pub struct TypeAnalysisBuilder {
     /// Scratch: only the naming pass consults it.
     type_provenance: HashMap<TypeId, Span>,
 
-    /// Each definition's structural arity, so a reference reflects whether its
-    /// target matches one node or a sibling sequence (`f: (SeqDef)` must be
-    /// rejected like an inline sequence). Scratch: only inference consults it.
-    def_arity: HashMap<DefId, Arity>,
-
     /// `:: TypeName` annotation occurrences in source order.
     /// Scratch: only the naming pass consults it.
     annotations: Vec<TypeAnnotation>,
@@ -286,12 +324,12 @@ impl TypeAnalysisBuilder {
             analysis: TypeAnalysis {
                 types: Vec::new(),
                 def_output: BTreeMap::new(),
+                def_arity: BTreeMap::new(),
                 pattern_result: HashMap::new(),
                 type_names: BTreeMap::new(),
             },
             intern_index: HashMap::new(),
             type_provenance: HashMap::new(),
-            def_arity: HashMap::new(),
             annotations: Vec::new(),
         };
 
@@ -375,11 +413,11 @@ impl TypeAnalysisBuilder {
     }
 
     pub fn record_def_arity(&mut self, def_id: DefId, arity: Arity) {
-        self.def_arity.insert(def_id, arity);
+        self.analysis.def_arity.insert(def_id, arity);
     }
 
     pub fn def_arity(&self, def_id: DefId) -> Option<Arity> {
-        self.def_arity.get(&def_id).copied()
+        self.analysis.def_arity(def_id)
     }
 
     /// Install the naming pass's result. Names must be complete and validated

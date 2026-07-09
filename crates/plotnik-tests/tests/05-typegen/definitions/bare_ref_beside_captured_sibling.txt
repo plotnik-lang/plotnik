@@ -4,10 +4,22 @@ Q = (program
   (A)
   (debugger_statement) @name
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   name: Node;
 }
 
 export type A =
   | { $tag: "X"; $data: { s: Node } };
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum A<'t> {
+    X { s: Node<'t> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub name: Node<'t>,
+}

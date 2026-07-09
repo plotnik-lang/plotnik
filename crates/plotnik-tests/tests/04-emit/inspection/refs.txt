@@ -2,50 +2,93 @@ Name = (identifier) @name
 Bare = (program (expression_statement (Name)))
 Captured = (program (expression_statement (Name) @item))
 ------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Bare     = 39
+Captured = 43
+Name     = 37
+
+[transitions]
+Name:
+  03                                        ▶
+  05   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(name) SpanEnd#1 SpanEnd#2 SpanEnd#0]  03
+
+Bare:
+  07                                        ▶
+  09   !   (program) [SpanStart#3 SpanStartAt#4]  12
+  11  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  07
+  12  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  16
+  14  ─‣┘  _ [SuppressEnd SpanEnd#6]        11
+  16  └‣─  (Name)                           05 : 14
+
+Captured:
+  20                                        ▶
+  22   !   (program) [SpanStart#7 SpanStartAt#8]  25
+  24  ─‣┘  _ [SpanEnd#9 SpanEnd#8 SpanEnd#7]  20
+  25  └‣─  (expression_statement) [SpanStartAt#9 SpanStart#11 StructOpen]  30
+  27  ─‣┘  _ [SpanStart#10 Set(item) SpanEnd#10 SpanEnd#11]  24
+  29  -ε-  [StructClose]                    27
+  30  └‣─  (Name)                           05 : 29
+
+Name (entrypoint):
+  34                                        ▶
+  35  -ε-  [StructClose]                    34
+  36       (Name)                           05 : 35
+  37  -ε-  [StructOpen]                     36
+
+Bare (entrypoint):
+  38                                        ▶
+  39       (Bare)                           09 : 38
+
+Captured (entrypoint):
+  40                                        ▶
+  41  -ε-  [StructClose]                    40
+  42       (Captured)                       22 : 41
+  43  -ε-  [StructOpen]                     42
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "name"
 S2 "item"
-S3 "Bare"
-S4 "Name"
-S5 "Captured"
-S6 "identifier"
-S7 "program"
-S8 "expression_statement"
+S3 "Name"
+S4 "Captured"
+S5 "identifier"
+S6 "program"
+S7 "expression_statement"
+S8 "Bare"
 
 [type_defs]
-T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:1  ; { item }
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { name }
+T3 = Struct  M1:1  ; { item }
 
 [type_members]
-M0: S1 → T0  ; name: <Node>
-M1: S2 → T1  ; item: Name
+M0: S1 → T1  ; name: <Node>
+M1: S2 → T2  ; item: Name
 
 [type_names]
-N0: S3 → T0  ; Bare
-N1: S4 → T1  ; Name
-N2: S5 → T2  ; Captured
+N0: S3 → T2  ; Name
+N1: S4 → T3  ; Captured
 
 [entrypoints]
 Bare     = 06 :: T0
-Captured = 11 :: T2
-Name     = 00 :: T1
+Captured = 08 :: T3
+Name     = 00 :: T2
 
 [spans]
-P00 def        0..25  src0  T1
-P01 capture    20..25  src0  T1.M0
+P00 def        0..25  src0  T2
+P01 capture    20..25  src0  T2.M0
 P02 pattern    7..19  src0
 P03 def        26..72  src0  T0
 P04 pattern    33..72  src0
 P05 pattern    42..71  src0
-P06 ref        64..70  src0  T1
-P07 def        73..129  src0  T2
+P06 ref        64..70  src0  T2
+P07 def        73..129  src0  T3
 P08 pattern    84..129  src0
 P09 pattern    93..128  src0
-P10 capture    122..127  src0  T2.M1
-P11 ref        115..121  src0  T1
+P10 capture    122..127  src0  T3.M1
+P11 ref        115..121  src0  T2
 
 [transitions]
 Name:
@@ -55,30 +98,31 @@ Name:
   05                                        ▶
 
 Bare:
-  06       (@40)                            40 : 08
+  06       (@40)                            40 : 07
   07                                        ▶
-  08  -ε-  [Node]                           10
-  10                                        ▶
 
 Captured:
-  11  -ε-  [StructOpen]                     13
-  13       (@45)                            45 : 14
-  14  -ε-  [StructClose]                    07
-  16  └‣─  (@32)                            32 : 17
-  17  ─‣┘  _ [SuppressEnd SpanEnd#6]        19
-  19  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  30
-  21  -ε-  [StructClose]                    24
+  08  -ε-  [StructOpen]                     10
+  10       (@45)                            45 : 11
+  11  -ε-  [StructClose]                    13
+  13                                        ▶
+  14  └‣─  (@32)                            32 : 16
+  15                                        ▶
+  16  ─‣┘  _ [SuppressEnd SpanEnd#6]        18
+  18  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  15
+  20  -ε-  [StructClose]                    24
+  22  ...
   23  ...
   24  ─‣┘  _ [SpanStart#10 Set(M1) SpanEnd#10 SpanEnd#11]  27
   27  ─‣┘  _ [SpanEnd#9 SpanEnd#8 SpanEnd#7]  38
   29                                        ▶
-  30                                        ▶
+  30  ...
   31  ...
   32   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  29
-  36  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  16
+  36  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  14
   38                                        ▶
   39  ...
   40   !   (program) [SpanStart#3 SpanStartAt#4]  36
-  42  └‣─  (@32)                            32 : 21
+  42  └‣─  (@32)                            32 : 20
   43  └‣─  (expression_statement) [SpanStartAt#9 SpanStart#11 StructOpen]  42
   45   !   (program) [SpanStart#7 SpanStartAt#8]  43

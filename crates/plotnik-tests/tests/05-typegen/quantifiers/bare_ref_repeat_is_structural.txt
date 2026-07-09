@@ -1,7 +1,17 @@
 Item = [A: (expression_statement) @s]
 Q = (program (Item)+)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Item =
   | { $tag: "A"; $data: { s: Node } };
 
-export type Q = Node;
+export type Q = undefined;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Item<'t> {
+    A { s: Node<'t> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q;

@@ -2,11 +2,24 @@ Q = [
   Str: (string) @s
   Num: (number) @n
 ] @result
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type QResult =
   | { $tag: "Str"; $data: { s: Node } }
   | { $tag: "Num"; $data: { n: Node } };
 
 export interface Q {
   result: QResult;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub result: QResult<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum QResult<'t> {
+    Str { s: Node<'t> },
+    Num { n: Node<'t> },
 }

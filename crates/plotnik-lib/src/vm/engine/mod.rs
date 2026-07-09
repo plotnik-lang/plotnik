@@ -3,13 +3,8 @@
 //! The VM executes bytecode against tree-sitter syntax trees,
 //! producing an effect log that can be materialized into output values.
 
-mod checkpoint;
-mod cursor;
-mod effect;
 mod error;
-mod frame;
 mod inspect;
-mod limits;
 mod materializer;
 mod recording;
 mod trace;
@@ -17,13 +12,13 @@ mod value;
 mod verify;
 mod vm;
 
-#[cfg(test)]
-mod checkpoint_tests;
+// Navigation, checkpoints, frames, the effect log, and limits live in
+// `plotnik-rt`, shared with the generated-code backend; re-exported so the
+// crate-facing paths stay `vm::...`.
+pub use plotnik_rt::{EffectLog, Limit, ResolvedRuntimeLimits, RuntimeEffect, RuntimeLimitSpec};
 
-pub use effect::{EffectLog, RuntimeEffect};
 pub use error::RuntimeError;
 pub use inspect::{Binding, Inspection, InspectionEntry, extract_inspection};
-pub use limits::{Limit, ResolvedRuntimeLimits, RuntimeLimitSpec};
 pub use materializer::{ValueMaterializer, materialize_verified};
 pub use recording::{NodeRef, Recording, RecordingTracer, StepEvent, StepRecord};
 pub use trace::{NoopTracer, PrintTracer, PrintTracerBuilder, Tracer, Verbosity};

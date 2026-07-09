@@ -6,11 +6,23 @@ warning: this type annotation restates the type's own name; omit it
   |
 2 | Q = (program (Foo) @val :: Foo)
   |                            ^^^
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Foo {
   call: Node;
 }
 
 export interface Q {
   val: Foo;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Foo<'t> {
+    pub call: Node<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub val: Foo<'t>,
 }

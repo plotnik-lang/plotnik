@@ -1,7 +1,16 @@
 Q = (identifier) @name :: Identifier
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export type Identifier = Node;
 
 export interface Q {
   name: Identifier;
 }
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub name: Identifier<'t>,
+}
+
+pub type Identifier<'t> = Node<'t>;

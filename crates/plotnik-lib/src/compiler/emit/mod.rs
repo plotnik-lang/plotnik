@@ -7,10 +7,10 @@ mod instructions;
 mod layout;
 mod layout_map;
 mod module;
-mod regex_table;
-mod string_table;
+pub(in crate::compiler) mod regex_table;
+pub(in crate::compiler) mod string_table;
 pub(in crate::compiler) mod tables;
-mod type_table;
+pub(in crate::compiler) mod type_table;
 
 #[cfg(test)]
 mod regex_table_tests;

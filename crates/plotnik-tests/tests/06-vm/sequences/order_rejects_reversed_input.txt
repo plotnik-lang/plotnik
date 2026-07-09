@@ -6,7 +6,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 foo; let x;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   a: Node;
   b: Node;
@@ -51,13 +51,14 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              12 : 03
-       ▶   (?)
+  02       (@12)                            12 : 03
+       ▶   (@12)
 
-?:
+@12:
   12       (program)                        10
        ●   program
   10       (lexical_declaration) [Node Set(M0)]  06
        ○   expression_statement
        ●   lexical_declaration
   06       (expression_statement) [Node Set(M1)]  08
+  10  ❮❮❮ 

@@ -5,6 +5,25 @@ Q = (program
     (function_declaration) @f
   }
 )
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 12
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (program)                        08
+  03  ─‣┘  _                                01
+  04  ─•─  (function_declaration) [Node Set(f)]  03
+  05   !   (comment) [Node Set(c)]          04
+  07  ──!  _                                05, 07
+  08  └─!  _                                05, 07
+
+Q (entrypoint):
+  09                                        ▶
+  10  -ε-  [StructClose]                    09
+  11       (Q)                              02 : 10
+  12  -ε-  [StructOpen]                     11
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -39,6 +58,6 @@ Q:
   08  ─‣┘  _                                09
   09                                        ▶
   10   !   (comment) [Node Set(M0)]         06
-  12  ─‣─  _                                10, 12
-  14  └‣─  _                                10, 12
+  12  ──!  _                                10, 12
+  14  └─!  _                                10, 12
   16   !   (program)                        14

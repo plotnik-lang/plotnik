@@ -102,14 +102,17 @@ A `.ptk` file contains definitions:
 
 ````
 ```
-; Helper (can also be used as entrypoint)
+; Helper (can also be used as entrypoint because it matches one node)
 Expr = [(identifier) (number) (string)]
 
 ; Another definition
 Stmt = (statement) @stmt
 ````
 
-All definitions are entrypoints and included in the binary. `--entry <Name>` selects which one to execute; with no `--entry`, the last definition runs by default.
+Definitions whose root matches exactly one node are entrypoints. Sequence- and
+quantifier-rooted definitions are fragments: they can be referenced or captured
+inside an entrypoint, but `--entry <Name>` cannot select them directly. With no
+`--entry`, the last callable definition runs by default.
 
 ### Script vs Module Mode
 
@@ -148,8 +151,9 @@ Set with `-l/--lang` or a shebang (`#!/usr/bin/env -S plotnik run -l <language>`
 
 ### Execution
 
-- Single definition: it is the default entrypoint.
-- Multiple definitions: the **last** definition is the default entrypoint; pass `--entry <Name>` to run a different one.
+- Single callable definition: it is the default entrypoint.
+- Multiple callable definitions: the **last callable** definition is the default entrypoint; pass `--entry <Name>` to run a different one.
+- Fragment definitions are not entrypoint candidates; nest or reference them from a callable definition.
 
 ### Example
 
@@ -211,15 +215,17 @@ The pattern is 4 levels deep, but the output is flat. You're extracting specific
 
 Definitions are the exception: references are **opaque**. A bare `(Item)` matches structurally and produces nothing; `(Item) @item` produces the definition's type. Fields never leak through a reference boundary. See [Type System: Definitions Are Types](type-system.md#definitions-are-types).
 
-### Default Root Values
+### Capture-Less Definitions
 
-A capture-less definition returns its root value, like regex group 0:
+A capture-less definition with no output syntax is void. To return the matched
+root node, capture it explicitly:
 
 ```
-Program = (program)            ; Program is Node
+Program = (program)            ; Program is void
+ProgramNode = (program) @root  ; ProgramNode is { root: Node }
 MaybeProgram = (program)?      ; MaybeProgram is Node | null
-Expr = [(identifier) (number)] ; Expr is Node
-Pair = {(identifier) (number)} ; Pair is void: no unique root
+Expr = [(identifier) (number)] ; Expr is void
+Pair = {(identifier) (number)} ; Pair is void
 ```
 
 If the body contains any capture, the captures define the result instead:
@@ -512,12 +518,14 @@ patterns follow regex escaping rules.
 ### Special Nodes
 
 - `(ERROR)` — matches parser error nodes
-- `(MISSING)` — matches nodes inserted by error recovery
-- `(MISSING identifier)` — matches a specific missing node kind
-- `(MISSING ";")` — matches a missing anonymous node
+- `(MISSING)` — matches any node inserted by error recovery
+- `(MISSING identifier)` — matches a specific missing token kind
+- `(MISSING ";")` — matches a missing anonymous token
 
 Both match as leaves: a missing node is a zero-width token, so neither
-`ERROR` nor `MISSING` accepts children.
+`ERROR` nor `MISSING` accepts children. Because error recovery only ever inserts
+tokens, a `(MISSING kind)` argument must name a leaf token — a kind with children
+like `(MISSING binary_expression)` can never match and is rejected at compile time.
 
 ```
 (ERROR) @syntax_error
@@ -1032,12 +1040,12 @@ Use as node kinds:
 **Encapsulation**: `(Name)` matches but extracts nothing. Capture the reference to get the definition's typed result — `(BinaryOp) @expr` above produces `{ expr: BinaryOp }` where `BinaryOp` is `{ left: Node, op: Node, right: Node }`. This separates structural reuse from data extraction, and it means extracting a pattern into a definition never silently changes your output.
 
 Named expressions define both pattern and type. A capture-less single-node
-definition returns its root node; use a sequence when the definition is meant
-to be purely structural:
+definition matches structurally and produces no data; capture the root node
+when the definition is meant to carry a value:
 
 ```
-Expr = [(identifier) (number)] ; returns Node
-Pair = {(identifier) (number)} ; void: structural only
+Expr = [(identifier) (number)] ; void: structural only
+ExprNode = [(identifier) (number)] @expr ; returns { expr: Node }
 (statement (Expr))     ; matches any statement containing an Expr, no output
 ```
 

@@ -1,7 +1,11 @@
 Q = (identifier)* @names :: Ident
---------------------- TYPES ----------------------
-export type Ident = Node;
+------------------- TYPESCRIPT -------------------
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
 
-export interface Q {
-  names: Ident[];
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub names: ::std::vec::Vec<Ident<'t>>,
 }
+
+pub type Ident<'t> = Node<'t>;

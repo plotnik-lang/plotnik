@@ -1,73 +1,58 @@
 A = (expression_statement)?
 Q = (program (A))
 --------------------- INPUT ----------------------
---------------------- TYPES ----------------------
-export type A = Node | null;
-
-export type Q = Node;
+------------------- TYPESCRIPT -------------------
+export type Q = undefined;
 --------------------- OUTPUT ---------------------
-{
-  "kind": "program",
-  "text": "",
-  "span": [0, 0]
-}
+null
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "Q"
-S2 "A"
-S3 "expression_statement"
-S4 "program"
+S1 "A"
+S2 "expression_statement"
+S3 "program"
+S4 "Q"
 
 [type_defs]
-T0 = <Node>
-T1 = Optional(T0)  ; <Node>?
+T0 = <Void>
+T1 = <Node>
+T2 = Optional(T1)  ; <Node>?
 
 [type_members]
 
 [type_names]
-N0: S1 → T0  ; Q
-N1: S2 → T1  ; A
+N0: S1 → T2  ; A
 
 [entrypoints]
-A = 00 :: T1
-Q = 02 :: T0
+Q = 00 :: T0
 
 [transitions]
-A:
-  00       (@18)                            18 : 01
-  01                                        ▶
-
 Q:
-  02       (@26)                            26 : 03
-  03  -ε-  [Node]                           05
-  05                                        ▶
-  06   !   (expression_statement)           07
-  07  ─‣┘  _                                15
-  08                                        ▶
-  09  -ε-  [Null]                           08
-  11   !   (expression_statement) [Node]    08
-  13  ─‣─  _                                11, 13
-  15                                        ▶
-  16   !   _                                11, 13
-  18  -ε-                                   16, 09
-  20  ─‣─  _                                06, 20
-  22  ...
-  23  ...
-  24  └‣─  _                                06, 20
-  26   !   (program)                        24, 15
+  00       (@20)                            20 : 01
+  01                                        ▶
+  02   !   (expression_statement)           03
+  03  ─‣┘  _                                07
+  04                                        ▶
+  05  -ε-  [Null]                           04
+  07                                        ▶
+  08   !   (expression_statement) [Node]    04
+  10  ──!  _                                08, 10
+  12   !   _                                08, 10
+  14  -ε-                                   12, 05
+  16  ──!  _                                02, 16
+  18  └─!  _                                02, 16
+  20   !   (program)                        18, 07
 --------------------- TRACE ----------------------
 Q:
-  02       (?)                              26 : 03
-       ▶   (?)
+  00       (@20)                            20 : 01
+       ▶   (@20)
 
-?:
-  26       (program)                        24, 15
+@20:
+  20       (program)                        18, 07
        ●   program
-  24       _                                06, 20
-  26  ❮❮❮ 
-  15   ◀   (?)                              
+  18       _                                02, 16
+  20  ❮❮❮ 
+  07   ◀   (@20)                            
 
 Q:
-  03  -ε-  [Node]                           05
-  05   ◀   (Q)                              ◼
+  01   ◀   (Q)                              ◼

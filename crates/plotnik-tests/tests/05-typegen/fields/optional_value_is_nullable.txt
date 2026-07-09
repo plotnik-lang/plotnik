@@ -1,5 +1,12 @@
 Q = (variable_declarator value: (number)? @init)
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   init: Node | null;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub init: ::core::option::Option<Node<'t>>,
 }

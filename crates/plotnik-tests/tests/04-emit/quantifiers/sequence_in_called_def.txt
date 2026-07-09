@@ -1,77 +1,109 @@
 Item = (identifier) @name
 Collect = {(Item) @item}* @items
 Q = (array (Collect))
+---------------------- NFA -----------------------
+[entrypoints]
+Item = 39
+Q    = 41
+
+[transitions]
+Item:
+  03                                        ▶
+  04   !   (identifier) [Node Set(name)]    03
+
+Collect:
+  05                                        ▶
+  06  -ε-  [ArrayClose Set(items)]          05
+  08  -ε-  [StructClose Push]               15, 06
+  10  -ε-  [StructClose Set(item)]          08
+  11   !   (Item)                           04 : 10
+  13  -ε-  [StructOpen StructOpen]          11
+  15  ──!  _                                13, 15
+  16   !   _                                13, 15
+  21  -ε-  [ArrayOpen]                      16, 06
+
+Q:
+  22                                        ▶
+  23   !   (array)                          31, 22
+  24  ─‣┘  _                                22
+  26  -ε-  [SuppressEnd]                    30, 24
+  27   !   (Item)                           04 : 26
+  28  -ε-  [SuppressBegin]                  27
+  30  ──!  _                                28, 30
+  31  └─!  _                                28, 30
+
+Item (entrypoint):
+  36                                        ▶
+  37  -ε-  [StructClose]                    36
+  38       (Item)                           04 : 37
+  39  -ε-  [StructOpen]                     38
+
+Q (entrypoint):
+  40                                        ▶
+  41       (Q)                              23 : 40
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "name"
 S2 "item"
 S3 "items"
-S4 "Q"
-S5 "Item"
-S6 "CollectItems"
-S7 "Collect"
-S8 "identifier"
-S9 "array"
+S4 "Item"
+S5 "CollectItems"
+S6 "Collect"
+S7 "identifier"
+S8 "array"
+S9 "Q"
 
 [type_defs]
-T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:1  ; { item }
-T3 = ArrayStar(T2)  ; CollectItems*
-T4 = Struct  M2:1  ; { items }
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { name }
+T3 = Struct  M1:1  ; { item }
+T4 = ArrayStar(T3)  ; CollectItems*
+T5 = Struct  M2:1  ; { items }
 
 [type_members]
-M0: S1 → T0  ; name: <Node>
-M1: S2 → T1  ; item: Item
-M2: S3 → T3  ; items: T3
+M0: S1 → T1  ; name: <Node>
+M1: S2 → T2  ; item: Item
+M2: S3 → T4  ; items: T4
 
 [type_names]
-N0: S4 → T0  ; Q
-N1: S5 → T1  ; Item
-N2: S6 → T2  ; CollectItems
-N3: S7 → T4  ; Collect
+N0: S4 → T2  ; Item
+N1: S5 → T3  ; CollectItems
+N2: S6 → T5  ; Collect
 
 [entrypoints]
-Collect = 06 :: T4
-Item    = 00 :: T1
-Q       = 12 :: T0
+Item = 00 :: T2
+Q    = 06 :: T0
 
 [transitions]
 Item:
   00  -ε-  [StructOpen]                     02
-  02       (@17)                            17 : 03
+  02       (@09)                            09 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
 
-Collect:
-  06  -ε-  [StructOpen]                     08
-  08       (@34)                            34 : 09
-  09  -ε-  [StructClose]                    11
-  11                                        ▶
-
 Q:
-  12       (@48)                            48 : 13
-  13  -ε-  [Node]                           15
-  15                                        ▶
-  16                                        ▶
-  17   !   (identifier) [Node Set(M0)]      16
-  19                                        ▶
-  20  -ε-  [ArrayClose Set(M2)]             19
-  22  -ε-  [StructClose Push]               29, 20
-  24  -ε-  [StructClose Set(M1)]            22
-  26   !   (@17)                            17 : 24
-  27  -ε-  [StructOpen StructOpen]          26
-  29  ─‣─  _                                27, 29
-  31  ─‣┘  _                                36
-  32   !   _                                27, 29
-  34  -ε-  [ArrayOpen]                      32, 20
-  36                                        ▶
-  37  -ε-  [SuppressEnd]                    42, 31
-  39   !   (@17)                            17 : 37
-  40  -ε-  [SuppressBegin]                  39
-  42  ─‣─  _                                40, 42
-  44  └‣─  _                                40, 42
-  46  ...
-  47  ...
-  48   !   (array)                          44, 36
+  06       (@40)                            40 : 07
+  07                                        ▶
+  08                                        ▶
+  09   !   (identifier) [Node Set(M0)]      08
+  11                                        ▶
+  12  -ε-  [ArrayClose Set(M2)]             11
+  14  -ε-  [StructClose Push]               21, 12
+  16  -ε-  [StructClose Set(M1)]            14
+  18   !   (@09)                            09 : 16
+  19  -ε-  [StructOpen StructOpen]          18
+  21  ──!  _                                19, 21
+  23  ─‣┘  _                                28
+  24   !   _                                19, 21
+  26  -ε-  [ArrayOpen]                      24, 12
+  28                                        ▶
+  29  -ε-  [SuppressEnd]                    34, 23
+  31   !   (@09)                            09 : 29
+  32  -ε-  [SuppressBegin]                  31
+  34  ──!  _                                32, 34
+  36  └─!  _                                32, 34
+  38  ...
+  39  ...
+  40   !   (array)                          36, 28

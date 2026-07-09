@@ -36,6 +36,13 @@ pub struct InspectArgs {
 }
 
 pub fn run(args: InspectArgs) -> CliResult {
+    run_common::reject_ambiguous_inputs(
+        args.query_text.as_deref(),
+        args.query_path.as_deref(),
+        args.source_text.as_deref(),
+        args.source_path.as_deref(),
+    )?;
+
     if args.source_path.is_none() && args.source_text.is_none() {
         return Err(CliError::fatal(
             "source is required: use positional argument or -s/--source",
@@ -84,7 +91,7 @@ pub fn run(args: InspectArgs) -> CliResult {
     let entrypoints = module.map(entrypoint_names).unwrap_or_default();
 
     let run = if let Some(module) = module {
-        let default_entry = compiled.definition_names().last();
+        let default_entry = module.entrypoint_names().last().map(str::to_owned);
         let entry = args.entry.clone().or(shebang_entry).or(default_entry);
         let entrypoint = run_common::resolve_entrypoint(module, entry.as_deref())?;
         let tree = lang.parse_source(&source_code);

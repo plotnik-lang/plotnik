@@ -1,4 +1,20 @@
 Q = (function_declaration name: (identifier) @name)
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 8
+
+[transitions]
+Q:
+  1                                         ▶
+  2   !   (function_declaration)            4
+  3  ─‣┘  _                                 1
+  4  └‣─  name: (identifier) [Node Set(name)]  3
+
+Q (entrypoint):
+  5                                         ▶
+  6  -ε-  [StructClose]                     5
+  7       (Q)                               2 : 6
+  8  -ε-  [StructOpen]                      7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

@@ -1,8 +1,17 @@
 MaybeId = (identifier)?
 Q = (program (expression_statement (array (MaybeId) @first)))
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   first: MaybeId;
 }
 
 export type MaybeId = Node | null;
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+pub type MaybeId<'t> = ::core::option::Option<Node<'t>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub first: ::core::option::Option<Node<'t>>,
+}

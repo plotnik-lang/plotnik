@@ -1,9 +1,10 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-//! Type declaration generation from compiled bytecode.
+//! Type declaration generation for target languages.
 //!
-//! Extracts type metadata from bytecode modules and generates type declarations
-//! for target languages. Currently supports TypeScript `.d.ts` generation.
+//! TypeScript renders `.d.ts` declarations from a compiled bytecode module;
+//! Rust renders output structs/enums for the proc-macro backend from the
+//! analysis-level type model.
 //!
 //! # Example
 //!
@@ -15,4 +16,5 @@
 //! let output = typescript::emit(&module);
 //! ```
 
+pub mod rust;
 pub mod typescript;

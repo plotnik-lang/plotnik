@@ -5,128 +5,21 @@ Q = (program [
 ] @item)
 --------------------- INPUT ----------------------
 x
---------------------- TYPES ----------------------
-export type QItem =
-  | { $tag: "A"; $data: { x: Node } }
-  | { $tag: "B"; $data: { y: Node } };
+------------------ DIAGNOSTICS -------------------
+error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+ --> query.ptk:3:28
+  |
+1 | Inner = (identifier)
+  |         ------------ defined here
+2 | Q = (program [
+3 |   A: (expression_statement (Inner) @x)
+  |                            ^^^^^^^
 
-export interface Q {
-  item: QItem;
-}
-
-export type Inner = Node;
---------------------- OUTPUT ---------------------
-{
-  "item": {
-    "$tag": "A",
-    "$data": {
-      "x": {
-        "kind": "identifier",
-        "text": "x",
-        "span": [0, 1]
-      }
-    }
-  }
-}
--------------------- BYTECODE --------------------
-[strings]
-S00 "Beauty will save the world"
-S01 "x"
-S02 "y"
-S03 "A"
-S04 "B"
-S05 "item"
-S06 "Inner"
-S07 "QItem"
-S08 "Q"
-S09 "identifier"
-S10 "program"
-S11 "expression_statement"
-S12 "labeled_statement"
-S13 "body"
-
-[type_defs]
-T0 = <Node>
-T1 = Struct  M0:1  ; { x }
-T2 = Struct  M1:1  ; { y }
-T3 = Enum    M2:2  ; A | B
-T4 = Struct  M4:1  ; { item }
-
-[type_members]
-M0: S01 → T0  ; x: <Node>
-M1: S02 → T0  ; y: <Node>
-M2: S03 → T1  ; A: T1
-M3: S04 → T2  ; B: T2
-M4: S05 → T3  ; item: QItem
-
-[type_names]
-N0: S06 → T0  ; Inner
-N1: S07 → T3  ; QItem
-N2: S08 → T4  ; Q
-
-[entrypoints]
-Inner = 00 :: T0
-Q     = 04 :: T4
-
-[transitions]
-Inner:
-  00       (@20)                            20 : 01
-  01  -ε-  [Node]                           03
-  03                                        ▶
-
-Q:
-  04  -ε-  [StructOpen]                     06
-  06       (@36)                            36 : 08
-  07  ...
-  08  -ε-  [StructClose]                    10
-  10                                        ▶
-  11  ─‣┘  _ [EnumClose]                    13
-  13  ─‣┘  _ [Set(M4)]                      15
-  15                                        ▶
-  16  -ε-  [Node Set(M1)]                   18
-  18  ─‣┘  _                                11
-  19                                        ▶
-  20   !   (identifier)                     19
-  21  -ε-  [Node Set(M0)]                   11
-  23  ...
-  24  └‣─  (@20)                            20 : 21
-  25   !   (expression_statement) [EnumOpen(M2)]  24
-  27  └‣─  (@20)                            20 : 16
-  28  └‣─  body: (expression_statement)     27
-  29   !   (labeled_statement) [EnumOpen(M3)]  28
-  31  ...
-  32  ─‣─  _                                25, 29, 32
-  34  └‣─  _                                25, 29, 32
-  36   !   (program)                        34
---------------------- TRACE ----------------------
-Q:
-  04  -ε-  [StructOpen]                     06
-  06       (?)                              36 : 08
-       ▶   (?)
-
-?:
-  36       (program)                        34
-       ●   program
-  34       _                                25, 29, 32
-       ●   expression_statement
-  25       (expression_statement) [EnumOpen(M2)]  24
-       ●   expression_statement
-  24       (?)                              20 : 21
-       ▶   (?)
-
-?:
-  20       (identifier)                     19
-       ●   identifier
-  19   ◀   (?)                              
-
-?:
-  21  -ε-  [Node Set(M0)]                   11
-  11       _ [EnumClose]                    13
-       ●   expression_statement
-  13       _ [Set(M4)]                      15
-       ●   program
-  15   ◀   (?)                              
-
-Q:
-  08  -ε-  [StructClose]                    10
-  10   ◀   (Q)                              ◼
+error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+ --> query.ptk:4:53
+  |
+1 | Inner = (identifier)
+  |         ------------ defined here
+...
+4 |   B: (labeled_statement body: (expression_statement (Inner) @y))
+  |                                                     ^^^^^^^

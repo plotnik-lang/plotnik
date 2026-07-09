@@ -6,6 +6,17 @@ Q = {
   .
   (identifier)
 }
+---------------------- NFA -----------------------
+[entrypoints]
+
+[transitions]
+Q:
+  0  -ε-                                    6, 7
+  1                                         ▶
+  2  ─◦─  (identifier) [Set(t)]             1
+  4  ─•─  (identifier) [Set(t)]             1
+  6   !   (number) [EnumOpen(A) EnumClose]  4
+  7   !   "+" [EnumOpen(B) EnumClose]       2
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -33,18 +44,5 @@ N0: S4 → T1  ; QT
 N1: S5 → T2  ; Q
 
 [entrypoints]
-Q = 00 :: T2
 
 [transitions]
-Q:
-  00  -ε-  [StructOpen]                     02
-  02       (@16)                            16 : 03
-  03  -ε-  [StructClose]                    05
-  05                                        ▶
-  06                                        ▶
-  07  ...
-  08  ─◦─  (identifier) [Set(M2)]           06
-  10  ─•─  (identifier) [Set(M2)]           06
-  12   !   (number) [EnumOpen(M0) EnumClose]  10
-  14   !   "+" [EnumOpen(M1) EnumClose]     08
-  16  -ε-                                   12, 14

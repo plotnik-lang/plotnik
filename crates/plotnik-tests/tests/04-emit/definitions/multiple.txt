@@ -1,5 +1,30 @@
 Foo = (identifier) @id
 Bar = (string) @str
+---------------------- NFA -----------------------
+[entrypoints]
+Bar = 13
+Foo = 09
+
+[transitions]
+Foo:
+  02                                        ▶
+  03   !   (identifier) [Node Set(id)]      02
+
+Bar:
+  04                                        ▶
+  05   !   (string) [Node Set(str)]         04
+
+Foo (entrypoint):
+  06                                        ▶
+  07  -ε-  [StructClose]                    06
+  08       (Foo)                            03 : 07
+  09  -ε-  [StructOpen]                     08
+
+Bar (entrypoint):
+  10                                        ▶
+  11  -ε-  [StructClose]                    10
+  12       (Bar)                            05 : 11
+  13  -ε-  [StructOpen]                     12
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

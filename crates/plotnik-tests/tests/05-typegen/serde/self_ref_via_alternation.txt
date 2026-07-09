@@ -1,0 +1,89 @@
+Expr = [
+  Lit: (number) @value
+  Binary: (binary_expression
+    left: (Expr) @left
+    right: (Expr) @right
+  )
+]
+------------------- TYPESCRIPT -------------------
+export type Expr =
+  | { $tag: "Lit"; $data: { value: Node } }
+  | { $tag: "Binary"; $data: { left: Expr; right: Expr } };
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Expr<'t> {
+    Lit { value: Node<'t> },
+    Binary { left: ::std::boxed::Box<Expr<'t>>, right: ::std::boxed::Box<Expr<'t>> },
+}
+
+impl ::plotnik_rt::SerializeWithSource for Expr<'_> {
+    fn serialize_with_source<S>(
+        &self,
+        source: &str,
+        serializer: S,
+    ) -> ::core::result::Result<S::Ok, S::Error>
+    where
+        S: ::plotnik_rt::serde::Serializer,
+    {
+        use ::plotnik_rt::serde::ser::SerializeMap as _;
+
+        match self {
+            Expr::Lit { value: v0 } => {
+                struct Data<'a, 't> {
+                    v0: &'a Node<'t>,
+                    source: &'a str,
+                }
+                impl ::plotnik_rt::serde::Serialize for Data<'_, '_> {
+                    fn serialize<S>(
+                        &self,
+                        serializer: S,
+                    ) -> ::core::result::Result<S::Ok, S::Error>
+                    where
+                        S: ::plotnik_rt::serde::Serializer,
+                    {
+                        use ::plotnik_rt::serde::ser::SerializeMap as _;
+
+                        let mut map = serializer.serialize_map(Some(1))?;
+                        map.serialize_entry("value", &::plotnik_rt::WithSource::new(self.v0, self.source))?;
+                        map.end()
+                    }
+                }
+
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("$tag", "Lit")?;
+                map.serialize_entry("$data", &Data { v0, source })?;
+                map.end()
+            }
+            Expr::Binary { left: v0, right: v1 } => {
+                struct Data<'a, 't> {
+                    v0: &'a ::std::boxed::Box<Expr<'t>>,
+                    v1: &'a ::std::boxed::Box<Expr<'t>>,
+                    source: &'a str,
+                }
+                impl ::plotnik_rt::serde::Serialize for Data<'_, '_> {
+                    fn serialize<S>(
+                        &self,
+                        serializer: S,
+                    ) -> ::core::result::Result<S::Ok, S::Error>
+                    where
+                        S: ::plotnik_rt::serde::Serializer,
+                    {
+                        use ::plotnik_rt::serde::ser::SerializeMap as _;
+
+                        let mut map = serializer.serialize_map(Some(2))?;
+                        map.serialize_entry("left", &::plotnik_rt::WithSource::new(self.v0, self.source))?;
+                        map.serialize_entry("right", &::plotnik_rt::WithSource::new(self.v1, self.source))?;
+                        map.end()
+                    }
+                }
+
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("$tag", "Binary")?;
+                map.serialize_entry("$data", &Data { v0, v1, source })?;
+                map.end()
+            }
+        }
+    }
+}

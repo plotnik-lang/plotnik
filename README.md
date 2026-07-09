@@ -45,27 +45,68 @@ Tree-sitter gives you the syntax tree. Extracting structured data from it still 
 - [x] TypeScript type generation
 - [x] CLI: `exec` for matches, `infer` for types, `ast`/`trace`/`dump` for debug
 - [ ] Full validation against grammar (reject queries that can never match)
-- [ ] Compile-time queries via proc-macro
+- [x] Compile-time queries via proc-macro (the `plotnik` crate's `query!`)
 - [ ] WASM
 - [ ] LSP, editor extensions
 
 ## Installation
 
 ```sh
-cargo install plotnik
+cargo install plotnik-cli
 ```
 
 By default, 15 common languages are included. To add specific languages:
 
 ```sh
-cargo install plotnik --features lang-ruby,lang-elixir
+cargo install plotnik-cli --features lang-ruby,lang-elixir
 ```
 
 Or with all 80+ languages:
 
 ```sh
-cargo install plotnik --features all-languages
+cargo install plotnik-cli --features all-languages
 ```
+
+## In Rust: compile-time queries
+
+The `plotnik` crate compiles a query at build time into typed Rust — output
+structs and enums with `parse`/`matches` entry points, no bytecode, no
+dynamic values:
+
+```toml
+[dependencies]
+plotnik = "0.3"
+tree-sitter-javascript = "0.25"
+```
+
+```rust
+// `query!` defines types, so invoke it at module scope — not inside a function.
+plotnik::query! {
+    r#"
+    Q = (program (expression_statement (identifier) @id))
+    "#,
+    grammar = "tree-sitter-javascript",
+}
+
+fn main() {
+    let source = "x;";
+    let mut parser = plotnik::tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_javascript::LANGUAGE.into()).unwrap();
+    let tree = parser.parse(source, None).unwrap();
+
+    // Safe entry points run under compiled-in step/memory/depth limits.
+    let q = Q::parse(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches"); // q.id: Node
+}
+```
+
+There is no built-in language list: `grammar = "..."` names any dependency
+that ships a `grammar.json` (`tree-sitter-*`, `arborium-*`, or your own
+grammar crate), so the compiled query is pinned to the exact grammar version
+your lockfile resolves. Invalid queries fail the build with the compiler's
+own diagnostics; `parse` and `matches` run under compiled-in limits for
+untrusted inputs.
 
 ## Example
 

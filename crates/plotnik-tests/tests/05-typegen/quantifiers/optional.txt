@@ -1,5 +1,9 @@
 Q = (identifier)? @id
---------------------- TYPES ----------------------
-export interface Q {
-  id: Node | null;
+------------------- TYPESCRIPT -------------------
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub id: ::core::option::Option<Node<'t>>,
 }

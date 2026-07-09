@@ -8,7 +8,7 @@ Nested = (call_expression
 Q = (program (expression_statement (Nested) @c))
 --------------------- INPUT ----------------------
 a()()
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Nested {
   name: Node | null;
 }
@@ -82,18 +82,18 @@ Q:
 --------------------- TRACE ----------------------
 Q:
   06  -ε-  [StructOpen]                     08
-  08       (?)                              32 : 09
-       ▶   (?)
+  08       (@32)                            32 : 09
+       ▶   (@32)
 
-?:
+@32:
   32       (program)                        30
        ●   program
   30       (expression_statement) [StructOpen]  29
        ●   expression_statement
-  29       (?)                              27 : 12
-       ▶   (?)
+  29       (@27)                            27 : 12
+       ▶   (@27)
 
-?:
+@27:
   27       (call_expression)                24
        ●   call_expression
   24       function: _                      17, 22
@@ -102,10 +102,10 @@ Q:
        ○   call_expression
   24  ❮❮❮ 
   22  -ε-  [Null Set(M0) SuppressBegin]     21
-  21       (?)                              27 : 19
-       ▶   (?)
+  21       (@27)                            27 : 19
+       ▶   (@27)
 
-?:
+@27:
   27       (call_expression)                24
        ●   call_expression
   24       function: _                      17, 22
@@ -114,19 +114,19 @@ Q:
        ●   identifier
   26       _                                16
        ●   call_expression
-  16   ◀   (?)                              
+  16   ◀   (@27)                            
 
-?:
+@27:
   19  -ε-  [SuppressEnd]                    26
   26       _                                16
        ●   call_expression
-  16   ◀   (?)                              
+  16   ◀   (@27)                            
 
-?:
+@32:
   12  -ε-  [StructClose]                    14
   14       _ [Set(M1)]                      28
        ●   program
-  28   ◀   (?)                              
+  28   ◀   (@32)                            
 
 Q:
   09  -ε-  [StructClose]                    11

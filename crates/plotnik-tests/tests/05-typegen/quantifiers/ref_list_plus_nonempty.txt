@@ -5,7 +5,7 @@ Q = (program
     (parenthesized_expression (object (Row)+ @rows))
   )
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Row {
   key: Node;
   val: Node;
@@ -13,4 +13,17 @@ export interface Row {
 
 export interface Q {
   rows: [Row, ...Row[]];
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Row<'t> {
+    pub key: Node<'t>,
+    pub val: Node<'t>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub rows: ::std::vec::Vec<Row<'t>>,
 }

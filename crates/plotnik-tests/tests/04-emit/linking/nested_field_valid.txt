@@ -3,6 +3,23 @@ Q = (function_declaration
     (return_statement) @ret
   ) @body
 ) @fn
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 10
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (function_declaration) [Node Set(fn)]  04
+  04  └‣─  body: (statement_block) [Node Set(body)]  06
+  05  ─‣┘² _                                01
+  06  └‣─  (return_statement) [Node Set(ret)]  05
+
+Q (entrypoint):
+  07                                        ▶
+  08  -ε-  [StructClose]                    07
+  09       (Q)                              02 : 08
+  10  -ε-  [StructOpen]                     09
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

@@ -5,6 +5,42 @@ Outer = (array
     (Inner) @item
   }* @items
 )
+---------------------- NFA -----------------------
+[entrypoints]
+Inner = 29
+Outer = 33
+
+[transitions]
+Inner:
+  02                                        ▶
+  03   !   (call_expression)                05
+  04  ─‣┘  _                                02
+  05  └‣─  (identifier) [Node Set(name)]    04
+
+Outer:
+  06                                        ▶
+  07   !   (array)                          25
+  08  ─‣┘  _ [ArrayClose Set(items)]        06
+  10  -ε-  [ArrayClose Set(items)]          06
+  12  -ε-  [StructClose Push]               19, 08
+  14  -ε-  [StructClose Set(item)]          12
+  15   !   (Inner)                          03 : 14
+  17  -ε-  [StructOpen StructOpen]          15
+  19  ──!  _                                17, 19
+  20  └─!  _                                17, 19
+  25  -ε-  [ArrayOpen]                      20, 10
+
+Inner (entrypoint):
+  26                                        ▶
+  27  -ε-  [StructClose]                    26
+  28       (Inner)                          03 : 27
+  29  -ε-  [StructOpen]                     28
+
+Outer (entrypoint):
+  30                                        ▶
+  31  -ε-  [StructClose]                    30
+  32       (Outer)                          07 : 31
+  33  -ε-  [StructOpen]                     32
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -61,8 +97,8 @@ Outer:
   22  -ε-  [StructClose Set(M1)]            20
   24   !   (@16)                            16 : 22
   25  -ε-  [StructOpen StructOpen]          24
-  27  ─‣─  _                                25, 27
-  29  └‣─  _                                25, 27
+  27  ──!  _                                25, 27
+  29  └─!  _                                25, 27
   31  ...
   32  -ε-  [ArrayOpen]                      29, 18
   34  ─‣┘  _ [ArrayClose Set(M2)]           17

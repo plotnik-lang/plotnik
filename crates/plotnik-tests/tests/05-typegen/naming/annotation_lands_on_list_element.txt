@@ -3,11 +3,23 @@ Q = (program
     (expression_statement) @s
   }* @rows :: Row
 )
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Row {
   s: Node;
 }
 
 export interface Q {
   rows: Row[];
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub rows: ::std::vec::Vec<Row<'t>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Row<'t> {
+    pub s: Node<'t>,
 }

@@ -1,47 +1,75 @@
 Comma = ","
 Test = (array (Comma) . (string) @next)
+---------------------- NFA -----------------------
+[entrypoints]
+Comma = 13
+Test  = 17
+
+[transitions]
+Comma:
+  02                                        ▶
+  03   !   ","                              02
+
+Test:
+  04                                        ▶
+  05   !   (array)                          11
+  06  ─‣┘  _                                04
+  07  ─◦─  (string) [Node Set(next)]        06
+  08   !   (Comma)                          03 : 07
+  10  ──!  _                                08, 10
+  11  └─!  _                                08, 10
+
+Comma (entrypoint):
+  12                                        ▶
+  13       (Comma)                          03 : 12
+
+Test (entrypoint):
+  14                                        ▶
+  15  -ε-  [StructClose]                    14
+  16       (Test)                           05 : 15
+  17  -ε-  [StructOpen]                     16
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
 S1 "next"
-S2 "Comma"
-S3 "Test"
-S4 ","
-S5 "array"
-S6 "string"
+S2 "Test"
+S3 ","
+S4 "array"
+S5 "string"
+S6 "Comma"
 
 [type_defs]
-T0 = <Node>
-T1 = Struct  M0:1  ; { next }
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { next }
 
 [type_members]
-M0: S1 → T0  ; next: <Node>
+M0: S1 → T1  ; next: <Node>
 
 [type_names]
-N0: S2 → T0  ; Comma
-N1: S3 → T1  ; Test
+N0: S2 → T2  ; Test
 
 [entrypoints]
 Comma = 00 :: T0
-Test  = 04 :: T1
+Test  = 02 :: T2
 
 [transitions]
 Comma:
-  00       (@15)                            15 : 01
-  01  -ε-  [Node]                           03
-  03                                        ▶
+  00       (@12)                            12 : 01
+  01                                        ▶
 
 Test:
-  04  -ε-  [StructOpen]                     06
-  06       (@21)                            21 : 08
+  02  -ε-  [StructOpen]                     04
+  04       (@20)                            20 : 05
+  05  -ε-  [StructClose]                    07
   07                                        ▶
-  08  -ε-  [StructClose]                    10
-  10                                        ▶
-  11  ─◦─  (string) [Node Set(M0)]          13
-  13  ─‣┘  _                                07
-  14                                        ▶
-  15   !   ","                              14
-  16   !   (@15)                            15 : 11
-  17  ─‣─  _                                16, 17
-  19  └‣─  _                                16, 17
-  21   !   (array)                          19
+  08  ─◦─  (string) [Node Set(M0)]          10
+  10  ─‣┘  _                                13
+  11                                        ▶
+  12   !   ","                              11
+  13                                        ▶
+  14   !   (@12)                            12 : 08
+  15  ...
+  16  ──!  _                                14, 16
+  18  └─!  _                                14, 16
+  20   !   (array)                          18

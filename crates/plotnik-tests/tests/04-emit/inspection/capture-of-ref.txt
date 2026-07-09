@@ -1,6 +1,36 @@
 Inner = (identifier) @x
 Q = (program (expression_statement (Inner) @v))
 ------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Inner = 23
+Q     = 27
+
+[transitions]
+Inner:
+  02                                        ▶
+  04   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(x) SpanEnd#1 SpanEnd#2 SpanEnd#0]  02
+
+Q:
+  06                                        ▶
+  08   !   (program) [SpanStart#3 SpanStartAt#4]  11
+  10  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  06
+  11  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#7 StructOpen]  16
+  13  ─‣┘  _ [SpanStart#6 Set(v) SpanEnd#6 SpanEnd#7]  10
+  15  -ε-  [StructClose]                    13
+  16  └‣─  (Inner)                          04 : 15
+
+Inner (entrypoint):
+  20                                        ▶
+  21  -ε-  [StructClose]                    20
+  22       (Inner)                          04 : 21
+  23  -ε-  [StructOpen]                     22
+
+Q (entrypoint):
+  24                                        ▶
+  25  -ε-  [StructClose]                    24
+  26       (Q)                              08 : 25
+  27  -ε-  [StructOpen]                     26
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

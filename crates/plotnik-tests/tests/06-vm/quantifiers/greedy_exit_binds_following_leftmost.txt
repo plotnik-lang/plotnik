@@ -6,7 +6,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 let a; foo; bar;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   decls: Node[];
   x: Node;
@@ -61,17 +61,17 @@ Q:
   08  └‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
   11  ─‣─  (_) [ArrayClose Set(M0) Node Set(M1)]  07
   14   !   (lexical_declaration) [Node Push]  16, 11
-  16  ─‣─  _                                14, 16
-  18  └‣─  _                                14, 16
+  16  ──!  _                                14, 16
+  18  └─!  _                                14, 16
   20  -ε-  [ArrayOpen]                      18, 08
   22   !   (program)                        20
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              22 : 03
-       ▶   (?)
+  02       (@22)                            22 : 03
+       ▶   (@22)
 
-?:
+@22:
   22       (program)                        20
        ●   program
   20  -ε-  [ArrayOpen]                      18, 08
@@ -95,7 +95,7 @@ Q:
        ●   expression_statement
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@22)                            
 
 Q:
   03  -ε-  [StructClose]                    05

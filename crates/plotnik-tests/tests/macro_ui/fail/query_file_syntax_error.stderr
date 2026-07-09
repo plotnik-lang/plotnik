@@ -1,0 +1,15 @@
+error: missing closing `)`
+ --> broken_query.ptk:1:5
+  |
+1 |   Q = (program
+  |       ^ node started here
+  |  _____|
+  | |
+2 | |   (expression_statement (identifier) @id)
+  | |__________________________________________^
+  |
+       help: add `)` to close the node
+ --> tests/macro_ui/fail/query_file_syntax_error.rs:7:12
+  |
+7 |     file = "broken_query.ptk",
+  |            ^^^^^^^^^^^^^^^^^^

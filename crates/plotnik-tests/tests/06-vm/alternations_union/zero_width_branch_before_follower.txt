@@ -9,7 +9,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 debugger;
---------------------- TYPES ----------------------
+------------------- TYPESCRIPT -------------------
 export interface Q {
   d: Node;
   e: Node | null;
@@ -67,21 +67,21 @@ Q:
   13  -ε-  [ArrayClose Set(M0)]             11
   15  ...
   16   !   (identifier) [Node Push]         18, 13
-  18  ─‣─  _                                16, 18
+  18  ──!  _                                16, 18
   20   !   _ [ArrayOpen]                    16, 18
   22  -ε-  [Null Set(M1)]                   20
   24   !   (empty_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  11
-  27  ─‣─  _                                22, 24, 27
-  29  └‣─  _                                22, 24, 27
+  27  ──!  _                                22, 24, 27
+  29  └─!  _                                22, 24, 27
   31  ...
   32   !   (program)                        29, 08
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (?)                              32 : 03
-       ▶   (?)
+  02       (@32)                            32 : 03
+       ▶   (@32)
 
-?:
+@32:
   32       (program)                        29, 08
        ●   program
   29       _                                22, 24, 27
@@ -103,7 +103,7 @@ Q:
        ●   debugger_statement
   07       _                                06
        ●   program
-  06   ◀   (?)                              
+  06   ◀   (@32)                            
 
 Q:
   03  -ε-  [StructClose]                    05

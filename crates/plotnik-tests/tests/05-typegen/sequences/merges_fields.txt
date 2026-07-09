@@ -2,8 +2,12 @@ Q = {
   (identifier) @a
   (number) @b
 }
---------------------- TYPES ----------------------
-export interface Q {
-  a: Node;
-  b: Node;
+------------------- TYPESCRIPT -------------------
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t> {
+    pub a: Node<'t>,
+    pub b: Node<'t>,
 }
