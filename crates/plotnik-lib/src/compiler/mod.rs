@@ -11,10 +11,14 @@ pub(crate) mod diagnostics;
 mod ids;
 pub(crate) mod limits;
 pub(crate) mod parse;
+pub(crate) mod regex;
 pub(crate) mod typegen;
 
 mod analyze;
 mod lower;
+
+#[cfg(test)]
+mod regex_tests;
 
 pub(crate) mod emit;
 pub(crate) mod query;

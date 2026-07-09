@@ -19,6 +19,7 @@ use crate::compiler::lower::ir::{
     CallIR, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin, MatchIR, NfaGraph, PredicateIR,
     PredicateValueIR,
 };
+use crate::compiler::regex::{PortableDfa, compile_portable_dfa};
 use crate::core::{NodeFieldId, NodeKindId};
 
 /// Dense runtime state id carried by frames and checkpoints.
@@ -211,6 +212,7 @@ pub(crate) struct ExpectedField {
 pub(crate) struct RegexPlan {
     pub(crate) id: RegexId,
     pub(crate) pattern: String,
+    pub(crate) automaton: PortableDfa,
 }
 
 #[derive(Clone, Debug)]
@@ -510,9 +512,12 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
                     let id = RegexId(self.regexes.len());
                     let pattern = pattern.to_string();
                     self.regex_ids.insert(pattern.clone(), id);
+                    let automaton = compile_portable_dfa(&pattern)
+                        .expect("regex predicate compiled during bytecode dry-run");
                     self.regexes.push(RegexPlan {
                         id,
                         pattern: pattern.clone(),
+                        automaton,
                     });
                     id
                 };

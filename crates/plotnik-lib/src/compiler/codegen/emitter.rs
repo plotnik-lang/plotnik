@@ -35,8 +35,8 @@ use crate::compiler::codegen::plan::{
     PredicatePlan, PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
 };
 use crate::compiler::codegen::reader::ReaderGen;
-use crate::compiler::emit::regex_table::compile_dfa_bytes;
 use crate::compiler::lower::ir::{NfaGraph, SemanticNfa};
+use crate::compiler::regex::compile_native_dfa;
 use crate::compiler::typegen::rust::Config as RustTypesConfig;
 use plotnik_rt::{Limit, Nav, SkipPolicy};
 
@@ -106,7 +106,7 @@ struct RegexStatic {
 
 impl RegexStatic {
     fn compile(id: RegexId, pattern: &str) -> Self {
-        let bytes = compile_dfa_bytes(pattern).expect("regex predicate compiled during emit");
+        let bytes = compile_native_dfa(pattern).expect("regex predicate compiled during emit");
         Self { id, bytes }
     }
 }
@@ -117,9 +117,8 @@ struct RustRepresentation {
     /// Field-id consts: raw id → `F_{NAME}` const name. Keyed by id and
     /// collision-suffixed at insert, so the const namespace stays injective.
     fields: BTreeMap<u16, String>,
-    /// Rust uses regex-automata's native serialized sparse-DFA format. The
-    /// neutral plan supplies stable regex ids and patterns; its portable DFA
-    /// representation is added alongside the cross-language runtime contract.
+    /// Rust uses regex-automata's native serialized sparse-DFA format. Dynamic
+    /// backends render the compiler-owned portable DFA carried by the plan.
     regexes: Vec<RegexStatic>,
 }
 
@@ -159,7 +158,10 @@ impl RustRepresentation {
             regexes: plan
                 .regexes()
                 .iter()
-                .map(|regex| RegexStatic::compile(regex.id, &regex.pattern))
+                .map(|regex| {
+                    regex.automaton.validate();
+                    RegexStatic::compile(regex.id, &regex.pattern)
+                })
                 .collect(),
         };
         for field in plan.fields() {

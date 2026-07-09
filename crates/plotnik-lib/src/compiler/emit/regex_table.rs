@@ -5,11 +5,10 @@
 //! Compilation lives here so the regex engine stays out of `core`; the table
 //! that accumulates the compiled bytes is a core type.
 
-use regex_automata::dfa::dense;
-
 use crate::bytecode::StringId;
 use crate::compiler::emit::tables::{EmitError, RegexId, RegexTableBuilder, StringTableBuilder};
 use crate::compiler::lower::ir::{InstructionIR, NfaGraph, PredicateValueIR};
+use crate::compiler::regex::compile_native_dfa;
 
 /// Compile every regex predicate into the regex table, resolving each pattern's
 /// StringId from the finished string table. Reads the string table; interns
@@ -55,23 +54,6 @@ pub(super) fn intern(
     }
 
     let bytes =
-        compile_dfa_bytes(pattern).map_err(|e| EmitError::RegexCompile(pattern.to_string(), e))?;
+        compile_native_dfa(pattern).map_err(|e| EmitError::RegexCompile(pattern.to_string(), e))?;
     regexes.push_dfa(string_id, bytes)
-}
-
-/// Compile `pattern` to serialized sparse-DFA bytes. The one compilation path
-/// shared by the bytecode emitter and the Rust code generator, so a DFA
-/// embedded in generated code is bit-identical to the wire's.
-pub(in crate::compiler) fn compile_dfa_bytes(pattern: &str) -> Result<Vec<u8>, String> {
-    let dense = dense::DFA::builder()
-        .configure(
-            dense::DFA::config()
-                .start_kind(regex_automata::dfa::StartKind::Unanchored)
-                .minimize(true),
-        )
-        .build(pattern)
-        .map_err(|e| e.to_string())?;
-
-    let sparse = dense.to_sparse().map_err(|e| e.to_string())?;
-    Ok(sparse.to_bytes_little_endian())
 }
