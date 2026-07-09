@@ -12,17 +12,17 @@
 //! can stay bare: the naming pass reserves it.
 
 use std::collections::{HashMap, HashSet};
-use std::fmt::Write as _;
 
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::codegen::emit::names::rust_scope_idents;
+use crate::compiler::codegen::emit::sink::Sink;
 use crate::compiler::ids::DefId;
 use crate::core::{Interner, Symbol};
 
 use super::Config;
 use super::analysis::TypeFacts;
-use super::idents::scope_idents;
 
 const DERIVES: &str = "#[derive(Debug, Clone, PartialEq, Eq, Hash)]";
 
@@ -183,14 +183,14 @@ impl<'a> Emitter<'a> {
         self.assign_item_idents();
 
         let sections = self.render_sections();
-        let mut out = String::new();
+        let mut out = Sink::<()>::new();
         if self.uses_node {
             let rt = &self.config.rt_crate;
-            out.push_str(&format!("use {rt}::Node;\n\n"));
+            out.push(&format!("use {rt}::Node;\n\n"));
         }
-        out.push_str(&sections.join("\n\n"));
-        out.push('\n');
-        out
+        out.push(&sections.join("\n\n"));
+        out.push("\n");
+        out.plain().to_string()
     }
 
     fn render_sections(&mut self) -> Vec<String> {
@@ -311,7 +311,7 @@ impl<'a> Emitter<'a> {
 
     fn assign_item_idents(&mut self) {
         let interner = self.interner;
-        let idents = scope_idents(self.items.iter().map(|item| interner.resolve(item.name)));
+        let idents = rust_scope_idents(self.items.iter().map(|item| interner.resolve(item.name)));
         for (item, ident) in self.items.iter().zip(idents) {
             self.item_idents.insert(item.name, ident);
         }
@@ -343,18 +343,21 @@ impl<'a> Emitter<'a> {
         let TypeShape::Struct(fields) = types.expect_type_shape(item.ty) else {
             unreachable!("struct item must have a struct shape");
         };
-        let field_idents = scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
+        let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let ident = self.item_ident(item.name).to_string();
         let lt = self.lifetime_args(item.ty);
 
-        let mut out = format!("{DERIVES}\npub struct {ident}{lt} {{\n");
-        for (info, field_ident) in fields.values().zip(&field_idents) {
-            let field_ty = self.field_type(TypeContext::item(item.ty), info);
-            writeln!(out, "    pub {field_ident}: {field_ty},")
-                .expect("writing to a String is infallible");
-        }
-        out.push('}');
-        out
+        let mut out = Sink::<()>::new();
+        out.line(DERIVES);
+        out.line(&format!("pub struct {ident}{lt} {{"));
+        out.indented(|out| {
+            for (info, field_ident) in fields.values().zip(&field_idents) {
+                let field_ty = self.field_type(TypeContext::item(item.ty), info);
+                out.line(&format!("pub {field_ident}: {field_ty},"));
+            }
+        });
+        out.push("}");
+        out.plain().to_string()
     }
 
     fn render_enum(&mut self, item: &Item) -> String {
@@ -363,18 +366,21 @@ impl<'a> Emitter<'a> {
         let TypeShape::Enum(variants) = types.expect_type_shape(item.ty) else {
             unreachable!("enum item must have an enum shape");
         };
-        let variant_idents = scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
+        let variant_idents = rust_scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
         let ident = self.item_ident(item.name).to_string();
         let lt = self.lifetime_args(item.ty);
 
-        let mut out = format!("{DERIVES}\npub enum {ident}{lt} {{\n");
-        for ((_, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
-            let payload = self.render_variant_payload(item.ty, payload);
-            writeln!(out, "    {variant_ident}{payload},")
-                .expect("writing to a String is infallible");
-        }
-        out.push('}');
-        out
+        let mut out = Sink::<()>::new();
+        out.line(DERIVES);
+        out.line(&format!("pub enum {ident}{lt} {{"));
+        out.indented(|out| {
+            for ((_, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
+                let payload = self.render_variant_payload(item.ty, payload);
+                out.line(&format!("{variant_ident}{payload},"));
+            }
+        });
+        out.push("}");
+        out.plain().to_string()
     }
 
     fn render_variant_payload(&mut self, item_ty: TypeId, payload: TypeId) -> String {
@@ -387,7 +393,7 @@ impl<'a> Emitter<'a> {
         let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
             unreachable!("enum variant payload is void or an anonymous struct");
         };
-        let field_idents = scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
+        let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let rendered: Vec<String> = fields
             .values()
             .zip(&field_idents)

@@ -18,6 +18,7 @@
 //!   dump format, so generated code lines up with `dump_nfa` output 1:1.
 
 mod config;
+pub(crate) mod emit;
 mod emitter;
 mod reader;
 

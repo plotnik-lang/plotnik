@@ -1,43 +1,53 @@
-//! Type to TypeScript string conversion.
+//! Type-to-TypeScript fragments.
+//!
+//! Fragments retain ANSI style events and optional semantic member ranges, so
+//! declarations, inline enum payloads, plain output, and mapped output all use
+//! this one rendering path.
 
 use crate::bytecode::{TypeDef, TypeDefKind, TypeId, TypeKind};
+use crate::compiler::codegen::emit::sink::{Sink, Style};
 
 use super::Emitter;
 use super::config::VoidType;
+use super::emitter::SemanticTag;
+
+#[derive(Clone, Copy)]
+enum MemberTags {
+    None,
+    Inline,
+}
 
 impl Emitter<'_> {
     /// Render a type reference at a use site: any named type renders by its
-    /// name (its declaration is emitted separately); anonymous types render
-    /// their shape inline.
-    pub(super) fn render_ty(&self, type_id: TypeId) -> String {
-        let c = self.colors();
+    /// name; anonymous types render their shape inline.
+    pub(super) fn render_ty(&self, type_id: TypeId) -> Sink<SemanticTag> {
         let Some(type_def) = self.types.get(type_id) else {
-            return "unknown".to_string();
+            return text("unknown");
         };
         if !matches!(type_def.decode(), TypeDefKind::Primitive(_))
             && let Some(name) = self.type_names.get(&type_id)
         {
-            return format!("{}{}{}", c.blue, name, c.reset);
+            let mut out = Sink::new();
+            out.styled(Style::Blue, name);
+            return out;
         }
         self.render_shape(type_id)
     }
 
-    /// Render a type's structure, ignoring its own name — the body of a
-    /// declaration (`export type Name = <shape>;`). Nested references still
-    /// render by name via [`render_ty`](Self::render_ty).
-    pub(super) fn render_shape(&self, type_id: TypeId) -> String {
-        let c = self.colors();
+    /// Render a declaration body structurally, while nested positions still
+    /// use their nominal names through [`Self::render_ty`].
+    pub(super) fn render_shape(&self, type_id: TypeId) -> Sink<SemanticTag> {
         let Some(type_def) = self.types.get(type_id) else {
-            return "unknown".to_string();
+            return text("unknown");
         };
 
         match type_def.decode() {
             TypeDefKind::Primitive(TypeKind::Void) => match self.config.void_type {
-                VoidType::Undefined => "undefined".to_string(),
-                VoidType::Null => "null".to_string(),
+                VoidType::Undefined => text("undefined"),
+                VoidType::Null => text("null"),
             },
-            TypeDefKind::Primitive(TypeKind::Node) => "Node".to_string(),
-            TypeDefKind::Primitive(_) => "unknown".to_string(),
+            TypeDefKind::Primitive(TypeKind::Node) => text("Node"),
+            TypeDefKind::Primitive(_) => text("unknown"),
             TypeDefKind::Wrapper {
                 kind: TypeKind::Alias,
                 inner,
@@ -46,124 +56,171 @@ impl Emitter<'_> {
                 kind: TypeKind::ArrayZeroOrMore,
                 inner,
             } => {
-                let elem_type = self.render_ty(inner);
-                format!("{}{}[]{}", elem_type, c.dim, c.reset)
+                let mut out = self.render_ty(inner);
+                out.styled(Style::Dim, "[]");
+                out
             }
             TypeDefKind::Wrapper {
                 kind: TypeKind::ArrayOneOrMore,
                 inner,
             } => {
-                let elem_type = self.render_ty(inner);
-                format!(
-                    "{}[{}{}{}, ...{}{}{}[]]{}",
-                    c.dim, c.reset, elem_type, c.dim, c.reset, elem_type, c.dim, c.reset
-                )
+                let element = self.render_ty(inner);
+                let mut out = Sink::new();
+                out.styled(Style::Dim, "[");
+                out.append(element);
+                out.styled(Style::Dim, ", ...");
+                out.append(self.render_ty(inner));
+                out.styled(Style::Dim, "[]]");
+                out
             }
             TypeDefKind::Wrapper {
                 kind: TypeKind::Optional,
                 inner,
             } => {
-                let inner_type = self.render_ty(inner);
-                format!("{} {}|{} null", inner_type, c.dim, c.reset)
+                let mut out = self.render_ty(inner);
+                out.push(" ");
+                out.styled(Style::Dim, "|");
+                out.push(" null");
+                out
             }
-            TypeDefKind::Wrapper { .. } => "unknown".to_string(),
-            TypeDefKind::Struct { .. } => self.inline_struct(&type_def),
+            TypeDefKind::Wrapper { .. } => text("unknown"),
+            TypeDefKind::Struct { .. } => self.inline_struct(&type_def, type_id, MemberTags::None),
             TypeDefKind::Enum { .. } => self.inline_enum(&type_def),
         }
     }
 
-    pub(super) fn inline_struct(&self, type_def: &TypeDef) -> String {
-        let c = self.colors();
-        let member_count = match type_def.decode() {
-            TypeDefKind::Struct { member_count, .. } => member_count,
-            _ => 0,
-        };
-        if member_count == 0 {
-            return format!("{}{{}}{}", c.dim, c.reset);
+    fn inline_struct(
+        &self,
+        type_def: &TypeDef,
+        type_id: TypeId,
+        tags: MemberTags,
+    ) -> Sink<SemanticTag> {
+        let mut fields: Vec<(String, TypeId, u16)> = self
+            .members_of_with_indices(type_def)
+            .map(|(index, member)| {
+                (
+                    self.strings.get(member.name_id).to_string(),
+                    member.type_id,
+                    index,
+                )
+            })
+            .collect();
+        if fields.is_empty() {
+            let mut out = Sink::new();
+            out.styled(Style::Dim, "{}");
+            return out;
         }
+        fields.sort_by(|left, right| left.0.cmp(&right.0));
 
-        let mut fields: Vec<(String, TypeId)> = self
+        let mut out = Sink::new();
+        out.styled(Style::Dim, "{");
+        out.push(" ");
+        let last = fields.len() - 1;
+        for (position, (name, field_type, member)) in fields.into_iter().enumerate() {
+            match tags {
+                MemberTags::None => out.push(&name),
+                MemberTags::Inline => out.tagged(
+                    SemanticTag {
+                        type_id,
+                        member: Some(member),
+                    },
+                    |out| out.push(&name),
+                ),
+            }
+            out.set_style(Style::Dim);
+            out.push(":");
+            out.reset_style();
+            out.push(" ");
+            out.append(self.render_ty(field_type));
+            if position != last {
+                // Deliberately no reset: this is byte-identical to the old
+                // renderer, whose next field name inherits dim until `:`.
+                out.set_style(Style::Dim);
+                out.push("; ");
+            }
+        }
+        out.push(" ");
+        out.styled(Style::Dim, "}");
+        out
+    }
+
+    fn inline_enum(&self, type_def: &TypeDef) -> Sink<SemanticTag> {
+        let variants: Vec<(String, TypeId)> = self
             .types
             .members_of(type_def)
             .map(|member| (self.strings.get(member.name_id).to_string(), member.type_id))
             .collect();
-        fields.sort_by(|a, b| a.0.cmp(&b.0));
-
-        // Optional fields render as `T | null` (always present), matching the
-        // materializer — see `emit_interface`.
-        let field_strs: Vec<String> = fields
-            .iter()
-            .map(|(name, ty)| {
-                let ts_type = self.render_ty(*ty);
-                format!("{}{}:{} {}", name, c.dim, c.reset, ts_type)
-            })
-            .collect();
-
-        format!(
-            "{}{{{} {} {}}}{}",
-            c.dim,
-            c.reset,
-            field_strs.join(&format!("{}; ", c.dim)),
-            c.dim,
-            c.reset
-        )
+        let mut out = Sink::new();
+        for (position, (name, payload)) in variants.iter().enumerate() {
+            if position > 0 {
+                out.push(" ");
+                out.styled(Style::Dim, "|");
+                out.push(" ");
+            }
+            out.append(self.render_variant(name, *payload, None, false));
+        }
+        out
     }
 
-    fn inline_enum(&self, type_def: &TypeDef) -> String {
-        let c = self.colors();
-        let variant_strs: Vec<String> = self
-            .types
-            .members_of(type_def)
-            .map(|member| {
-                let name = self.strings.get(member.name_id).to_string();
-                self.render_variant(&name, member.type_id)
-            })
-            .collect();
+    /// One variant literal, optionally tagging the variant and inline payload
+    /// fields for mapped d.ts output.
+    pub(super) fn render_variant(
+        &self,
+        name: &str,
+        payload_type: TypeId,
+        variant: Option<SemanticTag>,
+        payload_tags: bool,
+    ) -> Sink<SemanticTag> {
+        let mut out = Sink::new();
+        out.styled(Style::Dim, "{");
+        out.push(" $tag");
+        out.styled(Style::Dim, ":");
+        out.push(" ");
+        out.set_style(Style::Green);
+        out.push("\"");
+        match variant {
+            Some(tag) => out.tagged(tag, |out| out.push(name)),
+            None => out.push(name),
+        }
+        out.push("\"");
+        out.reset_style();
 
-        variant_strs.join(&format!(" {}|{} ", c.dim, c.reset))
-    }
-
-    /// One variant literal: `{ $tag: "A" }`, or `{ $tag: "A"; $data: … }` for
-    /// a variant with a payload.
-    pub(super) fn render_variant(&self, name: &str, payload_type: TypeId) -> String {
-        let c = self.colors();
         if self.is_void_type(payload_type) {
-            return format!(
-                "{}{{{} $tag{}:{} {}\"{}\"{} {}}}{}",
-                c.dim, c.reset, c.dim, c.reset, c.green, name, c.reset, c.dim, c.reset
-            );
+            out.push(" ");
+            out.styled(Style::Dim, "}");
+            return out;
         }
 
-        let data = self.inline_variant_payload(payload_type);
-        format!(
-            "{}{{{} $tag{}:{} {}\"{}\"{}{}; $data{}:{} {} {}}}{}",
-            c.dim,
-            c.reset,
-            c.dim,
-            c.reset,
-            c.green,
-            name,
-            c.reset,
-            c.dim,
-            c.dim,
-            c.reset,
-            data,
-            c.dim,
-            c.reset
-        )
+        // Keep both dim events: the prior renderer emitted one before
+        // `; $data` and another before `:`.
+        out.set_style(Style::Dim);
+        out.push("; $data");
+        out.set_style(Style::Dim);
+        out.push(":");
+        out.reset_style();
+        out.push(" ");
+        out.append(self.inline_variant_payload(
+            payload_type,
+            if payload_tags {
+                MemberTags::Inline
+            } else {
+                MemberTags::None
+            },
+        ));
+        out.push(" ");
+        out.styled(Style::Dim, "}");
+        out
     }
 
-    fn inline_variant_payload(&self, type_id: TypeId) -> String {
+    fn inline_variant_payload(&self, type_id: TypeId, tags: MemberTags) -> Sink<SemanticTag> {
         let Some(type_def) = self.types.get(type_id) else {
             return self.render_ty(type_id);
         };
 
-        // A struct payload is anonymous by design — always inline, even if a
-        // name table (foreign bytecode) happens to name it.
-        match type_def.decode() {
-            TypeDefKind::Struct { .. } => self.inline_struct(&type_def),
-            _ => self.render_ty(type_id),
+        if matches!(type_def.decode(), TypeDefKind::Struct { .. }) {
+            return self.inline_struct(&type_def, type_id, tags);
         }
+        self.render_ty(type_id)
     }
 
     pub(super) fn is_void_type(&self, type_id: TypeId) -> bool {
@@ -171,4 +228,10 @@ impl Emitter<'_> {
             .get(type_id)
             .is_some_and(|def| matches!(def.decode(), TypeDefKind::Primitive(TypeKind::Void)))
     }
+}
+
+fn text(value: &str) -> Sink<SemanticTag> {
+    let mut out = Sink::new();
+    out.push(value);
+    out
 }

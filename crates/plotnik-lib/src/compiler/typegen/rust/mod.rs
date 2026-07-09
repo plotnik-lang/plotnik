@@ -10,13 +10,10 @@
 mod analysis;
 mod config;
 pub(crate) mod emitter;
-pub(crate) mod idents;
 mod serde_impls;
 
 #[cfg(test)]
 mod analysis_tests;
-#[cfg(test)]
-mod idents_tests;
 
 pub use config::Config;
 

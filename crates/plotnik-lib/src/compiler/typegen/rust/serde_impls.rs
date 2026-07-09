@@ -15,9 +15,9 @@
 use std::fmt::Write as _;
 
 use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::codegen::emit::names::rust_scope_idents;
 
 use super::emitter::{Emitter, Item, ItemKind, TypeContext};
-use super::idents::scope_idents;
 
 struct SerdeBody {
     code: String,
@@ -79,7 +79,7 @@ impl Emitter<'_> {
         let TypeShape::Struct(fields) = types.expect_type_shape(item.ty) else {
             unreachable!("struct item must have a struct shape");
         };
-        let field_idents = scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
+        let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
 
         let mut out = format!(
             "        let mut map = serializer.serialize_map(Some({}))?;\n",
@@ -106,7 +106,7 @@ impl Emitter<'_> {
         let TypeShape::Enum(variants) = types.expect_type_shape(item.ty) else {
             unreachable!("enum item must have an enum shape");
         };
-        let variant_idents = scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
+        let variant_idents = rust_scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
 
         let mut out = String::from("        match self {\n");
         let mut uses_source = false;
@@ -141,7 +141,7 @@ impl Emitter<'_> {
         let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
             unreachable!("enum variant payload is void or an anonymous struct");
         };
-        let field_idents = scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
+        let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let (decl_generics, impl_generics) = if fields
             .values()
             .any(|info| self.facts.needs_lifetime(info.type_id))

@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 use crate::bytecode::{
     EntrypointsView, Module, StringsView, TypeDef, TypeId, TypeMember, TypesView,
 };
-use crate::core::Colors;
+use crate::compiler::codegen::emit::sink::Sink;
 
 use super::Config;
 
@@ -22,6 +22,12 @@ pub struct DtsRange {
     pub end: u32,
     pub type_id: u16,
     pub member: Option<u16>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct SemanticTag {
+    pub(super) type_id: TypeId,
+    pub(super) member: Option<u16>,
 }
 
 pub struct Emitter<'a> {
@@ -40,9 +46,7 @@ pub struct Emitter<'a> {
     pub(super) emitted_types: HashSet<TypeId>,
     /// Cycle guard for `mark_node_type_usage`.
     pub(super) node_scan_seen: HashSet<TypeId>,
-    pub(super) output: String,
-    pub(super) ranges: Vec<DtsRange>,
-    pub(super) map_enabled: bool,
+    pub(super) sink: Sink<SemanticTag>,
 }
 
 impl<'a> Emitter<'a> {
@@ -57,26 +61,30 @@ impl<'a> Emitter<'a> {
             needs_node_type: false,
             emitted_types: HashSet::new(),
             node_scan_seen: HashSet::new(),
-            output: String::new(),
-            ranges: Vec::new(),
-            map_enabled: false,
+            sink: Sink::new(),
         }
-    }
-
-    pub(super) fn colors(&self) -> Colors {
-        self.config.colors
     }
 
     pub fn emit(mut self) -> String {
         self.emit_body();
-        self.finish_output()
+        finish_output(self.sink.render(self.config.colors))
     }
 
     pub fn emit_mapped(mut self) -> (String, Vec<DtsRange>) {
-        self.map_enabled = true;
         self.emit_body();
-        let output = self.finish_output();
-        (output, self.ranges)
+        let output = finish_output(self.sink.plain().to_string());
+        let ranges = self
+            .sink
+            .tags()
+            .iter()
+            .map(|range| DtsRange {
+                start: u32::try_from(range.start).expect("d.ts range start fits in u32"),
+                end: u32::try_from(range.end).expect("d.ts range end fits in u32"),
+                type_id: u16::from(range.tag.type_id),
+                member: range.tag.member,
+            })
+            .collect();
+        (output, ranges)
     }
 
     fn emit_body(&mut self) {
@@ -118,38 +126,13 @@ impl<'a> Emitter<'a> {
         for (name, type_id) in remaining {
             let body = self.render_ty(type_id);
             self.declared_names.insert(name.clone());
-            self.emit_type_decl(&name, type_id, &body);
+            self.emit_type_decl(&name, type_id, body);
         }
-    }
-
-    fn finish_output(&mut self) -> String {
-        self.output.truncate(self.output.trim_end().len());
-        self.output.push('\n');
-        std::mem::take(&mut self.output)
     }
 
     pub(super) fn push_mapped(&mut self, text: &str, type_id: TypeId, member: Option<u16>) {
-        let start = self.output.len();
-        self.output.push_str(text);
-        let end = self.output.len();
-        self.record_range(start, end, type_id, member);
-    }
-
-    pub(super) fn record_range(
-        &mut self,
-        start: usize,
-        end: usize,
-        type_id: TypeId,
-        member: Option<u16>,
-    ) {
-        if !self.map_enabled {
-            return;
-        }
-        self.ranges.push(DtsRange {
-            start: u32::try_from(start).expect("d.ts range start fits in u32"),
-            end: u32::try_from(end).expect("d.ts range end fits in u32"),
-            type_id: u16::from(type_id),
-            member,
+        self.sink.tagged(SemanticTag { type_id, member }, |sink| {
+            sink.push(text);
         });
     }
 
@@ -165,4 +148,10 @@ impl<'a> Emitter<'a> {
             (idx, self.types.get_member(idx as usize))
         })
     }
+}
+
+fn finish_output(mut output: String) -> String {
+    output.truncate(output.trim_end().len());
+    output.push('\n');
+    output
 }

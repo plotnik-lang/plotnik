@@ -30,13 +30,14 @@ use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::codegen::emit::names::{rust_scope_idents, snake_ident};
+use crate::compiler::codegen::emit::sink::indentation;
 use crate::compiler::emit::tables::TypeTableBuilder;
 use crate::compiler::ids::DefId;
 use crate::compiler::typegen::rust::emitter::{Emitter as TypeModel, Item, ItemKind, TypeContext};
-use crate::compiler::typegen::rust::idents::scope_idents;
 use crate::core::{Interner, Symbol};
 
-use super::emitter::{accepts_entry_fn_name, safe_entry_fn_name, snake_ident};
+use super::emitter::{accepts_entry_fn_name, safe_entry_fn_name};
 
 const WORD_BYTES: u64 = 8;
 const NODE_VALUE_BYTES: u64 = 48;
@@ -571,7 +572,8 @@ impl<'a> ReaderGen<'a> {
         };
         let ident = self.model.item_ident(item.name).to_string();
         let twins = &self.tables.twins[&item.name];
-        let variant_idents = scope_idents(variants.keys().map(|&sym| self.interner.resolve(sym)));
+        let variant_idents =
+            rust_scope_idents(variants.keys().map(|&sym| self.interner.resolve(sym)));
         let fallible = self.item_reader_fallible(item);
         out.push('\n');
         self.reader_open(out, item);
@@ -638,7 +640,7 @@ impl<'a> ReaderGen<'a> {
         fields: &BTreeMap<Symbol, FieldInfo>,
         indices_of: impl Fn(usize) -> Vec<u16>,
     ) {
-        let p = pad(scope.level());
+        let p = indentation(scope.level());
         for (k, &name) in fields.keys().enumerate() {
             let _ = writeln!(
                 out,
@@ -674,9 +676,9 @@ impl<'a> ReaderGen<'a> {
         fields: &BTreeMap<Symbol, FieldInfo>,
         fallible: bool,
     ) {
-        let p = pad(scope.level());
+        let p = indentation(scope.level());
         let head = scope.construction_head();
-        let field_idents = scope_idents(fields.keys().map(|&sym| self.interner.resolve(sym)));
+        let field_idents = rust_scope_idents(fields.keys().map(|&sym| self.interner.resolve(sym)));
         if fallible {
             let _ = writeln!(out, "{p}Ok({head} {{");
         } else {
@@ -748,7 +750,7 @@ impl<'a> ReaderGen<'a> {
     /// `Option` layers the type carries; a present value wraps `Some` at
     /// every layer (the VM never nests nulls).
     fn nullable_expr(&self, inner: TypeId, context: ReadContext) -> String {
-        let p = pad(context.level);
+        let p = indentation(context.level);
         let inner_expr = self.value_expr(inner, context.in_some_branch());
         let mut out = String::new();
         let _ = writeln!(out, "if t.take_null() {{");
@@ -760,7 +762,7 @@ impl<'a> ReaderGen<'a> {
     }
 
     fn array_expr(&self, element: TypeId, context: ReadContext) -> String {
-        let p = pad(context.level);
+        let p = indentation(context.level);
         let items = format!("items{}", context.array_depth);
         let elem = self.value_expr(element, context.array_element());
         let mut out = String::new();
@@ -946,10 +948,6 @@ fn arm_pattern(mut indices: Vec<u16>) -> String {
         .map(u16::to_string)
         .collect::<Vec<_>>()
         .join(" | ")
-}
-
-fn pad(level: usize) -> String {
-    "    ".repeat(level)
 }
 
 fn align_to_word(bytes: u64) -> u64 {

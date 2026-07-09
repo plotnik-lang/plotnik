@@ -17,7 +17,8 @@
 //! sibling text here must follow — the 06-vm conformance corpus is the tripwire.
 //!
 //! All emitted shapes live as column-0 raw-string templates at the bottom of
-//! this file; [`splice`] substitutes `@KEY@` placeholders and re-indents.
+//! this file; the shared template splicer substitutes `@KEY@` placeholders
+//! and re-indents.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -25,6 +26,10 @@ use std::fmt::Write as _;
 use crate::bytecode::{EffectKind, PredicateOp};
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::codegen::Config;
+use crate::compiler::codegen::emit::lits::{decimal_byte_lines, rust_string};
+use crate::compiler::codegen::emit::names::{shouty_ident, snake_ident};
+use crate::compiler::codegen::emit::sink::Sink;
+use crate::compiler::codegen::emit::template::splice;
 use crate::compiler::codegen::reader::ReaderGen;
 use crate::compiler::emit::regex_table::compile_dfa_bytes;
 use crate::compiler::emit::string_table::seed_string_table;
@@ -381,15 +386,9 @@ impl<'a> Generator<'a> {
         out.push_str("/// The compiled matcher: engine machinery shielded from the query's\n");
         out.push_str("/// type namespace.\n");
         out.push_str("mod matcher {\n");
-        for line in machinery.lines() {
-            if line.is_empty() {
-                out.push('\n');
-            } else {
-                out.push_str("    ");
-                out.push_str(line);
-                out.push('\n');
-            }
-        }
+        let mut nested = Sink::<()>::new();
+        nested.indented(|nested| nested.lines(&machinery));
+        out.push_str(nested.plain());
         out.push_str("}\n");
         out
     }
@@ -449,7 +448,8 @@ impl<'a> Generator<'a> {
             for (id, expected) in &self.operands.expect_kinds {
                 let name = &expected.name;
                 let named = expected.named;
-                let _ = writeln!(out, "    ({id}, {name:?}, {named}),");
+                let name = rust_string(name);
+                let _ = writeln!(out, "    ({id}, {name}, {named}),");
             }
             out.push_str("];\n");
         }
@@ -460,7 +460,8 @@ impl<'a> Generator<'a> {
         } else {
             out.push_str("const EXPECTED_FIELDS: &[(u16, &str)] = &[\n");
             for (id, name) in &self.operands.expect_fields {
-                let _ = writeln!(out, "    ({id}, {name:?}),");
+                let name = rust_string(name);
+                let _ = writeln!(out, "    ({id}, {name}),");
             }
             out.push_str("];\n");
         }
@@ -492,14 +493,7 @@ impl<'a> Generator<'a> {
                 "static RE_{}: rt::StaticDfa = rt::StaticDfa::new(&[",
                 regex.index
             );
-            for chunk in regex.bytes.chunks(16) {
-                let line = chunk
-                    .iter()
-                    .map(|b| b.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                let _ = writeln!(out, "    {line},");
-            }
+            out.push_str(&decimal_byte_lines(&regex.bytes, 16, "    "));
             out.push_str("]);\n");
         }
     }
@@ -951,7 +945,7 @@ impl<'a> Generator<'a> {
         let text = "rt::node_text(source, &node)";
         match &pred.value {
             PredicateValueIR::String(value) => {
-                let lit = format!("{value:?}");
+                let lit = rust_string(value);
                 let fail = match pred.op {
                     PredicateOp::Eq => format!("{text} != {lit}"),
                     PredicateOp::Ne => format!("{text} == {lit}"),
@@ -1099,22 +1093,6 @@ fn policy_expr(policy: SkipPolicy) -> String {
     format!("rt::SkipPolicy::{policy:?}")
 }
 
-/// PascalCase → SHOUTY_SNAKE (`FooBar` → `FOO_BAR`, `HTTPServer` → `HTTP_SERVER`).
-pub(super) fn shouty_ident(name: &str) -> String {
-    case_segments(name)
-        .map(|s| s.to_uppercase())
-        .collect::<Vec<_>>()
-        .join("_")
-}
-
-/// PascalCase → snake_case (`FooBar` → `foo_bar`).
-pub(super) fn snake_ident(name: &str) -> String {
-    case_segments(name)
-        .map(|s| s.to_lowercase())
-        .collect::<Vec<_>>()
-        .join("_")
-}
-
 /// The public function a generated matcher exposes for a definition
 /// (`FooBar` → `foo_bar_trace`). Part of the generated-code contract:
 /// callers that only know the definition name resolve the symbol through
@@ -1151,53 +1129,6 @@ pub(super) fn depth_expr(limit: Limit, max_reader_frame_bytes: u64) -> String {
         Limit::Auto => format!("Some(rt::replay_depth_auto({max_reader_frame_bytes}))"),
         Limit::Of(n) => format!("Some({n})"),
         Limit::Unbounded => "None".to_string(),
-    }
-}
-
-/// Split camel/Pascal humps: a boundary opens before an uppercase following a
-/// non-uppercase, and before the last uppercase of an acronym run
-/// (`HTTPServer` → `HTTP`, `Server`).
-fn case_segments(name: &str) -> impl Iterator<Item = String> {
-    let chars: Vec<char> = name.chars().collect();
-    let mut segments = Vec::new();
-    let mut current = String::new();
-    for (i, &c) in chars.iter().enumerate() {
-        if c == '_' {
-            if !current.is_empty() {
-                segments.push(std::mem::take(&mut current));
-            }
-            continue;
-        }
-        let prev_upper = i > 0 && chars[i - 1].is_uppercase();
-        let next_lower = chars.get(i + 1).is_some_and(|n| n.is_lowercase());
-        let boundary = c.is_uppercase() && !current.is_empty() && (!prev_upper || next_lower);
-        if boundary {
-            segments.push(std::mem::take(&mut current));
-        }
-        current.push(c);
-    }
-    if !current.is_empty() {
-        segments.push(current);
-    }
-    segments.into_iter()
-}
-
-/// Splice a template into `out`: substitute `@KEY@` placeholders, then indent
-/// every non-empty line. Templates are written at column 0 so the emitted
-/// shape reads directly in this file.
-fn splice(out: &mut String, indent: &str, template: &str, subs: &[(&str, &str)]) {
-    let mut text = template.trim_matches('\n').to_string();
-    for (key, value) in subs {
-        text = text.replace(&format!("@{key}@"), value);
-    }
-    for line in text.lines() {
-        if line.is_empty() {
-            out.push('\n');
-            continue;
-        }
-        out.push_str(indent);
-        out.push_str(line);
-        out.push('\n');
     }
 }
 

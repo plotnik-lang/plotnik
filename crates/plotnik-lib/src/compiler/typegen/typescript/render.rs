@@ -1,13 +1,14 @@
-//! Output rendering methods.
+//! TypeScript declaration rendering over the shared semantic sink.
 
 use crate::bytecode::{TypeDef, TypeDefKind, TypeId, TypeKind};
+use crate::compiler::codegen::emit::sink::{Sink, Style};
 
 use super::Emitter;
+use super::emitter::SemanticTag;
 
 impl Emitter<'_> {
     /// Emit the declaration for a named type: `interface` for a struct, a
     /// multi-line tagged union for an enum, `type Name = …` for aliases.
-    /// Unnamed composites emit nothing — they render inline at use sites.
     pub(super) fn emit_declaration(&mut self, type_id: TypeId) {
         if self.emitted_types.contains(&type_id) {
             return;
@@ -35,235 +36,200 @@ impl Emitter<'_> {
                 inner,
             } => {
                 let body = self.render_ty(inner);
-                self.emit_type_decl(&name, type_id, &body);
+                self.emit_type_decl(&name, type_id, body);
             }
             _ => {
                 let body = self.render_shape(type_id);
-                self.emit_type_decl(&name, type_id, &body);
+                self.emit_type_decl(&name, type_id, body);
             }
         }
     }
 
-    /// Emit `export type Name = Body;` with proper coloring.
-    pub(super) fn emit_type_decl(&mut self, name: &str, type_id: TypeId, body: &str) {
-        let c = self.colors();
-        if self.config.export {
-            self.output
-                .push_str(&format!("{}export{} ", c.dim, c.reset));
-        }
-        self.output
-            .push_str(&format!("{}type{} {}", c.dim, c.reset, c.blue));
+    /// Emit `export type Name = Body;`, retaining style and mapping metadata.
+    pub(super) fn emit_type_decl(&mut self, name: &str, type_id: TypeId, body: Sink<SemanticTag>) {
+        emit_export(&mut self.sink, self.config.export);
+        self.sink.styled(Style::Dim, "type");
+        self.sink.push(" ");
+        self.sink.set_style(Style::Blue);
         self.push_mapped(name, type_id, None);
-        self.output.push_str(&format!(
-            "{} {}={} {}{};\n\n",
-            c.reset, c.dim, c.reset, body, c.dim
-        ));
-        self.output.push_str(c.reset);
+        self.sink.reset_style();
+        self.sink.push(" ");
+        self.sink.styled(Style::Dim, "=");
+        self.sink.push(" ");
+        self.sink.append(body);
+        self.sink.set_style(Style::Dim);
+        self.sink.push(";\n\n");
+        self.sink.reset_style();
     }
 
     fn emit_interface(&mut self, name: &str, type_id: TypeId, type_def: &TypeDef) {
-        let c = self.colors();
-
-        if self.config.export {
-            self.output
-                .push_str(&format!("{}export{} ", c.dim, c.reset));
-        }
-        self.output
-            .push_str(&format!("{}interface{} {}", c.dim, c.reset, c.blue));
+        emit_export(&mut self.sink, self.config.export);
+        self.sink.styled(Style::Dim, "interface");
+        self.sink.push(" ");
+        self.sink.set_style(Style::Blue);
         self.push_mapped(name, type_id, None);
-        self.output.push_str(&format!("{} {}{{\n", c.reset, c.dim));
+        self.sink.reset_style();
+        self.sink.push(" ");
+        self.sink.set_style(Style::Dim);
+        self.sink.push("{\n");
 
         let mut fields: Vec<(String, TypeId, u16)> = self
             .members_of_with_indices(type_def)
-            .map(|(idx, member)| {
+            .map(|(index, member)| {
                 (
                     self.strings.get(member.name_id).to_string(),
                     member.type_id,
-                    idx,
+                    index,
                 )
             })
             .collect();
-        fields.sort_by(|a, b| a.0.cmp(&b.0));
+        fields.sort_by(|left, right| left.0.cmp(&right.0));
 
-        for (field_name, field_type, member_idx) in fields {
-            // Every declared field is always present in the output. An optional
-            // field renders as `T | null` (the materializer emits null when it does
-            // not match), not `T?` which would wrongly permit an absent key.
-            let ts_type = self.render_ty(field_type);
-            self.output.push_str(&format!("{}  ", c.reset));
-            self.push_mapped(&field_name, type_id, Some(member_idx));
-            self.output
-                .push_str(&format!("{}:{} {}{};\n", c.dim, c.reset, ts_type, c.dim));
+        for (name, field_type, member) in fields {
+            // Optional fields remain present and render as `T | null`, not `T?`.
+            let rendered = self.render_ty(field_type);
+            self.sink.reset_style();
+            self.sink.push("  ");
+            self.push_mapped(&name, type_id, Some(member));
+            self.sink.set_style(Style::Dim);
+            self.sink.push(":");
+            self.sink.reset_style();
+            self.sink.push(" ");
+            self.sink.append(rendered);
+            self.sink.set_style(Style::Dim);
+            self.sink.push(";\n");
         }
 
-        self.output.push_str(&format!("{}}}{}\n\n", c.dim, c.reset));
+        self.sink.set_style(Style::Dim);
+        self.sink.push("}");
+        self.sink.reset_style();
+        self.sink.push("\n\n");
     }
 
-    /// Emit an enum as one multi-line union of inline variants:
-    ///
-    /// ```ts
-    /// export type Expr =
-    ///   | { $tag: "Lit"; $data: { value: Node } }
-    ///   | { $tag: "Neg"; $data: { inner: Expr } };
-    /// ```
-    ///
-    /// Variants have no standalone declarations; a void variant omits `$data`.
+    /// Emit an enum as one multi-line union of inline variants.
     fn emit_enum(&mut self, name: &str, type_id: TypeId, type_def: &TypeDef) {
-        let c = self.colors();
-
-        if self.config.export {
-            self.output
-                .push_str(&format!("{}export{} ", c.dim, c.reset));
-        }
-        self.output
-            .push_str(&format!("{}type{} {}", c.dim, c.reset, c.blue));
+        emit_export(&mut self.sink, self.config.export);
+        self.sink.styled(Style::Dim, "type");
+        self.sink.push(" ");
+        self.sink.set_style(Style::Blue);
         self.push_mapped(name, type_id, None);
-        self.output
-            .push_str(&format!("{} {}={}\n", c.reset, c.dim, c.reset));
+        self.sink.reset_style();
+        self.sink.push(" ");
+        self.sink.styled(Style::Dim, "=");
+        self.sink.push("\n");
 
         let variants: Vec<(String, TypeId, u16)> = self
             .members_of_with_indices(type_def)
-            .map(|(idx, member)| {
+            .map(|(index, member)| {
                 (
                     self.strings.get(member.name_id).to_string(),
                     member.type_id,
-                    idx,
+                    index,
                 )
             })
             .collect();
-
         let last = variants.len().saturating_sub(1);
-        for (i, (variant_name, payload_type, member_idx)) in variants.into_iter().enumerate() {
-            let terminator = if i == last { ";" } else { "" };
-            self.output.push_str(&format!("  {}|{} ", c.dim, c.reset));
-            self.emit_variant(&variant_name, payload_type, type_id, member_idx);
-            self.output
-                .push_str(&format!("{}{}{}\n", c.dim, terminator, c.reset));
-        }
-        self.output.push('\n');
-    }
-
-    /// Emit one variant literal, byte-identical to
-    /// [`render_variant`](Self::render_variant), but writing through
-    /// `push_mapped` so the tag and payload field ranges are recorded at push
-    /// time. Re-finding names in rendered text by substring scan is not sound —
-    /// a field name that collides with `$tag:`/`$data:` text binds to the
-    /// wrong offset.
-    fn emit_variant(
-        &mut self,
-        variant_name: &str,
-        payload_type: TypeId,
-        enum_type: TypeId,
-        variant_member: u16,
-    ) {
-        let c = self.colors();
-        self.output.push_str(&format!(
-            "{}{{{} $tag{}:{} {}\"",
-            c.dim, c.reset, c.dim, c.reset, c.green
-        ));
-        self.push_mapped(variant_name, enum_type, Some(variant_member));
-        self.output.push_str(&format!("\"{}", c.reset));
-
-        if self.is_void_type(payload_type) {
-            self.output.push_str(&format!(" {}}}{}", c.dim, c.reset));
-            return;
-        }
-
-        self.output
-            .push_str(&format!("{}; $data{}:{} ", c.dim, c.dim, c.reset));
-        self.emit_variant_payload(payload_type);
-        self.output.push_str(&format!(" {}}}{}", c.dim, c.reset));
-    }
-
-    /// Mapped twin of [`inline_variant_payload`](Self::inline_variant_payload):
-    /// a struct payload inlines with mapped field names, everything else
-    /// renders unmapped.
-    fn emit_variant_payload(&mut self, payload_type: TypeId) {
-        if let Some(type_def) = self.types.get(payload_type)
-            && matches!(type_def.decode(), TypeDefKind::Struct { .. })
-        {
-            self.emit_inline_struct_mapped(&type_def, payload_type);
-            return;
-        }
-        let rendered = self.render_ty(payload_type);
-        self.output.push_str(&rendered);
-    }
-
-    /// Mapped twin of [`inline_struct`](Self::inline_struct) — same bytes,
-    /// field names recorded as they are written.
-    fn emit_inline_struct_mapped(&mut self, type_def: &TypeDef, type_id: TypeId) {
-        let c = self.colors();
-        let mut fields: Vec<(String, TypeId, u16)> = self
-            .members_of_with_indices(type_def)
-            .map(|(idx, member)| {
-                (
-                    self.strings.get(member.name_id).to_string(),
-                    member.type_id,
-                    idx,
-                )
-            })
-            .collect();
-        if fields.is_empty() {
-            self.output.push_str(&format!("{}{{}}{}", c.dim, c.reset));
-            return;
-        }
-        fields.sort_by(|a, b| a.0.cmp(&b.0));
-
-        self.output.push_str(&format!("{}{{{} ", c.dim, c.reset));
-        let last = fields.len() - 1;
-        for (i, (field_name, field_type, member_idx)) in fields.into_iter().enumerate() {
-            self.push_mapped(&field_name, type_id, Some(member_idx));
-            let ts_type = self.render_ty(field_type);
-            self.output
-                .push_str(&format!("{}:{} {}", c.dim, c.reset, ts_type));
-            if i != last {
-                self.output.push_str(&format!("{}; ", c.dim));
+        for (position, (name, payload, member)) in variants.into_iter().enumerate() {
+            let rendered = self.render_variant(
+                &name,
+                payload,
+                Some(SemanticTag {
+                    type_id,
+                    member: Some(member),
+                }),
+                true,
+            );
+            self.sink.push("  ");
+            self.sink.styled(Style::Dim, "|");
+            self.sink.push(" ");
+            self.sink.append(rendered);
+            self.sink.set_style(Style::Dim);
+            if position == last {
+                self.sink.push(";");
             }
+            self.sink.reset_style();
+            self.sink.push("\n");
         }
-        self.output.push_str(&format!(" {}}}{}", c.dim, c.reset));
+        self.sink.push("\n");
     }
 
     pub(super) fn emit_node_interface(&mut self) {
-        let c = self.colors();
+        emit_export(&mut self.sink, self.config.export);
+        self.sink.styled(Style::Dim, "interface");
+        self.sink.push(" ");
+        self.sink.styled(Style::Blue, "Node");
+        self.sink.push(" ");
+        self.sink.set_style(Style::Dim);
+        self.sink.push("{\n");
 
-        if self.config.export {
-            self.output
-                .push_str(&format!("{}export{} ", c.dim, c.reset));
-        }
-        self.output.push_str(&format!(
-            "{}interface{} {}Node{} {}{{\n",
-            c.dim, c.reset, c.blue, c.reset, c.dim
-        ));
+        emit_node_field(&mut self.sink, "kind", text("string"));
+        emit_node_field(&mut self.sink, "text", text("string"));
 
-        self.output.push_str(&format!(
-            "{}  kind{}:{} string{};\n",
-            c.reset, c.dim, c.reset, c.dim
-        ));
-        self.output.push_str(&format!(
-            "{}  text{}:{} string{};\n",
-            c.reset, c.dim, c.reset, c.dim
-        ));
-        self.output.push_str(&format!(
-            "{}  span{}:{} {}[{}number{}, {}number{}]{};\n",
-            c.reset, c.dim, c.reset, c.dim, c.reset, c.dim, c.reset, c.dim, c.dim
-        ));
+        self.sink.reset_style();
+        self.sink.push("  span");
+        self.sink.styled(Style::Dim, ":");
+        self.sink.push(" ");
+        self.sink.styled(Style::Dim, "[");
+        self.sink.push("number");
+        self.sink.styled(Style::Dim, ", ");
+        self.sink.push("number");
+        self.sink.set_style(Style::Dim);
+        self.sink.push("]");
+        self.sink.set_style(Style::Dim);
+        self.sink.push(";\n");
 
         if self.config.verbose_nodes {
-            // startPosition and endPosition share same inline type
-            let pos_type = format!(
-                "{}{{{} row{}:{} number{}; column{}:{} number{}; {}}}",
-                c.dim, c.reset, c.dim, c.reset, c.dim, c.dim, c.reset, c.dim, c.dim
-            );
-            self.output.push_str(&format!(
-                "{}  startPosition{}:{} {}{};\n",
-                c.reset, c.dim, c.reset, pos_type, c.dim
-            ));
-            self.output.push_str(&format!(
-                "{}  endPosition{}:{} {}{};\n",
-                c.reset, c.dim, c.reset, pos_type, c.dim
-            ));
+            emit_node_field(&mut self.sink, "startPosition", position_type());
+            emit_node_field(&mut self.sink, "endPosition", position_type());
         }
 
-        self.output.push_str(&format!("{}}}{}\n\n", c.dim, c.reset));
+        self.sink.set_style(Style::Dim);
+        self.sink.push("}");
+        self.sink.reset_style();
+        self.sink.push("\n\n");
     }
+}
+
+fn emit_export(sink: &mut Sink<SemanticTag>, enabled: bool) {
+    if !enabled {
+        return;
+    }
+    sink.styled(Style::Dim, "export");
+    sink.push(" ");
+}
+
+fn emit_node_field(sink: &mut Sink<SemanticTag>, name: &str, ty: Sink<SemanticTag>) {
+    sink.reset_style();
+    sink.push("  ");
+    sink.push(name);
+    sink.styled(Style::Dim, ":");
+    sink.push(" ");
+    sink.append(ty);
+    sink.set_style(Style::Dim);
+    sink.push(";\n");
+}
+
+fn position_type() -> Sink<SemanticTag> {
+    let mut out = Sink::new();
+    out.styled(Style::Dim, "{");
+    out.push(" row");
+    out.styled(Style::Dim, ":");
+    out.push(" number");
+    out.set_style(Style::Dim);
+    out.push("; column");
+    out.set_style(Style::Dim);
+    out.push(":");
+    out.reset_style();
+    out.push(" number");
+    out.set_style(Style::Dim);
+    out.push("; ");
+    out.set_style(Style::Dim);
+    out.push("}");
+    out
+}
+
+fn text(value: &str) -> Sink<SemanticTag> {
+    let mut out = Sink::new();
+    out.push(value);
+    out
 }

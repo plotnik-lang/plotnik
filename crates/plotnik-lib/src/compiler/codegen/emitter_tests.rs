@@ -1,6 +1,7 @@
 use plotnik_rt::{Limit, Nav};
 
-use super::emitter::{depth_expr, limit_expr, nav_expr, shouty_ident, snake_ident};
+use super::emit::names::{shouty_ident, snake_ident};
+use super::emitter::{depth_expr, limit_expr, nav_expr};
 
 #[test]
 fn shouty_splits_pascal_humps() {
