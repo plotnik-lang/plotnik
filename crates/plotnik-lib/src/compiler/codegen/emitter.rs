@@ -12,7 +12,7 @@
 //!
 //! Control skeletons (`run`, `backtrack`, `match_retry`) transcribe the VM's
 //! `execute_with_stats` / `backtrack` handler-for-handler over the shared
-//! `plotnik_rt::Engine`; per-state arms transcribe one IR instruction each
+//! `plotnik_rt::Engine`; per-state arms render the target-neutral matcher plan
 //! with operands folded to constants. When the VM engine changes shape, the
 //! sibling text here must follow — the 06-vm conformance corpus is the tripwire.
 //!
@@ -25,21 +25,19 @@ use std::fmt::Write as _;
 
 use crate::bytecode::{EffectKind, PredicateOp};
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::codegen::Config;
 use crate::compiler::codegen::emit::lits::{decimal_byte_lines, rust_string};
 use crate::compiler::codegen::emit::names::{shouty_ident, snake_ident};
 use crate::compiler::codegen::emit::sink::Sink;
 use crate::compiler::codegen::emit::template::splice;
+use crate::compiler::codegen::plan::{
+    CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, ModulePlan, PredicatePlan,
+    PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
+};
 use crate::compiler::codegen::reader::ReaderGen;
 use crate::compiler::emit::regex_table::compile_dfa_bytes;
-use crate::compiler::lower::dump::NfaDumper;
-use crate::compiler::lower::ir::{
-    CallIR, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin, MatchIR, NfaGraph,
-    NodeKindConstraint, PredicateIR, PredicateValueIR, SemanticNfa,
-};
+use crate::compiler::lower::ir::{NfaGraph, SemanticNfa};
 use crate::compiler::typegen::rust::Config as RustTypesConfig;
-use crate::core::{NodeFieldId, NodeKindId};
 use plotnik_rt::{Limit, Nav, SkipPolicy};
 
 /// Generate the Rust query module for a compiled query's fork-point NFA.
@@ -101,265 +99,150 @@ impl CandidateCheck {
     }
 }
 
-struct ExpectedKind {
-    name: String,
-    named: bool,
-}
-
-impl ExpectedKind {
-    fn from_constraint(
-        constraint: NodeKindConstraint,
-        dumper: &NfaDumper<'_>,
-    ) -> Option<(u16, Self)> {
-        let (id, named) = match constraint {
-            NodeKindConstraint::Named(Some(id)) => (id, true),
-            NodeKindConstraint::Anonymous(Some(id)) => (id, false),
-            _ => return None,
-        };
-        if id == NodeKindId::ERROR {
-            return None;
-        }
-        Some((
-            u16::from(id),
-            Self {
-                name: dumper.kind_display_name(id),
-                named,
-            },
-        ))
-    }
-}
-
 struct RegexStatic {
-    index: usize,
+    id: RegexId,
     bytes: Vec<u8>,
 }
 
 impl RegexStatic {
-    fn compile(index: usize, pattern: &str) -> Self {
+    fn compile(id: RegexId, pattern: &str) -> Self {
         let bytes = compile_dfa_bytes(pattern).expect("regex predicate compiled during emit");
-        Self { index, bytes }
+        Self { id, bytes }
     }
 }
 
-struct OperandTables {
+/// Rust-only representation decisions over the neutral matcher plan.
+struct RustRepresentation {
+    states: Vec<StateInfo>,
     /// Field-id consts: raw id → `F_{NAME}` const name. Keyed by id and
     /// collision-suffixed at insert, so the const namespace stays injective.
     fields: BTreeMap<u16, String>,
-    /// Numeric kind and field ids baked into generated checks, paired with
-    /// their generation-time grammar names for the runtime skew assertion.
-    expect_kinds: BTreeMap<u16, ExpectedKind>,
-    expect_fields: BTreeMap<u16, String>,
-    /// Regex predicates in first-appearance order: pattern → compiled DFA.
-    regexes: BTreeMap<String, RegexStatic>,
-    any_predicate: bool,
-    any_retry_predicate: bool,
+    /// Rust uses regex-automata's native serialized sparse-DFA format. The
+    /// neutral plan supplies stable regex ids and patterns; its portable DFA
+    /// representation is added alongside the cross-language runtime contract.
+    regexes: Vec<RegexStatic>,
 }
 
-impl OperandTables {
-    fn collect(sorted: &[&InstructionIR], dumper: &NfaDumper<'_>) -> Self {
-        let mut tables = Self {
+impl RustRepresentation {
+    fn from_plan(plan: &crate::compiler::codegen::plan::MatcherPlan) -> Self {
+        let width = plan.label_width();
+        let states = plan
+            .states()
+            .iter()
+            .map(|state| {
+                let suffix = match state.origin {
+                    StateOrigin::Definition => "",
+                    StateOrigin::ConsumingDefinition => "_plus",
+                    StateOrigin::Entrypoint => "_ep",
+                };
+                StateInfo {
+                    id: state.id.raw(),
+                    const_name: format!(
+                        "S{:0width$}_{}{}",
+                        state.label.0,
+                        shouty_ident(&state.definition),
+                        suffix.to_uppercase()
+                    ),
+                    fn_stem: format!(
+                        "s{:0width$}_{}{}",
+                        state.label.0,
+                        snake_ident(&state.definition),
+                        suffix
+                    ),
+                }
+            })
+            .collect();
+
+        let mut representation = Self {
+            states,
             fields: BTreeMap::new(),
-            expect_kinds: BTreeMap::new(),
-            expect_fields: BTreeMap::new(),
-            regexes: BTreeMap::new(),
-            any_predicate: false,
-            any_retry_predicate: false,
+            regexes: plan
+                .regexes()
+                .iter()
+                .map(|regex| RegexStatic::compile(regex.id, &regex.pattern))
+                .collect(),
         };
-        for instr in sorted {
-            match instr {
-                InstructionIR::Match(m) => tables.record_match(m, dumper),
-                InstructionIR::Call(c) => tables.record_call(c, dumper),
-                InstructionIR::Return(_) => {}
-            }
+        for field in plan.fields() {
+            representation.record_field(field.id, &field.name);
         }
-        tables
+        representation
     }
 
-    fn record_match(&mut self, m: &MatchIR, dumper: &NfaDumper<'_>) {
-        if let Some((id, expected)) = ExpectedKind::from_constraint(m.node_kind, dumper) {
-            self.expect_kinds.insert(id, expected);
-        }
-        if let Some(field) = m.node_field {
-            self.record_field(field, dumper);
-        }
-        for &field in &m.neg_fields {
-            self.record_field(field, dumper);
-        }
-        let Some(pred) = &m.predicate else {
-            return;
-        };
-        self.any_predicate = true;
-        if is_retryable(m) {
-            self.any_retry_predicate = true;
-        }
-        let PredicateValueIR::Regex(pattern) = &pred.value else {
-            return;
-        };
-        let next_index = self.regexes.len();
-        self.regexes
-            .entry(pattern.to_string())
-            .or_insert_with(|| RegexStatic::compile(next_index, pattern));
-    }
-
-    fn record_call(&mut self, c: &CallIR, dumper: &NfaDumper<'_>) {
-        if let Some(field) = c.node_field {
-            self.record_field(field, dumper);
-        }
-    }
-
-    fn record_field(&mut self, field: NodeFieldId, dumper: &NfaDumper<'_>) {
-        let id = u16::from(field);
-        let display = dumper.field_display_name(field);
-        self.expect_fields.insert(id, display.clone());
+    fn record_field(&mut self, id: u16, display: &str) {
         if self.fields.contains_key(&id) {
             return;
         }
         // Distinct grammar field names can collapse to one SHOUTY form
         // (`fooBar` / `foo_bar`); suffix until free so a collision can never
         // silently alias two ids under one const.
-        let mut name = format!("F_{}", shouty_ident(&display));
+        let mut name = format!("F_{}", shouty_ident(display));
         while self.fields.values().any(|taken| *taken == name) {
             let _ = write!(name, "_{id}");
         }
         self.fields.insert(id, name);
     }
+
+    fn state(&self, id: StateId) -> &StateInfo {
+        self.states
+            .get(usize::from(id.raw()))
+            .expect("every planned state has a Rust representation")
+    }
 }
 
 struct Generator<'a> {
-    graph: &'a NfaGraph,
-    dumper: NfaDumper<'a>,
     config: &'a Config,
-    artifacts: AnalysisArtifacts<'a>,
-    /// Target-neutral output shapes and the one shared capture-member layout.
-    schema: OutputSchema<'a>,
-    /// Instructions in label order (the dump's order).
-    sorted: Vec<&'a InstructionIR>,
-    states: BTreeMap<Label, StateInfo>,
-    operands: OperandTables,
-}
-
-fn collect_states(
-    graph: &NfaGraph,
-    dumper: &NfaDumper<'_>,
-    sorted: &[&InstructionIR],
-) -> BTreeMap<Label, StateInfo> {
-    let width = dumper.label_width();
-    let mut states = BTreeMap::new();
-    for (id, instr) in sorted.iter().enumerate() {
-        let label = instr.label();
-        let def = dumper.def_name_of(label);
-        let suffix = match graph
-            .origin(label)
-            .expect("every pre-pack label carries an origin")
-        {
-            LabelOrigin::Def(_) => "",
-            LabelOrigin::ConsumingDef(_) => "_plus",
-            LabelOrigin::Wrapper(_) => "_ep",
-        };
-        let const_name = format!(
-            "S{:0width$}_{}{}",
-            label.0,
-            shouty_ident(def),
-            suffix.to_uppercase()
-        );
-        let fn_stem = format!("s{:0width$}_{}{}", label.0, snake_ident(def), suffix);
-        states.insert(
-            label,
-            StateInfo {
-                id: id as u16,
-                const_name,
-                fn_stem,
-            },
-        );
-    }
-    states
+    plan: ModulePlan<'a>,
+    rust: RustRepresentation,
 }
 
 impl<'a> Generator<'a> {
     fn new(graph: &'a NfaGraph, artifacts: AnalysisArtifacts<'a>, config: &'a Config) -> Self {
-        let schema = OutputSchema::from_artifacts(artifacts)
-            .expect("bytecode dry-run validated the output schema");
-
-        let dumper = NfaDumper::new(graph, artifacts);
-
-        let mut sorted: Vec<&InstructionIR> = graph.instructions().iter().collect();
-        sorted.sort_by_key(|i| i.label());
-        assert!(
-            sorted.len() <= u16::MAX as usize + 1,
-            "state space exceeds u16 ids"
-        );
-
-        let states = collect_states(graph, &dumper, &sorted);
-        let operands = OperandTables::collect(&sorted, &dumper);
-        Self {
-            graph,
-            dumper,
-            config,
-            artifacts,
-            schema,
-            sorted,
-            states,
-            operands,
-        }
+        let plan = ModulePlan::build(graph, artifacts);
+        let rust = RustRepresentation::from_plan(plan.matcher());
+        Self { config, plan, rust }
     }
 
-    fn state(&self, label: Label) -> &StateInfo {
-        self.states
-            .get(&label)
-            .expect("every successor label addresses an instruction")
+    fn state(&self, id: StateId) -> &StateInfo {
+        self.rust.state(id)
     }
 
-    fn field_const(&self, field: NodeFieldId) -> String {
-        self.operands
+    fn field_const(&self, field: u16) -> String {
+        self.rust
             .fields
-            .get(&u16::from(field))
+            .get(&field)
             .expect("every rendered field was recorded during operand collection")
             .clone()
     }
 
-    fn regex_static(&self, pattern: &str) -> String {
-        let regex = self
-            .operands
-            .regexes
-            .get(pattern)
-            .expect("regex collected before rendering");
-        format!("RE_{}", regex.index)
-    }
-
-    /// The absolute member-table index this effect's payload resolves to —
-    /// the same `member_base + relative_index` the bytecode emitter writes.
-    fn effect_payload(&self, effect: &EffectIR) -> u16 {
-        match effect.payload() {
-            EffectArg::Literal(value) => {
-                u16::try_from(*value).expect("literal effect payload fits u16")
-            }
-            EffectArg::Member(member) => {
-                let base = self
-                    .schema
-                    .layout()
-                    .member_base(member.parent_type)
-                    .expect("effect member parent has a capture scope");
-                base + member.relative_index
-            }
-        }
+    fn regex_static(&self, id: RegexId) -> String {
+        format!("RE_{}", id.index())
     }
 
     fn render(&self) -> String {
         let rust_config = RustTypesConfig::new()
             .rt_crate(self.config.rt_crate.clone())
             .serde(self.config.serde);
-        let readers = ReaderGen::new(self.artifacts, self.schema.layout(), &rust_config);
+        let artifacts = self.plan.artifacts();
+        let readers = ReaderGen::new(artifacts, self.plan.output().layout(), &rust_config);
 
         let mut out = String::new();
         self.header(&mut out);
         out.push('\n');
         out.push_str(&crate::compiler::typegen::rust::emit(
-            self.artifacts.type_analysis,
-            self.artifacts.dependency_analysis,
-            self.artifacts.interner,
+            artifacts.type_analysis,
+            artifacts.dependency_analysis,
+            artifacts.interner,
             &rust_config,
         ));
-        out.push_str(&readers.parse_api(self.graph.entrypoint_wrappers().keys().copied()));
+        out.push_str(
+            &readers.parse_api(
+                self.plan
+                    .matcher()
+                    .entrypoints()
+                    .iter()
+                    .map(|entry| entry.definition),
+            ),
+        );
         out.push_str(&readers.readers());
         self.entry_reexports(&mut out);
 
@@ -397,13 +280,11 @@ impl<'a> Generator<'a> {
     /// machinery does.
     fn entry_reexports(&self, out: &mut String) {
         let names: Vec<String> = self
-            .graph
-            .entrypoint_wrappers()
-            .keys()
-            .map(|&def_id| {
-                let sym = self.artifacts.dependency_analysis.def_name_sym(def_id);
-                entry_fn_name(self.artifacts.interner.resolve(sym))
-            })
+            .plan
+            .matcher()
+            .entrypoints()
+            .iter()
+            .map(|entry| entry_fn_name(&entry.name))
             .collect();
         out.push('\n');
         let _ = writeln!(out, "pub use self::matcher::{{{}}};", names.join(", "));
@@ -436,26 +317,28 @@ impl<'a> Generator<'a> {
             "/// Node-kind ids baked into the candidate checks: `(id, name, is_named)`\n\
              /// as the generation-time grammar defines them.\n",
         );
-        if self.operands.expect_kinds.is_empty() {
+        let matcher = self.plan.matcher();
+        if matcher.expected_kinds().is_empty() {
             out.push_str("const EXPECTED_KINDS: &[(u16, &str, bool)] = &[];\n");
         } else {
             out.push_str("const EXPECTED_KINDS: &[(u16, &str, bool)] = &[\n");
-            for (id, expected) in &self.operands.expect_kinds {
-                let name = &expected.name;
+            for expected in matcher.expected_kinds() {
+                let id = expected.id;
                 let named = expected.named;
-                let name = rust_string(name);
+                let name = rust_string(&expected.name);
                 let _ = writeln!(out, "    ({id}, {name}, {named}),");
             }
             out.push_str("];\n");
         }
         out.push('\n');
         out.push_str("/// Field ids baked into the field checks: `(id, name)`.\n");
-        if self.operands.expect_fields.is_empty() {
+        if matcher.expected_fields().is_empty() {
             out.push_str("const EXPECTED_FIELDS: &[(u16, &str)] = &[];\n");
         } else {
             out.push_str("const EXPECTED_FIELDS: &[(u16, &str)] = &[\n");
-            for (id, name) in &self.operands.expect_fields {
-                let name = rust_string(name);
+            for field in matcher.expected_fields() {
+                let id = field.id;
+                let name = rust_string(&field.name);
                 let _ = writeln!(out, "    ({id}, {name}),");
             }
             out.push_str("];\n");
@@ -465,11 +348,11 @@ impl<'a> Generator<'a> {
     }
 
     fn field_consts(&self, out: &mut String) {
-        if self.operands.fields.is_empty() {
+        if self.rust.fields.is_empty() {
             return;
         }
         out.push('\n');
-        for (id, name) in &self.operands.fields {
+        for (id, name) in &self.rust.fields {
             let _ = writeln!(
                 out,
                 "const {name}: rt::NodeFieldId = rt::NodeFieldId::from_raw({id});"
@@ -478,15 +361,14 @@ impl<'a> Generator<'a> {
     }
 
     fn regex_statics(&self, out: &mut String) {
-        let mut ordered: Vec<(&String, &RegexStatic)> = self.operands.regexes.iter().collect();
-        ordered.sort_by_key(|(_, regex)| regex.index);
-        for (pattern, regex) in ordered {
+        for (plan, regex) in self.plan.matcher().regexes().iter().zip(&self.rust.regexes) {
+            let pattern = &plan.pattern;
             out.push('\n');
             let _ = writeln!(out, "// /{pattern}/ — serialized sparse DFA");
             let _ = writeln!(
                 out,
                 "static RE_{}: rt::StaticDfa = rt::StaticDfa::new(&[",
-                regex.index
+                regex.id.index()
             );
             out.push_str(&decimal_byte_lines(&regex.bytes, 16, "    "));
             out.push_str("]);\n");
@@ -497,14 +379,13 @@ impl<'a> Generator<'a> {
         out.push('\n');
         out.push_str("// Dense runtime state ids, in NFA label order.\n");
         let mut current: Option<&str> = None;
-        for instr in &self.sorted {
-            let label = instr.label();
-            let def = self.dumper.def_name_of(label);
+        for state in self.plan.matcher().states() {
+            let def = state.definition.as_str();
             if current != Some(def) {
                 let _ = writeln!(out, "// {def}:");
                 current = Some(def);
             }
-            let info = self.state(label);
+            let info = self.state(state.id);
             let _ = writeln!(out, "const {}: u16 = {};", info.const_name, info.id);
         }
     }
@@ -523,9 +404,9 @@ impl<'a> Generator<'a> {
         };
         let steps_metered = if steps_metered { "true" } else { "false" };
         let memory_metered = if memory_metered { "true" } else { "false" };
-        for &label in self.graph.entrypoint_wrappers().values() {
-            let def = self.dumper.def_name_of(label);
-            let info = self.state(label);
+        for entry in self.plan.matcher().entrypoints() {
+            let def = entry.name.as_str();
+            let info = self.state(entry.entry);
             let subs = [
                 ("DEF", def),
                 ("FN", &entry_fn_name(def)),
@@ -546,26 +427,29 @@ impl<'a> Generator<'a> {
     }
 
     fn step_fn(&self, out: &mut String) {
-        let source_param = if self.operands.any_predicate {
+        let source_param = if self.plan.matcher().any_predicate() {
             "source"
         } else {
             "_source"
         };
         out.push('\n');
         splice(out, "", STEP_OPEN, &[("SOURCE", source_param)]);
-        for instr in &self.sorted {
-            for line in self.dumper.render_instruction(instr).lines() {
+        for state in self.plan.matcher().states() {
+            for line in state.provenance.lines() {
                 let _ = writeln!(out, "        // {}", line.trim_end());
             }
-            match instr {
-                InstructionIR::Match(m) => self.match_arm(out, m),
-                InstructionIR::Call(c) => self.call_arm(out, c),
-                InstructionIR::Return(r) => {
+            match &state.kind {
+                StatePlanKind::Epsilon { effects, flow } => {
+                    self.epsilon_arm(out, state, effects, flow);
+                }
+                StatePlanKind::Match(plan) => self.match_arm(out, state, plan),
+                StatePlanKind::Call(plan) => self.call_arm(out, state, plan),
+                StatePlanKind::Return => {
                     splice(
                         out,
                         "        ",
                         RETURN_ARM,
-                        &[("STATE", &self.state(r.label).const_name)],
+                        &[("STATE", &self.state(state.id).const_name)],
                     );
                 }
             }
@@ -573,54 +457,54 @@ impl<'a> Generator<'a> {
         out.push_str(STEP_CLOSE);
     }
 
+    fn epsilon_arm(
+        &self,
+        out: &mut String,
+        state: &StatePlan,
+        effects: &[EffectPlan],
+        flow: &FlowPlan,
+    ) {
+        let info = self.state(state.id);
+        let _ = writeln!(out, "        {} => {{", info.const_name);
+        self.effects_and_flow(out, effects, flow, "            ");
+        out.push_str("        }\n");
+    }
+
     /// The dispatch arm for a Match instruction. Epsilon runs effects and
     /// branches; everything else navigates, searches candidates, leaves a
     /// retry checkpoint when the engine owns the sibling search, then runs
     /// the shared finish (effects + branch).
-    fn match_arm(&self, out: &mut String, m: &MatchIR) {
-        let info = self.state(m.label);
+    fn match_arm(&self, out: &mut String, state: &StatePlan, plan: &MatchPlan) {
+        let info = self.state(state.id);
 
-        if m.is_epsilon() {
-            assert!(
-                matches!(m.node_kind, NodeKindConstraint::Any)
-                    && !m.missing
-                    && m.node_field.is_none()
-                    && m.neg_fields.is_empty()
-                    && m.predicate.is_none(),
-                "epsilon match carries no candidate checks"
-            );
-            let _ = writeln!(out, "        {} => {{", info.const_name);
-            self.effects_and_flow(out, m, "            ");
-            out.push_str("        }\n");
-            return;
-        }
-
-        let has_navigate = !matches!(m.nav, Nav::Stay | Nav::StayExact);
-        let has_checks = has_candidate_checks(m);
-        let needs_label = has_navigate || has_checks;
-
-        if needs_label {
+        if plan.needs_state_label() {
             let _ = writeln!(out, "        {} => 'state: {{", info.const_name);
         } else {
             let _ = writeln!(out, "        {} => {{", info.const_name);
         }
 
-        if has_navigate {
+        if plan.navigates() {
             splice(
                 out,
                 "            ",
                 NAVIGATE_OR_BACKTRACK,
-                &[("NAV", &nav_expr(m.nav))],
+                &[("NAV", &nav_expr(plan.nav))],
             );
         }
 
-        self.candidate_search(out, m, "            ", CandidateFailure::StateBacktrack);
-        self.retry_checkpoint(out, m, "            ");
+        self.candidate_search(
+            out,
+            state,
+            plan,
+            "            ",
+            CandidateFailure::StateBacktrack,
+        );
+        self.retry_checkpoint(out, state, plan, "            ");
 
-        if is_retryable(m) {
+        if plan.retry.is_some() {
             let _ = writeln!(out, "            finish_{}(eng)", info.fn_stem);
         } else {
-            self.effects_and_flow(out, m, "            ");
+            self.effects_and_flow(out, &plan.effects, &plan.flow, "            ");
         }
         out.push_str("        }\n");
     }
@@ -631,16 +515,17 @@ impl<'a> Generator<'a> {
     fn candidate_search(
         &self,
         out: &mut String,
-        m: &MatchIR,
+        state: &StatePlan,
+        plan: &MatchPlan,
         indent: &str,
         failure: CandidateFailure,
     ) {
-        if !has_candidate_checks(m) {
+        if !plan.has_candidate_checks() {
             return;
         }
-        let call = self.cand_call(m);
+        let call = self.cand_call(state, plan);
         let fail = failure.code();
-        if m.nav.skip_policy() == SkipPolicy::Exact {
+        if plan.search == SkipPolicy::Exact {
             splice(
                 out,
                 indent,
@@ -655,7 +540,7 @@ impl<'a> Generator<'a> {
             CANDIDATE_LOOP,
             &[
                 ("CAND", &call),
-                ("POLICY", &policy_expr(m.nav.skip_policy())),
+                ("POLICY", &policy_expr(plan.search)),
                 ("FAIL", fail),
             ],
         );
@@ -664,24 +549,30 @@ impl<'a> Generator<'a> {
     /// Accepting a candidate in an engine-owned sibling search leaves a
     /// match-retry checkpoint, gated on the policy admitting the node into
     /// the pattern's gap — the VM's `push_match_retry_if_resumable`.
-    fn retry_checkpoint(&self, out: &mut String, m: &MatchIR, indent: &str) {
-        if !is_retryable(m) {
+    fn retry_checkpoint(
+        &self,
+        out: &mut String,
+        state: &StatePlan,
+        plan: &MatchPlan,
+        indent: &str,
+    ) {
+        let Some(policy) = plan.retry else {
             return;
-        }
+        };
         splice(
             out,
             indent,
             RETRY_CHECKPOINT,
             &[
-                ("POLICY", &policy_expr(m.nav.skip_policy())),
-                ("STATE", &self.state(m.label).const_name),
+                ("POLICY", &policy_expr(policy)),
+                ("STATE", &self.state(state.id).const_name),
             ],
         );
     }
 
-    fn cand_call(&self, m: &MatchIR) -> String {
-        let stem = &self.state(m.label).fn_stem;
-        if m.predicate.is_some() {
+    fn cand_call(&self, state: &StatePlan, plan: &MatchPlan) -> String {
+        let stem = &self.state(state.id).fn_stem;
+        if plan.has_predicate() {
             format!("cand_{stem}(eng, source)")
         } else {
             format!("cand_{stem}(eng)")
@@ -690,19 +581,25 @@ impl<'a> Generator<'a> {
 
     /// Post-acceptance effects, then the successor branch — inline for states
     /// with no retry, `finish_*` fns where the backtrack path replays them.
-    fn effects_and_flow(&self, out: &mut String, m: &MatchIR, indent: &str) {
-        for effect in &m.effects {
+    fn effects_and_flow(
+        &self,
+        out: &mut String,
+        effects: &[EffectPlan],
+        flow: &FlowPlan,
+        indent: &str,
+    ) {
+        for effect in effects {
             self.effect_stmt(out, effect, indent);
         }
-        match m.successors.as_slice() {
-            [] => {
+        match flow {
+            FlowPlan::Accept => {
                 let _ = writeln!(out, "{indent}Flow::Accept");
             }
-            [next] => {
+            FlowPlan::Jump(next) => {
                 let _ = writeln!(out, "{indent}Flow::Jump({})", self.state(*next).const_name);
             }
-            [next, alts @ ..] => {
-                let alt_names = alts
+            FlowPlan::Branch { next, alternatives } => {
+                let alt_names = alternatives
                     .iter()
                     .map(|alt| self.state(*alt).const_name.as_str())
                     .collect::<Vec<_>>()
@@ -713,14 +610,14 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn effect_stmt(&self, out: &mut String, effect: &EffectIR, indent: &str) {
+    fn effect_stmt(&self, out: &mut String, effect: &EffectPlan, indent: &str) {
         let unit = |out: &mut String, variant: &str| {
             let _ = writeln!(
                 out,
                 "{indent}eng.emit_data(|_| rt::RuntimeEffect::{variant});"
             );
         };
-        match effect.kind() {
+        match effect.kind {
             EffectKind::Node => {
                 let _ = writeln!(
                     out,
@@ -735,7 +632,7 @@ impl<'a> Generator<'a> {
             EffectKind::EnumClose => unit(out, "EnumClose"),
             EffectKind::Null => unit(out, "Null"),
             EffectKind::Set | EffectKind::EnumOpen => {
-                let variant = if effect.kind() == EffectKind::Set {
+                let variant = if effect.kind == EffectKind::Set {
                     "Set"
                 } else {
                     "EnumOpen"
@@ -743,8 +640,7 @@ impl<'a> Generator<'a> {
                 let _ = writeln!(
                     out,
                     "{indent}eng.emit_data(|_| rt::RuntimeEffect::{variant}({})); // {}",
-                    self.effect_payload(effect),
-                    self.dumper.effect_display(effect)
+                    effect.payload, effect.display
                 );
             }
             EffectKind::SuppressBegin => {
@@ -762,21 +658,20 @@ impl<'a> Generator<'a> {
     /// The dispatch arm for a Call: navigate (or stay), satisfy the field
     /// constraint, leave a call-retry checkpoint when the nav owns a search,
     /// then enter the callee.
-    fn call_arm(&self, out: &mut String, c: &CallIR) {
-        let state = &self.state(c.label).const_name;
-        let target = &self.state(c.target).const_name;
-        let next = &self.state(c.next).const_name;
-        let stays_on_current_node = matches!(c.nav, Nav::Stay | Nav::StayExact);
-        let policy = c.nav.skip_policy();
+    fn call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &CallPlan) {
+        let state = &self.state(state_plan.id).const_name;
+        let target = &self.state(plan.target).const_name;
+        let next = &self.state(plan.next).const_name;
+        let stays_on_current_node = plan.stays_on_current_node();
 
-        if !stays_on_current_node || c.node_field.is_some() {
+        if plan.needs_state_label() {
             let _ = writeln!(out, "        {state} => 'state: {{");
         } else {
             let _ = writeln!(out, "        {state} => {{");
         }
 
         if stays_on_current_node {
-            if let Some(field) = c.node_field {
+            if let Some(field) = plan.field {
                 splice(
                     out,
                     "            ",
@@ -789,23 +684,23 @@ impl<'a> Generator<'a> {
                 out,
                 "            ",
                 NAVIGATE_OR_BACKTRACK,
-                &[("NAV", &nav_expr(c.nav))],
+                &[("NAV", &nav_expr(plan.nav))],
             );
-            if let Some(field) = c.node_field {
+            if let Some(field) = plan.field {
                 splice(
                     out,
                     "            ",
                     CALL_FIELD_SCAN,
                     &[
                         ("FIELD", &self.field_const(field)),
-                        ("POLICY", &policy_expr(policy)),
+                        ("POLICY", &policy_expr(plan.search)),
                     ],
                 );
             }
         }
 
-        if !stays_on_current_node && policy != SkipPolicy::Exact {
-            let field = match c.node_field {
+        if let Some(policy) = plan.retry {
+            let field = match plan.field {
                 Some(field) => format!("Some({})", self.field_const(field)),
                 None => "None".to_string(),
             };
@@ -829,30 +724,29 @@ impl<'a> Generator<'a> {
     }
 
     fn cand_fns(&self, out: &mut String) {
-        for instr in &self.sorted {
-            let InstructionIR::Match(m) = instr else {
+        for state in self.plan.matcher().states() {
+            let StatePlanKind::Match(plan) = &state.kind else {
                 continue;
             };
-            if m.is_epsilon() || !has_candidate_checks(m) {
+            if !plan.has_candidate_checks() {
                 continue;
             }
-            self.cand_fn(out, m);
+            self.cand_fn(out, state, plan);
         }
     }
 
     /// The candidate check, mirroring the VM's `candidate_matches` order:
     /// kind, missing, field, negated fields, predicate.
-    fn cand_fn(&self, out: &mut String, m: &MatchIR) {
-        let info = self.state(m.label);
+    fn cand_fn(&self, out: &mut String, state: &StatePlan, plan: &MatchPlan) {
+        let info = self.state(state.id);
         out.push('\n');
         let _ = writeln!(
             out,
             "/// `{}` candidate: `{}`.",
-            info.const_name,
-            self.dumper.node_pattern_display(m)
+            info.const_name, plan.candidate_pattern
         );
         out.push_str("#[inline]\n");
-        let source_param = if m.predicate.is_some() {
+        let source_param = if plan.has_predicate() {
             ", source: &str"
         } else {
             ""
@@ -862,10 +756,10 @@ impl<'a> Generator<'a> {
             "fn cand_{}(eng: &rt::Engine<'_>{source_param}) -> bool {{",
             info.fn_stem
         );
-        if needs_node_binding(m) {
+        if plan.needs_node_binding() {
             out.push_str("    let node = eng.node();\n");
         }
-        for check in self.candidate_checks(m) {
+        for check in self.candidate_checks(&plan.checks) {
             splice(
                 out,
                 "    ",
@@ -877,71 +771,62 @@ impl<'a> Generator<'a> {
     }
 
     /// Every check in the VM's `candidate_matches` order.
-    fn candidate_checks(&self, m: &MatchIR) -> Vec<CandidateCheck> {
-        let mut checks = Vec::new();
-
-        match m.node_kind {
-            NodeKindConstraint::Any => {}
-            NodeKindConstraint::Named(None) => {
-                checks.push(CandidateCheck::new("(_)", "!node.is_named()"));
-            }
-            NodeKindConstraint::Named(Some(id)) => {
-                checks.push(CandidateCheck::new(
-                    format!("({})", self.dumper.kind_display_name(id)),
-                    format!("node.kind_id() != {} || !node.is_named()", u16::from(id)),
-                ));
-            }
-            NodeKindConstraint::Anonymous(None) => {
-                checks.push(CandidateCheck::new("\"_\"", "node.is_named()"));
-            }
-            NodeKindConstraint::Anonymous(Some(id)) => {
-                checks.push(CandidateCheck::new(
-                    format!("\"{}\"", self.dumper.kind_display_name(id)),
-                    format!("node.kind_id() != {} || node.is_named()", u16::from(id)),
-                ));
-            }
-        }
-
-        if m.missing {
-            checks.push(CandidateCheck::new(
-                "(MISSING …): only nodes the parser inserted during error recovery".to_string(),
-                "!node.is_missing()".to_string(),
-            ));
-        }
-
-        if let Some(field) = m.node_field {
-            checks.push(CandidateCheck::new(
-                format!("{}:", self.dumper.field_display_name(field)),
-                format!(
-                    "eng.cursor().field_id() != Some({})",
-                    self.field_const(field)
+    fn candidate_checks(&self, plans: &[CheckPlan]) -> Vec<CandidateCheck> {
+        plans
+            .iter()
+            .map(|plan| match plan {
+                CheckPlan::Kind(kind) => {
+                    let (comment, named_failure) = match kind.class {
+                        KindClass::Named => ("(_)", "!node.is_named()"),
+                        KindClass::Anonymous => ("\"_\"", "node.is_named()"),
+                    };
+                    let Some(id) = kind.id else {
+                        return CandidateCheck::new(comment, named_failure);
+                    };
+                    let name = kind
+                        .name
+                        .as_deref()
+                        .expect("specific kind check carries its grammar name");
+                    match kind.class {
+                        KindClass::Named => CandidateCheck::new(
+                            format!("({name})"),
+                            format!("node.kind_id() != {id} || !node.is_named()"),
+                        ),
+                        KindClass::Anonymous => CandidateCheck::new(
+                            format!("\"{name}\""),
+                            format!("node.kind_id() != {id} || node.is_named()"),
+                        ),
+                    }
+                }
+                CheckPlan::Missing => CandidateCheck::new(
+                    "(MISSING …): only nodes the parser inserted during error recovery",
+                    "!node.is_missing()",
                 ),
-            ));
-        }
-
-        for &field in &m.neg_fields {
-            checks.push(CandidateCheck::new(
-                format!("-{}", self.dumper.field_display_name(field)),
-                format!(
-                    "node.child_by_field_id(u16::from({})).is_some()",
-                    self.field_const(field)
+                CheckPlan::Field(field) => CandidateCheck::new(
+                    format!("{}:", field.name),
+                    format!(
+                        "eng.cursor().field_id() != Some({})",
+                        self.field_const(field.id)
+                    ),
                 ),
-            ));
-        }
-
-        if let Some(pred) = &m.predicate {
-            checks.push(self.predicate_check(pred));
-        }
-
-        checks
+                CheckPlan::NegField(field) => CandidateCheck::new(
+                    format!("-{}", field.name),
+                    format!(
+                        "node.child_by_field_id(u16::from({})).is_some()",
+                        self.field_const(field.id)
+                    ),
+                ),
+                CheckPlan::Predicate(predicate) => self.predicate_check(predicate),
+            })
+            .collect()
     }
 
-    fn predicate_check(&self, pred: &PredicateIR) -> CandidateCheck {
+    fn predicate_check(&self, predicate: &PredicatePlan) -> CandidateCheck {
         let text = "rt::node_text(source, &node)";
-        match &pred.value {
-            PredicateValueIR::String(value) => {
+        match &predicate.value {
+            PredicateValuePlan::String(value) => {
                 let lit = rust_string(value);
-                let fail = match pred.op {
+                let fail = match predicate.op {
                     PredicateOp::Eq => format!("{text} != {lit}"),
                     PredicateOp::Ne => format!("{text} == {lit}"),
                     PredicateOp::StartsWith => format!("!{text}.starts_with({lit})"),
@@ -951,32 +836,32 @@ impl<'a> Generator<'a> {
                         unreachable!("regex predicate carries a regex value")
                     }
                 };
-                CandidateCheck::new(format!("{} {lit}", pred.op.as_str()), fail)
+                CandidateCheck::new(format!("{} {lit}", predicate.op.as_str()), fail)
             }
-            PredicateValueIR::Regex(pattern) => {
-                let re = self.regex_static(pattern);
-                let fail = match pred.op {
+            PredicateValuePlan::Regex { id, pattern } => {
+                let re = self.regex_static(*id);
+                let fail = match predicate.op {
                     PredicateOp::RegexMatch => format!("!{re}.is_match({text})"),
                     PredicateOp::RegexNoMatch => format!("{re}.is_match({text})"),
                     _ => unreachable!("string predicate carries a string value"),
                 };
-                CandidateCheck::new(format!("{} /{pattern}/", pred.op.as_str()), fail)
+                CandidateCheck::new(format!("{} /{pattern}/", predicate.op.as_str()), fail)
             }
         }
     }
 
     fn finish_fns(&self, out: &mut String) {
-        for instr in &self.sorted {
-            let InstructionIR::Match(m) = instr else {
+        for state in self.plan.matcher().states() {
+            let StatePlanKind::Match(plan) = &state.kind else {
                 continue;
             };
-            if !is_retryable(m) {
+            if plan.retry.is_none() {
                 continue;
             }
-            let info = self.state(m.label);
+            let info = self.state(state.id);
             // `eng` feeds effect emission and branch pushes; a finish that
             // only jumps must not bind it, or every such fn warns.
-            let eng = if m.effects.is_empty() && m.successors.len() < 2 {
+            let eng = if plan.effects.is_empty() && !matches!(plan.flow, FlowPlan::Branch { .. }) {
                 "_eng"
             } else {
                 "eng"
@@ -992,7 +877,7 @@ impl<'a> Generator<'a> {
                     ("ENG", eng),
                 ],
             );
-            self.effects_and_flow(out, m, "    ");
+            self.effects_and_flow(out, &plan.effects, &plan.flow, "    ");
             out.push_str("}\n");
         }
     }
@@ -1000,7 +885,7 @@ impl<'a> Generator<'a> {
     /// The backtrack unwind — the VM's `backtrack` with the Match arm
     /// dispatched to generated per-state retries.
     fn backtrack_fn(&self, out: &mut String) {
-        let source_arg = if self.operands.any_retry_predicate {
+        let source_arg = if self.plan.matcher().any_retry_predicate() {
             "source"
         } else {
             "_source"
@@ -1013,17 +898,19 @@ impl<'a> Generator<'a> {
     /// re-run the same state's candidate search, replay the finish. Only
     /// sibling-search states can carry a match-retry checkpoint.
     fn match_retry_fn(&self, out: &mut String) {
-        let retryable: Vec<&MatchIR> = self
-            .sorted
+        let retryable: Vec<(&StatePlan, &MatchPlan)> = self
+            .plan
+            .matcher()
+            .states()
             .iter()
-            .filter_map(|instr| match instr {
-                InstructionIR::Match(m) if is_retryable(m) => Some(m),
+            .filter_map(|state| match &state.kind {
+                StatePlanKind::Match(plan) if plan.retry.is_some() => Some((state, plan)),
                 _ => None,
             })
             .collect();
 
         let eng_param = if retryable.is_empty() { "_eng" } else { "eng" };
-        let source_param = if self.operands.any_retry_predicate {
+        let source_param = if self.plan.matcher().any_retry_predicate() {
             "source"
         } else {
             "_source"
@@ -1035,47 +922,31 @@ impl<'a> Generator<'a> {
             MATCH_RETRY_OPEN,
             &[("ENG", eng_param), ("SOURCE", source_param)],
         );
-        for m in retryable {
-            let info = self.state(m.label);
+        for (state, plan) in retryable {
+            let info = self.state(state.id);
+            let policy = plan
+                .retry
+                .expect("retryable match carries its exact skip policy");
             let _ = writeln!(out, "        {} => {{", info.const_name);
             splice(
                 out,
                 "            ",
                 RETRY_ADVANCE,
-                &[("POLICY", &policy_expr(m.nav.skip_policy()))],
+                &[("POLICY", &policy_expr(policy))],
             );
-            self.candidate_search(out, m, "            ", CandidateFailure::RetryExhausted);
-            self.retry_checkpoint(out, m, "            ");
+            self.candidate_search(
+                out,
+                state,
+                plan,
+                "            ",
+                CandidateFailure::RetryExhausted,
+            );
+            self.retry_checkpoint(out, state, plan, "            ");
             let _ = writeln!(out, "            Some(finish_{}(eng))", info.fn_stem);
             out.push_str("        }\n");
         }
         out.push_str(MATCH_RETRY_CLOSE);
     }
-}
-
-/// Whether acceptance at this state is a revisitable choice point (the VM's
-/// `push_match_retry_if_resumable` static half; the `admits` gate is runtime).
-fn is_retryable(m: &MatchIR) -> bool {
-    !m.is_epsilon() && m.nav.is_sibling_search()
-}
-
-/// Whether the state checks anything about the candidate node. A bare
-/// wildcard accepts the first candidate its navigation lands on.
-fn has_candidate_checks(m: &MatchIR) -> bool {
-    !matches!(m.node_kind, NodeKindConstraint::Any)
-        || m.missing
-        || m.node_field.is_some()
-        || !m.neg_fields.is_empty()
-        || m.predicate.is_some()
-}
-
-/// Whether the candidate fn reads the node itself (field checks go through
-/// the cursor instead).
-fn needs_node_binding(m: &MatchIR) -> bool {
-    !matches!(m.node_kind, NodeKindConstraint::Any)
-        || m.missing
-        || !m.neg_fields.is_empty()
-        || m.predicate.is_some()
 }
 
 /// `Nav` as a generated-code expression; the `Debug` form matches the variant

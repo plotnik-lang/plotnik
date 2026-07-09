@@ -20,6 +20,7 @@
 mod config;
 pub(crate) mod emit;
 mod emitter;
+mod plan;
 mod reader;
 
 #[cfg(test)]
