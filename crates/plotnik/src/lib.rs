@@ -19,8 +19,9 @@
 //!     parser.set_language(&language).unwrap();
 //!     let source = "x;";
 //!     let tree = parser.parse(source, None).unwrap();
-//!     // `parse` is the trusted-input path; use `Q::try_parse` for untrusted source.
-//!     let q = Q::parse(&tree, source).expect("matches");
+//!     let q = Q::parse(&tree, source)
+//!         .expect("auto limits fit")
+//!         .expect("matches");
 //! }
 //! ```
 //!
@@ -40,6 +41,8 @@
 /// every argument. Generated code reaches the runtime through
 /// [`::plotnik::rt`](rt), which is why this facade is the intended way in.
 pub use plotnik_macros::query;
+
+pub use plotnik_rt::{LimitExceeded, Matches, Parse, matches, parse};
 
 /// The shared runtime engine generated query modules run on. Generated code
 /// spells every runtime path as `::plotnik::rt::...`.

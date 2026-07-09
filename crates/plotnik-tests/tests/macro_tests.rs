@@ -3,7 +3,7 @@
 //! tree-sitter crates), the file form, compiled-in limits, the `crate`
 //! override, and the version-skew assert.
 
-use plotnik::rt::LimitError;
+use plotnik::LimitExceeded;
 use plotnik::tree_sitter::{Language, Parser, Tree};
 
 fn parse(language: &Language, source: &str) -> Tree {
@@ -62,11 +62,17 @@ mod limited {
     }
 }
 
-// Rows nest the committed value three scopes deep (struct, array, row
-// struct), so a depth policy of 1 must trip the metered path.
+// Recursive output nests `Expr` values through native reader calls, so a depth
+// policy of 1 must trip `parse`; `matches` suppresses output and never replays.
 mod depth_limited {
     plotnik::query! {
-        "Q = (program (expression_statement (identifier) @id)* @rows)",
+        r#"
+        Expr = [
+          Id: (identifier) @id
+          Paren: (parenthesized_expression (Expr) @expr)
+        ]
+        Q = (program (expression_statement (Expr) @expr))
+        "#,
         grammar = "arborium-javascript",
         depth = 1,
     }
@@ -94,9 +100,26 @@ fn arborium_grammar_produces_typed_output() {
     let source = "x;";
     let tree = parse(&js(), source);
 
-    let value = queries::Idents::parse(&tree, source).expect("matches");
+    let value = queries::Idents::parse(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches");
 
     assert_eq!(value.id.utf8_text(source.as_bytes()), Ok("x"));
+    assert!(queries::Idents::matches(&tree, source).expect("auto limits fit"));
+}
+
+#[test]
+fn generic_surface_delegates_to_generated_types() {
+    let source = "x;";
+    let tree = parse(&js(), source);
+
+    let value = plotnik::parse::<queries::Idents>(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches");
+
+    assert_eq!(value.id.utf8_text(source.as_bytes()), Ok("x"));
+    assert!(plotnik::matches::<queries::Idents>(&tree, source).expect("auto limits fit"));
+    assert!(plotnik::matches::<queries::Probe>(&tree, source).expect("auto limits fit"));
 }
 
 #[test]
@@ -112,7 +135,9 @@ fn vanilla_tree_sitter_grammar_resolves() {
     let source = "x;";
     let tree = parse(&tree_sitter_javascript::LANGUAGE.into(), source);
 
-    let value = vanilla::Q::parse(&tree, source).expect("matches");
+    let value = vanilla::Q::parse(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches");
 
     assert_eq!(value.id.utf8_text(source.as_bytes()), Ok("x"));
 }
@@ -122,7 +147,9 @@ fn subgrammar_selection_resolves_tsx() {
     let source = "x;";
     let tree = parse(&tree_sitter_typescript::LANGUAGE_TSX.into(), source);
 
-    let value = tsx::Q::parse(&tree, source).expect("matches");
+    let value = tsx::Q::parse(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches");
 
     assert_eq!(value.id.utf8_text(source.as_bytes()), Ok("x"));
 }
@@ -132,33 +159,38 @@ fn file_form_reads_next_to_the_invoking_file() {
     let source = "x;";
     let tree = parse(&js(), source);
 
-    let value = from_file::Q::parse(&tree, source).expect("matches");
+    let value = from_file::Q::parse(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches");
 
     assert_eq!(value.id.utf8_text(source.as_bytes()), Ok("x"));
 }
 
 #[test]
-fn compiled_in_step_limit_trips_try_parse_only() {
+fn compiled_in_step_limit_trips_safe_surfaces() {
     let source = "x;";
     let tree = parse(&js(), source);
 
-    assert!(limited::Q::parse(&tree, source).is_some());
     assert!(matches!(
-        limited::Q::try_parse(&tree, source),
-        Err(LimitError::Steps(1))
+        limited::Q::parse(&tree, source),
+        Err(LimitExceeded::Steps(1))
+    ));
+    assert!(matches!(
+        limited::Q::matches(&tree, source),
+        Err(LimitExceeded::Steps(1))
     ));
 }
 
 #[test]
-fn compiled_in_depth_limit_trips_try_parse_only() {
-    let source = "x;";
+fn compiled_in_depth_limit_trips_parse_only() {
+    let source = "((x));";
     let tree = parse(&js(), source);
 
-    assert!(depth_limited::Q::parse(&tree, source).is_some());
     assert!(matches!(
-        depth_limited::Q::try_parse(&tree, source),
-        Err(LimitError::Depth(1))
+        depth_limited::Q::parse(&tree, source),
+        Err(LimitExceeded::Depth(1))
     ));
+    assert!(depth_limited::Q::matches(&tree, source).expect("matches ignores replay depth"));
 }
 
 #[test]
@@ -166,14 +198,20 @@ fn crate_override_respells_the_runtime_path() {
     let source = "x;";
     let tree = parse(&js(), source);
 
-    assert!(repointed::Q::parse(&tree, source).is_some());
+    assert!(
+        repointed::Q::parse(&tree, source)
+            .expect("auto limits fit")
+            .is_some()
+    );
 }
 
 #[test]
 fn serde_feature_flows_through_the_facade() {
     let source = "x;";
     let tree = parse(&js(), source);
-    let value = queries::Idents::parse(&tree, source).expect("matches");
+    let value = queries::Idents::parse(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches");
 
     let json =
         serde_json::to_string(&plotnik::rt::WithSource::new(&value, source)).expect("serializes");

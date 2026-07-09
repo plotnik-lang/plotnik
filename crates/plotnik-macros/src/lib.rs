@@ -43,8 +43,8 @@ mod grammar_source_tests;
 /// - `crate = ::path::to::rt` — respell the runtime-crate path baked into
 ///   generated code; defaults to `::plotnik::rt`.
 /// - `steps = <n> | auto | unbounded`, `memory = <n> | auto | unbounded`,
-///   `depth = <n> | auto | unbounded` — the limit policy compiled into the
-///   `try_*` entry points (default `auto`). `steps` bound total work,
+///   `depth = <n> | auto` — the limit policy compiled into the safe entry
+///   points (default `auto`). `steps` bound total work,
 ///   `memory` bounds live backtracking state, `depth` bounds the committed
 ///   value's nesting (the typed replay recurses once per nested value, so
 ///   this is its native-stack guard).

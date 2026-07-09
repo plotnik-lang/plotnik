@@ -105,6 +105,13 @@ impl LimitKey {
         }
     }
 
+    /// Whether `unbounded` is a legal value. A recursive native value has no
+    /// safe unbounded replay depth (`drop` alone overflows), so `depth` refuses
+    /// it — reflected in the value-error wording.
+    fn allows_unbounded(self) -> bool {
+        !matches!(self, Self::Depth)
+    }
+
     fn slot(self, args: &mut LimitArgs) -> &mut Option<LimitArg> {
         match self {
             Self::Steps => &mut args.steps,
@@ -247,11 +254,15 @@ impl ArgCursor {
         Ok(path)
     }
 
-    fn take_limit(&mut self, key_span: Span, key: &str) -> Result<LimitArg, ExpandError> {
+    fn take_limit(&mut self, key_span: Span, key: LimitKey) -> Result<LimitArg, ExpandError> {
         let Some(token) = self.current().cloned() else {
             return Err(ExpandError::new(
                 key_span,
-                format!("`{key}` needs a value: an integer, `auto`, or `unbounded`"),
+                format!(
+                    "`{}` needs a value: {}",
+                    key.name(),
+                    accepted_limit_values(key)
+                ),
             ));
         };
         self.advance();
@@ -305,7 +316,16 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                                 ),
                             ));
                         };
-                        let value = cursor.take_limit(key_span, limit_key.name())?;
+                        let value = cursor.take_limit(key_span, limit_key)?;
+                        if matches!(limit_key, LimitKey::Depth)
+                            && matches!(&value, LimitArg::Unbounded)
+                        {
+                            return Err(ExpandError::new(
+                                key_span,
+                                "`depth = unbounded` is not supported; use `depth = auto` \
+                                 or an integer",
+                            ));
+                        }
                         args.limits.put(limit_key, value, key_span)?;
                     }
                 }
@@ -376,7 +396,7 @@ fn strip_ident(text: &str) -> &str {
     &body[end..]
 }
 
-fn take_integer_limit(token: &TokenTree, key: &str) -> Result<LimitArg, ExpandError> {
+fn take_integer_limit(token: &TokenTree, key: LimitKey) -> Result<LimitArg, ExpandError> {
     let text = token.to_string();
     let Ok(lit) = litrs::IntegerLit::parse(text) else {
         return Err(invalid_limit_value(token.span(), key));
@@ -387,9 +407,19 @@ fn take_integer_limit(token: &TokenTree, key: &str) -> Result<LimitArg, ExpandEr
     Ok(LimitArg::Of(value))
 }
 
-fn invalid_limit_value(span: Span, key: &str) -> ExpandError {
+/// The value forms a limit accepts, as an error-message fragment. `depth` omits
+/// `unbounded` because it refuses that value (see [`LimitKey::allows_unbounded`]).
+fn accepted_limit_values(key: LimitKey) -> &'static str {
+    if key.allows_unbounded() {
+        "an unsigned integer, `auto`, or `unbounded`"
+    } else {
+        "an unsigned integer or `auto`"
+    }
+}
+
+fn invalid_limit_value(span: Span, key: LimitKey) -> ExpandError {
     ExpandError::new(
         span,
-        format!("`{key}` needs an unsigned integer, `auto`, or `unbounded`"),
+        format!("`{}` needs {}", key.name(), accepted_limit_values(key)),
     )
 }

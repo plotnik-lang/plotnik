@@ -3,10 +3,10 @@
 //!
 //! - **trace**: the matcher's committed effect stream equals the VM's,
 //!   entry for entry;
-//! - **value**: the typed `parse` output, serialized through the serde
+//! - **value**: the safe typed `parse` output, serialized through the serde
 //!   channel, equals the VM's materialized value as JSON (compared as JSON
-//!   values — the two sides legitimately order struct fields differently),
-//!   and the metered `try_parse` twin returns the identical typed value.
+//!   values — the two sides legitimately order struct fields differently), and
+//!   `matches` agrees with the VM's yes/no outcome.
 //!
 //! Each fixture's query is compiled twice — to a bytecode module (executed
 //! here, in-process, as the oracle) and to Rust module source. The VM's
@@ -15,8 +15,7 @@
 //! real grammars and asserts agreement. `trybuild` builds *and runs* it, so
 //! this one target proves both that emitted code compiles and that it behaves
 //! like the VM across the corpus. A final hand-rolled module pins the
-//! compiled-in limit policy: an `Of(1)` step budget must trip `try_parse`
-//! while the unmetered `parse` still matches.
+//! compiled-in limit policy: an `Of(1)` step budget must trip `parse`.
 //!
 //! Inspection and recording fixtures are excluded: spans and step recordings
 //! are VM-only diagnostic channels the generated matcher deliberately lacks.
@@ -73,6 +72,12 @@ fn generated_matchers_replay_vm_traces() {
     program.push('\n');
     program.push_str(&limit_trip_mod());
     runs.push("limit_trip".to_string());
+    program.push('\n');
+    program.push_str(&unbounded_mod());
+    runs.push("unbounded".to_string());
+    program.push('\n');
+    program.push_str(&steps_only_mod());
+    runs.push("steps_only".to_string());
     let distinct: BTreeSet<&str> = runs.iter().map(String::as_str).collect();
     assert_eq!(distinct.len(), runs.len(), "fixture module names collide");
 
@@ -178,14 +183,10 @@ fn conformance_mod(fx: &Fixture) -> Option<String> {
 }
 
 /// The value-level differential inside a fixture's `run()`: call the typed
-/// entry point matching the definition's output shape. For parsed values,
-/// require the metered twin to agree and diff the serialized value against the
-/// VM's JSON. Void entries expose only the always-metered `matches`.
+/// entry point matching the definition's output shape. For parsed values, diff
+/// the serialized value against the VM's JSON, and require nominal `matches` to
+/// agree with the VM's yes/no outcome. Void entries expose only `matches`.
 fn value_channel(w: &mut String, module: &Module, entry: &str) {
-    let snake = matcher_entry_fn_name(entry);
-    let snake = snake
-        .strip_suffix("_trace")
-        .expect("entry fn names end in _trace by contract");
     match entry_shape(module, entry) {
         EntryShape::Matches => {
             writeln!(
@@ -199,22 +200,23 @@ fn value_channel(w: &mut String, module: &Module, entry: &str) {
             )
             .expect("writing to a String is infallible");
         }
-        shape @ (EntryShape::Nominal | EntryShape::Free) => {
-            let (parse, try_parse) = match shape {
-                EntryShape::Nominal => (format!("{entry}::parse"), format!("{entry}::try_parse")),
-                EntryShape::Free => (format!("{snake}_parse"), format!("{snake}_try_parse")),
-                EntryShape::Matches => unreachable!("handled above"),
-            };
-            writeln!(w, "        let parsed = matcher::{parse}(&tree, SOURCE);")
-                .expect("writing to a String is infallible");
+        EntryShape::Nominal => {
+            let parse = format!("{entry}::parse");
             writeln!(
                 w,
-                "        let metered = matcher::{try_parse}(&tree, SOURCE).expect(\"auto limits fit the corpus\");"
+                "        let parsed = matcher::{parse}(&tree, SOURCE).expect(\"auto limits fit the corpus\");"
             )
             .expect("writing to a String is infallible");
-            w.push_str(
-                "        assert_eq!(parsed, metered, \"{NAME}: metered parse diverges from unmetered\");\n",
-            );
+            writeln!(
+                w,
+                "        let matched = matcher::{entry}::matches(&tree, SOURCE).expect(\"auto limits fit the corpus\");"
+            )
+            .expect("writing to a String is infallible");
+            writeln!(
+                w,
+                "        assert_eq!(matched, EXPECTED.is_some(), \"{{NAME}}: matches() diverges from the VM outcome\");"
+            )
+            .expect("writing to a String is infallible");
             w.push_str("        let json = parsed.map(|v| {\n");
             w.push_str(
                 "            serde_json::to_string(&plotnik_rt::WithSource::new(&v, SOURCE))\n",
@@ -234,8 +236,6 @@ enum EntryShape {
     Matches,
     /// Struct/enum output: inherent `{Type}::parse`.
     Nominal,
-    /// Alias output: free `{snake}_parse`.
-    Free,
 }
 
 fn entry_shape(module: &Module, entry: &str) -> EntryShape {
@@ -249,7 +249,9 @@ fn entry_shape(module: &Module, entry: &str) -> EntryShape {
     match def.decode() {
         TypeDefKind::Primitive(TypeKind::Void) => EntryShape::Matches,
         TypeDefKind::Struct { .. } | TypeDefKind::Enum { .. } => EntryShape::Nominal,
-        TypeDefKind::Primitive(_) | TypeDefKind::Wrapper { .. } => EntryShape::Free,
+        TypeDefKind::Primitive(_) | TypeDefKind::Wrapper { .. } => {
+            unreachable!("callable definitions must be nominal or void")
+        }
     }
 }
 
@@ -296,8 +298,7 @@ fn vm_expected(
 }
 
 /// A module pinning the compiled-in limit policy end to end: with a one-step
-/// budget the metered entry point must trip, while the unmetered `parse` of
-/// the same module still matches.
+/// budget the safe entry points must trip.
 fn limit_trip_mod() -> String {
     let query = "Q = (program (expression_statement (identifier) @id))";
     let compiled = QueryBuilder::new(source_map(query))
@@ -329,11 +330,109 @@ fn limit_trip_mod() -> String {
     w.push_str("    }\n");
     w.push_str("\n    pub fn run() {\n");
     w.push_str("        let tree = crate::parse(crate::Lang::Js, SOURCE);\n");
-    w.push_str("        let parsed = matcher::Q::parse(&tree, SOURCE);\n");
-    w.push_str("        assert!(parsed.is_some(), \"limit_trip: unmetered parse must match\");\n");
-    w.push_str("        let err = matcher::Q::try_parse(&tree, SOURCE)\n");
+    w.push_str("        let err = matcher::Q::parse(&tree, SOURCE)\n");
     w.push_str("            .expect_err(\"limit_trip: a one-step budget must trip\");\n");
-    w.push_str("        assert_eq!(err, plotnik_rt::LimitError::Steps(1));\n");
+    w.push_str("        assert_eq!(err, plotnik_rt::LimitExceeded::Steps(1));\n");
+    w.push_str("        let err = matcher::Q::matches(&tree, SOURCE)\n");
+    w.push_str("            .expect_err(\"limit_trip: a one-step budget must trip\");\n");
+    w.push_str("        assert_eq!(err, plotnik_rt::LimitExceeded::Steps(1));\n");
+    w.push_str("    }\n}\n");
+    out
+}
+
+/// A module pinning the fully-unbounded opt-out: with both resources unbounded
+/// the safe entry points monomorphize to an unmetered `run` — no `run::<true, …>`
+/// survives, and `heap_bytes` is never sampled — yet they still match.
+fn unbounded_mod() -> String {
+    let query = "Q = (program (expression_statement (identifier) @id))";
+    let compiled = QueryBuilder::new(source_map(query))
+        .compile(&JS_GRAMMAR)
+        .expect("query parsing should not exhaust fuel");
+    assert!(
+        !compiled.diagnostics().has_errors(),
+        "unbounded query must compile"
+    );
+    let matcher = compiled
+        .to_rust_matcher(MatcherConfig::new().limits(RuntimeLimitSpec {
+            steps: Limit::Unbounded,
+            memory: Limit::Unbounded,
+        }))
+        .expect("unbounded query compiles to a matcher");
+    assert!(
+        !matcher.contains("run::<true,"),
+        "unbounded policy must not instantiate a metered `run`:\n{matcher}"
+    );
+    assert!(
+        matcher.contains("run::<false, false, false>"),
+        "unbounded `matches` must run fully unmetered and suppressed:\n{matcher}"
+    );
+
+    let mut out = String::new();
+    let w = &mut out;
+    w.push_str("mod unbounded {\n");
+    w.push_str("    const SOURCE: &str = \"x;\";\n");
+    w.push_str("\n    mod matcher {\n");
+    for line in matcher.lines() {
+        if line.is_empty() {
+            w.push('\n');
+        } else {
+            writeln!(w, "        {line}").expect("writing to a String is infallible");
+        }
+    }
+    w.push_str("    }\n");
+    w.push_str("\n    pub fn run() {\n");
+    w.push_str("        let tree = crate::parse(crate::Lang::Js, SOURCE);\n");
+    w.push_str("        let parsed = matcher::Q::parse(&tree, SOURCE)\n");
+    w.push_str("            .expect(\"unbounded: parse cannot trip a limit\");\n");
+    w.push_str("        assert!(parsed.is_some(), \"unbounded: Q matches x;\");\n");
+    w.push_str("        let matched = matcher::Q::matches(&tree, SOURCE)\n");
+    w.push_str("            .expect(\"unbounded: matches cannot trip a limit\");\n");
+    w.push_str("        assert!(matched, \"unbounded: Q matches x;\");\n");
+    w.push_str("    }\n}\n");
+    out
+}
+
+/// A module pinning independent per-resource metering: steps bounded, memory
+/// unbounded. The memory check folds out (`run::<true, false, …>`) while the
+/// one-step budget still trips.
+fn steps_only_mod() -> String {
+    let query = "Q = (program (expression_statement (identifier) @id))";
+    let compiled = QueryBuilder::new(source_map(query))
+        .compile(&JS_GRAMMAR)
+        .expect("query parsing should not exhaust fuel");
+    assert!(
+        !compiled.diagnostics().has_errors(),
+        "steps-only query must compile"
+    );
+    let matcher = compiled
+        .to_rust_matcher(MatcherConfig::new().limits(RuntimeLimitSpec {
+            steps: Limit::Of(1),
+            memory: Limit::Unbounded,
+        }))
+        .expect("steps-only query compiles to a matcher");
+    assert!(
+        matcher.contains("run::<true, false,"),
+        "steps-bounded, memory-unbounded must meter steps only:\n{matcher}"
+    );
+
+    let mut out = String::new();
+    let w = &mut out;
+    w.push_str("mod steps_only {\n");
+    w.push_str("    const SOURCE: &str = \"x;\";\n");
+    w.push_str("\n    mod matcher {\n");
+    for line in matcher.lines() {
+        if line.is_empty() {
+            w.push('\n');
+        } else {
+            writeln!(w, "        {line}").expect("writing to a String is infallible");
+        }
+    }
+    w.push_str("    }\n");
+    w.push_str("\n    pub fn run() {\n");
+    w.push_str("        let tree = crate::parse(crate::Lang::Js, SOURCE);\n");
+    w.push_str("        let err = matcher::Q::parse(&tree, SOURCE)\n");
+    w.push_str("            .expect_err(\"steps_only: a one-step budget must trip\");\n");
+    w.push_str("        assert_eq!(err, plotnik_rt::LimitExceeded::Steps(1));\n");
     w.push_str("    }\n}\n");
     out
 }

@@ -33,6 +33,8 @@ mod engine;
 #[cfg(feature = "serde")]
 mod serialize;
 #[cfg(feature = "tree-sitter")]
+mod surface;
+#[cfg(feature = "tree-sitter")]
 mod trace;
 
 #[cfg(test)]
@@ -40,6 +42,8 @@ mod trace;
 mod checkpoint_tests;
 #[cfg(test)]
 mod dfa_tests;
+#[cfg(test)]
+mod limits_tests;
 #[cfg(test)]
 mod nav_tests;
 #[cfg(test)]
@@ -49,7 +53,10 @@ mod trace_tests;
 pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
 pub use frame::{Frame, FrameArena};
 pub use ids::{NodeFieldId, NodeKindId, ZeroIdError};
-pub use limits::{Limit, LimitError, REPLAY_DEPTH_AUTO, ResolvedRuntimeLimits, RuntimeLimitSpec};
+pub use limits::{
+    Limit, LimitError, LimitExceeded, REPLAY_DEPTH_AUTO, ReplayDepth, ResolvedRuntimeLimits,
+    RuntimeLimitSpec, replay_depth_auto,
+};
 pub use nav::{Nav, SkipPolicy};
 pub use node_class::{NodeClass, SkipClass};
 
@@ -63,6 +70,8 @@ pub use effect::{EffectLog, RuntimeEffect, node_text};
 pub use engine::Engine;
 #[cfg(feature = "serde")]
 pub use serialize::{SerializeWithSource, WithSource};
+#[cfg(feature = "tree-sitter")]
+pub use surface::{Matches, Parse, matches, parse};
 #[cfg(feature = "tree-sitter")]
 pub use trace::TraceReader;
 

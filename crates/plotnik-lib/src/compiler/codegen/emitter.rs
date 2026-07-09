@@ -406,7 +406,7 @@ impl<'a> Generator<'a> {
         self.entry_reexports(&mut out);
 
         let mut machinery = String::new();
-        self.mod_header(&mut machinery);
+        self.mod_header(&mut machinery, readers.max_reader_frame_bytes());
         self.language_check(&mut machinery);
         self.field_consts(&mut machinery);
         self.regex_statics(&mut machinery);
@@ -457,7 +457,7 @@ impl<'a> Generator<'a> {
         let _ = writeln!(out, "pub use self::matcher::{{{}}};", names.join(", "));
     }
 
-    fn mod_header(&self, out: &mut String) {
+    fn mod_header(&self, out: &mut String, max_reader_frame_bytes: u64) {
         splice(
             out,
             "",
@@ -466,7 +466,11 @@ impl<'a> Generator<'a> {
                 ("RT", &self.config.rt_crate),
                 ("STEPS", &limit_expr(self.config.limits.steps)),
                 ("MEMORY", &limit_expr(self.config.limits.memory)),
-                ("DEPTH", &depth_expr(self.config.depth)),
+                ("READER_FRAME", &max_reader_frame_bytes.to_string()),
+                (
+                    "DEPTH",
+                    &depth_expr(self.config.depth, max_reader_frame_bytes),
+                ),
             ],
         );
     }
@@ -559,18 +563,38 @@ impl<'a> Generator<'a> {
     }
 
     fn entry_fns(&self, out: &mut String) {
+        // An unbounded resource emits `false` for its metering const, folding
+        // the check out of `run`. With both unbounded there is no ceiling to
+        // resolve, so the safe entries pass `NO_LIMITS` rather than pay for a
+        // per-call node count that nothing reads.
+        let steps_metered = self.config.limits.steps != Limit::Unbounded;
+        let memory_metered = self.config.limits.memory != Limit::Unbounded;
+        let safe_limits = if steps_metered || memory_metered {
+            "resolved_limits(tree)"
+        } else {
+            "NO_LIMITS"
+        };
+        let steps_metered = if steps_metered { "true" } else { "false" };
+        let memory_metered = if memory_metered { "true" } else { "false" };
         for &label in self.graph.entrypoint_wrappers().values() {
             let def = self.dumper.def_name_of(label);
             let info = self.state(label);
             let subs = [
                 ("DEF", def),
                 ("FN", &entry_fn_name(def)),
+                ("SAFE_FN", &safe_entry_fn_name(def)),
+                ("ACCEPTS_FN", &accepts_entry_fn_name(def)),
                 ("ENTRY", info.const_name.as_str()),
+                ("STEPS_METERED", steps_metered),
+                ("MEMORY_METERED", memory_metered),
+                ("SAFE_LIMITS", safe_limits),
             ];
             out.push('\n');
             splice(out, "", ENTRY_FN, &subs);
             out.push('\n');
-            splice(out, "", ENTRY_FN_METERED, &subs);
+            splice(out, "", ENTRY_FN_SAFE, &subs);
+            out.push('\n');
+            splice(out, "", ENTRY_ACCEPTS_SAFE, &subs);
         }
     }
 
@@ -1157,10 +1181,18 @@ pub fn entry_fn_name(def_name: &str) -> String {
     format!("{}_trace", snake_ident(def_name))
 }
 
-/// The metered sibling of [`entry_fn_name`], `pub(super)` inside the matcher
-/// module — the `try_*` surface reaches the driver through it.
-pub(super) fn metered_entry_fn_name(def_name: &str) -> String {
-    format!("{}_metered", entry_fn_name(def_name))
+/// The safe sibling of [`entry_fn_name`], `pub(super)` inside the matcher
+/// module — the safe `parse` surface reaches the driver through it. It applies
+/// the module's compiled-in limit policy, which may be unbounded (hence `_safe`,
+/// not `_metered`: metering is per-resource and folds out when unbounded).
+pub(super) fn safe_entry_fn_name(def_name: &str) -> String {
+    format!("{}_safe", snake_ident(def_name))
+}
+
+/// Private yes/no entry point for safe `matches`: applies the compiled-in
+/// policy with data effects suppressed so no typed output is built.
+pub(super) fn accepts_entry_fn_name(def_name: &str) -> String {
+    format!("{}_accepts", snake_ident(def_name))
 }
 
 /// `Limit` as a generated-code expression; the `Debug` form matches the
@@ -1172,9 +1204,9 @@ pub(super) fn limit_expr(limit: Limit) -> String {
 /// The replay-depth policy as the generated `MAX_REPLAY_DEPTH` initializer.
 /// Resolved at generation time — the ceiling guards the native stack, which
 /// does not scale with the input, so there is nothing to resolve per run.
-pub(super) fn depth_expr(limit: Limit) -> String {
+pub(super) fn depth_expr(limit: Limit, max_reader_frame_bytes: u64) -> String {
     match limit {
-        Limit::Auto => "Some(rt::REPLAY_DEPTH_AUTO)".to_string(),
+        Limit::Auto => format!("Some(rt::replay_depth_auto({max_reader_frame_bytes}))"),
         Limit::Of(n) => format!("Some({n})"),
         Limit::Unbounded => "None".to_string(),
     }
@@ -1240,7 +1272,7 @@ use @RT@ as rt;
 const MOD_HEADER: &str = r#"
 use @RT@ as rt;
 
-/// The limit policy compiled into the `try_*` entry points, resolved against
+/// The limit policy compiled into the safe entry points, resolved against
 /// each input's node count. Chosen at generation time, never at the call
 /// site: the query is trusted, the input is not.
 const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
@@ -1248,7 +1280,7 @@ const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
     memory: @MEMORY@,
 };
 
-/// No ceilings — what the unmetered entry points run under.
+/// No ceilings — what the unmetered trace entry points run under.
 const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
     max_steps: None,
     max_memory: None,
@@ -1258,12 +1290,13 @@ const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
 /// sampled; must be a power of two minus one. Twin of the VM's constant.
 const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
-/// Ceiling on the committed value's nesting for the `try_*` entry points
-/// (`None` opts out). The typed replay recurses once per nested value, so
-/// this bounds its native-stack use — a resource of the generated executor,
-/// not of the VM, whose output rendering is iterative. The unmetered entry
-/// points run without it, like every other limit.
-const MAX_REPLAY_DEPTH: Option<u64> = @DEPTH@;
+/// Conservative maximum native-stack bytes used by one typed replay reader
+/// frame before runtime padding.
+pub(super) const MAX_READER_FRAME_BYTES: u64 = @READER_FRAME@;
+
+/// Ceiling on recursive typed replay for safe `parse` (`None` opts out). The
+/// matcher itself is iterative; only reader recursion enters this guard.
+pub(super) const MAX_REPLAY_DEPTH: Option<u64> = @DEPTH@;
 
 /// Resolve [`LIMITS`] against this input's node count, exactly like
 /// `VM::builder(...).build()` resolves the VM's.
@@ -1314,18 +1347,30 @@ const ENTRY_FN: &str = r#"
 /// Match the `@DEF@` entrypoint against `tree`. `Some` carries the committed
 /// capture trace — the same effect stream the VM commits for this query.
 pub fn @FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
-    let outcome = run::<false>(tree, source, @ENTRY@, NO_LIMITS);
+    let outcome = run::<false, false, true>(tree, source, @ENTRY@, NO_LIMITS);
     outcome.expect("an unmetered run cannot exceed a limit")
 }
 "#;
 
-const ENTRY_FN_METERED: &str = r#"
+// The metering const generics (`@STEPS_METERED@`, `@MEMORY_METERED@`) are fixed
+// at generation time from the compiled-in policy: an unbounded resource emits
+// `false`, folding its check out of the monomorphized `run`. When both are
+// unbounded there is nothing to resolve, so the entries pass `NO_LIMITS` and
+// skip the per-call node count entirely.
+const ENTRY_FN_SAFE: &str = r#"
 /// [`@FN@`] under the module's compiled-in limits ([`LIMITS`]).
-pub(super) fn @FN@_metered<'t>(
+pub(super) fn @SAFE_FN@<'t>(
     tree: &'t rt::Tree,
     source: &str,
-) -> Result<Option<rt::EffectLog<'t>>, rt::LimitError> {
-    run::<true>(tree, source, @ENTRY@, resolved_limits(tree))
+) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
+    run::<@STEPS_METERED@, @MEMORY_METERED@, true>(tree, source, @ENTRY@, @SAFE_LIMITS@)
+}
+"#;
+
+const ENTRY_ACCEPTS_SAFE: &str = r#"
+/// Whether `@DEF@` accepts, under [`LIMITS`], with data effects suppressed.
+pub(super) fn @ACCEPTS_FN@(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
+    Ok(run::<@STEPS_METERED@, @MEMORY_METERED@, false>(tree, source, @ENTRY@, @SAFE_LIMITS@)?.is_some())
 }
 "#;
 
@@ -1348,45 +1393,49 @@ enum Unwound {
 }
 
 /// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
-/// `METERED` folds the budget checks away for the unmetered entry points;
-/// when on, they transcribe the VM's `execute_with_stats` loop head. (No
-/// let-chains: generated code targets the embedding crate's edition.)
-fn run<'t, const METERED: bool>(
+/// `METERED_STEPS` and `METERED_MEMORY` gate the two budget checks
+/// independently: each folds away when its resource is unbounded, so a fully
+/// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
+/// When either is on, the loop head transcribes the VM's `execute_with_stats`.
+/// `TRACE` controls whether data effects are recorded; `matches` disables it to
+/// avoid output allocation and replay-depth failures. (No let-chains: generated
+/// code targets the embedding crate's edition.)
+fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: bool>(
     tree: &'t rt::Tree,
     source: &str,
     entry: u16,
     limits: rt::ResolvedRuntimeLimits,
-) -> Result<Option<rt::EffectLog<'t>>, rt::LimitError> {
+) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
     verify_language(tree);
-    let mut eng = rt::Engine::new(tree.walk());
+    let mut eng = if TRACE {
+        rt::Engine::new(tree.walk())
+    } else {
+        rt::Engine::new_data_suppressed(tree.walk())
+    };
     let mut steps: u64 = 0;
     let mut ip = entry;
     loop {
-        if METERED {
-            // Step ceiling: bound total work. `None` opts out (Unbounded).
-            if let Some(max) = limits.max_steps {
-                if steps >= max {
-                    return Err(rt::LimitError::Steps(max));
+        if METERED_STEPS || METERED_MEMORY {
+            // Step ceiling: bound total work. Folded out when steps are
+            // unbounded; the counter still advances under a memory-only
+            // policy because the sample cadence below rides on it.
+            if METERED_STEPS {
+                if let Some(max) = limits.max_steps {
+                    if steps >= max {
+                        return Err(rt::LimitExceeded::Steps(max));
+                    }
                 }
             }
             steps += 1;
-            // Replay-depth ceiling: refuse a match nesting past the bound
-            // before the typed replay (one native frame per nested value)
-            // could risk the stack. Checked every dispatch; one dispatch
-            // opens at most a per-query constant of scopes.
-            if let Some(max) = MAX_REPLAY_DEPTH {
-                if eng.effect_depth() > max {
-                    return Err(rt::LimitError::Depth(max));
-                }
-            }
             // Memory ceiling: the live runtime heap, sampled every
             // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded,
-            // so the unobserved overshoot is noise (see the VM loop).
-            if steps & MEMORY_SAMPLE_MASK == 0 {
+            // so the unobserved overshoot is noise (see the VM loop). Folded
+            // out when memory is unbounded, so no `heap_bytes` read survives.
+            if METERED_MEMORY && steps & MEMORY_SAMPLE_MASK == 0 {
                 let used = eng.heap_bytes();
                 if let Some(max) = limits.max_memory {
                     if used > max {
-                        return Err(rt::LimitError::Memory { used, limit: max });
+                        return Err(rt::LimitExceeded::Memory { used, limit: max });
                     }
                 }
             }

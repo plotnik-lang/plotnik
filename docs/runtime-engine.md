@@ -200,12 +200,12 @@ and call depth costs heap memory only, which the memory ceiling bounds; the
 materializer renders output iteratively too.
 
 Generated Rust matchers meter one more resource: **replay depth**, the
-committed value's nesting (`Auto` = flat `1024`, not input-scaled — it guards
-the native stack, a per-process resource). Their typed replay recurses once
-per nested value, so the metered `try_*` entry points refuse a match nesting
-past the bound (`LimitError::Depth`) before replay runs; the unmetered entry
-points skip it like every other limit. The engine tracks the depth for both
-executors (`Engine::effect_depth`); only the generated driver enforces it.
+recursive typed reader's native-stack use. `Auto` is not input-scaled; the
+emitter estimates the module's widest reader frame and the runtime resolves a
+ceiling from that estimate. Safe `parse` refuses recursive output nesting past
+the bound (`LimitExceeded::Depth`) while `matches` suppresses output and never
+runs typed replay. The VM does not track or enforce replay depth: its
+backtracking and materialization paths are iterative.
 
 ## Trivia Handling
 

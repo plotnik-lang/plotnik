@@ -70,7 +70,7 @@ cargo install plotnik-cli --features all-languages
 ## In Rust: compile-time queries
 
 The `plotnik` crate compiles a query at build time into typed Rust — output
-structs and enums with `parse`/`try_parse` entry points, no bytecode, no
+structs and enums with `parse`/`matches` entry points, no bytecode, no
 dynamic values:
 
 ```toml
@@ -94,9 +94,10 @@ fn main() {
     parser.set_language(&tree_sitter_javascript::LANGUAGE.into()).unwrap();
     let tree = parser.parse(source, None).unwrap();
 
-    // `parse` is the trusted-input path; for untrusted source use `Q::try_parse`,
-    // which runs under the compiled-in step/memory/depth limits.
-    let q = Q::parse(&tree, source).expect("matches"); // q.id: Node
+    // Safe entry points run under compiled-in step/memory/depth limits.
+    let q = Q::parse(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches"); // q.id: Node
 }
 ```
 
@@ -104,8 +105,8 @@ There is no built-in language list: `grammar = "..."` names any dependency
 that ships a `grammar.json` (`tree-sitter-*`, `arborium-*`, or your own
 grammar crate), so the compiled query is pinned to the exact grammar version
 your lockfile resolves. Invalid queries fail the build with the compiler's
-own diagnostics; `try_parse` runs under compiled-in step/memory/depth limits
-for untrusted inputs.
+own diagnostics; `parse` and `matches` run under compiled-in limits for
+untrusted inputs.
 
 ## Example
 

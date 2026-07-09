@@ -364,8 +364,6 @@ fn grammar_name(json: &str) -> Option<String> {
     let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else {
         return None;
     };
-    let Some(name) = value.get("name").and_then(|name| name.as_str()) else {
-        return None;
-    };
+    let name = value.get("name").and_then(|name| name.as_str())?;
     Some(name.to_string())
 }

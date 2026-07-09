@@ -12,7 +12,6 @@ fn cp(frame_index: Option<u32>) -> Checkpoint {
         CheckpointState {
             descendant_index: 0,
             effect_watermark: 0,
-            effect_depth: 0,
             frame_index,
             recursion_depth: 0,
             suppress_depth: 0,
@@ -117,7 +116,6 @@ fn suppress_depth_outranges_u16() {
     let state = CheckpointState {
         descendant_index: 0,
         effect_watermark: 0,
-        effect_depth: 0,
         frame_index: None,
         recursion_depth: 0,
         suppress_depth: u16::MAX as u64 + 1,

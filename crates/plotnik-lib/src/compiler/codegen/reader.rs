@@ -36,7 +36,13 @@ use crate::compiler::typegen::rust::emitter::{Emitter as TypeModel, Item, ItemKi
 use crate::compiler::typegen::rust::idents::scope_idents;
 use crate::core::{Interner, Symbol};
 
-use super::emitter::{entry_fn_name, metered_entry_fn_name, snake_ident};
+use super::emitter::{accepts_entry_fn_name, safe_entry_fn_name, snake_ident};
+
+const WORD_BYTES: u64 = 8;
+const NODE_VALUE_BYTES: u64 = 48;
+const VEC_VALUE_BYTES: u64 = 24;
+const OPTION_TAG_BYTES: u64 = 8;
+const READER_FRAME_BASE_BYTES: u64 = 128;
 
 pub(super) struct ReaderGen<'a> {
     model: TypeModel<'a>,
@@ -112,33 +118,6 @@ impl InherentParseSignature {
     }
 }
 
-struct FreeParseSignature {
-    ident: String,
-    fn_generics: &'static str,
-    tree_ref: &'static str,
-    return_type: String,
-}
-
-impl FreeParseSignature {
-    fn for_item(model: &TypeModel<'_>, item: &Item) -> Self {
-        let ident = model.item_ident(item.name).to_string();
-        if model.needs_lifetime(item.ty) {
-            return Self {
-                ident: ident.clone(),
-                fn_generics: "<'t>",
-                tree_ref: "&'t rt::Tree",
-                return_type: format!("{ident}<'t>"),
-            };
-        }
-        Self {
-            return_type: ident.clone(),
-            ident,
-            fn_generics: "",
-            tree_ref: "&rt::Tree",
-        }
-    }
-}
-
 struct TraceReaderSignature {
     ident: String,
     fn_generics: &'static str,
@@ -176,28 +155,30 @@ impl<'a> ParseReplay<'a> {
         Self { indent, reader }
     }
 
-    fn emit_unmetered(&self, out: &mut String, trace: &str) {
-        let indent = self.indent;
-        let _ = writeln!(out, "{indent}let log = {trace}(tree, source)?;");
-        self.emit_value(out, "Some(value)");
-    }
-
-    fn emit_metered(&self, out: &mut String, metered: &str) {
+    fn emit_safe(&self, out: &mut String, safe: &str, fallible_reader: bool) {
         let indent = self.indent;
         let _ = writeln!(
             out,
-            "{indent}let Some(log) = matcher::{metered}(tree, source)? else {{"
+            "{indent}let Some(log) = matcher::{safe}(tree, source)? else {{"
         );
         let _ = writeln!(out, "{indent}    return Ok(None);");
         let _ = writeln!(out, "{indent}}};");
-        self.emit_value(out, "Ok(Some(value))");
+        self.emit_value(out, "Ok(Some(value))", fallible_reader);
     }
 
-    fn emit_value(&self, out: &mut String, result: &str) {
+    fn emit_value(&self, out: &mut String, result: &str, fallible_reader: bool) {
         let indent = self.indent;
         let reader = self.reader;
         let _ = writeln!(out, "{indent}let mut t = rt::TraceReader::new(&log);");
-        let _ = writeln!(out, "{indent}let value = {reader}(&mut t);");
+        if fallible_reader {
+            let _ = writeln!(
+                out,
+                "{indent}let depth = rt::ReplayDepth::new(matcher::MAX_REPLAY_DEPTH);"
+            );
+            let _ = writeln!(out, "{indent}let value = {reader}(&mut t, &depth)?;");
+        } else {
+            let _ = writeln!(out, "{indent}let value = {reader}(&mut t);");
+        }
         let _ = writeln!(out, "{indent}t.finish();");
         let _ = writeln!(out, "{indent}{result}");
     }
@@ -235,10 +216,205 @@ impl<'a> ReaderGen<'a> {
             .expect("every non-void item has a reader")
     }
 
-    /// The `parse`/`try_parse` or `matches` surface, one block per entrypoint
-    /// definition. Nominal outputs get inherent parse fns on their type, void
-    /// outputs get an inherent safe `matches`, and alias outputs still get free
-    /// parse fns.
+    fn item_named(&self, name: Symbol) -> Item {
+        *self
+            .model
+            .items()
+            .iter()
+            .find(|item| item.name == name)
+            .expect("every reader target declares an item")
+    }
+
+    fn reader_call(&self, name: Symbol) -> String {
+        let reader = self.reader_fn(name);
+        let item = self.item_named(name);
+        if self.item_reader_fallible(&item) {
+            format!("{reader}(t, depth)?")
+        } else {
+            format!("{reader}(t)")
+        }
+    }
+
+    fn item_enters_replay_depth(&self, item: &Item) -> bool {
+        self.deps
+            .def_id_for_sym(item.name)
+            .is_some_and(|def_id| self.deps.is_recursive_def(def_id))
+    }
+
+    fn item_reader_fallible(&self, item: &Item) -> bool {
+        self.item_enters_replay_depth(item)
+            || self.type_reaches_recursive_ref(item.ty, &mut HashSet::new())
+    }
+
+    fn type_reaches_recursive_ref(&self, ty: TypeId, seen: &mut HashSet<TypeId>) -> bool {
+        if !seen.insert(ty) {
+            return false;
+        }
+        if let Some(name) = self.model.type_name_of(ty) {
+            let item = self.item_named(name);
+            if self.item_enters_replay_depth(&item) {
+                return true;
+            }
+        }
+        match self.types.expect_type_shape(ty) {
+            TypeShape::Ref(def_id) => {
+                let target = self.types.expect_def_output(*def_id);
+                if target == TYPE_VOID {
+                    return false;
+                }
+                self.deps.is_recursive_def(*def_id) || self.type_reaches_recursive_ref(target, seen)
+            }
+            shape => shape
+                .child_type_ids()
+                .any(|child| self.type_reaches_recursive_ref(child, seen)),
+        }
+    }
+
+    /// Conservative source-level stack estimate for generated typed replay.
+    ///
+    /// Rust does not expose final stack maps here, so this counts the locals
+    /// the emitter creates and leaves runtime padding to `rt::replay_depth_auto`.
+    /// The estimate intentionally tracks reader shape, not input size: replay
+    /// depth protects the native stack.
+    pub(super) fn max_reader_frame_bytes(&self) -> u64 {
+        self.model
+            .items()
+            .iter()
+            .filter(|item| item.has_reader())
+            .map(|item| self.reader_frame_bytes(item))
+            .max()
+            .unwrap_or(READER_FRAME_BASE_BYTES)
+    }
+
+    fn reader_frame_bytes(&self, item: &Item) -> u64 {
+        let guard_bytes = if self.item_reader_fallible(item) {
+            WORD_BYTES
+        } else {
+            0
+        };
+        let local_bytes = match self.types.expect_type_shape(item.ty) {
+            TypeShape::Struct(fields) => self.field_scope_frame_bytes(item.ty, fields),
+            TypeShape::Enum(variants) => variants
+                .values()
+                .map(|&payload| self.enum_payload_frame_bytes(item.ty, payload))
+                .max()
+                .unwrap_or(0),
+            TypeShape::Void => 0,
+            _ => self.value_temp_bytes(item.ty, ReadContext::item(item.ty, 1)),
+        };
+
+        READER_FRAME_BASE_BYTES
+            .saturating_add(guard_bytes)
+            .saturating_add(local_bytes)
+    }
+
+    fn enum_payload_frame_bytes(&self, owner: TypeId, payload: TypeId) -> u64 {
+        if payload == TYPE_VOID {
+            return 0;
+        }
+        let TypeShape::Struct(fields) = self.types.expect_type_shape(payload) else {
+            unreachable!("enum variant payload is void or an anonymous struct");
+        };
+        self.field_scope_frame_bytes(owner, fields)
+    }
+
+    fn field_scope_frame_bytes(&self, owner: TypeId, fields: &BTreeMap<Symbol, FieldInfo>) -> u64 {
+        let context = ReadContext::item(owner, 1).field_value();
+        let slots = fields
+            .values()
+            .map(|info| self.option_value_bytes(self.field_value_bytes(info, context)))
+            .fold(0_u64, u64::saturating_add);
+        let widest_assignment = fields
+            .values()
+            .map(|info| self.field_value_bytes(info, context))
+            .max()
+            .unwrap_or(0);
+        slots.saturating_add(widest_assignment)
+    }
+
+    fn field_value_bytes(&self, info: &FieldInfo, context: ReadContext) -> u64 {
+        self.field_value_bytes_seen(info, context, &mut HashSet::new())
+    }
+
+    fn field_value_bytes_seen(
+        &self,
+        info: &FieldInfo,
+        context: ReadContext,
+        seen: &mut HashSet<TypeId>,
+    ) -> u64 {
+        let value = self.type_value_bytes(info.type_id, context, seen);
+        if info.optional {
+            self.option_value_bytes(value)
+        } else {
+            value
+        }
+    }
+
+    fn value_temp_bytes(&self, ty: TypeId, context: ReadContext) -> u64 {
+        match self.types.expect_type_shape(ty) {
+            TypeShape::Array { element, .. } => VEC_VALUE_BYTES.saturating_add(
+                self.type_value_bytes(*element, context.array_element(), &mut HashSet::new()),
+            ),
+            _ => self.type_value_bytes(ty, context, &mut HashSet::new()),
+        }
+    }
+
+    fn type_value_bytes(
+        &self,
+        ty: TypeId,
+        context: ReadContext,
+        seen: &mut HashSet<TypeId>,
+    ) -> u64 {
+        if !seen.insert(ty) {
+            return WORD_BYTES;
+        }
+
+        match self.types.expect_type_shape(ty) {
+            TypeShape::Void => 0,
+            TypeShape::Node | TypeShape::Custom(_) => NODE_VALUE_BYTES,
+            TypeShape::Optional(inner) => {
+                let inner = self.type_value_bytes(*inner, context, seen);
+                self.option_value_bytes(inner)
+            }
+            TypeShape::Array { element, .. } => VEC_VALUE_BYTES
+                .saturating_add(self.type_value_bytes(*element, context.array_element(), seen)),
+            TypeShape::Struct(fields) => fields
+                .values()
+                .map(|info| {
+                    let mut field_seen = seen.clone();
+                    self.field_value_bytes_seen(info, context.field_value(), &mut field_seen)
+                })
+                .fold(0_u64, u64::saturating_add),
+            TypeShape::Enum(variants) => {
+                let widest = variants
+                    .values()
+                    .map(|&payload| {
+                        let mut variant_seen = seen.clone();
+                        self.type_value_bytes(payload, context, &mut variant_seen)
+                    })
+                    .max()
+                    .unwrap_or(0);
+                WORD_BYTES.saturating_add(widest)
+            }
+            TypeShape::Ref(def_id) => {
+                let target = self.types.expect_def_output(*def_id);
+                if target == TYPE_VOID {
+                    return NODE_VALUE_BYTES;
+                }
+                if self.model.is_boxed_ref(context.cut, ty) {
+                    return WORD_BYTES;
+                }
+                self.type_value_bytes(target, context, seen)
+            }
+        }
+    }
+
+    fn option_value_bytes(&self, value_bytes: u64) -> u64 {
+        align_to_word(value_bytes.saturating_add(OPTION_TAG_BYTES))
+    }
+
+    /// The `parse`/`matches` surface, one block per entrypoint definition.
+    /// Callable definitions are nominal (parse + matches) or void (matches).
     pub(super) fn parse_api(&self, entrypoints: impl Iterator<Item = DefId>) -> String {
         let mut out = String::new();
         for def_id in entrypoints {
@@ -253,7 +429,7 @@ impl<'a> ReaderGen<'a> {
                 .expect("every entrypoint definition declares an item");
             match item.kind {
                 ItemKind::Struct | ItemKind::Enum => self.parse_impl(&mut out, &def, &item),
-                ItemKind::Alias => self.parse_free_fns(&mut out, &def, &item),
+                ItemKind::Alias => unreachable!("callable definitions are nominal or void"),
                 ItemKind::VoidDef => self.matches_impl(&mut out, &def, &item),
             }
         }
@@ -264,34 +440,20 @@ impl<'a> ReaderGen<'a> {
     /// the public API is always metered.
     fn matches_impl(&self, out: &mut String, def: &str, item: &Item) {
         let ident = self.model.item_ident(item.name);
-        let metered = metered_entry_fn_name(def);
         let _ = writeln!(out, "impl {ident} {{");
-        let _ = writeln!(
-            out,
-            "    /// Whether `{def}` matches `tree` under the module's compiled-in limits."
-        );
-        let _ = writeln!(out, "    pub fn matches(");
-        let _ = writeln!(out, "        tree: &rt::Tree,");
-        let _ = writeln!(out, "        source: &str,");
-        let _ = writeln!(
-            out,
-            "    ) -> ::core::result::Result<bool, rt::LimitError> {{"
-        );
-        let _ = writeln!(
-            out,
-            "        Ok(matcher::{metered}(tree, source)?.is_some())"
-        );
-        let _ = writeln!(out, "    }}");
+        self.inherent_matches_method(out, def);
         let _ = writeln!(out, "}}");
+        let _ = writeln!(out);
+        self.matches_trait_impl(out, item);
     }
 
-    /// Inherent `parse`/`try_parse` on a nominal (struct/enum) output type.
+    /// Inherent `parse`/`matches` on a nominal (struct/enum) output type.
     fn parse_impl(&self, out: &mut String, def: &str, item: &Item) {
         let sig = InherentParseSignature::for_item(&self.model, item);
         let reader = self.reader_fn(item.name);
         let replay = ParseReplay::new("        ", reader);
-        let trace = entry_fn_name(def);
-        let metered = metered_entry_fn_name(def);
+        let safe = safe_entry_fn_name(def);
+        let fallible_reader = self.item_reader_fallible(item);
         let _ = writeln!(
             out,
             "impl{} {}{} {{",
@@ -307,71 +469,87 @@ impl<'a> ReaderGen<'a> {
         );
         let _ = writeln!(
             out,
-            "    pub fn parse(tree: {}, source: &str) -> ::core::option::Option<Self> {{",
-            sig.tree_ref
+            "    /// The module's compiled-in limits bound total work, live"
         );
-        replay.emit_unmetered(out, &trace);
-        let _ = writeln!(out, "    }}");
-        let _ = writeln!(out);
-        let _ = writeln!(
-            out,
-            "    /// [`Self::parse`] under the module's compiled-in limits (steps bound"
-        );
-        let _ = writeln!(
-            out,
-            "    /// total work, memory bounds live backtracking state)."
-        );
-        let _ = writeln!(out, "    pub fn try_parse(");
+        let _ = writeln!(out, "    /// backtracking state, and typed replay depth.");
+        let _ = writeln!(out, "    pub fn parse(");
         let _ = writeln!(out, "        tree: {},", sig.tree_ref);
         let _ = writeln!(out, "        source: &str,");
         let _ = writeln!(
             out,
-            "    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitError> {{"
+            "    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {{"
         );
-        replay.emit_metered(out, &metered);
+        replay.emit_safe(out, &safe, fallible_reader);
+        let _ = writeln!(out, "    }}");
+        let _ = writeln!(out);
+        self.inherent_matches_method(out, def);
+        let _ = writeln!(out, "}}");
+        let _ = writeln!(out);
+        self.matches_trait_impl(out, item);
+        let _ = writeln!(out);
+        self.parse_trait_impl(out, item);
+    }
+
+    fn inherent_matches_method(&self, out: &mut String, def: &str) {
+        let accepts = accepts_entry_fn_name(def);
+        let _ = writeln!(
+            out,
+            "    /// Whether `{def}` matches `tree` under the module's compiled-in limits."
+        );
+        let _ = writeln!(out, "    pub fn matches(");
+        let _ = writeln!(out, "        tree: &rt::Tree,");
+        let _ = writeln!(out, "        source: &str,");
+        let _ = writeln!(
+            out,
+            "    ) -> ::core::result::Result<bool, rt::LimitExceeded> {{"
+        );
+        let _ = writeln!(out, "        matcher::{accepts}(tree, source)");
+        let _ = writeln!(out, "    }}");
+    }
+
+    fn matches_trait_impl(&self, out: &mut String, item: &Item) {
+        let ident = self.model.item_ident(item.name).to_string();
+        let (impl_generics, type_generics) = if item.kind == ItemKind::VoidDef {
+            ("", "")
+        } else {
+            let sig = InherentParseSignature::for_item(&self.model, item);
+            (sig.impl_generics, sig.type_generics)
+        };
+        let _ = writeln!(
+            out,
+            "impl{} rt::Matches for {}{} {{",
+            impl_generics, ident, type_generics
+        );
+        let _ = writeln!(
+            out,
+            "    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {{"
+        );
+        let _ = writeln!(out, "        {ident}::matches(tree, source)");
         let _ = writeln!(out, "    }}");
         let _ = writeln!(out, "}}");
     }
 
-    /// Free `parse` fns for an alias output — `impl` blocks cannot attach to
-    /// a `pub type` alias of a non-local type.
-    fn parse_free_fns(&self, out: &mut String, def: &str, item: &Item) {
-        let sig = FreeParseSignature::for_item(&self.model, item);
-        let snake = snake_ident(def);
-        let reader = self.reader_fn(item.name);
-        let replay = ParseReplay::new("    ", reader);
-        let trace = entry_fn_name(def);
-        let metered = metered_entry_fn_name(def);
+    fn parse_trait_impl(&self, out: &mut String, item: &Item) {
+        let sig = InherentParseSignature::for_item(&self.model, item);
+        let impl_generics = if sig.impl_generics.is_empty() {
+            "<'t>"
+        } else {
+            sig.impl_generics
+        };
         let _ = writeln!(
             out,
-            "/// Match `{def}` against `tree` and replay the committed trace into the"
+            "impl{impl_generics} rt::Parse<'t> for {}{} {{",
+            sig.ident, sig.type_generics
         );
+        let _ = writeln!(out, "    fn parse(");
+        let _ = writeln!(out, "        tree: &'t rt::Tree,");
+        let _ = writeln!(out, "        source: &str,");
         let _ = writeln!(
             out,
-            "/// typed output (`{}` aliases a non-nominal type, so `parse` is a",
-            sig.ident
+            "    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {{"
         );
-        let _ = writeln!(out, "/// free function). `None` is the no-match outcome.");
-        let _ = writeln!(out, "pub fn {snake}_parse{}(", sig.fn_generics);
-        let _ = writeln!(out, "    tree: {},", sig.tree_ref);
-        let _ = writeln!(out, "    source: &str,");
-        let _ = writeln!(out, ") -> ::core::option::Option<{}> {{", sig.return_type);
-        replay.emit_unmetered(out, &trace);
-        let _ = writeln!(out, "}}");
-        let _ = writeln!(out);
-        let _ = writeln!(
-            out,
-            "/// [`{snake}_parse`] under the module's compiled-in limits."
-        );
-        let _ = writeln!(out, "pub fn {snake}_try_parse{}(", sig.fn_generics);
-        let _ = writeln!(out, "    tree: {},", sig.tree_ref);
-        let _ = writeln!(out, "    source: &str,");
-        let _ = writeln!(
-            out,
-            ") -> ::core::result::Result<::core::option::Option<{}>, rt::LimitError> {{",
-            sig.return_type
-        );
-        replay.emit_metered(out, &metered);
+        let _ = writeln!(out, "        {}::parse(tree, source)", sig.ident);
+        let _ = writeln!(out, "    }}");
         let _ = writeln!(out, "}}");
     }
 
@@ -392,12 +570,29 @@ impl<'a> ReaderGen<'a> {
     fn reader_open(&self, out: &mut String, item: &Item) {
         let sig = TraceReaderSignature::for_item(&self.model, item);
         let reader = self.reader_fn(item.name);
+        let fallible = self.item_reader_fallible(item);
+        let depth_param = if fallible {
+            ", depth: &rt::ReplayDepth"
+        } else {
+            ""
+        };
+        let return_type = if fallible {
+            format!(
+                "::core::result::Result<{}, rt::LimitExceeded>",
+                sig.return_type
+            )
+        } else {
+            sig.return_type
+        };
         let _ = writeln!(out, "/// Replay one committed `{}` value.", sig.ident);
         let _ = writeln!(
             out,
-            "fn {reader}{}(t: &mut rt::TraceReader{}) -> {} {{",
-            sig.fn_generics, sig.reader_generics, sig.return_type
+            "fn {reader}{}(t: &mut rt::TraceReader{}{depth_param}) -> {return_type} {{",
+            sig.fn_generics, sig.reader_generics
         );
+        if self.item_enters_replay_depth(item) {
+            out.push_str("    let _depth = depth.enter()?;\n");
+        }
     }
 
     fn struct_reader(&self, out: &mut String, item: &Item) {
@@ -406,6 +601,7 @@ impl<'a> ReaderGen<'a> {
         };
         let ident = self.model.item_ident(item.name).to_string();
         let twins = &self.tables.twins[&item.name];
+        let fallible = self.item_reader_fallible(item);
         out.push('\n');
         self.reader_open(out, item);
         out.push_str("    t.expect_struct_open();\n");
@@ -414,7 +610,7 @@ impl<'a> ReaderGen<'a> {
             member_indices(self.table, twins, k)
         });
         out.push_str("    t.expect_struct_close();\n");
-        self.construct(out, Construction::struct_body(&ident), fields);
+        self.construct(out, Construction::struct_body(&ident), fields, fallible);
         out.push_str("}\n");
     }
 
@@ -425,6 +621,7 @@ impl<'a> ReaderGen<'a> {
         let ident = self.model.item_ident(item.name).to_string();
         let twins = &self.tables.twins[&item.name];
         let variant_idents = scope_idents(variants.keys().map(|&sym| self.interner.resolve(sym)));
+        let fallible = self.item_reader_fallible(item);
         out.push('\n');
         self.reader_open(out, item);
         out.push_str("    match t.expect_enum_open() {\n");
@@ -437,7 +634,11 @@ impl<'a> ReaderGen<'a> {
             let _ = writeln!(out, "        {indices} => {{");
             if payload == TYPE_VOID {
                 let _ = writeln!(out, "            t.expect_enum_close();");
-                let _ = writeln!(out, "            {ident}::{variant_ident}");
+                if fallible {
+                    let _ = writeln!(out, "            Ok({ident}::{variant_ident})");
+                } else {
+                    let _ = writeln!(out, "            {ident}::{variant_ident}");
+                }
                 out.push_str("        }\n");
                 continue;
             }
@@ -455,6 +656,7 @@ impl<'a> ReaderGen<'a> {
                 out,
                 Construction::enum_variant(&ident, variant_ident),
                 fields,
+                fallible,
             );
             out.push_str("        }\n");
         }
@@ -470,7 +672,11 @@ impl<'a> ReaderGen<'a> {
         out.push('\n');
         self.reader_open(out, item);
         let expr = self.value_expr(item.ty, ReadContext::item(item.ty, 1));
-        let _ = writeln!(out, "    {expr}");
+        if self.item_reader_fallible(item) {
+            let _ = writeln!(out, "    Ok({expr})");
+        } else {
+            let _ = writeln!(out, "    {expr}");
+        }
         out.push_str("}\n");
     }
 
@@ -520,11 +726,16 @@ impl<'a> ReaderGen<'a> {
         out: &mut String,
         construction: Construction,
         fields: &BTreeMap<Symbol, FieldInfo>,
+        fallible: bool,
     ) {
         let p = pad(construction.level);
         let head = construction.head;
         let field_idents = scope_idents(fields.keys().map(|&sym| self.interner.resolve(sym)));
-        let _ = writeln!(out, "{p}{head} {{");
+        if fallible {
+            let _ = writeln!(out, "{p}Ok({head} {{");
+        } else {
+            let _ = writeln!(out, "{p}{head} {{");
+        }
         for (k, ((&name, _), field_ident)) in fields.iter().zip(&field_idents).enumerate() {
             let name = self.interner.resolve(name);
             let _ = writeln!(
@@ -532,7 +743,11 @@ impl<'a> ReaderGen<'a> {
                 "{p}    {field_ident}: v{k}.expect(\"field-stability: every accepting path sets `{name}`\"),"
             );
         }
-        let _ = writeln!(out, "{p}}}");
+        if fallible {
+            let _ = writeln!(out, "{p}}})");
+        } else {
+            let _ = writeln!(out, "{p}}}");
+        }
     }
 
     /// A field's read expression: the capture-level `optional` flag wraps one
@@ -563,7 +778,7 @@ impl<'a> ReaderGen<'a> {
                     .model
                     .type_name_of(ty)
                     .expect("naming pass names every composite outside enum-variant payloads");
-                format!("{}(t)", self.reader_fn(name))
+                self.reader_call(name)
             }
             TypeShape::Ref(def_id) => {
                 let target = self.types.expect_def_output(*def_id);
@@ -572,7 +787,7 @@ impl<'a> ReaderGen<'a> {
                     // the matched node itself.
                     return "t.expect_node()".to_string();
                 }
-                let call = format!("{}(t)", self.reader_fn(self.deps.def_name_sym(*def_id)));
+                let call = self.reader_call(self.deps.def_name_sym(*def_id));
                 if self.model.is_boxed_ref(context.cut, ty) {
                     format!("::std::boxed::Box::new({call})")
                 } else {
@@ -802,4 +1017,12 @@ fn arm_pattern(mut indices: Vec<u16>) -> String {
 
 fn pad(level: usize) -> String {
     "    ".repeat(level)
+}
+
+fn align_to_word(bytes: u64) -> u64 {
+    let rem = bytes % WORD_BYTES;
+    if rem == 0 {
+        return bytes;
+    }
+    bytes.saturating_add(WORD_BYTES - rem)
 }
