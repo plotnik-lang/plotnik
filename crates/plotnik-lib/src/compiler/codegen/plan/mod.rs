@@ -10,6 +10,7 @@ mod replay;
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::lower::ir::NfaGraph;
+use plotnik_rt::Limit;
 
 pub(crate) use matcher::{
     CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, MatcherPlan, PredicatePlan,
@@ -25,10 +26,15 @@ pub(crate) struct ModulePlan<'a> {
     output: OutputSchema<'a>,
     matcher: MatcherPlan,
     replay: ReplayPlan,
+    limits: LimitsPlan,
 }
 
 impl<'a> ModulePlan<'a> {
-    pub(crate) fn build(graph: &NfaGraph, artifacts: AnalysisArtifacts<'a>) -> Self {
+    pub(crate) fn build(
+        graph: &NfaGraph,
+        artifacts: AnalysisArtifacts<'a>,
+        limits: LimitsPlan,
+    ) -> Self {
         let output = OutputSchema::from_artifacts(artifacts)
             .expect("bytecode dry-run validated the output schema");
         let matcher = MatcherPlan::build(graph, artifacts, output.layout());
@@ -38,6 +44,7 @@ impl<'a> ModulePlan<'a> {
             output,
             matcher,
             replay,
+            limits,
         }
     }
 
@@ -55,5 +62,27 @@ impl<'a> ModulePlan<'a> {
 
     pub(crate) fn replay(&self) -> &ReplayPlan {
         &self.replay
+    }
+
+    pub(crate) fn limits(&self) -> LimitsPlan {
+        self.limits
+    }
+}
+
+/// Target-neutral limit policy compiled into generated entry points.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct LimitsPlan {
+    pub(crate) steps: Limit,
+    pub(crate) memory: Limit,
+    pub(crate) replay_depth: Limit,
+}
+
+impl LimitsPlan {
+    pub(crate) fn new(steps: Limit, memory: Limit, replay_depth: Limit) -> Self {
+        Self {
+            steps,
+            memory,
+            replay_depth,
+        }
     }
 }

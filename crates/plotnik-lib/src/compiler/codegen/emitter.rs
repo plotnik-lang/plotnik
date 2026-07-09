@@ -31,8 +31,8 @@ use crate::compiler::codegen::emit::names::{shouty_ident, snake_ident};
 use crate::compiler::codegen::emit::sink::Sink;
 use crate::compiler::codegen::emit::template::splice;
 use crate::compiler::codegen::plan::{
-    CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, ModulePlan, PredicatePlan,
-    PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
+    CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, LimitsPlan, MatchPlan, ModulePlan,
+    PredicatePlan, PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
 };
 use crate::compiler::codegen::reader::ReaderGen;
 use crate::compiler::emit::regex_table::compile_dfa_bytes;
@@ -197,7 +197,8 @@ struct Generator<'a> {
 
 impl<'a> Generator<'a> {
     fn new(graph: &'a NfaGraph, artifacts: AnalysisArtifacts<'a>, config: &'a Config) -> Self {
-        let plan = ModulePlan::build(graph, artifacts);
+        let limits = LimitsPlan::new(config.limits.steps, config.limits.memory, config.depth);
+        let plan = ModulePlan::build(graph, artifacts, limits);
         let rust = RustRepresentation::from_plan(plan.matcher());
         Self { config, plan, rust }
     }
@@ -296,18 +297,19 @@ impl<'a> Generator<'a> {
     }
 
     fn mod_header(&self, out: &mut String, max_reader_frame_bytes: u64) {
+        let limits = self.plan.limits();
         splice(
             out,
             "",
             MOD_HEADER,
             &[
                 ("RT", &self.config.rt_crate),
-                ("STEPS", &limit_expr(self.config.limits.steps)),
-                ("MEMORY", &limit_expr(self.config.limits.memory)),
+                ("STEPS", &limit_expr(limits.steps)),
+                ("MEMORY", &limit_expr(limits.memory)),
                 ("READER_FRAME", &max_reader_frame_bytes.to_string()),
                 (
                     "DEPTH",
-                    &depth_expr(self.config.depth, max_reader_frame_bytes),
+                    &depth_expr(limits.replay_depth, max_reader_frame_bytes),
                 ),
             ],
         );
@@ -400,8 +402,9 @@ impl<'a> Generator<'a> {
         // the check out of `run`. With both unbounded there is no ceiling to
         // resolve, so the safe entries pass `NO_LIMITS` rather than pay for a
         // per-call node count that nothing reads.
-        let steps_metered = self.config.limits.steps != Limit::Unbounded;
-        let memory_metered = self.config.limits.memory != Limit::Unbounded;
+        let limits = self.plan.limits();
+        let steps_metered = limits.steps != Limit::Unbounded;
+        let memory_metered = limits.memory != Limit::Unbounded;
         let safe_limits = if steps_metered || memory_metered {
             "resolved_limits(tree)"
         } else {
