@@ -31,11 +31,6 @@ struct QueryInput {
     span: Span,
 }
 
-struct StrictQuery {
-    compiled: CompiledQuery,
-    span: Span,
-}
-
 struct RebuildAnchors {
     lines: Vec<String>,
 }
@@ -104,16 +99,16 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
 
     // Mirror `plotnik check --strict`: a compile-time-committed query must be
     // clean — proc macros have no warning channel, so warnings fail too.
-    let query = compile_strict_query(query, &loaded_grammar.grammar)?;
-    reject_colliding_entry_names(&query.compiled, query.span)?;
+    let query_span = query.span;
+    let compiled = compile_strict_query(query, &loaded_grammar.grammar)?;
+    reject_colliding_entry_names(&compiled, query_span)?;
 
     let config = MatcherConfig::new()
         .rt_crate(args.rt_crate.unwrap_or_else(|| "::plotnik::rt".to_string()))
         .serde(cfg!(feature = "serde"))
         .limits(runtime_limits(&args.limits))
         .depth(replay_depth(&args.limits));
-    Ok(query
-        .compiled
+    Ok(compiled
         .to_rust_matcher(config)
         .expect("a diagnostics-clean query generates a module"))
 }
@@ -121,7 +116,7 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
 fn compile_strict_query(
     query: QueryInput,
     grammar: &plotnik_lib::grammar::Grammar,
-) -> Result<StrictQuery, ExpandError> {
+) -> Result<CompiledQuery, ExpandError> {
     let span = query.span;
     let compiled = QueryBuilder::new(query.source_map)
         .with_strict_lints(true)
@@ -136,7 +131,7 @@ fn compile_strict_query(
         return Err(ExpandError::new(span, message));
     }
 
-    Ok(StrictQuery { compiled, span })
+    Ok(compiled)
 }
 
 /// Every definition becomes snake_case items (`{def}_trace`, the

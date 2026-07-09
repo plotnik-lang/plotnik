@@ -101,16 +101,16 @@ impl ItemKind {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct TypeContext {
+pub(crate) struct TypeContext {
     cut: Option<TypeId>,
 }
 
 impl TypeContext {
-    pub(super) fn item(item_ty: TypeId) -> Self {
+    pub(crate) fn item(item_ty: TypeId) -> Self {
         Self { cut: Some(item_ty) }
     }
 
-    fn array_element(self) -> Self {
+    pub(crate) fn array_element(self) -> Self {
         Self { cut: None }
     }
 }
@@ -163,13 +163,13 @@ impl<'a> Emitter<'a> {
         self.facts.needs_lifetime(ty)
     }
 
-    /// Whether a `Ref` occurrence rendered by value inside `item_ty`'s
-    /// declaration renders as `Box<...>`. `None` is the under-an-array
-    /// context: `Vec` already indirects, so nothing below it boxes. Sibling
-    /// backends (the trace readers) must ask with the same context the type
-    /// renderer used, or their `Box::new` placement drifts from the types.
-    pub(crate) fn is_boxed_ref(&self, item_ty: Option<TypeId>, ref_ty: TypeId) -> bool {
-        item_ty.is_some_and(|item| self.facts.is_boxed_in(item, ref_ty))
+    /// Whether a `Ref` occurrence rendered at `context` uses `Box<...>`.
+    /// Sibling backends (the trace readers) must ask with the same context the
+    /// type renderer used, or their `Box::new` placement drifts from the types.
+    pub(crate) fn is_boxed_ref(&self, context: TypeContext, ref_ty: TypeId) -> bool {
+        context
+            .cut
+            .is_some_and(|item| self.facts.is_boxed_in(item, ref_ty))
     }
 
     /// The naming-pass name of a nominal type, when it has one. Trustworthy
@@ -507,7 +507,7 @@ impl<'a> Emitter<'a> {
 
         let name = self.deps.def_name_sym(def_id);
         let base = self.named_type(name, target);
-        if self.is_boxed_ref(context.cut, ref_ty) {
+        if self.is_boxed_ref(context, ref_ty) {
             format!("::std::boxed::Box<{base}>")
         } else {
             base

@@ -30,12 +30,6 @@ pub struct StringArg {
     pub span: Span,
 }
 
-impl StringArg {
-    fn new(value: String, span: Span) -> Self {
-        Self { value, span }
-    }
-}
-
 pub enum QuerySource {
     Inline { literal: StringArg },
     File { path: StringArg },
@@ -268,7 +262,15 @@ impl ArgCursor {
         self.advance();
         match &token {
             TokenTree::Ident(ident) if ident.to_string() == "auto" => Ok(LimitArg::Auto),
-            TokenTree::Ident(ident) if ident.to_string() == "unbounded" => Ok(LimitArg::Unbounded),
+            TokenTree::Ident(ident) if ident.to_string() == "unbounded" => {
+                if key.allows_unbounded() {
+                    return Ok(LimitArg::Unbounded);
+                }
+                Err(ExpandError::new(
+                    key_span,
+                    "`depth = unbounded` is not supported; use `depth = auto` or an integer",
+                ))
+            }
             TokenTree::Literal(_) => take_integer_limit(&token, key),
             other => Err(invalid_limit_value(other.span(), key)),
         }
@@ -317,15 +319,6 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                             ));
                         };
                         let value = cursor.take_limit(key_span, limit_key)?;
-                        if matches!(limit_key, LimitKey::Depth)
-                            && matches!(&value, LimitArg::Unbounded)
-                        {
-                            return Err(ExpandError::new(
-                                key_span,
-                                "`depth = unbounded` is not supported; use `depth = auto` \
-                                 or an integer",
-                            ));
-                        }
                         args.limits.put(limit_key, value, key_span)?;
                     }
                 }
@@ -358,7 +351,10 @@ fn put<T>(slot: &mut Option<T>, value: T, span: Span, key: &str) -> Result<(), E
 fn string_value(token: &TokenTree) -> Result<StringArg, ExpandError> {
     let text = token.to_string();
     match litrs::StringLit::parse(text) {
-        Ok(lit) => Ok(StringArg::new(lit.value().to_string(), token.span())),
+        Ok(lit) => Ok(StringArg {
+            value: lit.value().to_string(),
+            span: token.span(),
+        }),
         Err(_) => Err(ExpandError::new(
             token.span(),
             "expected a string literal here",
