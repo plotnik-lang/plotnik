@@ -74,21 +74,17 @@ impl<'a> Emitter<'a> {
     /// typed-replay readers must spell items and fields exactly as the type
     /// declarations do, so they consult this model instead of re-deriving
     /// names. Never call [`Self::emit`] on a model — it collects again.
-    pub(crate) fn model(
-        types: &'a TypeAnalysis,
-        deps: &'a DependencyAnalysis,
-        interner: &'a Interner,
-        config: &'a Config,
-    ) -> Self {
-        let mut emitter = Self::new(types, deps, interner, config);
+    pub(crate) fn model(schema: OutputSchema<'a>, config: &'a Config) -> Self {
+        let facts = TypeFacts::compute(schema.types);
+        let mut emitter = Self {
+            schema,
+            config,
+            facts,
+            item_idents: HashMap::new(),
+            uses_node: false,
+        };
         emitter.assign_item_idents();
         emitter
-    }
-
-    /// The declared items, in emission order (definitions first, named
-    /// composites parent-first after their owner).
-    pub(crate) fn items(&self) -> &[Item] {
-        self.schema.items()
     }
 
     /// Whether the type's rendering mentions `'t` (transitively holds a node).
@@ -103,12 +99,6 @@ impl<'a> Emitter<'a> {
         context
             .cut
             .is_some_and(|item| self.facts.is_boxed_in(item, ref_ty))
-    }
-
-    /// The naming-pass name of a nominal type, when it has one. Trustworthy
-    /// only for the shapes `type_names` covers (see the field's doc).
-    pub(crate) fn type_name_of(&self, ty: TypeId) -> Option<Symbol> {
-        self.schema.type_name_of(ty)
     }
 
     pub(super) fn emit(mut self) -> String {

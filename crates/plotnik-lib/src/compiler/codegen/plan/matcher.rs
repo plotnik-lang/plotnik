@@ -12,7 +12,7 @@ use plotnik_rt::{Nav, SkipPolicy};
 
 use crate::bytecode::{EffectKind, NodeKindConstraint, PredicateOp};
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::output::{CaptureLayout, OutputSchema};
+use crate::compiler::analyze::output::CaptureLayout;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::dump::NfaDumper;
 use crate::compiler::lower::ir::{
@@ -20,38 +20,6 @@ use crate::compiler::lower::ir::{
     PredicateValueIR,
 };
 use crate::core::{NodeFieldId, NodeKindId};
-
-/// Everything a generated module shares across target languages.
-pub(crate) struct ModulePlan<'a> {
-    artifacts: AnalysisArtifacts<'a>,
-    output: OutputSchema<'a>,
-    matcher: MatcherPlan,
-}
-
-impl<'a> ModulePlan<'a> {
-    pub(crate) fn build(graph: &NfaGraph, artifacts: AnalysisArtifacts<'a>) -> Self {
-        let output = OutputSchema::from_artifacts(artifacts)
-            .expect("bytecode dry-run validated the output schema");
-        let matcher = MatcherPlan::build(graph, artifacts, output.layout());
-        Self {
-            artifacts,
-            output,
-            matcher,
-        }
-    }
-
-    pub(crate) fn artifacts(&self) -> AnalysisArtifacts<'a> {
-        self.artifacts
-    }
-
-    pub(crate) fn output(&self) -> &OutputSchema<'a> {
-        &self.output
-    }
-
-    pub(crate) fn matcher(&self) -> &MatcherPlan {
-        &self.matcher
-    }
-}
 
 /// Dense runtime state id carried by frames and checkpoints.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -268,7 +236,11 @@ pub(crate) struct MatcherPlan {
 }
 
 impl MatcherPlan {
-    fn build(graph: &NfaGraph, artifacts: AnalysisArtifacts<'_>, layout: &CaptureLayout) -> Self {
+    pub(super) fn build(
+        graph: &NfaGraph,
+        artifacts: AnalysisArtifacts<'_>,
+        layout: &CaptureLayout,
+    ) -> Self {
         let dumper = NfaDumper::new(graph, artifacts);
         let mut sorted: Vec<&InstructionIR> = graph.instructions().iter().collect();
         sorted.sort_by_key(|instruction| instruction.label());

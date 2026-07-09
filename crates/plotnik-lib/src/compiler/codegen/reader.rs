@@ -23,18 +23,21 @@
 //! typegen emitter's own model, so a keyword-renamed field reads exactly as
 //! it was declared.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::output::CaptureLayout;
+use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
 use crate::compiler::codegen::emit::names::{rust_scope_idents, snake_ident};
 use crate::compiler::codegen::emit::sink::indentation;
+use crate::compiler::codegen::plan::{
+    ReplayItem, ReplayItemKind, ReplayPlan, ReplayScopePlan, ReplayValuePlan, ReplayVariantPlan,
+};
 use crate::compiler::ids::DefId;
-use crate::compiler::typegen::rust::emitter::{Emitter as TypeModel, Item, ItemKind, TypeContext};
+use crate::compiler::typegen::rust::emitter::{Emitter as TypeModel, TypeContext};
 use crate::core::{Interner, Symbol};
 
 use super::emitter::{accepts_entry_fn_name, safe_entry_fn_name};
@@ -50,7 +53,7 @@ pub(super) struct ReaderGen<'a> {
     types: &'a TypeAnalysis,
     deps: &'a DependencyAnalysis,
     interner: &'a Interner,
-    layout: &'a CaptureLayout,
+    replay: &'a ReplayPlan,
     tables: ReaderTables,
 }
 
@@ -58,22 +61,13 @@ struct ReaderTables {
     /// Item name → reader fn ident, uniqued in item order (nominally distinct
     /// names can share a snake form, e.g. `HTTPServer` / `HttpServer`).
     reader_fns: HashMap<Symbol, String>,
-    /// Item name → every table-reachable analysis type carrying it (nominal
-    /// twins). The item's own type is always among them.
-    twins: HashMap<Symbol, Vec<TypeId>>,
 }
 
 impl ReaderTables {
-    fn collect(
-        model: &TypeModel<'_>,
-        types: &TypeAnalysis,
-        layout: &CaptureLayout,
-        interner: &Interner,
-    ) -> Self {
+    fn collect(replay: &ReplayPlan, interner: &Interner) -> Self {
         let mut reader_fns = HashMap::new();
         let mut taken = HashSet::new();
-        let mut twins: HashMap<Symbol, Vec<TypeId>> = HashMap::new();
-        for item in model.items() {
+        for item in replay.items() {
             if !item.has_reader() {
                 continue;
             }
@@ -82,13 +76,9 @@ impl ReaderTables {
                 name.push('_');
             }
             reader_fns.insert(item.name, name);
-
-            if item.is_composite() {
-                twins.insert(item.name, collect_twins(types, layout, item));
-            }
         }
 
-        Self { reader_fns, twins }
+        Self { reader_fns }
     }
 }
 
@@ -100,7 +90,7 @@ struct InherentParseSignature {
 }
 
 impl InherentParseSignature {
-    fn for_item(model: &TypeModel<'_>, item: &Item) -> Self {
+    fn for_item(model: &TypeModel<'_>, item: &ReplayItem) -> Self {
         let ident = model.item_ident(item.name).to_string();
         if model.needs_lifetime(item.ty) {
             return Self {
@@ -122,24 +112,20 @@ impl InherentParseSignature {
 impl<'a> ReaderGen<'a> {
     pub(super) fn new(
         artifacts: AnalysisArtifacts<'a>,
-        layout: &'a CaptureLayout,
+        output: &OutputSchema<'a>,
+        replay: &'a ReplayPlan,
         config: &'a crate::compiler::typegen::rust::Config,
     ) -> Self {
         let types = artifacts.type_analysis;
-        let model = TypeModel::model(
-            types,
-            artifacts.dependency_analysis,
-            artifacts.interner,
-            config,
-        );
-        let tables = ReaderTables::collect(&model, types, layout, artifacts.interner);
+        let model = TypeModel::model(output.clone(), config);
+        let tables = ReaderTables::collect(replay, artifacts.interner);
 
         Self {
             model,
             types,
             deps: artifacts.dependency_analysis,
             interner: artifacts.interner,
-            layout,
+            replay,
             tables,
         }
     }
@@ -151,57 +137,17 @@ impl<'a> ReaderGen<'a> {
             .expect("every non-void item has a reader")
     }
 
-    fn item_named(&self, name: Symbol) -> Item {
-        *self
-            .model
-            .items()
-            .iter()
-            .find(|item| item.name == name)
-            .expect("every reader target declares an item")
+    fn item_named(&self, name: Symbol) -> &ReplayItem {
+        self.replay.item(name)
     }
 
     fn reader_call(&self, name: Symbol) -> String {
         let reader = self.reader_fn(name);
         let item = self.item_named(name);
-        if self.item_reader_fallible(&item) {
+        if item.fallible {
             format!("{reader}(t, depth)?")
         } else {
             format!("{reader}(t)")
-        }
-    }
-
-    fn item_enters_replay_depth(&self, item: &Item) -> bool {
-        self.deps
-            .def_id_for_sym(item.name)
-            .is_some_and(|def_id| self.deps.is_recursive_def(def_id))
-    }
-
-    fn item_reader_fallible(&self, item: &Item) -> bool {
-        self.item_enters_replay_depth(item)
-            || self.type_reaches_recursive_ref(item.ty, &mut HashSet::new())
-    }
-
-    fn type_reaches_recursive_ref(&self, ty: TypeId, seen: &mut HashSet<TypeId>) -> bool {
-        if !seen.insert(ty) {
-            return false;
-        }
-        if let Some(name) = self.model.type_name_of(ty) {
-            let item = self.item_named(name);
-            if self.item_enters_replay_depth(&item) {
-                return true;
-            }
-        }
-        match self.types.expect_type_shape(ty) {
-            TypeShape::Ref(def_id) => {
-                let target = self.types.expect_def_output(*def_id);
-                if target == TYPE_VOID {
-                    return false;
-                }
-                self.deps.is_recursive_def(*def_id) || self.type_reaches_recursive_ref(target, seen)
-            }
-            shape => shape
-                .child_type_ids()
-                .any(|child| self.type_reaches_recursive_ref(child, seen)),
         }
     }
 
@@ -212,7 +158,7 @@ impl<'a> ReaderGen<'a> {
     /// The estimate intentionally tracks reader shape, not input size: replay
     /// depth protects the native stack.
     pub(super) fn max_reader_frame_bytes(&self) -> u64 {
-        self.model
+        self.replay
             .items()
             .iter()
             .filter(|item| item.has_reader())
@@ -221,12 +167,8 @@ impl<'a> ReaderGen<'a> {
             .unwrap_or(READER_FRAME_BASE_BYTES)
     }
 
-    fn reader_frame_bytes(&self, item: &Item) -> u64 {
-        let guard_bytes = if self.item_reader_fallible(item) {
-            WORD_BYTES
-        } else {
-            0
-        };
+    fn reader_frame_bytes(&self, item: &ReplayItem) -> u64 {
+        let guard_bytes = if item.fallible { WORD_BYTES } else { 0 };
         let local_bytes = match self.types.expect_type_shape(item.ty) {
             TypeShape::Struct(fields) => self.field_scope_frame_bytes(item.ty, fields),
             TypeShape::Enum(variants) => variants
@@ -356,16 +298,15 @@ impl<'a> ReaderGen<'a> {
             let name = self.deps.def_name_sym(def_id);
             let def = self.interner.resolve(name).to_string();
             out.push('\n');
-            let item = *self
-                .model
-                .items()
-                .iter()
-                .find(|item| item.name == name)
-                .expect("every entrypoint definition declares an item");
+            let item = self.replay.item(name);
             match item.kind {
-                ItemKind::Struct | ItemKind::Enum => self.parse_impl(&mut out, &def, &item),
-                ItemKind::Alias => unreachable!("callable definitions are nominal or void"),
-                ItemKind::VoidDef => self.matches_impl(&mut out, &def, &item),
+                ReplayItemKind::Struct(_) | ReplayItemKind::Enum(_) => {
+                    self.parse_impl(&mut out, &def, item);
+                }
+                ReplayItemKind::Alias(_) => {
+                    unreachable!("callable definitions are nominal or void")
+                }
+                ReplayItemKind::VoidDefinition => self.matches_impl(&mut out, &def, item),
             }
         }
         out
@@ -373,7 +314,7 @@ impl<'a> ReaderGen<'a> {
 
     /// `matches` for a void definition: it can only answer matched-or-not, and
     /// the public API is always metered.
-    fn matches_impl(&self, out: &mut String, def: &str, item: &Item) {
+    fn matches_impl(&self, out: &mut String, def: &str, item: &ReplayItem) {
         let ident = self.model.item_ident(item.name);
         let _ = writeln!(out, "impl {ident} {{");
         self.inherent_matches_method(out, def);
@@ -383,11 +324,11 @@ impl<'a> ReaderGen<'a> {
     }
 
     /// Inherent `parse`/`matches` on a nominal (struct/enum) output type.
-    fn parse_impl(&self, out: &mut String, def: &str, item: &Item) {
+    fn parse_impl(&self, out: &mut String, def: &str, item: &ReplayItem) {
         let sig = InherentParseSignature::for_item(&self.model, item);
         let reader = self.reader_fn(item.name);
         let safe = safe_entry_fn_name(def);
-        let fallible_reader = self.item_reader_fallible(item);
+        let fallible_reader = item.fallible;
         let _ = writeln!(
             out,
             "impl{} {}{} {{",
@@ -458,9 +399,10 @@ impl<'a> ReaderGen<'a> {
         let _ = writeln!(out, "    }}");
     }
 
-    fn matches_trait_impl(&self, out: &mut String, item: &Item) {
+    fn matches_trait_impl(&self, out: &mut String, item: &ReplayItem) {
         let ident = self.model.item_ident(item.name).to_string();
-        let (impl_generics, type_generics) = if item.kind == ItemKind::VoidDef {
+        let (impl_generics, type_generics) = if matches!(item.kind, ReplayItemKind::VoidDefinition)
+        {
             ("", "")
         } else {
             let sig = InherentParseSignature::for_item(&self.model, item);
@@ -480,7 +422,7 @@ impl<'a> ReaderGen<'a> {
         let _ = writeln!(out, "}}");
     }
 
-    fn parse_trait_impl(&self, out: &mut String, item: &Item) {
+    fn parse_trait_impl(&self, out: &mut String, item: &ReplayItem) {
         let sig = InherentParseSignature::for_item(&self.model, item);
         let impl_generics = if sig.impl_generics.is_empty() {
             "<'t>"
@@ -507,18 +449,18 @@ impl<'a> ReaderGen<'a> {
     /// Every reader fn, in item order.
     pub(super) fn readers(&self) -> String {
         let mut out = String::new();
-        for item in self.model.items() {
-            match item.kind {
-                ItemKind::Struct => self.struct_reader(&mut out, item),
-                ItemKind::Enum => self.enum_reader(&mut out, item),
-                ItemKind::Alias => self.alias_reader(&mut out, item),
-                ItemKind::VoidDef => {}
+        for item in self.replay.items() {
+            match &item.kind {
+                ReplayItemKind::Struct(scope) => self.struct_reader(&mut out, item, scope),
+                ReplayItemKind::Enum(variants) => self.enum_reader(&mut out, item, variants),
+                ReplayItemKind::Alias(value) => self.alias_reader(&mut out, item, value),
+                ReplayItemKind::VoidDefinition => {}
             }
         }
         out
     }
 
-    fn reader_open(&self, out: &mut String, item: &Item) {
+    fn reader_open(&self, out: &mut String, item: &ReplayItem) {
         let ident = self.model.item_ident(item.name).to_string();
         let (fn_generics, reader_generics, return_type) = if self.model.needs_lifetime(item.ty) {
             ("<'t>", "<'_, 't>", format!("{ident}<'t>"))
@@ -526,7 +468,7 @@ impl<'a> ReaderGen<'a> {
             ("", "<'_, '_>", ident.clone())
         };
         let reader = self.reader_fn(item.name);
-        let fallible = self.item_reader_fallible(item);
+        let fallible = item.fallible;
         let depth_param = if fallible {
             ", depth: &rt::ReplayDepth"
         } else {
@@ -542,70 +484,53 @@ impl<'a> ReaderGen<'a> {
             out,
             "fn {reader}{fn_generics}(t: &mut rt::TraceReader{reader_generics}{depth_param}) -> {return_type} {{"
         );
-        if self.item_enters_replay_depth(item) {
+        if item.enters_depth {
             out.push_str("    let _depth = depth.enter()?;\n");
         }
     }
 
-    fn struct_reader(&self, out: &mut String, item: &Item) {
-        let TypeShape::Struct(fields) = self.types.expect_type_shape(item.ty) else {
-            unreachable!("struct item must have a struct shape");
-        };
+    fn struct_reader(&self, out: &mut String, item: &ReplayItem, plan: &ReplayScopePlan) {
         let ident = self.model.item_ident(item.name).to_string();
-        let twins = &self.tables.twins[&item.name];
-        let fallible = self.item_reader_fallible(item);
         out.push('\n');
         self.reader_open(out, item);
         out.push_str("    t.expect_struct_open();\n");
         let scope = Scope::struct_body(item.ty, &ident);
-        self.field_scope(out, &scope, fields, |k| {
-            member_indices(self.layout, twins, k)
-        });
+        self.field_scope(out, &scope, plan);
         out.push_str("    t.expect_struct_close();\n");
-        self.construct(out, &scope, fields, fallible);
+        self.construct(out, &scope, plan, item.fallible);
         out.push_str("}\n");
     }
 
-    fn enum_reader(&self, out: &mut String, item: &Item) {
-        let TypeShape::Enum(variants) = self.types.expect_type_shape(item.ty) else {
-            unreachable!("enum item must have an enum shape");
-        };
+    fn enum_reader(&self, out: &mut String, item: &ReplayItem, variants: &[ReplayVariantPlan]) {
         let ident = self.model.item_ident(item.name).to_string();
-        let twins = &self.tables.twins[&item.name];
-        let variant_idents =
-            rust_scope_idents(variants.keys().map(|&sym| self.interner.resolve(sym)));
-        let fallible = self.item_reader_fallible(item);
+        let variant_idents = rust_scope_idents(
+            variants
+                .iter()
+                .map(|variant| self.interner.resolve(variant.name)),
+        );
         out.push('\n');
         self.reader_open(out, item);
         out.push_str("    match t.expect_enum_open() {\n");
-        for (k, ((&label, &payload), variant_ident)) in
-            variants.iter().zip(&variant_idents).enumerate()
-        {
-            let indices = arm_pattern(member_indices(self.layout, twins, k));
-            let label = self.interner.resolve(label);
+        for (variant, variant_ident) in variants.iter().zip(&variant_idents) {
+            let indices = arm_pattern(&variant.indices);
+            let label = self.interner.resolve(variant.name);
             let _ = writeln!(out, "        // {label}");
             let _ = writeln!(out, "        {indices} => {{");
-            if payload == TYPE_VOID {
+            let Some(payload) = &variant.payload else {
                 let _ = writeln!(out, "            t.expect_enum_close();");
-                if fallible {
+                if item.fallible {
                     let _ = writeln!(out, "            Ok({ident}::{variant_ident})");
                 } else {
                     let _ = writeln!(out, "            {ident}::{variant_ident}");
                 }
                 out.push_str("        }\n");
                 continue;
-            }
-
-            let TypeShape::Struct(fields) = self.types.expect_type_shape(payload) else {
-                unreachable!("enum variant payload is void or an anonymous struct");
             };
-            let payloads = payload_twins(self.types, twins, k);
+
             let scope = Scope::enum_payload(item.ty, &ident, variant_ident);
-            self.field_scope(out, &scope, fields, |j| {
-                member_indices(self.layout, &payloads, j)
-            });
+            self.field_scope(out, &scope, payload);
             out.push_str("            t.expect_enum_close();\n");
-            self.construct(out, &scope, fields, fallible);
+            self.construct(out, &scope, payload, item.fallible);
             out.push_str("        }\n");
         }
         let _ = writeln!(
@@ -616,11 +541,11 @@ impl<'a> ReaderGen<'a> {
         out.push_str("}\n");
     }
 
-    fn alias_reader(&self, out: &mut String, item: &Item) {
+    fn alias_reader(&self, out: &mut String, item: &ReplayItem, value: &ReplayValuePlan) {
         out.push('\n');
         self.reader_open(out, item);
-        let expr = self.value_expr(item.ty, ReadContext::item(item.ty, 1));
-        if self.item_reader_fallible(item) {
+        let expr = self.value_expr(value, ReadContext::item(item.ty, 1));
+        if item.fallible {
             let _ = writeln!(out, "    Ok({expr})");
         } else {
             let _ = writeln!(out, "    {expr}");
@@ -633,28 +558,22 @@ impl<'a> ReaderGen<'a> {
     /// field value. Enum payloads reuse it with `EnumClose` as the terminator
     /// (payload `Set`s attach directly to the enum frame — the materializer's
     /// contract).
-    fn field_scope(
-        &self,
-        out: &mut String,
-        scope: &Scope<'_>,
-        fields: &BTreeMap<Symbol, FieldInfo>,
-        indices_of: impl Fn(usize) -> Vec<u16>,
-    ) {
+    fn field_scope(&self, out: &mut String, scope: &Scope<'_>, plan: &ReplayScopePlan) {
         let p = indentation(scope.level());
-        for (k, &name) in fields.keys().enumerate() {
+        for (index, field) in plan.fields.iter().enumerate() {
             let _ = writeln!(
                 out,
-                "{p}let mut v{k} = None; // {}",
-                self.interner.resolve(name)
+                "{p}let mut v{index} = None; // {}",
+                self.interner.resolve(field.name)
             );
         }
         let _ = writeln!(out, "{p}while !t.{}() {{", scope.kind.probe());
         let _ = writeln!(out, "{p}    match t.peek_set() {{");
-        for (k, (&name, info)) in fields.iter().enumerate() {
-            let indices = arm_pattern(indices_of(k));
-            let expr = self.field_expr(info, scope.field_context());
-            let _ = writeln!(out, "{p}        // {}", self.interner.resolve(name));
-            let _ = writeln!(out, "{p}        {indices} => v{k} = Some({expr}),");
+        for (index, field) in plan.fields.iter().enumerate() {
+            let indices = arm_pattern(&field.indices);
+            let expr = self.value_expr(&field.value, scope.field_context());
+            let _ = writeln!(out, "{p}        // {}", self.interner.resolve(field.name));
+            let _ = writeln!(out, "{p}        {indices} => v{index} = Some({expr}),");
         }
         let _ = writeln!(
             out,
@@ -673,22 +592,26 @@ impl<'a> ReaderGen<'a> {
         &self,
         out: &mut String,
         scope: &Scope<'_>,
-        fields: &BTreeMap<Symbol, FieldInfo>,
+        plan: &ReplayScopePlan,
         fallible: bool,
     ) {
         let p = indentation(scope.level());
         let head = scope.construction_head();
-        let field_idents = rust_scope_idents(fields.keys().map(|&sym| self.interner.resolve(sym)));
+        let field_idents = rust_scope_idents(
+            plan.fields
+                .iter()
+                .map(|field| self.interner.resolve(field.name)),
+        );
         if fallible {
             let _ = writeln!(out, "{p}Ok({head} {{");
         } else {
             let _ = writeln!(out, "{p}{head} {{");
         }
-        for (k, ((&name, _), field_ident)) in fields.iter().zip(&field_idents).enumerate() {
-            let name = self.interner.resolve(name);
+        for (index, (field, field_ident)) in plan.fields.iter().zip(&field_idents).enumerate() {
+            let name = self.interner.resolve(field.name);
             let _ = writeln!(
                 out,
-                "{p}    {field_ident}: v{k}.expect(\"field-stability: every accepting path sets `{name}`\"),"
+                "{p}    {field_ident}: v{index}.expect(\"field-stability: every accepting path sets `{name}`\"),"
             );
         }
         if fallible {
@@ -698,58 +621,32 @@ impl<'a> ReaderGen<'a> {
         }
     }
 
-    /// A field's read expression: the capture-level `optional` flag wraps one
-    /// more null check around the base, exactly like the type wraps one more
-    /// `Option`.
-    fn field_expr(&self, info: &FieldInfo, context: ReadContext) -> String {
-        if info.optional {
-            self.nullable_expr(info.type_id, context)
-        } else {
-            self.value_expr(info.type_id, context)
-        }
-    }
-
-    /// Read one value of `ty`. The returned expression's first line splices
+    /// Read one planned value. The returned expression's first line splices
     /// inline; continuation lines are indented for `level`. `depth` suffixes
     /// array accumulators so nested arrays don't shadow. `cut` is the item
     /// declaration this position renders inside — the box-placement context,
     /// threaded exactly as the type renderer threads it so `Box::new` sits
     /// precisely where the declared type says `Box`.
-    fn value_expr(&self, ty: TypeId, context: ReadContext) -> String {
-        match self.types.expect_type_shape(ty) {
-            // A `Custom` is a named alias of Node; the node is the value.
-            TypeShape::Node | TypeShape::Custom(_) => "t.expect_node()".to_string(),
-            TypeShape::Optional(inner) => self.nullable_expr(*inner, context),
-            TypeShape::Array { element, .. } => self.array_expr(*element, context),
-            TypeShape::Struct(_) | TypeShape::Enum(_) => {
-                let name = self
-                    .model
-                    .type_name_of(ty)
-                    .expect("naming pass names every composite outside enum-variant payloads");
-                self.reader_call(name)
-            }
-            TypeShape::Ref(def_id) => {
-                let target = self.types.expect_def_output(*def_id);
-                if target == TYPE_VOID {
-                    // A void target contributes no value; the capture holds
-                    // the matched node itself.
-                    return "t.expect_node()".to_string();
-                }
-                let call = self.reader_call(self.deps.def_name_sym(*def_id));
-                if self.model.is_boxed_ref(context.type_context, ty) {
+    fn value_expr(&self, plan: &ReplayValuePlan, context: ReadContext) -> String {
+        match plan {
+            ReplayValuePlan::Node => "t.expect_node()".to_string(),
+            ReplayValuePlan::Nullable(inner) => self.nullable_expr(inner, context),
+            ReplayValuePlan::Array(element) => self.array_expr(element, context),
+            ReplayValuePlan::Read { item, source } => {
+                let call = self.reader_call(*item);
+                if self.model.is_boxed_ref(context.type_context, *source) {
                     format!("::std::boxed::Box::new({call})")
                 } else {
                     call
                 }
             }
-            TypeShape::Void => unreachable!("void cannot appear in an output position"),
         }
     }
 
     /// `Null` is the whole absent value — one flat null, however many
     /// `Option` layers the type carries; a present value wraps `Some` at
     /// every layer (the VM never nests nulls).
-    fn nullable_expr(&self, inner: TypeId, context: ReadContext) -> String {
+    fn nullable_expr(&self, inner: &ReplayValuePlan, context: ReadContext) -> String {
         let p = indentation(context.level);
         let inner_expr = self.value_expr(inner, context.in_some_branch());
         let mut out = String::new();
@@ -761,7 +658,7 @@ impl<'a> ReaderGen<'a> {
         out
     }
 
-    fn array_expr(&self, element: TypeId, context: ReadContext) -> String {
+    fn array_expr(&self, element: &ReplayValuePlan, context: ReadContext) -> String {
         let p = indentation(context.level);
         let items = format!("items{}", context.array_depth);
         let elem = self.value_expr(element, context.array_element());
@@ -880,69 +777,8 @@ impl<'a> Scope<'a> {
     }
 }
 
-/// Every table-reachable analysis type sharing this item's name and shape
-/// kind. Structural identity is enforced upstream (same name ⇒ same shape),
-/// so twins differ only in their member-run offsets.
-fn collect_twins(types: &TypeAnalysis, layout: &CaptureLayout, item: &Item) -> Vec<TypeId> {
-    let wants_struct = item.is_struct();
-    let mut out: BTreeSet<TypeId> = BTreeSet::new();
-    for (ty, name) in types.iter_type_names() {
-        if name != item.name {
-            continue;
-        }
-        let matches_kind = match types.expect_type_shape(ty) {
-            TypeShape::Struct(_) => wants_struct,
-            TypeShape::Enum(_) => !wants_struct,
-            _ => false,
-        };
-        if !matches_kind {
-            continue;
-        }
-        if layout.member_base(ty).is_none() {
-            continue;
-        }
-        out.insert(ty);
-    }
-    out.insert(item.ty);
-    out.into_iter().collect()
-}
-
-/// Variant `k`'s payload struct across every twin enum. Twins are
-/// structurally identical, so the variant lists align by position.
-fn payload_twins(types: &TypeAnalysis, twins: &[TypeId], k: usize) -> Vec<TypeId> {
-    twins
-        .iter()
-        .map(|&ty| {
-            let TypeShape::Enum(variants) = types.expect_type_shape(ty) else {
-                unreachable!("enum twins share the enum shape");
-            };
-            *variants
-                .values()
-                .nth(k)
-                .expect("twins share the variant list")
-        })
-        .collect()
-}
-
-/// The absolute member indices position `k` of this composite can arrive as,
-/// one per twin — the same `base + relative` sum the matcher baked into its
-/// `Set`/`EnumOpen` operands.
-fn member_indices(layout: &CaptureLayout, twins: &[TypeId], k: usize) -> Vec<u16> {
-    twins
-        .iter()
-        .map(|&ty| {
-            let scope = layout
-                .scope(ty)
-                .expect("twins are collected layout-present");
-            scope.absolute_index(u16::try_from(k).expect("member count fits u16"))
-        })
-        .collect()
-}
-
-/// `12` or `12 | 27` — sorted, deduped match pattern over twin indices.
-fn arm_pattern(mut indices: Vec<u16>) -> String {
-    indices.sort_unstable();
-    indices.dedup();
+/// `12` or `12 | 27` — the Rust match pattern for planned twin indices.
+fn arm_pattern(indices: &[u16]) -> String {
     indices
         .iter()
         .map(u16::to_string)

@@ -70,10 +70,6 @@ impl OutputItem {
     pub(crate) fn is_struct(self) -> bool {
         self.kind == OutputItemKind::Struct
     }
-
-    pub(crate) fn has_reader(self) -> bool {
-        self.kind != OutputItemKind::VoidDef
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -213,6 +209,7 @@ impl CaptureLayout {
 /// The name-assigned, reachable output model shared by bytecode and generated
 /// source backends. It contains semantic shapes and capture slots only; target
 /// representation choices such as Rust `Box` placement live downstream.
+#[derive(Clone)]
 pub(crate) struct OutputSchema<'a> {
     pub(crate) types: &'a TypeAnalysis,
     pub(crate) deps: &'a DependencyAnalysis,

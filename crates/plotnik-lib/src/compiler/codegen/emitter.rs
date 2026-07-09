@@ -223,7 +223,12 @@ impl<'a> Generator<'a> {
             .rt_crate(self.config.rt_crate.clone())
             .serde(self.config.serde);
         let artifacts = self.plan.artifacts();
-        let readers = ReaderGen::new(artifacts, self.plan.output().layout(), &rust_config);
+        let readers = ReaderGen::new(
+            artifacts,
+            self.plan.output(),
+            self.plan.replay(),
+            &rust_config,
+        );
 
         let mut out = String::new();
         self.header(&mut out);
