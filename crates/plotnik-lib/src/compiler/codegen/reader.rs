@@ -32,7 +32,7 @@ use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
 use crate::compiler::emit::tables::TypeTableBuilder;
 use crate::compiler::ids::DefId;
-use crate::compiler::typegen::rust::emitter::{Emitter as TypeModel, Item, ItemKind};
+use crate::compiler::typegen::rust::emitter::{Emitter as TypeModel, Item, ItemKind, TypeContext};
 use crate::compiler::typegen::rust::idents::scope_idents;
 use crate::core::{Interner, Symbol};
 
@@ -115,72 +115,6 @@ impl InherentParseSignature {
             type_generics: "",
             tree_ref: "&rt::Tree",
         }
-    }
-}
-
-struct TraceReaderSignature {
-    ident: String,
-    fn_generics: &'static str,
-    reader_generics: &'static str,
-    return_type: String,
-}
-
-impl TraceReaderSignature {
-    fn for_item(model: &TypeModel<'_>, item: &Item) -> Self {
-        let ident = model.item_ident(item.name).to_string();
-        if model.needs_lifetime(item.ty) {
-            return Self {
-                ident: ident.clone(),
-                fn_generics: "<'t>",
-                reader_generics: "<'_, 't>",
-                return_type: format!("{ident}<'t>"),
-            };
-        }
-        Self {
-            return_type: ident.clone(),
-            ident,
-            fn_generics: "",
-            reader_generics: "<'_, '_>",
-        }
-    }
-}
-
-struct ParseReplay<'a> {
-    indent: &'a str,
-    reader: &'a str,
-}
-
-impl<'a> ParseReplay<'a> {
-    fn new(indent: &'a str, reader: &'a str) -> Self {
-        Self { indent, reader }
-    }
-
-    fn emit_safe(&self, out: &mut String, safe: &str, fallible_reader: bool) {
-        let indent = self.indent;
-        let _ = writeln!(
-            out,
-            "{indent}let Some(log) = matcher::{safe}(tree, source)? else {{"
-        );
-        let _ = writeln!(out, "{indent}    return Ok(None);");
-        let _ = writeln!(out, "{indent}}};");
-        self.emit_value(out, "Ok(Some(value))", fallible_reader);
-    }
-
-    fn emit_value(&self, out: &mut String, result: &str, fallible_reader: bool) {
-        let indent = self.indent;
-        let reader = self.reader;
-        let _ = writeln!(out, "{indent}let mut t = rt::TraceReader::new(&log);");
-        if fallible_reader {
-            let _ = writeln!(
-                out,
-                "{indent}let depth = rt::ReplayDepth::new(matcher::MAX_REPLAY_DEPTH);"
-            );
-            let _ = writeln!(out, "{indent}let value = {reader}(&mut t, &depth)?;");
-        } else {
-            let _ = writeln!(out, "{indent}let value = {reader}(&mut t);");
-        }
-        let _ = writeln!(out, "{indent}t.finish();");
-        let _ = writeln!(out, "{indent}{result}");
     }
 }
 
@@ -401,7 +335,7 @@ impl<'a> ReaderGen<'a> {
                 if target == TYPE_VOID {
                     return NODE_VALUE_BYTES;
                 }
-                if self.model.is_boxed_ref(context.cut, ty) {
+                if self.model.is_boxed_ref(context.type_context, ty) {
                     return WORD_BYTES;
                 }
                 self.type_value_bytes(target, context, seen)
@@ -451,7 +385,6 @@ impl<'a> ReaderGen<'a> {
     fn parse_impl(&self, out: &mut String, def: &str, item: &Item) {
         let sig = InherentParseSignature::for_item(&self.model, item);
         let reader = self.reader_fn(item.name);
-        let replay = ParseReplay::new("        ", reader);
         let safe = safe_entry_fn_name(def);
         let fallible_reader = self.item_reader_fallible(item);
         let _ = writeln!(
@@ -479,7 +412,24 @@ impl<'a> ReaderGen<'a> {
             out,
             "    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {{"
         );
-        replay.emit_safe(out, &safe, fallible_reader);
+        let _ = writeln!(
+            out,
+            "        let Some(log) = matcher::{safe}(tree, source)? else {{"
+        );
+        let _ = writeln!(out, "            return Ok(None);");
+        let _ = writeln!(out, "        }};");
+        let _ = writeln!(out, "        let mut t = rt::TraceReader::new(&log);");
+        if fallible_reader {
+            let _ = writeln!(
+                out,
+                "        let depth = rt::ReplayDepth::new(matcher::MAX_REPLAY_DEPTH);"
+            );
+            let _ = writeln!(out, "        let value = {reader}(&mut t, &depth)?;");
+        } else {
+            let _ = writeln!(out, "        let value = {reader}(&mut t);");
+        }
+        let _ = writeln!(out, "        t.finish();");
+        let _ = writeln!(out, "        Ok(Some(value))");
         let _ = writeln!(out, "    }}");
         let _ = writeln!(out);
         self.inherent_matches_method(out, def);
@@ -568,7 +518,12 @@ impl<'a> ReaderGen<'a> {
     }
 
     fn reader_open(&self, out: &mut String, item: &Item) {
-        let sig = TraceReaderSignature::for_item(&self.model, item);
+        let ident = self.model.item_ident(item.name).to_string();
+        let (fn_generics, reader_generics, return_type) = if self.model.needs_lifetime(item.ty) {
+            ("<'t>", "<'_, 't>", format!("{ident}<'t>"))
+        } else {
+            ("", "<'_, '_>", ident.clone())
+        };
         let reader = self.reader_fn(item.name);
         let fallible = self.item_reader_fallible(item);
         let depth_param = if fallible {
@@ -577,18 +532,14 @@ impl<'a> ReaderGen<'a> {
             ""
         };
         let return_type = if fallible {
-            format!(
-                "::core::result::Result<{}, rt::LimitExceeded>",
-                sig.return_type
-            )
+            format!("::core::result::Result<{return_type}, rt::LimitExceeded>")
         } else {
-            sig.return_type
+            return_type
         };
-        let _ = writeln!(out, "/// Replay one committed `{}` value.", sig.ident);
+        let _ = writeln!(out, "/// Replay one committed `{ident}` value.");
         let _ = writeln!(
             out,
-            "fn {reader}{}(t: &mut rt::TraceReader{}{depth_param}) -> {return_type} {{",
-            sig.fn_generics, sig.reader_generics
+            "fn {reader}{fn_generics}(t: &mut rt::TraceReader{reader_generics}{depth_param}) -> {return_type} {{"
         );
         if self.item_enters_replay_depth(item) {
             out.push_str("    let _depth = depth.enter()?;\n");
@@ -610,7 +561,7 @@ impl<'a> ReaderGen<'a> {
             member_indices(self.table, twins, k)
         });
         out.push_str("    t.expect_struct_close();\n");
-        self.construct(out, Construction::struct_body(&ident), fields, fallible);
+        self.construct(out, &scope, fields, fallible);
         out.push_str("}\n");
     }
 
@@ -647,17 +598,12 @@ impl<'a> ReaderGen<'a> {
                 unreachable!("enum variant payload is void or an anonymous struct");
             };
             let payloads = payload_twins(self.types, twins, k);
-            let scope = Scope::enum_payload(item.ty, &ident);
+            let scope = Scope::enum_payload(item.ty, &ident, variant_ident);
             self.field_scope(out, &scope, fields, |j| {
                 member_indices(self.table, &payloads, j)
             });
             out.push_str("            t.expect_enum_close();\n");
-            self.construct(
-                out,
-                Construction::enum_variant(&ident, variant_ident),
-                fields,
-                fallible,
-            );
+            self.construct(out, &scope, fields, fallible);
             out.push_str("        }\n");
         }
         let _ = writeln!(
@@ -700,7 +646,7 @@ impl<'a> ReaderGen<'a> {
                 self.interner.resolve(name)
             );
         }
-        let _ = writeln!(out, "{p}while !t.{}() {{", scope.close.probe());
+        let _ = writeln!(out, "{p}while !t.{}() {{", scope.kind.probe());
         let _ = writeln!(out, "{p}    match t.peek_set() {{");
         for (k, (&name, info)) in fields.iter().enumerate() {
             let indices = arm_pattern(indices_of(k));
@@ -724,12 +670,12 @@ impl<'a> ReaderGen<'a> {
     fn construct(
         &self,
         out: &mut String,
-        construction: Construction,
+        scope: &Scope<'_>,
         fields: &BTreeMap<Symbol, FieldInfo>,
         fallible: bool,
     ) {
-        let p = pad(construction.level);
-        let head = construction.head;
+        let p = pad(scope.level());
+        let head = scope.construction_head();
         let field_idents = scope_idents(fields.keys().map(|&sym| self.interner.resolve(sym)));
         if fallible {
             let _ = writeln!(out, "{p}Ok({head} {{");
@@ -788,7 +734,7 @@ impl<'a> ReaderGen<'a> {
                     return "t.expect_node()".to_string();
                 }
                 let call = self.reader_call(self.deps.def_name_sym(*def_id));
-                if self.model.is_boxed_ref(context.cut, ty) {
+                if self.model.is_boxed_ref(context.type_context, ty) {
                     format!("::std::boxed::Box::new({call})")
                 } else {
                     call
@@ -832,33 +778,12 @@ impl<'a> ReaderGen<'a> {
     }
 }
 
-struct Construction {
-    level: usize,
-    head: String,
-}
-
-impl Construction {
-    fn struct_body(ident: &str) -> Self {
-        Self {
-            level: 1,
-            head: ident.to_string(),
-        }
-    }
-
-    fn enum_variant(enum_ident: &str, variant_ident: &str) -> Self {
-        Self {
-            level: 3,
-            head: format!("{enum_ident}::{variant_ident}"),
-        }
-    }
-}
-
-/// Where a value expression is emitted. `cut` is the owning item declaration
-/// that decides recursive `Box` placement, `level` is the emitted indentation,
-/// and `array_depth` keeps nested array accumulator names distinct.
+/// Where a value expression is emitted. `type_context` decides recursive
+/// `Box` placement, `level` is the emitted indentation, and `array_depth`
+/// keeps nested array accumulator names distinct.
 #[derive(Clone, Copy)]
 struct ReadContext {
-    cut: Option<TypeId>,
+    type_context: TypeContext,
     level: usize,
     array_depth: usize,
 }
@@ -866,7 +791,7 @@ struct ReadContext {
 impl ReadContext {
     fn item(item_ty: TypeId, level: usize) -> Self {
         Self {
-            cut: Some(item_ty),
+            type_context: TypeContext::item(item_ty),
             level,
             array_depth: 0,
         }
@@ -888,33 +813,32 @@ impl ReadContext {
 
     fn array_element(self) -> Self {
         Self {
-            cut: None,
+            type_context: self.type_context.array_element(),
             level: self.level + 2,
             array_depth: self.array_depth + 1,
         }
     }
 }
 
-/// One struct-like scope as [`ReaderGen::field_scope`] reads it: the
-/// box-placement cut of the owning item, the emitted code's indent level,
-/// the terminator probe, and the display name its panics cite.
+/// One struct-like scope from field collection through value construction.
+/// The kind fixes the close probe, indentation, and construction head together.
 struct Scope<'a> {
     context: ReadContext,
-    close: ScopeClose,
+    kind: ScopeKind<'a>,
     name: &'a str,
 }
 
 #[derive(Clone, Copy)]
-enum ScopeClose {
+enum ScopeKind<'a> {
     Struct,
-    Enum,
+    EnumPayload { variant_ident: &'a str },
 }
 
-impl ScopeClose {
+impl ScopeKind<'_> {
     fn probe(self) -> &'static str {
         match self {
-            ScopeClose::Struct => "at_struct_close",
-            ScopeClose::Enum => "at_enum_close",
+            ScopeKind::Struct => "at_struct_close",
+            ScopeKind::EnumPayload { .. } => "at_enum_close",
         }
     }
 }
@@ -923,15 +847,15 @@ impl<'a> Scope<'a> {
     fn struct_body(owner: TypeId, name: &'a str) -> Self {
         Self {
             context: ReadContext::item(owner, 1),
-            close: ScopeClose::Struct,
+            kind: ScopeKind::Struct,
             name,
         }
     }
 
-    fn enum_payload(owner: TypeId, name: &'a str) -> Self {
+    fn enum_payload(owner: TypeId, name: &'a str, variant_ident: &'a str) -> Self {
         Self {
             context: ReadContext::item(owner, 3),
-            close: ScopeClose::Enum,
+            kind: ScopeKind::EnumPayload { variant_ident },
             name,
         }
     }
@@ -942,6 +866,15 @@ impl<'a> Scope<'a> {
 
     fn level(&self) -> usize {
         self.context.level
+    }
+
+    fn construction_head(&self) -> String {
+        match self.kind {
+            ScopeKind::Struct => self.name.to_string(),
+            ScopeKind::EnumPayload { variant_ident } => {
+                format!("{}::{variant_ident}", self.name)
+            }
+        }
     }
 }
 

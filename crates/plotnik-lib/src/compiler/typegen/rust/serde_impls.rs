@@ -14,7 +14,7 @@
 
 use std::fmt::Write as _;
 
-use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
 
 use super::emitter::{Emitter, Item, ItemKind, TypeContext};
 use super::idents::scope_idents;
@@ -25,87 +25,11 @@ struct SerdeBody {
 }
 
 impl SerdeBody {
-    fn with_source(code: String) -> Self {
-        Self {
-            code,
-            uses_source: true,
-        }
-    }
-
-    fn without_source(code: String) -> Self {
-        Self {
-            code,
-            uses_source: false,
-        }
-    }
-
     fn source_param(&self) -> &'static str {
         if self.uses_source {
             "source"
         } else {
             "_source"
-        }
-    }
-}
-
-struct EnumVariant<'a> {
-    item_ty: TypeId,
-    payload: TypeId,
-    enum_ident: &'a str,
-    variant_ident: &'a str,
-    label: String,
-}
-
-struct EnumSerdeContext<'a> {
-    item_ty: TypeId,
-    ident: &'a str,
-}
-
-impl<'a> EnumSerdeContext<'a> {
-    fn for_item(item: &Item, ident: &'a str) -> Self {
-        Self {
-            item_ty: item.ty,
-            ident,
-        }
-    }
-
-    fn variant(&self, payload: TypeId, variant_ident: &'a str, label: String) -> EnumVariant<'a> {
-        EnumVariant {
-            item_ty: self.item_ty,
-            payload,
-            enum_ident: self.ident,
-            variant_ident,
-            label,
-        }
-    }
-}
-
-impl EnumVariant<'_> {
-    fn has_payload(&self) -> bool {
-        self.payload != TYPE_VOID
-    }
-}
-
-struct PayloadAdapterSignature {
-    decl_generics: &'static str,
-    impl_generics: &'static str,
-}
-
-impl PayloadAdapterSignature {
-    fn from_fields<'a>(
-        mut fields: impl Iterator<Item = &'a FieldInfo>,
-        facts: &super::analysis::TypeFacts,
-    ) -> Self {
-        let needs_lifetime = fields.any(|info| facts.needs_lifetime(info.type_id));
-        if needs_lifetime {
-            return Self {
-                decl_generics: "<'a, 't>",
-                impl_generics: "<'_, '_>",
-            };
-        }
-        Self {
-            decl_generics: "<'a>",
-            impl_generics: "<'_>",
         }
     }
 }
@@ -170,7 +94,10 @@ impl Emitter<'_> {
             .expect("writing to a String is infallible");
         }
         out.push_str("        map.end()\n");
-        SerdeBody::with_source(out)
+        SerdeBody {
+            code: out,
+            uses_source: true,
+        }
     }
 
     fn enum_body(&mut self, item: &Item, ident: &str) -> SerdeBody {
@@ -180,41 +107,49 @@ impl Emitter<'_> {
             unreachable!("enum item must have an enum shape");
         };
         let variant_idents = scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
-        let enum_context = EnumSerdeContext::for_item(item, ident);
 
         let mut out = String::from("        match self {\n");
         let mut uses_source = false;
         for ((&label_sym, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
-            let variant = enum_context.variant(
-                payload,
-                variant_ident,
-                interner.resolve(label_sym).to_owned(),
-            );
-            let arm = if variant.has_payload() {
+            let label = interner.resolve(label_sym);
+            let arm = if payload != TYPE_VOID {
                 uses_source = true;
-                self.payload_arm(&variant)
+                self.payload_arm(item.ty, payload, ident, variant_ident, label)
             } else {
-                unit_arm(&variant)
+                unit_arm(ident, variant_ident, label)
             };
             out.push_str(&arm);
         }
         out.push_str("        }\n");
-        if uses_source {
-            SerdeBody::with_source(out)
-        } else {
-            SerdeBody::without_source(out)
+        SerdeBody {
+            code: out,
+            uses_source,
         }
     }
 
-    fn payload_arm(&mut self, variant: &EnumVariant<'_>) -> String {
+    fn payload_arm(
+        &mut self,
+        item_ty: TypeId,
+        payload: TypeId,
+        ident: &str,
+        variant_ident: &str,
+        label: &str,
+    ) -> String {
         let types = self.types;
         let interner = self.interner;
         let rt = self.config.rt_crate.clone();
-        let TypeShape::Struct(fields) = types.expect_type_shape(variant.payload) else {
+        let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
             unreachable!("enum variant payload is void or an anonymous struct");
         };
         let field_idents = scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
-        let sig = PayloadAdapterSignature::from_fields(fields.values(), &self.facts);
+        let (decl_generics, impl_generics) = if fields
+            .values()
+            .any(|info| self.facts.needs_lifetime(info.type_id))
+        {
+            ("<'a, 't>", "<'_, '_>")
+        } else {
+            ("<'a>", "<'_>")
+        };
 
         let mut data_fields = String::new();
         let mut data_entries = String::new();
@@ -225,7 +160,7 @@ impl Emitter<'_> {
         {
             // The helper borrows the enum's actual field, so its type must be
             // spelled with the declaration's own cut context.
-            let field_ty = self.field_type(TypeContext::item(variant.item_ty), info);
+            let field_ty = self.field_type(TypeContext::item(item_ty), info);
             writeln!(data_fields, "                    v{index}: &'a {field_ty},")
                 .expect("writing to a String is infallible");
             let key = interner.resolve(name_sym);
@@ -241,10 +176,6 @@ impl Emitter<'_> {
         let binding_list = bindings.join(", ");
         let data_inits = data_inits.join(", ");
         let field_count = fields.len();
-        let ident = variant.enum_ident;
-        let variant_ident = variant.variant_ident;
-        let label = &variant.label;
-
         format!(
             "            {ident}::{variant_ident} {{ {binding_list} }} => {{
                 struct Data{} {{
@@ -271,15 +202,12 @@ impl Emitter<'_> {
                 map.end()
             }}
 ",
-            sig.decl_generics, sig.impl_generics
+            decl_generics, impl_generics
         )
     }
 }
 
-fn unit_arm(variant: &EnumVariant<'_>) -> String {
-    let ident = variant.enum_ident;
-    let variant_ident = variant.variant_ident;
-    let label = &variant.label;
+fn unit_arm(ident: &str, variant_ident: &str, label: &str) -> String {
     format!(
         "            {ident}::{variant_ident} => {{
                 let mut map = serializer.serialize_map(Some(1))?;

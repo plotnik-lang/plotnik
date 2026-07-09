@@ -70,12 +70,6 @@ pub struct LoadedGrammar {
     pub path: PathBuf,
 }
 
-impl LoadedGrammar {
-    fn new(grammar: Arc<Grammar>, path: PathBuf) -> Self {
-        Self { grammar, path }
-    }
-}
-
 struct NamedGrammar {
     name: String,
     resolved: ResolvedGrammar,
@@ -120,7 +114,10 @@ pub fn load(spec: &GrammarSpec<'_>, base_dir: Option<&Path>) -> Result<LoadedGra
         .expect("grammar cache lock is never poisoned")
         .get(&resolved.path)
     {
-        return Ok(LoadedGrammar::new(Arc::clone(grammar), resolved.path));
+        return Ok(LoadedGrammar {
+            grammar: Arc::clone(grammar),
+            path: resolved.path,
+        });
     }
 
     let raw = RawGrammar::from_json(&resolved.json)
@@ -132,7 +129,10 @@ pub fn load(spec: &GrammarSpec<'_>, base_dir: Option<&Path>) -> Result<LoadedGra
         .lock()
         .expect("grammar cache lock is never poisoned")
         .insert(resolved.path.clone(), Arc::clone(&grammar));
-    Ok(LoadedGrammar::new(grammar, resolved.path))
+    Ok(LoadedGrammar {
+        grammar,
+        path: resolved.path,
+    })
 }
 
 /// Resolve a user-written path the way `include_str!` would: absolute paths
@@ -169,7 +169,10 @@ fn resolve_package(name: &str, subgrammar: Option<&str>) -> Result<ResolvedGramm
         return ResolvedGrammar::read(path);
     }
 
-    let named = read_named_grammars(candidates)?;
+    let named = candidates
+        .into_iter()
+        .map(NamedGrammar::read)
+        .collect::<Result<Vec<_>, _>>()?;
     resolve_named_grammar(name, subgrammar, named)
 }
 
@@ -227,14 +230,6 @@ fn package_grammar_jsons(
         ));
     }
     Ok(candidates)
-}
-
-fn read_named_grammars(candidates: Vec<PathBuf>) -> Result<Vec<NamedGrammar>, String> {
-    let mut named = Vec::new();
-    for path in candidates {
-        named.push(NamedGrammar::read(path)?);
-    }
-    Ok(named)
 }
 
 fn resolve_named_grammar(
