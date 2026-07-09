@@ -13,6 +13,7 @@ Plotnik is a strongly-typed pattern matching language for tree-sitter syntax tre
 ### Contributors & LLM Agents
 
 - [AGENTS.md](../AGENTS.md) — Project rules, coding standards, testing patterns
+- [Generated Runtime Interface](runtime-interface.md) — Cross-language codegen runtime contract
 - [Runtime Engine](runtime-engine.md) — VM execution model
 - [Tree Navigation](tree-navigation.md) — Cursor walk implementation
 - [Binary Format](binary-format/01-overview.md) — Compiled query format
@@ -26,6 +27,7 @@ docs/
 ├── cli.md             # CLI tool usage guide
 ├── lang-reference.md  # Query language syntax and semantics
 ├── type-system.md     # Type inference rules and output shapes
+├── runtime-interface.md # Generated matcher/runtime contract
 ├── runtime-engine.md  # VM state, backtracking, effects
 ├── tree-navigation.md # Cursor walk, search loop, anchor lowering
 └── binary-format/     # Compiled bytecode specification
@@ -50,11 +52,12 @@ New to Plotnik:
 
 Building tooling:
 
-1. `binary-format/01-overview.md` → through `06-transitions.md`
-2. `runtime-engine.md`
-3. `tree-navigation.md`
-4. `binary-format/08-dump-format.md` — Understanding bytecode dumps
-5. `binary-format/09-trace-format.md` — Debugging with execution traces
+1. `runtime-interface.md` — Cross-language generated runtime contract
+2. `binary-format/01-overview.md` → through `06-transitions.md`
+3. `runtime-engine.md`
+4. `tree-navigation.md`
+5. `binary-format/08-dump-format.md` — Understanding bytecode dumps
+6. `binary-format/09-trace-format.md` — Debugging with execution traces
 
 Contributing:
 
