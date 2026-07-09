@@ -25,6 +25,7 @@ use std::fmt::Write as _;
 
 use crate::bytecode::{EffectKind, PredicateOp};
 use crate::compiler::analyze::AnalysisArtifacts;
+use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::codegen::Config;
 use crate::compiler::codegen::emit::lits::{decimal_byte_lines, rust_string};
 use crate::compiler::codegen::emit::names::{shouty_ident, snake_ident};
@@ -32,9 +33,6 @@ use crate::compiler::codegen::emit::sink::Sink;
 use crate::compiler::codegen::emit::template::splice;
 use crate::compiler::codegen::reader::ReaderGen;
 use crate::compiler::emit::regex_table::compile_dfa_bytes;
-use crate::compiler::emit::string_table::seed_string_table;
-use crate::compiler::emit::tables::TypeTableBuilder;
-use crate::compiler::emit::type_table::build_type_table;
 use crate::compiler::lower::dump::NfaDumper;
 use crate::compiler::lower::ir::{
     CallIR, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin, MatchIR, NfaGraph,
@@ -232,9 +230,8 @@ struct Generator<'a> {
     dumper: NfaDumper<'a>,
     config: &'a Config,
     artifacts: AnalysisArtifacts<'a>,
-    /// Member-index layout shared with the bytecode emitter, so generated
-    /// `Set`/`EnumOpen` payloads equal the VM's byte-for-byte.
-    types: TypeTableBuilder,
+    /// Target-neutral output shapes and the one shared capture-member layout.
+    schema: OutputSchema<'a>,
     /// Instructions in label order (the dump's order).
     sorted: Vec<&'a InstructionIR>,
     states: BTreeMap<Label, StateInfo>,
@@ -280,11 +277,8 @@ fn collect_states(
 
 impl<'a> Generator<'a> {
     fn new(graph: &'a NfaGraph, artifacts: AnalysisArtifacts<'a>, config: &'a Config) -> Self {
-        // Mirror the emit pipeline's table construction exactly: the member
-        // layout must match what the module the VM runs carries.
-        let strings = seed_string_table(graph).expect("string table built during emit");
-        let (types, _strings) =
-            build_type_table(&artifacts, strings).expect("type table built during emit");
+        let schema = OutputSchema::from_artifacts(artifacts)
+            .expect("bytecode dry-run validated the output schema");
 
         let dumper = NfaDumper::new(graph, artifacts);
 
@@ -302,7 +296,7 @@ impl<'a> Generator<'a> {
             dumper,
             config,
             artifacts,
-            types,
+            schema,
             sorted,
             states,
             operands,
@@ -341,9 +335,10 @@ impl<'a> Generator<'a> {
             }
             EffectArg::Member(member) => {
                 let base = self
-                    .types
+                    .schema
+                    .layout()
                     .member_base(member.parent_type)
-                    .expect("effect member parent emitted to the type table");
+                    .expect("effect member parent has a capture scope");
                 base + member.relative_index
             }
         }
@@ -353,7 +348,7 @@ impl<'a> Generator<'a> {
         let rust_config = RustTypesConfig::new()
             .rt_crate(self.config.rt_crate.clone())
             .serde(self.config.serde);
-        let readers = ReaderGen::new(self.artifacts, &self.types, &rust_config);
+        let readers = ReaderGen::new(self.artifacts, self.schema.layout(), &rust_config);
 
         let mut out = String::new();
         self.header(&mut out);

@@ -73,8 +73,8 @@ impl Emitter<'_> {
     }
 
     fn struct_body(&mut self, item: &Item) -> SerdeBody {
-        let types = self.types;
-        let interner = self.interner;
+        let types = self.schema.types;
+        let interner = self.schema.interner;
         let rt = self.config.rt_crate.clone();
         let TypeShape::Struct(fields) = types.expect_type_shape(item.ty) else {
             unreachable!("struct item must have a struct shape");
@@ -101,8 +101,8 @@ impl Emitter<'_> {
     }
 
     fn enum_body(&mut self, item: &Item, ident: &str) -> SerdeBody {
-        let types = self.types;
-        let interner = self.interner;
+        let types = self.schema.types;
+        let interner = self.schema.interner;
         let TypeShape::Enum(variants) = types.expect_type_shape(item.ty) else {
             unreachable!("enum item must have an enum shape");
         };
@@ -135,8 +135,8 @@ impl Emitter<'_> {
         variant_ident: &str,
         label: &str,
     ) -> String {
-        let types = self.types;
-        let interner = self.interner;
+        let types = self.schema.types;
+        let interner = self.schema.interner;
         let rt = self.config.rt_crate.clone();
         let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
             unreachable!("enum variant payload is void or an anonymous struct");

@@ -27,12 +27,12 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
 
 use crate::compiler::analyze::AnalysisArtifacts;
+use crate::compiler::analyze::output::CaptureLayout;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
 use crate::compiler::codegen::emit::names::{rust_scope_idents, snake_ident};
 use crate::compiler::codegen::emit::sink::indentation;
-use crate::compiler::emit::tables::TypeTableBuilder;
 use crate::compiler::ids::DefId;
 use crate::compiler::typegen::rust::emitter::{Emitter as TypeModel, Item, ItemKind, TypeContext};
 use crate::core::{Interner, Symbol};
@@ -50,7 +50,7 @@ pub(super) struct ReaderGen<'a> {
     types: &'a TypeAnalysis,
     deps: &'a DependencyAnalysis,
     interner: &'a Interner,
-    table: &'a TypeTableBuilder,
+    layout: &'a CaptureLayout,
     tables: ReaderTables,
 }
 
@@ -67,7 +67,7 @@ impl ReaderTables {
     fn collect(
         model: &TypeModel<'_>,
         types: &TypeAnalysis,
-        table: &TypeTableBuilder,
+        layout: &CaptureLayout,
         interner: &Interner,
     ) -> Self {
         let mut reader_fns = HashMap::new();
@@ -84,7 +84,7 @@ impl ReaderTables {
             reader_fns.insert(item.name, name);
 
             if item.is_composite() {
-                twins.insert(item.name, collect_twins(types, table, item));
+                twins.insert(item.name, collect_twins(types, layout, item));
             }
         }
 
@@ -122,7 +122,7 @@ impl InherentParseSignature {
 impl<'a> ReaderGen<'a> {
     pub(super) fn new(
         artifacts: AnalysisArtifacts<'a>,
-        table: &'a TypeTableBuilder,
+        layout: &'a CaptureLayout,
         config: &'a crate::compiler::typegen::rust::Config,
     ) -> Self {
         let types = artifacts.type_analysis;
@@ -132,14 +132,14 @@ impl<'a> ReaderGen<'a> {
             artifacts.interner,
             config,
         );
-        let tables = ReaderTables::collect(&model, types, table, artifacts.interner);
+        let tables = ReaderTables::collect(&model, types, layout, artifacts.interner);
 
         Self {
             model,
             types,
             deps: artifacts.dependency_analysis,
             interner: artifacts.interner,
-            table,
+            layout,
             tables,
         }
     }
@@ -559,7 +559,7 @@ impl<'a> ReaderGen<'a> {
         out.push_str("    t.expect_struct_open();\n");
         let scope = Scope::struct_body(item.ty, &ident);
         self.field_scope(out, &scope, fields, |k| {
-            member_indices(self.table, twins, k)
+            member_indices(self.layout, twins, k)
         });
         out.push_str("    t.expect_struct_close();\n");
         self.construct(out, &scope, fields, fallible);
@@ -581,7 +581,7 @@ impl<'a> ReaderGen<'a> {
         for (k, ((&label, &payload), variant_ident)) in
             variants.iter().zip(&variant_idents).enumerate()
         {
-            let indices = arm_pattern(member_indices(self.table, twins, k));
+            let indices = arm_pattern(member_indices(self.layout, twins, k));
             let label = self.interner.resolve(label);
             let _ = writeln!(out, "        // {label}");
             let _ = writeln!(out, "        {indices} => {{");
@@ -602,7 +602,7 @@ impl<'a> ReaderGen<'a> {
             let payloads = payload_twins(self.types, twins, k);
             let scope = Scope::enum_payload(item.ty, &ident, variant_ident);
             self.field_scope(out, &scope, fields, |j| {
-                member_indices(self.table, &payloads, j)
+                member_indices(self.layout, &payloads, j)
             });
             out.push_str("            t.expect_enum_close();\n");
             self.construct(out, &scope, fields, fallible);
@@ -883,7 +883,7 @@ impl<'a> Scope<'a> {
 /// Every table-reachable analysis type sharing this item's name and shape
 /// kind. Structural identity is enforced upstream (same name ⇒ same shape),
 /// so twins differ only in their member-run offsets.
-fn collect_twins(types: &TypeAnalysis, table: &TypeTableBuilder, item: &Item) -> Vec<TypeId> {
+fn collect_twins(types: &TypeAnalysis, layout: &CaptureLayout, item: &Item) -> Vec<TypeId> {
     let wants_struct = item.is_struct();
     let mut out: BTreeSet<TypeId> = BTreeSet::new();
     for (ty, name) in types.iter_type_names() {
@@ -898,7 +898,7 @@ fn collect_twins(types: &TypeAnalysis, table: &TypeTableBuilder, item: &Item) ->
         if !matches_kind {
             continue;
         }
-        if table.member_base(ty).is_none() {
+        if layout.member_base(ty).is_none() {
             continue;
         }
         out.insert(ty);
@@ -927,14 +927,14 @@ fn payload_twins(types: &TypeAnalysis, twins: &[TypeId], k: usize) -> Vec<TypeId
 /// The absolute member indices position `k` of this composite can arrive as,
 /// one per twin — the same `base + relative` sum the matcher baked into its
 /// `Set`/`EnumOpen` operands.
-fn member_indices(table: &TypeTableBuilder, twins: &[TypeId], k: usize) -> Vec<u16> {
+fn member_indices(layout: &CaptureLayout, twins: &[TypeId], k: usize) -> Vec<u16> {
     twins
         .iter()
         .map(|&ty| {
-            let base = table
-                .member_base(ty)
-                .expect("twins are collected table-present");
-            base + u16::try_from(k).expect("member count fits u16")
+            let scope = layout
+                .scope(ty)
+                .expect("twins are collected layout-present");
+            scope.absolute_index(u16::try_from(k).expect("member count fits u16"))
         })
         .collect()
 }

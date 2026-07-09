@@ -16,6 +16,7 @@ pub(in crate::compiler) mod type_table;
 mod regex_table_tests;
 
 use crate::compiler::analyze::AnalysisArtifacts;
+use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::emit::instructions::emit_instructions;
 use crate::compiler::emit::layout::compute_layout;
 use crate::compiler::emit::module::EmitPipeline;
@@ -33,14 +34,20 @@ pub(in crate::compiler) fn emit_unchecked(
     lowered_ir: &LoweredNfa,
 ) -> Result<Vec<u8>, EmitError> {
     let nfa = lowered_ir.raw();
+    let schema = OutputSchema::from_artifacts(input)?;
     let strings = seed_string_table(nfa)?;
-    let (types, strings) = build_type_table(&input, strings)?;
+    let (types, strings) = build_type_table(&schema, strings)?;
     let layout = compute_layout(nfa)?;
-    let mut pipeline = EmitPipeline::new(input, nfa, strings, types, layout);
+    let mut pipeline = EmitPipeline::new(input, nfa, strings, types, layout, schema.layout());
 
     let tables = pipeline.build_tables()?;
     let regexes = build_regex_table(nfa, pipeline.strings())?;
-    let pool = ConstantPool::new(pipeline.types(), pipeline.strings(), &regexes);
+    let pool = ConstantPool::new(
+        pipeline.types(),
+        pipeline.strings(),
+        &regexes,
+        schema.layout(),
+    );
     let transitions = emit_instructions(nfa.instructions(), pipeline.layout(), pool)?;
 
     pipeline.write_module(pool, &tables, &transitions)

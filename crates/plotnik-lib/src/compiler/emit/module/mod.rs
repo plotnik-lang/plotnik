@@ -12,6 +12,7 @@ use crate::bytecode::{
 };
 
 use crate::compiler::analyze::AnalysisArtifacts;
+use crate::compiler::analyze::output::CaptureLayout;
 use crate::compiler::emit::layout_map::LayoutMap;
 use crate::compiler::emit::tables::{
     ConstantPool, EmitError, StringTableBuilder, TypeTableBuilder,
@@ -33,6 +34,7 @@ pub(in crate::compiler::emit) struct EmitPipeline<'a> {
     strings: StringTableBuilder,
     types: TypeTableBuilder,
     layout: LayoutMap,
+    capture_layout: &'a CaptureLayout,
 }
 
 impl<'a> EmitPipeline<'a> {
@@ -42,6 +44,7 @@ impl<'a> EmitPipeline<'a> {
         strings: StringTableBuilder,
         types: TypeTableBuilder,
         layout: LayoutMap,
+        capture_layout: &'a CaptureLayout,
     ) -> Self {
         Self {
             input,
@@ -49,6 +52,7 @@ impl<'a> EmitPipeline<'a> {
             strings,
             types,
             layout,
+            capture_layout,
         }
     }
 
@@ -247,10 +251,10 @@ impl<'a> EmitPipeline<'a> {
                         .lookup(member_ref.parent_type)
                         .expect("span parent type emitted");
                     let member = self
-                        .types
-                        .member_base(member_ref.parent_type)
-                        .expect("span parent has members")
-                        + member_ref.relative_index;
+                        .capture_layout
+                        .scope(member_ref.parent_type)
+                        .expect("span parent has a capture scope")
+                        .absolute_index(member_ref.relative_index);
                     (u16::from(type_id), member)
                 }
                 None => (SPAN_NO_BINDING, SPAN_NO_BINDING),

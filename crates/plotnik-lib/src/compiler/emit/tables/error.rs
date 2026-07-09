@@ -3,6 +3,7 @@
 use crate::core::Symbol;
 
 use crate::bytecode::{EncodeError, MAX_SPANS};
+use crate::compiler::analyze::output::OutputSchemaError;
 
 /// Error during bytecode emission.
 #[derive(Clone, Debug, thiserror::Error)]
@@ -55,6 +56,16 @@ pub(in crate::compiler) enum EmitError {
     /// An instruction could not be encoded (count or payload out of range).
     #[error("instruction encoding error: {0}")]
     Encode(#[from] EncodeError),
+}
+
+impl From<OutputSchemaError> for EmitError {
+    fn from(error: OutputSchemaError) -> Self {
+        match error {
+            OutputSchemaError::Members(count) => Self::TooManyTypeMembers(count),
+            OutputSchemaError::Fields(count) => Self::TooManyFields(count),
+            OutputSchemaError::Variants(count) => Self::TooManyVariants(count),
+        }
+    }
 }
 
 impl EmitError {

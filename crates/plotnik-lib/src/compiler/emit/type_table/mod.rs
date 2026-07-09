@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeNameEntry};
 
-use crate::compiler::analyze::AnalysisArtifacts;
+use crate::compiler::analyze::output::{CaptureLayout, CaptureScopeKind, OutputSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_NODE, TYPE_VOID, TypeShape};
 use crate::compiler::emit::tables::{EmitError, StringTableBuilder, TypeTableBuilder};
@@ -19,11 +19,11 @@ use crate::core::Interner;
 /// Build the type table, interning type, member, and name strings into the
 /// shared string table. Threads the string table by value because it extends it.
 pub fn build_type_table(
-    input: &AnalysisArtifacts<'_>,
+    schema: &OutputSchema<'_>,
     mut strings: StringTableBuilder,
 ) -> Result<(TypeTableBuilder, StringTableBuilder), EmitError> {
     let mut types = TypeTableBuilder::new();
-    build(&mut types, *input, &mut strings)?;
+    build(&mut types, schema, &mut strings)?;
     Ok((types, strings))
 }
 
@@ -35,48 +35,30 @@ pub fn build_type_table(
 /// emitted first, then custom types in definition order, depth-first.
 fn build(
     types: &mut TypeTableBuilder,
-    input: AnalysisArtifacts<'_>,
+    schema: &OutputSchema<'_>,
     strings: &mut StringTableBuilder,
 ) -> Result<(), EmitError> {
-    let type_analysis = input.type_analysis;
-    let ordered_types = collect_ordered_types(type_analysis);
-    let usage = scan_builtin_usage(type_analysis, &ordered_types);
+    let type_analysis = schema.types;
+    let ordered_types = schema.ordered_types();
+    let usage = scan_builtin_usage(type_analysis, ordered_types);
 
     emit_builtins(types, &usage)?;
-    reserve_slots(types, &ordered_types)?;
+    reserve_slots(types, ordered_types)?;
 
     let mut ctx = TypeEmitCtx {
         type_analysis,
-        interner: input.interner,
+        interner: schema.interner,
         strings,
     };
-    fill_slots(types, &ordered_types, &usage, &mut ctx)?;
-    emit_type_names(types, &input, &mut ctx)?;
+    fill_slots(types, ordered_types, &usage, schema.layout(), &mut ctx)?;
+    assert_eq!(
+        usize::from(types.members_len()),
+        schema.layout().member_count(),
+        "wire type members consume every shared capture slot"
+    );
+    emit_type_names(types, &mut ctx)?;
 
     Ok(())
-}
-
-/// Collect custom types depth-first from definition result types. Every emitted
-/// effect's member ref names a type that one of these reaches, so this single
-/// walk also covers all effect-referenced types. Definition order fixes the
-/// emission order entrypoints rely on.
-fn collect_ordered_types(type_ctx: &TypeAnalysis) -> Vec<TypeId> {
-    let mut collector = TypeCollector::new();
-    for (_def_id, type_id) in type_ctx.iter_def_output() {
-        collector.collect(type_id, type_ctx);
-
-        if !matches!(type_ctx.expect_type_shape(type_id), TypeShape::Ref(_)) {
-            continue;
-        }
-
-        if !collector.seen.insert(type_id) {
-            continue;
-        }
-
-        collector.out.push(type_id);
-    }
-
-    collector.out
 }
 
 fn scan_builtin_usage(type_ctx: &TypeAnalysis, ordered_types: &[TypeId]) -> BuiltinUsage {
@@ -120,22 +102,19 @@ fn fill_slots(
     types: &mut TypeTableBuilder,
     ordered_types: &[TypeId],
     usage: &BuiltinUsage,
+    layout: &CaptureLayout,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
     let builtin_count = usage.builtin_count();
     for (i, &type_id) in ordered_types.iter().enumerate() {
         let slot_index = builtin_count + i;
         let type_shape = ctx.type_analysis.expect_type_shape(type_id);
-        emit_type_at_slot(types, slot_index, type_shape, ctx)?;
+        emit_type_at_slot(types, slot_index, type_id, type_shape, layout, ctx)?;
     }
     Ok(())
 }
 
-fn emit_type_names(
-    types: &mut TypeTableBuilder,
-    _input: &AnalysisArtifacts<'_>,
-    ctx: &mut TypeEmitCtx,
-) -> Result<(), EmitError> {
+fn emit_type_names(types: &mut TypeTableBuilder, ctx: &mut TypeEmitCtx) -> Result<(), EmitError> {
     // The naming pass is the single source of names: definition results,
     // path-generated composites, and `:: TypeName` annotations, in `TypeId`
     // (deterministic) order. Every named type is reachable from a definition
@@ -153,7 +132,9 @@ fn emit_type_names(
 fn emit_type_at_slot(
     types: &mut TypeTableBuilder,
     slot_index: usize,
+    type_id: TypeId,
     type_shape: &TypeShape,
+    layout: &CaptureLayout,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
     match type_shape {
@@ -203,15 +184,22 @@ fn emit_type_at_slot(
                 resolved_fields.push((field_name, field_type));
             }
 
-            let member_start = types.members_len()?;
+            let scope = layout
+                .scope(type_id)
+                .expect("every emitted struct has a capture scope");
+            assert_eq!(scope.kind(), CaptureScopeKind::Struct);
+            let member_start = scope.base();
+            assert_eq!(
+                types.members_len(),
+                member_start,
+                "wire members consume the shared capture layout in order"
+            );
             for (field_name, field_type) in resolved_fields {
-                types.push_member(TypeMember::new(field_name, field_type))?;
+                types.push_member(TypeMember::new(field_name, field_type));
             }
 
-            if fields.len() > EmitError::MAX_FIELDS {
-                return Err(EmitError::TooManyFields(fields.len()));
-            }
-            let member_count = fields.len() as u8;
+            let member_count = u8::try_from(scope.members().len())
+                .expect("capture layout validates struct field counts");
             types.fill_slot(slot_index, TypeDef::for_struct(member_start, member_count));
             Ok(())
         }
@@ -225,15 +213,22 @@ fn emit_type_at_slot(
                 resolved_variants.push((variant_name, variant_type));
             }
 
-            let member_start = types.members_len()?;
+            let scope = layout
+                .scope(type_id)
+                .expect("every emitted enum has a capture scope");
+            assert_eq!(scope.kind(), CaptureScopeKind::Enum);
+            let member_start = scope.base();
+            assert_eq!(
+                types.members_len(),
+                member_start,
+                "wire members consume the shared capture layout in order"
+            );
             for (variant_name, variant_type) in resolved_variants {
-                types.push_member(TypeMember::new(variant_name, variant_type))?;
+                types.push_member(TypeMember::new(variant_name, variant_type));
             }
 
-            if variants.len() > EmitError::MAX_VARIANTS {
-                return Err(EmitError::TooManyVariants(variants.len()));
-            }
-            let member_count = variants.len() as u8;
+            let member_count = u8::try_from(scope.members().len())
+                .expect("capture layout validates enum variant counts");
             types.fill_slot(slot_index, TypeDef::for_enum(member_start, member_count));
             Ok(())
         }
@@ -280,52 +275,6 @@ struct TypeEmitCtx<'a> {
     type_analysis: &'a TypeAnalysis,
     interner: &'a Interner,
     strings: &'a mut StringTableBuilder,
-}
-
-/// Depth-first collector for custom types reachable from definition results.
-/// `out` preserves the post-order (children before self) the emitter relies on;
-/// `seen` guards against revisiting shared sub-types and cycles.
-struct TypeCollector {
-    out: Vec<TypeId>,
-    seen: HashSet<TypeId>,
-}
-
-impl TypeCollector {
-    fn new() -> Self {
-        Self {
-            out: Vec::new(),
-            seen: HashSet::new(),
-        }
-    }
-
-    fn collect(&mut self, type_id: TypeId, type_ctx: &TypeAnalysis) {
-        if type_id.is_builtin() || self.seen.contains(&type_id) {
-            return;
-        }
-
-        let type_shape = type_ctx.expect_type_shape(type_id);
-
-        if let TypeShape::Ref(def_id) = type_shape {
-            let target_id = type_ctx.expect_def_output(*def_id);
-            self.collect(target_id, type_ctx);
-            return;
-        }
-
-        self.seen.insert(type_id);
-
-        for child_id in type_shape.child_type_ids() {
-            self.collect(child_id, type_ctx);
-        }
-
-        match type_shape {
-            TypeShape::Struct(_)
-            | TypeShape::Enum(_)
-            | TypeShape::Array { .. }
-            | TypeShape::Optional(_)
-            | TypeShape::Custom(_) => self.out.push(type_id),
-            _ => {}
-        }
-    }
 }
 
 struct BuiltinUsage {

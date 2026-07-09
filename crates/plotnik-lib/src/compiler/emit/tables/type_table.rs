@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use crate::bytecode::{TypeDef, TypeDefKind, TypeId as WireTypeId, TypeMember, TypeNameEntry};
+use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeMember, TypeNameEntry};
 
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::ids::TypeId;
@@ -59,18 +59,13 @@ impl TypeTableBuilder {
     }
 
     /// Member-table length, i.e. the base index for the next struct/enum's members.
-    pub fn members_len(&self) -> Result<u16, EmitError> {
+    pub fn members_len(&self) -> u16 {
         u16::try_from(self.type_members.len())
-            .map_err(|_| EmitError::TooManyTypeMembers(self.type_members.len()))
+            .expect("capture layout validates the type-member index space")
     }
 
-    pub fn push_member(&mut self, member: TypeMember) -> Result<(), EmitError> {
-        if self.type_members.len() >= EmitError::MAX_TYPE_MEMBERS {
-            return Err(EmitError::TooManyTypeMembers(self.type_members.len() + 1));
-        }
-
+    pub fn push_member(&mut self, member: TypeMember) {
         self.type_members.push(member);
-        Ok(())
     }
 
     pub fn push_name(&mut self, entry: TypeNameEntry) -> Result<(), EmitError> {
@@ -121,9 +116,6 @@ impl TypeTableBuilder {
         if self.type_defs.len() > EmitError::MAX_TYPES {
             return Err(EmitError::TooManyTypes(self.type_defs.len()));
         }
-        if self.type_members.len() > EmitError::MAX_TYPE_MEMBERS {
-            return Err(EmitError::TooManyTypeMembers(self.type_members.len()));
-        }
         if self.type_names.len() > EmitError::MAX_TYPE_NAMES {
             return Err(EmitError::TooManyTypeNames(self.type_names.len()));
         }
@@ -132,21 +124,6 @@ impl TypeTableBuilder {
 
     pub fn lookup(&self, type_id: TypeId) -> Option<WireTypeId> {
         self.mapping.get(&type_id).copied()
-    }
-
-    /// Get the absolute member base index for a struct/enum type.
-    ///
-    /// For Struct and Enum types, returns the starting index in the TypeMembers table.
-    /// Fields/variants are at indices [base..base+count).
-    pub fn member_base(&self, type_id: TypeId) -> Option<u16> {
-        let bc_type_id = self.mapping.get(&type_id)?;
-        let type_def = self.type_defs.get(u16::from(*bc_type_id) as usize)?;
-        match type_def.decode() {
-            TypeDefKind::Struct { member_start, .. } | TypeDefKind::Enum { member_start, .. } => {
-                Some(member_start)
-            }
-            _ => None,
-        }
     }
 
     /// Returns `(type_defs_bytes, type_members_bytes, type_names_bytes)`.
