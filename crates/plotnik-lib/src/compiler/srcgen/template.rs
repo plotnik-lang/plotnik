@@ -3,14 +3,11 @@
 use super::sink::Sink;
 
 /// Splice a column-zero template into `out`, substituting `@KEY@` values and
-/// indenting every non-empty line. A surviving placeholder is always an
-/// emitter bug, so it fails here instead of shipping malformed generated code.
+/// indenting every non-empty line. A template placeholder without a supplied
+/// value is always an emitter bug, so it fails here instead of shipping
+/// malformed generated code.
 pub(crate) fn splice(out: &mut String, indent: &str, template: &str, subs: &[(&str, &str)]) {
-    let mut text = template.trim_matches('\n').to_string();
-    for (key, value) in subs {
-        text = text.replace(&format!("@{key}@"), value);
-    }
-    assert_no_placeholders(&text);
+    let text = substitute(template.trim_matches('\n'), subs);
 
     let mut sink = Sink::<()>::new();
     for line in text.lines() {
@@ -25,23 +22,40 @@ pub(crate) fn splice(out: &mut String, indent: &str, template: &str, subs: &[(&s
     out.push_str(sink.plain());
 }
 
-fn assert_no_placeholders(text: &str) {
-    let bytes = text.as_bytes();
-    let mut start = 0;
-    while let Some(open) = bytes[start..].iter().position(|&byte| byte == b'@') {
-        let open = start + open;
-        let Some(close) = bytes[open + 1..].iter().position(|&byte| byte == b'@') else {
-            return;
+fn substitute(template: &str, subs: &[(&str, &str)]) -> String {
+    let mut text = String::with_capacity(template.len());
+    let mut rest = template;
+
+    loop {
+        let Some(open) = rest.find('@') else {
+            text.push_str(rest);
+            break;
         };
-        let close = open + 1 + close;
-        let key = &text[open + 1..close];
-        assert!(
-            key.is_empty()
-                || !key
-                    .bytes()
-                    .all(|byte| byte == b'_' || byte.is_ascii_uppercase()),
-            "unsubstituted template placeholder `@{key}@`"
-        );
-        start = close + 1;
+        text.push_str(&rest[..open]);
+
+        let after_open = &rest[open + 1..];
+        let Some(close) = after_open.find('@') else {
+            text.push_str(&rest[open..]);
+            break;
+        };
+        let key = &after_open[..close];
+        if is_placeholder(key) {
+            let Some((_, value)) = subs.iter().find(|(candidate, _)| *candidate == key) else {
+                panic!("unsubstituted template placeholder `@{key}@`");
+            };
+            text.push_str(value);
+        } else {
+            text.push_str(&rest[open..open + close + 2]);
+        }
+        rest = &after_open[close + 1..];
     }
+
+    text
+}
+
+fn is_placeholder(key: &str) -> bool {
+    !key.is_empty()
+        && key
+            .bytes()
+            .all(|byte| byte == b'_' || byte.is_ascii_uppercase())
 }
