@@ -21,11 +21,13 @@ mod libc_shims;
 mod langs;
 mod wire;
 
+use std::cell::OnceCell;
+
 use langs::Lang;
 use plotnik_lib::bytecode::{Entrypoint, Module};
 use plotnik_lib::{
-    MatcherConfig, NoopTracer, QueryBuilder, RecordingTracer, RuntimeLimitSpec, TypeScriptConfig,
-    VM, dump_tree, tokenize as query_tokenize,
+    CompiledQuery, MatcherConfig, NoopTracer, QueryBuilder, RecordingTracer, RuntimeLimitSpec,
+    TypeScriptConfig, VM, dump_tree, tokenize as query_tokenize,
 };
 use serde_json::{Value as JsonValue, json};
 use wasm_bindgen::prelude::*;
@@ -37,10 +39,10 @@ use wire::{InfoParts, error_json, info_json, json_value, result_json, to_js};
 #[wasm_bindgen]
 pub struct Session {
     lang: &'static Lang,
-    module: Option<Module>,
+    compiled: CompiledQuery,
     entrypoints: Vec<String>,
     info: JsonValue,
-    generated_rust: Option<String>,
+    generated_rust: OnceCell<Option<String>>,
 }
 
 #[wasm_bindgen]
@@ -63,9 +65,6 @@ impl Session {
             .to_typescript_mapped(TypeScriptConfig::new().colored(false))
             .unwrap_or_else(|| (String::new(), Vec::new()));
         let entrypoints = compiled.module().map(entrypoint_names).unwrap_or_default();
-        let identity = lang.identity();
-        let generated_rust =
-            compiled.to_rust_matcher(MatcherConfig::new().grammar_identity(identity));
         let info = info_json(InfoParts {
             module: compiled.module(),
             tokens: json_value!(tokens),
@@ -75,14 +74,13 @@ impl Session {
             entrypoints: &entrypoints,
             bytecode_size,
         });
-        let module = compiled.into_module();
 
         Ok(Session {
             lang,
-            module,
+            compiled,
             entrypoints,
             info,
-            generated_rust,
+            generated_rust: OnceCell::new(),
         })
     }
 
@@ -98,9 +96,13 @@ impl Session {
             return Err(JsValue::from_str("generation target must be 'rust'"));
         }
         let identity = self.lang.identity();
+        let code = self.generated_rust.get_or_init(|| {
+            self.compiled
+                .to_rust_matcher(MatcherConfig::new().grammar_identity(identity.clone()))
+        });
         Ok(to_js(&json!({
             "target": "rust",
-            "code": self.generated_rust,
+            "code": code,
             "grammar": {
                 "name": identity.name(),
                 "sha256": identity.sha256(),
@@ -146,7 +148,7 @@ pub fn tokenize_js(query: &str) -> JsValue {
 
 impl Session {
     fn execute(&self, source: &str, entry: Option<&str>, trace: TraceMode) -> JsonValue {
-        let Some(module) = self.module.as_ref() else {
+        let Some(module) = self.compiled.module() else {
             return error_json("query did not compile");
         };
 

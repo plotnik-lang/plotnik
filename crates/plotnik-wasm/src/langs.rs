@@ -14,6 +14,7 @@
 
 use plotnik_lib::GrammarIdentity;
 use plotnik_lib::grammar::Grammar;
+use std::sync::OnceLock;
 use tree_sitter::{Language, Parser, Tree};
 
 /// A language the bundle can run queries against: the tree-sitter parser
@@ -23,6 +24,7 @@ pub struct Lang {
     source: &'static str,
     ts_language: Language,
     grammar: Grammar,
+    identity: OnceLock<GrammarIdentity>,
 }
 
 impl Lang {
@@ -30,12 +32,14 @@ impl Lang {
         &self.grammar
     }
 
-    pub fn identity(&self) -> GrammarIdentity {
-        GrammarIdentity::from_json_bytes(
-            self.grammar.name(),
-            self.grammar_json.as_bytes(),
-            self.source,
-        )
+    pub fn identity(&self) -> &GrammarIdentity {
+        self.identity.get_or_init(|| {
+            GrammarIdentity::from_json_bytes(
+                self.grammar.name(),
+                self.grammar_json.as_bytes(),
+                self.source,
+            )
+        })
     }
 
     pub fn parse_source(&self, source: &str) -> Tree {
@@ -82,6 +86,7 @@ macro_rules! define_langs {
                         include_str!(env!(concat!("PLOTNIK_WASM_GRAMMAR_JSON_", $env_suffix))),
                         $name,
                     ),
+                    identity: std::sync::OnceLock::new(),
                 });
                 &LANGUAGE
             }

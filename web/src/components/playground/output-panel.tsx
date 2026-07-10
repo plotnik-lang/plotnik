@@ -30,13 +30,33 @@ const DTS_EXTENSIONS = [javascript({ typescript: true })];
 interface OutputPanelProps {
   info: SessionInfo | null;
   generated: GeneratedCode | null;
+  generating: boolean;
   runResult: RunResult | null;
   /** Query no longer compiles; the shown output is from the last good run. */
   stale: boolean;
+  tab: OutputTab;
+  onTabChange: (tab: OutputTab) => void;
 }
 
-function GeneratedBody({ generated }: { generated: GeneratedCode | null }) {
+export type OutputTab = "output" | "types" | "generated";
+
+function GeneratedBody({
+  generated,
+  generating,
+}: {
+  generated: GeneratedCode | null;
+  generating: boolean;
+}) {
   const [copied, setCopied] = useState(false);
+  if (generating) {
+    return (
+      <div className="flex flex-col gap-2 p-4">
+        <Skeleton className="h-4 w-3/5" />
+        <Skeleton className="h-4 w-2/5" />
+        <Skeleton className="h-4 w-4/5" />
+      </div>
+    );
+  }
   if (!generated || generated.code === null) {
     return (
       <Empty>
@@ -190,11 +210,18 @@ function TypesBody({ info }: { info: SessionInfo | null }) {
 export function OutputPanel({
   info,
   generated,
+  generating,
   runResult,
   stale,
+  tab,
+  onTabChange,
 }: OutputPanelProps) {
   return (
-    <Tabs defaultValue="output" className="flex h-full min-h-0 flex-col gap-0">
+    <Tabs
+      value={tab}
+      onValueChange={(value) => onTabChange(value as OutputTab)}
+      className="flex h-full min-h-0 flex-col gap-0"
+    >
       <div className="flex items-center border-b bg-sidebar px-2 py-1.5">
         <TabsList>
           <TabsTrigger value="output">Output</TabsTrigger>
@@ -209,7 +236,7 @@ export function OutputPanel({
         <TypesBody info={info} />
       </TabsContent>
       <TabsContent value="generated" className="min-h-0 flex-1">
-        <GeneratedBody generated={generated} />
+        <GeneratedBody generated={generated} generating={generating} />
       </TabsContent>
     </Tabs>
   );

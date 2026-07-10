@@ -29,10 +29,19 @@ const api: PlotnikApi = {
       const next = Session.compile(query, lang);
       session?.free();
       session = next;
-      return {
-        info: session.info() as SessionInfo,
-        generated: session.generate("rust") as GeneratedCode,
-      };
+      return { info: session.info() as SessionInfo };
+    } catch (error) {
+      return { fatal: String(error) };
+    }
+  },
+
+  async generate() {
+    await wasmReady;
+    if (!session) {
+      return { fatal: "no compiled query" };
+    }
+    try {
+      return session.generate("rust") as GeneratedCode;
     } catch (error) {
       return { fatal: String(error) };
     }

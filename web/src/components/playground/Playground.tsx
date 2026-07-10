@@ -37,7 +37,7 @@ import type { Range16 } from "./ast-index";
 import { AstView } from "./ast-view";
 import { setSpotlight, spotlightExtension } from "./cm-spotlight";
 import { CodeEditor } from "./code-editor";
-import { OutputPanel } from "./output-panel";
+import { OutputPanel, type OutputTab } from "./output-panel";
 import { decodePermalink, encodePermalink } from "./permalink";
 import { pushQueryFeedback } from "./query-feedback";
 import { usePlaygroundSession } from "./use-session";
@@ -91,6 +91,7 @@ export default function Playground() {
   const [source, setSource] = useState(initial?.s ?? DEFAULT_SOURCE);
   const [entryChoice, setEntryChoice] = useState<string | null>(null);
   const [astOpen, setAstOpen] = useState(false);
+  const [outputTab, setOutputTab] = useState<OutputTab>("output");
   const [copied, setCopied] = useState(false);
 
   const queryViewRef = useRef<EditorView | null>(null);
@@ -101,6 +102,7 @@ export default function Playground() {
     source,
     lang,
     entry: entryChoice,
+    generatedOpen: outputTab === "generated",
   });
   const { compiled } = session;
 
@@ -303,9 +305,12 @@ export default function Playground() {
             <ResizablePanel defaultSize="45%" minSize="15%">
               <OutputPanel
                 info={compiled?.info ?? null}
-                generated={compiled?.generated ?? null}
+                generated={session.generated}
+                generating={session.generating}
                 runResult={session.runResult}
                 stale={session.stale}
+                tab={outputTab}
+                onTabChange={setOutputTab}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
