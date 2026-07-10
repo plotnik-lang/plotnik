@@ -18,6 +18,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tree_sitter::{Language as TsLanguage, Parser as TsParser};
 
+use crate::fixture::parse_section_header;
+
 pub const CORPUS_SCHEMA_VERSION: u32 = 1;
 pub const RUNTIME_ABI: u32 = 1;
 
@@ -530,14 +532,14 @@ fn parse_fixture(name: String, raw: &str) -> Result<Fixture, String> {
     let mut zone = Zone::Query;
 
     for line in normalized.lines() {
-        if let Some(label) = rule_label(line) {
+        if let Some(section) = parse_section_header(line) {
             if matches!(zone, Zone::Query) {
-                let Some(found) = input_header_ext(label) else {
+                let Some(found) = section.strip_prefix("input") else {
                     return Err(format!(
-                        "{name}: 06-vm fixture starts with `{label}`, expected INPUT"
+                        "{name}: 06-vm fixture starts with `{section}`, expected INPUT"
                     ));
                 };
-                ext = found;
+                ext = found.strip_prefix('.').map(str::to_string);
                 zone = Zone::Input;
                 continue;
             }
@@ -576,29 +578,6 @@ enum Zone {
     Query,
     Input,
     Generated,
-}
-
-/// `INPUT` → `Some(None)`, `INPUT (ts)` → `Some(Some("ts"))`, else `None`.
-fn input_header_ext(label: &str) -> Option<Option<String>> {
-    let rest = label.strip_prefix("INPUT")?.trim();
-    if rest.is_empty() {
-        return Some(None);
-    }
-    let ext = rest.strip_prefix('(')?.strip_suffix(')')?.trim();
-    Some(Some(ext.to_string()))
-}
-
-fn rule_label(line: &str) -> Option<&str> {
-    let line = line.trim_end();
-    if !line.starts_with('-') || !line.ends_with('-') {
-        return None;
-    }
-    let label = line
-        .trim_matches('-')
-        .strip_prefix(' ')?
-        .strip_suffix(' ')?
-        .trim();
-    (!label.is_empty()).then_some(label)
 }
 
 fn source_map(query: &str) -> SourceMap {
@@ -667,3 +646,7 @@ fn collect_json_files_below(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "conformance_tests.rs"]
+mod conformance_tests;

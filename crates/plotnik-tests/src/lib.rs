@@ -2,3 +2,4 @@
 //! benchmarks that need concrete tree-sitter language packages.
 
 pub mod conformance;
+pub mod fixture;

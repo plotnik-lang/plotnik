@@ -59,6 +59,7 @@ use plotnik_lib::{
     RuntimeError, RustConfig, SourceMap, SourcePath, TypeScriptConfig, VM, Verbosity,
     extract_inspection, materialize_verified,
 };
+use plotnik_tests::fixture::parse_section_header;
 
 mod support;
 
@@ -271,59 +272,6 @@ fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
         ]),
         _ => None,
     }
-}
-
-/// Only fixture section rules become boundaries. Stage-order validation then
-/// rejects rules that look generated but appear in the wrong place. A rule is a
-/// label centered in dashes — `-------- DIAGNOSTICS --------`; the `INPUT` rule
-/// carries its grammar in parens, `INPUT (ts)`.
-fn parse_section_header(line: &str) -> Option<String> {
-    let label = rule_label(line)?;
-    let name = match label.split_once('(') {
-        Some((head, ext)) if head.trim().eq_ignore_ascii_case("input") => {
-            format!("input.{}", ext.strip_suffix(')')?.trim())
-        }
-        Some(_) => return None,
-        None => label.to_ascii_lowercase(),
-    };
-    let known = name == "input"
-        || name.starts_with("input.")
-        || matches!(
-            name.as_str(),
-            "cst"
-                | "ast"
-                | "symbols"
-                | "nfa"
-                | "bytecode"
-                | "mapped"
-                | "typescript"
-                | "rust"
-                | "matcher"
-                | "trace"
-                | "output"
-                | "inspection"
-                | "recording"
-                | "diagnostics"
-        );
-    known.then_some(name)
-}
-
-/// The label inside a `----- LABEL -----` rule, or `None` when the line isn't a
-/// rule. A rule sits at column zero and pads its label with a space on each side
-/// (` LABEL `), exactly as `section_rule` emits it; requiring that padding keeps
-/// authored query/input bytes — a negated field `-types-`, an indented source
-/// line — from being read as a section boundary.
-fn rule_label(line: &str) -> Option<&str> {
-    let line = line.trim_end();
-    if !line.starts_with('-') || !line.ends_with('-') {
-        return None;
-    }
-    let label = line
-        .trim_matches('-')
-        .strip_prefix(' ')?
-        .strip_suffix(' ')?
-        .trim();
-    (!label.is_empty()).then_some(label)
 }
 
 fn render(
@@ -732,7 +680,7 @@ fn section_rule(name: &str) -> String {
         None => name.to_ascii_uppercase(),
     };
     // At least one dash each side so an over-wide label still round-trips through
-    // `rule_label`; width degrades gracefully past 50 columns.
+    // the fixture parser; width degrades gracefully past 50 columns.
     let fill = WIDTH.saturating_sub(label.len() + 2);
     let half = fill / 2;
     let left = half.max(1);
