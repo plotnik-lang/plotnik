@@ -61,7 +61,7 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
                 .max()
                 .unwrap_or(0),
             TypeShape::Void => 0,
-            _ => self.value_temp_bytes(item.ty, EstimateContext::item(item.ty)),
+            _ => self.value_temp_bytes(item.ty, TypeContext::item(item.ty)),
         };
 
         READER_FRAME_BASE_BYTES
@@ -80,7 +80,7 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
     }
 
     fn field_scope_frame_bytes(&self, owner: TypeId, fields: &BTreeMap<Symbol, FieldInfo>) -> u64 {
-        let context = EstimateContext::item(owner).field_value();
+        let context = TypeContext::item(owner);
         let slots = fields
             .values()
             .map(|info| self.option_value_bytes(self.field_value_bytes(info, context)))
@@ -93,14 +93,14 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
         slots.saturating_add(widest_assignment)
     }
 
-    fn field_value_bytes(&self, info: &FieldInfo, context: EstimateContext) -> u64 {
+    fn field_value_bytes(&self, info: &FieldInfo, context: TypeContext) -> u64 {
         self.field_value_bytes_seen(info, context, &mut HashSet::new())
     }
 
     fn field_value_bytes_seen(
         &self,
         info: &FieldInfo,
-        context: EstimateContext,
+        context: TypeContext,
         seen: &mut HashSet<TypeId>,
     ) -> u64 {
         let value = self.type_value_bytes(info.type_id, context, seen);
@@ -111,7 +111,7 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
         }
     }
 
-    fn value_temp_bytes(&self, ty: TypeId, context: EstimateContext) -> u64 {
+    fn value_temp_bytes(&self, ty: TypeId, context: TypeContext) -> u64 {
         match self.types.expect_type_shape(ty) {
             TypeShape::Array { element, .. } => VEC_VALUE_BYTES.saturating_add(
                 self.type_value_bytes(*element, context.array_element(), &mut HashSet::new()),
@@ -123,7 +123,7 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
     fn type_value_bytes(
         &self,
         ty: TypeId,
-        context: EstimateContext,
+        context: TypeContext,
         seen: &mut HashSet<TypeId>,
     ) -> u64 {
         if !seen.insert(ty) {
@@ -143,7 +143,7 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
                 .values()
                 .map(|info| {
                     let mut field_seen = seen.clone();
-                    self.field_value_bytes_seen(info, context.field_value(), &mut field_seen)
+                    self.field_value_bytes_seen(info, context, &mut field_seen)
                 })
                 .fold(0_u64, u64::saturating_add),
             TypeShape::Enum(variants) => {
@@ -162,7 +162,7 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
                 if target == TYPE_VOID {
                     return NODE_VALUE_BYTES;
                 }
-                if self.model.is_boxed_ref(context.type_context, ty) {
+                if self.model.is_boxed_ref(context, ty) {
                     return WORD_BYTES;
                 }
                 self.type_value_bytes(target, context, seen)
@@ -172,29 +172,6 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
 
     fn option_value_bytes(&self, value_bytes: u64) -> u64 {
         align_to_word(value_bytes.saturating_add(OPTION_TAG_BYTES))
-    }
-}
-
-#[derive(Clone, Copy)]
-struct EstimateContext {
-    type_context: TypeContext,
-}
-
-impl EstimateContext {
-    fn item(item_ty: TypeId) -> Self {
-        Self {
-            type_context: TypeContext::item(item_ty),
-        }
-    }
-
-    fn field_value(self) -> Self {
-        self
-    }
-
-    fn array_element(self) -> Self {
-        Self {
-            type_context: self.type_context.array_element(),
-        }
     }
 }
 
