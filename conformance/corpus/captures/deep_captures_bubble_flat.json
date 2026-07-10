@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/captures/deep_captures_bubble_flat",
+  "query": "Q = (program\n  (function_declaration\n    name: (identifier) @name\n    body: (statement_block (return_statement (number) @retval))\n  )\n)",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "function f() { return 1 }",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "node",
+      "kind": "identifier",
+      "kind_id": 1,
+      "text": "f",
+      "span": [
+        9,
+        10
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "node",
+      "kind": "number",
+      "kind_id": 114,
+      "text": "1",
+      "span": [
+        22,
+        23
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 1
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "name": {
+      "kind": "identifier",
+      "span": [
+        9,
+        10
+      ],
+      "text": "f"
+    },
+    "retval": {
+      "kind": "number",
+      "span": [
+        22,
+        23
+      ],
+      "text": "1"
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/definitions/captured_star_over_nullable_def",
+  "query": "A = (expression_statement\n  (identifier) @id\n)? @x\n\nQ = (program\n  (A)* @xs\n)",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "a; b;",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "array_open"
+    },
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "node",
+      "kind": "identifier",
+      "kind_id": 1,
+      "text": "a",
+      "span": [
+        0,
+        1
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "struct_close"
+    },
+    {
+      "effect": "set",
+      "member": 1
+    },
+    {
+      "effect": "struct_close"
+    },
+    {
+      "effect": "push"
+    },
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "node",
+      "kind": "identifier",
+      "kind_id": 1,
+      "text": "b",
+      "span": [
+        3,
+        4
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "struct_close"
+    },
+    {
+      "effect": "set",
+      "member": 1
+    },
+    {
+      "effect": "struct_close"
+    },
+    {
+      "effect": "push"
+    },
+    {
+      "effect": "array_close"
+    },
+    {
+      "effect": "set",
+      "member": 2
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "xs": [
+      {
+        "x": {
+          "id": {
+            "kind": "identifier",
+            "span": [
+              0,
+              1
+            ],
+            "text": "a"
+          }
+        }
+      },
+      {
+        "x": {
+          "id": {
+            "kind": "identifier",
+            "span": [
+              3,
+              4
+            ],
+            "text": "b"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/captures/optional_field_value_present",
+  "query": "Q = (program\n  (lexical_declaration\n    (variable_declarator\n      name: (identifier) @n\n      value: (number)? @v\n    )\n  )\n)",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "let x = 1",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "node",
+      "kind": "identifier",
+      "kind_id": 1,
+      "text": "x",
+      "span": [
+        4,
+        5
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "node",
+      "kind": "number",
+      "kind_id": 114,
+      "text": "1",
+      "span": [
+        8,
+        9
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 1
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "n": {
+      "kind": "identifier",
+      "span": [
+        4,
+        5
+      ],
+      "text": "x"
+    },
+    "v": {
+      "kind": "number",
+      "span": [
+        8,
+        9
+      ],
+      "text": "1"
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/alternations_union/zero_width_branch_before_follower",
+  "query": "Q = (program\n  {\n    [\n      (identifier)* @ids\n      (empty_statement) @e\n    ]\n    (debugger_statement) @d\n  }\n)",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "debugger;",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "array_open"
+    },
+    {
+      "effect": "array_close"
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "null"
+    },
+    {
+      "effect": "set",
+      "member": 1
+    },
+    {
+      "effect": "node",
+      "kind": "debugger_statement",
+      "kind_id": 168,
+      "text": "debugger;",
+      "span": [
+        0,
+        9
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 2
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "d": {
+      "kind": "debugger_statement",
+      "span": [
+        0,
+        9
+      ],
+      "text": "debugger;"
+    },
+    "e": null,
+    "ids": []
+  }
+}

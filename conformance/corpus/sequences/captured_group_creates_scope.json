@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/sequences/captured_group_creates_scope",
+  "query": "Q = (program\n  {\n    (lexical_declaration) @a\n    (expression_statement) @b\n  } @pair\n)",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "let x; foo;",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "node",
+      "kind": "lexical_declaration",
+      "kind_id": 152,
+      "text": "let x;",
+      "span": [
+        0,
+        6
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "node",
+      "kind": "expression_statement",
+      "kind_id": 150,
+      "text": "foo;",
+      "span": [
+        7,
+        11
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 1
+    },
+    {
+      "effect": "struct_close"
+    },
+    {
+      "effect": "set",
+      "member": 2
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "pair": {
+      "a": {
+        "kind": "lexical_declaration",
+        "span": [
+          0,
+          6
+        ],
+        "text": "let x;"
+      },
+      "b": {
+        "kind": "expression_statement",
+        "span": [
+          7,
+          11
+        ],
+        "text": "foo;"
+      }
+    }
+  }
+}

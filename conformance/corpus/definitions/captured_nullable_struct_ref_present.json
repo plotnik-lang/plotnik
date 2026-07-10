@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/definitions/captured_nullable_struct_ref_present",
+  "query": "A = (expression_statement\n  (identifier) @id\n)? @x\n\nQ = (program\n  (A) @a\n  (debugger_statement) @d\n)",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "id; debugger;",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "node",
+      "kind": "identifier",
+      "kind_id": 1,
+      "text": "id",
+      "span": [
+        0,
+        2
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "struct_close"
+    },
+    {
+      "effect": "set",
+      "member": 1
+    },
+    {
+      "effect": "struct_close"
+    },
+    {
+      "effect": "set",
+      "member": 2
+    },
+    {
+      "effect": "node",
+      "kind": "debugger_statement",
+      "kind_id": 168,
+      "text": "debugger;",
+      "span": [
+        4,
+        13
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 3
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "a": {
+      "x": {
+        "id": {
+          "kind": "identifier",
+          "span": [
+            0,
+            2
+          ],
+          "text": "id"
+        }
+      }
+    },
+    "d": {
+      "kind": "debugger_statement",
+      "span": [
+        4,
+        13
+      ],
+      "text": "debugger;"
+    }
+  }
+}

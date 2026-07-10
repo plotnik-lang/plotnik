@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/sequences/inner_failure_retries_earlier_element",
+  "query": "Q = (program\n  {\n    (expression_statement (identifier) @a)\n    (debugger_statement) @d\n  }\n)",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "1; foo; debugger;",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "node",
+      "kind": "identifier",
+      "kind_id": 1,
+      "text": "foo",
+      "span": [
+        3,
+        6
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "node",
+      "kind": "debugger_statement",
+      "kind_id": 168,
+      "text": "debugger;",
+      "span": [
+        8,
+        17
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 1
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "a": {
+      "kind": "identifier",
+      "span": [
+        3,
+        6
+      ],
+      "text": "foo"
+    },
+    "d": {
+      "kind": "debugger_statement",
+      "span": [
+        8,
+        17
+      ],
+      "text": "debugger;"
+    }
+  }
+}

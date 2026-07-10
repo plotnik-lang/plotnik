@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/definitions/star_rooted_def_enum_elements",
+  "query": "Entry = [Id: (identifier) @id  Num: (number) @num]\nItems = (Entry)*\n\nQ = (program\n  (expression_statement\n    (array (Items) @items)\n  )\n)",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "[a, 1, b];",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "array_open"
+    },
+    {
+      "effect": "enum_open",
+      "variant": 2
+    },
+    {
+      "effect": "node",
+      "kind": "identifier",
+      "kind_id": 1,
+      "text": "a",
+      "span": [
+        1,
+        2
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "enum_close"
+    },
+    {
+      "effect": "push"
+    },
+    {
+      "effect": "enum_open",
+      "variant": 3
+    },
+    {
+      "effect": "node",
+      "kind": "number",
+      "kind_id": 114,
+      "text": "1",
+      "span": [
+        4,
+        5
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 1
+    },
+    {
+      "effect": "enum_close"
+    },
+    {
+      "effect": "push"
+    },
+    {
+      "effect": "enum_open",
+      "variant": 2
+    },
+    {
+      "effect": "node",
+      "kind": "identifier",
+      "kind_id": 1,
+      "text": "b",
+      "span": [
+        7,
+        8
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "enum_close"
+    },
+    {
+      "effect": "push"
+    },
+    {
+      "effect": "array_close"
+    },
+    {
+      "effect": "set",
+      "member": 4
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "items": [
+      {
+        "$data": {
+          "id": {
+            "kind": "identifier",
+            "span": [
+              1,
+              2
+            ],
+            "text": "a"
+          }
+        },
+        "$tag": "Id"
+      },
+      {
+        "$data": {
+          "num": {
+            "kind": "number",
+            "span": [
+              4,
+              5
+            ],
+            "text": "1"
+          }
+        },
+        "$tag": "Num"
+      },
+      {
+        "$data": {
+          "id": {
+            "kind": "identifier",
+            "span": [
+              7,
+              8
+            ],
+            "text": "b"
+          }
+        },
+        "$tag": "Id"
+      }
+    ]
+  }
+}

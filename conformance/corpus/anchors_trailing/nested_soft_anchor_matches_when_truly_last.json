@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/anchors_trailing/nested_soft_anchor_matches_when_truly_last",
+  "query": "Q = (program\n  (expression_statement\n    (array\n      (object\n        (pair) @p\n        .\n      )\n      .\n    )\n  )\n)",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "[{a:1}]",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "node",
+      "kind": "pair",
+      "kind_id": 237,
+      "text": "a:1",
+      "span": [
+        2,
+        5
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "p": {
+      "kind": "pair",
+      "span": [
+        2,
+        5
+      ],
+      "text": "a:1"
+    }
+  }
+}

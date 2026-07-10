@@ -37,6 +37,7 @@ shot:
 		--failure-output final $(FILTER) \
 		|| true
 	@cargo insta accept
+	@cargo run --quiet --package plotnik-tests --bin export-conformance
 	@cargo nextest run \
 		--no-fail-fast \
 		--hide-progress-bar \

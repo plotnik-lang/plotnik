@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/nodes/anonymous_escaped_quote",
+  "query": "Q = (program (expression_statement (string \"\\\"\" (string_fragment) @s \"\\\"\")))",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "\"hi\";",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "node",
+      "kind": "string_fragment",
+      "kind_id": 130,
+      "text": "hi",
+      "span": [
+        1,
+        3
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "s": {
+      "kind": "string_fragment",
+      "span": [
+        1,
+        3
+      ],
+      "text": "hi"
+    }
+  }
+}

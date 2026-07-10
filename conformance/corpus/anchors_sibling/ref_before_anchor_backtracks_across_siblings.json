@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/anchors_sibling/ref_before_anchor_backtracks_across_siblings",
+  "query": "Comma = \",\"\n\nQ = (program\n  (expression_statement\n    (array\n      (Comma)\n      .\n      (string) @s\n    )\n  )\n)",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "[1, 2, \"x\"]",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "node",
+      "kind": "string",
+      "kind_id": 221,
+      "text": "\"x\"",
+      "span": [
+        7,
+        10
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "s": {
+      "kind": "string",
+      "span": [
+        7,
+        10
+      ],
+      "text": "\"x\""
+    }
+  }
+}

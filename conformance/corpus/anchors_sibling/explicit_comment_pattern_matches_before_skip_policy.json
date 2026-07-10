@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "runtime_abi": 1,
+  "fixture": "06-vm/anchors_sibling/explicit_comment_pattern_matches_before_skip_policy",
+  "query": "Q = (program\n  {\n    (comment) @doc\n    .\n    (function_declaration) @fn\n  }\n)",
+  "language": "javascript",
+  "grammar": {
+    "name": "javascript",
+    "sha256": "7d9364b824be9250ba023065784550475d277b9dc9a7d20f9bebe9e471c908c3",
+    "source": "arborium-javascript@2.18.1"
+  },
+  "source": "// doc\nfunction f() {}",
+  "entrypoint": "Q",
+  "outcome": "match",
+  "expected_trace": [
+    {
+      "effect": "struct_open"
+    },
+    {
+      "effect": "node",
+      "kind": "comment",
+      "kind_id": 108,
+      "text": "// doc",
+      "span": [
+        0,
+        6
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 0
+    },
+    {
+      "effect": "node",
+      "kind": "function_declaration",
+      "kind_id": 201,
+      "text": "function f() {}",
+      "span": [
+        7,
+        22
+      ]
+    },
+    {
+      "effect": "set",
+      "member": 1
+    },
+    {
+      "effect": "struct_close"
+    }
+  ],
+  "expected_value": {
+    "doc": {
+      "kind": "comment",
+      "span": [
+        0,
+        6
+      ],
+      "text": "// doc"
+    },
+    "fn": {
+      "kind": "function_declaration",
+      "span": [
+        7,
+        22
+      ],
+      "text": "function f() {}"
+    }
+  }
+}
