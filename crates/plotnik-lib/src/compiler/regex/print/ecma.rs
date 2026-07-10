@@ -4,6 +4,8 @@ use std::fmt::Write as _;
 
 use regex_syntax::hir::{Class, Hir, HirKind, Literal, Look, Repetition};
 
+const LITERAL_METACHARACTERS: &str = r"\.^$|?*+()[]{}/";
+
 /// A pattern source and the only flag generated ECMAScript may enable.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct EcmaRegex {
@@ -126,7 +128,7 @@ fn write_literal(literal: &Literal, out: &mut String) {
             out.push(character);
             continue;
         }
-        if character.is_ascii() && r"\.^$|?*+()[]{}/".contains(character) {
+        if character.is_ascii() && LITERAL_METACHARACTERS.contains(character) {
             out.push('\\');
             out.push(character);
             continue;
@@ -145,7 +147,7 @@ fn literal_is_plain(character: char) -> bool {
     !character.is_control()
         && !matches!(character, '\u{2028}' | '\u{2029}')
         && (character as u32) <= 0xFFFF
-        && !r"\.^$|?*+()[]{}/".contains(character)
+        && !LITERAL_METACHARACTERS.contains(character)
 }
 
 fn write_class(class: &Class, out: &mut String) {
