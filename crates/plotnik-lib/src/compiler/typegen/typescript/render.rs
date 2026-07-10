@@ -133,11 +133,11 @@ impl Emitter<'_> {
             let rendered = self.render_variant(
                 &name,
                 payload,
-                Some(SemanticTag {
+                self.map_enabled.then_some(SemanticTag {
                     type_id,
                     member: Some(member),
                 }),
-                true,
+                self.map_enabled,
             );
             self.sink.push("  ");
             self.sink.styled(Style::Dim, "|");

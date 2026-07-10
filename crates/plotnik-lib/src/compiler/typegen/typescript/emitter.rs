@@ -47,6 +47,8 @@ pub struct Emitter<'a> {
     /// Cycle guard for `mark_node_type_usage`.
     pub(super) node_scan_seen: HashSet<TypeId>,
     pub(super) sink: Sink<SemanticTag>,
+    /// Semantic ranges are only retained by `emit_mapped`.
+    pub(super) map_enabled: bool,
 }
 
 impl<'a> Emitter<'a> {
@@ -62,15 +64,21 @@ impl<'a> Emitter<'a> {
             emitted_types: HashSet::new(),
             node_scan_seen: HashSet::new(),
             sink: Sink::new(),
+            map_enabled: false,
         }
     }
 
     pub fn emit(mut self) -> String {
         self.emit_body();
+        debug_assert!(
+            self.sink.tags().is_empty(),
+            "plain TypeScript emission must not retain semantic ranges"
+        );
         finish_output(self.sink.render(self.config.colors))
     }
 
     pub fn emit_mapped(mut self) -> (String, Vec<DtsRange>) {
+        self.map_enabled = true;
         self.emit_body();
         let output = finish_output(self.sink.plain().to_string());
         let ranges = self
@@ -131,6 +139,10 @@ impl<'a> Emitter<'a> {
     }
 
     pub(super) fn push_mapped(&mut self, text: &str, type_id: TypeId, member: Option<u16>) {
+        if !self.map_enabled {
+            self.sink.push(text);
+            return;
+        }
         self.sink.tagged(SemanticTag { type_id, member }, |sink| {
             sink.push(text);
         });
