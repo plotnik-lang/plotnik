@@ -3,7 +3,7 @@
 use sha2::{Digest, Sha256};
 
 /// Exact grammar artifact used to link a query.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct GrammarIdentity {
     pub(crate) name: String,
     pub(crate) sha256: String,

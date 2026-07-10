@@ -10,12 +10,12 @@ use std::path::{Path, PathBuf};
 
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    Colors, QueryBuilder, RuntimeError, SourceMap, SourcePath, VM, materialize_verified,
+    Colors, GrammarIdentity, QueryBuilder, RuntimeError, SourceMap, SourcePath, VM,
+    materialize_verified,
 };
 use plotnik_rt::RuntimeEffect;
 use serde::Serialize;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use tree_sitter::{Language as TsLanguage, Parser as TsParser};
 
 use crate::fixture::parse_section_header;
@@ -387,13 +387,6 @@ enum CaseResult {
     Skipped(String),
 }
 
-#[derive(Clone, Serialize)]
-struct GrammarIdentity {
-    name: String,
-    sha256: String,
-    source: String,
-}
-
 #[derive(Serialize)]
 struct CorpusManifest {
     schema_version: u32,
@@ -491,17 +484,16 @@ impl LanguageData {
             .map_err(|error| format!("parse {package_name} grammar: {error:?}"))?;
         let grammar = Grammar::from_raw(&raw)
             .map_err(|error| format!("lower {package_name} grammar metadata: {error:?}"))?;
-        let sha256 = format!("{:x}", Sha256::digest(&bytes));
 
         Ok(Self {
             language,
             grammar,
             ts,
-            identity: GrammarIdentity {
-                name: raw.name,
-                sha256,
-                source: format!("{}@{}", package.name, package.version),
-            },
+            identity: GrammarIdentity::from_json_bytes(
+                raw.name,
+                &bytes,
+                format!("{}@{}", package.name, package.version),
+            ),
         })
     }
 }
