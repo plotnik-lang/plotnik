@@ -45,12 +45,6 @@ pub fn run(args: GenerateArgs) -> CliResult {
 }
 
 pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
-    if args.grammar.is_some() && args.lang.is_some() {
-        return Err(CliError::fatal(
-            "--grammar cannot be combined with -l/--lang",
-        ));
-    }
-
     let loaded = load_query(args.query_path.as_deref(), args.query_text.as_deref())?;
     if loaded.sources.is_empty() {
         return Err(CliError::fatal("query cannot be empty"));
