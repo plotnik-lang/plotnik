@@ -74,14 +74,6 @@ path = "tests/rust_sections_compile.rs"
 name = "codegen_conformance"
 path = "tests/codegen_conformance.rs"
 
-[[test]]
-name = "conformance_corpus"
-path = "tests/conformance_corpus.rs"
-
-[[bin]]
-name = "export-conformance"
-path = "src/bin/export_conformance.rs"
-
 [[bench]]
 name = "vm"
 path = "benches/vm.rs"
