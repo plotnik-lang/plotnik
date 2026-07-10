@@ -35,4 +35,8 @@ impl Config {
         self.serde = enabled;
         self
     }
+
+    pub(crate) fn rt_crate_path(&self) -> &str {
+        &self.rt_crate
+    }
 }

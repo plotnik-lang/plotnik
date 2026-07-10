@@ -8,6 +8,8 @@ use std::path::PathBuf;
 
 use clap::{Arg, ArgAction, value_parser};
 
+use crate::commands::generate::GenerateTarget;
+
 pub fn query_path_arg() -> Arg {
     Arg::new("query_path")
         .value_name("QUERY")
@@ -126,7 +128,7 @@ pub fn target_arg() -> Arg {
     Arg::new("target")
         .long("target")
         .value_name("TARGET")
-        .value_parser(["rust"])
+        .value_parser(value_parser!(GenerateTarget))
         .required(true)
         .help("Generated-code target (rust)")
 }

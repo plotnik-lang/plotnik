@@ -16,7 +16,7 @@ use super::limits::resolve_limit_spec;
 use crate::commands::ast::AstArgs;
 use crate::commands::check::CheckArgs;
 use crate::commands::dump::DumpArgs;
-use crate::commands::generate::GenerateArgs;
+use crate::commands::generate::{GenerateArgs, GenerateTarget};
 use crate::commands::infer::InferArgs;
 use crate::commands::inspect::InspectArgs;
 use crate::commands::run::RunArgs;
@@ -194,7 +194,7 @@ pub struct GenerateOpts {
     pub query_text: Option<String>,
     pub lang: Option<String>,
     pub grammar: Option<PathBuf>,
-    pub target: String,
+    pub target: GenerateTarget,
     pub output: Option<PathBuf>,
     pub color: ColorChoice,
 }
@@ -207,8 +207,8 @@ impl GenerateOpts {
             lang: m.get_one::<String>("lang").cloned(),
             grammar: m.get_one::<PathBuf>("grammar").cloned(),
             target: m
-                .get_one::<String>("target")
-                .cloned()
+                .get_one::<GenerateTarget>("target")
+                .copied()
                 .expect("clap guarantees --target is present"),
             output: m.get_one::<PathBuf>("output").cloned(),
             color: ColorChoice::from_matches(m),

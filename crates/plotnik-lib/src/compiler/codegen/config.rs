@@ -1,18 +1,13 @@
 //! Configuration for Rust matcher emission.
 
-use std::borrow::Cow;
-
+use crate::compiler::typegen::rust::Config as RustTypesConfig;
 use crate::core::grammar::GrammarIdentity;
 use plotnik_rt::{Limit, RuntimeLimitSpec};
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// Absolute path of the runtime crate as generated code should spell it.
-    /// The default matches a direct `plotnik-rt` dependency; the proc-macro
-    /// backend re-points it at its own re-export.
-    pub(crate) rt_crate: Cow<'static, str>,
-    /// Also emit `SerializeWithSource` impls for the output types.
-    pub(crate) serde: bool,
+    /// Rust output-type configuration shared with the type renderer.
+    pub(crate) rust_types: RustTypesConfig,
     /// The limit policy compiled into the module's safe entry points.
     /// Chosen at generation time, never at the call site: the query is
     /// trusted, the input is not, and the query's author is the one who knows
@@ -32,8 +27,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            rt_crate: Cow::Borrowed("::plotnik_rt"),
-            serde: false,
+            rust_types: RustTypesConfig::new(),
             limits: RuntimeLimitSpec {
                 steps: Limit::Auto,
                 memory: Limit::Auto,
@@ -49,14 +43,14 @@ impl Config {
         Self::default()
     }
 
-    pub fn rt_crate(mut self, path: impl Into<Cow<'static, str>>) -> Self {
-        self.rt_crate = path.into();
+    pub fn rt_crate(mut self, path: impl Into<std::borrow::Cow<'static, str>>) -> Self {
+        self.rust_types = self.rust_types.rt_crate(path);
         self
     }
 
     /// Also emit `SerializeWithSource` impls for the output types.
     pub fn serde(mut self, enabled: bool) -> Self {
-        self.serde = enabled;
+        self.rust_types = self.rust_types.serde(enabled);
         self
     }
 
@@ -77,5 +71,9 @@ impl Config {
     pub fn grammar_identity(mut self, identity: GrammarIdentity) -> Self {
         self.grammar_identity = Some(identity);
         self
+    }
+
+    pub(crate) fn rt_crate_path(&self) -> &str {
+        self.rust_types.rt_crate_path()
     }
 }

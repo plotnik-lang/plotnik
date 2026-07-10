@@ -15,6 +15,7 @@ use crate::cli::commands::{
     ast_command, check_command, dump_command, generate_command, infer_command, inspect_command,
     run_command, trace_command,
 };
+use crate::commands::generate::GenerateTarget;
 
 #[test]
 fn generate_extracts_rust_target_and_grammar_path() {
@@ -34,7 +35,7 @@ fn generate_extracts_rust_target_and_grammar_path() {
     let options = GenerateOpts::from_matches(&matches);
 
     assert_eq!(options.query_path, Some(PathBuf::from("query.ptk")));
-    assert_eq!(options.target, "rust");
+    assert_eq!(options.target, GenerateTarget::Rust);
     assert_eq!(options.grammar, Some(PathBuf::from("grammar.json")));
     assert_eq!(options.output, Some(PathBuf::from("query.rs")));
 }

@@ -37,8 +37,10 @@ use crate::compiler::srcgen::lits::{decimal_byte_lines, rust_string};
 use crate::compiler::srcgen::names::{shouty_ident, snake_ident};
 use crate::compiler::srcgen::sink::Sink;
 use crate::compiler::srcgen::template::splice;
-use crate::compiler::typegen::rust::{Config as RustTypesConfig, TypeModel};
+use crate::compiler::typegen::rust::TypeModel;
 use plotnik_rt::{Limit, Nav, SkipPolicy};
+
+use super::names::{accepts_entry_fn_name, entry_fn_name, safe_entry_fn_name};
 
 /// Generate the Rust query module for a compiled query's fork-point NFA.
 ///
@@ -219,9 +221,7 @@ impl<'a> Generator<'a> {
     }
 
     fn render(&self) -> String {
-        let rust_config = RustTypesConfig::new()
-            .rt_crate(self.config.rt_crate.clone())
-            .serde(self.config.serde);
+        let rust_config = &self.config.rust_types;
         let artifacts = self.plan.artifacts();
         let type_model = TypeModel::new(self.plan.output().clone());
         let readers = ReaderGen::new(artifacts, &type_model, self.plan.replay());
@@ -231,7 +231,7 @@ impl<'a> Generator<'a> {
         out.push('\n');
         out.push_str(&crate::compiler::typegen::rust::emit_model(
             &type_model,
-            &rust_config,
+            rust_config,
         ));
         out.push_str(
             &readers.parse_api(
@@ -276,7 +276,7 @@ impl<'a> Generator<'a> {
             let _ = writeln!(out, "// Grammar SHA-256: {}", identity.sha256);
             let _ = writeln!(out, "// Grammar source: {:?}", identity.source);
         }
-        splice(out, "", HEADER, &[("RT", &self.config.rt_crate)]);
+        splice(out, "", HEADER, &[("RT", self.config.rt_crate_path())]);
     }
 
     /// `pub use` every trace entry point at module root, so the public
@@ -301,7 +301,7 @@ impl<'a> Generator<'a> {
             "",
             MOD_HEADER,
             &[
-                ("RT", &self.config.rt_crate),
+                ("RT", self.config.rt_crate_path()),
                 ("STEPS", &limit_expr(limits.steps)),
                 ("MEMORY", &limit_expr(limits.memory)),
                 ("READER_FRAME", &max_reader_frame_bytes.to_string()),
@@ -986,28 +986,6 @@ pub(super) fn nav_expr(nav: Nav) -> String {
 
 fn policy_expr(policy: SkipPolicy) -> String {
     format!("rt::SkipPolicy::{policy:?}")
-}
-
-/// The public function a generated matcher exposes for a definition
-/// (`FooBar` → `foo_bar_trace`). Part of the generated-code contract:
-/// callers that only know the definition name resolve the symbol through
-/// this, never by re-deriving the casing.
-pub fn entry_fn_name(def_name: &str) -> String {
-    format!("{}_trace", snake_ident(def_name))
-}
-
-/// The safe sibling of [`entry_fn_name`], `pub(super)` inside the matcher
-/// module — the safe `parse` surface reaches the driver through it. It applies
-/// the module's compiled-in limit policy, which may be unbounded (hence `_safe`,
-/// not `_metered`: metering is per-resource and folds out when unbounded).
-pub(super) fn safe_entry_fn_name(def_name: &str) -> String {
-    format!("{}_safe", snake_ident(def_name))
-}
-
-/// Private yes/no entry point for safe `matches`: applies the compiled-in
-/// policy with data effects suppressed so no typed output is built.
-pub(super) fn accepts_entry_fn_name(def_name: &str) -> String {
-    format!("{}_accepts", snake_ident(def_name))
 }
 
 /// `Limit` as a generated-code expression; the `Debug` form matches the

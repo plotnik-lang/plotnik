@@ -19,12 +19,14 @@
 
 mod config;
 mod emitter;
+mod names;
 mod plan;
 mod reader;
+mod reader_frame;
 
 #[cfg(test)]
 mod emitter_tests;
 
 pub use config::Config;
-pub use emitter::entry_fn_name;
 pub(crate) use emitter::generate;
+pub use names::entry_fn_name;

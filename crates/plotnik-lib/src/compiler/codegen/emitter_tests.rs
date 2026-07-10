@@ -5,24 +5,7 @@ use crate::compiler::codegen::Config;
 use crate::compiler::test_utils::synthetic_grammar;
 use crate::core::grammar::GrammarIdentity;
 
-use crate::compiler::srcgen::names::{shouty_ident, snake_ident};
-
 use super::emitter::{depth_expr, limit_expr, nav_expr};
-
-#[test]
-fn shouty_splits_pascal_humps() {
-    assert_eq!(shouty_ident("FooBar"), "FOO_BAR");
-    assert_eq!(shouty_ident("Q"), "Q");
-    assert_eq!(shouty_ident("HTTPServer"), "HTTP_SERVER");
-    assert_eq!(shouty_ident("Foo2Bar"), "FOO2_BAR");
-}
-
-#[test]
-fn snake_splits_pascal_humps() {
-    assert_eq!(snake_ident("FooBar"), "foo_bar");
-    assert_eq!(snake_ident("Q"), "q");
-    assert_eq!(snake_ident("HTTPServer"), "http_server");
-}
 
 #[test]
 fn nav_expr_matches_debug() {

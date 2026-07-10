@@ -5,18 +5,25 @@ use std::path::{Path, PathBuf};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{GrammarIdentity, MatcherConfig};
 
+use clap::ValueEnum;
+
 use super::compile::{compile_query, compile_query_with_grammar};
 use super::lang_resolver::require_lang;
 use super::query_loader::load_query;
 use crate::error::{CliError, CliResult};
 use crate::language_registry;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum GenerateTarget {
+    Rust,
+}
+
 pub struct GenerateArgs {
     pub query_path: Option<PathBuf>,
     pub query_text: Option<String>,
     pub lang: Option<String>,
     pub grammar: Option<PathBuf>,
-    pub target: String,
+    pub target: GenerateTarget,
     pub output: Option<PathBuf>,
     pub color: bool,
 }
@@ -38,9 +45,6 @@ pub fn run(args: GenerateArgs) -> CliResult {
 }
 
 pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
-    if args.target != "rust" {
-        return Err(CliError::fatal("--target must be 'rust'"));
-    }
     if args.grammar.is_some() && args.lang.is_some() {
         return Err(CliError::fatal(
             "--grammar cannot be combined with -l/--lang",
@@ -71,9 +75,11 @@ pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
         (compiled, identity)
     };
 
-    Ok(compiled
-        .to_rust_matcher(MatcherConfig::new().grammar_identity(identity))
-        .expect("successful full-pipeline compilation produces a matcher"))
+    match args.target {
+        GenerateTarget::Rust => Ok(compiled
+            .to_rust_matcher(MatcherConfig::new().grammar_identity(identity))
+            .expect("successful full-pipeline compilation produces a matcher")),
+    }
 }
 
 fn generate_compile_error(error: CliError) -> CliError {

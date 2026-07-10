@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use plotnik_lib::GrammarIdentity;
 
-use super::generate::{GenerateArgs, generate};
+use super::generate::{GenerateArgs, GenerateTarget, generate};
 use crate::error::CliError;
 
 #[test]
@@ -13,7 +13,7 @@ fn registry_generation_records_embedded_grammar_provenance() {
         query_text: Some("Q = (program)".to_string()),
         lang: Some("javascript".to_string()),
         grammar: None,
-        target: "rust".to_string(),
+        target: GenerateTarget::Rust,
         output: None,
         color: false,
     };
@@ -43,7 +43,7 @@ fn external_generation_hashes_exact_grammar_bytes() {
         query_text: Some("Q = (program)".to_string()),
         lang: None,
         grammar: Some(path.clone()),
-        target: "rust".to_string(),
+        target: GenerateTarget::Rust,
         output: None,
         color: false,
     };
@@ -66,7 +66,7 @@ fn invalid_query_is_a_domain_no() {
         query_text: Some("Q = (not_a_javascript_kind)".to_string()),
         lang: Some("javascript".to_string()),
         grammar: None,
-        target: "rust".to_string(),
+        target: GenerateTarget::Rust,
         output: None,
         color: false,
     };
