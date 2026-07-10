@@ -59,3 +59,36 @@ fn capture_layout_owns_the_per_scope_width_check() {
 
     assert_eq!(error, OutputSchemaError::Fields(256));
 }
+
+#[test]
+fn capture_layout_reports_the_actual_total_member_count() {
+    let mut interner = Interner::new();
+    let mut types = TypeAnalysisBuilder::new();
+    let mut ordered = Vec::new();
+    for scope in 0..257 {
+        let fields = (0..u8::MAX)
+            .map(|field| {
+                (
+                    interner.intern(&format!("scope_{scope}_field_{field}")),
+                    FieldInfo::required(TYPE_NODE),
+                )
+            })
+            .collect();
+        ordered.push(types.intern_struct(fields));
+    }
+    let fields = (0..10)
+        .map(|field| {
+            (
+                interner.intern(&format!("overflow_field_{field}")),
+                FieldInfo::required(TYPE_NODE),
+            )
+        })
+        .collect();
+    ordered.push(types.intern_struct(fields));
+    let types = types.finish();
+
+    let error = CaptureLayout::build(&types, &ordered)
+        .expect_err("65,545 members exceed the capture layout limit");
+
+    assert_eq!(error, OutputSchemaError::Members(65_545));
+}

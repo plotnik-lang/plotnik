@@ -160,14 +160,13 @@ impl CaptureLayout {
                     _ => continue,
                 };
 
-            let base = u16::try_from(member_count)
-                .map_err(|_| OutputSchemaError::Members(member_count))?;
-            for _ in &members {
-                if member_count >= MAX_MEMBERS {
-                    return Err(OutputSchemaError::Members(member_count + 1));
-                }
-                member_count += 1;
+            let next_member_count = member_count + members.len();
+            if next_member_count > MAX_MEMBERS {
+                return Err(OutputSchemaError::Members(next_member_count));
             }
+            let base = u16::try_from(member_count)
+                .expect("member count was checked against the u16 format limit");
+            member_count = next_member_count;
             match kind {
                 CaptureScopeKind::Struct if members.len() > MAX_SCOPE_MEMBERS => {
                     return Err(OutputSchemaError::Fields(members.len()));
