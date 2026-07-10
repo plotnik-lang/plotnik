@@ -1,7 +1,7 @@
 //! TypeScript declaration rendering over the shared semantic sink.
 
 use crate::bytecode::{TypeDef, TypeDefKind, TypeId, TypeKind};
-use crate::compiler::codegen::emit::sink::{Sink, Style};
+use crate::compiler::srcgen::sink::{Sink, Style};
 
 use super::Emitter;
 use super::emitter::SemanticTag;

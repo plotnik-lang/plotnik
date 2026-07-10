@@ -1,4 +1,4 @@
-use crate::compiler::codegen::emit::sink::{Sink, Style, indentation};
+use crate::compiler::srcgen::sink::{Sink, Style, indentation};
 use crate::core::Colors;
 
 #[test]

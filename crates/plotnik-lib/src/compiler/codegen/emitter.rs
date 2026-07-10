@@ -26,10 +26,6 @@ use std::fmt::Write as _;
 use crate::bytecode::{EffectKind, PredicateOp};
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::codegen::Config;
-use crate::compiler::codegen::emit::lits::{decimal_byte_lines, rust_string};
-use crate::compiler::codegen::emit::names::{shouty_ident, snake_ident};
-use crate::compiler::codegen::emit::sink::Sink;
-use crate::compiler::codegen::emit::template::splice;
 use crate::compiler::codegen::plan::{
     CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, LimitsPlan, MatchPlan, ModulePlan,
     PredicatePlan, PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
@@ -37,6 +33,10 @@ use crate::compiler::codegen::plan::{
 use crate::compiler::codegen::reader::ReaderGen;
 use crate::compiler::lower::ir::{NfaGraph, SemanticNfa};
 use crate::compiler::regex::compile_native_dfa;
+use crate::compiler::srcgen::lits::{decimal_byte_lines, rust_string};
+use crate::compiler::srcgen::names::{shouty_ident, snake_ident};
+use crate::compiler::srcgen::sink::Sink;
+use crate::compiler::srcgen::template::splice;
 use crate::compiler::typegen::rust::Config as RustTypesConfig;
 use plotnik_rt::{Limit, Nav, SkipPolicy};
 

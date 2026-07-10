@@ -31,12 +31,12 @@ use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
-use crate::compiler::codegen::emit::names::{rust_scope_idents, snake_ident};
-use crate::compiler::codegen::emit::sink::indentation;
 use crate::compiler::codegen::plan::{
     ReplayItem, ReplayItemKind, ReplayPlan, ReplayScopePlan, ReplayValuePlan, ReplayVariantPlan,
 };
 use crate::compiler::ids::DefId;
+use crate::compiler::srcgen::names::{rust_scope_idents, snake_ident};
+use crate::compiler::srcgen::sink::indentation;
 use crate::compiler::typegen::rust::emitter::{Emitter as TypeModel, TypeContext};
 use crate::core::{Interner, Symbol};
 

@@ -18,9 +18,9 @@ pub(crate) use crate::compiler::analyze::output::{OutputItem as Item, OutputItem
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
-use crate::compiler::codegen::emit::names::rust_scope_idents;
-use crate::compiler::codegen::emit::sink::Sink;
 use crate::compiler::ids::DefId;
+use crate::compiler::srcgen::names::rust_scope_idents;
+use crate::compiler::srcgen::sink::Sink;
 use crate::core::{Interner, Symbol};
 
 use super::Config;

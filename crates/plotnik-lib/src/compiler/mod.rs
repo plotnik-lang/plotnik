@@ -12,6 +12,7 @@ mod ids;
 pub(crate) mod limits;
 pub(crate) mod parse;
 pub(crate) mod regex;
+pub(crate) mod srcgen;
 pub(crate) mod typegen;
 
 mod analyze;

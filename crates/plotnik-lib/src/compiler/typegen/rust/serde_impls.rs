@@ -15,7 +15,7 @@
 use std::fmt::Write as _;
 
 use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
-use crate::compiler::codegen::emit::names::rust_scope_idents;
+use crate::compiler::srcgen::names::rust_scope_idents;
 
 use super::emitter::{Emitter, Item, ItemKind, TypeContext};
 

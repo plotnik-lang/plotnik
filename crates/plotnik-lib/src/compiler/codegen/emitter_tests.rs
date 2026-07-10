@@ -4,7 +4,8 @@ use crate::compiler::QueryBuilder;
 use crate::compiler::codegen::{Config, GrammarIdentity};
 use crate::compiler::test_utils::synthetic_grammar;
 
-use super::emit::names::{shouty_ident, snake_ident};
+use crate::compiler::srcgen::names::{shouty_ident, snake_ident};
+
 use super::emitter::{depth_expr, limit_expr, nav_expr};
 
 #[test]

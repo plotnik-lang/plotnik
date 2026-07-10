@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 use crate::bytecode::{
     EntrypointsView, Module, StringsView, TypeDef, TypeId, TypeMember, TypesView,
 };
-use crate::compiler::codegen::emit::sink::Sink;
+use crate::compiler::srcgen::sink::Sink;
 
 use super::Config;
 

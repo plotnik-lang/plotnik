@@ -1,4 +1,4 @@
-use crate::compiler::codegen::emit::lits::{decimal_byte_lines, rust_string};
+use crate::compiler::srcgen::lits::{decimal_byte_lines, rust_string};
 
 #[test]
 fn rust_strings_use_language_native_escaping() {

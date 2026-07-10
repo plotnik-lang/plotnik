@@ -1,4 +1,4 @@
-use crate::compiler::codegen::emit::template::splice;
+use crate::compiler::srcgen::template::splice;
 
 #[test]
 fn substitutes_and_indents_non_empty_lines() {

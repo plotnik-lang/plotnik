@@ -1,4 +1,4 @@
-use crate::compiler::codegen::emit::names::{rust_scope_idents, shouty_ident, snake_ident};
+use crate::compiler::srcgen::names::{rust_scope_idents, shouty_ident, snake_ident};
 
 #[test]
 fn case_conversion_preserves_acronym_boundaries() {

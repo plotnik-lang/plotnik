@@ -5,7 +5,7 @@
 //! this one rendering path.
 
 use crate::bytecode::{TypeDef, TypeDefKind, TypeId, TypeKind};
-use crate::compiler::codegen::emit::sink::{Sink, Style};
+use crate::compiler::srcgen::sink::{Sink, Style};
 
 use super::Emitter;
 use super::config::VoidType;
