@@ -6,7 +6,6 @@ import {
   CopyIcon,
   SearchXIcon,
 } from "lucide-react";
-import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +35,8 @@ interface OutputPanelProps {
   stale: boolean;
   tab: OutputTab;
   onTabChange: (tab: OutputTab) => void;
+  generatedCopied: boolean;
+  onGeneratedCopy: () => void;
 }
 
 export type OutputTab = "output" | "types" | "generated";
@@ -43,11 +44,14 @@ export type OutputTab = "output" | "types" | "generated";
 function GeneratedBody({
   generated,
   generating,
+  copied,
+  onCopy,
 }: {
   generated: GeneratedCode | null;
   generating: boolean;
+  copied: boolean;
+  onCopy: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
   if (generating) {
     return (
       <div className="flex flex-col gap-2 p-4">
@@ -70,16 +74,6 @@ function GeneratedBody({
     );
   }
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(generated.code ?? "");
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      setCopied(false);
-    }
-  };
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex min-w-0 items-center gap-2 border-b bg-sidebar px-3 py-1.5">
@@ -94,7 +88,7 @@ function GeneratedBody({
           type="button"
           variant="outline"
           size="xs"
-          onClick={copy}
+          onClick={onCopy}
           aria-live="polite"
         >
           {copied ? (
@@ -215,6 +209,8 @@ export function OutputPanel({
   stale,
   tab,
   onTabChange,
+  generatedCopied,
+  onGeneratedCopy,
 }: OutputPanelProps) {
   return (
     <Tabs
@@ -236,7 +232,12 @@ export function OutputPanel({
         <TypesBody info={info} />
       </TabsContent>
       <TabsContent value="generated" className="min-h-0 flex-1">
-        <GeneratedBody generated={generated} generating={generating} />
+        <GeneratedBody
+          generated={generated}
+          generating={generating}
+          copied={generatedCopied}
+          onCopy={onGeneratedCopy}
+        />
       </TabsContent>
     </Tabs>
   );
