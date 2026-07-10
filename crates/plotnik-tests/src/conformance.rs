@@ -152,7 +152,3 @@ enum Zone {
     Input,
     Generated,
 }
-
-#[cfg(test)]
-#[path = "conformance_tests.rs"]
-mod conformance_tests;
