@@ -8,7 +8,7 @@
 use crate::bytecode::StringId;
 use crate::compiler::emit::tables::{EmitError, RegexId, RegexTableBuilder, StringTableBuilder};
 use crate::compiler::lower::ir::{InstructionIR, NfaGraph, PredicateValueIR};
-use crate::compiler::regex::compile_native_dfa;
+use crate::compiler::regex::{compile_native_dfa, normalize};
 
 /// Compile every regex predicate into the regex table, resolving each pattern's
 /// StringId from the finished string table. Reads the string table; interns
@@ -53,7 +53,8 @@ pub(super) fn intern(
         return Ok(id);
     }
 
-    let bytes =
-        compile_native_dfa(pattern).map_err(|e| EmitError::RegexCompile(pattern.to_string(), e))?;
+    let normalized = normalize(pattern);
+    let bytes = compile_native_dfa(&normalized)
+        .map_err(|error| EmitError::RegexCompile(pattern.to_string(), error))?;
     regexes.push_dfa(string_id, bytes)
 }

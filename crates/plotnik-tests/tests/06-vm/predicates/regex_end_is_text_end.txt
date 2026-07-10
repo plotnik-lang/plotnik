@@ -1,0 +1,71 @@
+Q = (program (expression_statement (template_string (string_fragment =~ /c$/) @text)))
+--------------------- INPUT ----------------------
+`abc
+${x}`;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  text: Node;
+}
+--------------------- OUTPUT ---------------------
+<no match>
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "c$"
+S2 "text"
+S3 "Q"
+S4 "program"
+S5 "expression_statement"
+S6 "template_string"
+S7 "string_fragment"
+
+[regex]
+R1 /c$/
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { text }
+
+[type_members]
+M0: S2 → T0  ; text: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@15)                            15 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  ...
+  07  ...
+  08  └‣─  (string_fragment) [Node Set(M0)] =~ /c$/  11
+  11  ─‣┘³ _                                12
+  12                                        ▶
+  13  └‣─  (template_string)                08
+  14  └‣─  (expression_statement)           13
+  15   !   (program)                        14
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@15)                            15 : 03
+       ▶   (@15)
+
+@15:
+  15       (program)                        14
+       ●   program
+  14       (expression_statement)           13
+       ●   expression_statement
+  13       (template_string)                08
+       ●   template_string
+  08       (string_fragment) [Node Set(M0)] =~ /c$/  11
+       ○   `
+       ○   template_substitution
+       ○   `
+  13  ❮❮❮ 
+       ○   ;
+  14  ❮❮❮ 

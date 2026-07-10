@@ -1,0 +1,69 @@
+Q = (program (comment =~ /^\/\*..\*\/$/) @comment)
+--------------------- INPUT ----------------------
+/* */
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  comment: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "comment": {
+    "kind": "comment",
+    "text": "/*\r */",
+    "span": [0, 8]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "^\\/\\*..\\*\\/$"
+S2 "comment"
+S3 "Q"
+S4 "program"
+
+[regex]
+R1 /^\/\*..\*\/$/
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { comment }
+
+[type_members]
+M0: S2 → T0  ; comment: <Node>
+
+[type_names]
+N0: S3 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@13)                            13 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  ...
+  07  ...
+  08  └‣─  (comment) [Node Set(M0)] =~ /^\/\*..\*\/$/  11
+  11  ─‣┘  _                                12
+  12                                        ▶
+  13   !   (program)                        08
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@13)                            13 : 03
+       ▶   (@13)
+
+@13:
+  13       (program)                        08
+       ●   program
+  08       (comment) [Node Set(M0)] =~ /^\/\*..\*\/$/  11
+       ●   comment
+  11       _                                12
+       ●   program
+  12   ◀   (@13)                            
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

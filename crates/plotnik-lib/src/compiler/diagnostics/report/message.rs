@@ -97,6 +97,9 @@ pub enum DiagnosticKind {
     RegexBackreference,
     RegexLookaround,
     RegexNamedCapture,
+    RegexMultilineFlag,
+    RegexCrlfFlag,
+    RegexBoundaryVariant,
     RegexSyntaxError,
 
     UnknownNodeKind,
@@ -270,13 +273,19 @@ impl DiagnosticKind {
                 "put a pattern between the slashes, e.g. `=~ /^foo/`, or use a string predicate like `== \"foo\"`"
             }
             Self::RegexBackreference => {
-                "the regex engine is linear-time and cannot match backreferences; rewrite without `\\1`"
+                "the portable regex subset excludes backreferences; rewrite without `\\1`"
             }
             Self::RegexLookaround => {
-                "the regex engine cannot match lookaround; match the surrounding context with the query pattern instead"
+                "some target engines cannot match lookaround; match the surrounding context with the query pattern instead"
             }
             Self::RegexNamedCapture => {
                 "regex captures are inert in plotnik; capture nodes with `@name` outside the regex"
+            }
+            Self::RegexMultilineFlag | Self::RegexCrlfFlag => {
+                "spell line terminators explicitly; `^` and `$` always mean text start and end"
+            }
+            Self::RegexBoundaryVariant => {
+                "use `\\b` or `\\B`, which Plotnik defines as ASCII word boundaries on every target"
             }
             Self::InvalidSupertypeSyntax => {
                 "supertypes refine node kinds, not references: write `(supertype#subtype)` or just `(RefName)`"
@@ -397,6 +406,15 @@ impl DiagnosticKind {
             Self::RegexBackreference => "backreferences are not supported in regex",
             Self::RegexLookaround => "lookahead/lookbehind is not supported in regex",
             Self::RegexNamedCapture => "named captures are not supported in regex",
+            Self::RegexMultilineFlag => {
+                "multiline mode is not supported because target engines disagree on line terminators"
+            }
+            Self::RegexCrlfFlag => {
+                "CRLF mode is not supported because target engines disagree on line terminators"
+            }
+            Self::RegexBoundaryVariant => {
+                "this word-boundary variant has no shared equivalent across target engines"
+            }
             Self::RegexSyntaxError => "invalid regex syntax",
             Self::UnknownNodeKind => "unknown node kind",
             Self::MissingKindNotToken => "this kind is never inserted as a missing node",

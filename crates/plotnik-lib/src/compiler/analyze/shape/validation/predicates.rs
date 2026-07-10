@@ -4,6 +4,7 @@
 //! - Backreferences (`\1`)
 //! - Lookahead/lookbehind (`(?=...)`, `(?!...)`, etc.)
 //! - Named captures (`(?P<name>...)`)
+//! - Target-dependent line modes and word-boundary variants
 
 use regex_syntax::ast::{self, Ast, GroupKind, Visitor as RegexVisitor, visit};
 use regex_syntax::hir;
@@ -120,10 +121,12 @@ impl PredicateValidator<'_, '_> {
             }
         };
 
-        let detector = NamedCaptureDetector {
+        let detector = RegexFeatureDetector {
             named_captures: Vec::new(),
+            unsupported_flags: Vec::new(),
+            boundary_variants: Vec::new(),
         };
-        let detector = visit(&parsed_ast, detector).unwrap();
+        let detector = visit(&parsed_ast, detector).expect("regex feature detection cannot fail");
 
         for capture_span in detector.named_captures {
             let span = regex.map_span(&capture_span);
@@ -135,6 +138,27 @@ impl PredicateValidator<'_, '_> {
                     Span::new(self.source_id, span),
                 )
                 .fix("remove the named-capture marker", "")
+                .emit();
+        }
+
+        for (flag_span, flag) in detector.unsupported_flags {
+            let span = regex.map_span(&flag_span);
+            let kind = match flag {
+                UnsupportedFlag::Multiline => DiagnosticKind::RegexMultilineFlag,
+                UnsupportedFlag::Crlf => DiagnosticKind::RegexCrlfFlag,
+            };
+            self.diag
+                .report(kind, Span::new(self.source_id, span))
+                .emit();
+        }
+
+        for boundary_span in detector.boundary_variants {
+            let span = regex.map_span(&boundary_span);
+            self.diag
+                .report(
+                    DiagnosticKind::RegexBoundaryVariant,
+                    Span::new(self.source_id, span),
+                )
                 .emit();
         }
 
@@ -158,11 +182,19 @@ impl PredicateValidator<'_, '_> {
     }
 }
 
-struct NamedCaptureDetector {
+struct RegexFeatureDetector {
     named_captures: Vec<ast::Span>,
+    unsupported_flags: Vec<(ast::Span, UnsupportedFlag)>,
+    boundary_variants: Vec<ast::Span>,
 }
 
-impl RegexVisitor for NamedCaptureDetector {
+#[derive(Clone, Copy)]
+enum UnsupportedFlag {
+    Multiline,
+    Crlf,
+}
+
+impl RegexVisitor for RegexFeatureDetector {
     type Output = Self;
     type Err = std::convert::Infallible;
 
@@ -187,6 +219,46 @@ impl RegexVisitor for NamedCaptureDetector {
             );
             self.named_captures.push(ast::Span::new(start, end));
         }
+        if let Ast::Group(group) = ast
+            && let GroupKind::NonCapturing(flags) = &group.kind
+        {
+            self.record_flags(flags);
+        }
+        if let Ast::Flags(flags) = ast {
+            self.record_flags(&flags.flags);
+        }
+        if let Ast::Assertion(assertion) = ast
+            && matches!(
+                assertion.kind,
+                ast::AssertionKind::WordBoundaryStart
+                    | ast::AssertionKind::WordBoundaryEnd
+                    | ast::AssertionKind::WordBoundaryStartAngle
+                    | ast::AssertionKind::WordBoundaryEndAngle
+                    | ast::AssertionKind::WordBoundaryStartHalf
+                    | ast::AssertionKind::WordBoundaryEndHalf
+            )
+        {
+            self.boundary_variants.push(assertion.span);
+        }
         Ok(())
+    }
+}
+
+impl RegexFeatureDetector {
+    fn record_flags(&mut self, flags: &ast::Flags) {
+        let mut negated = false;
+        for item in &flags.items {
+            match item.kind {
+                ast::FlagsItemKind::Negation => negated = true,
+                ast::FlagsItemKind::Flag(_) if negated => {}
+                ast::FlagsItemKind::Flag(ast::Flag::MultiLine) => self
+                    .unsupported_flags
+                    .push((item.span, UnsupportedFlag::Multiline)),
+                ast::FlagsItemKind::Flag(ast::Flag::CRLF) => self
+                    .unsupported_flags
+                    .push((item.span, UnsupportedFlag::Crlf)),
+                ast::FlagsItemKind::Flag(_) => {}
+            }
+        }
     }
 }

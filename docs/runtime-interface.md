@@ -240,56 +240,35 @@ String predicates compare the exact node text:
 These operations are defined on Unicode text derived from the canonical UTF-8
 source bytes.
 
-### 5.1 Portable regex DFAs
+### 5.1 Native regex execution
 
-Regex predicates have regex-automata's syntax and matching semantics on every
-target. A backend must not reinterpret a pattern with JavaScript `RegExp`,
-Python `re`, `vim.regex`, or another platform dialect: differences in anchors,
-Unicode classes, and matching features would make executor behavior drift.
+The runtime operation is `regex_test(id, text) → bool`. It performs an
+unanchored containment search with the compiled pattern identified by `id`;
+`=~` returns that boolean and `!~` negates it. Each distinct printed pattern is
+compiled once when the generated module initializes, never once per candidate.
 
-The compiler builds each distinct pattern as one minimized, unanchored DFA and
-records a target-neutral automaton in `RegexPlan`. Its ABI `1` shape is:
+Dynamic targets use their native regex engine, but the compiler owns the
+semantics. Analysis admits one portable, pure-regular subset. Normalization
+then expands case folding, dot, shorthand and Unicode classes, and class set
+operations against the compiler's pinned Unicode tables; removes captures;
+and fixes `\b`/`\B` to ASCII word-boundary semantics. A total printer spells
+that normalized HIR in each host dialect. A backend cannot reject a pattern
+that passed analysis.
 
-```text
-PortableDfa {
-    start: StateId
-    states: [PortableState]
-}
+The printer invariant is normative: no emitted construct may consult a host's
+Unicode tables, flag defaults, locale, or engine version. Text anchors always
+mean whole-text start/end, and case-insensitive mode is never delegated to the
+host. The haystack is node text as Unicode scalar values in the platform's
+native string, obtained by a well-formed transcoding of the canonical UTF-8
+source. Predicate execution does not byte-walk and TypeScript does not use
+`TextEncoder` for this operation.
 
-PortableState {
-    accepting: Boolean
-    dead: Boolean
-    quit: Boolean
-    eoi: StateId
-    default: StateId
-    transitions: [{ start_byte, end_byte, next }]
-}
-```
-
-State ids are dense from zero. Transition ranges are inclusive, sorted,
-disjoint, and contain only exceptions to the state's `default` target. `eoi`
-is the transition for regex-automata's synthetic end-of-input symbol, which is
-distinct from every byte.
-
-A portable runtime evaluates a predicate as follows:
-
-1. set `state = start`;
-2. for each byte from `text_bytes(node)`, take the matching range or `default`;
-3. return true on an accepting state, false on a dead state, and treat a quit
-   state as an internal generated-code/runtime error;
-4. after the final byte, take the `eoi` transition and return whether that
-   state is accepting.
-
-The early accepting return is valid for boolean search even though a
-leftmost-first location search would continue. The EOI transition is required
-because regex-automata delays matches by one byte. Dynamic runtimes therefore
-walk canonical UTF-8 bytes; a TypeScript runtime encodes node text with
-`TextEncoder` rather than walking UTF-16 code units.
-
-Rust may keep embedding regex-automata's version-coupled native sparse-DFA
-serialization. Both forms come from the compiler-owned DFA build configuration,
-and compiler differential tests prove the portable walker against the native
-search. Regex execution is not charged to Plotnik's state-dispatch step counter.
+Rust is the representation exception, not a semantic exception: generated
+Rust and bytecode use `rt::StaticDfa` compiled by regex-automata from the same
+normalized HIR. Regex execution is not charged to Plotnik's state-dispatch
+step counter. Engine class and worst-case running time are target properties
+(Rust remains linear; some dynamic hosts backtrack), not conformance
+properties; the observable boolean result is shared.
 
 ## 6. Capture trace
 
@@ -469,5 +448,5 @@ The corpus must cover every navigation and resume mode, field and missing-node
 checks, all predicate operators, suppression, recursive calls, ordered branch
 priority, trace truncation after backtracking, nested replay shapes, automatic
 and explicit limits, and non-ASCII source before captured nodes. Regex cases
-walk the compiler-exported portable tables and are the tripwire for runtime
-walker drift.
+exercise every dialect printer's semantic traps and are the tripwire for
+normalization or host-spelling drift.

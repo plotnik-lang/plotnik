@@ -105,7 +105,7 @@ struct RegexStatic {
 }
 
 impl RegexStatic {
-    fn compile(id: RegexId, pattern: &str) -> Self {
+    fn compile(id: RegexId, pattern: &regex_syntax::hir::Hir) -> Self {
         let bytes = compile_native_dfa(pattern).expect("regex predicate compiled during emit");
         Self { id, bytes }
     }
@@ -117,8 +117,8 @@ struct RustRepresentation {
     /// Field-id consts: raw id → `F_{NAME}` const name. Keyed by id and
     /// collision-suffixed at insert, so the const namespace stays injective.
     fields: BTreeMap<u16, String>,
-    /// Rust uses regex-automata's native serialized sparse-DFA format. Dynamic
-    /// backends render the compiler-owned portable DFA carried by the plan.
+    /// Rust uses regex-automata's native serialized sparse-DFA format compiled
+    /// from the same normalized semantics dynamic backends print.
     regexes: Vec<RegexStatic>,
 }
 
@@ -158,10 +158,7 @@ impl RustRepresentation {
             regexes: plan
                 .regexes()
                 .iter()
-                .map(|regex| {
-                    regex.automaton.validate();
-                    RegexStatic::compile(regex.id, &regex.pattern)
-                })
+                .map(|regex| RegexStatic::compile(regex.id, &regex.normalized))
                 .collect(),
         };
         for field in plan.fields() {
