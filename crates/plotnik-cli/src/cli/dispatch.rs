@@ -16,6 +16,7 @@ use super::limits::resolve_limit_spec;
 use crate::commands::ast::AstArgs;
 use crate::commands::check::CheckArgs;
 use crate::commands::dump::DumpArgs;
+use crate::commands::generate::GenerateArgs;
 use crate::commands::infer::InferArgs;
 use crate::commands::inspect::InspectArgs;
 use crate::commands::run::RunArgs;
@@ -184,6 +185,47 @@ impl From<InferOpts> for InferArgs {
             output: p.output,
             color: p.color.should_colorize(),
             void_type: p.void_type,
+        }
+    }
+}
+
+pub struct GenerateOpts {
+    pub query_path: Option<PathBuf>,
+    pub query_text: Option<String>,
+    pub lang: Option<String>,
+    pub grammar: Option<PathBuf>,
+    pub target: String,
+    pub output: Option<PathBuf>,
+    pub color: ColorChoice,
+}
+
+impl GenerateOpts {
+    pub fn from_matches(m: &ArgMatches) -> Self {
+        Self {
+            query_path: m.get_one::<PathBuf>("query_path").cloned(),
+            query_text: m.get_one::<String>("query_text").cloned(),
+            lang: m.get_one::<String>("lang").cloned(),
+            grammar: m.get_one::<PathBuf>("grammar").cloned(),
+            target: m
+                .get_one::<String>("target")
+                .cloned()
+                .expect("clap guarantees --target is present"),
+            output: m.get_one::<PathBuf>("output").cloned(),
+            color: ColorChoice::from_matches(m),
+        }
+    }
+}
+
+impl From<GenerateOpts> for GenerateArgs {
+    fn from(options: GenerateOpts) -> Self {
+        Self {
+            query_path: options.query_path,
+            query_text: options.query_text,
+            lang: options.lang,
+            grammar: options.grammar,
+            target: options.target,
+            output: options.output,
+            color: options.color.should_colorize(),
         }
     }
 }

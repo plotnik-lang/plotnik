@@ -1,7 +1,12 @@
 /// <reference lib="webworker" />
 import * as Comlink from "comlink";
 import init, { Session, ast, tokenize } from "@/lib/plotnik-wasm/plotnik_wasm";
-import type { PlotnikApi, SessionInfo, TokenSpan } from "./protocol";
+import type {
+  GeneratedCode,
+  PlotnikApi,
+  SessionInfo,
+  TokenSpan,
+} from "./protocol";
 
 /* The engine side of the playground: owns the wasm instance and the one
    compiled session. Deliberately a dumb pass-through — policy (debounce,
@@ -24,7 +29,10 @@ const api: PlotnikApi = {
       const next = Session.compile(query, lang);
       session?.free();
       session = next;
-      return { info: session.info() as SessionInfo };
+      return {
+        info: session.info() as SessionInfo,
+        generated: session.generate("rust") as GeneratedCode,
+      };
     } catch (error) {
       return { fatal: String(error) };
     }

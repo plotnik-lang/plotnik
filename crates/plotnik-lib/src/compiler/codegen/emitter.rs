@@ -277,6 +277,11 @@ impl<'a> Generator<'a> {
     }
 
     fn header(&self, out: &mut String) {
+        if let Some(identity) = &self.config.grammar_identity {
+            let _ = writeln!(out, "// Grammar name: {:?}", identity.name);
+            let _ = writeln!(out, "// Grammar SHA-256: {}", identity.sha256);
+            let _ = writeln!(out, "// Grammar source: {:?}", identity.source);
+        }
         splice(out, "", HEADER, &[("RT", &self.config.rt_crate)]);
     }
 
@@ -319,6 +324,24 @@ impl<'a> Generator<'a> {
     /// first run checks each one against the tree's live language.
     fn language_check(&self, out: &mut String) {
         out.push('\n');
+        if let Some(identity) = &self.config.grammar_identity {
+            let _ = writeln!(
+                out,
+                "const GRAMMAR_NAME: &str = {};",
+                rust_string(&identity.name)
+            );
+            let _ = writeln!(
+                out,
+                "const GRAMMAR_SHA256: &str = {};",
+                rust_string(&identity.sha256)
+            );
+            let _ = writeln!(
+                out,
+                "const GRAMMAR_SOURCE: &str = {};",
+                rust_string(&identity.source)
+            );
+            out.push('\n');
+        }
         out.push_str(
             "/// Node-kind ids baked into the candidate checks: `(id, name, is_named)`\n\
              /// as the generation-time grammar defines them.\n",
@@ -350,7 +373,12 @@ impl<'a> Generator<'a> {
             out.push_str("];\n");
         }
         out.push('\n');
-        splice(out, "", VERIFY_LANGUAGE, &[]);
+        let template = if self.config.grammar_identity.is_some() {
+            VERIFY_LANGUAGE_WITH_IDENTITY
+        } else {
+            VERIFY_LANGUAGE
+        };
+        splice(out, "", template, &[]);
     }
 
     fn field_consts(&self, out: &mut String) {
@@ -1083,6 +1111,49 @@ fn verify_language(tree: &rt::Tree) {
                  grammar where field {id} is {name:?}, but the tree's language \
                  says {found:?} — rebuild the module with the grammar of the parser \
                  that produced the tree",
+            );
+        }
+    }
+}
+"#;
+
+const VERIFY_LANGUAGE_WITH_IDENTITY: &str = r#"
+/// A parser built from any other grammar version could renumber the baked
+/// kind/field ids and silently mis-match, so mismatches panic: version skew
+/// between the generation-time grammar and the runtime parser is a build
+/// mistake, not a runtime condition to recover from.
+///
+/// Every `run` checks its own tree — the walk is a handful of id lookups,
+/// noise next to a match — so the guarantee holds per call, not per process:
+/// a process that mixes languages (or grammar versions of one language) must
+/// fail on the wrong tree, not only on the first one it ever saw.
+fn verify_language(tree: &rt::Tree) {
+    let language = tree.language();
+    for &(id, name, named) in EXPECTED_KINDS {
+        let found = language.node_kind_for_id(id);
+        if found != Some(name) || language.node_kind_is_named(id) != named {
+            panic!(
+                "grammar version skew: this query module was generated against {} \
+                 ({}, grammar.json SHA-256 {}) where node kind {id} is {name:?}, \
+                 but the tree's language says {found:?} — regenerate against the \
+                 grammar.json belonging to the parser that produced the tree",
+                GRAMMAR_NAME,
+                GRAMMAR_SOURCE,
+                GRAMMAR_SHA256,
+            );
+        }
+    }
+    for &(id, name) in EXPECTED_FIELDS {
+        let found = language.field_name_for_id(id);
+        if found != Some(name) {
+            panic!(
+                "grammar version skew: this query module was generated against {} \
+                 ({}, grammar.json SHA-256 {}) where field {id} is {name:?}, but \
+                 the tree's language says {found:?} — regenerate against the \
+                 grammar.json belonging to the parser that produced the tree",
+                GRAMMAR_NAME,
+                GRAMMAR_SOURCE,
+                GRAMMAR_SHA256,
             );
         }
     }

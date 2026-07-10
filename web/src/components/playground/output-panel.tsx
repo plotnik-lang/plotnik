@@ -1,8 +1,15 @@
 import { json } from "@codemirror/lang-json";
 import { javascript } from "@codemirror/lang-javascript";
-import { CircleAlertIcon, SearchXIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CircleAlertIcon,
+  CopyIcon,
+  SearchXIcon,
+} from "lucide-react";
+import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Empty,
   EmptyDescription,
@@ -13,7 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CodeEditor } from "./code-editor";
-import type { RunResult, SessionInfo } from "./protocol";
+import type { GeneratedCode, RunResult, SessionInfo } from "./protocol";
 
 /* Stable identities: CodeEditor reconfigures whenever the extensions array
    changes, so inline literals would re-init the language on every render. */
@@ -22,9 +29,71 @@ const DTS_EXTENSIONS = [javascript({ typescript: true })];
 
 interface OutputPanelProps {
   info: SessionInfo | null;
+  generated: GeneratedCode | null;
   runResult: RunResult | null;
   /** Query no longer compiles; the shown output is from the last good run. */
   stale: boolean;
+}
+
+function GeneratedBody({ generated }: { generated: GeneratedCode | null }) {
+  const [copied, setCopied] = useState(false);
+  if (!generated || generated.code === null) {
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyTitle>No generated module yet</EmptyTitle>
+          <EmptyDescription>
+            The compiled Rust matcher appears once the query is valid.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(generated.code ?? "");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex min-w-0 items-center gap-2 border-b bg-sidebar px-3 py-1.5">
+        <code
+          className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground"
+          title={`${generated.grammar.name} · ${generated.grammar.source} · SHA-256 ${generated.grammar.sha256}`}
+        >
+          {generated.grammar.name} · {generated.grammar.source} · sha256:
+          {generated.grammar.sha256.slice(0, 12)}
+        </code>
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          onClick={copy}
+          aria-live="polite"
+        >
+          {copied ? (
+            <CheckIcon data-icon="inline-start" />
+          ) : (
+            <CopyIcon data-icon="inline-start" />
+          )}
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1">
+        <CodeEditor
+          value={generated.code}
+          readOnly
+          aria-label="generated Rust matcher"
+        />
+      </div>
+    </div>
+  );
 }
 
 function OutputBody({
@@ -118,13 +187,19 @@ function TypesBody({ info }: { info: SessionInfo | null }) {
   );
 }
 
-export function OutputPanel({ info, runResult, stale }: OutputPanelProps) {
+export function OutputPanel({
+  info,
+  generated,
+  runResult,
+  stale,
+}: OutputPanelProps) {
   return (
     <Tabs defaultValue="output" className="flex h-full min-h-0 flex-col gap-0">
       <div className="flex items-center border-b bg-sidebar px-2 py-1.5">
         <TabsList>
           <TabsTrigger value="output">Output</TabsTrigger>
           <TabsTrigger value="types">Types</TabsTrigger>
+          <TabsTrigger value="generated">Generated</TabsTrigger>
         </TabsList>
       </div>
       <TabsContent value="output" className="min-h-0 flex-1">
@@ -132,6 +207,9 @@ export function OutputPanel({ info, runResult, stale }: OutputPanelProps) {
       </TabsContent>
       <TabsContent value="types" className="min-h-0 flex-1">
         <TypesBody info={info} />
+      </TabsContent>
+      <TabsContent value="generated" className="min-h-0 flex-1">
+        <GeneratedBody generated={generated} />
       </TabsContent>
     </Tabs>
   );

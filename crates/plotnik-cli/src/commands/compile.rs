@@ -5,6 +5,7 @@
 //! diagnostic rather than a panic on `Module::load`.
 
 use plotnik_lib::bytecode::Module;
+use plotnik_lib::grammar::Grammar;
 use plotnik_lib::{CompiledQuery, QueryBuilder, SourceMap};
 
 use crate::error::CliError;
@@ -20,9 +21,18 @@ pub fn compile_query(
     color: bool,
     inspection: bool,
 ) -> Result<CompiledQuery, CliError> {
+    compile_query_with_grammar(sources, lang.grammar(), color, inspection)
+}
+
+pub fn compile_query_with_grammar(
+    sources: SourceMap,
+    grammar: &Grammar,
+    color: bool,
+    inspection: bool,
+) -> Result<CompiledQuery, CliError> {
     let compiled = QueryBuilder::new(sources)
         .with_inspection(inspection)
-        .compile(lang.grammar())
+        .compile(grammar)
         .map_err(|e| CliError::fatal(e.to_string()))?;
 
     let diagnostics = compiled.diagnostics();

@@ -303,6 +303,7 @@ export default function Playground() {
             <ResizablePanel defaultSize="45%" minSize="15%">
               <OutputPanel
                 info={compiled?.info ?? null}
+                generated={compiled?.generated ?? null}
                 runResult={session.runResult}
                 stale={session.stale}
               />

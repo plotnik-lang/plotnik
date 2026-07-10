@@ -14,6 +14,9 @@ plotnik check -q 'Func = (function_declaration) @fn' -l typescript
 # Generate TypeScript types
 plotnik infer -q 'Func = (function_declaration) @fn' -l typescript
 
+# Generate a compiled Rust matcher module
+plotnik generate query.ptk --target rust -l typescript -o query.rs
+
 # List supported languages
 plotnik lang list
 
@@ -31,6 +34,7 @@ plotnik lang dump typescript
 | `check`       | query | Validate query                  | Optional (enables grammar validation) |
 | `ast`         | both  | Show AST of query and/or source | Shebang or extension                  |
 | `infer`       | query | Generate type definitions       | Required                              |
+| `generate`    | query | Generate a compiled matcher     | Required unless `--grammar` is used   |
 | `dump`        | query | Show bytecode                   | Optional (enables linking)            |
 | `trace`       | both  | Trace query execution           | Shebang or extension                  |
 | `inspect`     | both  | Emit playground inspection JSON | Shebang or extension                  |
@@ -158,6 +162,39 @@ plotnik infer -q 'Q = (identifier) @id' -l js --no-node-type --no-export
 | `--no-node-type`    | Don't emit Node/Point definitions             |
 | `--no-export`       | Don't add `export` keyword                    |
 | `--void-type TYPE`  | Type for void results (`undefined` or `null`) |
+
+### generate
+
+Generate a self-contained compiled matcher module. Rust is the first target;
+the generated file contains typed output types, `parse`/`matches` entrypoints,
+and the matcher that runs on `plotnik-rt`.
+
+```sh
+# Link against the bundled language registry
+plotnik generate query.ptk --target rust -l typescript -o query.rs
+
+# Link against the exact grammar shipped by the production parser package
+plotnik generate query.ptk --target rust \
+  --grammar node_modules/tree-sitter-typescript/typescript/src/grammar.json \
+  -o query.rs
+
+# Inline query to stdout
+plotnik generate -q 'Q = (program)' --target rust -l javascript
+```
+
+The output records the grammar name, SHA-256 of the exact `grammar.json` bytes,
+and its source. At runtime, the generated matcher verifies every kind and field
+id it uses against the tree's live language. If verification fails, regenerate
+with `--grammar` pointing at the parser package used in production.
+
+**Flags:**
+
+| Flag                     | Purpose                                              |
+| ------------------------ | ---------------------------------------------------- |
+| `--target rust`          | Generated-code target (currently Rust)               |
+| `-l, --lang LANG`        | Link against the bundled registry grammar            |
+| `--grammar GRAMMAR_JSON` | Bypass the registry and link against this exact file |
+| `-o, --output FILE`      | Write the generated module instead of stdout         |
 
 ### lang
 
@@ -356,7 +393,7 @@ already-bounded effect log.
 
 ## Input Modes
 
-### Query-Only Commands (check, dump, infer)
+### Query-Only Commands (check, dump, infer, generate)
 
 These commands take a single input. Use either:
 

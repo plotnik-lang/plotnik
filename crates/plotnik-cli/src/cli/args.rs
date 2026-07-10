@@ -122,6 +122,24 @@ pub fn output_file_arg() -> Arg {
         .help("Write output to file")
 }
 
+pub fn target_arg() -> Arg {
+    Arg::new("target")
+        .long("target")
+        .value_name("TARGET")
+        .value_parser(["rust"])
+        .required(true)
+        .help("Generated-code target (rust)")
+}
+
+pub fn grammar_arg() -> Arg {
+    Arg::new("grammar")
+        .long("grammar")
+        .value_name("GRAMMAR_JSON")
+        .value_parser(value_parser!(PathBuf))
+        .conflicts_with("lang")
+        .help("Link against this exact grammar.json instead of the registry")
+}
+
 pub fn compact_arg() -> Arg {
     Arg::new("compact")
         .long("compact")

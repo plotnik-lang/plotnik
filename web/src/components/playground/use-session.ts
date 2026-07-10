@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPlotnikClient, type PlotnikClient } from "./client";
-import type { AstResult, RunResult, SessionInfo } from "./protocol";
+import type {
+  AstResult,
+  GeneratedCode,
+  RunResult,
+  SessionInfo,
+} from "./protocol";
 
 /* The playground's orchestration layer — and the only module that talks to
    the worker client. It owns the worker lifetime and turns keystroke-level
@@ -30,6 +35,7 @@ export interface SessionInput {
 export interface CompileOutcome {
   query: string;
   info: SessionInfo;
+  generated: GeneratedCode;
 }
 
 /** A dump paired with the exact source it describes (same pairing rule). */
@@ -95,7 +101,7 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
         return;
       }
       setFatal(null);
-      setCompiled({ query, info: result.info });
+      setCompiled({ query, info: result.info, generated: result.generated });
     },
   );
 

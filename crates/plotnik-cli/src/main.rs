@@ -12,8 +12,8 @@ use std::process::ExitCode;
 use clap::ArgMatches;
 
 use cli::{
-    AstOpts, CheckOpts, DumpOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts, TraceOpts,
-    build_cli, route_default_subcommand,
+    AstOpts, CheckOpts, DumpOpts, GenerateOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts,
+    TraceOpts, build_cli, route_default_subcommand,
 };
 use error::CliResult;
 
@@ -51,6 +51,10 @@ fn dispatch(matches: &ArgMatches) -> CliResult {
         Some(("infer", m)) => {
             let params = InferOpts::from_matches(m);
             commands::infer::run(params.into())
+        }
+        Some(("generate", m)) => {
+            let params = GenerateOpts::from_matches(m);
+            commands::generate::run(params.into())
         }
         Some(("run", m)) => {
             let params = RunOpts::from_matches(m);

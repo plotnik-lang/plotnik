@@ -66,6 +66,10 @@ fn main() {
             env_key,
             out_path.display()
         );
+        println!(
+            "cargo::rustc-env=PLOTNIK_WASM_GRAMMAR_SOURCE_{}={}@{}",
+            env_key, package.name, package.version
+        );
         println!("cargo::rerun-if-changed={grammar_path}");
     }
 

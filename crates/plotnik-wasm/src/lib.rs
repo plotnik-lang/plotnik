@@ -24,8 +24,8 @@ mod wire;
 use langs::Lang;
 use plotnik_lib::bytecode::{Entrypoint, Module};
 use plotnik_lib::{
-    NoopTracer, QueryBuilder, RecordingTracer, RuntimeLimitSpec, TypeScriptConfig, VM, dump_tree,
-    tokenize as query_tokenize,
+    MatcherConfig, NoopTracer, QueryBuilder, RecordingTracer, RuntimeLimitSpec, TypeScriptConfig,
+    VM, dump_tree, tokenize as query_tokenize,
 };
 use serde_json::{Value as JsonValue, json};
 use wasm_bindgen::prelude::*;
@@ -40,6 +40,7 @@ pub struct Session {
     module: Option<Module>,
     entrypoints: Vec<String>,
     info: JsonValue,
+    generated_rust: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -62,6 +63,15 @@ impl Session {
             .to_typescript_mapped(TypeScriptConfig::new().colored(false))
             .unwrap_or_else(|| (String::new(), Vec::new()));
         let entrypoints = compiled.module().map(entrypoint_names).unwrap_or_default();
+        let identity = lang.identity();
+        let generated_rust = if compiled.module().is_some() {
+            let product = QueryBuilder::from_inline(query)
+                .compile(lang.grammar())
+                .map_err(|error| JsValue::from_str(&error.to_string()))?;
+            product.to_rust_matcher(MatcherConfig::new().grammar_identity(identity.clone()))
+        } else {
+            None
+        };
         let info = info_json(InfoParts {
             module: compiled.module(),
             tokens: json_value!(tokens),
@@ -78,11 +88,31 @@ impl Session {
             module,
             entrypoints,
             info,
+            generated_rust,
         })
     }
 
     pub fn info(&self) -> JsValue {
         to_js(&self.info)
+    }
+
+    /// Generate the production Rust matcher for this query. Ordinary query
+    /// diagnostics return `code: null`; the accompanying identity always says
+    /// which exact embedded grammar a successful module links against.
+    pub fn generate(&self, target: &str) -> Result<JsValue, JsValue> {
+        if target != "rust" {
+            return Err(JsValue::from_str("generation target must be 'rust'"));
+        }
+        let identity = self.lang.identity();
+        Ok(to_js(&json!({
+            "target": "rust",
+            "code": self.generated_rust,
+            "grammar": {
+                "name": identity.name(),
+                "sha256": identity.sha256(),
+                "source": identity.source(),
+            },
+        })))
     }
 
     /// Run the compiled query against source text.

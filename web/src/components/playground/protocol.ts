@@ -77,6 +77,17 @@ export interface SessionInfo {
   bytecode_size: number | null;
 }
 
+/** `Session::generate()` — production generated-code artifact. */
+export interface GeneratedCode {
+  target: "rust";
+  code: string | null;
+  grammar: {
+    name: string;
+    sha256: string;
+    source: string;
+  };
+}
+
 export interface RunStats {
   steps_used: number;
   heap_high_water: number;
@@ -128,7 +139,10 @@ export interface PlotnikApi {
   compile(
     query: string,
     lang: string,
-  ): Promise<{ info: SessionInfo; fatal?: undefined } | { fatal: string }>;
+  ): Promise<
+    | { info: SessionInfo; generated: GeneratedCode; fatal?: undefined }
+    | { fatal: string }
+  >;
   /** Run the current session against `source`. */
   run(source: string, entry?: string): Promise<RunResult>;
   /** Run with a bounded execution recording (the debugger's data source). */
