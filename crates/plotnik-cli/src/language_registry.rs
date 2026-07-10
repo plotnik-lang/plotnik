@@ -2,6 +2,7 @@ use std::io::Read;
 use std::sync::OnceLock;
 
 use flate2::read::GzDecoder;
+use plotnik_lib::GrammarIdentity;
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use tree_sitter::{Language, Parser, Tree};
 
@@ -66,8 +67,12 @@ impl Lang {
             .get_or_init(|| gunzip(self.raw_json_gz).expect("invalid embedded grammar gzip"))
     }
 
-    pub fn source(&self) -> &str {
-        self.source
+    pub fn identity(&self) -> GrammarIdentity {
+        GrammarIdentity::from_json_bytes(
+            self.grammar().name(),
+            self.grammar_json().as_bytes(),
+            self.source,
+        )
     }
 
     pub fn grammar(&self) -> &Grammar {

@@ -84,14 +84,6 @@ impl<'a> NfaDumper<'a> {
         }
     }
 
-    pub(crate) fn field_display_name(&self, id: NodeFieldId) -> String {
-        self.field_name(id)
-    }
-
-    pub(crate) fn kind_display_name(&self, id: NodeKindId) -> String {
-        self.kind_name(id)
-    }
-
     pub(crate) fn effect_display(&self, e: &EffectIR) -> String {
         self.effect(e)
     }

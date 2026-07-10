@@ -104,7 +104,8 @@ impl MatchPlan {
         self.checks.iter().any(CheckPlan::reads_node)
     }
 
-    pub(crate) fn needs_state_label(&self) -> bool {
+    /// Whether candidate setup can fail before this state's terminal flow.
+    pub(crate) fn can_fail_before_flow(&self) -> bool {
         self.navigates() || self.has_candidate_checks()
     }
 }
@@ -124,7 +125,8 @@ impl CallPlan {
         matches!(self.nav, Nav::Stay | Nav::StayExact)
     }
 
-    pub(crate) fn needs_state_label(&self) -> bool {
+    /// Whether navigation or field selection can fail before entering the call.
+    pub(crate) fn can_fail_before_flow(&self) -> bool {
         !self.stays_on_current_node() || self.field.is_some()
     }
 }
@@ -273,7 +275,7 @@ impl MatcherPlan {
             })
             .collect();
 
-        let mut builder = MatcherPlanBuilder::new(&dumper, layout, &ids);
+        let mut builder = MatcherPlanBuilder::new(&dumper, artifacts, layout, &ids);
         let states = sorted
             .into_iter()
             .enumerate()
@@ -332,6 +334,7 @@ impl MatcherPlan {
 
 struct MatcherPlanBuilder<'p, 'a> {
     dumper: &'p NfaDumper<'a>,
+    artifacts: AnalysisArtifacts<'a>,
     layout: &'p CaptureLayout,
     ids: &'p BTreeMap<Label, StateId>,
     expected_kinds: BTreeMap<u16, ExpectedKind>,
@@ -346,11 +349,13 @@ struct MatcherPlanBuilder<'p, 'a> {
 impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
     fn new(
         dumper: &'p NfaDumper<'a>,
+        artifacts: AnalysisArtifacts<'a>,
         layout: &'p CaptureLayout,
         ids: &'p BTreeMap<Label, StateId>,
     ) -> Self {
         Self {
             dumper,
+            artifacts,
             layout,
             ids,
             expected_kinds: BTreeMap::new(),
@@ -464,7 +469,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             NodeKindConstraint::Named(id) => (KindClass::Named, id),
             NodeKindConstraint::Anonymous(id) => (KindClass::Anonymous, id),
         };
-        let name = id.map(|id| self.dumper.kind_display_name(id));
+        let name = id.map(|id| self.kind_name(id));
         if let (Some(id), Some(name)) = (id, &name)
             && id != NodeKindId::ERROR
         {
@@ -488,7 +493,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
     fn record_field(&mut self, field: NodeFieldId) -> FieldPlan {
         let field = FieldPlan {
             id: u16::from(field),
-            name: self.dumper.field_display_name(field),
+            name: self.field_name(field),
         };
         if !self.expected_fields.contains_key(&field.id) {
             self.fields.push(field.clone());
@@ -501,6 +506,23 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             },
         );
         field
+    }
+
+    fn kind_name(&self, id: NodeKindId) -> String {
+        if id == NodeKindId::ERROR {
+            return "ERROR".to_string();
+        }
+        self.artifacts
+            .grammar
+            .kind_name(id, self.artifacts.interner)
+            .expect("linked query binds every referenced node kind")
+    }
+
+    fn field_name(&self, id: NodeFieldId) -> String {
+        self.artifacts
+            .grammar
+            .field_name(id, self.artifacts.interner)
+            .expect("linked query binds every referenced field")
     }
 
     fn predicate(&mut self, predicate: &PredicateIR) -> PredicatePlan {

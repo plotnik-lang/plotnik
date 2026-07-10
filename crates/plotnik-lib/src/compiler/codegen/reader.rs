@@ -322,7 +322,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
 
     /// Inherent `parse`/`matches` on a nominal (struct/enum) output type.
     fn parse_impl(&self, out: &mut String, def: &str, item: &ReplayItem) {
-        let sig = InherentParseSignature::for_item(&self.model, item);
+        let sig = InherentParseSignature::for_item(self.model, item);
         let reader = self.reader_fn(item.name);
         let safe = safe_entry_fn_name(def);
         let fallible_reader = item.fallible;
@@ -402,7 +402,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         {
             ("", "")
         } else {
-            let sig = InherentParseSignature::for_item(&self.model, item);
+            let sig = InherentParseSignature::for_item(self.model, item);
             (sig.impl_generics, sig.type_generics)
         };
         let _ = writeln!(
@@ -420,7 +420,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
     }
 
     fn parse_trait_impl(&self, out: &mut String, item: &ReplayItem) {
-        let sig = InherentParseSignature::for_item(&self.model, item);
+        let sig = InherentParseSignature::for_item(self.model, item);
         let impl_generics = if sig.impl_generics.is_empty() {
             "<'t>"
         } else {

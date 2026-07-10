@@ -506,7 +506,7 @@ impl<'a> Generator<'a> {
     fn match_arm(&self, out: &mut String, state: &StatePlan, plan: &MatchPlan) {
         let info = self.state(state.id);
 
-        if plan.needs_state_label() {
+        if plan.can_fail_before_flow() {
             let _ = writeln!(out, "        {} => 'state: {{", info.const_name);
         } else {
             let _ = writeln!(out, "        {} => {{", info.const_name);
@@ -693,7 +693,7 @@ impl<'a> Generator<'a> {
         let next = &self.state(plan.next).const_name;
         let stays_on_current_node = plan.stays_on_current_node();
 
-        if plan.needs_state_label() {
+        if plan.can_fail_before_flow() {
             let _ = writeln!(out, "        {state} => 'state: {{");
         } else {
             let _ = writeln!(out, "        {state} => {{");

@@ -65,11 +65,7 @@ pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
             loaded.shebang.lang.as_deref(),
             "generate",
         )?;
-        let identity = GrammarIdentity::from_json_bytes(
-            lang.raw().name.clone(),
-            lang.grammar_json().as_bytes(),
-            lang.source(),
-        );
+        let identity = lang.identity();
         let compiled = compile_query(loaded.sources, lang, args.color, false)
             .map_err(generate_compile_error)?;
         (compiled, identity)

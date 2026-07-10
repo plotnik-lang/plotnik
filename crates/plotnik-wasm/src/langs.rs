@@ -19,7 +19,6 @@ use tree_sitter::{Language, Parser, Tree};
 /// A language the bundle can run queries against: the tree-sitter parser
 /// plus the Plotnik grammar metadata queries compile against.
 pub struct Lang {
-    name: &'static str,
     grammar_json: &'static str,
     source: &'static str,
     ts_language: Language,
@@ -32,7 +31,11 @@ impl Lang {
     }
 
     pub fn identity(&self) -> GrammarIdentity {
-        GrammarIdentity::from_json_bytes(self.name, self.grammar_json.as_bytes(), self.source)
+        GrammarIdentity::from_json_bytes(
+            self.grammar.name(),
+            self.grammar_json.as_bytes(),
+            self.source,
+        )
     }
 
     pub fn parse_source(&self, source: &str) -> Tree {
@@ -72,7 +75,6 @@ macro_rules! define_langs {
             #[cfg(feature = $feature)]
             fn $fn_name() -> &'static Lang {
                 static LANGUAGE: std::sync::LazyLock<Lang> = std::sync::LazyLock::new(|| Lang {
-                    name: $name,
                     grammar_json: include_str!(env!(concat!("PLOTNIK_WASM_GRAMMAR_JSON_", $env_suffix))),
                     source: env!(concat!("PLOTNIK_WASM_GRAMMAR_SOURCE_", $env_suffix)),
                     ts_language: $ts_lang.into(),

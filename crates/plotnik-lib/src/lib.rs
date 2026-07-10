@@ -43,7 +43,7 @@ pub mod diagnostics {
 }
 
 pub use crate::compiler::codegen::{
-    Config as MatcherConfig, GrammarIdentity, entry_fn_name as matcher_entry_fn_name,
+    Config as MatcherConfig, entry_fn_name as matcher_entry_fn_name,
 };
 pub use crate::compiler::typegen::rust::Config as RustConfig;
 pub use crate::compiler::typegen::typescript::{
@@ -51,6 +51,7 @@ pub use crate::compiler::typegen::typescript::{
 };
 
 pub use crate::core::Colors;
+pub use crate::core::grammar::GrammarIdentity;
 
 pub use crate::compiler::{
     CheckedQuery, CompiledQuery, Query, QueryBuilder, Source, SourceId, SourceKind, SourceMap,

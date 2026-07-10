@@ -25,6 +25,6 @@ mod reader;
 #[cfg(test)]
 mod emitter_tests;
 
-pub use config::{Config, GrammarIdentity};
+pub use config::Config;
 pub use emitter::entry_fn_name;
 pub(crate) use emitter::generate;

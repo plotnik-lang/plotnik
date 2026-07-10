@@ -1,8 +1,9 @@
 use plotnik_rt::{Limit, Nav};
 
 use crate::compiler::QueryBuilder;
-use crate::compiler::codegen::{Config, GrammarIdentity};
+use crate::compiler::codegen::Config;
 use crate::compiler::test_utils::synthetic_grammar;
+use crate::core::grammar::GrammarIdentity;
 
 use crate::compiler::srcgen::names::{shouty_ident, snake_ident};
 
