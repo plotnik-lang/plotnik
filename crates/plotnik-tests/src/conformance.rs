@@ -148,7 +148,7 @@ pub fn collect_vm_fixtures() -> Result<Vec<Fixture>, String> {
     let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
     let directory = tests.join("06-vm");
     let mut paths = Vec::new();
-    collect_fixture_paths(&directory, &mut paths)?;
+    collect_files(&directory, "txt", &mut paths)?;
     paths.sort();
 
     let mut fixtures = Vec::with_capacity(paths.len());
@@ -498,18 +498,18 @@ impl LanguageData {
     }
 }
 
-fn collect_fixture_paths(directory: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
+fn collect_files(directory: &Path, extension: &str, out: &mut Vec<PathBuf>) -> Result<(), String> {
     let entries = fs::read_dir(directory)
-        .map_err(|error| format!("read fixture dir {}: {error}", directory.display()))?;
+        .map_err(|error| format!("read directory {}: {error}", directory.display()))?;
     for entry in entries {
-        let entry = entry
-            .map_err(|error| format!("read fixture entry in {}: {error}", directory.display()))?;
+        let entry =
+            entry.map_err(|error| format!("read entry in {}: {error}", directory.display()))?;
         let path = entry.path();
         if path.is_dir() {
-            collect_fixture_paths(&path, out)?;
+            collect_files(&path, extension, out)?;
             continue;
         }
-        if path.extension().and_then(|extension| extension.to_str()) == Some("txt") {
+        if path.extension().and_then(|value| value.to_str()) == Some(extension) {
             out.push(path);
         }
     }
@@ -604,39 +604,20 @@ fn collect_json_files(directory: &Path) -> Result<Vec<PathBuf>, String> {
         return Ok(Vec::new());
     }
     let mut files = Vec::new();
-    collect_json_files_below(directory, directory, &mut files)?;
-    files.sort();
-    Ok(files)
-}
-
-fn collect_json_files_below(
-    directory: &Path,
-    root: &Path,
-    out: &mut Vec<PathBuf>,
-) -> Result<(), String> {
-    let entries = fs::read_dir(directory)
-        .map_err(|error| format!("read corpus dir {}: {error}", directory.display()))?;
-    for entry in entries {
-        let entry = entry
-            .map_err(|error| format!("read corpus entry in {}: {error}", directory.display()))?;
-        let path = entry.path();
-        if path.is_dir() {
-            collect_json_files_below(&path, root, out)?;
-            continue;
-        }
-        if path.extension().and_then(|extension| extension.to_str()) != Some("json") {
-            continue;
-        }
-        let relative = path.strip_prefix(root).map_err(|error| {
+    collect_files(directory, "json", &mut files)?;
+    let mut relative_files = Vec::with_capacity(files.len());
+    for path in files {
+        let relative = path.strip_prefix(directory).map_err(|error| {
             format!(
                 "corpus file {} is not below {}: {error}",
                 path.display(),
-                root.display()
+                directory.display()
             )
         })?;
-        out.push(relative.to_path_buf());
+        relative_files.push(relative.to_path_buf());
     }
-    Ok(())
+    relative_files.sort();
+    Ok(relative_files)
 }
 
 #[cfg(test)]
