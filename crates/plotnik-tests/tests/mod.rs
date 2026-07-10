@@ -10,7 +10,7 @@
 //! `INPUT (ts)` picks TypeScript, `INPUT (dart)` dart, plain `INPUT` JavaScript
 //! (see `Lang::resolve`). Authors may dash the rule loosely (`--- INPUT (ts) ---`);
 //! `make shot` normalizes it. For a 06-vm fixture the body is the source the VM
-//! runs; for a compile-only stage (04-emit, 05-typegen) only the grammar matters,
+//! runs; for a compile-only emission fixture only the grammar matters,
 //! so the body is left empty — the rule is a pure grammar selector. The stage
 //! directory selects which artifacts render:
 //!
@@ -18,12 +18,13 @@
 //! | ------------ | ---------------------------------------------------------------------------- |
 //! | `02-parser`  | cst, ast                                                                     |
 //! | `03-analyze` | symbols                                                                      |
-//! | `04-emit`    | nfa, bytecode                                                                |
-//! | `05-typegen` | typescript, rust (serde impls under a `serde/` folder)                      |
+//! | `04-emit/bytecode` | nfa, bytecode                                                         |
+//! | `04-emit/types` | typescript, rust types (serde impls under a `serde/` folder)             |
+//! | `04-emit/rust/module` | generated Rust matcher module                                      |
 //! | `06-vm`      | typescript, output, inspection if enabled, bytecode, trace (requires input) |
 //!
 //! Compile-stage fixtures under an `inspection/` folder compile with
-//! `QueryBuilder::with_inspection(true)`.
+//! `BytecodeConfig::inspection(BytecodeInspection::Spans)`.
 //!
 //! The `DIAGNOSTICS` section renders whenever the query produces warnings or errors.
 //! Errors are terminal for the compile stages (bytecode/typescript/rust/trace/output
@@ -55,10 +56,11 @@ use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    Colors, CompiledQuery, DtsRange, MatcherConfig, PrintTracer, QueryBuilder, RecordingTracer,
-    RuntimeError, RustConfig, SourceMap, SourcePath, TypeScriptConfig, VM, Verbosity,
-    extract_inspection, materialize_verified,
+    BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, DtsRange, PrintTracer, QueryBuilder,
+    RecordingTracer, RuntimeError, RustCodegenConfig, SourceMap, SourcePath,
+    TypeScriptCodegenConfig, VM, Verbosity, extract_inspection, materialize_verified,
 };
+use plotnik_tests::fixture::parse_section_header;
 
 mod support;
 
@@ -157,7 +159,7 @@ fn run_fixture(fx: &Fixture) -> Result<(), Failed> {
 fn check(fx: &Fixture) -> Result<(), String> {
     let raw =
         fs::read_to_string(&fx.path).map_err(|e| format!("read {}: {e}", fx.path.display()))?;
-    let parsed = parse_fixture(&raw, &fx.stage)?;
+    let parsed = parse_fixture(&raw, &fx.stage, &fx.name)?;
     let generated = render(&fx.stage, &fx.name, &parsed.query, parsed.input.as_ref())?;
     if generated.is_empty() {
         return Err(format!("stage `{}` produced no sections", fx.stage));
@@ -182,7 +184,7 @@ fn shot_enabled() -> bool {
     matches!(std::env::var("SHOT").as_deref(), Ok("1") | Ok("true"))
 }
 
-fn parse_fixture(raw: &str, stage: &str) -> Result<Parsed, String> {
+fn parse_fixture(raw: &str, stage: &str, name: &str) -> Result<Parsed, String> {
     let normalized = raw.replace("\r\n", "\n");
     let mut query_lines: Vec<&str> = Vec::new();
     let mut sections: Vec<(String, Vec<&str>)> = Vec::new();
@@ -228,13 +230,17 @@ fn parse_fixture(raw: &str, stage: &str) -> Result<Parsed, String> {
         _ => (None, 0),
     };
 
-    validate_generated_headers(stage, &sections[generated_start..])?;
+    validate_generated_headers(stage, name, &sections[generated_start..])?;
 
     Ok(Parsed { query, input })
 }
 
-fn validate_generated_headers(stage: &str, sections: &[(String, Vec<&str>)]) -> Result<(), String> {
-    let legal = generated_section_order(stage)
+fn validate_generated_headers(
+    stage: &str,
+    name: &str,
+    sections: &[(String, Vec<&str>)],
+) -> Result<(), String> {
+    let legal = generated_section_order(stage, name)
         .ok_or_else(|| format!("unknown stage directory `{stage}`"))?;
     let mut cursor = 0;
 
@@ -253,13 +259,13 @@ fn validate_generated_headers(stage: &str, sections: &[(String, Vec<&str>)]) -> 
     Ok(())
 }
 
-fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
+fn generated_section_order(stage: &str, name: &str) -> Option<&'static [&'static str]> {
     match stage.split('-').next().unwrap_or("") {
         "02" => Some(&["diagnostics", "cst", "ast"]),
         "03" => Some(&["diagnostics", "symbols"]),
-        "04" => Some(&["diagnostics", "nfa", "bytecode"]),
-        "05" => Some(&["diagnostics", "typescript", "rust", "mapped"]),
-        "07" => Some(&["diagnostics", "matcher"]),
+        "04" if name.contains("/bytecode/") => Some(&["diagnostics", "nfa", "bytecode"]),
+        "04" if name.contains("/types/") => Some(&["diagnostics", "typescript", "rust", "mapped"]),
+        "04" if name.contains("/rust/module/") => Some(&["diagnostics", "matcher"]),
         "06" => Some(&[
             "typescript",
             "diagnostics",
@@ -271,59 +277,6 @@ fn generated_section_order(stage: &str) -> Option<&'static [&'static str]> {
         ]),
         _ => None,
     }
-}
-
-/// Only fixture section rules become boundaries. Stage-order validation then
-/// rejects rules that look generated but appear in the wrong place. A rule is a
-/// label centered in dashes — `-------- DIAGNOSTICS --------`; the `INPUT` rule
-/// carries its grammar in parens, `INPUT (ts)`.
-fn parse_section_header(line: &str) -> Option<String> {
-    let label = rule_label(line)?;
-    let name = match label.split_once('(') {
-        Some((head, ext)) if head.trim().eq_ignore_ascii_case("input") => {
-            format!("input.{}", ext.strip_suffix(')')?.trim())
-        }
-        Some(_) => return None,
-        None => label.to_ascii_lowercase(),
-    };
-    let known = name == "input"
-        || name.starts_with("input.")
-        || matches!(
-            name.as_str(),
-            "cst"
-                | "ast"
-                | "symbols"
-                | "nfa"
-                | "bytecode"
-                | "mapped"
-                | "typescript"
-                | "rust"
-                | "matcher"
-                | "trace"
-                | "output"
-                | "inspection"
-                | "recording"
-                | "diagnostics"
-        );
-    known.then_some(name)
-}
-
-/// The label inside a `----- LABEL -----` rule, or `None` when the line isn't a
-/// rule. A rule sits at column zero and pads its label with a space on each side
-/// (` LABEL `), exactly as `section_rule` emits it; requiring that padding keeps
-/// authored query/input bytes — a negated field `-types-`, an indented source
-/// line — from being read as a section boundary.
-fn rule_label(line: &str) -> Option<&str> {
-    let line = line.trim_end();
-    if !line.starts_with('-') || !line.ends_with('-') {
-        return None;
-    }
-    let label = line
-        .trim_matches('-')
-        .strip_prefix(' ')?
-        .strip_suffix(' ')?
-        .trim();
-    (!label.is_empty()).then_some(label)
 }
 
 fn render(
@@ -342,10 +295,14 @@ fn render(
             },
         )),
         "03" => Ok(render_frontend(query, Front::Analyze)),
-        "04" => render_compile(name, query, input, Compile::Bytecode),
-        "05" => render_compile(name, query, input, Compile::Typegen),
+        "04" if name.contains("/bytecode/") => {
+            render_compile(name, query, input, Compile::Bytecode)
+        }
+        "04" if name.contains("/types/") => render_compile(name, query, input, Compile::Typegen),
+        "04" if name.contains("/rust/module/") => {
+            render_compile(name, query, input, Compile::Matcher)
+        }
         "06" => render_compile(name, query, input, Compile::Vm),
-        "07" => render_compile(name, query, input, Compile::Matcher),
         _ => Err(format!("unknown stage directory `{stage}`")),
     }
 }
@@ -404,7 +361,6 @@ fn render_compile(
     let inspects = name.contains("/inspection/");
     let strict_lints = name.contains("/lints/");
     let compiled = QueryBuilder::new(source_map(query))
-        .with_inspection(inspects || records)
         .with_strict_lints(strict_lints)
         .compile(lang.grammar)
         .expect("query parsing should not exhaust fuel");
@@ -425,13 +381,19 @@ fn render_compile(
         )
     });
 
-    let module = compiled
-        .module()
-        .expect("valid query should compile to a module");
-
     match kind {
         Compile::Bytecode => {
+            let emission = emit_bytecode(&compiled, inspects || records);
+            let module = emission
+                .artifact()
+                .expect("valid query should emit a bytecode module");
             out.extend(diag);
+            if emission.diagnostics().has_warnings() {
+                out.push((
+                    "diagnostics".into(),
+                    emission.diagnostics().render(compiled.source_map()),
+                ));
+            }
             let nfa = compiled
                 .dump_nfa(Colors::new(false))
                 .expect("valid query should compile to a module");
@@ -442,15 +404,21 @@ fn render_compile(
             out.extend(diag);
             let typescript = render_typescript(&compiled);
             out.push(("typescript".into(), typescript.clone()));
-            let rust_config = RustConfig::new().serde(name.contains("/serde/"));
+            let rust_config = RustCodegenConfig::new().serde(name.contains("/serde/"));
             let rust = compiled
-                .to_rust(rust_config)
-                .expect("valid query should compile to a module");
+                .emit_types(rust_config)
+                .expect("Rust type emission answers")
+                .into_artifact()
+                .expect("valid query emits Rust types")
+                .into_source();
             out.push(("rust".into(), rust));
             if name.contains("/mapped/") {
                 let (mapped_types, ranges) = compiled
-                    .to_typescript_mapped(typegen_config())
-                    .expect("valid query should compile to a module");
+                    .emit_types(typescript_config())
+                    .expect("TypeScript emission answers")
+                    .into_artifact()
+                    .expect("valid query emits TypeScript types")
+                    .into_parts();
                 assert_eq!(
                     typescript, mapped_types,
                     "mapped d.ts must match normal d.ts"
@@ -461,13 +429,20 @@ fn render_compile(
         Compile::Matcher => {
             out.extend(diag);
             let matcher = compiled
-                .to_rust_matcher(MatcherConfig::new())
-                .expect("valid query should compile to a module");
+                .emit(RustCodegenConfig::new())
+                .expect("Rust module emission answers")
+                .into_artifact()
+                .expect("valid query emits a Rust module")
+                .into_source();
             out.push(("matcher".into(), matcher));
         }
         Compile::Vm => {
+            let emission = emit_bytecode(&compiled, inspects || records);
+            let module = emission
+                .artifact()
+                .expect("valid query should emit a bytecode module");
             let input = input.ok_or_else(|| {
-                "06-vm fixtures require an `INPUT` section; compile-only fixtures belong in 04-emit/05-typegen".to_string()
+                "06-vm fixtures require an `INPUT` section; compile-only fixtures belong in 04-emit".to_string()
             })?;
             let entry = module
                 .entrypoint_names()
@@ -477,6 +452,12 @@ fn render_compile(
             let run = run_vm(&lang, module, &entry, &input.text, inspects, records)?;
             out.push(("typescript".into(), render_typescript(&compiled)));
             out.extend(diag);
+            if emission.diagnostics().has_warnings() {
+                out.push((
+                    "diagnostics".into(),
+                    emission.diagnostics().render(compiled.source_map()),
+                ));
+            }
             out.push(("output".into(), run.output));
             if let Some(inspection) = run.inspection {
                 out.push(("inspection".into(), inspection));
@@ -495,12 +476,25 @@ fn render_compile(
 
 fn render_typescript(compiled: &CompiledQuery) -> String {
     compiled
-        .to_typescript(typegen_config())
-        .expect("valid query should compile to a module")
+        .emit_types(typescript_config())
+        .expect("TypeScript emission answers")
+        .into_artifact()
+        .expect("valid query emits TypeScript types")
+        .into_parts()
+        .0
 }
 
-fn typegen_config() -> TypeScriptConfig {
-    TypeScriptConfig::new().emit_node_interface(false)
+fn typescript_config() -> TypeScriptCodegenConfig {
+    TypeScriptCodegenConfig::new().emit_node_interface(false)
+}
+
+fn emit_bytecode(compiled: &CompiledQuery, inspection: bool) -> plotnik_lib::Emission<Module> {
+    let config = if inspection {
+        BytecodeConfig::new().inspection(BytecodeInspection::Spans)
+    } else {
+        BytecodeConfig::new()
+    };
+    compiled.emit(config).expect("bytecode emission answers")
 }
 
 fn render_mapped(dts: &str, ranges: &[DtsRange]) -> String {
@@ -732,7 +726,7 @@ fn section_rule(name: &str) -> String {
         None => name.to_ascii_uppercase(),
     };
     // At least one dash each side so an over-wide label still round-trips through
-    // `rule_label`; width degrades gracefully past 50 columns.
+    // the fixture parser; width degrades gracefully past 50 columns.
     let fill = WIDTH.saturating_sub(label.len() + 2);
     let half = fill / 2;
     let left = half.max(1);

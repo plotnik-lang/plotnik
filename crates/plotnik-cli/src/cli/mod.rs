@@ -13,7 +13,8 @@ mod shebang_tests;
 
 pub use commands::build_cli;
 pub use dispatch::{
-    AstOpts, CheckOpts, DumpOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts, TraceOpts,
+    AstOpts, CheckOpts, DumpOpts, GenerateOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts,
+    TraceOpts,
 };
 
 /// Bare default subcommand: `plotnik query.ptk …` routes to `run`.

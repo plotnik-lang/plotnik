@@ -6,5 +6,5 @@ error: backreferences are not supported in regex
 1 | Q = (identifier =~ /(.)\1/)
   |                        ^^
   |
-help: the regex engine is linear-time and cannot match backreferences; rewrite without `\1`
+help: the portable regex subset excludes backreferences; rewrite without `\1`
 -------------------- SYMBOLS ---------------------

@@ -12,21 +12,24 @@ autobenches = false
 [lints]
 workspace = true
 
-[dev-dependencies]
-plotnik = { path = "../plotnik", features = ["serde"] }
+[dependencies]
 plotnik-lib = { workspace = true }
 plotnik-rt = { workspace = true, features = ["tree-sitter", "serde"] }
 arborium-dart = "2.18.0"
 arborium-javascript = "2.18.0"
 arborium-typescript = "2.18.0"
 cargo_metadata = "=0.23.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "=1.0.150"
+tree-sitter = "=0.26.10"
+
+[dev-dependencies]
+plotnik = { path = "../plotnik", features = ["serde"] }
 criterion = "=0.8.2"
 indoc = "=2.0.7"
 libtest-mimic = "=0.8.2"
 proptest = "=1.11.0"
-serde_json = "=1.0.150"
 similar = "=3.1.1"
-tree-sitter = "=0.26.10"
 # Vanilla (non-arborium) grammar crates: the macro's grammar resolution must
 # work against any package shipping a grammar.json, these two prove it —
 # typescript also pins the multi-grammar (`pkg/sub`) selection.

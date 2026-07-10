@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
+use plotnik_lib::GrammarIdentity;
 use plotnik_lib::grammar::Grammar;
 use plotnik_lib::grammar::raw::RawGrammar;
 
@@ -122,8 +123,14 @@ pub fn load(spec: &GrammarSpec<'_>, base_dir: Option<&Path>) -> Result<LoadedGra
 
     let raw = RawGrammar::from_json(&resolved.json)
         .map_err(|error| format!("invalid grammar `{}`: {error}", resolved.path.display()))?;
+    let identity = GrammarIdentity::from_json_bytes(
+        raw.name.clone(),
+        resolved.json.as_bytes(),
+        resolved.path.display().to_string(),
+    );
     let grammar = Grammar::from_raw(&raw)
-        .map_err(|error| format!("invalid grammar `{}`: {error}", resolved.path.display()))?;
+        .map_err(|error| format!("invalid grammar `{}`: {error}", resolved.path.display()))?
+        .with_identity(identity);
     let grammar = Arc::new(grammar);
     cache
         .lock()

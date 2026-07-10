@@ -5,14 +5,21 @@ use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::grammar::link;
 use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
+use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
 use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate_ast};
 use crate::compiler::analyze::types::check_entrypoints;
 use crate::compiler::analyze::types::type_check::{self, Arity, TypeAnalysis};
-use crate::compiler::emit::tables::EmitError;
+use crate::compiler::emit::targets::bytecode::tables::EmitError;
+use crate::compiler::emit::{
+    BytecodeConfig, CodegenProvenance, Emission, EmitTarget, RustCodegenConfig, RustModuleOutput,
+    RustTypesOutput, TypeScriptCodegenConfig, TypeScriptTypesOutput,
+};
 use crate::compiler::limits::CompilerLimits;
+use crate::compiler::lower::ir::SemanticNfa;
+use crate::compiler::lower::semantic_verify;
 use crate::compiler::lower::spans::assign_spans;
-use crate::compiler::lower::{LowerInput, lower_semantic, lower_to_nfa};
+use crate::compiler::lower::{LowerInput, lower_semantic, pack_lowered};
 use crate::compiler::parse::{Parser, Root, SyntaxNode, lex};
 use crate::core::grammar::Grammar;
 use crate::core::{Colors, Interner};
@@ -27,7 +34,6 @@ pub(crate) type AstMap = IndexMap<SourceId, Root>;
 pub struct QueryBuilder {
     source_map: SourceMap,
     limits: CompilerLimits,
-    inspection: bool,
     strict_lints: bool,
 }
 
@@ -36,7 +42,6 @@ impl QueryBuilder {
         Self {
             source_map,
             limits: CompilerLimits::default(),
-            inspection: false,
             strict_lints: false,
         }
     }
@@ -78,12 +83,6 @@ impl QueryBuilder {
         self
     }
 
-    /// Compile with inspection spans for playground/debugger joins. Default off.
-    pub fn with_inspection(mut self, enabled: bool) -> Self {
-        self.inspection = enabled;
-        self
-    }
-
     /// Enable stricter advisory lints that are too noisy for normal compilation.
     pub fn with_strict_lints(mut self, enabled: bool) -> Self {
         self.strict_lints = enabled;
@@ -94,12 +93,8 @@ impl QueryBuilder {
         self.parse()?.analyze()
     }
 
-    pub fn check(self, grammar: &Grammar) -> crate::compiler::QueryResult<CheckedQuery> {
-        Ok(self.link(grammar)?.check())
-    }
-
     pub fn compile(self, grammar: &Grammar) -> crate::compiler::QueryResult<CompiledQuery> {
-        Ok(self.link(grammar)?.compile_module())
+        self.link(grammar)?.compile()
     }
 
     pub(crate) fn link(self, grammar: &Grammar) -> crate::compiler::QueryResult<LinkOutcome> {
@@ -129,7 +124,6 @@ impl QueryBuilder {
             diag,
             ast_map: ast,
             limits: self.limits,
-            inspection: self.inspection,
             strict_lints: self.strict_lints,
         })
     }
@@ -141,7 +135,6 @@ pub(crate) struct QueryParsed {
     ast_map: AstMap,
     diag: Diagnostics,
     limits: CompilerLimits,
-    inspection: bool,
     strict_lints: bool,
 }
 
@@ -209,10 +202,6 @@ impl QueryParsed {
 
     pub(crate) fn ast_map(&self) -> &AstMap {
         &self.ast_map
-    }
-
-    pub(crate) fn inspection(&self) -> bool {
-        self.inspection
     }
 
     pub(crate) fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
@@ -333,10 +322,11 @@ impl Query {
     pub(crate) fn link(self, grammar: &Grammar) -> LinkOutcome {
         let mut analyzed = match self.into_analyzed() {
             Ok(analyzed) => analyzed,
-            Err(query) => return LinkOutcome::Invalid(query),
+            Err(query) => return LinkOutcome::Invalid(Box::new(query)),
         };
 
         let mut output = GrammarBindingBuilder::new();
+        output.identity(grammar.identity().cloned());
         link::GrammarLinkInput {
             interner: &mut analyzed.analysis.interner,
             grammar,
@@ -350,13 +340,13 @@ impl Query {
         .link(&mut output, &mut analyzed.parsed.diag);
 
         if analyzed.parsed.diag.has_errors() {
-            return LinkOutcome::Invalid(analyzed.into_query());
+            return LinkOutcome::Invalid(Box::new(analyzed.into_query()));
         }
 
-        LinkOutcome::Linked(LinkedQuery {
+        LinkOutcome::Linked(Box::new(LinkedQuery {
             analyzed,
             grammar: output.finish(),
-        })
+        }))
     }
 }
 
@@ -403,8 +393,8 @@ impl TryFrom<&str> for Query {
 }
 
 pub(crate) enum LinkOutcome {
-    Linked(LinkedQuery),
-    Invalid(Query),
+    Linked(Box<LinkedQuery>),
+    Invalid(Box<Query>),
 }
 
 pub(crate) struct LinkedQuery {
@@ -412,22 +402,170 @@ pub(crate) struct LinkedQuery {
     grammar: GrammarBinding,
 }
 
-pub struct CheckedQuery {
-    query: LinkOutcome,
+pub struct CompiledQuery {
+    linked: LinkOutcome,
+    semantic_nfa: Option<SemanticNfa>,
     diagnostics: Diagnostics,
 }
 
-impl CheckedQuery {
-    fn new(query: LinkOutcome, diagnostics: Diagnostics) -> Self {
-        Self { query, diagnostics }
+impl CompiledQuery {
+    pub fn is_valid(&self) -> bool {
+        self.semantic_nfa.is_some() && !self.diagnostics.has_errors()
     }
 
-    pub fn is_valid(&self) -> bool {
-        !self.diagnostics.has_errors()
+    pub fn emit<T: EmitTarget>(
+        &self,
+        target: T,
+    ) -> crate::compiler::QueryResult<Emission<T::Output>> {
+        target.emit(self)
+    }
+
+    pub fn emit_types<T: crate::compiler::emit::CodegenTarget>(
+        &self,
+        target: T,
+    ) -> crate::compiler::QueryResult<Emission<T::TypesOutput>> {
+        target.emit_types(self)
+    }
+
+    pub(crate) fn emit_bytecode(
+        &self,
+        config: &BytecodeConfig,
+    ) -> crate::compiler::QueryResult<Emission<Module>> {
+        if !self.is_valid() {
+            return Ok(Emission::invalid_query());
+        }
+        let linked = self
+            .linked
+            .linked()
+            .expect("valid compiled query is linked");
+        let input = LowerInput {
+            analysis: linked.analysis_input(),
+            symbol_table: linked.symbol_table(),
+            inspection: config.inspection_enabled(),
+        };
+        let mut diagnostics = Diagnostics::new();
+        if config.inspection_enabled() {
+            self.linked
+                .report_inspection_span_degradation_for(&input, &mut diagnostics);
+        }
+        let lowered = if config.inspection_enabled() {
+            pack_lowered(lower_semantic(&input), &input)
+        } else {
+            pack_lowered(
+                self.semantic_nfa
+                    .as_ref()
+                    .expect("valid query retains semantic NFA")
+                    .clone(),
+                &input,
+            )
+        };
+        let bytes =
+            match crate::compiler::emit::targets::bytecode::emit(linked.analysis_input(), &lowered)
+            {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    if error.is_target_limit() {
+                        self.linked.report_target_error(&mut diagnostics, error);
+                        return Ok(Emission::failure(diagnostics));
+                    }
+                    return Err(crate::compiler::Error::CompilerInvariantViolation(
+                        error.to_string(),
+                    ));
+                }
+            };
+        let module = Module::load(&bytes).map_err(|error| {
+            crate::compiler::Error::CompilerInvariantViolation(format!(
+                "bytecode target emitted a module rejected by its loader: {error}"
+            ))
+        })?;
+        Ok(Emission::success(module, diagnostics))
+    }
+
+    pub(crate) fn emit_rust_types(
+        &self,
+        config: &RustCodegenConfig,
+    ) -> crate::compiler::QueryResult<Emission<RustTypesOutput>> {
+        if !self.is_valid() {
+            return Ok(Emission::invalid_query());
+        }
+        let linked = self
+            .linked
+            .linked()
+            .expect("valid compiled query is linked");
+        let source = crate::compiler::emit::targets::rust::emit_types(
+            linked.type_analysis(),
+            linked.dependency_analysis(),
+            linked.interner(),
+            &config.rust_types_config(),
+        );
+        Ok(Emission::success(
+            RustTypesOutput::new(source),
+            Diagnostics::new(),
+        ))
+    }
+
+    pub(crate) fn emit_rust_module(
+        &self,
+        config: &RustCodegenConfig,
+    ) -> crate::compiler::QueryResult<Emission<RustModuleOutput>> {
+        if !self.is_valid() {
+            return Ok(Emission::invalid_query());
+        }
+        let linked = self
+            .linked
+            .linked()
+            .expect("valid compiled query is linked");
+        let mut matcher = config.matcher_config();
+        if config.provenance_mode() == CodegenProvenance::Full {
+            let identity = linked.grammar().identity().cloned().ok_or_else(|| {
+                crate::compiler::emit::EmitConfigError::new(
+                    "full provenance requested, but the linked grammar has no artifact identity",
+                )
+            })?;
+            matcher = matcher.grammar_identity(identity);
+        }
+        let plan = linked.codegen_plan(
+            self.semantic_nfa
+                .as_ref()
+                .expect("valid query retains semantic NFA"),
+        );
+        let source = crate::compiler::emit::targets::rust::generate(&plan, &matcher);
+        Ok(Emission::success(
+            RustModuleOutput::new(source),
+            Diagnostics::new(),
+        ))
+    }
+
+    pub(crate) fn emit_typescript_types(
+        &self,
+        config: &TypeScriptCodegenConfig,
+    ) -> crate::compiler::QueryResult<Emission<TypeScriptTypesOutput>> {
+        if !self.is_valid() {
+            return Ok(Emission::invalid_query());
+        }
+        let linked = self
+            .linked
+            .linked()
+            .expect("valid compiled query is linked");
+        let schema = OutputSchema::from_artifacts(linked.analysis_input())
+            .expect("target-neutral compilation validated the output schema");
+        let legacy = config.legacy_config();
+        let (source, mappings) = if config.colored_output() {
+            (
+                crate::compiler::emit::targets::typescript::emit_schema(&schema, legacy),
+                Vec::new(),
+            )
+        } else {
+            crate::compiler::emit::targets::typescript::emit_schema_mapped(&schema, legacy)
+        };
+        Ok(Emission::success(
+            TypeScriptTypesOutput::new(source, mappings),
+            Diagnostics::new(),
+        ))
     }
 
     pub fn source_map(&self) -> &SourceMap {
-        self.query.source_map()
+        self.linked.source_map()
     }
 
     pub fn diagnostics(&self) -> &Diagnostics {
@@ -435,110 +573,34 @@ impl CheckedQuery {
     }
 
     pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
-        self.query.definition_names()
-    }
-}
-
-pub struct CompiledQuery {
-    checked: CheckedQuery,
-    compiled: Option<CompiledArtifact>,
-}
-
-struct CompiledArtifact {
-    bytecode: Vec<u8>,
-    module: Module,
-}
-
-impl CompiledQuery {
-    fn failed(query: LinkOutcome, diagnostics: Diagnostics) -> Self {
-        Self {
-            checked: CheckedQuery::new(query, diagnostics),
-            compiled: None,
-        }
-    }
-
-    pub fn is_valid(&self) -> bool {
-        self.compiled.is_some() && self.checked.is_valid()
-    }
-
-    pub fn source_map(&self) -> &SourceMap {
-        self.checked.source_map()
-    }
-
-    pub fn diagnostics(&self) -> &Diagnostics {
-        self.checked.diagnostics()
-    }
-
-    pub fn definition_names(&self) -> impl Iterator<Item = String> + '_ {
-        self.checked.definition_names()
+        self.linked.definition_names()
     }
 
     pub fn entrypoint_names(&self) -> impl Iterator<Item = String> + '_ {
-        self.module()
-            .into_iter()
-            .flat_map(|module| module.entrypoint_names().map(str::to_string))
-    }
-
-    pub fn bytecode(&self) -> Option<&[u8]> {
-        self.compiled
-            .as_ref()
-            .map(|compiled| compiled.bytecode.as_slice())
-    }
-
-    pub fn module(&self) -> Option<&Module> {
-        self.compiled.as_ref().map(|compiled| &compiled.module)
-    }
-
-    pub fn into_module(self) -> Option<Module> {
-        self.compiled.map(|compiled| compiled.module)
-    }
-
-    pub fn to_typescript(
-        &self,
-        config: crate::compiler::typegen::typescript::Config,
-    ) -> Option<String> {
-        self.module()
-            .map(|module| crate::compiler::typegen::typescript::emit(module, config))
-    }
-
-    pub fn to_typescript_mapped(
-        &self,
-        config: crate::compiler::typegen::typescript::Config,
-    ) -> Option<(String, Vec<crate::compiler::typegen::typescript::DtsRange>)> {
-        self.module()
-            .map(|module| crate::compiler::typegen::typescript::emit_mapped(module, config))
-    }
-
-    /// Render Rust output types for the query's definitions (the proc-macro
-    /// backend's typegen). `None` when the query didn't compile, mirroring
-    /// [`Self::module`].
-    pub fn to_rust(&self, config: crate::compiler::typegen::rust::Config) -> Option<String> {
-        self.compiled.as_ref()?;
-        let linked = self.checked.query.linked()?;
-        Some(crate::compiler::typegen::rust::emit(
-            linked.type_analysis(),
-            linked.dependency_analysis(),
-            linked.interner(),
-            &config,
-        ))
+        self.linked.linked().into_iter().flat_map(|linked| {
+            linked
+                .type_analysis()
+                .iter_entrypoint_output()
+                .map(|(definition, _)| {
+                    linked
+                        .interner()
+                        .resolve(linked.dependency_analysis().def_name_sym(definition))
+                        .to_string()
+                })
+        })
     }
 
     /// Render the optimized pre-pack NFA — the IR every backend consumes — in
     /// the bytecode dump format (label space, with definition provenance).
     /// `None` when the query didn't compile, mirroring [`Self::module`].
     pub fn dump_nfa(&self, colors: Colors) -> Option<String> {
-        self.compiled.as_ref()?;
-        let linked = self.checked.query.linked()?;
-        Some(linked.dump_nfa(colors))
-    }
-
-    /// Render the generated Rust matcher — the compiled-code executor the
-    /// proc-macro backend embeds. `None` when the query didn't compile,
-    /// mirroring [`Self::module`].
-    pub fn to_rust_matcher(&self, config: crate::compiler::codegen::Config) -> Option<String> {
-        self.compiled.as_ref()?;
-        let linked = self.checked.query.linked()?;
-        Some(linked.to_rust_matcher(&config))
+        let semantic = self.semantic_nfa.as_ref()?;
+        let linked = self.linked.linked()?;
+        Some(crate::compiler::lower::dump::dump_nfa(
+            semantic,
+            linked.analysis_input(),
+            colors,
+        ))
     }
 }
 
@@ -576,116 +638,65 @@ impl LinkOutcome {
         self.expect_linked().grammar()
     }
 
-    pub(crate) fn check(self) -> CheckedQuery {
-        let diagnostics = self.dry_run();
-        CheckedQuery::new(self, diagnostics)
+    #[cfg(test)]
+    pub(in crate::compiler) fn emit_bytecode_for_test(&self) -> Result<Vec<u8>, EmitError> {
+        let linked = self
+            .linked()
+            .expect("test bytecode emission requires a linked query");
+        let input = LowerInput {
+            analysis: linked.analysis_input(),
+            symbol_table: linked.symbol_table(),
+            inspection: false,
+        };
+        let lowered = pack_lowered(lower_semantic(&input), &input);
+        crate::compiler::emit::targets::bytecode::emit(linked.analysis_input(), &lowered)
     }
 
-    pub(crate) fn compile_module(self) -> CompiledQuery {
-        let mut diagnostics = self.dry_run();
-
+    pub(crate) fn compile(self) -> crate::compiler::QueryResult<CompiledQuery> {
+        let mut diagnostics = self.diagnostics().clone();
+        let Some(linked) = self.linked() else {
+            return Ok(CompiledQuery {
+                linked: self,
+                semantic_nfa: None,
+                diagnostics,
+            });
+        };
         if diagnostics.has_errors() {
-            return CompiledQuery::failed(self, diagnostics);
+            return Ok(CompiledQuery {
+                linked: self,
+                semantic_nfa: None,
+                diagnostics,
+            });
         }
 
-        self.report_inspection_span_degradation(&mut diagnostics);
-
-        let bytes = match self.emit() {
-            Ok(bytes) => bytes,
-            Err(err) => {
-                if let Some((source, range)) = self.fallback_span() {
-                    diagnostics
-                        .report(DiagnosticKind::EmitFailed, Span::new(source, range))
-                        .detail(err.to_string())
-                        .emit();
-                }
-
-                return CompiledQuery::failed(self, diagnostics);
+        let schema = match OutputSchema::from_artifacts(linked.analysis_input()) {
+            Ok(schema) => schema,
+            Err(error) => {
+                self.report_shared_limit_error(&mut diagnostics, error.to_string());
+                return Ok(CompiledQuery {
+                    linked: self,
+                    semantic_nfa: None,
+                    diagnostics,
+                });
             }
         };
-
-        let module = match Module::load(&bytes) {
-            Ok(loaded) => loaded,
-            Err(err) => {
-                if let Some((source, range)) = self.fallback_span() {
-                    diagnostics
-                        .report(DiagnosticKind::BytecodeRejected, Span::new(source, range))
-                        .detail(err.to_string())
-                        .emit();
-                }
-
-                return CompiledQuery::failed(self, diagnostics);
-            }
+        let input = LowerInput {
+            analysis: linked.analysis_input(),
+            symbol_table: linked.symbol_table(),
+            inspection: false,
         };
-
-        CompiledQuery {
-            checked: CheckedQuery::new(self, diagnostics),
-            compiled: Some(CompiledArtifact {
-                bytecode: bytes,
-                module,
-            }),
+        let semantic_nfa = lower_semantic(&input);
+        if let Err(error) = semantic_verify::verify(&semantic_nfa, &schema) {
+            debug_assert!(false, "semantic NFA verification failed: {error}");
+            return Err(crate::compiler::Error::CompilerInvariantViolation(
+                error.to_string(),
+            ));
         }
-    }
-
-    /// Emit bytecode. Returns `Err(EmitError::InvalidQuery)` if the query has errors.
-    pub(in crate::compiler) fn emit(&self) -> Result<Vec<u8>, EmitError> {
-        match self {
-            LinkOutcome::Linked(query) => query.emit(),
-            LinkOutcome::Invalid(_) => Err(EmitError::InvalidQuery),
-        }
-    }
-
-    /// Emit without the emitter's debug load self-check.
-    ///
-    /// `dry_run` loads the bytecode itself so malformed output is reported
-    /// as a diagnostic instead of reaching the debug self-check panic.
-    fn emit_unchecked(&self) -> Result<Vec<u8>, EmitError> {
-        match self {
-            LinkOutcome::Linked(query) => query.emit_unchecked(),
-            LinkOutcome::Invalid(_) => Err(EmitError::InvalidQuery),
-        }
-    }
-
-    /// Full-pipeline dry run for `check`: emit bytecode and load it, reporting any
-    /// failure as a diagnostic instead of panicking. Returns the analyze/link
-    /// diagnostics plus any emit/load failure; the caller inspects `has_errors()`.
-    ///
-    /// Loads the bytecode itself, so it never reaches the emitter's debug
-    /// self-check panic in debug or release.
-    pub(crate) fn dry_run(&self) -> Diagnostics {
-        let Some(query) = self.linked() else {
-            return self.diagnostics().clone();
-        };
-
-        let mut diag = query.diagnostics().clone();
-        if diag.has_errors() {
-            return diag;
-        }
-
-        let bytes = match self.emit_unchecked() {
-            Ok(bytes) => bytes,
-            Err(err) => {
-                if let Some((source, range)) = self.fallback_span() {
-                    diag.report(DiagnosticKind::EmitFailed, Span::new(source, range))
-                        .detail(err.to_string())
-                        .emit();
-                }
-                return diag;
-            }
-        };
-
-        match crate::bytecode::Module::load(&bytes) {
-            Ok(_) => {}
-            Err(err) => {
-                if let Some((source, range)) = self.fallback_span() {
-                    diag.report(DiagnosticKind::BytecodeRejected, Span::new(source, range))
-                        .detail(err.to_string())
-                        .emit();
-                }
-            }
-        }
-
-        diag
+        Ok(CompiledQuery {
+            linked: self,
+            semantic_nfa: Some(semantic_nfa),
+            diagnostics,
+        })
     }
 
     fn linked(&self) -> Option<&LinkedQuery> {
@@ -711,34 +722,22 @@ impl LinkOutcome {
     /// A coarse fallback span for emit/load failures, none of which carry a
     /// source mapping. Points at the whole first source; the diagnostic's detail
     /// carries the specifics. `None` when the query has no sources at all, so the
-    /// dry run is total even on an empty source map.
+    /// operation remains total even on an empty source map.
     fn fallback_span(&self) -> Option<(SourceId, TextRange)> {
         let source = self.source_map().iter().next()?;
         let len = u32::try_from(source.content.len()).unwrap_or(u32::MAX);
         Some((source.id, TextRange::up_to(len.into())))
     }
 
-    fn report_inspection_span_degradation(&self, diagnostics: &mut Diagnostics) {
-        let Some(query) = self.linked() else {
-            return;
-        };
-        if !query.analyzed.parsed.inspection() {
-            return;
-        }
-
-        // Recomputes the same deterministic assignment lowering will build —
-        // deliberately: threading it into `LowerInput` would couple the
-        // diagnostics stage to lowering internals to save one cheap pre-walk
-        // on the inspection-only path.
-        let assignment = assign_spans(&LowerInput {
-            analysis: query.analysis_input(),
-            symbol_table: query.symbol_table(),
-            inspection: true,
-        });
+    fn report_inspection_span_degradation_for(
+        &self,
+        input: &LowerInput<'_>,
+        diagnostics: &mut Diagnostics,
+    ) {
+        let assignment = assign_spans(input);
         if assignment.dropped_tiers.is_empty() {
             return;
         }
-
         let (source, range) = assignment
             .first_dropped
             .expect("dropped span tier must have a first construct");
@@ -752,6 +751,27 @@ impl LinkOutcome {
                 dropped_tier_names(&assignment.dropped_tiers)
             ))
             .emit();
+    }
+
+    fn report_target_error(&self, diagnostics: &mut Diagnostics, error: EmitError) {
+        if let Some((source, range)) = self.fallback_span() {
+            diagnostics
+                .report(
+                    DiagnosticKind::TargetLimitExceeded,
+                    Span::new(source, range),
+                )
+                .detail(error.to_string())
+                .emit();
+        }
+    }
+
+    fn report_shared_limit_error(&self, diagnostics: &mut Diagnostics, error: String) {
+        if let Some((source, range)) = self.fallback_span() {
+            diagnostics
+                .report(DiagnosticKind::QueryTooComplex, Span::new(source, range))
+                .detail(error)
+                .emit();
+        }
     }
 }
 
@@ -803,38 +823,8 @@ impl LinkedQuery {
         &self.grammar
     }
 
-    fn emit(&self) -> Result<Vec<u8>, EmitError> {
-        let nfa = self.compile();
-        crate::compiler::emit::emit(self.analysis_input(), &nfa)
-    }
-
-    fn emit_unchecked(&self) -> Result<Vec<u8>, EmitError> {
-        let nfa = self.compile();
-        crate::compiler::emit::emit_unchecked(self.analysis_input(), &nfa)
-    }
-
-    fn compile(&self) -> crate::compiler::lower::ir::LoweredNfa {
-        lower_to_nfa(self.lower_input())
-    }
-
-    fn dump_nfa(&self, colors: Colors) -> String {
-        let input = self.lower_input();
-        let semantic = lower_semantic(&input);
-        crate::compiler::lower::dump::dump_nfa(&semantic, input.analysis, colors)
-    }
-
-    fn to_rust_matcher(&self, config: &crate::compiler::codegen::Config) -> String {
-        let input = self.lower_input();
-        let semantic = lower_semantic(&input);
-        crate::compiler::codegen::generate(&semantic, input.analysis, config)
-    }
-
-    fn lower_input(&self) -> LowerInput<'_> {
-        LowerInput {
-            analysis: self.analysis_input(),
-            symbol_table: self.symbol_table(),
-            inspection: self.analyzed.parsed.inspection(),
-        }
+    fn codegen_plan(&self, semantic: &SemanticNfa) -> crate::compiler::emit::CodegenPlan<'_> {
+        crate::compiler::emit::CodegenPlan::build(semantic.raw(), self.analysis_input())
     }
 
     fn analysis_input(&self) -> AnalysisArtifacts<'_> {

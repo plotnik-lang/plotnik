@@ -12,19 +12,34 @@
 //! 3. a `define_langs!` row below
 //! 4. the playground selector: `web/src/components/playground/Playground.tsx`
 
+use plotnik_lib::GrammarIdentity;
 use plotnik_lib::grammar::Grammar;
+use std::sync::OnceLock;
 use tree_sitter::{Language, Parser, Tree};
 
 /// A language the bundle can run queries against: the tree-sitter parser
 /// plus the Plotnik grammar metadata queries compile against.
 pub struct Lang {
+    grammar_json: &'static str,
+    source: &'static str,
     ts_language: Language,
     grammar: Grammar,
+    identity: OnceLock<GrammarIdentity>,
 }
 
 impl Lang {
     pub fn grammar(&self) -> &Grammar {
         &self.grammar
+    }
+
+    pub fn identity(&self) -> &GrammarIdentity {
+        self.identity.get_or_init(|| {
+            GrammarIdentity::from_json_bytes(
+                self.grammar.name(),
+                self.grammar_json.as_bytes(),
+                self.source,
+            )
+        })
     }
 
     pub fn parse_source(&self, source: &str) -> Tree {
@@ -39,13 +54,18 @@ impl Lang {
 /// build.rs embeds each enabled grammar's compacted `grammar.json`
 /// (uncompressed — the served bundle is compressed as a whole).
 #[cfg(any(feature = "lang-javascript", feature = "lang-typescript"))]
-fn load_grammar(json: &str, name: &str) -> Grammar {
+fn load_grammar(json: &str, name: &str, source: &str) -> Grammar {
     use plotnik_lib::grammar::raw::RawGrammar;
 
     let raw = RawGrammar::from_json(json)
         .unwrap_or_else(|error| panic!("invalid embedded {name} grammar JSON: {error}"));
     Grammar::from_raw(&raw)
         .unwrap_or_else(|error| panic!("invalid embedded {name} grammar metadata: {error}"))
+        .with_identity(GrammarIdentity::from_json_bytes(
+            name,
+            json.as_bytes(),
+            source,
+        ))
 }
 
 macro_rules! define_langs {
@@ -64,11 +84,15 @@ macro_rules! define_langs {
             #[cfg(feature = $feature)]
             fn $fn_name() -> &'static Lang {
                 static LANGUAGE: std::sync::LazyLock<Lang> = std::sync::LazyLock::new(|| Lang {
+                    grammar_json: include_str!(env!(concat!("PLOTNIK_WASM_GRAMMAR_JSON_", $env_suffix))),
+                    source: env!(concat!("PLOTNIK_WASM_GRAMMAR_SOURCE_", $env_suffix)),
                     ts_language: $ts_lang.into(),
                     grammar: load_grammar(
                         include_str!(env!(concat!("PLOTNIK_WASM_GRAMMAR_JSON_", $env_suffix))),
                         $name,
+                        env!(concat!("PLOTNIK_WASM_GRAMMAR_SOURCE_", $env_suffix)),
                     ),
+                    identity: std::sync::OnceLock::new(),
                 });
                 &LANGUAGE
             }

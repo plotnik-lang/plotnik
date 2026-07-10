@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPlotnikClient, type PlotnikClient } from "./client";
-import type { AstResult, RunResult, SessionInfo } from "./protocol";
+import type {
+  AstResult,
+  GeneratedCode,
+  RunResult,
+  SessionInfo,
+} from "./protocol";
 
 /* The playground's orchestration layer — and the only module that talks to
    the worker client. It owns the worker lifetime and turns keystroke-level
@@ -23,6 +28,8 @@ export interface SessionInput {
       A pick absent from the compiled query falls back, and comes back when
       the entrypoint reappears. */
   entry: string | null;
+  /** Generated-code tab is visible and may request its lazy artifact. */
+  generatedOpen: boolean;
 }
 
 /** A compile result paired with the exact text it describes: every offset in
@@ -43,10 +50,12 @@ export interface PlaygroundSession {
   ready: boolean;
   /** A compile is scheduled or in flight. */
   compiling: boolean;
-  /** Pathological compile failure; ordinary errors are `info.diagnostics`. */
+  /** Pathological compiler failure; ordinary errors are `info.diagnostics`. */
   fatal: string | null;
   /** Last good compile (kept through fatal ones). */
   compiled: CompileOutcome | null;
+  generated: GeneratedCode | null;
+  generating: boolean;
   entrypoints: string[];
   /** Effective entrypoint after fallback; feed it back into the selector. */
   entry: string | null;
@@ -60,12 +69,13 @@ const COMPILE_DEBOUNCE_MS = 250;
 const RUN_DEBOUNCE_MS = 150;
 
 export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
-  const { query, source, lang, entry } = input;
+  const { query, source, lang, entry, generatedOpen } = input;
 
   const clientRef = useRef<PlotnikClient | null>(null);
   const [ready, setReady] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
   const [compiled, setCompiled] = useState<CompileOutcome | null>(null);
+  const [generated, setGenerated] = useState<GeneratedCode | null>(null);
   const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [ast, setAst] = useState<AstSnapshot | null>(null);
 
@@ -95,6 +105,7 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
         return;
       }
       setFatal(null);
+      setGenerated(null);
       setCompiled({ query, info: result.info });
     },
   );
@@ -105,6 +116,21 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
       ? entry
       : (entrypoints[entrypoints.length - 1] ?? null);
   const hasModule = compiled !== null && compiled.info.bytecode_size !== null;
+
+  const generating = useDebouncedTask(
+    ready && generatedOpen && hasModule && generated === null,
+    0,
+    [compiled, generatedOpen],
+    async (stillCurrent) => {
+      const result = await clientRef.current?.generate();
+      if (!result || !stillCurrent()) return;
+      if ("fatal" in result) {
+        setFatal(result.fatal);
+        return;
+      }
+      setGenerated(result);
+    },
+  );
 
   useDebouncedTask(
     ready && hasModule,
@@ -134,6 +160,8 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
     compiling,
     fatal,
     compiled,
+    generated,
+    generating,
     entrypoints,
     entry: effectiveEntry,
     runResult,

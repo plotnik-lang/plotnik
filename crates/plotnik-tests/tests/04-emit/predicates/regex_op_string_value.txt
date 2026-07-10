@@ -1,7 +1,0 @@
-Q = (identifier =~ "foo") @id
------------------- DIAGNOSTICS -------------------
-error: predicate operand out of range at step 8
- --> query.ptk:1:1
-  |
-1 | Q = (identifier =~ "foo") @id
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

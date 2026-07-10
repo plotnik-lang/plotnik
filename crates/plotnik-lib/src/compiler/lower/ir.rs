@@ -85,6 +85,10 @@ impl EffectIR {
         self.kind
     }
 
+    pub(crate) fn argument(&self) -> &EffectArg {
+        &self.payload
+    }
+
     /// Create a literal effect without member reference.
     pub fn literal(kind: EffectKind, payload: usize) -> Self {
         Self {

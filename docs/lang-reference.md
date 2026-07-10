@@ -437,7 +437,7 @@ Filter nodes by their text content with inline predicates:
 | `=~`     | matches regex  |
 | `!~`     | does not match |
 
-**Regex patterns** use `/pattern/` syntax. Full Unicode is supported. Patterns match anywhere in the text (use `^` and `$` anchors for full-match semantics).
+**Regex patterns** use `/pattern/` syntax. Full Unicode is supported. Patterns match anywhere in the text (use `^` and `$` anchors for full-match semantics). `\b` and `\B` use ASCII word characters on every target. Case-insensitive mode (`(?i)`) is expanded at generation time against Plotnik's pinned Unicode tables rather than delegated to the host regex engine.
 
 ```
 (identifier =~ /^test_/)      ; starts with "test_"
@@ -450,6 +450,8 @@ Filter nodes by their text content with inline predicates:
 - Backreferences (`\1`, `\2`)
 - Lookahead/lookbehind (`(?=...)`, `(?!...)`, `(?<=...)`, `(?<!...)`)
 - Named captures (`(?P<name>...)`)
+- Multiline and CRLF modes (`(?m)`, `(?R)`, including scoped forms)
+- Word-boundary variants (`\<`, `\>`, `\b{start}`, `\b{end}`, and half-boundary forms)
 
 Predicates don't affect output types — they're structural constraints like anchors.
 

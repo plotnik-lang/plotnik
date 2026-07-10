@@ -2,6 +2,7 @@ use std::io::Read;
 use std::sync::OnceLock;
 
 use flate2::read::GzDecoder;
+use plotnik_lib::GrammarIdentity;
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use tree_sitter::{Language, Parser, Tree};
 
@@ -13,6 +14,8 @@ pub struct Lang {
     extensions: &'static [&'static str],
     ts_language: Language,
     raw_json_gz: &'static [u8],
+    source: &'static str,
+    raw_json: OnceLock<String>,
     raw: OnceLock<RawGrammar>,
     grammar: OnceLock<Grammar>,
 }
@@ -25,6 +28,7 @@ impl Lang {
         extensions: &'static [&'static str],
         ts_language: Language,
         raw_json_gz: &'static [u8],
+        source: &'static str,
     ) -> Self {
         Self {
             name,
@@ -32,6 +36,8 @@ impl Lang {
             extensions,
             ts_language,
             raw_json_gz,
+            source,
+            raw_json: OnceLock::new(),
             raw: OnceLock::new(),
             grammar: OnceLock::new(),
         }
@@ -52,14 +58,24 @@ impl Lang {
 
     pub fn raw(&self) -> &RawGrammar {
         self.raw.get_or_init(|| {
-            let json = gunzip(self.raw_json_gz).expect("invalid embedded grammar gzip");
-            RawGrammar::from_json(&json).expect("invalid embedded grammar JSON")
+            RawGrammar::from_json(self.grammar_json()).expect("invalid embedded grammar JSON")
         })
+    }
+
+    pub fn grammar_json(&self) -> &str {
+        self.raw_json
+            .get_or_init(|| gunzip(self.raw_json_gz).expect("invalid embedded grammar gzip"))
     }
 
     pub fn grammar(&self) -> &Grammar {
         self.grammar.get_or_init(|| {
-            Grammar::from_raw(self.raw()).expect("invalid embedded grammar metadata")
+            let grammar = Grammar::from_raw(self.raw()).expect("invalid embedded grammar metadata");
+            let identity = GrammarIdentity::from_json_bytes(
+                grammar.name(),
+                self.grammar_json().as_bytes(),
+                self.source,
+            );
+            grammar.with_identity(identity)
         })
     }
 
@@ -108,6 +124,7 @@ macro_rules! define_langs {
                             &[$($ext),*],
                             $ts_lang.into(),
                             include_bytes!(env!(concat!("PLOTNIK_GRAMMAR_JSON_GZ_", $env_suffix))),
+                            env!(concat!("PLOTNIK_GRAMMAR_SOURCE_", $env_suffix)),
                         )
                     });
 

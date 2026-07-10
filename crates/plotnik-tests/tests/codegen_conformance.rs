@@ -29,10 +29,11 @@ use std::sync::LazyLock;
 use plotnik_lib::bytecode::{Module, TypeDefKind, TypeKind};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    Colors, MatcherConfig, QueryBuilder, RuntimeError, SourceMap, SourcePath, VM,
-    matcher_entry_fn_name, materialize_verified,
+    BytecodeConfig, Colors, QueryBuilder, RuntimeError, RustCodegenConfig, SourceMap, SourcePath,
+    VM, matcher_entry_fn_name, materialize_verified,
 };
-use plotnik_rt::{Limit, RuntimeEffect, RuntimeLimitSpec};
+use plotnik_rt::{Limit, RuntimeLimitSpec};
+use plotnik_tests::conformance::{Fixture, collect_vm_fixtures, render_effect};
 use tree_sitter::{Language as TsLanguage, Parser as TsParser};
 
 #[path = "../test_support/grammar_loader.rs"]
@@ -40,13 +41,12 @@ mod grammar_loader;
 
 #[test]
 fn generated_matchers_replay_vm_traces() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
-    let fixtures = collect_fixtures(&root.join("06-vm"), &root);
+    let fixtures = collect_vm_fixtures().expect("discover 06-vm fixtures");
 
     let mut program = String::from(PRELUDE);
     let mut runs = Vec::new();
     let mut skipped = Vec::new();
-    for fx in &fixtures {
+    for fx in fixtures.iter().filter(|fixture| fixture.excluded.is_none()) {
         match conformance_mod(fx) {
             Some(text) => {
                 program.push('\n');
@@ -121,13 +121,18 @@ fn conformance_mod(fx: &Fixture) -> Option<String> {
         return None;
     }
     let module = compiled
-        .module()
+        .emit(BytecodeConfig::new())
+        .expect("bytecode emission answers")
+        .into_artifact()
         .expect("a query without errors compiles to a module");
     let entry = module.entrypoint_names().last()?.to_string();
-    let expected = vm_expected(&lang, module, &entry, &fx.input, &fx.name);
+    let expected = vm_expected(&lang, &module, &entry, &fx.input, &fx.name);
     let matcher = compiled
-        .to_rust_matcher(MatcherConfig::new().serde(true))
-        .expect("a query without errors compiles to a matcher");
+        .emit(RustCodegenConfig::new().serde(true))
+        .expect("Rust emission answers")
+        .into_artifact()
+        .expect("a query without errors compiles to a matcher")
+        .into_source();
 
     let mut out = String::new();
     let w = &mut out;
@@ -177,7 +182,7 @@ fn conformance_mod(fx: &Fixture) -> Option<String> {
         matcher_entry_fn_name(&entry),
     )
     .expect("writing to a String is infallible");
-    value_channel(w, module, &entry);
+    value_channel(w, &module, &entry);
     w.push_str("    }\n}\n");
     Some(out)
 }
@@ -309,11 +314,14 @@ fn limit_trip_mod() -> String {
         "limit-trip query must compile"
     );
     let matcher = compiled
-        .to_rust_matcher(MatcherConfig::new().limits(RuntimeLimitSpec {
+        .emit(RustCodegenConfig::new().limits(RuntimeLimitSpec {
             steps: Limit::Of(1),
             memory: Limit::Auto,
         }))
-        .expect("limit-trip query compiles to a matcher");
+        .expect("Rust emission answers")
+        .into_artifact()
+        .expect("limit-trip query compiles to a matcher")
+        .into_source();
 
     let mut out = String::new();
     let w = &mut out;
@@ -353,11 +361,14 @@ fn unbounded_mod() -> String {
         "unbounded query must compile"
     );
     let matcher = compiled
-        .to_rust_matcher(MatcherConfig::new().limits(RuntimeLimitSpec {
+        .emit(RustCodegenConfig::new().limits(RuntimeLimitSpec {
             steps: Limit::Unbounded,
             memory: Limit::Unbounded,
         }))
-        .expect("unbounded query compiles to a matcher");
+        .expect("Rust emission answers")
+        .into_artifact()
+        .expect("unbounded query compiles to a matcher")
+        .into_source();
     assert!(
         !matcher.contains("run::<true,"),
         "unbounded policy must not instantiate a metered `run`:\n{matcher}"
@@ -405,11 +416,14 @@ fn steps_only_mod() -> String {
         "steps-only query must compile"
     );
     let matcher = compiled
-        .to_rust_matcher(MatcherConfig::new().limits(RuntimeLimitSpec {
+        .emit(RustCodegenConfig::new().limits(RuntimeLimitSpec {
             steps: Limit::Of(1),
             memory: Limit::Unbounded,
         }))
-        .expect("steps-only query compiles to a matcher");
+        .expect("Rust emission answers")
+        .into_artifact()
+        .expect("steps-only query compiles to a matcher")
+        .into_source();
     assert!(
         matcher.contains("run::<true, false,"),
         "steps-bounded, memory-unbounded must meter steps only:\n{matcher}"
@@ -435,31 +449,6 @@ fn steps_only_mod() -> String {
     w.push_str("        assert_eq!(err, plotnik_rt::LimitExceeded::Steps(1));\n");
     w.push_str("    }\n}\n");
     out
-}
-
-/// Renders one effect for comparison. Nodes are identified by kind + byte
-/// range — the strongest identity that survives serialization into the
-/// generated program (tree-sitter node ids are process-local addresses).
-/// Must stay in step with its twin inside [`PRELUDE`]: the two copies render
-/// the two executors' streams, so any drift fails every fixture loudly.
-fn render_effect(effect: &RuntimeEffect<'_>) -> String {
-    match effect {
-        RuntimeEffect::Node(n) => {
-            format!("Node {} {}..{}", n.kind_id(), n.start_byte(), n.end_byte())
-        }
-        RuntimeEffect::ArrayOpen => "ArrayOpen".into(),
-        RuntimeEffect::Push => "Push".into(),
-        RuntimeEffect::ArrayClose => "ArrayClose".into(),
-        RuntimeEffect::StructOpen => "StructOpen".into(),
-        RuntimeEffect::Set(i) => format!("Set {i}"),
-        RuntimeEffect::StructClose => "StructClose".into(),
-        RuntimeEffect::EnumOpen(i) => format!("EnumOpen {i}"),
-        RuntimeEffect::EnumClose => "EnumClose".into(),
-        RuntimeEffect::Null => "Null".into(),
-        RuntimeEffect::SpanStart { .. } | RuntimeEffect::SpanEnd(_) => {
-            unreachable!("conformance queries compile without inspection")
-        }
-    }
 }
 
 const PRELUDE: &str = r#"//! Conformance program generated by `codegen_conformance.rs` — do not edit.
@@ -489,26 +478,8 @@ fn parse(lang: Lang, source: &str) -> rt::Tree {
     parser.parse(source, None).expect("parse fixture input")
 }
 
-// Twin of `render_effect` in `codegen_conformance.rs`; the harness renders
-// the VM oracle's stream with that copy, so any drift fails loudly.
 fn render_effect(effect: &rt::RuntimeEffect<'_>) -> String {
-    match effect {
-        rt::RuntimeEffect::Node(n) => {
-            format!("Node {} {}..{}", n.kind_id(), n.start_byte(), n.end_byte())
-        }
-        rt::RuntimeEffect::ArrayOpen => "ArrayOpen".into(),
-        rt::RuntimeEffect::Push => "Push".into(),
-        rt::RuntimeEffect::ArrayClose => "ArrayClose".into(),
-        rt::RuntimeEffect::StructOpen => "StructOpen".into(),
-        rt::RuntimeEffect::Set(i) => format!("Set {i}"),
-        rt::RuntimeEffect::StructClose => "StructClose".into(),
-        rt::RuntimeEffect::EnumOpen(i) => format!("EnumOpen {i}"),
-        rt::RuntimeEffect::EnumClose => "EnumClose".into(),
-        rt::RuntimeEffect::Null => "Null".into(),
-        rt::RuntimeEffect::SpanStart { .. } | rt::RuntimeEffect::SpanEnd(_) => {
-            unreachable!("conformance queries compile without inspection")
-        }
-    }
+    plotnik_tests::conformance::render_effect(effect)
 }
 
 fn check(name: &str, got: Option<rt::EffectLog<'_>>, expected: Option<&[&str]>) {
@@ -557,123 +528,6 @@ fn outcome(matched: bool) -> &'static str {
     if matched { "match" } else { "no match" }
 }
 "#;
-
-struct Fixture {
-    /// Path relative to `tests/`, extension stripped: `06-vm/captures/...`.
-    name: String,
-    query: String,
-    input: String,
-    ext: Option<String>,
-}
-
-fn collect_fixtures(dir: &Path, root: &Path) -> Vec<Fixture> {
-    let mut out = Vec::new();
-    walk(dir, root, &mut out);
-    out.sort_by(|a, b| a.name.cmp(&b.name));
-    out
-}
-
-fn walk(dir: &Path, root: &Path, out: &mut Vec<Fixture>) {
-    let entries =
-        fs::read_dir(dir).unwrap_or_else(|e| panic!("read fixture dir {}: {e}", dir.display()));
-    for entry in entries {
-        let entry =
-            entry.unwrap_or_else(|e| panic!("read fixture entry in {}: {e}", dir.display()));
-        let path = entry.path();
-        if path.is_dir() {
-            walk(&path, root, out);
-            continue;
-        }
-        if path.extension().and_then(|e| e.to_str()) != Some("txt") {
-            continue;
-        }
-        let name = path
-            .strip_prefix(root)
-            .expect("fixture path is under the tests root")
-            .with_extension("")
-            .to_string_lossy()
-            .replace(std::path::MAIN_SEPARATOR, "/");
-        if name.contains("/inspection/") || name.contains("/recording/") {
-            continue;
-        }
-        let raw = fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("read fixture {}: {e}", path.display()));
-        out.push(parse_fixture(name, &raw));
-    }
-}
-
-/// The authored half of a fixture, same shape `tests/mod.rs` parses: query
-/// text before the first section rule, then the `INPUT`/`INPUT (ext)` body up
-/// to the next rule. Generated sections after that are the snapshot harness's
-/// business, not ours.
-fn parse_fixture(name: String, raw: &str) -> Fixture {
-    let normalized = raw.replace("\r\n", "\n");
-    let mut query_lines = Vec::new();
-    let mut input_lines = Vec::new();
-    let mut ext = None;
-    let mut zone = Zone::Query;
-
-    for line in normalized.lines() {
-        if let Some(label) = rule_label(line) {
-            match (&zone, input_header_ext(label)) {
-                (Zone::Query, Some(found)) => {
-                    ext = found;
-                    zone = Zone::Input;
-                }
-                (Zone::Query, None) => {
-                    panic!("{name}: 06-vm fixtures start with an INPUT section, found `{label}`")
-                }
-                _ => {
-                    zone = Zone::Generated;
-                }
-            }
-            continue;
-        }
-        match zone {
-            Zone::Query => query_lines.push(line),
-            Zone::Input => input_lines.push(line),
-            Zone::Generated => {}
-        }
-    }
-
-    Fixture {
-        name,
-        query: query_lines.join("\n"),
-        input: input_lines.join("\n"),
-        ext,
-    }
-}
-
-enum Zone {
-    Query,
-    Input,
-    Generated,
-}
-
-/// `INPUT` → `Some(None)`, `INPUT (ts)` → `Some(Some("ts"))`, else `None`.
-fn input_header_ext(label: &str) -> Option<Option<String>> {
-    let rest = label.strip_prefix("INPUT")?.trim();
-    if rest.is_empty() {
-        return Some(None);
-    }
-    let ext = rest.strip_prefix('(')?.strip_suffix(')')?.trim();
-    Some(Some(ext.to_string()))
-}
-
-/// Same rule shape `tests/mod.rs` emits: a label centered in dashes with one
-/// space of padding each side.
-fn rule_label(line: &str) -> Option<&str> {
-    let line = line.trim_end();
-    if !line.starts_with('-') || !line.ends_with('-') {
-        return None;
-    }
-    let label = line
-        .trim_matches('-')
-        .strip_prefix(' ')?
-        .strip_suffix(' ')?
-        .trim();
-    (!label.is_empty()).then_some(label)
-}
 
 /// `06-vm/captures/single_node` → `fx_06_vm_captures_single_node`.
 fn mod_ident(name: &str) -> String {

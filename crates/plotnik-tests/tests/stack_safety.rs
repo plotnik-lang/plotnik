@@ -16,7 +16,8 @@ use std::thread;
 use indoc::indoc;
 use plotnik_lib::bytecode::Module;
 use plotnik_lib::{
-    Colors, Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM, Value,
+    BytecodeConfig, Colors, Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM,
+    Value,
 };
 
 mod support;
@@ -63,7 +64,11 @@ fn compile(query: &str) -> Module {
         "{}",
         compiled.diagnostics().render(compiled.source_map())
     );
-    compiled.into_module().expect("query emits a module")
+    compiled
+        .emit(BytecodeConfig::new())
+        .expect("bytecode emission answers")
+        .into_artifact()
+        .expect("query emits a module")
 }
 
 #[test]

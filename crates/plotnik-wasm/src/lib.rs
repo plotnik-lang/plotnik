@@ -21,10 +21,13 @@ mod libc_shims;
 mod langs;
 mod wire;
 
+use std::cell::OnceCell;
+
 use langs::Lang;
 use plotnik_lib::bytecode::{Entrypoint, Module};
 use plotnik_lib::{
-    NoopTracer, QueryBuilder, RecordingTracer, RuntimeLimitSpec, TypeScriptConfig, VM, dump_tree,
+    BytecodeConfig, BytecodeInspection, CodegenProvenance, CompiledQuery, NoopTracer, QueryBuilder,
+    RecordingTracer, RuntimeLimitSpec, RustCodegenConfig, TypeScriptCodegenConfig, VM, dump_tree,
     tokenize as query_tokenize,
 };
 use serde_json::{Value as JsonValue, json};
@@ -37,9 +40,11 @@ use wire::{InfoParts, error_json, info_json, json_value, result_json, to_js};
 #[wasm_bindgen]
 pub struct Session {
     lang: &'static Lang,
+    compiled: CompiledQuery,
     module: Option<Module>,
     entrypoints: Vec<String>,
     info: JsonValue,
+    generated_rust: OnceCell<Option<String>>,
 }
 
 #[wasm_bindgen]
@@ -52,18 +57,29 @@ impl Session {
         let lang = langs::resolve(lang).map_err(|error| JsValue::from_str(&error))?;
         let tokens = query_tokenize(query);
         let compiled = QueryBuilder::from_inline(query)
-            .with_inspection(true)
             .compile(lang.grammar())
             .map_err(|error| JsValue::from_str(&error.to_string()))?;
 
-        let diagnostics = json_value!(compiled.diagnostics().to_wire(compiled.source_map()));
-        let bytecode_size = compiled.bytecode().map(<[u8]>::len);
-        let (dts, dts_map) = compiled
-            .to_typescript_mapped(TypeScriptConfig::new().colored(false))
+        let bytecode = compiled
+            .emit(BytecodeConfig::new().inspection(BytecodeInspection::Spans))
+            .map_err(|error| JsValue::from_str(&error.to_string()))?;
+        let bytecode_diagnostics = bytecode.diagnostics().clone();
+        let mut diagnostics = compiled.diagnostics().clone();
+        let module = bytecode.into_artifact();
+        let bytecode_size = module.as_ref().map(|module| module.bytes().len());
+        let types = compiled
+            .emit_types(TypeScriptCodegenConfig::new().colored(false))
+            .map_err(|error| JsValue::from_str(&error.to_string()))?;
+        diagnostics.extend(types.diagnostics().clone());
+        diagnostics.extend(bytecode_diagnostics);
+        let diagnostics = json_value!(diagnostics.to_wire(compiled.source_map()));
+        let (dts, dts_map) = types
+            .into_artifact()
+            .map(|output| output.into_parts())
             .unwrap_or_else(|| (String::new(), Vec::new()));
-        let entrypoints = compiled.module().map(entrypoint_names).unwrap_or_default();
+        let entrypoints = module.as_ref().map(entrypoint_names).unwrap_or_default();
         let info = info_json(InfoParts {
-            module: compiled.module(),
+            module: module.as_ref(),
             tokens: json_value!(tokens),
             diagnostics,
             dts,
@@ -71,18 +87,45 @@ impl Session {
             entrypoints: &entrypoints,
             bytecode_size,
         });
-        let module = compiled.into_module();
 
         Ok(Session {
             lang,
+            compiled,
             module,
             entrypoints,
             info,
+            generated_rust: OnceCell::new(),
         })
     }
 
     pub fn info(&self) -> JsValue {
         to_js(&self.info)
+    }
+
+    /// Generate the production Rust matcher for this query. Ordinary query
+    /// diagnostics return `code: null`; the accompanying identity always says
+    /// which exact embedded grammar a successful module links against.
+    pub fn generate(&self, target: &str) -> Result<JsValue, JsValue> {
+        if target != "rust" {
+            return Err(JsValue::from_str("generation target must be 'rust'"));
+        }
+        let identity = self.lang.identity();
+        let code = self.generated_rust.get_or_init(|| {
+            self.compiled
+                .emit(RustCodegenConfig::new().provenance(CodegenProvenance::Full))
+                .expect("built-in Rust emission configuration is valid")
+                .into_artifact()
+                .map(|output| output.into_source())
+        });
+        Ok(to_js(&json!({
+            "target": "rust",
+            "code": code,
+            "grammar": {
+                "name": identity.name(),
+                "sha256": identity.sha256(),
+                "source": identity.source(),
+            },
+        })))
     }
 
     /// Run the compiled query against source text.

@@ -20,6 +20,6 @@ workspace = true
 serde = ["plotnik-macros/serde", "plotnik-rt/serde"]
 
 [dependencies]
-plotnik-macros = { path = "../plotnik-macros", version = "0.3.3" }
-plotnik-rt = { path = "../plotnik-rt", version = "0.3.3" }
+plotnik-macros = { path = "../plotnik-macros", version = "0.4.0" }
+plotnik-rt = { path = "../plotnik-rt", version = "0.4.0" }
 tree-sitter = "0.26.10"

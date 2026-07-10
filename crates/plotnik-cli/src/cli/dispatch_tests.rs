@@ -12,9 +12,49 @@ use plotnik_lib::Limit;
 
 use super::*;
 use crate::cli::commands::{
-    ast_command, check_command, dump_command, infer_command, inspect_command, run_command,
-    trace_command,
+    ast_command, check_command, dump_command, generate_command, infer_command, inspect_command,
+    run_command, trace_command,
 };
+use crate::commands::generate::GenerateTarget;
+
+#[test]
+fn generate_extracts_rust_target_and_grammar_path() {
+    let matches = generate_command()
+        .try_get_matches_from([
+            "generate",
+            "query.ptk",
+            "--target",
+            "rust",
+            "--grammar",
+            "grammar.json",
+            "-o",
+            "query.rs",
+        ])
+        .unwrap();
+
+    let options = GenerateOpts::from_matches(&matches);
+
+    assert_eq!(options.query_path, Some(PathBuf::from("query.ptk")));
+    assert_eq!(options.target, GenerateTarget::Rust);
+    assert_eq!(options.grammar, Some(PathBuf::from("grammar.json")));
+    assert_eq!(options.output, Some(PathBuf::from("query.rs")));
+}
+
+#[test]
+fn generate_rejects_registry_and_external_grammar_together() {
+    let result = generate_command().try_get_matches_from([
+        "generate",
+        "query.ptk",
+        "--target",
+        "rust",
+        "--grammar",
+        "grammar.json",
+        "-l",
+        "javascript",
+    ]);
+
+    assert!(result.is_err());
+}
 
 #[test]
 fn dump_accepts_trace_flags() {

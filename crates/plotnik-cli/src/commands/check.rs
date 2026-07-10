@@ -29,7 +29,7 @@ pub fn run(args: CheckArgs) -> CliResult {
     )?;
     let checked = QueryBuilder::new(loaded.sources)
         .with_strict_lints(args.strict)
-        .check(lang.grammar())
+        .compile(lang.grammar())
         .map_err(|e| CliError::fatal(e.to_string()))?;
 
     let diagnostics = checked.diagnostics();

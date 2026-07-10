@@ -1,0 +1,166 @@
+Expr = [
+  Empty: (identifier)?
+  Wrap: (parenthesized_expression (Expr))
+]
+Q = (program (expression_statement (Expr) @expr))
+------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 64
+
+[transitions]
+Expr:
+  00  -ε-                                   07, 10, 09
+  02                                        ▶
+  04   !   (identifier) [EnumClose]         02
+  06  ──!  _                                04, 06
+  07   !   _ [EnumOpen(Empty)]              04, 06
+  09  -ε-  [EnumOpen(Empty) EnumClose]      02
+  10   !   (parenthesized_expression) [EnumOpen(Wrap)]  11, 31
+  11  -ε-  [EnumClose]                      02
+  12  ─‣┘  _ [SuppressEnd EnumClose]        02
+
+Expr (consuming):
+  13  -ε-                                   19, 21
+  14                                        ▶
+  16   !   (identifier) [EnumClose]         14
+  18  ──!  _                                16, 18
+  19   !   _ [EnumOpen(Empty)]              16, 18
+  21   !   (parenthesized_expression) [EnumOpen(Wrap)]  22, 26
+  22  -ε-  [EnumClose]                      14
+  23  ─‣┘  _ [SuppressEnd EnumClose]        14
+  25  └‣─  (Expr+)                          13 : 23
+  26  -ε-  [SuppressBegin]                  25
+
+Expr:
+  30  └‣─  (Expr+)                          13 : 12
+  31  -ε-  [SuppressBegin]                  30
+
+Q:
+  35                                        ▶
+  36   !   (program)                        38
+  37  ─‣┘  _                                35
+  38  └‣─  (expression_statement)           59, 48
+  39  ─‣┘  _ [Set(expr)]                    37
+  43   !   (identifier) [EnumClose]         39
+  45  ──!  _                                43, 45
+  46   !   _ [EnumOpen(Empty)]              43, 45
+  48  -ε-  [EnumOpen(Empty) EnumClose Set(expr)]  37
+  49   !   (parenthesized_expression) [EnumOpen(Wrap)]  50, 54
+  50  -ε-  [EnumClose]                      39
+  51  ─‣┘  _ [SuppressEnd EnumClose]        39
+  53  └‣─  (Expr+)                          13 : 51
+  54  -ε-  [SuppressBegin]                  53
+  58  ──!  _                                46, 49, 58
+  59  └─!  _                                46, 49, 58
+
+Q (entrypoint):
+  61                                        ▶
+  62  -ε-  [StructClose]                    61
+  63       (Q)                              36 : 62
+  64  -ε-  [StructOpen]                     63
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "Empty"
+S2 "Wrap"
+S3 "expr"
+S4 "Expr"
+S5 "Q"
+S6 "identifier"
+S7 "parenthesized_expression"
+S8 "program"
+S9 "expression_statement"
+
+[type_defs]
+T0 = <Void>
+T1 = Enum    M0:2  ; Empty | Wrap
+T2 = Struct  M2:1  ; { expr }
+
+[type_members]
+M0: S1 → T0  ; Empty: <Void>
+M1: S2 → T0  ; Wrap: <Void>
+M2: S3 → T1  ; expr: Expr
+
+[type_names]
+N0: S4 → T1  ; Expr
+N1: S5 → T2  ; Q
+
+[entrypoints]
+Q = 000 :: T2
+
+[spans]
+P00 def        0..75  src0  T1
+P01 enum       7..75  src0
+P02 branch     11..31  src0  T1.M0
+P03 quantifier 30..31  src0
+P04 pattern    18..30  src0
+P05 branch     34..73  src0  T1.M1
+P06 pattern    40..73  src0
+P07 ref        66..72  src0  T1
+P08 def        76..125  src0  T2
+P09 pattern    80..125  src0
+P10 pattern    89..124  src0
+P11 capture    118..123  src0  T2.M2
+P12 ref        111..117  src0  T1
+
+[transitions]
+Q:
+  000  -ε-  [StructOpen]                    002
+  002       (@112)                          112 : 003
+  003  -ε-  [StructClose]                   005
+  005                                       ▶
+  006  └‣─  (@061)                          061 : 008
+  007                                       ▶
+  008  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  007
+  011  └‣─  (@061)                          061 : 012
+  012  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  019
+  015  └‣─  (@061)                          061 : 016
+  016  ─‣┘  _ [SuppressEnd SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  106
+  019                                       ▶
+  020   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  019
+  023  ...
+  024  ──!  _                               020, 024
+  026   !   _ [SpanStart#3]                 020, 024
+  028  -ε-  [SpanStart#1 SpanStart#2 EnumOpen(M0)]  026
+  030  ─‣┘  _ [SpanEnd#10 SpanEnd#9 SpanEnd#8]  074
+  032  -ε-  [SpanStart#1 SpanStart#2 EnumOpen(M0) EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  019
+  035  -ε-  [SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  019
+  038  ...
+  039  ...
+  040   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  007
+  043  ──!  _                               040, 043
+  045   !   _ [SpanStart#3]                 040, 043
+  047  ...
+  048  -ε-  [SpanStart#1 SpanStart#2 EnumOpen(M0)]  045
+  050  -ε-  [SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  007
+  053  -ε-  [SuppressBegin]                 006
+  055  ...
+  056  -ε-  [SpanStart#7]                   050, 053
+  058   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 EnumOpen(M1) SpanStartAt#6]  056
+  061  -ε-  [SpanStart#0]                   048, 058
+  063  ...
+  064  -ε-  [SuppressBegin]                 011
+  066  -ε-  [SpanStart#7]                   035, 064
+  068   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 EnumOpen(M1) SpanStartAt#6]  066
+  071  ...
+  072  -ε-  [SpanStart#0]                   028, 068, 032
+  074                                       ▶
+  075   !   (identifier) [SpanStartAt#4 SpanEnd#4 SpanEnd#3 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  106
+  078  ──!  _                               075, 078
+  080   !   _ [SpanStart#3]                 075, 078
+  082  -ε-  [SpanStart#1 SpanStart#2 EnumOpen(M0)]  080
+  084  -ε-  [SpanStart#1 SpanStart#2 EnumOpen(M0) EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0 SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  030
+  088  -ε-  [SpanEnd#7 SpanEnd#6 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  106
+  091  -ε-  [SuppressBegin]                 015
+  093  -ε-  [SpanStart#7]                   088, 091
+  095  ...
+  096   !   (parenthesized_expression) [SpanStart#1 SpanStart#5 EnumOpen(M1) SpanStartAt#6]  093
+  099  ──!  _                               082, 096, 099
+  101  └─!  _                               082, 096, 099
+  103  ...
+  104  -ε-  [SpanStart#0]                   101, 084
+  106  ─‣┘  _ [SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  030
+  109  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  104
+  111  ...
+  112   !   (program) [SpanStart#8 SpanStartAt#9]  109

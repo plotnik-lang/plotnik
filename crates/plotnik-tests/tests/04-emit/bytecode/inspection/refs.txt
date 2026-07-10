@@ -1,0 +1,126 @@
+Name = (identifier) @name
+Bare = (program (expression_statement (Name)))
+Captured = (program (expression_statement (Name) @item))
+------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Bare     = 27
+Captured = 31
+Name     = 25
+
+[transitions]
+Name:
+  03                                        ▶
+  04   !   (identifier) [Node Set(name)]    03
+
+Bare:
+  05                                        ▶
+  06   !   (program)                        08
+  08  └‣─  (expression_statement) [SuppressBegin]  11
+  09  ─‣┘² _ [SuppressEnd]                  05
+  11  └‣─  (Name)                           04 : 09
+
+Captured:
+  13                                        ▶
+  14   !   (program)                        16
+  16  └‣─  (expression_statement) [StructOpen]  20
+  17  ─‣┘² _ [Set(item)]                    13
+  19  -ε-  [StructClose]                    17
+  20  └‣─  (Name)                           04 : 19
+
+Name (entrypoint):
+  22                                        ▶
+  23  -ε-  [StructClose]                    22
+  24       (Name)                           04 : 23
+  25  -ε-  [StructOpen]                     24
+
+Bare (entrypoint):
+  26                                        ▶
+  27       (Bare)                           06 : 26
+
+Captured (entrypoint):
+  28                                        ▶
+  29  -ε-  [StructClose]                    28
+  30       (Captured)                       14 : 29
+  31  -ε-  [StructOpen]                     30
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "item"
+S3 "Name"
+S4 "Captured"
+S5 "identifier"
+S6 "program"
+S7 "expression_statement"
+S8 "Bare"
+
+[type_defs]
+T0 = <Void>
+T1 = <Node>
+T2 = Struct  M0:1  ; { name }
+T3 = Struct  M1:1  ; { item }
+
+[type_members]
+M0: S1 → T1  ; name: <Node>
+M1: S2 → T2  ; item: Name
+
+[type_names]
+N0: S3 → T2  ; Name
+N1: S4 → T3  ; Captured
+
+[entrypoints]
+Bare     = 06 :: T0
+Captured = 08 :: T3
+Name     = 00 :: T2
+
+[spans]
+P00 def        0..25  src0  T2
+P01 capture    20..25  src0  T2.M0
+P02 pattern    7..19  src0
+P03 def        26..72  src0  T0
+P04 pattern    33..72  src0
+P05 pattern    42..71  src0
+P06 ref        64..70  src0  T2
+P07 def        73..129  src0  T3
+P08 pattern    84..129  src0
+P09 pattern    93..128  src0
+P10 capture    122..127  src0  T3.M1
+P11 ref        115..121  src0  T2
+
+[transitions]
+Name:
+  00  -ε-  [StructOpen]                     02
+  02       (@32)                            32 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Bare:
+  06       (@40)                            40 : 07
+  07                                        ▶
+
+Captured:
+  08  -ε-  [StructOpen]                     10
+  10       (@45)                            45 : 11
+  11  -ε-  [StructClose]                    13
+  13                                        ▶
+  14  └‣─  (@32)                            32 : 16
+  15                                        ▶
+  16  ─‣┘  _ [SuppressEnd SpanEnd#6]        18
+  18  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  15
+  20  -ε-  [StructClose]                    24
+  22  ...
+  23  ...
+  24  ─‣┘  _ [SpanStart#10 Set(M1) SpanEnd#10 SpanEnd#11]  27
+  27  ─‣┘  _ [SpanEnd#9 SpanEnd#8 SpanEnd#7]  38
+  29                                        ▶
+  30  ...
+  31  ...
+  32   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  29
+  36  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  14
+  38                                        ▶
+  39  ...
+  40   !   (program) [SpanStart#3 SpanStartAt#4]  36
+  42  └‣─  (@32)                            32 : 20
+  43  └‣─  (expression_statement) [SpanStartAt#9 SpanStart#11 StructOpen]  42
+  45   !   (program) [SpanStart#7 SpanStartAt#8]  43

@@ -2,7 +2,7 @@ use indoc::indoc;
 
 use crate::bytecode::PredicateOp;
 use crate::compiler::test_utils::synthetic_grammar as grammar;
-use crate::compiler::{QueryBuilder, SourceMap, SourcePath};
+use crate::compiler::{BytecodeConfig, QueryBuilder, SourceMap, SourcePath};
 
 use super::{DecodedInstr, Instruction, Module};
 
@@ -13,8 +13,11 @@ fn compile_module(query_src: &str) -> Module {
         .compile(grammar())
         .expect("query parsing should not exhaust fuel");
     assert!(compiled.is_valid(), "query should compile: {query_src}");
-    Module::load(compiled.bytecode().expect("compiled query has bytecode"))
-        .expect("compiled bytecode should load")
+    compiled
+        .emit(BytecodeConfig::new())
+        .expect("bytecode emission answers")
+        .into_artifact()
+        .expect("compiled query has bytecode")
 }
 
 #[test]

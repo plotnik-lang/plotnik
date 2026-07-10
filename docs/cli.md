@@ -14,6 +14,9 @@ plotnik check -q 'Func = (function_declaration) @fn' -l typescript
 # Generate TypeScript types
 plotnik infer -q 'Func = (function_declaration) @fn' -l typescript
 
+# Generate a compiled Rust matcher module
+plotnik generate query.ptk --target rust -l typescript -o query.rs
+
 # List supported languages
 plotnik lang list
 
@@ -31,6 +34,7 @@ plotnik lang dump typescript
 | `check`       | query | Validate query                  | Optional (enables grammar validation) |
 | `ast`         | both  | Show AST of query and/or source | Shebang or extension                  |
 | `infer`       | query | Generate type definitions       | Required                              |
+| `generate`    | query | Generate a compiled matcher     | Required unless `--grammar` is used   |
 | `dump`        | query | Show bytecode                   | Optional (enables linking)            |
 | `trace`       | both  | Trace query execution           | Shebang or extension                  |
 | `inspect`     | both  | Emit playground inspection JSON | Shebang or extension                  |
@@ -92,7 +96,8 @@ Requires a language via `-l` or a shebang; node kinds are resolved to grammar ID
 
 ### check
 
-Validate a query. Like `cargo check`.
+Validate a query. Like `cargo check`, this parses, analyzes, links, lowers, and
+verifies the shared executor contracts without selecting an emission target.
 
 ```sh
 # Validate syntax, types, recursion (no grammar)
@@ -116,6 +121,10 @@ With `-l`: also validates node kinds and field names exist in grammar.
 On success: silent, exits 0. A valid query with warnings prints them and
 still exits 0 (`--strict` turns warnings into failures).
 On error: prints diagnostics to stderr, exits 1.
+
+`check` does not test bytecode-format capacities. A query can pass `check` and
+emit source while a later VM-bytecode emission reports a target limit (for
+example, the bytecode type table's per-struct field width).
 
 With `--json`, on exit 0 or 1 stdout is a JSON array of diagnostics (`[]`
 when the query is clean), each with `code`, `severity`, `message`, `span`
@@ -158,6 +167,39 @@ plotnik infer -q 'Q = (identifier) @id' -l js --no-node-type --no-export
 | `--no-node-type`    | Don't emit Node/Point definitions             |
 | `--no-export`       | Don't add `export` keyword                    |
 | `--void-type TYPE`  | Type for void results (`undefined` or `null`) |
+
+### generate
+
+Generate a self-contained compiled matcher module. Rust is the first target;
+the generated file contains typed output types, `parse`/`matches` entrypoints,
+and the matcher that runs on `plotnik-rt`.
+
+```sh
+# Link against the bundled language registry
+plotnik generate query.ptk --target rust -l typescript -o query.rs
+
+# Link against the exact grammar shipped by the production parser package
+plotnik generate query.ptk --target rust \
+  --grammar node_modules/tree-sitter-typescript/typescript/src/grammar.json \
+  -o query.rs
+
+# Inline query to stdout
+plotnik generate -q 'Q = (program)' --target rust -l javascript
+```
+
+The output records the grammar name, SHA-256 of the exact `grammar.json` bytes,
+and its source. At runtime, the generated matcher verifies every kind and field
+id it uses against the tree's live language. If verification fails, regenerate
+with `--grammar` pointing at the parser package used in production.
+
+**Flags:**
+
+| Flag                     | Purpose                                              |
+| ------------------------ | ---------------------------------------------------- |
+| `--target rust`          | Generated-code target (currently Rust)               |
+| `-l, --lang LANG`        | Link against the bundled registry grammar            |
+| `--grammar GRAMMAR_JSON` | Bypass the registry and link against this exact file |
+| `-o, --output FILE`      | Write the generated module instead of stdout         |
 
 ### lang
 
@@ -356,7 +398,7 @@ already-bounded effect log.
 
 ## Input Modes
 
-### Query-Only Commands (check, dump, infer)
+### Query-Only Commands (check, dump, infer, generate)
 
 These commands take a single input. Use either:
 
@@ -523,11 +565,11 @@ Common errors:
 
 Uniform across all commands:
 
-| Code | Meaning                                         |
-| ---- | ----------------------------------------------- |
-| 0    | Yes/success (match found, query valid)          |
-| 1    | Domain "no" (`run`: no match; `check`: invalid) |
-| 2    | Couldn't answer (usage, IO, or internal error)  |
+| Code | Meaning                                                                   |
+| ---- | ------------------------------------------------------------------------- |
+| 0    | Yes/success (match found, query valid)                                    |
+| 1    | Domain "no" (no match, invalid query, or selected-target capacity limit)  |
+| 2    | Couldn't answer (usage, IO, invalid target configuration, internal error) |
 
 ---
 

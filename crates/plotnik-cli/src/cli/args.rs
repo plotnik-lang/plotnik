@@ -8,6 +8,8 @@ use std::path::PathBuf;
 
 use clap::{Arg, ArgAction, value_parser};
 
+use crate::commands::generate::GenerateTarget;
+
 pub fn query_path_arg() -> Arg {
     Arg::new("query_path")
         .value_name("QUERY")
@@ -120,6 +122,24 @@ pub fn output_file_arg() -> Arg {
         .value_name("FILE")
         .value_parser(value_parser!(PathBuf))
         .help("Write output to file")
+}
+
+pub fn target_arg() -> Arg {
+    Arg::new("target")
+        .long("target")
+        .value_name("TARGET")
+        .value_parser(value_parser!(GenerateTarget))
+        .required(true)
+        .help("Generated-code target (rust)")
+}
+
+pub fn grammar_arg() -> Arg {
+    Arg::new("grammar")
+        .long("grammar")
+        .value_name("GRAMMAR_JSON")
+        .value_parser(value_parser!(PathBuf))
+        .conflicts_with("lang")
+        .help("Link against this exact grammar.json instead of the registry")
 }
 
 pub fn compact_arg() -> Arg {

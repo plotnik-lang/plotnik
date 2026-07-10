@@ -2,6 +2,7 @@ pub mod ast;
 pub mod check;
 pub mod compile;
 pub mod dump;
+pub mod generate;
 pub mod infer;
 pub mod inspect;
 pub mod lang;
@@ -17,6 +18,9 @@ mod ast_tests;
 
 #[cfg(test)]
 mod check_tests;
+
+#[cfg(test)]
+mod generate_tests;
 
 #[cfg(test)]
 mod run_common_tests;

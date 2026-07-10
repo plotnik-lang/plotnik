@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use plotnik_lib::{TypeScriptConfig, TypeScriptVoidType};
+use plotnik_lib::{TypeScriptCodegenConfig, TypeScriptVoidType};
 
 use super::compile::compile_query;
 use super::lang_resolver::require_lang;
@@ -40,7 +40,7 @@ pub fn run(args: InferArgs) -> CliResult {
         "infer",
     )?;
 
-    let compiled = compile_query(loaded.sources, lang, args.color, false)?;
+    let compiled = compile_query(loaded.sources, lang, args.color)?;
 
     let void_type = match args.void_type.as_deref() {
         Some("null") => TypeScriptVoidType::Null,
@@ -48,15 +48,32 @@ pub fn run(args: InferArgs) -> CliResult {
     };
     // Only use colors when outputting to stdout (not to file)
     let use_colors = args.color && args.output.is_none();
-    let config = TypeScriptConfig::new()
+    let config = TypeScriptCodegenConfig::new()
         .export(args.export)
         .emit_node_interface(!args.no_node_type)
         .verbose_nodes(args.verbose_nodes)
         .void_type(void_type)
         .colored(use_colors);
-    let output = compiled
-        .to_typescript(config)
-        .expect("dry_run guarantees a module");
+    let emission = compiled
+        .emit_types(config)
+        .map_err(|error| CliError::fatal(error.to_string()))?;
+    let has_errors = emission.diagnostics().has_errors();
+    if !emission.diagnostics().is_empty() {
+        eprint!(
+            "{}",
+            emission
+                .diagnostics()
+                .render_colored(compiled.source_map(), args.color)
+        );
+    }
+    if has_errors {
+        return Err(CliError::No);
+    }
+    let output = emission
+        .into_artifact()
+        .expect("valid query emits TypeScript types")
+        .into_parts()
+        .0;
 
     if let Some(ref path) = args.output {
         fs::write(path, &output)

@@ -37,7 +37,7 @@ import type { Range16 } from "./ast-index";
 import { AstView } from "./ast-view";
 import { setSpotlight, spotlightExtension } from "./cm-spotlight";
 import { CodeEditor } from "./code-editor";
-import { OutputPanel } from "./output-panel";
+import { OutputPanel, type OutputTab } from "./output-panel";
 import { decodePermalink, encodePermalink } from "./permalink";
 import { pushQueryFeedback } from "./query-feedback";
 import { usePlaygroundSession } from "./use-session";
@@ -91,7 +91,17 @@ export default function Playground() {
   const [source, setSource] = useState(initial?.s ?? DEFAULT_SOURCE);
   const [entryChoice, setEntryChoice] = useState<string | null>(null);
   const [astOpen, setAstOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [outputTab, setOutputTab] = useState<OutputTab>("output");
+  const {
+    copied: shareCopied,
+    show: showShareCopied,
+    clear: clearShareCopied,
+  } = useCopyFeedback();
+  const {
+    copied: generatedCopied,
+    show: showGeneratedCopied,
+    clear: clearGeneratedCopied,
+  } = useCopyFeedback();
 
   const queryViewRef = useRef<EditorView | null>(null);
   const sourceViewRef = useRef<EditorView | null>(null);
@@ -101,6 +111,7 @@ export default function Playground() {
     source,
     lang,
     entry: entryChoice,
+    generatedOpen: outputTab === "generated",
   });
   const { compiled } = session;
 
@@ -116,15 +127,23 @@ export default function Playground() {
     }
   }, [compiled]);
 
-  const share = useCallback(async () => {
+  const share = useCallback(() => {
     const hash = encodePermalink({ q: query, s: source, l: lang });
     const url = new URL(window.location.href);
     url.hash = hash;
     window.history.replaceState(null, "", url);
-    await navigator.clipboard.writeText(url.toString());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }, [query, source, lang]);
+    void navigator.clipboard
+      .writeText(url.toString())
+      .then(showShareCopied, clearShareCopied);
+  }, [query, source, lang, showShareCopied, clearShareCopied]);
+
+  const copyGenerated = useCallback(() => {
+    const code = session.generated?.code;
+    if (code === null || code === undefined) return;
+    void navigator.clipboard
+      .writeText(code)
+      .then(showGeneratedCopied, clearGeneratedCopied);
+  }, [session.generated, showGeneratedCopied, clearGeneratedCopied]);
 
   const errorCount =
     compiled?.info.diagnostics.filter(
@@ -208,12 +227,12 @@ export default function Playground() {
             </Select>
           )}
           <Button variant="outline" size="sm" onClick={share}>
-            {copied ? (
+            {shareCopied ? (
               <CheckIcon data-icon="inline-start" />
             ) : (
               <Share2Icon data-icon="inline-start" />
             )}
-            {copied ? "Copied" : "Share"}
+            {shareCopied ? "Copied" : "Share"}
           </Button>
         </div>
       </header>
@@ -303,8 +322,14 @@ export default function Playground() {
             <ResizablePanel defaultSize="45%" minSize="15%">
               <OutputPanel
                 info={compiled?.info ?? null}
+                generated={session.generated}
+                generating={session.generating}
                 runResult={session.runResult}
                 stale={session.stale}
+                tab={outputTab}
+                onTabChange={setOutputTab}
+                generatedCopied={generatedCopied}
+                onGeneratedCopy={copyGenerated}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -312,6 +337,37 @@ export default function Playground() {
       </ResizablePanelGroup>
     </div>
   );
+}
+
+function useCopyFeedback() {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | null>(null);
+
+  const clear = useCallback(() => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+    setCopied(false);
+  }, []);
+
+  const show = useCallback(() => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    setCopied(true);
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      setCopied(false);
+    }, 1500);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  return { copied, show, clear };
 }
 
 function PaneLabel({ children }: { children: ReactNode }) {

@@ -365,7 +365,7 @@ mod debug_impl {
                     let name = self
                         .label_to_def
                         .get(&c.target)
-                        .map(|def_id| format!("def#{}", def_id.as_u32()))
+                        .map(|def_id| format!("def#{}", def_id.index()))
                         .unwrap_or_else(|| format!("label#{}", c.target.0));
                     WalkStep {
                         see_through: false,

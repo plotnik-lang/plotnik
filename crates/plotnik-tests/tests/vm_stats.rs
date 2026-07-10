@@ -1,7 +1,9 @@
 mod support;
 
 use plotnik_lib::bytecode::{Entrypoint, Module};
-use plotnik_lib::{Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM};
+use plotnik_lib::{
+    BytecodeConfig, Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM,
+};
 
 fn compile(src: &str) -> Module {
     let compiled = QueryBuilder::from_inline(src)
@@ -12,7 +14,11 @@ fn compile(src: &str) -> Module {
         "{}",
         compiled.diagnostics().render(compiled.source_map())
     );
-    compiled.into_module().expect("valid query emits module")
+    compiled
+        .emit(BytecodeConfig::new())
+        .expect("bytecode emission answers")
+        .into_artifact()
+        .expect("valid query emits module")
 }
 
 fn module_and_entry() -> (Module, Entrypoint) {

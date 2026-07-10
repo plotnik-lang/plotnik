@@ -107,7 +107,7 @@ impl Drop for ReplayDepthGuard<'_> {
 }
 
 /// One resource's limit policy, independent of any particular input.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Limit {
     /// Derive a ceiling from the input size (see [`RuntimeLimitSpec::resolve`]).
     Auto,
@@ -130,7 +130,7 @@ impl Limit {
 }
 
 /// The limit policy for a run, before it is sized to a specific input.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RuntimeLimitSpec {
     /// Bound on total work (instruction dispatches).
     pub steps: Limit,

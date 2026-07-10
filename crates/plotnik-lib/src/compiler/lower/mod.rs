@@ -15,6 +15,7 @@ pub mod epsilon;
 mod input;
 pub mod ir;
 pub mod pack;
+pub(crate) mod semantic_verify;
 pub(crate) mod spans;
 pub mod thompson;
 mod verify;
@@ -50,8 +51,4 @@ pub(crate) fn pack_lowered(semantic: SemanticNfa, input: &LowerInput<'_>) -> Low
     run_verified("pack_instructions", &mut ir, input, pack_instructions);
     verify_constructed(&ir, input);
     LoweredNfa::new(ir)
-}
-
-pub(crate) fn lower_to_nfa(input: LowerInput<'_>) -> LoweredNfa {
-    pack_lowered(lower_semantic(&input), &input)
 }

@@ -1,0 +1,18 @@
+Q = (identifier =~ /\<x\b{end}\b{start-half}/)
+------------------ DIAGNOSTICS -------------------
+error: this word-boundary variant has no shared equivalent across target engines
+ --> query.ptk:1:21
+  |
+1 | Q = (identifier =~ /\<x\b{end}\b{start-half}/)
+  |                     ^^
+  |
+help: use `\b` or `\B`, which Plotnik defines as ASCII word boundaries on every target
+
+error: this word-boundary variant has no shared equivalent across target engines
+ --> query.ptk:1:24
+  |
+1 | Q = (identifier =~ /\<x\b{end}\b{start-half}/)
+  |                        ^^^^^^^
+  |
+help: use `\b` or `\B`, which Plotnik defines as ASCII word boundaries on every target
+-------------------- SYMBOLS ---------------------

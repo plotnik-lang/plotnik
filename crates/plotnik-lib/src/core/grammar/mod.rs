@@ -2,6 +2,7 @@
 
 mod admissibility;
 mod aliases;
+mod identity;
 mod json;
 mod lower;
 mod node_shapes;
@@ -26,6 +27,7 @@ mod structure_tests;
 #[cfg(test)]
 mod types_tests;
 
+pub use identity::GrammarIdentity;
 pub use json::GrammarError;
 pub use prepared::VariableType;
 pub use render::{

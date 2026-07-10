@@ -22,7 +22,9 @@ use proptest::sample::select;
 use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 
 use plotnik_lib::bytecode::Module;
-use plotnik_lib::{Colors, QueryBuilder, VM, materialize_verified};
+use plotnik_lib::{
+    BytecodeConfig, Colors, QueryBuilder, TypeScriptCodegenConfig, VM, materialize_verified,
+};
 
 mod support;
 
@@ -59,7 +61,15 @@ fn try_compile(query: &str) -> Option<Vec<u8>> {
     if !compiled.is_valid() {
         return None;
     }
-    compiled.bytecode().map(|bytes| bytes.to_vec())
+    let _types = compiled
+        .emit_types(TypeScriptCodegenConfig::new())
+        .ok()?
+        .into_artifact()?;
+    compiled
+        .emit(BytecodeConfig::new())
+        .ok()?
+        .into_artifact()
+        .map(|module| module.bytes().to_vec())
 }
 
 fn parse_js(source: &str) -> Tree {

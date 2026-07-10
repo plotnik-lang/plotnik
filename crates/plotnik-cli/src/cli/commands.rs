@@ -71,11 +71,42 @@ Run 'plotnik <command> --help' for examples."#,
         .subcommand(check_command())
         .subcommand(ast_command())
         .subcommand(infer_command())
+        .subcommand(generate_command())
         .subcommand(dump_command())
         .subcommand(trace_command())
         .subcommand(inspect_command())
         .subcommand(lang_command())
         .subcommand(completions_command())
+}
+
+pub fn generate_command() -> Command {
+    Command::new("generate")
+        .about("Generate a compiled matcher module")
+        .override_usage(
+            "\
+  plotnik generate <QUERY> --target rust -l <LANG>
+  plotnik generate <QUERY> --target rust --grammar <grammar.json>
+  plotnik generate -q <TEXT> --target rust -l <LANG>",
+        )
+        .after_help(
+            r#"EXAMPLES:
+  plotnik generate query.ptk --target rust -l typescript
+  plotnik generate query.ptk --target rust --grammar node_modules/tree-sitter-typescript/typescript/src/grammar.json
+  plotnik generate query.ptk --target rust -l javascript -o query.rs
+
+The generated module depends on the `plotnik-rt` crate and records the exact
+grammar name, SHA-256, and source used during linking."#,
+        )
+        .arg(query_path_arg())
+        .next_help_heading("Input options")
+        .arg(query_text_arg())
+        .arg(lang_arg())
+        .arg(grammar_arg())
+        .next_help_heading("Generation options")
+        .arg(target_arg())
+        .arg(output_file_arg())
+        .next_help_heading("Global options")
+        .arg(color_arg())
 }
 
 pub fn ast_command() -> Command {

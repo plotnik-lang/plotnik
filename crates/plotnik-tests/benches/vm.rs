@@ -133,8 +133,11 @@ fn compile(query: &str) -> Module {
         .expect("bench query parses");
     // On failure, run the query through `plotnik check` to see diagnostics.
     assert!(compiled.is_valid(), "bench query compiles cleanly");
-    Module::load(compiled.bytecode().expect("valid query emits bytecode"))
-        .expect("emitted bytecode loads")
+    compiled
+        .emit(plotnik_lib::BytecodeConfig::new())
+        .expect("bytecode emission answers")
+        .into_artifact()
+        .expect("valid query emits bytecode")
 }
 
 struct Scenario {
