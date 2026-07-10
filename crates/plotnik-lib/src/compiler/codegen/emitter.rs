@@ -37,7 +37,7 @@ use crate::compiler::srcgen::lits::{decimal_byte_lines, rust_string};
 use crate::compiler::srcgen::names::{shouty_ident, snake_ident};
 use crate::compiler::srcgen::sink::Sink;
 use crate::compiler::srcgen::template::splice;
-use crate::compiler::typegen::rust::Config as RustTypesConfig;
+use crate::compiler::typegen::rust::{Config as RustTypesConfig, TypeModel};
 use plotnik_rt::{Limit, Nav, SkipPolicy};
 
 /// Generate the Rust query module for a compiled query's fork-point NFA.
@@ -223,20 +223,14 @@ impl<'a> Generator<'a> {
             .rt_crate(self.config.rt_crate.clone())
             .serde(self.config.serde);
         let artifacts = self.plan.artifacts();
-        let readers = ReaderGen::new(
-            artifacts,
-            self.plan.output(),
-            self.plan.replay(),
-            &rust_config,
-        );
+        let type_model = TypeModel::new(self.plan.output().clone());
+        let readers = ReaderGen::new(artifacts, &type_model, self.plan.replay());
 
         let mut out = String::new();
         self.header(&mut out);
         out.push('\n');
-        out.push_str(&crate::compiler::typegen::rust::emit(
-            artifacts.type_analysis,
-            artifacts.dependency_analysis,
-            artifacts.interner,
+        out.push_str(&crate::compiler::typegen::rust::emit_model(
+            &type_model,
             &rust_config,
         ));
         out.push_str(

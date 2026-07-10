@@ -17,7 +17,8 @@ use std::fmt::Write as _;
 use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
 use crate::compiler::srcgen::names::rust_scope_idents;
 
-use super::emitter::{Emitter, Item, ItemKind, TypeContext};
+use super::emitter::{Emitter, Item, ItemKind};
+use super::model::TypeContext;
 
 struct SerdeBody {
     code: String,
@@ -34,7 +35,7 @@ impl SerdeBody {
     }
 }
 
-impl Emitter<'_> {
+impl Emitter<'_, '_> {
     pub(super) fn serde_impl(&mut self, item: &Item) -> String {
         let rt = self.config.rt_crate.clone();
         let ident = self.item_ident(item.name).to_string();
@@ -144,7 +145,7 @@ impl Emitter<'_> {
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let (decl_generics, impl_generics) = if fields
             .values()
-            .any(|info| self.facts.needs_lifetime(info.type_id))
+            .any(|info| self.needs_lifetime(info.type_id))
         {
             ("<'a, 't>", "<'_, '_>")
         } else {

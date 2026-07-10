@@ -11,99 +11,37 @@
 //! declarations shadow the prelude inside the generated module. `Node` alone
 //! can stay bare: the naming pass reserves it.
 
-use std::collections::HashMap;
-
 use crate::compiler::analyze::output::OutputSchema;
 pub(crate) use crate::compiler::analyze::output::{OutputItem as Item, OutputItemKind as ItemKind};
-use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
 use crate::compiler::ids::DefId;
 use crate::compiler::srcgen::names::rust_scope_idents;
 use crate::compiler::srcgen::sink::Sink;
-use crate::core::{Interner, Symbol};
+use crate::core::Symbol;
 
 use super::Config;
-use super::analysis::TypeFacts;
+use super::model::{TypeContext, TypeModel};
 
 const DERIVES: &str = "#[derive(Debug, Clone, PartialEq, Eq, Hash)]";
 
-pub(crate) struct Emitter<'a> {
-    pub(super) schema: OutputSchema<'a>,
-    pub(super) config: &'a Config,
-    pub(super) facts: TypeFacts,
-    /// Hygienic module-scope identifier for every declared item name.
-    item_idents: HashMap<Symbol, String>,
+pub(crate) struct Emitter<'m, 'a> {
+    model: &'m TypeModel<'a>,
+    pub(super) schema: &'m OutputSchema<'a>,
+    pub(super) config: &'m Config,
     uses_node: bool,
 }
 
-#[derive(Clone, Copy)]
-pub(crate) struct TypeContext {
-    cut: Option<TypeId>,
-}
-
-impl TypeContext {
-    pub(crate) fn item(item_ty: TypeId) -> Self {
-        Self { cut: Some(item_ty) }
-    }
-
-    pub(crate) fn array_element(self) -> Self {
-        Self { cut: None }
-    }
-}
-
-impl<'a> Emitter<'a> {
-    pub(super) fn new(
-        types: &'a TypeAnalysis,
-        deps: &'a DependencyAnalysis,
-        interner: &'a Interner,
-        config: &'a Config,
-    ) -> Self {
-        let schema = OutputSchema::new(types, deps, interner)
-            .expect("bytecode dry-run validated the output schema");
+impl<'m, 'a> Emitter<'m, 'a> {
+    pub(super) fn new(model: &'m TypeModel<'a>, config: &'m Config) -> Self {
         Self {
-            schema,
+            schema: model.schema(),
+            model,
             config,
-            facts: TypeFacts::compute(types),
-            item_idents: HashMap::new(),
             uses_node: false,
         }
     }
 
-    /// A collected, name-assigned view for sibling backends: the matcher's
-    /// typed-replay readers must spell items and fields exactly as the type
-    /// declarations do, so they consult this model instead of re-deriving
-    /// names. Never call [`Self::emit`] on a model — it collects again.
-    pub(crate) fn model(schema: OutputSchema<'a>, config: &'a Config) -> Self {
-        let facts = TypeFacts::compute(schema.types);
-        let mut emitter = Self {
-            schema,
-            config,
-            facts,
-            item_idents: HashMap::new(),
-            uses_node: false,
-        };
-        emitter.assign_item_idents();
-        emitter
-    }
-
-    /// Whether the type's rendering mentions `'t` (transitively holds a node).
-    pub(crate) fn needs_lifetime(&self, ty: TypeId) -> bool {
-        self.facts.needs_lifetime(ty)
-    }
-
-    /// Whether a `Ref` occurrence rendered at `context` uses `Box<...>`.
-    /// Sibling backends (the trace readers) must ask with the same context the
-    /// type renderer used, or their `Box::new` placement drifts from the types.
-    pub(crate) fn is_boxed_ref(&self, context: TypeContext, ref_ty: TypeId) -> bool {
-        context
-            .cut
-            .is_some_and(|item| self.facts.is_boxed_in(item, ref_ty))
-    }
-
     pub(super) fn emit(mut self) -> String {
-        self.assign_item_idents();
-
         let sections = self.render_sections();
         let mut out = Sink::<()>::new();
         if self.uses_node {
@@ -134,19 +72,12 @@ impl<'a> Emitter<'a> {
         sections
     }
 
-    fn assign_item_idents(&mut self) {
-        let interner = self.schema.interner;
-        let items = self.schema.items();
-        let idents = rust_scope_idents(items.iter().map(|item| interner.resolve(item.name)));
-        for (item, ident) in items.iter().zip(idents) {
-            self.item_idents.insert(item.name, ident);
-        }
+    pub(crate) fn item_ident(&self, name: Symbol) -> &str {
+        self.model.item_ident(name)
     }
 
-    pub(crate) fn item_ident(&self, name: Symbol) -> &str {
-        self.item_idents
-            .get(&name)
-            .expect("every declared item name has an identifier")
+    pub(super) fn needs_lifetime(&self, ty: TypeId) -> bool {
+        self.model.needs_lifetime(ty)
     }
 
     fn render_item(&mut self, item: &Item) -> String {
@@ -245,7 +176,7 @@ impl<'a> Emitter<'a> {
     ///
     /// Throughout the rendering recursion, `cut` is the item declaration a
     /// by-value path from this position is still inside — the context
-    /// [`Self::is_boxed_ref`] keys on. Descending into an array element
+    /// the shared type model keys on. Descending into an array element
     /// clears it: `Vec` indirects, so no cycle below is by-value.
     fn alias_body(&mut self, context: TypeContext, ty: TypeId) -> String {
         let types = self.schema.types;
@@ -339,7 +270,7 @@ impl<'a> Emitter<'a> {
 
         let name = self.schema.deps.def_name_sym(def_id);
         let base = self.named_type(name, target);
-        if self.is_boxed_ref(context, ref_ty) {
+        if self.model.is_boxed_ref(context, ref_ty) {
             format!("::std::boxed::Box<{base}>")
         } else {
             base
@@ -347,10 +278,6 @@ impl<'a> Emitter<'a> {
     }
 
     pub(super) fn lifetime_args(&self, ty: TypeId) -> &'static str {
-        if self.facts.needs_lifetime(ty) {
-            "<'t>"
-        } else {
-            ""
-        }
+        if self.needs_lifetime(ty) { "<'t>" } else { "" }
     }
 }

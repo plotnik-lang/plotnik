@@ -9,13 +9,15 @@
 
 mod analysis;
 mod config;
-pub(crate) mod emitter;
+mod emitter;
+mod model;
 mod serde_impls;
 
 #[cfg(test)]
 mod analysis_tests;
 
 pub use config::Config;
+pub(crate) use model::{TypeContext, TypeModel};
 
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
@@ -27,5 +29,12 @@ pub(crate) fn emit(
     interner: &Interner,
     config: &Config,
 ) -> String {
-    emitter::Emitter::new(types, deps, interner, config).emit()
+    let schema = crate::compiler::analyze::output::OutputSchema::new(types, deps, interner)
+        .expect("bytecode dry-run validated the output schema");
+    let model = TypeModel::new(schema);
+    emit_model(&model, config)
+}
+
+pub(crate) fn emit_model(model: &TypeModel<'_>, config: &Config) -> String {
+    emitter::Emitter::new(model, config).emit()
 }

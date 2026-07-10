@@ -27,7 +27,6 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
@@ -37,7 +36,7 @@ use crate::compiler::codegen::plan::{
 use crate::compiler::ids::DefId;
 use crate::compiler::srcgen::names::{rust_scope_idents, snake_ident};
 use crate::compiler::srcgen::sink::indentation;
-use crate::compiler::typegen::rust::emitter::{Emitter as TypeModel, TypeContext};
+use crate::compiler::typegen::rust::{TypeContext, TypeModel};
 use crate::core::{Interner, Symbol};
 
 use super::emitter::{accepts_entry_fn_name, safe_entry_fn_name};
@@ -48,8 +47,8 @@ const VEC_VALUE_BYTES: u64 = 24;
 const OPTION_TAG_BYTES: u64 = 8;
 const READER_FRAME_BASE_BYTES: u64 = 128;
 
-pub(super) struct ReaderGen<'a> {
-    model: TypeModel<'a>,
+pub(super) struct ReaderGen<'m, 'a> {
+    model: &'m TypeModel<'a>,
     types: &'a TypeAnalysis,
     deps: &'a DependencyAnalysis,
     interner: &'a Interner,
@@ -109,15 +108,13 @@ impl InherentParseSignature {
     }
 }
 
-impl<'a> ReaderGen<'a> {
+impl<'m, 'a> ReaderGen<'m, 'a> {
     pub(super) fn new(
         artifacts: AnalysisArtifacts<'a>,
-        output: &OutputSchema<'a>,
+        model: &'m TypeModel<'a>,
         replay: &'a ReplayPlan,
-        config: &'a crate::compiler::typegen::rust::Config,
     ) -> Self {
         let types = artifacts.type_analysis;
-        let model = TypeModel::model(output.clone(), config);
         let tables = ReaderTables::collect(replay, artifacts.interner);
 
         Self {
