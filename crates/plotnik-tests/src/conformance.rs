@@ -21,7 +21,6 @@ use tree_sitter::{Language as TsLanguage, Parser as TsParser};
 use crate::fixture::parse_section_header;
 
 pub const CORPUS_SCHEMA_VERSION: u32 = 1;
-pub const RUNTIME_ABI: u32 = 1;
 
 const DISCOVERY_FLOOR: usize = 250;
 const RUNNABLE_FLOOR: usize = 200;
@@ -219,7 +218,7 @@ pub fn generate_corpus() -> Result<GeneratedCorpus, String> {
 
     let manifest = CorpusManifest {
         schema_version: CORPUS_SCHEMA_VERSION,
-        runtime_abi: RUNTIME_ABI,
+        runtime_abi: plotnik_rt::RUNTIME_ABI,
         case_count: case_paths.len(),
         cases: case_paths,
         skipped,
@@ -298,7 +297,10 @@ fn generate_case(fixture: &Fixture, language: &LanguageData) -> Result<CaseResul
         ));
     }
 
-    let Some(module) = compiled.module() else {
+    let emission = compiled
+        .emit(plotnik_lib::BytecodeConfig::new())
+        .map_err(|error| format!("{}: emit bytecode: {error}", fixture.name))?;
+    let Some(module) = emission.artifact() else {
         return Err(format!(
             "{}: error-free query did not produce a bytecode module",
             fixture.name
@@ -347,7 +349,7 @@ fn generate_case(fixture: &Fixture, language: &LanguageData) -> Result<CaseResul
 
     Ok(CaseResult::Case(Box::new(CorpusCase {
         schema_version: CORPUS_SCHEMA_VERSION,
-        runtime_abi: RUNTIME_ABI,
+        runtime_abi: plotnik_rt::RUNTIME_ABI,
         fixture: fixture.name.clone(),
         query: fixture.query.clone(),
         language: language.language,

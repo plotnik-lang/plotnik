@@ -101,6 +101,7 @@ pub enum DiagnosticKind {
     RegexCrlfFlag,
     RegexBoundaryVariant,
     RegexSyntaxError,
+    PredicateValueMismatch,
 
     UnknownNodeKind,
     MissingKindNotToken,
@@ -117,10 +118,10 @@ pub enum DiagnosticKind {
 
     MissingDefName,
 
-    // Placed last (lowest priority): `check`'s dry run reports these only when no
+    // Placed last (lowest priority): emission reports these only when no
     // earlier-stage error exists.
-    EmitFailed,
-    BytecodeRejected,
+    TargetLimitExceeded,
+    CompilerInvariantViolation,
     NoEntrypoints,
     EmptyQuery,
 }
@@ -287,6 +288,9 @@ impl DiagnosticKind {
             Self::RegexBoundaryVariant => {
                 "use `\\b` or `\\B`, which Plotnik defines as ASCII word boundaries on every target"
             }
+            Self::PredicateValueMismatch => {
+                "use a quoted string with `==`, `!=`, `^=`, `$=`, or `*=`; use `/…/` with `=~` or `!~`"
+            }
             Self::InvalidSupertypeSyntax => {
                 "supertypes refine node kinds, not references: write `(supertype#subtype)` or just `(RefName)`"
             }
@@ -416,6 +420,7 @@ impl DiagnosticKind {
                 "this word-boundary variant has no shared equivalent across target engines"
             }
             Self::RegexSyntaxError => "invalid regex syntax",
+            Self::PredicateValueMismatch => "predicate operator and value do not match",
             Self::UnknownNodeKind => "unknown node kind",
             Self::MissingKindNotToken => "this kind is never inserted as a missing node",
             Self::UnknownField => "unknown field",
@@ -429,8 +434,8 @@ impl DiagnosticKind {
             Self::UnsatisfiablePattern => "pattern can never match",
             Self::QueryTooComplex => "query too complex to compile",
             Self::MissingDefName => "definition must be named",
-            Self::EmitFailed => "bytecode emission failed",
-            Self::BytecodeRejected => "query compiles to invalid bytecode",
+            Self::TargetLimitExceeded => "emission target limit exceeded",
+            Self::CompilerInvariantViolation => "compiler invariant violation",
             Self::NoEntrypoints => "query produces no entrypoints",
             Self::EmptyQuery => "query defines nothing",
         }
@@ -490,7 +495,7 @@ impl DiagnosticKind {
                 "branch label `{}` is already used in this alternation".to_string()
             }
             // The detail (an `EmitError`/`ModuleError` Display) is already a complete message.
-            Self::EmitFailed | Self::BytecodeRejected => "{}".to_string(),
+            Self::TargetLimitExceeded | Self::CompilerInvariantViolation => "{}".to_string(),
             _ => format!("{}: {{}}", self.summary()),
         }
     }

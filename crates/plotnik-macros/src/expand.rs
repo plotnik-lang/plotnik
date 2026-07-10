@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
-use plotnik_lib::{CompiledQuery, MatcherConfig, QueryBuilder, SourceMap, SourcePath};
+use plotnik_lib::{CompiledQuery, QueryBuilder, RustCodegenConfig, SourceMap, SourcePath};
 use plotnik_rt::{Limit, RuntimeLimitSpec};
 
 use crate::args::{self, ExpandError, LimitArg, LimitArgs, QuerySource};
@@ -103,14 +103,25 @@ fn try_expand(input: TokenStream, anchors: &mut RebuildAnchors) -> Result<String
     let compiled = compile_strict_query(query, &loaded_grammar.grammar)?;
     reject_colliding_entry_names(&compiled, query_span)?;
 
-    let config = MatcherConfig::new()
-        .rt_crate(args.rt_crate.unwrap_or_else(|| "::plotnik::rt".to_string()))
+    let config = RustCodegenConfig::new()
+        .runtime_crate(args.rt_crate.unwrap_or_else(|| "::plotnik::rt".to_string()))
         .serde(cfg!(feature = "serde"))
         .limits(runtime_limits(&args.limits))
         .depth(replay_depth(&args.limits));
-    Ok(compiled
-        .to_rust_matcher(config)
-        .expect("a diagnostics-clean query generates a module"))
+    let emission = compiled
+        .emit(config)
+        .map_err(|error| ExpandError::new(query_span, error.to_string()))?;
+    if !emission.diagnostics().is_empty() {
+        let rendered = emission
+            .diagnostics()
+            .render_colored(compiled.source_map(), false);
+        let message = rendered.strip_prefix("error: ").unwrap_or(&rendered);
+        return Err(ExpandError::new(query_span, message));
+    }
+    emission
+        .into_artifact()
+        .map(|output| output.into_source())
+        .ok_or_else(|| ExpandError::new(query_span, "query did not emit a Rust module"))
 }
 
 fn compile_strict_query(

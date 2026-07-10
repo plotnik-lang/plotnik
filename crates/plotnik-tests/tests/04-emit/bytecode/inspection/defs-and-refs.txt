@@ -1,0 +1,95 @@
+Ident = (identifier) @name
+Q = (program (expression_statement (Ident) @item))
+------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Ident = 16
+Q     = 20
+
+[transitions]
+Ident:
+  02                                        ▶
+  03   !   (identifier) [Node Set(name)]    02
+
+Q:
+  04                                        ▶
+  05   !   (program)                        07
+  07  └‣─  (expression_statement) [StructOpen]  11
+  08  ─‣┘² _ [Set(item)]                    04
+  10  -ε-  [StructClose]                    08
+  11  └‣─  (Ident)                          03 : 10
+
+Ident (entrypoint):
+  13                                        ▶
+  14  -ε-  [StructClose]                    13
+  15       (Ident)                          03 : 14
+  16  -ε-  [StructOpen]                     15
+
+Q (entrypoint):
+  17                                        ▶
+  18  -ε-  [StructClose]                    17
+  19       (Q)                              05 : 18
+  20  -ε-  [StructOpen]                     19
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "name"
+S2 "item"
+S3 "Ident"
+S4 "Q"
+S5 "identifier"
+S6 "program"
+S7 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Struct  M0:1  ; { name }
+T2 = Struct  M1:1  ; { item }
+
+[type_members]
+M0: S1 → T0  ; name: <Node>
+M1: S2 → T1  ; item: Ident
+
+[type_names]
+N0: S3 → T1  ; Ident
+N1: S4 → T2  ; Q
+
+[entrypoints]
+Ident = 00 :: T1
+Q     = 06 :: T2
+
+[spans]
+P0 def        0..26  src0  T1
+P1 capture    21..26  src0  T1.M0
+P2 pattern    8..20  src0
+P3 def        27..77  src0  T2
+P4 pattern    31..77  src0
+P5 pattern    40..76  src0
+P6 capture    70..75  src0  T2.M1
+P7 ref        62..69  src0  T1
+
+[transitions]
+Ident:
+  00  -ε-  [StructOpen]                     02
+  02       (@24)                            24 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+
+Q:
+  06  -ε-  [StructOpen]                     08
+  08       (@32)                            32 : 09
+  09  -ε-  [StructClose]                    11
+  11                                        ▶
+  12  -ε-  [StructClose]                    16
+  14                                        ▶
+  15  ...
+  16  ─‣┘  _ [SpanStart#6 Set(M1) SpanEnd#6 SpanEnd#7]  19
+  19  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  14
+  21                                        ▶
+  22  ...
+  23  ...
+  24   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  21
+  28  └‣─  (@24)                            24 : 12
+  29  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#7 StructOpen]  28
+  31  ...
+  32   !   (program) [SpanStart#3 SpanStartAt#4]  29

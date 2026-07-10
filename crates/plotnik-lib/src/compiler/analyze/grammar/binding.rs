@@ -6,6 +6,7 @@
 
 use indexmap::IndexMap;
 
+use crate::core::grammar::GrammarIdentity;
 use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 
 /// Resolution table produced by the link pass: the query's node-kind and field
@@ -16,6 +17,7 @@ use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 pub struct GrammarBinding {
     node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
     node_field_ids: IndexMap<Symbol, NodeFieldId>,
+    identity: Option<GrammarIdentity>,
 }
 
 impl GrammarBinding {
@@ -29,6 +31,7 @@ impl GrammarBinding {
         Self {
             node_kind_ids,
             node_field_ids,
+            identity: None,
         }
     }
 
@@ -100,6 +103,10 @@ impl GrammarBinding {
     pub fn field_entries(&self) -> impl ExactSizeIterator<Item = (Symbol, NodeFieldId)> + '_ {
         self.node_field_ids.iter().map(|(&sym, &id)| (sym, id))
     }
+
+    pub fn identity(&self) -> Option<&GrammarIdentity> {
+        self.identity.as_ref()
+    }
 }
 
 /// Mutable accumulator for a [`GrammarBinding`], owned by the link pass.
@@ -107,11 +114,16 @@ impl GrammarBinding {
 pub struct GrammarBindingBuilder {
     node_kind_ids: IndexMap<NodeKind<Symbol>, NodeKindId>,
     node_field_ids: IndexMap<Symbol, NodeFieldId>,
+    identity: Option<GrammarIdentity>,
 }
 
 impl GrammarBindingBuilder {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn identity(&mut self, identity: Option<GrammarIdentity>) {
+        self.identity = identity;
     }
 
     /// Record the first NodeKindId seen for a node kind, keeping the existing entry.
@@ -126,6 +138,8 @@ impl GrammarBindingBuilder {
 
     /// Freeze the accumulated resolution tables into an immutable [`GrammarBinding`].
     pub fn finish(self) -> GrammarBinding {
-        GrammarBinding::new(self.node_kind_ids, self.node_field_ids)
+        let mut binding = GrammarBinding::new(self.node_kind_ids, self.node_field_ids);
+        binding.identity = self.identity;
+        binding
     }
 }

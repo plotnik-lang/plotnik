@@ -42,23 +42,21 @@ pub mod diagnostics {
     };
 }
 
-pub use crate::compiler::codegen::{
-    Config as MatcherConfig, entry_fn_name as matcher_entry_fn_name,
-};
-pub use crate::compiler::typegen::rust::Config as RustConfig;
-pub use crate::compiler::typegen::typescript::{
-    Config as TypeScriptConfig, DtsRange, VoidType as TypeScriptVoidType,
-};
+pub use crate::compiler::entry_fn_name as matcher_entry_fn_name;
+pub use crate::compiler::{DtsRange, TypeScriptVoidType};
 
 pub use crate::core::Colors;
 pub use crate::core::grammar::GrammarIdentity;
 
 pub use crate::compiler::{
-    CheckedQuery, CompiledQuery, Query, QueryBuilder, Source, SourceId, SourceKind, SourceMap,
-    SourcePath, TokenSpan, tokenize,
+    BytecodeConfig, BytecodeInspection, CodegenProvenance, CodegenTarget, DiagnosticBuilder,
+    DiagnosticKind, Diagnostics, Emission, EmitConfigError, EmitTarget, Error, QueryResult,
+    RustCodegenConfig, RustModuleOutput, RustTypesOutput, Severity, Span, TypeScriptCodegenConfig,
+    TypeScriptNodeRepresentation, TypeScriptTypesOutput,
 };
 pub use crate::compiler::{
-    DiagnosticBuilder, DiagnosticKind, Diagnostics, Error, QueryResult, Severity, Span,
+    CompiledQuery, Query, QueryBuilder, Source, SourceId, SourceKind, SourceMap, SourcePath,
+    TokenSpan, tokenize,
 };
 
 #[cfg(feature = "vm")]

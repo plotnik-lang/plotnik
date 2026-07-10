@@ -131,9 +131,10 @@ fn invalid_three_way_mutual_recursion_across_files() {
 #[test]
 fn analysis_rejects_byte_oriented_regex() {
     let linked = Query::expect(r"Q = (identifier =~ /(?-u:\xFF)/) @x").link(grammar());
-    let diag = linked.dry_run();
+    let compiled = linked.compile().expect("compilation answers");
+    let diag = compiled.diagnostics();
     assert!(diag.has_errors());
-    let rendered = diag.render(linked.source_map());
+    let rendered = diag.render(compiled.source_map());
     assert!(
         rendered.contains("pattern can match invalid UTF-8"),
         "{rendered}"
@@ -141,22 +142,29 @@ fn analysis_rejects_byte_oriented_regex() {
 }
 
 #[test]
-fn dry_run_rejects_value_less_definition() {
+fn compile_rejects_value_less_definition() {
     let linked = Query::expect("Q = .").link(grammar());
-    let diag = linked.dry_run();
+    let compiled = linked.compile().expect("compilation answers");
+    let diag = compiled.diagnostics();
     assert!(diag.has_errors());
-    let rendered = diag.render(linked.source_map());
+    let rendered = diag.render(compiled.source_map());
     assert!(rendered.contains("no entrypoint"), "{rendered}");
 }
 
 #[test]
-fn dry_run_accepts_valid_query() {
+fn compile_accepts_valid_query() {
     let linked = Query::parse_and_validate("Q = (identifier) @id").link(grammar());
-    assert!(!linked.dry_run().has_errors());
+    assert!(
+        !linked
+            .compile()
+            .expect("compilation answers")
+            .diagnostics()
+            .has_errors()
+    );
 }
 
 #[test]
-fn dry_run_flags_dropped_value_less_def_among_valid() {
+fn compile_flags_dropped_value_less_def_among_valid() {
     let linked = Query::expect(indoc!(
         "
         Bad = .
@@ -164,17 +172,23 @@ fn dry_run_flags_dropped_value_less_def_among_valid() {
     "
     ))
     .link(grammar());
-    let diag = linked.dry_run();
+    let compiled = linked.compile().expect("compilation answers");
+    let diag = compiled.diagnostics();
     assert!(diag.has_errors());
-    let rendered = diag.render(linked.source_map());
+    let rendered = diag.render(compiled.source_map());
     assert!(rendered.contains("no entrypoint"), "{rendered}");
 }
 
 #[test]
-fn dry_run_is_total_on_empty_source_map() {
-    // The dry run must never panic — even on a query with zero sources.
+fn compile_is_total_on_empty_source_map() {
     let linked = QueryBuilder::new(SourceMap::new()).link(grammar()).unwrap();
-    assert!(!linked.dry_run().has_errors());
+    assert!(
+        !linked
+            .compile()
+            .expect("compilation answers")
+            .diagnostics()
+            .has_errors()
+    );
 }
 
 #[test]
@@ -277,7 +291,11 @@ fn deeply_referenced_alternation_compiles_in_linear_time() {
     let linked = Query::parse_and_validate(&src).link(grammar());
     assert!(linked.is_valid(), "{}", linked.dump_diagnostics());
     assert!(
-        !linked.dry_run().has_errors(),
+        !linked
+            .compile()
+            .expect("compilation answers")
+            .diagnostics()
+            .has_errors(),
         "alternation DAG must lower cleanly",
     );
 }

@@ -2,6 +2,42 @@
 
 Plotnik is a strongly-typed pattern matching language for tree-sitter syntax trees.
 
+## Compiler and emission pipeline
+
+Compilation stops at a target-neutral, always-verified semantic NFA:
+
+```text
+Parse → Analyze → Link → Lower → CompiledQuery
+                                   ├─ emit(BytecodeConfig) → verified Module
+                                   ├─ emit(RustCodegenConfig) → Rust module
+                                   ├─ emit_types(RustCodegenConfig) → Rust types
+                                   └─ emit_types(TypeScriptCodegenConfig) → .d.ts
+```
+
+The public configuration type selects the target; emission is pure and never
+writes files. `CompiledQuery` contains no eager bytecode or decoded module.
+Inspection is a bytecode option and explicitly re-lowers with span effects.
+
+```rust,ignore
+use plotnik_lib::{BytecodeConfig, QueryBuilder, RustCodegenConfig};
+
+let compiled = QueryBuilder::from_inline(query).compile(&grammar)?;
+let module = compiled.emit(BytecodeConfig::new())?.into_artifact();
+let rust = compiled.emit(RustCodegenConfig::new())?.into_artifact();
+let types = compiled.emit_types(RustCodegenConfig::new())?.into_artifact();
+```
+
+Emission implementation lives under one subsystem:
+
+```text
+compiler/emit/
+  plan.rs, matcher.rs, replay.rs, sink.rs, ansi.rs
+  targets/{bytecode,rust,typescript}/
+```
+
+Golden emission fixtures mirror that taxonomy under `04-emit/bytecode`,
+`04-emit/types`, and `04-emit/rust/module`; VM semantics remain under `06-vm`.
+
 ## Quick Links by Audience
 
 ### Users

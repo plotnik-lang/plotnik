@@ -17,7 +17,7 @@
 //! helper links against a small synthetic grammar instead of a real language package.
 
 use crate::compiler::test_utils::synthetic_grammar as grammar;
-use crate::compiler::{QueryBuilder, SourceMap, SourcePath};
+use crate::compiler::{BytecodeConfig, BytecodeInspection, QueryBuilder, SourceMap, SourcePath};
 use indoc::indoc;
 
 use super::{ByteStorage, Module, ModuleError};
@@ -36,8 +36,11 @@ fn emit_bytes(query_src: &str) -> Vec<u8> {
         .expect("query parsing should not exhaust fuel");
     assert!(compiled.is_valid(), "query should compile: {query_src}");
     compiled
-        .bytecode()
+        .emit(BytecodeConfig::new())
+        .expect("bytecode emission answers")
+        .into_artifact()
         .expect("compiled query has bytecode")
+        .bytes()
         .to_vec()
 }
 
@@ -606,13 +609,15 @@ fn emit_inspection_bytes(query_src: &str) -> Vec<u8> {
     let mut source_map = SourceMap::new();
     source_map.add_file(SourcePath::new("query.ptk"), query_src);
     let compiled = QueryBuilder::new(source_map)
-        .with_inspection(true)
         .compile(grammar())
         .expect("query parsing should not exhaust fuel");
     assert!(compiled.is_valid(), "query should compile: {query_src}");
     compiled
-        .bytecode()
+        .emit(BytecodeConfig::new().inspection(BytecodeInspection::Spans))
+        .expect("bytecode emission answers")
+        .into_artifact()
         .expect("compiled query has bytecode")
+        .bytes()
         .to_vec()
 }
 

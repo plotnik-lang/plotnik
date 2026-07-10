@@ -1,5 +1,4 @@
-//! Compile-checks the golden Rust sections: `RUST` (05-typegen output types)
-//! and `MATCHER` (07-codegen generated matchers).
+//! Compile-checks the Rust type and module sections under `04-emit`.
 //!
 //! The snapshot harness (`tests/mod.rs`) keeps the sections up to date; this
 //! test proves the committed goldens are valid Rust against the real
@@ -17,8 +16,13 @@ use std::path::Path;
 fn golden_rust_sections_compile() {
     let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
     let mut mods = Vec::new();
-    collect(&tests, &tests.join("05-typegen"), "RUST", &mut mods);
-    collect(&tests, &tests.join("07-codegen"), "MATCHER", &mut mods);
+    collect(&tests, &tests.join("04-emit/types"), "RUST", &mut mods);
+    collect(
+        &tests,
+        &tests.join("04-emit/rust/module"),
+        "MATCHER",
+        &mut mods,
+    );
     assert!(!mods.is_empty(), "no Rust sections found in the corpus");
     mods.sort();
 
@@ -100,7 +104,7 @@ fn rule_label(line: &str) -> Option<&str> {
     (!label.is_empty()).then_some(label)
 }
 
-/// `05-typegen/serde/enum` → `fx_05_typegen_serde_enum`. The `fx_` prefix
+/// `04-emit/types/serde/enum` → `fx_04_emit_types_serde_enum`. The `fx_` prefix
 /// keeps keywords and leading digits out of play.
 fn mod_ident(rel: &str) -> String {
     let mut out = String::from("fx_");

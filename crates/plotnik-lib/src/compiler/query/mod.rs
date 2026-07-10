@@ -10,4 +10,4 @@ mod printer_tests;
 mod stages_tests;
 
 pub(crate) use stages::LinkOutcome;
-pub use stages::{CheckedQuery, CompiledQuery, Query, QueryBuilder};
+pub use stages::{CompiledQuery, Query, QueryBuilder};

@@ -1,8 +1,9 @@
 # Plotnik Type System
 
 Plotnik infers static types from query structure. Types — including their
-names — are computed at compile time and stored in the bytecode; typegen and
-the JSON materializer are pure renderers of that information.
+names — are retained in the target-neutral compiled query. Rust and TypeScript
+type emission project those same facts directly; bytecode is only constructed
+when the VM target is explicitly selected.
 
 ## The Output Model
 

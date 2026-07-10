@@ -1,22 +1,18 @@
 //! Plotnik compiler pipeline.
 //!
-//! Orchestrates the parser, analysis, lowering, emission, and typegen modules
+//! Orchestrates parsing, analysis, lowering, and target emission
 //! into the `Query`/`QueryBuilder` pipeline. Pass internals stay under this
 //! module; the crate root re-exports only the facade-level API.
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
-pub(crate) mod codegen;
+mod analyze;
 pub(crate) mod diagnostics;
 mod ids;
 pub(crate) mod limits;
+mod lower;
 pub(crate) mod parse;
 pub(crate) mod regex;
-pub(crate) mod srcgen;
-pub(crate) mod typegen;
-
-mod analyze;
-mod lower;
 
 #[cfg(test)]
 mod regex_tests;
@@ -32,5 +28,11 @@ pub use crate::compiler::diagnostics::{
     DiagnosticBuilder, DiagnosticKind, Diagnostics, Error, QueryResult, Severity, Source, SourceId,
     SourceKind, SourceMap, SourcePath, Span,
 };
+pub use emit::{
+    BytecodeConfig, BytecodeInspection, CodegenProvenance, CodegenTarget, DtsRange, Emission,
+    EmitConfigError, EmitTarget, RustCodegenConfig, RustModuleOutput, RustTypesOutput,
+    TypeScriptCodegenConfig, TypeScriptNodeRepresentation, TypeScriptTypesOutput,
+    TypeScriptVoidType, entry_fn_name,
+};
 pub use parse::{TokenSpan, tokenize};
-pub use query::{CheckedQuery, CompiledQuery, Query, QueryBuilder};
+pub use query::{CompiledQuery, Query, QueryBuilder};

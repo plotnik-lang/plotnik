@@ -2028,7 +2028,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "plotnik"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "plotnik-macros",
  "plotnik-rt",
@@ -2037,7 +2037,7 @@ dependencies = [
 
 [[package]]
 name = "plotnik-cli"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "arborium-ada",
  "arborium-agda",
@@ -2165,7 +2165,7 @@ dependencies = [
 
 [[package]]
 name = "plotnik-lib"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "annotate-snippets",
  "bitflags",
@@ -2192,7 +2192,7 @@ dependencies = [
 
 [[package]]
 name = "plotnik-macros"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "cargo_metadata",
  "crc32fast",
@@ -2204,7 +2204,7 @@ dependencies = [
 
 [[package]]
 name = "plotnik-rt"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "regex-automata",
  "serde",
@@ -2213,7 +2213,7 @@ dependencies = [
 
 [[package]]
 name = "plotnik-tests"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "arborium-dart",
  "arborium-javascript",
@@ -2237,7 +2237,7 @@ dependencies = [
 
 [[package]]
 name = "plotnik-wasm"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "arborium-javascript",
  "arborium-typescript",

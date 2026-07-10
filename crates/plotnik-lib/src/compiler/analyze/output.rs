@@ -16,16 +16,11 @@ use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, 
 use crate::core::{Interner, Symbol};
 
 const MAX_MEMBERS: usize = u16::MAX as usize;
-const MAX_SCOPE_MEMBERS: usize = u8::MAX as usize;
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub(crate) enum OutputSchemaError {
     #[error("too many type members: {0} (max {MAX_MEMBERS})")]
     Members(usize),
-    #[error("too many struct fields: {0} (max {MAX_SCOPE_MEMBERS})")]
-    Fields(usize),
-    #[error("too many enum variants: {0} (max {MAX_SCOPE_MEMBERS})")]
-    Variants(usize),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -167,15 +162,6 @@ impl CaptureLayout {
             let base = u16::try_from(member_count)
                 .expect("member count was checked against the u16 format limit");
             member_count = next_member_count;
-            match kind {
-                CaptureScopeKind::Struct if members.len() > MAX_SCOPE_MEMBERS => {
-                    return Err(OutputSchemaError::Fields(members.len()));
-                }
-                CaptureScopeKind::Enum if members.len() > MAX_SCOPE_MEMBERS => {
-                    return Err(OutputSchemaError::Variants(members.len()));
-                }
-                _ => {}
-            }
             scopes.insert(
                 type_id,
                 CaptureScope {
@@ -264,6 +250,14 @@ impl<'a> OutputSchema<'a> {
 
     pub(crate) fn layout(&self) -> &CaptureLayout {
         &self.layout
+    }
+
+    pub(crate) fn dependency_analysis(&self) -> &DependencyAnalysis {
+        self.deps
+    }
+
+    pub(crate) fn interner(&self) -> &Interner {
+        self.interner
     }
 }
 

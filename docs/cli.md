@@ -96,7 +96,8 @@ Requires a language via `-l` or a shebang; node kinds are resolved to grammar ID
 
 ### check
 
-Validate a query. Like `cargo check`.
+Validate a query. Like `cargo check`, this parses, analyzes, links, lowers, and
+verifies the shared executor contracts without selecting an emission target.
 
 ```sh
 # Validate syntax, types, recursion (no grammar)
@@ -120,6 +121,10 @@ With `-l`: also validates node kinds and field names exist in grammar.
 On success: silent, exits 0. A valid query with warnings prints them and
 still exits 0 (`--strict` turns warnings into failures).
 On error: prints diagnostics to stderr, exits 1.
+
+`check` does not test bytecode-format capacities. A query can pass `check` and
+emit source while a later VM-bytecode emission reports a target limit (for
+example, the bytecode type table's per-struct field width).
 
 With `--json`, on exit 0 or 1 stdout is a JSON array of diagnostics (`[]`
 when the query is clean), each with `code`, `severity`, `message`, `span`
@@ -560,11 +565,11 @@ Common errors:
 
 Uniform across all commands:
 
-| Code | Meaning                                         |
-| ---- | ----------------------------------------------- |
-| 0    | Yes/success (match found, query valid)          |
-| 1    | Domain "no" (`run`: no match; `check`: invalid) |
-| 2    | Couldn't answer (usage, IO, or internal error)  |
+| Code | Meaning                                                                   |
+| ---- | ------------------------------------------------------------------------- |
+| 0    | Yes/success (match found, query valid)                                    |
+| 1    | Domain "no" (no match, invalid query, or selected-target capacity limit)  |
+| 2    | Couldn't answer (usage, IO, invalid target configuration, internal error) |
 
 ---
 

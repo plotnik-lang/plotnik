@@ -1,0 +1,92 @@
+Q = (program
+  (expression_statement
+    [
+      (binary_expression
+        (identifier)
+        "+"
+        (_)
+      )
+      (_)
+      _
+    ]
+  )
+)
+------------------- INPUT (ts) -------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 18
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (program)                        04
+  04  └‣─  (expression_statement)           16
+  05  ─‣┘² _                                01
+  06   !   (binary_expression)              10
+  07  ─‣┘  _                                05
+  08  ─‣─  (_)                              07
+  09  ─‣─  "+"                              08
+  10  └‣─  (identifier)                     09
+  11   !   (_)                              05
+  12   !   _                                05
+  15  ──!  _                                06, 11, 12, 15
+  16  └─!  _                                06, 11, 12, 15
+
+Q (entrypoint):
+  17                                        ▶
+  18       (Q)                              02 : 17
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "program"
+S2 "expression_statement"
+S3 "binary_expression"
+S4 "identifier"
+S5 "+"
+S6 "Q"
+
+[type_defs]
+T0 = <Void>
+
+[type_members]
+
+[type_names]
+
+[entrypoints]
+Q = 00 :: T0
+
+[spans]
+P00 def        0..150  src0  T0
+P01 pattern    4..150  src0
+P02 pattern    15..148  src0
+P03 union      41..144  src0
+P04 branch     49..120  src0
+P05 pattern    49..120  src0
+P06 pattern    76..88  src0
+P07 pattern    97..100  src0
+P08 pattern    109..112  src0
+P09 branch     127..130  src0
+P10 pattern    127..130  src0
+P11 branch     137..138  src0
+P12 pattern    137..138  src0
+
+[transitions]
+Q:
+  00       (@30)                            30 : 01
+  01                                        ▶
+  02  ─‣─  (_) [SpanStartAt#8 SpanEnd#8]    04
+  04  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  06
+  06  ─‣┘  _                                08
+  07  ...
+  08  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  10                                        ▶
+  11  ─‣─  "+" [SpanStartAt#7 SpanEnd#7]    02
+  13  └‣─  (identifier) [SpanStartAt#6 SpanEnd#6]  11
+  15  ...
+  16   !   (binary_expression) [SpanStart#3 SpanStart#4 SpanStartAt#5]  13
+  18   !   (_) [SpanStart#3 SpanStart#9 SpanStartAt#10 SpanEnd#10 SpanEnd#9 SpanEnd#3]  06
+  21   !   _ [SpanStart#3 SpanStart#11 SpanStartAt#12 SpanEnd#12 SpanEnd#11 SpanEnd#3]  06
+  24  ──!  _                                16, 18, 21, 24
+  26  └─!  _                                16, 18, 21, 24
+  28  └‣─  (expression_statement) [SpanStartAt#2]  26
+  30   !   (program) [SpanStart#0 SpanStartAt#1]  28

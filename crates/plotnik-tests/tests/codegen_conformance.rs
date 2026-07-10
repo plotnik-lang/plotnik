@@ -29,8 +29,8 @@ use std::sync::LazyLock;
 use plotnik_lib::bytecode::{Module, TypeDefKind, TypeKind};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    Colors, MatcherConfig, QueryBuilder, RuntimeError, SourceMap, SourcePath, VM,
-    matcher_entry_fn_name, materialize_verified,
+    BytecodeConfig, Colors, QueryBuilder, RuntimeError, RustCodegenConfig, SourceMap, SourcePath,
+    VM, matcher_entry_fn_name, materialize_verified,
 };
 use plotnik_rt::{Limit, RuntimeLimitSpec};
 use plotnik_tests::conformance::{Fixture, collect_vm_fixtures, render_effect};
@@ -121,13 +121,18 @@ fn conformance_mod(fx: &Fixture) -> Option<String> {
         return None;
     }
     let module = compiled
-        .module()
+        .emit(BytecodeConfig::new())
+        .expect("bytecode emission answers")
+        .into_artifact()
         .expect("a query without errors compiles to a module");
     let entry = module.entrypoint_names().last()?.to_string();
-    let expected = vm_expected(&lang, module, &entry, &fx.input, &fx.name);
+    let expected = vm_expected(&lang, &module, &entry, &fx.input, &fx.name);
     let matcher = compiled
-        .to_rust_matcher(MatcherConfig::new().serde(true))
-        .expect("a query without errors compiles to a matcher");
+        .emit(RustCodegenConfig::new().serde(true))
+        .expect("Rust emission answers")
+        .into_artifact()
+        .expect("a query without errors compiles to a matcher")
+        .into_source();
 
     let mut out = String::new();
     let w = &mut out;
@@ -177,7 +182,7 @@ fn conformance_mod(fx: &Fixture) -> Option<String> {
         matcher_entry_fn_name(&entry),
     )
     .expect("writing to a String is infallible");
-    value_channel(w, module, &entry);
+    value_channel(w, &module, &entry);
     w.push_str("    }\n}\n");
     Some(out)
 }
@@ -309,11 +314,14 @@ fn limit_trip_mod() -> String {
         "limit-trip query must compile"
     );
     let matcher = compiled
-        .to_rust_matcher(MatcherConfig::new().limits(RuntimeLimitSpec {
+        .emit(RustCodegenConfig::new().limits(RuntimeLimitSpec {
             steps: Limit::Of(1),
             memory: Limit::Auto,
         }))
-        .expect("limit-trip query compiles to a matcher");
+        .expect("Rust emission answers")
+        .into_artifact()
+        .expect("limit-trip query compiles to a matcher")
+        .into_source();
 
     let mut out = String::new();
     let w = &mut out;
@@ -353,11 +361,14 @@ fn unbounded_mod() -> String {
         "unbounded query must compile"
     );
     let matcher = compiled
-        .to_rust_matcher(MatcherConfig::new().limits(RuntimeLimitSpec {
+        .emit(RustCodegenConfig::new().limits(RuntimeLimitSpec {
             steps: Limit::Unbounded,
             memory: Limit::Unbounded,
         }))
-        .expect("unbounded query compiles to a matcher");
+        .expect("Rust emission answers")
+        .into_artifact()
+        .expect("unbounded query compiles to a matcher")
+        .into_source();
     assert!(
         !matcher.contains("run::<true,"),
         "unbounded policy must not instantiate a metered `run`:\n{matcher}"
@@ -405,11 +416,14 @@ fn steps_only_mod() -> String {
         "steps-only query must compile"
     );
     let matcher = compiled
-        .to_rust_matcher(MatcherConfig::new().limits(RuntimeLimitSpec {
+        .emit(RustCodegenConfig::new().limits(RuntimeLimitSpec {
             steps: Limit::Of(1),
             memory: Limit::Unbounded,
         }))
-        .expect("steps-only query compiles to a matcher");
+        .expect("Rust emission answers")
+        .into_artifact()
+        .expect("steps-only query compiles to a matcher")
+        .into_source();
     assert!(
         matcher.contains("run::<true, false,"),
         "steps-bounded, memory-unbounded must meter steps only:\n{matcher}"

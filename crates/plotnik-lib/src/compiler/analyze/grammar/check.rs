@@ -35,6 +35,21 @@ impl<'a, 'q> GrammarLinker<'a, 'q> {
                 }
                 let child_ctx = self.resolve_node_context(&located_node);
 
+                if let Some(predicate) = node.predicate()
+                    && let Some(operator) = predicate.operator()
+                {
+                    let mismatched = (operator.is_regex_op() && predicate.string_value().is_some())
+                        || (!operator.is_regex_op() && predicate.regex().is_some());
+                    if mismatched {
+                        self.diag
+                            .report(
+                                DiagnosticKind::PredicateValueMismatch,
+                                located.span_of(predicate.syntax().text_range()),
+                            )
+                            .emit();
+                    }
+                }
+
                 // Predicates are only valid on leaf nodes. Skipped under a disjunction/option,
                 // where this position need not match for the query to.
                 if participation.is_required()

@@ -75,7 +75,7 @@ dynamic values:
 
 ```toml
 [dependencies]
-plotnik = "0.3"
+plotnik = "0.4"
 tree-sitter-javascript = "0.25"
 ```
 

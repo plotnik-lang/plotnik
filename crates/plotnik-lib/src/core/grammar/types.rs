@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::{Cardinality, NodeClass, NodeFieldId, NodeKind, NodeKindId};
 
+use super::GrammarIdentity;
 use super::admissibility::{AdmissibilityIndex, KindSet, Reachability};
 use super::json::GrammarError;
 use super::raw::RawGrammar;
@@ -57,6 +58,7 @@ pub(super) struct FieldEntry {
 #[derive(Debug, Clone)]
 pub struct Grammar {
     name: String,
+    identity: Option<GrammarIdentity>,
     node_constraints: HashMap<NodeKindId, NodeConstraints>,
     extra_node_kinds: Vec<NodeKindId>,
     root_node_kind: Option<NodeKindId>,
@@ -261,6 +263,7 @@ impl Grammar {
 
         Ok(Self {
             name,
+            identity: None,
             node_constraints,
             extra_node_kinds,
             root_node_kind,
@@ -287,6 +290,22 @@ impl Grammar {
     /// Grammar name (e.g., "javascript", "rust").
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Attach provenance for the exact grammar artifact this metadata was
+    /// derived from.
+    pub fn with_identity(mut self, identity: GrammarIdentity) -> Self {
+        assert_eq!(
+            self.name,
+            identity.name(),
+            "grammar identity name must match parsed grammar metadata"
+        );
+        self.identity = Some(identity);
+        self
+    }
+
+    pub fn identity(&self) -> Option<&GrammarIdentity> {
+        self.identity.as_ref()
     }
 
     /// Distilled structural skeleton of the grammar's productions — ordered,

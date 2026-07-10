@@ -9,11 +9,15 @@
 //! these primitives; generated Rust matchers (the proc-macro backend) compile
 //! to direct calls into the same primitives — engine semantics stay
 //! single-sourced.
+
 //!
 //! The `tree-sitter` feature (default) gates exactly the modules that touch a
 //! parse tree. With `default-features = false` only the tree-free vocabulary
 //! remains, which is what lets `plotnik-lib`'s compiler build without linking
 //! tree-sitter's C runtime.
+
+/// ABI implemented by this runtime build and required by generated modules.
+pub const RUNTIME_ABI: u32 = 1;
 
 mod dfa;
 mod frame;

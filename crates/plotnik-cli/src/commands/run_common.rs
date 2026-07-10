@@ -179,8 +179,13 @@ pub fn plan_exec(input: ExecRequest) -> Result<ExecPlan, CliError> {
         input.source_path,
     )?;
 
-    let compiled = compile_query(loaded.sources, lang, input.color, input.inspection)?;
-    let module = compiled.into_module().expect("dry_run guarantees a module");
+    let compiled = compile_query(loaded.sources, lang, input.color)?;
+    let config = if input.inspection {
+        plotnik_lib::BytecodeConfig::new().inspection(plotnik_lib::BytecodeInspection::Spans)
+    } else {
+        plotnik_lib::BytecodeConfig::new()
+    };
+    let module = super::compile::emit_module(&compiled, config, input.color)?;
     // Queries conventionally put the top-level callable definition last.
     let default_entry = module.entrypoint_names().last().map(str::to_owned);
 

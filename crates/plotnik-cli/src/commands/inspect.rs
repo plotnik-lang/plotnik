@@ -4,8 +4,9 @@ use std::path::PathBuf;
 
 use plotnik_lib::bytecode::{Module, SPAN_NO_BINDING};
 use plotnik_lib::{
-    Colors, NoopTracer, QueryBuilder, RecordingTracer, RuntimeError, RuntimeLimitSpec,
-    TypeScriptConfig, VM, extract_inspection, materialize_verified, tokenize,
+    BytecodeConfig, BytecodeInspection, Colors, NoopTracer, QueryBuilder, RecordingTracer,
+    RuntimeError, RuntimeLimitSpec, TypeScriptCodegenConfig, VM, extract_inspection,
+    materialize_verified, tokenize,
 };
 use serde_json::{Map, Value, json};
 
@@ -75,22 +76,33 @@ pub fn run(args: InspectArgs) -> CliResult {
     )?;
 
     let compiled = QueryBuilder::new(loaded.sources)
-        .with_inspection(true)
         .compile(lang.grammar())
         .map_err(|e| CliError::fatal(e.to_string()))?;
 
-    let diagnostics = compiled.diagnostics().to_wire(compiled.source_map());
-    let diagnostics_have_errors = compiled.diagnostics().has_errors();
-    let module = compiled.module();
-    let (dts, dts_map) = compiled
-        .to_typescript_mapped(TypeScriptConfig::new().colored(false))
+    let types = compiled
+        .emit_types(TypeScriptCodegenConfig::new().colored(false))
+        .map_err(|error| CliError::fatal(error.to_string()))?;
+    let type_diagnostics = types.diagnostics().clone();
+    let (dts, dts_map) = types
+        .into_artifact()
+        .map(|output| output.into_parts())
         .unwrap_or_else(|| (String::new(), Vec::new()));
+    let bytecode = compiled
+        .emit(BytecodeConfig::new().inspection(BytecodeInspection::Spans))
+        .map_err(|error| CliError::fatal(error.to_string()))?;
+    let mut diagnostics = compiled.diagnostics().clone();
+    diagnostics.extend(type_diagnostics);
+    diagnostics.extend(bytecode.diagnostics().clone());
+    let diagnostics_have_errors = diagnostics.has_errors();
+    let diagnostics = diagnostics.to_wire(compiled.source_map());
+    let module = bytecode.into_artifact();
     let spans = module
+        .as_ref()
         .map(spans_json)
         .unwrap_or_else(|| Value::Array(Vec::new()));
-    let entrypoints = module.map(entrypoint_names).unwrap_or_default();
+    let entrypoints = module.as_ref().map(entrypoint_names).unwrap_or_default();
 
-    let run = if let Some(module) = module {
+    let run = if let Some(module) = module.as_ref() {
         let default_entry = module.entrypoint_names().last().map(str::to_owned);
         let entry = args.entry.clone().or(shebang_entry).or(default_entry);
         let entrypoint = run_common::resolve_entrypoint(module, entry.as_deref())?;

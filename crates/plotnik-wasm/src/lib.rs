@@ -26,8 +26,9 @@ use std::cell::OnceCell;
 use langs::Lang;
 use plotnik_lib::bytecode::{Entrypoint, Module};
 use plotnik_lib::{
-    CompiledQuery, MatcherConfig, NoopTracer, QueryBuilder, RecordingTracer, RuntimeLimitSpec,
-    TypeScriptConfig, VM, dump_tree, tokenize as query_tokenize,
+    BytecodeConfig, BytecodeInspection, CodegenProvenance, CompiledQuery, NoopTracer, QueryBuilder,
+    RecordingTracer, RuntimeLimitSpec, RustCodegenConfig, TypeScriptCodegenConfig, VM, dump_tree,
+    tokenize as query_tokenize,
 };
 use serde_json::{Value as JsonValue, json};
 use wasm_bindgen::prelude::*;
@@ -40,6 +41,7 @@ use wire::{InfoParts, error_json, info_json, json_value, result_json, to_js};
 pub struct Session {
     lang: &'static Lang,
     compiled: CompiledQuery,
+    module: Option<Module>,
     entrypoints: Vec<String>,
     info: JsonValue,
     generated_rust: OnceCell<Option<String>>,
@@ -55,18 +57,29 @@ impl Session {
         let lang = langs::resolve(lang).map_err(|error| JsValue::from_str(&error))?;
         let tokens = query_tokenize(query);
         let compiled = QueryBuilder::from_inline(query)
-            .with_inspection(true)
             .compile(lang.grammar())
             .map_err(|error| JsValue::from_str(&error.to_string()))?;
 
-        let diagnostics = json_value!(compiled.diagnostics().to_wire(compiled.source_map()));
-        let bytecode_size = compiled.bytecode().map(<[u8]>::len);
-        let (dts, dts_map) = compiled
-            .to_typescript_mapped(TypeScriptConfig::new().colored(false))
+        let bytecode = compiled
+            .emit(BytecodeConfig::new().inspection(BytecodeInspection::Spans))
+            .map_err(|error| JsValue::from_str(&error.to_string()))?;
+        let bytecode_diagnostics = bytecode.diagnostics().clone();
+        let mut diagnostics = compiled.diagnostics().clone();
+        let module = bytecode.into_artifact();
+        let bytecode_size = module.as_ref().map(|module| module.bytes().len());
+        let types = compiled
+            .emit_types(TypeScriptCodegenConfig::new().colored(false))
+            .map_err(|error| JsValue::from_str(&error.to_string()))?;
+        diagnostics.extend(types.diagnostics().clone());
+        diagnostics.extend(bytecode_diagnostics);
+        let diagnostics = json_value!(diagnostics.to_wire(compiled.source_map()));
+        let (dts, dts_map) = types
+            .into_artifact()
+            .map(|output| output.into_parts())
             .unwrap_or_else(|| (String::new(), Vec::new()));
-        let entrypoints = compiled.module().map(entrypoint_names).unwrap_or_default();
+        let entrypoints = module.as_ref().map(entrypoint_names).unwrap_or_default();
         let info = info_json(InfoParts {
-            module: compiled.module(),
+            module: module.as_ref(),
             tokens: json_value!(tokens),
             diagnostics,
             dts,
@@ -78,6 +91,7 @@ impl Session {
         Ok(Session {
             lang,
             compiled,
+            module,
             entrypoints,
             info,
             generated_rust: OnceCell::new(),
@@ -98,7 +112,10 @@ impl Session {
         let identity = self.lang.identity();
         let code = self.generated_rust.get_or_init(|| {
             self.compiled
-                .to_rust_matcher(MatcherConfig::new().grammar_identity(identity.clone()))
+                .emit(RustCodegenConfig::new().provenance(CodegenProvenance::Full))
+                .expect("built-in Rust emission configuration is valid")
+                .into_artifact()
+                .map(|output| output.into_source())
         });
         Ok(to_js(&json!({
             "target": "rust",
@@ -148,7 +165,7 @@ pub fn tokenize_js(query: &str) -> JsValue {
 
 impl Session {
     fn execute(&self, source: &str, entry: Option<&str>, trace: TraceMode) -> JsonValue {
-        let Some(module) = self.compiled.module() else {
+        let Some(module) = self.module.as_ref() else {
             return error_json("query did not compile");
         };
 

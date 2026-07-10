@@ -37,7 +37,7 @@ fn capture_layout_assigns_one_absolute_member_sequence() {
 }
 
 #[test]
-fn capture_layout_owns_the_per_scope_width_check() {
+fn capture_layout_accepts_256_fields() {
     let mut interner = Interner::new();
     let mut types = TypeAnalysisBuilder::new();
     let fields = (0..=u8::MAX)
@@ -54,10 +54,10 @@ fn capture_layout_owns_the_per_scope_width_check() {
     types.record_def_arity(def, Arity::One);
     let types = types.finish();
 
-    let error = CaptureLayout::build(&types, &collect_ordered_types(&types))
-        .expect_err("256 fields exceed the capture-scope count");
+    let layout = CaptureLayout::build(&types, &collect_ordered_types(&types))
+        .expect("per-scope widths belong to bytecode emission");
 
-    assert_eq!(error, OutputSchemaError::Fields(256));
+    assert_eq!(layout.member_count(), 256);
 }
 
 #[test]

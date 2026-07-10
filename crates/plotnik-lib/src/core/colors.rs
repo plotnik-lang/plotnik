@@ -10,7 +10,7 @@
 ///
 /// Designed for jq-inspired colorization that works in both light and dark themes.
 /// Uses only standard 16-color ANSI codes (no RGB).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Colors {
     pub blue: &'static str,
     pub green: &'static str,

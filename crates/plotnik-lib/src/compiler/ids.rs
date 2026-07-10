@@ -19,11 +19,6 @@ impl DefId {
     }
 
     #[inline]
-    pub fn as_u32(self) -> u32 {
-        self.0
-    }
-
-    #[inline]
     pub fn index(self) -> usize {
         self.0 as usize
     }

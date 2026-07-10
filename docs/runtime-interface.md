@@ -10,6 +10,10 @@ The bytecode VM and `plotnik-rt` are the reference implementation. See
 [runtime-engine.md](runtime-engine.md) for the execution model and
 [tree-navigation.md](tree-navigation.md) for the complete navigation table.
 
+The reference ABI value is owned by `plotnik_rt::RUNTIME_ABI`. The compiler
+copies that value into generated-module metadata; other runtime ecosystems
+publish the ABI range they implement.
+
 ## 1. Compatibility
 
 Dynamic-language runtimes expose an inclusive supported ABI range:

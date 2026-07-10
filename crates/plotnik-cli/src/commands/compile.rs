@@ -1,37 +1,27 @@
-//! Shared compile path for run, dump, and infer.
-//!
-//! All three funnel through `dry_run` — the same full-pipeline validation
-//! `check` runs — so a query `check` rejects fails here too, as a rendered
-//! diagnostic rather than a panic on `Module::load`.
+//! Shared target-neutral compile and bytecode emission paths.
 
 use plotnik_lib::bytecode::Module;
 use plotnik_lib::grammar::Grammar;
-use plotnik_lib::{CompiledQuery, QueryBuilder, SourceMap};
+use plotnik_lib::{BytecodeConfig, CompiledQuery, QueryBuilder, SourceMap};
 
 use crate::error::CliError;
 use crate::language_registry::Lang;
 
-/// Parse, analyze, link, validate (full `dry_run`), emit, load.
-///
-/// `dry_run` already proves emit+load succeed, so the final load can only
-/// fail on a genuine bug; it is surfaced as a clean error, never a panic.
+/// Parse, analyze, link, lower, and validate target-neutral compiler IR.
 pub fn compile_query(
     sources: SourceMap,
     lang: &Lang,
     color: bool,
-    inspection: bool,
 ) -> Result<CompiledQuery, CliError> {
-    compile_query_with_grammar(sources, lang.grammar(), color, inspection)
+    compile_query_with_grammar(sources, lang.grammar(), color)
 }
 
 pub fn compile_query_with_grammar(
     sources: SourceMap,
     grammar: &Grammar,
     color: bool,
-    inspection: bool,
 ) -> Result<CompiledQuery, CliError> {
     let compiled = QueryBuilder::new(sources)
-        .with_inspection(inspection)
         .compile(grammar)
         .map_err(|e| CliError::fatal(e.to_string()))?;
 
@@ -48,6 +38,31 @@ pub fn compile_query_with_grammar(
 }
 
 pub fn compile_module(sources: SourceMap, lang: &Lang, color: bool) -> Result<Module, CliError> {
-    let compiled = compile_query(sources, lang, color, false)?;
-    Ok(compiled.into_module().expect("dry_run guarantees a module"))
+    let compiled = compile_query(sources, lang, color)?;
+    emit_module(&compiled, BytecodeConfig::new(), color)
+}
+
+pub fn emit_module(
+    compiled: &CompiledQuery,
+    config: BytecodeConfig,
+    color: bool,
+) -> Result<Module, CliError> {
+    let emission = compiled
+        .emit(config)
+        .map_err(|error| CliError::fatal(error.to_string()))?;
+    let has_errors = emission.diagnostics().has_errors();
+    if !emission.diagnostics().is_empty() {
+        eprint!(
+            "{}",
+            emission
+                .diagnostics()
+                .render_colored(compiled.source_map(), color)
+        );
+    }
+    if has_errors {
+        return Err(CliError::No);
+    }
+    emission
+        .into_artifact()
+        .ok_or_else(|| CliError::fatal("bytecode emission produced no module"))
 }

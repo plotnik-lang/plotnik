@@ -67,17 +67,15 @@ impl Lang {
             .get_or_init(|| gunzip(self.raw_json_gz).expect("invalid embedded grammar gzip"))
     }
 
-    pub fn identity(&self) -> GrammarIdentity {
-        GrammarIdentity::from_json_bytes(
-            self.grammar().name(),
-            self.grammar_json().as_bytes(),
-            self.source,
-        )
-    }
-
     pub fn grammar(&self) -> &Grammar {
         self.grammar.get_or_init(|| {
-            Grammar::from_raw(self.raw()).expect("invalid embedded grammar metadata")
+            let grammar = Grammar::from_raw(self.raw()).expect("invalid embedded grammar metadata");
+            let identity = GrammarIdentity::from_json_bytes(
+                grammar.name(),
+                self.grammar_json().as_bytes(),
+                self.source,
+            );
+            grammar.with_identity(identity)
         })
     }
 

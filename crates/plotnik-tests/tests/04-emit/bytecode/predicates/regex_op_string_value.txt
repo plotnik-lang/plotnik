@@ -1,0 +1,9 @@
+Q = (identifier =~ "foo") @id
+------------------ DIAGNOSTICS -------------------
+error: predicate operator and value do not match
+ --> query.ptk:1:17
+  |
+1 | Q = (identifier =~ "foo") @id
+  |                 ^^^^^^^^
+  |
+help: use a quoted string with `==`, `!=`, `^=`, `$=`, or `*=`; use `/…/` with `=~` or `!~`

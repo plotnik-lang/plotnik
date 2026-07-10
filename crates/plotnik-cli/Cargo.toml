@@ -254,7 +254,7 @@ lang-zsh = ["dep:arborium-zsh"]
 [dependencies]
 clap = { version = "4.5", features = ["derive", "string"] }
 clap_complete = "4.5"
-plotnik-lib = { path = "../plotnik-lib", version = "0.3.3", default-features = false, features = ["vm"] }
+plotnik-lib = { path = "../plotnik-lib", version = "0.4.0", default-features = false, features = ["vm"] }
 serde_json = "1"
 tree-sitter = "0.26.10"
 # @generated:lang-deps:begin
@@ -379,7 +379,7 @@ libc = "0.2"
 [build-dependencies]
 cargo_metadata = "0.23"
 flate2 = "1.1"
-plotnik-lib = { path = "../plotnik-lib", version = "0.3.3", default-features = false }
+plotnik-lib = { path = "../plotnik-lib", version = "0.4.0", default-features = false }
 
 [dev-dependencies]
 indoc = "=2.0.7"

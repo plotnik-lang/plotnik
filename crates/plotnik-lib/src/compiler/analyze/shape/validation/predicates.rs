@@ -57,10 +57,16 @@ impl RegexLiteral<'_> {
 
 impl Visitor for PredicateValidator<'_, '_> {
     fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
-        if let Some(pred) = node.node().predicate()
-            && let Some(op) = pred.operator()
-            && op.is_regex_op()
-            && let Some(regex) = pred.regex()
+        let Some(predicate) = node.node().predicate() else {
+            walk_node_pattern(self, node);
+            return;
+        };
+        let Some(operator) = predicate.operator() else {
+            walk_node_pattern(self, node);
+            return;
+        };
+        if operator.is_regex_op()
+            && let Some(regex) = predicate.regex()
         {
             self.validate_regex(RegexLiteral {
                 pattern: regex.pattern(self.source),

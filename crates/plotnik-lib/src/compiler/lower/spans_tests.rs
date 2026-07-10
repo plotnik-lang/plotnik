@@ -3,7 +3,7 @@ use std::fmt::Write as _;
 use crate::bytecode::{HEADER_SIZE, Header, SPAN_NO_BINDING, STEP_SIZE, SpanEntry, SpanKind};
 use crate::compiler::diagnostics::DiagnosticKind;
 use crate::compiler::test_utils::synthetic_grammar;
-use crate::compiler::{CompiledQuery, QueryBuilder};
+use crate::compiler::{BytecodeConfig, BytecodeInspection, CompiledQuery, Emission, QueryBuilder};
 
 #[test]
 fn assigns_dense_spans_in_walk_order() {
@@ -51,19 +51,20 @@ fn ladder_drops_whole_lower_priority_tiers() {
         writeln!(src, "Q{i} = (identifier) @c_{i}").expect("write query");
     }
 
-    let compiled = inspected(&src);
+    let compiled = compiled(&src);
+    let emission = inspected(&compiled);
     assert!(
-        compiled
+        emission
             .diagnostics()
             .kinds()
             .any(|kind| kind == DiagnosticKind::InspectionSpansDegraded),
         "{}",
-        compiled.diagnostics().render(compiled.source_map())
+        emission.diagnostics().render(compiled.source_map())
     );
 
-    let spans: Vec<_> = compiled
-        .module()
-        .expect("valid query should compile")
+    let spans: Vec<_> = emission
+        .artifact()
+        .expect("valid query should emit")
         .spans()
         .iter()
         .collect();
@@ -77,26 +78,28 @@ fn capture_markers_change_transition_bytes_when_inspection_is_enabled() {
     let plain = QueryBuilder::from_inline(src)
         .compile(synthetic_grammar())
         .expect("query parsing should not exhaust fuel");
-    let inspected = inspected(src);
+    let inspected = inspected(&plain)
+        .into_artifact()
+        .expect("inspected module emits");
+    let plain = plain
+        .emit(BytecodeConfig::new())
+        .expect("plain bytecode emission answers")
+        .into_artifact()
+        .expect("plain module emits");
 
     assert_ne!(
-        transition_bytes(plain.bytecode().expect("plain bytecode")),
-        transition_bytes(inspected.bytecode().expect("inspected bytecode")),
+        transition_bytes(plain.bytes()),
+        transition_bytes(inspected.bytes()),
     );
-    assert!(plain.module().expect("plain module").spans().is_empty());
-    assert!(
-        !inspected
-            .module()
-            .expect("inspected module")
-            .spans()
-            .is_empty()
-    );
+    assert!(plain.spans().is_empty());
+    assert!(!inspected.spans().is_empty());
 }
 
 fn inspected_spans(src: &str) -> Vec<SpanEntry> {
-    inspected(src)
-        .module()
-        .expect("valid query should compile")
+    let compiled = compiled(src);
+    inspected(&compiled)
+        .into_artifact()
+        .expect("valid query should emit")
         .spans()
         .iter()
         .collect()
@@ -106,9 +109,8 @@ fn exact_range_query() -> &'static str {
     "Q = (program (expression_statement)? @_ (lexical_declaration (variable_declarator name: (identifier) @id :: Ident)))"
 }
 
-fn inspected(src: &str) -> CompiledQuery {
+fn compiled(src: &str) -> CompiledQuery {
     let compiled = QueryBuilder::from_inline(src)
-        .with_inspection(true)
         .compile(synthetic_grammar())
         .expect("query parsing should not exhaust fuel");
     assert!(
@@ -117,6 +119,12 @@ fn inspected(src: &str) -> CompiledQuery {
         compiled.diagnostics().render(compiled.source_map())
     );
     compiled
+}
+
+fn inspected(compiled: &CompiledQuery) -> Emission<crate::bytecode::Module> {
+    compiled
+        .emit(BytecodeConfig::new().inspection(BytecodeInspection::Spans))
+        .expect("inspected bytecode emission answers")
 }
 
 fn find_kind(spans: &[SpanEntry], kind: SpanKind) -> SpanEntry {

@@ -54,13 +54,18 @@ impl Lang {
 /// build.rs embeds each enabled grammar's compacted `grammar.json`
 /// (uncompressed — the served bundle is compressed as a whole).
 #[cfg(any(feature = "lang-javascript", feature = "lang-typescript"))]
-fn load_grammar(json: &str, name: &str) -> Grammar {
+fn load_grammar(json: &str, name: &str, source: &str) -> Grammar {
     use plotnik_lib::grammar::raw::RawGrammar;
 
     let raw = RawGrammar::from_json(json)
         .unwrap_or_else(|error| panic!("invalid embedded {name} grammar JSON: {error}"));
     Grammar::from_raw(&raw)
         .unwrap_or_else(|error| panic!("invalid embedded {name} grammar metadata: {error}"))
+        .with_identity(GrammarIdentity::from_json_bytes(
+            name,
+            json.as_bytes(),
+            source,
+        ))
 }
 
 macro_rules! define_langs {
@@ -85,6 +90,7 @@ macro_rules! define_langs {
                     grammar: load_grammar(
                         include_str!(env!(concat!("PLOTNIK_WASM_GRAMMAR_JSON_", $env_suffix))),
                         $name,
+                        env!(concat!("PLOTNIK_WASM_GRAMMAR_SOURCE_", $env_suffix)),
                     ),
                     identity: std::sync::OnceLock::new(),
                 });

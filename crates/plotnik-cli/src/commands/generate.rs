@@ -3,7 +3,7 @@ use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
-use plotnik_lib::{GrammarIdentity, MatcherConfig};
+use plotnik_lib::{CodegenProvenance, GrammarIdentity, RustCodegenConfig};
 
 use clap::ValueEnum;
 
@@ -50,29 +50,42 @@ pub(crate) fn generate(args: &GenerateArgs) -> Result<String, CliError> {
         return Err(CliError::fatal("query cannot be empty"));
     }
 
-    let (compiled, identity) = if let Some(path) = &args.grammar {
+    let compiled = if let Some(path) = &args.grammar {
         let external = load_external_grammar(path)?;
         validate_declared_language(loaded.shebang.lang.as_deref(), &external.identity)?;
-        let compiled =
-            compile_query_with_grammar(loaded.sources, &external.grammar, args.color, false)
-                .map_err(generate_compile_error)?;
-        (compiled, external.identity)
+        compile_query_with_grammar(loaded.sources, &external.grammar, args.color)
+            .map_err(generate_compile_error)?
     } else {
         let lang = require_lang(
             args.lang.as_deref(),
             loaded.shebang.lang.as_deref(),
             "generate",
         )?;
-        let identity = lang.identity();
-        let compiled = compile_query(loaded.sources, lang, args.color, false)
-            .map_err(generate_compile_error)?;
-        (compiled, identity)
+        compile_query(loaded.sources, lang, args.color).map_err(generate_compile_error)?
     };
 
     match args.target {
-        GenerateTarget::Rust => Ok(compiled
-            .to_rust_matcher(MatcherConfig::new().grammar_identity(identity))
-            .expect("successful full-pipeline compilation produces a matcher")),
+        GenerateTarget::Rust => {
+            let emission = compiled
+                .emit(RustCodegenConfig::new().provenance(CodegenProvenance::Full))
+                .map_err(|error| CliError::fatal(error.to_string()))?;
+            let has_errors = emission.diagnostics().has_errors();
+            if !emission.diagnostics().is_empty() {
+                eprint!(
+                    "{}",
+                    emission
+                        .diagnostics()
+                        .render_colored(compiled.source_map(), args.color)
+                );
+            }
+            if has_errors {
+                return Err(CliError::No);
+            }
+            Ok(emission
+                .into_artifact()
+                .expect("valid query emits a Rust module")
+                .into_source())
+        }
     }
 }
 
@@ -109,12 +122,14 @@ fn load_external_grammar(path: &Path) -> Result<ExternalGrammar, CliError> {
     })?;
     let identity =
         GrammarIdentity::from_json_bytes(raw.name.clone(), &bytes, path.display().to_string());
-    let grammar = Grammar::from_raw(&raw).map_err(|error| {
-        CliError::fatal(format!(
-            "failed to load grammar metadata '{}': {error:?}",
-            path.display()
-        ))
-    })?;
+    let grammar = Grammar::from_raw(&raw)
+        .map_err(|error| {
+            CliError::fatal(format!(
+                "failed to load grammar metadata '{}': {error:?}",
+                path.display()
+            ))
+        })?
+        .with_identity(identity.clone());
     Ok(ExternalGrammar { grammar, identity })
 }
 
