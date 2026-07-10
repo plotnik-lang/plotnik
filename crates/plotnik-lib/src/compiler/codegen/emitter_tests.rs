@@ -77,3 +77,23 @@ fn generated_product_module_records_exact_grammar_identity() {
     assert!(generated.contains("regenerate against the"));
     assert!(generated.contains("grammar.json belonging to the parser"));
 }
+
+#[test]
+fn inspection_does_not_change_generated_matcher() {
+    let plain = QueryBuilder::from_inline("Q = (program)")
+        .compile(synthetic_grammar())
+        .expect("plain test query compiles");
+    let inspected = QueryBuilder::from_inline("Q = (program)")
+        .with_inspection(true)
+        .compile(synthetic_grammar())
+        .expect("inspection test query compiles");
+
+    let plain = plain
+        .to_rust_matcher(Config::new())
+        .expect("plain query generates a matcher");
+    let inspected = inspected
+        .to_rust_matcher(Config::new())
+        .expect("inspection query generates a matcher");
+
+    assert_eq!(inspected, plain);
+}

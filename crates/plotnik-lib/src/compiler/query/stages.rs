@@ -824,7 +824,13 @@ impl LinkedQuery {
     }
 
     fn to_rust_matcher(&self, config: &crate::compiler::codegen::Config) -> String {
-        let input = self.lower_input();
+        // Inspection effects exist only for VM-backed tooling. Generated
+        // matchers deliberately lower the same checked query without them.
+        let input = LowerInput {
+            analysis: self.analysis_input(),
+            symbol_table: self.symbol_table(),
+            inspection: false,
+        };
         let semantic = lower_semantic(&input);
         crate::compiler::codegen::generate(&semantic, input.analysis, config)
     }

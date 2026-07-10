@@ -64,14 +64,8 @@ impl Session {
             .unwrap_or_else(|| (String::new(), Vec::new()));
         let entrypoints = compiled.module().map(entrypoint_names).unwrap_or_default();
         let identity = lang.identity();
-        let generated_rust = if compiled.module().is_some() {
-            let product = QueryBuilder::from_inline(query)
-                .compile(lang.grammar())
-                .map_err(|error| JsValue::from_str(&error.to_string()))?;
-            product.to_rust_matcher(MatcherConfig::new().grammar_identity(identity.clone()))
-        } else {
-            None
-        };
+        let generated_rust =
+            compiled.to_rust_matcher(MatcherConfig::new().grammar_identity(identity));
         let info = info_json(InfoParts {
             module: compiled.module(),
             tokens: json_value!(tokens),
