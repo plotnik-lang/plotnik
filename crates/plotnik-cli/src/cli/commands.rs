@@ -180,7 +180,7 @@ pub fn check_command() -> Command {
 
 pub fn dump_command() -> Command {
     let cmd = Command::new("dump")
-        .about("Show compiled bytecode")
+        .about("Show internal VM bytecode for debugging")
         .override_usage(
             "\
   plotnik dump <QUERY>

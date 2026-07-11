@@ -1,4 +1,4 @@
-//! Type metadata definitions for bytecode format.
+//! Type metadata definitions for the internal bytecode layout.
 
 use super::{StringId, TypeId};
 
@@ -148,7 +148,7 @@ impl TypeDef {
     }
 
     /// Decode, returning `None` on an unknown kind byte instead of panicking —
-    /// for load-time validation of untrusted bytecode.
+    /// for validation of the compiler's internal bytecode.
     pub fn try_decode(&self) -> Option<TypeDefKind> {
         let kind = TypeKind::from_u8(self.kind)?;
         Some(match kind {

@@ -1,7 +1,8 @@
-# Bytecode Dump Format
+# Internal Bytecode Dump
 
-`plotnik dump` prints a loaded module in a stable, human-readable form. It is
-intended for golden fixtures and debugging compiler output.
+`plotnik dump` renders the VM's transient bytecode as stable, human-readable
+text. It is intended for learning, golden fixtures, and compiler debugging.
+The command does not create or consume a bytecode artifact.
 
 ## Sections
 

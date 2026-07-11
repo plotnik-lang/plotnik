@@ -473,9 +473,9 @@ impl CompiledQuery {
                     ));
                 }
             };
-        let module = Module::load(&bytes).map_err(|error| {
+        let module = Module::load_compiler_output(&bytes).map_err(|error| {
             crate::compiler::Error::CompilerInvariantViolation(format!(
-                "bytecode target emitted a module rejected by its loader: {error}"
+                "bytecode target failed internal construction validation: {error}"
             ))
         })?;
         Ok(Emission::success(module, diagnostics))

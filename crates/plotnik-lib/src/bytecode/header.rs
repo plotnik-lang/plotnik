@@ -1,4 +1,4 @@
-//! Bytecode file header (64 bytes).
+//! Internal bytecode buffer header (64 bytes).
 //!
 //! Offsets are computed from counts + SECTION_ALIGN (64 bytes); no stored offsets.
 //! Section order: Header → StringBlob → RegexBlob → StringTable → RegexTable →
@@ -17,7 +17,7 @@ use super::{
 /// of that layout is [`Header::section_data_sizes`].
 pub(crate) const SECTION_COUNT: usize = 12;
 
-/// File header - first 64 bytes of the bytecode file.
+/// First 64 bytes of the internal bytecode buffer.
 ///
 /// Layout (offsets computed from counts):
 /// - 0-23: identity and sizes (magic, version, checksum, total_size, str_blob_size, regex_blob_size)
@@ -30,11 +30,11 @@ pub struct Header {
     // Bytes 0-23: Identity and sizes (6 × u32)
     /// Magic bytes: b"PTKQ"
     pub magic: [u8; 4],
-    /// Bytecode format version.
+    /// Internal bytecode layout version.
     pub version: u32,
     /// CRC32 checksum of everything after the header
     pub checksum: u32,
-    /// Total file size in bytes
+    /// Total buffer size in bytes.
     pub total_size: u32,
     /// Size of the string blob in bytes.
     pub str_blob_size: u32,
@@ -203,7 +203,7 @@ impl Header {
 
     /// Data size (bytes, before alignment padding) of each section, in layout
     /// order. This is the single descriptor of the section layout — offset
-    /// computation ([`compute_offsets`](Self::compute_offsets)) and the load-time
+    /// computation ([`compute_offsets`](Self::compute_offsets)) and the construction-time
     /// bounds/padding checks all fold over it.
     ///
     /// Widened to `u64` so a corrupt header cannot overflow a running layout.

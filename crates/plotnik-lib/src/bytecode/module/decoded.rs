@@ -1,7 +1,7 @@
-//! Pre-decoded instruction stream, built once at module load.
+//! Pre-decoded instruction stream, built once during internal construction.
 //!
 //! The VM's dispatch loop previously re-parsed instruction bytes on every
-//! visit. Load-time validation proves the stream well-formed, so the same walk
+//! visit. Construction-time validation proves the stream well-formed, so the same walk
 //! now also materializes fixed-size structs the loop can index directly; the
 //! byte-level decoders remain the single source of truth and feed this build.
 
@@ -12,7 +12,7 @@ use super::super::instructions::header_byte;
 use super::Instruction;
 
 /// One pre-decoded step. Interior slots of a multi-step `Match` hold `Return`
-/// placeholders that are never addressed: load-time validation proves every
+/// placeholders that are never addressed: construction-time validation proves every
 /// jump target and successor lands on an instruction start.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum DecodedInstr {

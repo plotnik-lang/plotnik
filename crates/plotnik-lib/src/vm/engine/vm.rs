@@ -314,7 +314,7 @@ impl<'t> VM<'t> {
         let node_text = node_text(self.source, &node);
 
         if p.is_regex {
-            // The DFAs are deserialized once at `Module::load` and reused here;
+            // The DFAs are deserialized once during internal validation and reused here;
             // `RegexDfas::is_match` upholds the populated-slot invariant that a
             // module passing load guarantees. Deserializing per evaluation, as
             // this once did, re-validated the whole automaton on every predicate

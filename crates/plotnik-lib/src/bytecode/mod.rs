@@ -1,13 +1,14 @@
-//! Bytecode format and runtime types for Plotnik.
+//! Plotnik's internal bytecode representation and debug views.
 //!
-//! Public bytecode facade for compiled Plotnik queries. Implements the binary
-//! format specified in `docs/binary-format/`.
+//! The compiler constructs this representation in memory for the VM. It is not
+//! a user-facing file or interchange format. The public views support compiler
+//! diagnostics, `plotnik dump`, and other teaching or debugging tools.
 
 #![allow(clippy::comparison_chain)]
 // Without the `vm` feature the engine-serving half of this module (the
 // pre-decoded transition stream, trace rendering) has no callers. It stays
 // compiled anyway so `Module` is the same object in every configuration —
-// load-time validation must not drift between the compiler-only build and the
+// construction-time validation must not drift between the compiler-only build and the
 // executing one.
 #![cfg_attr(not(feature = "vm"), allow(dead_code, unused_imports))]
 
@@ -33,7 +34,7 @@ pub use dump::dump;
 pub use entrypoint::Entrypoint;
 pub use ids::{StringId, TypeId};
 pub use instructions::{EncodeError, StepAddr};
-pub use module::{EntrypointsView, Module, ModuleError, StringsView, TypesView};
+pub use module::{EntrypointsView, Module, StringsView, TypesView};
 pub use spans::{SPAN_NO_BINDING, SpanEntry, SpanKind, SpansView};
 pub use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
 pub use type_system::{Arity, PrimitiveType, TypeKind};

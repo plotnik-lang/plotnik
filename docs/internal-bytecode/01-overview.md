@@ -1,4 +1,9 @@
-# Binary Format: Overview
+# Internal Bytecode Layout
+
+This document explains the transient buffer shared by Plotnik's compiler and
+VM. Bytecode is not a file format, interchange format, cache artifact, or public
+compatibility surface. Users encounter it only as textual output from debugging
+and teaching commands such as `plotnik dump`.
 
 64-byte header + 12 data sections. All sections are 64-byte aligned. Offsets are computed from counts.
 
@@ -60,7 +65,7 @@ StringTable and RegexTable use `count + 1` entries. The final entry stores the b
 
 ### Offset Computation
 
-Section offsets are not stored in the header. Loaders compute them by:
+Section offsets are not stored in the header. Internal construction computes them by:
 
 1. Start after header (offset 64)
 2. For each section in order:
@@ -68,7 +73,9 @@ Section offsets are not stored in the header. Loaders compute them by:
    - Section size = count × record size (or explicit size for blobs)
 3. Blob sizes come from header: `str_blob_size` and `regex_blob_size`
 
-The bytes filling each 64-byte alignment gap (and the final tail up to `total_size`) are reserved zero; loaders reject a non-zero byte in any gap.
+The bytes filling each 64-byte alignment gap (and the final tail up to
+`total_size`) are reserved zero; internal validation rejects a non-zero byte in
+any gap.
 
 ## Header (v10)
 
@@ -102,14 +109,13 @@ struct Header {
 }
 ```
 
-## Loading & validation
+## Construction and validation
 
-`Module::load` rejects malformed input instead of failing open. A loaded module
-is guaranteed not to panic on later view/decode access — for _any_ input that
-passes these checks, including a deliberately forged module whose CRC was
-recomputed over crafted bytes. The CRC is not a MAC, so the structural checks
-(steps 5–12), not the checksum, are what uphold the no-panic guarantee.
-Validation, in order:
+The emitter validates its own buffer before constructing the VM representation.
+This is an internal compiler assertion boundary, not an input parser. Tests
+deliberately mutate emitted buffers to prove that malformed compiler output is
+rejected cleanly. The CRC catches accidental internal corruption; structural
+checks uphold the no-panic guarantee. Validation runs in this order:
 
 1. **Magic / version / size** — `PTKQ`, version 10, and `total_size` equal to the
    byte length.
@@ -149,6 +155,6 @@ Validation, in order:
     drive the materializer's builder stack (`Push`/`Set`/`ArrayClose`/
     `StructClose`/`EnumClose`), the VM's suppression counter, or the inspection
     span bracket stack into a panic.
-    This closes the last forged-module panic class — the materializer's
+    This closes the last malformed-representation panic class — the materializer's
     builder-stack panics and the VM's `SuppressEnd` underflow — that
     decode-level checks cannot see.

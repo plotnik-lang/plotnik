@@ -11,7 +11,7 @@
 //! (`crates/plotnik-lib/src/vm/engine/vm.rs`). On compiler output these are
 //! unreachable by construction; on a forged module that swaps one effect they
 //! are not. This pass proves them unreachable for *any* module that passes
-//! `Module::load`, so they stay sound loud invariants instead of reachable
+//! internal bytecode validation, so they stay sound loud invariants instead of reachable
 //! panics.
 //!
 //! ## Model
@@ -106,14 +106,14 @@
 //! guarantee: a forged module can still declare types its effects do not
 //! produce.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 
-use super::{Instruction, Module, ModuleError, push_unique};
+use super::{Instruction, Module, ModuleError};
 use crate::bytecode::{Effect, EffectKind, TypeDefKind, TypeKind};
 
 /// Builder frames the materializer pushes. The root/result frame can be a
 /// scalar, but compiled effects only push these three frame kinds.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum FrameKind {
     Array,
     Struct,
@@ -130,7 +130,7 @@ impl FrameKind {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum PendingState {
     Empty,
     Full,
@@ -190,6 +190,21 @@ impl DefSummary {
             sets_caller_top: false,
         }
     }
+
+    /// Accumulate the monotone facts learned from one dependency state. A
+    /// known pending result cannot flip without contradicting two body exits.
+    fn refine(self, next: Self) -> Option<Self> {
+        let returns_pending = match (self.returns_pending, next.returns_pending) {
+            (Some(old), Some(new)) if old != new => return None,
+            (Some(value), _) | (_, Some(value)) => Some(value),
+            (None, None) => None,
+        };
+        Some(Self {
+            entry_tos: self.entry_tos & next.entry_tos,
+            returns_pending,
+            sets_caller_top: self.sets_caller_top | next.sets_caller_top,
+        })
+    }
 }
 
 /// Summaries keyed by definition-entry step.
@@ -201,52 +216,66 @@ type DefSummaries = HashMap<u16, DefSummary>;
 pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> {
     let entrypoints = module.entrypoints();
 
-    let mut defs: Vec<u16> = Vec::new();
+    let mut defs = Vec::new();
+    let mut known = HashSet::new();
+    let mut summaries = DefSummaries::new();
+    let mut queue = VecDeque::new();
+    let mut queued = HashSet::new();
     for entrypoint in entrypoints.iter() {
-        push_unique(&mut defs, u16::from(entrypoint.target()));
+        let target = u16::from(entrypoint.target());
+        if known.insert(target) {
+            defs.push(target);
+            summaries.insert(target, DefSummary::unknown());
+            enqueue(&mut queue, &mut queued, target);
+        }
     }
     // Entries reached through a `Call` — these run with caller frames live, so
     // a whole-run accept inside them is banned (see module docs).
-    let mut called: Vec<u16> = Vec::new();
-
-    let mut summaries: DefSummaries = defs.iter().map(|&d| (d, DefSummary::unknown())).collect();
+    let mut called = HashSet::new();
+    // A summary change only invalidates direct callers. Keeping reverse edges
+    // avoids rescanning every definition for every link in a dependency chain.
+    let mut callers: HashMap<u16, Vec<u16>> = HashMap::new();
+    let mut call_edges = HashSet::new();
 
     // Monotone fixpoint: `entry_tos` only ever shrinks (intersection),
     // `sets_caller_top` only flips on, `returns_pending` only becomes known,
-    // and the definition/called sets only grow, all within finite bounds, so
-    // this terminates.
-    loop {
-        let mut changed = false;
-        let mut i = 0;
-        while i < defs.len() {
-            let entry = defs[i];
-            i += 1;
+    // and the definition/called sets only grow. FIFO scheduling coalesces a
+    // batch of callee changes before a wide caller is revisited.
+    while let Some(entry) = queue.pop_front() {
+        queued.remove(&entry);
 
-            let is_called = called.contains(&entry);
-            let analysis = analyze(module, &summaries, entry, is_called, false)?;
-            for target in analysis.discovered {
-                if push_unique(&mut defs, target) {
-                    summaries.insert(target, DefSummary::unknown());
-                    changed = true;
-                }
-                if push_unique(&mut called, target) {
-                    changed = true;
-                }
+        let analysis = analyze(module, &summaries, entry, called.contains(&entry), false)?;
+        for target in analysis.discovered {
+            if known.insert(target) {
+                defs.push(target);
+                summaries.insert(target, DefSummary::unknown());
+                enqueue(&mut queue, &mut queued, target);
             }
-
-            let next = DefSummary {
-                entry_tos: analysis.entry_tos,
-                returns_pending: analysis.returns_pending,
-                sets_caller_top: analysis.sets_caller_top,
-            };
-            let slot = summaries.entry(entry).or_insert(DefSummary::unknown());
-            if *slot != next {
-                *slot = next;
-                changed = true;
+            if called.insert(target) {
+                enqueue(&mut queue, &mut queued, target);
+            }
+            if call_edges.insert((entry, target)) {
+                callers.entry(target).or_default().push(entry);
             }
         }
-        if !changed {
-            break;
+
+        let analysis_summary = DefSummary {
+            entry_tos: analysis.entry_tos,
+            returns_pending: analysis.returns_pending,
+            sets_caller_top: analysis.sets_caller_top,
+        };
+        let old = summaries[&entry];
+        let Some(next) = old.refine(analysis_summary) else {
+            return Err(ModuleError::EffectStackImbalance(entry));
+        };
+        if old == next {
+            continue;
+        }
+        summaries.insert(entry, next);
+        if let Some(dependents) = callers.get(&entry) {
+            for &caller in dependents {
+                enqueue(&mut queue, &mut queued, caller);
+            }
         }
     }
 
@@ -270,6 +299,12 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     Ok(())
 }
 
+fn enqueue(queue: &mut VecDeque<u16>, queued: &mut HashSet<u16>, entry: u16) {
+    if queued.insert(entry) {
+        queue.push_back(entry);
+    }
+}
+
 struct Analysis {
     /// Caller-top kinds this body tolerates (intersection of every read).
     entry_tos: u8,
@@ -284,7 +319,7 @@ struct Analysis {
 /// Abstract state at instruction entry: the builder frames pushed so far
 /// (relative to this body's entry), suppression depth, open span ids, and
 /// pending register.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 struct AbsState {
     stack: Vec<FrameKind>,
     suppress: i32,
@@ -317,12 +352,13 @@ fn analyze(
     let mut returns_pending = None;
     let mut sets_caller_top = false;
     let mut discovered = Vec::new();
+    let mut discovered_set = HashSet::new();
 
     // Collecting semantics: every distinct abstract state a step is reached
     // with is kept and processed once. The opener tallies accumulate, per
     // visited step, how many frame/suppression/span openers exist — a state
     // outgrowing them proves a net-positive cycle (see module docs).
-    let mut memo: HashMap<u16, Vec<AbsState>> = HashMap::new();
+    let mut memo: HashMap<u16, HashSet<AbsState>> = HashMap::new();
     let mut states_spent: usize = 0;
     let mut frame_openers: usize = 0;
     let mut suppress_openers: i32 = 0;
@@ -346,9 +382,9 @@ fn analyze(
                     }
                 }
             }
-            Vec::new()
+            HashSet::new()
         });
-        if seen.contains(&state) {
+        if !seen.insert(state.clone()) {
             continue;
         }
         if state.stack.len() > frame_openers || state.suppress > suppress_openers {
@@ -361,8 +397,6 @@ fn analyze(
         if states_spent > STATE_BUDGET {
             return Err(ModuleError::EffectStackBudget(step));
         }
-        seen.push(state.clone());
-
         let AbsState {
             mut stack,
             mut suppress,
@@ -427,7 +461,9 @@ fn analyze(
             }
             Instruction::Call(c) => {
                 let target = u16::from(c.target);
-                discovered.push(target);
+                if discovered_set.insert(target) {
+                    discovered.push(target);
+                }
                 let next = u16::from(c.next);
 
                 if suppress > 0 {

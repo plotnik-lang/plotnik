@@ -1,4 +1,4 @@
-# Binary Format: Type Metadata
+# Internal Bytecode: Type Metadata
 
 Type system metadata for code generation and runtime validation. Describes the shape of data extracted by queries.
 

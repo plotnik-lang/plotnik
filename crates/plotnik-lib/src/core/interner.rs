@@ -91,7 +91,7 @@ impl Interner {
             .map(|(i, s)| (Symbol(i as u32), s.as_str()))
     }
 
-    /// Emit as binary format blob and offset table.
+    /// Emit as an internal bytecode blob and offset table.
     ///
     /// Returns (concatenated UTF-8 bytes, offset for each string + sentinel).
     /// The offsets array has `len() + 1` entries; the last is the total blob size.

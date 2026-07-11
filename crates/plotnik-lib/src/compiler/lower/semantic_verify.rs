@@ -1,10 +1,10 @@
 //! Always-on verification at the executor fork point.
 //!
 //! This is the production trust boundary for lowered query IR. It mirrors the
-//! bytecode loader's collecting effect-stack analysis, but works before any
+//! bytecode validator's collecting effect-stack analysis, but works before any
 //! target chooses a representation.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::bytecode::EffectKind;
 use crate::compiler::analyze::output::{CaptureMemberKind, CaptureScopeKind, OutputSchema};
@@ -127,7 +127,7 @@ mod tests {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum FrameKind {
     Array,
     Struct,
@@ -144,7 +144,7 @@ impl FrameKind {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum PendingState {
     Empty,
     Full,
@@ -185,6 +185,21 @@ impl DefSummary {
             returns_pending: None,
             sets_caller_top: false,
         }
+    }
+
+    /// Accumulate the monotone facts learned from one dependency state. A
+    /// known pending result cannot flip without contradicting two body exits.
+    fn refine(self, next: Self) -> Option<Self> {
+        let returns_pending = match (self.returns_pending, next.returns_pending) {
+            (Some(old), Some(new)) if old != new => return None,
+            (Some(value), _) | (_, Some(value)) => Some(value),
+            (None, None) => None,
+        };
+        Some(Self {
+            entry_tos: self.entry_tos & next.entry_tos,
+            returns_pending,
+            sets_caller_top: self.sets_caller_top | next.sets_caller_top,
+        })
     }
 }
 
@@ -237,44 +252,60 @@ impl<'a> Program<'a> {
 
     fn verify_effects(&self) -> Result<(), SemanticVerifyError> {
         let wrappers: Vec<Label> = self.graph.entrypoint_wrappers().values().copied().collect();
-        let mut definitions = wrappers.clone();
-        let mut called = Vec::new();
-        let mut summaries: DefSummaries = definitions
-            .iter()
-            .copied()
-            .map(|entry| (entry, DefSummary::unknown()))
-            .collect();
+        let mut definitions = Vec::new();
+        let mut known = HashSet::new();
+        let mut called = HashSet::new();
+        let mut summaries = DefSummaries::new();
+        let mut queue = VecDeque::new();
+        let mut queued = HashSet::new();
+        // Revisit only direct callers whose callee summary changed. FIFO
+        // scheduling coalesces a batch of leaf changes before a wide caller.
+        let mut callers: HashMap<Label, Vec<Label>> = HashMap::new();
+        let mut call_edges = HashSet::new();
 
-        loop {
-            let mut changed = false;
-            let mut index = 0;
-            while index < definitions.len() {
-                let entry = definitions[index];
-                index += 1;
-                let analysis =
-                    self.analyze_body(&summaries, entry, called.contains(&entry), false)?;
-                for target in analysis.discovered {
-                    if push_unique(&mut definitions, target) {
-                        summaries.insert(target, DefSummary::unknown());
-                        changed = true;
-                    }
-                    if push_unique(&mut called, target) {
-                        changed = true;
-                    }
+        for &entry in &wrappers {
+            if known.insert(entry) {
+                definitions.push(entry);
+                summaries.insert(entry, DefSummary::unknown());
+                enqueue(&mut queue, &mut queued, entry);
+            }
+        }
+
+        while let Some(entry) = queue.pop_front() {
+            queued.remove(&entry);
+
+            let analysis = self.analyze_body(&summaries, entry, called.contains(&entry), false)?;
+            for target in analysis.discovered {
+                if known.insert(target) {
+                    definitions.push(target);
+                    summaries.insert(target, DefSummary::unknown());
+                    enqueue(&mut queue, &mut queued, target);
                 }
-                let next = DefSummary {
-                    entry_tos: analysis.entry_tos,
-                    returns_pending: analysis.returns_pending,
-                    sets_caller_top: analysis.sets_caller_top,
-                };
-                let slot = summaries.entry(entry).or_insert(DefSummary::unknown());
-                if *slot != next {
-                    *slot = next;
-                    changed = true;
+                if called.insert(target) {
+                    enqueue(&mut queue, &mut queued, target);
+                }
+                if call_edges.insert((entry, target)) {
+                    callers.entry(target).or_default().push(entry);
                 }
             }
-            if !changed {
-                break;
+
+            let analysis_summary = DefSummary {
+                entry_tos: analysis.entry_tos,
+                returns_pending: analysis.returns_pending,
+                sets_caller_top: analysis.sets_caller_top,
+            };
+            let old = summaries[&entry];
+            let Some(next) = old.refine(analysis_summary) else {
+                return Err(SemanticVerifyError::EffectStack(entry));
+            };
+            if old == next {
+                continue;
+            }
+            summaries.insert(entry, next);
+            if let Some(dependents) = callers.get(&entry) {
+                for &caller in dependents {
+                    enqueue(&mut queue, &mut queued, caller);
+                }
             }
         }
 
@@ -301,7 +332,8 @@ impl<'a> Program<'a> {
         let mut returns_pending = None;
         let mut sets_caller_top = false;
         let mut discovered = Vec::new();
-        let mut memo: HashMap<Label, Vec<AbsState>> = HashMap::new();
+        let mut discovered_set = HashSet::new();
+        let mut memo: HashMap<Label, HashSet<AbsState>> = HashMap::new();
         let mut states_spent = 0;
         let mut frame_openers = 0;
         let mut suppression_openers = 0;
@@ -326,9 +358,9 @@ impl<'a> Program<'a> {
                         }
                     }
                 }
-                Vec::new()
+                HashSet::new()
             });
-            if seen.contains(&state) {
+            if !seen.insert(state.clone()) {
                 continue;
             }
             if state.stack.len() > frame_openers || state.suppress > suppression_openers {
@@ -341,8 +373,6 @@ impl<'a> Program<'a> {
             if states_spent > STATE_BUDGET {
                 return Err(SemanticVerifyError::StateBudget(label));
             }
-            seen.push(state.clone());
-
             let AbsState {
                 mut stack,
                 mut suppress,
@@ -395,7 +425,9 @@ impl<'a> Program<'a> {
                     }
                 }
                 InstructionIR::Call(call) => {
-                    push_unique(&mut discovered, call.target);
+                    if discovered_set.insert(call.target) {
+                        discovered.push(call.target);
+                    }
                     if suppress > 0 {
                         work.push((
                             call.next,
@@ -713,7 +745,7 @@ struct BodyAnalysis {
     discovered: Vec<Label>,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 struct AbsState {
     stack: Vec<FrameKind>,
     suppress: usize,
@@ -833,10 +865,8 @@ fn record_exit(
     Ok(())
 }
 
-fn push_unique(values: &mut Vec<Label>, value: Label) -> bool {
-    if values.contains(&value) {
-        return false;
+fn enqueue(queue: &mut VecDeque<Label>, queued: &mut HashSet<Label>, entry: Label) {
+    if queued.insert(entry) {
+        queue.push_back(entry);
     }
-    values.push(value);
-    true
 }

@@ -25,7 +25,7 @@ Lifetimes:
 
 Two zones, one rule each:
 
-- Outside (query text, source files, CLI args, bytecode files):
+- Outside (query text, source files, CLI args):
   - never panic
   - report through `Diagnostics` or `Result`
 - Inside (everything past validation, including subsystem boundaries):
@@ -61,12 +61,12 @@ crates/
     src/language_registry.rs   # define_langs! table, one entry per language
     build.rs                   # embeds gzipped grammar.json per enabled lang feature
   plotnik-lib/
-    src/bytecode/              # binary format, instruction set, module loading
+    src/bytecode/              # internal VM representation and validation
     src/compiler/
       parse/                   # lexer, grammar, AST
       analyze/                 # semantic analysis passes
       lower/                   # Thompson NFA build + optimization passes
-      emit/                    # IR → binary module
+      emit/                    # IR → internal VM representation
       query/                   # facade: Query, QueryBuilder, CheckedQuery, CompiledQuery
       typegen/                 # bytecode → TypeScript .d.ts / Rust types
       codegen/                 # fork-point NFA → generated Rust matcher
@@ -84,7 +84,7 @@ crates/
       05-typegen/
       06-vm/
       07-codegen/
-docs/                          # specs: language, type system, CLI, runtime, binary format
+docs/                          # specs: language, type system, CLI, runtime, internal bytecode
 ```
 
 Pipeline:
@@ -93,7 +93,7 @@ Pipeline:
 2. Analyze: resolve names, infer types, check recursion
 3. Link (a grammar): bind node kinds and fields to the target grammar
 4. Lower: build and optimize the Thompson NFA
-5. Emit: NFA to binary bytecode module
+5. Emit: NFA to the VM's internal bytecode representation
 
 # Query language
 
@@ -211,25 +211,3 @@ The golden fixtures have priority over Rust-based tests.
 - Don't generate data for `insta` snapshots and golden fixtures by hand:
   - use `@""` for `insta` placeholders, then `make shot`
   - fill inputs only for golden snapshots
-
-# Pull requests
-
-Use conventional commits for PR titles and commit messages.
-
-Body format:
-
-```
-## Summary
-
-<1-3 bullets: what this PR does>
-
-## Why
-
-<1-2 sentences: motivation, problem solved, or link to relevant docs>
-
-## Notes (optional)
-
-<Tradeoffs, alternatives considered, gotchas>
-```
-
-Summary becomes the squash-merge commit body. Omit "How" (the diff shows it) and "Testing" (CI covers it).

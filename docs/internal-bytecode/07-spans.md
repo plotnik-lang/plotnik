@@ -59,7 +59,7 @@ cursor already points at the matched node. The compiler asserts this on the
 fresh Thompson IR before optimization; later passes may move it only along
 cursor-preserving epsilon chains.
 
-Load-time effect-stack validation tracks span depth, including inside
+Construction-time effect-stack validation tracks span depth, including inside
 suppression scopes, so malformed bytecode with unbalanced span brackets is
 rejected before execution. Span effects are still recorded under runtime
 suppression: a bare `(Foo)` reference suppresses `Foo`'s output values but not

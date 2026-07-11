@@ -22,7 +22,7 @@ pub const TYPE_NODE: TypeId = TypeId(PrimitiveType::Node.index() as u32);
 ///
 /// This represents the inference-time type representation which carries
 /// actual data (fields, variants, inner types). Distinct from
-/// `type_system::TypeKind` which is the bytecode format discriminant.
+/// `type_system::TypeKind`, the internal bytecode discriminant.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeShape {
     /// Produces nothing, transparent to parent scope.

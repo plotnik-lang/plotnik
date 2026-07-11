@@ -1,11 +1,11 @@
-//! Bytecode format constants.
+//! Internal bytecode layout constants.
 
 use super::effects::EFFECT_PAYLOAD_BITS;
 
-/// Magic bytes identifying a Plotnik bytecode file.
+/// Magic bytes identifying Plotnik's internal bytecode buffer.
 pub const MAGIC: [u8; 4] = *b"PTKQ";
 
-/// Current bytecode format version.
+/// Current internal layout version.
 /// v2: Removed explicit offsets (computed from counts), added regex section.
 /// v3: Removed flags field.
 /// v4: Removed the trivia section.
@@ -20,7 +20,7 @@ pub const VERSION: u32 = 10;
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;
 
-/// File header size in bytes.
+/// Buffer header size in bytes.
 ///
 /// The header occupies exactly one `SECTION_ALIGN` block, so the first section
 /// (StringBlob) begins at this offset. `Header` statically asserts it has this

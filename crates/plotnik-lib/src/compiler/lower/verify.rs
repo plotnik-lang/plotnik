@@ -586,7 +586,7 @@ mod debug_impl {
 
     /// Every compiled `Node` effect must run after some real match has
     /// consumed a candidate. This is only a compiler IR check: once the VM's
-    /// `Node` effect reads the cursor directly, forged bytecode can still
+    /// `Node` effect reads the cursor directly, malformed internal bytecode can still
     /// produce wrong values, but it cannot reach undefined state.
     fn check_no_node_on_zero_width_paths(nfa: &NfaGraph) -> Result<(), String> {
         let instr_map: HashMap<Label, &InstructionIR> =

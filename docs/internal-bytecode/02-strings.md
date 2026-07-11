@@ -1,6 +1,7 @@
-# Binary Format: Strings
+# Internal Bytecode: Strings
 
-Strings are stored in a centralized pool to eliminate redundancy and alignment padding overhead. They are referenced by `StringId` throughout the file.
+Strings are stored in a centralized pool to eliminate redundancy and alignment
+padding overhead. They are referenced by `StringId` throughout the buffer.
 
 ## Primitives
 

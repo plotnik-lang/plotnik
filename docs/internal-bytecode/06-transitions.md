@@ -1,4 +1,4 @@
-# Binary Format: Transitions
+# Internal Bytecode: Transitions
 
 The transitions section stores VM instructions as 8-byte-aligned steps addressed
 by `StepId`. Byte offset is:

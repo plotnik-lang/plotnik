@@ -54,7 +54,7 @@ const TEMPLATES: &[&str] = &[
 
 /// Compile a query without ever panicking: `None` if it does not parse, link
 /// cleanly, or emit. Mirrors the production `run` path (validity gate + `emit`).
-fn try_compile(query: &str) -> Option<Vec<u8>> {
+fn try_compile(query: &str) -> Option<Module> {
     let compiled = QueryBuilder::from_inline(query)
         .compile(support::javascript_grammar())
         .ok()?;
@@ -65,11 +65,7 @@ fn try_compile(query: &str) -> Option<Vec<u8>> {
         .emit_types(TypeScriptCodegenConfig::new())
         .ok()?
         .into_artifact()?;
-    compiled
-        .emit(BytecodeConfig::new())
-        .ok()?
-        .into_artifact()
-        .map(|module| module.bytes().to_vec())
+    compiled.emit(BytecodeConfig::new()).ok()?.into_artifact()
 }
 
 fn parse_js(source: &str) -> Tree {
@@ -180,8 +176,7 @@ proptest! {
     /// output — never panics or overflows the stack.
     #[test]
     fn run_pipeline_never_panics(template in select(TEMPLATES.to_vec()), source in arb_source()) {
-        if let Some(bytes) = try_compile(template) {
-            let module = Module::load(&bytes).expect("compiler emits a loadable module");
+        if let Some(module) = try_compile(template) {
             exercise_pipeline(&module, &source);
         }
     }

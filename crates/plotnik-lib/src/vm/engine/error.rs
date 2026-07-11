@@ -1,7 +1,5 @@
 //! Runtime errors and control-flow signals for VM execution.
 
-use crate::bytecode::ModuleError;
-
 /// Errors during VM execution.
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
@@ -16,9 +14,6 @@ pub enum RuntimeError {
 
     #[error("no match found")]
     NoMatch,
-
-    #[error("module error: {0}")]
-    Module(#[from] ModuleError),
 }
 
 /// Non-error outcomes that unwind a step back to the main execution loop.

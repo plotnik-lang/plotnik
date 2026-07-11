@@ -7,7 +7,7 @@ use regex_automata::dfa::Automaton;
 use regex_automata::dfa::sparse::DFA;
 
 /// `DFA::from_bytes` validates the entire serialized automaton (no unsafe
-/// trust involved), so this doubles as the load-time gate that proves a
+/// trust involved), so this doubles as the construction-time gate that proves a
 /// module's regex blob is well-formed. [`RegexDfas`] keeps the validated
 /// automaton instead of re-deserializing it.
 ///
@@ -27,7 +27,7 @@ pub fn deserialize_dfa(bytes: &[u8]) -> Result<DFA<&[u8]>, String> {
 /// `DFA::from_bytes` re-validates the whole serialized automaton, so the old
 /// path — deserializing inside the VM's match loop — re-paid that cost on every
 /// predicate test, thousands of times over a quantified pattern on a large file.
-/// These owned automata are built once, folded into the load-time validation
+/// These owned automata are built once, folded into construction-time validation
 /// that already deserialized each DFA, then searched directly thereafter. The
 /// owned copy duplicates bytes still resident in the module's serialized blob —
 /// that blob is one immutable, contiguous allocation backing every section, so
