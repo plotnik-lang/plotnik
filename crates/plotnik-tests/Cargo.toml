@@ -26,7 +26,6 @@ tree-sitter = "=0.26.10"
 plotnik = { path = "../plotnik", features = ["serde"] }
 criterion = "=0.8.2"
 indoc = "=2.0.7"
-libtest-mimic = "=0.8.2"
 proptest = "=1.11.0"
 similar = "=3.1.1"
 # Vanilla (non-arborium) grammar crates: the macro's grammar resolution must
@@ -42,7 +41,6 @@ cargo_metadata = "=0.23.1"
 [[test]]
 name = "snapshots"
 path = "tests/mod.rs"
-harness = false
 
 [[test]]
 name = "fuzz_no_panic"

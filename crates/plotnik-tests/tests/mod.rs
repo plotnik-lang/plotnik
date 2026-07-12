@@ -35,21 +35,20 @@
 //! included — that attachment is exactly what those fixtures pin; every other
 //! parser fixture omits trivia for a leaner tree.
 //!
-//! Run:   `cargo nextest run --test snapshots`
-//! Accept: `SHOT=1 cargo nextest run --test snapshots`  (also wired into `make shot`)
+//! Run:   `cargo test -p plotnik-tests --test snapshots`
+//! Accept: `SHOT=1 cargo test -p plotnik-tests --test snapshots` (also wired into `make shot`)
 //!
-//! Trial names are the fixture path, so a `nextest` name filter scopes a run: a
-//! stage (`06-vm`), a folder (`06-vm/captures`), or one construct across every
-//! stage at once — `captures`, `quantifiers`, `anchors`, `alternations`,
-//! `definitions`, `predicates`, `recursion`. That last form only stays complete
-//! because every stage spells a construct identically; keep new folders on that
-//! vocabulary.
+//! Native test names are snake_case-normalized fixture paths, so a name filter
+//! scopes a run: a stage (`stage_06_vm`), a folder (`stage_06_vm::captures`), or
+//! one construct across every stage at once — `captures`, `quantifiers`, `anchors`,
+//! `alternations`, `definitions`, `predicates`, `recursion`. That last form only
+//! stays complete because every stage spells a construct identically; keep new
+//! folders on that vocabulary.
 
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
 
-use libtest_mimic::{Arguments, Failed, Trial};
 use similar::TextDiff;
 use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 
@@ -64,24 +63,24 @@ use plotnik_tests::fixture::parse_section_header;
 use support::formatter::Assessment;
 use support::snapshots::{
     Fixture, FixtureKind, FixtureMode, GeneratedOutput, GeneratedSection, InspectionPolicy,
-    MappingPolicy, SectionKind, SerdePolicy, TriviaPolicy, VmMode, discover,
+    MappingPolicy, SectionKind, SerdePolicy, TriviaPolicy, VmMode, fixture,
 };
 
 mod support;
 
-fn main() {
-    let args = Arguments::from_args();
-    let mode = FixtureMode::from_env()
-        .unwrap_or_else(|error| panic!("invalid fixture update configuration: {error}"));
+fn run_fixture(relative: &str) -> Result<(), String> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
-    let trials = discover(&root)
-        .into_iter()
-        .map(|fx| {
-            let name = fx.name.as_str().to_owned();
-            Trial::test(name, move || run_fixture(&fx, mode))
-        })
-        .collect();
-    libtest_mimic::run(&args, trials).exit();
+    let fx = fixture(&root, relative)?;
+    let mode = fixture_mode()?;
+    check(&fx, mode)
+}
+
+fn fixture_mode() -> Result<FixtureMode, String> {
+    static MODE: LazyLock<Result<FixtureMode, String>> = LazyLock::new(FixtureMode::from_env);
+    match &*MODE {
+        Ok(mode) => Ok(*mode),
+        Err(error) => Err(error.clone()),
+    }
 }
 
 /// The authored half of a fixture; generated sections are recomputed, not parsed back.
@@ -93,10 +92,6 @@ struct Parsed {
 struct Input {
     ext: Option<String>,
     text: String,
-}
-
-fn run_fixture(fx: &Fixture, mode: FixtureMode) -> Result<(), Failed> {
-    check(fx, mode).map_err(Failed::from)
 }
 
 fn check(fx: &Fixture, mode: FixtureMode) -> Result<(), String> {
@@ -136,7 +131,7 @@ fn check(fx: &Fixture, mode: FixtureMode) -> Result<(), String> {
     let expected = canonical(&parsed.query, parsed.input.as_ref(), &generated);
     if actual != expected {
         return Err(format!(
-            "fixture out of date — run `make shot` (or `SHOT=1 cargo nextest run`):\n{}",
+            "fixture out of date — run `make shot` (or `SHOT=1 cargo test -p plotnik-tests --test snapshots`):\n{}",
             unified_diff(&actual, &expected)
         ));
     }
@@ -726,3 +721,5 @@ fn unified_diff(actual: &str, expected: &str) -> String {
         .header("on disk", "expected")
         .to_string()
 }
+
+include!(concat!(env!("OUT_DIR"), "/golden_tests.rs"));
