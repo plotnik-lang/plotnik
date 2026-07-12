@@ -85,7 +85,6 @@ struct Output {
     text: String,
     at_line_start: bool,
     line_comment_open: bool,
-    column: usize,
     work: WorkCounter,
 }
 
@@ -95,7 +94,6 @@ impl Output {
             text: String::with_capacity(capacity),
             at_line_start: true,
             line_comment_open: false,
-            column: 0,
             work: WorkCounter::default(),
         }
     }
@@ -108,7 +106,6 @@ impl Output {
             self.text.push(' ');
         }
         self.work.add(indent.width());
-        self.column = indent.width();
         self.at_line_start = false;
     }
 
@@ -119,7 +116,6 @@ impl Output {
         );
         self.text.push_str(text);
         self.work.add(text.len());
-        self.column += text.chars().count();
     }
 
     fn append_space(&mut self) {
@@ -131,7 +127,6 @@ impl Output {
         self.work.add(1);
         self.at_line_start = true;
         self.line_comment_open = false;
-        self.column = 0;
         self.ensure_indent(indent);
     }
 
@@ -141,7 +136,6 @@ impl Output {
         self.work.add(1 + text.len());
         self.at_line_start = false;
         self.line_comment_open = false;
-        self.column = text.chars().count();
     }
 
     fn separate_file_items(&mut self, blank: bool) {
@@ -157,7 +151,6 @@ impl Output {
         }
         self.at_line_start = true;
         self.line_comment_open = false;
-        self.column = 0;
     }
 
     fn finish(self) -> (String, usize) {
