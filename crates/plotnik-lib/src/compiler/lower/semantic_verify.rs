@@ -4,6 +4,9 @@
 //! bytecode validator's collecting effect-stack analysis, but works before any
 //! target chooses a representation.
 
+#[cfg(test)]
+use std::cell::Cell;
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::bytecode::EffectKind;
@@ -15,6 +18,21 @@ use crate::compiler::lower::ir::{
 
 const STATE_BUDGET: usize = 1 << 18;
 pub(crate) const MAX_STATES: usize = u16::MAX as usize + 1;
+
+#[cfg(test)]
+thread_local! {
+    static BODY_ANALYSES: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn reset_body_analyses() {
+    BODY_ANALYSES.set(0);
+}
+
+#[cfg(test)]
+pub(crate) fn body_analyses() -> usize {
+    BODY_ANALYSES.get()
+}
 
 #[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 pub(crate) enum SemanticVerifyError {
@@ -328,12 +346,15 @@ impl<'a> Program<'a> {
         is_called: bool,
         final_check: bool,
     ) -> Result<BodyAnalysis, SemanticVerifyError> {
+        #[cfg(test)]
+        BODY_ANALYSES.set(BODY_ANALYSES.get() + 1);
+
         let mut entry_tos = KS_ANY;
         let mut returns_pending = None;
         let mut sets_caller_top = false;
         let mut discovered = Vec::new();
         let mut discovered_set = HashSet::new();
-        let mut memo: HashMap<Label, HashSet<AbsState>> = HashMap::new();
+        let mut memo: HashMap<Label, HashMap<AbsState, ()>> = HashMap::new();
         let mut states_spent = 0;
         let mut frame_openers = 0;
         let mut suppression_openers = 0;
@@ -358,11 +379,16 @@ impl<'a> Program<'a> {
                         }
                     }
                 }
-                HashSet::new()
+                HashMap::new()
             });
-            if !seen.insert(state.clone()) {
-                continue;
-            }
+            let state = match seen.entry(state) {
+                Entry::Occupied(_) => continue,
+                Entry::Vacant(entry) => {
+                    let state = entry.key().clone();
+                    entry.insert(());
+                    state
+                }
+            };
             if state.stack.len() > frame_openers || state.suppress > suppression_openers {
                 return Err(SemanticVerifyError::EffectStack(label));
             }

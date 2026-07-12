@@ -16,9 +16,15 @@
 use std::fmt::Write as _;
 
 use crate::compiler::test_utils::synthetic_grammar as grammar;
-use crate::compiler::{BytecodeConfig, BytecodeInspection, QueryBuilder, SourceMap, SourcePath};
+use crate::compiler::{
+    BytecodeConfig, BytecodeInspection, QueryBuilder, SourceMap, SourcePath,
+    reset_semantic_body_analyses, semantic_body_analyses,
+};
 use indoc::indoc;
 
+use super::effect_stack::{
+    body_analyses as loader_body_analyses, reset_body_analyses as reset_loader_body_analyses,
+};
 use super::{ByteStorage, Module, ModuleError};
 use crate::bytecode::effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectKind};
 use crate::bytecode::type_meta::TypeDefKind;
@@ -55,19 +61,44 @@ fn many_callable_definitions_load_without_global_fixpoint_rescans() {
     // Every callable definition emits both a wrapper and a called body. This
     // shape used to spend quadratic time deduplicating roots and repeatedly
     // rescanning the whole definition set as body summaries became known.
+    const DEFINITIONS: usize = 4_096;
+    // Both verifiers currently need six body walks per source definition. Keep
+    // modest scheduling slack while making any definition-count rescan fail.
+    const MAX_BODY_ANALYSES_PER_DEFINITION: usize = 8;
+
     let mut query = String::new();
-    for index in 0..4_096 {
+    for index in 0..DEFINITIONS {
         writeln!(query, "Query{index} = (identifier)").expect("writing to a string succeeds");
     }
 
+    reset_semantic_body_analyses();
+    reset_loader_body_analyses();
     let bytes = emit_bytes(&query);
+    let semantic_analyses = semantic_body_analyses();
+    let emission_load_analyses = loader_body_analyses();
     assert!(
         bytes.len() > 63 * 1_024,
         "regression module must stay large"
     );
-    let module = Module::load_compiler_output(&bytes).expect("compiler output validates");
 
-    assert_eq!(module.entrypoints().len(), 4_096);
+    assert!(
+        semantic_analyses <= DEFINITIONS * MAX_BODY_ANALYSES_PER_DEFINITION,
+        "semantic verifier performed {semantic_analyses} body analyses for {DEFINITIONS} definitions"
+    );
+    assert!(
+        emission_load_analyses <= DEFINITIONS * MAX_BODY_ANALYSES_PER_DEFINITION,
+        "emission loader performed {emission_load_analyses} body analyses for {DEFINITIONS} definitions"
+    );
+
+    reset_loader_body_analyses();
+    let module = Module::load_compiler_output(&bytes).expect("compiler output validates");
+    let reload_analyses = loader_body_analyses();
+    assert!(
+        reload_analyses <= DEFINITIONS * MAX_BODY_ANALYSES_PER_DEFINITION,
+        "module reload performed {reload_analyses} body analyses for {DEFINITIONS} definitions"
+    );
+
+    assert_eq!(module.entrypoints().len(), DEFINITIONS);
 }
 
 /// Byte offset of the first predicated Match's 4-byte predicate

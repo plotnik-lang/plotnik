@@ -50,7 +50,7 @@ impl RegexDfas {
     /// `idx` is a predicate operand the loader bounds to a real entry
     /// (`1..count`, see `Module::validate_extended_match`), so the slot is always
     /// populated and the search cannot fail — an empty slot or a search error
-    /// would be a forged-/miscompiled-module bug, stated loudly here rather than
+    /// would be a miscompiled-module bug, stated loudly here rather than
     /// silently mis-answered.
     pub fn is_match(&self, idx: usize, text: &str) -> bool {
         let dfa = self.dfas[idx]

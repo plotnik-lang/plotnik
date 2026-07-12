@@ -8,9 +8,9 @@
 //! panics when a payload arrives both as the pending value and as direct
 //! fields, the end-of-log assert panics on unclosed frames, and the VM's
 //! `emit_effect` panics if a `SuppressEnd` underflows the suppression counter
-//! (`crates/plotnik-lib/src/vm/engine/vm.rs`). On compiler output these are
-//! unreachable by construction; on a forged module that swaps one effect they
-//! are not. This pass proves them unreachable for *any* module that passes
+//! (`crates/plotnik-lib/src/vm/engine/vm.rs`). On valid compiler output these are
+//! unreachable by construction; malformed output could still violate them.
+//! This pass proves them unreachable for every module that passes
 //! module validation, so they stay sound loud invariants instead of reachable
 //! panics.
 //!
@@ -42,8 +42,8 @@
 //! single state per step — as this pass once did — rejected modules the
 //! compiler itself emitted.
 //!
-//! Termination against forged modules cannot rely on the state sets converging
-//! on their own — a net-growing cycle would mint a deeper stack every lap. Two
+//! Termination cannot rely on the state sets converging on their own — malformed
+//! bytecode with a net-growing cycle would mint a deeper stack every lap. Two
 //! bounds close that off, both loose enough that compiler output never trips
 //! them:
 //!
@@ -56,9 +56,9 @@
 //!   span stack get the same treatment against their own opener counts.
 //! - **A state budget.** Frame payloads (enum member, `got_data`, pending) are
 //!   finite but can multiply across nesting; a hard cap on states explored per
-//!   body bounds load time on adversarial input. Compiler output stays far
-//!   below it: the states at a merged step correspond to the pre-dedup twins,
-//!   and step addresses are `u16`, so a body contributes at most tens of
+//!   body bounds load time on pathological compiler output. Valid output stays
+//!   far below it: the states at a merged step correspond to the pre-dedup
+//!   twins, and step addresses are `u16`, so a body contributes at most tens of
 //!   thousands of states in total.
 //!
 //! ## Why summaries
@@ -94,7 +94,7 @@
 //! every definition body with `Return` and only accepts at wrapper level.
 //!
 //! Net-neutrality, no popping below entry, and suppression balance are not
-//! assumed — they are verified, so a forged body that violates them is rejected
+//! assumed — they are verified, so a malformed body is rejected
 //! rather than silently mismodeled.
 //!
 //! ## Scope
@@ -103,9 +103,12 @@
 //! span-pairing and enum void/data-consistency assertions. Full agreement
 //! between materialized values and the declared type tables (checked by
 //! `debug_verify_type` in debug builds) is a compiler self-check, not a load
-//! guarantee: a forged module can still declare types its effects do not
+//! guarantee: malformed bytecode can still declare types its effects do not
 //! produce.
 
+#[cfg(test)]
+use std::cell::Cell;
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{Instruction, Module, ModuleError};
@@ -166,11 +169,26 @@ const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_ENUM;
 /// `Set` targets — a `Struct` or an `Enum` frame.
 const KS_SET: u8 = KS_STRUCT | KS_ENUM;
 
-/// Hard cap on abstract states explored per body walk. Compiler output is
-/// bounded by the pre-dedup instruction count (`u16` step space); only a
-/// forged module engineering a combinatorial frame-payload blowup can get
-/// near this, and rejecting it bounds load time.
+/// Hard cap on abstract states explored per body walk. Valid output is bounded
+/// by the pre-dedup instruction count (`u16` step space); pathological compiler
+/// output is rejected before a combinatorial frame-payload blowup can monopolize
+/// load time.
 const STATE_BUDGET: usize = 1 << 18;
+
+#[cfg(test)]
+thread_local! {
+    static BODY_ANALYSES: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(super) fn reset_body_analyses() {
+    BODY_ANALYSES.set(0);
+}
+
+#[cfg(test)]
+pub(super) fn body_analyses() -> usize {
+    BODY_ANALYSES.get()
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct DefSummary {
@@ -348,6 +366,9 @@ fn analyze(
     is_called: bool,
     final_check: bool,
 ) -> Result<Analysis, ModuleError> {
+    #[cfg(test)]
+    BODY_ANALYSES.set(BODY_ANALYSES.get() + 1);
+
     let mut entry_tos = KS_ANY;
     let mut returns_pending = None;
     let mut sets_caller_top = false;
@@ -358,7 +379,7 @@ fn analyze(
     // with is kept and processed once. The opener tallies accumulate, per
     // visited step, how many frame/suppression/span openers exist — a state
     // outgrowing them proves a net-positive cycle (see module docs).
-    let mut memo: HashMap<u16, HashSet<AbsState>> = HashMap::new();
+    let mut memo: HashMap<u16, HashMap<AbsState, ()>> = HashMap::new();
     let mut states_spent: usize = 0;
     let mut frame_openers: usize = 0;
     let mut suppress_openers: i32 = 0;
@@ -382,11 +403,16 @@ fn analyze(
                     }
                 }
             }
-            HashSet::new()
+            HashMap::new()
         });
-        if !seen.insert(state.clone()) {
-            continue;
-        }
+        let state = match seen.entry(state) {
+            Entry::Occupied(_) => continue,
+            Entry::Vacant(entry) => {
+                let state = entry.key().clone();
+                entry.insert(());
+                state
+            }
+        };
         if state.stack.len() > frame_openers || state.suppress > suppress_openers {
             return Err(ModuleError::EffectStackImbalance(step));
         }
@@ -684,7 +710,7 @@ struct EffectState<'a> {
 }
 
 /// A `SpanEnd` must close the innermost open span, with the id the matching
-/// bracket opened — a lone or mis-paired close is a forged module.
+/// bracket opened — a lone or mis-paired close is malformed bytecode.
 fn close_span(span_stack: &mut Vec<u16>, id: u16, step: u16) -> Result<(), ModuleError> {
     match span_stack.pop() {
         Some(open) if open == id => Ok(()),
