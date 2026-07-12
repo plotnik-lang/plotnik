@@ -10,7 +10,7 @@ use crate::compiler::parse::ast::{self, SeqItem};
 use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx, first_unmatched_close};
 use super::navigation::{is_down_nav, resumable_search_nav};
-use super::scope::{SkipExit, SplitExits};
+use super::scope::SkipExit;
 
 /// The sibling nav implied by a sequence's trailing anchor, used to mark the
 /// last pattern as anchor-followed.
@@ -222,26 +222,22 @@ impl NfaBuilder<'_> {
                 .filter(|_| followed_by_anchor && !self.item_owns_iteration(pattern));
 
             current_exit = if let Some(nav) = search_nav {
-                let body = self.dispatch_pattern(
-                    pattern,
-                    PatternCtx {
-                        exit: current_exit,
-                        nav: Some(Nav::StayExact),
-                        capture: item_capture,
-                        value: false,
-                    },
-                );
+                let pattern_ctx = PatternCtx {
+                    exit: current_exit,
+                    nav: Some(Nav::StayExact),
+                    capture: item_capture,
+                    value: false,
+                };
+                let body = self.dispatch_pattern(pattern, pattern_ctx);
                 self.emit_position_search(nav, body)
             } else {
-                self.dispatch_pattern(
-                    pattern,
-                    PatternCtx {
-                        exit: current_exit,
-                        nav: nav_override,
-                        capture: item_capture,
-                        value: false,
-                    },
-                )
+                let pattern_ctx = PatternCtx {
+                    exit: current_exit,
+                    nav: nav_override,
+                    capture: item_capture,
+                    value: false,
+                };
+                self.dispatch_pattern(pattern, pattern_ctx)
             };
             following_nav = nav_override;
         }
@@ -291,10 +287,13 @@ impl NfaBuilder<'_> {
         // the wrong node or miss null on the skip path. Split positionally so a
         // close and its consumer (e.g. `[EndEnum, Push]`) stay together and in order.
         let tail_effects = split_sequence_tail_effects(capture.post);
-        let exit = if tail_effects.exit_post.is_empty() {
-            exit
-        } else {
-            self.emit_effects_epsilon(exit, tail_effects.exit_post, CaptureEffects::default())
+        let exit_post = tail_effects.exit_post;
+        let exit = self.emit_effects_if_nonempty(exit, exit_post.clone());
+        let caller_skip_exit = match caller_skip_exit {
+            Some(SkipExit::To(skip)) => {
+                Some(SkipExit::To(self.emit_effects_if_nonempty(skip, exit_post)))
+            }
+            other => other,
         };
 
         // Compile the continuation with both navigations, or use exit if there is none.
@@ -344,16 +343,13 @@ impl NfaBuilder<'_> {
             (SkipExit::To(skip), mtch, CaptureEffects::default())
         };
 
-        let entry = self.compile_skippable_with_exits(
-            first_pattern,
-            SplitExits {
-                match_exit,
-                skip_exit,
-            },
-            first_nav,
-            first_post,
-            false,
-        );
+        let pattern_ctx = PatternCtx {
+            exit: match_exit,
+            nav: first_nav,
+            capture: first_post,
+            value: false,
+        };
+        let entry = self.compile_nullable_pattern(first_pattern, pattern_ctx, skip_exit);
 
         // Open the scope on a single entry epsilon every path crosses first.
         self.wrap_entry_pre(entry, capture.pre)

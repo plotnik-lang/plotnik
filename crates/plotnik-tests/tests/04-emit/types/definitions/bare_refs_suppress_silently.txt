@@ -11,11 +11,11 @@ Q = (program
   (B)
 )
 ------------------- TYPESCRIPT -------------------
-export type B =
-  | { $tag: "Y"; $data: { d: Node } };
-
 export type A =
   | { $tag: "X"; $data: { s: Node } };
+
+export type B =
+  | { $tag: "Y"; $data: { d: Node } };
 
 export type Q = undefined;
 ---------------------- RUST ----------------------

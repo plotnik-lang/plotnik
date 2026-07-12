@@ -24,7 +24,7 @@ Root
             Id "identifier"
             ParenClose ")"
           CaptureToken "@name"
-          TypeAnnotation
+          CaptureType
             DoubleColon "::"
             Id "Foo"
       Branch
@@ -36,7 +36,7 @@ Root
             Id "number"
             ParenClose ")"
           CaptureToken "@value"
-          TypeAnnotation
+          CaptureType
             DoubleColon "::"
             Id "Foo"
       Branch
@@ -48,7 +48,7 @@ Root
             Id "string"
             ParenClose ")"
           CaptureToken "@value"
-          TypeAnnotation
+          CaptureType
             DoubleColon "::"
             Id "Foo"
       Branch

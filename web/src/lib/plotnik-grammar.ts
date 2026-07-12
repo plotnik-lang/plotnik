@@ -17,7 +17,7 @@ export const plotnikGrammar: LanguageRegistration = {
     { include: "#shebang" },
     { include: "#definition" },
     { include: "#capture" },
-    { include: "#type-annotation" },
+    { include: "#capture-type" },
     { include: "#field" },
     { include: "#negated-field" },
     { include: "#node-ref" },
@@ -62,11 +62,11 @@ export const plotnikGrammar: LanguageRegistration = {
       name: "variable.capture.plotnik",
       match: "@[a-z_][a-z0-9_]*\\b|@_",
     },
-    "type-annotation": {
-      match: "(::)\\s*([A-Z][A-Za-z0-9_]*)",
+    "capture-type": {
+      match: "(::)\\s*([a-z][A-Za-z0-9_]*|[A-Z][A-Za-z0-9]*)\\b",
       captures: {
         "1": { name: "keyword.operator.type.plotnik" },
-        "2": { name: "entity.name.type.annotation.plotnik" },
+        "2": { name: "entity.name.type.capture.plotnik" },
       },
     },
     field: {

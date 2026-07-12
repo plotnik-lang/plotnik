@@ -1,6 +1,8 @@
 use crate::bytecode::Nav;
 use crate::compiler::ids::DefId;
-use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR, NfaGraph, ReturnIR};
+use crate::compiler::lower::ir::{
+    DefVariant, EffectIR, InstructionIR, Label, MatchIR, NfaGraph, ReturnIR,
+};
 use indexmap::IndexMap;
 
 #[test]
@@ -13,10 +15,9 @@ fn unbalanced_body_depth_panics() {
         ],
         def_entries: {
             let mut entries = IndexMap::new();
-            entries.insert(DefId::from_raw(0), Label(0));
+            entries.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
             entries
         },
-        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
@@ -37,10 +38,9 @@ fn zero_width_node_effect_panics() {
         ],
         def_entries: {
             let mut entries = IndexMap::new();
-            entries.insert(DefId::from_raw(0), Label(0));
+            entries.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
             entries
         },
-        def_entries_consuming: Default::default(),
         entrypoint_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),

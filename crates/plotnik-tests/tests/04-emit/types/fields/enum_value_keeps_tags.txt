@@ -5,13 +5,13 @@ Q = (call_expression
   ] @fn
 )
 ------------------- TYPESCRIPT -------------------
-export type QFn =
-  | { $tag: "Id" }
-  | { $tag: "Member" };
-
 export interface Q {
   fn: QFn;
 }
+
+export type QFn =
+  | { $tag: "Id" }
+  | { $tag: "Member" };
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q {

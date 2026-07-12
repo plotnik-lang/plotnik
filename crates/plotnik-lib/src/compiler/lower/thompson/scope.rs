@@ -44,6 +44,22 @@ impl CaptureExits {
             CaptureExits::Split { match_exit, .. } => match_exit,
         }
     }
+
+    pub(super) fn map_targets(self, mut wrap: impl FnMut(Label) -> Label) -> Self {
+        match self {
+            Self::Single(exit) => Self::Single(wrap(exit)),
+            Self::Split {
+                match_exit,
+                skip_exit,
+            } => Self::Split {
+                match_exit: wrap(match_exit),
+                skip_exit: match skip_exit {
+                    SkipExit::To(exit) => SkipExit::To(wrap(exit)),
+                    SkipExit::Fail => SkipExit::Fail,
+                },
+            },
+        }
+    }
 }
 
 /// Continuation for a zero-width (skip) outcome.
@@ -75,11 +91,28 @@ pub(super) struct SplitExits {
 /// can `Split` to a skip path; the non-scope pass-throughs (`Node`/`Ref`/
 /// `PendingValue`) take a plain [`Label`] — they own no skip path, so a `Split` is
 /// unrepresentable for them rather than silently collapsed via `match_exit`.
-pub(super) struct CaptureRequest<'a> {
-    pub inner: &'a Pattern,
+pub(super) struct CaptureRequest {
+    pub inner: Pattern,
     pub nav: Option<Nav>,
     pub capture_effects: Vec<EffectIR>,
     pub outer_capture: CaptureEffects,
+}
+
+impl CaptureRequest {
+    /// A definition-root array produces a pending value rather than assigning
+    /// a named capture at this site.
+    pub(super) fn pending_array(
+        inner: Pattern,
+        nav: Option<Nav>,
+        outer_capture: CaptureEffects,
+    ) -> Self {
+        Self {
+            inner,
+            nav,
+            capture_effects: vec![],
+            outer_capture,
+        }
+    }
 }
 
 /// Emitted in order after a scope-closing epsilon (`EndArr`/`EndStruct`): the
@@ -153,9 +186,16 @@ impl NfaBuilder<'_> {
     /// `@cap` is resolved by the caller, against the enclosing scope.
     pub(super) fn compile_struct_capture(
         &mut self,
-        req: CaptureRequest<'_>,
+        req: CaptureRequest,
         exits: CaptureExits,
     ) -> Label {
+        // `{...}? @x`: the row is optional as a whole. The struct scope moves
+        // inside the quantifier iteration so a skip emits a bare `Null` for the
+        // capture — never a hollow `{ field: null }` struct.
+        if matches!(&req.inner, Pattern::QuantifiedPattern(_)) {
+            return self.compile_optional_row_capture(req, exits);
+        }
+
         let CaptureRequest {
             inner,
             nav,
@@ -163,25 +203,12 @@ impl NfaBuilder<'_> {
             outer_capture,
         } = req;
 
-        // `{...}? @x`: the row is optional as a whole. The struct scope moves
-        // inside the quantifier iteration so a skip emits a bare `Null` for the
-        // capture — never a hollow `{ field: null }` struct.
-        if let Pattern::QuantifiedPattern(quant) = inner {
-            return self.compile_optional_row_capture(
-                quant,
-                nav,
-                capture_effects,
-                outer_capture,
-                exits,
-            );
-        }
-
         // The struct scope's type drives the inner captures' Set member resolution.
         let scope_type_id = self
             .ctx
             .analysis
             .type_analysis
-            .expect_pattern_result(inner)
+            .expect_pattern_result(&inner)
             .flow
             .type_id();
 
@@ -194,7 +221,7 @@ impl NfaBuilder<'_> {
             CaptureExits::Single(exit) => {
                 let struct_close = self.emit_struct_close_step_with_effects(end_effects, exit);
                 self.compile_with_optional_scope(scope_type_id, |this| {
-                    this.compile_pattern(inner, struct_close, nav)
+                    this.compile_pattern(&inner, struct_close, nav)
                 })
             }
             CaptureExits::Split {
@@ -210,16 +237,13 @@ impl NfaBuilder<'_> {
                     SkipExit::Fail => SkipExit::Fail,
                 };
                 self.compile_with_optional_scope(scope_type_id, |this| {
-                    this.compile_skippable_with_exits(
-                        inner,
-                        SplitExits {
-                            match_exit: match_struct_close,
-                            skip_exit: skip_struct_close,
-                        },
+                    let pattern_ctx = PatternCtx {
+                        exit: match_struct_close,
                         nav,
-                        CaptureEffects::default(),
-                        false,
-                    )
+                        capture: CaptureEffects::default(),
+                        value: false,
+                    };
+                    this.compile_nullable_pattern(&inner, pattern_ctx, skip_struct_close)
                 })
             }
         };
@@ -234,7 +258,7 @@ impl NfaBuilder<'_> {
     /// wrapper is emitted.
     pub(super) fn compile_bubble_with_node_capture(
         &mut self,
-        req: CaptureRequest<'_>,
+        req: CaptureRequest,
         exit: Label,
     ) -> Label {
         let CaptureRequest {
@@ -257,15 +281,13 @@ impl NfaBuilder<'_> {
         };
 
         let inner_capture = CaptureEffects::new(outer_capture.pre, capture_effects);
-        self.dispatch_pattern(
-            inner,
-            PatternCtx {
-                exit: actual_exit,
-                nav,
-                capture: inner_capture,
-                value: false,
-            },
-        )
+        let pattern_ctx = PatternCtx {
+            exit: actual_exit,
+            nav,
+            capture: inner_capture,
+            value: false,
+        };
+        self.dispatch_pattern(&inner, pattern_ctx)
     }
 
     /// Compile a pattern with Struct/EndStruct wrapping for array iteration.

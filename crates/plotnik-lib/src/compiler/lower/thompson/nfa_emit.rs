@@ -1,6 +1,9 @@
 use crate::bytecode::{EffectKind, Nav};
-use crate::compiler::lower::ir::{CallIR, CalleeEntry, EffectIR, Label, MatchIR, ReturnAddr};
-use crate::compiler::parse::ast::{Pattern, QuantifierOperator};
+use crate::compiler::lower::ir::{
+    CallIR, CalleeEntry, EffectArg, EffectIR, Label, MatchIR, ReturnAddr, SplitReturnAddrs,
+};
+use crate::compiler::lower::spans::SpanBindingIR;
+use crate::compiler::parse::ast::{self, Pattern, QuantifierOperator};
 use crate::core::NodeFieldId;
 
 use super::NfaBuilder;
@@ -59,6 +62,30 @@ impl NfaBuilder<'_> {
         label
     }
 
+    pub(super) fn emit_split_call(
+        &mut self,
+        entry_nav: Nav,
+        returns: SplitReturnAddrs,
+        callee: CalleeEntry,
+    ) -> Label {
+        let label = self.fresh_label();
+        self.instructions
+            .push(CallIR::split(label, entry_nav, returns, callee).into());
+        label
+    }
+
+    pub(super) fn emit_routed_call(
+        &mut self,
+        entry_nav: Nav,
+        return_addr: ReturnAddr,
+        callee: CalleeEntry,
+    ) -> Label {
+        let label = self.fresh_label();
+        self.instructions
+            .push(CallIR::routed(label, entry_nav, return_addr, callee).into());
+        label
+    }
+
     /// Emit an epsilon with combined effects.
     ///
     /// Note: this consumes only `outer.post`. Callers whose capture owns no
@@ -111,11 +138,30 @@ impl NfaBuilder<'_> {
         exit: Label,
         capture: &CaptureEffects,
     ) -> Label {
+        let capture_span = capture.post.iter().find_map(|effect| {
+            if effect.kind() != EffectKind::SpanStart {
+                return None;
+            }
+            let EffectArg::Literal(id) = effect.payload() else {
+                unreachable!("inspection span effects carry literal ids")
+            };
+            self.spans
+                .as_ref()
+                .and_then(|spans| spans.entries.get(*id))
+                .is_some_and(|entry| entry.kind == crate::bytecode::SpanKind::Capture)
+                .then_some(*id as u16)
+        });
         let null_effects: Vec<_> = capture
             .post
             .iter()
             .filter(|eff| eff.kind() == EffectKind::Set)
-            .flat_map(|set_eff| [EffectIR::null(), set_eff.clone()])
+            .flat_map(|set_eff| {
+                capture_span
+                    .map(EffectIR::span_start)
+                    .into_iter()
+                    .chain([EffectIR::null(), set_eff.clone()])
+                    .chain(capture_span.map(EffectIR::span_end))
+            })
             .collect();
 
         self.emit_effects_if_nonempty(exit, null_effects)
@@ -137,16 +183,27 @@ impl NfaBuilder<'_> {
             return exit;
         }
 
-        let captures = Self::collect_captures(inner);
+        let captures = collect_capture_occurrences(inner);
         if captures.is_empty() {
             return exit;
         }
 
         let mut null_effects = Vec::new();
-        for name in captures {
-            if let Some(member_ref) = self.lookup_member_in_scope(&name) {
+        for capture in captures {
+            let name = capture
+                .name()
+                .expect("collected regular capture has a name");
+            if let Some(member_ref) = self.lookup_member_in_scope(&name.text()[1..]) {
+                let span = self.span_id(capture.syntax(), crate::bytecode::SpanKind::Capture);
+                if let Some(span) = span {
+                    self.bind_span(span, SpanBindingIR::Member(member_ref));
+                    null_effects.push(EffectIR::span_start(span.0));
+                }
                 null_effects.push(EffectIR::null());
                 null_effects.push(EffectIR::with_member(EffectKind::Set, member_ref));
+                if let Some(span) = span {
+                    null_effects.push(EffectIR::span_end(span.0));
+                }
             }
         }
 
@@ -264,4 +321,22 @@ impl NfaBuilder<'_> {
 
         navigate
     }
+}
+
+fn collect_capture_occurrences(pattern: &Pattern) -> Vec<ast::CapturedPattern> {
+    fn collect(pattern: &Pattern, captures: &mut Vec<ast::CapturedPattern>) {
+        if let Pattern::CapturedPattern(capture) = pattern
+            && !capture.is_suppressive()
+            && capture.name().is_some()
+        {
+            captures.push(capture.clone());
+        }
+        for child in pattern.children() {
+            collect(&child, captures);
+        }
+    }
+
+    let mut captures = Vec::new();
+    collect(pattern, &mut captures);
+    captures
 }

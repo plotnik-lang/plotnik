@@ -6,17 +6,17 @@ Both = (pair
   (number) @val
 )
 ------------------- TYPESCRIPT -------------------
-export interface Both {
-  key: Node;
-  val: Node;
+export interface Name {
+  name: Node;
 }
 
 export interface Value {
   value: Node;
 }
 
-export interface Name {
-  name: Node;
+export interface Both {
+  key: Node;
+  val: Node;
 }
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;

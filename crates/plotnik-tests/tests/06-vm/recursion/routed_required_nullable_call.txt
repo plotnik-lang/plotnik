@@ -1,0 +1,268 @@
+A = [
+  (statement_block
+    (A)+
+    (debugger_statement)
+  )
+  (statement_block (debugger_statement))
+]?
+
+Q = (program
+  (A)
+  (expression_statement) @e
+)
+--------------------- INPUT ----------------------
+{ { debugger; } debugger; } f();
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  e: Node;
+}
+--------------------- OUTPUT ---------------------
+{
+  "e": {
+    "kind": "expression_statement",
+    "text": "f();",
+    "span": [28, 32]
+  }
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "e"
+S2 "A"
+S3 "Q"
+S4 "statement_block"
+S5 "debugger_statement"
+S6 "program"
+S7 "expression_statement"
+
+[type_defs]
+T0 = <Node>
+T1 = Optional(T0)  ; <Node>?
+T2 = Struct  M0:1  ; { e }
+
+[type_members]
+M0: S1 → T0  ; e: <Node>
+
+[type_names]
+N0: S2 → T1  ; A
+N1: S3 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@52)                            52 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06                                        ▶
+  07  ─‣┘  _                                13
+  08  └‣─  (expression_statement) [Node Set(M0)]  15
+  10  ─‣─  (expression_statement) [Node Set(M0)]  15
+  12  ─‣─  (debugger_statement)             23
+  13                                        ▶
+  14  ─‣─  (debugger_statement)             07
+  15  ─‣┘  _                                06
+  16  -ε-  [SuppressEnd]                    21, 14
+  18       (@32)                            32 : 16
+  19  -ε-  [SuppressBegin]                  18
+  21  ──!  _                                19, 21
+  23  ─‣┘  _                                10
+  24  └─!  _                                19, 21
+  26   !   (statement_block)                24
+  27  └‣─  (debugger_statement)             07
+  28   !   (statement_block)                27
+  29  ──!  _                                26, 28, 29
+  31  ...
+  32   !   _                                26, 28, 29
+  34  -ε-  [SuppressEnd]                    40, 12
+  36       (@32)                            32 : 34
+  37  -ε-  [SuppressBegin]                  36
+  39  ...
+  40  ──!  _                                37, 40
+  42  └─!  _                                37, 40
+  44   !   (statement_block)                42
+  45  └‣─  (debugger_statement)             23
+  46   !   (statement_block)                45
+  47  ...
+  48  ──!  _                                44, 46, 48
+  50  └─!  _                                44, 46, 48
+  52   !   (program)                        50, 08
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@52)                            52 : 03
+       ▶   (@52)
+
+@52:
+  52       (program)                        50, 08
+       ●   program
+  50       _                                44, 46, 48
+       ●   statement_block
+  44       (statement_block)                42
+       ●   statement_block
+  42       _                                37, 40
+       ●   {
+  37  -ε-  [SuppressBegin]                  36
+  36       (@32)                            32 : 34
+       ▶   (@32)
+
+@32:
+  32       _                                26, 28, 29
+       ●   {
+  26       (statement_block)                24
+       ○   {
+  32  ❮❮❮ 
+  28       (statement_block)                27
+       ○   {
+  32  ❮❮❮ 
+  29       _                                26, 28, 29
+       ●   statement_block
+  26       (statement_block)                24
+       ●   statement_block
+  24       _                                19, 21
+       ●   {
+  19  -ε-  [SuppressBegin]                  18
+  18       (@32)                            32 : 16
+       ▶   (@32)
+
+@32:
+  32       _                                26, 28, 29
+       ●   {
+  26       (statement_block)                24
+       ○   {
+  32  ❮❮❮ 
+  28       (statement_block)                27
+       ○   {
+  32  ❮❮❮ 
+  29       _                                26, 28, 29
+       ●   debugger_statement
+  26       (statement_block)                24
+       ○   debugger_statement
+  29  ❮❮❮ 
+  28       (statement_block)                27
+       ○   debugger_statement
+  29  ❮❮❮ 
+  29       _                                26, 28, 29
+       ●   }
+  26       (statement_block)                24
+       ○   }
+  29  ❮❮❮ 
+  28       (statement_block)                27
+       ○   }
+  29  ❮❮❮ 
+  29       _                                26, 28, 29
+  24  ❮❮❮ 
+  21       _                                19, 21
+       ●   debugger_statement
+  19  -ε-  [SuppressBegin]                  18
+  18       (@32)                            32 : 16
+       ▶   (@32)
+
+@32:
+  32       _                                26, 28, 29
+       ●   debugger_statement
+  26       (statement_block)                24
+       ○   debugger_statement
+  32  ❮❮❮ 
+  28       (statement_block)                27
+       ○   debugger_statement
+  32  ❮❮❮ 
+  29       _                                26, 28, 29
+       ●   }
+  26       (statement_block)                24
+       ○   }
+  29  ❮❮❮ 
+  28       (statement_block)                27
+       ○   }
+  29  ❮❮❮ 
+  29       _                                26, 28, 29
+  21  ❮❮❮ 
+  21       _                                19, 21
+       ●   }
+  19  -ε-  [SuppressBegin]                  18
+  18       (@32)                            32 : 16
+       ▶   (@32)
+
+@32:
+  32       _                                26, 28, 29
+       ●   }
+  26       (statement_block)                24
+       ○   }
+  32  ❮❮❮ 
+  28       (statement_block)                27
+       ○   }
+  32  ❮❮❮ 
+  29       _                                26, 28, 29
+  21  ❮❮❮ 
+  21       _                                19, 21
+  29  ❮❮❮ 
+  28       (statement_block)                27
+       ●   statement_block
+  27       (debugger_statement)             07
+       ○   {
+       ●   debugger_statement
+  07       _                                13
+       ●   statement_block
+  13   ◀   (@32)                            
+
+@52:
+  34  -ε-  [SuppressEnd]                    40, 12
+  40       _                                37, 40
+       ●   debugger_statement
+  37  -ε-  [SuppressBegin]                  36
+  36       (@32)                            32 : 34
+       ▶   (@32)
+
+@32:
+  32       _                                26, 28, 29
+       ●   debugger_statement
+  26       (statement_block)                24
+       ○   debugger_statement
+  32  ❮❮❮ 
+  28       (statement_block)                27
+       ○   debugger_statement
+  32  ❮❮❮ 
+  29       _                                26, 28, 29
+       ●   }
+  26       (statement_block)                24
+       ○   }
+  29  ❮❮❮ 
+  28       (statement_block)                27
+       ○   }
+  29  ❮❮❮ 
+  29       _                                26, 28, 29
+  40  ❮❮❮ 
+  40       _                                37, 40
+       ●   }
+  37  -ε-  [SuppressBegin]                  36
+  36       (@32)                            32 : 34
+       ▶   (@32)
+
+@32:
+  32       _                                26, 28, 29
+       ●   }
+  26       (statement_block)                24
+       ○   }
+  32  ❮❮❮ 
+  28       (statement_block)                27
+       ○   }
+  32  ❮❮❮ 
+  29       _                                26, 28, 29
+  40  ❮❮❮ 
+  40       _                                37, 40
+  34  ❮❮❮ 
+  12       (debugger_statement)             23
+       ●   debugger_statement
+  23       _                                10
+       ●   statement_block
+  10       (expression_statement) [Node Set(M0)]  15
+       ●   expression_statement
+  15       _                                06
+       ●   program
+  06   ◀   (@52)                            
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

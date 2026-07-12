@@ -99,23 +99,23 @@ Pipeline:
 
 Full spec: `docs/lang-reference.md`, `docs/type-system.md`. The essentials:
 
-| Syntax              | Meaning                            |
-| ------------------- | ---------------------------------- |
-| `(node_kind)`       | Named node                         |
-| `"text"` / `'text'` | Anonymous node (literal token)     |
-| `(_)` / `_`         | Any named node / any node          |
-| `@name`             | Capture (snake_case only)          |
-| `@x :: T`           | Type annotation (T is PascalCase)  |
-| `field: pattern`    | Field constraint                   |
-| `-field`            | Negated field (assert absent)      |
-| `?` `*` `+`         | Quantifiers (non-greedy: `??` etc) |
-| `.` / `.!`          | Soft / strict anchor               |
-| `{...}`             | Sequence (siblings in order)       |
-| `[...]`             | Union / enum (first match wins)    |
-| `Name = ...`        | Named definition (entrypoint)      |
-| `(Name)`            | Use named definition               |
-| `(node == "x")`     | String predicate (== != ^= $= \*=) |
-| `(node =~ /x/)`     | Regex predicate (=~ !~)            |
+| Syntax              | Meaning                                     |
+| ------------------- | ------------------------------------------- |
+| `(node_kind)`       | Named node                                  |
+| `"text"` / `'text'` | Anonymous node (literal token)              |
+| `(_)` / `_`         | Any named node / any node                   |
+| `@name`             | Capture (snake_case only)                   |
+| `@x :: T`           | Capture type (`str`, `bool`, or PascalCase) |
+| `field: pattern`    | Field constraint                            |
+| `-field`            | Negated field (assert absent)               |
+| `?` `*` `+`         | Quantifiers (non-greedy: `??` etc)          |
+| `.` / `.!`          | Soft / strict anchor                        |
+| `{...}`             | Sequence (siblings in order)                |
+| `[...]`             | Union / enum (first match wins)             |
+| `Name = ...`        | Named definition (entrypoint)               |
+| `(Name)`            | Use named definition                        |
+| `(node == "x")`     | String predicate (== != ^= $= \*=)          |
+| `(node =~ /x/)`     | Regex predicate (=~ !~)                     |
 
 Rules that trip everyone:
 

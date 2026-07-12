@@ -4,12 +4,12 @@ Q = (program
   } @my_items
 )
 ------------------- TYPESCRIPT -------------------
-export interface QMyItems {
-  s: Node;
-}
-
 export interface Q {
   my_items: QMyItems;
+}
+
+export interface QMyItems {
+  s: Node;
 }
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;

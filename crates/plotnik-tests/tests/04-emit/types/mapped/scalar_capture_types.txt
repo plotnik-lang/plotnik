@@ -1,0 +1,21 @@
+Q = (program
+  (comment)? @doc :: str
+  (expression_statement)? @present :: bool
+)
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  doc: string | null;
+  present: boolean;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'s> {
+    pub doc: ::core::option::Option<&'s str>,
+    pub present: bool,
+}
+--------------------- MAPPED ---------------------
+17..18 T3 "Q"
+23..26 T3.M0 "doc"
+28..34 T0 "string"
+45..52 T3.M1 "present"
+54..61 T1 "boolean"

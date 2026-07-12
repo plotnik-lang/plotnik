@@ -3,8 +3,6 @@
 //! Manages the construction and propagation of capture effects (Node + Set)
 //! through the compilation pipeline.
 
-use std::collections::HashSet;
-
 use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::types::{CaptureKind, TypeAnalysis, TypeShape};
 use crate::compiler::ids::TypeId;
@@ -141,7 +139,9 @@ pub(super) fn first_unmatched_close(post: &[EffectIR]) -> Option<usize> {
             EffectKind::ArrayClose
             | EffectKind::StructClose
             | EffectKind::EnumClose
-            | EffectKind::SuppressEnd => return Some(i),
+            | EffectKind::SuppressEnd
+            | EffectKind::StrClose
+            | EffectKind::BoolClose => return Some(i),
             _ => {}
         }
     }
@@ -311,22 +311,6 @@ impl NfaBuilder<'_> {
                 .is_some_and(|v| self.is_ref_returning_structured(&v)),
             _ => false,
         }
-    }
-
-    pub(super) fn collect_captures(pattern: &Pattern) -> HashSet<String> {
-        fn collect(pattern: &Pattern, names: &mut HashSet<String>) {
-            if let Pattern::CapturedPattern(cap) = pattern
-                && let Some(name) = cap.name()
-            {
-                names.insert(name.text()[1..].to_string());
-            }
-            for child in pattern.children() {
-                collect(&child, names);
-            }
-        }
-        let mut names = HashSet::new();
-        collect(pattern, &mut names);
-        names
     }
 }
 

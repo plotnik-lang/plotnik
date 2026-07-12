@@ -26,7 +26,7 @@ pub enum DiagnosticKind {
     UnclosedAlternation,
 
     ExpectedExpression,
-    ExpectedTypeName,
+    ExpectedCaptureType,
     ExpectedFieldName,
     ExpectedSubtype,
     ExpectedPredicateValue,
@@ -48,7 +48,7 @@ pub enum DiagnosticKind {
     NegatedFieldAsFieldValue,
     InvalidFieldEquals,
     InvalidSupertypeSyntax,
-    InvalidTypeAnnotationSyntax,
+    InvalidCaptureTypeSyntax,
     ErrorTakesNoArguments,
     MissingTakesNoChildren,
     RefCannotHaveChildren,
@@ -56,12 +56,13 @@ pub enum DiagnosticKind {
     UnsupportedPredicate,
     UnexpectedToken,
     CaptureWithoutTarget,
+    CaptureTypeWithoutCapture,
 
     CaptureNameInvalid,
     DefNameInvalid,
     BranchLabelInvalid,
     FieldNameInvalid,
-    TypeNameInvalid,
+    CaptureTypeNameInvalid,
     TreeSitterSequenceSyntaxDeprecated,
     NegationSyntaxDeprecated,
     SupertypeSlashDeprecated,
@@ -86,7 +87,10 @@ pub enum DiagnosticKind {
     IncompatibleCaptureTypes,
     IncompatibleStructShapes,
     TypeNameConflict,
-    RedundantTypeAnnotation,
+    UnknownCaptureType,
+    InvalidCaptureType,
+    CaptureTypeSuppressesData,
+    RedundantCaptureType,
     InspectionSpansDegraded,
     EntrypointNeverMatchesRoot,
 
@@ -131,7 +135,8 @@ impl DiagnosticKind {
     pub fn severity(&self) -> Severity {
         match self {
             Self::UnusedBranchLabels
-            | Self::RedundantTypeAnnotation
+            | Self::CaptureTypeSuppressesData
+            | Self::RedundantCaptureType
             | Self::InspectionSpansDegraded
             | Self::EntrypointNeverMatchesRoot
             | Self::TreeSitterSequenceSyntaxDeprecated
@@ -168,7 +173,7 @@ impl DiagnosticKind {
         matches!(
             self,
             Self::ExpectedExpression
-                | Self::ExpectedTypeName
+                | Self::ExpectedCaptureType
                 | Self::ExpectedFieldName
                 | Self::ExpectedSubtype
                 | Self::ExpectedPredicateValue
@@ -186,7 +191,7 @@ impl DiagnosticKind {
     pub fn hint(&self) -> Option<&'static str> {
         let text = match self {
             Self::ExpectedSubtype => "e.g., `expression#binary_expression`",
-            Self::ExpectedTypeName => "e.g., `::MyType`",
+            Self::ExpectedCaptureType => "e.g., `:: str` or `:: MyType`",
             Self::ExpectedFieldName => "e.g., `-value`",
             Self::EmptyTree => "use `(_)` to match any named node, or `_` for any node",
             Self::EmptyAnonymousNode => {
@@ -197,6 +202,9 @@ impl DiagnosticKind {
             Self::ErrorMissingOutsideParens => "write `(ERROR)` or `(MISSING \";\")`",
             Self::CaptureWithoutTarget => {
                 "captures attach to the pattern before them: `(node) @name`"
+            }
+            Self::CaptureTypeWithoutCapture => {
+                "capture types attach to a regular capture: `(node) @name :: str`"
             }
             Self::CaptureNameInvalid => "captures become fields in the output",
             Self::DefNameInvalid => "definitions become types in the output",
@@ -330,7 +338,7 @@ impl DiagnosticKind {
             Self::UnclosedRegex => "missing closing `/` for regex",
             Self::UnclosedString => "unterminated string",
             Self::ExpectedExpression => "expected an expression",
-            Self::ExpectedTypeName => "expected a type name after `::`",
+            Self::ExpectedCaptureType => "expected a capture type after `::`",
             Self::ExpectedFieldName => "expected a field name",
             Self::ExpectedSubtype => "expected a subtype after `/`",
             Self::ExpectedPredicateValue => "expected a string or regex after the operator",
@@ -353,7 +361,7 @@ impl DiagnosticKind {
             Self::NegatedFieldAsFieldValue => "a negated field cannot be a field value",
             Self::InvalidFieldEquals => "fields use `:`, not `=`",
             Self::InvalidSupertypeSyntax => "references cannot have supertypes",
-            Self::InvalidTypeAnnotationSyntax => "type annotations use `::`, not `:`",
+            Self::InvalidCaptureTypeSyntax => "capture types use `::`, not `:`",
             Self::ErrorTakesNoArguments => "`(ERROR)` cannot have children",
             Self::MissingTakesNoChildren => {
                 "`(MISSING)` takes at most a node kind or a quoted token"
@@ -363,11 +371,14 @@ impl DiagnosticKind {
             Self::UnsupportedPredicate => "tree-sitter predicates are not supported",
             Self::UnexpectedToken => "unexpected token",
             Self::CaptureWithoutTarget => "expected a capture name after `@`",
+            Self::CaptureTypeWithoutCapture => "capture type has no capture",
             Self::CaptureNameInvalid => "capture names must be snake_case",
             Self::DefNameInvalid => "definition names must be PascalCase",
             Self::BranchLabelInvalid => "branch labels must be PascalCase",
             Self::FieldNameInvalid => "field names must be snake_case",
-            Self::TypeNameInvalid => "type names must be PascalCase",
+            Self::CaptureTypeNameInvalid => {
+                "capture type names cannot contain punctuation or custom-name separators"
+            }
             Self::TreeSitterSequenceSyntaxDeprecated => {
                 "parenthesized sequences are tree-sitter syntax"
             }
@@ -396,7 +407,10 @@ impl DiagnosticKind {
             Self::IncompatibleCaptureTypes => "incompatible capture types",
             Self::IncompatibleStructShapes => "incompatible struct shapes",
             Self::TypeNameConflict => "conflicting type name",
-            Self::RedundantTypeAnnotation => "redundant type annotation",
+            Self::UnknownCaptureType => "unknown capture type",
+            Self::InvalidCaptureType => "invalid capture type",
+            Self::CaptureTypeSuppressesData => "capture type suppresses data",
+            Self::RedundantCaptureType => "redundant capture type",
             Self::InspectionSpansDegraded => "query too large for full inspection detail",
             Self::EntrypointNeverMatchesRoot => {
                 "entrypoint can never match: matching starts at the tree root"
@@ -463,7 +477,9 @@ impl DiagnosticKind {
             Self::TypeNameConflict => {
                 "type name `{}` is already used for a different type".to_string()
             }
-            Self::RedundantTypeAnnotation => "this type annotation {}".to_string(),
+            Self::UnknownCaptureType => "unknown capture type `{}`".to_string(),
+            Self::InvalidCaptureType | Self::CaptureTypeSuppressesData => "{}".to_string(),
+            Self::RedundantCaptureType => "this capture type {}".to_string(),
             Self::InspectionSpansDegraded => "{}".to_string(),
             Self::DuplicateCaptureInScope => {
                 "capture `@{}` already defined in this scope".to_string()

@@ -28,6 +28,41 @@ pub enum EffectKind {
     SpanStart = 13,
     /// Close the innermost inspection span.
     SpanEnd = 14,
+    /// Open one value-local scalar provenance frame.
+    ScalarOpen = 15,
+    /// Mark the current explicit node-pattern match in every open scalar frame.
+    ScalarMark = 16,
+    /// Close a scalar frame and produce source text (or null with no marks).
+    StrClose = 17,
+    /// Close a scalar frame and produce the boolean encoded in the payload.
+    BoolClose = 18,
+    /// Produce the current node's source text directly.
+    NodeStr = 19,
+    /// Produce `true` for the current matched node directly.
+    NodeBool = 20,
+    /// Produce the boolean encoded in the payload without provenance.
+    BoolValue = 21,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EffectSuppression {
+    Data,
+    Control,
+    Bypass,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ValueFrameKind {
+    Array,
+    Struct,
+    Enum,
+    Scalar,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FrameAction {
+    Open(ValueFrameKind),
+    Close(ValueFrameKind),
 }
 
 impl EffectKind {
@@ -54,9 +89,63 @@ impl EffectKind {
             12 => Self::SpanStartAt,
             13 => Self::SpanStart,
             14 => Self::SpanEnd,
+            15 => Self::ScalarOpen,
+            16 => Self::ScalarMark,
+            17 => Self::StrClose,
+            18 => Self::BoolClose,
+            19 => Self::NodeStr,
+            20 => Self::NodeBool,
+            21 => Self::BoolValue,
             _ => return None,
         };
         Some(op)
+    }
+
+    pub fn suppression(self) -> EffectSuppression {
+        match self {
+            Self::SuppressBegin | Self::SuppressEnd => EffectSuppression::Control,
+            Self::SpanStartAt | Self::SpanStart | Self::SpanEnd | Self::ScalarMark => {
+                EffectSuppression::Bypass
+            }
+            _ => EffectSuppression::Data,
+        }
+    }
+
+    pub fn reads_cursor(self) -> bool {
+        matches!(
+            self,
+            Self::Node | Self::SpanStartAt | Self::ScalarMark | Self::NodeStr | Self::NodeBool
+        )
+    }
+
+    pub fn is_motion_barrier(self) -> bool {
+        matches!(self, Self::ScalarOpen | Self::StrClose | Self::BoolClose)
+    }
+
+    pub fn frame_action(self) -> Option<FrameAction> {
+        let action = match self {
+            Self::ArrayOpen => FrameAction::Open(ValueFrameKind::Array),
+            Self::ArrayClose => FrameAction::Close(ValueFrameKind::Array),
+            Self::StructOpen => FrameAction::Open(ValueFrameKind::Struct),
+            Self::StructClose => FrameAction::Close(ValueFrameKind::Struct),
+            Self::EnumOpen => FrameAction::Open(ValueFrameKind::Enum),
+            Self::EnumClose => FrameAction::Close(ValueFrameKind::Enum),
+            Self::ScalarOpen => FrameAction::Open(ValueFrameKind::Scalar),
+            Self::StrClose | Self::BoolClose => FrameAction::Close(ValueFrameKind::Scalar),
+            _ => return None,
+        };
+        Some(action)
+    }
+
+    /// Validate the payload using the two tables an effect may index. All
+    /// effects decoded at the trust boundary pass through this one contract.
+    pub fn accepts_payload(self, payload: usize, member_count: usize, span_count: usize) -> bool {
+        match self {
+            Self::Set | Self::EnumOpen => payload < member_count,
+            Self::SpanStartAt | Self::SpanStart | Self::SpanEnd => payload < span_count,
+            Self::BoolClose | Self::BoolValue => payload <= 1,
+            _ => payload == 0,
+        }
     }
 }
 

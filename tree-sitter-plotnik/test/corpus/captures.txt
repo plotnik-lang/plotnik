@@ -50,10 +50,13 @@ Q = (program
         (suppressive_capture)))))
 
 ================================================================================
-Type annotations
+Capture types
 ================================================================================
 Q = (p
   (a) @x :: Type
+  (a) @text :: str
+  (a)? @present :: bool
+  (a) @unknown :: num
   {(b) @inner}+ @rows :: Row
   [(c) (d)] @choice::Pick
 )
@@ -68,8 +71,28 @@ Q = (p
         (named_node
           (identifier))
         (capture)
-        (type_annotation
-          (type_identifier)))
+        (capture_type
+          (capture_type_identifier)))
+      (captured_pattern
+        (named_node
+          (identifier))
+        (capture)
+        (capture_type
+          (builtin_capture_type)))
+      (captured_pattern
+        (quantified_pattern
+          (named_node
+            (identifier))
+          (quantifier))
+        (capture)
+        (capture_type
+          (builtin_capture_type)))
+      (captured_pattern
+        (named_node
+          (identifier))
+        (capture)
+        (capture_type
+          (capture_type_identifier)))
       (captured_pattern
         (quantified_pattern
           (sequence
@@ -79,8 +102,8 @@ Q = (p
               (capture)))
           (quantifier))
         (capture)
-        (type_annotation
-          (type_identifier)))
+        (capture_type
+          (capture_type_identifier)))
       (captured_pattern
         (alternation
           (branch
@@ -90,8 +113,8 @@ Q = (p
             (named_node
               (identifier))))
         (capture)
-        (type_annotation
-          (type_identifier))))))
+        (capture_type
+          (capture_type_identifier))))))
 
 ================================================================================
 Capture names with digits and underscores

@@ -7,13 +7,13 @@ Q = (program
   } @b :: Info
 )
 ------------------- TYPESCRIPT -------------------
-export interface Info {
-  stmt: Node;
-}
-
 export interface Q {
   a: Info;
   b: Info;
+}
+
+export interface Info {
+  stmt: Node;
 }
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;

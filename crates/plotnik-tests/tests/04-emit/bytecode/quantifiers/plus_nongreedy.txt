@@ -3,29 +3,16 @@ Q = (identifier)+? @items
 [entrypoints]
 
 [transitions]
-Q:
-  1                                         ▶
-  2  -ε-  [ArrayClose Set(items)]           1
-  4   !   (identifier) [Node Push]          2, 6
-  6  ──!  _                                 4, 6
-  7   !   _ [ArrayOpen]                     4, 6
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "items"
-S2 "Q"
-S3 "identifier"
+S1 "identifier"
 
 [type_defs]
-T0 = <Node>
-T1 = ArrayPlus(T0)  ; <Node>+
-T2 = Struct  M0:1  ; { items }
 
 [type_members]
-M0: S1 → T1  ; items: T1
 
 [type_names]
-N0: S2 → T2  ; Q
 
 [entrypoints]
 

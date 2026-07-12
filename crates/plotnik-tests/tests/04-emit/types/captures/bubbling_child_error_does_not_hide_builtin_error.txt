@@ -1,0 +1,20 @@
+Q = (program
+  (expression_statement
+    (identifier) @dup
+    (identifier) @dup
+  ) @flag :: bool
+)
+------------------ DIAGNOSTICS -------------------
+error: capture `@dup` already defined in this scope
+ --> query.ptk:4:5
+  |
+4 |     (identifier) @dup
+  |     ^^^^^^^^^^^^^^^^^
+  |
+help: rename one capture, or use an enum if they are mutually exclusive branches
+
+error: capture type `bool` requires a value that may be absent; this capture is always present
+ --> query.ptk:5:11
+  |
+5 |   ) @flag :: bool
+  |           ^^^^^^^

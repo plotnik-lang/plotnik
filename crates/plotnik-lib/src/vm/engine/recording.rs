@@ -152,6 +152,13 @@ impl RecordingTracer {
             RuntimeEffect::EnumOpen(idx) => format!("EnumOpen \"{}\"", self.member_name(*idx)),
             RuntimeEffect::EnumClose => "EnumClose".to_string(),
             RuntimeEffect::Null => "Null".to_string(),
+            RuntimeEffect::ScalarOpen => "ScalarOpen".to_string(),
+            RuntimeEffect::ScalarMark(_) => "ScalarMark".to_string(),
+            RuntimeEffect::StrClose => "StrClose".to_string(),
+            RuntimeEffect::BoolClose(value) => format!("BoolClose({value})"),
+            RuntimeEffect::NodeStr(_) => "NodeStr".to_string(),
+            RuntimeEffect::NodeBool(_) => "NodeBool".to_string(),
+            RuntimeEffect::BoolValue(value) => format!("BoolValue({value})"),
             RuntimeEffect::SpanStart { id, node } => {
                 if node.is_some() {
                     format!("SpanStartAt#{id}")
@@ -180,12 +187,21 @@ impl RecordingTracer {
             EffectKind::SpanStartAt => format!("SpanStartAt#{payload}"),
             EffectKind::SpanStart => format!("SpanStart#{payload}"),
             EffectKind::SpanEnd => format!("SpanEnd#{payload}"),
+            EffectKind::ScalarOpen => "ScalarOpen".to_string(),
+            EffectKind::ScalarMark => "ScalarMark".to_string(),
+            EffectKind::StrClose => "StrClose".to_string(),
+            EffectKind::BoolClose => format!("BoolClose({})", payload != 0),
+            EffectKind::NodeStr => "NodeStr".to_string(),
+            EffectKind::NodeBool => "NodeBool".to_string(),
+            EffectKind::BoolValue => format!("BoolValue({})", payload != 0),
         }
     }
 
     fn effect_node(effect: &RuntimeEffect<'_>) -> Option<NodeRef> {
         match effect {
             RuntimeEffect::Node(node) => Some(node_ref(*node)),
+            RuntimeEffect::ScalarMark(node) => Some(node_ref(*node)),
+            RuntimeEffect::NodeStr(node) | RuntimeEffect::NodeBool(node) => Some(node_ref(*node)),
             RuntimeEffect::SpanStart {
                 node: Some(node), ..
             } => Some(node_ref(*node)),
@@ -302,7 +318,7 @@ impl Tracer for RecordingTracer {
         self.add_record(StepEvent::Call { target: target_ip }, None);
     }
 
-    fn trace_return(&mut self) {
+    fn trace_return(&mut self, _outcome: plotnik_rt::ReturnOutcome) {
         self.add_record(StepEvent::Return, None);
     }
 

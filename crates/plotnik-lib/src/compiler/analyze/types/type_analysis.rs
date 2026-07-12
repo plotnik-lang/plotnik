@@ -11,20 +11,26 @@
 //! owned by `DependencyAnalysis` and read from there. This artifact only maps the
 //! `DefId`s that analysis already assigned to the types it inferred for them.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::compiler::analyze::types::type_shape::{
-    Arity, FieldInfo, PatternFlow, PatternShape, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
+use crate::compiler::analyze::types::raw_output::{
+    RawCaptureObservation, RawDefinitionValueRole, RawOutputGraphBuilder,
 };
+use crate::compiler::analyze::types::type_shape::{
+    Arity, FieldInfo, PatternFlow, PatternShape, TYPE_BOOL, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId,
+    TypeShape,
+};
+use crate::compiler::analyze::types::{CaptureFact, UnionFlowPlan};
+use crate::compiler::diagnostics::report::Diagnostics;
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
 use crate::core::Symbol;
 
-/// One `:: TypeName` annotation occurrence, recorded during inference for the
+/// One custom `:: TypeName` occurrence, recorded during inference for the
 /// naming pass to validate (nominal identity, collisions, redundancy).
 #[derive(Clone, Copy, Debug)]
-pub struct TypeAnnotation {
+pub struct CustomCaptureTypeOccurrence {
     pub name: Symbol,
     pub span: Span,
     pub type_id: TypeId,
@@ -37,7 +43,7 @@ pub struct TypeAnnotation {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct TypeAnalysis {
-    types: Vec<TypeShape>,
+    pub(super) types: Vec<TypeShape>,
 
     /// Each definition's output type, keyed by `DefId`. `BTreeMap` so iteration
     /// is in `DefId` order — the SCC/emission order entrypoints rely on. Total
@@ -45,18 +51,25 @@ pub struct TypeAnalysis {
     /// `TYPE_VOID`, so a lookup for any admitted `DefId` hits. `finish` admits
     /// the map only after checking its type ids and every `Ref` target are
     /// consistent.
-    def_output: BTreeMap<DefId, TypeId>,
+    pub(super) def_output: BTreeMap<DefId, TypeId>,
 
     /// Each definition's structural arity. `Arity::One` definitions are
     /// callable entrypoints; `Arity::Many` definitions are fragments that can be
     /// referenced or nested but get no top-level entry surface.
     def_arity: BTreeMap<DefId, Arity>,
 
-    pattern_result: HashMap<Pattern, PatternShape>,
+    pub(super) pattern_result: HashMap<Pattern, PatternShape>,
+
+    /// Raw capture mechanism plus the optional built-in capture-type plan for
+    /// every admitted regular capture occurrence.
+    pub(super) capture_facts: HashMap<Pattern, CaptureFact>,
+
+    /// Concrete missing-field behavior for each union-like alternation.
+    pub(super) union_flow: HashMap<Pattern, UnionFlowPlan>,
 
     /// Every named type, assigned by the naming pass: definition results carry
     /// their definition's name, nested composites carry path-derived names
-    /// (`FooItems`), and `:: TypeName` annotations override. Complete: every
+    /// (`FooItems`), and custom `:: TypeName` capture types override. Complete: every
     /// struct/enum reachable from a definition output outside an enum-variant
     /// payload position has exactly one name. `BTreeMap` for deterministic
     /// emission order.
@@ -123,6 +136,24 @@ impl TypeAnalysis {
     pub fn expect_pattern_result(&self, pattern: &Pattern) -> &PatternShape {
         self.pattern_result(pattern)
             .expect("admitted pattern must have an inferred result")
+    }
+
+    pub fn capture_fact(&self, pattern: &Pattern) -> Option<&CaptureFact> {
+        self.capture_facts.get(pattern)
+    }
+
+    pub fn expect_capture_fact(&self, pattern: &Pattern) -> &CaptureFact {
+        self.capture_fact(pattern)
+            .expect("admitted regular capture must have frozen capture facts")
+    }
+
+    pub fn union_flow_plan(&self, pattern: &Pattern) -> Option<&UnionFlowPlan> {
+        self.union_flow.get(pattern)
+    }
+
+    pub fn expect_union_flow_plan(&self, pattern: &Pattern) -> &UnionFlowPlan {
+        self.union_flow_plan(pattern)
+            .expect("admitted union flow must have an explicit fallback plan")
     }
 
     pub fn arity(&self, pattern: &Pattern) -> Option<Arity> {
@@ -199,6 +230,14 @@ impl TypeAnalysis {
             matches!(self.type_shape(TYPE_NODE), Some(TypeShape::Node)),
             "TYPE_NODE must be interned at its canonical id",
         );
+        assert!(
+            matches!(self.type_shape(TYPE_STR), Some(TypeShape::Str)),
+            "TYPE_STR must be interned at its canonical id",
+        );
+        assert!(
+            matches!(self.type_shape(TYPE_BOOL), Some(TypeShape::Bool)),
+            "TYPE_BOOL must be interned at its canonical id",
+        );
 
         for shape in &self.types {
             for child_id in shape.child_type_ids() {
@@ -272,7 +311,7 @@ impl TypeAnalysis {
 /// memo. [`finish`](Self::finish) drops the scratch and hands back the frozen
 /// [`TypeAnalysis`].
 pub struct TypeAnalysisBuilder {
-    analysis: TypeAnalysis,
+    pub(super) analysis: TypeAnalysis,
 
     /// Reverse index for `intern_type` deduplication of leaf and wrapper shapes.
     /// Structs and enums are deliberately NOT deduplicated: they are nominal —
@@ -285,9 +324,18 @@ pub struct TypeAnalysisBuilder {
     /// Scratch: only the naming pass consults it.
     type_provenance: HashMap<TypeId, Span>,
 
-    /// `:: TypeName` annotation occurrences in source order.
+    /// Custom `:: TypeName` capture-type occurrences in source order.
     /// Scratch: only the naming pass consults it.
-    annotations: Vec<TypeAnnotation>,
+    custom_capture_types: Vec<CustomCaptureTypeOccurrence>,
+
+    /// Present only when the builtin pre-scan requests producer provenance.
+    /// Keeping the recorder on the builder prevents normalization details from
+    /// leaking into the ordinary public type model.
+    raw_output_graph: Option<RawOutputGraphBuilder>,
+
+    /// Raw naming failures gate capture-type normalization but have no meaning
+    /// after the builder freezes the final public graph.
+    pub(super) invalid_types: HashSet<TypeId>,
 }
 
 pub(crate) struct TypeAnalysisView<'a> {
@@ -326,11 +374,15 @@ impl TypeAnalysisBuilder {
                 def_output: BTreeMap::new(),
                 def_arity: BTreeMap::new(),
                 pattern_result: HashMap::new(),
+                capture_facts: HashMap::new(),
+                union_flow: HashMap::new(),
                 type_names: BTreeMap::new(),
             },
             intern_index: HashMap::new(),
             type_provenance: HashMap::new(),
-            annotations: Vec::new(),
+            custom_capture_types: Vec::new(),
+            raw_output_graph: None,
+            invalid_types: HashSet::new(),
         };
 
         // Pre-register builtin types at their expected IDs.
@@ -340,12 +392,28 @@ impl TypeAnalysisBuilder {
         let node_id = builder.intern_type(TypeShape::Node);
         debug_assert_eq!(node_id, TYPE_NODE);
 
+        let str_id = builder.intern_type(TypeShape::Str);
+        debug_assert_eq!(str_id, TYPE_STR);
+
+        let bool_id = builder.intern_type(TypeShape::Bool);
+        debug_assert_eq!(bool_id, TYPE_BOOL);
+
+        builder
+    }
+
+    pub(crate) fn for_capture_normalization() -> Self {
+        let mut builder = Self::new();
+        builder.raw_output_graph = Some(RawOutputGraphBuilder::default());
         builder
     }
 
     /// Freeze the accumulated state, dropping the inference-only scratch. Admits
     /// the result only after asserting it is internally consistent.
     pub fn finish(self) -> TypeAnalysis {
+        assert!(
+            self.raw_output_graph.is_none(),
+            "capture-type normalization must consume its producer provenance",
+        );
         self.analysis.assert_well_formed();
         self.analysis
     }
@@ -386,6 +454,10 @@ impl TypeAnalysisBuilder {
         self.intern_type(TypeShape::Struct(BTreeMap::from([(name, info)])))
     }
 
+    pub fn intern_custom(&mut self, name: Symbol) -> TypeId {
+        self.intern_type(TypeShape::Custom(name))
+    }
+
     /// Record where a fresh struct/enum came from, for naming-pass diagnostics.
     pub fn record_type_provenance(&mut self, type_id: TypeId, span: Span) {
         self.type_provenance.entry(type_id).or_insert(span);
@@ -395,21 +467,106 @@ impl TypeAnalysisBuilder {
         self.type_provenance.get(&type_id).copied()
     }
 
-    /// Record a `:: TypeName` annotation occurrence for the naming pass.
-    pub fn record_annotation(&mut self, annotation: TypeAnnotation) {
-        self.annotations.push(annotation);
+    /// Record a custom `:: TypeName` occurrence for the naming pass.
+    pub fn record_custom_capture_type(&mut self, occurrence: CustomCaptureTypeOccurrence) {
+        self.custom_capture_types.push(occurrence);
     }
 
-    pub fn annotations(&self) -> &[TypeAnnotation] {
-        &self.annotations
+    pub fn custom_capture_types(&self) -> &[CustomCaptureTypeOccurrence] {
+        &self.custom_capture_types
     }
 
-    pub fn record_pattern_result(&mut self, pattern: Pattern, shape: PatternShape) {
+    pub fn record_pattern_result(
+        &mut self,
+        pattern: Pattern,
+        source: crate::compiler::diagnostics::source::SourceId,
+        shape: PatternShape,
+    ) {
+        if let Some(graph) = &mut self.raw_output_graph {
+            graph.record_pattern(pattern.clone(), source, &shape, &self.analysis);
+        }
         self.analysis.pattern_result.insert(pattern, shape);
+    }
+
+    pub(crate) fn record_raw_capture_observation(
+        &mut self,
+        pattern: Pattern,
+        observation: RawCaptureObservation,
+    ) {
+        let Some(graph) = &mut self.raw_output_graph else {
+            return;
+        };
+        graph.record_capture(pattern, observation);
+    }
+
+    pub(crate) fn records_raw_output_provenance(&self) -> bool {
+        self.raw_output_graph.is_some()
+    }
+
+    pub fn record_capture_fact(&mut self, pattern: Pattern, fact: CaptureFact) {
+        self.analysis.capture_facts.insert(pattern, fact);
+    }
+
+    pub fn record_union_flow(&mut self, pattern: Pattern, plan: UnionFlowPlan) {
+        self.analysis.union_flow.insert(pattern, plan);
+    }
+
+    pub(crate) fn record_invalid_type(&mut self, type_id: TypeId) {
+        self.invalid_types.insert(type_id);
+    }
+
+    pub(crate) fn record_alternation_incompatibility(&mut self, pattern: Pattern, field: Symbol) {
+        let Some(graph) = &mut self.raw_output_graph else {
+            return;
+        };
+        graph.record_alternation_incompatibility(pattern, field);
+    }
+
+    /// Snapshot only the alternation outputs needed to freeze omission plans.
+    /// The snapshot breaks the immutable borrow before plans are inserted
+    /// without cloning every inferred pattern and shape in the query.
+    pub(crate) fn alternation_field_results(&self) -> Vec<(Pattern, TypeId)> {
+        self.analysis
+            .pattern_result
+            .iter()
+            .filter_map(|(pattern, shape)| {
+                if !matches!(pattern, Pattern::Union(_) | Pattern::Enum(_)) {
+                    return None;
+                }
+                let PatternFlow::Fields(type_id) = shape.flow else {
+                    return None;
+                };
+                Some((pattern.clone(), type_id))
+            })
+            .collect()
     }
 
     pub fn record_def_output(&mut self, def_id: DefId, type_id: TypeId) {
         self.analysis.def_output.insert(def_id, type_id);
+    }
+
+    pub(crate) fn record_raw_definition(
+        &mut self,
+        def_id: DefId,
+        body: &Pattern,
+        value_role: RawDefinitionValueRole,
+    ) {
+        let Some(graph) = &mut self.raw_output_graph else {
+            return;
+        };
+        graph.record_definition(def_id, body, value_role);
+    }
+
+    pub(crate) fn normalize_capture_types(
+        &mut self,
+        interner: &crate::core::Interner,
+        diagnostics: &mut Diagnostics,
+    ) {
+        let graph = self
+            .raw_output_graph
+            .take()
+            .expect("capture-type pre-scan enables producer provenance");
+        graph.finish().normalize(self, interner, diagnostics);
     }
 
     pub fn record_def_arity(&mut self, def_id: DefId, arity: Arity) {

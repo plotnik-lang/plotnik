@@ -1,0 +1,165 @@
+Q = (program
+  {
+    (comment)? @comment
+  } @value :: str
+)
+--------------------- INPUT ----------------------
+value;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  value: string | null;
+}
+------------------ DIAGNOSTICS -------------------
+warning: capture type `str` replaces structured data with source text
+ --> query.ptk:4:12
+  |
+4 |   } @value :: str
+  |            ^^^^^^
+  |
+help: the replaced fields, variants, or scalar payload will not be returned
+--------------------- OUTPUT ---------------------
+{
+  "value": null
+}
+------------------- INSPECTION -------------------
+{
+  "v": 1,
+  "entries": [
+    {
+      "span_id": 0,
+      "parent": null,
+      "hull": [
+        0,
+        6
+      ],
+      "bindings": [],
+      "effect_range": [
+        1,
+        13
+      ]
+    },
+    {
+      "span_id": 1,
+      "parent": 0,
+      "hull": [
+        0,
+        6
+      ],
+      "bindings": [],
+      "effect_range": [
+        2,
+        12
+      ]
+    },
+    {
+      "span_id": 2,
+      "parent": 1,
+      "hull": null,
+      "bindings": [
+        {
+          "path": "/value",
+          "effect_idx": 10
+        }
+      ],
+      "effect_range": [
+        3,
+        11
+      ]
+    },
+    {
+      "span_id": 4,
+      "parent": 2,
+      "hull": null,
+      "bindings": [],
+      "effect_range": [
+        5,
+        8
+      ]
+    },
+    {
+      "span_id": 6,
+      "parent": 3,
+      "hull": null,
+      "bindings": [],
+      "effect_range": [
+        6,
+        7
+      ]
+    }
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "value"
+S2 "Q"
+S3 "program"
+S4 "comment"
+
+[type_defs]
+T0 = <Str>
+T1 = Optional(T0)  ; <Str>?
+T2 = Struct  M0:1  ; { value }
+
+[type_members]
+M0: S1 → T1  ; value: T1
+
+[type_names]
+N0: S2 → T2  ; Q
+
+[entrypoints]
+Q = 00 :: T2
+
+[spans]
+P0 def        0..60  src0  T2
+P1 pattern    4..60  src0
+P2 capture    45..51  src0  T2.M0
+P3 capture_type 52..58  src0  T0
+P4 sequence   15..44  src0
+P5 capture    32..40  src0
+P6 quantifier 30..31  src0
+P7 pattern    21..30  src0
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@28)                            28 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  -ε-  [StrClose Set(M0) SpanEnd#2]     08
+  08  ─‣┘  _ [SpanEnd#1 SpanEnd#0]          10
+  10                                        ▶
+  11  -ε-  [StrClose Set(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  14  -ε-  [SpanEnd#6 SpanEnd#4]            11
+  16   !   (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  06
+  19  ──!  _                                16, 19
+  21  └─!  _                                16, 19
+  23  ...
+  24  -ε-  [SpanStart#6]                    21, 14
+  26  -ε-  [ScalarOpen SpanStart#4]         24
+  28   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  26
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@28)                            28 : 03
+       ▶   (@28)
+
+@28:
+  28       (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  26
+       ●   program
+  26  -ε-  [ScalarOpen SpanStart#4]         24
+  24  -ε-  [SpanStart#6]                    21, 14
+  21       _                                16, 19
+       ●   expression_statement
+  16       (comment) [SpanStartAt#7 ScalarMark SpanEnd#7 SpanEnd#6 SpanEnd#4]  06
+       ○   expression_statement
+  21  ❮❮❮ 
+  19       _                                16, 19
+  24  ❮❮❮ 
+  14  -ε-  [SpanEnd#6 SpanEnd#4]            11
+  11  -ε-  [StrClose Set(M0) SpanEnd#2 SpanEnd#1 SpanEnd#0]  10
+  10   ◀   (@28)                            
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

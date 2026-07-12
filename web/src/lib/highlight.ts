@@ -106,7 +106,7 @@ function makeTheme(
           "entity.name.type.definition.plotnik",
           "entity.name.type.reference.plotnik",
           "entity.name.type.variant.plotnik",
-          "entity.name.type.annotation.plotnik",
+          "entity.name.type.capture.plotnik",
         ],
         settings: { foreground: p.type },
       },

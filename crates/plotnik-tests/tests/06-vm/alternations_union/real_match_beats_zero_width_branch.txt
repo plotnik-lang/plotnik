@@ -61,11 +61,11 @@ Q:
   12   !   _ [Null Set(M1)]                 08, 10
   14  ─‣┘  _                                06
   15  ...
-  16   !   (identifier) [Null Set(M0) Node Set(M1)]  07
-  19  -ε-  [Null Set(M0) Null Set(M1)]      14
-  22  ──!  _                                12, 16, 22
-  24  └─!  _                                12, 16, 22
-  26  └‣─  (expression_statement)           24, 19
+  16  -ε-  [Null Set(M1) Null Set(M0)]      14
+  19   !   (identifier) [Null Set(M0) Node Set(M1)]  07
+  22  ──!  _                                12, 19, 22
+  24  └─!  _                                12, 19, 22
+  26  └‣─  (expression_statement)           24, 16
   28   !   (program)                        26
 --------------------- TRACE ----------------------
 Q:
@@ -76,9 +76,9 @@ Q:
 @28:
   28       (program)                        26
        ●   program
-  26       (expression_statement)           24, 19
+  26       (expression_statement)           24, 16
        ●   expression_statement
-  24       _                                12, 16, 22
+  24       _                                12, 19, 22
        ●   identifier
   12       _ [Null Set(M1)]                 08, 10
        ●   identifier
@@ -92,7 +92,7 @@ Q:
   10  ❮❮❮ 
   10       _                                08, 10
   24  ❮❮❮ 
-  16       (identifier) [Null Set(M0) Node Set(M1)]  07
+  19       (identifier) [Null Set(M0) Node Set(M1)]  07
        ●   identifier
   07       _                                14
        ●   expression_statement

@@ -5,7 +5,7 @@
 //! exactly — including the cases that previously forced an O(n) rescan:
 //! duplicate max-holders and the all-`None` stack.
 
-use crate::checkpoint::{Checkpoint, CheckpointStack, CheckpointState};
+use crate::checkpoint::{Checkpoint, CheckpointStack, CheckpointState, EffectDepths};
 
 fn cp(frame_index: Option<u32>) -> Checkpoint {
     Checkpoint::branch(
@@ -14,7 +14,7 @@ fn cp(frame_index: Option<u32>) -> Checkpoint {
             effect_watermark: 0,
             frame_index,
             recursion_depth: 0,
-            suppress_depth: 0,
+            effect_depths: EffectDepths::new(0, 0),
         },
         0,
     )
@@ -118,7 +118,12 @@ fn suppress_depth_outranges_u16() {
         effect_watermark: 0,
         frame_index: None,
         recursion_depth: 0,
-        suppress_depth: u16::MAX as u64 + 1,
+        effect_depths: EffectDepths::new(u32::from(u16::MAX) + 1, 0),
     };
-    assert_eq!(state.suppress_depth, 65_536);
+    assert_eq!(state.effect_depths.suppression(), 65_536);
+}
+
+#[test]
+fn effect_depths_keep_checkpoints_compact() {
+    assert_eq!(std::mem::size_of::<Checkpoint>(), 56);
 }

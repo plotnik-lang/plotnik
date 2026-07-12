@@ -1,0 +1,32 @@
+Q = (program
+  {
+    (comment) @comment
+    (expression_statement (identifier) @id)
+  } @chunk :: str
+  (expression_statement
+    (identifier) @name
+  ) @statement :: str
+)
+------------------ DIAGNOSTICS -------------------
+warning: capture type `str` replaces structured data with source text
+ --> query.ptk:5:12
+  |
+5 |   } @chunk :: str
+  |            ^^^^^^
+  |
+help: the replaced fields, variants, or scalar payload will not be returned
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  chunk: string;
+  name: Node;
+  statement: string;
+}
+---------------------- RUST ----------------------
+use ::plotnik_rt::Node;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'t, 's> {
+    pub chunk: &'s str,
+    pub statement: &'s str,
+    pub name: Node<'t>,
+}

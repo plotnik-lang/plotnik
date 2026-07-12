@@ -39,7 +39,11 @@ fn emit_bytes(query_src: &str) -> Vec<u8> {
     let compiled = QueryBuilder::new(source_map)
         .compile(grammar())
         .expect("query parsing should not exhaust fuel");
-    assert!(compiled.is_valid(), "query should compile: {query_src}");
+    assert!(
+        compiled.is_valid(),
+        "query should compile: {query_src}\n{}",
+        compiled.diagnostics().render(compiled.source_map())
+    );
     compiled
         .emit(BytecodeConfig::new())
         .expect("bytecode emission answers")
@@ -48,6 +52,17 @@ fn emit_bytes(query_src: &str) -> Vec<u8> {
         .bytes()
         .to_vec()
 }
+
+const SPLIT_CALL_QUERY: &str = indoc! {r#"
+    Body = [ Rec: {(comment) @c (B)} Base: (comment) @c ]
+    B = { (Body)?? @first (Body)? @second }
+    Q = (program (B) @x :: str)
+"#};
+
+const ROUTED_CALL_QUERY: &str = indoc! {r#"
+    A = (statement_block (A)+ (identifier))?
+    Q = (program (A) (expression_statement) @e)
+"#};
 
 /// Recompute the CRC32 checked by the module loader so a tampered body
 /// reaches the structural validators exercised by these tests.
@@ -213,7 +228,7 @@ fn transitions(bytes: &[u8]) -> (usize, u16) {
 /// Byte size of an instruction from its opcode nibble (mirrors `Opcode::size`).
 fn instr_size(opcode: u8) -> usize {
     match opcode {
-        0 | 6 | 7 | 8 => 8,
+        0 | 6 | 7 | 8 | 9 => 8,
         1 => 16,
         2 => 24,
         3 => 32,
@@ -383,16 +398,16 @@ fn forged_nonzero_section_padding_is_rejected() {
 
 #[test]
 fn forged_unknown_opcode_is_rejected() {
-    // `8` is unassigned; the VM's `decode_step` would
+    // `10` is unassigned; the VM's `decode_step` would
     // `.expect()` on the `None` from `Opcode::from_u8` for this step.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let off = first_instr(&bytes, |_| true);
-    bytes[off] = (bytes[off] & 0xF0) | 0x08;
+    bytes[off] = (bytes[off] & 0xF0) | 0x0A;
     reseal(&mut bytes);
 
     let err = Module::load_compiler_output(&bytes).expect_err("forged opcode must be rejected");
     assert!(
-        matches!(err, ModuleError::InvalidOpcode { opcode: 0x08, .. }),
+        matches!(err, ModuleError::InvalidOpcode { opcode: 0x0A, .. }),
         "expected InvalidOpcode, got {err:?}"
     );
 }
@@ -479,13 +494,43 @@ fn forged_invalid_effect_opcode_is_rejected() {
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let slot = effect_slots(&bytes)[0];
     let existing = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]);
-    let invalid_op = EffectKind::SpanEnd as u16 + 1;
+    let invalid_op = EffectKind::BoolValue as u16 + 1;
     let forged = (invalid_op << EFFECT_PAYLOAD_BITS) | (existing & EFFECT_PAYLOAD_MAX as u16);
     bytes[slot..slot + 2].copy_from_slice(&forged.to_le_bytes());
     reseal(&mut bytes);
 
     let err =
         Module::load_compiler_output(&bytes).expect_err("forged effect opcode must be rejected");
+    assert!(
+        matches!(err, ModuleError::MalformedTransitions),
+        "expected MalformedTransitions, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_nonzero_unit_effect_payload_is_rejected() {
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let slot = effect_slots(&bytes)[0];
+    bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::ScalarMark, 1));
+    reseal(&mut bytes);
+
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("unit effects must reject a nonzero payload");
+    assert!(
+        matches!(err, ModuleError::MalformedTransitions),
+        "expected MalformedTransitions, got {err:?}"
+    );
+}
+
+#[test]
+fn forged_bool_close_payload_out_of_range_is_rejected() {
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let slot = effect_slots(&bytes)[0];
+    bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::BoolClose, 2));
+    reseal(&mut bytes);
+
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("BoolClose payload must be exactly zero or one");
     assert!(
         matches!(err, ModuleError::MalformedTransitions),
         "expected MalformedTransitions, got {err:?}"
@@ -1069,6 +1114,25 @@ fn forged_dropped_scope_close_is_rejected() {
 }
 
 #[test]
+fn forged_mismatched_scalar_frame_is_rejected() {
+    let mut bytes = emit_bytes(indoc! {r#"
+        Q = (program
+          {
+            (comment) @comment
+            (expression_statement (identifier) @id)
+          } @chunk :: str
+        )
+    "#});
+    let slot = first_effect_op(&bytes, |op| op == EffectKind::ScalarOpen as u16);
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::StructOpen));
+    reseal(&mut bytes);
+
+    let err =
+        Module::load_compiler_output(&bytes).expect_err("StrClose must close a ScalarOpen frame");
+    assert!(matches!(err, ModuleError::EffectStackImbalance(_)));
+}
+
+#[test]
 fn forged_suppress_underflow_is_rejected() {
     // Replace a data effect with a bare `SuppressEnd`. With no matching
     // `SuppressBegin` on the path, the VM's suppression counter would underflow
@@ -1082,10 +1146,7 @@ fn forged_suppress_underflow_is_rejected() {
 
     let err = Module::load_compiler_output(&bytes)
         .expect_err("forged SuppressEnd underflow must be rejected");
-    assert!(
-        matches!(err, ModuleError::EffectStackImbalance(_)),
-        "expected EffectStackImbalance, got {err:?}"
-    );
+    assert!(matches!(err, ModuleError::EffectStackImbalance(_)));
 }
 
 /// Step index of the last `Return` instruction in the transitions stream.
@@ -1145,10 +1206,9 @@ fn forged_accept_inside_called_def_is_rejected() {
 
     let err = Module::load_compiler_output(&bytes)
         .expect_err("forged accept inside a called body must be rejected");
-    assert!(
-        matches!(err, ModuleError::EffectStackImbalance(_)),
-        "expected EffectStackImbalance, got {err:?}"
-    );
+    // Return-route validation rejects the now-returnless callee before the
+    // effect-stack pass reaches the open wrapper frame.
+    assert!(matches!(err, ModuleError::MalformedTransitions));
 }
 
 #[test]
@@ -1248,9 +1308,8 @@ fn forged_set_extended_match_reserved_count_bit_is_rejected() {
 
 #[test]
 fn forged_nonzero_return_pad_is_rejected() {
-    // A Return is `header || 7 reserved padding bytes` (`Return::to_bytes`); the
-    // decoder drops bytes 1-7, so a forged non-zero pad must be rejected at load.
-    for byte in 1usize..8 {
+    // Bytes 1-2 are the outcome and entry contract; bytes 3-7 are padding.
+    for byte in 3usize..8 {
         let mut bytes = emit_bytes(STRUCT_QUERY);
         let off = first_instr(&bytes, |o| o == 7); // Return
         bytes[off + byte] = 1;
@@ -1263,6 +1322,117 @@ fn forged_nonzero_return_pad_is_rejected() {
             "forged byte {byte}: expected MalformedTransitions, got {err:?}"
         );
     }
+}
+
+#[test]
+fn forged_invalid_return_entry_is_rejected() {
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let off = first_instr(&bytes, |opcode| opcode == 7);
+    bytes[off + 2] = 2;
+    reseal(&mut bytes);
+
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("unknown return entry contract must be rejected");
+    assert!(matches!(err, ModuleError::MalformedTransitions));
+}
+
+#[test]
+fn forged_invalid_return_outcome_is_rejected() {
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let off = first_instr(&bytes, |opcode| opcode == 7);
+    bytes[off + 1] = 2;
+    reseal(&mut bytes);
+
+    let err =
+        Module::load_compiler_output(&bytes).expect_err("unknown return outcome must be rejected");
+    assert!(matches!(err, ModuleError::MalformedTransitions));
+}
+
+#[test]
+fn forged_split_call_invalid_nav_and_zero_targets_are_rejected() {
+    for byte in [1usize, 2, 4, 6] {
+        let mut bytes = emit_bytes(SPLIT_CALL_QUERY);
+        let off = first_instr(&bytes, |opcode| opcode == 8);
+        if byte == 1 {
+            bytes[off + byte] = 0x80;
+        } else {
+            bytes[off + byte..off + byte + 2].copy_from_slice(&0u16.to_le_bytes());
+        }
+        reseal(&mut bytes);
+
+        let err = Module::load_compiler_output(&bytes)
+            .expect_err("malformed split call must be rejected");
+        assert!(matches!(err, ModuleError::MalformedTransitions));
+    }
+}
+
+#[test]
+fn forged_routed_call_invalid_metadata_and_targets_are_rejected() {
+    for byte in [1usize, 2, 3, 4, 6] {
+        let mut bytes = emit_bytes(ROUTED_CALL_QUERY);
+        let off = first_instr(&bytes, |opcode| opcode == 9);
+        match byte {
+            1 => bytes[off + byte] = 0x80,
+            2 | 3 => bytes[off + byte] = 1,
+            4 | 6 => bytes[off + byte..off + byte + 2].copy_from_slice(&0u16.to_le_bytes()),
+            _ => unreachable!("test enumerates every RoutedCall field"),
+        }
+        reseal(&mut bytes);
+
+        let err = Module::load_compiler_output(&bytes)
+            .expect_err("malformed routed call must be rejected");
+        assert!(matches!(err, ModuleError::MalformedTransitions));
+    }
+}
+
+#[test]
+fn forged_ordinary_and_routed_call_target_mismatches_are_rejected() {
+    let mut bytes = emit_bytes(ROUTED_CALL_QUERY);
+    let ordinary = first_instr(&bytes, |opcode| opcode == 6);
+    let routed = first_instr(&bytes, |opcode| opcode == 9);
+    let routed_target = [bytes[routed + 6], bytes[routed + 7]];
+    bytes[ordinary + 6..ordinary + 8].copy_from_slice(&routed_target);
+    reseal(&mut bytes);
+
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("ordinary call cannot target a routed body");
+    assert!(matches!(err, ModuleError::MalformedTransitions));
+
+    let mut bytes = emit_bytes(ROUTED_CALL_QUERY);
+    let ordinary = first_instr(&bytes, |opcode| opcode == 6);
+    let routed = first_instr(&bytes, |opcode| opcode == 9);
+    let ordinary_target = [bytes[ordinary + 6], bytes[ordinary + 7]];
+    bytes[routed + 6..routed + 8].copy_from_slice(&ordinary_target);
+    reseal(&mut bytes);
+
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("routed call cannot target an ordinary body");
+    assert!(matches!(err, ModuleError::MalformedTransitions));
+}
+
+#[test]
+fn forged_call_and_callee_return_contract_mismatch_is_rejected() {
+    let mut bytes = emit_bytes(SPLIT_CALL_QUERY);
+    let split = first_instr(&bytes, |opcode| opcode == 8);
+    let ordinary = first_instr(&bytes, |opcode| opcode == 6);
+    let split_target = [bytes[split + 6], bytes[split + 7]];
+    bytes[ordinary + 6..ordinary + 8].copy_from_slice(&split_target);
+    reseal(&mut bytes);
+
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("ordinary call cannot target a split-return body");
+    assert!(matches!(err, ModuleError::MalformedTransitions));
+
+    let mut bytes = emit_bytes(SPLIT_CALL_QUERY);
+    let split = first_instr(&bytes, |opcode| opcode == 8);
+    let ordinary = first_instr(&bytes, |opcode| opcode == 6);
+    let ordinary_target = [bytes[ordinary + 6], bytes[ordinary + 7]];
+    bytes[split + 6..split + 8].copy_from_slice(&ordinary_target);
+    reseal(&mut bytes);
+
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("split call requires a body with both return outcomes");
+    assert!(matches!(err, ModuleError::MalformedTransitions));
 }
 
 #[test]
@@ -1482,7 +1652,7 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
 
 #[test]
 fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
-    // Void/Node/String carry no payload: both `data` (bytes 0-1) and `count`
+    // Void/Node/Str/Bool carry no payload: both `data` (bytes 0-1) and `count`
     // (byte 2) are reserved-zero (docs/binary-format/04-types.md). Smuggled state
     // in either must be rejected, not silently ignored by the typed view.
     for byte in [0usize, 2] {
@@ -1507,6 +1677,55 @@ fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
             "forged byte {byte}: expected InvalidTypeDef, got {err:?}"
         );
     }
+}
+
+#[test]
+fn scalar_primitive_typedefs_use_reserved_zero_metadata() {
+    for (query, expected) in [
+        (r#"Q = (identifier) @id :: str"#, TypeKind::Str),
+        (
+            r#"Q = (program (identifier)? @present :: bool)"#,
+            TypeKind::Bool,
+        ),
+    ] {
+        for byte in [0usize, 2] {
+            let mut bytes = emit_bytes(query);
+            let (defs_off, primitive_idx) = {
+                let module = Module::load_compiler_output(&bytes)
+                    .expect("module validates before tampering");
+                let types = module.types();
+                let index = (0..types.defs_count())
+                    .find(|&index| {
+                        matches!(types.def(index).decode(), TypeDefKind::Primitive(kind) if kind == expected)
+                    })
+                    .expect("query must emit the requested scalar primitive");
+                (module.offsets().type_defs as usize, index)
+            };
+
+            bytes[defs_off + primitive_idx * 4 + byte] = 1;
+            reseal(&mut bytes);
+
+            let err = Module::load_compiler_output(&bytes)
+                .expect_err("scalar primitive metadata must remain reserved-zero");
+            assert!(
+                matches!(err, ModuleError::InvalidTypeDef(_)),
+                "{expected:?}, byte {byte}: expected InvalidTypeDef, got {err:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn version_ten_module_is_rejected_without_compatibility_mode() {
+    let mut bytes = emit_bytes(STRUCT_QUERY);
+    bytes[4..8].copy_from_slice(&10_u32.to_le_bytes());
+
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("v10 modules must be regenerated for the scalar vocabulary");
+    assert!(
+        matches!(err, ModuleError::UnsupportedVersion(10)),
+        "expected UnsupportedVersion(10), got {err:?}"
+    );
 }
 
 #[test]

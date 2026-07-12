@@ -7,13 +7,13 @@ Q = (program
 --------------------- INPUT ----------------------
 debugger;
 ------------------- TYPESCRIPT -------------------
-export type QX =
-  | { $tag: "A"; $data: { id: Node | null } }
-  | { $tag: "B"; $data: { d: Node } };
-
 export interface Q {
   x: QX;
 }
+
+export type QX =
+  | { $tag: "A"; $data: { id: Node | null } }
+  | { $tag: "B"; $data: { d: Node } };
 --------------------- OUTPUT ---------------------
 {
   "x": {

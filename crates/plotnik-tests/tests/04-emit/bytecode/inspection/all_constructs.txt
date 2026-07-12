@@ -25,10 +25,10 @@ Value = 43
 
 [transitions]
 Value:
-  00  -ε-                                   03, 04
-  02                                        ▶
-  03   !   (identifier) [EnumOpen(Id) Node Set(id) EnumClose]  02
-  04   !   (number) [EnumOpen(Num) Node Set(num) EnumClose]  02
+  00  -ε-                                   02, 03
+  01                                        ▶
+  02   !   (identifier) [EnumOpen(Id) Node Set(id) EnumClose]  01
+  03   !   (number) [EnumOpen(Num) Node Set(num) EnumClose]  01
 
 Q:
   06                                        ▶
@@ -124,7 +124,7 @@ P13 capture    281..286  src0  T5.M4
 P14 pattern    109..280  src0
 P15 pattern    136..274  src0
 P16 capture    184..189  src0  T5.M5
-P17 annotation 190..197  src0  T4
+P17 capture_type 190..197  src0  T4
 P18 field      165..169  src0
 P19 pattern    171..183  src0
 P20 field      206..211  src0

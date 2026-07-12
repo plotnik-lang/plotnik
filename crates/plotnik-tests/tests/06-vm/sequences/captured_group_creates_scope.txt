@@ -7,13 +7,13 @@ Q = (program
 --------------------- INPUT ----------------------
 let x; foo;
 ------------------- TYPESCRIPT -------------------
+export interface Q {
+  pair: QPair;
+}
+
 export interface QPair {
   a: Node;
   b: Node;
-}
-
-export interface Q {
-  pair: QPair;
 }
 --------------------- OUTPUT ---------------------
 {

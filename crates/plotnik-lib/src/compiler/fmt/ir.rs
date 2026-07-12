@@ -58,7 +58,7 @@ pub(super) enum NodeKind {
     Anchor,
     NegatedField,
     Predicate,
-    TypeAnnotation,
+    CaptureType,
     Atomic,
 }
 
@@ -87,7 +87,7 @@ impl NodeKind {
             SyntaxKind::Anchor => Self::Anchor,
             SyntaxKind::NegatedField => Self::NegatedField,
             SyntaxKind::NodePredicate => Self::Predicate,
-            SyntaxKind::TypeAnnotation => Self::TypeAnnotation,
+            SyntaxKind::CaptureType => Self::CaptureType,
             _ => Self::Atomic,
         }
     }
@@ -114,7 +114,7 @@ impl NodeKind {
             | Self::Anchor
             | Self::NegatedField
             | Self::Predicate
-            | Self::TypeAnnotation => 1,
+            | Self::CaptureType => 1,
         }
     }
 }
@@ -290,7 +290,7 @@ impl NodeLayout {
             | NodeKind::Anchor
             | NodeKind::NegatedField
             | NodeKind::Predicate
-            | NodeKind::TypeAnnotation
+            | NodeKind::CaptureType
             | NodeKind::Atomic => Self::Atomic,
         }
     }

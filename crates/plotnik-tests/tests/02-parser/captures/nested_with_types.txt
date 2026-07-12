@@ -21,7 +21,7 @@ Root
               Id "identifier"
               ParenClose ")"
           CaptureToken "@name"
-          TypeAnnotation
+          CaptureType
             DoubleColon "::"
             Id "Foo"
         Field
@@ -38,13 +38,13 @@ Root
                   ParenClose ")"
                 Star "*"
               CaptureToken "@body_stmts"
-              TypeAnnotation
+              CaptureType
                 DoubleColon "::"
                 Id "Statement"
             ParenClose ")"
         ParenClose ")"
       CaptureToken "@func"
-      TypeAnnotation
+      CaptureType
         DoubleColon "::"
         Id "Function"
 ---------------------- AST -----------------------

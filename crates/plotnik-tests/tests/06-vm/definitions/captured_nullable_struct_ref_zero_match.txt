@@ -9,17 +9,17 @@ Q = (program
 --------------------- INPUT ----------------------
 debugger;
 ------------------- TYPESCRIPT -------------------
-export interface AX {
-  id: Node;
+export interface Q {
+  a: A;
+  d: Node;
 }
 
 export interface A {
   x: AX | null;
 }
 
-export interface Q {
-  a: A;
-  d: Node;
+export interface AX {
+  id: Node;
 }
 --------------------- OUTPUT ---------------------
 {
@@ -71,55 +71,46 @@ Q = 00 :: T3
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@46)                            46 : 03
+  02       (@30)                            30 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06  └‣─  (identifier) [Node Set(M0)]      08
-  08  ─‣┘  _ [StructClose Set(M1)]          14
-  10  └‣─  (identifier) [Node Set(M0)]      12
-  12  ─‣┘  _ [StructClose Set(M1)]          32
-  14                                        ▶
-  15  ─‣┘  _                                26
-  16  -ε-  [Null Set(M1)]                   14
-  18   !   (expression_statement) [StructOpen]  06
-  20  ──!  _                                18, 20
-  22   !   _                                18, 20
-  24  -ε-                                   22, 16
-  26                                        ▶
-  27  └‣─  (debugger_statement) [StructClose Set(M2) Node Set(M3)]  15
-  30  ...
-  31  ...
-  32  ─‣─  (debugger_statement) [StructClose Set(M2) Node Set(M3)]  15
-  35  -ε-  [Null Set(M1)]                   27
-  37   !   (expression_statement) [StructOpen]  10
-  39  ...
-  40  ──!  _                                37, 40
-  42  └─!  _                                37, 40
-  44  -ε-  [StructOpen]                     42, 35
-  46   !   (program)                        44
+  08  ─‣┘  _ [StructClose Set(M1)]          16
+  10                                        ▶
+  11  └‣─  (debugger_statement) [StructClose Set(M2) Node Set(M3)]  14
+  14  ─‣┘  _                                10
+  15  ...
+  16  ─‣─  (debugger_statement) [StructClose Set(M2) Node Set(M3)]  14
+  19  -ε-  [Null Set(M1)]                   11
+  21   !   (expression_statement) [StructOpen]  06
+  23  ...
+  24  ──!  _                                21, 24
+  26  └─!  _                                21, 24
+  28  -ε-  [StructOpen]                     26, 19
+  30   !   (program)                        28
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@46)                            46 : 03
-       ▶   (@46)
+  02       (@30)                            30 : 03
+       ▶   (@30)
 
-@46:
-  46       (program)                        44
+@30:
+  30       (program)                        28
        ●   program
-  44  -ε-  [StructOpen]                     42, 35
-  42       _                                37, 40
+  28  -ε-  [StructOpen]                     26, 19
+  26       _                                21, 24
        ●   debugger_statement
-  37       (expression_statement) [StructOpen]  10
+  21       (expression_statement) [StructOpen]  06
        ○   debugger_statement
-  42  ❮❮❮ 
-  40       _                                37, 40
-  44  ❮❮❮ 
-  35  -ε-  [Null Set(M1)]                   27
-  27       (debugger_statement) [StructClose Set(M2) Node Set(M3)]  15
+  26  ❮❮❮ 
+  24       _                                21, 24
+  28  ❮❮❮ 
+  19  -ε-  [Null Set(M1)]                   11
+  11       (debugger_statement) [StructClose Set(M2) Node Set(M3)]  14
        ●   debugger_statement
-  15       _                                26
+  14       _                                10
        ●   program
-  26   ◀   (@46)                            
+  10   ◀   (@30)                            
 
 Q:
   03  -ε-  [StructClose]                    05

@@ -44,15 +44,19 @@ pub(crate) use constants::{
     REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
     VERSION,
 };
-pub(crate) use effects::{Effect, EffectKind};
+pub(crate) use effects::{Effect, EffectKind, EffectSuppression, FrameAction, ValueFrameKind};
 pub(crate) use format::{
     LineBuilder, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
 };
 pub(crate) use header::Header;
 pub(crate) use instructions::{
-    Call, Match, MatchInstr, MatchPredicate, Return, StepId, select_match_opcode,
+    Call, Match, MatchInstr, MatchPredicate, Return, ReturnEntry, ReturnMode, RoutedCall,
+    SplitCall, SplitCallReturns, StepId, select_match_opcode,
 };
-pub(crate) use module::{DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Instruction};
+pub(crate) use module::{
+    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedRoutedCall, DecodedSplitCall,
+    Instruction,
+};
 pub(crate) use node_kind_constraint::NodeKindConstraint;
 // Nav and the regex DFA runtime live in `plotnik-rt` (shared with generated
 // code); re-exported here because they are part of the bytecode vocabulary.

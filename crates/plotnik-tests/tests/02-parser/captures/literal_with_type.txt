@@ -11,7 +11,7 @@ Root
         StringContent "return"
         DoubleQuote "\""
       CaptureToken "@kw"
-      TypeAnnotation
+      CaptureType
         DoubleColon "::"
         Id "Foo"
 ---------------------- AST -----------------------

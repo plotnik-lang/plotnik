@@ -4,12 +4,12 @@ Q = (program
   )? @x
 )
 ------------------- TYPESCRIPT -------------------
-export interface QX {
-  id: Node;
-}
-
 export interface Q {
   x: QX | null;
+}
+
+export interface QX {
+  id: Node;
 }
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;

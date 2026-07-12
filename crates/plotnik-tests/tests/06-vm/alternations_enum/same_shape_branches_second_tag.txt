@@ -11,13 +11,13 @@ Q = (program
 --------------------- INPUT ----------------------
 "s"
 ------------------- TYPESCRIPT -------------------
-export type QItem =
-  | { $tag: "A"; $data: { x: Node } }
-  | { $tag: "B"; $data: { y: Node } };
-
 export interface Q {
   item: QItem;
 }
+
+export type QItem =
+  | { $tag: "A"; $data: { x: Node } }
+  | { $tag: "B"; $data: { y: Node } };
 --------------------- OUTPUT ---------------------
 {
   "item": {

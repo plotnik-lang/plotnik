@@ -15,6 +15,12 @@ Pred = (identifier =~ /^get/) @fn :: Getter
 ;                                 ^ @punctuation.delimiter
 ;                                    ^ @type
 
+Text = (identifier) @text :: str
+;                             ^ @type.builtin
+
+Flag = (comment)? @present :: bool
+;                             ^ @type.builtin
+
 Missing = (statement_block (MISSING ";"))
 ;                           ^ @keyword
 ;                                   ^ @string

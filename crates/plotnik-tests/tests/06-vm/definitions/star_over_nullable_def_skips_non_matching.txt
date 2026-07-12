@@ -8,16 +8,16 @@ Q = (program
 --------------------- INPUT ----------------------
 a; debugger; b;
 ------------------- TYPESCRIPT -------------------
-export interface AX {
-  id: Node;
+export interface Q {
+  xs: A[];
 }
 
 export interface A {
   x: AX | null;
 }
 
-export interface Q {
-  xs: A[];
+export interface AX {
+  id: Node;
 }
 --------------------- OUTPUT ---------------------
 {
@@ -79,74 +79,65 @@ Q = 00 :: T4
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@46)                            46 : 03
+  02       (@30)                            30 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06  └‣─  (identifier) [Node Set(M0)]      08
-  08  ─‣┘  _ [StructClose Set(M1)]          14
-  10  └‣─  (identifier) [Node Set(M0)]      12
-  12  ─‣┘  _ [StructClose Set(M1)]          29
-  14                                        ▶
+  08  ─‣┘  _ [StructClose Set(M1)]          13
+  10                                        ▶
+  11  -ε-  [ArrayClose Set(M2)]             10
+  13  -ε-  [StructClose Push]               22, 28
   15  ...
-  16  -ε-  [Null Set(M1)]                   14
-  18   !   (expression_statement) [StructOpen]  06
-  20  ──!  _                                18, 20
-  22   !   _                                18, 20
-  24  -ε-                                   22, 16
-  26                                        ▶
-  27  -ε-  [ArrayClose Set(M2)]             26
-  29  -ε-  [StructClose Push]               38, 44
-  31  ...
-  32   !   (expression_statement) [StructOpen]  10
-  34  ──!  _                                32, 34
-  36   !   _ [StructOpen]                   32, 34
-  38  ──!  _                                36, 38
-  40  └─!  _                                36, 38
-  42  -ε-  [ArrayOpen]                      40, 27
-  44  ─‣┘  _ [ArrayClose Set(M2)]           26
-  46   !   (program)                        42
+  16   !   (expression_statement) [StructOpen]  06
+  18  ──!  _                                16, 18
+  20   !   _ [StructOpen]                   16, 18
+  22  ──!  _                                20, 22
+  24  └─!  _                                20, 22
+  26  -ε-  [ArrayOpen]                      24, 11
+  28  ─‣┘  _ [ArrayClose Set(M2)]           10
+  30   !   (program)                        26
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@46)                            46 : 03
-       ▶   (@46)
+  02       (@30)                            30 : 03
+       ▶   (@30)
 
-@46:
-  46       (program)                        42
+@30:
+  30       (program)                        26
        ●   program
-  42  -ε-  [ArrayOpen]                      40, 27
-  40       _                                36, 38
+  26  -ε-  [ArrayOpen]                      24, 11
+  24       _                                20, 22
        ●   expression_statement
-  36       _ [StructOpen]                   32, 34
+  20       _ [StructOpen]                   16, 18
        ●   expression_statement
-  32       (expression_statement) [StructOpen]  10
+  16       (expression_statement) [StructOpen]  06
        ●   expression_statement
-  10       (identifier) [Node Set(M0)]      12
+  06       (identifier) [Node Set(M0)]      08
        ●   identifier
-  12       _ [StructClose Set(M1)]          29
+  08       _ [StructClose Set(M1)]          13
        ●   expression_statement
-  29  -ε-  [StructClose Push]               38, 44
-  38       _                                36, 38
+  13  -ε-  [StructClose Push]               22, 28
+  22       _                                20, 22
        ●   debugger_statement
-  36       _ [StructOpen]                   32, 34
+  20       _ [StructOpen]                   16, 18
        ●   debugger_statement
-  32       (expression_statement) [StructOpen]  10
+  16       (expression_statement) [StructOpen]  06
        ○   debugger_statement
-  36  ❮❮❮ 
-  34       _                                32, 34
+  20  ❮❮❮ 
+  18       _                                16, 18
        ●   expression_statement
-  32       (expression_statement) [StructOpen]  10
+  16       (expression_statement) [StructOpen]  06
        ●   expression_statement
-  10       (identifier) [Node Set(M0)]      12
+  06       (identifier) [Node Set(M0)]      08
        ●   identifier
-  12       _ [StructClose Set(M1)]          29
+  08       _ [StructClose Set(M1)]          13
        ●   expression_statement
-  29  -ε-  [StructClose Push]               38, 44
-  38       _                                36, 38
-  29  ❮❮❮ 
-  44       _ [ArrayClose Set(M2)]           26
+  13  -ε-  [StructClose Push]               22, 28
+  22       _                                20, 22
+  13  ❮❮❮ 
+  28       _ [ArrayClose Set(M2)]           10
        ●   program
-  26   ◀   (@46)                            
+  10   ◀   (@30)                            
 
 Q:
   03  -ε-  [StructClose]                    05

@@ -62,55 +62,49 @@ Q = 00 :: T2
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@35)                            35 : 03
+  02       (@24)                            24 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06                                        ▶
-  07  ─‣┘³ _                                18
-  08  -ε-  [Null]                           06
-  10   !   (identifier) [Node]              06
-  12  ──!  _                                10, 12
-  14   !   _                                10, 12
-  16  -ε-                                   14, 08
-  18                                        ▶
-  19  └‣─  (number) [Set(M0) Node Set(M1)]  07
-  21  ─‣─  (number) [Set(M0) Node Set(M1)]  07
+  07  ─‣┘³ _                                06
+  08  └‣─  (number) [Set(M0) Node Set(M1)]  07
+  10  ─‣─  (number) [Set(M0) Node Set(M1)]  07
+  12  -ε-  [Null]                           08
+  14   !   (identifier) [Node]              10
+  16  ──!  _                                14, 16
+  18  └─!  _                                14, 16
+  20  └‣─  (array)                          18, 12
+  22  └‣─  (expression_statement)           20
   23  ...
-  24  -ε-  [Null]                           19
-  26   !   (identifier) [Node]              21
-  28  ──!  _                                26, 28
-  30  └─!  _                                26, 28
-  32  └‣─  (array)                          30, 24
-  34  └‣─  (expression_statement)           32
-  35   !   (program)                        34
+  24   !   (program)                        22
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@35)                            35 : 03
-       ▶   (@35)
+  02       (@24)                            24 : 03
+       ▶   (@24)
 
-@35:
-  35       (program)                        34
+@24:
+  24       (program)                        22
        ●   program
-  34       (expression_statement)           32
+  22       (expression_statement)           20
        ●   expression_statement
-  32       (array)                          30, 24
+  20       (array)                          18, 12
        ●   array
-  30       _                                26, 28
+  18       _                                14, 16
        ●   [
-  26       (identifier) [Node]              21
+  14       (identifier) [Node]              10
        ○   [
-  30  ❮❮❮ 
-  28       _                                26, 28
+  18  ❮❮❮ 
+  16       _                                14, 16
        ●   identifier
-  26       (identifier) [Node]              21
+  14       (identifier) [Node]              10
        ●   identifier
-  21       (number) [Set(M0) Node Set(M1)]  07
+  10       (number) [Set(M0) Node Set(M1)]  07
        ○   ,
        ●   number
-  07       _                                18
+  07       _                                06
        ●   program
-  18   ◀   (@35)                            
+  06   ◀   (@24)                            
 
 Q:
   03  -ε-  [StructClose]                    05

@@ -9,12 +9,12 @@ Q = (program
   ] @item
 )
 ------------------- TYPESCRIPT -------------------
-export type QItem =
-  | { $tag: "Stmt"; $data: { kind: QItemStmtKind } };
-
 export interface Q {
   item: QItem;
 }
+
+export type QItem =
+  | { $tag: "Stmt"; $data: { kind: QItemStmtKind } };
 
 export type QItemStmtKind =
   | { $tag: "Yes" }

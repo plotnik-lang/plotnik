@@ -1,0 +1,87 @@
+Q = (program
+  {
+    (comment)? @comment
+  }? @present :: bool
+)
+--------------------- INPUT ----------------------
+value;
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  present: boolean;
+}
+------------------ DIAGNOSTICS -------------------
+warning: capture type `bool` replaces the captured value with a boolean
+ --> query.ptk:4:15
+  |
+4 |   }? @present :: bool
+  |               ^^^^^^^
+  |
+help: the replaced fields, variants, or scalar payload will not be returned
+--------------------- OUTPUT ---------------------
+{
+  "present": false
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "present"
+S2 "Q"
+S3 "program"
+S4 "comment"
+
+[type_defs]
+T0 = <Bool>
+T1 = Struct  M0:1  ; { present }
+
+[type_members]
+M0: S1 → T0  ; present: <Bool>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@22)                            22 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06   !   (comment)                        08
+  07  ...
+  08  ─‣┘  _ [BoolValue(1) Set(M0)]         10
+  10                                        ▶
+  11  ──!  _                                06, 11
+  13   !   _                                06, 11
+  15  ...
+  16  ──!  _                                13, 16
+  18  └─!  _                                13, 16
+  20  -ε-  [BoolValue(0) Set(M0)]           10
+  22   !   (program)                        18, 20
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@22)                            22 : 03
+       ▶   (@22)
+
+@22:
+  22       (program)                        18, 20
+       ●   program
+  18       _                                13, 16
+       ●   expression_statement
+  13       _                                06, 11
+       ●   expression_statement
+  06       (comment)                        08
+       ○   expression_statement
+  13  ❮❮❮ 
+  11       _                                06, 11
+  18  ❮❮❮ 
+  16       _                                13, 16
+  22  ❮❮❮ 
+  20  -ε-  [BoolValue(0) Set(M0)]           10
+  10   ◀   (@22)                            
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

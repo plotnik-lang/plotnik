@@ -343,7 +343,7 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
                     .map(|t| t.text()[1..].to_string())
                     .unwrap_or_default();
                 let type_ann = c
-                    .type_annotation()
+                    .capture_type()
                     .and_then(|t| t.name())
                     .map(|t| t.text().to_string());
                 match type_ann {

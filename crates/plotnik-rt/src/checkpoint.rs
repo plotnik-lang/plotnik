@@ -8,6 +8,33 @@ use std::num::NonZeroU64;
 
 use crate::{NodeFieldId, SkipPolicy};
 
+/// Effect-control depths restored together on backtracking.
+///
+/// Both counters are bounded by the `u32` call/effect structure, so two lanes
+/// retain the post-`u16` suppression range without padding every checkpoint.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EffectDepths {
+    suppression: u32,
+    scalar: u32,
+}
+
+impl EffectDepths {
+    pub fn new(suppression: u32, scalar: u32) -> Self {
+        Self {
+            suppression,
+            scalar,
+        }
+    }
+
+    pub fn suppression(self) -> u32 {
+        self.suppression
+    }
+
+    pub fn scalar(self) -> u32 {
+        self.scalar
+    }
+}
+
 /// Everything needed to re-enter a callee at the next sibling after a Call's
 /// callee fails. Carrying this on the checkpoint (rather than in ambient VM
 /// state) keeps the resume fully self-contained: `backtrack` advances the
@@ -58,8 +85,8 @@ pub struct CheckpointState {
     pub frame_index: Option<u32>,
     /// Recursion depth at checkpoint.
     pub recursion_depth: u32,
-    /// Suppression depth at checkpoint (see `VM::suppress_depth` for its bound).
-    pub suppress_depth: u64,
+    /// Suppression and open scalar-frame depths.
+    pub effect_depths: EffectDepths,
 }
 
 #[derive(Clone, Copy, Debug)]

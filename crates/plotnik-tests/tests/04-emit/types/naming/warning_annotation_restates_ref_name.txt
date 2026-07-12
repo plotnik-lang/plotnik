@@ -4,7 +4,7 @@ Q = (program
   (Foo) @val :: Foo
 )
 ------------------ DIAGNOSTICS -------------------
-warning: this type annotation restates the type's own name; omit it
+warning: this capture type restates the type's own name; omit it
  --> query.ptk:4:17
   |
 4 |   (Foo) @val :: Foo

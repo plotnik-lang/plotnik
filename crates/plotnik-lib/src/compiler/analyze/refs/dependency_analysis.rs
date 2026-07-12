@@ -23,7 +23,95 @@ pub struct DependencyAnalysis {
 
     recursive_defs: HashSet<DefId>,
 
-    referenced_defs: HashSet<DefId>,
+    dependencies: DefinitionDependencies,
+}
+
+/// Definition-reference graph with the two queries later compiler stages need:
+/// inbound-use classification and transitive reachability from a set of roots.
+///
+/// The graph is indexed by `DefId`, just like `defs`. Keeping this behavior here
+/// gives lowering, schema projection, and inspection one authoritative notion of
+/// which definition bodies a callable root can demand.
+#[derive(Clone, Debug)]
+pub(in crate::compiler::analyze::refs) struct DefinitionDependencies {
+    outgoing: Vec<Vec<DefId>>,
+    has_inbound: Vec<bool>,
+}
+
+/// A stable definition subset. Membership is recorded densely; iteration is in
+/// `DefId` order regardless of graph traversal order.
+#[derive(Clone, Debug)]
+pub struct DefinitionReachability {
+    reachable: Vec<bool>,
+}
+
+impl DefinitionDependencies {
+    pub(in crate::compiler::analyze::refs) fn new(outgoing: Vec<Vec<DefId>>) -> Self {
+        let mut has_inbound = vec![false; outgoing.len()];
+        for dependencies in &outgoing {
+            for &target in dependencies {
+                let inbound = has_inbound
+                    .get_mut(target.index())
+                    .expect("definition dependency must target an admitted DefId");
+                *inbound = true;
+            }
+        }
+        Self {
+            outgoing,
+            has_inbound,
+        }
+    }
+
+    pub(in crate::compiler::analyze::refs) fn has_inbound_references(&self, id: DefId) -> bool {
+        *self
+            .has_inbound
+            .get(id.index())
+            .expect("inbound-reference query must use an admitted DefId")
+    }
+
+    pub(in crate::compiler::analyze::refs) fn reachable_from(
+        &self,
+        roots: impl IntoIterator<Item = DefId>,
+    ) -> DefinitionReachability {
+        let mut reachable = vec![false; self.outgoing.len()];
+        let mut pending = roots.into_iter().collect::<Vec<_>>();
+
+        while let Some(def_id) = pending.pop() {
+            let admitted = reachable
+                .get_mut(def_id.index())
+                .expect("reachability root must be an admitted DefId");
+            if *admitted {
+                continue;
+            }
+            *admitted = true;
+            pending.extend_from_slice(
+                self.outgoing
+                    .get(def_id.index())
+                    .expect("reachable definition must have a dependency row"),
+            );
+        }
+
+        DefinitionReachability { reachable }
+    }
+}
+
+impl DefinitionReachability {
+    pub fn contains(&self, id: DefId) -> bool {
+        *self
+            .reachable
+            .get(id.index())
+            .expect("reachability membership must use an admitted DefId")
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = DefId> + '_ {
+        self.reachable
+            .iter()
+            .enumerate()
+            .filter(|(_, reachable)| **reachable)
+            .map(|(index, _)| {
+                DefId::from_raw(u32::try_from(index).expect("DefId index originated as u32"))
+            })
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -38,7 +126,7 @@ impl DependencyAnalysis {
         def_ids_by_sym: HashMap<Symbol, DefId>,
         defs: Vec<DefInfo>,
         recursive_defs: HashSet<DefId>,
-        referenced_defs: HashSet<DefId>,
+        dependencies: DefinitionDependencies,
     ) -> Self {
         assert_eq!(
             sccs.iter().flatten().count(),
@@ -86,19 +174,18 @@ impl DependencyAnalysis {
                 "recursive DefId must be within defs",
             );
         }
-        for def_id in &referenced_defs {
-            assert!(
-                def_id.index() < defs.len(),
-                "referenced DefId must be within defs",
-            );
-        }
+        assert_eq!(
+            dependencies.outgoing.len(),
+            defs.len(),
+            "every definition must have one dependency row",
+        );
 
         Self {
             sccs,
             def_ids_by_sym,
             defs,
             recursive_defs,
-            referenced_defs,
+            dependencies,
         }
     }
 
@@ -109,7 +196,7 @@ impl DependencyAnalysis {
             HashMap::new(),
             Vec::new(),
             HashSet::new(),
-            HashSet::new(),
+            DefinitionDependencies::new(Vec::new()),
         )
     }
 
@@ -136,7 +223,16 @@ impl DependencyAnalysis {
     }
 
     pub fn has_inbound_references(&self, id: DefId) -> bool {
-        self.referenced_defs.contains(&id)
+        self.dependencies.has_inbound_references(id)
+    }
+
+    /// Compute the transitive definition set demanded by `roots`.
+    ///
+    /// The closure includes the roots themselves and is safe for recursive
+    /// components. Its iterator is deterministic `DefId` order, making the same
+    /// result reusable by output layout and inspection projection.
+    pub fn reachable_from(&self, roots: impl IntoIterator<Item = DefId>) -> DefinitionReachability {
+        self.dependencies.reachable_from(roots)
     }
 
     pub fn sccs(&self) -> &[Vec<DefId>] {

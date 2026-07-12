@@ -12,10 +12,10 @@ Outer = 33
 
 [transitions]
 Inner:
-  02                                        ▶
-  03   !   (call_expression)                05
-  04  ─‣┘  _                                02
-  05  └‣─  (identifier) [Node Set(name)]    04
+  01                                        ▶
+  02   !   (call_expression)                04
+  03  ─‣┘  _                                01
+  04  └‣─  (identifier) [Node Set(name)]    03
 
 Outer:
   06                                        ▶
@@ -24,7 +24,7 @@ Outer:
   10  -ε-  [ArrayClose Set(items)]          06
   12  -ε-  [StructClose Push]               19, 08
   14  -ε-  [StructClose Set(item)]          12
-  15   !   (Inner)                          03 : 14
+  15   !   (Inner)                          02 : 14
   17  -ε-  [StructOpen StructOpen]          15
   19  ──!  _                                17, 19
   20  └─!  _                                17, 19
@@ -33,7 +33,7 @@ Outer:
 Inner (entrypoint):
   26                                        ▶
   27  -ε-  [StructClose]                    26
-  28       (Inner)                          03 : 27
+  28       (Inner)                          02 : 27
   29  -ε-  [StructOpen]                     28
 
 Outer (entrypoint):

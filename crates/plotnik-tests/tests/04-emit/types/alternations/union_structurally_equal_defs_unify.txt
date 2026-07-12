@@ -21,12 +21,12 @@ Q = (program
   )
 )
 ------------------- TYPESCRIPT -------------------
-export interface Pair {
+export interface Row {
   key: Node;
   val: Node;
 }
 
-export interface Row {
+export interface Pair {
   key: Node;
   val: Node;
 }

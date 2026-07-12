@@ -28,10 +28,14 @@
 //! any real path), so debug builds stay usable on large queries.
 
 #[cfg(debug_assertions)]
-pub use debug_impl::{run_verified, verify_constructed, verify_fresh_build};
+pub use debug_impl::{
+    run_root_pruning_verified, run_verified, verify_constructed, verify_fresh_build,
+};
 
 #[cfg(not(debug_assertions))]
-pub use release_impl::{run_verified, verify_constructed, verify_fresh_build};
+pub use release_impl::{
+    run_root_pruning_verified, run_verified, verify_constructed, verify_fresh_build,
+};
 
 #[cfg(all(test, debug_assertions))]
 #[path = "verify_tests.rs"]
@@ -45,6 +49,18 @@ mod release_impl {
     /// Run a pass. Verification is compiled out in release builds.
     #[inline(always)]
     pub fn run_verified(
+        _name: &str,
+        nfa: &mut NfaGraph,
+        _ctx: &LowerInput,
+        pass: impl FnOnce(&mut NfaGraph),
+    ) {
+        pass(nfa);
+    }
+
+    /// Run a pass that may intentionally prune internal definition roots.
+    /// Verification is compiled out in release builds.
+    #[inline(always)]
+    pub fn run_root_pruning_verified(
         _name: &str,
         nfa: &mut NfaGraph,
         _ctx: &LowerInput,
@@ -74,7 +90,8 @@ mod debug_impl {
     use crate::compiler::ids::DefId;
     use crate::compiler::lower::LowerInput;
     use crate::compiler::lower::ir::{
-        InstructionIR, Label, MatchIR, NfaGraph, NodeKindConstraint, PredicateValueIR,
+        DefRoute, DefVariant, InstructionIR, Label, MatchIR, NfaGraph, NodeKindConstraint,
+        PredicateValueIR, ReturnOutcome,
     };
 
     /// Max completed paths recorded per fingerprint. This counts root-to-leaf
@@ -107,7 +124,7 @@ mod debug_impl {
         Predicate(u8, String),
         Effect(EffectKind, Option<String>),
         Call(String),
-        Return,
+        Return(crate::compiler::lower::ir::ReturnOutcome),
         /// Cycle back-reference detected during traversal.
         CycleRef,
         /// Label referenced but not present in the instruction list.
@@ -131,11 +148,10 @@ mod debug_impl {
         }
     }
 
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    #[derive(Clone, Debug, PartialEq, Eq)]
     enum WalkRoot {
         Entrypoint(DefId),
-        Def(DefId),
-        ConsumingDef(DefId),
+        Def(DefVariant),
     }
 
     struct PassSnapshot {
@@ -229,9 +245,12 @@ mod debug_impl {
 
         for op in ops {
             match op {
-                SemanticOp::Effect(EffectKind::Node | EffectKind::SpanStartAt, _)
-                | SemanticOp::Call(_)
-                | SemanticOp::Return
+                SemanticOp::Effect(kind, _) if kind.reads_cursor() => {
+                    flush(&mut out, &mut effects, &mut others);
+                    out.push(op);
+                }
+                SemanticOp::Call(_)
+                | SemanticOp::Return(_)
                 | SemanticOp::CycleRef
                 | SemanticOp::DanglingLabel
                 | SemanticOp::DepthCut => {
@@ -318,16 +337,14 @@ mod debug_impl {
     impl<'a> GraphWalk<'a> {
         fn new(
             instructions: &'a [InstructionIR],
-            def_entries: &IndexMap<DefId, Label>,
-            def_entries_consuming: &IndexMap<DefId, Label>,
+            def_entries: &IndexMap<DefVariant, Label>,
             ctx: &'a LowerInput<'a>,
         ) -> Self {
             Self {
                 instr_map: instructions.iter().map(|i| (i.label(), i)).collect(),
                 label_to_def: def_entries
                     .iter()
-                    .chain(def_entries_consuming.iter())
-                    .map(|(&d, &l)| (l, d))
+                    .map(|(variant, &label)| (label, variant.def_id()))
                     .collect(),
                 ctx,
             }
@@ -370,12 +387,12 @@ mod debug_impl {
                     WalkStep {
                         see_through: false,
                         ops: vec![SemanticOp::Call(name)],
-                        succs: vec![c.next],
+                        succs: c.return_labels().to_vec(),
                     }
                 }
-                InstructionIR::Return(_) => WalkStep {
+                InstructionIR::Return(return_) => WalkStep {
                     see_through: false,
-                    ops: vec![SemanticOp::Return],
+                    ops: vec![SemanticOp::Return(return_.outcome())],
                     succs: vec![],
                 },
             }
@@ -483,14 +500,16 @@ mod debug_impl {
     fn scope_role(op: EffectKind) -> Option<ScopeRole> {
         use EffectKind::*;
         let role = match op {
-            ArrayOpen | StructOpen | EnumOpen | SuppressBegin => ScopeRole::Open(op),
+            ArrayOpen | StructOpen | EnumOpen | SuppressBegin | ScalarOpen => ScopeRole::Open(op),
             ArrayClose => ScopeRole::Close(ArrayOpen),
             StructClose => ScopeRole::Close(StructOpen),
             EnumClose => ScopeRole::Close(EnumOpen),
             SuppressEnd => ScopeRole::Close(SuppressBegin),
-            SpanStartAt | SpanStart => ScopeRole::Open(SpanStart),
-            SpanEnd => ScopeRole::Close(SpanStart),
-            Node | Push | Set | Null => return None,
+            StrClose | BoolClose => ScopeRole::Close(ScalarOpen),
+            Node | Push | Set | Null | ScalarMark | NodeStr | NodeBool | BoolValue
+            | SpanStartAt | SpanStart | SpanEnd => {
+                return None;
+            }
         };
         Some(role)
     }
@@ -501,11 +520,28 @@ mod debug_impl {
     /// are expected and not flagged.
     fn check_path_scopes(path: &Path) -> Result<(), String> {
         let mut stack: Vec<EffectKind> = Vec::new();
+        let mut spans: Vec<Option<String>> = Vec::new();
         for op in path {
-            let SemanticOp::Effect(opcode, _) = op else {
+            let SemanticOp::Effect(opcode, payload) = op else {
                 continue;
             };
             let opcode = *opcode;
+            if matches!(opcode, EffectKind::SpanStartAt | EffectKind::SpanStart) {
+                spans.push(payload.clone());
+                continue;
+            }
+            if opcode == EffectKind::SpanEnd {
+                match spans.pop() {
+                    Some(open) if open == *payload => {}
+                    Some(open) => {
+                        return Err(format!(
+                            "SpanEnd({payload:?}) closes a span but the innermost open span is {open:?}"
+                        ));
+                    }
+                    None => return Err("SpanEnd has no matching open span".to_string()),
+                }
+                continue;
+            }
             match scope_role(opcode) {
                 None => {}
                 Some(ScopeRole::Open(open)) => stack.push(open),
@@ -529,6 +565,9 @@ mod debug_impl {
         );
         if !truncated && !stack.is_empty() {
             return Err(format!("path ends with unclosed scope(s): {stack:?}"));
+        }
+        if !truncated && !spans.is_empty() {
+            return Err(format!("path ends with unclosed span(s): {spans:?}"));
         }
         Ok(())
     }
@@ -579,7 +618,11 @@ mod debug_impl {
             nfa.instructions.iter().map(|i| (i.label(), i)).collect();
 
         for (root, entry) in entries(nfa) {
-            check_depth_root(root, entry, &instr_map)?;
+            let route = match &root {
+                WalkRoot::Entrypoint(_) => DefRoute::Caller,
+                WalkRoot::Def(variant) => variant.route(),
+            };
+            check_depth_root(root, entry, route, &instr_map)?;
         }
         Ok(())
     }
@@ -643,12 +686,10 @@ mod debug_impl {
                 InstructionIR::Match(m) => {
                     let after_nav_zero_width = zero_width && m.nav == Nav::Epsilon;
                     if after_nav_zero_width
-                        && m.effects
-                            .iter()
-                            .any(|effect| effect.kind() == EffectKind::Node)
+                        && m.effects.iter().any(|effect| effect.kind().reads_cursor())
                     {
                         return Err(format!(
-                            "{root:?}: Node effect at {:?} is reachable without a consumed node",
+                            "{root:?}: cursor-reading effect at {:?} is reachable without a consumed node",
                             m.label
                         ));
                     }
@@ -658,7 +699,10 @@ mod debug_impl {
                     }
                 }
                 InstructionIR::Call(c) => {
-                    work.push((c.next, false));
+                    work.push((c.matched_return(), false));
+                    if let Some(zero) = c.zero_return() {
+                        work.push((zero, zero_width));
+                    }
                 }
                 InstructionIR::Return(_) => {}
             }
@@ -670,6 +714,7 @@ mod debug_impl {
     fn check_depth_root(
         root: WalkRoot,
         entry: Label,
+        route: DefRoute,
         instr_map: &HashMap<Label, &InstructionIR>,
     ) -> Result<(), String> {
         let mut memo: HashMap<Label, i32> = HashMap::new();
@@ -695,10 +740,13 @@ mod debug_impl {
                 InstructionIR::Match(m) => {
                     let next_net = net + m.nav.depth_delta();
                     if m.successors.is_empty() {
-                        if next_net != 0 {
+                        let expected_exit = route
+                            .return_depth(ReturnOutcome::Matched)
+                            .expect("every body has a matched route");
+                        if next_net != expected_exit {
                             return Err(format!(
-                                "{root:?}: accepting match {:?} exits at depth {next_net}",
-                                m.label
+                                "{root:?}: accepting match {:?} exits at depth {next_net}, expected {expected_exit}",
+                                m.label,
                             ));
                         }
                         continue;
@@ -708,13 +756,31 @@ mod debug_impl {
                     }
                 }
                 InstructionIR::Call(c) => {
-                    work.push((c.next, net + c.nav.depth_delta()));
+                    work.push((c.matched_return(), net + c.entry_nav().depth_delta()));
+                    if let Some(zero) = c.zero_return() {
+                        work.push((zero, net));
+                    }
                 }
                 InstructionIR::Return(r) => {
-                    if net != 0 {
+                    if r.entry() != route.return_entry() {
                         return Err(format!(
-                            "{root:?}: return {:?} exits at depth {net}",
-                            r.label
+                            "{root:?}: return {:?} has {:?} entry, expected {:?}",
+                            r.label,
+                            r.entry(),
+                            route.return_entry()
+                        ));
+                    }
+                    let Some(expected_exit) = route.return_depth(r.outcome()) else {
+                        return Err(format!(
+                            "{root:?}: return {:?} has unsupported {:?} outcome",
+                            r.label,
+                            r.outcome()
+                        ));
+                    };
+                    if net != expected_exit {
+                        return Err(format!(
+                            "{root:?}: return {:?} exits at depth {net}, expected {expected_exit}",
+                            r.label,
                         ));
                     }
                 }
@@ -742,22 +808,14 @@ mod debug_impl {
         for (&def_id, &label) in &nfa.entrypoint_wrappers {
             v.push((WalkRoot::Entrypoint(def_id), label));
         }
-        for (&def_id, &label) in &nfa.def_entries {
-            v.push((WalkRoot::Def(def_id), label));
-        }
-        for (&def_id, &label) in &nfa.def_entries_consuming {
-            v.push((WalkRoot::ConsumingDef(def_id), label));
+        for (variant, &label) in &nfa.def_entries {
+            v.push((WalkRoot::Def(variant.clone()), label));
         }
         v
     }
 
     fn snapshot(nfa: &NfaGraph, ctx: &LowerInput) -> PassSnapshot {
-        let walk = GraphWalk::new(
-            &nfa.instructions,
-            &nfa.def_entries,
-            &nfa.def_entries_consuming,
-            ctx,
-        );
+        let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
         let fingerprints = entries(nfa)
             .into_iter()
             .map(|(key, entry)| {
@@ -801,18 +859,8 @@ mod debug_impl {
             panic!("[verify] pass `{name}` produced zero-width Node effect: {e}");
         }
 
-        let before_walk = GraphWalk::new(
-            &before.instructions,
-            &nfa.def_entries,
-            &nfa.def_entries_consuming,
-            ctx,
-        );
-        let after_walk = GraphWalk::new(
-            &nfa.instructions,
-            &nfa.def_entries,
-            &nfa.def_entries_consuming,
-            ctx,
-        );
+        let before_walk = GraphWalk::new(&before.instructions, &nfa.def_entries, ctx);
+        let after_walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
         for (key, entry, before_fp) in &before.fingerprints {
             let after_fp = after_walk.fingerprint(*entry);
             if *before_fp != after_fp {
@@ -839,6 +887,24 @@ mod debug_impl {
         verify_after_pass(name, &before, nfa, ctx);
     }
 
+    /// Run a pass that may intentionally remove internal definition roots.
+    /// Entrypoint behavior and every surviving definition body must remain
+    /// unchanged; fingerprints for roots the pass deleted are discarded.
+    pub fn run_root_pruning_verified(
+        name: &str,
+        nfa: &mut NfaGraph,
+        ctx: &LowerInput,
+        pass: impl FnOnce(&mut NfaGraph),
+    ) {
+        let mut before = snapshot(nfa, ctx);
+        pass(nfa);
+        before.fingerprints.retain(|(root, _, _)| match root {
+            WalkRoot::Entrypoint(_) => true,
+            WalkRoot::Def(variant) => nfa.def_entries.contains_key(variant),
+        });
+        verify_after_pass(name, &before, nfa, ctx);
+    }
+
     /// Check the freshly-constructed IR before any pass runs: structural soundness
     /// plus balanced scope effects on every path. Passes preserve the fingerprint
     /// (which carries the full effect sequence), so a construction that balances
@@ -851,12 +917,7 @@ mod debug_impl {
         if let Err(e) = check_no_node_on_zero_width_paths(nfa) {
             panic!("[verify] construction produced zero-width Node effect: {e}");
         }
-        let walk = GraphWalk::new(
-            &nfa.instructions,
-            &nfa.def_entries,
-            &nfa.def_entries_consuming,
-            ctx,
-        );
+        let walk = GraphWalk::new(&nfa.instructions, &nfa.def_entries, ctx);
         for (key, entry) in entries(nfa) {
             if let Err(e) = walk.check_scopes(entry) {
                 panic!("[verify] construction produced unbalanced scope effects for {key:?}:\n{e}");

@@ -10,13 +10,17 @@ use crate::bytecode::{
 };
 
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::output::CaptureLayout;
+use crate::compiler::analyze::output::{CaptureLayout, OutputSchema};
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::emit::targets::bytecode::tables::{
     ConstantPool, EmitError, StringTableBuilder, TypeTableBuilder,
 };
 use crate::compiler::lower::ir::NfaGraph;
 use crate::compiler::lower::spans::{SpanBindingIR, SpanTable};
+
+use super::layout::compute_layout;
+use super::string_table::seed_string_table;
+use super::type_table::build_type_table;
 
 /// The node-kind, field, and entrypoint wire tables. Built together because all
 /// three intern their names into the one string table.
@@ -36,22 +40,28 @@ pub(in crate::compiler::emit) struct EmitPipeline<'a> {
 }
 
 impl<'a> EmitPipeline<'a> {
-    pub(in crate::compiler::emit) fn new(
+    /// Prepare every shared encoding table before module assembly begins.
+    ///
+    /// String seeding, type projection, and instruction layout are one ordered
+    /// preparation phase: the resulting builders must agree before later table
+    /// assembly interns the final symbol names. Keeping that sequence here
+    /// avoids exposing six independently correlated constructor arguments.
+    pub(in crate::compiler::emit) fn prepare(
         input: AnalysisArtifacts<'a>,
         ir: &'a NfaGraph,
-        strings: StringTableBuilder,
-        types: TypeTableBuilder,
-        layout: LayoutMap,
-        capture_layout: &'a CaptureLayout,
-    ) -> Self {
-        Self {
+        schema: &'a OutputSchema<'a>,
+    ) -> Result<Self, EmitError> {
+        let strings = seed_string_table(ir)?;
+        let (types, strings) = build_type_table(schema, strings)?;
+        let layout = compute_layout(ir)?;
+        Ok(Self {
             input,
             ir,
             strings,
             types,
             layout,
-            capture_layout,
-        }
+            capture_layout: schema.layout(),
+        })
     }
 
     pub(in crate::compiler::emit) fn strings(&self) -> &StringTableBuilder {
@@ -239,21 +249,25 @@ impl<'a> EmitPipeline<'a> {
         let mut bytes = Vec::with_capacity(spans.entries.len() * SpanEntry::SIZE);
         for entry in &spans.entries {
             let (type_id, member) = match entry.binding {
-                Some(SpanBindingIR::Type(type_id)) => (
-                    u16::from(self.types.resolve_type(type_id, self.input.type_analysis)?),
-                    SPAN_NO_BINDING,
-                ),
+                Some(SpanBindingIR::Type(type_id)) => {
+                    let type_id = self.input.type_analysis.resolve_underlying_type_id(type_id);
+                    let wire_type = self
+                        .types
+                        .lookup(type_id)
+                        .expect("validated span type binding must reference an emitted type");
+                    (u16::from(wire_type), SPAN_NO_BINDING)
+                }
                 Some(SpanBindingIR::Member(member_ref)) => {
-                    let type_id = self
+                    let wire_type = self
                         .types
                         .lookup(member_ref.parent_type)
-                        .expect("span parent type emitted");
+                        .expect("validated span member binding must reference an emitted type");
                     let member = self
                         .capture_layout
                         .scope(member_ref.parent_type)
-                        .expect("span parent has a capture scope")
+                        .expect("validated span member binding must reference a capture scope")
                         .absolute_index(member_ref.relative_index);
-                    (u16::from(type_id), member)
+                    (u16::from(wire_type), member)
                 }
                 None => (SPAN_NO_BINDING, SPAN_NO_BINDING),
             };

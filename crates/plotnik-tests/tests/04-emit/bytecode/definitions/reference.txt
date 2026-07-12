@@ -7,20 +7,20 @@ Q     = 18
 
 [transitions]
 Inner:
-  02                                        ▶
-  03   !   (identifier) [Node Set(name)]    02
+  01                                        ▶
+  02   !   (identifier) [Node Set(name)]    01
 
 Q:
   04                                        ▶
   05   !   (expression_statement) [StructOpen]  09
   06  ─‣┘  _ [Set(item)]                    04
   08  -ε-  [StructClose]                    06
-  09  └‣─  (Inner)                          03 : 08
+  09  └‣─  (Inner)                          02 : 08
 
 Inner (entrypoint):
   11                                        ▶
   12  -ε-  [StructClose]                    11
-  13       (Inner)                          03 : 12
+  13       (Inner)                          02 : 12
   14  -ε-  [StructOpen]                     13
 
 Q (entrypoint):

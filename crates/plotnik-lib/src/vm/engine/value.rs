@@ -62,6 +62,8 @@ impl Serialize for NodeHandle<'_> {
 pub enum Value<'s> {
     Null,
     Node(NodeHandle<'s>),
+    Str(&'s str),
+    Bool(bool),
     Array(Vec<Value<'s>>),
     /// Struct with ordered fields.
     Struct(Vec<(&'s str, Value<'s>)>),
@@ -97,7 +99,7 @@ fn take_children<'s>(value: &mut Value<'s>, worklist: &mut Vec<Value<'s>>) {
                 worklist.push(*boxed);
             }
         }
-        Value::Null | Value::Node(_) => {}
+        Value::Null | Value::Node(_) | Value::Str(_) | Value::Bool(_) => {}
     }
 }
 
@@ -113,6 +115,8 @@ impl Serialize for Value<'_> {
         match self {
             Value::Null => serializer.serialize_none(),
             Value::Node(h) => h.serialize(serializer),
+            Value::Str(value) => serializer.serialize_str(value),
+            Value::Bool(value) => serializer.serialize_bool(*value),
             Value::Array(arr) => {
                 let mut seq = serializer.serialize_seq(Some(arr.len()))?;
                 for item in arr {
@@ -308,6 +312,14 @@ fn emit_value<'a>(
             ctx.out.push_str(c.reset);
         }
         Value::Node(h) => format_node_handle(ctx, h, indent),
+        Value::Str(value) => {
+            ctx.out.push_str(c.green);
+            ctx.out.push('"');
+            escape_json_into(ctx.out, value);
+            ctx.out.push('"');
+            ctx.out.push_str(c.reset);
+        }
+        Value::Bool(value) => ctx.out.push_str(if *value { "true" } else { "false" }),
         Value::Array(arr) => {
             ctx.out.push_str(c.dim);
             ctx.out.push('[');

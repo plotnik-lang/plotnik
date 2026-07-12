@@ -14,9 +14,9 @@ export type Ids = Node[];
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 
-pub type Ids<'t> = ::std::vec::Vec<Node<'t>>;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'t> {
     pub ids: ::std::vec::Vec<Node<'t>>,
 }
+
+pub type Ids<'t> = ::std::vec::Vec<Node<'t>>;

@@ -13,21 +13,17 @@ Rec = 17
 
 [transitions]
 Rec:
-  00  -ε-                                   03, 10
+  00  -ε-                                   02, 09
+  01                                        ▶
+  02   !   (program) [EnumOpen(A)]          05
+  04  ─‣┘  _ [EnumClose]                    01
+  05  └‣─  (expression_statement)           08
+  06  ─‣┘  _ [Set(inner)]                   04
+  08  └‣─  (Rec)                            00 : 06
+  09   !   (identifier) [EnumOpen(B) Node Set(id) EnumClose]  01
 
 Q:
-  01  -ε-  [SuppressBegin]                  14
-
-Rec:
-  02                                        ▶
-  03   !   (program) [EnumOpen(A)]          06
-  05  ─‣┘  _ [EnumClose]                    02
-  06  └‣─  (expression_statement)           09
-  07  ─‣┘  _ [Set(inner)]                   05
-  09  └‣─  (Rec)                            00 : 07
-  10   !   (identifier) [EnumOpen(B) Node Set(id) EnumClose]  02
-
-Q:
+  11  -ε-  [SuppressBegin]                  14
   12                                        ▶
   13  -ε-  [SuppressEnd]                    12
   14   !   (Rec)                            00 : 13
@@ -38,7 +34,7 @@ Rec (entrypoint):
 
 Q (entrypoint):
   18                                        ▶
-  19       (Q)                              01 : 18
+  19       (Q)                              11 : 18
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

@@ -16,7 +16,7 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 1;
+pub const REQUIRED_RUNTIME_ABI: u32 = 2;
 
 use ::plotnik_rt::Node;
 
@@ -42,7 +42,7 @@ impl<'t> Err<'t> {
         let Some(log) = matcher::err_safe(tree, source)? else {
             return Ok(None);
         };
-        let mut t = rt::TraceReader::new(&log);
+        let mut t = rt::TraceReader::new(&log, source);
         let value = read_err(&mut t);
         t.finish();
         Ok(Some(value))
@@ -63,10 +63,10 @@ impl<'t> rt::Matches for Err<'t> {
     }
 }
 
-impl<'t> rt::Parse<'t> for Err<'t> {
+impl<'t, 's> rt::Parse<'t, 's> for Err<'t> {
     fn parse(
         tree: &'t rt::Tree,
-        source: &str,
+        source: &'s str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
         Err::parse(tree, source)
     }
@@ -84,7 +84,7 @@ impl<'t> Q<'t> {
         let Some(log) = matcher::q_safe(tree, source)? else {
             return Ok(None);
         };
-        let mut t = rt::TraceReader::new(&log);
+        let mut t = rt::TraceReader::new(&log, source);
         let value = read_q(&mut t);
         t.finish();
         Ok(Some(value))
@@ -105,17 +105,17 @@ impl<'t> rt::Matches for Q<'t> {
     }
 }
 
-impl<'t> rt::Parse<'t> for Q<'t> {
+impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
     fn parse(
         tree: &'t rt::Tree,
-        source: &str,
+        source: &'s str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
         Q::parse(tree, source)
     }
 }
 
 /// Replay one committed `Err` value.
-fn read_err<'t>(t: &mut rt::TraceReader<'_, 't>) -> Err<'t> {
+fn read_err<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Err<'t> {
     t.expect_struct_open();
     let mut v0 = None; // err
     while !t.at_struct_close() {
@@ -133,7 +133,7 @@ fn read_err<'t>(t: &mut rt::TraceReader<'_, 't>) -> Err<'t> {
 }
 
 /// Replay one committed `Q` value.
-fn read_q<'t>(t: &mut rt::TraceReader<'_, 't>) -> Q<'t> {
+fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'t> {
     t.expect_struct_open();
     let mut v0 = None; // gap
     while !t.at_struct_close() {
@@ -243,10 +243,10 @@ mod matcher {
 
     // Dense runtime state ids, in NFA label order.
     // Err:
-    const S02_ERR: u16 = 0;
-    const S03_ERR: u16 = 1;
-    const S04_ERR: u16 = 2;
-    const S05_ERR: u16 = 3;
+    const S01_ERR: u16 = 0;
+    const S02_ERR: u16 = 1;
+    const S03_ERR: u16 = 2;
+    const S04_ERR: u16 = 3;
     // Q:
     const S06_Q: u16 = 4;
     const S07_Q: u16 = 5;
@@ -384,35 +384,36 @@ mod matcher {
 
     fn step<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
-            //   02                                        ▶
-            S02_ERR => {
+            //   01                                        ▶
+            S01_ERR => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   03   !   (program)                        05
-            S03_ERR => 'state: {
-                if !cand_s03_err(eng) {
+            //   02   !   (program)                        04
+            S02_ERR => 'state: {
+                if !cand_s02_err(eng) {
                     break 'state Flow::Backtrack;
                 }
-                Flow::Jump(S05_ERR)
+                Flow::Jump(S04_ERR)
             }
-            //   04  ─‣┘  _                                02
-            S04_ERR => 'state: {
+            //   03  ─‣┘  _                                01
+            S03_ERR => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                Flow::Jump(S02_ERR)
+                Flow::Jump(S01_ERR)
             }
-            //   05  └‣─  (ERROR) [Node Set(err)]          04
-            S05_ERR => 'state: {
+            //   04  └‣─  (ERROR) [Node Set(err)]          03
+            S04_ERR => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
                 }
                 loop {
-                    if cand_s05_err(eng) {
+                    if cand_s04_err(eng) {
                         break;
                     }
                     if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
@@ -420,16 +421,17 @@ mod matcher {
                     }
                 }
                 if rt::SkipPolicy::Any.admits(&eng.node()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_ERR));
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S04_ERR));
                 }
-                finish_s05_err(eng)
+                finish_s04_err(eng)
             }
             //   06                                        ▶
             S06_Q => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
             //   07   !   (program)                        09
@@ -503,9 +505,10 @@ mod matcher {
             //   14                                        ▶
             S14_ERR_EP => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
             //   15  -ε-  [StructClose]                    14
@@ -513,10 +516,10 @@ mod matcher {
                 eng.emit_data(|_| rt::RuntimeEffect::StructClose);
                 Flow::Jump(S14_ERR_EP)
             }
-            //   16       (Err)                            03 : 15
+            //   16       (Err)                            02 : 15
             S16_ERR_EP => {
                 eng.enter_frame(S15_ERR_EP);
-                Flow::Jump(S03_ERR)
+                Flow::Jump(S02_ERR)
             }
             //   17  -ε-  [StructOpen]                     16
             S17_ERR_EP => {
@@ -526,9 +529,10 @@ mod matcher {
             //   18                                        ▶
             S18_Q_EP => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
             //   19  -ε-  [StructClose]                    18
@@ -550,9 +554,9 @@ mod matcher {
         }
     }
 
-    /// `S03_ERR` candidate: `(program)`.
+    /// `S02_ERR` candidate: `(program)`.
     #[inline]
-    fn cand_s03_err(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s02_err(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
         // (program)
         if node.kind_id() != 134 || !node.is_named() {
@@ -561,9 +565,9 @@ mod matcher {
         true
     }
 
-    /// `S05_ERR` candidate: `(ERROR)`.
+    /// `S04_ERR` candidate: `(ERROR)`.
     #[inline]
-    fn cand_s05_err(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s04_err(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
         // (ERROR)
         if node.kind_id() != 65535 || !node.is_named() {
@@ -624,14 +628,14 @@ mod matcher {
         true
     }
 
-    /// `S05_ERR` post-acceptance: effects, then branch. Shared by the dispatch
+    /// `S04_ERR` post-acceptance: effects, then branch. Shared by the dispatch
     /// path and the match-retry resume, so a retried candidate replays exactly
     /// what the original acceptance would have.
     #[inline]
-    fn finish_s05_err(eng: &mut rt::Engine<'_>) -> Flow {
+    fn finish_s04_err(eng: &mut rt::Engine<'_>) -> Flow {
         eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
         eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(err)
-        Flow::Jump(S04_ERR)
+        Flow::Jump(S03_ERR)
     }
 
     /// `S09_Q` post-acceptance: effects, then branch. Shared by the dispatch
@@ -713,12 +717,12 @@ mod matcher {
 
     fn match_retry<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Option<Flow> {
         match ip {
-            S05_ERR => {
+            S04_ERR => {
                 if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
                     return None;
                 }
                 loop {
-                    if cand_s05_err(eng) {
+                    if cand_s04_err(eng) {
                         break;
                     }
                     if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
@@ -726,9 +730,9 @@ mod matcher {
                     }
                 }
                 if rt::SkipPolicy::Any.admits(&eng.node()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_ERR));
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S04_ERR));
                 }
-                Some(finish_s05_err(eng))
+                Some(finish_s04_err(eng))
             }
             S09_Q => {
                 if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {

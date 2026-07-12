@@ -324,18 +324,44 @@ Output type:
 
 The `@func` capture on the sequence creates a nested scope. All captures inside (`@node`, `@name`, `@body`) become fields of that nested object.
 
-### Type Annotations
+### Capture Types
 
-`::` after a capture names the output type in codegen:
+`::` after a regular capture selects its capture type:
 
-| Annotation | Effect                       |
-| ---------- | ---------------------------- |
-| `@x`       | Inferred (usually `Node`)    |
-| `@x :: T`  | Name the type `T` in codegen |
+| Syntax       | Effect                                                  |
+| ------------ | ------------------------------------------------------- |
+| `@x`         | Inferred (usually `Node`)                               |
+| `@x :: str`  | Source text for the captured value                      |
+| `@x :: bool` | Observable presence; an absent optional becomes `false` |
+| `@x :: Name` | Custom nominal name for the inferred type               |
 
-Type names must be `PascalCase`.
+`str` and `bool` are the complete lowercase built-in set. Any other lowercase
+name is an error. Custom names must be `PascalCase`; `Str` is a custom name,
+not the built-in `str`. The common spellings `string` and `boolean` are
+diagnosed with fixes to `str` and `bool`.
 
-Every structured type has a compiler-generated name already (`{Parent}{Field}` along the capture path), so annotations are optional. An annotation overrides the generated name and resets the chain — nested composites derive from the new name. Names are nominal: the same name on identical shapes denotes one shared type; on different shapes it's a compile error. `Node` and definition names are reserved. See [Type System: Type Naming](type-system.md#type-naming).
+A built-in capture type is applied only after the ordinary capture has been
+validated, so it cannot legalize an invalid multi-node or valueless capture.
+`str` recursively preserves optional and array dimensions: `Node?` becomes
+`string | null`, and `Node[]` becomes `string[]`. Every array item owns its
+own source range. A structured value becomes the source slice from its first
+matched node through its last; a valid zero-node value becomes `null`.
+
+`bool` means presence, not truthiness. A matched optional becomes `true` and
+its absent path becomes `false`; a required value is rejected unless the same
+field is omitted by an enclosing union branch. That omitted branch supplies
+`false`.
+
+Replacing structured data with `str` or `bool` emits a warning.
+
+Every structured type has a compiler-generated name already
+(`{Parent}{Field}` along the capture path), so custom capture types are
+optional. A custom name overrides the generated name and resets the chain —
+nested composites derive from the new name. Names are nominal: the same name
+on identical shapes denotes one shared type; on different shapes it is a
+compile error. `Node` and definition names are reserved. See
+[Type System: Capture Types](type-system.md#capture-types) and
+[Type Naming](type-system.md#type-naming).
 
 ### Suppressive Captures
 
@@ -362,7 +388,7 @@ Rules:
 - `@_` and `@_name` match like regular captures but produce no output
 - Named suppressive captures (`@_foo`) are equivalent to `@_` — the name is documentation only
 - Captures inside a suppressed subtree are inert; they never collide with same-named captures outside it
-- Type annotations are not allowed on suppressive captures
+- Capture types are not allowed on suppressive captures
 - Nesting works: `@_outer` containing `@_inner` correctly suppresses both
 
 ### Summary
@@ -378,6 +404,8 @@ Rules:
 | `(Def) @x`              | The definition's type, or an error if void |
 | `(Def)* @xs`            | Array of the definition's type             |
 | `[...] @_`              | Match and discard                          |
+| `@x :: str`             | Source text, preserving `?`/`*`/`+`        |
+| `@x :: bool`            | Presence boolean                           |
 | `@x :: T`               | Custom type name                           |
 
 ---
@@ -1126,27 +1154,27 @@ Enums render as one multi-line union with inline variants — variant payloads n
 
 ## Quick Reference
 
-| Feature              | Tree-sitter        | Plotnik                   |
-| -------------------- | ------------------ | ------------------------- |
-| Capture              | `@name`            | `@name` (snake_case only) |
-| Suppressive capture  |                    | `@_` or `@_name`          |
-| Type annotation      |                    | `@x :: T`                 |
-| Named node           | `(type)`           | `(type)`                  |
-| Anonymous node       | `"text"`           | `"text"`                  |
-| Any node             | `_`                | `_`                       |
-| Any named node       | `(_)`              | `(_)`                     |
-| Field constraint     | `field: pattern`   | `field: pattern`          |
-| Negated field        | `!field`           | `-field`                  |
-| Quantifiers          | `?` `*` `+`        | `?` `*` `+`               |
-| Non-greedy           |                    | `??` `*?` `+?`            |
-| Sequence             | `((a) (b))`        | `{(a) (b)}`               |
-| Alternation          | `[a b]`            | `[a b]`                   |
-| Enum alternation     |                    | `[A: (a) B: (b)]`         |
-| Anchor               | `.`                | `.` soft, `.!` exact      |
-| Predicate            | `(#eq? @x "foo")`  | `(node == "foo")`         |
-| Regex predicate      | `(#match? @x "p")` | `(node =~ /p/)`           |
-| Named expression     |                    | `Name = pattern`          |
-| Use named expression |                    | `(Name)`                  |
+| Feature              | Tree-sitter        | Plotnik                     |
+| -------------------- | ------------------ | --------------------------- |
+| Capture              | `@name`            | `@name` (snake_case only)   |
+| Suppressive capture  |                    | `@_` or `@_name`            |
+| Capture type         |                    | `@x :: str`, `bool`, or `T` |
+| Named node           | `(type)`           | `(type)`                    |
+| Anonymous node       | `"text"`           | `"text"`                    |
+| Any node             | `_`                | `_`                         |
+| Any named node       | `(_)`              | `(_)`                       |
+| Field constraint     | `field: pattern`   | `field: pattern`            |
+| Negated field        | `!field`           | `-field`                    |
+| Quantifiers          | `?` `*` `+`        | `?` `*` `+`                 |
+| Non-greedy           |                    | `??` `*?` `+?`              |
+| Sequence             | `((a) (b))`        | `{(a) (b)}`                 |
+| Alternation          | `[a b]`            | `[a b]`                     |
+| Enum alternation     |                    | `[A: (a) B: (b)]`           |
+| Anchor               | `.`                | `.` soft, `.!` exact        |
+| Predicate            | `(#eq? @x "foo")`  | `(node == "foo")`           |
+| Regex predicate      | `(#match? @x "p")` | `(node =~ /p/)`             |
+| Named expression     |                    | `Name = pattern`            |
+| Use named expression |                    | `(Name)`                    |
 
 ---
 

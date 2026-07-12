@@ -18,15 +18,15 @@ Test = 25
 
 [transitions]
 Expr:
-  00  -ε-                                   03, 04
-  02                                        ▶
-  03   !   (number) [EnumOpen(Lit) Node Set(value) EnumClose]  02
-  04   !   (call_expression) [EnumOpen(Nested)]  11
-  06  ─‣┘  _ [EnumClose]                    02
-  07  ─‣─  arguments: (arguments)           10
-  08  ─‣┘  _ [Set(inner)]                   06
-  10  └‣─  (Expr)                           00 : 08
-  11  └‣─  function: (identifier) [Node Set(fn)]  07
+  00  -ε-                                   02, 03
+  01                                        ▶
+  02   !   (number) [EnumOpen(Lit) Node Set(value) EnumClose]  01
+  03   !   (call_expression) [EnumOpen(Nested)]  10
+  05  ─‣┘  _ [EnumClose]                    01
+  06  ─‣─  arguments: (arguments)           09
+  07  ─‣┘  _ [Set(inner)]                   05
+  09  └‣─  (Expr)                           00 : 07
+  10  └‣─  function: (identifier) [Node Set(fn)]  06
 
 Test:
   13                                        ▶

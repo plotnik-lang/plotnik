@@ -17,8 +17,8 @@ use crate::compiler::analyze::output::CaptureLayout;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::dump::NfaDumper;
 use crate::compiler::lower::ir::{
-    CallIR, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin, MatchIR, NfaGraph, PredicateIR,
-    PredicateValueIR,
+    CallIR, CallProtocol, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin, MatchIR,
+    NfaGraph, PredicateIR, PredicateValueIR,
 };
 use crate::compiler::regex::normalize;
 use crate::core::{NodeFieldId, NodeKindId};
@@ -69,7 +69,7 @@ pub(crate) enum StatePlanKind {
     },
     Match(MatchPlan),
     Call(CallPlan),
-    Return,
+    Return(plotnik_rt::ReturnOutcome),
 }
 
 #[derive(Clone, Debug)]
@@ -111,7 +111,14 @@ impl MatchPlan {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct CallPlan {
+pub(crate) enum CallPlan {
+    Ordinary(OrdinaryCallPlan),
+    Routed(RoutedCallPlan),
+    Split(SplitCallPlan),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct OrdinaryCallPlan {
     pub(crate) nav: Nav,
     pub(crate) search: SkipPolicy,
     pub(crate) retry: Option<SkipPolicy>,
@@ -120,7 +127,7 @@ pub(crate) struct CallPlan {
     pub(crate) next: StateId,
 }
 
-impl CallPlan {
+impl OrdinaryCallPlan {
     pub(crate) fn stays_on_current_node(&self) -> bool {
         matches!(self.nav, Nav::Stay | Nav::StayExact)
     }
@@ -129,6 +136,19 @@ impl CallPlan {
     pub(crate) fn can_fail_before_flow(&self) -> bool {
         !self.stays_on_current_node() || self.field.is_some()
     }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SplitCallPlan {
+    pub(crate) target: StateId,
+    pub(crate) matched: StateId,
+    pub(crate) zero: StateId,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RoutedCallPlan {
+    pub(crate) target: StateId,
+    pub(crate) next: StateId,
 }
 
 #[derive(Clone, Debug)]
@@ -375,13 +395,19 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
             .expect("every pre-pack label carries an origin")
         {
             LabelOrigin::Def(_) => StateOrigin::Definition,
-            LabelOrigin::ConsumingDef(_) => StateOrigin::ConsumingDefinition,
+            LabelOrigin::DefVariant { route, .. } => {
+                if route.requires_consumption() {
+                    StateOrigin::ConsumingDefinition
+                } else {
+                    StateOrigin::Definition
+                }
+            }
             LabelOrigin::Wrapper(_) => StateOrigin::Entrypoint,
         };
         let kind = match instruction {
             InstructionIR::Match(instruction) => self.match_state(instruction),
             InstructionIR::Call(instruction) => StatePlanKind::Call(self.call_state(instruction)),
-            InstructionIR::Return(_) => StatePlanKind::Return,
+            InstructionIR::Return(return_) => StatePlanKind::Return(return_.outcome()),
         };
         StatePlan {
             id: StateId(u16::try_from(index).expect("validated state count fits u16 ids")),
@@ -423,19 +449,34 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
     }
 
     fn call_state(&mut self, instruction: &CallIR) -> CallPlan {
-        let field = instruction
-            .node_field
-            .map(|field| self.record_field(field).id);
-        let stays = matches!(instruction.nav, Nav::Stay | Nav::StayExact);
-        let search = instruction.nav.skip_policy();
-        let retry = (!stays && search != SkipPolicy::Exact).then_some(search);
-        CallPlan {
-            nav: instruction.nav,
-            search,
-            retry,
-            field,
-            target: resolve_state(self.ids, instruction.target),
-            next: resolve_state(self.ids, instruction.next),
+        let target = resolve_state(self.ids, instruction.target);
+        let matched = resolve_state(self.ids, instruction.matched_return());
+        match instruction.protocol {
+            CallProtocol::Split { returns, .. } => CallPlan::Split(SplitCallPlan {
+                target,
+                matched,
+                zero: resolve_state(self.ids, returns[1]),
+            }),
+            CallProtocol::Routed { .. } => CallPlan::Routed(RoutedCallPlan {
+                target,
+                next: matched,
+            }),
+            CallProtocol::Ordinary {
+                nav, node_field, ..
+            } => {
+                let field = node_field.map(|field| self.record_field(field).id);
+                let stays = matches!(nav, Nav::Stay | Nav::StayExact);
+                let search = nav.skip_policy();
+                let retry = (!stays && search != SkipPolicy::Exact).then_some(search);
+                CallPlan::Ordinary(OrdinaryCallPlan {
+                    nav,
+                    search,
+                    retry,
+                    field,
+                    target,
+                    next: matched,
+                })
+            }
         }
     }
 

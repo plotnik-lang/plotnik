@@ -1,0 +1,47 @@
+Q = (program
+  (comment)? @doc :: str
+  (expression_statement)? @has_statement :: bool
+)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "program"
+      Capture
+        Quantifier
+          NamedNode
+            ParenOpen "("
+            Id "comment"
+            ParenClose ")"
+          Question "?"
+        CaptureToken "@doc"
+        CaptureType
+          DoubleColon "::"
+          Id "str"
+      Capture
+        Quantifier
+          NamedNode
+            ParenOpen "("
+            Id "expression_statement"
+            ParenClose ")"
+          Question "?"
+        CaptureToken "@has_statement"
+        CaptureType
+          DoubleColon "::"
+          Id "bool"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode program
+      CapturedPattern @doc :: str
+        QuantifiedPattern ?
+          NamedNode comment
+      CapturedPattern @has_statement :: bool
+        QuantifiedPattern ?
+          NamedNode expression_statement

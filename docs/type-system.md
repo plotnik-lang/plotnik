@@ -11,12 +11,12 @@ when the VM target is explicitly selected.
 result their body produces, but they do not implicitly capture the matched
 root node. Four constructs produce or name output:
 
-| Syntax        | Output                                       |
-| ------------- | -------------------------------------------- |
-| `@name`       | A field in the enclosing scope               |
-| `Def = ...`   | A named type for the body's result           |
-| `Label:`      | An enum variant (when the value is consumed) |
-| `:: TypeName` | A name for the type at that position         |
+| Syntax      | Output                                       |
+| ----------- | -------------------------------------------- |
+| `@name`     | A field in the enclosing scope               |
+| `Def = ...` | A named type for the body's result           |
+| `Label:`    | An enum variant (when the value is consumed) |
+| `:: type`   | A built-in or custom capture type            |
 
 Everything else — nested node patterns, sequences, references, anchors,
 predicates — is structural unless one of those output positions consumes it.
@@ -114,7 +114,7 @@ definition under a call-site `?` nests: `(MaybeId)? @x` → `x: MaybeId | null`
 (both nulls print the same in JSON).
 
 Containers never mint type names — names come only from definitions,
-captures, `::` annotations, and variant tags. So the element must already be
+captures, custom capture types, and variant tags. So the element must already be
 a nameable type: a plain node, or a reference. An anonymous element shape is
 rejected; name it in its own definition:
 
@@ -415,6 +415,59 @@ NestedCall = (call_expression
 → { name: Node | null, inner: NestedCall | null }
 ```
 
+## Capture Types
+
+Analysis first infers and validates the ordinary capture, then applies the
+written capture type. Removing `:: str` or `:: bool` therefore always leaves
+an independently valid capture.
+
+### Built-in `str`
+
+`str` replaces each terminal value with the source range owned by that value
+and preserves its existing containers:
+
+| Ordinary type     | `:: str` result     |
+| ----------------- | ------------------- |
+| `Node`            | `string`            |
+| `Node \| null`    | `string \| null`    |
+| `Node[]`          | `string[]`          |
+| nonempty `Node[]` | nonempty `string[]` |
+| struct/enum       | `string` (warning)  |
+
+Array items keep distinct ranges; trivia between items belongs to neither.
+A structured value uses the hull from its first contributing node to its last.
+An admitted zero-node value is `null`, while a real zero-byte node is the
+present empty string `""`.
+
+A capture on a non-leaf node replaces only that capture's `Node` value. Child
+captures that bubble independently into the enclosing scope remain ordinary
+fields. By contrast, converting a captured sequence or enum replaces the
+structured data it owns and warns once at the written capture type.
+
+### Built-in `bool`
+
+`bool` exposes observable absence; it never reads or interprets captured text:
+
+```text
+absent  -> false
+present -> true
+```
+
+An optional non-boolean value becomes `boolean`. Nested optionals collapse to
+one boolean. A required node, list, struct, or enum is rejected because the
+result would always be `true`, unless that exact field is omitted by an
+enclosing union branch. In that case the capture observes branch presence and
+the omitted branch receives `false`, not `null`. `bool` never means `any()` and
+does not map list elements.
+
+### Custom capture types
+
+PascalCase capture types assign nominal names without changing the underlying
+value. `str` and `bool` are the only lowercase built-ins; `:: Str` and
+`:: Bool` are custom names. A custom name may name a captured node or a
+structured shape; it cannot name the result of a built-in capture type because
+each capture has only one capture-type position.
+
 ## Type Naming
 
 Every structured type gets its name at compile time. Names are deterministic
@@ -467,7 +520,7 @@ export type QItem =
 Labels are used **verbatim** (`DECL` stays `DECL`), so two labels can never
 collide after case conversion.
 
-### `::` Annotations
+### Custom `:: Name` Capture Types
 
 `@x :: Name` overrides the generated name **and resets the chain** — children
 derive from the new name:
@@ -501,15 +554,15 @@ On a plain node capture, `:: Name` declares a named alias:
 
 ### Names Are Nominal
 
-- The same annotation name on **structurally identical** types denotes one
+- The same custom capture type name on **structurally identical** types denotes one
   type — annotate two identical shapes `:: Info` and both fields share
   `Info`, declared once.
 - The same name on **different** shapes is a compile error, reported with
   both spans (`type name X is already used for a different type`).
 - Definition names and the builtin `Node` are reserved; `Node = ...` is an
   error.
-- An annotation that matches the name the compiler would generate anyway is a
-  warning (`omit it`), as is an annotation on a reference (a definition's type
+- A custom capture type that matches the name the compiler would generate anyway is a
+  warning (`omit it`), as is one on a reference (a definition's type
   cannot be renamed at a use site).
 - There is no numeric suffixing — a name conflict is always an error, never a
   silent rename.

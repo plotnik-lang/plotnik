@@ -16,9 +16,9 @@ export type MaybeId = Node | null;
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 
-pub type MaybeId<'t> = ::core::option::Option<Node<'t>>;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'t> {
     pub x: ::core::option::Option<::core::option::Option<Node<'t>>>,
 }
+
+pub type MaybeId<'t> = ::core::option::Option<Node<'t>>;

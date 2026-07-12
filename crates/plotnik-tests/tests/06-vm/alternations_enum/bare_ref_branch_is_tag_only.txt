@@ -10,16 +10,16 @@ Q = (program
 --------------------- INPUT ----------------------
 x;
 ------------------- TYPESCRIPT -------------------
-export type QV =
-  | { $tag: "Call" };
+export interface Inner {
+  name: Node;
+}
 
 export interface Q {
   v: QV;
 }
 
-export interface Inner {
-  name: Node;
-}
+export type QV =
+  | { $tag: "Call" };
 --------------------- OUTPUT ---------------------
 {
   "v": {

@@ -8,16 +8,16 @@ Q = (program
 --------------------- INPUT ----------------------
 foo;
 ------------------- TYPESCRIPT -------------------
-export interface QOuterInner {
-  e: Node;
+export interface Q {
+  outer: QOuter;
 }
 
 export interface QOuter {
   inner: QOuterInner;
 }
 
-export interface Q {
-  outer: QOuter;
+export interface QOuterInner {
+  e: Node;
 }
 --------------------- OUTPUT ---------------------
 {

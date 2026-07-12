@@ -250,7 +250,7 @@ fn preserves_comments_owned_by_pattern_wrappers() {
         "Q = [Label /* branch */ : (call (a) (b))]",
         "Q = (Foo /* ref */)",
         "Q = (identifier /* predicate */ == \"x\")",
-        "Q = (identifier) @x :: /* annotation */ Name",
+        "Q = (identifier) @x :: /* capture type */ Name",
         "Q = (call (a) (b) /* closer */)",
         "Q = (call (a) (b)) /* multiline\nblock */ @x",
     ];

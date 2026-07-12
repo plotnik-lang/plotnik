@@ -16,7 +16,7 @@ fn report_with_default_message() {
     let mut diagnostics = Diagnostics::new();
     diagnostics
         .report(
-            DiagnosticKind::ExpectedTypeName,
+            DiagnosticKind::ExpectedCaptureType,
             Span::new(id, TextRange::new(0.into(), 5.into())),
         )
         .emit();

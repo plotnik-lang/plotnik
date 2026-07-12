@@ -5,15 +5,16 @@
 
 use std::collections::HashMap;
 
-use crate::compiler::analyze::output::OutputSchema;
+use crate::compiler::analyze::output::{OutputItem, OutputSchema};
 use crate::compiler::analyze::types::type_shape::TypeId;
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
 use crate::core::Symbol;
 
-use super::representation::TypeFacts;
+use super::representation::{LifetimeUsage, TypeFacts};
 
 pub(crate) struct TypeModel<'a> {
     schema: OutputSchema<'a>,
+    items: Vec<OutputItem>,
     facts: TypeFacts,
     /// Hygienic module-scope identifier for every declared item name.
     item_idents: HashMap<Symbol, String>,
@@ -38,7 +39,7 @@ impl<'a> TypeModel<'a> {
     pub(crate) fn new(schema: OutputSchema<'a>) -> Self {
         let facts = TypeFacts::compute(schema.types);
         let interner = schema.interner;
-        let items = schema.items();
+        let items = schema.entrypoint_items().to_vec();
         let idents = rust_scope_idents(items.iter().map(|item| interner.resolve(item.name)));
         let item_idents = items
             .iter()
@@ -47,6 +48,7 @@ impl<'a> TypeModel<'a> {
             .collect();
         Self {
             schema,
+            items,
             facts,
             item_idents,
         }
@@ -56,15 +58,18 @@ impl<'a> TypeModel<'a> {
         &self.schema
     }
 
+    pub(crate) fn items(&self) -> &[OutputItem] {
+        &self.items
+    }
+
     pub(crate) fn item_ident(&self, name: Symbol) -> &str {
         self.item_idents
             .get(&name)
             .expect("every declared item name has an identifier")
     }
 
-    /// Whether the type's rendering mentions `'t` (transitively holds a node).
-    pub(crate) fn needs_lifetime(&self, ty: TypeId) -> bool {
-        self.facts.needs_lifetime(ty)
+    pub(super) fn lifetime_usage(&self, ty: TypeId) -> LifetimeUsage {
+        self.facts.lifetime_usage(ty)
     }
 
     /// Whether a `Ref` occurrence rendered at `context` uses `Box<...>`.

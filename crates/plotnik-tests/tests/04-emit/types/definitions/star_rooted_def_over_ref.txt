@@ -32,9 +32,9 @@ pub struct Row<'t> {
     pub val: Node<'t>,
 }
 
-pub type Rows<'t> = ::std::vec::Vec<Row<'t>>;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'t> {
     pub rows: ::std::vec::Vec<Row<'t>>,
 }
+
+pub type Rows<'t> = ::std::vec::Vec<Row<'t>>;

@@ -9,41 +9,33 @@ Q = (program
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entrypoints]
-Q = 37
+Q = 29
 
 [transitions]
-MaybeName:
-  00  -ε-                                   07, 03
-  02                                        ▶
-  03  -ε-  [Null Set(name)]                 02
-  04   !   (identifier) [Node Set(name)]    02
-  06  ──!  _                                04, 06
-  07   !   _                                04, 06
-
 Q:
-  09                                        ▶
-  10   !   (program)                        23
-  11  ─‣┘  _                                09
-  12  ─‣─  (expression_statement)           22
-  13  ─‣┘  _ [StructClose Set(second)]      11
-  16  -ε-  [Null Set(name) StructClose Set(second)]  11
-  17   !   (identifier) [Node Set(name)]    13
-  19  ──!  _                                17, 19
-  20  └─!  _                                17, 19
-  22  -ε-  [StructOpen]                     20, 16
-  23  └‣─  (expression_statement)           33
-  24  ─‣┘  _ [StructClose Set(first)]       12
-  27  -ε-  [Null Set(name) StructClose Set(first)]  12
-  28   !   (identifier) [Node Set(name)]    24
-  30  ──!  _                                28, 30
-  31  └─!  _                                28, 30
-  33  -ε-  [StructOpen]                     31, 27
+  01                                        ▶
+  02   !   (program)                        15
+  03  ─‣┘  _                                01
+  04  ─‣─  (expression_statement)           14
+  05  ─‣┘  _ [StructClose Set(second)]      03
+  08  -ε-  [Null Set(name) StructClose Set(second)]  03
+  09   !   (identifier) [Node Set(name)]    05
+  11  ──!  _                                09, 11
+  12  └─!  _                                09, 11
+  14  -ε-  [StructOpen]                     12, 08
+  15  └‣─  (expression_statement)           25
+  16  ─‣┘  _ [StructClose Set(first)]       04
+  19  -ε-  [Null Set(name) StructClose Set(first)]  04
+  20   !   (identifier) [Node Set(name)]    16
+  22  ──!  _                                20, 22
+  23  └─!  _                                20, 22
+  25  -ε-  [StructOpen]                     23, 19
 
 Q (entrypoint):
-  34                                        ▶
-  35  -ε-  [StructClose]                    34
-  36       (Q)                              10 : 35
-  37  -ε-  [StructOpen]                     36
+  26                                        ▶
+  27  -ε-  [StructClose]                    26
+  28       (Q)                              02 : 27
+  29  -ε-  [StructOpen]                     28
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -92,36 +84,29 @@ P12 ref        122..133  src0  T1
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@72)                            72 : 03
+  02       (@56)                            56 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06  ...
   07  ...
   08   !   (identifier) [SpanStartAt#3 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  12
-  12  ─‣┘  _ [StructClose SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  69
+  12  ─‣┘  _ [StructClose SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  37
   15  ...
   16   !   (identifier) [SpanStartAt#3 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  20
-  20  ─‣┘  _ [StructClose SpanStart#8 Set(M1) SpanEnd#8 SpanEnd#9]  52
+  20  ─‣┘  _ [StructClose SpanStart#8 Set(M1) SpanEnd#8 SpanEnd#9]  34
   23                                        ▶
-  24  -ε-  [Null Set(M0) SpanEnd#2 SpanEnd#0]  23
-  27   !   (identifier) [SpanStartAt#3 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#3 SpanEnd#2 SpanEnd#0]  23
-  31  ...
-  32  ──!  _                                27, 32
-  34   !   _                                27, 32
-  36  -ε-  [SpanStart#2]                    34, 24
-  38  -ε-  [SpanStart#0]                    36
-  40                                        ▶
-  41  -ε-  [Null Set(M0) SpanEnd#2 SpanEnd#0 StructClose SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  69
-  45  ──!  _                                08, 45
-  47  ...
-  48  └─!  _                                08, 45
-  50  -ε-  [SpanStart#2]                    48, 41
-  52  ─‣─  (expression_statement) [SpanEnd#7 SpanStartAt#10 SpanStart#12 StructOpen SpanStart#0]  50
+  24  -ε-  [SpanStart#1 Null Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0 StructClose SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  37
+  28  ──!  _                                08, 28
+  30  └─!  _                                08, 28
+  32  -ε-  [SpanStart#2]                    30, 24
+  34  ─‣─  (expression_statement) [SpanEnd#7 SpanStartAt#10 SpanStart#12 StructOpen SpanStart#0]  32
+  37  ─‣┘  _ [SpanEnd#10 SpanEnd#6 SpanEnd#5 SpanEnd#4]  23
+  40  -ε-  [SpanStart#1 Null Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0 StructClose SpanStart#8 Set(M1) SpanEnd#8 SpanEnd#9]  34
+  44  ──!  _                                16, 44
+  46  └─!  _                                16, 44
+  48  -ε-  [SpanStart#2]                    46, 40
+  50  └‣─  (expression_statement) [SpanStart#6 SpanStartAt#7 SpanStart#9 StructOpen SpanStart#0]  48
+  53  ...
+  54  ...
   55  ...
-  56  -ε-  [Null Set(M0) SpanEnd#2 SpanEnd#0 StructClose SpanStart#8 Set(M1) SpanEnd#8 SpanEnd#9]  52
-  60  ──!  _                                16, 60
-  62  └─!  _                                16, 60
-  64  -ε-  [SpanStart#2]                    62, 56
-  66  └‣─  (expression_statement) [SpanStart#6 SpanStartAt#7 SpanStart#9 StructOpen SpanStart#0]  64
-  69  ─‣┘  _ [SpanEnd#10 SpanEnd#6 SpanEnd#5 SpanEnd#4]  40
-  72   !   (program) [SpanStart#4 SpanStartAt#5]  66
+  56   !   (program) [SpanStart#4 SpanStartAt#5]  50

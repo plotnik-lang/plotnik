@@ -8,8 +8,8 @@
 //!   PascalCase(`f`), landing on array/optional *elements*. Enum variant
 //!   payload structs stay anonymous (rendered inline); composites inside a
 //!   payload field are named enum name + verbatim label + PascalCase(field).
-//! - A `:: TypeName` annotation overrides the generated name and restarts the
-//!   chain below it.
+//! - A custom `:: TypeName` capture type overrides the generated name and
+//!   restarts the chain below it.
 //!
 //! Names are nominal: the same name may recur only for structurally identical
 //! types (they collapse into one emission). Any other collision is a compile
@@ -22,43 +22,15 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::compiler::analyze::names::SymbolTable;
 use crate::compiler::analyze::refs::DependencyAnalysis;
-use crate::compiler::analyze::types::type_analysis::{TypeAnalysisBuilder, TypeAnnotation};
+use crate::compiler::analyze::types::type_analysis::{
+    CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
+};
 use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::parse::ast;
 use crate::core::utils::to_pascal_case;
 use crate::core::{Interner, Symbol};
-
-pub(crate) fn assign_type_names(
-    ctx: &mut TypeAnalysisBuilder,
-    interner: &mut Interner,
-    symbol_table: &SymbolTable,
-    dependency_analysis: &DependencyAnalysis,
-    diag: &mut Diagnostics,
-) {
-    let annotated: HashMap<TypeId, TypeAnnotation> = ctx
-        .annotations()
-        .iter()
-        .map(|ann| (ann.type_id, *ann))
-        .collect();
-
-    let mut namer = Namer {
-        ctx,
-        interner,
-        diag,
-        annotated,
-        claims: HashMap::new(),
-        names: BTreeMap::new(),
-    };
-
-    namer.reserve_builtins();
-    namer.claim_definitions(symbol_table, dependency_analysis);
-    namer.walk_definitions(dependency_analysis);
-
-    let names = namer.names;
-    ctx.set_type_names(names);
-}
 
 struct Claim {
     /// The type this name stands for; `None` reserves the name without a type
@@ -67,16 +39,48 @@ struct Claim {
     span: Option<Span>,
 }
 
-struct Namer<'a, 'd> {
-    ctx: &'a TypeAnalysisBuilder,
+pub(crate) struct TypeNamer<'a, 'd> {
+    ctx: &'a mut TypeAnalysisBuilder,
     interner: &'a mut Interner,
-    diag: &'d mut Diagnostics,
-    annotated: HashMap<TypeId, TypeAnnotation>,
+    diag: Option<&'d mut Diagnostics>,
+    custom_capture_types: HashMap<TypeId, CustomCaptureTypeOccurrence>,
     claims: HashMap<Symbol, Claim>,
     names: BTreeMap<TypeId, Symbol>,
 }
 
-impl Namer<'_, '_> {
+impl<'a, 'd> TypeNamer<'a, 'd> {
+    pub(crate) fn new(
+        ctx: &'a mut TypeAnalysisBuilder,
+        interner: &'a mut Interner,
+        diag: &'d mut Diagnostics,
+    ) -> Self {
+        let custom_capture_types = ctx
+            .custom_capture_types()
+            .iter()
+            .map(|capture_type| (capture_type.type_id, *capture_type))
+            .collect();
+        Self {
+            ctx,
+            interner,
+            diag: Some(diag),
+            custom_capture_types,
+            claims: HashMap::new(),
+            names: BTreeMap::new(),
+        }
+    }
+
+    pub(crate) fn assign(
+        mut self,
+        symbol_table: &SymbolTable,
+        dependency_analysis: &DependencyAnalysis,
+    ) {
+        self.reserve_builtins();
+        self.claim_definitions(symbol_table, dependency_analysis);
+        self.walk_definitions(dependency_analysis);
+
+        self.ctx.set_type_names(self.names);
+    }
+
     fn reserve_builtins(&mut self) {
         let node_sym = self.interner.intern("Node");
         self.claims.insert(
@@ -90,7 +94,7 @@ impl Namer<'_, '_> {
 
     /// Pass 1: every definition claims its name. Non-void results enter the
     /// name table; void definitions still reserve the name (predictability —
-    /// an annotation may not squat on a definition's name).
+    /// a custom capture type may not squat on a definition's name).
     fn claim_definitions(&mut self, symbol_table: &SymbolTable, deps: &DependencyAnalysis) {
         for &def_id in deps.sccs().iter().flatten() {
             let name_sym = deps.def_name_sym(def_id);
@@ -181,22 +185,22 @@ impl Namer<'_, '_> {
             TypeShape::Struct(_) | TypeShape::Enum(_) => {
                 if let Some(&existing) = self.names.get(&element) {
                     // A definition's result keeps its own name here (`(Foo) @val`
-                    // renders as `val: Foo`); an annotation on it is redundant
-                    // noise or a futile rename.
-                    self.check_annotation_on_named(element, existing);
+                    // renders as `val: Foo`); a custom capture type on it is
+                    // redundant noise or a futile rename.
+                    self.check_capture_type_on_named(element, existing);
                     return;
                 }
 
                 let generated = format!("{parent_name}{}", to_pascal_case(field));
-                let (name_sym, span) = match self.annotated.get(&element).copied() {
-                    Some(ann) => {
-                        if self.interner.resolve(ann.name) == generated {
-                            self.warn_redundant_annotation(
-                                ann.span,
+                let (name_sym, span) = match self.custom_capture_types.get(&element).copied() {
+                    Some(capture_type) => {
+                        if self.interner.resolve(capture_type.name) == generated {
+                            self.warn_redundant_capture_type(
+                                capture_type.span,
                                 "matches the generated type name; omit it",
                             );
                         }
-                        (ann.name, Some(ann.span))
+                        (capture_type.name, Some(capture_type.span))
                     }
                     None => {
                         let sym = self.interner.intern(&generated);
@@ -214,52 +218,62 @@ impl Namer<'_, '_> {
                 // A leaf alias from `@x :: TypeName`. `:: Node` restates the
                 // default; leave it unnamed so it renders as plain `Node`.
                 if self.interner.resolve(sym) == "Node" {
-                    if let Some(ann) = self.annotated.get(&element).copied() {
-                        self.warn_redundant_annotation(
-                            ann.span,
+                    if let Some(capture_type) = self.custom_capture_types.get(&element).copied() {
+                        self.warn_redundant_capture_type(
+                            capture_type.span,
                             "`Node` is already the default type; omit it",
                         );
                     }
                     return;
                 }
-                let span = self.annotated.get(&element).map(|ann| ann.span);
+                let span = self
+                    .custom_capture_types
+                    .get(&element)
+                    .map(|capture_type| capture_type.span);
                 if self.claim(sym, Some(element), span) {
                     self.names.insert(element, sym);
                 }
             }
             TypeShape::Ref(_) => {
-                // Named by its own definition; an annotation cannot rename it.
-                if let Some(ann) = self.annotated.get(&element).copied() {
-                    self.warn_redundant_annotation(
-                        ann.span,
+                // Named by its own definition; a capture type cannot rename it.
+                if let Some(capture_type) = self.custom_capture_types.get(&element).copied() {
+                    self.warn_redundant_capture_type(
+                        capture_type.span,
                         "a reference keeps its definition's type name; omit it",
                     );
                 }
             }
             TypeShape::Void
             | TypeShape::Node
+            | TypeShape::Str
+            | TypeShape::Bool
             | TypeShape::Array { .. }
             | TypeShape::Optional(_) => {}
         }
     }
 
-    fn check_annotation_on_named(&mut self, element: TypeId, existing: Symbol) {
-        let Some(ann) = self.annotated.get(&element).copied() else {
+    fn check_capture_type_on_named(&mut self, element: TypeId, existing: Symbol) {
+        let Some(capture_type) = self.custom_capture_types.get(&element).copied() else {
             return;
         };
-        if ann.name == existing {
-            self.warn_redundant_annotation(ann.span, "restates the type's own name; omit it");
+        if capture_type.name == existing {
+            self.warn_redundant_capture_type(
+                capture_type.span,
+                "restates the type's own name; omit it",
+            );
         } else {
-            self.warn_redundant_annotation(
-                ann.span,
+            self.warn_redundant_capture_type(
+                capture_type.span,
                 "cannot rename a type that already has a name; omit it",
             );
         }
     }
 
-    fn warn_redundant_annotation(&mut self, span: Span, detail: &str) {
-        self.diag
-            .report(DiagnosticKind::RedundantTypeAnnotation, span)
+    fn warn_redundant_capture_type(&mut self, span: Span, detail: &str) {
+        let Some(diag) = self.diag.as_deref_mut() else {
+            return;
+        };
+        diag.report(DiagnosticKind::RedundantCaptureType, span)
             .detail(detail)
             .emit();
     }
@@ -297,13 +311,18 @@ impl Namer<'_, '_> {
 
                 let existing_span = existing_claim.span;
                 let name_str = self.interner.resolve(name).to_owned();
+                if let Some(type_id) = type_id {
+                    self.ctx.record_invalid_type(type_id);
+                }
                 let Some(span) = span.or(existing_span) else {
                     // No span on either side cannot happen for user-written
                     // conflicts: builtins never conflict with each other.
                     unreachable!("a name conflict always involves a user-written site");
                 };
-                let mut builder = self
-                    .diag
+                let Some(diag) = self.diag.as_deref_mut() else {
+                    return false;
+                };
+                let mut builder = diag
                     .report(DiagnosticKind::TypeNameConflict, span)
                     .detail(name_str);
                 if let Some(first) = existing_span
@@ -317,6 +336,45 @@ impl Namer<'_, '_> {
                 false
             }
         }
+    }
+}
+
+/// Raw naming validation records exactly which types participate in a naming
+/// conflict so capture-type normalization cannot erase that error. It does not
+/// emit diagnostics or install names; the final naming pass reports raw and
+/// normalized-only conflicts once against the final graph.
+pub(crate) struct RawTypeNameValidator<'a> {
+    ctx: &'a mut TypeAnalysisBuilder,
+    interner: &'a mut Interner,
+}
+
+impl<'a> RawTypeNameValidator<'a> {
+    pub(crate) fn new(ctx: &'a mut TypeAnalysisBuilder, interner: &'a mut Interner) -> Self {
+        Self { ctx, interner }
+    }
+
+    pub(crate) fn validate(
+        self,
+        symbol_table: &SymbolTable,
+        dependency_analysis: &DependencyAnalysis,
+    ) {
+        let custom_capture_types = self
+            .ctx
+            .custom_capture_types()
+            .iter()
+            .map(|capture_type| (capture_type.type_id, *capture_type))
+            .collect();
+        let mut validator = TypeNamer {
+            ctx: self.ctx,
+            interner: self.interner,
+            diag: None,
+            custom_capture_types,
+            claims: HashMap::new(),
+            names: BTreeMap::new(),
+        };
+        validator.reserve_builtins();
+        validator.claim_definitions(symbol_table, dependency_analysis);
+        validator.walk_definitions(dependency_analysis);
     }
 }
 

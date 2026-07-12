@@ -45,7 +45,9 @@ use std::collections::hash_map::Entry;
 use crate::bytecode::{Nav, NodeKindConstraint};
 use crate::core::NodeFieldId;
 
-use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, NfaGraph, PredicateIR};
+use crate::compiler::lower::ir::{
+    CallProtocol, EffectIR, InstructionIR, Label, NfaGraph, PredicateIR,
+};
 
 pub fn dedup_states(nfa: &mut NfaGraph) {
     loop {
@@ -93,9 +95,7 @@ enum StateKey {
         successors: Vec<SuccKey>,
     },
     Call {
-        nav: Nav,
-        node_field: Option<NodeFieldId>,
-        next: Label,
+        protocol: CallProtocol,
         target: Label,
     },
 }
@@ -120,9 +120,7 @@ impl StateKey {
                     .collect(),
             }),
             InstructionIR::Call(c) => Some(Self::Call {
-                nav: c.nav,
-                node_field: c.node_field,
-                next: c.next,
+                protocol: c.protocol,
                 target: c.target,
             }),
             InstructionIR::Return(_) => None,
@@ -169,7 +167,7 @@ fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
                 }
             }
             InstructionIR::Call(c) => {
-                c.next = resolve(c.next);
+                c.remap_returns(resolve);
                 c.target = resolve(c.target);
             }
             InstructionIR::Return(_) => {}
@@ -177,9 +175,6 @@ fn apply_remap(nfa: &mut NfaGraph, remap: &HashMap<Label, Label>) {
     }
 
     for entry in nfa.def_entries.values_mut() {
-        *entry = resolve(*entry);
-    }
-    for entry in nfa.def_entries_consuming.values_mut() {
         *entry = resolve(*entry);
     }
     for entry in nfa.entrypoint_wrappers.values_mut() {

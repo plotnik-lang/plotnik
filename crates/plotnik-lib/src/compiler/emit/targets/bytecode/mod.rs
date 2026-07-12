@@ -17,12 +17,9 @@ use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::lower::ir::LoweredNfa;
 
 use self::instructions::emit_instructions;
-use self::layout::compute_layout;
 use self::module::EmitPipeline;
 use self::regex_table::build_regex_table;
-use self::string_table::seed_string_table;
 use self::tables::{ConstantPool, EmitError};
-use self::type_table::build_type_table;
 
 pub(in crate::compiler) fn emit(
     input: AnalysisArtifacts<'_>,
@@ -30,10 +27,7 @@ pub(in crate::compiler) fn emit(
 ) -> Result<Vec<u8>, EmitError> {
     let nfa = lowered_ir.raw();
     let schema = OutputSchema::from_artifacts(input)?;
-    let strings = seed_string_table(nfa)?;
-    let (types, strings) = build_type_table(&schema, strings)?;
-    let layout = compute_layout(nfa)?;
-    let mut pipeline = EmitPipeline::new(input, nfa, strings, types, layout, schema.layout());
+    let mut pipeline = EmitPipeline::prepare(input, nfa, &schema)?;
     let tables = pipeline.build_tables()?;
     let regexes = build_regex_table(nfa, pipeline.strings())?;
     let pool = ConstantPool::new(

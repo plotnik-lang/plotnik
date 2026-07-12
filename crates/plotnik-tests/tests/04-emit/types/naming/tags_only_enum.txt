@@ -5,13 +5,13 @@ Q = (program
   ] @kind
 )
 ------------------- TYPESCRIPT -------------------
-export type QKind =
-  | { $tag: "Stmt" }
-  | { $tag: "Decl" };
-
 export interface Q {
   kind: QKind;
 }
+
+export type QKind =
+  | { $tag: "Stmt" }
+  | { $tag: "Decl" };
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q {

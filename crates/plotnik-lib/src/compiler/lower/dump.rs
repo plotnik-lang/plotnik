@@ -10,13 +10,13 @@
 
 use std::fmt::Write as _;
 
-use crate::bytecode::{EffectKind, LineBuilder, Symbol, nav_symbol, width_for_count};
+use crate::bytecode::{EffectKind, LineBuilder, Nav, Symbol, nav_symbol, width_for_count};
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::types::TypeShape;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
-    CallIR, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin, MatchIR, NfaGraph,
-    NodeKindConstraint, PredicateValueIR, SemanticNfa,
+    CallIR, CallProtocol, DefOutputOrigin, EffectArg, EffectIR, InstructionIR, Label, LabelOrigin,
+    MatchIR, NfaGraph, NodeKindConstraint, PredicateValueIR, SemanticNfa, SourceMode,
 };
 use crate::core::{Colors, NodeFieldId, NodeKindId};
 
@@ -68,7 +68,7 @@ impl<'a> NfaDumper<'a> {
         match instr {
             InstructionIR::Match(m) => self.format_match(m),
             InstructionIR::Call(call) => self.format_call(call),
-            InstructionIR::Return(r) => self.format_return(r.label),
+            InstructionIR::Return(r) => self.format_return(r),
         }
     }
 
@@ -78,9 +78,8 @@ impl<'a> NfaDumper<'a> {
 
     pub(crate) fn def_name_of(&self, label: Label) -> &str {
         match self.origin_of(label) {
-            LabelOrigin::Def(id) | LabelOrigin::ConsumingDef(id) | LabelOrigin::Wrapper(id) => {
-                self.def_name(id)
-            }
+            LabelOrigin::Def(id) | LabelOrigin::Wrapper(id) => self.def_name(id),
+            LabelOrigin::DefVariant { def_id, .. } => self.def_name(def_id),
         }
     }
 
@@ -145,7 +144,7 @@ impl NfaDumper<'_> {
             let line = match instr {
                 InstructionIR::Match(m) => self.format_match(m),
                 InstructionIR::Call(call) => self.format_call(call),
-                InstructionIR::Return(r) => self.format_return(r.label),
+                InstructionIR::Return(r) => self.format_return(r),
             };
             out.push_str(&line);
             out.push('\n');
@@ -161,7 +160,9 @@ impl NfaDumper<'_> {
     fn origin_header(&self, origin: LabelOrigin) -> String {
         match origin {
             LabelOrigin::Def(id) => format!("{}:", self.def_name(id)),
-            LabelOrigin::ConsumingDef(id) => format!("{} (consuming):", self.def_name(id)),
+            origin @ LabelOrigin::DefVariant { .. } => {
+                format!("{}:", self.variant_name(origin))
+            }
             LabelOrigin::Wrapper(id) => format!("{} (entrypoint):", self.def_name(id)),
         }
     }
@@ -169,6 +170,39 @@ impl NfaDumper<'_> {
     fn def_name(&self, def_id: DefId) -> &str {
         let sym = self.artifacts.dependency_analysis.def_name_sym(def_id);
         self.artifacts.interner.resolve(sym)
+    }
+
+    fn variant_name(&self, origin: LabelOrigin) -> String {
+        let LabelOrigin::DefVariant {
+            def_id,
+            output,
+            source,
+            route,
+        } = origin
+        else {
+            unreachable!("variant names require variant provenance")
+        };
+        let mut modes = Vec::new();
+        if let DefOutputOrigin::CaptureType(output) = output {
+            modes.push(format!("output#{}", output.0));
+        }
+        if output == DefOutputOrigin::Suppressed {
+            modes.push("suppressed".to_string());
+        }
+        if source == SourceMode::Mark {
+            modes.push("marked".to_string());
+        }
+        if route.requires_consumption() {
+            modes.push("consuming".to_string());
+        }
+        if route.splits() {
+            modes.push("split".to_string());
+        }
+        let entry_nav = route.body_nav();
+        if entry_nav != Nav::StayExact {
+            modes.push(format!("routed {entry_nav:?}"));
+        }
+        format!("{} ({})", self.def_name(def_id), modes.join(", "))
     }
 
     fn prefix(&self, label: Label, symbol: Symbol) -> String {
@@ -277,6 +311,13 @@ impl NfaDumper<'_> {
             EffectKind::SpanStartAt => format!("SpanStartAt#{}", literal(e.payload())),
             EffectKind::SpanStart => format!("SpanStart#{}", literal(e.payload())),
             EffectKind::SpanEnd => format!("SpanEnd#{}", literal(e.payload())),
+            EffectKind::ScalarOpen => "ScalarOpen".to_string(),
+            EffectKind::ScalarMark => "ScalarMark".to_string(),
+            EffectKind::StrClose => "StrClose".to_string(),
+            EffectKind::BoolClose => format!("BoolClose({})", literal(e.payload())),
+            EffectKind::NodeStr => "NodeStr".to_string(),
+            EffectKind::NodeBool => "NodeBool".to_string(),
+            EffectKind::BoolValue => format!("BoolValue({})", literal(e.payload())),
         }
     }
 
@@ -334,9 +375,13 @@ impl NfaDumper<'_> {
 
     fn format_call(&self, call: &CallIR) -> String {
         let c = &self.colors;
-        let prefix = self.prefix(call.label, nav_symbol(call.nav));
+        let symbol = match call.protocol {
+            CallProtocol::Ordinary { nav, .. } => nav_symbol(nav),
+            CallProtocol::Routed { .. } | CallProtocol::Split { .. } => Symbol::EMPTY,
+        };
+        let prefix = self.prefix(call.label, symbol);
 
-        let field_part = match call.node_field {
+        let field_part = match call.field() {
             Some(field_id) => format!("{}: ", self.field_name(field_id)),
             None => String::new(),
         };
@@ -346,12 +391,13 @@ impl NfaDumper<'_> {
             self.callee_name(call.target),
             c.reset
         );
-        let successors = format!(
-            "{:0w$} : {:0w$}",
-            call.target.0,
-            call.next.0,
-            w = self.label_width
-        );
+        let returns = call
+            .return_labels()
+            .iter()
+            .map(|label| format!("{:0w$}", label.0, w = self.label_width))
+            .collect::<Vec<_>>()
+            .join(" / ");
+        let successors = format!("{:0w$} : {returns}", call.target.0, w = self.label_width);
 
         LineBuilder::new(self.label_width).pad_successors(format!("{prefix}{content}"), &successors)
     }
@@ -362,13 +408,17 @@ impl NfaDumper<'_> {
     fn callee_name(&self, target: Label) -> String {
         match self.origin_of(target) {
             LabelOrigin::Def(id) | LabelOrigin::Wrapper(id) => self.def_name(id).to_string(),
-            LabelOrigin::ConsumingDef(id) => format!("{}+", self.def_name(id)),
+            origin @ LabelOrigin::DefVariant { .. } => self.variant_name(origin),
         }
     }
 
-    fn format_return(&self, label: Label) -> String {
-        let prefix = self.prefix(label, Symbol::EMPTY);
-        LineBuilder::new(self.label_width).pad_successors(prefix, "▶")
+    fn format_return(&self, return_: &crate::compiler::lower::ir::ReturnIR) -> String {
+        let prefix = self.prefix(return_.label, Symbol::EMPTY);
+        let outcome = match return_.outcome() {
+            crate::compiler::lower::ir::ReturnOutcome::Matched => "▶",
+            crate::compiler::lower::ir::ReturnOutcome::Zero => "▶ zero",
+        };
+        LineBuilder::new(self.label_width).pad_successors(prefix, outcome)
     }
 }
 

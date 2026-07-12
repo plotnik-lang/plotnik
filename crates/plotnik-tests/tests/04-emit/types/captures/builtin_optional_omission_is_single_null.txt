@@ -1,0 +1,17 @@
+Q = (program
+  [
+    (expression_statement
+      (identifier)? @x :: str
+    )
+    (debugger_statement)
+  ]
+)
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  x: string | null;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'s> {
+    pub x: ::core::option::Option<&'s str>,
+}

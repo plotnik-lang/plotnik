@@ -23,7 +23,7 @@ impl ReplayPlan {
     pub(super) fn build(schema: &OutputSchema<'_>) -> Self {
         let builder = ReplayPlanBuilder { schema };
         let items = schema
-            .items()
+            .entrypoint_items()
             .iter()
             .map(|item| builder.item(*item))
             .collect::<Vec<_>>();
@@ -100,6 +100,8 @@ pub(crate) struct ReplayVariantPlan {
 #[derive(Clone, Debug)]
 pub(crate) enum ReplayValuePlan {
     Node,
+    Str,
+    Bool,
     Nullable(Box<ReplayValuePlan>),
     Array(Box<ReplayValuePlan>),
     Read {
@@ -193,6 +195,8 @@ impl ReplayPlanBuilder<'_, '_> {
     fn value(&self, ty: TypeId) -> ReplayValuePlan {
         match self.schema.types.expect_type_shape(ty) {
             TypeShape::Node | TypeShape::Custom(_) => ReplayValuePlan::Node,
+            TypeShape::Str => ReplayValuePlan::Str,
+            TypeShape::Bool => ReplayValuePlan::Bool,
             TypeShape::Optional(inner) => ReplayValuePlan::Nullable(Box::new(self.value(*inner))),
             TypeShape::Array { element, .. } => {
                 ReplayValuePlan::Array(Box::new(self.value(*element)))

@@ -13,7 +13,7 @@ Root
           ParenClose ")"
         Plus "+"
       CaptureToken "@stmts"
-      TypeAnnotation
+      CaptureType
         DoubleColon "::"
         Id "Statement"
 ---------------------- AST -----------------------

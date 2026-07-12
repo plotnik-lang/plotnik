@@ -5,7 +5,7 @@ Expr = [
   )
 ]
 ------------------ DIAGNOSTICS -------------------
-warning: this type annotation a reference keeps its definition's type name; omit it
+warning: this capture type a reference keeps its definition's type name; omit it
  --> query.ptk:4:22
   |
 4 |     (Expr) @inner :: Foo

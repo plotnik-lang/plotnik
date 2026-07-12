@@ -22,6 +22,7 @@ mod navigation;
 mod nfa_emit;
 mod patterns;
 mod quantifier;
+mod scalar;
 mod scope;
 mod sequences;
 

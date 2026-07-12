@@ -10,21 +10,21 @@ Q    = 23
 
 [transitions]
 Func:
-  02                                        ▶
-  03   !   (function_declaration)           02
+  01                                        ▶
+  02   !   (function_declaration)           01
 
 Q:
   04                                        ▶
   05   !   (program)                        13
   06  ─‣┘  _ [ArrayClose Set(funcs)]        04
   09  -ε-  [Node Push]                      12, 06
-  10   !   (Func)                           03 : 09
+  10   !   (Func)                           02 : 09
   12  ──!  _                                10, 12
   13  └─!  _ [ArrayOpen]                    10, 12
 
 Func (entrypoint):
   18                                        ▶
-  19       (Func)                           03 : 18
+  19       (Func)                           02 : 18
 
 Q (entrypoint):
   20                                        ▶

@@ -226,6 +226,8 @@ pub enum Opcode {
     Match64 = 0x5,
     Call = 0x6,
     Return = 0x7,
+    SplitCall = 0x8,
+    RoutedCall = 0x9,
 }
 
 impl Opcode {
@@ -241,6 +243,8 @@ impl Opcode {
             0x5 => Some(Self::Match64),
             0x6 => Some(Self::Call),
             0x7 => Some(Self::Return),
+            0x8 => Some(Self::SplitCall),
+            0x9 => Some(Self::RoutedCall),
             _ => None,
         }
     }
@@ -255,7 +259,7 @@ impl Opcode {
             Self::Match32 => 32,
             Self::Match48 => 48,
             Self::Match64 => 64,
-            Self::Call | Self::Return => STEP_SIZE,
+            Self::Call | Self::Return | Self::SplitCall | Self::RoutedCall => STEP_SIZE,
         }
     }
 
@@ -777,16 +781,221 @@ impl Call {
     }
 }
 
+/// Matched-only call whose callee owns entry navigation.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct RoutedCall {
+    pub segment: u8,
+    /// Navigation owned by the routed callee, retained for validation.
+    pub entry_nav: Nav,
+    pub next: StepId,
+    pub target: StepId,
+}
+
+impl RoutedCall {
+    pub fn new(entry_nav: Nav, next: StepId, target: StepId) -> Self {
+        Self {
+            segment: 0,
+            entry_nav,
+            next,
+            target,
+        }
+    }
+
+    pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
+        let header = bytes[0];
+        let segment = header_byte::segment(header);
+        let opcode = header_byte::opcode(header).expect("invalid opcode");
+        assert!(
+            segment == 0,
+            "non-zero segment not yet supported: {segment}"
+        );
+        assert_eq!(opcode, Opcode::RoutedCall, "expected RoutedCall opcode");
+
+        let step = |offset| {
+            StepId::try_from(u16::from_le_bytes([bytes[offset], bytes[offset + 1]]))
+                .expect("step id must be non-zero")
+        };
+        Self {
+            segment,
+            entry_nav: Nav::from_byte(bytes[1]),
+            next: step(4),
+            target: step(6),
+        }
+    }
+
+    pub fn to_bytes(self) -> [u8; 8] {
+        let mut bytes = [0u8; 8];
+        bytes[0] = header_byte::pack(self.segment, 0, Opcode::RoutedCall);
+        bytes[1] = self.entry_nav.to_byte();
+        bytes[4..6].copy_from_slice(&u16::from(self.next).to_le_bytes());
+        bytes[6..8].copy_from_slice(&u16::from(self.target).to_le_bytes());
+        bytes
+    }
+}
+
+/// Call instruction for a nullable definition with distinct return outcomes.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct SplitCall {
+    /// Segment index (0-3).
+    pub segment: u8,
+    /// Navigation owned by the routed callee, retained for validation.
+    pub entry_nav: Nav,
+    pub returns: SplitCallReturns,
+    /// Callee entry point.
+    pub target: StepId,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct SplitCallReturns {
+    pub matched: StepId,
+    pub zero: StepId,
+}
+
+impl SplitCall {
+    pub fn new(entry_nav: Nav, returns: SplitCallReturns, target: StepId) -> Self {
+        Self {
+            segment: 0,
+            entry_nav,
+            returns,
+            target,
+        }
+    }
+
+    pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
+        let header = bytes[0];
+        let segment = header_byte::segment(header);
+        let opcode = header_byte::opcode(header).expect("invalid opcode");
+        assert!(
+            segment == 0,
+            "non-zero segment not yet supported: {segment}"
+        );
+        assert_eq!(opcode, Opcode::SplitCall, "expected SplitCall opcode");
+
+        let step = |offset| {
+            StepId::try_from(u16::from_le_bytes([bytes[offset], bytes[offset + 1]]))
+                .expect("step id must be non-zero")
+        };
+        Self {
+            segment,
+            entry_nav: Nav::from_byte(bytes[1]),
+            returns: SplitCallReturns {
+                matched: step(2),
+                zero: step(4),
+            },
+            target: step(6),
+        }
+    }
+
+    pub fn to_bytes(self) -> [u8; 8] {
+        let mut bytes = [0u8; 8];
+        bytes[0] = header_byte::pack(self.segment, 0, Opcode::SplitCall);
+        bytes[1] = self.entry_nav.to_byte();
+        bytes[2..4].copy_from_slice(&u16::from(self.returns.matched).to_le_bytes());
+        bytes[4..6].copy_from_slice(&u16::from(self.returns.zero).to_le_bytes());
+        bytes[6..8].copy_from_slice(&u16::from(self.target).to_le_bytes());
+        bytes
+    }
+}
+
+/// Which side of the call boundary owns a returning body's entry navigation.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ReturnEntry {
+    Caller,
+    Routed,
+}
+
+/// Complete return protocol. Invalid combinations such as a caller-owned
+/// zero-width return are unrepresentable after decoding.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ReturnMode {
+    CallerMatched,
+    RoutedMatched,
+    RoutedZero,
+}
+
+impl ReturnMode {
+    pub fn from_bytes(outcome: u8, entry: u8) -> Option<Self> {
+        match (
+            plotnik_rt::ReturnOutcome::from_byte(outcome),
+            ReturnEntry::from_byte(entry),
+        ) {
+            (Some(plotnik_rt::ReturnOutcome::Matched), Some(ReturnEntry::Caller)) => {
+                Some(Self::CallerMatched)
+            }
+            (Some(plotnik_rt::ReturnOutcome::Matched), Some(ReturnEntry::Routed)) => {
+                Some(Self::RoutedMatched)
+            }
+            (Some(plotnik_rt::ReturnOutcome::Zero), Some(ReturnEntry::Routed)) => {
+                Some(Self::RoutedZero)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn outcome(self) -> plotnik_rt::ReturnOutcome {
+        match self {
+            Self::CallerMatched | Self::RoutedMatched => plotnik_rt::ReturnOutcome::Matched,
+            Self::RoutedZero => plotnik_rt::ReturnOutcome::Zero,
+        }
+    }
+
+    pub fn entry(self) -> ReturnEntry {
+        match self {
+            Self::CallerMatched => ReturnEntry::Caller,
+            Self::RoutedMatched | Self::RoutedZero => ReturnEntry::Routed,
+        }
+    }
+}
+
+impl ReturnEntry {
+    pub fn from_byte(byte: u8) -> Option<Self> {
+        match byte {
+            0 => Some(Self::Caller),
+            1 => Some(Self::Routed),
+            _ => None,
+        }
+    }
+
+    pub fn to_byte(self) -> u8 {
+        match self {
+            Self::Caller => 0,
+            Self::Routed => 1,
+        }
+    }
+}
+
 /// Return instruction for returning from definitions.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Return {
     /// Segment index (0-3).
     pub segment: u8,
+    pub mode: ReturnMode,
 }
 
 impl Return {
     pub fn new() -> Self {
-        Self { segment: 0 }
+        Self::matched()
+    }
+
+    pub fn matched() -> Self {
+        Self {
+            segment: 0,
+            mode: ReturnMode::CallerMatched,
+        }
+    }
+
+    pub fn routed_matched() -> Self {
+        Self {
+            segment: 0,
+            mode: ReturnMode::RoutedMatched,
+        }
+    }
+
+    pub fn routed_zero() -> Self {
+        Self {
+            segment: 0,
+            mode: ReturnMode::RoutedZero,
+        }
     }
 
     /// Decode from 8-byte bytecode.
@@ -803,7 +1012,10 @@ impl Return {
         );
         assert_eq!(opcode, Opcode::Return, "expected Return opcode");
 
-        Self { segment }
+        Self {
+            segment,
+            mode: ReturnMode::from_bytes(bytes[1], bytes[2]).expect("validated return mode"),
+        }
     }
 
     /// Encode to 8-byte bytecode.
@@ -812,7 +1024,9 @@ impl Return {
     pub fn to_bytes(self) -> [u8; 8] {
         let mut bytes = [0u8; 8];
         bytes[0] = header_byte::pack(self.segment, 0, Opcode::Return);
-        // bytes[1..8] are reserved/padding
+        bytes[1] = self.mode.outcome().to_byte();
+        bytes[2] = self.mode.entry().to_byte();
+        // bytes[3..8] are reserved/padding
         bytes
     }
 }

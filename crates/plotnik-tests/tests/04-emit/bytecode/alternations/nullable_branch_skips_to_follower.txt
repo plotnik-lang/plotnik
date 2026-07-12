@@ -7,27 +7,27 @@ Q = (array
 )
 ---------------------- NFA -----------------------
 [entrypoints]
-Q = 19
+Q = 25
 
 [transitions]
 Q:
   01                                        ▶
-  02   !   (array)                          14, 04
+  02   !   (array)                          20, 04
   03  ─‣┘  _                                01
   04  └‣─  (string) [Node Set(s)]           03
   05  ─‣─  (string) [Node Set(s)]           03
   06   !   (identifier)                     05
   08  ──!  _                                06, 08
   09   !   _                                06, 08
-  10   !   (number)                         05
-  13  ──!  _                                09, 10, 13
-  14  └─!  _                                09, 10, 13
+  16   !   (number)                         05
+  19  ──!  _                                09, 16, 19
+  20  └─!  _                                09, 16, 19
 
 Q (entrypoint):
-  16                                        ▶
-  17  -ε-  [StructClose]                    16
-  18       (Q)                              02 : 17
-  19  -ε-  [StructOpen]                     18
+  22                                        ▶
+  23  -ε-  [StructClose]                    22
+  24       (Q)                              02 : 23
+  25  -ε-  [StructOpen]                     24
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"

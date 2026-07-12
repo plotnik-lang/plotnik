@@ -8,12 +8,12 @@ Q = (program
 --------------------- INPUT ----------------------
 a;
 ------------------- TYPESCRIPT -------------------
-export interface QX {
-  a: Node;
-}
-
 export interface Q {
   x: QX;
+}
+
+export interface QX {
+  a: Node;
 }
 ------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
