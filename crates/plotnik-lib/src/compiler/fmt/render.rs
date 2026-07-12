@@ -1,4 +1,4 @@
-use super::comments::{Comment, CommentPlacement};
+use super::comments::{Comment, CommentKind, CommentPlacement};
 use super::contract;
 use super::ir::{
     CaptureCount, Element, FilePart, FormatFile, GroupLayout, GroupPart, ModelNode, NodeKind,
@@ -84,6 +84,7 @@ impl RenderContext {
 struct Output {
     text: String,
     at_line_start: bool,
+    line_comment_open: bool,
     column: usize,
     work: WorkCounter,
 }
@@ -93,6 +94,7 @@ impl Output {
         Self {
             text: String::with_capacity(capacity),
             at_line_start: true,
+            line_comment_open: false,
             column: 0,
             work: WorkCounter::default(),
         }
@@ -128,6 +130,7 @@ impl Output {
         self.text.push('\n');
         self.work.add(1);
         self.at_line_start = true;
+        self.line_comment_open = false;
         self.column = 0;
         self.ensure_indent(indent);
     }
@@ -137,6 +140,7 @@ impl Output {
         self.text.push_str(text);
         self.work.add(1 + text.len());
         self.at_line_start = false;
+        self.line_comment_open = false;
         self.column = text.chars().count();
     }
 
@@ -152,6 +156,7 @@ impl Output {
             self.work.add(1);
         }
         self.at_line_start = true;
+        self.line_comment_open = false;
         self.column = 0;
     }
 
@@ -163,6 +168,7 @@ impl Output {
 struct AffixSegment<'a> {
     text: String,
     inline_comments: Vec<&'a Comment>,
+    boundary_comments: Vec<&'a Comment>,
     suffix_kind: Option<SuffixKind>,
 }
 
@@ -183,7 +189,7 @@ struct NodePlan<'a> {
     core: &'a ModelNode,
     prefixes: Vec<AffixSegment<'a>>,
     suffixes: Vec<AffixSegment<'a>>,
-    forcing_comments: Vec<&'a Comment>,
+    comments: CommentBoundaries<'a>,
 }
 
 impl NodePlan<'_> {
@@ -215,8 +221,17 @@ impl<'a> CommentBoundaries<'a> {
     }
 
     fn is_multiline(&self) -> bool {
-        !self.before.is_empty() || !self.after.is_empty()
+        !self.before.is_empty() || comments_after_are_multiline(&self.after)
     }
+}
+
+fn comments_after_are_multiline(comments: &[&Comment]) -> bool {
+    comments
+        .iter()
+        .any(|comment| comment.multiline || comment.placement == CommentPlacement::OwnLine)
+        || comments
+            .windows(2)
+            .any(|pair| pair[0].kind == CommentKind::Line)
 }
 
 enum FileBody<'a> {
@@ -226,8 +241,8 @@ enum FileBody<'a> {
 }
 
 struct DefinitionPlan<'a> {
-    prefix_elements: &'a [Element],
     prefix_text: String,
+    prefix_inline_comments: Vec<&'a Comment>,
     prefix_width: usize,
     body: NodePlan<'a>,
     comments: CommentBoundaries<'a>,
@@ -280,7 +295,7 @@ impl Renderer {
         let plans = self.file_plans(root);
         let multiline = plans
             .iter()
-            .map(|plan| self.file_body_is_multiline(&plan.body))
+            .map(Self::file_plan_is_multiline)
             .collect::<Vec<_>>();
 
         for (index, plan) in plans.iter().enumerate() {
@@ -342,11 +357,12 @@ impl Renderer {
         plans
     }
 
-    fn file_body_is_multiline(&self, body: &FileBody<'_>) -> bool {
-        match body {
+    fn file_plan_is_multiline(plan: &FilePlan<'_>) -> bool {
+        let body_is_multiline = match &plan.body {
             FileBody::Definition(plan) => plan.multiline,
             FileBody::Shebang(_) | FileBody::CommentBlock(_) => false,
-        }
+        };
+        body_is_multiline || comments_after_are_multiline(&plan.trailing_comments)
     }
 
     fn render_file_plan(&mut self, plan: &FilePlan<'_>, output: &mut Output) {
@@ -372,85 +388,97 @@ impl Renderer {
             unreachable!("definition node has definition layout")
         };
         let prefix_elements = node.fragment(prefix);
-        let prefix_text = inline_text(prefix_elements, &mut self.work);
+        let (prefix_inline_comments, prefix_boundary_comments) =
+            self.split_comments(prefix_elements);
+        let prefix_text = self.inline_text(prefix_elements);
         let prefix_width = prefix_text.chars().count();
         let body_plan = self.node_plan(node.node_at(body));
-        let mut comments = forcing_comments(prefix_elements, &mut self.work);
-        comments.extend(body_plan.forcing_comments.iter().copied());
-        let comments = CommentBoundaries::from_comments(comments);
-        let multiline = comments.is_multiline()
+        let multiline = !prefix_boundary_comments.is_empty()
             || self.plan_core_is_multiline(
                 &body_plan,
                 RenderContext::root().after_width(prefix_width + 1),
             );
         DefinitionPlan {
-            prefix_elements,
             prefix_text,
+            prefix_inline_comments,
             prefix_width,
             body: body_plan,
-            comments,
+            comments: CommentBoundaries {
+                before: Vec::new(),
+                after: prefix_boundary_comments,
+            },
             multiline,
         }
     }
 
     fn render_definition(&mut self, plan: &DefinitionPlan<'_>, output: &mut Output) {
-        self.emit_leading(&plan.comments.before, IndentLevel::default(), output);
-
         output.ensure_indent(IndentLevel::default());
-        self.record_inline_comments(plan.prefix_elements);
+        self.record_comments(&plan.prefix_inline_comments);
         output.append(&plan.prefix_text);
-        output.append_space();
-        self.render_plan_core(
-            &plan.body,
-            RenderContext::root().after_width(plan.prefix_width + 1),
-            output,
-        );
-        self.emit_after(&plan.comments.after, IndentLevel::default(), output);
+        let body_has_leading_comments = !plan.body.comments.before.is_empty();
+        let boundary_before_body = !plan.comments.after.is_empty() || body_has_leading_comments;
+        if plan.comments.after.is_empty() {
+            if !body_has_leading_comments {
+                output.append_space();
+            }
+        } else {
+            self.emit_after(&plan.comments.after, IndentLevel::default(), output);
+        }
+        if body_has_leading_comments {
+            self.emit_leading(&plan.body.comments.before, IndentLevel::default(), output);
+        } else if boundary_before_body {
+            output.newline(IndentLevel::default());
+        }
+        let context = if boundary_before_body {
+            RenderContext::root()
+        } else {
+            RenderContext::root().after_width(plan.prefix_width + 1)
+        };
+        self.render_plan_core(&plan.body, context, output);
+        self.emit_after(&plan.body.comments.after, IndentLevel::default(), output);
     }
 
     fn render_node(&mut self, node: &ModelNode, context: RenderContext, output: &mut Output) {
         let plan = self.node_plan(node);
-        let boundaries = CommentBoundaries::from_comments(plan.forcing_comments.clone());
-        self.emit_leading(&boundaries.before, context.indent, output);
+        self.emit_leading(&plan.comments.before, context.indent, output);
         self.render_plan_core(&plan, context, output);
-        self.emit_after(&boundaries.after, context.indent, output);
+        self.emit_after(&plan.comments.after, context.indent, output);
     }
 
     fn node_plan<'a>(&mut self, node: &'a ModelNode) -> NodePlan<'a> {
         let mut current = node;
         let mut prefixes = Vec::new();
         let mut suffixes = Vec::new();
-        let mut forcing = Vec::new();
+        let mut before_comments = Vec::new();
 
         loop {
             self.work.add(1);
             match (current.kind, &current.layout) {
                 (NodeKind::Prefix(kind), NodeLayout::Prefix { prefix, body }) => {
                     let elements = current.fragment(*prefix);
-                    let mut text = inline_text(elements, &mut self.work);
+                    let mut text = self.inline_text(elements);
                     match kind {
                         PrefixKind::Field => text.push(' '),
                         PrefixKind::Branch if !text.is_empty() => text.push(' '),
                         PrefixKind::Branch => {}
                     }
-                    let (inline_comments, forcing_comments) =
-                        split_comments(elements, &mut self.work);
-                    forcing.extend(forcing_comments.iter().copied());
+                    let (inline_comments, boundary_comments) = self.split_comments(elements);
+                    before_comments.extend(boundary_comments.iter().copied());
                     prefixes.push(AffixSegment {
                         text,
                         inline_comments,
+                        boundary_comments,
                         suffix_kind: None,
                     });
                     current = current.node_at(*body);
                 }
                 (NodeKind::Suffix(kind), NodeLayout::Suffix { body, suffix }) => {
                     let elements = current.fragment(*suffix);
-                    let (inline_comments, forcing_comments) =
-                        split_comments(elements, &mut self.work);
-                    forcing.extend(forcing_comments.iter().copied());
+                    let (inline_comments, boundary_comments) = self.split_comments(elements);
                     suffixes.push(AffixSegment {
-                        text: inline_text(elements, &mut self.work),
+                        text: self.inline_text(elements),
                         inline_comments,
+                        boundary_comments,
                         suffix_kind: Some(kind),
                     });
                     current = current.node_at(*body);
@@ -459,20 +487,29 @@ impl Renderer {
             }
         }
         suffixes.reverse();
-        if matches!(current.layout, NodeLayout::Atomic) {
-            forcing.extend(forcing_comments(&current.elements, &mut self.work));
+        let atomic_comments = if matches!(current.layout, NodeLayout::Atomic) {
+            CommentBoundaries::from_comments(self.boundary_comments(&current.elements))
+        } else {
+            CommentBoundaries::from_comments(Vec::new())
+        };
+        before_comments.extend(atomic_comments.before);
+        let mut after_comments = atomic_comments.after;
+        for suffix in &suffixes {
+            after_comments.extend(suffix.boundary_comments.iter().copied());
         }
-        forcing.sort_by_key(|comment| comment.id.0);
         NodePlan {
             core: current,
             prefixes,
             suffixes,
-            forcing_comments: forcing,
+            comments: CommentBoundaries {
+                before: before_comments,
+                after: after_comments,
+            },
         }
     }
 
     fn plan_core_is_multiline(&self, plan: &NodePlan<'_>, context: RenderContext) -> bool {
-        if !plan.forcing_comments.is_empty() {
+        if plan.comments.is_multiline() {
             return true;
         }
         let context = context
@@ -508,7 +545,7 @@ impl Renderer {
             NodeLayout::Group(group) => self.render_group(plan.core, group, context, output),
             NodeLayout::Atomic => {
                 self.record_inline_comments(&plan.core.elements);
-                output.append(&inline_text(&plan.core.elements, &mut self.work));
+                output.append(&self.inline_text(&plan.core.elements));
             }
             NodeLayout::Root { .. }
             | NodeLayout::Definition { .. }
@@ -533,16 +570,15 @@ impl Renderer {
     ) {
         if !self.group_must_break(node, group, context) {
             node.for_each_descendant_comment(&mut |comment| self.record_comment(comment));
-            output.append(&inline_text(&node.elements, &mut self.work));
+            output.append(&self.inline_text(&node.elements));
             return;
         }
 
         let head_elements = node.fragment(group.head);
-        self.record_inline_comments(head_elements);
-        output.append(&inline_text(head_elements, &mut self.work));
-        for comment in forcing_comments(head_elements, &mut self.work) {
-            self.emit_boundary_comment(comment, context.indent.next(), output);
-        }
+        let (inline_comments, boundary_comments) = self.split_comments(head_elements);
+        self.record_comments(&inline_comments);
+        output.append(&self.inline_text(head_elements));
+        self.emit_after(&boundary_comments, context.indent.next(), output);
         for part in &group.parts {
             self.work.add(1);
             match *part {
@@ -602,7 +638,7 @@ impl Renderer {
 
     fn emit_after(&mut self, comments: &[&Comment], indent: IndentLevel, output: &mut Output) {
         for comment in comments {
-            if comment.placement == CommentPlacement::OwnLine {
+            if comment.placement == CommentPlacement::OwnLine || output.line_comment_open {
                 output.newline(indent);
             } else {
                 output.append_space();
@@ -635,7 +671,7 @@ impl Renderer {
         indent: IndentLevel,
         output: &mut Output,
     ) {
-        if comment.placement == CommentPlacement::OwnLine {
+        if comment.placement == CommentPlacement::OwnLine || output.line_comment_open {
             output.newline(indent);
         } else {
             output.append_space();
@@ -650,17 +686,40 @@ impl Renderer {
         for line in lines {
             output.newline_verbatim(line);
         }
+        output.line_comment_open = comment.kind == CommentKind::Line;
     }
 
     fn record_inline_comments(&mut self, elements: &[Element]) {
+        let (inline_comments, _) = self.split_comments(elements);
+        self.record_comments(&inline_comments);
+    }
+
+    fn split_comments<'a>(
+        &mut self,
+        elements: &'a [Element],
+    ) -> (Vec<&'a Comment>, Vec<&'a Comment>) {
         let mut comments = Vec::new();
         collect_comments(elements, &mut comments, &mut self.work);
-        for comment in comments
-            .into_iter()
-            .filter(|comment| !comment.forces_line())
-        {
-            self.record_comment(comment);
+        if comments.iter().any(|comment| comment.forces_line()) {
+            return (Vec::new(), comments);
         }
+        (comments, Vec::new())
+    }
+
+    fn boundary_comments<'a>(&mut self, elements: &'a [Element]) -> Vec<&'a Comment> {
+        let mut comments = Vec::new();
+        collect_comments(elements, &mut comments, &mut self.work);
+        if comments.iter().any(|comment| comment.forces_line()) {
+            return comments;
+        }
+        Vec::new()
+    }
+
+    fn inline_text(&mut self, elements: &[Element]) -> String {
+        let include_comments = self.boundary_comments(elements).is_empty();
+        let mut atoms = Vec::new();
+        collect_atoms(elements, &mut atoms, include_comments, &mut self.work);
+        format_atoms(&atoms)
     }
 
     fn record_comments(&mut self, comments: &[&Comment]) {
@@ -675,26 +734,6 @@ impl Renderer {
         self.emitted_comments[id] = true;
         self.emitted_count += 1;
     }
-}
-
-fn split_comments<'a>(
-    elements: &'a [Element],
-    work: &mut WorkCounter,
-) -> (Vec<&'a Comment>, Vec<&'a Comment>) {
-    let mut comments = Vec::new();
-    collect_comments(elements, &mut comments, work);
-    comments
-        .into_iter()
-        .partition(|comment| !comment.forces_line())
-}
-
-fn forcing_comments<'a>(elements: &'a [Element], work: &mut WorkCounter) -> Vec<&'a Comment> {
-    let mut comments = Vec::new();
-    collect_comments(elements, &mut comments, work);
-    comments
-        .into_iter()
-        .filter(|comment| comment.forces_line())
-        .collect()
 }
 
 fn collect_comments<'a>(
@@ -712,19 +751,18 @@ fn collect_comments<'a>(
     }
 }
 
-fn inline_text(elements: &[Element], work: &mut WorkCounter) -> String {
-    let mut atoms = Vec::new();
-    collect_atoms(elements, &mut atoms, work);
-    format_atoms(&atoms)
-}
-
-fn collect_atoms<'a>(elements: &'a [Element], atoms: &mut Vec<Atom<'a>>, work: &mut WorkCounter) {
+fn collect_atoms<'a>(
+    elements: &'a [Element],
+    atoms: &mut Vec<Atom<'a>>,
+    include_comments: bool,
+    work: &mut WorkCounter,
+) {
     for element in elements {
         work.add(1);
         match element {
-            Element::Node(node) => collect_atoms(&node.elements, atoms, work),
+            Element::Node(node) => collect_atoms(&node.elements, atoms, include_comments, work),
             Element::Token(token) => atoms.push(Atom::Token(token)),
-            Element::Comment(comment) if !comment.forces_line() => {
+            Element::Comment(comment) if include_comments && !comment.forces_line() => {
                 atoms.push(Atom::Comment(comment));
             }
             Element::Comment(_) => {}

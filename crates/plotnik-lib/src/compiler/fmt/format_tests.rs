@@ -237,6 +237,43 @@ fn forcing_comments_keep_source_order_across_suffix_boundaries() {
 }
 
 #[test]
+fn forcing_comments_never_cross_later_comments() {
+    let cases = [
+        "Q // first\n= /* second */ (a)",
+        "Q = field: // first\n/* second */ (a)",
+        "Q = (a) // first\n/* second */ @x",
+        "Q = (a) // first\n/* second */ *",
+    ];
+
+    for input in cases {
+        let output = format_query(input).expect("mixed boundary comments format");
+
+        assert_eq!(comment_texts(&output), vec!["// first", "/* second */"]);
+        assert_eq!(format_query(&output).expect("output formats"), output);
+    }
+}
+
+#[test]
+fn definition_comment_keeps_blank_line_classification_stable() {
+    let input = "A // tail\n= (a)\nB = (b)";
+
+    let output = format_query(input).expect("definition comment formats");
+
+    assert_eq!(format_query(&output).expect("output formats"), output);
+    assert_eq!(comment_texts(&output), vec!["// tail"]);
+}
+
+#[test]
+fn multiline_file_trailing_comment_counts_toward_definition_spacing() {
+    let input = "A = (a) /* first\nsecond */\nB = (b)";
+
+    let output = format_query(input).expect("multiline trailing comment formats");
+
+    assert_eq!(format_query(&output).expect("output formats"), output);
+    assert!(output.contains("second */\n\nB = (b)"), "{output}");
+}
+
+#[test]
 fn outer_suffix_participates_in_width_measurement() {
     let long_kind = "a".repeat(61);
     let input = format!("Q = ({long_kind} (identifier)) @long_capture_name");
