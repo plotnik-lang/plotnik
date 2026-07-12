@@ -12,7 +12,7 @@ pub use grammar_loader::load_arborium_grammar_json;
 
 pub fn javascript_grammar() -> &'static Grammar {
     static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-        let raw = RawGrammar::from_json(&load_arborium_grammar_json("arborium-javascript"))
+        let raw = RawGrammar::from_json(load_arborium_grammar_json("arborium-javascript"))
             .expect("javascript grammar fixture");
         Grammar::from_raw(&raw).expect("javascript grammar metadata")
     });

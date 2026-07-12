@@ -1,19 +1,17 @@
-//! Compile-checks the Rust type and module sections under `04-emit`.
+//! Adds the Rust type and module sections under `04-emit` to the generated
+//! conformance program.
 //!
 //! The snapshot harness (`tests/mod.rs`) keeps the sections up to date; this
 //! test proves the committed goldens are valid Rust against the real
-//! `plotnik-rt`. Every section becomes one `mod` of a single generated
-//! program, so name collisions across fixtures are impossible and the whole
-//! corpus costs one `trybuild` compile. Extraction happens at test runtime
-//! from the fixture files — a broken emitter fails this one test without
-//! wedging `make shot`.
+//! `plotnik-rt`. Every section becomes one `mod`, so name collisions across
+//! fixtures are impossible. The caller compiles them together with the 06-vm
+//! generated matchers, keeping all generated-Rust validation in one rustc job.
 
 use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
-#[test]
-fn golden_rust_sections_compile() {
+pub(super) fn append_golden_rust_sections(program: &mut String) {
     let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
     let mut mods = Vec::new();
     collect(&tests, &tests.join("04-emit/types"), "RUST", &mut mods);
@@ -26,19 +24,9 @@ fn golden_rust_sections_compile() {
     assert!(!mods.is_empty(), "no Rust sections found in the corpus");
     mods.sort();
 
-    let mut program = String::from("#![allow(dead_code)]\n");
     for (name, body) in &mods {
         write!(program, "\nmod {name} {{\n{body}}}\n").expect("writing to a String is infallible");
     }
-    program.push_str("\nfn main() {}\n");
-
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("golden-rust");
-    fs::create_dir_all(&dir).expect("create trybuild scratch dir");
-    let file = dir.join("all_rust_sections.rs");
-    fs::write(&file, program).expect("write generated program");
-
-    let cases = trybuild::TestCases::new();
-    cases.pass(&file);
 }
 
 fn collect(root: &Path, dir: &Path, label: &str, out: &mut Vec<(String, String)>) {

@@ -22,7 +22,23 @@ use indoc::indoc;
 use crate::language_registry::{self, Lang, all, from_name};
 
 #[test]
-fn structure_table_resolves_across_all_grammars() {
+fn structure_table_resolves_across_all_grammars_and_abi_compat_all_languages() {
+    let failures = [
+        structure_table_resolves_across_all_grammars(),
+        abi_compat_all_languages(),
+    ]
+    .into_iter()
+    .filter_map(Result::err)
+    .collect::<Vec<_>>();
+
+    assert!(
+        failures.is_empty(),
+        "all-language registry invariants failed:\n\n{}",
+        failures.join("\n\n")
+    );
+}
+
+fn structure_table_resolves_across_all_grammars() -> Result<(), String> {
     let mut empty = Vec::new();
     let mut dangling = Vec::new();
 
@@ -51,14 +67,20 @@ fn structure_table_resolves_across_all_grammars() {
         }
     }
 
-    assert!(
-        empty.is_empty(),
-        "grammars with an empty structure table: {empty:?}"
-    );
-    assert!(
-        dangling.is_empty(),
-        "descent bodies pointing at missing variables: {dangling:?}"
-    );
+    let mut failures = Vec::new();
+    if !empty.is_empty() {
+        failures.push(format!("grammars with an empty structure table: {empty:?}"));
+    }
+    if !dangling.is_empty() {
+        failures.push(format!(
+            "descent bodies pointing at missing variables: {dangling:?}"
+        ));
+    }
+
+    if failures.is_empty() {
+        return Ok(());
+    }
+    Err(failures.join("\n"))
 }
 
 /// Locks the two cases the four-way model used to mishandle: an aliased
@@ -331,39 +353,45 @@ fn format_id(id: Option<u16>) -> String {
         .unwrap_or_else(|| "<missing>".to_string())
 }
 
-#[test]
-fn abi_compat_all_languages() {
+fn abi_compat_all_languages() -> Result<(), String> {
     let langs = language_registry::all();
     let expected = language_registry::enabled_language_names();
     if expected.is_empty() {
         #[cfg(feature = "all-languages")]
-        panic!("no languages registered");
+        return Err("no languages registered".to_string());
     }
 
     let registered = langs.iter().map(|lang| lang.name()).collect::<HashSet<_>>();
-    assert_eq!(
-        registered.len(),
-        expected.len(),
-        "enabled language feature count must match registered languages"
-    );
+    let mut failures = Vec::new();
+    if registered.len() != expected.len() {
+        failures.push(format!(
+            "enabled language feature count ({}) does not match registered language count ({})",
+            expected.len(),
+            registered.len()
+        ));
+    }
     for name in expected {
-        assert!(
-            registered.contains(name),
-            "enabled language `{name}` was not registered"
-        );
+        if !registered.contains(name) {
+            failures.push(format!("enabled language `{name}` was not registered"));
+        }
     }
 
     for lang in langs {
         let result = compare_lang(lang);
         if let CheckResult::Mismatch { differences } = &result {
             let details: Vec<String> = differences.iter().map(format_difference).collect();
-            panic!(
+            failures.push(format!(
                 "ABI mismatch for '{}':\n  {}",
                 lang.name(),
                 details.join("\n  ")
-            );
+            ));
         }
     }
+
+    if failures.is_empty() {
+        return Ok(());
+    }
+    Err(failures.join("\n"))
 }
 
 /// Soundness regression for grammar verification: the grammar must admit every

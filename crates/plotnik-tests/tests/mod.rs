@@ -656,7 +656,7 @@ macro_rules! grammar_loader {
     ($name:ident, $package:literal) => {
         fn $name() -> &'static Grammar {
             static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-                let raw = RawGrammar::from_json(&support::load_arborium_grammar_json($package))
+                let raw = RawGrammar::from_json(support::load_arborium_grammar_json($package))
                     .expect(concat!($package, " grammar fixture"));
                 Grammar::from_raw(&raw).expect(concat!($package, " grammar metadata"))
             });

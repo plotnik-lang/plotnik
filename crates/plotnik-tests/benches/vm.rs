@@ -109,7 +109,7 @@ mod corpus {
 }
 
 static GRAMMAR: LazyLock<Grammar> = LazyLock::new(|| {
-    let raw = RawGrammar::from_json(&grammar_loader::load_arborium_grammar_json(
+    let raw = RawGrammar::from_json(grammar_loader::load_arborium_grammar_json(
         "arborium-javascript",
     ))
     .expect("javascript grammar fixture");
