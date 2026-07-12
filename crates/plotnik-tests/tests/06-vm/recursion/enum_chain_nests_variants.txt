@@ -1,9 +1,13 @@
 Chain = [
   Base: (identifier) @name
-  Step: (call_expression function: (Chain) @inner)
+  Step: (call_expression
+    function: (Chain) @inner
+  )
 ]
 
-Q = (program (expression_statement (Chain) @top))
+Q = (program
+  (expression_statement (Chain) @top)
+)
 --------------------- INPUT ----------------------
 a()();
 ------------------- TYPESCRIPT -------------------

@@ -6,7 +6,11 @@ Row = (pair
 Rows = (Row)*
 
 Q = (program
-  (expression_statement (parenthesized_expression (object (Rows) @rows)))
+  (expression_statement
+    (parenthesized_expression
+      (object (Rows) @rows)
+    )
+  )
 )
 --------------------- INPUT ----------------------
 ({a: 1, b: 2});

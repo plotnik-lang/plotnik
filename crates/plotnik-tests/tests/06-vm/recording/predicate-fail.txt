@@ -1,4 +1,8 @@
-Q = (program (expression_statement (identifier == "y") @id))
+Q = (program
+  (expression_statement
+    (identifier == "y") @id
+  )
+)
 ------------------- INPUT (ts) -------------------
 x
 ------------------- TYPESCRIPT -------------------
@@ -248,11 +252,11 @@ N0: S3 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..60  src0  T1
-P1 pattern    4..60  src0
-P2 pattern    13..59  src0
-P3 capture    55..58  src0  T1.M0
-P4 pattern    35..54  src0
+P0 def        0..70  src0  T1
+P1 pattern    4..70  src0
+P2 pattern    15..68  src0
+P3 capture    61..64  src0  T1.M0
+P4 pattern    41..60  src0
 
 [transitions]
 Q:

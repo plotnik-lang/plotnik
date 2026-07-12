@@ -1,4 +1,6 @@
-Q = (program (expression_statement)* @stmts)
+Q = (program
+  (expression_statement)* @stmts
+)
 ------------------- INPUT (ts) -------------------
 a
 b
@@ -164,11 +166,11 @@ N0: S2 → T2  ; Q
 Q = 00 :: T2
 
 [spans]
-P0 def        0..44  src0  T2
-P1 pattern    4..44  src0
-P2 capture    37..43  src0  T2.M0
-P3 quantifier 35..36  src0
-P4 pattern    13..35  src0
+P0 def        0..47  src0  T2
+P1 pattern    4..47  src0
+P2 capture    39..45  src0  T2.M0
+P3 quantifier 37..38  src0
+P4 pattern    15..37  src0
 
 [transitions]
 Q:

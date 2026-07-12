@@ -1,5 +1,10 @@
 MaybeId = (identifier)?
-Q = (program (expression_statement (array (MaybeId)*)))
+
+Q = (program
+  (expression_statement
+    (array (MaybeId)*)
+  )
+)
 ------------------- TYPESCRIPT -------------------
 export type Q = undefined;
 ---------------------- RUST ----------------------

@@ -1,13 +1,17 @@
 Q = {
   (identifier) @items
-  {(number) @x}*
+  {
+    (number) @x
+  }*
 }
 ------------------ DIAGNOSTICS -------------------
 error: captures `@x` repeat with `*` but aren't collected into a list
  --> query.ptk:3:3
   |
-3 |   {(number) @x}*
-  |   ^^^^^^^^^^^^^^
+3 | /   {
+4 | |     (number) @x
+5 | |   }*
+  | |____^
   |
 help: add a row capture so each repeat becomes one element: `{...}* @rows`
 help: or discard the captures if only the structure matters: `{...}* @_`

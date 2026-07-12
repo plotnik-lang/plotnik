@@ -1,4 +1,6 @@
-Q = (variable_declarator value: (number)? @init)
+Q = (variable_declarator
+  value: (number)? @init
+)
 ------------------- TYPESCRIPT -------------------
 export interface Q {
   init: Node | null;

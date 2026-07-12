@@ -1,6 +1,8 @@
 Q = (program
   (expression_statement
-    (parenthesized_expression (binary_expression (identifier) @l))
+    (parenthesized_expression
+      (binary_expression (identifier) @l)
+    )
   )
   (debugger_statement) @d
 )

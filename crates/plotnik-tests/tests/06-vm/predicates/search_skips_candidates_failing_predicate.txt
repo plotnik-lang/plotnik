@@ -1,4 +1,10 @@
-Q = (program (expression_statement (binary_expression (identifier == "b") @x)))
+Q = (program
+  (expression_statement
+    (binary_expression
+      (identifier == "b") @x
+    )
+  )
+)
 --------------------- INPUT ----------------------
 a + b;
 ------------------- TYPESCRIPT -------------------

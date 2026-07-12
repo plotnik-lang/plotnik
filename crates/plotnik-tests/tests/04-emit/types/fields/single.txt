@@ -1,4 +1,6 @@
-Q = (function_declaration name: (identifier) @name)
+Q = (function_declaration
+  name: (identifier) @name
+)
 ------------------- TYPESCRIPT -------------------
 export interface Q {
   name: Node;

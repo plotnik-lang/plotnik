@@ -1,4 +1,6 @@
-Q = (program (expression_statement)+ @stmts)
+Q = (program
+  (expression_statement)+ @stmts
+)
 --------------------- INPUT ----------------------
 a; b;
 ------------------- TYPESCRIPT -------------------

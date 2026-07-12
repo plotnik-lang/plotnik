@@ -1,13 +1,15 @@
 Expr = [
   Lit: (number) @n
-  Rec: (parenthesized_expression (Expr) @inner :: Foo)
+  Rec: (parenthesized_expression
+    (Expr) @inner :: Foo
+  )
 ]
 ------------------ DIAGNOSTICS -------------------
 warning: this type annotation a reference keeps its definition's type name; omit it
- --> query.ptk:3:51
+ --> query.ptk:4:22
   |
-3 |   Rec: (parenthesized_expression (Expr) @inner :: Foo)
-  |                                                   ^^^
+4 |     (Expr) @inner :: Foo
+  |                      ^^^
 ------------------- TYPESCRIPT -------------------
 export type Expr =
   | { $tag: "Lit"; $data: { n: Node } }

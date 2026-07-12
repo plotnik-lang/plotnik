@@ -1,7 +1,18 @@
-Maybe = (program (expression_statement)? @stmt)
-Many = (program (expression_statement)* @stmts)
-Some = (program (expression_statement)+ @stmts)
-Lazy = (program (expression_statement)*? @stmts)
+Maybe = (program
+  (expression_statement)? @stmt
+)
+
+Many = (program
+  (expression_statement)* @stmts
+)
+
+Some = (program
+  (expression_statement)+ @stmts
+)
+
+Lazy = (program
+  (expression_statement)*? @stmts
+)
 
 Funcs = (program
   (function_declaration
@@ -152,34 +163,34 @@ Maybe = 000 :: T01
 Some  = 012 :: T05
 
 [spans]
-P00 def        0..47  src0  T01
-P01 pattern    8..47  src0
-P02 capture    41..46  src0  T01.M0
-P03 quantifier 39..40  src0
-P04 pattern    17..39  src0
-P05 def        48..95  src0  T03
-P06 pattern    55..95  src0
-P07 capture    88..94  src0  T03.M1
-P08 quantifier 86..87  src0
-P09 pattern    64..86  src0
-P10 def        96..143  src0  T05
-P11 pattern    103..143  src0
-P12 capture    136..142  src0  T05.M2
-P13 quantifier 134..135  src0
-P14 pattern    112..134  src0
-P15 def        144..192  src0  T06
-P16 pattern    151..192  src0
-P17 capture    185..191  src0  T06.M3
-P18 quantifier 182..184  src0
-P19 pattern    160..182  src0
-P20 def        194..277  src0  T09
-P21 pattern    202..277  src0
-P22 capture    269..275  src0  T09.M5
-P23 quantifier 267..268  src0
-P24 pattern    213..267  src0
-P25 capture    258..263  src0  T07.M4
-P26 field      239..243  src0
-P27 pattern    245..257  src0
+P00 def        0..50  src0  T01
+P01 pattern    8..50  src0
+P02 capture    43..48  src0  T01.M0
+P03 quantifier 41..42  src0
+P04 pattern    19..41  src0
+P05 def        52..102  src0  T03
+P06 pattern    59..102  src0
+P07 capture    94..100  src0  T03.M1
+P08 quantifier 92..93  src0
+P09 pattern    70..92  src0
+P10 def        104..154  src0  T05
+P11 pattern    111..154  src0
+P12 capture    146..152  src0  T05.M2
+P13 quantifier 144..145  src0
+P14 pattern    122..144  src0
+P15 def        156..207  src0  T06
+P16 pattern    163..207  src0
+P17 capture    199..205  src0  T06.M3
+P18 quantifier 196..198  src0
+P19 pattern    174..196  src0
+P20 def        209..292  src0  T09
+P21 pattern    217..292  src0
+P22 capture    284..290  src0  T09.M5
+P23 quantifier 282..283  src0
+P24 pattern    228..282  src0
+P25 capture    273..278  src0  T07.M4
+P26 field      254..258  src0
+P27 pattern    260..272  src0
 
 [transitions]
 Maybe:

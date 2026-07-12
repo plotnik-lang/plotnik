@@ -4,7 +4,13 @@ Row = (pair
 )
 
 Q = (program
-  (expression_statement (parenthesized_expression (object (Row)? @first)))
+  (expression_statement
+    (parenthesized_expression
+      (object
+        (Row)? @first
+      )
+    )
+  )
 )
 ------------------- TYPESCRIPT -------------------
 export interface Row {

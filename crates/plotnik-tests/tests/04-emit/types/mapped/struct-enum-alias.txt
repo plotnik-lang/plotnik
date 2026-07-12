@@ -5,7 +5,9 @@ Expr = [
   Num: (number) @value
 ]
 
-Q = (program (expression_statement (Expr) @expr))
+Q = (program
+  (expression_statement (Expr) @expr)
+)
 ------------------ DIAGNOSTICS -------------------
 error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
  --> query.ptk:4:7

@@ -1,4 +1,6 @@
-Q = (program (expression_statement (identifier) @id))
+Q = (program
+  (expression_statement (identifier) @id)
+)
 -------------------- MATCHER ---------------------
 // Generated Plotnik query module: typed output types, `parse`/`matches` entry
 // points, per-type trace readers, and the compiled matcher (`mod matcher`).

@@ -4,7 +4,12 @@ Entry = [
 ]
 
 Items = (Entry)*
-Q = (program (expression_statement (array (Items) @items)))
+
+Q = (program
+  (expression_statement
+    (array (Items) @items)
+  )
+)
 ------------------- TYPESCRIPT -------------------
 export type Entry =
   | { $tag: "Id"; $data: { id: Node } }

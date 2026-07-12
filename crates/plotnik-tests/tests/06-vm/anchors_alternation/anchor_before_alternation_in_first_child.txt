@@ -1,6 +1,11 @@
 Q = (program
   (expression_statement
-    (call_expression arguments: (arguments . [(identifier) @arg]))
+    (call_expression
+      arguments: (arguments
+        .
+        [(identifier) @arg]
+      )
+    )
   )
 )
 --------------------- INPUT ----------------------

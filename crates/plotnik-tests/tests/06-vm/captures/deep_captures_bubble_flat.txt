@@ -1,7 +1,9 @@
 Q = (program
   (function_declaration
     name: (identifier) @name
-    body: (statement_block (return_statement (number) @retval))
+    body: (statement_block
+      (return_statement (number) @retval)
+    )
   )
 )
 --------------------- INPUT ----------------------

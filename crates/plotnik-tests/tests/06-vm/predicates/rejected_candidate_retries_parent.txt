@@ -1,4 +1,8 @@
-Q = (program (expression_statement (identifier == "b") @id))
+Q = (program
+  (expression_statement
+    (identifier == "b") @id
+  )
+)
 --------------------- INPUT ----------------------
 a; b;
 ------------------- TYPESCRIPT -------------------

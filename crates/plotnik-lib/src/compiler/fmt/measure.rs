@@ -1,16 +1,15 @@
 use crate::compiler::parse::cst::SyntaxKind;
 
 use super::ir::{
-    CaptureCount, Element, GroupKind, GroupPart, InlineSummary, LayoutAnalysis, NodeKind,
+    Element, GroupKind, GroupPart, InlineSummary, LandmarkCount, LayoutAnalysis, NodeKind,
     NodeLayout, Width,
 };
 use super::tokens::needs_space;
 
 impl InlineSummary {
-    fn token(kind: SyntaxKind, width: usize, captures: usize) -> Self {
+    fn token(kind: SyntaxKind, width: usize) -> Self {
         Self {
             width: Width(width),
-            captures: CaptureCount(captures),
             first_token: Some(kind),
             last_token: Some(kind),
             empty: false,
@@ -62,7 +61,7 @@ impl InlineSummary {
                     .saturating_add(separator)
                     .saturating_add(next.width.0),
             ),
-            captures: CaptureCount(self.captures.0.saturating_add(next.captures.0)),
+            landmarks: LandmarkCount(self.landmarks.0.saturating_add(next.landmarks.0)),
             has_hardline: self.has_hardline || next.has_hardline,
             first_token: self.first_token.or(next.first_token),
             last_token: next.last_token.or(self.last_token),
@@ -71,27 +70,28 @@ impl InlineSummary {
             empty: false,
         }
     }
+
+    fn with_landmarks(mut self, count: usize) -> Self {
+        self.landmarks = LandmarkCount(self.landmarks.0.saturating_add(count));
+        self
+    }
 }
 
-pub(super) fn analyze(layout: &NodeLayout, elements: &[Element]) -> LayoutAnalysis {
+pub(super) fn analyze(kind: NodeKind, layout: &NodeLayout, elements: &[Element]) -> LayoutAnalysis {
     let inline = elements
         .iter()
         .fold(InlineSummary::default(), |summary, element| {
             let next = match element {
                 Element::Node(child) => child.analysis.inline,
-                Element::Token(token) => InlineSummary::token(
-                    token.kind,
-                    token.text().chars().count(),
-                    usize::from(matches!(
-                        token.kind,
-                        SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture
-                    )),
-                ),
+                Element::Token(token) => {
+                    InlineSummary::token(token.kind, token.text().chars().count())
+                }
                 Element::Comment(comment) if comment.forces_line() => InlineSummary::hardline(),
                 Element::Comment(comment) => InlineSummary::comment(comment.text().chars().count()),
             };
             summary.followed_by(next)
-        });
+        })
+        .with_landmarks(kind.landmark_count());
     let child_break = elements.iter().any(|element| {
         element
             .node()
@@ -132,6 +132,6 @@ pub(super) fn analyze(layout: &NodeLayout, elements: &[Element]) -> LayoutAnalys
         _ => false,
     };
     let must_break =
-        structural_break || inline.captures.0 >= 2 || inline.has_hardline || child_break;
+        structural_break || inline.landmarks.0 > 3 || inline.has_hardline || child_break;
     LayoutAnalysis { inline, must_break }
 }

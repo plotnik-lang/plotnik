@@ -1,6 +1,8 @@
 Q = (program
   (expression_statement)? @stmt
-  (function_declaration name: (identifier) @name)
+  (function_declaration
+    name: (identifier) @name
+  )
 )
 ------------------- INPUT (ts) -------------------
 function f() {}
@@ -149,15 +151,15 @@ N0: S3 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..96  src0  T1
-P1 pattern    4..96  src0
+P0 def        0..103  src0  T1
+P1 pattern    4..103  src0
 P2 capture    39..44  src0  T1.M0
 P3 quantifier 37..38  src0
 P4 pattern    15..37  src0
-P5 pattern    47..94  src0
-P6 capture    88..93  src0  T1.M1
-P7 field      69..73  src0
-P8 pattern    75..87  src0
+P5 pattern    47..101  src0
+P6 capture    92..97  src0  T1.M1
+P7 field      73..77  src0
+P8 pattern    79..91  src0
 
 [transitions]
 Q:

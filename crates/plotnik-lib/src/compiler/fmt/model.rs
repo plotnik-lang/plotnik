@@ -67,7 +67,7 @@ impl Builder {
             .collect();
         let kind = NodeKind::from_syntax(syntax.kind(), &elements);
         let layout = NodeLayout::for_node(kind, &elements);
-        let analysis = measure::analyze(&layout, &elements);
+        let analysis = measure::analyze(kind, &layout, &elements);
         self.work.add(1 + elements.len() * 2);
         ModelNode {
             kind,

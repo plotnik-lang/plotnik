@@ -57,6 +57,8 @@ pub(super) enum NodeKind {
     PatternAtom,
     Anchor,
     NegatedField,
+    Predicate,
+    TypeAnnotation,
     Atomic,
 }
 
@@ -76,12 +78,16 @@ impl NodeKind {
             }
             SyntaxKind::Alternation => Self::Group(GroupKind::Alternation),
             SyntaxKind::Field => Self::Prefix(PrefixKind::Field),
-            SyntaxKind::Branch => Self::Prefix(PrefixKind::Branch),
+            SyntaxKind::Branch => Self::Prefix(PrefixKind::Branch {
+                labeled: has_direct_token(elements, SyntaxKind::Id),
+            }),
             SyntaxKind::Capture => Self::Suffix(SuffixKind::Capture),
             SyntaxKind::Quantifier => Self::Suffix(SuffixKind::Quantifier),
             SyntaxKind::DefRef | SyntaxKind::Str | SyntaxKind::Wildcard => Self::PatternAtom,
             SyntaxKind::Anchor => Self::Anchor,
             SyntaxKind::NegatedField => Self::NegatedField,
+            SyntaxKind::NodePredicate => Self::Predicate,
+            SyntaxKind::TypeAnnotation => Self::TypeAnnotation,
             _ => Self::Atomic,
         }
     }
@@ -95,6 +101,21 @@ impl NodeKind {
 
     pub fn is_definition_body(self) -> bool {
         self.is_pattern() || matches!(self, Self::Anchor | Self::NegatedField)
+    }
+
+    pub fn landmark_count(self) -> usize {
+        match self {
+            Self::Root | Self::Definition | Self::Atomic => 0,
+            Self::Prefix(PrefixKind::Branch { labeled: false }) => 0,
+            Self::Group(_)
+            | Self::Prefix(_)
+            | Self::Suffix(_)
+            | Self::PatternAtom
+            | Self::Anchor
+            | Self::NegatedField
+            | Self::Predicate
+            | Self::TypeAnnotation => 1,
+        }
     }
 }
 
@@ -118,7 +139,9 @@ impl GroupKind {
 
     pub fn contains_item(self, child: NodeKind) -> bool {
         match self {
-            Self::Alternation => child == NodeKind::Prefix(PrefixKind::Branch),
+            Self::Alternation => {
+                matches!(child, NodeKind::Prefix(PrefixKind::Branch { .. }))
+            }
             Self::NamedNode | Self::Sequence(_) => {
                 child.is_pattern() || matches!(child, NodeKind::Anchor | NodeKind::NegatedField)
             }
@@ -135,7 +158,7 @@ pub(super) enum SequenceDelimiter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum PrefixKind {
     Field,
-    Branch,
+    Branch { labeled: bool },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -266,6 +289,8 @@ impl NodeLayout {
             NodeKind::PatternAtom
             | NodeKind::Anchor
             | NodeKind::NegatedField
+            | NodeKind::Predicate
+            | NodeKind::TypeAnnotation
             | NodeKind::Atomic => Self::Atomic,
         }
     }
@@ -397,12 +422,12 @@ pub(super) struct FormatMetrics {
 pub(super) struct Width(pub usize);
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(super) struct CaptureCount(pub usize);
+pub(super) struct LandmarkCount(pub usize);
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct InlineSummary {
     pub width: Width,
-    pub captures: CaptureCount,
+    pub landmarks: LandmarkCount,
     pub has_hardline: bool,
     pub first_token: Option<SyntaxKind>,
     pub last_token: Option<SyntaxKind>,
@@ -415,7 +440,7 @@ impl Default for InlineSummary {
     fn default() -> Self {
         Self {
             width: Width::default(),
-            captures: CaptureCount::default(),
+            landmarks: LandmarkCount::default(),
             has_hardline: false,
             first_token: None,
             last_token: None,

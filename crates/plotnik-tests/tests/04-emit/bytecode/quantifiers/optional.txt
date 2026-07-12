@@ -1,4 +1,6 @@
-Q = (function_declaration (decorator)? @dec)
+Q = (function_declaration
+  (decorator)? @dec
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 13

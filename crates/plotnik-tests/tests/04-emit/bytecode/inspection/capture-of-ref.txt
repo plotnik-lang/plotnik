@@ -1,5 +1,8 @@
 Inner = (identifier) @x
-Q = (program (expression_statement (Inner) @v))
+
+Q = (program
+  (expression_statement (Inner) @v)
+)
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entrypoints]
@@ -62,11 +65,11 @@ Q     = 06 :: T2
 P0 def        0..23  src0  T1
 P1 capture    21..23  src0  T1.M0
 P2 pattern    8..20  src0
-P3 def        24..71  src0  T2
-P4 pattern    28..71  src0
-P5 pattern    37..70  src0
-P6 capture    67..69  src0  T2.M1
-P7 ref        59..66  src0  T1
+P3 def        25..75  src0  T2
+P4 pattern    29..75  src0
+P5 pattern    40..73  src0
+P6 capture    70..72  src0  T2.M1
+P7 ref        62..69  src0  T1
 
 [transitions]
 Inner:

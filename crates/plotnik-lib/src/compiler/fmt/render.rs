@@ -1,13 +1,14 @@
 use super::comments::{Comment, CommentKind, CommentPlacement};
 use super::contract;
 use super::ir::{
-    CaptureCount, Element, FilePart, FormatFile, GroupLayout, GroupPart, ModelNode, NodeKind,
+    Element, FilePart, FormatFile, GroupLayout, GroupPart, LandmarkCount, ModelNode, NodeKind,
     NodeLayout, PrefixKind, SuffixKind, Token, Width, WorkCounter,
 };
 use super::tokens::{Atom, format_atoms};
 
 const INDENT_WIDTH: usize = 2;
 const LINE_WIDTH: usize = 80;
+const INLINE_LANDMARK_BUDGET: usize = 3;
 
 #[derive(Debug, Clone, Copy, Default)]
 struct IndentLevel(usize);
@@ -26,21 +27,22 @@ impl IndentLevel {
 struct Column(usize);
 
 #[derive(Debug, Clone, Copy, Default)]
-struct PendingSuffixes {
-    width: Width,
-    captures: CaptureCount,
+struct PendingAffixes {
+    suffix_width: Width,
+    landmarks: LandmarkCount,
 }
 
-impl PendingSuffixes {
-    fn followed_by(self, suffixes: &[AffixSegment<'_>]) -> Self {
-        let width: usize = suffixes.iter().map(AffixSegment::suffix_width).sum();
-        let captures = suffixes
+impl PendingAffixes {
+    fn followed_by(self, prefixes: &[AffixSegment<'_>], suffixes: &[AffixSegment<'_>]) -> Self {
+        let suffix_width: usize = suffixes.iter().map(AffixSegment::suffix_width).sum();
+        let landmarks = prefixes
             .iter()
-            .filter(|segment| segment.suffix_kind == Some(SuffixKind::Capture))
-            .count();
+            .chain(suffixes)
+            .map(|segment| segment.landmarks.0)
+            .sum::<usize>();
         Self {
-            width: Width(self.width.0 + width),
-            captures: CaptureCount(self.captures.0 + captures),
+            suffix_width: Width(self.suffix_width.0 + suffix_width),
+            landmarks: LandmarkCount(self.landmarks.0.saturating_add(landmarks)),
         }
     }
 }
@@ -49,7 +51,7 @@ impl PendingSuffixes {
 struct RenderContext {
     indent: IndentLevel,
     first_line_column: Column,
-    pending_suffixes: PendingSuffixes,
+    pending_affixes: PendingAffixes,
 }
 
 impl RenderContext {
@@ -62,7 +64,7 @@ impl RenderContext {
         Self {
             indent,
             first_line_column: Column(indent.width()),
-            pending_suffixes: PendingSuffixes::default(),
+            pending_affixes: PendingAffixes::default(),
         }
     }
 
@@ -73,9 +75,9 @@ impl RenderContext {
         }
     }
 
-    fn with_suffixes(self, suffixes: &[AffixSegment<'_>]) -> Self {
+    fn with_affixes(self, prefixes: &[AffixSegment<'_>], suffixes: &[AffixSegment<'_>]) -> Self {
         Self {
-            pending_suffixes: self.pending_suffixes.followed_by(suffixes),
+            pending_affixes: self.pending_affixes.followed_by(prefixes, suffixes),
             ..self
         }
     }
@@ -162,6 +164,7 @@ struct AffixSegment<'a> {
     text: String,
     inline_comments: Vec<&'a Comment>,
     boundary_comments: Vec<&'a Comment>,
+    landmarks: LandmarkCount,
     suffix_kind: Option<SuffixKind>,
 }
 
@@ -449,11 +452,20 @@ impl Renderer {
             match (current.kind, &current.layout) {
                 (NodeKind::Prefix(kind), NodeLayout::Prefix { prefix, body }) => {
                     let elements = current.fragment(*prefix);
+                    let body_node = current.node_at(*body);
+                    let landmarks = LandmarkCount(
+                        current
+                            .analysis
+                            .inline
+                            .landmarks
+                            .0
+                            .saturating_sub(body_node.analysis.inline.landmarks.0),
+                    );
                     let mut text = self.inline_text(elements);
                     match kind {
                         PrefixKind::Field => text.push(' '),
-                        PrefixKind::Branch if !text.is_empty() => text.push(' '),
-                        PrefixKind::Branch => {}
+                        PrefixKind::Branch { .. } if !text.is_empty() => text.push(' '),
+                        PrefixKind::Branch { .. } => {}
                     }
                     let (inline_comments, boundary_comments) = self.split_comments(elements);
                     before_comments.extend(boundary_comments.iter().copied());
@@ -461,20 +473,31 @@ impl Renderer {
                         text,
                         inline_comments,
                         boundary_comments,
+                        landmarks,
                         suffix_kind: None,
                     });
-                    current = current.node_at(*body);
+                    current = body_node;
                 }
                 (NodeKind::Suffix(kind), NodeLayout::Suffix { body, suffix }) => {
                     let elements = current.fragment(*suffix);
+                    let body_node = current.node_at(*body);
+                    let landmarks = LandmarkCount(
+                        current
+                            .analysis
+                            .inline
+                            .landmarks
+                            .0
+                            .saturating_sub(body_node.analysis.inline.landmarks.0),
+                    );
                     let (inline_comments, boundary_comments) = self.split_comments(elements);
                     suffixes.push(AffixSegment {
                         text: self.inline_text(elements),
                         inline_comments,
                         boundary_comments,
+                        landmarks,
                         suffix_kind: Some(kind),
                     });
-                    current = current.node_at(*body);
+                    current = body_node;
                 }
                 _ => break,
             }
@@ -507,7 +530,7 @@ impl Renderer {
         }
         let context = context
             .after_width(plan.prefix_width())
-            .with_suffixes(&plan.suffixes);
+            .with_affixes(&plan.prefixes, &plan.suffixes);
         match &plan.core.layout {
             NodeLayout::Group(group) => self.group_must_break(plan.core, group, context),
             NodeLayout::Atomic => false,
@@ -533,7 +556,7 @@ impl Renderer {
         }
         let context = context
             .after_width(plan.prefix_width())
-            .with_suffixes(&plan.suffixes);
+            .with_affixes(&plan.prefixes, &plan.suffixes);
         match &plan.core.layout {
             NodeLayout::Group(group) => self.render_group(plan.core, group, context, output),
             NodeLayout::Atomic => {
@@ -605,11 +628,16 @@ impl Renderer {
         let width_overflow = has_items
             && context.first_line_column.0
                 + node.analysis.inline.width.0
-                + context.pending_suffixes.width.0
+                + context.pending_affixes.suffix_width.0
                 > LINE_WIDTH;
-        let capture_dense =
-            node.analysis.inline.captures.0 + context.pending_suffixes.captures.0 >= 2;
-        let must_break = node.analysis.must_break || capture_dense || width_overflow;
+        let semantic_density = node
+            .analysis
+            .inline
+            .landmarks
+            .0
+            .saturating_add(context.pending_affixes.landmarks.0)
+            > INLINE_LANDMARK_BUDGET;
+        let must_break = node.analysis.must_break || semantic_density || width_overflow;
         must_break && (has_items || node.analysis.inline.has_hardline)
     }
 

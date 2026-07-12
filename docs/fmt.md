@@ -37,9 +37,9 @@ The decision is bottom-up, per group (`NamedNode`, `Sequence`, `Alternation`):
 
 ```
 broken(group) :=
-     structural_break(group)            // the rules below
-  or inline form has 2+ capture suffixes // capture-density rule
-  or any child group is broken          // breaks propagate upward
+     structural_break(group)             // the rules below
+  or inline form has 4+ semantic landmarks // density rule
+  or any child group is broken           // breaks propagate upward
   or a boundary comment requires lines
   or inline rendering would overflow the line width
 ```
@@ -51,10 +51,11 @@ per line in a broken group.
 
 ### Constants
 
-| Constant   | Value              |
-| ---------- | ------------------ |
-| Indent     | 2 spaces/level     |
-| Line width | 80 Unicode scalars |
+| Constant               | Value              |
+| ---------------------- | ------------------ |
+| Indent                 | 2 spaces/level     |
+| Line width             | 80 Unicode scalars |
+| Inline landmark budget | 3                  |
 
 Formatter-generated whitespace never contains tabs; tabs inside preserved
 comments remain verbatim. Width uses `chars().count()` over the entire line,
@@ -70,7 +71,6 @@ These force the broken mode even when the inline form would fit:
 | `Alternation` | it has 2+ branches, or any branch is labeled |
 | `Sequence`    | it has 2+ items, **anchors included**        |
 | `NamedNode`   | it has 2+ items, **anchors excluded**        |
-| Any group     | its inline form has 2+ explicit captures     |
 
 "Item" means a child pattern, a `Field`, or a `NegatedField`. The node kind,
 a `NodePredicate`, and trailing suffixes are part of the head/closer, never
@@ -95,10 +95,55 @@ Q = {
 }
 ```
 
-The capture-density rule counts syntactic capture suffixes (`@name`, `@_`, and
-`@_name`), not `@` characters in strings or comments. It includes a capture
-attached to the group itself. Canonical output therefore does not normally put
-two capture suffixes on one line:
+### Semantic density
+
+An inline candidate may contain at most three semantic landmarks. Four or more
+forces the nearest group with a breakable item into broken mode. The budget
+measures how many distinct matching, navigation, and output decisions a reader
+must decode on one line; it is independent of byte length and nesting depth.
+
+Each of these CST constructs counts as one landmark:
+
+- pattern: named node, sequence, alternation, definition reference, string,
+  wildcard;
+- navigation and structure: field, **labeled** branch, anchor, negated field;
+- modifier: node predicate, quantifier, capture, type annotation.
+
+Unlabeled branch wrappers do not count. Definitions, comments, punctuation,
+literal contents, regex internals, and category-refinement tokens do not count.
+Field and branch prefixes and quantifier, capture, and type-annotation suffixes
+belong to the complete inline candidate even when the renderer flattens those
+wrappers around a group.
+
+Three match steps remain a concise path:
+
+```
+Q = (foo (bar (baz)))
+```
+
+A fourth step breaks the nearest useful container:
+
+```
+Q = (foo
+  (bar (baz (qux)))
+)
+```
+
+The same budget applies across syntax categories:
+
+```
+Q = (pair key: (identifier))  // node + field + node: inline
+Q = (identifier == "x") @id   // node + predicate + capture: inline
+
+Q = (program                 // ancestor makes four: broken
+  (identifier == "x") @id
+)
+```
+
+Captures are landmarks, so the former capture-only rule is a consequence of
+the general budget: valid syntax that would put two capture suffixes in one
+candidate necessarily has at least four landmarks. Canonical output therefore
+still does not normally put two capture suffixes on one line:
 
 ```
 Q = {
@@ -112,10 +157,10 @@ Q = (program
 )
 ```
 
-The rule is evaluated on the complete inline candidate, including suffixes
-carried by a field or another wrapper. For example,
-`foo: (wrapper (id) @id) @foo` breaks the `wrapper` group so that `@id` and
-`@foo` land on different lines.
+If a group has no breakable item, density is unavoidable just like width: the
+formatter keeps the atomic or itemless head inline rather than inventing an
+unsupported half-broken shape. Long simple tokens likewise remain one
+landmark; only the width rule applies to their physical length.
 
 Consequences of the table, spelled out:
 
@@ -124,13 +169,17 @@ Consequences of the table, spelled out:
   declarations. (Exception-free: `[A: (x)] @e` still breaks.)
 - A single-branch unlabeled alternation, a single-item sequence, and a
   single-child node stay inline while they fit: `[(identifier)] @arg`,
-  `{(identifier) @id}`, `(program (expression_statement (E) @e))`.
-- Chains of single-child nodes stay on one line until they hit 80 scalars or
-  the capture-density rule. Selector-style queries without repeated captures
-  are meant to read as paths:
+  `{(identifier) @id}`, `(program (E) @e)`.
+- Chains of single-child nodes stay inline while the complete candidate has at
+  most three landmarks and fits within 80 scalars. Longer paths break in
+  readable chunks of at most three landmarks:
 
   ```
-  Q = (program (expression_statement (binary_expression (identifier == "b") @x)))
+  Q = (program
+    (expression_statement
+      (binary_expression (identifier == "b"))
+    )
+  )
   ```
 
 - A node acquires a second item and immediately fans out, however short:
@@ -329,13 +378,13 @@ emission pass. Reformatting the result is a test invariant, not a convergence
 mechanism in the public API.
 
 ```text
-fmt_pattern(pattern, col, level, pending_suffix):
+fmt_pattern(pattern, col, level, pending_affixes):
     model = normalize(pattern)              # typed layout IR + lossless token handles
-    inline = inline_summary(model, pending_suffix)
+    inline = inline_summary(model, pending_affixes)
 
     must_break =
         construct_threshold(model)
-        or inline.capture_count >= 2
+        or inline.landmark_count > 3
         or child_is_broken(model)
         or boundary_comment_requires_lines(model)
 
@@ -352,7 +401,7 @@ fmt_pattern(pattern, col, level, pending_suffix):
         newline(level + 1)
         render_item(item)                   # item owns field/label prefix
     newline(level)
-    emit(model.closer, pending_suffix)
+    emit(model.closer, pending_affixes)
 ```
 
 Comment classification and attachment happen before measurement, including
@@ -360,11 +409,11 @@ newlines inside block-comment tokens. One ordered CST-token traversal records
 the first and last code token on each source line and classifies every comment
 from those line facts; there is no per-comment source or token scan.
 Structural facts are compositional and bottom-up; summaries store width,
-capture count, hardline state, and boundary token roles rather than flattened
+landmark count, hardline state, and boundary token roles rather than flattened
 subtree strings. Normalization records definition bodies, group items, comment
 boundaries, closers, and prefix/suffix fragments explicitly, so rendering does
 not rediscover structure or compare node identity. Width is decided at emission
-because the starting column and structured pending suffix chain are contextual.
+because the starting column and structured pending affix chain are contextual.
 
 Emission writes directly into one source-sized `String`; no document or line
 tree is built and copied afterward. Deterministic work accounting covers token

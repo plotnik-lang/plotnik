@@ -1,4 +1,10 @@
-Q = (program (lexical_declaration (variable_declarator name: (identifier) @n)))
+Q = (program
+  (lexical_declaration
+    (variable_declarator
+      name: (identifier) @n
+    )
+  )
+)
 --------------------- INPUT ----------------------
 let x
 ------------------- TYPESCRIPT -------------------

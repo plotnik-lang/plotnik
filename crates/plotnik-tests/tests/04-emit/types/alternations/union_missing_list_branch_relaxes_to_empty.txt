@@ -1,6 +1,8 @@
 Q = (program
   [
-    {(expression_statement)+ @stmts}
+    {
+      (expression_statement)+ @stmts
+    }
     (debugger_statement) @d
   ]
 )

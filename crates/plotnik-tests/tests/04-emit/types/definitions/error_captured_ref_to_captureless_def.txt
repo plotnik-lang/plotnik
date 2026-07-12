@@ -1,10 +1,14 @@
 A = (identifier)
-Q = (program (expression_statement (A) @x))
+
+Q = (program
+  (expression_statement (A) @x)
+)
 ------------------ DIAGNOSTICS -------------------
 error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
- --> query.ptk:2:36
+ --> query.ptk:4:25
   |
 1 | A = (identifier)
   |     ------------ defined here
-2 | Q = (program (expression_statement (A) @x))
-  |                                    ^^^
+...
+4 |   (expression_statement (A) @x)
+  |                         ^^^

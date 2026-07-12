@@ -1,6 +1,16 @@
-Arr = (array (Obj)? @obj)
-Obj = (object (pair value: (Arr)? @arr))
-Q = (program (expression_statement (Arr) @top))
+Arr = (array
+  (Obj)? @obj
+)
+
+Obj = (object
+  (pair
+    value: (Arr)? @arr
+  )
+)
+
+Q = (program
+  (expression_statement (Arr) @top)
+)
 --------------------- INPUT ----------------------
 [{a: [1]}];
 ------------------- TYPESCRIPT -------------------

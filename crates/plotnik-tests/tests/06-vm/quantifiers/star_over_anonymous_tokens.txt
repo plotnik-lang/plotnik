@@ -1,4 +1,10 @@
-Q = (program (expression_statement (array ","* @commas)))
+Q = (program
+  (expression_statement
+    (array
+      ","* @commas
+    )
+  )
+)
 --------------------- INPUT ----------------------
 [1, 2, 3];
 ------------------- TYPESCRIPT -------------------

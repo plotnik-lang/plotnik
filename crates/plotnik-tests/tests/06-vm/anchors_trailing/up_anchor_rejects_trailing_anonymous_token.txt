@@ -1,4 +1,6 @@
-Q = (program (debugger_statement "debugger" .))
+Q = (program
+  (debugger_statement "debugger" .)
+)
 --------------------- INPUT ----------------------
 debugger;
 ------------------- TYPESCRIPT -------------------

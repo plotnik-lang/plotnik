@@ -1,11 +1,13 @@
-Q = (function_declaration (program))+ @fns
+Q = (function_declaration
+  (program)
+)+ @fns
 ------------------ DIAGNOSTICS -------------------
 error: `program` cannot be a child of this node
- --> query.ptk:1:28
+ --> query.ptk:2:4
   |
-1 | Q = (function_declaration (program))+ @fns
-  |      --------------------  ^^^^^^^
-  |      |
-  |      on `function_declaration`
+1 | Q = (function_declaration
+  |      -------------------- on `function_declaration`
+2 |   (program)
+  |    ^^^^^^^
   |
 help: `function_declaration` has no unlabeled children — its children are fields: `body: (statement_block)`, `name: (identifier)`, `parameters: (formal_parameters)`

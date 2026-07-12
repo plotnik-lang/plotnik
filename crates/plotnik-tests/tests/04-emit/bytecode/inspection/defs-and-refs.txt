@@ -1,5 +1,8 @@
 Ident = (identifier) @name
-Q = (program (expression_statement (Ident) @item))
+
+Q = (program
+  (expression_statement (Ident) @item)
+)
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entrypoints]
@@ -62,11 +65,11 @@ Q     = 06 :: T2
 P0 def        0..26  src0  T1
 P1 capture    21..26  src0  T1.M0
 P2 pattern    8..20  src0
-P3 def        27..77  src0  T2
-P4 pattern    31..77  src0
-P5 pattern    40..76  src0
-P6 capture    70..75  src0  T2.M1
-P7 ref        62..69  src0  T1
+P3 def        28..81  src0  T2
+P4 pattern    32..81  src0
+P5 pattern    43..79  src0
+P6 capture    73..78  src0  T2.M1
+P7 ref        65..72  src0  T1
 
 [transitions]
 Ident:

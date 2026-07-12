@@ -4,7 +4,9 @@ Q = (program
     .
     (debugger_statement)*? @b
     .
-    (expression_statement (identifier == "foo")) @c
+    (expression_statement
+      (identifier == "foo")
+    ) @c
   }
 )
 --------------------- INPUT ----------------------

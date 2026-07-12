@@ -1,5 +1,14 @@
-Member = (method_definition name: (property_identifier == "b") @name)
-Q = (program (class_declaration body: (class_body member: (Member) @m)))
+Member = (method_definition
+  name: (property_identifier == "b") @name
+)
+
+Q = (program
+  (class_declaration
+    body: (class_body
+      member: (Member) @m
+    )
+  )
+)
 --------------------- INPUT ----------------------
 class C { a(){}; b(){} }
 ------------------- TYPESCRIPT -------------------

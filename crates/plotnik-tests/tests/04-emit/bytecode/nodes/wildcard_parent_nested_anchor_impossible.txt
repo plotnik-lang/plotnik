@@ -1,9 +1,17 @@
-Q = (_ (array .! (identifier)) @a)
+Q = (_
+  (array
+    .!
+    (identifier)
+  ) @a
+)
 ------------------ DIAGNOSTICS -------------------
 error: with strict adjacency (`.!`), the first child of `array` must be `identifier`, but `array` begins with `"["`
- --> query.ptk:1:9
+ --> query.ptk:2:4
   |
-1 | Q = (_ (array .! (identifier)) @a)
-  |         ^^^^^
+2 |   (array
+  |    ^^^^^
   |
-help: `.!` allows nothing between — not even anonymous tokens or comments; the soft anchor `.` skips those: `(array . (identifier))`
+help: `.!` allows nothing between — not even anonymous tokens or comments; the soft anchor `.` skips those: `(array
+          .
+          (identifier)
+        )`

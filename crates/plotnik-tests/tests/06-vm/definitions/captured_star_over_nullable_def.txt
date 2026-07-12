@@ -2,7 +2,9 @@ A = (expression_statement
   (identifier) @id
 )? @x
 
-Q = (program (A)* @xs)
+Q = (program
+  (A)* @xs
+)
 --------------------- INPUT ----------------------
 a; b;
 ------------------- TYPESCRIPT -------------------

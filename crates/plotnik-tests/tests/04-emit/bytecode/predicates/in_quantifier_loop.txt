@@ -1,4 +1,6 @@
-Q = (array (identifier ^= "a")* @xs)
+Q = (array
+  (identifier ^= "a")* @xs
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 19

@@ -1,4 +1,8 @@
-Q = (function_declaration name: [[[(identifier)]]]) @fn
+Q = (function_declaration
+  name: [
+    [[(identifier)]]
+  ]
+) @fn
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 9

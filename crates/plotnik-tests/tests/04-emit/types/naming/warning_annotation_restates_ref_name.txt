@@ -1,11 +1,14 @@
 Foo = (expression_statement (call_expression) @call)
-Q = (program (Foo) @val :: Foo)
+
+Q = (program
+  (Foo) @val :: Foo
+)
 ------------------ DIAGNOSTICS -------------------
 warning: this type annotation restates the type's own name; omit it
- --> query.ptk:2:28
+ --> query.ptk:4:17
   |
-2 | Q = (program (Foo) @val :: Foo)
-  |                            ^^^
+4 |   (Foo) @val :: Foo
+  |                 ^^^
 ------------------- TYPESCRIPT -------------------
 export interface Foo {
   call: Node;

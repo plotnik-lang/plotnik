@@ -3,7 +3,9 @@ Expr = [
   Num: (number) @num
 ]
 
-Q = (program (expression_statement (Expr) @expr))
+Q = (program
+  (expression_statement (Expr) @expr)
+)
 ------------------- INPUT (ts) -------------------
 42
 ------------------- TYPESCRIPT -------------------
@@ -221,11 +223,11 @@ P04 pattern    15..27  src0
 P05 branch     34..52  src0  T3.M3
 P06 capture    48..52  src0  T2.M1
 P07 pattern    39..47  src0
-P08 def        56..105  src0  T4
-P09 pattern    60..105  src0
-P10 pattern    69..104  src0
-P11 capture    98..103  src0  T4.M4
-P12 ref        91..97  src0  T3
+P08 def        56..108  src0  T4
+P09 pattern    60..108  src0
+P10 pattern    71..106  src0
+P11 capture    100..105  src0  T4.M4
+P12 ref        93..99  src0  T3
 
 [transitions]
 Expr:

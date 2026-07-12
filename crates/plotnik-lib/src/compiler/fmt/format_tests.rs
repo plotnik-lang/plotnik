@@ -71,6 +71,107 @@ fn keeps_single_child_groups_inline_inside_broken_parent() {
 }
 
 #[test]
+fn semantic_landmark_budget_breaks_dense_paths() {
+    let cases = [
+        ("Q = (foo (bar (baz)))", "Q = (foo (bar (baz)))\n"),
+        (
+            "Q = (foo (bar (baz (qux))))",
+            indoc! {"
+                Q = (foo
+                  (bar (baz (qux)))
+                )
+            "},
+        ),
+        (
+            "Q = (foo (bar (baz (qux (quux)))))",
+            indoc! {"
+                Q = (foo
+                  (bar
+                    (baz (qux (quux)))
+                  )
+                )
+            "},
+        ),
+    ];
+
+    for (input, expected) in cases {
+        let output = format_query(input).expect("landmark path formats");
+
+        assert_eq!(output, expected);
+        assert_eq!(format_query(&output).expect("output formats"), output);
+    }
+}
+
+#[test]
+fn semantic_landmarks_include_navigation_predicates_and_modifiers() {
+    let inline = [
+        "Q = (pair key: (identifier))",
+        "Q = (identifier == \"x\") @id",
+        "Q = {(identifier) @id}",
+        "Q = [(identifier) @id]",
+        "Q = (array . (identifier))",
+        "Q = (identifier) @id :: Name",
+    ];
+    for input in inline {
+        assert_eq!(
+            format_query(input).expect("three-landmark query formats"),
+            format!("{input}\n")
+        );
+    }
+
+    let broken = [
+        "Q = (root (pair key: (identifier)))",
+        "Q = (program (identifier == \"x\") @id)",
+        "Q = (program (identifier)* @ids)",
+        "Q = (array . (identifier) @id)",
+        "Q = (program (identifier) @id :: Name)",
+    ];
+    for input in broken {
+        let output = format_query(input).expect("four-landmark query formats");
+
+        assert!(output.lines().count() > 1, "{input}: {output}");
+        assert_eq!(format_query(&output).expect("output formats"), output);
+    }
+}
+
+#[test]
+fn semantic_landmarks_count_contextual_branch_prefixes() {
+    assert_eq!(
+        format_query("Q = [Only: (wrapper (identifier))]").expect("enum formats"),
+        indoc! {"
+            Q = [
+              Only: (wrapper (identifier))
+            ]
+        "}
+    );
+    assert_eq!(
+        format_query("Q = [Only: (outer (wrapper (identifier)))]").expect("dense enum formats"),
+        indoc! {"
+            Q = [
+              Only: (outer
+                (wrapper (identifier))
+              )
+            ]
+        "}
+    );
+}
+
+#[test]
+fn semantic_landmarks_ignore_token_length_and_category_refinement() {
+    let long_kind = "a".repeat(100);
+    let long = format!("Q = ({long_kind})");
+
+    assert_eq!(
+        format_query(&long).expect("long atom formats"),
+        format!("{long}\n")
+    );
+    assert_eq!(
+        format_query("Q = (expression#binary_expression)").expect("refinement formats"),
+        "Q = (expression#binary_expression)\n"
+    );
+}
+
+#[test]
 fn breaks_capture_dense_groups() {
     let input = "Q = {(identifier) @id} @inner";
 
@@ -375,6 +476,14 @@ fn adversarial_shapes_stay_within_a_linear_work_budget() {
             "{shape} exceeded its absolute linear budget: {large_metrics:?}"
         );
     }
+
+    let dense = nested_landmark_query(96);
+    let (_, metrics) = format_query_measured(&dense, ParseConfig::default())
+        .expect("dense landmark chain formats");
+    assert!(
+        metrics.work <= (metrics.input_bytes + metrics.output_bytes).saturating_mul(32),
+        "dense landmark chain exceeded its input-plus-output budget: {metrics:?}"
+    );
 }
 
 fn comment_heavy_query(count: usize) -> String {
@@ -395,6 +504,14 @@ fn nested_field_query(depth: usize) -> String {
     let mut pattern = "(leaf)".to_owned();
     for _ in 0..depth {
         pattern = format!("field: {pattern}");
+    }
+    format!("Q = {pattern}")
+}
+
+fn nested_landmark_query(depth: usize) -> String {
+    let mut pattern = "(leaf)".to_owned();
+    for _ in 0..depth {
+        pattern = format!("(node {pattern})");
     }
     format!("Q = {pattern}")
 }

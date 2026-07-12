@@ -1,4 +1,8 @@
-Q = (program (function_declaration (class_declaration))* @x)
+Q = (program
+  (function_declaration
+    (class_declaration)
+  )* @x
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 22

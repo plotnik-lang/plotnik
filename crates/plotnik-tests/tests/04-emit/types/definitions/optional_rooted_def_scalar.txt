@@ -1,5 +1,10 @@
 MaybeId = (identifier)?
-Q = (program (expression_statement (array (MaybeId) @first)))
+
+Q = (program
+  (expression_statement
+    (array (MaybeId) @first)
+  )
+)
 ------------------- TYPESCRIPT -------------------
 export interface Q {
   first: MaybeId;

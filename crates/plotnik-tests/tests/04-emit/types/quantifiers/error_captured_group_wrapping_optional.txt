@@ -1,9 +1,15 @@
-Q = (program {(debugger_statement)?} @x)
+Q = (program
+  {
+    (debugger_statement)?
+  } @x
+)
 ------------------ DIAGNOSTICS -------------------
 error: this group doesn't match exactly one node, so there is no single node to bind
- --> query.ptk:1:14
+ --> query.ptk:2:3
   |
-1 | Q = (program {(debugger_statement)?} @x)
-  |              ^^^^^^^^^^^^^^^^^^^^^^^
+2 | /   {
+3 | |     (debugger_statement)?
+4 | |   } @x
+  | |___^
   |
 help: capture individual nodes inside the group: `{(a) @a (b) @b} @x`

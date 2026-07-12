@@ -1,4 +1,6 @@
-Q = (program (expression_statement (number) @n))
+Q = (program
+  (expression_statement (number) @n)
+)
 --------------------- INPUT ----------------------
 foo;
 ------------------- TYPESCRIPT -------------------

@@ -1,6 +1,9 @@
 Name = (identifier) @name
 Bare = (program (expression_statement (Name)))
-Captured = (program (expression_statement (Name) @item))
+
+Captured = (program
+  (expression_statement (Name) @item)
+)
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entrypoints]
@@ -82,11 +85,11 @@ P03 def        26..72  src0  T0
 P04 pattern    33..72  src0
 P05 pattern    42..71  src0
 P06 ref        64..70  src0  T2
-P07 def        73..129  src0  T3
-P08 pattern    84..129  src0
-P09 pattern    93..128  src0
-P10 capture    122..127  src0  T3.M1
-P11 ref        115..121  src0  T2
+P07 def        74..133  src0  T3
+P08 pattern    85..133  src0
+P09 pattern    96..131  src0
+P10 capture    125..130  src0  T3.M1
+P11 ref        118..124  src0  T2
 
 [transitions]
 Name:

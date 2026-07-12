@@ -6,7 +6,11 @@ Row = (pair
 MaybeRow = (Row)?
 
 Q = (program
-  (expression_statement (parenthesized_expression (object (MaybeRow) @first)))
+  (expression_statement
+    (parenthesized_expression
+      (object (MaybeRow) @first)
+    )
+  )
 )
 ------------------- TYPESCRIPT -------------------
 export interface Row {

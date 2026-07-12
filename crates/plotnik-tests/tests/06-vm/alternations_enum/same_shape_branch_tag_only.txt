@@ -1,6 +1,8 @@
 Q = (program
   [
-    A: (expression_statement (identifier) @x)
+    A: (expression_statement
+      (identifier) @x
+    )
     B: (expression_statement (string))
   ] @item
 )

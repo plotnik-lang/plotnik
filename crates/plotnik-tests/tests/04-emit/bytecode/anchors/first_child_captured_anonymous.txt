@@ -1,4 +1,7 @@
-Q = (statement_block . "{" @op)
+Q = (statement_block
+  .
+  "{" @op
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 9

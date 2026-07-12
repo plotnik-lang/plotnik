@@ -3,7 +3,9 @@ A = [
   Y: (number)
 ]
 
-Q = (program (expression_statement (A) @a))
+Q = (program
+  (expression_statement (A) @a)
+)
 ------------------- TYPESCRIPT -------------------
 export type A =
   | { $tag: "X" }

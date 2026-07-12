@@ -1,6 +1,8 @@
 Q = (program
   [
-    (lexical_declaration (variable_declarator)+ @vs)
+    (lexical_declaration
+      (variable_declarator)+ @vs
+    )
     (expression_statement) @s
   ]
 )

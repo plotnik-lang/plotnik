@@ -1,4 +1,6 @@
-Q = (pair key: _ @key)
+Q = (pair
+  key: _ @key
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 8
