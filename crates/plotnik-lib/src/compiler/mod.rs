@@ -38,6 +38,6 @@ pub use emit::{
     TypeScriptCodegenConfig, TypeScriptNodeRepresentation, TypeScriptTypesOutput,
     TypeScriptVoidType, entry_fn_name,
 };
-pub use fmt::format_query;
+pub use fmt::{FormatError, FormatResult, format_query};
 pub use parse::{TokenSpan, tokenize};
 pub use query::{CompiledQuery, Query, QueryBuilder};

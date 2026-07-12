@@ -1,6 +1,6 @@
 use indoc::indoc;
 
-use super::format::{format_query, format_query_with_config};
+use super::format::{FormatError, format_query, format_query_measured, format_query_with_config};
 use crate::compiler::diagnostics::Error;
 use crate::compiler::parse::ParseConfig;
 
@@ -10,7 +10,7 @@ fn formats_inline_spacing_and_normalizations() {
 
     let output = format_query(input);
 
-    assert!(matches!(output, Err(Error::QueryParseError(_))));
+    assert!(matches!(output, Err(FormatError::Parse { .. })));
     assert_eq!(
         format_query("Q=(identifier=='x')@id::Name").expect("query formats"),
         "Q = (identifier == \"x\") @id :: Name\n"
@@ -280,7 +280,7 @@ fn comment_texts(source: &str) -> Vec<&str> {
 fn rejects_parse_errors_and_propagates_limits() {
     assert!(matches!(
         format_query("Q = ("),
-        Err(Error::QueryParseError(_))
+        Err(FormatError::Parse { .. })
     ));
     assert!(matches!(
         format_query_with_config(
@@ -290,6 +290,74 @@ fn rejects_parse_errors_and_propagates_limits() {
                 max_depth: 100,
             }
         ),
-        Err(Error::ParseFuelExhausted)
+        Err(FormatError::Resource(Error::ParseFuelExhausted))
     ));
+}
+
+#[test]
+fn parse_errors_include_their_rendering_source_map() {
+    let error = format_query("Q = (").expect_err("broken query is rejected");
+    let FormatError::Parse {
+        diagnostics,
+        source_map,
+    } = error
+    else {
+        panic!("syntax error returns parse diagnostics")
+    };
+
+    let rendered = diagnostics.render(&source_map);
+
+    assert!(rendered.contains("Q = ("), "{rendered}");
+}
+
+#[test]
+fn adversarial_shapes_stay_within_a_linear_work_budget() {
+    let shapes = [
+        (
+            comment_heavy_query(200),
+            comment_heavy_query(400),
+            "comments",
+        ),
+        (flat_group_query(400), flat_group_query(800), "flat group"),
+        (nested_field_query(48), nested_field_query(96), "fields"),
+    ];
+
+    for (small, large, shape) in shapes {
+        let (_, small_metrics) = format_query_measured(&small, ParseConfig::default())
+            .expect("small adversarial query formats");
+        let (_, large_metrics) = format_query_measured(&large, ParseConfig::default())
+            .expect("large adversarial query formats");
+
+        assert!(
+            large_metrics.work <= small_metrics.work * 3,
+            "{shape} work grew faster than input: {small_metrics:?} -> {large_metrics:?}"
+        );
+        assert!(
+            large_metrics.work
+                <= (large_metrics.input_bytes + large_metrics.output_bytes).saturating_mul(32),
+            "{shape} exceeded its absolute linear budget: {large_metrics:?}"
+        );
+    }
+}
+
+fn comment_heavy_query(count: usize) -> String {
+    let items = std::iter::repeat_n("/* comment */ (leaf)", count)
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("Q = (root {items})")
+}
+
+fn flat_group_query(count: usize) -> String {
+    let items = std::iter::repeat_n("(leaf)", count)
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("Q = (root {items})")
+}
+
+fn nested_field_query(depth: usize) -> String {
+    let mut pattern = "(leaf)".to_owned();
+    for _ in 0..depth {
+        pattern = format!("field: {pattern}");
+    }
+    format!("Q = {pattern}")
 }

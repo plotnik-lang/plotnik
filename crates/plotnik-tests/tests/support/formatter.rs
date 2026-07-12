@@ -1,4 +1,4 @@
-use plotnik_lib::{Error as QueryError, TokenSpan, format_query, tokenize};
+use plotnik_lib::{FormatError, TokenSpan, format_query, tokenize};
 use similar::TextDiff;
 
 pub enum Assessment {
@@ -19,7 +19,7 @@ impl Assessment {
 pub fn evaluate(query: &str, name: &str) -> Result<Assessment, String> {
     let output = match format_query(query) {
         Ok(output) => output,
-        Err(QueryError::QueryParseError(_)) => return Ok(Assessment::Unformattable),
+        Err(FormatError::Parse { .. }) => return Ok(Assessment::Unformattable),
         Err(error) => return Err(format!("format query for `{name}`: {error}")),
     };
     let repeated = format_query(&output).map_err(|error| {

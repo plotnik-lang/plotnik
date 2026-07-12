@@ -12,4 +12,4 @@ mod tokens;
 #[cfg(test)]
 mod format_tests;
 
-pub use format::format_query;
+pub use format::{FormatError, FormatResult, format_query};

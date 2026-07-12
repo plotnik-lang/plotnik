@@ -1,51 +1,44 @@
-use std::ops::Range;
-
 use rowan::NodeOrToken;
 
 use crate::compiler::parse::Root;
 use crate::compiler::parse::cst::{SyntaxKind, SyntaxNode};
 
-use super::comments::{Comment, CommentClassifier, CommentId, CommentSlot, UnitId};
+use super::comments::{Comment, CommentClassifier};
 use super::contract;
-use super::ir::{Element, FormatFile, ModelNode, NodeKind, Token};
+use super::ir::{Element, FormatFile, ModelNode, NodeKind, NodeLayout, Token, WorkCounter};
 use super::measure;
 
 pub(super) fn normalize(source: &str, root: &Root) -> FormatFile {
-    let significant_ranges = root
-        .syntax()
-        .descendants_with_tokens()
-        .filter_map(NodeOrToken::into_token)
-        .filter(|token| !token.kind().is_trivia())
-        .map(|token| Range::<usize>::from(token.text_range()))
-        .collect::<Vec<_>>();
     let mut builder = Builder {
-        classifier: CommentClassifier::new(source, significant_ranges),
-        next_comment_id: 0,
-        next_unit_id: 0,
+        classifier: CommentClassifier::new(source, root.syntax()),
+        work: WorkCounter::default(),
     };
+    builder.work.add(builder.classifier.token_count());
     let root = builder.node(root.syntax());
+    assert!(
+        builder.classifier.is_empty(),
+        "normalization consumes every classified comment"
+    );
     let file = FormatFile {
         root,
-        comment_count: builder.next_comment_id as usize,
+        comment_count: builder.classifier.comment_count(),
+        source_len: source.len(),
+        normalization_work: builder.work.value(),
     };
     contract::validate_model(&file);
     file
 }
 
-struct Builder<'q> {
-    classifier: CommentClassifier<'q>,
-    next_comment_id: u32,
-    next_unit_id: u32,
+struct Builder {
+    classifier: CommentClassifier,
+    work: WorkCounter,
 }
 
-impl Builder<'_> {
+impl Builder {
     fn node(&mut self, syntax: &SyntaxNode) -> ModelNode {
-        let owner = UnitId(self.next_unit_id);
-        self.next_unit_id += 1;
         let elements: Vec<Element> = syntax
             .children_with_tokens()
-            .enumerate()
-            .filter_map(|(element_index, element)| match element {
+            .filter_map(|element| match element {
                 NodeOrToken::Node(node) => Some(Element::Node(Box::new(self.node(&node)))),
                 NodeOrToken::Token(token)
                     if matches!(token.kind(), SyntaxKind::Whitespace | SyntaxKind::Newline) =>
@@ -58,13 +51,7 @@ impl Builder<'_> {
                         SyntaxKind::LineComment | SyntaxKind::BlockComment
                     ) =>
                 {
-                    Some(Element::Comment(self.comment(
-                        &token,
-                        CommentSlot {
-                            owner,
-                            element_index: element_index as u32,
-                        },
-                    )))
+                    Some(Element::Comment(self.comment(&token)))
                 }
                 NodeOrToken::Token(token) => {
                     let replacement = if token.kind() == SyntaxKind::Slash
@@ -79,21 +66,18 @@ impl Builder<'_> {
             })
             .collect();
         let kind = NodeKind::from_syntax(syntax.kind(), &elements);
-        let analysis = measure::analyze(kind, &elements);
+        let layout = NodeLayout::for_node(kind, &elements);
+        let analysis = measure::analyze(&layout, &elements);
+        self.work.add(1 + elements.len() * 2);
         ModelNode {
             kind,
             elements,
+            layout,
             analysis,
         }
     }
 
-    fn comment(
-        &mut self,
-        token: &rowan::SyntaxToken<crate::compiler::parse::cst::QueryLang>,
-        slot: CommentSlot,
-    ) -> Comment {
-        let id = CommentId(self.next_comment_id);
-        self.next_comment_id += 1;
-        self.classifier.classify(id, slot, token)
+    fn comment(&mut self, token: &crate::compiler::parse::cst::SyntaxToken) -> Comment {
+        self.classifier.take(token)
     }
 }

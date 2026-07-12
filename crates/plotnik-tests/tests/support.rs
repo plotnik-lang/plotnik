@@ -2,6 +2,7 @@
 
 pub mod atomic_file;
 pub mod formatter;
+pub mod snapshots;
 
 #[path = "../test_support/grammar_loader.rs"]
 mod grammar_loader;

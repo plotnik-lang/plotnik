@@ -148,14 +148,11 @@ pub(super) enum SuffixKind {
 pub(super) struct ModelNode {
     pub kind: NodeKind,
     pub elements: Vec<Element>,
+    pub layout: NodeLayout,
     pub analysis: LayoutAnalysis,
 }
 
 impl ModelNode {
-    pub fn children(&self) -> impl Iterator<Item = &ModelNode> {
-        self.elements.iter().filter_map(Element::node)
-    }
-
     pub fn for_each_descendant_comment(&self, visit: &mut impl FnMut(&Comment)) {
         for element in &self.elements {
             match element {
@@ -173,23 +170,227 @@ impl ModelNode {
         })
     }
 
-    pub fn group_kind(&self) -> Option<GroupKind> {
-        let NodeKind::Group(kind) = self.kind else {
-            return None;
-        };
-        Some(kind)
+    pub fn node_at(&self, index: usize) -> &ModelNode {
+        self.elements[index]
+            .node()
+            .expect("layout node boundary points at a node")
     }
 
-    pub fn is_group_item(&self, child: &ModelNode) -> bool {
-        self.group_kind()
-            .is_some_and(|group| group.contains_item(child.kind))
+    pub fn comment_at(&self, index: usize) -> &Comment {
+        self.elements[index]
+            .comment()
+            .expect("layout comment boundary points at a comment")
     }
+
+    pub fn fragment(&self, fragment: Fragment) -> &[Element] {
+        &self.elements[fragment.range()]
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Fragment {
+    start: usize,
+    end: usize,
+}
+
+impl Fragment {
+    pub fn new(start: usize, end: usize) -> Self {
+        assert!(start <= end, "fragment boundaries are ordered");
+        Self { start, end }
+    }
+
+    pub fn before(index: usize) -> Self {
+        Self::new(0, index)
+    }
+
+    pub fn after(index: usize, len: usize) -> Self {
+        Self::new(index + 1, len)
+    }
+
+    fn range(self) -> Range<usize> {
+        self.start..self.end
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(super) enum NodeLayout {
+    Root { parts: Vec<FilePart> },
+    Definition { prefix: Fragment, body: usize },
+    Group(GroupLayout),
+    Prefix { prefix: Fragment, body: usize },
+    Suffix { body: usize, suffix: Fragment },
+    Atomic,
+}
+
+impl NodeLayout {
+    pub fn for_node(kind: NodeKind, elements: &[Element]) -> Self {
+        match kind {
+            NodeKind::Root => Self::Root {
+                parts: elements
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, element)| match element {
+                        Element::Node(node) if node.kind == NodeKind::Definition => {
+                            Some(FilePart::Definition(index))
+                        }
+                        Element::Comment(_) => Some(FilePart::Comment(index)),
+                        Element::Token(token) if token.kind == SyntaxKind::Shebang => {
+                            Some(FilePart::Shebang(index))
+                        }
+                        Element::Node(_) | Element::Token(_) => None,
+                    })
+                    .collect(),
+            },
+            NodeKind::Definition => {
+                let body = find_child(elements, NodeKind::is_definition_body);
+                Self::Definition {
+                    prefix: Fragment::before(body),
+                    body,
+                }
+            }
+            NodeKind::Group(group) => Self::Group(GroupLayout::new(group, elements)),
+            NodeKind::Prefix(_) => {
+                let body = find_child(elements, NodeKind::is_pattern);
+                Self::Prefix {
+                    prefix: Fragment::before(body),
+                    body,
+                }
+            }
+            NodeKind::Suffix(_) => {
+                let body = find_child(elements, NodeKind::is_pattern);
+                Self::Suffix {
+                    body,
+                    suffix: Fragment::after(body, elements.len()),
+                }
+            }
+            NodeKind::PatternAtom
+            | NodeKind::Anchor
+            | NodeKind::NegatedField
+            | NodeKind::Atomic => Self::Atomic,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) enum FilePart {
+    Definition(usize),
+    Comment(usize),
+    Shebang(usize),
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct GroupLayout {
+    pub kind: GroupKind,
+    pub head: Fragment,
+    pub parts: Vec<GroupPart>,
+    pub closer: usize,
+}
+
+impl GroupLayout {
+    fn new(kind: GroupKind, elements: &[Element]) -> Self {
+        let closer = elements
+            .iter()
+            .rposition(|element| {
+                matches!(element, Element::Token(token) if token.kind == kind.close_token())
+            })
+            .expect("parse-clean group has a closer");
+        let first_item = elements.iter().enumerate().find_map(|(index, element)| {
+            element
+                .node()
+                .filter(|child| kind.contains_item(child.kind))
+                .map(|_| index)
+        });
+        let head_end = first_item.unwrap_or_else(|| {
+            elements[..closer]
+                .iter()
+                .position(|element| element.comment().is_some_and(Comment::forces_line))
+                .unwrap_or(closer)
+        });
+        let parts = elements[head_end..closer]
+            .iter()
+            .enumerate()
+            .filter_map(|(offset, element)| {
+                let index = head_end + offset;
+                match element {
+                    Element::Node(child) if kind.contains_item(child.kind) => {
+                        Some(GroupPart::Item(index))
+                    }
+                    Element::Comment(_) => Some(GroupPart::Comment(index)),
+                    Element::Node(_) | Element::Token(_) => None,
+                }
+            })
+            .collect();
+        Self {
+            kind,
+            head: Fragment::before(head_end),
+            parts,
+            closer,
+        }
+    }
+
+    pub fn has_items(&self) -> bool {
+        self.parts
+            .iter()
+            .any(|part| matches!(part, GroupPart::Item(_)))
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.parts
+            .iter()
+            .filter(|part| matches!(part, GroupPart::Item(_)))
+            .count()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) enum GroupPart {
+    Item(usize),
+    Comment(usize),
 }
 
 #[derive(Debug)]
 pub(super) struct FormatFile {
     pub root: ModelNode,
     pub comment_count: usize,
+    pub source_len: usize,
+    pub normalization_work: usize,
+}
+
+#[derive(Debug, Default)]
+pub(super) struct WorkCounter {
+    #[cfg(test)]
+    value: usize,
+}
+
+impl WorkCounter {
+    #[inline]
+    pub fn add(&mut self, amount: usize) {
+        #[cfg(test)]
+        {
+            self.value += amount;
+        }
+        #[cfg(not(test))]
+        let _ = amount;
+    }
+
+    pub fn value(&self) -> usize {
+        #[cfg(test)]
+        {
+            self.value
+        }
+        #[cfg(not(test))]
+        {
+            0
+        }
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy)]
+pub(super) struct FormatMetrics {
+    pub work: usize,
+    pub input_bytes: usize,
+    pub output_bytes: usize,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -236,3 +437,11 @@ fn has_direct_token(elements: &[Element], kind: SyntaxKind) -> bool {
         .iter()
         .any(|element| matches!(element, Element::Token(token) if token.kind == kind))
 }
+
+fn find_child(elements: &[Element], predicate: impl Fn(NodeKind) -> bool) -> usize {
+    elements
+        .iter()
+        .position(|element| element.node().is_some_and(|child| predicate(child.kind)))
+        .expect("parse-clean wrapper has its semantic body")
+}
+use std::ops::Range;

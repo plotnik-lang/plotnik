@@ -16,7 +16,8 @@ Terminology follows the parser's CST (`compiler/parse/cst.rs`): `Def`,
 - **Input must parse cleanly.** The formatter formats the CST, not text. A
   file with parse errors is left untouched (recovery CSTs are not formattable).
   Parse- or analyze-level _warnings_ (e.g. tree-sitter-style `((a) (b))`) do
-  not block formatting.
+  not block formatting. A parse failure returns its diagnostics together with
+  the matching source map, so callers can render it without rebuilding context.
 - **Semantics-preserving.** Output differs from input only in whitespace,
   plus the explicit [normalizations](#normalizations). Comments are preserved.
 - **Idempotent and canonical.** Formatting is a pure function of the
@@ -329,7 +330,7 @@ mechanism in the public API.
 
 ```text
 fmt_pattern(pattern, col, level, pending_suffix):
-    model = normalize(pattern)              # semantic IR with lossless token handles
+    model = normalize(pattern)              # typed layout IR + lossless token handles
     inline = inline_summary(model, pending_suffix)
 
     must_break =
@@ -355,12 +356,22 @@ fmt_pattern(pattern, col, level, pending_suffix):
 ```
 
 Comment classification and attachment happen before measurement, including
-newlines inside block-comment tokens. Classification uses ordered CST token
-ranges and line boundaries, so it does not rescan the query per comment.
+newlines inside block-comment tokens. One ordered CST-token traversal records
+the first and last code token on each source line and classifies every comment
+from those line facts; there is no per-comment source or token scan.
 Structural facts are compositional and bottom-up; summaries store width,
 capture count, hardline state, and boundary token roles rather than flattened
-subtree strings. Width is decided at emission because the starting column and
-structured pending suffix chain are contextual.
+subtree strings. Normalization records definition bodies, group items, comment
+boundaries, closers, and prefix/suffix fragments explicitly, so rendering does
+not rediscover structure or compare node identity. Width is decided at emission
+because the starting column and structured pending suffix chain are contextual.
+
+Emission writes directly into one source-sized `String`; no document or line
+tree is built and copied afterward. Deterministic work accounting covers token
+classification, normalization, measurement, layout traversal, atom traversal,
+and output bytes. Geometric tests enforce both a relative scaling bound and an
+absolute input-plus-output work budget for comment-heavy, broad-group, and
+deep-prefix queries.
 
 Idempotence is not assumed from CST identity: comment relocation and explicit
 token normalizations may change trivia ownership or token spelling. It is a

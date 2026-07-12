@@ -1,7 +1,8 @@
 use crate::compiler::parse::cst::SyntaxKind;
 
 use super::ir::{
-    CaptureCount, Element, GroupKind, InlineSummary, LayoutAnalysis, NodeKind, PrefixKind, Width,
+    CaptureCount, Element, GroupKind, GroupPart, InlineSummary, LayoutAnalysis, NodeKind,
+    NodeLayout, Width,
 };
 use super::tokens::needs_space;
 
@@ -72,7 +73,7 @@ impl InlineSummary {
     }
 }
 
-pub(super) fn analyze(kind: NodeKind, elements: &[Element]) -> LayoutAnalysis {
+pub(super) fn analyze(layout: &NodeLayout, elements: &[Element]) -> LayoutAnalysis {
     let inline = elements
         .iter()
         .fold(InlineSummary::default(), |summary, element| {
@@ -96,19 +97,15 @@ pub(super) fn analyze(kind: NodeKind, elements: &[Element]) -> LayoutAnalysis {
             .node()
             .is_some_and(|child| child.analysis.must_break)
     });
-    let group_item_count = |group: GroupKind| {
-        elements
-            .iter()
-            .filter_map(Element::node)
-            .filter(|child| group.contains_item(child.kind))
-            .count()
-    };
-    let structural_break = match kind {
-        NodeKind::Group(GroupKind::Alternation) => {
-            let (count, labeled) = elements
+    let structural_break = match layout {
+        NodeLayout::Group(group) if group.kind == GroupKind::Alternation => {
+            let (count, labeled) = group
+                .parts
                 .iter()
-                .filter_map(Element::node)
-                .filter(|child| child.kind == NodeKind::Prefix(PrefixKind::Branch))
+                .filter_map(|part| match part {
+                    GroupPart::Item(index) => elements[*index].node(),
+                    GroupPart::Comment(_) => None,
+                })
                 .fold((0, false), |(count, labeled), branch| {
                     (
                         count + 1,
@@ -117,12 +114,17 @@ pub(super) fn analyze(kind: NodeKind, elements: &[Element]) -> LayoutAnalysis {
                 });
             count >= 2 || labeled
         }
-        NodeKind::Group(group @ GroupKind::Sequence(_)) => group_item_count(group) >= 2,
-        NodeKind::Group(group @ GroupKind::NamedNode) => {
-            elements
+        NodeLayout::Group(group) if matches!(group.kind, GroupKind::Sequence(_)) => {
+            group.item_count() >= 2
+        }
+        NodeLayout::Group(group) if group.kind == GroupKind::NamedNode => {
+            group
+                .parts
                 .iter()
-                .filter_map(Element::node)
-                .filter(|child| group.contains_item(child.kind))
+                .filter_map(|part| match part {
+                    GroupPart::Item(index) => elements[*index].node(),
+                    GroupPart::Comment(_) => None,
+                })
                 .filter(|child| child.kind != NodeKind::Anchor)
                 .count()
                 >= 2

@@ -1,21 +1,13 @@
-#[cfg(debug_assertions)]
-use std::collections::HashSet;
-
 use super::ir::FormatFile;
 
 pub(super) fn validate_model(file: &FormatFile) {
     let mut ids = vec![false; file.comment_count];
     let mut visited = 0;
-    #[cfg(debug_assertions)]
-    let mut slots = HashSet::with_capacity(file.comment_count);
     file.root.for_each_descendant_comment(&mut |comment| {
         let id = comment.id.0 as usize;
-        let _attachment = comment.slot;
         assert!(id < ids.len(), "CommentId is in the normalized file");
         assert!(!ids[id], "CommentId is unique");
         ids[id] = true;
-        #[cfg(debug_assertions)]
-        assert!(slots.insert(comment.slot), "comment attachment is unique");
         visited += 1;
     });
     assert_eq!(visited, file.comment_count);
