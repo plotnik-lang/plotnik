@@ -1,5 +1,5 @@
 error: `depth` needs an unsigned integer or `auto`
- --> tests/macro_ui/fail/depth_invalid.rs:4:13
+ --> tests/macro_diagnostics/fail/depth_invalid.rs:4:13
   |
 4 |     depth = nope,
   |             ^^^^

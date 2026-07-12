@@ -1,5 +1,5 @@
 error: failed to read `no_such_query.ptk`: No such file or directory (os error 2)
- --> tests/macro_ui/fail/query_file_not_found.rs:3:12
+ --> tests/macro_diagnostics/fail/query_file_not_found.rs:3:12
   |
 3 |     file = "no_such_query.ptk",
   |            ^^^^^^^^^^^^^^^^^^^

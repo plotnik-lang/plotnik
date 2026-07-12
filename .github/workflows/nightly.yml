@@ -53,5 +53,6 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_SECRET }}
           files: lcov.info
+          disable_search: true
           fail_ci_if_error: true
           slug: plotnik-lang/plotnik

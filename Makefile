@@ -29,7 +29,7 @@ test:
 shot:
 	@# See AGENTS.md for diagnostic guidelines
 	@# SHOT=1 accepts the golden-fixture suite (tests/0N-*); TRYBUILD=overwrite
-	@# refreshes the macro_ui .stderr goldens; cargo insta accept does the rest.
+	@# refreshes the macro_diagnostics .stderr goldens; cargo insta accept does the rest.
 	@SHOT=1 TRYBUILD=overwrite cargo nextest run \
 		--no-fail-fast \
 		--hide-progress-bar \
@@ -60,11 +60,6 @@ check-wasm:
 	@CC_wasm32_unknown_unknown="$(WASM_CC)" \
 		AR_wasm32_unknown_unknown="$(WASM_AR)" \
 		cargo check \
-		--package plotnik-lib \
-		--target wasm32-unknown-unknown
-	@CC_wasm32_unknown_unknown="$(WASM_CC)" \
-		AR_wasm32_unknown_unknown="$(WASM_AR)" \
-		cargo check \
 		--package plotnik-wasm \
 		--target wasm32-unknown-unknown
 
@@ -85,7 +80,9 @@ coverage:
 		--all-features \
 		--workspace \
 		--lcov \
-		--output-path lcov.info
+		--output-path lcov.info \
+		-- \
+		--skip macro_diagnostics
 
 fmt:
 	@cargo fmt --quiet

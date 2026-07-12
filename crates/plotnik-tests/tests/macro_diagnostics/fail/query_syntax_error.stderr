@@ -9,7 +9,7 @@ error: missing closing `)`
          | |____^
          |
        help: add `)` to close the node
- --> tests/macro_ui/fail/query_syntax_error.rs:6:5
+ --> tests/macro_diagnostics/fail/query_syntax_error.rs:6:5
   |
 6 | /     r#"
 7 | |     Q = (program

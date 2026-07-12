@@ -1,5 +1,5 @@
 error: `crate = plotnik::rt` must be an absolute module path like `::my_facade::rt` or `::plotnik_rt`
- --> tests/macro_ui/fail/relative_crate_path.rs:6:5
+ --> tests/macro_diagnostics/fail/relative_crate_path.rs:6:5
   |
 6 |     crate = plotnik::rt,
   |     ^^^^^

@@ -19,8 +19,6 @@
 //!
 //! However, fuel exhaustion (parse_fuel, recursion_fuel) returns an actual error immediately.
 
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 pub use crate::compiler::diagnostics::Error;
 
 pub(crate) mod ast;

@@ -1,5 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 //! Type inference: structural arity and data-flow types computed over the AST.
 
 pub mod capture_kind;

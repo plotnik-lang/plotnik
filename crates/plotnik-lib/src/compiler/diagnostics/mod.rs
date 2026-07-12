@@ -1,5 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 pub mod report;
 pub mod source;
 pub mod span;

@@ -1,5 +1,5 @@
 error: package `tree-sitter-typescript` ships several grammars (`tsx`, `typescript`); pick one with `grammar = "tree-sitter-typescript/tsx"`
- --> tests/macro_ui/fail/ambiguous_subgrammar.rs:5:15
+ --> tests/macro_diagnostics/fail/ambiguous_subgrammar.rs:5:15
   |
 5 |     grammar = "tree-sitter-typescript",
   |               ^^^^^^^^^^^^^^^^^^^^^^^^

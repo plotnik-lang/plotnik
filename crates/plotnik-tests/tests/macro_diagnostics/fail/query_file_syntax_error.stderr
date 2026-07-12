@@ -9,7 +9,7 @@ error: missing closing `)`
   | |__________________________________________^
   |
        help: add `)` to close the node
- --> tests/macro_ui/fail/query_file_syntax_error.rs:7:12
+ --> tests/macro_diagnostics/fail/query_file_syntax_error.rs:7:12
   |
 7 |     file = "broken_query.ptk",
   |            ^^^^^^^^^^^^^^^^^^

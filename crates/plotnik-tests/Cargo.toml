@@ -65,12 +65,8 @@ name = "macro_tests"
 path = "tests/macro_tests.rs"
 
 [[test]]
-name = "macro_ui"
-path = "tests/macro_ui.rs"
-
-[[test]]
-name = "codegen_conformance"
-path = "tests/codegen_conformance.rs"
+name = "macro_diagnostics"
+path = "tests/macro_diagnostics.rs"
 
 [[bench]]
 name = "vm"
