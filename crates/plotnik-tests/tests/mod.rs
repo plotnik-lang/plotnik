@@ -302,19 +302,15 @@ impl FixtureKind {
 #[derive(Debug, Clone, Copy)]
 enum FixtureMode {
     Check,
-    FormatQueries,
     AcceptAll,
 }
 
 impl FixtureMode {
     fn from_env() -> Result<Self, String> {
-        let shot = env_switch("SHOT")?;
-        let check = env_switch("PLOTNIK_FMT_CHECK")?;
-        match (shot, check) {
-            (true, true) => Err("`SHOT` and `PLOTNIK_FMT_CHECK` cannot both be enabled".into()),
-            (true, false) => Ok(Self::AcceptAll),
-            (false, true) => Ok(Self::Check),
-            (false, false) => Ok(Self::FormatQueries),
+        if env_switch("SHOT")? {
+            Ok(Self::AcceptAll)
+        } else {
+            Ok(Self::Check)
         }
     }
 }
@@ -449,13 +445,10 @@ fn check(fx: &Fixture, mode: FixtureMode) -> Result<(), String> {
 
     let generated = render(fx.kind, &query, parsed.input.as_ref())?;
     let formatted = canonical(&query, parsed.input.as_ref(), &generated);
-    if matches!(mode, FixtureMode::Check) {
-        return Err(format!(
-            "query formatting is out of date:\n{}",
-            unified_diff(&actual, &formatted)
-        ));
-    }
-    support::atomic_file::replace(&fx.path, &formatted)
+    Err(format!(
+        "query formatting is out of date — run `make shot`:\n{}",
+        unified_diff(&actual, &formatted)
+    ))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

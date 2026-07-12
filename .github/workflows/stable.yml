@@ -20,7 +20,6 @@ env:
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
   CLICOLOR: 1
-  PLOTNIK_FMT_CHECK: 1
 
 jobs:
   test:
