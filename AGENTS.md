@@ -41,7 +41,7 @@ Two zones, one rule each:
 | ------------------------ | ----------------------------------------------------- |
 | `make check`             | `cargo check --workspace --all-targets`               |
 | `make clippy`            | clippy with `-D warnings`                             |
-| `make test [FILTER=...]` | full test suite via `cargo nextest`                   |
+| `make test [FILTER=...]` | full test suite via native Rust test harnesses        |
 | `make shot [FILTER=...]` | accept golden fixtures + insta snapshots, then re-run |
 | `make fmt`               | `cargo fmt` + prettier                                |
 | `make coverage-lines`    | per-file missing lines for `plotnik-lib`              |

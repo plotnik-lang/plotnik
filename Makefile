@@ -21,28 +21,40 @@ clippy:
 		-D warnings
 
 test:
-	@cargo nextest run \
+	@cargo test \
+		--workspace \
+		--lib \
+		--bins \
+		--tests \
 		--no-fail-fast \
-		--show-progress only \
-		--status-level fail \
-		--failure-output final $(FILTER)
+		--quiet \
+		-- \
+		$(FILTER)
 
 shot:
 	@# See AGENTS.md for diagnostic guidelines
 	@# SHOT=1 accepts the golden-fixture suite (tests/0N-*); TRYBUILD=overwrite
 	@# refreshes the macro_diagnostics .stderr goldens; cargo insta accept does the rest.
-	@SHOT=1 TRYBUILD=overwrite cargo nextest run \
+	@SHOT=1 TRYBUILD=overwrite cargo test \
+		--workspace \
+		--lib \
+		--bins \
+		--tests \
 		--no-fail-fast \
-		--hide-progress-bar \
-		--status-level none \
-		--failure-output final $(FILTER) \
+		--quiet \
+		-- \
+		$(FILTER) \
 		|| true
 	@cargo insta accept
-	@cargo nextest run \
+	@cargo test \
+		--workspace \
+		--lib \
+		--bins \
+		--tests \
 		--no-fail-fast \
-		--hide-progress-bar \
-		--status-level none \
-		--failure-output final $(FILTER)
+		--quiet \
+		-- \
+		$(FILTER)
 
 bench:
 	@cargo bench \

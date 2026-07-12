@@ -1,7 +1,4 @@
-use std::fs;
 use std::path::{Path, PathBuf};
-
-const FIXTURE_EXT: &str = "txt";
 
 pub(crate) struct Fixture {
     pub path: PathBuf,
@@ -359,22 +356,21 @@ impl GeneratedOutput {
     }
 }
 
-pub(crate) fn discover(root: &Path) -> Vec<Fixture> {
-    let mut out = Vec::new();
-    let entries = fs::read_dir(root).expect("tests/ directory must be readable");
-    for entry in entries {
-        let entry = entry
-            .unwrap_or_else(|error| panic!("read fixture entry in {}: {error}", root.display()));
-        let path = entry.path();
-        if path.is_dir()
-            && let Some(stage) = path.file_name().and_then(|name| name.to_str())
-            && is_stage_dir(stage)
-        {
-            walk(&path, stage, root, &mut out);
-        }
-    }
-    out.sort_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
-    out
+pub(crate) fn fixture(root: &Path, relative: &str) -> Result<Fixture, String> {
+    let relative_path = Path::new(relative);
+    let stage = relative_path
+        .components()
+        .next()
+        .and_then(|component| component.as_os_str().to_str())
+        .ok_or_else(|| format!("fixture path has no UTF-8 stage: {relative}"))?;
+    let name_path = relative_path.with_extension("");
+    let name = FixtureName::from_relative(&name_path)?;
+    let kind = FixtureKind::classify(stage, &name)?;
+    Ok(Fixture {
+        path: root.join(relative_path),
+        name,
+        kind,
+    })
 }
 
 fn env_switch(name: &str) -> Result<bool, String> {
@@ -386,40 +382,5 @@ fn env_switch(name: &str) -> Result<bool, String> {
         Ok(value) => Err(format!(
             "`{name}` must be one of 0, 1, false, or true; got `{value}`"
         )),
-    }
-}
-
-fn is_stage_dir(name: &str) -> bool {
-    let bytes = name.as_bytes();
-    bytes.len() >= 3
-        && bytes[0].is_ascii_digit()
-        && bytes[1].is_ascii_digit()
-        && bytes[2] == b'-'
-        && !name.starts_with("01-")
-}
-
-fn walk(dir: &Path, stage: &str, root: &Path, out: &mut Vec<Fixture>) {
-    let entries = fs::read_dir(dir)
-        .unwrap_or_else(|error| panic!("read fixture dir {}: {error}", dir.display()));
-    for entry in entries {
-        let entry = entry
-            .unwrap_or_else(|error| panic!("read fixture entry in {}: {error}", dir.display()));
-        let path = entry.path();
-        if path.is_dir() {
-            walk(&path, stage, root, out);
-            continue;
-        }
-        if path.extension().and_then(|extension| extension.to_str()) != Some(FIXTURE_EXT) {
-            continue;
-        }
-        let relative = path
-            .strip_prefix(root)
-            .expect("fixture path is under tests root")
-            .with_extension("");
-        let name = FixtureName::from_relative(&relative)
-            .unwrap_or_else(|error| panic!("name {}: {error}", path.display()));
-        let kind = FixtureKind::classify(stage, &name)
-            .unwrap_or_else(|error| panic!("classify {}: {error}", path.display()));
-        out.push(Fixture { path, name, kind });
     }
 }
