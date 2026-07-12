@@ -1,4 +1,6 @@
-A = [X: (expression_statement) @s]
+A = [
+  X: (expression_statement) @s
+]
 
 Q = (program
   (A)

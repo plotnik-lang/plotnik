@@ -1,5 +1,8 @@
 Func = (function_declaration)
-Q = (program (Func)+ @funcs)
+
+Q = (program
+  (Func)+ @funcs
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Func = 19

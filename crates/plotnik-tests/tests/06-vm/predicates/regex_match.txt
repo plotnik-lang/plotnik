@@ -1,4 +1,8 @@
-Q = (program (expression_statement (identifier =~ /^foo/) @id))
+Q = (program
+  (expression_statement
+    (identifier =~ /^foo/) @id
+  )
+)
 --------------------- INPUT ----------------------
 foobar;
 ------------------- TYPESCRIPT -------------------

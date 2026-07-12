@@ -1,5 +1,10 @@
-A = (expression_statement (identifier) @id)? @x
-Q = (program (A)* @xs)
+A = (expression_statement
+  (identifier) @id
+)? @x
+
+Q = (program
+  (A)* @xs
+)
 --------------------- INPUT ----------------------
 debugger;
 ------------------- TYPESCRIPT -------------------

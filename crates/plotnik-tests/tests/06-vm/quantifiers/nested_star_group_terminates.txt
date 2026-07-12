@@ -1,5 +1,7 @@
 Q = (program
-  {(expression_statement)*}*
+  {
+    (expression_statement)*
+  }*
   (debugger_statement) @d
 )
 --------------------- INPUT ----------------------

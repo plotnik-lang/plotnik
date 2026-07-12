@@ -1,6 +1,10 @@
 Q = (program
   {
-    (lexical_declaration (variable_declarator name: (identifier) @n)) @decl
+    (lexical_declaration
+      (variable_declarator
+        name: (identifier) @n
+      )
+    ) @decl
   }* @rows
 )
 --------------------- INPUT ----------------------

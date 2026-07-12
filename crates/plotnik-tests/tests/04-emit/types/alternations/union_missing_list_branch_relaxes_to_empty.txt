@@ -1,7 +1,11 @@
-Q = (program [
-  {(expression_statement)+ @stmts}
-  (debugger_statement) @d
-])
+Q = (program
+  [
+    {
+      (expression_statement)+ @stmts
+    }
+    (debugger_statement) @d
+  ]
+)
 ------------------- TYPESCRIPT -------------------
 export interface Q {
   d: Node | null;

@@ -1,7 +1,9 @@
-Q = (program [
-  A: (expression_statement)
-  B: (debugger_statement)
-] @_)
+Q = (program
+  [
+    A: (expression_statement)
+    B: (debugger_statement)
+  ] @_
+)
 ------------------- TYPESCRIPT -------------------
 export type Q = undefined;
 ---------------------- RUST ----------------------

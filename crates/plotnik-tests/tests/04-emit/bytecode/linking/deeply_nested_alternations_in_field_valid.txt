@@ -1,10 +1,6 @@
 Q = (function_declaration
   name: [
-    [
-      [
-        (identifier)
-      ]
-    ]
+    [[(identifier)]]
   ]
 ) @fn
 ---------------------- NFA -----------------------

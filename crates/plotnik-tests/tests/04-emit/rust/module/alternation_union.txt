@@ -1,6 +1,9 @@
 Q = (program
   (expression_statement
-    [(identifier) @id (number) @num]
+    [
+      (identifier) @id
+      (number) @num
+    ]
   )
 )
 -------------------- MATCHER ---------------------

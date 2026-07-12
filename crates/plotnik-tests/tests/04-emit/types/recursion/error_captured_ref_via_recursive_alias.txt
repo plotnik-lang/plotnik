@@ -1,14 +1,17 @@
 A = (B)
+
 B = {
   (debugger_statement)
-  (statement_block (A) @x)? @s
+  (statement_block
+    (A) @x
+  )? @s
 }
 ------------------ DIAGNOSTICS -------------------
 error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
- --> query.ptk:4:20
+ --> query.ptk:6:5
   |
 1 | A = (B)
   |     --- defined here
 ...
-4 |   (statement_block (A) @x)? @s
-  |                    ^^^
+6 |     (A) @x
+  |     ^^^

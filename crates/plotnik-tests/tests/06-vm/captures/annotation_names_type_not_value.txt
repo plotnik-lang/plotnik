@@ -1,4 +1,8 @@
-Q = (program (expression_statement (identifier) @id :: Ident))
+Q = (program
+  (expression_statement
+    (identifier) @id :: Ident
+  )
+)
 --------------------- INPUT ----------------------
 foo;
 ------------------- TYPESCRIPT -------------------

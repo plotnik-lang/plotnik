@@ -23,7 +23,8 @@ use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 
 use plotnik_lib::bytecode::Module;
 use plotnik_lib::{
-    BytecodeConfig, Colors, QueryBuilder, TypeScriptCodegenConfig, VM, materialize_verified,
+    BytecodeConfig, Colors, QueryBuilder, TypeScriptCodegenConfig, VM, format_query,
+    materialize_verified,
 };
 
 mod support;
@@ -159,6 +160,16 @@ fn arb_query_text() -> impl Strategy<Value = String> {
     ]
 }
 
+fn arb_commented_query() -> impl Strategy<Value = String> {
+    (0usize..80).prop_map(|count| {
+        let items = (0..count)
+            .map(|index| format!("/* comment {index} */ (leaf)"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!("Q = (root {items})")
+    })
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(256))]
 
@@ -166,6 +177,19 @@ proptest! {
     #[test]
     fn compiling_arbitrary_text_never_panics(text in arb_query_text()) {
         let _ = try_compile(&text);
+    }
+
+    /// Formatting untrusted query text never panics — invalid syntax is an error.
+    #[test]
+    fn formatting_arbitrary_text_never_panics(text in arb_query_text()) {
+        let _ = format_query(&text);
+    }
+
+    /// Parse-clean patterns with dense comment boundaries remain total and idempotent.
+    #[test]
+    fn formatting_commented_patterns_never_panics(query in arb_commented_query()) {
+        let output = format_query(&query).expect("generated query is parse-clean");
+        prop_assert_eq!(format_query(&output).expect("formatted query reparses"), output);
     }
 }
 

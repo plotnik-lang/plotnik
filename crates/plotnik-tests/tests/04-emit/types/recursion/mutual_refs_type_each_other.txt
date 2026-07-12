@@ -1,14 +1,20 @@
 A = [
   Base: (identifier) @id
-  Nest: (array (B) @b)
+  Nest: (array
+    (B) @b
+  )
 ]
 
 B = [
   Leaf: (number) @n
-  Wrap: (parenthesized_expression (A) @a)
+  Wrap: (parenthesized_expression
+    (A) @a
+  )
 ]
 
-Q = (program (expression_statement (A) @root))
+Q = (program
+  (expression_statement (A) @root)
+)
 ------------------- TYPESCRIPT -------------------
 export type B =
   | { $tag: "Leaf"; $data: { n: Node } }

@@ -1,6 +1,4 @@
-Inner = (expression_statement
-  (identifier) @id
-)
+Inner = (expression_statement (identifier) @id)
 
 Q = (program
   (Inner)

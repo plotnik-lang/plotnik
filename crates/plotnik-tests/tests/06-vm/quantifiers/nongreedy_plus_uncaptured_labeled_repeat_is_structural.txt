@@ -1,4 +1,6 @@
-A = [X: (expression_statement)]
+A = [
+  X: (expression_statement)
+]
 
 Q = (program
   (A)+?

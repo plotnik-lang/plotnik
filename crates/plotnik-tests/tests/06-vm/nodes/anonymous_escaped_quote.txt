@@ -1,4 +1,12 @@
-Q = (program (expression_statement (string "\"" (string_fragment) @s "\"")))
+Q = (program
+  (expression_statement
+    (string
+      "\""
+      (string_fragment) @s
+      "\""
+    )
+  )
+)
 --------------------- INPUT ----------------------
 "hi";
 ------------------- TYPESCRIPT -------------------

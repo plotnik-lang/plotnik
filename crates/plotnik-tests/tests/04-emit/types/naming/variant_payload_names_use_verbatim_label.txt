@@ -1,7 +1,13 @@
-Q = (program [
-  Stmt: (expression_statement {(identifier) @name} @info)
-  DECL: (lexical_declaration) @node
-] @item)
+Q = (program
+  [
+    Stmt: (expression_statement
+      {
+        (identifier) @name
+      } @info
+    )
+    DECL: (lexical_declaration) @node
+  ] @item
+)
 ------------------- TYPESCRIPT -------------------
 export type QItem =
   | { $tag: "Stmt"; $data: { info: QItemStmtInfo } }

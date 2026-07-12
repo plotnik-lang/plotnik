@@ -2,7 +2,10 @@ Expr = [
   Empty: (identifier)?
   Wrap: (parenthesized_expression (Expr))
 ]
-Q = (program (expression_statement (Expr) @expr))
+
+Q = (program
+  (expression_statement (Expr) @expr)
+)
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
 [entrypoints]
@@ -98,11 +101,11 @@ P04 pattern    18..30  src0
 P05 branch     34..73  src0  T1.M1
 P06 pattern    40..73  src0
 P07 ref        66..72  src0  T1
-P08 def        76..125  src0  T2
-P09 pattern    80..125  src0
-P10 pattern    89..124  src0
-P11 capture    118..123  src0  T2.M2
-P12 ref        111..117  src0  T1
+P08 def        77..129  src0  T2
+P09 pattern    81..129  src0
+P10 pattern    92..127  src0
+P11 capture    121..126  src0  T2.M2
+P12 ref        114..120  src0  T1
 
 [transitions]
 Q:

@@ -1,9 +1,14 @@
-Q = (new_expression -arguments (arguments))
+Q = (new_expression
+  -arguments
+  (arguments)
+)
 ------------------ DIAGNOSTICS -------------------
 error: `-arguments` requires `arguments` to be absent, but this `new_expression` pattern also matches `arguments`
- --> query.ptk:1:22
+ --> query.ptk:2:4
   |
-1 | Q = (new_expression -arguments (arguments))
-  |                      ^^^^^^^^^ ----------- matches `arguments` here
+2 |   -arguments
+  |    ^^^^^^^^^
+3 |   (arguments)
+  |   ----------- matches `arguments` here
   |
 help: drop `-arguments` or remove the `arguments` child

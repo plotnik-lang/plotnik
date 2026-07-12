@@ -1,6 +1,8 @@
 A = {
   (expression_statement)
-  (statement_block (B)* @xs)? @blk
+  (statement_block
+    (B)* @xs
+  )? @blk
 }
 
 B = {
@@ -9,9 +11,9 @@ B = {
 }
 ------------------ DIAGNOSTICS -------------------
 error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
- --> query.ptk:3:20
+ --> query.ptk:4:5
   |
-3 |   (statement_block (B)* @xs)? @blk
-  |                    ^^^^
+4 |     (B)* @xs
+  |     ^^^^
   |
 help: add internal captures: `{(a) @a (b) @b}* @items`

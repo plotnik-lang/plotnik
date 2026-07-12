@@ -1,4 +1,6 @@
-Q = (binary_expression operator: "+") @expr
+Q = (binary_expression
+  operator: "+"
+) @expr
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 8

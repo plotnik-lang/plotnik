@@ -1,4 +1,6 @@
-Q = (statement_block (identifier)? @id)
+Q = (statement_block
+  (identifier)? @id
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 13

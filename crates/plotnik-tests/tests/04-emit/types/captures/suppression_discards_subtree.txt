@@ -1,4 +1,8 @@
-Q = (program (expression_statement (identifier) @id) @_)
+Q = (program
+  (expression_statement
+    (identifier) @id
+  ) @_
+)
 ------------------- TYPESCRIPT -------------------
 export type Q = undefined;
 ---------------------- RUST ----------------------

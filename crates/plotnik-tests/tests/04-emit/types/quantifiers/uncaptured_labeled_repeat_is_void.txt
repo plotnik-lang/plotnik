@@ -1,17 +1,18 @@
-Q = (program [
-  A: (expression_statement)
-  B: (lexical_declaration)
-]*)
+Q = (program
+  [
+    A: (expression_statement)
+    B: (lexical_declaration)
+  ]*
+)
 ------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
- --> query.ptk:1:14
+ --> query.ptk:2:3
   |
-1 |   Q = (program [
-  |  ______________^
-2 | |   A: (expression_statement)
-3 | |   B: (lexical_declaration)
-4 | | ]*)
-  | |_^
+2 | /   [
+3 | |     A: (expression_statement)
+4 | |     B: (lexical_declaration)
+5 | |   ]*
+  | |___^
   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
 ------------------- TYPESCRIPT -------------------

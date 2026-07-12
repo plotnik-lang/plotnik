@@ -1,4 +1,6 @@
-Q = (program (lexical_declaration)* @decls)
+Q = (program
+  (lexical_declaration)* @decls
+)
 --------------------- INPUT ----------------------
 let a; foo; let b;
 ------------------- TYPESCRIPT -------------------

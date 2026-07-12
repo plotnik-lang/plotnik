@@ -72,3 +72,8 @@ path = "tests/macro_diagnostics.rs"
 name = "vm"
 path = "benches/vm.rs"
 harness = false
+
+[[bench]]
+name = "formatter"
+path = "benches/formatter.rs"
+harness = false

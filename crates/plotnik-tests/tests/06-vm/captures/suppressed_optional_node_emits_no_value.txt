@@ -1,4 +1,6 @@
-Q = (program (expression_statement)? @_)
+Q = (program
+  (expression_statement)? @_
+)
 --------------------- INPUT ----------------------
 a;
 ------------------- TYPESCRIPT -------------------

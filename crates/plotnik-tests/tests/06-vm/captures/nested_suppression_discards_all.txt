@@ -1,5 +1,7 @@
 Q = (program
-  {(expression_statement (identifier) @_inner)} @_outer
+  {
+    (expression_statement (identifier) @_inner)
+  } @_outer
   (debugger_statement) @d
 )
 --------------------- INPUT ----------------------

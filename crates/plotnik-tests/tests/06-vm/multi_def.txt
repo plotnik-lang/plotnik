@@ -1,5 +1,8 @@
 Other = (program (function_declaration) @fn)
-Q = (program (expression_statement (identifier) @name))
+
+Q = (program
+  (expression_statement (identifier) @name)
+)
 --------------------- INPUT ----------------------
 foo;
 ------------------- TYPESCRIPT -------------------

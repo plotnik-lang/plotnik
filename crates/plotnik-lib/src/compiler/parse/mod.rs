@@ -54,6 +54,22 @@ pub use parser::{DEFAULT_FUEL, DEFAULT_MAX_DEPTH, ParseConfig, Parser};
 
 pub use lexer::lex;
 
+/// Parse one lossless query CST with caller-owned diagnostics and resource limits.
+///
+/// Syntax diagnostics remain in `diagnostics`; only fatal parser resource failures
+/// are returned. Callers decide whether recovery trees are acceptable at their
+/// boundary.
+pub(crate) fn parse_lossless(
+    source: &str,
+    source_id: crate::compiler::diagnostics::SourceId,
+    diagnostics: &mut crate::compiler::diagnostics::Diagnostics,
+    config: ParseConfig,
+) -> Result<Root, Error> {
+    Parser::new(source, source_id, lex(source), diagnostics, config)
+        .parse()
+        .map(parser::ParsedRoot::into_ast)
+}
+
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct TokenSpan {
     /// Stable lowercase token class for editor/highlighter consumers.

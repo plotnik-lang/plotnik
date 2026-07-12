@@ -20,7 +20,7 @@ use crate::compiler::lower::ir::SemanticNfa;
 use crate::compiler::lower::semantic_verify;
 use crate::compiler::lower::spans::assign_spans;
 use crate::compiler::lower::{LowerInput, lower_semantic, pack_lowered};
-use crate::compiler::parse::{Parser, Root, SyntaxNode, lex};
+use crate::compiler::parse::{Root, SyntaxNode, parse_lossless};
 use crate::core::grammar::Grammar;
 use crate::core::{Colors, Interner};
 
@@ -106,17 +106,13 @@ impl QueryBuilder {
         let mut diag = Diagnostics::new();
 
         for source in self.source_map.iter() {
-            let tokens = lex(source.content);
-            let parser = Parser::new(
+            let root = parse_lossless(
                 source.content,
                 source.id,
-                tokens,
                 &mut diag,
                 self.limits.parse().config(),
-            );
-
-            let res = parser.parse()?;
-            ast.insert(source.id, res.into_ast());
+            )?;
+            ast.insert(source.id, root);
         }
 
         Ok(QueryParsed {

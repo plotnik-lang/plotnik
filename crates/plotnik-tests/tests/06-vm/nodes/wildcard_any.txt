@@ -1,4 +1,8 @@
-Q = (program (expression_statement (array _ @tok)))
+Q = (program
+  (expression_statement
+    (array _ @tok)
+  )
+)
 --------------------- INPUT ----------------------
 [a];
 ------------------- TYPESCRIPT -------------------

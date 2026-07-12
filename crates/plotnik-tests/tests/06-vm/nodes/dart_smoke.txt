@@ -1,4 +1,8 @@
-Q = (program (function_signature name: (identifier) @name))
+Q = (program
+  (function_signature
+    name: (identifier) @name
+  )
+)
 ------------------ INPUT (dart) ------------------
 void f() {}
 ------------------- TYPESCRIPT -------------------

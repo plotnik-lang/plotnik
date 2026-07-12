@@ -1,4 +1,7 @@
-Q = (list_literal (list_literal) @outer (list_literal) @inner)
+Q = (list_literal
+  (list_literal) @outer
+  (list_literal) @inner
+)
 ------------------ INPUT (dart) ------------------
 ---------------------- NFA -----------------------
 [entrypoints]

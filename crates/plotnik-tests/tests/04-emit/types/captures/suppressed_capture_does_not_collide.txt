@@ -1,5 +1,7 @@
 Q = (program
-  (expression_statement (identifier) @x) @_
+  (expression_statement
+    (identifier) @x
+  ) @_
   (debugger_statement) @x
 )
 ------------------- TYPESCRIPT -------------------

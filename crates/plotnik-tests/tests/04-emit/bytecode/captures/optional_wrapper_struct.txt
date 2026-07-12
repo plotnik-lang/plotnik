@@ -1,5 +1,7 @@
 Q = {
-  {(identifier) @id} @inner
+  {
+    (identifier) @id
+  } @inner
 }? @outer
 ---------------------- NFA -----------------------
 [entrypoints]

@@ -1,15 +1,19 @@
 Alias = (identifier)
+
 Expr = [
   Id: (Alias) @name :: Ident
   Num: (number) @value
 ]
-Q = (program (expression_statement (Expr) @expr))
+
+Q = (program
+  (expression_statement (Expr) @expr)
+)
 ------------------ DIAGNOSTICS -------------------
 error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
- --> query.ptk:3:7
+ --> query.ptk:4:7
   |
 1 | Alias = (identifier)
   |         ------------ defined here
-2 | Expr = [
-3 |   Id: (Alias) @name :: Ident
+...
+4 |   Id: (Alias) @name :: Ident
   |       ^^^^^^^

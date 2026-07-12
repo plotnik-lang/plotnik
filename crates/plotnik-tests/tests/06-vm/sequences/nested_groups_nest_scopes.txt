@@ -1,6 +1,8 @@
 Q = (program
   {
-    {(expression_statement) @e} @inner
+    {
+      (expression_statement) @e
+    } @inner
   } @outer
 )
 --------------------- INPUT ----------------------

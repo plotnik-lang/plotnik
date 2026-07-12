@@ -65,6 +65,15 @@ pub struct ParseConfig {
     pub fuel: u32,
     pub max_depth: u32,
 }
+
+impl Default for ParseConfig {
+    fn default() -> Self {
+        Self {
+            fuel: DEFAULT_FUEL,
+            max_depth: DEFAULT_MAX_DEPTH,
+        }
+    }
+}
 /// Lookaheads allowed without consuming a token before the stuck-parser assertion fires.
 const MAX_STALL_LOOKAHEADS: u32 = 256;
 

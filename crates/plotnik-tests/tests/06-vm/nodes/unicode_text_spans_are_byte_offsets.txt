@@ -1,4 +1,6 @@
-Q = (program (expression_statement (identifier) @id))
+Q = (program
+  (expression_statement (identifier) @id)
+)
 --------------------- INPUT ----------------------
 π;
 ------------------- TYPESCRIPT -------------------

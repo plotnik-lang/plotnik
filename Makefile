@@ -3,6 +3,7 @@
 LLVM_PREFIX ?= /opt/homebrew/opt/llvm
 WASM_CC ?= $(LLVM_PREFIX)/bin/clang
 WASM_AR ?= $(LLVM_PREFIX)/bin/llvm-ar
+BENCH ?= vm
 
 check:
 	@cargo check \
@@ -46,7 +47,7 @@ shot:
 bench:
 	@cargo bench \
 		--package plotnik-tests \
-		--bench vm \
+		--bench $(BENCH) \
 		-- $(FILTER)
 
 coverage-lines:

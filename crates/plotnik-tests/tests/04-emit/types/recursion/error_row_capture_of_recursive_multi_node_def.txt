@@ -3,12 +3,14 @@ A = {
   (statement_block (A))?
 }
 
-Q = (program (A)* @xs)
+Q = (program
+  (A)* @xs
+)
 ------------------ DIAGNOSTICS -------------------
 error: one repeat of this `*` group doesn't match exactly one node, so there is no single node to bind per element
- --> query.ptk:6:14
+ --> query.ptk:7:3
   |
-6 | Q = (program (A)* @xs)
-  |              ^^^^
+7 |   (A)* @xs
+  |   ^^^^
   |
 help: add internal captures: `{(a) @a (b) @b}* @items`

@@ -1,4 +1,6 @@
-Q = (program (identifier)* @ids)
+Q = (program
+  (identifier)* @ids
+)
 --------------------- INPUT ----------------------
 x;
 ------------------- TYPESCRIPT -------------------

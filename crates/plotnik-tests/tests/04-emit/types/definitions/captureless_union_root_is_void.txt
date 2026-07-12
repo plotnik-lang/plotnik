@@ -1,4 +1,7 @@
-Q = [(identifier) (number)]
+Q = [
+  (identifier)
+  (number)
+]
 ------------------- TYPESCRIPT -------------------
 export type Q = undefined;
 ---------------------- RUST ----------------------

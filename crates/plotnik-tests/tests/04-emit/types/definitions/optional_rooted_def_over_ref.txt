@@ -1,9 +1,15 @@
-Row = (pair key: (_) @key value: (_) @val)
+Row = (pair
+  key: (_) @key
+  value: (_) @val
+)
+
 MaybeRow = (Row)?
 
 Q = (program
   (expression_statement
-    (parenthesized_expression (object (MaybeRow) @first))
+    (parenthesized_expression
+      (object (MaybeRow) @first)
+    )
   )
 )
 ------------------- TYPESCRIPT -------------------

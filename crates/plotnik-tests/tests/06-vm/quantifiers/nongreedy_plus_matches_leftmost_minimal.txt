@@ -1,5 +1,7 @@
 Q = (program
-  {(lexical_declaration)+? @d}
+  {
+    (lexical_declaration)+? @d
+  }
 )
 --------------------- INPUT ----------------------
 let a; let b;

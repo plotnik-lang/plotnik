@@ -1,4 +1,6 @@
-Q = (program (expression_statement (number) @n))
+Q = (program
+  (expression_statement (number) @n)
+)
 ------------------- INPUT (ts) -------------------
 x
 ------------------- TYPESCRIPT -------------------
@@ -247,11 +249,11 @@ N0: S2 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..48  src0  T1
-P1 pattern    4..48  src0
-P2 pattern    13..47  src0
-P3 capture    44..46  src0  T1.M0
-P4 pattern    35..43  src0
+P0 def        0..51  src0  T1
+P1 pattern    4..51  src0
+P2 pattern    15..49  src0
+P3 capture    46..48  src0  T1.M0
+P4 pattern    37..45  src0
 
 [transitions]
 Q:

@@ -1,5 +1,7 @@
 Rec = [
-  A: (program (expression_statement (Rec) @inner))
+  A: (program
+    (expression_statement (Rec) @inner)
+  )
   B: (identifier) @id
 ]
 

@@ -1,9 +1,11 @@
 Inner = (expression_statement (call_expression) @call)
 
-Q = (program [
-  Call: (Inner)
-  Decl: (lexical_declaration) @d
-] @item)
+Q = (program
+  [
+    Call: (Inner)
+    Decl: (lexical_declaration) @d
+  ] @item
+)
 ------------------- TYPESCRIPT -------------------
 export type QItem =
   | { $tag: "Call" }

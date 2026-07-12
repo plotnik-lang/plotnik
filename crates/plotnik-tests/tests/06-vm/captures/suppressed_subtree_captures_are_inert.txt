@@ -1,6 +1,8 @@
 Q = (program
   (expression_statement (identifier) @x)
-  {(debugger_statement) @x}? @_
+  {
+    (debugger_statement) @x
+  }? @_
 )
 --------------------- INPUT ----------------------
 foo;

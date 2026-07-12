@@ -1,12 +1,14 @@
 Q = (foo
-  (pair (a) @x) @p
+  (pair
+    (a) @x
+  ) @p
   (b) @x
 )
 ------------------ DIAGNOSTICS -------------------
 error: capture `@x` already defined in this scope
- --> query.ptk:3:3
+ --> query.ptk:5:3
   |
-3 |   (b) @x
+5 |   (b) @x
   |   ^^^^^^
   |
 help: rename one capture, or use an enum if they are mutually exclusive branches

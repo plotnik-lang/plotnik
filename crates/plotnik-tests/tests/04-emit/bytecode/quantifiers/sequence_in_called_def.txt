@@ -1,5 +1,9 @@
 Item = (identifier) @name
-Collect = {(Item) @item}* @items
+
+Collect = {
+  (Item) @item
+}* @items
+
 Q = (array (Collect))
 ---------------------- NFA -----------------------
 [entrypoints]

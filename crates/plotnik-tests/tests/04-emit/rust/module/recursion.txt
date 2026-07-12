@@ -1,12 +1,12 @@
 Expr = [
-  Paren: (parenthesized_expression (Expr) @inner)
+  Paren: (parenthesized_expression
+    (Expr) @inner
+  )
   Id: (identifier) @id
 ]
 
 Q = (program
-  (expression_statement
-    (Expr) @expr
-  )
+  (expression_statement (Expr) @expr)
 )
 -------------------- MATCHER ---------------------
 // Generated Plotnik query module: typed output types, `parse`/`matches` entry

@@ -1,4 +1,8 @@
-Entry = [Id: (identifier) @id  Num: (number) @num]
+Entry = [
+  Id: (identifier) @id
+  Num: (number) @num
+]
+
 Items = (Entry)*
 
 Q = (program

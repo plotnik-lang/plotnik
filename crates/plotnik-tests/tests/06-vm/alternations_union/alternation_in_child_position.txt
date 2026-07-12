@@ -1,7 +1,5 @@
 Q = (program
-  [
-    (expression_statement) @expr
-  ]
+  [(expression_statement) @expr]
 )
 --------------------- INPUT ----------------------
 a;

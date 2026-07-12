@@ -1,9 +1,15 @@
-Row = (pair key: (_) @key value: (_) @val)
+Row = (pair
+  key: (_) @key
+  value: (_) @val
+)
+
 Rows = (Row)*
 
 Q = (program
   (expression_statement
-    (parenthesized_expression (object (Rows) @rows))
+    (parenthesized_expression
+      (object (Rows) @rows)
+    )
   )
 )
 ------------------- TYPESCRIPT -------------------

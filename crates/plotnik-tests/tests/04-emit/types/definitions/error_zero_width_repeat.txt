@@ -1,12 +1,20 @@
 MaybeId = (identifier)?
-Q = (program (expression_statement (array (MaybeId)* @xs)))
+
+Q = (program
+  (expression_statement
+    (array
+      (MaybeId)* @xs
+    )
+  )
+)
 ------------------ DIAGNOSTICS -------------------
 error: the referenced definition can match zero nodes, but a `*` repeat must consume input on every iteration — its empty case could never occur here
- --> query.ptk:2:43
+ --> query.ptk:6:7
   |
 1 | MaybeId = (identifier)?
   |           ------------- can match zero nodes here
-2 | Q = (program (expression_statement (array (MaybeId)* @xs)))
-  |                                           ^^^^^^^^^^
+...
+6 |       (MaybeId)* @xs
+  |       ^^^^^^^^^^
   |
 help: make the definition consume at least one node, or drop the quantifier

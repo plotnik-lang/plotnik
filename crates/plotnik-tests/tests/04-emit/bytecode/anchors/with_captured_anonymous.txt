@@ -1,4 +1,8 @@
-Q = (binary_expression "+" @op . (identifier))
+Q = (binary_expression
+  "+" @op
+  .
+  (identifier)
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 12

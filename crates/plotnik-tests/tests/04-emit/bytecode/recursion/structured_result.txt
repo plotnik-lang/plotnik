@@ -2,11 +2,15 @@ Expr = [
   Lit: (number) @value
   Nested: (call_expression
     function: (identifier) @fn
-    arguments: (arguments (Expr) @inner)
+    arguments: (arguments
+      (Expr) @inner
+    )
   )
 ]
 
-Test = (program (expression_statement (Expr) @expr))
+Test = (program
+  (expression_statement (Expr) @expr)
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Expr = 21

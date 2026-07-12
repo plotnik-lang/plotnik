@@ -1,4 +1,6 @@
-Item = (array (Item)* @children)
+Item = (array
+  (Item)* @children
+)
 ------------------- TYPESCRIPT -------------------
 export interface Item {
   children: Item[];

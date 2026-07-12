@@ -1,4 +1,7 @@
-Q = (array (identifier) (number))
+Q = (array
+  (identifier)
+  (number)
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 7

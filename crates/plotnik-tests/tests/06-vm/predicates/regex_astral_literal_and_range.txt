@@ -1,4 +1,6 @@
-Q = (program (comment =~ /🦀[\u{1F980}-\u{1F99F}]/) @comment)
+Q = (program
+  (comment =~ /🦀[\u{1F980}-\u{1F99F}]/) @comment
+)
 --------------------- INPUT ----------------------
 // 🦀🦀
 ------------------- TYPESCRIPT -------------------

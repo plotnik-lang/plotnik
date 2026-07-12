@@ -1,7 +1,9 @@
-Q = (program [
-  A: (expression_statement)
-  B: (debugger_statement)
-] @kind :: Kind)
+Q = (program
+  [
+    A: (expression_statement)
+    B: (debugger_statement)
+  ] @kind :: Kind
+)
 ------------------- TYPESCRIPT -------------------
 export type Kind =
   | { $tag: "A" }

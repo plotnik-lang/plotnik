@@ -3,10 +3,12 @@ Impossible = (binary_expression
   left: (_)
 )
 
-Q = (program (expression_statement (Impossible) @expr))
+Q = (program
+  (expression_statement (Impossible) @expr)
+)
 ------------------ DIAGNOSTICS -------------------
 error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
- --> query.ptk:6:36
+ --> query.ptk:7:25
   |
 1 |   Impossible = (binary_expression
   |  ______________-
@@ -14,6 +16,6 @@ error: the referenced definition produces no value; add a capture inside it or c
 3 | |   left: (_)
 4 | | )
   | |_- defined here
-5 |
-6 |   Q = (program (expression_statement (Impossible) @expr))
-  |                                      ^^^^^^^^^^^^
+...
+7 |     (expression_statement (Impossible) @expr)
+  |                           ^^^^^^^^^^^^

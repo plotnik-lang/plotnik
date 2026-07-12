@@ -1,7 +1,13 @@
-Q = (program [
-  A: (expression_statement (identifier) @x)
-  B: (expression_statement (string) @y)
-] @item)
+Q = (program
+  [
+    A: (expression_statement
+      (identifier) @x
+    )
+    B: (expression_statement
+      (string) @y
+    )
+  ] @item
+)
 --------------------- INPUT ----------------------
 "s"
 ------------------- TYPESCRIPT -------------------

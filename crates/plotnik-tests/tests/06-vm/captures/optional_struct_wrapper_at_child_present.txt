@@ -1,6 +1,8 @@
 Q = (program
   (expression_statement
-    {(identifier) @id}? @outer
+    {
+      (identifier) @id
+    }? @outer
   )
 )
 --------------------- INPUT ----------------------

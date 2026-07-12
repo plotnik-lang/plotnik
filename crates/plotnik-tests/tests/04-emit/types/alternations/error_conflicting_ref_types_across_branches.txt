@@ -1,4 +1,8 @@
-Row = (pair key: (_) @key value: (_) @val)
+Row = (pair
+  key: (_) @key
+  value: (_) @val
+)
+
 Name = (property_identifier) @name
 
 Q = (program
@@ -15,11 +19,11 @@ Q = (program
 )
 ------------------ DIAGNOSTICS -------------------
 error: capture `@x` has incompatible types across branches
-  --> query.ptk:9:17
+  --> query.ptk:13:17
    |
- 9 |           (Row) @x
+13 |           (Row) @x
    |                 ^^
-10 |           (Name) @x
+14 |           (Name) @x
    |                  -- and a different type here
    |
 help: make every branch produce the same type, or label the branches for an enum

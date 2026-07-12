@@ -1,13 +1,17 @@
 Leaf = (identifier) @id
-Q = (program (expression_statement (Leaf) @leaf))
+
+Q = (program
+  (expression_statement (Leaf) @leaf)
+)
+
 Bad = (identifier) @bad
 ------------------- INPUT (ts) -------------------
 let x = 1;
 ------------------ DIAGNOSTICS -------------------
 warning: entrypoint can never match: matching starts at the tree root
- --> query.ptk:3:7
+ --> query.ptk:7:7
   |
-3 | Bad = (identifier) @bad
+7 | Bad = (identifier) @bad
   |       ^^^^^^^^^^^^^^^^^
   |
 help: wrap the pattern in the grammar's root node, e.g. `(program ...)`

@@ -1,10 +1,6 @@
 Q = (statement_block
   {
-    {
-      {
-        (function_declaration)
-      }
-    }
+    {{(function_declaration)}}
   }
 ) @block
 ---------------------- NFA -----------------------

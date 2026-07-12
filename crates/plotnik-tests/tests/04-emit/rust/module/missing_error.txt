@@ -1,6 +1,4 @@
-Err = (program
-  (ERROR) @err
-)
+Err = (program (ERROR) @err)
 
 Q = (program
   (if_statement

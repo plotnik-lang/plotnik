@@ -1,4 +1,8 @@
-Q = (program (expression_statement (identifier) @id)? @x)
+Q = (program
+  (expression_statement
+    (identifier) @id
+  )? @x
+)
 ------------------- TYPESCRIPT -------------------
 export interface QX {
   id: Node;

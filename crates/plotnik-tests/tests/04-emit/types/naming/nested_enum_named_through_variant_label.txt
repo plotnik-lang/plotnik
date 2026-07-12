@@ -1,9 +1,13 @@
-Q = (program [
-  Stmt: (expression_statement [
-    Yes: (identifier)
-    No: (number)
-  ] @kind)
-] @item)
+Q = (program
+  [
+    Stmt: (expression_statement
+      [
+        Yes: (identifier)
+        No: (number)
+      ] @kind
+    )
+  ] @item
+)
 ------------------- TYPESCRIPT -------------------
 export type QItem =
   | { $tag: "Stmt"; $data: { kind: QItemStmtKind } };
