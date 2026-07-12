@@ -1,4 +1,4 @@
-# Internal Bytecode: Strings
+# Binary Format: Strings
 
 Strings are stored in a centralized pool to eliminate redundancy and alignment
 padding overhead. They are referenced by `StringId` throughout the buffer.

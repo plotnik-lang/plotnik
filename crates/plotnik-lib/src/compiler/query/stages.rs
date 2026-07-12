@@ -475,7 +475,7 @@ impl CompiledQuery {
             };
         let module = Module::load_compiler_output(&bytes).map_err(|error| {
             crate::compiler::Error::CompilerInvariantViolation(format!(
-                "bytecode target failed internal construction validation: {error}"
+                "bytecode target failed module validation: {error}"
             ))
         })?;
         Ok(Emission::success(module, diagnostics))

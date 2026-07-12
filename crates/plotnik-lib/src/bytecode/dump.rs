@@ -1,6 +1,6 @@
-//! Human-readable view of internal bytecode for debugging and documentation.
+//! Human-readable bytecode dump for debugging and documentation.
 //!
-//! See `docs/internal-bytecode/08-dump-format.md` for the output format specification.
+//! See `docs/binary-format/08-dump-format.md` for the output format specification.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -18,7 +18,7 @@ use super::{Call, Match, Return, SPAN_NO_BINDING};
 use crate::bytecode::type_system::TYPE_CUSTOM_START;
 use plotnik_rt::Nav;
 
-/// Render the internal VM representation for debugging and teaching.
+/// Generate a human-readable dump of the bytecode module.
 pub fn dump(module: &Module, colors: Colors) -> String {
     let mut out = String::new();
     let ctx = DumpContext::new(module, colors);

@@ -1,9 +1,9 @@
-# Internal Bytecode Layout
+# Binary Format
 
-This document explains the transient buffer shared by Plotnik's compiler and
-VM. Bytecode is not a file format, interchange format, cache artifact, or public
-compatibility surface. Users encounter it only as textual output from debugging
-and teaching commands such as `plotnik dump`.
+This document specifies Plotnik bytecode. The compiler emits it in-process and
+immediately loads it into the VM; it is not a user-facing file, interchange, or
+cache format. Users encounter bytecode only as textual output from debugging and
+teaching commands such as `plotnik dump`.
 
 64-byte header + 12 data sections. All sections are 64-byte aligned. Offsets are computed from counts.
 
@@ -65,7 +65,7 @@ StringTable and RegexTable use `count + 1` entries. The final entry stores the b
 
 ### Offset Computation
 
-Section offsets are not stored in the header. Internal construction computes them by:
+Section offsets are not stored in the header. The module loader computes them by:
 
 1. Start after header (offset 64)
 2. For each section in order:
@@ -74,7 +74,7 @@ Section offsets are not stored in the header. Internal construction computes the
 3. Blob sizes come from header: `str_blob_size` and `regex_blob_size`
 
 The bytes filling each 64-byte alignment gap (and the final tail up to
-`total_size`) are reserved zero; internal validation rejects a non-zero byte in
+`total_size`) are reserved zero; bytecode validation rejects a non-zero byte in
 any gap.
 
 ## Header (v10)
@@ -111,10 +111,10 @@ struct Header {
 
 ## Construction and validation
 
-The emitter validates its own buffer before constructing the VM representation.
-This is an internal compiler assertion boundary, not an input parser. Tests
-deliberately mutate emitted buffers to prove that malformed compiler output is
-rejected cleanly. The CRC catches accidental internal corruption; structural
+The module loader validates compiler output before constructing the VM module.
+It is a compiler assertion boundary, not a user input parser. Tests deliberately
+mutate emitted bytecode to prove that malformed compiler output is rejected
+cleanly. The CRC catches accidental corruption; structural
 checks uphold the no-panic guarantee. Validation runs in this order:
 
 1. **Magic / version / size** — `PTKQ`, version 10, and `total_size` equal to the

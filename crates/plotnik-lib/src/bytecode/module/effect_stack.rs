@@ -11,7 +11,7 @@
 //! (`crates/plotnik-lib/src/vm/engine/vm.rs`). On compiler output these are
 //! unreachable by construction; on a forged module that swaps one effect they
 //! are not. This pass proves them unreachable for *any* module that passes
-//! internal bytecode validation, so they stay sound loud invariants instead of reachable
+//! module validation, so they stay sound loud invariants instead of reachable
 //! panics.
 //!
 //! ## Model

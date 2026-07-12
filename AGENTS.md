@@ -61,12 +61,12 @@ crates/
     src/language_registry.rs   # define_langs! table, one entry per language
     build.rs                   # embeds gzipped grammar.json per enabled lang feature
   plotnik-lib/
-    src/bytecode/              # internal VM representation and validation
+    src/bytecode/              # bytecode format, instruction set, module loading
     src/compiler/
       parse/                   # lexer, grammar, AST
       analyze/                 # semantic analysis passes
       lower/                   # Thompson NFA build + optimization passes
-      emit/                    # IR → internal VM representation
+      emit/                    # IR → bytecode module
       query/                   # facade: Query, QueryBuilder, CheckedQuery, CompiledQuery
       typegen/                 # bytecode → TypeScript .d.ts / Rust types
       codegen/                 # fork-point NFA → generated Rust matcher
@@ -84,7 +84,7 @@ crates/
       05-typegen/
       06-vm/
       07-codegen/
-docs/                          # specs: language, type system, CLI, runtime, internal bytecode
+docs/                          # specs: language, type system, CLI, runtime, binary format
 ```
 
 Pipeline:
@@ -93,7 +93,7 @@ Pipeline:
 2. Analyze: resolve names, infer types, check recursion
 3. Link (a grammar): bind node kinds and fields to the target grammar
 4. Lower: build and optimize the Thompson NFA
-5. Emit: NFA to the VM's internal bytecode representation
+5. Emit: NFA to binary bytecode module
 
 # Query language
 

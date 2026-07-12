@@ -1021,7 +1021,7 @@ const HEADER: &str = r#"
 // points, per-type trace readers, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format
-// (docs/internal-bytecode/08-dump-format.md).
+// (docs/binary-format/08-dump-format.md).
 
 use @RT@ as rt;
 

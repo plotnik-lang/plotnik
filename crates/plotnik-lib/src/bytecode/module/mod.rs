@@ -1,8 +1,8 @@
-//! Internal bytecode representation with unified storage.
+//! Bytecode module with unified storage.
 //!
-//! [`Module`] holds the compiler's transient VM representation plus a
-//! pre-decoded transition stream. Plotnik does not expose bytecode as a file or
-//! interchange format.
+//! [`Module`] holds compiled bytecode plus a pre-decoded transition stream.
+//! Construction remains crate-private so only compiler output can cross the
+//! checked loader boundary.
 
 use std::ops::Deref;
 
@@ -93,7 +93,7 @@ impl<'a> Instruction<'a> {
     }
 }
 
-/// Plotnik's internal compiled representation.
+/// A compiled bytecode module.
 ///
 /// Instructions are decoded lazily via [`decode_step`](Self::decode_step).
 /// Cold data (strings, symbols, types) is accessed through view methods.
@@ -103,11 +103,11 @@ pub struct Module {
     header: Header,
     /// Cached section offsets (computed from header counts).
     offsets: SectionOffsets,
-    /// Regex-predicate DFAs, deserialized once during construction and reused by the
+    /// Regex-predicate DFAs, deserialized once at module load and reused by the
     /// VM on every evaluation instead of being rebuilt from the blob each time
     /// (issue #426).
     regex_dfas: RegexDfas,
-    /// Pre-decoded transitions, built during construction after validation (the hot loop
+    /// Pre-decoded transitions, built at module load after validation (the hot loop
     /// indexes this instead of re-parsing bytes; see `decoded`).
     decoded: DecodedProgram,
     /// Per-step "is an instruction start" bitmap from load validation
@@ -121,8 +121,7 @@ pub struct Module {
 impl Module {
     /// Load compiler output into the VM after running every boundary check.
     ///
-    /// Crate-private visibility is intentional: bytecode can enter here only
-    /// from Plotnik's emitter, never from a user-controlled source.
+    /// Crate-private visibility keeps this loader on the compiler-to-VM boundary.
     pub(crate) fn load_compiler_output(bytes: &[u8]) -> Result<Self, ModuleError> {
         Self::load_storage(ByteStorage::from_emitted_bytes(bytes))
     }
@@ -141,7 +140,7 @@ impl Module {
         &self.storage
     }
 
-    /// Size of the internal VM representation, for diagnostics and teaching tools.
+    /// Size of the bytecode module, for diagnostics and teaching tools.
     pub fn bytecode_size(&self) -> usize {
         self.storage.len()
     }
@@ -412,7 +411,7 @@ impl<'a> TypesView<'a> {
     }
 
     /// A member's `type_id` without building the (`NonZero`) name `StringId`.
-    /// Internal validation uses this so a malformed zero name cannot panic the
+    /// Load-time validation uses this so a malformed zero name cannot panic the
     /// validator before `validate_string_ids` rejects it.
     pub(crate) fn member_type_id(&self, idx: usize) -> TypeId {
         assert!(idx < self.members_count, "type member index out of bounds");

@@ -33,7 +33,7 @@ pub(crate) const PREDICATE_SIZE: usize = PREDICATE_SLOTS * PAYLOAD_SLOT_SIZE;
 /// The first byte of every instruction: `segment(2) | node_class(2) | opcode(4)`.
 ///
 /// One source of truth for the header-byte field positions, shared by every
-/// instruction decoder/encoder and the construction-time validator.
+/// instruction decoder/encoder and the load-time validator.
 pub(crate) mod header_byte {
     use super::Opcode;
 
@@ -76,7 +76,7 @@ pub(crate) mod header_byte {
 /// VM) is orthogonal to `has_predicate` (a payload-framing bit the decoder needs
 /// to size the instruction), so they compose freely.
 ///
-/// Decoded once here so the Match decoder, the encoder, and the construction-time
+/// Decoded once here so the Match decoder, the encoder, and the load-time
 /// validator share one definition of the field positions.
 #[derive(Clone, Copy)]
 pub(crate) struct MatchCounts {
@@ -120,7 +120,7 @@ impl MatchCounts {
             | if self.missing { Self::MISSING_BIT } else { 0 }
     }
 
-    /// Whether any reserved bit (bits 1-0) is set; internal validation rejects it.
+    /// Whether any reserved bit (bits 1-0) is set; load-time validation rejects it.
     pub(crate) fn reserved_bits_set(w: u16) -> bool {
         w & Self::RESERVED_MASK != 0
     }
@@ -230,7 +230,7 @@ pub enum Opcode {
 
 impl Opcode {
     /// Decode an opcode nibble, returning `None` for an unknown value so that
-    /// malformed internal bytecode is rejected with a clean error instead of panicking.
+    /// malformed bytecode is rejected with a clean error instead of panicking.
     pub fn from_u8(v: u8) -> Option<Self> {
         match v {
             0x0 => Some(Self::Match8),
@@ -564,12 +564,12 @@ impl MatchPredicate {
     }
 
     /// Unpack `(op, is_regex)` from the op/flags word. Shared by the decoder and
-    /// the construction-time validator.
+    /// the load-time validator.
     pub(crate) fn unpack_op_flags(w: u16) -> (u8, bool) {
         ((w & Self::OP_MASK) as u8, w & Self::REGEX_FLAG != 0)
     }
 
-    /// Whether any reserved bit of the op/flags word is set; construction-time
+    /// Whether any reserved bit of the op/flags word is set; load-time
     /// validation rejects it.
     pub(crate) fn reserved_bits_set(w: u16) -> bool {
         w & Self::RESERVED_MASK != 0

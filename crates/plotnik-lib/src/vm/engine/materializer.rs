@@ -26,7 +26,7 @@ impl<'a> ValueMaterializer<'a> {
     }
 
     fn resolve_member_name(&self, idx: u16) -> &'a str {
-        // Effect payloads are validated during internal construction; out of bounds here is
+        // Effect payloads are validated at module load; out of bounds here is
         // a loader bug, and the slice-index panic is the assertion.
         self.member_names[idx as usize]
     }

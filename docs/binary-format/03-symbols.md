@@ -1,4 +1,4 @@
-# Internal Bytecode: Symbols
+# Binary Format: Symbols
 
 Symbol tables map external tree-sitter IDs to internal string names.
 
@@ -11,8 +11,8 @@ Precompiled DFA patterns for predicate matching. Uses the sentinel pattern like 
 - **Section Offset**: Computed (follows StringBlob)
 - **Size**: `header.regex_blob_size`
 
-Contains concatenated serialized DFAs (from `regex-automata`). Internal
-construction deserializes each DFA once via `DFA::from_bytes()`, validates it,
+Contains concatenated serialized DFAs (from `regex-automata`). The module loader
+deserializes each DFA once via `DFA::from_bytes()`, validates it,
 and caches the owned automaton for predicate evaluation (issue #426).
 
 ### RegexTable

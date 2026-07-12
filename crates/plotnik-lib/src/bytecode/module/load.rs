@@ -1,7 +1,7 @@
-//! Internal loading and structural validation of compiler-emitted bytecode.
+//! Loading and structural validation of compiler-emitted bytecode.
 //!
-//! Bytecode is an internal compiler-to-VM representation. These checks catch
-//! compiler bugs before the VM trusts that representation. Malformed bytes
+//! This loader is crate-private and accepts only compiler output. Its checks catch
+//! compiler bugs before the VM trusts the bytecode. Malformed bytes
 //! return [`ModuleError`]; they never become a [`Module`] or reach execution.
 
 use super::super::effects::{Effect, EffectKind};
@@ -20,7 +20,7 @@ use crate::bytecode::predicate_op::PredicateOp;
 use plotnik_rt::Nav;
 use std::collections::{HashMap, HashSet};
 
-/// Internal bytecode validation error.
+/// Bytecode validation error.
 ///
 /// Every variant is raised at the trust boundary (this module and
 /// `effect_stack.rs`); the reader side never constructs one. Re-exported as
@@ -304,7 +304,7 @@ impl Module {
         let mut prev = 0u32;
         for i in 0..=count {
             // Entry layout: string_id (u16) | reserved (u16) | offset (u32).
-            // The reserved u16 is pinned to zero (docs/internal-bytecode/03-symbols.md);
+            // The reserved u16 is pinned to zero (docs/binary-format/03-symbols.md);
             // a non-zero value is smuggled state.
             if read_u16_le(table, i * 8 + 2) != 0 {
                 return Err(ModuleError::MalformedRegexTable);
@@ -354,7 +354,7 @@ impl Module {
     /// TypeMembers section, and every referenced TypeId — a wrapper/alias inner
     /// type or a struct/enum member type — addressing a real def, so the
     /// materializer never resolves a type out of range
-    /// (`docs/internal-bytecode/04-types.md`).
+    /// (`docs/binary-format/04-types.md`).
     fn validate_type_defs(&self) -> Result<(), ModuleError> {
         let types = self.types();
         let members = self.header.type_members_count as u32;
@@ -368,7 +368,7 @@ impl Module {
                 return Err(invalid());
             };
             // Fields the kind does not name are reserved-zero
-            // (docs/internal-bytecode/04-types.md); smuggled state there must not pass validation.
+            // (docs/binary-format/04-types.md); smuggled state there must not pass validation.
             let (raw_data, raw_count) = def.member_range();
             match data {
                 TypeDefKind::Primitive(_) => {
@@ -583,7 +583,7 @@ impl Module {
     /// etc.) never slice out of bounds. The table holds `str_table_count + 1`
     /// offsets, so the valid id range is `0..str_table_count`. This upholds the
     /// representation's guarantee that validated bytecode never panics on view access
-    /// (`docs/internal-bytecode/01-overview.md`).
+    /// (`docs/binary-format/01-overview.md`).
     fn validate_string_ids(&self) -> Result<(), ModuleError> {
         let storage: &[u8] = &self.storage;
         let n = self.header.str_table_count;
@@ -912,7 +912,7 @@ impl Module {
             let value_ref = u16::from_le_bytes([b[2], b[3]]);
 
             // Bits above the operator and regex flag are reserved-zero
-            // (docs/internal-bytecode/06-transitions.md), so a malformed set bit must
+            // (docs/binary-format/06-transitions.md), so a malformed set bit must
             // not pass validation.
             if MatchPredicate::reserved_bits_set(op_and_flags) {
                 return Err(ModuleError::InvalidPredicateOperand(step as usize));

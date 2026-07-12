@@ -1,11 +1,11 @@
-//! Internal bytecode layout constants.
+//! Bytecode format constants.
 
 use super::effects::EFFECT_PAYLOAD_BITS;
 
-/// Magic bytes identifying Plotnik's internal bytecode buffer.
+/// Magic bytes identifying a Plotnik bytecode module.
 pub const MAGIC: [u8; 4] = *b"PTKQ";
 
-/// Current internal layout version.
+/// Current bytecode format version.
 /// v2: Removed explicit offsets (computed from counts), added regex section.
 /// v3: Removed flags field.
 /// v4: Removed the trivia section.

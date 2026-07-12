@@ -1,6 +1,6 @@
 //! Human-readable dump of the fork-point NFA (the optimized, pre-pack IR).
 //!
-//! Mirrors the bytecode dump's visual grammar (`docs/internal-bytecode/08-dump-format.md`)
+//! Mirrors the bytecode dump's visual grammar (`docs/binary-format/08-dump-format.md`)
 //! in label space, keeping the resolution the wire format erases: symbolic labels
 //! instead of packed step addresses, definition-name section headers from label
 //! provenance (`Name (consuming):` for the guarded-recursion body variant,

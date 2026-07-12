@@ -1,6 +1,6 @@
-//! Internal compiler-to-VM boundary hardening.
+//! Module loader hardening.
 //!
-//! Each test emits an internal buffer, deliberately corrupts one field, and
+//! Each test emits a bytecode buffer, deliberately corrupts one field, and
 //! recomputes the CRC so the checksum gate still passes. It then asserts that
 //! [`Module::load_compiler_output`] returns a clean [`ModuleError`] before a
 //! view, decoder, VM, or materializer can observe the buffer. Together these
@@ -43,7 +43,7 @@ fn emit_bytes(query_src: &str) -> Vec<u8> {
         .to_vec()
 }
 
-/// Recompute the CRC32 checked during internal loading so a tampered body
+/// Recompute the CRC32 checked by the module loader so a tampered body
 /// reaches the structural validators exercised by these tests.
 fn reseal(bytes: &mut [u8]) {
     let crc = crc32fast::hash(&bytes[64..]);
@@ -74,8 +74,7 @@ fn many_callable_definitions_load_without_global_fixpoint_rescans() {
 /// (`op_and_flags` u16 || `value_ref` u16) in the transitions stream.
 fn find_predicate_off(bytes: &[u8]) -> usize {
     let (base, steps) = {
-        let m = Module::load_compiler_output(bytes)
-            .expect("internal representation validates before tampering");
+        let m = Module::load_compiler_output(bytes).expect("module validates before tampering");
         (
             m.offsets().transitions as usize,
             m.header().transitions_count,
@@ -114,7 +113,7 @@ fn forged_invalid_entrypoint_name_is_rejected() {
     for forged in [0u16, u16::MAX] {
         let mut bytes = emit_bytes(r#"Top = (identifier) @id"#);
         let ep_off = Module::load_compiler_output(&bytes)
-            .expect("internal representation validates before tampering")
+            .expect("module validates before tampering")
             .offsets()
             .entrypoints as usize;
 
@@ -135,7 +134,7 @@ fn forged_out_of_range_predicate_operand_is_rejected() {
     // The `== "needle"` predicate stores a string-table index as its value_ref.
     let mut bytes = emit_bytes(r#"Q = (identifier == "needle")"#);
     let str_count = Module::load_compiler_output(&bytes)
-        .expect("internal representation validates before tampering")
+        .expect("module validates before tampering")
         .header()
         .str_table_count;
 
@@ -175,8 +174,7 @@ const STRUCT_QUERY: &str =
     r#"Top = (binary_expression left: (identifier) @l right: (identifier) @r)"#;
 
 fn transitions(bytes: &[u8]) -> (usize, u16) {
-    let m = Module::load_compiler_output(bytes)
-        .expect("internal representation validates before tampering");
+    let m = Module::load_compiler_output(bytes).expect("module validates before tampering");
     (
         m.offsets().transitions as usize,
         m.header().transitions_count,
@@ -301,16 +299,14 @@ fn effect_payload(bytes: &[u8], slot: usize) -> u16 {
 }
 
 fn type_member_type_id_off(bytes: &[u8], member: u16) -> usize {
-    let m = Module::load_compiler_output(bytes)
-        .expect("internal representation validates before tampering");
+    let m = Module::load_compiler_output(bytes).expect("module validates before tampering");
     m.offsets().type_members as usize + member as usize * 4 + 2
 }
 
 /// Byte offset of the first non-empty inter-section alignment gap — the padding
 /// the emitter zero-fills before each aligned section (or the final tail).
 fn first_section_gap(bytes: &[u8]) -> usize {
-    let m = Module::load_compiler_output(bytes)
-        .expect("internal representation validates before tampering");
+    let m = Module::load_compiler_output(bytes).expect("module validates before tampering");
     let o = m.offsets();
     let h = m.header();
     // (section start, data length) in layout order, terminated by the buffer end.
@@ -512,7 +508,7 @@ fn forged_oob_member_operand_is_rejected() {
     // `get_member`, which asserts the index is in bounds.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let members = Module::load_compiler_output(&bytes)
-        .expect("internal representation validates before tampering")
+        .expect("module validates before tampering")
         .header()
         .type_members_count;
     let slot = effect_slots(&bytes)
@@ -713,7 +709,7 @@ fn forged_mispaired_span_ids_are_rejected() {
     // prove it.
     let mut bytes = emit_inspection_bytes(STRUCT_QUERY);
     let spans_count = Module::load_compiler_output(&bytes)
-        .expect("internal representation validates before tampering")
+        .expect("module validates before tampering")
         .header()
         .spans_count;
     assert!(spans_count >= 2, "test needs two spans to mis-pair");
@@ -736,8 +732,7 @@ fn forged_mispaired_span_ids_are_rejected() {
 #[test]
 fn forged_invalid_span_binding_is_rejected() {
     let mut bytes = emit_bytes(STRUCT_QUERY);
-    let module = Module::load_compiler_output(&bytes)
-        .expect("internal representation validates before tampering");
+    let module = Module::load_compiler_output(&bytes).expect("module validates before tampering");
     let span = SpanEntry {
         source: 0,
         kind: SpanKind::Capture,
@@ -813,8 +808,8 @@ fn forged_regex_pattern_string_id_is_rejected() {
     for forged in [0u16, u16::MAX] {
         let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);
         let (regex_off, regex_count, str_count) = {
-            let m = Module::load_compiler_output(&bytes)
-                .expect("internal representation validates before tampering");
+            let m =
+                Module::load_compiler_output(&bytes).expect("module validates before tampering");
             (
                 m.offsets().regex_table as usize,
                 m.header().regex_table_count,
@@ -846,12 +841,11 @@ fn forged_regex_pattern_string_id_is_rejected() {
 #[test]
 fn forged_nonzero_regex_table_reserved_is_rejected() {
     // Each regex-table entry is `string_id(u16) | reserved(u16) | offset(u32)`; the
-    // reserved field is pinned to zero (docs/internal-bytecode/03-symbols.md). A forged
+    // reserved field is pinned to zero (docs/binary-format/03-symbols.md). A forged
     // non-zero value must be rejected at load, not carried as smuggled state.
     let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);
     let (regex_off, regex_count) = {
-        let m = Module::load_compiler_output(&bytes)
-            .expect("internal representation validates before tampering");
+        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         (
             m.offsets().regex_table as usize,
             m.header().regex_table_count,
@@ -879,8 +873,7 @@ fn forged_corrupt_regex_dfa_is_rejected() {
     // `.expect()`ed at match time.
     let mut bytes = emit_bytes(r#"Q = (identifier =~ /x/)"#);
     let (blob_off, blob_len) = {
-        let m = Module::load_compiler_output(&bytes)
-            .expect("internal representation validates before tampering");
+        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         (
             m.offsets().regex_blob as usize,
             m.header().regex_blob_size as usize,
@@ -902,12 +895,11 @@ fn forged_corrupt_regex_dfa_is_rejected() {
 fn forged_entrypoint_into_instruction_interior_is_rejected() {
     // Issue #457: an entrypoint `target` that lands inside a multi-step
     // instruction (not on a recorded instruction start) makes the VM begin
-    // decoding mid-instruction. `target < steps` is not enough — the construction-time
+    // decoding mid-instruction. `target < steps` is not enough — the load-time
     // check holds entrypoints to the same instruction-start rule as successors.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let (ep_off, interior) = {
-        let m = Module::load_compiler_output(&bytes)
-            .expect("internal representation validates before tampering");
+        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         (
             m.offsets().entrypoints as usize,
             first_multistep_interior_step(&bytes),
@@ -1006,7 +998,7 @@ fn forged_data_enum_variant_without_data_is_rejected() {
     // Lie that the variant is non-void by pointing it at the enum type itself.
     let mut bytes = emit_bytes(r#"Q = [A: (identifier)]"#);
     let type_count = Module::load_compiler_output(&bytes)
-        .expect("internal representation validates before tampering")
+        .expect("module validates before tampering")
         .header()
         .type_defs_count;
     assert!(
@@ -1146,8 +1138,7 @@ fn forged_enum_wrapper_hiding_callee_write_is_rejected() {
     "#});
 
     let void_member = {
-        let m = Module::load_compiler_output(&bytes)
-            .expect("internal representation validates before tampering");
+        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         let types = m.types();
         (0..m.header().type_members_count)
             .find(|&i| {
@@ -1187,7 +1178,7 @@ fn forged_wrapper_without_root_struct_is_rejected() {
     // so a requirement bubbling out of it must be rejected, not silently dropped.
     let mut bytes = emit_bytes(r#"Q = (_) @x"#);
     let ep_off = Module::load_compiler_output(&bytes)
-        .expect("internal representation validates before tampering")
+        .expect("module validates before tampering")
         .offsets()
         .entrypoints as usize;
     let struct_open_slot = first_effect_op(&bytes, |op| op == EffectKind::StructOpen as u16);
@@ -1211,7 +1202,7 @@ fn forged_wrapper_without_root_struct_is_rejected() {
 #[test]
 fn forged_set_extended_match_reserved_count_bit_is_rejected() {
     // Bit 0 of an extended-Match counts word (low bit of byte 6) is reserved-zero
-    // (docs/internal-bytecode/06-transitions.md); the decoder never reads it, so a
+    // (docs/binary-format/06-transitions.md); the decoder never reads it, so a
     // forged set bit must be rejected at load.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let off = first_instr(&bytes, |o| (1..=5).contains(&o)); // extended Match
@@ -1308,7 +1299,7 @@ fn forged_unknown_type_def_kind_is_rejected() {
     // an unknown kind would panic the materializer's `def`/`TypeDefKind` decode.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let type_defs_off = Module::load_compiler_output(&bytes)
-        .expect("internal representation validates before tampering")
+        .expect("module validates before tampering")
         .offsets()
         .type_defs as usize;
     bytes[type_defs_off + 3] = 0xFF;
@@ -1328,7 +1319,7 @@ fn forged_out_of_range_entrypoint_target_is_rejected() {
     // steps` must be rejected before `is_start` is indexed.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let ep_off = Module::load_compiler_output(&bytes)
-        .expect("internal representation validates before tampering")
+        .expect("module validates before tampering")
         .offsets()
         .entrypoints as usize;
     bytes[ep_off + 2..ep_off + 4].copy_from_slice(&u16::MAX.to_le_bytes());
@@ -1348,7 +1339,7 @@ fn forged_nonzero_entrypoint_pad_is_rejected() {
     // them, so a forged non-zero pad must be rejected at load, not ignored.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let ep_off = Module::load_compiler_output(&bytes)
-        .expect("internal representation validates before tampering")
+        .expect("module validates before tampering")
         .offsets()
         .entrypoints as usize;
     bytes[ep_off + 6..ep_off + 8].copy_from_slice(&1u16.to_le_bytes());
@@ -1369,8 +1360,7 @@ fn forged_out_of_range_entrypoint_result_type_is_rejected() {
     // is one past the last valid index.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let (ep_off, type_defs) = {
-        let m = Module::load_compiler_output(&bytes)
-            .expect("internal representation validates before tampering");
+        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         (m.offsets().entrypoints as usize, m.header().type_defs_count)
     };
     bytes[ep_off + 4..ep_off + 6].copy_from_slice(&type_defs.to_le_bytes());
@@ -1391,7 +1381,7 @@ fn forged_type_member_name_string_id_is_rejected() {
     // (stride 4, name at offset 0) the materializer's struct-field keys rely on.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let members_off = Module::load_compiler_output(&bytes)
-        .expect("internal representation validates before tampering")
+        .expect("module validates before tampering")
         .offsets()
         .type_members as usize;
     bytes[members_off..members_off + 2].copy_from_slice(&0u16.to_le_bytes());
@@ -1411,8 +1401,7 @@ fn forged_oob_member_type_id_is_rejected() {
     // TypeDef, or the materializer resolves a struct field to a type out of range.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let (members_off, type_defs) = {
-        let m = Module::load_compiler_output(&bytes)
-            .expect("internal representation validates before tampering");
+        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         (
             m.offsets().type_members as usize,
             m.header().type_defs_count,
@@ -1438,8 +1427,7 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
     // element lookup resolves a type out of range.
     let mut bytes = emit_bytes(r#"Top = (program (expression_statement)* @stmts)"#);
     let (defs_off, type_defs, wrapper_idx) = {
-        let m = Module::load_compiler_output(&bytes)
-            .expect("internal representation validates before tampering");
+        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         let types = m.types();
         let idx = (0..types.defs_count())
             .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Wrapper { .. }))
@@ -1466,13 +1454,13 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
 #[test]
 fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
     // Void/Node/String carry no payload: both `data` (bytes 0-1) and `count`
-    // (byte 2) are reserved-zero (docs/internal-bytecode/04-types.md). Smuggled state
+    // (byte 2) are reserved-zero (docs/binary-format/04-types.md). Smuggled state
     // in either must be rejected, not silently ignored by the typed view.
     for byte in [0usize, 2] {
         let mut bytes = emit_bytes(STRUCT_QUERY);
         let (defs_off, prim_idx) = {
-            let m = Module::load_compiler_output(&bytes)
-                .expect("internal representation validates before tampering");
+            let m =
+                Module::load_compiler_output(&bytes).expect("module validates before tampering");
             let types = m.types();
             let idx = (0..types.defs_count())
                 .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Primitive(_)))
@@ -1498,8 +1486,7 @@ fn forged_nonzero_wrapper_typedef_count_is_rejected() {
     // (byte 2) as zero. A non-zero count must be rejected.
     let mut bytes = emit_bytes(r#"Top = (program (expression_statement)* @stmts)"#);
     let (defs_off, wrapper_idx) = {
-        let m = Module::load_compiler_output(&bytes)
-            .expect("internal representation validates before tampering");
+        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         let types = m.types();
         let idx = (0..types.defs_count())
             .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Wrapper { .. }))
@@ -1524,8 +1511,7 @@ fn forged_oob_type_name_type_id_is_rejected() {
     // real TypeDef; a named definition emits at least one entry.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let (names_off, type_defs) = {
-        let m = Module::load_compiler_output(&bytes)
-            .expect("internal representation validates before tampering");
+        let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         assert!(
             m.types().names_count() > 0,
             "named def must emit a type name"
@@ -1700,7 +1686,7 @@ fn forged_zero_node_symbol_is_rejected() {
     // (`NonZeroU16`) in the renderers; a forged zero would panic `dump`/`trace`.
     let mut bytes = emit_bytes(r#"Top = (identifier) @id"#);
     let off = Module::load_compiler_output(&bytes)
-        .expect("internal representation validates before tampering")
+        .expect("module validates before tampering")
         .offsets()
         .node_kinds as usize;
 

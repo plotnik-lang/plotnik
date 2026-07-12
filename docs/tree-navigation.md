@@ -1,6 +1,6 @@
 # Tree Navigation
 
-How the VM navigates tree-sitter syntax trees. This covers API choice, search loop mechanics, and anchor lowering. For execution semantics, see [runtime-engine.md](runtime-engine.md). For instruction encoding, see [06-transitions.md](internal-bytecode/06-transitions.md).
+How the VM navigates tree-sitter syntax trees. This covers API choice, search loop mechanics, and anchor lowering. For execution semantics, see [runtime-engine.md](runtime-engine.md). For instruction encoding, see [06-transitions.md](binary-format/06-transitions.md).
 
 ## TreeCursor API
 
@@ -45,7 +45,7 @@ The `Node` API's `next_sibling()` is O(siblings) — unacceptable for repeated b
 
 ## Nav Encoding
 
-`Nav` is a single byte encoding movement and skip policy. See [06-transitions.md § 3.1](internal-bytecode/06-transitions.md) for bit layout.
+`Nav` is a single byte encoding movement and skip policy. See [06-transitions.md § 3.1](binary-format/06-transitions.md) for bit layout.
 
 | Nav                   | Dump Symbol | Movement                                |
 | --------------------- | ----------- | --------------------------------------- |
@@ -189,7 +189,7 @@ The split fires when the alternation's exit is the follower's own single `Match`
 
 ### Compilation Examples
 
-Using dump format from [08-dump-format.md](internal-bytecode/08-dump-format.md):
+Using dump format from [08-dump-format.md](binary-format/08-dump-format.md):
 
 > These examples show the _logical_ anchor lowering — the nav mode each anchor produces. An item that must be located among its siblings (an unpinned first item, or any item reached past a skipping anchor) additionally compiles to a small search wrapper: a branch into the candidate plus an advance-and-retry edge, converging on the anchored continuation. The wrapper is uniform across alternations, anchors, and quantifiers (one `emit_position_search` combinator). Run `dump` for the exact instructions; the rows below omit the wrapper for readability.
 

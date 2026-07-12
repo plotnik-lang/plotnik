@@ -1,4 +1,4 @@
-//! Capacity limits and construction-time validation for the bytecode boundary (#422).
+//! Capacity limits and load-time validation for the bytecode boundary (#422).
 //!
 //! These assert that a query which would overflow a fixed-width field fails
 //! emission with a clear [`EmitError`] instead of silently wrapping or panicking,

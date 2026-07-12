@@ -1,4 +1,4 @@
-//! Internal bytecode section primitives.
+//! Binary format section primitives.
 
 use super::ids::StringId;
 

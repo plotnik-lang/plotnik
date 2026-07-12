@@ -1,4 +1,4 @@
-# Internal Bytecode: Entrypoints
+# Binary Format: Entrypoints
 
 This section defines the named entry points for the query. Only definitions
 whose root matches exactly one node are entrypoints and can be executed against

@@ -83,7 +83,7 @@ plotnik ast app.ts --json
 
 ### dump
 
-Show the VM's internal bytecode as text. This command is for learning and
+Show compiled bytecode as text. This command is for learning and
 compiler debugging; it neither reads nor writes a bytecode artifact.
 
 ```sh

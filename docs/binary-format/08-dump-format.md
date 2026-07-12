@@ -1,4 +1,4 @@
-# Internal Bytecode Dump
+# Bytecode Dump Format
 
 `plotnik dump` renders the VM's transient bytecode as stable, human-readable
 text. It is intended for learning, golden fixtures, and compiler debugging.

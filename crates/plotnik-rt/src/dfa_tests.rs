@@ -2,7 +2,7 @@
 
 use crate::dfa::deserialize_dfa;
 
-// Internal bytecode validation no longer pre-checks for empty DFA bytes; it relies
+// Bytecode validation no longer pre-checks for empty DFA bytes; it relies
 // on `deserialize_dfa` rejecting empty/garbage input so a forged module with a
 // zero-length regex entry still fails to `InvalidRegexDfa` instead of caching a
 // bogus automaton. These pin that contract.

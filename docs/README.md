@@ -8,7 +8,7 @@ Compilation stops at a target-neutral, always-verified semantic NFA:
 
 ```text
 Parse → Analyze → Link → Lower → CompiledQuery
-                                   ├─ emit(BytecodeConfig) → internal VM representation
+                                   ├─ emit(BytecodeConfig) → verified Module
                                    ├─ emit(RustCodegenConfig) → Rust module
                                    ├─ emit_types(RustCodegenConfig) → Rust types
                                    └─ emit_types(TypeScriptCodegenConfig) → .d.ts
@@ -16,8 +16,9 @@ Parse → Analyze → Link → Lower → CompiledQuery
 
 Emission is pure and never writes files. `CompiledQuery` contains no eager
 bytecode. `BytecodeConfig` serves the in-process VM and compiler diagnostics;
-its result is not a file, interchange format, or compatibility surface.
-Inspection explicitly re-lowers the internal representation with span effects.
+the compiler emits bytecode and immediately loads it as a validated `Module`.
+It is not accepted or persisted as a user-facing artifact. Inspection explicitly
+re-lowers the bytecode with span effects.
 
 ```rust,ignore
 use plotnik_lib::{BytecodeConfig, QueryBuilder, RustCodegenConfig};
@@ -53,7 +54,7 @@ Golden emission fixtures mirror that taxonomy under `04-emit/bytecode`,
 - [Generated Runtime Interface](runtime-interface.md) — Cross-language codegen runtime contract
 - [Runtime Engine](runtime-engine.md) — VM execution model
 - [Tree Navigation](tree-navigation.md) — Cursor walk implementation
-- [Internal Bytecode Layout](internal-bytecode/01-overview.md) — Contributor and debugging reference
+- [Binary Format](binary-format/01-overview.md) — Contributor and debugging reference
 
 ## Document Map
 
@@ -67,7 +68,7 @@ docs/
 ├── runtime-interface.md # Generated matcher/runtime contract
 ├── runtime-engine.md  # VM state, backtracking, effects
 ├── tree-navigation.md # Cursor walk, search loop, anchor lowering
-└── internal-bytecode/     # Internal VM layout and debug-output reference
+└── binary-format/     # Bytecode layout and debug-output reference
     ├── 01-overview.md   # Header, sections, alignment
     ├── 02-strings.md    # String pool and table
     ├── 03-symbols.md    # Node kinds, fields, trivia
@@ -90,11 +91,11 @@ New to Plotnik:
 Contributing to the runtime or debugging the compiler:
 
 1. `runtime-interface.md` — Cross-language generated runtime contract
-2. `internal-bytecode/01-overview.md` → through `06-transitions.md` (internal layout)
+2. `binary-format/01-overview.md` → through `06-transitions.md` (bytecode layout)
 3. `runtime-engine.md`
 4. `tree-navigation.md`
-5. `internal-bytecode/08-dump-format.md` — Understanding bytecode dumps
-6. `internal-bytecode/09-trace-format.md` — Debugging with execution traces
+5. `binary-format/08-dump-format.md` — Understanding bytecode dumps
+6. `binary-format/09-trace-format.md` — Debugging with execution traces
 
 Contributing:
 
