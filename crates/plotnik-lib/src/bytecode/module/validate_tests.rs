@@ -56,18 +56,25 @@ fn reseal(bytes: &mut [u8]) {
     bytes[8..12].copy_from_slice(&crc.to_le_bytes());
 }
 
+const MANY_DEFINITIONS: usize = 4_096;
+// Both verifiers currently need six body walks per source definition. Keep
+// modest scheduling slack while making any definition-count rescan fail.
+const MAX_BODY_ANALYSES_PER_DEFINITION: usize = 8;
+
+fn assert_linear_body_analyses(stage: &str, analyses: usize) {
+    assert!(
+        analyses <= MANY_DEFINITIONS * MAX_BODY_ANALYSES_PER_DEFINITION,
+        "{stage} performed {analyses} body analyses for {MANY_DEFINITIONS} definitions"
+    );
+}
+
 #[test]
 fn many_callable_definitions_load_without_global_fixpoint_rescans() {
     // Every callable definition emits both a wrapper and a called body. This
     // shape used to spend quadratic time deduplicating roots and repeatedly
     // rescanning the whole definition set as body summaries became known.
-    const DEFINITIONS: usize = 4_096;
-    // Both verifiers currently need six body walks per source definition. Keep
-    // modest scheduling slack while making any definition-count rescan fail.
-    const MAX_BODY_ANALYSES_PER_DEFINITION: usize = 8;
-
     let mut query = String::new();
-    for index in 0..DEFINITIONS {
+    for index in 0..MANY_DEFINITIONS {
         writeln!(query, "Query{index} = (identifier)").expect("writing to a string succeeds");
     }
 
@@ -81,24 +88,15 @@ fn many_callable_definitions_load_without_global_fixpoint_rescans() {
         "regression module must stay large"
     );
 
-    assert!(
-        semantic_analyses <= DEFINITIONS * MAX_BODY_ANALYSES_PER_DEFINITION,
-        "semantic verifier performed {semantic_analyses} body analyses for {DEFINITIONS} definitions"
-    );
-    assert!(
-        emission_load_analyses <= DEFINITIONS * MAX_BODY_ANALYSES_PER_DEFINITION,
-        "emission loader performed {emission_load_analyses} body analyses for {DEFINITIONS} definitions"
-    );
+    assert_linear_body_analyses("semantic verifier", semantic_analyses);
+    assert_linear_body_analyses("emission loader", emission_load_analyses);
 
     reset_loader_body_analyses();
     let module = Module::load_compiler_output(&bytes).expect("compiler output validates");
     let reload_analyses = loader_body_analyses();
-    assert!(
-        reload_analyses <= DEFINITIONS * MAX_BODY_ANALYSES_PER_DEFINITION,
-        "module reload performed {reload_analyses} body analyses for {DEFINITIONS} definitions"
-    );
+    assert_linear_body_analyses("module reload", reload_analyses);
 
-    assert_eq!(module.entrypoints().len(), DEFINITIONS);
+    assert_eq!(module.entrypoints().len(), MANY_DEFINITIONS);
 }
 
 /// Byte offset of the first predicated Match's 4-byte predicate

@@ -34,6 +34,11 @@ pub(crate) fn body_analyses() -> usize {
     BODY_ANALYSES.get()
 }
 
+#[cfg(test)]
+fn record_body_analysis() {
+    BODY_ANALYSES.set(BODY_ANALYSES.get() + 1);
+}
+
 #[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 pub(crate) enum SemanticVerifyError {
     #[error("semantic matcher has {0} states (max {MAX_STATES})")]
@@ -347,7 +352,7 @@ impl<'a> Program<'a> {
         final_check: bool,
     ) -> Result<BodyAnalysis, SemanticVerifyError> {
         #[cfg(test)]
-        BODY_ANALYSES.set(BODY_ANALYSES.get() + 1);
+        record_body_analysis();
 
         let mut entry_tos = KS_ANY;
         let mut returns_pending = None;
@@ -381,13 +386,8 @@ impl<'a> Program<'a> {
                 }
                 HashMap::new()
             });
-            let state = match seen.entry(state) {
-                Entry::Occupied(_) => continue,
-                Entry::Vacant(entry) => {
-                    let state = entry.key().clone();
-                    entry.insert(());
-                    state
-                }
+            let Some(state) = take_unseen_state(seen, state) else {
+                continue;
             };
             if state.stack.len() > frame_openers || state.suppress > suppression_openers {
                 return Err(SemanticVerifyError::EffectStack(label));
@@ -786,6 +786,19 @@ impl AbsState {
             suppress: 0,
             span_stack: Vec::new(),
             pending: PendingState::Empty,
+        }
+    }
+}
+
+/// Remember `state` and return an owned copy only on its first visit. The map's
+/// entry API avoids cloning stack and span vectors for duplicate arrivals.
+fn take_unseen_state(seen: &mut HashMap<AbsState, ()>, state: AbsState) -> Option<AbsState> {
+    match seen.entry(state) {
+        Entry::Occupied(_) => None,
+        Entry::Vacant(entry) => {
+            let state = entry.key().clone();
+            entry.insert(());
+            Some(state)
         }
     }
 }

@@ -190,6 +190,11 @@ pub(super) fn body_analyses() -> usize {
     BODY_ANALYSES.get()
 }
 
+#[cfg(test)]
+fn record_body_analysis() {
+    BODY_ANALYSES.set(BODY_ANALYSES.get() + 1);
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct DefSummary {
     entry_tos: u8,
@@ -356,6 +361,19 @@ impl AbsState {
     }
 }
 
+/// Remember `state` and return an owned copy only on its first visit. The map's
+/// entry API avoids cloning stack and span vectors for duplicate arrivals.
+fn take_unseen_state(seen: &mut HashMap<AbsState, ()>, state: AbsState) -> Option<AbsState> {
+    match seen.entry(state) {
+        Entry::Occupied(_) => None,
+        Entry::Vacant(entry) => {
+            let state = entry.key().clone();
+            entry.insert(());
+            Some(state)
+        }
+    }
+}
+
 /// Walk one body, computing its summary facts and verifying its structural
 /// invariants against every abstract state that reaches each step. When
 /// `final_check` is set, also verify each call site against `summaries`.
@@ -367,7 +385,7 @@ fn analyze(
     final_check: bool,
 ) -> Result<Analysis, ModuleError> {
     #[cfg(test)]
-    BODY_ANALYSES.set(BODY_ANALYSES.get() + 1);
+    record_body_analysis();
 
     let mut entry_tos = KS_ANY;
     let mut returns_pending = None;
@@ -405,13 +423,8 @@ fn analyze(
             }
             HashMap::new()
         });
-        let state = match seen.entry(state) {
-            Entry::Occupied(_) => continue,
-            Entry::Vacant(entry) => {
-                let state = entry.key().clone();
-                entry.insert(());
-                state
-            }
+        let Some(state) = take_unseen_state(seen, state) else {
+            continue;
         };
         if state.stack.len() > frame_openers || state.suppress > suppress_openers {
             return Err(ModuleError::EffectStackImbalance(step));
