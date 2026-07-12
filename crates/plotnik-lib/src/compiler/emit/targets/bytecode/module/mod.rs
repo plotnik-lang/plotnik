@@ -1,5 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 //! Module-assembly emission phase: build the node-kind/field/entrypoint wire
 //! tables, serialize every section, and frame the module with its header and
 //! checksum.

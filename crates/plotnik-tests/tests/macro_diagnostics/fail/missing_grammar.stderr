@@ -1,5 +1,5 @@
 error: missing `grammar = "..."`: name a dependency that ships a grammar (e.g. `grammar = "tree-sitter-javascript"`) or a grammar.json path
- --> tests/macro_ui/fail/missing_grammar.rs:1:1
+ --> tests/macro_diagnostics/fail/missing_grammar.rs:1:1
   |
 1 | / plotnik::query! {
 2 | |     "Q = (program)"

@@ -1,5 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 //! Core data structures for Plotnik grammar-derived node information.
 
 pub mod colors;

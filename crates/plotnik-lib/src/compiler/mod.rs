@@ -4,8 +4,6 @@
 //! into the `Query`/`QueryBuilder` pipeline. Pass internals stay under this
 //! module; the crate root re-exports only the facade-level API.
 
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 mod analyze;
 pub(crate) mod diagnostics;
 mod ids;

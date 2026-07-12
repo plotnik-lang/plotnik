@@ -1,5 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 //! Thompson-like NFA construction for query compilation.
 //!
 //! Compiles query AST patterns into bytecode IR with symbolic labels.

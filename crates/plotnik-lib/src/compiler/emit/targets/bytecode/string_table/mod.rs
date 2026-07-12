@@ -1,5 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 //! String-table emission phase: intern the predicate strings the instruction
 //! stream references.
 

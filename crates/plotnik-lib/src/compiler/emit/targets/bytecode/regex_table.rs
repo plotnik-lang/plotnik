@@ -1,5 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 //! Regex-table emission phase: compile predicate regexes to sparse DFAs.
 //!
 //! Compilation lives here so the regex engine stays out of `core`; the table

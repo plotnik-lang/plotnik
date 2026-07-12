@@ -1,5 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 //! Instruction-layout emission phase: assign a cache-aligned step address to
 //! every label.
 

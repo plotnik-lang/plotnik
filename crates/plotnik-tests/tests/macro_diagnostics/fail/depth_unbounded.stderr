@@ -1,5 +1,5 @@
 error: `depth = unbounded` is not supported; use `depth = auto` or an integer
- --> tests/macro_ui/fail/depth_unbounded.rs:4:5
+ --> tests/macro_diagnostics/fail/depth_unbounded.rs:4:5
   |
 4 |     depth = unbounded,
   |     ^^^^^

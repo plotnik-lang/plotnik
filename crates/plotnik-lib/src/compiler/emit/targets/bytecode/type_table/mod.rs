@@ -1,5 +1,3 @@
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 //! Type-table emission phase: walk the inferred types (TypeAnalysis) and lower
 //! them into the bytecode type table, interning their names into the shared
 //! string table. The table storage and its read accessors live in

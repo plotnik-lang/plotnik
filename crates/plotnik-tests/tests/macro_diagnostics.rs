@@ -5,8 +5,8 @@
 //! goldens with `make shot` (`TRYBUILD=overwrite`).
 
 #[test]
-fn macro_ui() {
+fn macro_diagnostics() {
     let cases = trybuild::TestCases::new();
-    cases.pass("tests/macro_ui/pass/*.rs");
-    cases.compile_fail("tests/macro_ui/fail/*.rs");
+    cases.pass("tests/macro_diagnostics/pass/*.rs");
+    cases.compile_fail("tests/macro_diagnostics/fail/*.rs");
 }
