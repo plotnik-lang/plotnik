@@ -175,10 +175,10 @@ Tag-only enum variants emit no payload effects, so the rendered value has
 `$tag` without `$data`.
 
 Materialized values borrow captured node text from the source and member/tag
-names from the loaded module's string table. Rendering is unchanged; the borrows
+names from the bytecode string table. Rendering is unchanged; the borrows
 only avoid repeated string allocation and UTF-8 validation.
 
-Load-time validation proves the stream discipline before the VM runs, so these
+Construction-time validation proves the stream discipline before the VM runs, so these
 materializer assertions are inside-zone invariants.
 
 ## Execution Limits

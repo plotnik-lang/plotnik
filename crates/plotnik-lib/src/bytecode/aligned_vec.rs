@@ -49,12 +49,6 @@ impl AlignedVec {
         }
     }
 
-    /// Read a file into aligned storage.
-    pub fn from_file(path: impl AsRef<std::path::Path>) -> std::io::Result<Self> {
-        let bytes = std::fs::read(path)?;
-        Ok(Self::copy_from_slice(&bytes))
-    }
-
     /// Number of bytes stored.
     pub fn len(&self) -> usize {
         self.len

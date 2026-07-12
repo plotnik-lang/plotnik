@@ -22,9 +22,8 @@ use std::cell::Cell;
 /// A safe run exceeded one of its resolved ceilings.
 ///
 /// The generated matchers' safe entry points report through this; the VM
-/// reports the same trips through its own `RuntimeError` (which folds in
-/// interpretation-only failures like module errors). The wording of the two
-/// must stay aligned — both describe the same enforcement.
+/// reports the same trips through its own `RuntimeError`. The wording of the
+/// two must stay aligned — both describe the same enforcement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LimitExceeded {

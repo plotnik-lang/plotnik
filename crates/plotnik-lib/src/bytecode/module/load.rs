@@ -1,12 +1,8 @@
-//! Load-time structural validation — the trust boundary.
+//! Loading and structural validation of compiler-emitted bytecode.
 //!
-//! Everything here runs inside [`Module::load`]. It turns untrusted bytes into a
-//! verified [`Module`]; once these checks pass, the rest of the crate trusts the
-//! module completely (the no-panic guarantee, see `effect_stack.rs`). On any
-//! malformed input it returns a [`ModuleError`], never panics.
-
-use std::collections::HashMap;
-use std::io;
+//! This loader is crate-private and accepts only compiler output. Its checks catch
+//! compiler bugs before the VM trusts the bytecode. Malformed bytes
+//! return [`ModuleError`]; they never become a [`Module`] or reach execution.
 
 use super::super::effects::{Effect, EffectKind};
 use super::super::instructions::{
@@ -22,8 +18,9 @@ use super::super::{
 use super::*;
 use crate::bytecode::predicate_op::PredicateOp;
 use plotnik_rt::Nav;
+use std::collections::{HashMap, HashSet};
 
-/// Module load error.
+/// Bytecode validation error.
 ///
 /// Every variant is raised at the trust boundary (this module and
 /// `effect_stack.rs`); the reader side never constructs one. Re-exported as
@@ -34,13 +31,13 @@ pub enum ModuleError {
     InvalidMagic,
     #[error("unsupported version: {0} (expected {VERSION})")]
     UnsupportedVersion(u32),
-    #[error("file too small: {0} bytes (minimum {HEADER_SIZE})")]
-    FileTooSmall(usize),
+    #[error("bytecode buffer too small: {0} bytes (minimum {HEADER_SIZE})")]
+    BufferTooSmall(usize),
     #[error("size mismatch: header says {header} bytes, got {actual}")]
     SizeMismatch { header: u32, actual: usize },
     #[error("malformed header: reserved bytes must be zero")]
     MalformedHeader,
-    #[error("section out of bounds: header counts exceed the {total}-byte file")]
+    #[error("section out of bounds: header counts exceed the {total}-byte buffer")]
     SectionOutOfBounds { total: u32 },
     #[error("non-zero section padding")]
     NonZeroSectionPadding,
@@ -80,8 +77,6 @@ pub enum ModuleError {
     InvalidSpanPayload(u16),
     #[error("span bracket imbalance at step {0}")]
     SpanImbalance(u16),
-    #[error("io error: {0}")]
-    Io(#[from] io::Error),
 }
 
 /// Round `value` up to the next multiple of `align` in `u64` (overflow-free).
@@ -102,9 +97,9 @@ fn read_transition_u16(storage: &[u8], off: usize) -> Result<u16, ModuleError> {
 }
 
 impl Module {
-    pub(super) fn from_storage(storage: ByteStorage) -> Result<Self, ModuleError> {
+    pub(super) fn load_storage(storage: ByteStorage) -> Result<Self, ModuleError> {
         if storage.len() < HEADER_SIZE {
-            return Err(ModuleError::FileTooSmall(storage.len()));
+            return Err(ModuleError::BufferTooSmall(storage.len()));
         }
 
         let header = Header::from_bytes(&storage[..HEADER_SIZE]);
@@ -122,7 +117,7 @@ impl Module {
             });
         }
 
-        // Bound every section against the file in u64 *before* `compute_offsets`
+        // Bound every section against the buffer in u64 *before* `compute_offsets`
         // does its u32 arithmetic: a corrupt header with a near-`u32::MAX` blob
         // size or count would otherwise overflow that arithmetic and panic
         // (debug) instead of returning an error.
@@ -157,7 +152,7 @@ impl Module {
         Ok(module)
     }
 
-    /// Validate a loaded module so later *view* accesses cannot panic and
+    /// Validate compiler output so later *view* accesses cannot panic and
     /// accidental corruption of the body is detected.
     ///
     /// Section bounds are checked earlier, in [`validate_section_bounds`], before
@@ -168,15 +163,15 @@ impl Module {
     /// well-formed, the documented TypeDef member ranges stay in bounds, and
     /// entrypoint targets address real steps.
     ///
-    /// The CRC32 detects *accidental* corruption of the body — the format's
-    /// threat model (truncation, bit-rot). It is not a MAC, so a deliberately
-    /// forged module can recompute a matching checksum over crafted bytes;
+    /// The CRC32 detects accidental corruption between emission and
+    /// construction. It is not a substitute for structural validation, so a
+    /// test buffer with a recomputed checksum must still fail the checks below;
     /// [`Self::validate_transitions`] therefore re-verifies the lazily-decoded
     /// instruction stream structurally, and
     /// [`validate_effect_stack`](super::effect_stack::validate_effect_stack)
     /// proves no path can panic the materializer's builder stack or the VM's
-    /// suppression counter — so a loaded module never panics on view/decode/VM
-    /// access regardless of how it was crafted.
+    /// suppression counter — so validated bytecode never panics on view/decode/VM
+    /// access even when compiler output is malformed.
     fn validate(&self) -> Result<(RegexDfas, Vec<bool>), ModuleError> {
         // Reserved header bytes are not covered by the CRC; v6 fixes them at zero.
         if self.header._reserved != [0u8; 20] {
@@ -200,7 +195,7 @@ impl Module {
         self.validate_spans()?;
         // Bound every embedded `StringId` before any later check constructs a
         // (`NonZero`) `StringId` from one — e.g. `validate_entrypoints` builds an
-        // `Entrypoint`, which would otherwise panic on a forged zero name.
+        // `Entrypoint`, which would otherwise panic on a malformed zero name.
         self.validate_string_ids()?;
         self.validate_symbol_ids()?;
         let is_start = self.validate_transitions()?;
@@ -208,14 +203,15 @@ impl Module {
         self.validate_depth_neutrality()?;
         // Structural validity (every step decodes, every jump lands on a start)
         // is now established, so the effect-stack walk can use the safe typed
-        // instruction API. This closes the last forged-module panic class: the
-        // materializer's builder-stack panics and the VM's suppression underflow.
+        // instruction API. This closes the last malformed-representation panic
+        // class: the materializer's builder-stack panics and the VM's
+        // suppression underflow.
         super::effect_stack::validate_effect_stack(self)?;
         Ok((regex_dfas, is_start))
     }
 
     /// Recompute the section layout in `u64` (no overflow) and ensure every
-    /// section, up to and including the final one (Spans), fits inside the file.
+    /// section, up to and including the final one (Spans), fits inside the buffer.
     ///
     /// Runs on the raw header *before* [`Header::compute_offsets`], so a corrupt
     /// header cannot drive that u32 arithmetic to overflow. Sections are laid
@@ -235,7 +231,7 @@ impl Module {
 
         // Every section but the last is alignment-padded; folding them leaves
         // the cursor at the start of the final section, whose unaligned end
-        // bounds the file.
+        // bounds the buffer.
         let mut cursor = HEADER_SIZE as u64; // sections begin right after the header
         for &size in rest {
             cursor = align_up_u64(cursor + size, align);
@@ -259,7 +255,7 @@ impl Module {
         let sizes = self.header.section_data_sizes();
 
         // The gap after each section's data, up to the next section's start (or
-        // the file end for the last section), must be all zero.
+        // the buffer end for the last section), must be all zero.
         for i in 0..starts.len() {
             let gap_start = (starts[i] + sizes[i] as u32) as usize;
             let gap_end = match starts.get(i + 1) {
@@ -372,7 +368,7 @@ impl Module {
                 return Err(invalid());
             };
             // Fields the kind does not name are reserved-zero
-            // (docs/binary-format/04-types.md); smuggled state there must not load.
+            // (docs/binary-format/04-types.md); smuggled state there must not pass validation.
             let (raw_data, raw_count) = def.member_range();
             match data {
                 TypeDefKind::Primitive(_) => {
@@ -490,7 +486,7 @@ impl Module {
             }
 
             // Bytes 6-7 are the reserved `_pad`; `Entrypoint::from_bytes` discards
-            // them, so a forged non-zero pad would otherwise load unnoticed.
+            // them, so a malformed non-zero pad would otherwise pass unnoticed.
             if read_u16_le(storage, base + i * 8 + 6) != 0 {
                 return Err(invalid());
             }
@@ -506,9 +502,13 @@ impl Module {
     /// as its own root.
     fn validate_depth_neutrality(&self) -> Result<(), ModuleError> {
         let mut roots = Vec::new();
+        let mut known = HashSet::new();
 
         for entrypoint in self.entrypoints().iter() {
-            push_unique(&mut roots, u16::from(entrypoint.target()));
+            let target = u16::from(entrypoint.target());
+            if known.insert(target) {
+                roots.push(target);
+            }
         }
 
         let mut step = 0u16;
@@ -518,7 +518,10 @@ impl Module {
                     step += m.step_count();
                 }
                 Instruction::Call(c) => {
-                    push_unique(&mut roots, u16::from(c.target));
+                    let target = u16::from(c.target);
+                    if known.insert(target) {
+                        roots.push(target);
+                    }
                     step += 1;
                 }
                 Instruction::Return(_) => {
@@ -579,14 +582,14 @@ impl Module {
     /// resolve them (and `find_by_name`, the materializer's struct-field keys,
     /// etc.) never slice out of bounds. The table holds `str_table_count + 1`
     /// offsets, so the valid id range is `0..str_table_count`. This upholds the
-    /// format's guarantee that a loaded module never panics on view access
+    /// representation's guarantee that validated bytecode never panics on view access
     /// (`docs/binary-format/01-overview.md`).
     fn validate_string_ids(&self) -> Result<(), ModuleError> {
         let storage: &[u8] = &self.storage;
         let n = self.header.str_table_count;
 
         // Read the raw `u16` rather than the typed accessor: a required `StringId`
-        // is a `NonZeroU16`, so building one from a forged zero would panic
+        // is a `NonZeroU16`, so building one from a malformed zero would panic
         // here in the validator itself, defeating the purpose. A valid required id
         // is a real, non-easter-egg entry: `1..str_table_count`. Section bounds are
         // already proven by `validate_section_bounds`, so the reads stay in range.
@@ -655,8 +658,8 @@ impl Module {
 
     /// The `symbol` half of each node-kind/node-field entry must be non-zero:
     /// renderers rebuild `NodeKindId`/`NodeFieldId` (`NonZeroU16`) from it via
-    /// `try_from(..).expect(..)` (`render.rs`), so a forged zero would panic
-    /// `dump`/`trace` instead of failing the load.
+    /// `try_from(..).expect(..)` (`render.rs`), so a malformed zero would panic
+    /// `dump`/`trace` instead of failing validation.
     fn validate_symbol_ids(&self) -> Result<(), ModuleError> {
         let storage: &[u8] = &self.storage;
         let check = |base: u32, count: usize| {
@@ -680,14 +683,14 @@ impl Module {
     }
 
     /// Structurally re-verify the whole instruction stream so the documented
-    /// guarantee — a loaded module never panics on view/decode access — holds
-    /// for *any* module whose header and CRC check out, including a deliberately
-    /// forged one.
+    /// guarantee — validated bytecode never panics on view/decode access — holds
+    /// for every compiler buffer whose header and CRC check out, including the
+    /// deliberately mutated buffers used by validation tests.
     ///
     /// A module is decoded lazily: [`decode_step`](Self::decode_step) and the
     /// per-opcode decoders, the effect/predicate iterators, and the materializer
     /// all build `NonZero`/enum values and index tables straight from
-    /// instruction bytes. Each is a panic site on crafted input — `Opcode`,
+    /// instruction bytes. Each is a panic site on malformed compiler output — `Opcode`,
     /// `Nav`, `NodeKindConstraint`, `EffectKind`, and `StepId` decoding, plus
     /// `get_member` / `at` table lookups. This walk rejects every such
     /// input up front, reading only through checked slicing so it never panics
@@ -751,7 +754,7 @@ impl Module {
             }
             // node_class_bits (header bits 4-5) is meaningful only for Match
             // variants; Call/Return ignore it, so the format pins those bits to
-            // zero — a forged non-zero node_class_bits there is smuggled state.
+            // zero — a malformed non-zero node_class_bits there is smuggled state.
             if matches!(opcode, Opcode::Call | Opcode::Return)
                 && header_byte::node_class_bits(header) != 0
             {
@@ -760,8 +763,8 @@ impl Module {
 
             match opcode {
                 Opcode::Return => {
-                    // Bytes 1-7 are reserved padding (`Return::to_bytes`); a forged
-                    // non-zero pad would otherwise load unnoticed.
+                    // Bytes 1-7 are reserved padding (`Return::to_bytes`); a
+                    // malformed non-zero pad would otherwise pass unnoticed.
                     check_zero(instr_off + 1, 7)?;
                 }
                 Opcode::Call => {
@@ -839,7 +842,7 @@ impl Module {
         let counts = read_transition_u16(storage, instr_off + 6)?;
         // Bits 1-0 of the counts word are reserved (bit 2 is the `missing` flag,
         // which the decoder does read); the decoder never reads the reserved bits,
-        // so a forged set bit would load unnoticed.
+        // so a malformed set bit would pass validation unnoticed.
         if MatchCounts::reserved_bits_set(counts) {
             return Err(ModuleError::MalformedTransitions);
         }
@@ -888,7 +891,7 @@ impl Module {
 
         // Neg-field slots hold raw `NodeFieldId`s (`NonZeroU16`); the decoder's
         // `neg_fields()` rebuilds them via `try_from(..).expect(..)`
-        // (`instructions.rs`), so a forged zero must not load.
+        // (`instructions.rs`), so a malformed zero must not pass validation.
         for i in 0..neg {
             let off = instr_off + MATCH_PAYLOAD_START + (effects + i) * PAYLOAD_SLOT_SIZE;
             let b = storage
@@ -909,8 +912,8 @@ impl Module {
             let value_ref = u16::from_le_bytes([b[2], b[3]]);
 
             // Bits above the operator and regex flag are reserved-zero
-            // (docs/binary-format/06-transitions.md), so a forged set bit must
-            // not load.
+            // (docs/binary-format/06-transitions.md), so a malformed set bit must
+            // not pass validation.
             if MatchPredicate::reserved_bits_set(op_and_flags) {
                 return Err(ModuleError::InvalidPredicateOperand(step as usize));
             }

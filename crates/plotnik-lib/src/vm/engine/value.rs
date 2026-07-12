@@ -55,7 +55,7 @@ impl Serialize for NodeHandle<'_> {
 }
 
 /// Self-contained output value, borrowing node text from the query source and
-/// member/tag names from the loaded module (`'s` must outlive both).
+/// member/tag names from the bytecode string table (`'s` must outlive both).
 ///
 /// `Struct` uses `Vec<(&str, Value)>` to preserve field order from type metadata.
 #[derive(Clone, Debug, PartialEq)]

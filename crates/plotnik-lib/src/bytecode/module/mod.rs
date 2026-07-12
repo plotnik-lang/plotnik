@@ -1,11 +1,10 @@
 //! Bytecode module with unified storage.
 //!
-//! The [`Module`] struct holds compiled bytecode plus a pre-decoded transition
-//! stream for VM dispatch.
+//! [`Module`] holds compiled bytecode plus a pre-decoded transition stream.
+//! Construction remains crate-private so only compiler output can cross the
+//! checked loader boundary.
 
-use std::io;
 use std::ops::Deref;
-use std::path::Path;
 
 use super::aligned_vec::AlignedVec;
 use super::header::{Header, SectionOffsets};
@@ -15,8 +14,7 @@ use super::sections::SymbolNameEntry;
 use super::spans::SpansView;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
-    Entrypoint, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STEP_SIZE,
-    STRING_TABLE_ENTRY_SIZE,
+    Entrypoint, REGEX_TABLE_ENTRY_SIZE, SPAN_ENTRY_SIZE, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
 };
 use plotnik_rt::RegexDfas;
 
@@ -27,17 +25,7 @@ mod load;
 pub(crate) use decoded::{
     DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedProgram,
 };
-pub use load::ModuleError;
-
-/// Append `value` if absent; returns whether it was newly inserted.
-fn push_unique(values: &mut Vec<u16>, value: u16) -> bool {
-    if values.contains(&value) {
-        false
-    } else {
-        values.push(value);
-        true
-    }
-}
+pub(crate) use load::ModuleError;
 
 #[inline]
 fn read_u16_le(bytes: &[u8], offset: usize) -> u16 {
@@ -54,63 +42,27 @@ fn read_u32_le(bytes: &[u8], offset: usize) -> u32 {
     ])
 }
 
-/// Storage for bytecode bytes with guaranteed 64-byte alignment.
-///
-/// All bytecode must be 64-byte aligned for DFA deserialization and cache
-/// efficiency. This enum ensures alignment through two paths:
-/// - `Static`: Pre-aligned via `include_query_aligned!` macro
-/// - `Aligned`: Allocated with 64-byte alignment via `AlignedVec`
-pub enum ByteStorage {
-    /// Static bytes from `include_query_aligned!` (zero-copy, pre-aligned).
-    Static(&'static [u8]),
-    /// Owned bytes with guaranteed 64-byte alignment.
-    Aligned(AlignedVec),
-}
+/// Compiler-owned bytecode storage with guaranteed 64-byte alignment.
+pub(crate) struct ByteStorage(AlignedVec);
 
 impl Deref for ByteStorage {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        match self {
-            ByteStorage::Static(s) => s,
-            ByteStorage::Aligned(v) => v,
-        }
+        &self.0
     }
 }
 
 impl std::fmt::Debug for ByteStorage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ByteStorage::Static(s) => f.debug_tuple("Static").field(&s.len()).finish(),
-            ByteStorage::Aligned(v) => f.debug_tuple("Aligned").field(&v.len()).finish(),
-        }
+        f.debug_tuple("ByteStorage").field(&self.0.len()).finish()
     }
 }
 
 impl ByteStorage {
-    /// Create from static bytes (zero-copy).
-    ///
-    /// The bytes must be 64-byte aligned. Use `include_query_aligned!` macro.
-    ///
-    /// # Panics
-    /// Panics if bytes are not 64-byte aligned.
-    pub fn from_static(bytes: &'static [u8]) -> Self {
-        assert!(
-            (bytes.as_ptr() as usize).is_multiple_of(SECTION_ALIGN),
-            "static bytes must be 64-byte aligned; use include_query_aligned! macro"
-        );
-        Self::Static(bytes)
-    }
-
-    /// Create by copying bytes into aligned storage.
-    ///
-    /// Use this when receiving bytes from unknown sources (e.g., network).
-    pub fn copy_from_slice(bytes: &[u8]) -> Self {
-        Self::Aligned(AlignedVec::copy_from_slice(bytes))
-    }
-
-    pub fn from_file(path: impl AsRef<Path>) -> io::Result<Self> {
-        Ok(Self::Aligned(AlignedVec::from_file(path)?))
+    /// Copy compiler-emitted bytes into the aligned runtime buffer.
+    pub(crate) fn from_emitted_bytes(bytes: &[u8]) -> Self {
+        Self(AlignedVec::copy_from_slice(bytes))
     }
 }
 
@@ -151,11 +103,11 @@ pub struct Module {
     header: Header,
     /// Cached section offsets (computed from header counts).
     offsets: SectionOffsets,
-    /// Regex-predicate DFAs, deserialized once here at load and reused by the
+    /// Regex-predicate DFAs, deserialized once at module load and reused by the
     /// VM on every evaluation instead of being rebuilt from the blob each time
     /// (issue #426).
     regex_dfas: RegexDfas,
-    /// Pre-decoded transitions, built at load after validation (the hot loop
+    /// Pre-decoded transitions, built at module load after validation (the hot loop
     /// indexes this instead of re-parsing bytes; see `decoded`).
     decoded: DecodedProgram,
     /// Per-step "is an instruction start" bitmap from load validation
@@ -167,30 +119,11 @@ pub struct Module {
 }
 
 impl Module {
-    /// Load a module from static bytes (zero-copy).
+    /// Load compiler output into the VM after running every boundary check.
     ///
-    /// Use with `include_query_aligned!` to embed aligned bytecode:
-    /// ```ignore
-    /// use plotnik_lib::include_query_aligned;
-    ///
-    /// let module = Module::from_static(include_query_aligned!("query.ptk.bin"))?;
-    /// ```
-    ///
-    /// # Panics
-    /// Panics if bytes are not 64-byte aligned.
-    pub fn from_static(bytes: &'static [u8]) -> Result<Self, ModuleError> {
-        Self::from_storage(ByteStorage::from_static(bytes))
-    }
-
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, ModuleError> {
-        Self::from_storage(ByteStorage::from_file(&path)?)
-    }
-
-    /// Load a module from arbitrary bytes (copies into aligned storage).
-    ///
-    /// Use this for bytes from unknown sources (network, etc.). Always copies.
-    pub fn load(bytes: &[u8]) -> Result<Self, ModuleError> {
-        Self::from_storage(ByteStorage::copy_from_slice(bytes))
+    /// Crate-private visibility keeps this loader on the compiler-to-VM boundary.
+    pub(crate) fn load_compiler_output(bytes: &[u8]) -> Result<Self, ModuleError> {
+        Self::load_storage(ByteStorage::from_emitted_bytes(bytes))
     }
 
     pub(crate) fn header(&self) -> &Header {
@@ -202,8 +135,14 @@ impl Module {
         &self.offsets
     }
 
-    pub fn bytes(&self) -> &[u8] {
+    #[cfg(test)]
+    pub(crate) fn bytes(&self) -> &[u8] {
         &self.storage
+    }
+
+    /// Size of the bytecode module, for diagnostics and teaching tools.
+    pub fn bytecode_size(&self) -> usize {
+        self.storage.len()
     }
 
     #[inline]
@@ -472,7 +411,7 @@ impl<'a> TypesView<'a> {
     }
 
     /// A member's `type_id` without building the (`NonZero`) name `StringId`.
-    /// Load-time validation uses this so a forged zero name cannot panic the
+    /// Load-time validation uses this so a malformed zero name cannot panic the
     /// validator before `validate_string_ids` rejects it.
     pub(crate) fn member_type_id(&self, idx: usize) -> TypeId {
         assert!(idx < self.members_count, "type member index out of bounds");
@@ -581,4 +520,4 @@ impl<'a> EntrypointsView<'a> {
 #[cfg(test)]
 mod decoded_tests;
 #[cfg(test)]
-mod load_tests;
+mod validate_tests;

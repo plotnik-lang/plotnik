@@ -230,7 +230,7 @@ pub enum Opcode {
 
 impl Opcode {
     /// Decode an opcode nibble, returning `None` for an unknown value so that
-    /// untrusted bytecode is rejected with a clean error instead of panicking.
+    /// malformed bytecode is rejected with a clean error instead of panicking.
     pub fn from_u8(v: u8) -> Option<Self> {
         match v {
             0x0 => Some(Self::Match8),

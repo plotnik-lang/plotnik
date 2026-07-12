@@ -27,7 +27,7 @@ pub fn deserialize_dfa(bytes: &[u8]) -> Result<DFA<&[u8]>, String> {
 /// `DFA::from_bytes` re-validates the whole serialized automaton, so the old
 /// path — deserializing inside the VM's match loop — re-paid that cost on every
 /// predicate test, thousands of times over a quantified pattern on a large file.
-/// These owned automata are built once, folded into the load-time validation
+/// These owned automata are built once, folded into load-time validation
 /// that already deserialized each DFA, then searched directly thereafter. The
 /// owned copy duplicates bytes still resident in the module's serialized blob —
 /// that blob is one immutable, contiguous allocation backing every section, so
@@ -50,7 +50,7 @@ impl RegexDfas {
     /// `idx` is a predicate operand the loader bounds to a real entry
     /// (`1..count`, see `Module::validate_extended_match`), so the slot is always
     /// populated and the search cannot fail — an empty slot or a search error
-    /// would be a forged-/miscompiled-module bug, stated loudly here rather than
+    /// would be a miscompiled-module bug, stated loudly here rather than
     /// silently mis-answered.
     pub fn is_match(&self, idx: usize, text: &str) -> bool {
         let dfa = self.dfas[idx]

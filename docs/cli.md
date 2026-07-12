@@ -83,7 +83,8 @@ plotnik ast app.ts --json
 
 ### dump
 
-Show compiled bytecode. For debugging the compiler.
+Show compiled bytecode as text. This command is for learning and
+compiler debugging; it neither reads nor writes a bytecode artifact.
 
 ```sh
 plotnik dump -q 'Q = (identifier) @id' -l typescript

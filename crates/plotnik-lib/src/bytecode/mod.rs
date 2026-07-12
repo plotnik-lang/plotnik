@@ -1,7 +1,8 @@
 //! Bytecode format and runtime types for Plotnik.
 //!
-//! Public bytecode facade for compiled Plotnik queries. Implements the binary
-//! format specified in `docs/binary-format/`.
+//! The compiler emits bytecode in memory for the VM. It is not
+//! a user-facing file or interchange format. The public views support compiler
+//! diagnostics, `plotnik dump`, and other teaching or debugging tools.
 
 #![allow(clippy::comparison_chain)]
 // Without the `vm` feature the engine-serving half of this module (the
@@ -33,7 +34,7 @@ pub use dump::dump;
 pub use entrypoint::Entrypoint;
 pub use ids::{StringId, TypeId};
 pub use instructions::{EncodeError, StepAddr};
-pub use module::{EntrypointsView, Module, ModuleError, StringsView, TypesView};
+pub use module::{EntrypointsView, Module, StringsView, TypesView};
 pub use spans::{SPAN_NO_BINDING, SpanEntry, SpanKind, SpansView};
 pub use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
 pub use type_system::{Arity, PrimitiveType, TypeKind};

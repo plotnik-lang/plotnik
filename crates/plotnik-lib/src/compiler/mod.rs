@@ -17,6 +17,11 @@ pub(crate) mod regex;
 #[cfg(test)]
 mod regex_tests;
 
+#[cfg(test)]
+pub(crate) use lower::semantic_verify::{
+    body_analyses as semantic_body_analyses, reset_body_analyses as reset_semantic_body_analyses,
+};
+
 pub(crate) mod emit;
 pub(crate) mod query;
 #[cfg(test)]

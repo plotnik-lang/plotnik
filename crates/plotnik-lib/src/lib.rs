@@ -16,6 +16,7 @@
 
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+#[doc(hidden)]
 pub mod bytecode;
 mod compiler;
 mod core;
@@ -67,27 +68,3 @@ pub use crate::vm::{
     Value, ValueMaterializer, Verbosity, debug_verify_type, extract_inspection,
     materialize_verified,
 };
-
-/// Embed bytecode with 64-byte alignment (zero-copy loading).
-///
-/// Use this instead of `include_bytes!` to ensure the embedded bytecode
-/// is properly aligned for DFA deserialization and cache efficiency.
-///
-/// # Example
-///
-/// ```ignore
-/// use plotnik_lib::{include_query_aligned, bytecode::Module};
-///
-/// let module = Module::from_static(include_query_aligned!("query.ptk.bin"))?;
-/// ```
-#[macro_export]
-macro_rules! include_query_aligned {
-    ($path:expr) => {{
-        #[repr(C, align(64))]
-        struct Aligned<const N: usize>([u8; N]);
-
-        const BYTES: &[u8] = include_bytes!($path);
-        static ALIGNED: Aligned<{ BYTES.len() }> = Aligned(*BYTES);
-        ALIGNED.0.as_slice()
-    }};
-}

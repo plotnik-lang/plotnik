@@ -2,7 +2,7 @@
 
 use super::effects::EFFECT_PAYLOAD_BITS;
 
-/// Magic bytes identifying a Plotnik bytecode file.
+/// Magic bytes identifying a Plotnik bytecode module.
 pub const MAGIC: [u8; 4] = *b"PTKQ";
 
 /// Current bytecode format version.
@@ -20,7 +20,7 @@ pub const VERSION: u32 = 10;
 /// Section alignment in bytes.
 pub const SECTION_ALIGN: usize = 64;
 
-/// File header size in bytes.
+/// Buffer header size in bytes.
 ///
 /// The header occupies exactly one `SECTION_ALIGN` block, so the first section
 /// (StringBlob) begins at this offset. `Header` statically asserts it has this

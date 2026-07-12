@@ -2,7 +2,7 @@
 //!
 //! These assert that a query which would overflow a fixed-width field fails
 //! emission with a clear [`EmitError`] instead of silently wrapping or panicking,
-//! and that a truncated or corrupted module is rejected by `Module::load`.
+//! and that a truncated or corrupted module is rejected by `Module::load_compiler_output`.
 
 use std::fmt::Write as _;
 
@@ -187,13 +187,13 @@ fn effect_member_payload_overflow_is_emit_error() {
 fn truncated_or_corrupted_module_is_rejected() {
     let bytes = try_emit("Q = (program (_) @name)").expect("valid query emits");
 
-    // The pristine module loads.
-    Module::load(&bytes).expect("pristine module loads");
+    // The pristine representation validates.
+    Module::load_compiler_output(&bytes).expect("pristine representation validates");
 
     // Any truncation shorter than the whole file is rejected, never panics.
     for cut in [0, 1, 63, 64, 96, bytes.len() / 2, bytes.len() - 1] {
         assert!(
-            Module::load(&bytes[..cut]).is_err(),
+            Module::load_compiler_output(&bytes[..cut]).is_err(),
             "truncation to {cut} bytes must be rejected"
         );
     }
@@ -205,7 +205,7 @@ fn truncated_or_corrupted_module_is_rejected() {
         let mut corrupt = bytes.clone();
         corrupt[i] ^= 0xFF;
         assert!(
-            Module::load(&corrupt).is_err(),
+            Module::load_compiler_output(&corrupt).is_err(),
             "flipping byte {i} must be rejected"
         );
     }
@@ -221,7 +221,7 @@ fn crafted_header_blob_size_does_not_overflow_offsets() {
     bytes[16..20].copy_from_slice(&u32::MAX.to_le_bytes());
 
     assert!(
-        Module::load(&bytes).is_err(),
+        Module::load_compiler_output(&bytes).is_err(),
         "near-u32::MAX str_blob_size must error, not overflow-panic"
     );
 }

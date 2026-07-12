@@ -139,7 +139,7 @@ impl<'a> EmitPipeline<'a> {
         let entrypoints_bytes = emit_entrypoints(&tables.entrypoints);
         let spans_bytes = self.emit_spans()?;
 
-        // Section order matches the binary format:
+        // Section order matches the bytecode layout:
         // Header → StringBlob → RegexBlob → StringTable → RegexTable →
         // NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames →
         // Entrypoints → Transitions → Spans

@@ -66,7 +66,7 @@ impl Session {
         let bytecode_diagnostics = bytecode.diagnostics().clone();
         let mut diagnostics = compiled.diagnostics().clone();
         let module = bytecode.into_artifact();
-        let bytecode_size = module.as_ref().map(|module| module.bytes().len());
+        let bytecode_size = module.as_ref().map(Module::bytecode_size);
         let types = compiled
             .emit_types(TypeScriptCodegenConfig::new().colored(false))
             .map_err(|error| JsValue::from_str(&error.to_string()))?;
