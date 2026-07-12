@@ -1,7 +1,9 @@
 Q = (program
   [
     Tag: {
-      (expression_statement (call_expression) @c)? @lead
+      (expression_statement
+        (call_expression) @c
+      )? @lead
       (expression_statement) @a
       (expression_statement) @b
     }
@@ -21,16 +23,16 @@ export interface Q {
 }
 ------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
- --> query.ptk:2:3
-  |
-2 | /   [
-3 | |     Tag: {
-4 | |       (expression_statement (call_expression) @c)? @lead
-5 | |       (expression_statement) @a
-... |
-8 | |   ]
-  | |___^
-  |
+  --> query.ptk:2:3
+   |
+ 2 | /   [
+ 3 | |     Tag: {
+ 4 | |       (expression_statement
+ 5 | |         (call_expression) @c
+...  |
+10 | |   ]
+   | |___^
+   |
 help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
 --------------------- OUTPUT ---------------------
 {

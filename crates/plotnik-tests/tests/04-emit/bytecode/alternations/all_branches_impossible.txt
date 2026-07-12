@@ -1,6 +1,9 @@
 Q = [
   (function_declaration .! (identifier))
-  (binary_expression left: (_) left: (_))
+  (binary_expression
+    left: (_)
+    left: (_)
+  )
 ]
 ------------------ DIAGNOSTICS -------------------
 error: with strict adjacency (`.!`), the first child of `function_declaration` must be `identifier`, but `function_declaration` begins with `"async"` or `"function"`
@@ -14,7 +17,7 @@ help: `.!` allows nothing between — not even anonymous tokens or comments; the
 error: a `binary_expression` has one `left`, but this pattern binds `left` 2 times
  --> query.ptk:3:4
   |
-3 |   (binary_expression left: (_) left: (_))
+3 |   (binary_expression
   |    ^^^^^^^^^^^^^^^^^
   |
 help: keep a single `left:` child

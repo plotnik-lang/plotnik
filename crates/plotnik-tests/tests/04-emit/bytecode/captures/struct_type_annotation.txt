@@ -1,4 +1,6 @@
-Q = {(identifier) @fn} @outer :: FunctionInfo
+Q = {
+  (identifier) @fn
+} @outer :: FunctionInfo
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 8

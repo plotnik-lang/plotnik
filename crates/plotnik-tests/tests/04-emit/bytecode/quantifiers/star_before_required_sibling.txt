@@ -1,4 +1,7 @@
-Q = (array (identifier)* @ids (number) @n)
+Q = (array
+  (identifier)* @ids
+  (number) @n
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 21

@@ -1,5 +1,7 @@
 Q = (program
-  (expression_statement (identifier) @id)? @x
+  (expression_statement
+    (identifier) @id
+  )? @x
   (debugger_statement) @d
 )
 --------------------- INPUT ----------------------

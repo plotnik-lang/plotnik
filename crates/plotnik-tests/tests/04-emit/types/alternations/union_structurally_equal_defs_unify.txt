@@ -1,5 +1,12 @@
-Row = (pair key: (_) @key value: (_) @val)
-Pair = (pair key: (_) @key value: (_) @val)
+Row = (pair
+  key: (_) @key
+  value: (_) @val
+)
+
+Pair = (pair
+  key: (_) @key
+  value: (_) @val
+)
 
 Q = (program
   (expression_statement

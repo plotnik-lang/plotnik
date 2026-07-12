@@ -1,9 +1,13 @@
-Q = (array (_ (program) @p) @node)
+Q = (array
+  (_
+    (program) @p
+  ) @node
+)
 ------------------ DIAGNOSTICS -------------------
 error: no node the grammar builds takes these children
- --> query.ptk:1:13
+ --> query.ptk:2:4
   |
-1 | Q = (array (_ (program) @p) @node)
-  |             ^
+2 |   (_
+  |    ^
   |
 help: `(_)` and `_` match any node, but no node kind admits this combination of children in this order

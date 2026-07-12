@@ -6,6 +6,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  PLOTNIK_FMT_CHECK: 1
 
 jobs:
   verify:

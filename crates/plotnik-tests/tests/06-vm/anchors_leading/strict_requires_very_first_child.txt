@@ -1,7 +1,4 @@
-Q = (program
-  .!
-  (debugger_statement) @d
-)
+Q = (program .! (debugger_statement) @d)
 --------------------- INPUT ----------------------
 debugger;
 ------------------- TYPESCRIPT -------------------

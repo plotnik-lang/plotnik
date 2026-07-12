@@ -1,4 +1,9 @@
-Q = (program [(expression_statement) (debugger_statement)] @value)
+Q = (program
+  [
+    (expression_statement)
+    (debugger_statement)
+  ] @value
+)
 ------------------- TYPESCRIPT -------------------
 export interface Q {
   value: Node;

@@ -1,7 +1,9 @@
-Q = (program [
-  A: (expression_statement)+
-  B: (debugger_statement)
-] @x)
+Q = (program
+  [
+    A: (expression_statement)+
+    B: (debugger_statement)
+  ] @x
+)
 ------------------- TYPESCRIPT -------------------
 export type QX =
   | { $tag: "A" }

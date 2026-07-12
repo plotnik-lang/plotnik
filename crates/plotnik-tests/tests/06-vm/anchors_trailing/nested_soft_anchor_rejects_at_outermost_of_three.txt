@@ -1,17 +1,4 @@
-Q = (program
-  (expression_statement
-    (array
-      (array
-        (array
-          (number) @n
-          .
-        )
-        .
-      )
-      .
-    )
-  )
-)
+Q = (program (expression_statement (array (array (array (number) @n .) .) .)))
 --------------------- INPUT ----------------------
 [[[1]], x]
 ------------------- TYPESCRIPT -------------------

@@ -1,4 +1,7 @@
-Q = (_ (identifier) @a (identifier) @b)
+Q = (_
+  (identifier) @a
+  (identifier) @b
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 9

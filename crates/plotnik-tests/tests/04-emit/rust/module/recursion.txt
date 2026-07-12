@@ -3,11 +3,7 @@ Expr = [
   Id: (identifier) @id
 ]
 
-Q = (program
-  (expression_statement
-    (Expr) @expr
-  )
-)
+Q = (program (expression_statement (Expr) @expr))
 -------------------- MATCHER ---------------------
 // Generated Plotnik query module: typed output types, `parse`/`matches` entry
 // points, per-type trace readers, and the compiled matcher (`mod matcher`).

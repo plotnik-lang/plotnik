@@ -1,5 +1,7 @@
 Q = (program
-  {(identifier) @id}? @_
+  {
+    (identifier) @id
+  }? @_
 )
 --------------------- INPUT ----------------------
 a;

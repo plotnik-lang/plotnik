@@ -61,6 +61,7 @@ use plotnik_lib::{
     TypeScriptCodegenConfig, VM, Verbosity, extract_inspection, materialize_verified,
 };
 use plotnik_tests::fixture::parse_section_header;
+use support::formatter::Assessment;
 
 mod support;
 
@@ -68,12 +69,14 @@ const FIXTURE_EXT: &str = "txt";
 
 fn main() {
     let args = Arguments::from_args();
+    let mode = FixtureMode::from_env()
+        .unwrap_or_else(|error| panic!("invalid fixture update configuration: {error}"));
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
     let trials = discover(&root)
         .into_iter()
         .map(|fx| {
-            let name = fx.name.clone();
-            Trial::test(name, move || run_fixture(&fx))
+            let name = fx.name.as_str().to_owned();
+            Trial::test(name, move || run_fixture(&fx, mode))
         })
         .collect();
     libtest_mimic::run(&args, trials).exit();
@@ -81,8 +84,251 @@ fn main() {
 
 struct Fixture {
     path: PathBuf,
-    name: String,
-    stage: String,
+    name: FixtureName,
+    kind: FixtureKind,
+}
+
+#[derive(Clone)]
+struct FixtureName {
+    display: String,
+    components: Vec<String>,
+}
+
+impl FixtureName {
+    fn from_relative(path: &Path) -> Result<Self, String> {
+        let components = path
+            .iter()
+            .map(|component| {
+                component
+                    .to_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("fixture path is not UTF-8: {}", path.display()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        if components.is_empty() {
+            return Err("fixture path has no components".into());
+        }
+        Ok(Self {
+            display: components.join("/"),
+            components,
+        })
+    }
+
+    fn as_str(&self) -> &str {
+        &self.display
+    }
+
+    fn contains(&self, component: &str) -> bool {
+        self.components.iter().any(|part| part == component)
+    }
+
+    fn contains_path(&self, path: &[&str]) -> bool {
+        self.components
+            .windows(path.len())
+            .any(|window| window.iter().map(String::as_str).eq(path.iter().copied()))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum TriviaPolicy {
+    Include,
+    Omit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InspectionPolicy {
+    Include,
+    Omit,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum LintPolicy {
+    Strict,
+    Normal,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum SerdePolicy {
+    Include,
+    Omit,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum MappingPolicy {
+    Include,
+    Omit,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum VmMode {
+    Recording,
+    Traced { inspection: InspectionPolicy },
+}
+
+#[derive(Debug, Clone, Copy)]
+enum FixtureKind {
+    Parser {
+        trivia: TriviaPolicy,
+    },
+    Analyze,
+    Bytecode {
+        inspection: InspectionPolicy,
+        lints: LintPolicy,
+    },
+    Types {
+        serde: SerdePolicy,
+        mapping: MappingPolicy,
+        lints: LintPolicy,
+    },
+    Matcher {
+        lints: LintPolicy,
+    },
+    Vm {
+        mode: VmMode,
+        lints: LintPolicy,
+    },
+}
+
+impl FixtureKind {
+    fn classify(stage: &str, name: &FixtureName) -> Result<Self, String> {
+        let lints = if name.contains("lints") {
+            LintPolicy::Strict
+        } else {
+            LintPolicy::Normal
+        };
+        match stage.split('-').next().unwrap_or("") {
+            "02" => Ok(Self::Parser {
+                trivia: if name.contains("trivia") {
+                    TriviaPolicy::Include
+                } else {
+                    TriviaPolicy::Omit
+                },
+            }),
+            "03" => Ok(Self::Analyze),
+            "04" if name.contains("bytecode") => Ok(Self::Bytecode {
+                inspection: if name.contains("inspection") || name.contains("recording") {
+                    InspectionPolicy::Include
+                } else {
+                    InspectionPolicy::Omit
+                },
+                lints,
+            }),
+            "04" if name.contains("types") => Ok(Self::Types {
+                serde: if name.contains("serde") {
+                    SerdePolicy::Include
+                } else {
+                    SerdePolicy::Omit
+                },
+                mapping: if name.contains("mapped") {
+                    MappingPolicy::Include
+                } else {
+                    MappingPolicy::Omit
+                },
+                lints,
+            }),
+            "04" if name.contains_path(&["rust", "module"]) => Ok(Self::Matcher { lints }),
+            "06" => Ok(Self::Vm {
+                mode: if name.contains("recording") {
+                    VmMode::Recording
+                } else {
+                    VmMode::Traced {
+                        inspection: if name.contains("inspection") {
+                            InspectionPolicy::Include
+                        } else {
+                            InspectionPolicy::Omit
+                        },
+                    }
+                },
+                lints,
+            }),
+            _ => Err(format!(
+                "unknown fixture kind `{}` under `{stage}`",
+                name.as_str()
+            )),
+        }
+    }
+
+    fn preserves_query_layout(self) -> bool {
+        matches!(self, Self::Parser { .. })
+    }
+
+    fn strict_lints(self) -> bool {
+        matches!(
+            self,
+            Self::Bytecode {
+                lints: LintPolicy::Strict,
+                ..
+            } | Self::Types {
+                lints: LintPolicy::Strict,
+                ..
+            } | Self::Matcher {
+                lints: LintPolicy::Strict
+            } | Self::Vm {
+                lints: LintPolicy::Strict,
+                ..
+            }
+        )
+    }
+
+    fn legal_sections(self) -> &'static [SectionKind] {
+        match self {
+            Self::Parser { .. } => &[SectionKind::Diagnostics, SectionKind::Cst, SectionKind::Ast],
+            Self::Analyze => &[SectionKind::Diagnostics, SectionKind::Symbols],
+            Self::Bytecode { .. } => &[
+                SectionKind::Diagnostics,
+                SectionKind::Nfa,
+                SectionKind::Bytecode,
+            ],
+            Self::Types { .. } => &[
+                SectionKind::Diagnostics,
+                SectionKind::TypeScript,
+                SectionKind::Rust,
+                SectionKind::Mapped,
+            ],
+            Self::Matcher { .. } => &[SectionKind::Diagnostics, SectionKind::Matcher],
+            Self::Vm { .. } => &[
+                SectionKind::TypeScript,
+                SectionKind::Diagnostics,
+                SectionKind::Output,
+                SectionKind::Inspection,
+                SectionKind::Recording,
+                SectionKind::Bytecode,
+                SectionKind::Trace,
+            ],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum FixtureMode {
+    Check,
+    FormatQueries,
+    AcceptAll,
+}
+
+impl FixtureMode {
+    fn from_env() -> Result<Self, String> {
+        let shot = env_switch("SHOT")?;
+        let check = env_switch("PLOTNIK_FMT_CHECK")?;
+        match (shot, check) {
+            (true, true) => Err("`SHOT` and `PLOTNIK_FMT_CHECK` cannot both be enabled".into()),
+            (true, false) => Ok(Self::AcceptAll),
+            (false, true) => Ok(Self::Check),
+            (false, false) => Ok(Self::FormatQueries),
+        }
+    }
+}
+
+fn env_switch(name: &str) -> Result<bool, String> {
+    match std::env::var(name) {
+        Err(std::env::VarError::NotPresent) => Ok(false),
+        Err(error) => Err(format!("read `{name}`: {error}")),
+        Ok(value) if matches!(value.as_str(), "1" | "true") => Ok(true),
+        Ok(value) if matches!(value.as_str(), "0" | "false") => Ok(false),
+        Ok(value) => Err(format!(
+            "`{name}` must be one of 0, 1, false, or true; got `{value}`"
+        )),
+    }
 }
 
 fn discover(root: &Path) -> Vec<Fixture> {
@@ -98,11 +344,10 @@ fn discover(root: &Path) -> Vec<Fixture> {
             && let Some(stage) = path.file_name().and_then(|s| s.to_str())
             && is_stage_dir(stage)
         {
-            let stage = stage.to_string();
-            walk(&path, &stage, root, &mut out);
+            walk(&path, stage, root, &mut out);
         }
     }
-    out.sort_by(|a, b| a.name.cmp(&b.name));
+    out.sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
     out
 }
 
@@ -129,14 +374,11 @@ fn walk(dir: &Path, stage: &str, root: &Path, out: &mut Vec<Fixture>) {
                 .strip_prefix(root)
                 .expect("fixture path is under tests root")
                 .with_extension("");
-            let name = rel
-                .to_string_lossy()
-                .replace(std::path::MAIN_SEPARATOR, "/");
-            out.push(Fixture {
-                path,
-                name,
-                stage: stage.to_string(),
-            });
+            let name = FixtureName::from_relative(&rel)
+                .unwrap_or_else(|error| panic!("name {}: {error}", path.display()));
+            let kind = FixtureKind::classify(stage, &name)
+                .unwrap_or_else(|error| panic!("classify {}: {error}", path.display()));
+            out.push(Fixture { path, name, kind });
         }
     }
 }
@@ -152,39 +394,194 @@ struct Input {
     text: String,
 }
 
-fn run_fixture(fx: &Fixture) -> Result<(), Failed> {
-    check(fx).map_err(Failed::from)
+fn run_fixture(fx: &Fixture, mode: FixtureMode) -> Result<(), Failed> {
+    check(fx, mode).map_err(Failed::from)
 }
 
-fn check(fx: &Fixture) -> Result<(), String> {
+fn check(fx: &Fixture, mode: FixtureMode) -> Result<(), String> {
     let raw =
         fs::read_to_string(&fx.path).map_err(|e| format!("read {}: {e}", fx.path.display()))?;
-    let parsed = parse_fixture(&raw, &fx.stage, &fx.name)?;
-    let generated = render(&fx.stage, &fx.name, &parsed.query, parsed.input.as_ref())?;
-    if generated.is_empty() {
-        return Err(format!("stage `{}` produced no sections", fx.stage));
-    }
-
-    let expected = canonical(&parsed.query, parsed.input.as_ref(), &generated);
+    let parsed = parse_fixture(&raw, fx.kind, fx.name.as_str())?;
     let actual = raw.replace("\r\n", "\n");
-    if actual == expected {
+    let evaluated = support::formatter::evaluate(&parsed.query, fx.name.as_str())?;
+
+    if matches!(mode, FixtureMode::AcceptAll) {
+        let query = if fx.kind.preserves_query_layout() {
+            parsed.query
+        } else {
+            evaluated.into_query_or(parsed.query)
+        };
+        let generated = render(fx.kind, &query, parsed.input.as_ref())?;
+        if generated.is_empty() {
+            return Err(format!(
+                "fixture `{}` produced no sections",
+                fx.name.as_str()
+            ));
+        }
+        let accepted = canonical(&query, parsed.input.as_ref(), &generated);
+        if actual != accepted {
+            support::atomic_file::replace(&fx.path, &accepted)?;
+        }
         return Ok(());
     }
-    if shot_enabled() {
-        fs::write(&fx.path, &expected).map_err(|e| format!("write {}: {e}", fx.path.display()))?;
+
+    let generated = render(fx.kind, &parsed.query, parsed.input.as_ref())?;
+    if generated.is_empty() {
+        return Err(format!(
+            "fixture `{}` produced no sections",
+            fx.name.as_str()
+        ));
+    }
+    let expected = canonical(&parsed.query, parsed.input.as_ref(), &generated);
+    if actual != expected {
+        return Err(format!(
+            "fixture out of date — run `make shot` (or `SHOT=1 cargo nextest run`):\n{}",
+            unified_diff(&actual, &expected)
+        ));
+    }
+
+    if fx.kind.preserves_query_layout() {
         return Ok(());
     }
-    Err(format!(
-        "fixture out of date — run `make shot` (or `SHOT=1 cargo nextest run`):\n{}",
-        unified_diff(&actual, &expected)
-    ))
+    let Assessment::Changed(query) = evaluated else {
+        return Ok(());
+    };
+
+    let generated = render(fx.kind, &query, parsed.input.as_ref())?;
+    let formatted = canonical(&query, parsed.input.as_ref(), &generated);
+    if matches!(mode, FixtureMode::Check) {
+        return Err(format!(
+            "query formatting is out of date:\n{}",
+            unified_diff(&actual, &formatted)
+        ));
+    }
+    support::atomic_file::replace(&fx.path, &formatted)
 }
 
-fn shot_enabled() -> bool {
-    matches!(std::env::var("SHOT").as_deref(), Ok("1") | Ok("true"))
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SectionKind {
+    Diagnostics,
+    Cst,
+    Ast,
+    Symbols,
+    Nfa,
+    Bytecode,
+    TypeScript,
+    Rust,
+    Mapped,
+    Matcher,
+    Output,
+    Inspection,
+    Recording,
+    Trace,
 }
 
-fn parse_fixture(raw: &str, stage: &str, name: &str) -> Result<Parsed, String> {
+impl SectionKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Diagnostics => "diagnostics",
+            Self::Cst => "cst",
+            Self::Ast => "ast",
+            Self::Symbols => "symbols",
+            Self::Nfa => "nfa",
+            Self::Bytecode => "bytecode",
+            Self::TypeScript => "typescript",
+            Self::Rust => "rust",
+            Self::Mapped => "mapped",
+            Self::Matcher => "matcher",
+            Self::Output => "output",
+            Self::Inspection => "inspection",
+            Self::Recording => "recording",
+            Self::Trace => "trace",
+        }
+    }
+
+    fn from_header(header: &str) -> Option<Self> {
+        ALL_SECTION_KINDS
+            .iter()
+            .copied()
+            .find(|kind| kind.as_str() == header)
+    }
+}
+
+const ALL_SECTION_KINDS: &[SectionKind] = &[
+    SectionKind::Diagnostics,
+    SectionKind::Cst,
+    SectionKind::Ast,
+    SectionKind::Symbols,
+    SectionKind::Nfa,
+    SectionKind::Bytecode,
+    SectionKind::TypeScript,
+    SectionKind::Rust,
+    SectionKind::Mapped,
+    SectionKind::Matcher,
+    SectionKind::Output,
+    SectionKind::Inspection,
+    SectionKind::Recording,
+    SectionKind::Trace,
+];
+
+struct GeneratedSection {
+    kind: SectionKind,
+    body: String,
+}
+
+impl GeneratedSection {
+    fn new(kind: SectionKind, body: impl Into<String>) -> Self {
+        Self {
+            kind,
+            body: body.into(),
+        }
+    }
+}
+
+struct GeneratedOutput {
+    sections: Vec<GeneratedSection>,
+}
+
+impl GeneratedOutput {
+    fn validate(kind: FixtureKind, sections: Vec<GeneratedSection>) -> Result<Self, String> {
+        let legal = kind.legal_sections();
+        let mut output: Vec<GeneratedSection> = Vec::with_capacity(sections.len());
+        let mut last_position = None;
+        for section in sections {
+            let position = legal
+                .iter()
+                .position(|candidate| *candidate == section.kind)
+                .ok_or_else(|| format!("generated illegal `{}` section", section.kind.as_str()))?;
+            if let Some(existing) = output.iter_mut().find(|item| item.kind == section.kind) {
+                if section.kind != SectionKind::Diagnostics {
+                    return Err(format!(
+                        "generated duplicate `{}` section",
+                        section.kind.as_str()
+                    ));
+                }
+                if !existing.body.ends_with('\n') {
+                    existing.body.push('\n');
+                }
+                existing
+                    .body
+                    .push_str(section.body.trim_start_matches('\n'));
+                continue;
+            }
+            if last_position.is_some_and(|last| position < last) {
+                return Err(format!(
+                    "generated `{}` section out of order",
+                    section.kind.as_str()
+                ));
+            }
+            last_position = Some(position);
+            output.push(section);
+        }
+        Ok(Self { sections: output })
+    }
+
+    fn into_sections(self) -> Vec<GeneratedSection> {
+        self.sections
+    }
+}
+
+fn parse_fixture(raw: &str, kind: FixtureKind, name: &str) -> Result<Parsed, String> {
     let normalized = raw.replace("\r\n", "\n");
     let mut query_lines: Vec<&str> = Vec::new();
     let mut sections: Vec<(String, Vec<&str>)> = Vec::new();
@@ -230,27 +627,29 @@ fn parse_fixture(raw: &str, stage: &str, name: &str) -> Result<Parsed, String> {
         _ => (None, 0),
     };
 
-    validate_generated_headers(stage, name, &sections[generated_start..])?;
+    validate_generated_headers(kind, name, &sections[generated_start..])?;
 
     Ok(Parsed { query, input })
 }
 
 fn validate_generated_headers(
-    stage: &str,
+    kind: FixtureKind,
     name: &str,
     sections: &[(String, Vec<&str>)],
 ) -> Result<(), String> {
-    let legal = generated_section_order(stage, name)
-        .ok_or_else(|| format!("unknown stage directory `{stage}`"))?;
+    let legal = kind.legal_sections();
     let mut cursor = 0;
 
-    for (name, _) in sections {
+    for (header, _) in sections {
+        let Some(section_kind) = SectionKind::from_header(header) else {
+            return Err(format!("unknown generated section `{header}` in `{name}`"));
+        };
         let Some(offset) = legal[cursor..]
             .iter()
-            .position(|known| *known == name.as_str())
+            .position(|known| *known == section_kind)
         else {
             return Err(format!(
-                "section `{name}` is invalid or out of order for `{stage}`; fixture section rules are reserved in authored query/input text"
+                "section `{header}` is invalid or out of order for `{name}`; fixture section rules are reserved in authored query/input text"
             ));
         };
         cursor += offset + 1;
@@ -259,60 +658,27 @@ fn validate_generated_headers(
     Ok(())
 }
 
-fn generated_section_order(stage: &str, name: &str) -> Option<&'static [&'static str]> {
-    match stage.split('-').next().unwrap_or("") {
-        "02" => Some(&["diagnostics", "cst", "ast"]),
-        "03" => Some(&["diagnostics", "symbols"]),
-        "04" if name.contains("/bytecode/") => Some(&["diagnostics", "nfa", "bytecode"]),
-        "04" if name.contains("/types/") => Some(&["diagnostics", "typescript", "rust", "mapped"]),
-        "04" if name.contains("/rust/module/") => Some(&["diagnostics", "matcher"]),
-        "06" => Some(&[
-            "typescript",
-            "diagnostics",
-            "output",
-            "inspection",
-            "recording",
-            "bytecode",
-            "trace",
-        ]),
-        _ => None,
-    }
-}
-
 fn render(
-    stage: &str,
-    name: &str,
+    kind: FixtureKind,
     query: &str,
     input: Option<&Input>,
-) -> Result<Vec<(String, String)>, String> {
-    match stage.split('-').next().unwrap_or("") {
+) -> Result<Vec<GeneratedSection>, String> {
+    let sections = match kind {
         // The `trivia` folder pins how whitespace/comments attach to the CST, so it
         // renders the trivia-inclusive CST; every other parser fixture omits trivia.
-        "02" => Ok(render_frontend(
-            query,
-            Front::Parser {
-                trivia: name.contains("/trivia/"),
-            },
-        )),
-        "03" => Ok(render_frontend(query, Front::Analyze)),
-        "04" if name.contains("/bytecode/") => {
-            render_compile(name, query, input, Compile::Bytecode)
-        }
-        "04" if name.contains("/types/") => render_compile(name, query, input, Compile::Typegen),
-        "04" if name.contains("/rust/module/") => {
-            render_compile(name, query, input, Compile::Matcher)
-        }
-        "06" => render_compile(name, query, input, Compile::Vm),
-        _ => Err(format!("unknown stage directory `{stage}`")),
-    }
+        FixtureKind::Parser { trivia } => render_frontend(query, FrontendMode::Parser(trivia)),
+        FixtureKind::Analyze => render_frontend(query, FrontendMode::Analyze),
+        compile => render_compile(compile, query, input),
+    }?;
+    Ok(GeneratedOutput::validate(kind, sections)?.into_sections())
 }
 
-enum Front {
-    Parser { trivia: bool },
+enum FrontendMode {
+    Parser(TriviaPolicy),
     Analyze,
 }
 
-fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
+fn render_frontend(query: &str, kind: FrontendMode) -> Result<Vec<GeneratedSection>, String> {
     let analyzed = QueryBuilder::new(source_map(query))
         .analyze()
         .expect("query parsing should not exhaust fuel");
@@ -321,98 +687,96 @@ fn render_frontend(query: &str, kind: Front) -> Vec<(String, String)> {
 
     let mut out = Vec::new();
     if has_errors || diagnostics.has_warnings() {
-        out.push((
-            "diagnostics".into(),
+        out.push(GeneratedSection::new(
+            SectionKind::Diagnostics,
             diagnostics.render(analyzed.source_map()),
         ));
     }
     match kind {
         // Parser recovery fixtures pin diagnostics only; a half-built error CST is noise.
-        Front::Parser { trivia } if !has_errors => {
-            let cst = analyzed.dump_cst_with_trivia(trivia);
-            out.push(("cst".into(), cst));
-            out.push(("ast".into(), analyzed.dump_ast()));
+        FrontendMode::Parser(trivia) if !has_errors => {
+            let cst = analyzed.dump_cst_with_trivia(matches!(trivia, TriviaPolicy::Include));
+            out.push(GeneratedSection::new(SectionKind::Cst, cst));
+            out.push(GeneratedSection::new(SectionKind::Ast, analyzed.dump_ast()));
         }
-        Front::Parser { .. } => {}
+        FrontendMode::Parser(_) => {}
         // The symbol table is meaningful even with unresolved refs, so it renders
         // alongside any error diagnostics rather than being suppressed.
-        Front::Analyze => {
-            out.push(("symbols".into(), analyzed.dump_symbols()));
+        FrontendMode::Analyze => {
+            out.push(GeneratedSection::new(
+                SectionKind::Symbols,
+                analyzed.dump_symbols(),
+            ));
         }
     }
-    out
-}
-
-enum Compile {
-    Bytecode,
-    Typegen,
-    Vm,
-    Matcher,
+    Ok(out)
 }
 
 fn render_compile(
-    name: &str,
+    kind: FixtureKind,
     query: &str,
     input: Option<&Input>,
-    kind: Compile,
-) -> Result<Vec<(String, String)>, String> {
+) -> Result<Vec<GeneratedSection>, String> {
     let lang = Lang::resolve(input.and_then(|i| i.ext.as_deref()))?;
-    let records = name.contains("/recording/");
-    let inspects = name.contains("/inspection/");
-    let strict_lints = name.contains("/lints/");
     let compiled = QueryBuilder::new(source_map(query))
-        .with_strict_lints(strict_lints)
+        .with_strict_lints(kind.strict_lints())
         .compile(lang.grammar)
         .expect("query parsing should not exhaust fuel");
     let diagnostics = compiled.diagnostics();
 
     let mut out = Vec::new();
     if diagnostics.has_errors() {
-        out.push((
-            "diagnostics".into(),
+        out.push(GeneratedSection::new(
+            SectionKind::Diagnostics,
             diagnostics.render(compiled.source_map()),
         ));
         return Ok(out);
     }
     let diag = diagnostics.has_warnings().then(|| {
-        (
-            "diagnostics".to_string(),
+        GeneratedSection::new(
+            SectionKind::Diagnostics,
             diagnostics.render(compiled.source_map()),
         )
     });
 
     match kind {
-        Compile::Bytecode => {
-            let emission = emit_bytecode(&compiled, inspects || records);
+        FixtureKind::Bytecode { inspection, .. } => {
+            let emission = emit_bytecode(&compiled, inspection);
             let module = emission
                 .artifact()
                 .expect("valid query should emit a bytecode module");
             out.extend(diag);
             if emission.diagnostics().has_warnings() {
-                out.push((
-                    "diagnostics".into(),
+                out.push(GeneratedSection::new(
+                    SectionKind::Diagnostics,
                     emission.diagnostics().render(compiled.source_map()),
                 ));
             }
             let nfa = compiled
                 .dump_nfa(Colors::new(false))
                 .expect("valid query should compile to a module");
-            out.push(("nfa".into(), nfa));
-            out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))));
+            out.push(GeneratedSection::new(SectionKind::Nfa, nfa));
+            out.push(GeneratedSection::new(
+                SectionKind::Bytecode,
+                dump_bytecode(module, Colors::new(false)),
+            ));
         }
-        Compile::Typegen => {
+        FixtureKind::Types { serde, mapping, .. } => {
             out.extend(diag);
             let typescript = render_typescript(&compiled);
-            out.push(("typescript".into(), typescript.clone()));
-            let rust_config = RustCodegenConfig::new().serde(name.contains("/serde/"));
+            out.push(GeneratedSection::new(
+                SectionKind::TypeScript,
+                typescript.clone(),
+            ));
+            let rust_config = RustCodegenConfig::new().serde(matches!(serde, SerdePolicy::Include));
             let rust = compiled
                 .emit_types(rust_config)
                 .expect("Rust type emission answers")
                 .into_artifact()
                 .expect("valid query emits Rust types")
                 .into_source();
-            out.push(("rust".into(), rust));
-            if name.contains("/mapped/") {
+            out.push(GeneratedSection::new(SectionKind::Rust, rust));
+            if matches!(mapping, MappingPolicy::Include) {
                 let (mapped_types, ranges) = compiled
                     .emit_types(typescript_config())
                     .expect("TypeScript emission answers")
@@ -423,10 +787,13 @@ fn render_compile(
                     typescript, mapped_types,
                     "mapped d.ts must match normal d.ts"
                 );
-                out.push(("mapped".into(), render_mapped(&mapped_types, &ranges)));
+                out.push(GeneratedSection::new(
+                    SectionKind::Mapped,
+                    render_mapped(&mapped_types, &ranges),
+                ));
             }
         }
-        Compile::Matcher => {
+        FixtureKind::Matcher { .. } => {
             out.extend(diag);
             let matcher = compiled
                 .emit(RustCodegenConfig::new())
@@ -434,10 +801,14 @@ fn render_compile(
                 .into_artifact()
                 .expect("valid query emits a Rust module")
                 .into_source();
-            out.push(("matcher".into(), matcher));
+            out.push(GeneratedSection::new(SectionKind::Matcher, matcher));
         }
-        Compile::Vm => {
-            let emission = emit_bytecode(&compiled, inspects || records);
+        FixtureKind::Vm { mode, .. } => {
+            let inspection = match mode {
+                VmMode::Recording => InspectionPolicy::Include,
+                VmMode::Traced { inspection } => inspection,
+            };
+            let emission = emit_bytecode(&compiled, inspection);
             let module = emission
                 .artifact()
                 .expect("valid query should emit a bytecode module");
@@ -449,26 +820,53 @@ fn render_compile(
                 .last()
                 .ok_or_else(|| "06-vm fixture produced no callable entrypoints".to_string())?
                 .to_string();
-            let run = run_vm(&lang, module, &entry, &input.text, inspects, records)?;
-            out.push(("typescript".into(), render_typescript(&compiled)));
+            let run = run_vm(VmScenario {
+                lang: &lang,
+                module,
+                entry: &entry,
+                source: &input.text,
+                mode,
+            })?;
+            out.push(GeneratedSection::new(
+                SectionKind::TypeScript,
+                render_typescript(&compiled),
+            ));
             out.extend(diag);
             if emission.diagnostics().has_warnings() {
-                out.push((
-                    "diagnostics".into(),
+                out.push(GeneratedSection::new(
+                    SectionKind::Diagnostics,
                     emission.diagnostics().render(compiled.source_map()),
                 ));
             }
-            out.push(("output".into(), run.output));
-            if let Some(inspection) = run.inspection {
-                out.push(("inspection".into(), inspection));
+            match run {
+                VmArtifacts::Recording { output, recording } => {
+                    out.push(GeneratedSection::new(SectionKind::Output, output));
+                    out.push(GeneratedSection::new(SectionKind::Recording, recording));
+                }
+                VmArtifacts::Traced {
+                    output,
+                    trace,
+                    inspection,
+                } => {
+                    out.push(GeneratedSection::new(SectionKind::Output, output));
+                    if let Some(inspection) = inspection {
+                        out.push(GeneratedSection::new(SectionKind::Inspection, inspection));
+                    }
+                    out.push(GeneratedSection::new(
+                        SectionKind::Bytecode,
+                        dump_bytecode(module, Colors::new(false)),
+                    ));
+                    out.push(GeneratedSection::new(SectionKind::Trace, trace));
+                    return Ok(out);
+                }
             }
-            if let Some(recording) = run.recording {
-                out.push(("recording".into(), recording));
-            }
-            out.push(("bytecode".into(), dump_bytecode(module, Colors::new(false))));
-            if let Some(trace) = run.trace {
-                out.push(("trace".into(), trace));
-            }
+            out.push(GeneratedSection::new(
+                SectionKind::Bytecode,
+                dump_bytecode(module, Colors::new(false)),
+            ));
+        }
+        FixtureKind::Parser { .. } | FixtureKind::Analyze => {
+            unreachable!("frontend fixtures do not reach compilation")
         }
     }
     Ok(out)
@@ -488,8 +886,11 @@ fn typescript_config() -> TypeScriptCodegenConfig {
     TypeScriptCodegenConfig::new().emit_node_interface(false)
 }
 
-fn emit_bytecode(compiled: &CompiledQuery, inspection: bool) -> plotnik_lib::Emission<Module> {
-    let config = if inspection {
+fn emit_bytecode(
+    compiled: &CompiledQuery,
+    inspection: InspectionPolicy,
+) -> plotnik_lib::Emission<Module> {
+    let config = if inspection == InspectionPolicy::Include {
         BytecodeConfig::new().inspection(BytecodeInspection::Spans)
     } else {
         BytecodeConfig::new()
@@ -518,31 +919,38 @@ fn render_mapped(dts: &str, ranges: &[DtsRange]) -> String {
     out
 }
 
-struct VmRun {
-    trace: Option<String>,
-    output: String,
-    inspection: Option<String>,
-    recording: Option<String>,
+struct VmScenario<'a> {
+    lang: &'a Lang,
+    module: &'a Module,
+    entry: &'a str,
+    source: &'a str,
+    mode: VmMode,
 }
 
-fn run_vm(
-    lang: &Lang,
-    module: &Module,
-    entry: &str,
-    source: &str,
-    inspect: bool,
-    record: bool,
-) -> Result<VmRun, String> {
-    let tree = lang.parse(source);
-    let entrypoint = module
-        .entrypoint(entry)
+enum VmArtifacts {
+    Recording {
+        output: String,
+        recording: String,
+    },
+    Traced {
+        output: String,
+        trace: String,
+        inspection: Option<String>,
+    },
+}
+
+fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
+    let tree = scenario.lang.parse(scenario.source);
+    let entrypoint = scenario
+        .module
+        .entrypoint(scenario.entry)
         .expect("selected definition must be an entrypoint");
 
-    let vm = VM::builder(source, &tree).build();
+    let vm = VM::builder(scenario.source, &tree).build();
 
-    if record {
-        let mut tracer = RecordingTracer::new(module, 65_536);
-        let result = vm.execute_with(module, &entrypoint, &mut tracer);
+    if matches!(scenario.mode, VmMode::Recording) {
+        let mut tracer = RecordingTracer::new(scenario.module, 65_536);
+        let result = vm.execute_with(scenario.module, &entrypoint, &mut tracer);
         let recording = tracer.finish();
         let mut recording_json =
             serde_json::to_string_pretty(&recording).expect("recording serialization cannot fail");
@@ -553,8 +961,8 @@ fn run_vm(
                 // The verified variant (not plain `materialize`) so a type-unsound emission
                 // panics the fixture in debug; the check compiles out under `--release`.
                 let value = materialize_verified(
-                    source,
-                    module,
+                    scenario.source,
+                    scenario.module,
                     &entrypoint,
                     effects.as_slice(),
                     Colors::new(false),
@@ -564,28 +972,31 @@ fn run_vm(
             Err(RuntimeError::NoMatch) => "<no match>".to_string(),
             // A no-match is a real outcome worth pinning; step/memory exhaustion is
             // not — fail the trial rather than accept a resource limit as golden output.
-            Err(err) => return Err(format!("VM run failed for `{entry}`: {err}")),
+            Err(err) => {
+                return Err(format!("VM run failed for `{}`: {err}", scenario.entry));
+            }
         };
 
-        return Ok(VmRun {
-            trace: None,
+        return Ok(VmArtifacts::Recording {
             output,
-            inspection: None,
-            recording: Some(recording_json),
+            recording: recording_json,
         });
     }
 
-    let mut tracer = PrintTracer::builder(source, module)
+    let VmMode::Traced { inspection } = scenario.mode else {
+        unreachable!("recording mode returns above")
+    };
+    let mut tracer = PrintTracer::builder(scenario.source, scenario.module)
         .verbosity(Verbosity::Default)
         .colored(false)
         .build();
 
-    let result = vm.execute_with(module, &entrypoint, &mut tracer);
+    let result = vm.execute_with(scenario.module, &entrypoint, &mut tracer);
     let trace = tracer.render();
     let (output, inspection) = match result {
         Ok(effects) => {
-            let inspection = inspect.then(|| {
-                let inspection = extract_inspection(effects.as_slice(), module);
+            let inspection = (inspection == InspectionPolicy::Include).then(|| {
+                let inspection = extract_inspection(effects.as_slice(), scenario.module);
                 let mut rendered = serde_json::to_string_pretty(&inspection)
                     .expect("inspection serialization cannot fail");
                 rendered.push('\n');
@@ -594,8 +1005,8 @@ fn run_vm(
             // The verified variant (not plain `materialize`) so a type-unsound emission
             // panics the fixture in debug; the check compiles out under `--release`.
             let value = materialize_verified(
-                source,
-                module,
+                scenario.source,
+                scenario.module,
                 &entrypoint,
                 effects.as_slice(),
                 Colors::new(false),
@@ -605,13 +1016,12 @@ fn run_vm(
         Err(RuntimeError::NoMatch) => ("<no match>".to_string(), None),
         // A no-match is a real outcome worth pinning; step/memory exhaustion is
         // not — fail the trial rather than accept a resource limit as golden output.
-        Err(err) => return Err(format!("VM run failed for `{entry}`: {err}")),
+        Err(err) => return Err(format!("VM run failed for `{}`: {err}", scenario.entry)),
     };
-    Ok(VmRun {
-        trace: Some(trace),
+    Ok(VmArtifacts::Traced {
         output,
+        trace,
         inspection,
-        recording: None,
     })
 }
 
@@ -678,7 +1088,7 @@ fn source_map(query: &str) -> SourceMap {
 /// The canonical file text every fixture is compared against. Rebuilding the whole
 /// file each run, rather than editing sections in place, is what drops stale
 /// sections on accept.
-fn canonical(query: &str, input: Option<&Input>, generated: &[(String, String)]) -> String {
+fn canonical(query: &str, input: Option<&Input>, generated: &[GeneratedSection]) -> String {
     let mut out = String::new();
     out.push_str(query);
     if !out.ends_with('\n') {
@@ -691,8 +1101,8 @@ fn canonical(query: &str, input: Option<&Input>, generated: &[(String, String)])
         };
         push_authored_section(&mut out, &header, &input.text);
     }
-    for (name, body) in generated {
-        push_section(&mut out, name, body);
+    for section in generated {
+        push_section(&mut out, section.kind.as_str(), &section.body);
     }
     out
 }

@@ -1,9 +1,17 @@
-Q = (array (identifier) .! (identifier))
+Q = (array
+  (identifier)
+  .!
+  (identifier)
+)
 ------------------ DIAGNOSTICS -------------------
 error: no `array` places these children in this adjacency
  --> query.ptk:1:6
   |
-1 | Q = (array (identifier) .! (identifier))
+1 | Q = (array
   |      ^^^^^
   |
-help: `.!` allows nothing between — not even anonymous tokens or comments; the soft anchor `.` skips those: `(array (identifier) . (identifier))`
+help: `.!` allows nothing between — not even anonymous tokens or comments; the soft anchor `.` skips those: `(array
+        (identifier)
+        .
+        (identifier)
+      )`

@@ -1,10 +1,12 @@
-Row = (pair key: (_) @key value: (_) @val)
+Row = (pair
+  key: (_) @key
+  value: (_) @val
+)
+
 Rows = (Row)*
 
 Q = (program
-  (expression_statement
-    (parenthesized_expression (object (Rows) @rows))
-  )
+  (expression_statement (parenthesized_expression (object (Rows) @rows)))
 )
 --------------------- INPUT ----------------------
 ({a: 1, b: 2});

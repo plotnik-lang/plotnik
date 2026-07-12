@@ -1,4 +1,8 @@
-Q = (program (expression_statement (identifier =~ /^\p{Lu}$/) @id)* @rows)
+Q = (program
+  (expression_statement
+    (identifier =~ /^\p{Lu}$/) @id
+  )* @rows
+)
 --------------------- INPUT ----------------------
 A; a; K;
 ------------------- TYPESCRIPT -------------------

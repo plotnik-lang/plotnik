@@ -1,7 +1,10 @@
 Q = (program
   (lexical_declaration
     (variable_declarator
-      value: (template_string (string_fragment == "a\nb") @frag))))
+      value: (template_string (string_fragment == "a\nb") @frag)
+    )
+  )
+)
 --------------------- INPUT ----------------------
 const s = `a
 b`;

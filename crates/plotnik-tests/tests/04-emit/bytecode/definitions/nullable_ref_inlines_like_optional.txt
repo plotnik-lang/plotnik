@@ -1,5 +1,9 @@
 MaybeId = (identifier)?
-Q = (array (MaybeId) (number) @n)
+
+Q = (array
+  (MaybeId)
+  (number) @n
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 22

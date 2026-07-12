@@ -1,25 +1,28 @@
 Inner = (identifier)
-Q = (program [
-  A: (expression_statement (Inner) @x)
-  B: (labeled_statement body: (expression_statement (Inner) @y))
-] @item)
+
+Q = (program
+  [
+    A: (expression_statement (Inner) @x)
+    B: (labeled_statement body: (expression_statement (Inner) @y))
+  ] @item
+)
 --------------------- INPUT ----------------------
 x
 ------------------ DIAGNOSTICS -------------------
 error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
- --> query.ptk:3:28
-  |
-1 | Inner = (identifier)
-  |         ------------ defined here
-2 | Q = (program [
-3 |   A: (expression_statement (Inner) @x)
-  |                            ^^^^^^^
-
-error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
- --> query.ptk:4:53
+ --> query.ptk:5:30
   |
 1 | Inner = (identifier)
   |         ------------ defined here
 ...
-4 |   B: (labeled_statement body: (expression_statement (Inner) @y))
-  |                                                     ^^^^^^^
+5 |     A: (expression_statement (Inner) @x)
+  |                              ^^^^^^^
+
+error: the referenced definition produces no value; add a capture inside it or capture a node pattern directly
+ --> query.ptk:6:55
+  |
+1 | Inner = (identifier)
+  |         ------------ defined here
+...
+6 |     B: (labeled_statement body: (expression_statement (Inner) @y))
+  |                                                       ^^^^^^^

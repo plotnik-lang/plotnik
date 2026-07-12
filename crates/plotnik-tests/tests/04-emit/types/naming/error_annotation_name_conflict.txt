@@ -1,12 +1,19 @@
 Q = (program
-  {(expression_statement) @foo :: QBar} @a
-  {(lexical_declaration) @x} @bar
+  {
+    (expression_statement) @foo :: QBar
+  } @a
+  {
+    (lexical_declaration) @x
+  } @bar
 )
 ------------------ DIAGNOSTICS -------------------
 error: type name `QBar` is already used for a different type
- --> query.ptk:3:3
+ --> query.ptk:5:3
   |
-2 |   {(expression_statement) @foo :: QBar} @a
-  |                                   ---- already used here
-3 |   {(lexical_declaration) @x} @bar
-  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 |       (expression_statement) @foo :: QBar
+  |                                      ---- already used here
+4 |     } @a
+5 | /   {
+6 | |     (lexical_declaration) @x
+7 | |   } @bar
+  | |___^

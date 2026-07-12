@@ -1,14 +1,4 @@
-Q = (program
-  (expression_statement
-    (array
-      (object
-        (pair) @p
-        .
-      )
-      .
-    )
-  )
-)
+Q = (program (expression_statement (array (object (pair) @p .) .)))
 --------------------- INPUT ----------------------
 [{a:1}]
 ------------------- TYPESCRIPT -------------------

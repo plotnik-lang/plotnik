@@ -1,12 +1,17 @@
-A = (foo (bar) @cap (B))
+A = (foo
+  (bar) @cap
+  (B)
+)
+
 B = (bar (A))
 ------------------ DIAGNOSTICS -------------------
 error: infinite recursion: no escape path
- --> query.ptk:2:11
+ --> query.ptk:6:11
   |
-1 | A = (foo (bar) @cap (B))
-  |                      - references B (completing cycle)
-2 | B = (bar (A))
+3 |   (B)
+  |    - references B (completing cycle)
+...
+6 | B = (bar (A))
   | -         ^
   | |         |
   | |         references A

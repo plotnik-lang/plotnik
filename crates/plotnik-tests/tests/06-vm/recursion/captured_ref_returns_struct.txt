@@ -5,9 +5,7 @@ Nested = (call_expression
   ]
 )
 
-Q = (program
-  (expression_statement (Nested) @top)
-)
+Q = (program (expression_statement (Nested) @top))
 --------------------- INPUT ----------------------
 a()();
 ------------------- TYPESCRIPT -------------------

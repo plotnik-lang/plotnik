@@ -1,4 +1,8 @@
-Q = (program (expression_statement (identifier =~ /^x/) @id)* @rows)
+Q = (program
+  (expression_statement
+    (identifier =~ /^x/) @id
+  )* @rows
+)
 --------------------- INPUT ----------------------
 x1; ax; x3;
 ------------------- TYPESCRIPT -------------------

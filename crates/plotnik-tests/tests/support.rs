@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+pub mod atomic_file;
+pub mod formatter;
+
 #[path = "../test_support/grammar_loader.rs"]
 mod grammar_loader;
 

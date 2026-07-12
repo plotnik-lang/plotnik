@@ -1,9 +1,10 @@
-Row = (pair key: (_) @key value: (_) @val)
+Row = (pair
+  key: (_) @key
+  value: (_) @val
+)
 
 Q = (program
-  (expression_statement
-    (parenthesized_expression (object (Row)+ @rows))
-  )
+  (expression_statement (parenthesized_expression (object (Row)+ @rows)))
 )
 ------------------- TYPESCRIPT -------------------
 export interface Row {

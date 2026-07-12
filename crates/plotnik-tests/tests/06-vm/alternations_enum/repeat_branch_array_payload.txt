@@ -1,7 +1,9 @@
-Q = (program [
-  A: (expression_statement)* @stmts
-  B: (debugger_statement)
-] @x)
+Q = (program
+  [
+    A: (expression_statement)* @stmts
+    B: (debugger_statement)
+  ] @x
+)
 --------------------- INPUT ----------------------
 a; b;
 ------------------- TYPESCRIPT -------------------

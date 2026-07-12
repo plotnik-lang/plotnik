@@ -1,7 +1,9 @@
-Q = (program [
-  Bad: (expression_statement (identifier == "nope") @bad)
-  Good: (expression_statement (identifier) @good)
-] @expr)
+Q = (program
+  [
+    Bad: (expression_statement (identifier == "nope") @bad)
+    Good: (expression_statement (identifier) @good)
+  ] @expr
+)
 ------------------- INPUT (ts) -------------------
 x
 ------------------- TYPESCRIPT -------------------
@@ -759,18 +761,18 @@ N1: S08 → T4  ; Q
 Q = 00 :: T4
 
 [spans]
-P00 def        0..131  src0  T4
-P01 pattern    4..131  src0
-P02 capture    125..130  src0  T4.M4
-P03 enum       13..124  src0
-P04 branch     17..72  src0  T3.M2
-P05 pattern    22..72  src0
-P06 capture    67..71  src0  T1.M0
-P07 pattern    44..66  src0
-P08 branch     75..122  src0  T3.M3
-P09 pattern    81..122  src0
-P10 capture    116..121  src0  T2.M1
-P11 pattern    103..115  src0
+P00 def        0..140  src0  T4
+P01 pattern    4..140  src0
+P02 capture    133..138  src0  T4.M4
+P03 enum       15..132  src0
+P04 branch     21..76  src0  T3.M2
+P05 pattern    26..76  src0
+P06 capture    71..75  src0  T1.M0
+P07 pattern    48..70  src0
+P08 branch     81..128  src0  T3.M3
+P09 pattern    87..128  src0
+P10 capture    122..127  src0  T2.M1
+P11 pattern    109..121  src0
 
 [transitions]
 Q:

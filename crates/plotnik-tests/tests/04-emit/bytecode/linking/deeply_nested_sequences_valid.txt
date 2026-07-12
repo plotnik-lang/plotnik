@@ -1,12 +1,4 @@
-Q = (statement_block
-  {
-    {
-      {
-        (function_declaration)
-      }
-    }
-  }
-) @block
+Q = (statement_block {{{(function_declaration)}}}) @block
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 8

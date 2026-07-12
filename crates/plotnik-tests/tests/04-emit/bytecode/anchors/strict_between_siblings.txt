@@ -1,4 +1,8 @@
-Q = (binary_expression "+" .! (identifier))
+Q = (binary_expression
+  "+"
+  .!
+  (identifier)
+)
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 10

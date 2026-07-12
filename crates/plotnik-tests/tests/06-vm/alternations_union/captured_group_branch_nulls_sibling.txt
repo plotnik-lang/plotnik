@@ -1,6 +1,8 @@
 Q = (program
   [
-    {(expression_statement) @a} @grp
+    {
+      (expression_statement) @a
+    } @grp
     (comment) @b
   ] @w
 )

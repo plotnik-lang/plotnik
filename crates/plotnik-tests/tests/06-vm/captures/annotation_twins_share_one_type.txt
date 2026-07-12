@@ -1,6 +1,14 @@
 Q = (program
-  (expression_statement {(identifier) @v} @a :: Pair)
-  (expression_statement {(identifier) @v} @b :: Pair)
+  (expression_statement
+    {
+      (identifier) @v
+    } @a :: Pair
+  )
+  (expression_statement
+    {
+      (identifier) @v
+    } @b :: Pair
+  )
 )
 --------------------- INPUT ----------------------
 x;

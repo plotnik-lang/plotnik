@@ -1,4 +1,8 @@
-Q = (program {(expression_statement) @s} @x)
+Q = (program
+  {
+    (expression_statement) @s
+  } @x
+)
 ------------------- TYPESCRIPT -------------------
 export interface QX {
   s: Node;

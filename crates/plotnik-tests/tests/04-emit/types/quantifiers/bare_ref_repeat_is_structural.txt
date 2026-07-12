@@ -1,4 +1,7 @@
-Item = [A: (expression_statement) @s]
+Item = [
+  A: (expression_statement) @s
+]
+
 Q = (program (Item)+)
 ------------------- TYPESCRIPT -------------------
 export type Item =

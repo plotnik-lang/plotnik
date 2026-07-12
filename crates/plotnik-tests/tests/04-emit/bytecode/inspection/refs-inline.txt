@@ -1,4 +1,5 @@
 MaybeName = (identifier)? @name
+
 Q = (program
   {
     (expression_statement (MaybeName) @first)
@@ -78,15 +79,15 @@ P00 def        0..31  src0  T1
 P01 capture    26..31  src0  T1.M0
 P02 quantifier 24..25  src0
 P03 pattern    12..24  src0
-P04 def        32..147  src0  T2
-P05 pattern    36..147  src0
-P06 sequence   47..145  src0
-P07 pattern    53..94  src0
-P08 capture    87..93  src0  T2.M1
-P09 ref        75..86  src0  T1
-P10 pattern    99..141  src0
-P11 capture    133..140  src0  T2.M2
-P12 ref        121..132  src0  T1
+P04 def        33..148  src0  T2
+P05 pattern    37..148  src0
+P06 sequence   48..146  src0
+P07 pattern    54..95  src0
+P08 capture    88..94  src0  T2.M1
+P09 ref        76..87  src0  T1
+P10 pattern    100..142  src0
+P11 capture    134..141  src0  T2.M2
+P12 ref        122..133  src0  T1
 
 [transitions]
 Q:

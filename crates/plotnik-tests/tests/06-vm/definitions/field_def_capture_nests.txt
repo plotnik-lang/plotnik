@@ -1,10 +1,5 @@
 Name = (identifier) @text
-
-Q = (program
-  (function_declaration
-    name: (Name) @fn
-  )
-)
+Q = (program (function_declaration name: (Name) @fn))
 --------------------- INPUT ----------------------
 function foo(){}
 ------------------- TYPESCRIPT -------------------

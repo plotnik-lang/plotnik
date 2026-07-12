@@ -1,16 +1,17 @@
-Q = (program [
-  (expression_statement)+
-  (lexical_declaration)
-] @x)
+Q = (program
+  [
+    (expression_statement)+
+    (lexical_declaration)
+  ] @x
+)
 ------------------ DIAGNOSTICS -------------------
 error: this alternation doesn't match exactly one node, so there is no single node to bind
- --> query.ptk:1:14
+ --> query.ptk:2:3
   |
-1 |   Q = (program [
-  |  ______________^
-2 | |   (expression_statement)+
-3 | |   (lexical_declaration)
-4 | | ] @x)
-  | |_^
+2 | /   [
+3 | |     (expression_statement)+
+4 | |     (lexical_declaration)
+5 | |   ] @x
+  | |___^
   |
 help: capture inside the branches, or drop this capture

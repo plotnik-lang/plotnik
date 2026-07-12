@@ -57,7 +57,7 @@ pub use crate::compiler::{
 };
 pub use crate::compiler::{
     CompiledQuery, Query, QueryBuilder, Source, SourceId, SourceKind, SourceMap, SourcePath,
-    TokenSpan, tokenize,
+    TokenSpan, format_query, tokenize,
 };
 
 #[cfg(feature = "vm")]

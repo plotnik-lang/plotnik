@@ -1,14 +1,34 @@
 Q = [
-    A0: (identifier) @x0   A1: (identifier) @x1   A2: (identifier) @x2
-    A3: (identifier) @x3   A4: (identifier) @x4   A5: (identifier) @x5
-    A6: (identifier) @x6   A7: (identifier) @x7   A8: (identifier) @x8
-    A9: (identifier) @x9   A10: (identifier) @x10 A11: (identifier) @x11
-    A12: (identifier) @x12 A13: (identifier) @x13 A14: (identifier) @x14
-    A15: (identifier) @x15 A16: (identifier) @x16 A17: (identifier) @x17
-    A18: (identifier) @x18 A19: (identifier) @x19 A20: (identifier) @x20
-    A21: (identifier) @x21 A22: (identifier) @x22 A23: (identifier) @x23
-    A24: (identifier) @x24 A25: (identifier) @x25 A26: (identifier) @x26
-    A27: (identifier) @x27 A28: (identifier) @x28 A29: (identifier) @x29
+  A0: (identifier) @x0
+  A1: (identifier) @x1
+  A2: (identifier) @x2
+  A3: (identifier) @x3
+  A4: (identifier) @x4
+  A5: (identifier) @x5
+  A6: (identifier) @x6
+  A7: (identifier) @x7
+  A8: (identifier) @x8
+  A9: (identifier) @x9
+  A10: (identifier) @x10
+  A11: (identifier) @x11
+  A12: (identifier) @x12
+  A13: (identifier) @x13
+  A14: (identifier) @x14
+  A15: (identifier) @x15
+  A16: (identifier) @x16
+  A17: (identifier) @x17
+  A18: (identifier) @x18
+  A19: (identifier) @x19
+  A20: (identifier) @x20
+  A21: (identifier) @x21
+  A22: (identifier) @x22
+  A23: (identifier) @x23
+  A24: (identifier) @x24
+  A25: (identifier) @x25
+  A26: (identifier) @x26
+  A27: (identifier) @x27
+  A28: (identifier) @x28
+  A29: (identifier) @x29
 ]
 ---------------------- NFA -----------------------
 [entrypoints]

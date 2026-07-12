@@ -2,6 +2,7 @@ Maybe = (program (expression_statement)? @stmt)
 Many = (program (expression_statement)* @stmts)
 Some = (program (expression_statement)+ @stmts)
 Lazy = (program (expression_statement)*? @stmts)
+
 Funcs = (program
   (function_declaration
     name: (identifier) @name
@@ -171,14 +172,14 @@ P16 pattern    151..192  src0
 P17 capture    185..191  src0  T06.M3
 P18 quantifier 182..184  src0
 P19 pattern    160..182  src0
-P20 def        193..276  src0  T09
-P21 pattern    201..276  src0
-P22 capture    268..274  src0  T09.M5
-P23 quantifier 266..267  src0
-P24 pattern    212..266  src0
-P25 capture    257..262  src0  T07.M4
-P26 field      238..242  src0
-P27 pattern    244..256  src0
+P20 def        194..277  src0  T09
+P21 pattern    202..277  src0
+P22 capture    269..275  src0  T09.M5
+P23 quantifier 267..268  src0
+P24 pattern    213..267  src0
+P25 capture    258..263  src0  T07.M4
+P26 field      239..243  src0
+P27 pattern    245..257  src0
 
 [transitions]
 Maybe:

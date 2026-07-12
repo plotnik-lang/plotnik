@@ -1,10 +1,5 @@
 Ids = (identifier)*
-
-Q = (program
-  (expression_statement
-    (array (Ids) @ids)
-  )
-)
+Q = (program (expression_statement (array (Ids) @ids)))
 --------------------- INPUT ----------------------
 [1];
 ------------------- TYPESCRIPT -------------------

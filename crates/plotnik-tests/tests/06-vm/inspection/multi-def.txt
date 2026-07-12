@@ -1,4 +1,5 @@
 Name = (identifier) @name
+
 Q = (program
   {
     (expression_statement (Name) @first)
@@ -283,15 +284,15 @@ Q    = 06 :: T2
 P00 def        0..25  src0  T1
 P01 capture    20..25  src0  T1.M0
 P02 pattern    7..19  src0
-P03 def        26..131  src0  T2
-P04 pattern    30..131  src0
-P05 sequence   41..129  src0
-P06 pattern    47..83  src0
-P07 capture    76..82  src0  T2.M1
-P08 ref        69..75  src0  T1
-P09 pattern    88..125  src0
-P10 capture    117..124  src0  T2.M2
-P11 ref        110..116  src0  T1
+P03 def        27..132  src0  T2
+P04 pattern    31..132  src0
+P05 sequence   42..130  src0
+P06 pattern    48..84  src0
+P07 capture    77..83  src0  T2.M1
+P08 ref        70..76  src0  T1
+P09 pattern    89..126  src0
+P10 capture    118..125  src0  T2.M2
+P11 ref        111..117  src0  T1
 
 [transitions]
 Name:

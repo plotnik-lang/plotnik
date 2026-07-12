@@ -1,9 +1,7 @@
 Q = (program
   {
     (expression_statement)?
-    (function_declaration
-      name: (identifier) @name
-    )
+    (function_declaration name: (identifier) @name)
   }
 )
 ------------------- INPUT (ts) -------------------
@@ -156,15 +154,15 @@ N0: S2 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..113  src0  T1
-P1 pattern    4..113  src0
-P2 sequence   15..111  src0
+P0 def        0..102  src0  T1
+P1 pattern    4..102  src0
+P2 sequence   15..100  src0
 P3 quantifier 43..44  src0
 P4 pattern    21..43  src0
-P5 pattern    49..107  src0
-P6 capture    96..101  src0  T1.M0
-P7 field      77..81  src0
-P8 pattern    83..95  src0
+P5 pattern    49..96  src0
+P6 capture    90..95  src0  T1.M0
+P7 field      71..75  src0
+P8 pattern    77..89  src0
 
 [transitions]
 Q:

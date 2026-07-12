@@ -1,12 +1,17 @@
-Q = (list_literal "]" "[")
+Q = (list_literal
+  "]"
+  "["
+)
 ------------------ INPUT (dart) ------------------
 ------------------ DIAGNOSTICS -------------------
 error: the grammar places `"["` before `"]"` in `list_literal`
- --> query.ptk:1:19
+ --> query.ptk:2:3
   |
-1 | Q = (list_literal "]" "[")
-  |      ------------ ^^^ --- `"["` must come before `"]"`
-  |      |
-  |      inside `list_literal`
+1 | Q = (list_literal
+  |      ------------ inside `list_literal`
+2 |   "]"
+  |   ^^^
+3 |   "["
+  |   --- `"["` must come before `"]"`
   |
 help: write `"["` before `"]"`

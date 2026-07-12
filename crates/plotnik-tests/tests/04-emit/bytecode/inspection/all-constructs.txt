@@ -9,7 +9,10 @@ Q = (program
     (lexical_declaration
       (variable_declarator
         name: (identifier) @name :: Name
-        value: [(Value) (string) @str]
+        value: [
+          (Value)
+          (string) @str
+        ]
       )
     ) @decl
   }
@@ -112,25 +115,25 @@ P04 pattern    16..28  src0
 P05 branch     35..53  src0  T3.M3
 P06 capture    49..53  src0  T2.M1
 P07 pattern    40..48  src0
-P08 def        57..262  src0  T5
-P09 pattern    61..262  src0
-P10 sequence   72..260  src0
+P08 def        57..292  src0  T5
+P09 pattern    61..292  src0
+P10 sequence   72..290  src0
 P11 quantifier 100..101  src0
 P12 pattern    78..100  src0
-P13 capture    251..256  src0  T5.M4
-P14 pattern    109..250  src0
-P15 pattern    136..244  src0
+P13 capture    281..286  src0  T5.M4
+P14 pattern    109..280  src0
+P15 pattern    136..274  src0
 P16 capture    184..189  src0  T5.M5
 P17 annotation 190..197  src0  T4
 P18 field      165..169  src0
 P19 pattern    171..183  src0
 P20 field      206..211  src0
-P21 union      213..236  src0
-P22 branch     214..221  src0
-P23 ref        214..221  src0  T3
-P24 branch     222..235  src0
-P25 capture    231..235  src0  T5.M6
-P26 pattern    222..230  src0
+P21 union      213..266  src0
+P22 branch     225..232  src0
+P23 ref        225..232  src0  T3
+P24 branch     243..256  src0
+P25 capture    252..256  src0  T5.M6
+P26 pattern    243..251  src0
 
 [transitions]
 Value:

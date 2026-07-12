@@ -1,11 +1,6 @@
 Q = (program
   (expression_statement
-    (assignment_expression
-      right: (array
-        (identifier)+ @ids
-        .!
-      )
-    )
+    (assignment_expression right: (array (identifier)+ @ids .!))
   )
 )
 --------------------- INPUT ----------------------

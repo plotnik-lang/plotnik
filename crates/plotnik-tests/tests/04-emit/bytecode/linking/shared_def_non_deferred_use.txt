@@ -1,7 +1,10 @@
 Bad = arguments: (identifier)
 
 Q = (binary_expression
-  [(Bad) (identifier)]
+  [
+    (Bad)
+    (identifier)
+  ]
   (Bad)
 )
 ------------------ DIAGNOSTICS -------------------

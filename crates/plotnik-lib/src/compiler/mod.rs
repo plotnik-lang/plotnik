@@ -6,6 +6,7 @@
 
 mod analyze;
 pub(crate) mod diagnostics;
+mod fmt;
 mod ids;
 pub(crate) mod limits;
 mod lower;
@@ -37,5 +38,6 @@ pub use emit::{
     TypeScriptCodegenConfig, TypeScriptNodeRepresentation, TypeScriptTypesOutput,
     TypeScriptVoidType, entry_fn_name,
 };
+pub use fmt::format_query;
 pub use parse::{TokenSpan, tokenize};
 pub use query::{CompiledQuery, Query, QueryBuilder};

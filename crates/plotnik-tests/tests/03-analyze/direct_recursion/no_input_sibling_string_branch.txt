@@ -1,6 +1,6 @@
 A = [
   (A)
-  'escape'
+  "escape"
 ]
 ------------------ DIAGNOSTICS -------------------
 error: infinite recursion: cycle consumes no input

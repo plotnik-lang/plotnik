@@ -1,4 +1,6 @@
-Q = (program (expression_statement (template_string (string_fragment =~ /c$/) @text)))
+Q = (program
+  (expression_statement (template_string (string_fragment =~ /c$/) @text))
+)
 --------------------- INPUT ----------------------
 `abc
 ${x}`;

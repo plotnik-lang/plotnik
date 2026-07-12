@@ -2,7 +2,9 @@ Q = (program
   (expression_statement
     [
       (number) @x
-      {(identifier) @x} @row
+      {
+        (identifier) @x
+      } @row
     ]
   )
 )
