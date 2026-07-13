@@ -212,9 +212,9 @@ fn forged_invalid_predicate_op_is_rejected() {
     );
 }
 
-/// A struct query that emits extended Matches carrying `Node`/`Set` effects and
+/// A record-producing query that emits extended Matches carrying `Node`/`Set` effects and
 /// successors — the shapes the per-instruction forging tests below target.
-const STRUCT_QUERY: &str =
+const RECORD_QUERY: &str =
     r#"Top = (binary_expression left: (identifier) @l right: (identifier) @r)"#;
 
 fn transitions(bytes: &[u8]) -> (usize, u16) {
@@ -383,7 +383,7 @@ fn forged_nonzero_section_padding_is_rejected() {
     // The emitter zero-fills the alignment gap before every aligned section; a
     // non-zero byte in any gap is smuggled state at a section boundary that the
     // CRC alone would carry along, so the loader must reject it.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let pad_off = first_section_gap(&bytes);
     bytes[pad_off] = 1;
     reseal(&mut bytes);
@@ -400,7 +400,7 @@ fn forged_nonzero_section_padding_is_rejected() {
 fn forged_unknown_opcode_is_rejected() {
     // `10` is unassigned; the VM's `decode_step` would
     // `.expect()` on the `None` from `Opcode::from_u8` for this step.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let off = first_instr(&bytes, |_| true);
     bytes[off] = (bytes[off] & 0xF0) | 0x0A;
     reseal(&mut bytes);
@@ -416,7 +416,7 @@ fn forged_unknown_opcode_is_rejected() {
 fn forged_nonzero_segment_is_rejected() {
     // Segment bits (header bits 6-7) are reserved at zero; the call/return
     // decoders `assert!` on a non-zero segment.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let off = first_instr(&bytes, |_| true);
     bytes[off] |= 0x40;
     reseal(&mut bytes);
@@ -458,7 +458,7 @@ fn forged_nonzero_call_return_node_kind_is_rejected() {
 fn forged_reserved_node_kind_is_rejected() {
     // node_class_bits `0b11` (header bits 4-5) is reserved; `NodeKindConstraint::from_bytes`
     // would panic on it.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let off = first_instr(&bytes, |o| o <= 5);
     bytes[off] |= 0x30;
     reseal(&mut bytes);
@@ -475,7 +475,7 @@ fn forged_reserved_node_kind_is_rejected() {
 fn forged_invalid_nav_is_rejected() {
     // `0x80` is an Up-family byte (bit 7 set) with a zero level; `Nav::from_byte`
     // would panic, so the loader must reject it.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let off = first_instr(&bytes, |o| o <= 5);
     bytes[off + 1] = 0x80;
     reseal(&mut bytes);
@@ -491,7 +491,7 @@ fn forged_invalid_nav_is_rejected() {
 fn forged_invalid_effect_opcode_is_rejected() {
     // One past the last effect opcode: `EffectKind::from_u8` would panic when
     // the VM emits this effect.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let slot = effect_slots(&bytes)[0];
     let existing = u16::from_le_bytes([bytes[slot], bytes[slot + 1]]);
     let invalid_op = EffectKind::BoolValue as u16 + 1;
@@ -509,7 +509,7 @@ fn forged_invalid_effect_opcode_is_rejected() {
 
 #[test]
 fn forged_nonzero_unit_effect_payload_is_rejected() {
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let slot = effect_slots(&bytes)[0];
     bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::ScalarMark, 1));
     reseal(&mut bytes);
@@ -524,7 +524,7 @@ fn forged_nonzero_unit_effect_payload_is_rejected() {
 
 #[test]
 fn forged_bool_close_payload_out_of_range_is_rejected() {
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let slot = effect_slots(&bytes)[0];
     bytes[slot..slot + 2].copy_from_slice(&effect_word_with_payload(EffectKind::BoolClose, 2));
     reseal(&mut bytes);
@@ -539,7 +539,7 @@ fn forged_bool_close_payload_out_of_range_is_rejected() {
 
 #[test]
 fn forged_span_effect_before_spans_section_is_rejected() {
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let slot = effect_slots(&bytes)[0];
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::SpanStart));
     reseal(&mut bytes);
@@ -553,7 +553,7 @@ fn forged_span_effect_before_spans_section_is_rejected() {
 
 #[test]
 fn forged_span_effect_payload_out_of_range_is_rejected() {
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let span = SpanEntry {
         source: 0,
         kind: SpanKind::Def,
@@ -580,7 +580,7 @@ fn forged_span_effect_payload_out_of_range_is_rejected() {
 fn forged_oob_member_operand_is_rejected() {
     // A `Set`/`VariantOpen` payload indexes the type-member table via the materializer's
     // `get_member`, which asserts the index is in bounds.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let members = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .header()
@@ -594,7 +594,7 @@ fn forged_oob_member_operand_is_rejected() {
                 Some(EffectKind::Set | EffectKind::VariantOpen)
             )
         })
-        .expect("struct query must emit a Set/VariantOpen effect");
+        .expect("record query must emit a Set/VariantOpen effect");
     let opcode_bits =
         u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & !(EFFECT_PAYLOAD_MAX as u16);
     let forged = opcode_bits | (members & EFFECT_PAYLOAD_MAX as u16);
@@ -623,7 +623,7 @@ fn add_single_span(bytes: &mut Vec<u8>, span_bytes: [u8; SPAN_ENTRY_SIZE]) {
 
 #[test]
 fn span_section_view_decodes_valid_entry() {
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let span = SpanEntry {
         source: 0,
         kind: SpanKind::Def,
@@ -642,7 +642,7 @@ fn span_section_view_decodes_valid_entry() {
 
 #[test]
 fn forged_invalid_span_kind_is_rejected() {
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let mut span = SpanEntry {
         source: 0,
         kind: SpanKind::Def,
@@ -664,7 +664,7 @@ fn forged_invalid_span_kind_is_rejected() {
 
 #[test]
 fn forged_invalid_span_range_is_rejected() {
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let span = SpanEntry {
         source: 0,
         kind: SpanKind::Pattern,
@@ -686,7 +686,7 @@ fn forged_invalid_span_range_is_rejected() {
 fn forged_member_binding_without_type_is_rejected() {
     // The emitter never writes a live member with no type; consumers key the
     // whole binding off `type_id`, so this combination is smuggled state.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let span = SpanEntry {
         source: 0,
         kind: SpanKind::Capture,
@@ -739,7 +739,7 @@ fn effect_slots_of(bytes: &[u8], kinds: &[EffectKind]) -> Vec<usize> {
 fn forged_unclosed_span_bracket_is_rejected() {
     // Rewriting a SpanEnd into a SpanStart leaves its span open (and mis-pairs
     // every close after it); the balance verifier must reject the module.
-    let mut bytes = emit_inspection_bytes(STRUCT_QUERY);
+    let mut bytes = emit_inspection_bytes(RECORD_QUERY);
     let slot = *effect_slots_of(&bytes, &[EffectKind::SpanEnd])
         .first()
         .expect("inspection module must emit a SpanEnd");
@@ -760,7 +760,7 @@ fn forged_unclosed_span_bracket_is_rejected() {
 fn forged_unopened_span_close_is_rejected() {
     // Rewriting the first span open into a SpanEnd makes some path close a span
     // that was never opened.
-    let mut bytes = emit_inspection_bytes(STRUCT_QUERY);
+    let mut bytes = emit_inspection_bytes(RECORD_QUERY);
     let slot = *effect_slots_of(&bytes, &[EffectKind::SpanStart, EffectKind::SpanStartAt])
         .first()
         .expect("inspection module must emit a span open");
@@ -781,7 +781,7 @@ fn forged_mispaired_span_ids_are_rejected() {
     // Depth stays balanced, but a SpanEnd names a different span than the
     // matching open — inspection extraction asserts pairing, so the loader must
     // prove it.
-    let mut bytes = emit_inspection_bytes(STRUCT_QUERY);
+    let mut bytes = emit_inspection_bytes(RECORD_QUERY);
     let spans_count = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .header()
@@ -805,7 +805,7 @@ fn forged_mispaired_span_ids_are_rejected() {
 
 #[test]
 fn forged_invalid_span_binding_is_rejected() {
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let module = Module::load_compiler_output(&bytes).expect("module validates before tampering");
     let span = SpanEntry {
         source: 0,
@@ -829,7 +829,7 @@ fn forged_invalid_span_binding_is_rejected() {
 fn forged_zero_successor_is_rejected() {
     // `0` decodes through `StepId`, which panics; `0` is the terminal marker
     // only for the `Match8` fast path, never an extended successor slot.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let succ_off = first_ext_successor(&bytes);
     bytes[succ_off..succ_off + 2].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
@@ -845,7 +845,7 @@ fn forged_zero_successor_is_rejected() {
 #[test]
 fn forged_out_of_range_successor_is_rejected() {
     // A successor past the step count would slice past the buffer in `decode_step`.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let succ_off = first_ext_successor(&bytes);
     bytes[succ_off..succ_off + 2].copy_from_slice(&u16::MAX.to_le_bytes());
     reseal(&mut bytes);
@@ -971,7 +971,7 @@ fn forged_entrypoint_into_instruction_interior_is_rejected() {
     // instruction (not on a recorded instruction start) makes the VM begin
     // decoding mid-instruction. `target < steps` is not enough — the load-time
     // check holds entrypoints to the same instruction-start rule as successors.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let (ep_off, interior) = {
         let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         (
@@ -997,7 +997,7 @@ fn forged_effect_set_to_push_is_rejected() {
     // Swap an executed `Set` for `Push`. A validated representation would accept it, then
     // the materializer would panic because the builder on top is a Struct, not
     // an Array. The effect-stack verifier rejects it at load instead.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let slot = first_effect_op(&bytes, |op| op == EffectKind::Set as u16);
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Push));
     reseal(&mut bytes);
@@ -1011,8 +1011,8 @@ fn forged_effect_set_to_push_is_rejected() {
 
 #[test]
 fn forged_scalar_capture_set_to_push_is_rejected() {
-    // The minimal case: a scalar struct whose only effect is a `Set` into the
-    // entrypoint wrapper's root struct. Forged to `Push`, the body now demands
+    // The minimal case: a scalar record whose only effect is a `Set` into the
+    // entrypoint wrapper's root record. Forged to `Push`, the body now demands
     // an Array top while the wrapper hands it a Struct — caught when the entrypoint
     // wrapper is checked as a root.
     let mut bytes = emit_bytes(r#"Q = (identifier) @id"#);
@@ -1100,7 +1100,7 @@ fn forged_dropped_scope_close_is_rejected() {
     // Turn a `StructClose` into a no-op `Node`: the struct's `StructOpen` is
     // never closed, so the body returns with an open frame — the materializer
     // would leave the builder stack unbalanced. Rejected as a non-neutral body.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let slot = first_effect_op(&bytes, |op| op == EffectKind::StructClose as u16);
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Node));
     reseal(&mut bytes);
@@ -1137,7 +1137,7 @@ fn forged_suppress_underflow_is_rejected() {
     // Replace a data effect with a bare `SuppressEnd`. With no matching
     // `SuppressBegin` on the path, the VM's suppression counter would underflow
     // and `.expect()` panic; the verifier rejects it at load.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let slot = first_effect_op(&bytes, |op| {
         op == EffectKind::StructOpen as u16 || op == EffectKind::Set as u16
     });
@@ -1260,8 +1260,8 @@ fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
 }
 
 #[test]
-fn forged_wrapper_without_root_struct_is_rejected() {
-    // A struct entrypoint wrapper opens a root `StructOpen` before calling the
+fn forged_record_wrapper_without_root_frame_is_rejected() {
+    // A record-producing entrypoint wrapper opens a root `StructOpen` before calling the
     // body, so the body always has a Struct to `Set` into. Neutralize that
     // `StructOpen` and its matching `StructClose` (turn both into no-op `Null`s)
     // and lie that the result type is scalar: the entry's `Set` would then hit
@@ -1278,7 +1278,7 @@ fn forged_wrapper_without_root_struct_is_rejected() {
     let null = effect_word(EffectKind::Null);
     bytes[struct_open_slot..struct_open_slot + 2].copy_from_slice(&null);
     bytes[struct_close_slot..struct_close_slot + 2].copy_from_slice(&null);
-    // Result type T1 (struct) -> T0 (scalar <Node>): the root frame is now a Scalar.
+    // Result type T1 (record) -> T0 (scalar <Node>): the root frame is now a Scalar.
     bytes[ep_off + 4..ep_off + 6].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
@@ -1295,7 +1295,7 @@ fn forged_set_extended_match_reserved_count_bit_is_rejected() {
     // Bit 0 of an extended-Match counts word (low bit of byte 6) is reserved-zero
     // (docs/binary-format/06-transitions.md); the decoder never reads it, so a
     // forged set bit must be rejected at load.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let off = first_instr(&bytes, |o| (1..=5).contains(&o)); // extended Match
     bytes[off + 6] |= 0x01;
     reseal(&mut bytes);
@@ -1312,7 +1312,7 @@ fn forged_set_extended_match_reserved_count_bit_is_rejected() {
 fn forged_nonzero_return_pad_is_rejected() {
     // Bytes 1-2 are the outcome and entry contract; bytes 3-7 are padding.
     for byte in 3usize..8 {
-        let mut bytes = emit_bytes(STRUCT_QUERY);
+        let mut bytes = emit_bytes(RECORD_QUERY);
         let off = first_instr(&bytes, |o| o == 7); // Return
         bytes[off + byte] = 1;
         reseal(&mut bytes);
@@ -1328,7 +1328,7 @@ fn forged_nonzero_return_pad_is_rejected() {
 
 #[test]
 fn forged_invalid_return_entry_is_rejected() {
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let off = first_instr(&bytes, |opcode| opcode == 7);
     bytes[off + 2] = 2;
     reseal(&mut bytes);
@@ -1340,7 +1340,7 @@ fn forged_invalid_return_entry_is_rejected() {
 
 #[test]
 fn forged_invalid_return_outcome_is_rejected() {
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let off = first_instr(&bytes, |opcode| opcode == 7);
     bytes[off + 1] = 2;
     reseal(&mut bytes);
@@ -1498,7 +1498,7 @@ fn forged_predicate_regex_flag_mismatch_is_rejected() {
 fn forged_unknown_type_def_kind_is_rejected() {
     // A TypeDef's kind byte (byte 3 of the 4-byte entry) must be a known TypeKind;
     // an unknown kind would panic the materializer's `def`/`TypeDefKind` decode.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let type_defs_off = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .offsets()
@@ -1518,7 +1518,7 @@ fn forged_unknown_type_def_kind_is_rejected() {
 fn forged_out_of_range_entrypoint_target_is_rejected() {
     // The plain out-of-range case (vs the interior-target case above): `target >=
     // steps` must be rejected before `is_start` is indexed.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let ep_off = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .offsets()
@@ -1538,7 +1538,7 @@ fn forged_out_of_range_entrypoint_target_is_rejected() {
 fn forged_nonzero_entrypoint_pad_is_rejected() {
     // Bytes 6-7 of the 8-byte entrypoint are reserved `_pad`; `from_bytes` drops
     // them, so a forged non-zero pad must be rejected at load, not ignored.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let ep_off = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .offsets()
@@ -1559,7 +1559,7 @@ fn forged_out_of_range_entrypoint_result_type_is_rejected() {
     // `result_type` (u16 at entry+4) must address a real TypeDef, or the
     // materializer's root-frame TypeId lookup reads out of bounds. `type_defs_count`
     // is one past the last valid index.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let (ep_off, type_defs) = {
         let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         (m.offsets().entrypoints as usize, m.header().type_defs_count)
@@ -1579,8 +1579,8 @@ fn forged_out_of_range_entrypoint_result_type_is_rejected() {
 fn forged_type_member_name_string_id_is_rejected() {
     // `validate_string_ids` runs one closure over six sections with distinct
     // (base, stride, name_off) tuples; this locks the type-member arithmetic
-    // (stride 4, name at offset 0) the materializer's struct-field keys rely on.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    // (stride 4, name at offset 0) the materializer's record-field keys rely on.
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let members_off = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .offsets()
@@ -1599,8 +1599,8 @@ fn forged_type_member_name_string_id_is_rejected() {
 #[test]
 fn forged_oob_member_type_id_is_rejected() {
     // A TypeMember's `type_id` (bytes 2-3 of the 4-byte entry) must address a real
-    // TypeDef, or the materializer resolves a struct field to a type out of range.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    // TypeDef, or the materializer resolves a record field to a type out of range.
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let (members_off, type_defs) = {
         let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         (
@@ -1658,14 +1658,14 @@ fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
     // (byte 2) are reserved-zero (docs/binary-format/04-types.md). Smuggled state
     // in either must be rejected, not silently ignored by the typed view.
     for byte in [0usize, 2] {
-        let mut bytes = emit_bytes(STRUCT_QUERY);
+        let mut bytes = emit_bytes(RECORD_QUERY);
         let (defs_off, prim_idx) = {
             let m =
                 Module::load_compiler_output(&bytes).expect("module validates before tampering");
             let types = m.types();
             let idx = (0..types.defs_count())
                 .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Primitive(_)))
-                .expect("struct query must emit a primitive type def");
+                .expect("record query must emit a primitive type def");
             (m.offsets().type_defs as usize, idx)
         };
 
@@ -1719,7 +1719,7 @@ fn scalar_primitive_typedefs_use_reserved_zero_metadata() {
 
 #[test]
 fn version_ten_module_is_rejected_without_compatibility_mode() {
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     bytes[4..8].copy_from_slice(&10_u32.to_le_bytes());
 
     let err = Module::load_compiler_output(&bytes)
@@ -1759,7 +1759,7 @@ fn forged_nonzero_wrapper_typedef_count_is_rejected() {
 fn forged_oob_type_name_type_id_is_rejected() {
     // A TypeNameEntry's target `type_id` (bytes 2-3 of the 4-byte entry) must address a
     // real TypeDef; a named definition emits at least one entry.
-    let mut bytes = emit_bytes(STRUCT_QUERY);
+    let mut bytes = emit_bytes(RECORD_QUERY);
     let (names_off, type_defs) = {
         let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         assert!(

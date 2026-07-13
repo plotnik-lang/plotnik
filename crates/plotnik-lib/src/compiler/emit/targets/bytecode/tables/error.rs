@@ -20,8 +20,8 @@ pub(in crate::compiler) enum EmitError {
     /// Too many type names (exceeds u16 max).
     #[error("too many type names: {0} (max {max})", max = EmitError::MAX_TYPE_NAMES)]
     TooManyTypeNames(usize),
-    /// Struct has more fields than the format's u8 member count allows.
-    #[error("too many struct fields: {0} (max {max})", max = EmitError::MAX_FIELDS)]
+    /// Record has more fields than the format's u8 member count allows.
+    #[error("too many record fields: {0} (max {max})", max = EmitError::MAX_FIELDS)]
     TooManyFields(usize),
     /// Variant type has more cases than the format's u8 member count allows.
     #[error("too many variant cases: {0} (max {max})", max = EmitError::MAX_CASES)]

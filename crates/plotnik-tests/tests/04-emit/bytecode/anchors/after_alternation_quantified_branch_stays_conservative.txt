@@ -42,7 +42,7 @@ S6 ";"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { x, y }
+T1 = Record  M0:2  ; { x, y }
 T2 = Optional(T0)  ; <Node>?
 
 [type_members]

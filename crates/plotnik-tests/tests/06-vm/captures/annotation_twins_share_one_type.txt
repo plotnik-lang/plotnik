@@ -53,9 +53,9 @@ S8 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { v }
-T2 = Struct  M1:1  ; { v }
-T3 = Struct  M2:2  ; { a, b }
+T1 = Record  M0:1  ; { v }
+T2 = Record  M1:1  ; { v }
+T3 = Record  M2:2  ; { a, b }
 
 [type_members]
 M0: S1 → T0  ; v: <Node>

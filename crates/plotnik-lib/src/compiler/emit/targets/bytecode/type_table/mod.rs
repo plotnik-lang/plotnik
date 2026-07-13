@@ -174,7 +174,7 @@ fn emit_type_at_slot(
 
             let scope = layout
                 .scope(type_id)
-                .expect("every emitted struct has a capture scope");
+                .expect("every emitted record has a capture scope");
             assert_eq!(scope.kind(), CaptureScopeKind::Record);
             let member_start = scope.base();
             assert_eq!(
@@ -188,7 +188,7 @@ fn emit_type_at_slot(
 
             let member_count = u8::try_from(scope.members().len())
                 .map_err(|_| EmitError::TooManyFields(scope.members().len()))?;
-            types.fill_slot(slot_index, TypeDef::for_struct(member_start, member_count));
+            types.fill_slot(slot_index, TypeDef::for_record(member_start, member_count));
             Ok(())
         }
 

@@ -17,7 +17,7 @@ S4 "class_declaration"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { cls }
+T1 = Record  M0:1  ; { cls }
 
 [type_members]
 M0: S1 → T0  ; cls: <Node>

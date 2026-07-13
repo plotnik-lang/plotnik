@@ -67,11 +67,11 @@ S13 "right"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:1  ; { value }
-T3 = Struct  M2:1  ; { name }
+T1 = Record  M0:1  ; { name }
+T2 = Record  M1:1  ; { value }
+T3 = Record  M2:1  ; { name }
 T4 = Variant M3:2  ; Literal | Variable
-T5 = Struct  M5:2  ; { value, target }
+T5 = Record  M5:2  ; { value, target }
 
 [type_members]
 M0: S01 → T0  ; name: <Node>

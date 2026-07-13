@@ -53,14 +53,14 @@ S17 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { a }
-T2 = Struct  M1:1  ; { b }
-T3 = Struct  M2:1  ; { c }
-T4 = Struct  M3:1  ; { d }
-T5 = Struct  M4:1  ; { e }
-T6 = Struct  M5:1  ; { f }
-T7 = Struct  M6:1  ; { g }
-T8 = Struct  M7:1  ; { h }
+T1 = Record  M0:1  ; { a }
+T2 = Record  M1:1  ; { b }
+T3 = Record  M2:1  ; { c }
+T4 = Record  M3:1  ; { d }
+T5 = Record  M4:1  ; { e }
+T6 = Record  M5:1  ; { f }
+T7 = Record  M6:1  ; { g }
+T8 = Record  M7:1  ; { h }
 
 [type_members]
 M0: S01 → T0  ; a: <Node>

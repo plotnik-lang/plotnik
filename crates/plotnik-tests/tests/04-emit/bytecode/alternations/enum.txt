@@ -29,8 +29,8 @@ S7 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { a }
-T2 = Struct  M1:1  ; { b }
+T1 = Record  M0:1  ; { a }
+T2 = Record  M1:1  ; { b }
 T3 = Variant M2:2  ; A | B
 
 [type_members]

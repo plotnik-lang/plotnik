@@ -29,7 +29,7 @@ S6 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
+T1 = Record  M0:1  ; { id }
 
 [type_members]
 M0: S2 → T0  ; id: <Node>

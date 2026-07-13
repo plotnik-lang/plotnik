@@ -57,7 +57,7 @@ impl Serialize for NodeHandle<'_> {
 /// Self-contained output value, borrowing node text from the query source and
 /// member/tag names from the bytecode string table (`'s` must outlive both).
 ///
-/// `Struct` uses `Vec<(&str, Value)>` to preserve field order from type metadata.
+/// `Record` uses `Vec<(&str, Value)>` to preserve field order from type metadata.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value<'s> {
     Null,
@@ -65,8 +65,8 @@ pub enum Value<'s> {
     Text(&'s str),
     Bool(bool),
     Array(Vec<Value<'s>>),
-    /// Struct with ordered fields.
-    Struct(Vec<(&'s str, Value<'s>)>),
+    /// Record with ordered fields.
+    Record(Vec<(&'s str, Value<'s>)>),
     /// Variant case. `data` is `None` for void payloads.
     Variant {
         tag: &'s str,
@@ -93,7 +93,7 @@ impl Drop for Value<'_> {
 fn take_children<'s>(value: &mut Value<'s>, worklist: &mut Vec<Value<'s>>) {
     match value {
         Value::Array(items) => worklist.append(items),
-        Value::Struct(fields) => worklist.extend(fields.drain(..).map(|(_, v)| v)),
+        Value::Record(fields) => worklist.extend(fields.drain(..).map(|(_, v)| v)),
         Value::Variant { data, .. } => {
             if let Some(boxed) = data.take() {
                 worklist.push(*boxed);
@@ -124,7 +124,7 @@ impl Serialize for Value<'_> {
                 }
                 seq.end()
             }
-            Value::Struct(fields) => {
+            Value::Record(fields) => {
                 let mut map = serializer.serialize_map(Some(fields.len()))?;
                 for (key, value) in fields {
                     map.serialize_entry(key, value)?;
@@ -176,10 +176,10 @@ struct FormatCtx<'a> {
 enum Step<'a> {
     /// Render a value: a leaf writes directly, a composite pushes its expansion.
     Value(&'a Value<'a>, usize),
-    /// Write a borrowed slice verbatim. Color codes are `'static`; struct keys and
+    /// Write a borrowed slice verbatim. Color codes are `'static`; record keys and
     /// variant tags borrow the value.
     Str(&'a str),
-    /// Write a struct field key `"key":` (colored, escaped, trailing space in pretty).
+    /// Write a record field key `"key":` (colored, escaped, trailing space in pretty).
     Key(&'a str),
     /// Pretty-mode line break followed by `n` indent spaces.
     Line(usize),
@@ -351,7 +351,7 @@ fn emit_value<'a>(
             deferred.push(Step::Str(c.reset));
             stack.extend(deferred.into_iter().rev());
         }
-        Value::Struct(fields) => {
+        Value::Record(fields) => {
             ctx.out.push_str(c.dim);
             ctx.out.push('{');
             ctx.out.push_str(c.reset);
@@ -439,7 +439,7 @@ fn emit_value<'a>(
     }
 }
 
-/// Write a struct field key `"key":` (colored, escaped, trailing space in pretty).
+/// Write a record field key `"key":` (colored, escaped, trailing space in pretty).
 fn emit_key(ctx: &mut FormatCtx<'_>, key: &str) {
     let c = ctx.colors;
     ctx.out.push_str(c.blue);

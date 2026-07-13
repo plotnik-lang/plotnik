@@ -57,8 +57,8 @@ S6 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { a }
-T2 = Struct  M1:1  ; { x }
+T1 = Record  M0:1  ; { a }
+T2 = Record  M1:1  ; { x }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>

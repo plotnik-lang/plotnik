@@ -40,10 +40,10 @@ S10 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { expression }
-T2 = Struct  M1:1  ; { debugger }
+T1 = Record  M0:1  ; { expression }
+T2 = Record  M1:1  ; { debugger }
 T3 = Variant M2:2  ; Expression | Debugger
-T4 = Struct  M4:1  ; { statement }
+T4 = Record  M4:1  ; { statement }
 T5 = Optional(T3)  ; QStatement?
 
 [type_members]

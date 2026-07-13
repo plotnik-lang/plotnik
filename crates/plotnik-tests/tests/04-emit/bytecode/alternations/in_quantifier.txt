@@ -47,12 +47,12 @@ S12 "shorthand_property_identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { a }
-T2 = Struct  M1:1  ; { b }
+T1 = Record  M0:1  ; { a }
+T2 = Record  M1:1  ; { b }
 T3 = Variant M2:2  ; A | B
-T4 = Struct  M4:1  ; { item }
+T4 = Record  M4:1  ; { item }
 T5 = ArrayStar(T4)  ; QItems*
-T6 = Struct  M5:1  ; { items }
+T6 = Record  M5:1  ; { items }
 
 [type_members]
 M0: S01 → T0  ; a: <Node>

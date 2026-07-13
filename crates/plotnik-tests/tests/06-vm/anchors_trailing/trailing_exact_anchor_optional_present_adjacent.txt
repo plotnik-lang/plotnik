@@ -38,7 +38,7 @@ S6 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { a, b }
+T1 = Record  M0:2  ; { a, b }
 T2 = Optional(T0)  ; <Node>?
 
 [type_members]

@@ -430,7 +430,7 @@ impl Module {
 
     /// Validate every TypeDef: a known kind, member runs that stay inside the
     /// TypeMembers section, and every referenced TypeId — a wrapper/alias inner
-    /// type or a struct/variant member type — addressing a real def, so the
+    /// type or a record/variant member type — addressing a real def, so the
     /// materializer never resolves a type out of range
     /// (`docs/binary-format/04-types.md`).
     fn validate_type_defs(&self) -> Result<(), ModuleError> {
@@ -459,7 +459,7 @@ impl Module {
                         return Err(invalid());
                     }
                 }
-                TypeDefKind::Struct {
+                TypeDefKind::Record {
                     member_start,
                     member_count,
                 }
@@ -467,7 +467,7 @@ impl Module {
                     member_start,
                     member_count,
                 } => {
-                    // Member-run bounds are identical for struct and variant types.
+                    // Member-run bounds are identical for record and variant types.
                     if member_start as u32 + member_count as u32 > members {
                         return Err(invalid());
                     }
@@ -789,7 +789,7 @@ impl Module {
     /// Every *required* `StringId` held in a section — entrypoint names,
     /// node/field symbol names, type names, type member names, and regex pattern
     /// names — must address a real string-table entry, so the view accessors that
-    /// resolve them (and `find_by_name`, the materializer's struct-field keys,
+    /// resolve them (and `find_by_name`, the materializer's record-field keys,
     /// etc.) never slice out of bounds. The table holds `str_table_count + 1`
     /// offsets, so the valid id range is `0..str_table_count`. This upholds the
     /// representation's guarantee that validated bytecode never panics on view access

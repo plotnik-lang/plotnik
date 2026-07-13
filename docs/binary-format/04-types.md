@@ -15,8 +15,8 @@ Type system metadata for code generation and runtime validation. Describes the s
 | 2     | `Optional`        | Wraps another type              |
 | 3     | `ArrayZeroOrMore` | Zero or more (T\*)              |
 | 4     | `ArrayOneOrMore`  | One or more (T+)                |
-| 5     | `Struct`          | Record with named fields        |
-| 6     | `Enum`            | Discriminated union             |
+| 5     | `Record`          | Record with named fields        |
+| 6     | `Variant`         | Variant type with named cases   |
 | 7     | `Alias`           | Named reference to another type |
 | 8     | `Text`            | Borrowed source text            |
 | 9     | `Bool`            | Boolean value                   |
@@ -60,18 +60,18 @@ struct TypeDef {
 
 **Field semantics by kind**:
 
-| Kind              | `data`        | `count`      |
-| :---------------- | :------------ | :----------- |
-| `Void`            | 0             | 0            |
-| `Node`            | 0             | 0            |
-| `Text`            | 0             | 0            |
-| `Bool`            | 0             | 0            |
-| `Optional`        | Inner TypeId  | 0            |
-| `ArrayZeroOrMore` | Inner TypeId  | 0            |
-| `ArrayOneOrMore`  | Inner TypeId  | 0            |
-| `Alias`           | Target TypeId | 0            |
-| `Struct`          | MemberIndex   | FieldCount   |
-| `Enum`            | MemberIndex   | VariantCount |
+| Kind              | `data`        | `count`    |
+| :---------------- | :------------ | :--------- |
+| `Void`            | 0             | 0          |
+| `Node`            | 0             | 0          |
+| `Text`            | 0             | 0          |
+| `Bool`            | 0             | 0          |
+| `Optional`        | Inner TypeId  | 0          |
+| `ArrayZeroOrMore` | Inner TypeId  | 0          |
+| `ArrayOneOrMore`  | Inner TypeId  | 0          |
+| `Alias`           | Target TypeId | 0          |
+| `Record`          | MemberIndex   | FieldCount |
+| `Variant`         | MemberIndex   | CaseCount  |
 
 > **Limit**: `count` is u8, so composites are limited to 255 members.
 
@@ -84,13 +84,14 @@ struct TypeDef {
 ```rust
 #[repr(C)]
 struct TypeMember {
-    name: u16,      // StringId (field or variant name)
-    ty: u16,        // TypeId (field type or variant payload)
+    name: u16,      // StringId (field or case name)
+    ty: u16,        // TypeId (field type or case payload)
 }
 ```
 
-For struct fields: `name` is the field name, `ty` is the field's type.
-For enum variants: `name` is the variant tag, `ty` is the payload type (use `Void` for unit variants).
+For record fields, `name` is the field name and `ty` is the field type. For
+variant cases, `name` is the case name and `ty` is the payload type (`Void`
+means no payload).
 
 ### TypeNames
 
@@ -119,14 +120,14 @@ Sorted lexicographically by name (resolved via String Table) for binary search.
 > **Note**: Only **used** primitives are emitted to TypeDefs. The emitter writes
 > them first in order (`Void`, `Node`, `Text`, `Bool`), then custom output types.
 
-### Simple Struct
+### Simple Record
 
 Query: `Q = (function name: (identifier) @name)`
 
 ```
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
+T1 = Record  M0:1  ; { name }
 
 [type_members]
 M0: S1 → T0  ; name: <Node>
@@ -135,7 +136,7 @@ M0: S1 → T0  ; name: <Node>
 N0: S2 → T1  ; Q
 ```
 
-### Recursive Enum
+### Recursive Variant
 
 Query:
 
@@ -150,8 +151,8 @@ List = [
 [type_defs]
 T0 = <Void>
 T1 = <Node>
-T2 = Struct  M0:2  ; { head, tail }
-T3 = Enum    M2:2  ; Nil | Cons
+T2 = Record  M0:2  ; { head, tail }
+T3 = Variant M2:2  ; Nil | Cons
 
 [type_members]
 M0: S1 → T1  ; head: <Node>
@@ -171,7 +172,7 @@ Query: `Q = (identifier) @name :: Identifier`
 [type_defs]
 T0 = <Node>
 T1 = Alias(T0)
-T2 = Struct  M0:1  ; { name }
+T2 = Record  M0:1  ; { name }
 
 [type_members]
 M0: S2 → T1  ; name: Identifier
@@ -185,7 +186,7 @@ N1: S3 → T2  ; Q
 
 Loaders must verify:
 
-- `Struct`/`Enum`: `(data as u32) + (count as u32) ≤ type_members_count`, and every
+- `Record`/`Variant`: `(data as u32) + (count as u32) ≤ type_members_count`, and every
   member's `ty` is a valid TypeId (`< type_defs_count`).
 - Wrapper/`Alias`: `data` (inner/target TypeId) is `< type_defs_count`, and the
   reserved `count` is `0`.
@@ -203,8 +204,8 @@ code generator is a pure renderer:
 2. Start from entrypoints, walk reachable types
 3. For each type:
    - Look up structure in TypeDefs
-   - Named → emit a declaration under that name, verbatim; anonymous (enum
-     variant payloads, foreign bytecode) → render inline at use sites
+   - Named → emit a declaration under that name, verbatim; anonymous (variant
+     case payloads, foreign bytecode) → render inline at use sites
 4. The same name may appear on several TypeIds only for structurally identical
    types (nominal twins from repeated custom capture types) — one declaration serves
    them all. Never invent names.

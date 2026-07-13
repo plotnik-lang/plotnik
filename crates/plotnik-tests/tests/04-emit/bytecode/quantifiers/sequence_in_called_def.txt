@@ -50,10 +50,10 @@ S9 "Q"
 [type_defs]
 T0 = <Void>
 T1 = <Node>
-T2 = Struct  M0:1  ; { name }
-T3 = Struct  M1:1  ; { item }
+T2 = Record  M0:1  ; { name }
+T3 = Record  M1:1  ; { item }
 T4 = ArrayStar(T3)  ; CollectItems*
-T5 = Struct  M2:1  ; { items }
+T5 = Record  M2:1  ; { items }
 
 [type_members]
 M0: S1 → T1  ; name: <Node>

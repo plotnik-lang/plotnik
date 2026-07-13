@@ -41,11 +41,11 @@ S10 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { expression }
-T2 = Struct  M1:1  ; { debugger }
+T1 = Record  M0:1  ; { expression }
+T2 = Record  M1:1  ; { debugger }
 T3 = Variant M2:2  ; Expression | Debugger
 T4 = ArrayStar(T3)  ; QStatements*
-T5 = Struct  M4:1  ; { statements }
+T5 = Record  M4:1  ; { statements }
 
 [type_members]
 M0: S01 → T0  ; expression: <Node>

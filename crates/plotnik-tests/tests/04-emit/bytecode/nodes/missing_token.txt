@@ -22,7 +22,7 @@ S3 ";"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { m }
+T1 = Record  M0:1  ; { m }
 
 [type_members]
 M0: S1 → T0  ; m: <Node>

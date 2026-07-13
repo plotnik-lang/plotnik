@@ -81,11 +81,11 @@ S18 "value"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { num }
+T1 = Record  M0:1  ; { id }
+T2 = Record  M1:1  ; { num }
 T3 = Variant M2:2  ; Id | Num
 T4 = Alias(T0)
-T5 = Struct  M4:3  ; { decl, name, str }
+T5 = Record  M4:3  ; { decl, name, str }
 T6 = Optional(T0)  ; <Node>?
 
 [type_members]

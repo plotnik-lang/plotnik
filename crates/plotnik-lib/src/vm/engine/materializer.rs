@@ -55,7 +55,7 @@ pub fn materialize_verified<'s>(
 /// Value accumulator for stack-based materialization.
 enum ValueAccumulator<'s> {
     Array(Vec<Value<'s>>),
-    Struct(Vec<(&'s str, Value<'s>)>),
+    Record(Vec<(&'s str, Value<'s>)>),
     Variant {
         tag: &'s str,
         fields: Vec<(&'s str, Value<'s>)>,
@@ -70,7 +70,7 @@ impl ValueAccumulator<'_> {
     fn kind(&self) -> &'static str {
         match self {
             ValueAccumulator::Array(_) => "Array",
-            ValueAccumulator::Struct(_) => "Struct",
+            ValueAccumulator::Record(_) => "Record",
             ValueAccumulator::Variant { .. } => "Variant",
             ValueAccumulator::Scalar(_) => "Scalar",
         }
@@ -184,7 +184,7 @@ impl<'a> ValueMaterializer<'a> {
                     pending = Some(Value::Array(arr));
                 }
                 RuntimeEffect::StructOpen => {
-                    stack.push(ValueAccumulator::Struct(vec![]));
+                    stack.push(ValueAccumulator::Record(vec![]));
                 }
                 RuntimeEffect::Set(idx) => {
                     let field_name = self.resolve_member_name(*idx);
@@ -192,25 +192,25 @@ impl<'a> ValueMaterializer<'a> {
                         .take()
                         .expect("Set requires a produced value (verified at load)");
                     match stack.last_mut() {
-                        Some(ValueAccumulator::Struct(fields)) => fields.push((field_name, val)),
+                        Some(ValueAccumulator::Record(fields)) => fields.push((field_name, val)),
                         Some(ValueAccumulator::Variant { fields, .. }) => {
                             fields.push((field_name, val))
                         }
                         other => panic!(
-                            "effect {effect_idx}: Set expects Struct/Variant on stack, found {:?}",
+                            "effect {effect_idx}: Set expects Record/Variant on stack, found {:?}",
                             other.map(|b| b.kind())
                         ),
                     }
                 }
                 RuntimeEffect::StructClose => {
                     let top = stack.pop();
-                    let Some(ValueAccumulator::Struct(fields)) = top else {
+                    let Some(ValueAccumulator::Record(fields)) = top else {
                         panic!(
-                            "effect {effect_idx}: StructClose expects Struct on stack, found {:?}",
+                            "effect {effect_idx}: StructClose expects Record on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
-                    pending = Some(Value::Struct(fields));
+                    pending = Some(Value::Record(fields));
                 }
                 RuntimeEffect::VariantOpen(idx) => {
                     let tag = self.resolve_member_name(*idx);
@@ -229,7 +229,7 @@ impl<'a> ValueMaterializer<'a> {
                     };
                     let data = match (pending.take(), fields.is_empty()) {
                         (Some(v), true) => Some(Box::new(v)),
-                        (None, false) => Some(Box::new(Value::Struct(fields))),
+                        (None, false) => Some(Box::new(Value::Record(fields))),
                         (None, true) => None,
                         (Some(_), false) => {
                             panic!(

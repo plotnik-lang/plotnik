@@ -28,8 +28,8 @@ fn try_emit(src: &str) -> Result<Vec<u8>, EmitError> {
 }
 
 #[test]
-fn struct_field_count_overflow_is_emit_error() {
-    // 300 captures inside one node → a struct with 300 fields, past the u8 limit.
+fn record_field_count_overflow_is_emit_error() {
+    // 300 captures inside one node → a record with 300 fields, past the u8 limit.
     // A concrete child kind (over `(_)`) keeps the satisfiability solve linear here —
     // the field *count* is what this exercises, not how the children are matched.
     let mut query = String::from("Q = (program");
@@ -38,7 +38,7 @@ fn struct_field_count_overflow_is_emit_error() {
     }
     query.push(')');
 
-    let err = try_emit(&query).expect_err("300 struct fields must not encode");
+    let err = try_emit(&query).expect_err("300 record fields must not encode");
     assert!(matches!(err, EmitError::TooManyFields(300)), "got {err:?}");
 }
 
@@ -157,7 +157,7 @@ fn emit_error_classification_respects_limit_ownership() {
 #[test]
 fn effect_member_payload_overflow_is_emit_error() {
     // Members are indexed into a 10-bit effect payload (max 1023). Spread > 1024
-    // globally-distinct captures across several definitions (each struct staying
+    // globally-distinct captures across several definitions (each record staying
     // under the 255-field limit) so a Set effect references an index past 1023.
     let mut query = String::new();
     for def in 0..5 {

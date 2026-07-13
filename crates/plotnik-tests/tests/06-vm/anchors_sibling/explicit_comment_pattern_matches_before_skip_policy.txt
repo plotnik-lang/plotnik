@@ -38,7 +38,7 @@ S6 "function_declaration"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { doc, fn }
+T1 = Record  M0:2  ; { doc, fn }
 
 [type_members]
 M0: S1 → T0  ; doc: <Node>

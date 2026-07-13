@@ -37,7 +37,7 @@ S9 "value"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { frag }
+T1 = Record  M0:1  ; { frag }
 
 [type_members]
 M0: S2 → T0  ; frag: <Node>

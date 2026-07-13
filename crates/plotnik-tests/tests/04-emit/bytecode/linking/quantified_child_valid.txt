@@ -31,7 +31,7 @@ S5 "function_declaration"
 [type_defs]
 T0 = <Node>
 T1 = ArrayPlus(T0)  ; <Node>+
-T2 = Struct  M0:2  ; { block, fns }
+T2 = Record  M0:2  ; { block, fns }
 
 [type_members]
 M0: S1 → T0  ; block: <Node>

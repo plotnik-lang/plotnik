@@ -23,7 +23,7 @@ S3 "interface_declaration"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { decl }
+T1 = Record  M0:1  ; { decl }
 
 [type_members]
 M0: S1 → T0  ; decl: <Node>

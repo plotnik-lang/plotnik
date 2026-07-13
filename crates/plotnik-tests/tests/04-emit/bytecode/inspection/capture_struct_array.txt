@@ -40,9 +40,9 @@ S7 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
+T1 = Record  M0:1  ; { name }
 T2 = ArrayStar(T1)  ; QFuncs*
-T3 = Struct  M1:1  ; { funcs }
+T3 = Record  M1:1  ; { funcs }
 
 [type_members]
 M0: S1 → T0  ; name: <Node>

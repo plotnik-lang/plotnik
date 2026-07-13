@@ -63,9 +63,9 @@ S7 "comment"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { a }
+T1 = Record  M0:1  ; { a }
 T2 = ArrayStar(T1)  ; QItems*
-T3 = Struct  M1:1  ; { items }
+T3 = Record  M1:1  ; { items }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>

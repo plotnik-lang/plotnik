@@ -44,7 +44,7 @@ S11 "identifier"
 [type_defs]
 T0 = <Void>
 T1 = Variant M0:2  ; A | B
-T2 = Struct  M2:1  ; { t }
+T2 = Record  M2:1  ; { t }
 
 [type_members]
 M0: S01 → T0  ; A: <Void>

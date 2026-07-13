@@ -47,7 +47,7 @@ S8 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:3  ; { a, b, c }
+T1 = Record  M0:3  ; { a, b, c }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>

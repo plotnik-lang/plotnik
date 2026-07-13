@@ -51,8 +51,8 @@ S6 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { next }
-T2 = Struct  M1:2  ; { leaf, next }
+T1 = Record  M0:1  ; { next }
+T2 = Record  M1:2  ; { leaf, next }
 T3 = Optional(T0)  ; <Node>?
 T4 = Optional(T1)  ; Odd?
 

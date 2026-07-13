@@ -36,7 +36,7 @@ S7 "expression_statement"
 [type_defs]
 T0 = <Node>
 T1 = ArrayStar(T0)  ; <Node>*
-T2 = Struct  M0:2  ; { vs, s }
+T2 = Record  M0:2  ; { vs, s }
 T3 = Optional(T0)  ; <Node>?
 
 [type_members]

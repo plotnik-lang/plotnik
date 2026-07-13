@@ -52,9 +52,9 @@ S7 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { a }
+T1 = Record  M0:1  ; { a }
 T2 = Variant M1:1  ; In
-T3 = Struct  M2:1  ; { y }
+T3 = Record  M2:1  ; { y }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>

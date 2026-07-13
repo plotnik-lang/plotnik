@@ -45,8 +45,8 @@ S10 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:2  ; { a, d }
+T1 = Record  M0:1  ; { id }
+T2 = Record  M1:2  ; { a, d }
 T3 = Optional(T0)  ; <Node>?
 
 [type_members]

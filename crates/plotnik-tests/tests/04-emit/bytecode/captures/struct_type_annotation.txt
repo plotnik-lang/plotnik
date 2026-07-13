@@ -26,8 +26,8 @@ S5 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { fn }
-T2 = Struct  M1:1  ; { outer }
+T1 = Record  M0:1  ; { fn }
+T2 = Record  M1:1  ; { outer }
 
 [type_members]
 M0: S1 → T0  ; fn: <Node>

@@ -21,7 +21,7 @@ S4 "expression_statement"
 
 [type_defs]
 T0 = <Bool>
-T1 = Struct  M0:1  ; { has_statement }
+T1 = Record  M0:1  ; { has_statement }
 
 [type_members]
 M0: S1 → T0  ; has_statement: <Bool>

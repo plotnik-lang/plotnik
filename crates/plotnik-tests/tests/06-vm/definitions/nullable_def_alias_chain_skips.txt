@@ -33,7 +33,7 @@ S6 "debugger_statement"
 T0 = <Void>
 T1 = <Node>
 T2 = Optional(T1)  ; <Node>?
-T3 = Struct  M0:1  ; { d }
+T3 = Record  M0:1  ; { d }
 
 [type_members]
 M0: S1 → T1  ; d: <Node>

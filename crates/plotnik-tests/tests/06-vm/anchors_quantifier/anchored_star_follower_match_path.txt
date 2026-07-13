@@ -59,7 +59,7 @@ S10 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = ArrayStar(T0)  ; <Node>*
-T2 = Struct  M0:3  ; { a, b, c }
+T2 = Record  M0:3  ; { a, b, c }
 T3 = Optional(T0)  ; <Node>?
 
 [type_members]

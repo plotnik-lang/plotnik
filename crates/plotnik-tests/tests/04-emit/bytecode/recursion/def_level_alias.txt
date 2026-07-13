@@ -51,8 +51,8 @@ S9 "Q"
 [type_defs]
 T0 = <Void>
 T1 = <Node>
-T2 = Struct  M0:1  ; { inner }
-T3 = Struct  M1:1  ; { id }
+T2 = Record  M0:1  ; { inner }
+T3 = Record  M1:1  ; { id }
 T4 = Variant M2:2  ; A | B
 
 [type_members]

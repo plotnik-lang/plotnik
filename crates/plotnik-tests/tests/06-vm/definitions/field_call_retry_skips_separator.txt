@@ -47,8 +47,8 @@ S12 "member"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:1  ; { m }
+T1 = Record  M0:1  ; { name }
+T2 = Record  M1:1  ; { m }
 
 [type_members]
 M0: S02 → T0  ; name: <Node>

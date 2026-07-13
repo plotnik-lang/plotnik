@@ -42,7 +42,7 @@ S9 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { l, d }
+T1 = Record  M0:2  ; { l, d }
 
 [type_members]
 M0: S1 → T0  ; l: <Node>

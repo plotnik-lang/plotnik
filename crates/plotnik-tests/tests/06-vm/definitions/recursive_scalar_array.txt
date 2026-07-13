@@ -45,8 +45,8 @@ T0 = <Node>
 T1 = <Text>
 T2 = ArrayStar(T0)  ; <Node>*
 T3 = ArrayStar(T1)  ; <Text>*
-T4 = Struct  M0:1  ; { comments }
-T5 = Struct  M1:1  ; { result }
+T4 = Record  M0:1  ; { comments }
+T5 = Record  M1:1  ; { result }
 
 [type_members]
 M0: S1 → T3  ; comments: T3

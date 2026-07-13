@@ -34,9 +34,9 @@ S7 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
+T1 = Record  M0:1  ; { id }
 T2 = Variant M1:1  ; A
-T3 = Struct  M2:1  ; { x }
+T3 = Record  M2:1  ; { x }
 T4 = Optional(T0)  ; <Node>?
 
 [type_members]

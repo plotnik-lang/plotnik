@@ -35,7 +35,7 @@ S5 "expression_statement"
 [type_defs]
 T0 = <Text>
 T1 = Optional(T0)  ; <Text>?
-T2 = Struct  M0:1  ; { value }
+T2 = Record  M0:1  ; { value }
 
 [type_members]
 M0: S1 → T1  ; value: T1

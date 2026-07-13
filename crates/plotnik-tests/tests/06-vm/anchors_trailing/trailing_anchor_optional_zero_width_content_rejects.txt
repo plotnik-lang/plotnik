@@ -22,7 +22,7 @@ S4 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { b }
+T1 = Record  M0:1  ; { b }
 T2 = Optional(T0)  ; <Node>?
 
 [type_members]

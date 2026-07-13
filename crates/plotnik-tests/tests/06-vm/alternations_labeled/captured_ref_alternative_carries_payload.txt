@@ -51,10 +51,10 @@ S10 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:1  ; { data }
+T1 = Record  M0:1  ; { name }
+T2 = Record  M1:1  ; { data }
 T3 = Variant M2:1  ; Call
-T4 = Struct  M3:1  ; { v }
+T4 = Record  M3:1  ; { v }
 
 [type_members]
 M0: S01 → T0  ; name: <Node>

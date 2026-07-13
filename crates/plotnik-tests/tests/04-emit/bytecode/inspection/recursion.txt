@@ -67,7 +67,7 @@ S9 "expression_statement"
 [type_defs]
 T0 = <Void>
 T1 = Variant M0:2  ; Empty | Wrap
-T2 = Struct  M2:1  ; { expr }
+T2 = Record  M2:1  ; { expr }
 
 [type_members]
 M0: S1 → T0  ; Empty: <Void>

@@ -38,9 +38,9 @@ S7 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { n }
+T1 = Record  M0:1  ; { n }
 T2 = ArrayStar(T1)  ; QRows*
-T3 = Struct  M1:1  ; { rows }
+T3 = Record  M1:1  ; { rows }
 
 [type_members]
 M0: S1 → T0  ; n: <Node>

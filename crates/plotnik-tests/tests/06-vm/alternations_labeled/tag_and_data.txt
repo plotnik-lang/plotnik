@@ -46,10 +46,10 @@ S11 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { a }
-T2 = Struct  M1:1  ; { b }
+T1 = Record  M0:1  ; { a }
+T2 = Record  M1:1  ; { b }
 T3 = Variant M2:2  ; A | B
-T4 = Struct  M4:1  ; { e }
+T4 = Record  M4:1  ; { e }
 
 [type_members]
 M0: S01 → T0  ; a: <Node>

@@ -40,9 +40,9 @@ S8 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { a, b }
+T1 = Record  M0:2  ; { a, b }
 T2 = ArrayStar(T1)  ; QItems*
-T3 = Struct  M2:1  ; { items }
+T3 = Record  M2:1  ; { items }
 
 [type_members]
 M0: S1 → T0  ; a: <Node>

@@ -39,8 +39,8 @@ S11 "arguments"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { value }
-T2 = Struct  M1:2  ; { fn, inner }
+T1 = Record  M0:1  ; { value }
+T2 = Record  M1:2  ; { fn, inner }
 T3 = Variant M3:2  ; Lit | Rec
 
 [type_members]

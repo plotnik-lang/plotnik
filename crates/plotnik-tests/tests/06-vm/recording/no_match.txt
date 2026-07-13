@@ -237,7 +237,7 @@ S5 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { n }
+T1 = Record  M0:1  ; { n }
 
 [type_members]
 M0: S1 → T0  ; n: <Node>

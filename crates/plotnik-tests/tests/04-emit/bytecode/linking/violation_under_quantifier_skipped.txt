@@ -38,7 +38,7 @@ S5 "class_declaration"
 [type_defs]
 T0 = <Node>
 T1 = ArrayStar(T0)  ; <Node>*
-T2 = Struct  M0:1  ; { x }
+T2 = Record  M0:1  ; { x }
 
 [type_members]
 M0: S1 → T1  ; x: T1

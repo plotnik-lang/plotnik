@@ -26,7 +26,7 @@ S7 "left"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { l }
+T1 = Record  M0:1  ; { l }
 
 [type_members]
 M0: S1 → T0  ; l: <Node>

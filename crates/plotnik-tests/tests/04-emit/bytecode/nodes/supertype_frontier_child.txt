@@ -25,7 +25,7 @@ S4 "call_expression"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { call }
+T1 = Record  M0:1  ; { call }
 
 [type_members]
 M0: S1 → T0  ; call: <Node>

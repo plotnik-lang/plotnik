@@ -30,7 +30,7 @@ R1 /c$/
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { text }
+T1 = Record  M0:1  ; { text }
 
 [type_members]
 M0: S2 → T0  ; text: <Node>

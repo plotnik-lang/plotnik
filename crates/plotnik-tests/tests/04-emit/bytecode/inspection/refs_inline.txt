@@ -50,8 +50,8 @@ S8 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:2  ; { first, second }
+T1 = Record  M0:1  ; { name }
+T2 = Record  M1:2  ; { first, second }
 T3 = Optional(T0)  ; <Node>?
 
 [type_members]

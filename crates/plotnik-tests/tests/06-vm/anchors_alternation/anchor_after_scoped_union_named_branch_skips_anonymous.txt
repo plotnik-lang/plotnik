@@ -46,8 +46,8 @@ S10 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { n }
-T2 = Struct  M1:1  ; { t }
+T1 = Record  M0:1  ; { n }
+T2 = Record  M1:1  ; { t }
 T3 = Optional(T0)  ; <Node>?
 
 [type_members]

@@ -178,11 +178,11 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
                 };
                 (formatted, comment)
             }
-            TypeDefKind::Struct {
+            TypeDefKind::Record {
                 member_start,
                 member_count,
             } => {
-                let formatted = format!("Struct  M{:0mw$}:{}", member_start, member_count);
+                let formatted = format!("Record  M{:0mw$}:{}", member_start, member_count);
                 let fields: Vec<_> = types
                     .members_of(&def)
                     .map(|m| strings.get(m.name_id).to_string())

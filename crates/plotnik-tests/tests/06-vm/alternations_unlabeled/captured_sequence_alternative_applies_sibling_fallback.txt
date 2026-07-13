@@ -50,9 +50,9 @@ S10 "comment"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { a }
-T2 = Struct  M1:2  ; { grp, b }
-T3 = Struct  M3:1  ; { w }
+T1 = Record  M0:1  ; { a }
+T2 = Record  M1:2  ; { grp, b }
+T3 = Record  M3:1  ; { w }
 T4 = Optional(T1)  ; QWGrp?
 T5 = Optional(T0)  ; <Node>?
 

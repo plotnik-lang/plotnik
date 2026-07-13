@@ -40,7 +40,7 @@ S7 "identifier"
 [type_defs]
 T0 = <Text>
 T1 = <Bool>
-T2 = Struct  M0:2  ; { has_comment, name }
+T2 = Record  M0:2  ; { has_comment, name }
 
 [type_members]
 M0: S1 → T1  ; has_comment: <Bool>

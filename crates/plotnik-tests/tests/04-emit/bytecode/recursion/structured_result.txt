@@ -65,10 +65,10 @@ S15 "function"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { value }
-T2 = Struct  M1:2  ; { fn, inner }
+T1 = Record  M0:1  ; { value }
+T2 = Record  M1:2  ; { fn, inner }
 T3 = Variant M3:2  ; Lit | Nested
-T4 = Struct  M5:1  ; { expr }
+T4 = Record  M5:1  ; { expr }
 
 [type_members]
 M0: S01 → T0  ; value: <Node>

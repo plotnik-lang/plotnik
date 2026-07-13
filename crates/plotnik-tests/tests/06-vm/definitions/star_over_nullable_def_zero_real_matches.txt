@@ -38,10 +38,10 @@ S9 "program"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { x }
+T1 = Record  M0:1  ; { id }
+T2 = Record  M1:1  ; { x }
 T3 = ArrayStar(T2)  ; A*
-T4 = Struct  M2:1  ; { xs }
+T4 = Record  M2:1  ; { xs }
 T5 = Optional(T1)  ; AX?
 
 [type_members]

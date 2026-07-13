@@ -21,7 +21,7 @@ S3 "program"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { p }
+T1 = Record  M0:1  ; { p }
 
 [type_members]
 M0: S1 → T0  ; p: <Node>

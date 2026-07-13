@@ -16,13 +16,13 @@ impl TypeKind {
 ///
 /// Semantics of `payload` and `count` depend on `kind`:
 /// - Wrappers (Optional, ArrayStar, ArrayPlus): `payload` = inner TypeId, `count` = 0
-/// - Struct/Variant: `payload` = member index, `count` = member count
+/// - Record/Variant: `payload` = member index, `count` = member count
 /// - Alias: `payload` = target TypeId, `count` = 0
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct TypeDef {
     /// For wrappers/alias: inner/target TypeId.
-    /// For Struct/Variant: index into TypeMembers section.
+    /// For Record/Variant: index into TypeMembers section.
     payload: u16,
     /// Member count (0 for wrappers/alias, field/variant count for composites).
     count: u8,
@@ -40,7 +40,7 @@ pub enum TypeDefKind {
     /// Wrapper types: Optional, ArrayZeroOrMore, ArrayOneOrMore, Alias.
     Wrapper { kind: TypeKind, inner: TypeId },
     /// A fixed set of named fields.
-    Struct { member_start: u16, member_count: u8 },
+    Record { member_start: u16, member_count: u8 },
     /// Variant type with named cases.
     Variant { member_start: u16, member_count: u8 },
 }
@@ -76,8 +76,8 @@ impl TypeDef {
         }
     }
 
-    /// Shared byte-writer for the two member-run kinds (Struct, Variant). The
-    /// `kind as u8` write here is the on-wire discriminant — `for_struct` and
+    /// Shared byte-writer for the two member-run kinds (Record, Variant). The
+    /// `kind as u8` write here is the on-wire discriminant — `for_record` and
     /// `for_variant` are the only callers.
     fn composite(kind: TypeKind, member_start: u16, member_count: u8) -> Self {
         Self {
@@ -105,8 +105,8 @@ impl TypeDef {
         Self::wrapper(TypeKind::ARRAY_PLUS, element)
     }
 
-    pub fn for_struct(member_start: u16, member_count: u8) -> Self {
-        Self::composite(TypeKind::Struct, member_start, member_count)
+    pub fn for_record(member_start: u16, member_count: u8) -> Self {
+        Self::composite(TypeKind::Record, member_start, member_count)
     }
 
     pub fn for_variant(member_start: u16, member_count: u8) -> Self {
@@ -131,7 +131,7 @@ impl TypeDef {
 
     /// Member range `(start, count)` as stored, regardless of kind.
     ///
-    /// Meaningful only for Struct/Variant, where `start` indexes TypeMembers and
+    /// Meaningful only for Record/Variant, where `start` indexes TypeMembers and
     /// `count` is the field/variant count.
     pub fn member_range(&self) -> (u16, u8) {
         (self.payload, self.count)
@@ -162,7 +162,7 @@ impl TypeDef {
                 kind,
                 inner: TypeId::from(self.payload),
             },
-            TypeKind::Struct => TypeDefKind::Struct {
+            TypeKind::Record => TypeDefKind::Record {
                 member_start: self.payload,
                 member_count: self.count,
             },

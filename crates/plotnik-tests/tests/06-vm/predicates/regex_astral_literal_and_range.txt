@@ -28,7 +28,7 @@ R1 /🦀[\u{1F980}-\u{1F99F}]/
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { comment }
+T1 = Record  M0:1  ; { comment }
 
 [type_members]
 M0: S2 → T0  ; comment: <Node>

@@ -44,8 +44,8 @@ S8 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { x }
-T2 = Struct  M1:2  ; { x, row }
+T1 = Record  M0:1  ; { x }
+T2 = Record  M1:2  ; { x, row }
 T3 = Optional(T0)  ; <Node>?
 T4 = Optional(T1)  ; QRow?
 

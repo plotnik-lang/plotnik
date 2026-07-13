@@ -30,7 +30,7 @@ S4 "decorator"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { dec }
+T1 = Record  M0:1  ; { dec }
 T2 = Optional(T0)  ; <Node>?
 
 [type_members]

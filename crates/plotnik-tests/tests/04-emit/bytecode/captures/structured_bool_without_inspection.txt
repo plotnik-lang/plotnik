@@ -44,7 +44,7 @@ S5 "comment"
 
 [type_defs]
 T0 = <Bool>
-T1 = Struct  M0:1  ; { seen }
+T1 = Record  M0:1  ; { seen }
 
 [type_members]
 M0: S1 → T0  ; seen: <Bool>

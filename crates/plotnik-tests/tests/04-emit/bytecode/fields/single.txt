@@ -27,7 +27,7 @@ S4 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
+T1 = Record  M0:1  ; { name }
 
 [type_members]
 M0: S1 → T0  ; name: <Node>

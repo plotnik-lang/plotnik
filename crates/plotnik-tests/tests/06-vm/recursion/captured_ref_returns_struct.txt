@@ -49,8 +49,8 @@ S10 "function"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:2  ; { name, inner }
-T2 = Struct  M2:1  ; { top }
+T1 = Record  M0:2  ; { name, inner }
+T2 = Record  M2:1  ; { top }
 T3 = Optional(T0)  ; <Node>?
 T4 = Optional(T1)  ; Nested?
 

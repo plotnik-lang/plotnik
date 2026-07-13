@@ -43,9 +43,9 @@ S8 "program"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { comment }
-T2 = Struct  M1:1  ; { identifier }
-T3 = Struct  M2:2  ; { left, right }
+T1 = Record  M0:1  ; { comment }
+T2 = Record  M1:1  ; { identifier }
+T3 = Record  M2:2  ; { left, right }
 T4 = Optional(T0)  ; <Node>?
 T5 = Optional(T1)  ; QLeft?
 T6 = Optional(T2)  ; QRight?

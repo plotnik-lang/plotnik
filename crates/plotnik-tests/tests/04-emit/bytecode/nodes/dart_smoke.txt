@@ -23,7 +23,7 @@ S3 "list_literal"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { list }
+T1 = Record  M0:1  ; { list }
 
 [type_members]
 M0: S1 → T0  ; list: <Node>

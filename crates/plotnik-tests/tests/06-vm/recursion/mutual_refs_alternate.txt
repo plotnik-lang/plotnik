@@ -52,9 +52,9 @@ S11 "expression_statement"
 S12 "value"
 
 [type_defs]
-T0 = Struct  M0:1  ; { obj }
-T1 = Struct  M1:1  ; { arr }
-T2 = Struct  M2:1  ; { top }
+T0 = Record  M0:1  ; { obj }
+T1 = Record  M1:1  ; { arr }
+T2 = Record  M2:1  ; { top }
 T3 = Optional(T1)  ; Obj?
 T4 = Optional(T0)  ; Arr?
 

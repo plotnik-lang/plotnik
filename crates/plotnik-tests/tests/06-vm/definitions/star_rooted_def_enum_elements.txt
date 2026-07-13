@@ -76,11 +76,11 @@ S13 "array"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { num }
+T1 = Record  M0:1  ; { id }
+T2 = Record  M1:1  ; { num }
 T3 = Variant M2:2  ; Id | Num
 T4 = ArrayStar(T3)  ; Entry*
-T5 = Struct  M4:1  ; { items }
+T5 = Record  M4:1  ; { items }
 
 [type_members]
 M0: S01 → T0  ; id: <Node>

@@ -128,15 +128,15 @@ S14 "identifier"
 
 [type_defs]
 T00 = <Node>
-T01 = Struct  M0:1  ; { stmt }
+T01 = Record  M0:1  ; { stmt }
 T02 = ArrayStar(T00)  ; <Node>*
-T03 = Struct  M1:1  ; { stmts }
+T03 = Record  M1:1  ; { stmts }
 T04 = ArrayPlus(T00)  ; <Node>+
-T05 = Struct  M2:1  ; { stmts }
-T06 = Struct  M3:1  ; { stmts }
-T07 = Struct  M4:1  ; { name }
+T05 = Record  M2:1  ; { stmts }
+T06 = Record  M3:1  ; { stmts }
+T07 = Record  M4:1  ; { name }
 T08 = ArrayStar(T07)  ; FuncsFuncs*
-T09 = Struct  M5:1  ; { funcs }
+T09 = Record  M5:1  ; { funcs }
 T10 = Optional(T00)  ; <Node>?
 
 [type_members]

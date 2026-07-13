@@ -53,7 +53,7 @@ S17 "object"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:8  ; { a, b, c, d, e, f, g, h }
+T1 = Record  M0:8  ; { a, b, c, d, e, f, g, h }
 T2 = Optional(T0)  ; <Node>?
 
 [type_members]

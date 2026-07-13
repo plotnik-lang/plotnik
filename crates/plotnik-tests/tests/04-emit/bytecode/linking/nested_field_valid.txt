@@ -33,7 +33,7 @@ S7 "return_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:3  ; { fn, body, ret }
+T1 = Record  M0:3  ; { fn, body, ret }
 
 [type_members]
 M0: S1 → T0  ; fn: <Node>

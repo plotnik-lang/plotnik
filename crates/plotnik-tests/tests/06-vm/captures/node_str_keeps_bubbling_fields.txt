@@ -32,7 +32,7 @@ S6 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = <Text>
-T2 = Struct  M0:2  ; { statement, id }
+T2 = Record  M0:2  ; { statement, id }
 
 [type_members]
 M0: S1 → T1  ; statement: <Text>

@@ -38,8 +38,8 @@ S7 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { outer }
+T1 = Record  M0:1  ; { id }
+T2 = Record  M1:1  ; { outer }
 T3 = Optional(T1)  ; QOuter?
 
 [type_members]

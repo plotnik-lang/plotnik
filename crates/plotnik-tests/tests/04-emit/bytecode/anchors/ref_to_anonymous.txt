@@ -46,7 +46,7 @@ S6 "Comma"
 [type_defs]
 T0 = <Void>
 T1 = <Node>
-T2 = Struct  M0:1  ; { next }
+T2 = Record  M0:1  ; { next }
 
 [type_members]
 M0: S1 → T1  ; next: <Node>

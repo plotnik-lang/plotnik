@@ -46,7 +46,7 @@ S9 "number"
 [type_defs]
 T0 = <Node>
 T1 = Optional(T0)  ; <Node>?
-T2 = Struct  M0:2  ; { first, n }
+T2 = Record  M0:2  ; { first, n }
 
 [type_members]
 M0: S1 → T1  ; first: MaybeId

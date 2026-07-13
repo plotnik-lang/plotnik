@@ -26,7 +26,7 @@ S3 "pair"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { key }
+T1 = Record  M0:1  ; { key }
 
 [type_members]
 M0: S1 → T0  ; key: <Node>

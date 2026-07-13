@@ -465,10 +465,10 @@ impl<'a> TypesView<'a> {
         self.names_count
     }
 
-    /// Iterate over members of a struct or variant type.
+    /// Iterate over members of a record or variant type.
     pub fn members_of(&self, def: &TypeDef) -> impl Iterator<Item = TypeMember> + '_ {
         let (start, count) = match def.decode() {
-            TypeDefKind::Struct {
+            TypeDefKind::Record {
                 member_start,
                 member_count,
             }

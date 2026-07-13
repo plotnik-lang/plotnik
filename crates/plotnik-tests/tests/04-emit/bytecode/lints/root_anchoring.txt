@@ -70,9 +70,9 @@ S9 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { leaf }
-T3 = Struct  M2:1  ; { bad }
+T1 = Record  M0:1  ; { id }
+T2 = Record  M1:1  ; { leaf }
+T3 = Record  M2:1  ; { bad }
 
 [type_members]
 M0: S1 → T0  ; id: <Node>

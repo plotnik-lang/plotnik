@@ -194,10 +194,10 @@ S11 "expression_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { num }
+T1 = Record  M0:1  ; { id }
+T2 = Record  M1:1  ; { num }
 T3 = Variant M2:2  ; Id | Num
-T4 = Struct  M4:1  ; { expr }
+T4 = Record  M4:1  ; { expr }
 
 [type_members]
 M0: S01 → T0  ; id: <Node>

@@ -32,7 +32,7 @@ T0 = <Node>
 T1 = <Text>
 T2 = ArrayStar(T0)  ; <Node>*
 T3 = ArrayStar(T1)  ; <Text>*
-T4 = Struct  M0:1  ; { comments }
+T4 = Record  M0:1  ; { comments }
 
 [type_members]
 M0: S1 → T3  ; comments: T3

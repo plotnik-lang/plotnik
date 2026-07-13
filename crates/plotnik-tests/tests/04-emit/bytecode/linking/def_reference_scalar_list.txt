@@ -44,7 +44,7 @@ S5 "Func"
 T0 = <Void>
 T1 = <Node>
 T2 = ArrayPlus(T1)  ; <Node>+
-T3 = Struct  M0:1  ; { funcs }
+T3 = Record  M0:1  ; { funcs }
 
 [type_members]
 M0: S1 → T2  ; funcs: T2

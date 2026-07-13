@@ -33,7 +33,7 @@ S4 "identifier"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
+T1 = Record  M0:1  ; { id }
 T2 = Optional(T0)  ; <Node>?
 
 [type_members]

@@ -173,8 +173,8 @@ impl<'a> TypeVerifier<'a> {
                 _ => unreachable!(),
             },
 
-            TypeDefKind::Struct { .. } => match value {
-                Value::Struct(fields) => {
+            TypeDefKind::Record { .. } => match value {
+                Value::Record(fields) => {
                     // Collect first: `members_of` borrows `self.types`, which would
                     // clash with the `&mut self` recursion inside the loop.
                     let members: Vec<_> = self.types.members_of(&type_def).collect();
@@ -209,7 +209,7 @@ impl<'a> TypeVerifier<'a> {
                 _ => {
                     self.errors.push(format_error(
                         &self.path,
-                        &format!("type: struct, value: {}", value_kind_name(value)),
+                        &format!("type: record, value: {}", value_kind_name(value)),
                     ));
                 }
             },
@@ -280,7 +280,7 @@ fn value_kind_name(value: &Value) -> &'static str {
         Value::Text(_) => "Text",
         Value::Bool(_) => "Bool",
         Value::Array(_) => "array",
-        Value::Struct(_) => "struct",
+        Value::Record(_) => "record",
         Value::Variant { .. } => "variant",
     }
 }

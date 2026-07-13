@@ -130,7 +130,7 @@ checks uphold the no-panic guarantee. Validation runs in this order:
    end exactly at their blob length; string slices must be valid UTF-8.
 6. **Regex DFAs** — every real regex entry's serialized sparse DFA must
    deserialize, so the VM's per-evaluation deserialize is a sound invariant.
-7. **TypeDefs** — each kind byte must be known, and every Struct/Enum member range
+7. **TypeDefs** — each kind byte must be known, and every Record/Variant member range
    (`data + count`) must stay within `type_members_count`.
 8. **Spans** — each span entry has a known kind, zero flags, `start <= end`, and
    type/member bindings that are either `0xFFFF` or in range (a live member with

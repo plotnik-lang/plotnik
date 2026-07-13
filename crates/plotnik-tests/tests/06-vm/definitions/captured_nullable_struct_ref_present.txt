@@ -55,9 +55,9 @@ S11 "debugger_statement"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { x }
-T3 = Struct  M2:2  ; { a, d }
+T1 = Record  M0:1  ; { id }
+T2 = Record  M1:1  ; { x }
+T3 = Record  M2:2  ; { a, d }
 T4 = Optional(T1)  ; AX?
 
 [type_members]

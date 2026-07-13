@@ -34,7 +34,7 @@ S7 "string_fragment"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { s }
+T1 = Record  M0:1  ; { s }
 
 [type_members]
 M0: S1 → T0  ; s: <Node>

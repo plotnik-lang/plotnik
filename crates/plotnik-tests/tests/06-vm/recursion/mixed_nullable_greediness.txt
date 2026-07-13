@@ -64,12 +64,12 @@ S14 "program"
 [type_defs]
 T0 = <Node>
 T1 = <Text>
-T2 = Struct  M0:1  ; { c }
-T3 = Struct  M1:1  ; { c }
+T2 = Record  M0:1  ; { c }
+T3 = Record  M1:1  ; { c }
 T4 = Variant M2:2  ; Rec | Base
-T5 = Struct  M4:2  ; { first, second }
+T5 = Record  M4:2  ; { first, second }
 T6 = Optional(T1)  ; <Text>?
-T7 = Struct  M6:2  ; { x, rest }
+T7 = Record  M6:2  ; { x, rest }
 T8 = Optional(T4)  ; Body?
 
 [type_members]

@@ -59,10 +59,10 @@ S12 "function"
 
 [type_defs]
 T0 = <Node>
-T1 = Struct  M0:1  ; { name }
-T2 = Struct  M1:1  ; { inner }
+T1 = Record  M0:1  ; { name }
+T2 = Record  M1:1  ; { inner }
 T3 = Variant M2:2  ; Base | Step
-T4 = Struct  M4:1  ; { top }
+T4 = Record  M4:1  ; { top }
 
 [type_members]
 M0: S01 → T0  ; name: <Node>

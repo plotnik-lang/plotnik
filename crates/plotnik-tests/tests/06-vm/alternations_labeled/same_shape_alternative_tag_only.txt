@@ -39,9 +39,9 @@ S10 "string"
 [type_defs]
 T0 = <Void>
 T1 = <Node>
-T2 = Struct  M0:1  ; { x }
+T2 = Record  M0:1  ; { x }
 T3 = Variant M1:2  ; A | B
-T4 = Struct  M3:1  ; { item }
+T4 = Record  M3:1  ; { item }
 
 [type_members]
 M0: S01 → T1  ; x: <Node>
