@@ -63,7 +63,7 @@ mod limited {
 }
 
 // Recursive output nests `Expr` values through native reader calls, so a depth
-// policy of 1 must trip `match_tree`; `is_match` suppresses output and never replays.
+// policy of 1 must trip `parse`; `matches` suppresses output and never replays.
 mod depth_limited {
     plotnik::query! {
         r#"
@@ -150,12 +150,12 @@ fn arborium_grammar_produces_typed_output() {
     let source = "x;";
     let tree = parse(&js(), source);
 
-    let value = queries::Idents::match_tree(&tree, source)
+    let value = queries::Idents::parse(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
     assert_eq!(value.id.utf8_text(source.as_bytes()), Ok("x"));
-    assert!(queries::Idents::is_match(&tree, source).expect("auto limits fit"));
+    assert!(queries::Idents::matches(&tree, source).expect("auto limits fit"));
 }
 
 #[test]
@@ -163,21 +163,21 @@ fn generic_surface_delegates_to_generated_types() {
     let source = "x;";
     let tree = parse(&js(), source);
 
-    let value = plotnik::match_tree::<queries::Idents>(&tree, source)
+    let value = plotnik::parse::<queries::Idents>(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
     assert_eq!(value.id.utf8_text(source.as_bytes()), Ok("x"));
-    assert!(plotnik::is_match::<queries::Idents>(&tree, source).expect("auto limits fit"));
-    assert!(plotnik::is_match::<queries::Probe>(&tree, source).expect("auto limits fit"));
+    assert!(plotnik::matches::<queries::Idents>(&tree, source).expect("auto limits fit"));
+    assert!(plotnik::matches::<queries::Probe>(&tree, source).expect("auto limits fit"));
 }
 
 #[test]
-fn void_definition_exposes_is_match() {
+fn void_definition_exposes_matches() {
     let source = "x;";
     let tree = parse(&js(), source);
 
-    assert!(queries::Probe::is_match(&tree, source).expect("auto limits fit"));
+    assert!(queries::Probe::matches(&tree, source).expect("auto limits fit"));
 }
 
 #[test]
@@ -185,7 +185,7 @@ fn vanilla_tree_sitter_grammar_resolves() {
     let source = "x;";
     let tree = parse(&tree_sitter_javascript::LANGUAGE.into(), source);
 
-    let value = vanilla::Q::match_tree(&tree, source)
+    let value = vanilla::Q::parse(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
@@ -197,7 +197,7 @@ fn subgrammar_selection_resolves_tsx() {
     let source = "x;";
     let tree = parse(&tree_sitter_typescript::LANGUAGE_TSX.into(), source);
 
-    let value = tsx::Q::match_tree(&tree, source)
+    let value = tsx::Q::parse(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
@@ -209,7 +209,7 @@ fn file_form_reads_next_to_the_invoking_file() {
     let source = "x;";
     let tree = parse(&js(), source);
 
-    let value = from_file::Q::match_tree(&tree, source)
+    let value = from_file::Q::parse(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
@@ -222,25 +222,25 @@ fn compiled_in_step_limit_trips_safe_surfaces() {
     let tree = parse(&js(), source);
 
     assert!(matches!(
-        limited::Q::match_tree(&tree, source),
+        limited::Q::parse(&tree, source),
         Err(LimitExceeded::Steps(1))
     ));
     assert!(matches!(
-        limited::Q::is_match(&tree, source),
+        limited::Q::matches(&tree, source),
         Err(LimitExceeded::Steps(1))
     ));
 }
 
 #[test]
-fn compiled_in_depth_limit_trips_match_tree_only() {
+fn compiled_in_depth_limit_trips_parse_only() {
     let source = "((x));";
     let tree = parse(&js(), source);
 
     assert!(matches!(
-        depth_limited::Q::match_tree(&tree, source),
+        depth_limited::Q::parse(&tree, source),
         Err(LimitExceeded::Depth(1))
     ));
-    assert!(depth_limited::Q::is_match(&tree, source).expect("is_match ignores replay depth"));
+    assert!(depth_limited::Q::matches(&tree, source).expect("matches ignores replay depth"));
 }
 
 #[test]
@@ -249,7 +249,7 @@ fn crate_override_respells_the_runtime_path() {
     let tree = parse(&js(), source);
 
     assert!(
-        repointed::Q::match_tree(&tree, source)
+        repointed::Q::parse(&tree, source)
             .expect("auto limits fit")
             .is_some()
     );
@@ -259,7 +259,7 @@ fn crate_override_respells_the_runtime_path() {
 fn serde_feature_flows_through_the_facade() {
     let source = "x;";
     let tree = parse(&js(), source);
-    let value = queries::Idents::match_tree(&tree, source)
+    let value = queries::Idents::parse(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
@@ -274,7 +274,7 @@ fn generated_scalars_preserve_items_and_presence() {
     let source = "// first\n\n// second\nx;";
     let tree = parse(&js(), source);
 
-    let value = scalar_output::Q::match_tree(&tree, source)
+    let value = scalar_output::Q::parse(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
@@ -287,7 +287,7 @@ fn generated_bool_uses_absence_not_truthiness() {
     let source = "// only";
     let tree = parse(&js(), source);
 
-    let value = plotnik::match_tree::<scalar_output::Q>(&tree, source)
+    let value = plotnik::parse::<scalar_output::Q>(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
@@ -300,7 +300,7 @@ fn generated_output_can_borrow_tree_and_source_independently() {
     let source = "name;";
     let tree = parse(&js(), source);
 
-    let value = mixed_borrows::Q::match_tree(&tree, source)
+    let value = mixed_borrows::Q::parse(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
@@ -313,7 +313,7 @@ fn generated_matcher_preserves_mixed_recursive_greediness() {
     let source = "//a\n//b\n//stop";
     let tree = parse(&js(), source);
 
-    let value = recursive_split_returns::Q::match_tree(&tree, source)
+    let value = recursive_split_returns::Q::parse(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
@@ -325,7 +325,7 @@ fn generated_matcher_executes_routed_required_recursive_call() {
     let source = "{ { debugger; } debugger; } f();";
     let tree = parse(&js(), source);
 
-    let value = recursive_routed_returns::Q::match_tree(&tree, source)
+    let value = recursive_routed_returns::Q::parse(&tree, source)
         .expect("auto limits fit")
         .expect("matches");
 
@@ -343,7 +343,7 @@ fn wrong_language_tree_panics_with_version_skew() {
     let source = "void main() {}";
     let tree = parse(&arborium_dart::language().into(), source);
 
-    let panic = std::panic::catch_unwind(|| skew::Q::match_tree(&tree, source))
+    let panic = std::panic::catch_unwind(|| skew::Q::parse(&tree, source))
         .expect_err("the language check must reject a dart tree");
 
     let message = panic

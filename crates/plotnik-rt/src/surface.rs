@@ -2,25 +2,25 @@
 //!
 //! Generated modules provide inherent methods as the primary API. These traits
 //! and helpers are the generic door: callers can name a query type parameter
-//! and still get the same safe `match_tree`/`is_match` behavior.
+//! and still get the same safe `parse`/`matches` behavior.
 
 use crate::{LimitExceeded, Tree};
 
-pub trait IsMatch {
-    fn is_match(tree: &Tree, source: &str) -> Result<bool, LimitExceeded>;
+pub trait Matches {
+    fn matches(tree: &Tree, source: &str) -> Result<bool, LimitExceeded>;
 }
 
-pub trait MatchTree<'t, 's>: IsMatch + Sized {
-    fn match_tree(tree: &'t Tree, source: &'s str) -> Result<Option<Self>, LimitExceeded>;
+pub trait Parse<'t, 's>: Matches + Sized {
+    fn parse(tree: &'t Tree, source: &'s str) -> Result<Option<Self>, LimitExceeded>;
 }
 
-pub fn match_tree<'t, 's, Q: MatchTree<'t, 's>>(
+pub fn parse<'t, 's, Q: Parse<'t, 's>>(
     tree: &'t Tree,
     source: &'s str,
 ) -> Result<Option<Q>, LimitExceeded> {
-    Q::match_tree(tree, source)
+    Q::parse(tree, source)
 }
 
-pub fn is_match<Q: IsMatch>(tree: &Tree, source: &str) -> Result<bool, LimitExceeded> {
-    Q::is_match(tree, source)
+pub fn matches<Q: Matches>(tree: &Tree, source: &str) -> Result<bool, LimitExceeded> {
+    Q::matches(tree, source)
 }

@@ -1,4 +1,4 @@
-//! Typed replay emission: per-type readers and the `match_tree`/`is_match` surface.
+//! Typed replay emission: per-type readers and the `parse`/`matches` surface.
 //!
 //! The committed trace is a tiny wire format whose schema *is* the query's
 //! output type, so the replay is a generated deserializer (serde-derive
@@ -74,7 +74,7 @@ impl ReaderTables {
     }
 }
 
-struct InherentMatchTreeSignature {
+struct InherentParseSignature {
     ident: String,
     impl_generics: &'static str,
     type_generics: &'static str,
@@ -82,7 +82,7 @@ struct InherentMatchTreeSignature {
     source_ref: &'static str,
 }
 
-impl InherentMatchTreeSignature {
+impl InherentParseSignature {
     fn for_item(model: &TypeModel<'_>, item: &ReplayItem) -> Self {
         let ident = model.item_ident(item.name).to_string();
         let usage = model.lifetime_usage(item.ty);
@@ -148,9 +148,9 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         ReaderFrameEstimator::new(self.model, self.replay).max_bytes()
     }
 
-    /// The `match_tree`/`is_match` surface, one block per entrypoint definition.
-    /// Callable definitions are nominal (`match_tree` + `is_match`) or void (`is_match`).
-    pub(super) fn matching_api(&self, entrypoints: impl Iterator<Item = DefId>) -> String {
+    /// The `parse`/`matches` surface, one block per entrypoint definition.
+    /// Callable definitions are nominal (parse + matches) or void (matches).
+    pub(super) fn parse_api(&self, entrypoints: impl Iterator<Item = DefId>) -> String {
         let mut out = String::new();
         for def_id in entrypoints {
             let name = self.deps.def_name_sym(def_id);
@@ -159,31 +159,31 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
             let item = self.replay.item(name);
             match item.kind {
                 ReplayItemKind::Struct(_) | ReplayItemKind::Variant(_) => {
-                    self.match_tree_impl(&mut out, &def, item);
+                    self.parse_impl(&mut out, &def, item);
                 }
                 ReplayItemKind::Alias(_) => {
                     unreachable!("callable definitions are nominal or void")
                 }
-                ReplayItemKind::VoidDefinition => self.is_match_impl(&mut out, &def, item),
+                ReplayItemKind::VoidDefinition => self.matches_impl(&mut out, &def, item),
             }
         }
         out
     }
 
-    /// `is_match` for a void definition: it can only answer matched-or-not, and
+    /// `matches` for a void definition: it can only answer matched-or-not, and
     /// the public API is always metered.
-    fn is_match_impl(&self, out: &mut String, def: &str, item: &ReplayItem) {
+    fn matches_impl(&self, out: &mut String, def: &str, item: &ReplayItem) {
         let ident = self.model.item_ident(item.name);
         let _ = writeln!(out, "impl {ident} {{");
-        self.inherent_is_match_method(out, def);
+        self.inherent_matches_method(out, def);
         let _ = writeln!(out, "}}");
         let _ = writeln!(out);
-        self.is_match_trait_impl(out, item);
+        self.matches_trait_impl(out, item);
     }
 
-    /// Inherent `match_tree`/`is_match` on a nominal (struct/enum) output type.
-    fn match_tree_impl(&self, out: &mut String, def: &str, item: &ReplayItem) {
-        let sig = InherentMatchTreeSignature::for_item(self.model, item);
+    /// Inherent `parse`/`matches` on a nominal (struct/enum) output type.
+    fn parse_impl(&self, out: &mut String, def: &str, item: &ReplayItem) {
+        let sig = InherentParseSignature::for_item(self.model, item);
         let reader = self.reader_fn(item.name);
         let safe = safe_entry_fn_name(def);
         let fallible_reader = item.fallible;
@@ -205,7 +205,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
             "    /// The module's compiled-in limits bound total work, live"
         );
         let _ = writeln!(out, "    /// backtracking state, and typed replay depth.");
-        let _ = writeln!(out, "    pub fn match_tree(");
+        let _ = writeln!(out, "    pub fn parse(");
         let _ = writeln!(out, "        tree: {},", sig.tree_ref);
         let _ = writeln!(out, "        source: {},", sig.source_ref);
         let _ = writeln!(
@@ -235,21 +235,21 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         let _ = writeln!(out, "        Ok(Some(value))");
         let _ = writeln!(out, "    }}");
         let _ = writeln!(out);
-        self.inherent_is_match_method(out, def);
+        self.inherent_matches_method(out, def);
         let _ = writeln!(out, "}}");
         let _ = writeln!(out);
-        self.is_match_trait_impl(out, item);
+        self.matches_trait_impl(out, item);
         let _ = writeln!(out);
-        self.match_tree_trait_impl(out, item);
+        self.parse_trait_impl(out, item);
     }
 
-    fn inherent_is_match_method(&self, out: &mut String, def: &str) {
+    fn inherent_matches_method(&self, out: &mut String, def: &str) {
         let accepts = accepts_entry_fn_name(def);
         let _ = writeln!(
             out,
             "    /// Whether `{def}` matches `tree` under the module's compiled-in limits."
         );
-        let _ = writeln!(out, "    pub fn is_match(");
+        let _ = writeln!(out, "    pub fn matches(");
         let _ = writeln!(out, "        tree: &rt::Tree,");
         let _ = writeln!(out, "        source: &str,");
         let _ = writeln!(
@@ -260,44 +260,44 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         let _ = writeln!(out, "    }}");
     }
 
-    fn is_match_trait_impl(&self, out: &mut String, item: &ReplayItem) {
+    fn matches_trait_impl(&self, out: &mut String, item: &ReplayItem) {
         let ident = self.model.item_ident(item.name).to_string();
         let (impl_generics, type_generics) = if matches!(item.kind, ReplayItemKind::VoidDefinition)
         {
             ("", "")
         } else {
-            let sig = InherentMatchTreeSignature::for_item(self.model, item);
+            let sig = InherentParseSignature::for_item(self.model, item);
             (sig.impl_generics, sig.type_generics)
         };
         let _ = writeln!(
             out,
-            "impl{} rt::IsMatch for {}{} {{",
+            "impl{} rt::Matches for {}{} {{",
             impl_generics, ident, type_generics
         );
         let _ = writeln!(
             out,
-            "    fn is_match(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {{"
+            "    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {{"
         );
-        let _ = writeln!(out, "        {ident}::is_match(tree, source)");
+        let _ = writeln!(out, "        {ident}::matches(tree, source)");
         let _ = writeln!(out, "    }}");
         let _ = writeln!(out, "}}");
     }
 
-    fn match_tree_trait_impl(&self, out: &mut String, item: &ReplayItem) {
-        let sig = InherentMatchTreeSignature::for_item(self.model, item);
+    fn parse_trait_impl(&self, out: &mut String, item: &ReplayItem) {
+        let sig = InherentParseSignature::for_item(self.model, item);
         let _ = writeln!(
             out,
-            "impl<'t, 's> rt::MatchTree<'t, 's> for {}{} {{",
+            "impl<'t, 's> rt::Parse<'t, 's> for {}{} {{",
             sig.ident, sig.type_generics
         );
-        let _ = writeln!(out, "    fn match_tree(");
+        let _ = writeln!(out, "    fn parse(");
         let _ = writeln!(out, "        tree: &'t rt::Tree,");
         let _ = writeln!(out, "        source: &'s str,");
         let _ = writeln!(
             out,
             "    ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {{"
         );
-        let _ = writeln!(out, "        {}::match_tree(tree, source)", sig.ident);
+        let _ = writeln!(out, "        {}::parse(tree, source)", sig.ident);
         let _ = writeln!(out, "    }}");
         let _ = writeln!(out, "}}");
     }

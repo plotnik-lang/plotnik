@@ -82,7 +82,7 @@ pub use engine::Engine;
 #[cfg(feature = "serde")]
 pub use serialize::{SerializeWithSource, WithSource};
 #[cfg(feature = "tree-sitter")]
-pub use surface::{IsMatch, MatchTree, is_match, match_tree};
+pub use surface::{Matches, Parse, matches, parse};
 #[cfg(feature = "tree-sitter")]
 pub use trace::TraceReader;
 

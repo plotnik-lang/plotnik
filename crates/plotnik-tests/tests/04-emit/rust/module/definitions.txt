@@ -5,7 +5,7 @@ Q = (program
   (Inner) @second
 )
 -------------------- MATCHER ---------------------
-// Generated Plotnik query module: typed output types, `match_tree`/`is_match` entry
+// Generated Plotnik query module: typed output types, `parse`/`matches` entry
 // points, per-type trace readers, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format
@@ -32,7 +32,7 @@ impl<'t> Inner<'t> {
     /// the typed output. `None` is the no-match outcome.
     /// The module's compiled-in limits bound total work, live
     /// backtracking state, and typed replay depth.
-    pub fn match_tree(
+    pub fn parse(
         tree: &'t rt::Tree,
         source: &str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
@@ -46,7 +46,7 @@ impl<'t> Inner<'t> {
     }
 
     /// Whether `Inner` matches `tree` under the module's compiled-in limits.
-    pub fn is_match(
+    pub fn matches(
         tree: &rt::Tree,
         source: &str,
     ) -> ::core::result::Result<bool, rt::LimitExceeded> {
@@ -54,18 +54,18 @@ impl<'t> Inner<'t> {
     }
 }
 
-impl<'t> rt::IsMatch for Inner<'t> {
-    fn is_match(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        Inner::is_match(tree, source)
+impl<'t> rt::Matches for Inner<'t> {
+    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
+        Inner::matches(tree, source)
     }
 }
 
-impl<'t, 's> rt::MatchTree<'t, 's> for Inner<'t> {
-    fn match_tree(
+impl<'t, 's> rt::Parse<'t, 's> for Inner<'t> {
+    fn parse(
         tree: &'t rt::Tree,
         source: &'s str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        Inner::match_tree(tree, source)
+        Inner::parse(tree, source)
     }
 }
 
@@ -74,7 +74,7 @@ impl<'t> Q<'t> {
     /// the typed output. `None` is the no-match outcome.
     /// The module's compiled-in limits bound total work, live
     /// backtracking state, and typed replay depth.
-    pub fn match_tree(
+    pub fn parse(
         tree: &'t rt::Tree,
         source: &str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
@@ -88,7 +88,7 @@ impl<'t> Q<'t> {
     }
 
     /// Whether `Q` matches `tree` under the module's compiled-in limits.
-    pub fn is_match(
+    pub fn matches(
         tree: &rt::Tree,
         source: &str,
     ) -> ::core::result::Result<bool, rt::LimitExceeded> {
@@ -96,18 +96,18 @@ impl<'t> Q<'t> {
     }
 }
 
-impl<'t> rt::IsMatch for Q<'t> {
-    fn is_match(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        Q::is_match(tree, source)
+impl<'t> rt::Matches for Q<'t> {
+    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
+        Q::matches(tree, source)
     }
 }
 
-impl<'t, 's> rt::MatchTree<'t, 's> for Q<'t> {
-    fn match_tree(
+impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
+    fn parse(
         tree: &'t rt::Tree,
         source: &'s str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
-        Q::match_tree(tree, source)
+        Q::parse(tree, source)
     }
 }
 
@@ -176,7 +176,7 @@ mod matcher {
     /// frame before runtime padding.
     pub(super) const MAX_READER_FRAME_BYTES: u64 = 232;
 
-    /// Ceiling on recursive typed replay for safe `match_tree` (`None` opts out). The
+    /// Ceiling on recursive typed replay for safe `parse` (`None` opts out). The
     /// matcher itself is iterative; only reader recursion enters this guard.
     pub(super) const MAX_REPLAY_DEPTH: Option<u64> = Some(rt::replay_depth_auto(232));
 
@@ -320,7 +320,7 @@ mod matcher {
     /// independently: each folds away when its resource is unbounded, so a fully
     /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
     /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
-    /// `TRACE` controls whether data effects are recorded; `is_match` disables it to
+    /// `TRACE` controls whether data effects are recorded; `matches` disables it to
     /// avoid output allocation and replay-depth failures. (No let-chains: generated
     /// code targets the embedding crate's edition.)
     fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: bool>(

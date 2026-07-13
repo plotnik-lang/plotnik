@@ -13,7 +13,7 @@ pub struct Config {
     /// trusted, the input is not, and the query's author is the one who knows
     /// the budget it deserves.
     pub(crate) limits: RuntimeLimitSpec,
-    /// The replay-depth policy for safe `match_tree`. Not part of
+    /// The replay-depth policy for safe `parse`. Not part of
     /// [`RuntimeLimitSpec`] — that spec is shared with the VM, whose output
     /// rendering is iterative; replay depth is a generated-executor resource
     /// (its typed replay recurses once per nested value).
@@ -60,7 +60,7 @@ impl Config {
         self
     }
 
-    /// Override the compiled-in replay-depth policy for safe `match_tree` (see the
+    /// Override the compiled-in replay-depth policy for safe `parse` (see the
     /// field's doc for why it lives outside the shared spec).
     pub fn depth(mut self, depth: Limit) -> Self {
         self.depth = depth;

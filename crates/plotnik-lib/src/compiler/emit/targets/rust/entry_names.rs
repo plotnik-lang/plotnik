@@ -12,7 +12,7 @@ pub(crate) fn safe_entry_fn_name(def_name: &str) -> String {
     format!("{}_safe", snake_ident(def_name))
 }
 
-/// Limit-applying yes/no entry used by generated `is_match` APIs.
+/// Limit-applying yes/no entry used by generated `matches` APIs.
 pub(crate) fn accepts_entry_fn_name(def_name: &str) -> String {
     format!("{}_accepts", snake_ident(def_name))
 }

@@ -1,6 +1,6 @@
 Probe = (program)
 -------------------- MATCHER ---------------------
-// Generated Plotnik query module: typed output types, `match_tree`/`is_match` entry
+// Generated Plotnik query module: typed output types, `parse`/`matches` entry
 // points, per-type trace readers, and the compiled matcher (`mod matcher`).
 // Matcher states mirror the NFA dump's labels 1:1 (`S{label}_{DEF}`), and every
 // dispatch arm carries its instruction in the dump format
@@ -15,7 +15,7 @@ pub struct Probe;
 
 impl Probe {
     /// Whether `Probe` matches `tree` under the module's compiled-in limits.
-    pub fn is_match(
+    pub fn matches(
         tree: &rt::Tree,
         source: &str,
     ) -> ::core::result::Result<bool, rt::LimitExceeded> {
@@ -23,9 +23,9 @@ impl Probe {
     }
 }
 
-impl rt::IsMatch for Probe {
-    fn is_match(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
-        Probe::is_match(tree, source)
+impl rt::Matches for Probe {
+    fn matches(tree: &rt::Tree, source: &str) -> ::core::result::Result<bool, rt::LimitExceeded> {
+        Probe::matches(tree, source)
     }
 }
 
@@ -58,7 +58,7 @@ mod matcher {
     /// frame before runtime padding.
     pub(super) const MAX_READER_FRAME_BYTES: u64 = 128;
 
-    /// Ceiling on recursive typed replay for safe `match_tree` (`None` opts out). The
+    /// Ceiling on recursive typed replay for safe `parse` (`None` opts out). The
     /// matcher itself is iterative; only reader recursion enters this guard.
     pub(super) const MAX_REPLAY_DEPTH: Option<u64> = Some(rt::replay_depth_auto(128));
 
@@ -162,7 +162,7 @@ mod matcher {
     /// independently: each folds away when its resource is unbounded, so a fully
     /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
     /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
-    /// `TRACE` controls whether data effects are recorded; `is_match` disables it to
+    /// `TRACE` controls whether data effects are recorded; `matches` disables it to
     /// avoid output allocation and replay-depth failures. (No let-chains: generated
     /// code targets the embedding crate's edition.)
     fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: bool>(
