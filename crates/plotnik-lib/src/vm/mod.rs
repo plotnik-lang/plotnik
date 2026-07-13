@@ -8,8 +8,9 @@
 mod engine;
 
 pub use engine::{
-    Binding, Inspection, InspectionEntry, JournalEvent, Limit, MatchJournal, NodeHandle, NodeRef,
+    Binding, Inspection, InspectionEntry, JournalEvent, Limit, MatchJournal, NodeHandle,
     NoopTracer, PrintTracer, PrintTracerBuilder, Recording, RecordingTracer, ResolvedRuntimeLimits,
-    RunStats, RuntimeError, RuntimeLimitSpec, StepEvent, StepRecord, Tracer, VM, VMBuilder, Value,
-    ValueMaterializer, Verbosity, debug_verify_type, extract_inspection, materialize_verified,
+    RunStats, RuntimeError, RuntimeLimitSpec, StepEvent, StepRecord, TraceNode, Tracer, VM,
+    VMBuilder, Value, ValueMaterializer, Verbosity, debug_verify_type, extract_inspection,
+    materialize_verified,
 };

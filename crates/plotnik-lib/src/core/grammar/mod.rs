@@ -31,7 +31,8 @@ pub use identity::GrammarIdentity;
 pub use json::GrammarError;
 pub use prepared::VariableType;
 pub use render::{
-    Body, DEFAULT_WIDTH, Def, DefKind, DumpOptions, NodeRef, Quant, Shape, TokenText, TreeGrammar,
+    Body, DEFAULT_WIDTH, Def, DefKind, DumpOptions, GrammarNodeRef, Quant, Shape, TokenText,
+    TreeGrammar,
 };
 pub use structure::{SkeletonStep, SkeletonVariable, StepTarget, StructureTable, VarId};
 pub(crate) use structure::{StepProjection, SurfaceRealizer};

@@ -20,7 +20,7 @@ pub use plotnik_rt::{JournalEvent, Limit, MatchJournal, ResolvedRuntimeLimits, R
 pub use error::RuntimeError;
 pub use inspect::{Binding, Inspection, InspectionEntry, extract_inspection};
 pub use materializer::{ValueMaterializer, materialize_verified};
-pub use recording::{NodeRef, Recording, RecordingTracer, StepEvent, StepRecord};
+pub use recording::{Recording, RecordingTracer, StepEvent, StepRecord, TraceNode};
 pub use trace::{NoopTracer, PrintTracer, PrintTracerBuilder, Tracer, Verbosity};
 pub use value::{NodeHandle, Value};
 pub use verify::debug_verify_type;

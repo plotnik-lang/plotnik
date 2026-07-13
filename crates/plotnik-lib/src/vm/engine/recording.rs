@@ -21,7 +21,7 @@ pub struct StepRecord {
     pub ip: u16,
     pub event: StepEvent,
     pub span: Option<u16>,
-    pub node: Option<NodeRef>,
+    pub node: Option<TraceNode>,
     pub journal_len: u32,
 }
 
@@ -48,7 +48,7 @@ pub enum StepEvent {
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
-pub struct NodeRef {
+pub struct TraceNode {
     pub kind_id: u16,
     pub start: u32,
     pub end: u32,
@@ -95,11 +95,11 @@ impl RecordingTracer {
         }
     }
 
-    fn add_record(&mut self, event: StepEvent, node: Option<NodeRef>) -> u32 {
+    fn add_record(&mut self, event: StepEvent, node: Option<TraceNode>) -> u32 {
         self.add_record_at(self.current_ip, event, node)
     }
 
-    fn add_record_at(&mut self, ip: CodeAddr, event: StepEvent, node: Option<NodeRef>) -> u32 {
+    fn add_record_at(&mut self, ip: CodeAddr, event: StepEvent, node: Option<TraceNode>) -> u32 {
         let record_idx = self.records_seen;
         self.records_seen = self
             .records_seen
@@ -206,14 +206,14 @@ impl RecordingTracer {
         }
     }
 
-    fn event_node(event: &JournalEvent<'_>) -> Option<NodeRef> {
+    fn event_node(event: &JournalEvent<'_>) -> Option<TraceNode> {
         match event {
-            JournalEvent::Node(node) => Some(node_ref(*node)),
-            JournalEvent::ScalarMark(node) => Some(node_ref(*node)),
-            JournalEvent::NodeStr(node) | JournalEvent::NodeBool(node) => Some(node_ref(*node)),
+            JournalEvent::Node(node) => Some(trace_node(*node)),
+            JournalEvent::ScalarMark(node) => Some(trace_node(*node)),
+            JournalEvent::NodeStr(node) | JournalEvent::NodeBool(node) => Some(trace_node(*node)),
             JournalEvent::SpanStart {
                 node: Some(node), ..
-            } => Some(node_ref(*node)),
+            } => Some(trace_node(*node)),
             _ => None,
         }
     }
@@ -226,7 +226,7 @@ impl Tracer for RecordingTracer {
     }
 
     fn trace_nav(&mut self, _nav: Nav, node: Node<'_>) {
-        self.add_record(StepEvent::Nav, Some(node_ref(node)));
+        self.add_record(StepEvent::Nav, Some(trace_node(node)));
     }
 
     fn trace_nav_failure(&mut self, _nav: Nav) {
@@ -234,11 +234,11 @@ impl Tracer for RecordingTracer {
     }
 
     fn trace_match_success(&mut self, node: Node<'_>) {
-        self.add_record(StepEvent::MatchOk, Some(node_ref(node)));
+        self.add_record(StepEvent::MatchOk, Some(trace_node(node)));
     }
 
     fn trace_match_failure(&mut self, node: Node<'_>) {
-        self.add_record(StepEvent::MatchFail, Some(node_ref(node)));
+        self.add_record(StepEvent::MatchFail, Some(trace_node(node)));
     }
 
     fn trace_field_success(&mut self, _field_id: NodeFieldId) {
@@ -246,15 +246,15 @@ impl Tracer for RecordingTracer {
     }
 
     fn trace_field_failure(&mut self, node: Node<'_>) {
-        self.add_record(StepEvent::FieldFail, Some(node_ref(node)));
+        self.add_record(StepEvent::FieldFail, Some(trace_node(node)));
     }
 
     fn trace_predicate_failure(&mut self, node: Node<'_>) {
-        self.add_record(StepEvent::PredicateFail, Some(node_ref(node)));
+        self.add_record(StepEvent::PredicateFail, Some(trace_node(node)));
     }
 
     fn trace_neg_field_failure(&mut self, node: Node<'_>, _field: NodeFieldId) {
-        self.add_record(StepEvent::NegFieldFail, Some(node_ref(node)));
+        self.add_record(StepEvent::NegFieldFail, Some(trace_node(node)));
     }
 
     fn trace_journal_event(&mut self, event: &JournalEvent<'_>) {
@@ -358,9 +358,9 @@ impl Tracer for RecordingTracer {
     }
 }
 
-fn node_ref(node: Node<'_>) -> NodeRef {
+fn trace_node(node: Node<'_>) -> TraceNode {
     let range = node.byte_range();
-    NodeRef {
+    TraceNode {
         kind_id: node.kind_id(),
         start: u32::try_from(range.start).expect("node start byte fits in u32"),
         end: u32::try_from(range.end).expect("node end byte fits in u32"),
