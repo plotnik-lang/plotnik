@@ -1,6 +1,6 @@
-//! Runtime effects for VM execution.
+//! Rollbackable journal entries recorded during matching.
 //!
-//! Runtime effects carry actual node references, unlike bytecode `Effect`
+//! Journal events carry actual node references, unlike bytecode `Effect`
 //! which only stores kind + payload.
 
 use tree_sitter::Node;
@@ -9,7 +9,7 @@ use tree_sitter::Node;
 /// tree), which is exactly what conformance harnesses need: two executors run
 /// over one parse tree must produce identical streams, node-for-node.
 #[derive(Debug, PartialEq)]
-pub enum RuntimeEffect<'t> {
+pub enum JournalEvent<'t> {
     /// Capture a node reference.
     Node(Node<'t>),
     /// Begin a list value.
@@ -50,18 +50,18 @@ pub enum RuntimeEffect<'t> {
     SpanEnd(u16),
 }
 
-/// Effect log with truncation support for backtracking.
+/// Match journal with truncation support for backtracking.
 #[derive(Debug)]
-pub struct EffectLog<'t>(Vec<RuntimeEffect<'t>>);
+pub struct MatchJournal<'t>(Vec<JournalEvent<'t>>);
 
-impl<'t> EffectLog<'t> {
+impl<'t> MatchJournal<'t> {
     pub fn new() -> Self {
         Self(Vec::new())
     }
 
     #[inline]
-    pub fn push(&mut self, effect: RuntimeEffect<'t>) {
-        self.0.push(effect);
+    pub fn push(&mut self, event: JournalEvent<'t>) {
+        self.0.push(event);
     }
 
     /// Get current length (used as watermark for backtracking).
@@ -74,7 +74,7 @@ impl<'t> EffectLog<'t> {
     /// capacity is not counted — this measures live data, not the allocation.
     #[inline]
     pub fn byte_footprint(&self) -> u64 {
-        (self.0.len() * std::mem::size_of::<RuntimeEffect<'t>>()) as u64
+        (self.0.len() * std::mem::size_of::<JournalEvent<'t>>()) as u64
     }
 
     /// Check if empty.
@@ -84,18 +84,18 @@ impl<'t> EffectLog<'t> {
         self.0.is_empty()
     }
 
-    /// Truncate to a saved watermark, rolling back effects on backtrack.
+    /// Truncate to a saved watermark, rolling back events on backtrack.
     #[inline]
     pub fn truncate(&mut self, watermark: usize) {
         self.0.truncate(watermark);
     }
 
-    pub fn as_slice(&self) -> &[RuntimeEffect<'t>] {
+    pub fn as_slice(&self) -> &[JournalEvent<'t>] {
         &self.0
     }
 }
 
-impl Default for EffectLog<'_> {
+impl Default for MatchJournal<'_> {
     fn default() -> Self {
         Self::new()
     }

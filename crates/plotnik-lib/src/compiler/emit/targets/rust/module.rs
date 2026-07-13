@@ -652,14 +652,14 @@ impl<'a> Generator<'a> {
         let unit = |out: &mut String, variant: &str| {
             let _ = writeln!(
                 out,
-                "{indent}eng.emit_data(|_| rt::RuntimeEffect::{variant});"
+                "{indent}eng.emit_data(|_| rt::JournalEvent::{variant});"
             );
         };
         match effect.kind {
             EffectKind::Node => {
                 let _ = writeln!(
                     out,
-                    "{indent}eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));"
+                    "{indent}eng.emit_data(|c| rt::JournalEvent::Node(c.node()));"
                 );
             }
             EffectKind::ListOpen => unit(out, "ListOpen"),
@@ -677,7 +677,7 @@ impl<'a> Generator<'a> {
                 };
                 let _ = writeln!(
                     out,
-                    "{indent}eng.emit_data(|_| rt::RuntimeEffect::{variant}({})); // {}",
+                    "{indent}eng.emit_data(|_| rt::JournalEvent::{variant}({})); // {}",
                     effect.payload, effect.display
                 );
             }
@@ -1198,8 +1198,8 @@ fn verify_language(tree: &rt::Tree) {
 
 const ENTRY_FN: &str = r#"
 /// Match the `@DEF@` entrypoint against `tree`. `Some` carries the committed
-/// capture trace — the same effect stream the VM commits for this query.
-pub fn @FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
+/// match journal — the same event sequence the VM commits for this query.
+pub fn @FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
     let outcome = run::<false, false, true>(tree, source, @ENTRY@, NO_LIMITS);
     outcome.expect("an unmetered run cannot exceed a limit")
 }
@@ -1215,7 +1215,7 @@ const ENTRY_FN_SAFE: &str = r#"
 pub(super) fn @SAFE_FN@<'t>(
     tree: &'t rt::Tree,
     source: &str,
-) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
+) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
     run::<@FUEL_METERED@, @MEMORY_METERED@, true>(tree, source, @ENTRY@, @SAFE_LIMITS@)
 }
 "#;
@@ -1232,7 +1232,7 @@ const DRIVER_SKELETON: &str = r#"
 enum Flow {
     /// Continue at this state.
     Jump(u16),
-    /// The entrypoint accepted; the effect log is the committed trace.
+    /// The entrypoint accepted; the match journal is committed.
     Accept,
     /// The state failed; unwind the checkpoint stack.
     Backtrack,
@@ -1250,7 +1250,7 @@ enum Unwound {
 /// independently: each folds away when its resource is unbounded, so a fully
 /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
 /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
-/// `TRACE` controls whether data effects are recorded; `matches` disables it to
+/// `TRACE` controls whether data events are journaled; `matches` disables it to
 /// avoid output allocation and replay-depth failures. (No let-chains: generated
 /// code targets the embedding crate's edition.)
 fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const TRACE: bool>(
@@ -1258,7 +1258,7 @@ fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const TRACE: bo
     source: &str,
     entry: u16,
     limits: rt::ResolvedRuntimeLimits,
-) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
+) -> Result<Option<rt::MatchJournal<'t>>, rt::LimitExceeded> {
     verify_language(tree);
     let mut eng = if TRACE {
         rt::Engine::new(tree.walk())
@@ -1295,10 +1295,10 @@ fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const TRACE: bo
         }
         match dispatch(&mut eng, source, ip) {
             Flow::Jump(next) => ip = next,
-            Flow::Accept => return Ok(Some(eng.into_effects())),
+            Flow::Accept => return Ok(Some(eng.into_journal())),
             Flow::Backtrack => match backtrack(&mut eng, source) {
                 Unwound::Resumed(next) => ip = next,
-                Unwound::Accepted => return Ok(Some(eng.into_effects())),
+                Unwound::Accepted => return Ok(Some(eng.into_journal())),
                 Unwound::NoMatch => return Ok(None),
             },
         }

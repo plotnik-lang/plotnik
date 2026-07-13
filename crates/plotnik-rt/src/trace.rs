@@ -1,7 +1,7 @@
-//! The typed replay's cursor over a committed effect log.
+//! The typed decoder's cursor over a committed match journal.
 //!
-//! A generated matcher commits the same effect stream the VM commits; the
-//! generated per-type readers then replay that stream once, on the winning
+//! A generated matcher commits the same journal the VM commits; the generated
+//! per-type readers then decode that journal once, on the winning
 //! path, into the query's typed output. [`TraceReader`] is the cursor those
 //! readers share: it only knows the stream's vocabulary, while the readers
 //! carry the schema (which entries are possible where — proven at emit by the
@@ -12,13 +12,13 @@
 
 use tree_sitter::Node;
 
-use crate::{EffectLog, RuntimeEffect, node_text, source_text};
+use crate::{JournalEvent, MatchJournal, node_text, source_text};
 
 /// `record_set_index` sentinel: no `RecordSet` closes a value starting here.
 const NO_RECORD_SET: u32 = u32::MAX;
 
 pub struct TraceReader<'a, 't, 's> {
-    entries: &'a [RuntimeEffect<'t>],
+    entries: &'a [JournalEvent<'t>],
     source: &'s str,
     pos: usize,
     /// For each position, where the `RecordSet` that closes a field value
@@ -30,8 +30,8 @@ pub struct TraceReader<'a, 't, 's> {
 }
 
 impl<'a, 't, 's> TraceReader<'a, 't, 's> {
-    pub fn new(log: &'a EffectLog<'t>, source: &'s str) -> Self {
-        let entries = log.as_slice();
+    pub fn new(journal: &'a MatchJournal<'t>, source: &'s str) -> Self {
+        let entries = journal.as_slice();
         Self {
             entries,
             source,
@@ -51,7 +51,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         );
     }
 
-    fn next(&mut self) -> &'a RuntimeEffect<'t> {
+    fn next(&mut self) -> &'a JournalEvent<'t> {
         let entry = self
             .entries
             .get(self.pos)
@@ -60,7 +60,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         entry
     }
 
-    fn peek(&self) -> Option<&'a RuntimeEffect<'t>> {
+    fn peek(&self) -> Option<&'a JournalEvent<'t>> {
         self.entries.get(self.pos)
     }
 
@@ -83,7 +83,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
             self.pos
         );
         match &self.entries[record_set_pos as usize] {
-            RuntimeEffect::RecordSet(index) => *index,
+            JournalEvent::RecordSet(index) => *index,
             other => {
                 unreachable!("record_set_index addresses RecordSet entries, found {other:?}")
             }
@@ -93,7 +93,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
     /// Consume `Absent` if it is next. For options, `Absent` is the
     /// whole absent value, anything else is the present value.
     pub fn take_absent(&mut self) -> bool {
-        if matches!(self.peek(), Some(RuntimeEffect::Absent)) {
+        if matches!(self.peek(), Some(JournalEvent::Absent)) {
             self.pos += 1;
             return true;
         }
@@ -101,7 +101,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
     }
 
     fn take_unmarked_str(&mut self) -> bool {
-        if !matches!(self.peek(), Some(RuntimeEffect::ScalarOpen)) {
+        if !matches!(self.peek(), Some(JournalEvent::ScalarOpen)) {
             return false;
         }
 
@@ -109,9 +109,9 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         let mut marked = false;
         for index in self.pos..self.entries.len() {
             match &self.entries[index] {
-                RuntimeEffect::ScalarOpen => depth += 1,
-                RuntimeEffect::ScalarMark(_) => marked = true,
-                RuntimeEffect::StrClose => {
+                JournalEvent::ScalarOpen => depth += 1,
+                JournalEvent::ScalarMark(_) => marked = true,
+                JournalEvent::StrClose => {
                     depth -= 1;
                     if depth != 0 {
                         continue;
@@ -122,7 +122,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
                     self.pos = index + 1;
                     return true;
                 }
-                RuntimeEffect::BoolClose(_) => {
+                JournalEvent::BoolClose(_) => {
                     depth -= 1;
                     if depth == 0 {
                         return false;
@@ -135,32 +135,32 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
     }
 
     pub fn at_list_close(&self) -> bool {
-        matches!(self.peek(), Some(RuntimeEffect::ListClose))
+        matches!(self.peek(), Some(JournalEvent::ListClose))
     }
 
     pub fn at_record_close(&self) -> bool {
-        matches!(self.peek(), Some(RuntimeEffect::RecordClose))
+        matches!(self.peek(), Some(JournalEvent::RecordClose))
     }
 
     pub fn at_variant_close(&self) -> bool {
-        matches!(self.peek(), Some(RuntimeEffect::VariantClose))
+        matches!(self.peek(), Some(JournalEvent::VariantClose))
     }
 
     pub fn expect_node(&mut self) -> Node<'t> {
         match self.next() {
-            RuntimeEffect::Node(node) => *node,
+            JournalEvent::Node(node) => *node,
             other => self.mismatch("Node", other),
         }
     }
 
     pub fn expect_str(&mut self) -> &'s str {
-        if let Some(RuntimeEffect::NodeStr(node)) = self.peek() {
+        if let Some(JournalEvent::NodeStr(node)) = self.peek() {
             let value = node_text(self.source, node);
             self.pos += 1;
             return value;
         }
         let (range, close) = self.read_scalar();
-        if !matches!(close, RuntimeEffect::StrClose) {
+        if !matches!(close, JournalEvent::StrClose) {
             self.mismatch("StrClose", close);
         }
         let range = range.expect("a non-null text reader requires at least one scalar mark");
@@ -168,25 +168,25 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
     }
 
     pub fn expect_bool(&mut self) -> bool {
-        if matches!(self.peek(), Some(RuntimeEffect::NodeBool(_))) {
+        if matches!(self.peek(), Some(JournalEvent::NodeBool(_))) {
             self.pos += 1;
             return true;
         }
-        if let Some(RuntimeEffect::BoolValue(value)) = self.peek() {
+        if let Some(JournalEvent::BoolValue(value)) = self.peek() {
             let value = *value;
             self.pos += 1;
             return value;
         }
         let (_, close) = self.read_scalar();
         match close {
-            RuntimeEffect::BoolClose(value) => *value,
+            JournalEvent::BoolClose(value) => *value,
             other => self.mismatch("BoolClose", other),
         }
     }
 
-    fn read_scalar(&mut self) -> (Option<std::ops::Range<usize>>, &'a RuntimeEffect<'t>) {
+    fn read_scalar(&mut self) -> (Option<std::ops::Range<usize>>, &'a JournalEvent<'t>) {
         match self.next() {
-            RuntimeEffect::ScalarOpen => {}
+            JournalEvent::ScalarOpen => {}
             other => self.mismatch("ScalarOpen", other),
         }
         let mut depth = 1_u32;
@@ -194,15 +194,15 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         loop {
             let entry = self.next();
             match entry {
-                RuntimeEffect::ScalarOpen => depth += 1,
-                RuntimeEffect::ScalarMark(node) => {
+                JournalEvent::ScalarOpen => depth += 1,
+                JournalEvent::ScalarMark(node) => {
                     let mark = node.start_byte()..node.end_byte();
                     range = Some(match range {
                         Some(current) => current.start.min(mark.start)..current.end.max(mark.end),
                         None => mark,
                     });
                 }
-                RuntimeEffect::StrClose | RuntimeEffect::BoolClose(_) => {
+                JournalEvent::StrClose | JournalEvent::BoolClose(_) => {
                     depth -= 1;
                     if depth == 0 {
                         return (range, entry);
@@ -215,61 +215,61 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
 
     pub fn expect_record_set(&mut self) -> u16 {
         match self.next() {
-            RuntimeEffect::RecordSet(index) => *index,
+            JournalEvent::RecordSet(index) => *index,
             other => self.mismatch("RecordSet", other),
         }
     }
 
     pub fn expect_variant_open(&mut self) -> u16 {
         match self.next() {
-            RuntimeEffect::VariantOpen(index) => *index,
+            JournalEvent::VariantOpen(index) => *index,
             other => self.mismatch("VariantOpen", other),
         }
     }
 
     pub fn expect_list_open(&mut self) {
         match self.next() {
-            RuntimeEffect::ListOpen => {}
+            JournalEvent::ListOpen => {}
             other => self.mismatch("ListOpen", other),
         }
     }
 
     pub fn expect_list_close(&mut self) {
         match self.next() {
-            RuntimeEffect::ListClose => {}
+            JournalEvent::ListClose => {}
             other => self.mismatch("ListClose", other),
         }
     }
 
     pub fn expect_array_push(&mut self) {
         match self.next() {
-            RuntimeEffect::ArrayPush => {}
+            JournalEvent::ArrayPush => {}
             other => self.mismatch("ArrayPush", other),
         }
     }
 
     pub fn expect_record_open(&mut self) {
         match self.next() {
-            RuntimeEffect::RecordOpen => {}
+            JournalEvent::RecordOpen => {}
             other => self.mismatch("RecordOpen", other),
         }
     }
 
     pub fn expect_record_close(&mut self) {
         match self.next() {
-            RuntimeEffect::RecordClose => {}
+            JournalEvent::RecordClose => {}
             other => self.mismatch("RecordClose", other),
         }
     }
 
     pub fn expect_variant_close(&mut self) {
         match self.next() {
-            RuntimeEffect::VariantClose => {}
+            JournalEvent::VariantClose => {}
             other => self.mismatch("VariantClose", other),
         }
     }
 
-    fn mismatch(&self, expected: &str, found: &RuntimeEffect<'_>) -> ! {
+    fn mismatch(&self, expected: &str, found: &JournalEvent<'_>) -> ! {
         panic!(
             "trace reader: expected {expected} at {}, found {found:?}",
             self.pos - 1,
@@ -289,7 +289,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
 /// `*Open` leaves the group, and the parked answer — the first `RecordSet` after
 /// the group — is exactly the answer *at* the open (a composite field value
 /// starts there) and for whatever precedes it on the outer level.
-fn build_record_set_index(entries: &[RuntimeEffect<'_>]) -> Vec<u32> {
+fn build_record_set_index(entries: &[JournalEvent<'_>]) -> Vec<u32> {
     assert!(
         u32::try_from(entries.len()).is_ok_and(|len| len < NO_RECORD_SET),
         "trace length fits the u32 index space"
@@ -299,22 +299,22 @@ fn build_record_set_index(entries: &[RuntimeEffect<'_>]) -> Vec<u32> {
     let mut outer: Vec<u32> = Vec::new();
     for (i, entry) in entries.iter().enumerate().rev() {
         match entry {
-            RuntimeEffect::RecordSet(_) => {
+            JournalEvent::RecordSet(_) => {
                 cur = i as u32;
                 index[i] = cur;
             }
-            RuntimeEffect::ListClose
-            | RuntimeEffect::RecordClose
-            | RuntimeEffect::VariantClose
-            | RuntimeEffect::StrClose
-            | RuntimeEffect::BoolClose(_) => {
+            JournalEvent::ListClose
+            | JournalEvent::RecordClose
+            | JournalEvent::VariantClose
+            | JournalEvent::StrClose
+            | JournalEvent::BoolClose(_) => {
                 outer.push(cur);
                 cur = NO_RECORD_SET;
             }
-            RuntimeEffect::ListOpen
-            | RuntimeEffect::RecordOpen
-            | RuntimeEffect::VariantOpen(_)
-            | RuntimeEffect::ScalarOpen => {
+            JournalEvent::ListOpen
+            | JournalEvent::RecordOpen
+            | JournalEvent::VariantOpen(_)
+            | JournalEvent::ScalarOpen => {
                 cur = outer
                     .pop()
                     .expect("open/close balance proven by the effect-stack validation");

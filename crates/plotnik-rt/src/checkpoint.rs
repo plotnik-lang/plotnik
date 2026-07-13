@@ -79,8 +79,8 @@ pub struct CheckpointState {
     /// Cursor position (tree-sitter descendant_index) — always present; the
     /// restore fallback when the pooled snapshot was evicted.
     pub descendant_index: u32,
-    /// Effect stream length at checkpoint.
-    pub effect_watermark: usize,
+    /// Match journal length at checkpoint.
+    pub journal_watermark: usize,
     /// Frame arena state at checkpoint.
     pub frame_index: Option<u32>,
     /// Recursion depth at checkpoint.

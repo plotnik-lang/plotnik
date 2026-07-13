@@ -287,7 +287,7 @@ The loader verifies:
 - calls and returns uphold cursor-depth neutrality;
 - ordinary calls target matched-only bodies, split calls target bodies with
   both outcomes, and entrypoint wrappers return matched only;
-- the committed effect stream cannot underflow the materializer stack or
+- the committed match journal cannot underflow the materializer stack or
   suppression depth, and all list/record/variant/scalar frames are balanced;
-- the committed effect stream cannot underflow or mis-nest the inspection span
+- the committed match journal cannot underflow or mis-nest the inspection span
   stack.

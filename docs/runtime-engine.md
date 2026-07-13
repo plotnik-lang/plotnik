@@ -12,7 +12,7 @@ struct VM<'t> {
     ip: StepId,
     frames: FrameArena,
     checkpoints: CheckpointStack,
-    effects: EffectLog<'t>,
+    journal: MatchJournal<'t>,
     effect_depths: u64, // suppression u32 | scalar u32
 }
 
@@ -113,7 +113,7 @@ Exact navigation fails on the first mismatch.
 ```rust
 struct Checkpoint {
     descendant_index: u32,
-    effect_watermark: usize,
+    journal_watermark: usize,
     frame_index: Option<u32>,
     recursion_depth: u32,
     effect_depths: u64, // suppression u32 | scalar u32
@@ -121,7 +121,7 @@ struct Checkpoint {
 }
 ```
 
-Backtracking restores cursor position, truncates the effect log, restores the
+Backtracking restores cursor position, truncates the match journal, restores the
 frame arena pointer, restores suppression and open-scalar depth, and then
 resumes per the checkpoint's kind: a branch checkpoint resumes at its recorded instruction; a
 call-retry checkpoint advances to the next candidate satisfying the Call's
@@ -135,16 +135,16 @@ an optional consumes — so no search ever silently commits.
 Frame pruning after `Return` keeps the arena bounded by active checkpoints plus
 the current call stack.
 
-## Effects
+## Match Journal
 
-Effects are logged only on paths that have not backtracked. Suppression (`@_`)
-increments a depth counter; ordinary data effects are skipped while the counter
+Events are appended only on paths that have not backtracked. Suppression (`@_`)
+increments a depth counter; ordinary output events are skipped while the counter
 is non-zero. Scalar marks bypass suppression so an enclosing `:: str` or
 `:: bool` value can retain provenance across a suppressed nested value. Scalar
-open and close effects obey suppression, so `matches` records no scalar trace.
+open and close events obey suppression, so `matches` records no scalar data.
 
 ```rust
-pub enum RuntimeEffect<'t> {
+pub enum JournalEvent<'t> {
     Node(tree_sitter::Node<'t>),
     ListOpen,
     ArrayPush,
@@ -167,7 +167,7 @@ pub enum RuntimeEffect<'t> {
 }
 ```
 
-| Effect                 | Action                                                   |
+| Journal event          | Action                                                   |
 | ---------------------- | -------------------------------------------------------- |
 | Node                   | Produce the current cursor node                          |
 | Absent                 | Produce an absent value                                  |
@@ -211,7 +211,7 @@ entrypoint value:
 
 ## Materialization
 
-The materializer is a stack machine over the committed effect stream. Producers
+The materializer is a stack machine over the committed match journal. Producers
 (`Node`, `Absent`, and close effects) place a value in a `pending` register.
 Consumers (`RecordSet`, `ArrayPush`) take that pending value and attach it to the current
 builder frame. Open effects push builder frames; close effects pop them and

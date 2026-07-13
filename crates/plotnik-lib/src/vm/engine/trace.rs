@@ -27,7 +27,7 @@ use crate::bytecode::{
 };
 use crate::core::{Colors, NodeFieldId};
 
-use plotnik_rt::{ReturnOutcome, RuntimeEffect};
+use plotnik_rt::{JournalEvent, ReturnOutcome};
 
 /// Verbosity level for trace output.
 ///
@@ -81,8 +81,8 @@ pub trait Tracer {
     /// Called when a candidate node fails a negated-field constraint.
     fn trace_neg_field_failure(&mut self, node: Node<'_>, field: NodeFieldId);
 
-    /// Called after emitting an effect.
-    fn trace_effect(&mut self, effect: &RuntimeEffect<'_>);
+    /// Called after appending a journal event.
+    fn trace_journal_event(&mut self, event: &JournalEvent<'_>);
 
     /// Called when an effect is suppressed (inside @_ capture).
     fn trace_effect_suppressed(&mut self, opcode: EffectKind, payload: usize);
@@ -142,7 +142,7 @@ impl Tracer for NoopTracer {
     fn trace_neg_field_failure(&mut self, _node: Node<'_>, _field: NodeFieldId) {}
 
     #[inline(always)]
-    fn trace_effect(&mut self, _effect: &RuntimeEffect<'_>) {}
+    fn trace_journal_event(&mut self, _event: &JournalEvent<'_>) {}
 
     #[inline(always)]
     fn trace_effect_suppressed(&mut self, _opcode: EffectKind, _payload: usize) {}
@@ -255,33 +255,33 @@ enum TraceEffect {
 }
 
 impl TraceEffect {
-    fn from_runtime(effect: &RuntimeEffect<'_>) -> Self {
-        match effect {
-            RuntimeEffect::Node(_) => Self::Node,
-            RuntimeEffect::ListOpen => Self::ListOpen,
-            RuntimeEffect::ArrayPush => Self::ArrayPush,
-            RuntimeEffect::ListClose => Self::ListClose,
-            RuntimeEffect::RecordOpen => Self::RecordOpen,
-            RuntimeEffect::RecordClose => Self::RecordClose,
-            RuntimeEffect::RecordSet(idx) => Self::RecordSet(*idx),
-            RuntimeEffect::VariantOpen(idx) => Self::VariantOpen(*idx),
-            RuntimeEffect::VariantClose => Self::VariantClose,
-            RuntimeEffect::Absent => Self::Absent,
-            RuntimeEffect::SpanStart { id, node } => {
+    fn from_journal(event: &JournalEvent<'_>) -> Self {
+        match event {
+            JournalEvent::Node(_) => Self::Node,
+            JournalEvent::ListOpen => Self::ListOpen,
+            JournalEvent::ArrayPush => Self::ArrayPush,
+            JournalEvent::ListClose => Self::ListClose,
+            JournalEvent::RecordOpen => Self::RecordOpen,
+            JournalEvent::RecordClose => Self::RecordClose,
+            JournalEvent::RecordSet(idx) => Self::RecordSet(*idx),
+            JournalEvent::VariantOpen(idx) => Self::VariantOpen(*idx),
+            JournalEvent::VariantClose => Self::VariantClose,
+            JournalEvent::Absent => Self::Absent,
+            JournalEvent::SpanStart { id, node } => {
                 if node.is_some() {
                     Self::SpanStartAt(*id)
                 } else {
                     Self::SpanStart(*id)
                 }
             }
-            RuntimeEffect::SpanEnd(id) => Self::SpanEnd(*id),
-            RuntimeEffect::ScalarOpen => Self::ScalarOpen,
-            RuntimeEffect::ScalarMark(_) => Self::ScalarMark,
-            RuntimeEffect::StrClose => Self::StrClose,
-            RuntimeEffect::BoolClose(value) => Self::BoolClose(*value),
-            RuntimeEffect::NodeStr(_) => Self::NodeStr,
-            RuntimeEffect::NodeBool(_) => Self::NodeBool,
-            RuntimeEffect::BoolValue(value) => Self::BoolValue(*value),
+            JournalEvent::SpanEnd(id) => Self::SpanEnd(*id),
+            JournalEvent::ScalarOpen => Self::ScalarOpen,
+            JournalEvent::ScalarMark(_) => Self::ScalarMark,
+            JournalEvent::StrClose => Self::StrClose,
+            JournalEvent::BoolClose(value) => Self::BoolClose(*value),
+            JournalEvent::NodeStr(_) => Self::NodeStr,
+            JournalEvent::NodeBool(_) => Self::NodeBool,
+            JournalEvent::BoolValue(value) => Self::BoolValue(*value),
         }
     }
 
@@ -618,12 +618,12 @@ impl Tracer for PrintTracer<'_> {
         self.add_subline(trace::MATCH_FAILURE, &format!("✗ -{}", name));
     }
 
-    fn trace_effect(&mut self, effect: &RuntimeEffect<'_>) {
+    fn trace_journal_event(&mut self, event: &JournalEvent<'_>) {
         if self.verbosity == Verbosity::Default {
             return;
         }
 
-        let effect_str = self.format_effect(TraceEffect::from_runtime(effect));
+        let effect_str = self.format_effect(TraceEffect::from_journal(event));
         self.add_subline(trace::EFFECT, &effect_str);
     }
 

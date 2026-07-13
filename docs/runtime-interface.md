@@ -29,7 +29,7 @@ first cross-language runtime contract. The ABI changes when generated code and
 a runtime must change together, including changes to:
 
 - navigation, checkpoint, or resume behavior;
-- the capture-trace vocabulary or payload meanings;
+- the match-journal vocabulary or payload meanings;
 - the document and tree-adapter operations generated matchers call;
 - limit accounting or the errors returned by safe entrypoints.
 
@@ -50,7 +50,7 @@ parse(document)   -> Result<Optional<Output>, LimitExceeded>
 matches(document) -> Result<Boolean, LimitExceeded>
 ```
 
-`parse` runs the matcher, then replays its committed capture trace into the
+`parse` runs the matcher, then decodes its committed match journal into the
 generated output type. `matches` runs the same matcher with data effects
 suppressed; it does not allocate an output trace and cannot fail a replay-depth
 limit.
@@ -180,7 +180,7 @@ The mutable engine state consists of:
 - the current position;
 - call frames and current recursion depth;
 - a LIFO checkpoint stack;
-- the capture trace and its current length;
+- the match journal and its current length;
 - the current suppression depth;
 - the number of open, logged scalar frames.
 
@@ -192,7 +192,7 @@ Every checkpoint snapshots all state that affects future matching:
 ```text
 CheckpointState {
     position
-    effect_watermark
+    journal_watermark
     frame
     recursion_depth
     effect_depths { suppression: u32, scalar: u32 }
@@ -279,16 +279,16 @@ step counter. Engine class and worst-case running time are target properties
 (Rust remains linear; some dynamic hosts backtrack), not conformance
 properties; the observable boolean result is shared.
 
-## 6. Capture trace
+## 6. Match journal
 
 The matcher never constructs typed values while it can still backtrack. It
-records an in-memory capture trace on the active path and truncates that trace
-when restoring a checkpoint. The committed trace is replayed exactly once
+records an in-memory match journal on the active path and truncates that journal
+when restoring a checkpoint. The committed journal is decoded exactly once
 after acceptance.
 
 Generated runtimes implement this vocabulary:
 
-| Effect                 | Payload and meaning                                |
+| Journal event          | Payload and meaning                                |
 | ---------------------- | -------------------------------------------------- |
 | `Node`                 | Current binding-native node.                       |
 | `Absent`               | One absent option/union value.                     |
@@ -314,14 +314,14 @@ before their closing `RecordSet`. The order of sibling `RecordSet` entries insid
 record is not stable and must not be used as declaration order.
 
 `SuppressBegin` and `SuppressEnd` change the suppression depth but are not
-capture-trace entries. While suppression is nonzero, ordinary data effects,
+journal entries. While suppression is nonzero, ordinary data events,
 including scalar opens and closes, are skipped. `ScalarMark` bypasses data
 suppression so an enclosing scalar still sees nodes matched inside a suppressed
 definition. A mark is a no-op when no scalar frame is open. Suppression still
 nests during `matches`, whose initial depth is nonzero, so `matches` allocates
-no scalar trace.
+no scalar events.
 
-Inspection-span effects belong to the VM/playground inspection path. Generated
+Inspection-span events belong to the VM/playground inspection path. Generated
 production matchers reject inspection-compiled queries and do not include those
 effects in the generated-runtime ABI.
 
@@ -339,7 +339,7 @@ are emitted only when inspection requests that provenance.
 
 ### 6.1 Replay reader
 
-Typed readers consume the committed trace linearly. A runtime reader provides:
+Typed decoders consume the committed match journal linearly. A runtime decoder provides:
 
 - `take_absent`;
 - `expect_node`, `expect_record_set`, and `expect_variant_open`;
@@ -481,7 +481,7 @@ A target is conforming when its runner executes the shared corpus and agrees
 with the VM oracle on:
 
 - match/no-match and portable limit category;
-- the committed capture trace, including layout indices, captured-node byte
+- the committed match journal, including layout indices, captured-node byte
   spans, scalar marks, and scalar close values;
 - the debug value after typed replay;
 - grammar-skew and runtime-ABI failures.

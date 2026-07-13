@@ -25,7 +25,7 @@ pub enum RuntimeError {
 /// either continues (`Backtracked`) or completes the run (`Accept`).
 #[derive(Debug)]
 pub(crate) enum ControlFlow {
-    /// Successful completion: the run is done and the effect log is final.
+    /// Successful completion: the run is done and the match journal is committed.
     Accept,
     /// Backtracking occurred; control returns to the main loop to continue.
     Backtracked,

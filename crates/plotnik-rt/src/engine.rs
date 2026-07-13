@@ -1,10 +1,10 @@
 //! Shared execution-state core for query executors.
 //!
 //! [`Engine`] bundles the mutable state a query run threads through every
-//! instruction — cursor, call frames, backtracking checkpoints, the capture
-//! effect log, and the suppression gate — together with the transitions that
+//! instruction — cursor, call frames, backtracking checkpoints, the match
+//! journal, and the suppression gate — together with the transitions that
 //! must stay in lockstep: checkpoint save/restore, frame entry/exit, and
-//! gated effect emission. The bytecode VM drives this core from its dispatch
+//! gated journal event emission. The bytecode VM drives this core from its dispatch
 //! loop; generated matchers (the proc-macro backend) drive the same core from
 //! compiled per-state code. Keeping the checkpoint contract in one place is
 //! the point: a state field added here cannot silently escape save/restore
@@ -17,8 +17,8 @@ use std::num::NonZeroU64;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::{
-    Checkpoint, CheckpointStack, CheckpointState, CursorWrapper, EffectLog, FrameArena,
-    RuntimeEffect,
+    Checkpoint, CheckpointStack, CheckpointState, CursorWrapper, FrameArena, JournalEvent,
+    MatchJournal,
 };
 
 /// Execution state shared by the bytecode VM and generated matchers.
@@ -30,17 +30,17 @@ pub struct Engine<'t> {
     cursor: CursorWrapper<'t>,
     frames: FrameArena,
     checkpoints: CheckpointStack,
-    effects: EffectLog<'t>,
+    journal: MatchJournal<'t>,
     recursion_depth: u32,
-    /// Suppression nesting on the active match path: when `> 0`, data effects
-    /// are suppressed (not emitted to the log). `SuppressBegin` increments,
+    /// Suppression nesting on the active match path: when `> 0`, data events
+    /// are suppressed (not appended to the journal). `SuppressBegin` increments,
     /// `SuppressEnd` decrements. Each open scope lives inside an active call
     /// frame, so it is bounded by call-nesting depth (`recursion_depth`) times
     /// a per-query constant — and call depth is itself capped by the
     /// `u32`-indexed frame arena. A `u16` was far too narrow (deep `@_`
     /// recursion overflowed it at 65_536).
     suppress_depth: u32,
-    /// Number of non-suppressed `ScalarOpen`s on the current effect path.
+    /// Number of non-suppressed `ScalarOpen`s on the current journal path.
     scalar_depth: u32,
     /// Whether the cursor's lazy snapshot pool has activated (see
     /// [`CursorWrapper::snapshot`]); once true, every checkpoint push pairs
@@ -55,7 +55,7 @@ impl<'t> Engine<'t> {
         Self::with_initial_suppression(cursor, 0)
     }
 
-    /// Start an engine for a yes/no run: all data effects are suppressed from
+    /// Start an engine for a yes/no run: all data events are suppressed from
     /// the root, so matching can answer without building a committed value.
     /// Query-level suppression scopes still nest above this base depth.
     pub fn new_data_suppressed(cursor: TreeCursor<'t>) -> Self {
@@ -67,7 +67,7 @@ impl<'t> Engine<'t> {
             cursor: CursorWrapper::new(cursor),
             frames: FrameArena::new(),
             checkpoints: CheckpointStack::new(),
-            effects: EffectLog::new(),
+            journal: MatchJournal::new(),
             recursion_depth: 0,
             suppress_depth,
             scalar_depth: 0,
@@ -91,23 +91,23 @@ impl<'t> Engine<'t> {
         self.cursor.node()
     }
 
-    /// The committed effect stream so far.
+    /// The current rollbackable match journal.
     #[inline]
-    pub fn effects(&self) -> &EffectLog<'t> {
-        &self.effects
+    pub fn journal(&self) -> &MatchJournal<'t> {
+        &self.journal
     }
 
-    /// Surrender the committed effect stream (on Accept).
+    /// Surrender the committed match journal after acceptance.
     #[inline]
-    pub fn into_effects(self) -> EffectLog<'t> {
-        self.effects
+    pub fn into_journal(self) -> MatchJournal<'t> {
+        self.journal
     }
 
     /// Snapshot the engine state a checkpoint restores on backtrack.
     pub fn checkpoint_state(&self) -> CheckpointState {
         CheckpointState {
             descendant_index: self.cursor.descendant_index(),
-            effect_watermark: self.effects.len(),
+            journal_watermark: self.journal.len(),
             frame_index: self.frames.current(),
             recursion_depth: self.recursion_depth,
             effect_depths: crate::EffectDepths::new(self.suppress_depth, self.scalar_depth),
@@ -125,7 +125,7 @@ impl<'t> Engine<'t> {
         } else if self.cursor.restore_without_snapshot(state.descendant_index) {
             self.snapshot_cursor_active = true;
         }
-        self.effects.truncate(state.effect_watermark);
+        self.journal.truncate(state.journal_watermark);
         self.frames.restore(state.frame_index);
         self.recursion_depth = state.recursion_depth;
         self.suppress_depth = state.effect_depths.suppression();
@@ -152,7 +152,7 @@ impl<'t> Engine<'t> {
             // Restored — must equal the snapshot the checkpoint captured.
             cursor,
             frames,
-            effects,
+            journal,
             recursion_depth,
             suppress_depth,
             scalar_depth,
@@ -167,9 +167,9 @@ impl<'t> Engine<'t> {
             "checkpoint restore: cursor position"
         );
         debug_assert_eq!(
-            effects.len(),
-            state.effect_watermark,
-            "checkpoint restore: effect watermark"
+            journal.len(),
+            state.journal_watermark,
+            "checkpoint restore: journal watermark"
         );
         debug_assert_eq!(
             frames.current(),
@@ -286,7 +286,7 @@ impl<'t> Engine<'t> {
         self.frames.is_empty()
     }
 
-    /// Open a suppression scope (bare-ref opacity). Returns whether effects
+    /// Open a suppression scope (bare-ref opacity). Returns whether data events
     /// were already suppressed *before* this open — what a tracer reports.
     pub fn suppress_begin(&mut self) -> bool {
         let was_suppressed = self.suppress_depth > 0;
@@ -297,7 +297,7 @@ impl<'t> Engine<'t> {
         was_suppressed
     }
 
-    /// Close a suppression scope. Returns whether effects are still
+    /// Close a suppression scope. Returns whether data events are still
     /// suppressed *after* this close — what a tracer reports.
     pub fn suppress_end(&mut self) -> bool {
         self.suppress_depth = self
@@ -307,32 +307,32 @@ impl<'t> Engine<'t> {
         self.suppress_depth > 0
     }
 
-    /// Emit a data effect through the suppression gate. The effect is built
+    /// Emit a data event through the suppression gate. The event is built
     /// lazily so a suppressed `Node` capture never reads the cursor. Returns
-    /// the logged effect, or `None` when suppressed.
+    /// the journaled event, or `None` when suppressed.
     #[inline]
     pub fn emit_data(
         &mut self,
-        make: impl FnOnce(&CursorWrapper<'t>) -> RuntimeEffect<'t>,
-    ) -> Option<&RuntimeEffect<'t>> {
+        make: impl FnOnce(&CursorWrapper<'t>) -> JournalEvent<'t>,
+    ) -> Option<&JournalEvent<'t>> {
         if self.suppress_depth > 0 {
             return None;
         }
-        let effect = make(&self.cursor);
-        self.effects.push(effect);
-        Some(self.effects.as_slice().last().expect("just pushed"))
+        let event = make(&self.cursor);
+        self.journal.push(event);
+        Some(self.journal.as_slice().last().expect("just pushed"))
     }
 
-    /// Emit an inspection-span effect, bypassing suppression: uncaptured
+    /// Emit an inspection-span event, bypassing suppression: uncaptured
     /// `(Foo)` bodies still produce source hulls even when they carry no
     /// output bindings.
     #[inline]
-    pub fn emit_span(&mut self, effect: RuntimeEffect<'t>) {
-        self.effects.push(effect);
+    pub fn emit_span(&mut self, event: JournalEvent<'t>) {
+        self.journal.push(event);
     }
 
     /// Open a scalar frame through the data-suppression gate.
-    pub fn scalar_open(&mut self) -> Option<&RuntimeEffect<'t>> {
+    pub fn scalar_open(&mut self) -> Option<&JournalEvent<'t>> {
         if self.suppress_depth > 0 {
             return None;
         }
@@ -340,42 +340,42 @@ impl<'t> Engine<'t> {
             .scalar_depth
             .checked_add(1)
             .expect("scalar frame depth exceeds u32");
-        self.effects.push(RuntimeEffect::ScalarOpen);
-        Some(self.effects.as_slice().last().expect("just pushed"))
+        self.journal.push(JournalEvent::ScalarOpen);
+        Some(self.journal.as_slice().last().expect("just pushed"))
     }
 
     /// Mark the current node when any scalar frame is live. Marks deliberately
     /// cross data-suppression brackets so an enclosing scalar retains the
     /// provenance of a suppressed nested value.
-    pub fn scalar_mark(&mut self) -> Option<&RuntimeEffect<'t>> {
+    pub fn scalar_mark(&mut self) -> Option<&JournalEvent<'t>> {
         if self.scalar_depth == 0 {
             return None;
         }
-        self.effects.push(RuntimeEffect::ScalarMark(self.node()));
-        Some(self.effects.as_slice().last().expect("just pushed"))
+        self.journal.push(JournalEvent::ScalarMark(self.node()));
+        Some(self.journal.as_slice().last().expect("just pushed"))
     }
 
-    pub fn scalar_close_str(&mut self) -> Option<&RuntimeEffect<'t>> {
-        self.scalar_close(RuntimeEffect::StrClose)
+    pub fn scalar_close_str(&mut self) -> Option<&JournalEvent<'t>> {
+        self.scalar_close(JournalEvent::StrClose)
     }
 
-    pub fn scalar_close_bool(&mut self, value: bool) -> Option<&RuntimeEffect<'t>> {
-        self.scalar_close(RuntimeEffect::BoolClose(value))
+    pub fn scalar_close_bool(&mut self, value: bool) -> Option<&JournalEvent<'t>> {
+        self.scalar_close(JournalEvent::BoolClose(value))
     }
 
-    pub fn node_str(&mut self) -> Option<&RuntimeEffect<'t>> {
-        self.emit_data(|cursor| RuntimeEffect::NodeStr(cursor.node()))
+    pub fn node_str(&mut self) -> Option<&JournalEvent<'t>> {
+        self.emit_data(|cursor| JournalEvent::NodeStr(cursor.node()))
     }
 
-    pub fn node_bool(&mut self) -> Option<&RuntimeEffect<'t>> {
-        self.emit_data(|cursor| RuntimeEffect::NodeBool(cursor.node()))
+    pub fn node_bool(&mut self) -> Option<&JournalEvent<'t>> {
+        self.emit_data(|cursor| JournalEvent::NodeBool(cursor.node()))
     }
 
-    pub fn bool_value(&mut self, value: bool) -> Option<&RuntimeEffect<'t>> {
-        self.emit_data(|_| RuntimeEffect::BoolValue(value))
+    pub fn bool_value(&mut self, value: bool) -> Option<&JournalEvent<'t>> {
+        self.emit_data(|_| JournalEvent::BoolValue(value))
     }
 
-    fn scalar_close(&mut self, effect: RuntimeEffect<'t>) -> Option<&RuntimeEffect<'t>> {
+    fn scalar_close(&mut self, event: JournalEvent<'t>) -> Option<&JournalEvent<'t>> {
         if self.suppress_depth > 0 {
             return None;
         }
@@ -383,8 +383,8 @@ impl<'t> Engine<'t> {
             .scalar_depth
             .checked_sub(1)
             .expect("scalar close without an open scalar frame");
-        self.effects.push(effect);
-        Some(self.effects.as_slice().last().expect("just pushed"))
+        self.journal.push(event);
+        Some(self.journal.as_slice().last().expect("just pushed"))
     }
 
     /// Live bytes across the growable runtime arenas — the quantity a memory
@@ -392,7 +392,7 @@ impl<'t> Engine<'t> {
     pub fn heap_bytes(&self) -> u64 {
         self.frames.byte_footprint()
             + self.checkpoints.byte_footprint()
-            + self.effects.byte_footprint()
+            + self.journal.byte_footprint()
             + self.cursor.snapshot_footprint()
     }
 }

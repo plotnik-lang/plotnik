@@ -393,7 +393,7 @@ There is no recursion/depth limit: backtracking and output rendering are
 iterative, so deep nesting consumes heap, not the native stack. `--max-memory`
 meters the VM's execution arenas during the run; output rendering happens
 afterward and is not separately metered, though its size tracks the
-already-bounded effect log.
+already-bounded match journal.
 
 ---
 

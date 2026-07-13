@@ -21,7 +21,7 @@ export interface Q {
       },
       "span": null,
       "node": null,
-      "effect_len": 0
+      "journal_len": 0
     },
     {
       "ip": 0,
@@ -30,17 +30,17 @@ export interface Q {
       },
       "span": null,
       "node": null,
-      "effect_len": 0
+      "journal_len": 0
     },
     {
       "ip": 0,
       "event": {
-        "kind": "effect",
-        "effect": "RecordOpen"
+        "kind": "journal_event",
+        "event": "RecordOpen"
       },
       "span": null,
       "node": null,
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 2,
@@ -49,7 +49,7 @@ export interface Q {
       },
       "span": null,
       "node": null,
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 2,
@@ -59,7 +59,7 @@ export interface Q {
       },
       "span": null,
       "node": null,
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 18,
@@ -68,7 +68,7 @@ export interface Q {
       },
       "span": null,
       "node": null,
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 18,
@@ -81,7 +81,7 @@ export interface Q {
         "start": 0,
         "end": 1
       },
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 18,
@@ -94,23 +94,23 @@ export interface Q {
         "start": 0,
         "end": 1
       },
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 18,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStart#0"
+        "kind": "journal_event",
+        "event": "SpanStart#0"
       },
       "span": 0,
       "node": null,
-      "effect_len": 2
+      "journal_len": 2
     },
     {
       "ip": 18,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStartAt#1"
+        "kind": "journal_event",
+        "event": "SpanStartAt#1"
       },
       "span": 1,
       "node": {
@@ -118,7 +118,7 @@ export interface Q {
         "start": 0,
         "end": 1
       },
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 16,
@@ -127,7 +127,7 @@ export interface Q {
       },
       "span": 1,
       "node": null,
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 16,
@@ -140,7 +140,7 @@ export interface Q {
         "start": 0,
         "end": 1
       },
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 16,
@@ -153,7 +153,7 @@ export interface Q {
         "start": 0,
         "end": 1
       },
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 16,
@@ -162,13 +162,13 @@ export interface Q {
       },
       "span": 1,
       "node": null,
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 16,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStartAt#2"
+        "kind": "journal_event",
+        "event": "SpanStartAt#2"
       },
       "span": 2,
       "node": {
@@ -176,7 +176,7 @@ export interface Q {
         "start": 0,
         "end": 1
       },
-      "effect_len": 4
+      "journal_len": 4
     },
     {
       "ip": 8,
@@ -185,7 +185,7 @@ export interface Q {
       },
       "span": 2,
       "node": null,
-      "effect_len": 4
+      "journal_len": 4
     },
     {
       "ip": 8,
@@ -198,7 +198,7 @@ export interface Q {
         "start": 0,
         "end": 1
       },
-      "effect_len": 4
+      "journal_len": 4
     },
     {
       "ip": 8,
@@ -211,7 +211,7 @@ export interface Q {
         "start": 0,
         "end": 1
       },
-      "effect_len": 4
+      "journal_len": 4
     },
     {
       "ip": 8,
@@ -221,7 +221,7 @@ export interface Q {
       },
       "span": 1,
       "node": null,
-      "effect_len": 3
+      "journal_len": 3
     }
   ],
   "truncated": false

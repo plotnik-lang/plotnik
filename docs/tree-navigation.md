@@ -11,13 +11,13 @@ struct VM<'t> {
     cursor: TreeCursor<'t>,          // created at tree root, never reset
     ip: StepId,                      // current step index
     frames: Vec<Frame>,              // call stack
-    effects: EffectLog<'t>,          // side-effect log
+    journal: MatchJournal<'t>,       // rollbackable match journal
     suppress_depth: u64,             // suppressive capture depth
 }
 
 struct Checkpoint {
     descendant_index: u32,             // cursor position (4 bytes)
-    effect_watermark: usize,           // effect log length
+    journal_watermark: usize,          // match journal length
     frame_index: Option<u32>,          // call stack state
     ip: StepId,                        // branch target, or the owning Call/Match
     resume: Resume,                    // Branch | Call(CallResume) | Match

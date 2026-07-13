@@ -43,7 +43,7 @@ export type QExpr =
       },
       "span": null,
       "node": null,
-      "effect_len": 0
+      "journal_len": 0
     },
     {
       "ip": 0,
@@ -52,17 +52,17 @@ export type QExpr =
       },
       "span": null,
       "node": null,
-      "effect_len": 0
+      "journal_len": 0
     },
     {
       "ip": 0,
       "event": {
-        "kind": "effect",
-        "effect": "RecordOpen"
+        "kind": "journal_event",
+        "event": "RecordOpen"
       },
       "span": null,
       "node": null,
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 2,
@@ -71,7 +71,7 @@ export type QExpr =
       },
       "span": null,
       "node": null,
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 2,
@@ -81,7 +81,7 @@ export type QExpr =
       },
       "span": null,
       "node": null,
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 37,
@@ -90,7 +90,7 @@ export type QExpr =
       },
       "span": null,
       "node": null,
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 37,
@@ -103,7 +103,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 37,
@@ -116,23 +116,23 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 1
+      "journal_len": 1
     },
     {
       "ip": 37,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStart#0"
+        "kind": "journal_event",
+        "event": "SpanStart#0"
       },
       "span": 0,
       "node": null,
-      "effect_len": 2
+      "journal_len": 2
     },
     {
       "ip": 37,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStartAt#1"
+        "kind": "journal_event",
+        "event": "SpanStartAt#1"
       },
       "span": 1,
       "node": {
@@ -140,7 +140,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 32,
@@ -149,7 +149,7 @@ export type QExpr =
       },
       "span": 1,
       "node": null,
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 32,
@@ -162,7 +162,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 32,
@@ -175,7 +175,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 32,
@@ -184,7 +184,7 @@ export type QExpr =
       },
       "span": 1,
       "node": null,
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 32,
@@ -193,7 +193,7 @@ export type QExpr =
       },
       "span": 1,
       "node": null,
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 24,
@@ -202,7 +202,7 @@ export type QExpr =
       },
       "span": 1,
       "node": null,
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 24,
@@ -215,7 +215,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 24,
@@ -228,43 +228,43 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 24,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStart#3"
+        "kind": "journal_event",
+        "event": "SpanStart#3"
       },
       "span": 3,
       "node": null,
-      "effect_len": 4
+      "journal_len": 4
     },
     {
       "ip": 24,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStart#4"
+        "kind": "journal_event",
+        "event": "SpanStart#4"
       },
       "span": 4,
       "node": null,
-      "effect_len": 5
+      "journal_len": 5
     },
     {
       "ip": 24,
       "event": {
-        "kind": "effect",
-        "effect": "VariantOpen \"Bad\""
+        "kind": "journal_event",
+        "event": "VariantOpen \"Bad\""
       },
       "span": 4,
       "node": null,
-      "effect_len": 6
+      "journal_len": 6
     },
     {
       "ip": 24,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStartAt#5"
+        "kind": "journal_event",
+        "event": "SpanStartAt#5"
       },
       "span": 5,
       "node": {
@@ -272,7 +272,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 7
+      "journal_len": 7
     },
     {
       "ip": 8,
@@ -281,7 +281,7 @@ export type QExpr =
       },
       "span": 5,
       "node": null,
-      "effect_len": 7
+      "journal_len": 7
     },
     {
       "ip": 8,
@@ -294,7 +294,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 7
+      "journal_len": 7
     },
     {
       "ip": 8,
@@ -307,7 +307,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 7
+      "journal_len": 7
     },
     {
       "ip": 8,
@@ -317,7 +317,7 @@ export type QExpr =
       },
       "span": 1,
       "node": null,
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 27,
@@ -326,7 +326,7 @@ export type QExpr =
       },
       "span": 1,
       "node": null,
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 27,
@@ -339,7 +339,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 27,
@@ -352,43 +352,43 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 3
+      "journal_len": 3
     },
     {
       "ip": 27,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStart#3"
+        "kind": "journal_event",
+        "event": "SpanStart#3"
       },
       "span": 3,
       "node": null,
-      "effect_len": 4
+      "journal_len": 4
     },
     {
       "ip": 27,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStart#8"
+        "kind": "journal_event",
+        "event": "SpanStart#8"
       },
       "span": 8,
       "node": null,
-      "effect_len": 5
+      "journal_len": 5
     },
     {
       "ip": 27,
       "event": {
-        "kind": "effect",
-        "effect": "VariantOpen \"Good\""
+        "kind": "journal_event",
+        "event": "VariantOpen \"Good\""
       },
       "span": 8,
       "node": null,
-      "effect_len": 6
+      "journal_len": 6
     },
     {
       "ip": 27,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStartAt#9"
+        "kind": "journal_event",
+        "event": "SpanStartAt#9"
       },
       "span": 9,
       "node": {
@@ -396,7 +396,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 7
+      "journal_len": 7
     },
     {
       "ip": 16,
@@ -405,7 +405,7 @@ export type QExpr =
       },
       "span": 9,
       "node": null,
-      "effect_len": 7
+      "journal_len": 7
     },
     {
       "ip": 16,
@@ -418,7 +418,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 7
+      "journal_len": 7
     },
     {
       "ip": 16,
@@ -431,7 +431,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 7
+      "journal_len": 7
     },
     {
       "ip": 16,
@@ -440,13 +440,13 @@ export type QExpr =
       },
       "span": 9,
       "node": null,
-      "effect_len": 7
+      "journal_len": 7
     },
     {
       "ip": 16,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStartAt#11"
+        "kind": "journal_event",
+        "event": "SpanStartAt#11"
       },
       "span": 11,
       "node": {
@@ -454,23 +454,23 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 8
+      "journal_len": 8
     },
     {
       "ip": 16,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStart#10"
+        "kind": "journal_event",
+        "event": "SpanStart#10"
       },
       "span": 10,
       "node": null,
-      "effect_len": 9
+      "journal_len": 9
     },
     {
       "ip": 16,
       "event": {
-        "kind": "effect",
-        "effect": "Node"
+        "kind": "journal_event",
+        "event": "Node"
       },
       "span": 10,
       "node": {
@@ -478,37 +478,37 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 10
+      "journal_len": 10
     },
     {
       "ip": 16,
       "event": {
-        "kind": "effect",
-        "effect": "RecordSet \"good\""
+        "kind": "journal_event",
+        "event": "RecordSet \"good\""
       },
       "span": 10,
       "node": null,
-      "effect_len": 11
+      "journal_len": 11
     },
     {
       "ip": 16,
       "event": {
-        "kind": "effect",
-        "effect": "SpanEnd#10"
+        "kind": "journal_event",
+        "event": "SpanEnd#10"
       },
       "span": 10,
       "node": null,
-      "effect_len": 12
+      "journal_len": 12
     },
     {
       "ip": 16,
       "event": {
-        "kind": "effect",
-        "effect": "SpanEnd#11"
+        "kind": "journal_event",
+        "event": "SpanEnd#11"
       },
       "span": 11,
       "node": null,
-      "effect_len": 13
+      "journal_len": 13
     },
     {
       "ip": 19,
@@ -517,7 +517,7 @@ export type QExpr =
       },
       "span": 9,
       "node": null,
-      "effect_len": 13
+      "journal_len": 13
     },
     {
       "ip": 19,
@@ -530,7 +530,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 13
+      "journal_len": 13
     },
     {
       "ip": 19,
@@ -543,47 +543,47 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 13
+      "journal_len": 13
     },
     {
       "ip": 19,
       "event": {
-        "kind": "effect",
-        "effect": "SpanEnd#9"
+        "kind": "journal_event",
+        "event": "SpanEnd#9"
       },
       "span": 9,
       "node": null,
-      "effect_len": 14
+      "journal_len": 14
     },
     {
       "ip": 19,
       "event": {
-        "kind": "effect",
-        "effect": "VariantClose"
+        "kind": "journal_event",
+        "event": "VariantClose"
       },
       "span": 8,
       "node": null,
-      "effect_len": 15
+      "journal_len": 15
     },
     {
       "ip": 19,
       "event": {
-        "kind": "effect",
-        "effect": "SpanEnd#8"
+        "kind": "journal_event",
+        "event": "SpanEnd#8"
       },
       "span": 8,
       "node": null,
-      "effect_len": 16
+      "journal_len": 16
     },
     {
       "ip": 19,
       "event": {
-        "kind": "effect",
-        "effect": "SpanEnd#3"
+        "kind": "journal_event",
+        "event": "SpanEnd#3"
       },
       "span": 3,
       "node": null,
-      "effect_len": 17
+      "journal_len": 17
     },
     {
       "ip": 34,
@@ -592,7 +592,7 @@ export type QExpr =
       },
       "span": 1,
       "node": null,
-      "effect_len": 17
+      "journal_len": 17
     },
     {
       "ip": 34,
@@ -605,7 +605,7 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 17
+      "journal_len": 17
     },
     {
       "ip": 34,
@@ -618,57 +618,57 @@ export type QExpr =
         "start": 0,
         "end": 1
       },
-      "effect_len": 17
+      "journal_len": 17
     },
     {
       "ip": 34,
       "event": {
-        "kind": "effect",
-        "effect": "SpanStart#2"
+        "kind": "journal_event",
+        "event": "SpanStart#2"
       },
       "span": 2,
       "node": null,
-      "effect_len": 18
+      "journal_len": 18
     },
     {
       "ip": 34,
       "event": {
-        "kind": "effect",
-        "effect": "RecordSet \"expr\""
+        "kind": "journal_event",
+        "event": "RecordSet \"expr\""
       },
       "span": 2,
       "node": null,
-      "effect_len": 19
+      "journal_len": 19
     },
     {
       "ip": 34,
       "event": {
-        "kind": "effect",
-        "effect": "SpanEnd#2"
+        "kind": "journal_event",
+        "event": "SpanEnd#2"
       },
       "span": 2,
       "node": null,
-      "effect_len": 20
+      "journal_len": 20
     },
     {
       "ip": 34,
       "event": {
-        "kind": "effect",
-        "effect": "SpanEnd#1"
+        "kind": "journal_event",
+        "event": "SpanEnd#1"
       },
       "span": 1,
       "node": null,
-      "effect_len": 21
+      "journal_len": 21
     },
     {
       "ip": 34,
       "event": {
-        "kind": "effect",
-        "effect": "SpanEnd#0"
+        "kind": "journal_event",
+        "event": "SpanEnd#0"
       },
       "span": 0,
       "node": null,
-      "effect_len": 22
+      "journal_len": 22
     },
     {
       "ip": 22,
@@ -677,7 +677,7 @@ export type QExpr =
       },
       "span": null,
       "node": null,
-      "effect_len": 22
+      "journal_len": 22
     },
     {
       "ip": 22,
@@ -686,7 +686,7 @@ export type QExpr =
       },
       "span": null,
       "node": null,
-      "effect_len": 22
+      "journal_len": 22
     },
     {
       "ip": 3,
@@ -695,17 +695,17 @@ export type QExpr =
       },
       "span": null,
       "node": null,
-      "effect_len": 22
+      "journal_len": 22
     },
     {
       "ip": 3,
       "event": {
-        "kind": "effect",
-        "effect": "RecordClose"
+        "kind": "journal_event",
+        "event": "RecordClose"
       },
       "span": null,
       "node": null,
-      "effect_len": 23
+      "journal_len": 23
     },
     {
       "ip": 5,
@@ -714,7 +714,7 @@ export type QExpr =
       },
       "span": null,
       "node": null,
-      "effect_len": 23
+      "journal_len": 23
     },
     {
       "ip": 5,
@@ -723,7 +723,7 @@ export type QExpr =
       },
       "span": null,
       "node": null,
-      "effect_len": 23
+      "journal_len": 23
     }
   ],
   "truncated": false

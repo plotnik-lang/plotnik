@@ -214,13 +214,13 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         );
         let _ = writeln!(
             out,
-            "        let Some(log) = matcher::{safe}(tree, source)? else {{"
+            "        let Some(journal) = matcher::{safe}(tree, source)? else {{"
         );
         let _ = writeln!(out, "            return Ok(None);");
         let _ = writeln!(out, "        }};");
         let _ = writeln!(
             out,
-            "        let mut t = rt::TraceReader::new(&log, source);"
+            "        let mut t = rt::TraceReader::new(&journal, source);"
         );
         if fallible_reader {
             let _ = writeln!(

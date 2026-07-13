@@ -10,8 +10,8 @@ use crate::bytecode::{
 use crate::core::NodeFieldId;
 
 use plotnik_rt::{
-    CallResume, Checkpoint, EffectLog, Engine, ResolvedRuntimeLimits, Resume, ReturnOutcome,
-    RuntimeEffect, RuntimeLimitSpec, SkipPolicy,
+    CallResume, Checkpoint, Engine, JournalEvent, MatchJournal, ResolvedRuntimeLimits, Resume,
+    ReturnOutcome, RuntimeLimitSpec, SkipPolicy,
 };
 
 use super::error::{ControlFlow, RuntimeError, Signal};
@@ -34,7 +34,7 @@ pub struct RunStats {
 
 /// Virtual machine state for query execution.
 ///
-/// The engine core — cursor, frames, checkpoints, effect log, suppression —
+/// The engine core — cursor, frames, checkpoints, match journal, suppression —
 /// lives in [`plotnik_rt::Engine`], shared with generated matchers so the
 /// checkpoint contract stays single-sourced. The VM keeps only the
 /// interpretive layer: the instruction pointer into decoded bytecode and the
@@ -98,7 +98,7 @@ impl<'t> VM<'t> {
         Checkpoint::call_retry(self.engine.checkpoint_state(), call_ip, resume)
     }
 
-    /// Execute query from entrypoint, returning effect log.
+    /// Execute a query from an entrypoint, returning its committed match journal.
     ///
     /// This is a convenience method that uses `NoopTracer`, which gets
     /// completely optimized away at compile time.
@@ -106,7 +106,7 @@ impl<'t> VM<'t> {
         self,
         module: &Module,
         entrypoint: &Entrypoint,
-    ) -> Result<EffectLog<'t>, RuntimeError> {
+    ) -> Result<MatchJournal<'t>, RuntimeError> {
         self.execute_with(module, entrypoint, &mut NoopTracer)
     }
 
@@ -120,7 +120,7 @@ impl<'t> VM<'t> {
         module: &Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
-    ) -> Result<EffectLog<'t>, RuntimeError> {
+    ) -> Result<MatchJournal<'t>, RuntimeError> {
         let (result, _) = self.execute_with_stats(module, entrypoint, tracer);
         result
     }
@@ -131,7 +131,7 @@ impl<'t> VM<'t> {
         module: &Module,
         entrypoint: &Entrypoint,
         tracer: &mut T,
-    ) -> (Result<EffectLog<'t>, RuntimeError>, RunStats) {
+    ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
         self.ip = u16::from(entrypoint.target());
         if T::ENABLED {
             tracer.trace_enter_entrypoint(self.ip);
@@ -196,7 +196,7 @@ impl<'t> VM<'t> {
                 Ok(()) | Err(Signal::Flow(ControlFlow::Backtracked)) => continue,
                 Err(Signal::Flow(ControlFlow::Accept)) => {
                     let stats = self.finish_stats(&mut heap_high_water);
-                    return (Ok(self.engine.into_effects()), stats);
+                    return (Ok(self.engine.into_journal()), stats);
                 }
                 Err(Signal::Error(e)) => {
                     let stats = self.finish_stats(&mut heap_high_water);
@@ -753,7 +753,7 @@ impl<'t> VM<'t> {
         use crate::bytecode::EffectSuppression;
         use EffectKind::*;
 
-        let effect = match op.kind.suppression() {
+        let event = match op.kind.suppression() {
             EffectSuppression::Control => match op.kind {
                 SuppressBegin => {
                     let was_suppressed = self.engine.suppress_begin();
@@ -776,21 +776,21 @@ impl<'t> VM<'t> {
                     let logged = self.engine.scalar_mark();
                     if T::ENABLED {
                         match logged {
-                            Some(effect) => tracer.trace_effect(effect),
+                            Some(event) => tracer.trace_journal_event(event),
                             None => tracer.trace_effect_suppressed(op.kind, op.payload),
                         }
                     }
                     return;
                 }
-                SpanStartAt => RuntimeEffect::SpanStart {
+                SpanStartAt => JournalEvent::SpanStart {
                     id: op.payload as u16,
                     node: Some(self.engine.node()),
                 },
-                SpanStart => RuntimeEffect::SpanStart {
+                SpanStart => JournalEvent::SpanStart {
                     id: op.payload as u16,
                     node: None,
                 },
-                SpanEnd => RuntimeEffect::SpanEnd(op.payload as u16),
+                SpanEnd => JournalEvent::SpanEnd(op.payload as u16),
                 _ => unreachable!("bypass metadata only classifies spans and scalar marks"),
             },
             EffectSuppression::Data => {
@@ -802,16 +802,16 @@ impl<'t> VM<'t> {
                     NodeBool => self.engine.node_bool(),
                     BoolValue => self.engine.bool_value(op.payload != 0),
                     _ => self.engine.emit_data(|cursor| match op.kind {
-                        Node => RuntimeEffect::Node(cursor.node()),
-                        ListOpen => RuntimeEffect::ListOpen,
-                        ArrayPush => RuntimeEffect::ArrayPush,
-                        ListClose => RuntimeEffect::ListClose,
-                        RecordOpen => RuntimeEffect::RecordOpen,
-                        RecordClose => RuntimeEffect::RecordClose,
-                        RecordSet => RuntimeEffect::RecordSet(op.payload as u16),
-                        VariantOpen => RuntimeEffect::VariantOpen(op.payload as u16),
-                        VariantClose => RuntimeEffect::VariantClose,
-                        Absent => RuntimeEffect::Absent,
+                        Node => JournalEvent::Node(cursor.node()),
+                        ListOpen => JournalEvent::ListOpen,
+                        ArrayPush => JournalEvent::ArrayPush,
+                        ListClose => JournalEvent::ListClose,
+                        RecordOpen => JournalEvent::RecordOpen,
+                        RecordClose => JournalEvent::RecordClose,
+                        RecordSet => JournalEvent::RecordSet(op.payload as u16),
+                        VariantOpen => JournalEvent::VariantOpen(op.payload as u16),
+                        VariantClose => JournalEvent::VariantClose,
+                        Absent => JournalEvent::Absent,
                         SuppressBegin | SuppressEnd | SpanStartAt | SpanStart | SpanEnd
                         | ScalarOpen | ScalarMark | StrClose | BoolClose | NodeStr | NodeBool
                         | BoolValue => {
@@ -821,7 +821,7 @@ impl<'t> VM<'t> {
                 };
                 if T::ENABLED {
                     match logged {
-                        Some(effect) => tracer.trace_effect(effect),
+                        Some(event) => tracer.trace_journal_event(event),
                         None => tracer.trace_effect_suppressed(op.kind, op.payload),
                     }
                 }
@@ -830,8 +830,8 @@ impl<'t> VM<'t> {
         };
 
         if T::ENABLED {
-            tracer.trace_effect(&effect);
+            tracer.trace_journal_event(&event);
         }
-        self.engine.emit_span(effect);
+        self.engine.emit_span(event);
     }
 }

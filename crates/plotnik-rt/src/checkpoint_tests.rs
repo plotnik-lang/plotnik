@@ -11,7 +11,7 @@ fn cp(frame_index: Option<u32>) -> Checkpoint {
     Checkpoint::branch(
         CheckpointState {
             descendant_index: 0,
-            effect_watermark: 0,
+            journal_watermark: 0,
             frame_index,
             recursion_depth: 0,
             effect_depths: EffectDepths::new(0, 0),
@@ -115,7 +115,7 @@ fn interleaved_push_pop() {
 fn suppress_depth_outranges_u16() {
     let state = CheckpointState {
         descendant_index: 0,
-        effect_watermark: 0,
+        journal_watermark: 0,
         frame_index: None,
         recursion_depth: 0,
         effect_depths: EffectDepths::new(u32::from(u16::MAX) + 1, 0),

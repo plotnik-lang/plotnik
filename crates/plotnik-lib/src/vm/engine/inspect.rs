@@ -1,11 +1,11 @@
-//! Extract inspection joins from a winning VM effect log.
+//! Extract inspection joins from a winning match journal.
 
 use serde::Serialize;
 use tree_sitter::Node;
 
 use crate::bytecode::{Module, SpanKind};
 
-use plotnik_rt::RuntimeEffect;
+use plotnik_rt::JournalEvent;
 
 #[derive(Debug, Serialize)]
 pub struct Inspection {
@@ -25,7 +25,7 @@ pub struct InspectionEntry {
 #[derive(Debug, Serialize)]
 pub struct Binding {
     /// JSON-pointer-style path of the bound value, relative to the builder
-    /// frames open when the binding effect fired. Not absolute: a container
+    /// frames open when the binding event fired. Not absolute: a container
     /// assigned after its close (`RecordSet`/`ArrayPush` following `ListClose` etc.)
     /// binds on its own entry, while the elements bound under indices on the
     /// entries active during construction — a consumer absolutizes by joining
@@ -64,9 +64,9 @@ impl ValueProvenance {
     }
 }
 
-pub fn extract_inspection(effects: &[RuntimeEffect<'_>], module: &Module) -> Inspection {
+pub fn extract_inspection(events: &[JournalEvent<'_>], module: &Module) -> Inspection {
     let extractor = Inspector::new(module);
-    extractor.extract(effects)
+    extractor.extract(events)
 }
 
 struct Inspector<'m> {
@@ -99,11 +99,11 @@ impl<'m> Inspector<'m> {
         }
     }
 
-    fn extract(mut self, effects: &[RuntimeEffect<'_>]) -> Inspection {
-        for (effect_idx, effect) in effects.iter().enumerate() {
-            let effect_idx = u32::try_from(effect_idx).expect("effect log index fits in u32");
-            match effect {
-                RuntimeEffect::SpanStart { id, node } => {
+    fn extract(mut self, events: &[JournalEvent<'_>]) -> Inspection {
+        for (event_idx, event) in events.iter().enumerate() {
+            let event_idx = u32::try_from(event_idx).expect("journal event index fits in u32");
+            match event {
+                JournalEvent::SpanStart { id, node } => {
                     let parent = self.open.last().copied();
                     let idx = u32::try_from(self.entries.len())
                         .expect("inspection entry count fits in u32");
@@ -112,13 +112,13 @@ impl<'m> Inspector<'m> {
                         parent,
                         hull: node.map(node_hull),
                         bindings: Vec::new(),
-                        effect_range: (effect_idx, effect_idx),
+                        effect_range: (event_idx, event_idx),
                     });
                     self.open.push(idx);
                     self.record_scalar_item_owner(idx);
                 }
-                RuntimeEffect::SpanEnd(id) => self.close_span(*id, effect_idx),
-                RuntimeEffect::Node(node) => {
+                JournalEvent::SpanEnd(id) => self.close_span(*id, event_idx),
+                JournalEvent::Node(node) => {
                     self.pending = Some(ValueProvenance {
                         item_owner: self.open.last().copied(),
                         hull: Some(node_hull(*node)),
@@ -127,45 +127,45 @@ impl<'m> Inspector<'m> {
                         union_hull(&mut entry.hull, Some(node_hull(*node)));
                     }
                 }
-                RuntimeEffect::ListOpen => {
+                JournalEvent::ListOpen => {
                     let provenance = self.open_value();
                     self.frames.push(Frame::List { len: 0, provenance });
                 }
-                RuntimeEffect::ArrayPush => self.bind_push(effect_idx),
-                RuntimeEffect::ListClose => match self.frames.pop() {
+                JournalEvent::ArrayPush => self.bind_push(event_idx),
+                JournalEvent::ListClose => match self.frames.pop() {
                     Some(Frame::List { provenance, .. }) => self.pending = Some(provenance),
                     other => panic!(
                         "ListClose expects List on inspection frame stack, found {:?}",
                         frame_kind(other.as_ref())
                     ),
                 },
-                RuntimeEffect::RecordOpen => {
+                JournalEvent::RecordOpen => {
                     let provenance = self.open_value();
                     self.frames.push(Frame::Record { provenance });
                 }
-                RuntimeEffect::RecordSet(member) => self.bind_set(*member, effect_idx),
-                RuntimeEffect::RecordClose => match self.frames.pop() {
+                JournalEvent::RecordSet(member) => self.bind_set(*member, event_idx),
+                JournalEvent::RecordClose => match self.frames.pop() {
                     Some(Frame::Record { provenance }) => self.pending = Some(provenance),
                     other => panic!(
                         "RecordClose expects Record on inspection frame stack, found {:?}",
                         frame_kind(other.as_ref())
                     ),
                 },
-                RuntimeEffect::VariantOpen(member) => self.open_variant(*member, effect_idx),
-                RuntimeEffect::VariantClose => match self.frames.pop() {
+                JournalEvent::VariantOpen(member) => self.open_variant(*member, event_idx),
+                JournalEvent::VariantClose => match self.frames.pop() {
                     Some(Frame::Variant { provenance }) => self.pending = Some(provenance),
                     other => panic!(
                         "VariantClose expects Variant on inspection frame stack, found {:?}",
                         frame_kind(other.as_ref())
                     ),
                 },
-                RuntimeEffect::Absent => {
+                JournalEvent::Absent => {
                     self.pending = Some(ValueProvenance {
                         item_owner: None,
                         hull: None,
                     });
                 }
-                RuntimeEffect::NodeStr(node) | RuntimeEffect::NodeBool(node) => {
+                JournalEvent::NodeStr(node) | JournalEvent::NodeBool(node) => {
                     let hull = Some(node_hull(*node));
                     self.pending = Some(ValueProvenance {
                         item_owner: None,
@@ -175,17 +175,17 @@ impl<'m> Inspector<'m> {
                         union_hull(&mut entry.hull, hull);
                     }
                 }
-                RuntimeEffect::BoolValue(_) => {
+                JournalEvent::BoolValue(_) => {
                     self.pending = Some(ValueProvenance {
                         item_owner: None,
                         hull: None,
                     });
                 }
-                RuntimeEffect::ScalarOpen => self.scalar_frames.push(ScalarProvenance {
+                JournalEvent::ScalarOpen => self.scalar_frames.push(ScalarProvenance {
                     item_owner: None,
                     hull: None,
                 }),
-                RuntimeEffect::ScalarMark(node) => {
+                JournalEvent::ScalarMark(node) => {
                     let hull = Some(node_hull(*node));
                     for scalar in &mut self.scalar_frames {
                         union_hull(&mut scalar.hull, hull);
@@ -194,11 +194,11 @@ impl<'m> Inspector<'m> {
                         union_hull(&mut entry.hull, hull);
                     }
                 }
-                RuntimeEffect::StrClose | RuntimeEffect::BoolClose(_) => {
+                JournalEvent::StrClose | JournalEvent::BoolClose(_) => {
                     let scalar = self
                         .scalar_frames
                         .pop()
-                        .expect("scalar effect frames are balanced on the winning path");
+                        .expect("scalar event frames are balanced on the winning path");
                     self.pending = Some(ValueProvenance {
                         item_owner: scalar.item_owner,
                         hull: scalar.hull,
@@ -209,7 +209,7 @@ impl<'m> Inspector<'m> {
 
         assert!(
             self.open.is_empty(),
-            "inspection span stack must be empty after effect log"
+            "inspection span stack must be empty after the match journal"
         );
         Inspection {
             v: 1,

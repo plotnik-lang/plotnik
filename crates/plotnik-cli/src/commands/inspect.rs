@@ -206,19 +206,19 @@ fn run_payload_from_result(
     entrypoint: &plotnik_lib::bytecode::Entrypoint,
     source_code: &str,
     result: (
-        Result<plotnik_lib::EffectLog<'_>, RuntimeError>,
+        Result<plotnik_lib::MatchJournal<'_>, RuntimeError>,
         plotnik_lib::RunStats,
     ),
     trace: Option<Value>,
 ) -> RunPayload {
     let (result, stats) = result;
     match result {
-        Ok(effects) => {
+        Ok(journal) => {
             let colors = Colors::new(false);
             let value =
-                materialize_verified(source_code, module, entrypoint, effects.as_slice(), colors);
+                materialize_verified(source_code, module, entrypoint, journal.as_slice(), colors);
             let inspection = (!module.spans().is_empty())
-                .then(|| extract_inspection(effects.as_slice(), module));
+                .then(|| extract_inspection(journal.as_slice(), module));
             RunPayload {
                 value: json_value!(value),
                 inspection: json_value!(inspection),

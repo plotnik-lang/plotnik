@@ -8,7 +8,7 @@
 //! the VM enforces.
 //!
 //! Fuel bounds time-like blowup (catastrophic backtracking); memory bounds
-//! space-like blowup (unbounded checkpoint or effect growth). *Call* depth
+//! space-like blowup (unbounded checkpoint or journal growth). *Call* depth
 //! needs no ceiling of its own: backtracking is iterative, so it is pure heap —
 //! the frame arena, already part of the memory sum — not a native-stack risk.
 //!

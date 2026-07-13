@@ -2,8 +2,8 @@
 //!
 //! Hosts the pieces of query execution that are independent of *how* the query
 //! program is delivered: tree navigation ([`CursorWrapper`]), backtracking
-//! state ([`CheckpointStack`], [`FrameArena`]), the capture effect log
-//! ([`EffectLog`]), regex-predicate automata ([`RegexDfas`]), execution limits,
+//! state ([`CheckpointStack`], [`FrameArena`]), the match journal
+//! ([`MatchJournal`]), regex-predicate automata ([`RegexDfas`]), execution limits,
 //! and the type vocabulary shared with the compiler ([`Nav`], [`NodeKindId`],
 //! ...). The bytecode VM in `plotnik-lib` interprets query programs on top of
 //! these primitives; generated Rust matchers (the proc-macro backend) compile
@@ -31,9 +31,9 @@ mod checkpoint;
 #[cfg(feature = "tree-sitter")]
 mod cursor;
 #[cfg(feature = "tree-sitter")]
-mod effect;
-#[cfg(feature = "tree-sitter")]
 mod engine;
+#[cfg(feature = "tree-sitter")]
+mod journal;
 #[cfg(feature = "serde")]
 mod serialize;
 #[cfg(feature = "tree-sitter")]
@@ -47,10 +47,10 @@ mod checkpoint_tests;
 #[cfg(test)]
 mod dfa_tests;
 #[cfg(test)]
-#[cfg(feature = "tree-sitter")]
-mod effect_tests;
-#[cfg(test)]
 mod frame_tests;
+#[cfg(test)]
+#[cfg(feature = "tree-sitter")]
+mod journal_tests;
 #[cfg(test)]
 mod limits_tests;
 #[cfg(test)]
@@ -76,9 +76,9 @@ pub use checkpoint::{
 #[cfg(feature = "tree-sitter")]
 pub use cursor::CursorWrapper;
 #[cfg(feature = "tree-sitter")]
-pub use effect::{EffectLog, RuntimeEffect, node_text, source_text};
-#[cfg(feature = "tree-sitter")]
 pub use engine::Engine;
+#[cfg(feature = "tree-sitter")]
+pub use journal::{JournalEvent, MatchJournal, node_text, source_text};
 #[cfg(feature = "serde")]
 pub use serialize::{SerializeWithSource, WithSource};
 #[cfg(feature = "tree-sitter")]

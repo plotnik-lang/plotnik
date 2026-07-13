@@ -7,7 +7,7 @@ use crate::bytecode::{EffectKind, Instruction, Module, ModuleRenderContext, Nav}
 use crate::core::NodeFieldId;
 
 use super::trace::Tracer;
-use plotnik_rt::RuntimeEffect;
+use plotnik_rt::JournalEvent;
 
 #[derive(Debug, Serialize)]
 pub struct Recording {
@@ -22,7 +22,7 @@ pub struct StepRecord {
     pub event: StepEvent,
     pub span: Option<u16>,
     pub node: Option<NodeRef>,
-    pub effect_len: u32,
+    pub journal_len: u32,
 }
 
 #[derive(Debug, Serialize)]
@@ -38,6 +38,7 @@ pub enum StepEvent {
     PredicateFail,
     NegFieldFail,
     Effect { effect: String },
+    JournalEvent { event: String },
     SuppressedEffect { effect: String },
     Call { target: u16 },
     Return,
@@ -55,7 +56,7 @@ pub struct NodeRef {
 
 struct Shadow {
     span_depth: usize,
-    effect_len: u32,
+    journal_len: u32,
     record_idx: u32,
 }
 
@@ -67,7 +68,7 @@ pub struct RecordingTracer {
     max_records: usize,
     truncated: bool,
     current_ip: u16,
-    effect_len: u32,
+    journal_len: u32,
     records_seen: u32,
 }
 
@@ -81,7 +82,7 @@ impl RecordingTracer {
             max_records,
             truncated: false,
             current_ip: 0,
-            effect_len: 0,
+            journal_len: 0,
             records_seen: 0,
         }
     }
@@ -111,7 +112,7 @@ impl RecordingTracer {
                 event,
                 span: self.span_stack.last().copied(),
                 node,
-                effect_len: self.effect_len,
+                journal_len: self.journal_len,
             });
         } else {
             self.truncated = true;
@@ -127,11 +128,11 @@ impl RecordingTracer {
         self.steps.len() < self.max_records
     }
 
-    fn bump_effect_len(&mut self) {
-        self.effect_len = self
-            .effect_len
+    fn bump_journal_len(&mut self) {
+        self.journal_len = self
+            .journal_len
             .checked_add(1)
-            .expect("effect log length fits in u32");
+            .expect("match journal length fits in u32");
     }
 
     fn member_name(&self, idx: u16) -> &str {
@@ -140,37 +141,37 @@ impl RecordingTracer {
             .expect("effect member index names a type member")
     }
 
-    fn format_runtime_effect(&self, effect: &RuntimeEffect<'_>) -> String {
-        match effect {
-            RuntimeEffect::Node(_) => "Node".to_string(),
-            RuntimeEffect::ListOpen => "ListOpen".to_string(),
-            RuntimeEffect::ArrayPush => "ArrayPush".to_string(),
-            RuntimeEffect::ListClose => "ListClose".to_string(),
-            RuntimeEffect::RecordOpen => "RecordOpen".to_string(),
-            RuntimeEffect::RecordClose => "RecordClose".to_string(),
-            RuntimeEffect::RecordSet(idx) => {
+    fn format_journal_event(&self, event: &JournalEvent<'_>) -> String {
+        match event {
+            JournalEvent::Node(_) => "Node".to_string(),
+            JournalEvent::ListOpen => "ListOpen".to_string(),
+            JournalEvent::ArrayPush => "ArrayPush".to_string(),
+            JournalEvent::ListClose => "ListClose".to_string(),
+            JournalEvent::RecordOpen => "RecordOpen".to_string(),
+            JournalEvent::RecordClose => "RecordClose".to_string(),
+            JournalEvent::RecordSet(idx) => {
                 format!("RecordSet \"{}\"", self.member_name(*idx))
             }
-            RuntimeEffect::VariantOpen(idx) => {
+            JournalEvent::VariantOpen(idx) => {
                 format!("VariantOpen \"{}\"", self.member_name(*idx))
             }
-            RuntimeEffect::VariantClose => "VariantClose".to_string(),
-            RuntimeEffect::Absent => "Absent".to_string(),
-            RuntimeEffect::ScalarOpen => "ScalarOpen".to_string(),
-            RuntimeEffect::ScalarMark(_) => "ScalarMark".to_string(),
-            RuntimeEffect::StrClose => "StrClose".to_string(),
-            RuntimeEffect::BoolClose(value) => format!("BoolClose({value})"),
-            RuntimeEffect::NodeStr(_) => "NodeStr".to_string(),
-            RuntimeEffect::NodeBool(_) => "NodeBool".to_string(),
-            RuntimeEffect::BoolValue(value) => format!("BoolValue({value})"),
-            RuntimeEffect::SpanStart { id, node } => {
+            JournalEvent::VariantClose => "VariantClose".to_string(),
+            JournalEvent::Absent => "Absent".to_string(),
+            JournalEvent::ScalarOpen => "ScalarOpen".to_string(),
+            JournalEvent::ScalarMark(_) => "ScalarMark".to_string(),
+            JournalEvent::StrClose => "StrClose".to_string(),
+            JournalEvent::BoolClose(value) => format!("BoolClose({value})"),
+            JournalEvent::NodeStr(_) => "NodeStr".to_string(),
+            JournalEvent::NodeBool(_) => "NodeBool".to_string(),
+            JournalEvent::BoolValue(value) => format!("BoolValue({value})"),
+            JournalEvent::SpanStart { id, node } => {
                 if node.is_some() {
                     format!("SpanStartAt#{id}")
                 } else {
                     format!("SpanStart#{id}")
                 }
             }
-            RuntimeEffect::SpanEnd(id) => format!("SpanEnd#{id}"),
+            JournalEvent::SpanEnd(id) => format!("SpanEnd#{id}"),
         }
     }
 
@@ -205,12 +206,12 @@ impl RecordingTracer {
         }
     }
 
-    fn effect_node(effect: &RuntimeEffect<'_>) -> Option<NodeRef> {
-        match effect {
-            RuntimeEffect::Node(node) => Some(node_ref(*node)),
-            RuntimeEffect::ScalarMark(node) => Some(node_ref(*node)),
-            RuntimeEffect::NodeStr(node) | RuntimeEffect::NodeBool(node) => Some(node_ref(*node)),
-            RuntimeEffect::SpanStart {
+    fn event_node(event: &JournalEvent<'_>) -> Option<NodeRef> {
+        match event {
+            JournalEvent::Node(node) => Some(node_ref(*node)),
+            JournalEvent::ScalarMark(node) => Some(node_ref(*node)),
+            JournalEvent::NodeStr(node) | JournalEvent::NodeBool(node) => Some(node_ref(*node)),
+            JournalEvent::SpanStart {
                 node: Some(node), ..
             } => Some(node_ref(*node)),
             _ => None,
@@ -256,32 +257,22 @@ impl Tracer for RecordingTracer {
         self.add_record(StepEvent::NegFieldFail, Some(node_ref(node)));
     }
 
-    fn trace_effect(&mut self, effect: &RuntimeEffect<'_>) {
-        let effect_name = if self.keeps_records() {
-            self.format_runtime_effect(effect)
+    fn trace_journal_event(&mut self, event: &JournalEvent<'_>) {
+        let event_name = if self.keeps_records() {
+            self.format_journal_event(event)
         } else {
             String::new()
         };
-        let node = Self::effect_node(effect);
-        self.bump_effect_len();
+        let node = Self::event_node(event);
+        self.bump_journal_len();
 
-        match effect {
-            RuntimeEffect::SpanStart { id, .. } => {
+        match event {
+            JournalEvent::SpanStart { id, .. } => {
                 self.span_stack.push(*id);
-                self.add_record(
-                    StepEvent::Effect {
-                        effect: effect_name,
-                    },
-                    node,
-                );
+                self.add_record(StepEvent::JournalEvent { event: event_name }, node);
             }
-            RuntimeEffect::SpanEnd(id) => {
-                self.add_record(
-                    StepEvent::Effect {
-                        effect: effect_name,
-                    },
-                    node,
-                );
+            JournalEvent::SpanEnd(id) => {
+                self.add_record(StepEvent::JournalEvent { event: event_name }, node);
                 let popped = self
                     .span_stack
                     .pop()
@@ -289,12 +280,7 @@ impl Tracer for RecordingTracer {
                 assert_eq!(popped, *id, "recording span stack must be balanced");
             }
             _ => {
-                self.add_record(
-                    StepEvent::Effect {
-                        effect: effect_name,
-                    },
-                    node,
-                );
+                self.add_record(StepEvent::JournalEvent { event: event_name }, node);
             }
         }
     }
@@ -334,7 +320,7 @@ impl Tracer for RecordingTracer {
         let record_idx = self.add_record_at(ip, StepEvent::CheckpointNew, None);
         self.shadow.push(Shadow {
             span_depth: self.span_stack.len(),
-            effect_len: self.effect_len,
+            journal_len: self.journal_len,
             record_idx,
         });
     }
@@ -345,9 +331,9 @@ impl Tracer for RecordingTracer {
             .pop()
             .expect("trace_backtrack requires a matching checkpoint");
         self.span_stack.truncate(shadow.span_depth);
-        // The VM truncates its effect log to the checkpoint's watermark on
-        // restore; mirror that so effect_len keeps indexing the real log.
-        self.effect_len = shadow.effect_len;
+        // The VM truncates its match journal to the checkpoint's watermark on
+        // restore; mirror that so `journal_len` keeps indexing the real journal.
+        self.journal_len = shadow.journal_len;
         self.add_record(
             StepEvent::Backtrack {
                 to_step: shadow.record_idx,

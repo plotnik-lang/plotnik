@@ -1,7 +1,7 @@
 //! Runtime engine for executing compiled Plotnik queries.
 //!
 //! The VM executes bytecode against tree-sitter syntax trees,
-//! producing an effect log that can be materialized into output values.
+//! producing a match journal that can be materialized into output values.
 
 mod error;
 mod inspect;
@@ -12,10 +12,10 @@ mod value;
 mod verify;
 mod vm;
 
-// Navigation, checkpoints, frames, the effect log, and limits live in
+// Navigation, checkpoints, frames, the match journal, and limits live in
 // `plotnik-rt`, shared with the generated-code backend; re-exported so the
 // crate-facing paths stay `vm::...`.
-pub use plotnik_rt::{EffectLog, Limit, ResolvedRuntimeLimits, RuntimeEffect, RuntimeLimitSpec};
+pub use plotnik_rt::{JournalEvent, Limit, MatchJournal, ResolvedRuntimeLimits, RuntimeLimitSpec};
 
 pub use error::RuntimeError;
 pub use inspect::{Binding, Inspection, InspectionEntry, extract_inspection};
