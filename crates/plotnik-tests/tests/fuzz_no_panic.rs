@@ -76,7 +76,7 @@ fn parse_js(source: &str) -> Tree {
     parser.parse(source, None).expect("parse source")
 }
 
-/// Run the full untrusted pipeline for every entrypoint: execute (auto limits),
+/// Run the full untrusted pipeline for every entry point: execute (auto limits),
 /// and on a match materialize + format + drop the value. Any panic or overflow
 /// here fails the property.
 fn exercise_pipeline(module: &Module, source: &str) {
@@ -84,7 +84,7 @@ fn exercise_pipeline(module: &Module, source: &str) {
     for i in 0..module.entry_point_count() {
         let entry = module
             .entry_point_at(i)
-            .expect("entrypoint_count bounds entrypoint_at");
+            .expect("entry_point_count bounds entry_point_at");
         let vm = VM::builder(source, &tree).build();
         if let Ok(effects) = vm.execute(module, &entry) {
             let value = materialize_verified(

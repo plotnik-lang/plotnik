@@ -23,7 +23,7 @@ fn compile(src: &str) -> Module {
 
 fn module_and_entry() -> (Module, EntryPoint) {
     let module = compile("Q = (program (expression_statement (identifier) @id))");
-    let entry = module.entry_point("Q").expect("Q entrypoint exists");
+    let entry = module.entry_point("Q").expect("Q entry point exists");
     (module, entry)
 }
 

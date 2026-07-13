@@ -105,8 +105,8 @@ pub trait Tracer {
     /// (the checkpoint's `recursion_depth`, before the cursor/frames are reset).
     fn trace_backtrack(&mut self, depth: u32);
 
-    /// Called when entering an entrypoint (for section labels).
-    fn trace_enter_entrypoint(&mut self, target_ip: CodeAddr);
+    /// Called when entering an entry point (for section labels).
+    fn trace_enter_entry_point(&mut self, target_ip: CodeAddr);
 }
 
 /// No-op tracer that gets optimized away completely.
@@ -164,7 +164,7 @@ impl Tracer for NoopTracer {
     fn trace_backtrack(&mut self, _depth: u32) {}
 
     #[inline(always)]
-    fn trace_enter_entrypoint(&mut self, _target_ip: CodeAddr) {}
+    fn trace_enter_entry_point(&mut self, _target_ip: CodeAddr) {}
 }
 
 pub struct PrintTracer<'s> {
@@ -327,7 +327,7 @@ impl<'s> PrintTracer<'s> {
         self.render.member_name(idx).unwrap_or("?")
     }
 
-    /// The definition name for a call or entry target. Only entrypoints carry a
+    /// The definition name for a call or entry target. Only entry points carry a
     /// name; a call into an internal body (or an entry that isn't a named
     /// definition) falls back to its address `@{ip}`, exactly as the bytecode
     /// dump renders the same target.
@@ -679,7 +679,7 @@ impl Tracer for PrintTracer<'_> {
             (false, ReturnOutcome::Matched) => "",
             (false, ReturnOutcome::Zero) => "zero",
             (true, ReturnOutcome::Zero) => {
-                unreachable!("entrypoint zero returns are rejected during module validation")
+                unreachable!("entry point zero returns are rejected during module validation")
             }
         };
         self.add_instruction(ip, trace::RETURN, &content, successor);
@@ -714,7 +714,7 @@ impl Tracer for PrintTracer<'_> {
         self.lines.push(line);
     }
 
-    fn trace_enter_entrypoint(&mut self, target_ip: CodeAddr) {
+    fn trace_enter_entry_point(&mut self, target_ip: CodeAddr) {
         let name = self.def_ref_name(target_ip);
         self.push_def_header(&name);
         self.call_stack.push(name);

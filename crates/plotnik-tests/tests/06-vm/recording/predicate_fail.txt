@@ -18,7 +18,7 @@ export interface Q {
     {
       "ip": 0,
       "event": {
-        "kind": "enter_entrypoint",
+        "kind": "enter_entry_point",
         "target": 0
       },
       "span": null,

@@ -231,7 +231,7 @@ fn bench_scenarios(c: &mut Criterion) {
         let module = compile(s.query);
         let entry = module
             .entry_point(s.entry)
-            .expect("bench entrypoint exists");
+            .expect("bench entry point exists");
         let mut group = c.benchmark_group(s.name);
         for (size_name, source) in corpora_for(s.name) {
             let source: &str = source;
@@ -262,7 +262,7 @@ fn bench_scan_execute(c: &mut Criterion) {
     let module = compile(s.query);
     let entry = module
         .entry_point(s.entry)
-        .expect("bench entrypoint exists");
+        .expect("bench entry point exists");
     let source: &str = &MEDIUM;
     let tree = parse_js(source);
     let mut group = c.benchmark_group("scan_rows_execute");
@@ -287,7 +287,7 @@ fn bench_backtrack_storm(c: &mut Criterion) {
     let module = compile("Missing = (program {(_)* (debugger_statement)})");
     let entry = module
         .entry_point("Missing")
-        .expect("bench entrypoint exists");
+        .expect("bench entry point exists");
     let source: &str = &SMALL;
     let tree = parse_js(source);
     let mut group = c.benchmark_group("backtrack_storm");

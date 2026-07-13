@@ -11,7 +11,7 @@ use crate::core::Colors;
 use super::Value;
 
 /// Panics with a pretty diagnostic if the value doesn't match the declared type.
-/// `declared_type` should be the `result_type` from the entrypoint that was executed.
+/// `declared_type` should be the `result_type` from the entry point that was executed.
 /// No-op in release builds.
 #[cfg(debug_assertions)]
 pub fn debug_verify_type(value: &Value, declared_type: TypeId, module: &Module, colors: Colors) {
@@ -341,10 +341,10 @@ fn panic_with_mismatch(
     const WIDTH: usize = 80;
     let separator = "=".repeat(WIDTH);
 
-    let entrypoints = module.entry_points();
+    let entry_points = module.entry_points();
     let strings = module.strings();
 
-    let type_name = entrypoints
+    let type_name = entry_points
         .iter()
         .find_map(|e| {
             if e.result_type() == declared_type {

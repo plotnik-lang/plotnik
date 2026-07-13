@@ -33,7 +33,7 @@ impl<'a> ValueMaterializer<'a> {
 }
 
 /// Materialize the journal events into a [`Value`], then check it against the
-/// entrypoint's declared type.
+/// entry point's declared type.
 ///
 /// The type check is the trailing half of materialization, not an optional
 /// follow-up: it catches materializer/typegen drift and compiles to a no-op in
@@ -42,13 +42,13 @@ impl<'a> ValueMaterializer<'a> {
 pub fn materialize_verified<'s>(
     source: &'s str,
     module: &'s Module,
-    entrypoint: &EntryPoint,
+    entry_point: &EntryPoint,
     events: &[JournalEvent<'_>],
     colors: Colors,
 ) -> Value<'s> {
     let materializer = ValueMaterializer::new(source, module);
     let value = materializer.materialize(events);
-    debug_verify_type(&value, entrypoint.result_type(), module, colors);
+    debug_verify_type(&value, entry_point.result_type(), module, colors);
     value
 }
 

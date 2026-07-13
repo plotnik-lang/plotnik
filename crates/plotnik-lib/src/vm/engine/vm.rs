@@ -99,16 +99,16 @@ impl<'t> VM<'t> {
         Checkpoint::call_retry(self.engine.checkpoint_state(), u16::from(call_ip), resume)
     }
 
-    /// Execute a query from an entrypoint, returning its committed match journal.
+    /// Execute a query from an entry point, returning its committed match journal.
     ///
     /// This is a convenience method that uses `NoopTracer`, which gets
     /// completely optimized away at compile time.
     pub fn execute(
         self,
         module: &Module,
-        entrypoint: &EntryPoint,
+        entry_point: &EntryPoint,
     ) -> Result<MatchJournal<'t>, RuntimeError> {
-        self.execute_with(module, entrypoint, &mut NoopTracer)
+        self.execute_with(module, entry_point, &mut NoopTracer)
     }
 
     /// Execute query with a tracer for debugging.
@@ -119,10 +119,10 @@ impl<'t> VM<'t> {
     pub fn execute_with<T: Tracer>(
         self,
         module: &Module,
-        entrypoint: &EntryPoint,
+        entry_point: &EntryPoint,
         tracer: &mut T,
     ) -> Result<MatchJournal<'t>, RuntimeError> {
-        let (result, _) = self.execute_with_stats(module, entrypoint, tracer);
+        let (result, _) = self.execute_with_stats(module, entry_point, tracer);
         result
     }
 
@@ -130,12 +130,12 @@ impl<'t> VM<'t> {
     pub fn execute_with_stats<T: Tracer>(
         mut self,
         module: &Module,
-        entrypoint: &EntryPoint,
+        entry_point: &EntryPoint,
         tracer: &mut T,
     ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
-        self.ip = entrypoint.target();
+        self.ip = entry_point.target();
         if T::ENABLED {
-            tracer.trace_enter_entrypoint(self.ip);
+            tracer.trace_enter_entry_point(self.ip);
         }
 
         let mut peak_live_heap_bytes = self.engine.heap_bytes();
@@ -606,12 +606,12 @@ impl<'t> VM<'t> {
             tracer.trace_return(outcome);
         }
 
-        // If no frames, we're returning from top-level entrypoint → Accept
+        // If no frames, we're returning from the top-level entry point → Accept
         if self.engine.frames_empty() {
             assert_eq!(
                 outcome,
                 ReturnOutcome::Matched,
-                "entrypoint returned through a zero-width call continuation"
+                "entry point returned through a zero-width call continuation"
             );
             return Err(ControlFlow::Accept.into());
         }

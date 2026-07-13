@@ -40,7 +40,7 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
         }
     }
 
-    /// Assert the whole trace was consumed — the entrypoint's value is the
+    /// Assert the whole trace was consumed — the entry point's value is the
     /// entire committed stream, so leftovers mean the decoder lost sync.
     pub fn finish(self) {
         assert!(

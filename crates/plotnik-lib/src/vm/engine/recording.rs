@@ -44,7 +44,7 @@ pub enum StepEvent {
     Return,
     CheckpointNew,
     Backtrack { to_step: u32 },
-    EnterEntrypoint { target: u16 },
+    EnterEntryPoint { target: u16 },
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -347,10 +347,10 @@ impl Tracer for RecordingTracer {
         );
     }
 
-    fn trace_enter_entrypoint(&mut self, target_ip: CodeAddr) {
+    fn trace_enter_entry_point(&mut self, target_ip: CodeAddr) {
         self.current_ip = target_ip;
         self.add_record(
-            StepEvent::EnterEntrypoint {
+            StepEvent::EnterEntryPoint {
                 target: target_ip.get(),
             },
             None,

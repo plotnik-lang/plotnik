@@ -519,16 +519,16 @@ enum VmArtifacts {
 
 fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
     let tree = scenario.lang.parse(scenario.source);
-    let entrypoint = scenario
+    let entry_point = scenario
         .module
         .entry_point(scenario.entry)
-        .expect("selected definition must be an entrypoint");
+        .expect("selected definition must be an entry point");
 
     let vm = VM::builder(scenario.source, &tree).build();
 
     if matches!(scenario.mode, VmMode::Recording) {
         let mut tracer = RecordingTracer::new(scenario.module, 65_536);
-        let result = vm.execute_with(scenario.module, &entrypoint, &mut tracer);
+        let result = vm.execute_with(scenario.module, &entry_point, &mut tracer);
         let recording = tracer.finish();
         let mut recording_json =
             serde_json::to_string_pretty(&recording).expect("recording serialization cannot fail");
@@ -541,7 +541,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
                 let value = materialize_verified(
                     scenario.source,
                     scenario.module,
-                    &entrypoint,
+                    &entry_point,
                     effects.as_slice(),
                     Colors::new(false),
                 );
@@ -569,7 +569,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
         .colored(false)
         .build();
 
-    let result = vm.execute_with(scenario.module, &entrypoint, &mut tracer);
+    let result = vm.execute_with(scenario.module, &entry_point, &mut tracer);
     let trace = tracer.render();
     let (output, inspection) = match result {
         Ok(effects) => {
@@ -586,7 +586,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
             let value = materialize_verified(
                 scenario.source,
                 scenario.module,
-                &entrypoint,
+                &entry_point,
                 effects.as_slice(),
                 Colors::new(false),
             );

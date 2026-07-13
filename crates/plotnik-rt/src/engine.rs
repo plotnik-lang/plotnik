@@ -265,7 +265,7 @@ impl<'t> Engine<'t> {
     /// no live checkpoint can restore (O(1) amortized).
     ///
     /// Panics if no frame is active; executors gate on [`Engine::frames_empty`]
-    /// (an empty frame stack at Return means entrypoint acceptance).
+    /// (an empty frame stack at Return means entry point acceptance).
     pub fn exit_frame(&mut self, outcome: crate::ReturnOutcome) -> u16 {
         let return_addr = self.frames.pop(outcome);
         self.recursion_depth = self
