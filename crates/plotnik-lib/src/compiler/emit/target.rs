@@ -255,7 +255,7 @@ pub enum TypeScriptNodeRepresentation {
 pub struct TypeScriptCodegenConfig {
     export: bool,
     emit_node_interface: bool,
-    verbose_nodes: bool,
+    include_points: bool,
     void_type: VoidType,
     colors: Colors,
     node_representation: TypeScriptNodeRepresentation,
@@ -266,7 +266,7 @@ impl Default for TypeScriptCodegenConfig {
         Self {
             export: true,
             emit_node_interface: true,
-            verbose_nodes: false,
+            include_points: false,
             void_type: VoidType::Undefined,
             colors: Colors::OFF,
             node_representation: TypeScriptNodeRepresentation::SerializedValue,
@@ -289,8 +289,8 @@ impl TypeScriptCodegenConfig {
         self
     }
 
-    pub fn verbose_nodes(mut self, enabled: bool) -> Self {
-        self.verbose_nodes = enabled;
+    pub fn include_points(mut self, enabled: bool) -> Self {
+        self.include_points = enabled;
         self
     }
 
@@ -313,7 +313,7 @@ impl TypeScriptCodegenConfig {
         crate::compiler::emit::targets::typescript::Config::new()
             .export(self.export)
             .emit_node_interface(self.emit_node_interface)
-            .verbose_nodes(self.verbose_nodes)
+            .include_points(self.include_points)
             .void_type(self.void_type)
             .colored(!self.colors.blue.is_empty())
     }

@@ -102,18 +102,18 @@ pub fn format_arg() -> Arg {
         .help("Output format (typescript, ts)")
 }
 
-pub fn verbose_nodes_arg() -> Arg {
-    Arg::new("verbose_nodes")
-        .long("verbose-nodes")
+pub fn include_points_arg() -> Arg {
+    Arg::new("include_points")
+        .long("include-points")
         .action(ArgAction::SetTrue)
-        .help("Include verbose node information (line/column positions)")
+        .help("Include zero-based row/byte-column points in nodes")
 }
 
 pub fn no_node_type_arg() -> Arg {
     Arg::new("no_node_type")
         .long("no-node-type")
         .action(ArgAction::SetTrue)
-        .help("Don't emit Node/Point type definitions")
+        .help("Don't emit the Node type definition")
 }
 
 pub fn no_export_arg() -> Arg {

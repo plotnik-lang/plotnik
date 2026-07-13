@@ -16,7 +16,7 @@ pub enum VoidType {
 pub struct Config {
     pub(crate) export: bool,
     pub(crate) emit_node_interface: bool,
-    pub(crate) verbose_nodes: bool,
+    pub(crate) include_points: bool,
     pub(crate) void_type: VoidType,
     pub(crate) colors: Colors,
 }
@@ -26,7 +26,7 @@ impl Default for Config {
         Self {
             export: true,
             emit_node_interface: true,
-            verbose_nodes: false,
+            include_points: false,
             void_type: VoidType::default(),
             colors: Colors::OFF,
         }
@@ -49,8 +49,8 @@ impl Config {
         self
     }
 
-    pub fn verbose_nodes(mut self, value: bool) -> Self {
-        self.verbose_nodes = value;
+    pub fn include_points(mut self, value: bool) -> Self {
+        self.include_points = value;
         self
     }
 

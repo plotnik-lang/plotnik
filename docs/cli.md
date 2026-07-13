@@ -150,10 +150,10 @@ plotnik infer -q 'Func = (function_declaration) @fn' -l javascript
 # Write to file
 plotnik infer -q 'Func = (function_declaration) @fn' -l javascript -o types.d.ts
 
-# Verbose node shape (includes line/column)
-plotnik infer -q 'Func = (function_declaration) @fn' -l javascript --verbose-nodes
+# Include zero-based row/byte-column points
+plotnik infer -q 'Func = (function_declaration) @fn' -l javascript --include-points
 
-# Skip boilerplate (Node/Point types, exports)
+# Skip boilerplate (Node type, exports)
 plotnik infer -q 'Q = (identifier) @id' -l js --no-node-type --no-export
 ```
 
@@ -164,8 +164,8 @@ plotnik infer -q 'Q = (identifier) @id' -l js --no-node-type --no-export
 | `-l, --lang LANG`   | Target language grammar (required)            |
 | `-o, --output FILE` | Write output to file                          |
 | `--format FORMAT`   | Output format (`typescript`, `ts`)            |
-| `--verbose-nodes`   | Include line/column in Node type              |
-| `--no-node-type`    | Don't emit Node/Point definitions             |
+| `--include-points`  | Include row/byte-column points in `Node`      |
+| `--no-node-type`    | Don't emit the `Node` definition              |
 | `--no-export`       | Don't add `export` keyword                    |
 | `--void-type TYPE`  | Type for void results (`undefined` or `null`) |
 

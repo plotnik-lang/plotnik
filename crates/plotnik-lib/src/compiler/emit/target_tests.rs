@@ -24,3 +24,34 @@ fn invalid_target_configuration_is_a_spanless_query_error() {
     assert!(matches!(typescript_error, Error::EmitConfig(_)));
     assert!(compiled.diagnostics().is_empty());
 }
+
+#[test]
+fn typescript_serialized_nodes_keep_the_idiomatic_span_shape() {
+    let compiled = QueryBuilder::from_inline("Q = (program) @root")
+        .compile(synthetic_grammar())
+        .expect("test query compiles");
+
+    let default = compiled
+        .emit_types(TypeScriptCodegenConfig::new())
+        .expect("default TypeScript emission answers")
+        .into_artifact()
+        .expect("valid query emits TypeScript types");
+    let with_points = compiled
+        .emit_types(TypeScriptCodegenConfig::new().include_points(true))
+        .expect("point-aware TypeScript emission answers")
+        .into_artifact()
+        .expect("valid query emits TypeScript types");
+
+    assert!(default.source().contains("span: [number, number];"));
+    assert!(!default.source().contains("startPoint:"));
+    assert!(
+        with_points
+            .source()
+            .contains("startPoint: { row: number; column: number; };")
+    );
+    assert!(
+        with_points
+            .source()
+            .contains("endPoint: { row: number; column: number; };")
+    );
+}

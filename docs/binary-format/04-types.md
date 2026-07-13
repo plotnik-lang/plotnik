@@ -25,11 +25,11 @@ Type system metadata for code generation and runtime validation. Describes the s
 
 The `Node` type represents a platform-dependent handle to a tree-sitter AST node:
 
-| Context    | Representation                                             |
-| :--------- | :--------------------------------------------------------- |
-| Rust       | `tree_sitter::Node<'tree>` (lifetime-bound reference)      |
-| TypeScript | Binding-provided object with `startPosition`, `text`, etc. |
-| JSON       | Unique node identifier (e.g., `"node:42"`)                 |
+| Context    | Representation                                                         |
+| :--------- | :--------------------------------------------------------------------- |
+| Rust       | `tree_sitter::Node<'tree>` (lifetime-bound reference)                  |
+| TypeScript | Target-configured; serialized values default to `{ kind, text, span }` |
+| JSON       | `{ kind, text, span: [start, end] }`                                   |
 
 ### Text and Boolean Semantics
 

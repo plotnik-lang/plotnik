@@ -270,11 +270,12 @@ Default capture type — a reference to a tree-sitter node:
 interface Node {
   kind: string;           // e.g. "identifier"
   text: string;           // source text
-  span: [number, number]; // byte offsets
+  span: [number, number]; // half-open UTF-8 byte offsets
 }
 ```
 
-`infer --verbose-nodes` adds `startPosition`/`endPosition` (`{ row, column }`).
+`infer --include-points` adds `startPoint` and `endPoint`. Each point has a
+zero-based `row` and a zero-based, byte-based `column`.
 
 ### Cardinality: Quantifiers → Arrays
 

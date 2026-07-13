@@ -79,7 +79,7 @@ fn dump_accepts_run_flags() {
         "dump",
         "query.ptk",
         "--compact",
-        "--verbose-nodes",
+        "--include-points",
         "--entry",
         "Foo",
     ]);
@@ -153,7 +153,7 @@ fn trace_accepts_run_flags() {
         "query.ptk",
         "app.js",
         "--compact",
-        "--verbose-nodes",
+        "--include-points",
     ]);
     assert!(
         result.is_ok(),
@@ -186,7 +186,7 @@ fn check_accepts_run_flags() {
         "check",
         "query.ptk",
         "--compact",
-        "--verbose-nodes",
+        "--include-points",
         "--entry",
         "Foo",
     ]);
@@ -269,8 +269,8 @@ fn dump_help_hides_run_flags() {
         "dump help should not show --compact"
     );
     assert!(
-        !help.contains("--verbose-nodes"),
-        "dump help should not show --verbose-nodes"
+        !help.contains("--include-points"),
+        "dump help should not show --include-points"
     );
     assert!(
         !help.contains("--entry"),
@@ -326,8 +326,8 @@ fn trace_help_hides_run_output_flags() {
         "trace help should not show --compact"
     );
     assert!(
-        !help.contains("--verbose-nodes"),
-        "trace help should not show --verbose-nodes"
+        !help.contains("--include-points"),
+        "trace help should not show --include-points"
     );
 }
 
@@ -349,8 +349,8 @@ fn check_help_hides_unified_flags() {
         "check help should not show --compact"
     );
     assert!(
-        !help.contains("--verbose-nodes"),
-        "check help should not show --verbose-nodes"
+        !help.contains("--include-points"),
+        "check help should not show --include-points"
     );
     assert!(
         !help.contains("--entry"),
@@ -396,8 +396,8 @@ fn infer_help_hides_unified_flags() {
         "infer help should not show --no-result"
     );
     assert!(
-        help.contains("--verbose-nodes"),
-        "infer help SHOULD show --verbose-nodes"
+        help.contains("--include-points"),
+        "infer help SHOULD show --include-points"
     );
 }
 
@@ -489,7 +489,7 @@ fn run_params_extracts_all_fields() {
         "Query",
         "--color",
         "never",
-        "--verbose-nodes",
+        "--include-points",
     ]);
     assert!(result.is_ok());
 
@@ -537,7 +537,7 @@ fn tree_accepts_run_flags() {
         "query.ptk",
         "app.js",
         "--compact",
-        "--verbose-nodes",
+        "--include-points",
         "--entry",
         "Foo",
     ]);
@@ -632,8 +632,8 @@ fn tree_help_hides_unified_flags() {
         "tree help should not show --compact"
     );
     assert!(
-        !help.contains("--verbose-nodes"),
-        "tree help should not show --verbose-nodes"
+        !help.contains("--include-points"),
+        "tree help should not show --include-points"
     );
     assert!(
         !help.contains("--entry"),

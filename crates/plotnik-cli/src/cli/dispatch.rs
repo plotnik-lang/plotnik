@@ -119,7 +119,7 @@ pub struct DumpOpts {
     pub query_text: Option<String>,
     pub lang: Option<String>,
     pub color: ColorChoice,
-    // Note: source_path, source_text, entry, compact, verbose_nodes, verbose,
+    // Note: source_path, source_text, entry, compact, include_points, verbose,
     // no_result, and the runtime-limit flags are parsed but not extracted.
 }
 
@@ -150,7 +150,7 @@ pub struct InferOpts {
     pub query_text: Option<String>,
     pub lang: Option<String>,
     pub format: String,
-    pub verbose_nodes: bool,
+    pub include_points: bool,
     pub no_node_type: bool,
     pub no_export: bool,
     pub void_type: Option<String>,
@@ -168,7 +168,7 @@ impl InferOpts {
                 .get_one::<String>("format")
                 .cloned()
                 .unwrap_or_else(|| "typescript".to_string()),
-            verbose_nodes: m.get_flag("verbose_nodes"),
+            include_points: m.get_flag("include_points"),
             no_node_type: m.get_flag("no_node_type"),
             no_export: m.get_flag("no_export"),
             void_type: m.get_one::<String>("void_type").cloned(),
@@ -185,7 +185,7 @@ impl From<InferOpts> for InferArgs {
             query_text: p.query_text,
             lang: p.lang,
             format: p.format,
-            verbose_nodes: p.verbose_nodes,
+            include_points: p.include_points,
             no_node_type: p.no_node_type,
             export: !p.no_export,
             output: p.output,
@@ -247,7 +247,7 @@ pub struct RunOpts {
     pub limits: RuntimeLimitSpec,
     pub json: bool,
     pub color: ColorChoice,
-    // Note: verbose_nodes, verbose, no_result are hidden unified flags,
+    // Note: include_points, verbose, no_result are hidden unified flags,
     // parsed but not extracted.
 }
 
@@ -306,7 +306,7 @@ pub struct TraceOpts {
     pub limits: RuntimeLimitSpec,
     pub json: bool,
     pub color: ColorChoice,
-    // Note: compact, verbose_nodes are parsed but not extracted (unified flags)
+    // Note: compact, include_points are parsed but not extracted (unified flags)
 }
 
 impl TraceOpts {

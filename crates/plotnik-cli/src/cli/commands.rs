@@ -17,10 +17,10 @@ fn with_hidden_source_args(cmd: Command) -> Command {
 fn with_hidden_exec_args(cmd: Command) -> Command {
     cmd.arg(entry_arg().hide(true))
         .arg(compact_arg().hide(true))
-        .arg(verbose_nodes_arg().hide(true))
+        .arg(include_points_arg().hide(true))
 }
 
-// --verbose-nodes is visible for infer, so exclude it from the hidden set.
+// --include-points is visible for infer, so exclude it from the hidden set.
 fn with_hidden_exec_args_partial(cmd: Command) -> Command {
     cmd.arg(entry_arg().hide(true))
         .arg(compact_arg().hide(true))
@@ -224,7 +224,7 @@ pub fn infer_command() -> Command {
         .arg(lang_arg())
         .next_help_heading("Output options")
         .arg(format_arg())
-        .arg(verbose_nodes_arg())
+        .arg(include_points_arg())
         .arg(no_node_type_arg())
         .arg(no_export_arg())
         .arg(void_type_arg())
@@ -262,7 +262,7 @@ pub fn run_command() -> Command {
         .arg(entry_arg())
         .next_help_heading("Output options")
         .arg(compact_arg())
-        .arg(verbose_nodes_arg().hide(true))
+        .arg(include_points_arg().hide(true))
         .next_help_heading("Limit options")
         .arg(fuel_arg())
         .arg(max_memory_arg())
@@ -307,7 +307,7 @@ pub fn trace_command() -> Command {
 
     with_hidden_json_arg(with_hidden_raw_arg(
         cmd.arg(compact_arg().hide(true))
-            .arg(verbose_nodes_arg().hide(true)),
+            .arg(include_points_arg().hide(true)),
     ))
 }
 
@@ -345,7 +345,7 @@ pub fn inspect_command() -> Command {
 
     with_hidden_raw_arg(
         cmd.arg(compact_arg().hide(true))
-            .arg(verbose_nodes_arg().hide(true))
+            .arg(include_points_arg().hide(true))
             .arg(no_result_arg().hide(true)),
     )
 }
