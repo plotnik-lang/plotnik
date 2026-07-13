@@ -34,7 +34,7 @@ impl EntryPoint {
     pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
         Self {
             name: StringId::try_from(u16::from_le_bytes([bytes[0], bytes[1]]))
-                .expect("entrypoint name id must be non-zero"),
+                .expect("entry-point name id must be non-zero"),
             target: CodeAddr::from(u16::from_le_bytes([bytes[2], bytes[3]])),
             result_type: TypeId::from(u16::from_le_bytes([bytes[4], bytes[5]])),
             _pad: 0,

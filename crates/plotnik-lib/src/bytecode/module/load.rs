@@ -54,7 +54,7 @@ pub enum ModuleError {
     #[error("invalid type name at index {0}")]
     InvalidTypeName(usize),
     #[error("invalid entry point at index {0}")]
-    InvalidEntrypoint(usize),
+    InvalidEntryPoint(usize),
     #[error("invalid opcode {opcode:#x} at instruction address {addr}")]
     InvalidOpcode { addr: CodeAddr, opcode: u8 },
     #[error("string id out of range at index {0}")]
@@ -271,12 +271,12 @@ impl Module {
         self.validate_type_names()?;
         self.validate_spans()?;
         // Bound every embedded `StringId` before any later check constructs a
-        // (`NonZero`) `StringId` from one — e.g. `validate_entrypoints` builds an
+        // (`NonZero`) `StringId` from one — e.g. `validate_entry_points` builds an
         // `EntryPoint`, which would otherwise panic on a malformed zero name.
         self.validate_string_ids()?;
         self.validate_symbol_ids()?;
         let is_start = self.validate_instructions()?;
-        self.validate_entrypoints(&is_start)?;
+        self.validate_entry_points(&is_start)?;
         self.validate_return_routes()?;
         self.validate_depth_neutrality()?;
         // Structural validity (every instruction decodes, every jump lands on a start)
@@ -540,14 +540,14 @@ impl Module {
     /// [`Self::validate_instructions`]: a `target` that lands inside a multi-word
     /// instruction would make the VM start decoding mid-instruction, so it must
     /// be an instruction start, not merely in range.
-    fn validate_entrypoints(&self, is_start: &[bool]) -> Result<(), ModuleError> {
+    fn validate_entry_points(&self, is_start: &[bool]) -> Result<(), ModuleError> {
         let entry_points = self.entry_points();
         let word_count = self.header.instruction_word_count;
         let type_defs = self.header.type_defs_count;
         let storage: &[u8] = &self.storage;
         let base = self.offsets.entry_points as usize;
         for i in 0..entry_points.len() {
-            let invalid = || ModuleError::InvalidEntrypoint(i);
+            let invalid = || ModuleError::InvalidEntryPoint(i);
             let ep = entry_points.get(i);
             let target = ep.target();
 
@@ -926,7 +926,7 @@ impl Module {
     /// 2. Every collected jump target — successor or call next/target — must land
     ///    on a recorded instruction start.
     ///
-    /// Returns the instruction-start bitmap so [`Self::validate_entrypoints`] can
+    /// Returns the instruction-start bitmap so [`Self::validate_entry_points`] can
     /// hold entry-point targets to the same rule: an entry point pointing into the
     /// interior of a multi-word instruction would otherwise begin decoding
     /// mid-instruction.

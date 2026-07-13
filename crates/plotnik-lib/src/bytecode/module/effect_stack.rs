@@ -25,7 +25,7 @@
 //! materializer's pending-value register is full. Tracking span *ids* (not just
 //! a depth) proves every `SpanEnd` closes the span the matching bracket opened,
 //! so inspection extraction can assert pairing instead of re-validating. The
-//! walk starts from each entrypoint wrapper and follows `Match` successors,
+//! walk starts from each entry-point wrapper and follows `Match` successors,
 //! descending through `Call` and resuming at its return address — exactly the
 //! edge set that orders effects at runtime.
 //!
@@ -75,7 +75,7 @@
 //! summary instead of inlining, which both terminates and stays sound. The
 //! summaries are computed by a monotone fixpoint (a callee that reads its
 //! caller's top before pushing propagates the constraint up to its own
-//! callers), then a final pass checks every call site and every entrypoint
+//! callers), then a final pass checks every call site and every entry point
 //! wrapper against the stabilized summaries.
 //!
 //! `record_sets_caller_top` exists because a below-entry `RecordSet` mutates state the
@@ -87,7 +87,7 @@
 //! panic past the check.
 //!
 //! A successor-less `Match` accepts the *whole run* from any call depth,
-//! freezing the log with every caller frame still open. Inside an entrypoint
+//! freezing the log with every caller frame still open. Inside an entry point
 //! wrapper the local stack is the global stack, so the existing exit check is
 //! exact; inside a body reachable through `Call` the caller's frames are
 //! invisible here, so such accepts are rejected outright — the compiler ends
@@ -242,15 +242,15 @@ type DefSummaries = HashMap<CodeAddr, DefSummary>;
 /// into a panic. Assumes [`Module::validate_instructions`] has already run, so
 /// every instruction decode and every jump target is safe.
 pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> {
-    let entrypoints = module.entry_points();
+    let entry_points = module.entry_points();
 
     let mut defs = Vec::new();
     let mut known = HashSet::new();
     let mut summaries = DefSummaries::new();
     let mut queue = VecDeque::new();
     let mut queued = HashSet::new();
-    for entrypoint in entrypoints.iter() {
-        let target = entrypoint.target();
+    for entry_point in entry_points.iter() {
+        let target = entry_point.target();
         if known.insert(target) {
             defs.push(target);
             summaries.insert(target, DefSummary::unknown());
@@ -325,11 +325,11 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
         )?;
     }
 
-    // ...and every entrypoint wrapper. A wrapper has no caller, so a residual
+    // ...and every entry-point wrapper. A wrapper has no caller, so a residual
     // caller-top constraint means some effect would read below the frames the
     // wrapper itself opened and hit the materializer's result root frame.
-    for entrypoint in entrypoints.iter() {
-        let target = entrypoint.target();
+    for entry_point in entry_points.iter() {
+        let target = entry_point.target();
         let wrapper = analyze(
             module,
             &summaries,

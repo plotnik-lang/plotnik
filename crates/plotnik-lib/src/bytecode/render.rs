@@ -14,7 +14,7 @@ pub(crate) struct ModuleRenderContext {
     member_names: Vec<String>,
     all_strings: Vec<String>,
     regex_patterns: Vec<String>,
-    entrypoint_by_ip: BTreeMap<u16, String>,
+    entry_point_by_ip: BTreeMap<u16, String>,
 }
 
 impl ModuleRenderContext {
@@ -25,7 +25,7 @@ impl ModuleRenderContext {
         let types = module.types();
         let node_kinds = module.node_kinds();
         let node_fields = module.node_fields();
-        let entrypoints = module.entry_points();
+        let entry_points = module.entry_points();
 
         let mut node_kind_names = BTreeMap::new();
         for t in node_kinds.iter() {
@@ -54,9 +54,9 @@ impl ModuleRenderContext {
             regex_patterns.push(strings.get(string_id).to_string());
         }
 
-        let mut entrypoint_by_ip = BTreeMap::new();
-        for e in entrypoints.iter() {
-            entrypoint_by_ip.insert(u16::from(e.target()), strings.get(e.name()).to_string());
+        let mut entry_point_by_ip = BTreeMap::new();
+        for e in entry_points.iter() {
+            entry_point_by_ip.insert(u16::from(e.target()), strings.get(e.name()).to_string());
         }
 
         Self {
@@ -65,7 +65,7 @@ impl ModuleRenderContext {
             member_names,
             all_strings,
             regex_patterns,
-            entrypoint_by_ip,
+            entry_point_by_ip,
         }
     }
 
@@ -90,7 +90,7 @@ impl ModuleRenderContext {
     }
 
     pub(crate) fn entry_point_name(&self, ip: u16) -> Option<&str> {
-        self.entrypoint_by_ip.get(&ip).map(|s| s.as_str())
+        self.entry_point_by_ip.get(&ip).map(|s| s.as_str())
     }
 
     pub(crate) fn dump_node_field_name(&self, id: NodeFieldId) -> String {
