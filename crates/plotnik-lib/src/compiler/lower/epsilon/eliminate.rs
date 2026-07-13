@@ -12,8 +12,6 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::bytecode::EffectKind;
-
 use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR, NfaGraph};
 
 fn build_label_to_index(instructions: &[InstructionIR]) -> HashMap<Label, usize> {
@@ -83,6 +81,13 @@ impl<'a> InstrIndex<'a> {
                 return Some((current, effects)); // Branching epsilon: visible but can't see through
             }
 
+            if m.effects
+                .iter()
+                .any(|effect| effect.kind().is_motion_barrier())
+            {
+                return Some((current, effects));
+            }
+
             effects.extend(m.effects.iter().cloned());
             current = m.successors[0];
         }
@@ -131,13 +136,11 @@ impl MatchEdit {
     }
 }
 
-/// Whether any effect reads the VM cursor (`Node`, `SpanStartAt`). Such effects are
+/// Whether any effect reads the VM cursor. Such effects are
 /// position-sensitive: their meaning depends on the current cursor node, so
 /// they cannot be reordered across a navigation.
 fn reads_cursor(effects: &[EffectIR]) -> bool {
-    effects
-        .iter()
-        .any(|e| matches!(e.kind(), EffectKind::Node | EffectKind::SpanStartAt))
+    effects.iter().any(|effect| effect.kind().reads_cursor())
 }
 
 /// Phase A: Forward migration.
@@ -156,6 +159,14 @@ fn forward_migrate(instructions: &mut [InstructionIR]) -> bool {
         };
 
         if eps.effects.is_empty() {
+            continue;
+        }
+
+        if eps
+            .effects
+            .iter()
+            .any(|effect| effect.kind().is_motion_barrier())
+        {
             continue;
         }
 
@@ -241,18 +252,6 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
             changed = true;
         }
     }
-    for entry in result.def_entries_consuming.values_mut() {
-        if let Some((target, effects)) =
-            InstrIndex::new(&result.instructions, &idx).see_through(*entry)
-            && effects.is_empty()
-            && target != *entry
-        {
-            entry_remaps.insert(*entry, target);
-            *entry = target;
-            changed = true;
-        }
-    }
-
     for instr in &mut result.instructions {
         if let InstructionIR::Call(c) = instr
             && let Some(&new) = entry_remaps.get(&c.target)
@@ -319,23 +318,35 @@ fn laser_vision(result: &mut NfaGraph) -> bool {
     }
 
     for i in 0..result.instructions.len() {
-        let next_label = match &result.instructions[i] {
-            InstructionIR::Call(c) => Some(c.next),
-            _ => None,
+        let returns = match &result.instructions[i] {
+            InstructionIR::Call(c) => c.return_labels().to_vec(),
+            _ => continue,
         };
-
-        let Some(next) = next_label else { continue };
-        let Some((target, effects)) = InstrIndex::new(&result.instructions, &idx).see_through(next)
-        else {
+        let index = InstrIndex::new(&result.instructions, &idx);
+        let remapped = returns
+            .iter()
+            .copied()
+            .map(|next| {
+                let Some((target, effects)) = index.see_through(next) else {
+                    return next;
+                };
+                if effects.is_empty() { target } else { next }
+            })
+            .collect::<Vec<_>>();
+        if remapped == returns {
             continue;
-        };
-
-        if effects.is_empty() && target != next {
-            if let InstructionIR::Call(c) = &mut result.instructions[i] {
-                c.next = target;
-            }
-            changed = true;
         }
+        let InstructionIR::Call(call) = &mut result.instructions[i] else {
+            unreachable!("selected a call instruction")
+        };
+        call.remap_returns(|label| {
+            let index = returns
+                .iter()
+                .position(|&original| original == label)
+                .expect("call return belongs to its original route set");
+            remapped[index]
+        });
+        changed = true;
     }
 
     changed

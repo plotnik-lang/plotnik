@@ -86,6 +86,56 @@ mod repointed {
     }
 }
 
+mod scalar_output {
+    plotnik::query! {
+        r#"
+        Q = (program
+          (comment)* @comments :: str
+          (expression_statement)? @has_statement :: bool
+        )
+        "#,
+        grammar = "arborium-javascript",
+    }
+}
+
+mod mixed_borrows {
+    plotnik::query! {
+        "Q = (program (expression_statement (identifier) @text :: str) @statement)",
+        grammar = "arborium-javascript",
+    }
+}
+
+mod recursive_split_returns {
+    plotnik::query! {
+        r#"
+        Body = [
+          Rec: {(comment) (B)}
+          Base: (comment)
+        ]
+        B = {(Body)?? (Body)?}
+        Q = (program {
+          (B)
+          .!
+          [(comment == "//b") (comment == "//stop")] @rest :: str
+        })
+        "#,
+        grammar = "arborium-javascript",
+    }
+}
+
+mod recursive_routed_returns {
+    plotnik::query! {
+        r#"
+        A = [
+          (statement_block (A)+ (debugger_statement))
+          (statement_block (debugger_statement))
+        ]?
+        Q = (program (A) (expression_statement) @e)
+        "#,
+        grammar = "arborium-javascript",
+    }
+}
+
 // Dedicated module for the skew test: its first (and only) run must be the
 // wrong-language one, and the language check is once-per-module.
 mod skew {
@@ -217,6 +267,75 @@ fn serde_feature_flows_through_the_facade() {
         serde_json::to_string(&plotnik::rt::WithSource::new(&value, source)).expect("serializes");
 
     assert!(json.contains("\"id\""), "got: {json}");
+}
+
+#[test]
+fn generated_scalars_preserve_items_and_presence() {
+    let source = "// first\n\n// second\nx;";
+    let tree = parse(&js(), source);
+
+    let value = scalar_output::Q::parse(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches");
+
+    assert_eq!(value.comments, ["// first", "// second"]);
+    assert!(value.has_statement);
+}
+
+#[test]
+fn generated_bool_uses_absence_not_truthiness() {
+    let source = "// only";
+    let tree = parse(&js(), source);
+
+    let value = plotnik::parse::<scalar_output::Q>(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches");
+
+    assert_eq!(value.comments, ["// only"]);
+    assert!(!value.has_statement);
+}
+
+#[test]
+fn generated_output_can_borrow_tree_and_source_independently() {
+    let source = "name;";
+    let tree = parse(&js(), source);
+
+    let value = mixed_borrows::Q::parse(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches");
+
+    assert_eq!(value.text, "name");
+    assert_eq!(value.statement.utf8_text(source.as_bytes()), Ok("name;"));
+}
+
+#[test]
+fn generated_matcher_preserves_mixed_recursive_greediness() {
+    let source = "//a\n//b\n//stop";
+    let tree = parse(&js(), source);
+
+    let value = recursive_split_returns::Q::parse(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches");
+
+    assert_eq!(value.rest, "//stop");
+}
+
+#[test]
+fn generated_matcher_executes_routed_required_recursive_call() {
+    let source = "{ { debugger; } debugger; } f();";
+    let tree = parse(&js(), source);
+
+    let value = recursive_routed_returns::Q::parse(&tree, source)
+        .expect("auto limits fit")
+        .expect("matches");
+
+    assert_eq!(
+        value
+            .e
+            .utf8_text(source.as_bytes())
+            .expect("captured node lies within UTF-8 source"),
+        "f();"
+    );
 }
 
 #[test]

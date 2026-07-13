@@ -16,8 +16,8 @@ use crate::compiler::ids::DefId;
 use crate::compiler::limits::ReferenceLimits;
 use crate::compiler::parse::ast::{DefRef, Pattern};
 
-use super::dependency_analysis::DefInfo;
 pub use super::dependency_analysis::DependencyAnalysis;
+use super::dependency_analysis::{DefInfo, DefinitionDependencies};
 
 pub fn analyze_dependencies(
     symbol_table: &SymbolTable,
@@ -73,11 +73,18 @@ pub fn analyze_dependencies(
         scc_ids_by_def.push(scc_ids);
     }
 
-    let mut referenced_defs = HashSet::new();
+    let mut outgoing = vec![Vec::new(); defs.len()];
     for name in symbol_table.names() {
         let body = symbol_table
             .body(name)
             .expect("symbol-table name must have a body");
+        let owner_sym = interner
+            .get(name)
+            .expect("definition name must already be interned");
+        let owner = def_ids_by_sym
+            .get(&owner_sym)
+            .copied()
+            .expect("definition name must have a DefId");
         for ref_name in collect_defined_refs(body, symbol_table) {
             let sym = interner
                 .get(ref_name)
@@ -86,7 +93,7 @@ pub fn analyze_dependencies(
                 .get(&sym)
                 .copied()
                 .expect("defined reference must have a DefId");
-            referenced_defs.insert(def_id);
+            outgoing[owner.index()].push(def_id);
         }
     }
 
@@ -95,7 +102,7 @@ pub fn analyze_dependencies(
         def_ids_by_sym,
         defs,
         recursive_defs,
-        referenced_defs,
+        DefinitionDependencies::new(outgoing),
     ))
 }
 

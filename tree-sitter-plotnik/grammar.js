@@ -53,18 +53,33 @@ module.exports = grammar({
 
     quantifier: (_) => choice(...QUANTIFIERS),
 
-    // Type annotations attach to regular captures only; `@_ :: T` is an
+    // Capture types attach to regular captures only; `@_ :: T` is an
     // error in the reference parser.
     captured_pattern: ($) =>
       seq(
         field("pattern", choice($._suffixable, $.quantified_pattern)),
         choice(
-          seq(field("capture", $.capture), optional($.type_annotation)),
+          seq(field("capture", $.capture), optional($.capture_type)),
           field("capture", $.suppressive_capture),
         ),
       ),
 
-    type_annotation: ($) => seq("::", field("type", $.type_identifier)),
+    capture_type: ($) =>
+      seq(
+        "::",
+        field(
+          "type",
+          choice($.builtin_capture_type, $.capture_type_identifier),
+        ),
+      ),
+
+    builtin_capture_type: (_) => choice("str", "bool"),
+
+    // Lowercase names are syntactically complete so semantic analysis can
+    // diagnose unknown built-ins. Custom names are PascalCase and deliberately
+    // exclude `_`, matching the reference parser's validation boundary.
+    capture_type_identifier: (_) =>
+      choice(/[a-z][a-zA-Z0-9_]*/, /[A-Z][a-zA-Z0-9]*/),
 
     // What may appear among a node's children. Anchors and negated fields
     // are positional assertions, not patterns: they never take suffixes and
@@ -190,7 +205,7 @@ module.exports = grammar({
           ),
         ),
         choice(
-          seq(field("capture", $.capture), optional($.type_annotation)),
+          seq(field("capture", $.capture), optional($.capture_type)),
           field("capture", $.suppressive_capture),
         ),
       ),

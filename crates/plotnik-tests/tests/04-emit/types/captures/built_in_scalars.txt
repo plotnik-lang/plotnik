@@ -1,0 +1,18 @@
+Q = (program
+  (comment)? @doc :: str
+  (comment)* @comments :: str
+  (expression_statement)? @has_statement :: bool
+)
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  comments: string[];
+  doc: string | null;
+  has_statement: boolean;
+}
+---------------------- RUST ----------------------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Q<'s> {
+    pub doc: ::core::option::Option<&'s str>,
+    pub comments: ::std::vec::Vec<&'s str>,
+    pub has_statement: bool,
+}

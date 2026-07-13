@@ -25,8 +25,9 @@ use std::fmt::Write as _;
 
 use crate::bytecode::{EffectKind, PredicateOp};
 use crate::compiler::emit::plan::{
-    CallPlan, CheckPlan, CodegenPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, PredicatePlan,
-    PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
+    CallPlan, CheckPlan, CodegenPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, OrdinaryCallPlan,
+    PredicatePlan, PredicateValuePlan, RegexId, RoutedCallPlan, SplitCallPlan, StateId,
+    StateOrigin, StatePlan, StatePlanKind,
 };
 use crate::compiler::emit::sink::Sink;
 use crate::compiler::emit::targets::rust::Config;
@@ -484,12 +485,15 @@ impl<'a> Generator<'a> {
                 }
                 StatePlanKind::Match(plan) => self.match_arm(out, state, plan),
                 StatePlanKind::Call(plan) => self.call_arm(out, state, plan),
-                StatePlanKind::Return => {
+                StatePlanKind::Return(outcome) => {
                     splice(
                         out,
                         "        ",
                         RETURN_ARM,
-                        &[("STATE", &self.state(state.id).const_name)],
+                        &[
+                            ("STATE", &self.state(state.id).const_name),
+                            ("OUTCOME", return_outcome_expr(*outcome)),
+                        ],
                     );
                 }
             }
@@ -532,13 +536,7 @@ impl<'a> Generator<'a> {
             );
         }
 
-        self.candidate_search(
-            out,
-            state,
-            plan,
-            "            ",
-            CandidateFailure::StateBacktrack,
-        );
+        self.candidate_search(out, state, plan, CandidateFailure::StateBacktrack);
         self.retry_checkpoint(out, state, plan, "            ");
 
         if plan.retry.is_some() {
@@ -557,7 +555,6 @@ impl<'a> Generator<'a> {
         out: &mut String,
         state: &StatePlan,
         plan: &MatchPlan,
-        indent: &str,
         failure: CandidateFailure,
     ) {
         if !plan.has_candidate_checks() {
@@ -565,6 +562,7 @@ impl<'a> Generator<'a> {
         }
         let call = self.cand_call(state, plan);
         let fail = failure.code();
+        let indent = "            ";
         if plan.search == SkipPolicy::Exact {
             splice(
                 out,
@@ -689,6 +687,29 @@ impl<'a> Generator<'a> {
             EffectKind::SuppressEnd => {
                 let _ = writeln!(out, "{indent}eng.suppress_end();");
             }
+            EffectKind::ScalarOpen => {
+                let _ = writeln!(out, "{indent}eng.scalar_open();");
+            }
+            EffectKind::ScalarMark => {
+                let _ = writeln!(out, "{indent}eng.scalar_mark();");
+            }
+            EffectKind::StrClose => {
+                let _ = writeln!(out, "{indent}eng.scalar_close_str();");
+            }
+            EffectKind::BoolClose => {
+                let value = effect.payload != 0;
+                let _ = writeln!(out, "{indent}eng.scalar_close_bool({value});");
+            }
+            EffectKind::NodeStr => {
+                let _ = writeln!(out, "{indent}eng.node_str();");
+            }
+            EffectKind::NodeBool => {
+                let _ = writeln!(out, "{indent}eng.node_bool();");
+            }
+            EffectKind::BoolValue => {
+                let value = effect.payload != 0;
+                let _ = writeln!(out, "{indent}eng.bool_value({value});");
+            }
             EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd => {
                 unreachable!("inspection spans rejected before generation")
             }
@@ -699,6 +720,14 @@ impl<'a> Generator<'a> {
     /// constraint, leave a call-retry checkpoint when the nav owns a search,
     /// then enter the callee.
     fn call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &CallPlan) {
+        match plan {
+            CallPlan::Ordinary(plan) => self.ordinary_call_arm(out, state_plan, plan),
+            CallPlan::Routed(plan) => self.routed_call_arm(out, state_plan, plan),
+            CallPlan::Split(plan) => self.split_call_arm(out, state_plan, plan),
+        }
+    }
+
+    fn ordinary_call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &OrdinaryCallPlan) {
         let state = &self.state(state_plan.id).const_name;
         let target = &self.state(plan.target).const_name;
         let next = &self.state(plan.next).const_name;
@@ -758,6 +787,27 @@ impl<'a> Generator<'a> {
             );
         }
 
+        let _ = writeln!(out, "            eng.enter_frame({next});");
+        let _ = writeln!(out, "            Flow::Jump({target})");
+        out.push_str("        }\n");
+    }
+
+    fn split_call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &SplitCallPlan) {
+        let state = &self.state(state_plan.id).const_name;
+        let target = &self.state(plan.target).const_name;
+        let matched = &self.state(plan.matched).const_name;
+        let zero = &self.state(plan.zero).const_name;
+        let _ = writeln!(out, "        {state} => {{");
+        let _ = writeln!(out, "            eng.enter_split_frame({matched}, {zero});");
+        let _ = writeln!(out, "            Flow::Jump({target})");
+        out.push_str("        }\n");
+    }
+
+    fn routed_call_arm(&self, out: &mut String, state_plan: &StatePlan, plan: &RoutedCallPlan) {
+        let state = &self.state(state_plan.id).const_name;
+        let target = &self.state(plan.target).const_name;
+        let next = &self.state(plan.next).const_name;
+        let _ = writeln!(out, "        {state} => {{");
         let _ = writeln!(out, "            eng.enter_frame({next});");
         let _ = writeln!(out, "            Flow::Jump({target})");
         out.push_str("        }\n");
@@ -974,13 +1024,7 @@ impl<'a> Generator<'a> {
                 RETRY_ADVANCE,
                 &[("POLICY", &policy_expr(policy))],
             );
-            self.candidate_search(
-                out,
-                state,
-                plan,
-                "            ",
-                CandidateFailure::RetryExhausted,
-            );
+            self.candidate_search(out, state, plan, CandidateFailure::RetryExhausted);
             self.retry_checkpoint(out, state, plan, "            ");
             let _ = writeln!(out, "            Some(finish_{}(eng))", info.fn_stem);
             out.push_str("        }\n");
@@ -997,6 +1041,13 @@ pub(super) fn nav_expr(nav: Nav) -> String {
 
 fn policy_expr(policy: SkipPolicy) -> String {
     format!("rt::SkipPolicy::{policy:?}")
+}
+
+fn return_outcome_expr(outcome: plotnik_rt::ReturnOutcome) -> &'static str {
+    match outcome {
+        plotnik_rt::ReturnOutcome::Matched => "rt::ReturnOutcome::Matched",
+        plotnik_rt::ReturnOutcome::Zero => "rt::ReturnOutcome::Zero",
+    }
 }
 
 /// `Limit` as a generated-code expression; the `Debug` form matches the
@@ -1329,9 +1380,10 @@ eng.push_checkpoint(rt::Checkpoint::call_retry(
 const RETURN_ARM: &str = r#"
 @STATE@ => {
     if eng.frames_empty() {
+        assert_eq!(@OUTCOME@, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
         Flow::Accept
     } else {
-        Flow::Jump(eng.exit_frame())
+        Flow::Jump(eng.exit_frame(@OUTCOME@))
     }
 }
 "#;

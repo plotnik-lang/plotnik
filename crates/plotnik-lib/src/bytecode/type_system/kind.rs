@@ -2,7 +2,7 @@
 
 /// Semantic type kind.
 ///
-/// Primitive types (Void, Node) are stored as `TypeDef`s like any other
+/// Primitive types are stored as `TypeDef`s like any other
 /// type — the kind field is the only thing that distinguishes them.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
@@ -23,6 +23,10 @@ pub enum TypeKind {
     Enum = 6,
     /// Named reference to another type (e.g., `type Foo = Bar`).
     Alias = 7,
+    /// Borrowed source text.
+    Str = 8,
+    /// Boolean value.
+    Bool = 9,
 }
 
 impl TypeKind {
@@ -37,13 +41,15 @@ impl TypeKind {
             5 => Some(Self::Struct),
             6 => Some(Self::Enum),
             7 => Some(Self::Alias),
+            8 => Some(Self::Str),
+            9 => Some(Self::Bool),
             _ => None,
         }
     }
 
-    /// Whether this is a primitive/builtin type (Void, Node).
+    /// Whether this is a primitive/builtin type.
     pub fn is_primitive(self) -> bool {
-        matches!(self, Self::Void | Self::Node)
+        matches!(self, Self::Void | Self::Node | Self::Str | Self::Bool)
     }
 
     /// Whether this is a wrapper type (Optional, ArrayZeroOrMore, ArrayOneOrMore).
@@ -74,6 +80,8 @@ impl TypeKind {
         match self {
             Self::Void => Some("Void"),
             Self::Node => Some("Node"),
+            Self::Str => Some("Str"),
+            Self::Bool => Some("Bool"),
             _ => None,
         }
     }

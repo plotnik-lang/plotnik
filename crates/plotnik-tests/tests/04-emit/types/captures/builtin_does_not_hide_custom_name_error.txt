@@ -1,0 +1,16 @@
+Q = (program
+  {
+    {
+      (comment) @comment
+    } @inner :: Q
+  } @outer :: str
+)
+------------------ DIAGNOSTICS -------------------
+error: type name `Q` is already used for a different type
+ --> query.ptk:5:17
+  |
+1 | Q = (program
+  | - already used here
+...
+5 |     } @inner :: Q
+  |                 ^

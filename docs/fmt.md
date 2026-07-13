@@ -9,7 +9,7 @@ working draft no longer claims results from an unavailable reference tool.
 Terminology follows the parser's CST (`compiler/parse/cst.rs`): `Def`,
 `NamedNode`, `Sequence` (`{...}`), `Alternation` (`[...]`) with `Branch`es,
 `Field`, `NegatedField`, `Anchor`, `NodePredicate`, `Capture`,
-`TypeAnnotation`, `Quantifier`, `Str` (string literal), and `Wildcard` (`_`).
+`CaptureType`, `Quantifier`, `Str` (string literal), and `Wildcard` (`_`).
 
 ## Contract
 
@@ -107,11 +107,11 @@ Each of these CST constructs counts as one landmark:
 - pattern: named node, sequence, alternation, definition reference, string,
   wildcard;
 - navigation and structure: field, **labeled** branch, anchor, negated field;
-- modifier: node predicate, quantifier, capture, type annotation.
+- modifier: node predicate, quantifier, capture, capture type.
 
 Unlabeled branch wrappers do not count. Definitions, comments, punctuation,
 literal contents, regex internals, and category-refinement tokens do not count.
-Field and branch prefixes and quantifier, capture, and type-annotation suffixes
+Field and branch prefixes and quantifier, capture, and capture-type suffixes
 belong to the complete inline candidate even when the renderer flattens those
 wrappers around a group.
 
@@ -240,14 +240,14 @@ Inline, exactly one space separates sibling parts. The full token-pair table:
 | `field:` / `Label:`          | no space before `:`, one after                 |
 | quantifier                   | glued to its pattern: `(x)*`, `","+`, `(x)*?`  |
 | capture                      | one space before `@`: `(x) @name`              |
-| type annotation              | spaced `::` both sides: `@x :: T`              |
+| capture type                 | spaced `::` both sides: `@x :: T`              |
 | predicate                    | spaced: `(identifier == "foo")`, `(x =~ /re/)` |
 | negated field                | glued `-`: `-value`                            |
 | anchors inline               | spaced like items: `(a) . (b)`, `. (x)`        |
 | category refinement          | glued `#`: `(expression#call_expression)`      |
 | `MISSING` / `ERROR` argument | one space: `(MISSING ";")`                     |
 
-Suffixes attach in fixed grammar order — quantifier, capture, annotation —
+Suffixes attach in fixed grammar order — quantifier, capture, capture type —
 and never migrate to their own line:
 
 ```
@@ -330,7 +330,7 @@ Beyond whitespace, the formatter rewrites these equivalent spellings:
 | Input                 | Output                  | Why                                                                      |
 | --------------------- | ----------------------- | ------------------------------------------------------------------------ |
 | `'text'`              | `"text"`                | double quotes are canonical; keep `'` only when the content contains `"` |
-| `@x::T`, `@x ::T`     | `@x :: T`               | annotation is always spaced                                              |
+| `@x::T`, `@x ::T`     | `@x :: T`               | capture type is always spaced                                            |
 | `(identifier=="foo")` | `(identifier == "foo")` | predicates are always spaced                                             |
 | `(x) *`               | `(x)*`                  | quantifiers bind tight                                                   |
 | `(kind/sub)`          | `(kind#sub)`            | `/` is the deprecated spelling                                           |

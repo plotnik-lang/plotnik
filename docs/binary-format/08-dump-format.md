@@ -73,7 +73,9 @@ Instruction forms:
 | Match       | `step nav field: (kind) [effects] succs` |
 | Epsilon     | `step -ε- [effects] succs`               |
 | Call        | `step nav field: (@target) target : ret` |
-| Return      | `step ▶`                                 |
+| RoutedCall  | `step (@target) target : ret`            |
+| SplitCall   | `step (@target) target : matched / zero` |
+| Return      | `step ▶` or `step ▶ zero`                |
 | Padding     | `step ...`                               |
 
 An empty navigation column means `Stay`. `-ε-` means `Nav::Epsilon`, a distinct
@@ -83,6 +85,10 @@ Effects are shown in one bracket group in execution order. The group appears
 after the node/predicate column and before successors.
 
 Inspection effects render as `SpanStartAt#5`, `SpanStart#5`, and `SpanEnd#5`.
+Scalar effects use the stable names `ScalarOpen`, `ScalarMark`, `StrClose`, and
+`BoolClose(0)` / `BoolClose(1)`; direct node scalars use `NodeStr` and
+`NodeBool`; provenance-free booleans use `BoolValue(0)` / `BoolValue(1)`. Primitive type definitions render as
+`<Str>` and `<Bool>`.
 
 ## Navigation Symbols
 

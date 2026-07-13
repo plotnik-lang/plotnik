@@ -17,8 +17,8 @@ export interface Q {
 }
 --------------------- OUTPUT ---------------------
 {
-  "ids": [],
   "e": null,
+  "ids": [],
   "d": {
     "kind": "debugger_statement",
     "text": "debugger;",
@@ -57,53 +57,55 @@ Q = 00 :: T2
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@32)                            32 : 03
+  02       (@34)                            34 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  └‣─  (debugger_statement) [ArrayOpen ArrayClose Set(M0) Null Set(M1) Node Set(M2)]  07
-  11  ─‣─  (debugger_statement) [Node Set(M2)]  07
-  13  -ε-  [ArrayClose Set(M0)]             11
-  15  ...
-  16   !   (identifier) [Node Push]         18, 13
-  18  ──!  _                                16, 18
-  20   !   _ [ArrayOpen]                    16, 18
-  22  -ε-  [Null Set(M1)]                   20
-  24   !   (empty_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  11
-  27  ──!  _                                22, 24, 27
-  29  └─!  _                                22, 24, 27
-  31  ...
-  32   !   (program)                        29, 08
+  08  └‣─  (debugger_statement) [Node Set(M2)]  07
+  10  ─‣─  (debugger_statement) [Node Set(M2)]  07
+  12  -ε-  [ArrayClose Set(M0)]             10
+  14   !   (identifier) [Node Push]         16, 12
+  16  ──!  _                                14, 16
+  18   !   _ [ArrayOpen]                    14, 16
+  20  -ε-  [Null Set(M1)]                   18
+  22  ...
+  23  ...
+  24  -ε-  [Null Set(M1) ArrayOpen ArrayClose Set(M0)]  08
+  27   !   (empty_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  10
+  30  ──!  _                                20, 27, 30
+  32  └─!  _                                20, 27, 30
+  34   !   (program)                        32, 24
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@32)                            32 : 03
-       ▶   (@32)
+  02       (@34)                            34 : 03
+       ▶   (@34)
 
-@32:
-  32       (program)                        29, 08
+@34:
+  34       (program)                        32, 24
        ●   program
-  29       _                                22, 24, 27
+  32       _                                20, 27, 30
        ●   debugger_statement
-  22  -ε-  [Null Set(M1)]                   20
-  20       _ [ArrayOpen]                    16, 18
+  20  -ε-  [Null Set(M1)]                   18
+  18       _ [ArrayOpen]                    14, 16
        ●   debugger_statement
-  16       (identifier) [Node Push]         18, 13
+  14       (identifier) [Node Push]         16, 12
        ○   debugger_statement
-  20  ❮❮❮ 
-  18       _                                16, 18
-  29  ❮❮❮ 
-  24       (empty_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  11
-       ○   debugger_statement
-  29  ❮❮❮ 
-  27       _                                22, 24, 27
+  18  ❮❮❮ 
+  16       _                                14, 16
   32  ❮❮❮ 
-  08       (debugger_statement) [ArrayOpen ArrayClose Set(M0) Null Set(M1) Node Set(M2)]  07
+  27       (empty_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  10
+       ○   debugger_statement
+  32  ❮❮❮ 
+  30       _                                20, 27, 30
+  34  ❮❮❮ 
+  24  -ε-  [Null Set(M1) ArrayOpen ArrayClose Set(M0)]  08
+  08       (debugger_statement) [Node Set(M2)]  07
        ●   debugger_statement
   07       _                                06
        ●   program
-  06   ◀   (@32)                            
+  06   ◀   (@34)                            
 
 Q:
   03  -ε-  [StructClose]                    05

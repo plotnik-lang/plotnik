@@ -5,13 +5,13 @@ Q = (program
   ] @x
 )
 ------------------- TYPESCRIPT -------------------
-export type QX =
-  | { $tag: "A" }
-  | { $tag: "B" };
-
 export interface Q {
   x: QX;
 }
+
+export type QX =
+  | { $tag: "A" }
+  | { $tag: "B" };
 ---------------------- RUST ----------------------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q {

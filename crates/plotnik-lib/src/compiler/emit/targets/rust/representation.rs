@@ -24,7 +24,7 @@ use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
 
 pub(super) struct TypeFacts {
-    needs_lifetime: HashMap<TypeId, bool>,
+    lifetimes: HashMap<TypeId, LifetimeUsage>,
     /// Per `Ref` node: everything its target reaches through by-value
     /// containment, the target itself included. A ref rendered inside item
     /// `I` closes a by-value cycle exactly when `I` is in its target's
@@ -32,19 +32,31 @@ pub(super) struct TypeFacts {
     by_value_closures: HashMap<TypeId, HashSet<TypeId>>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct LifetimeUsage {
+    pub(super) tree: bool,
+    pub(super) source: bool,
+}
+
+impl LifetimeUsage {
+    fn merge(&mut self, other: Self) {
+        self.tree |= other.tree;
+        self.source |= other.source;
+    }
+}
+
 impl TypeFacts {
     pub(super) fn compute(types: &TypeAnalysis) -> Self {
         let reachable = collect_reachable(types);
         Self {
-            needs_lifetime: lifetime_fixpoint(types, &reachable),
+            lifetimes: lifetime_fixpoint(types, &reachable),
             by_value_closures: ref_target_closures(types, &reachable),
         }
     }
 
-    /// Whether the type's rendering mentions `'t` (transitively holds a node).
-    pub(super) fn needs_lifetime(&self, ty: TypeId) -> bool {
+    pub(super) fn lifetime_usage(&self, ty: TypeId) -> LifetimeUsage {
         *self
-            .needs_lifetime
+            .lifetimes
             .get(&ty)
             .expect("lifetime facts cover every type reachable from a definition output")
     }
@@ -87,27 +99,42 @@ fn collect_reachable(types: &TypeAnalysis) -> Vec<TypeId> {
     out
 }
 
-fn lifetime_fixpoint(types: &TypeAnalysis, reachable: &[TypeId]) -> HashMap<TypeId, bool> {
-    let mut facts: HashMap<TypeId, bool> = reachable.iter().map(|&ty| (ty, false)).collect();
+fn lifetime_fixpoint(types: &TypeAnalysis, reachable: &[TypeId]) -> HashMap<TypeId, LifetimeUsage> {
+    let mut facts: HashMap<TypeId, LifetimeUsage> = reachable
+        .iter()
+        .map(|&ty| (ty, LifetimeUsage::default()))
+        .collect();
 
     loop {
         let mut changed = false;
         for &ty in reachable {
-            if facts[&ty] {
-                continue;
-            }
-            let holds_node = match types.expect_type_shape(ty) {
-                // Custom is a named alias of Node; a void-targeted Ref
-                // renders as Node too.
-                TypeShape::Node | TypeShape::Custom(_) => true,
+            let mut usage = match types.expect_type_shape(ty) {
+                TypeShape::Node | TypeShape::Custom(_) => LifetimeUsage {
+                    tree: true,
+                    source: false,
+                },
+                TypeShape::Str => LifetimeUsage {
+                    tree: false,
+                    source: true,
+                },
                 TypeShape::Ref(def_id) => {
                     let target = types.expect_def_output(*def_id);
-                    target == TYPE_VOID || facts[&target]
+                    if target == TYPE_VOID {
+                        LifetimeUsage {
+                            tree: true,
+                            source: false,
+                        }
+                    } else {
+                        facts[&target]
+                    }
                 }
-                shape => shape.child_type_ids().any(|child| facts[&child]),
+                _ => LifetimeUsage::default(),
             };
-            if holds_node {
-                facts.insert(ty, true);
+            for child in types.expect_type_shape(ty).child_type_ids() {
+                usage.merge(facts[&child]);
+            }
+            if usage != facts[&ty] {
+                facts.insert(ty, usage);
                 changed = true;
             }
         }

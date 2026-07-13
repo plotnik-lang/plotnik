@@ -10,3 +10,5 @@ pub use recursion::validate_recursion;
 
 #[cfg(test)]
 mod collect_tests;
+#[cfg(test)]
+mod dependency_analysis_tests;

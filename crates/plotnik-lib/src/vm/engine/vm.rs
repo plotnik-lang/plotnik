@@ -3,15 +3,15 @@
 use tree_sitter::Tree;
 
 use crate::bytecode::{
-    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, Effect, EffectKind, Entrypoint,
-    Module, Nav, NodeKindConstraint, PredicateOp,
+    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedRoutedCall, DecodedSplitCall,
+    Effect, EffectKind, Entrypoint, Module, Nav, NodeKindConstraint, PredicateOp,
 };
 
 use crate::core::NodeFieldId;
 
 use plotnik_rt::{
-    CallResume, Checkpoint, EffectLog, Engine, ResolvedRuntimeLimits, Resume, RuntimeEffect,
-    RuntimeLimitSpec, SkipPolicy,
+    CallResume, Checkpoint, EffectLog, Engine, ResolvedRuntimeLimits, Resume, ReturnOutcome,
+    RuntimeEffect, RuntimeLimitSpec, SkipPolicy,
 };
 
 use super::error::{ControlFlow, RuntimeError, Signal};
@@ -185,7 +185,9 @@ impl<'t> VM<'t> {
             let result = match module.decoded().step(self.ip) {
                 DecodedInstr::Match(m) => self.exec_match(m, module, tracer),
                 DecodedInstr::Call(c) => self.exec_call(c, module, tracer),
-                DecodedInstr::Return => self.exec_return(tracer),
+                DecodedInstr::RoutedCall(c) => self.exec_routed_call(c, tracer),
+                DecodedInstr::SplitCall(c) => self.exec_split_call(c, tracer),
+                DecodedInstr::Return(outcome) => self.exec_return(outcome, tracer),
             };
 
             match result {
@@ -486,6 +488,32 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
+    fn exec_split_call<T: Tracer>(
+        &mut self,
+        call: DecodedSplitCall,
+        tracer: &mut T,
+    ) -> Result<(), Signal> {
+        if T::ENABLED {
+            tracer.trace_call(call.target);
+        }
+        self.engine.enter_split_frame(call.matched, call.zero);
+        self.ip = call.target;
+        Ok(())
+    }
+
+    fn exec_routed_call<T: Tracer>(
+        &mut self,
+        call: DecodedRoutedCall,
+        tracer: &mut T,
+    ) -> Result<(), Signal> {
+        if T::ENABLED {
+            tracer.trace_call(call.target);
+        }
+        self.engine.enter_frame(call.next);
+        self.ip = call.target;
+        Ok(())
+    }
+
     /// Push a frame for `target` (returning to `next`) and jump in.
     fn enter_callee<T: Tracer>(&mut self, target: u16, next: u16, tracer: &mut T) {
         if T::ENABLED {
@@ -560,17 +588,26 @@ impl<'t> VM<'t> {
         Ok(())
     }
 
-    fn exec_return<T: Tracer>(&mut self, tracer: &mut T) -> Result<(), Signal> {
+    fn exec_return<T: Tracer>(
+        &mut self,
+        outcome: ReturnOutcome,
+        tracer: &mut T,
+    ) -> Result<(), Signal> {
         if T::ENABLED {
-            tracer.trace_return();
+            tracer.trace_return(outcome);
         }
 
         // If no frames, we're returning from top-level entrypoint → Accept
         if self.engine.frames_empty() {
+            assert_eq!(
+                outcome,
+                ReturnOutcome::Matched,
+                "entrypoint returned through a zero-width call continuation"
+            );
             return Err(ControlFlow::Accept.into());
         }
 
-        self.ip = self.engine.exit_frame();
+        self.ip = self.engine.exit_frame(outcome);
         Ok(())
     }
 
@@ -711,54 +748,75 @@ impl<'t> VM<'t> {
     }
 
     fn emit_effect<T: Tracer>(&mut self, op: Effect, tracer: &mut T) {
+        use crate::bytecode::EffectSuppression;
         use EffectKind::*;
 
-        let effect = match op.kind {
-            SuppressBegin => {
-                let was_suppressed = self.engine.suppress_begin();
-                if T::ENABLED {
-                    tracer.trace_suppress_control(SuppressBegin, was_suppressed);
-                }
-                return;
-            }
-            SuppressEnd => {
-                let still_suppressed = self.engine.suppress_end();
-                if T::ENABLED {
-                    tracer.trace_suppress_control(SuppressEnd, still_suppressed);
-                }
-                return;
-            }
-            // Span effects bypass suppression: uncaptured `(Foo)` bodies still
-            // produce source hulls even when they carry no output bindings.
-            SpanStartAt => RuntimeEffect::SpanStart {
-                id: op.payload as u16,
-                node: Some(self.engine.node()),
-            },
-            SpanStart => RuntimeEffect::SpanStart {
-                id: op.payload as u16,
-                node: None,
-            },
-            SpanEnd => RuntimeEffect::SpanEnd(op.payload as u16),
-
-            // Data effects go through the engine's suppression gate; the
-            // closure builds them lazily so a suppressed `Node` capture never
-            // reads the cursor.
-            _ => {
-                let logged = self.engine.emit_data(|cursor| match op.kind {
-                    Node => RuntimeEffect::Node(cursor.node()),
-                    ArrayOpen => RuntimeEffect::ArrayOpen,
-                    Push => RuntimeEffect::Push,
-                    ArrayClose => RuntimeEffect::ArrayClose,
-                    StructOpen => RuntimeEffect::StructOpen,
-                    StructClose => RuntimeEffect::StructClose,
-                    Set => RuntimeEffect::Set(op.payload as u16),
-                    EnumOpen => RuntimeEffect::EnumOpen(op.payload as u16),
-                    EnumClose => RuntimeEffect::EnumClose,
-                    Null => RuntimeEffect::Null,
-                    SuppressBegin | SuppressEnd | SpanStartAt | SpanStart | SpanEnd => {
-                        unreachable!("bracketing effects are handled before the data gate")
+        let effect = match op.kind.suppression() {
+            EffectSuppression::Control => match op.kind {
+                SuppressBegin => {
+                    let was_suppressed = self.engine.suppress_begin();
+                    if T::ENABLED {
+                        tracer.trace_suppress_control(SuppressBegin, was_suppressed);
                     }
-                });
+                    return;
+                }
+                SuppressEnd => {
+                    let still_suppressed = self.engine.suppress_end();
+                    if T::ENABLED {
+                        tracer.trace_suppress_control(SuppressEnd, still_suppressed);
+                    }
+                    return;
+                }
+                _ => unreachable!("control metadata only classifies suppression brackets"),
+            },
+            EffectSuppression::Bypass => match op.kind {
+                ScalarMark => {
+                    let logged = self.engine.scalar_mark();
+                    if T::ENABLED {
+                        match logged {
+                            Some(effect) => tracer.trace_effect(effect),
+                            None => tracer.trace_effect_suppressed(op.kind, op.payload),
+                        }
+                    }
+                    return;
+                }
+                SpanStartAt => RuntimeEffect::SpanStart {
+                    id: op.payload as u16,
+                    node: Some(self.engine.node()),
+                },
+                SpanStart => RuntimeEffect::SpanStart {
+                    id: op.payload as u16,
+                    node: None,
+                },
+                SpanEnd => RuntimeEffect::SpanEnd(op.payload as u16),
+                _ => unreachable!("bypass metadata only classifies spans and scalar marks"),
+            },
+            EffectSuppression::Data => {
+                let logged = match op.kind {
+                    ScalarOpen => self.engine.scalar_open(),
+                    StrClose => self.engine.scalar_close_str(),
+                    BoolClose => self.engine.scalar_close_bool(op.payload != 0),
+                    NodeStr => self.engine.node_str(),
+                    NodeBool => self.engine.node_bool(),
+                    BoolValue => self.engine.bool_value(op.payload != 0),
+                    _ => self.engine.emit_data(|cursor| match op.kind {
+                        Node => RuntimeEffect::Node(cursor.node()),
+                        ArrayOpen => RuntimeEffect::ArrayOpen,
+                        Push => RuntimeEffect::Push,
+                        ArrayClose => RuntimeEffect::ArrayClose,
+                        StructOpen => RuntimeEffect::StructOpen,
+                        StructClose => RuntimeEffect::StructClose,
+                        Set => RuntimeEffect::Set(op.payload as u16),
+                        EnumOpen => RuntimeEffect::EnumOpen(op.payload as u16),
+                        EnumClose => RuntimeEffect::EnumClose,
+                        Null => RuntimeEffect::Null,
+                        SuppressBegin | SuppressEnd | SpanStartAt | SpanStart | SpanEnd
+                        | ScalarOpen | ScalarMark | StrClose | BoolClose | NodeStr | NodeBool
+                        | BoolValue => {
+                            unreachable!("metadata routes non-ordinary data effects first")
+                        }
+                    }),
+                };
                 if T::ENABLED {
                     match logged {
                         Some(effect) => tracer.trace_effect(effect),

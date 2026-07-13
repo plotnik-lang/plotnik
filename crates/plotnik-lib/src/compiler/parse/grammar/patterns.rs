@@ -63,6 +63,16 @@ impl Parser<'_, '_> {
             return false;
         }
 
+        if self.at(SyntaxKind::DoubleColon) {
+            self.start_node(SyntaxKind::Error);
+            if let Some(report) = self.report_current(DiagnosticKind::CaptureTypeWithoutCapture) {
+                report.emit();
+            }
+            self.parse_capture_type();
+            self.finish_node();
+            return false;
+        }
+
         if self.at_ts_predicate() {
             self.error_unsupported_predicate();
             return false;

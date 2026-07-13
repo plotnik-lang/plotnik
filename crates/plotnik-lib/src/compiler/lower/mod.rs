@@ -5,7 +5,7 @@ use crate::compiler::lower::epsilon::eliminate_epsilons;
 use crate::compiler::lower::ir::{LoweredNfa, SemanticNfa};
 use crate::compiler::lower::pack::pack_instructions;
 use crate::compiler::lower::thompson::NfaBuilder;
-use crate::compiler::lower::verify::{run_verified, verify_constructed};
+use crate::compiler::lower::verify::{run_root_pruning_verified, run_verified, verify_constructed};
 
 pub mod collapse;
 pub mod dead;
@@ -32,7 +32,7 @@ pub(crate) fn lower_semantic(input: &LowerInput<'_>) -> SemanticNfa {
     let mut ir = NfaBuilder::build_ir(input);
     verify_constructed(&ir, input);
     run_verified("eliminate_epsilons", &mut ir, input, eliminate_epsilons);
-    run_verified("remove_unreachable", &mut ir, input, remove_unreachable);
+    run_root_pruning_verified("remove_unreachable", &mut ir, input, remove_unreachable);
     run_verified("collapse_up", &mut ir, input, collapse_up);
     // Dedup is a bisimulation quotient, which the path fingerprint cannot
     // survive: merging twin states on a loop shifts the walker's cycle cut a

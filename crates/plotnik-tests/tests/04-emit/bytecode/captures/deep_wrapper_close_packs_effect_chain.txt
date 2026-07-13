@@ -52,38 +52,38 @@ S16 "Q"
 S17 "identifier"
 
 [type_defs]
-T00 = <Node>
-T01 = Struct  M0:1  ; { a }
-T02 = Struct  M1:1  ; { b }
-T03 = Struct  M2:1  ; { c }
-T04 = Struct  M3:1  ; { d }
-T05 = Struct  M4:1  ; { e }
-T06 = Struct  M5:1  ; { f }
-T07 = Struct  M6:1  ; { g }
-T08 = Struct  M7:1  ; { h }
+T0 = <Node>
+T1 = Struct  M0:1  ; { a }
+T2 = Struct  M1:1  ; { b }
+T3 = Struct  M2:1  ; { c }
+T4 = Struct  M3:1  ; { d }
+T5 = Struct  M4:1  ; { e }
+T6 = Struct  M5:1  ; { f }
+T7 = Struct  M6:1  ; { g }
+T8 = Struct  M7:1  ; { h }
 
 [type_members]
-M0: S01 → T00  ; a: <Node>
-M1: S02 → T01  ; b: QHGFEDCB
-M2: S03 → T02  ; c: QHGFEDC
-M3: S04 → T03  ; d: QHGFED
-M4: S05 → T04  ; e: QHGFE
-M5: S06 → T05  ; f: QHGF
-M6: S07 → T06  ; g: QHG
-M7: S08 → T07  ; h: QH
+M0: S01 → T0  ; a: <Node>
+M1: S02 → T1  ; b: QHGFEDCB
+M2: S03 → T2  ; c: QHGFEDC
+M3: S04 → T3  ; d: QHGFED
+M4: S05 → T4  ; e: QHGFE
+M5: S06 → T5  ; f: QHGF
+M6: S07 → T6  ; g: QHG
+M7: S08 → T7  ; h: QH
 
 [type_names]
-N0: S09 → T01  ; QHGFEDCB
-N1: S10 → T02  ; QHGFEDC
-N2: S11 → T03  ; QHGFED
-N3: S12 → T04  ; QHGFE
-N4: S13 → T05  ; QHGF
-N5: S14 → T06  ; QHG
-N6: S15 → T07  ; QH
-N7: S16 → T08  ; Q
+N0: S09 → T1  ; QHGFEDCB
+N1: S10 → T2  ; QHGFEDC
+N2: S11 → T3  ; QHGFED
+N3: S12 → T4  ; QHGFE
+N4: S13 → T5  ; QHGF
+N5: S14 → T6  ; QHG
+N6: S15 → T7  ; QH
+N7: S16 → T8  ; Q
 
 [entrypoints]
-Q = 00 :: T08
+Q = 00 :: T8
 
 [transitions]
 Q:

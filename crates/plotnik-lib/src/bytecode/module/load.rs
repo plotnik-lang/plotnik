@@ -7,7 +7,7 @@
 use super::super::effects::{Effect, EffectKind};
 use super::super::instructions::{
     MATCH_PAYLOAD_START, MatchCounts, MatchPredicate, PAYLOAD_SLOT_SIZE, PREDICATE_SIZE,
-    PREDICATE_SLOTS, header_byte,
+    PREDICATE_SLOTS, ReturnEntry, header_byte,
 };
 use super::super::node_kind_constraint::NodeKindConstraint;
 use super::super::sections::SymbolNameEntry;
@@ -77,6 +77,83 @@ pub enum ModuleError {
     InvalidSpanPayload(u16),
     #[error("span bracket imbalance at step {0}")]
     SpanImbalance(u16),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct ReturnOutcomes(u8);
+
+impl ReturnOutcomes {
+    const NONE: Self = Self(0);
+    const MATCHED: Self = Self(1);
+    const BOTH: Self = Self(3);
+
+    fn insert(&mut self, outcome: plotnik_rt::ReturnOutcome) {
+        self.0 |= match outcome {
+            plotnik_rt::ReturnOutcome::Matched => Self::MATCHED.0,
+            plotnik_rt::ReturnOutcome::Zero => 2,
+        };
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct ReturnContract {
+    outcomes: ReturnOutcomes,
+    entry: Option<ReturnEntry>,
+    mixed_entries: bool,
+}
+
+impl ReturnContract {
+    const NONE: Self = Self {
+        outcomes: ReturnOutcomes::NONE,
+        entry: None,
+        mixed_entries: false,
+    };
+
+    fn insert(&mut self, return_: Return) {
+        self.outcomes.insert(return_.mode.outcome());
+        match self.entry {
+            None => self.entry = Some(return_.mode.entry()),
+            Some(entry) if entry != return_.mode.entry() => self.mixed_entries = true,
+            Some(_) => {}
+        }
+    }
+
+    fn is(self, outcomes: ReturnOutcomes, entry: ReturnEntry) -> bool {
+        self.outcomes == outcomes && self.entry == Some(entry) && !self.mixed_entries
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DepthRoute {
+    Caller,
+    RoutedMatchOnly(i32),
+    RoutedSplit(i32),
+}
+
+impl DepthRoute {
+    fn expected(self, outcome: plotnik_rt::ReturnOutcome) -> Option<i32> {
+        match (self, outcome) {
+            (Self::Caller, plotnik_rt::ReturnOutcome::Matched) => Some(0),
+            (Self::RoutedMatchOnly(depth), plotnik_rt::ReturnOutcome::Matched)
+            | (Self::RoutedSplit(depth), plotnik_rt::ReturnOutcome::Matched) => Some(depth),
+            (Self::RoutedSplit(_), plotnik_rt::ReturnOutcome::Zero) => Some(0),
+            (Self::Caller | Self::RoutedMatchOnly(_), plotnik_rt::ReturnOutcome::Zero) => None,
+        }
+    }
+
+    fn matched_depth(self) -> i32 {
+        match self {
+            Self::Caller => 0,
+            Self::RoutedMatchOnly(depth) | Self::RoutedSplit(depth) => depth,
+        }
+    }
+
+    fn return_entry(self) -> ReturnEntry {
+        match self {
+            Self::Caller => ReturnEntry::Caller,
+            Self::RoutedMatchOnly(_) | Self::RoutedSplit(_) => ReturnEntry::Routed,
+        }
+    }
 }
 
 /// Round `value` up to the next multiple of `align` in `u64` (overflow-free).
@@ -200,6 +277,7 @@ impl Module {
         self.validate_symbol_ids()?;
         let is_start = self.validate_transitions()?;
         self.validate_entrypoints(&is_start)?;
+        self.validate_return_routes()?;
         self.validate_depth_neutrality()?;
         // Structural validity (every step decodes, every jump lands on a start)
         // is now established, so the effect-stack walk can use the safe typed
@@ -494,20 +572,22 @@ impl Module {
         Ok(())
     }
 
-    /// Every entry body returns at the same cursor depth it entered with.
+    /// Every entry body returns at the cursor depth promised by its call form.
     ///
     /// The VM treats call bodies as independent cursors: a `Call` applies its own
-    /// navigation, then resumes at `next` after a net-neutral callee returns. We
-    /// therefore validate each entrypoint target and every encoded `Call` target
-    /// as its own root.
+    /// navigation, then resumes at `next` after a net-neutral callee returns.
+    /// A `SplitCall` routes its entry navigation through the callee instead, so
+    /// its body and both continuations have that navigation's depth delta.
     fn validate_depth_neutrality(&self) -> Result<(), ModuleError> {
-        let mut roots = Vec::new();
-        let mut known = HashSet::new();
+        let mut roots = HashMap::new();
 
         for entrypoint in self.entrypoints().iter() {
             let target = u16::from(entrypoint.target());
-            if known.insert(target) {
-                roots.push(target);
+            let route = DepthRoute::Caller;
+            if let Some(expected) = roots.insert(target, route)
+                && expected != route
+            {
+                return Err(ModuleError::MalformedTransitions);
             }
         }
 
@@ -519,8 +599,31 @@ impl Module {
                 }
                 Instruction::Call(c) => {
                     let target = u16::from(c.target);
-                    if known.insert(target) {
-                        roots.push(target);
+                    let route = DepthRoute::Caller;
+                    if let Some(expected) = roots.insert(target, route)
+                        && expected != route
+                    {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    step += 1;
+                }
+                Instruction::RoutedCall(c) => {
+                    let target = u16::from(c.target);
+                    let route = DepthRoute::RoutedMatchOnly(c.entry_nav.depth_delta());
+                    if let Some(previous) = roots.insert(target, route)
+                        && previous != route
+                    {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    step += 1;
+                }
+                Instruction::SplitCall(c) => {
+                    let target = u16::from(c.target);
+                    let route = DepthRoute::RoutedSplit(c.entry_nav.depth_delta());
+                    if let Some(previous) = roots.insert(target, route)
+                        && previous != route
+                    {
+                        return Err(ModuleError::MalformedTransitions);
                     }
                     step += 1;
                 }
@@ -530,13 +633,103 @@ impl Module {
             }
         }
 
-        for root in roots {
-            self.validate_depth_root(root)?;
+        for (root, route) in roots {
+            self.validate_depth_root(root, route)?;
         }
         Ok(())
     }
 
-    fn validate_depth_root(&self, entry: u16) -> Result<(), ModuleError> {
+    /// Calls and callees must agree on the return outcomes carried by their
+    /// frames. This keeps malformed bytecode from selecting a continuation an
+    /// ordinary frame does not own, or from encoding a split call whose zero
+    /// route can never be taken.
+    fn validate_return_routes(&self) -> Result<(), ModuleError> {
+        let mut cache = HashMap::new();
+
+        for entrypoint in self.entrypoints().iter() {
+            let target = u16::from(entrypoint.target());
+            if !self
+                .return_contract(target, &mut cache)
+                .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
+            {
+                return Err(ModuleError::MalformedTransitions);
+            }
+        }
+
+        let mut step = 0;
+        while step < self.header.transitions_count {
+            match self.decode_step(step) {
+                Instruction::Match(matched) => step += matched.step_count(),
+                Instruction::Call(call) => {
+                    let target = u16::from(call.target);
+                    if !self
+                        .return_contract(target, &mut cache)
+                        .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
+                    {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    step += 1;
+                }
+                Instruction::RoutedCall(call) => {
+                    let target = u16::from(call.target);
+                    if !self
+                        .return_contract(target, &mut cache)
+                        .is(ReturnOutcomes::MATCHED, ReturnEntry::Routed)
+                    {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    step += 1;
+                }
+                Instruction::SplitCall(call) => {
+                    let target = u16::from(call.target);
+                    if !self
+                        .return_contract(target, &mut cache)
+                        .is(ReturnOutcomes::BOTH, ReturnEntry::Routed)
+                    {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    step += 1;
+                }
+                Instruction::Return(_) => step += 1,
+            }
+        }
+        Ok(())
+    }
+
+    fn return_contract(
+        &self,
+        entry: u16,
+        cache: &mut HashMap<u16, ReturnContract>,
+    ) -> ReturnContract {
+        if let Some(&contract) = cache.get(&entry) {
+            return contract;
+        }
+
+        let mut contract = ReturnContract::NONE;
+        let mut seen = HashSet::new();
+        let mut work = vec![entry];
+        while let Some(step) = work.pop() {
+            if !seen.insert(step) {
+                continue;
+            }
+            match self.decode_step(step) {
+                Instruction::Match(matched) => {
+                    work.extend(matched.successors().map(u16::from));
+                }
+                Instruction::Call(call) => work.push(u16::from(call.next)),
+                Instruction::RoutedCall(call) => work.push(u16::from(call.next)),
+                Instruction::SplitCall(call) => {
+                    work.push(u16::from(call.returns.zero));
+                    work.push(u16::from(call.returns.matched));
+                }
+                Instruction::Return(return_) => contract.insert(return_),
+            }
+        }
+        cache.insert(entry, contract);
+        contract
+    }
+
+    fn validate_depth_root(&self, entry: u16, route: DepthRoute) -> Result<(), ModuleError> {
         let mut memo: HashMap<u16, i32> = HashMap::new();
         let mut work = vec![(entry, 0i32)];
 
@@ -550,15 +743,22 @@ impl Module {
             memo.insert(step, net);
 
             match self.decode_step(step) {
-                Instruction::Return(_) => {
-                    if net != 0 {
+                Instruction::Return(return_) => {
+                    if return_.mode.entry() != route.return_entry() {
+                        return Err(ModuleError::DepthImbalance(step));
+                    }
+                    let Some(expected_exit) = route.expected(return_.mode.outcome()) else {
+                        return Err(ModuleError::DepthImbalance(step));
+                    };
+                    if net != expected_exit {
                         return Err(ModuleError::DepthImbalance(step));
                     }
                 }
                 Instruction::Match(m) => {
                     let next_net = net + m.nav.depth_delta();
                     if m.succ_count() == 0 {
-                        if next_net != 0 {
+                        let expected_exit = route.matched_depth();
+                        if next_net != expected_exit {
                             return Err(ModuleError::DepthImbalance(step));
                         }
                     } else {
@@ -569,6 +769,16 @@ impl Module {
                 }
                 Instruction::Call(c) => {
                     work.push((u16::from(c.next), net + c.nav.depth_delta()));
+                }
+                Instruction::RoutedCall(c) => {
+                    work.push((u16::from(c.next), net + c.entry_nav.depth_delta()));
+                }
+                Instruction::SplitCall(c) => {
+                    work.push((
+                        u16::from(c.returns.matched),
+                        net + c.entry_nav.depth_delta(),
+                    ));
+                    work.push((u16::from(c.returns.zero), net));
                 }
             }
         }
@@ -755,17 +965,23 @@ impl Module {
             // node_class_bits (header bits 4-5) is meaningful only for Match
             // variants; Call/Return ignore it, so the format pins those bits to
             // zero — a malformed non-zero node_class_bits there is smuggled state.
-            if matches!(opcode, Opcode::Call | Opcode::Return)
-                && header_byte::node_class_bits(header) != 0
+            if matches!(
+                opcode,
+                Opcode::Call | Opcode::RoutedCall | Opcode::Return | Opcode::SplitCall
+            ) && header_byte::node_class_bits(header) != 0
             {
                 return Err(ModuleError::MalformedTransitions);
             }
 
             match opcode {
                 Opcode::Return => {
-                    // Bytes 1-7 are reserved padding (`Return::to_bytes`); a
-                    // malformed non-zero pad would otherwise pass unnoticed.
-                    check_zero(instr_off + 1, 7)?;
+                    if plotnik_rt::ReturnOutcome::from_byte(read_u8(instr_off + 1)?).is_none() {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    if ReturnEntry::from_byte(read_u8(instr_off + 2)?).is_none() {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    check_zero(instr_off + 3, 5)?;
                 }
                 Opcode::Call => {
                     // `Call::from_bytes` decodes a nav and two non-zero `StepId`s.
@@ -780,7 +996,32 @@ impl Module {
                     targets.push(next);
                     targets.push(target);
                 }
-                _ => {
+                Opcode::RoutedCall => {
+                    if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    check_zero(instr_off + 2, 2)?;
+                    let next = read_transition_u16(storage, instr_off + 4)?;
+                    let target = read_transition_u16(storage, instr_off + 6)?;
+                    if next == 0 || target == 0 {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    targets.push(next);
+                    targets.push(target);
+                }
+                Opcode::SplitCall => {
+                    if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    let matched = read_transition_u16(storage, instr_off + 2)?;
+                    let zero = read_transition_u16(storage, instr_off + 4)?;
+                    let target = read_transition_u16(storage, instr_off + 6)?;
+                    if matched == 0 || zero == 0 || target == 0 {
+                        return Err(ModuleError::MalformedTransitions);
+                    }
+                    targets.extend([matched, zero, target]);
+                }
+                opcode if opcode.is_match() => {
                     // A Match variant (`Match8` or extended).
                     let node_kind = header_byte::node_class_bits(header);
                     if NodeKindConstraint::try_from_bytes(
@@ -805,6 +1046,7 @@ impl Module {
                         self.validate_extended_match(opcode, instr_off, step, &mut targets)?;
                     }
                 }
+                _ => unreachable!("all non-match opcodes handled above"),
             }
 
             step = step
@@ -860,10 +1102,10 @@ impl Module {
             return Err(ModuleError::MalformedTransitions);
         }
 
-        // Effect opcodes are decoded (neg fields are plain `u16`); a `Set`/`Enum`
-        // operand indexes the type-member table via the materializer's `get_member`,
-        // which asserts the index is in bounds.
-        let members = self.header.type_members_count;
+        // Every decoded effect validates its payload through `EffectKind`'s
+        // metadata contract before any trusting consumer sees it.
+        let members = usize::from(self.header.type_members_count);
+        let spans = usize::from(self.header.spans_count);
         let check_effect = |slot: usize| -> Result<(), ModuleError> {
             let off = instr_off + MATCH_PAYLOAD_START + slot * PAYLOAD_SLOT_SIZE;
             let b = storage
@@ -871,19 +1113,16 @@ impl Module {
                 .ok_or(ModuleError::MalformedTransitions)?;
             let op =
                 Effect::try_from_bytes([b[0], b[1]]).ok_or(ModuleError::MalformedTransitions)?;
-            if matches!(op.kind, EffectKind::Set | EffectKind::EnumOpen)
-                && op.payload as u16 >= members
-            {
-                return Err(ModuleError::MalformedTransitions);
+            if op.kind.accepts_payload(op.payload, members, spans) {
+                return Ok(());
             }
             if matches!(
                 op.kind,
                 EffectKind::SpanStartAt | EffectKind::SpanStart | EffectKind::SpanEnd
-            ) && op.payload as u16 >= self.header.spans_count
-            {
+            ) {
                 return Err(ModuleError::InvalidSpanPayload(step));
             }
-            Ok(())
+            Err(ModuleError::MalformedTransitions)
         };
         for i in 0..effects {
             check_effect(i)?;

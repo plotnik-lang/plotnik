@@ -50,67 +50,100 @@ Q = 00 :: T2
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@58)                            58 : 03
+  02       (@40)                            40 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06                                        ▶
-  07  ─‣┘  _                                40
-  08  -ε-  [Null]                           06
-  10  └‣─  (debugger_statement)             31
-  11  ─‣─  (debugger_statement) [SuppressEnd]  31
-  13                                        ▶
-  14  └‣─  (debugger_statement)             21
-  15  ─‣┘  _                                43
-  16  ─‣─  (debugger_statement) [SuppressEnd]  21
-  18  └‣─  (@26)                            26 : 16
-  19  -ε-  [SuppressBegin]                  18
-  21  ─‣┘  _                                13
-  22   !   (statement_block) [Node]         14, 19
-  24  ──!  _                                22, 24
-  26   !   _                                22, 24
-  28  └‣─  (@26)                            26 : 11
-  29  -ε-  [SuppressBegin]                  28
-  31  ─‣┘  _                                06
-  32   !   (statement_block) [Node]         10, 29
-  34  ──!  _                                32, 34
-  36   !   _                                32, 34
-  38  -ε-                                   36, 08
-  40                                        ▶
-  41  └‣─  (expression_statement) [Node Set(M0)]  07
-  43  ─‣─  (expression_statement) [Node Set(M0)]  07
-  45  └‣─  (debugger_statement)             15
-  46  ─‣─  (debugger_statement) [SuppressEnd]  15
-  48  └‣─  (@26)                            26 : 46
-  49  -ε-  [SuppressBegin]                  48
-  51   !   (statement_block)                45, 49
-  53  ──!  _                                51, 53
-  55  ...
-  56  └─!  _                                51, 53
-  58   !   (program)                        56, 41
+  07  ─‣┘  _                                06
+  08  └‣─  (expression_statement) [Node Set(M0)]  07
+  10  ─‣─  (expression_statement) [Node Set(M0)]  07
+  12  └‣─  (debugger_statement) [SuppressEnd]  33
+  14  ─‣─  (debugger_statement) [SuppressEnd]  33
+  16                                        ▶
+  17                                        ▶ zero
+  18  └‣─  (debugger_statement) [SuppressEnd]  23
+  20  ─‣─  (debugger_statement) [SuppressEnd]  23
+  22       (@30)                            30 : 20 / 18
+  23  ─‣┘  _                                16
+  24   !   (statement_block) [SuppressBegin]  22
+  26  ──!  _                                24, 26
+  28  └─!  _                                24, 26
+  30  -ε-                                   28, 17
+  32       (@30)                            30 : 14 / 12
+  33  ─‣┘  _                                10
+  34   !   (statement_block) [SuppressBegin]  32
+  36  ──!  _                                34, 36
+  38  └─!  _                                34, 36
+  40   !   (program)                        38, 08
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@58)                            58 : 03
-       ▶   (@58)
+  02       (@40)                            40 : 03
+       ▶   (@40)
 
-@58:
-  58       (program)                        56, 41
+@40:
+  40       (program)                        38, 08
        ●   program
-  56       _                                51, 53
+  38       _                                34, 36
        ●   statement_block
-  51       (statement_block)                45, 49
+  34       (statement_block) [SuppressBegin]  32
        ●   statement_block
-  45       (debugger_statement)             15
+  32       (@30)                            30 : 14 / 12
+       ▶   (@30)
+
+@30:
+  30  -ε-                                   28, 17
+  28       _                                24, 26
+       ●   {
+  24       (statement_block) [SuppressBegin]  22
        ○   {
-       ○   statement_block
-       ●   debugger_statement
-  15       _                                43
+  28  ❮❮❮ 
+  26       _                                24, 26
        ●   statement_block
-  43       (expression_statement) [Node Set(M0)]  07
+  24       (statement_block) [SuppressBegin]  22
+       ●   statement_block
+  22       (@30)                            30 : 20 / 18
+       ▶   (@30)
+
+@30:
+  30  -ε-                                   28, 17
+  28       _                                24, 26
+       ●   {
+  24       (statement_block) [SuppressBegin]  22
+       ○   {
+  28  ❮❮❮ 
+  26       _                                24, 26
+       ●   debugger_statement
+  24       (statement_block) [SuppressBegin]  22
+       ○   debugger_statement
+  26  ❮❮❮ 
+  26       _                                24, 26
+       ●   }
+  24       (statement_block) [SuppressBegin]  22
+       ○   }
+  26  ❮❮❮ 
+  26       _                                24, 26
+  30  ❮❮❮ 
+  17   ◀   (@30)                            zero
+
+@30:
+  18       (debugger_statement) [SuppressEnd]  23
+       ○   {
+       ●   debugger_statement
+  23       _                                16
+       ●   statement_block
+  16   ◀   (@30)                            
+
+@40:
+  14       (debugger_statement) [SuppressEnd]  33
+       ●   debugger_statement
+  33       _                                10
+       ●   statement_block
+  10       (expression_statement) [Node Set(M0)]  07
        ●   expression_statement
-  07       _                                40
+  07       _                                06
        ●   program
-  40   ◀   (@58)                            
+  06   ◀   (@40)                            
 
 Q:
   03  -ε-  [StructClose]                    05

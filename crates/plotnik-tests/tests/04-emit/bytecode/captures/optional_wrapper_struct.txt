@@ -7,41 +7,16 @@ Q = {
 [entrypoints]
 
 [transitions]
-Q:
-  00  -ε-                                   10, 02
-  01                                        ▶
-  02  -ε-  [Null Set(outer)]                01
-  05   !   (identifier) [StructOpen Node Set(id) StructClose Set(inner) StructClose Set(outer)]  01
-  07  -ε-  [StructOpen]                     05
-  09  ──!  _                                07, 09
-  10   !   _                                07, 09
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
-S1 "id"
-S2 "inner"
-S3 "outer"
-S4 "QOuterInner"
-S5 "QOuter"
-S6 "Q"
-S7 "identifier"
+S1 "identifier"
 
 [type_defs]
-T0 = <Node>
-T1 = Struct  M0:1  ; { id }
-T2 = Struct  M1:1  ; { inner }
-T3 = Struct  M2:1  ; { outer }
-T4 = Optional(T2)  ; QOuter?
 
 [type_members]
-M0: S1 → T0  ; id: <Node>
-M1: S2 → T1  ; inner: QOuterInner
-M2: S3 → T4  ; outer: T4
 
 [type_names]
-N0: S4 → T1  ; QOuterInner
-N1: S5 → T2  ; QOuter
-N2: S6 → T3  ; Q
 
 [entrypoints]
 

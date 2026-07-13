@@ -1,0 +1,62 @@
+Unused = (comment)*
+Used = (comment)+
+Q = (program (Used))
+--------------------- INPUT ----------------------
+---------------------- NFA -----------------------
+[entrypoints]
+Q = 20
+
+[transitions]
+Q:
+  01                                        ▶
+  02   !   (program) [SuppressBegin]        17
+  03  ─‣┘  _ [SuppressEnd]                  01
+
+Used:
+  05                                        ▶
+  06  -ε-  [ArrayClose]                     05
+  08   !   (comment) [Node Push]            10, 06
+  10  ──!  _                                08, 10
+  11   !   _ [ArrayOpen]                    08, 10
+
+Q:
+  17  └‣─  (Used)                           11 : 03
+
+Q (entrypoint):
+  19                                        ▶
+  20       (Q)                              02 : 19
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "Used"
+S2 "comment"
+S3 "program"
+S4 "Q"
+
+[type_defs]
+T0 = <Void>
+T1 = <Node>
+T2 = ArrayPlus(T1)  ; <Node>+
+
+[type_members]
+
+[type_names]
+N0: S1 → T2  ; Used
+
+[entrypoints]
+Q = 00 :: T0
+
+[transitions]
+Q:
+  00       (@16)                            16 : 01
+  01                                        ▶
+  02  └‣─  (@14)                            14 : 03
+  03  ─‣┘  _ [SuppressEnd]                  05
+  05                                        ▶
+  06                                        ▶
+  07  ...
+  08  -ε-  [ArrayClose]                     06
+  10   !   (comment) [Node Push]            12, 08
+  12  ──!  _                                10, 12
+  14   !   _ [ArrayOpen]                    10, 12
+  16   !   (program) [SuppressBegin]        02

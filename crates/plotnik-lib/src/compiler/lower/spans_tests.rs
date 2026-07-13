@@ -23,7 +23,7 @@ fn assigns_dense_spans_in_walk_order() {
             SpanKind::Pattern,
             SpanKind::Pattern,
             SpanKind::Capture,
-            SpanKind::Annotation,
+            SpanKind::CaptureType,
             SpanKind::Field,
             SpanKind::Pattern,
         ]
@@ -32,7 +32,7 @@ fn assigns_dense_spans_in_walk_order() {
 }
 
 #[test]
-fn token_spans_cover_capture_quantifier_field_and_annotation_tokens() {
+fn token_spans_cover_capture_quantifier_field_and_capture_type_tokens() {
     let src = exact_range_query();
     let spans = inspected_spans(src);
 
@@ -40,10 +40,47 @@ fn token_spans_cover_capture_quantifier_field_and_annotation_tokens() {
     assert_eq!(span_text(src, find_kind(&spans, SpanKind::Quantifier)), "?");
     assert_eq!(span_text(src, find_kind(&spans, SpanKind::Field)), "name");
 
-    let annotation = find_kind(&spans, SpanKind::Annotation);
-    assert_eq!(span_text(src, annotation), ":: Ident");
-    assert_ne!(annotation.type_id, SPAN_NO_BINDING);
-    assert_eq!(annotation.member, SPAN_NO_BINDING);
+    let capture_type = find_kind(&spans, SpanKind::CaptureType);
+    assert_eq!(span_text(src, capture_type), ":: Ident");
+    assert_ne!(capture_type.type_id, SPAN_NO_BINDING);
+    assert_eq!(capture_type.member, SPAN_NO_BINDING);
+}
+
+#[test]
+fn semantic_span_bindings_survive_bytecode_projection() {
+    let spans = inspected_spans("Q = (program (expression_statement (identifier) @id))");
+
+    let definition = find_kind(&spans, SpanKind::Def);
+    assert_ne!(definition.type_id, SPAN_NO_BINDING);
+    assert_eq!(definition.member, SPAN_NO_BINDING);
+
+    let capture = find_kind(&spans, SpanKind::Capture);
+    assert_ne!(capture.type_id, SPAN_NO_BINDING);
+    assert_ne!(capture.member, SPAN_NO_BINDING);
+}
+
+#[test]
+fn unused_fragment_spans_are_not_projected() {
+    let src = "Unused = (comment)* @unused\n\
+               Used = (comment)+ @used\n\
+               Q = (program (Used))";
+    let unused_end = src
+        .find("Used =")
+        .expect("query contains the used fragment");
+    let spans = inspected_spans(src);
+
+    assert!(
+        spans
+            .iter()
+            .all(|span| usize::try_from(span.start).expect("span offset fits usize") >= unused_end),
+        "unused definition contributed an inspection span: {spans:?}"
+    );
+    assert!(
+        spans
+            .iter()
+            .any(|span| span_text(src, *span).contains("Used")),
+        "reachable fragment spans must remain: {spans:?}"
+    );
 }
 
 #[test]

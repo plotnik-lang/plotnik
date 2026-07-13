@@ -5,13 +5,13 @@ Q = (program
   ] @x
 )
 ------------------- TYPESCRIPT -------------------
+export interface Q {
+  x: QX;
+}
+
 export interface QX {
   a: Node | null;
   b: Node | null;
-}
-
-export interface Q {
-  x: QX;
 }
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;

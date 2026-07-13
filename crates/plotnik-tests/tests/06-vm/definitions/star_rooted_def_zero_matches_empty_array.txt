@@ -46,63 +46,57 @@ Q = 00 :: T2
 [transitions]
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@36)                            36 : 03
+  02       (@25)                            25 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06  -ε-  [ArrayClose]                     08
   08  ─‣┘  _ [Set(M0)]                      15
   10                                        ▶
-  11  -ε-  [ArrayClose]                     10
-  13   !   (identifier) [Node Push]         16, 11
-  15  ─‣┘² _                                22
+  11  -ε-  [ArrayClose Set(M0)]             15
+  13   !   (identifier) [Node Push]         16, 06
+  15  ─‣┘² _                                10
   16  ──!  _                                13, 16
-  18   !   _                                13, 16
+  18  └─!  _                                13, 16
   20  -ε-  [ArrayOpen]                      18, 11
-  22                                        ▶
+  22  └‣─  (array)                          20
   23  ...
-  24  -ε-  [ArrayClose Set(M0)]             15
-  26   !   (identifier) [Node Push]         28, 06
-  28  ──!  _                                26, 28
-  30  └─!  _                                26, 28
-  32  -ε-  [ArrayOpen]                      30, 24
-  34  └‣─  (array)                          32
-  35  └‣─  (expression_statement)           34
-  36   !   (program)                        35
+  24  └‣─  (expression_statement)           22
+  25   !   (program)                        24
 --------------------- TRACE ----------------------
 Q:
   00  -ε-  [StructOpen]                     02
-  02       (@36)                            36 : 03
-       ▶   (@36)
+  02       (@25)                            25 : 03
+       ▶   (@25)
 
-@36:
-  36       (program)                        35
+@25:
+  25       (program)                        24
        ●   program
-  35       (expression_statement)           34
+  24       (expression_statement)           22
        ●   expression_statement
-  34       (array)                          32
+  22       (array)                          20
        ●   array
-  32  -ε-  [ArrayOpen]                      30, 24
-  30       _                                26, 28
+  20  -ε-  [ArrayOpen]                      18, 11
+  18       _                                13, 16
        ●   [
-  26       (identifier) [Node Push]         28, 06
+  13       (identifier) [Node Push]         16, 06
        ○   [
-  30  ❮❮❮ 
-  28       _                                26, 28
+  18  ❮❮❮ 
+  16       _                                13, 16
        ●   number
-  26       (identifier) [Node Push]         28, 06
+  13       (identifier) [Node Push]         16, 06
        ○   number
-  28  ❮❮❮ 
-  28       _                                26, 28
+  16  ❮❮❮ 
+  16       _                                13, 16
        ●   ]
-  26       (identifier) [Node Push]         28, 06
+  13       (identifier) [Node Push]         16, 06
        ○   ]
-  28  ❮❮❮ 
-  28       _                                26, 28
-  32  ❮❮❮ 
-  24  -ε-  [ArrayClose Set(M0)]             15
-  15       _                                22
+  16  ❮❮❮ 
+  16       _                                13, 16
+  20  ❮❮❮ 
+  11  -ε-  [ArrayClose Set(M0)]             15
+  15       _                                10
        ●   program
-  22   ◀   (@36)                            
+  10   ◀   (@25)                            
 
 Q:
   03  -ε-  [StructClose]                    05

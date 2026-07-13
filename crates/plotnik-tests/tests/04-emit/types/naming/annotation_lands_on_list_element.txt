@@ -4,12 +4,12 @@ Q = (program
   }* @rows :: Row
 )
 ------------------- TYPESCRIPT -------------------
-export interface Row {
-  s: Node;
-}
-
 export interface Q {
   rows: Row[];
+}
+
+export interface Row {
+  s: Node;
 }
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;

@@ -11,13 +11,13 @@ Q = (program
 --------------------- INPUT ----------------------
 foo
 ------------------- TYPESCRIPT -------------------
-export interface QRow {
-  x: Node;
-}
-
 export interface Q {
   row: QRow | null;
   x: Node | null;
+}
+
+export interface QRow {
+  x: Node;
 }
 --------------------- OUTPUT ---------------------
 {

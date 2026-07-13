@@ -24,24 +24,27 @@ rejected at load.
 
 ## Kinds
 
-| Value | Name         |
-| ----- | ------------ |
-| 0     | `def`        |
-| 1     | `ref`        |
-| 2     | `pattern`    |
-| 3     | `capture`    |
-| 4     | `field`      |
-| 5     | `neg_field`  |
-| 6     | `predicate`  |
-| 7     | `quantifier` |
-| 8     | `sequence`   |
-| 9     | `union`      |
-| 10    | `enum`       |
-| 11    | `branch`     |
-| 12    | `annotation` |
+| Value | Name           |
+| ----- | -------------- |
+| 0     | `def`          |
+| 1     | `ref`          |
+| 2     | `pattern`      |
+| 3     | `capture`      |
+| 4     | `field`        |
+| 5     | `neg_field`    |
+| 6     | `predicate`    |
+| 7     | `quantifier`   |
+| 8     | `sequence`     |
+| 9     | `union`        |
+| 10    | `enum`         |
+| 11    | `branch`       |
+| 12    | `capture_type` |
 
-`neg_field` and `predicate` are reserved for inspection detail; v10 loaders
-accept the kind values, but the compiler does not emit them yet.
+`capture_type` covers `:: T`, `:: str`, or `:: bool`. Renaming the language
+concept did not renumber the closed span-kind vocabulary: it remains value 12.
+`neg_field` and `predicate` are reserved for
+inspection detail; v11 loaders accept the kind values, but the compiler does
+not emit them yet.
 
 ## Span Effects
 
@@ -59,6 +62,14 @@ cursor already points at the matched node. The compiler asserts this on the
 fresh Thompson IR before optimization; later passes may move it only along
 cursor-preserving epsilon chains.
 
+Scalar capture types contribute their exact runtime provenance independently
+of inspection-detail spans. While a capture span is open, its scalar marks are
+folded into an optional byte-range hull: a present string highlights precisely
+the text it returns, a present boolean may carry its matched range, and
+`null`/fallback `false` has no invented range. A real zero-byte node retains a
+real zero-width hull. This remains exact even when lower-priority pattern spans
+are degraded away.
+
 Construction-time effect-stack validation tracks span depth, including inside
 suppression scopes, so malformed bytecode with unbalanced span brackets is
 rejected before execution. Span effects are still recorded under runtime
@@ -71,7 +82,7 @@ The compiler can emit at most 1024 spans because effect payloads are 10-bit.
 When inspection is enabled and a query has more span-worthy constructs, spans
 are admitted by detail tier. Higher-value tiers such as definitions, captures,
 patterns, and references are kept ahead of lower-value detail such as fields
-and annotations. Each tier is admitted or dropped as a whole; a large dropped
+and capture types. Each tier is admitted or dropped as a whole; a large dropped
 tier does not prevent a later smaller tier from being admitted if it still
 fits. Dropped tiers are omitted from the Spans section and reported with the
 `inspection_spans_degraded` warning; the module remains executable.

@@ -3,13 +3,13 @@ Q = (function_declaration
   body: (statement_block) @body
 ) @func :: FunctionInfo
 ------------------- TYPESCRIPT -------------------
-export type FunctionInfo = Node;
-
 export interface Q {
   body: Node;
   func: FunctionInfo;
   name: Node;
 }
+
+export type FunctionInfo = Node;
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 

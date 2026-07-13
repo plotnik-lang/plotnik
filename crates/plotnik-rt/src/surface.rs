@@ -10,11 +10,14 @@ pub trait Matches {
     fn matches(tree: &Tree, source: &str) -> Result<bool, LimitExceeded>;
 }
 
-pub trait Parse<'t>: Matches + Sized {
-    fn parse(tree: &'t Tree, source: &str) -> Result<Option<Self>, LimitExceeded>;
+pub trait Parse<'t, 's>: Matches + Sized {
+    fn parse(tree: &'t Tree, source: &'s str) -> Result<Option<Self>, LimitExceeded>;
 }
 
-pub fn parse<'t, Q: Parse<'t>>(tree: &'t Tree, source: &str) -> Result<Option<Q>, LimitExceeded> {
+pub fn parse<'t, 's, Q: Parse<'t, 's>>(
+    tree: &'t Tree,
+    source: &'s str,
+) -> Result<Option<Q>, LimitExceeded> {
     Q::parse(tree, source)
 }
 

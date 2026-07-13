@@ -24,9 +24,9 @@ RUNTIME_ABI_MAX
 ```
 
 A generated module records one `REQUIRED_RUNTIME_ABI` and refuses to initialize
-unless it lies in that range. The first cross-language runtime contract is ABI
-`1`. The ABI changes when generated code and a runtime must change together,
-including changes to:
+unless it lies in that range. The current contract is ABI `2`; ABI `1` was the
+first cross-language runtime contract. The ABI changes when generated code and
+a runtime must change together, including changes to:
 
 - navigation, checkpoint, or resume behavior;
 - the capture-trace vocabulary or payload meanings;
@@ -63,7 +63,9 @@ A document binds together five things that must not drift independently:
 4. the grammar/language handle used for compatibility verification;
 5. the binding-native node type returned in captured output.
 
-Rust currently spells this as separate `&Tree` and `&str` parameters. GC'd
+Rust spells this as separate `&Tree` and `&str` parameters. Output may borrow
+the two independently: node fields borrow the tree and `str` fields borrow the
+source. GC'd
 targets should normally expose one `Document` object so its ownership and
 encoding obligations cannot be separated accidentally.
 
@@ -179,7 +181,8 @@ The mutable engine state consists of:
 - call frames and current recursion depth;
 - a LIFO checkpoint stack;
 - the capture trace and its current length;
-- the current suppression depth.
+- the current suppression depth;
+- the number of open, logged scalar frames.
 
 An instruction pointer, step counter, and resolved limit policy may live in the
 generated driver's representation instead of the runtime object.
@@ -192,13 +195,15 @@ CheckpointState {
     effect_watermark
     frame
     recursion_depth
-    suppression_depth
+    effect_depths { suppression: u32, scalar: u32 }
 }
 ```
 
 Restoring a checkpoint restores the position and frame, truncates the capture
-trace to its watermark, and restores both depth counters. Adding mutable engine
+trace to its watermark, and restores all depth counters. Adding mutable engine
 state requires classifying it as restored or deliberately cumulative.
+The two effect-control depths share one packed `u64` checkpoint field, retaining
+the regression-required range above `u16` without padding every checkpoint.
 
 There are three resume forms:
 
@@ -295,6 +300,13 @@ Generated runtimes implement this vocabulary:
 | `StructClose`       | Close the struct and make it pending.              |
 | `EnumOpen(variant)` | Begin the selected layout variant.                 |
 | `EnumClose`         | Close the enum and make it pending.                |
+| `ScalarOpen`        | Begin one value-local source-provenance frame.     |
+| `ScalarMark(node)`  | Add an explicit matched node to every open scalar. |
+| `StrClose`          | Close a scalar and produce source text or null.    |
+| `BoolClose(value)`  | Close a scalar and produce the supplied boolean.   |
+| `NodeStr(node)`     | Produce one matched node's source text directly.   |
+| `NodeBool(node)`    | Produce `true` for one matched node directly.      |
+| `BoolValue(value)`  | Produce a boolean without source provenance.       |
 
 Member and variant payloads are the indices assigned by the compiler's shared
 `CaptureLayout`; they are not target-specific field ordinals. Values appear
@@ -302,12 +314,28 @@ before their closing `Set`. The order of sibling `Set` entries inside one
 struct is not stable and must not be used as declaration order.
 
 `SuppressBegin` and `SuppressEnd` change the suppression depth but are not
-capture-trace entries. While suppression is nonzero, data effects are skipped.
-Suppression still nests during `matches`, whose initial depth is nonzero.
+capture-trace entries. While suppression is nonzero, ordinary data effects,
+including scalar opens and closes, are skipped. `ScalarMark` bypasses data
+suppression so an enclosing scalar still sees nodes matched inside a suppressed
+definition. A mark is a no-op when no scalar frame is open. Suppression still
+nests during `matches`, whose initial depth is nonzero, so `matches` allocates
+no scalar trace.
 
 Inspection-span effects belong to the VM/playground inspection path. Generated
 production matchers reject inspection-compiled queries and do not include those
-effects in runtime ABI `1`.
+effects in the generated-runtime ABI.
+
+Scalar effects use balanced value semantics. `ScalarOpen` starts with no range;
+every mark unions the node's half-open UTF-8 byte span into the frame's hull.
+`StrClose` returns `null` when the hull is absent and otherwise borrows that
+slice from the source. A real `n..n` mark therefore returns `""`, not `null`.
+`BoolClose` uses its boolean payload and retains the hull only as inspection
+provenance; it never derives truthiness from marks.
+For a scalar whose raw value is one node, `NodeStr` and `NodeBool` are the
+equivalent one-entry fast path; the node also carries inspection provenance.
+Production lowering uses `BoolValue(true)` for presence booleans because their
+source range is not observable there; `NodeBool` and balanced boolean frames
+are emitted only when inspection requests that provenance.
 
 ### 6.1 Replay reader
 
@@ -315,6 +343,7 @@ Typed readers consume the committed trace linearly. A runtime reader provides:
 
 - `take_null`;
 - `expect_node`, `expect_set`, and `expect_enum_open`;
+- `expect_str` and `expect_bool` scalar leaves;
 - `expect_*_open` and `expect_*_close` for arrays and structs;
 - `expect_push` and close lookahead for repeated values;
 - `peek_set`, which returns the first `Set` after the balanced value beginning
@@ -324,7 +353,14 @@ Typed readers consume the committed trace linearly. A runtime reader provides:
 `peek_set` is required because a field's value precedes its member index and
 different members may require different typed readers. Implementations should
 precompute matching `Set` positions in one backward pass so replay remains
-linear on deeply nested output.
+linear on deeply nested output. Its balanced-value scan treats `ScalarOpen`
+through either scalar close as one value, including nested scalar frames.
+
+The reader receives the exact source used to parse the tree. A string leaf
+returns a source slice and therefore carries the source lifetime; a node leaf
+carries the independent tree lifetime. Rust expresses the generic contract as
+`Parse<'t, 's>`, and generated types include only the lifetimes reachable from
+their output (`Q<'t>`, `Q<'s>`, `Q<'t, 's>`, or `Q`).
 
 The compiler validates balanced trace shapes. A mismatch during replay is an
 inside-zone generated-code/runtime defect and should assert or throw as an
@@ -335,7 +371,7 @@ internal error, not be returned as invalid user input.
 Safe runs resolve independent step and memory policies. Each policy is
 `Auto`, an explicit nonnegative ceiling, or `Unbounded`.
 
-| Resource | ABI `1` automatic ceiling        | What is metered                                                 |
+| Resource | Automatic ceiling                | What is metered                                                 |
 | -------- | -------------------------------- | --------------------------------------------------------------- |
 | Steps    | `1_000_000 + 1_024 * node_count` | Generated state dispatches.                                     |
 | Memory   | `64 MiB + 256 * node_count`      | Live frames, checkpoints, capture effects, and saved positions. |
@@ -368,6 +404,8 @@ Conformance compares values rather than platform object layouts. Every runtime
 provides a test-side serializer with this recursive JSON mapping:
 
 - optional absence and void output: `null`;
+- source string: JSON string;
+- boolean: JSON boolean;
 - array: JSON array;
 - struct: object keyed by generated member name;
 - enum: `{ "$tag": "Variant" }`, plus `$data` when the selected variant has a
@@ -443,14 +481,15 @@ A target is conforming when its runner executes the shared corpus and agrees
 with the VM oracle on:
 
 - match/no-match and portable limit category;
-- the committed capture trace, including layout indices and captured-node byte
-  spans;
+- the committed capture trace, including layout indices, captured-node byte
+  spans, scalar marks, and scalar close values;
 - the debug value after typed replay;
 - grammar-skew and runtime-ABI failures.
 
 The corpus must cover every navigation and resume mode, field and missing-node
 checks, all predicate operators, suppression, recursive calls, ordered branch
 priority, trace truncation after backtracking, nested replay shapes, automatic
-and explicit limits, and non-ASCII source before captured nodes. Regex cases
+and explicit limits, scalar item boundaries and zero-byte ranges, and non-ASCII
+source before captured nodes. Regex cases
 exercise every dialect printer's semantic traps and are the tripwire for
 normalization or host-spelling drift.

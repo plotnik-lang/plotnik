@@ -35,23 +35,8 @@ pub enum CaptureKind {
     Array,
 }
 
-/// Capture value-mechanism classification, exposed as accessors on the analyzed
-/// [`TypeAnalysis`] artifact so inference and emission read one implementation.
+/// Capture value-mechanism classification while analysis is in progress.
 impl TypeAnalysis {
-    /// Classify the value mechanism of a captured inner expression.
-    ///
-    /// Reads the inner's admitted type info. Missing pattern or definition data is a
-    /// compiler bug after [`TypeAnalysisBuilder::finish`](super::type_analysis::TypeAnalysisBuilder::finish),
-    /// so this accessor is loud rather than recovering to `Node`.
-    pub fn capture_kind(
-        &self,
-        inner: &Pattern,
-        deps: &DependencyAnalysis,
-        interner: &Interner,
-    ) -> CaptureKind {
-        self.classify(inner, deps, interner, CaptureLookupMode::Admitted)
-    }
-
     fn classify(
         &self,
         inner: &Pattern,

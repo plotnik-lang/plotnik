@@ -10,9 +10,14 @@ use std::collections::BTreeMap;
 use crate::bytecode::{EffectKind, Nav, PredicateOp, StepAddr, select_match_opcode};
 use indexmap::IndexMap;
 
+use crate::compiler::analyze::types::CaptureTypePlan;
 use crate::compiler::ids::{DefId, TypeId};
 use crate::compiler::lower::spans::SpanTable;
 use crate::core::NodeFieldId;
+
+pub(crate) use crate::bytecode::ReturnEntry;
+pub(crate) use crate::bytecode::ReturnMode;
+pub use plotnik_rt::ReturnOutcome;
 
 /// Node kind constraint for Match instructions.
 ///
@@ -38,6 +43,249 @@ pub struct ReturnAddr(pub Label);
 /// Label where a callee definition starts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CalleeEntry(pub Label);
+
+/// How a compiled definition body produces its pending value.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum DefOutputMode {
+    Ordinary,
+    Suppressed,
+    CaptureType(CaptureTypePlan),
+}
+
+/// Copyable output provenance retained after a definition variant is lowered.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DefOutputOrigin {
+    Ordinary,
+    Suppressed,
+    CaptureType(TypeId),
+}
+
+impl DefOutputMode {
+    pub(crate) fn origin(&self) -> DefOutputOrigin {
+        match self {
+            Self::Ordinary => DefOutputOrigin::Ordinary,
+            Self::Suppressed => DefOutputOrigin::Suppressed,
+            Self::CaptureType(plan) => DefOutputOrigin::CaptureType(plan.final_type()),
+        }
+    }
+}
+
+/// Whether explicit node-pattern matches contribute source provenance.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum SourceMode {
+    Ordinary,
+    Mark,
+}
+
+/// Return outcomes provided by a definition whose entry navigation is routed
+/// through its body.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum RoutedReturns {
+    MatchOnly,
+    Split,
+}
+
+/// Independent lowering choices for one definition body.
+///
+/// Keeping the axes in one semantic key prevents each new behavior from
+/// growing its own parallel entry map. Equal call sites reuse the same body,
+/// including through recursive components.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct DefBodyMode {
+    output: DefOutputMode,
+    source: SourceMode,
+}
+
+impl DefBodyMode {
+    pub(crate) fn ordinary() -> Self {
+        Self {
+            output: DefOutputMode::Ordinary,
+            source: SourceMode::Ordinary,
+        }
+    }
+
+    pub(crate) fn with_capture_type(mut self, plan: CaptureTypePlan) -> Self {
+        self.output = DefOutputMode::CaptureType(plan);
+        self
+    }
+
+    pub(crate) fn suppress_output(mut self) -> Self {
+        self.output = DefOutputMode::Suppressed;
+        self
+    }
+
+    pub(crate) fn mark_source(mut self) -> Self {
+        self.source = SourceMode::Mark;
+        self
+    }
+
+    pub(crate) fn output(&self) -> &DefOutputMode {
+        &self.output
+    }
+
+    pub(crate) fn marks_source(&self) -> bool {
+        self.source == SourceMode::Mark
+    }
+
+    pub(crate) fn source(&self) -> SourceMode {
+        self.source
+    }
+
+    pub(crate) fn suppresses_output(&self) -> bool {
+        matches!(self.output, DefOutputMode::Suppressed)
+    }
+
+    pub(crate) fn has_capture_type(&self) -> bool {
+        matches!(self.output, DefOutputMode::CaptureType(_))
+    }
+
+    pub(crate) fn is_ordinary(&self) -> bool {
+        matches!(self.output, DefOutputMode::Ordinary) && self.source == SourceMode::Ordinary
+    }
+}
+
+/// Navigation and return routing for one definition body.
+///
+/// Ordinary calls navigate before entering an exact body. Recursive nullable
+/// calls route navigation into the body instead, so the body's authored branch
+/// order remains above any candidate-search checkpoint.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum DefRoute {
+    Caller,
+    Routed { nav: Nav, returns: RoutedReturns },
+}
+
+impl DefRoute {
+    fn routed(nav: Nav, returns: RoutedReturns) -> Self {
+        assert!(
+            nav != Nav::Epsilon,
+            "definition entry must navigate or stay"
+        );
+        Self::Routed { nav, returns }
+    }
+
+    pub(crate) fn match_only(nav: Nav) -> Self {
+        Self::routed(nav, RoutedReturns::MatchOnly)
+    }
+
+    pub(crate) fn split(nav: Nav) -> Self {
+        Self::routed(nav, RoutedReturns::Split)
+    }
+
+    pub(crate) fn body_nav(self) -> Nav {
+        match self {
+            Self::Caller => Nav::StayExact,
+            Self::Routed { nav, .. } => nav,
+        }
+    }
+
+    pub(crate) fn splits(self) -> bool {
+        matches!(
+            self,
+            Self::Routed {
+                returns: RoutedReturns::Split,
+                ..
+            }
+        )
+    }
+
+    pub(crate) fn requires_consumption(self) -> bool {
+        matches!(
+            self,
+            Self::Routed {
+                returns: RoutedReturns::MatchOnly,
+                ..
+            }
+        )
+    }
+
+    pub(crate) fn return_depth(self, outcome: ReturnOutcome) -> Option<i32> {
+        match (self, outcome) {
+            (Self::Caller, ReturnOutcome::Matched) => Some(0),
+            (Self::Caller, ReturnOutcome::Zero) => None,
+            (Self::Routed { nav, .. }, ReturnOutcome::Matched) => Some(nav.depth_delta()),
+            (
+                Self::Routed {
+                    returns: RoutedReturns::Split,
+                    ..
+                },
+                ReturnOutcome::Zero,
+            ) => Some(0),
+            (
+                Self::Routed {
+                    returns: RoutedReturns::MatchOnly,
+                    ..
+                },
+                ReturnOutcome::Zero,
+            ) => None,
+        }
+    }
+
+    pub(crate) fn return_entry(self) -> ReturnEntry {
+        match self {
+            Self::Caller => ReturnEntry::Caller,
+            Self::Routed { .. } => ReturnEntry::Routed,
+        }
+    }
+}
+
+/// One memoized definition body and its lowering mode.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct DefVariant {
+    def_id: DefId,
+    mode: DefBodyMode,
+    route: DefRoute,
+}
+
+impl DefVariant {
+    pub(crate) fn ordinary(def_id: DefId) -> Self {
+        Self {
+            def_id,
+            mode: DefBodyMode::ordinary(),
+            route: DefRoute::Caller,
+        }
+    }
+
+    pub(crate) fn new(def_id: DefId, mode: DefBodyMode) -> Self {
+        Self {
+            def_id,
+            mode,
+            route: DefRoute::Caller,
+        }
+    }
+
+    pub(crate) fn routed_match(def_id: DefId, mode: DefBodyMode, nav: Nav) -> Self {
+        Self {
+            def_id,
+            mode,
+            route: DefRoute::match_only(nav),
+        }
+    }
+
+    pub(crate) fn routed_split(def_id: DefId, mode: DefBodyMode, nav: Nav) -> Self {
+        Self {
+            def_id,
+            mode,
+            route: DefRoute::split(nav),
+        }
+    }
+
+    pub(crate) fn def_id(&self) -> DefId {
+        self.def_id
+    }
+
+    pub(crate) fn mode(&self) -> &DefBodyMode {
+        &self.mode
+    }
+
+    pub(crate) fn route(&self) -> DefRoute {
+        self.route
+    }
+
+    pub(crate) fn is_ordinary(&self) -> bool {
+        self.mode.is_ordinary() && self.route == DefRoute::Caller
+    }
+}
 
 /// Symbolic reference to a struct field or enum variant.
 ///
@@ -154,6 +402,34 @@ impl EffectIR {
         Self::literal(EffectKind::SuppressEnd, 0)
     }
 
+    pub fn scalar_open() -> Self {
+        Self::literal(EffectKind::ScalarOpen, 0)
+    }
+
+    pub fn scalar_mark() -> Self {
+        Self::literal(EffectKind::ScalarMark, 0)
+    }
+
+    pub fn str_close() -> Self {
+        Self::literal(EffectKind::StrClose, 0)
+    }
+
+    pub fn bool_close(value: bool) -> Self {
+        Self::literal(EffectKind::BoolClose, usize::from(value))
+    }
+
+    pub fn node_str() -> Self {
+        Self::literal(EffectKind::NodeStr, 0)
+    }
+
+    pub fn node_bool() -> Self {
+        Self::literal(EffectKind::NodeBool, 0)
+    }
+
+    pub fn bool_value(value: bool) -> Self {
+        Self::literal(EffectKind::BoolValue, usize::from(value))
+    }
+
     /// Open an inspection span and snapshot the current cursor node.
     pub fn span_start_at(id: u16) -> Self {
         Self::literal(EffectKind::SpanStartAt, id as usize)
@@ -268,7 +544,7 @@ impl InstructionIR {
     pub fn successors(&self) -> &[Label] {
         match self {
             Self::Match(m) => &m.successors,
-            Self::Call(c) => std::slice::from_ref(&c.next),
+            Self::Call(c) => c.return_labels(),
             Self::Return(_) => &[],
         }
     }
@@ -419,14 +695,27 @@ impl From<MatchIR> for InstructionIR {
 pub struct CallIR {
     /// Where this instruction lives.
     pub label: Label,
-    /// Navigation to apply before jumping to target.
-    pub nav: Nav,
-    /// Field constraint (None = no constraint).
-    pub node_field: Option<NodeFieldId>,
-    /// Return address (where to continue after callee returns).
-    pub next: Label,
+    /// Complete entry/return protocol. Its variants encode only executable
+    /// combinations, so caller-owned calls can never acquire split returns.
+    pub protocol: CallProtocol,
     /// Callee entry point.
     pub target: Label,
+}
+
+/// Entry protocol for a definition call.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum CallProtocol {
+    /// The call instruction navigates before entering an exact callee body and
+    /// has one matched continuation.
+    Ordinary {
+        nav: Nav,
+        node_field: Option<NodeFieldId>,
+        next: Label,
+    },
+    /// The callee owns entry navigation and has one matched continuation.
+    Routed { entry_nav: Nav, next: Label },
+    /// The callee owns entry navigation and selects matched or zero-width.
+    Split { entry_nav: Nav, returns: [Label; 2] },
 }
 
 impl CallIR {
@@ -434,22 +723,126 @@ impl CallIR {
     pub fn new(label: Label, return_addr: ReturnAddr, callee: CalleeEntry) -> Self {
         Self {
             label,
-            nav: Nav::Stay,
-            node_field: None,
-            next: return_addr.0,
+            protocol: CallProtocol::Ordinary {
+                nav: Nav::Stay,
+                node_field: None,
+                next: return_addr.0,
+            },
+            target: callee.0,
+        }
+    }
+
+    /// Create a matched-only call whose callee owns entry navigation.
+    pub fn routed(
+        label: Label,
+        entry_nav: Nav,
+        return_addr: ReturnAddr,
+        callee: CalleeEntry,
+    ) -> Self {
+        Self {
+            label,
+            protocol: CallProtocol::Routed {
+                entry_nav,
+                next: return_addr.0,
+            },
+            target: callee.0,
+        }
+    }
+
+    /// Create a call whose nullable callee reports matched and zero-width
+    /// outcomes separately. Navigation belongs to the routed callee variant.
+    pub fn split(
+        label: Label,
+        entry_nav: Nav,
+        returns: SplitReturnAddrs,
+        callee: CalleeEntry,
+    ) -> Self {
+        Self {
+            label,
+            protocol: CallProtocol::Split {
+                entry_nav,
+                returns: [returns.matched.0, returns.zero.0],
+            },
             target: callee.0,
         }
     }
 
     pub fn nav(mut self, nav: Nav) -> Self {
-        self.nav = nav;
+        let CallProtocol::Ordinary {
+            nav: current_nav, ..
+        } = &mut self.protocol
+        else {
+            panic!("routed calls derive navigation from their callee route")
+        };
+        *current_nav = nav;
         self
     }
 
     pub fn node_field(mut self, f: impl Into<Option<NodeFieldId>>) -> Self {
-        self.node_field = f.into();
+        let CallProtocol::Ordinary { node_field, .. } = &mut self.protocol else {
+            panic!("routed calls cannot carry a field constraint")
+        };
+        *node_field = f.into();
         self
     }
+
+    pub fn entry_nav(&self) -> Nav {
+        match self.protocol {
+            CallProtocol::Ordinary { nav, .. } => nav,
+            CallProtocol::Routed { entry_nav, .. } | CallProtocol::Split { entry_nav, .. } => {
+                entry_nav
+            }
+        }
+    }
+
+    pub fn field(&self) -> Option<NodeFieldId> {
+        match self.protocol {
+            CallProtocol::Ordinary { node_field, .. } => node_field,
+            CallProtocol::Routed { .. } | CallProtocol::Split { .. } => None,
+        }
+    }
+
+    pub fn return_labels(&self) -> &[Label] {
+        match &self.protocol {
+            CallProtocol::Ordinary { next, .. } | CallProtocol::Routed { next, .. } => {
+                std::slice::from_ref(next)
+            }
+            CallProtocol::Split { returns, .. } => returns,
+        }
+    }
+
+    pub fn matched_return(&self) -> Label {
+        self.return_labels()[0]
+    }
+
+    pub fn zero_return(&self) -> Option<Label> {
+        match self.protocol {
+            CallProtocol::Split { returns, .. } => Some(returns[1]),
+            CallProtocol::Ordinary { .. } | CallProtocol::Routed { .. } => None,
+        }
+    }
+
+    pub(crate) fn remap_returns(&mut self, mut resolve: impl FnMut(Label) -> Label) {
+        match &mut self.protocol {
+            CallProtocol::Ordinary { next, .. } | CallProtocol::Routed { next, .. } => {
+                *next = resolve(*next)
+            }
+            CallProtocol::Split { returns, .. } => {
+                returns[0] = resolve(returns[0]);
+                returns[1] = resolve(returns[1]);
+            }
+        }
+    }
+}
+
+/// The two semantic continuations of a nullable recursive call.
+///
+/// Bundling the same-typed labels prevents callers from silently transposing
+/// the matched and zero-width routes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SplitReturnAddrs {
+    pub matched: ReturnAddr,
+    pub zero: ReturnAddr,
 }
 
 impl From<CallIR> for InstructionIR {
@@ -463,11 +856,42 @@ impl From<CallIR> for InstructionIR {
 pub struct ReturnIR {
     /// Where this instruction lives.
     pub label: Label,
+    /// Complete entry/outcome protocol.
+    pub mode: ReturnMode,
 }
 
 impl ReturnIR {
     pub fn new(label: Label) -> Self {
-        Self { label }
+        Self::matched(label)
+    }
+
+    pub fn matched(label: Label) -> Self {
+        Self {
+            label,
+            mode: ReturnMode::CallerMatched,
+        }
+    }
+
+    pub fn routed_matched(label: Label) -> Self {
+        Self {
+            label,
+            mode: ReturnMode::RoutedMatched,
+        }
+    }
+
+    pub fn routed_zero(label: Label) -> Self {
+        Self {
+            label,
+            mode: ReturnMode::RoutedZero,
+        }
+    }
+
+    pub fn outcome(&self) -> ReturnOutcome {
+        self.mode.outcome()
+    }
+
+    pub(crate) fn entry(&self) -> ReturnEntry {
+        self.mode.entry()
     }
 }
 
@@ -490,9 +914,13 @@ impl From<ReturnIR> for InstructionIR {
 pub(crate) enum LabelOrigin {
     /// Allocated while compiling this definition's body.
     Def(DefId),
-    /// Allocated while compiling this definition's consuming-only body variant
-    /// (used by guarded recursive nullable calls).
-    ConsumingDef(DefId),
+    /// Allocated while compiling a non-ordinary definition-body variant.
+    DefVariant {
+        def_id: DefId,
+        output: DefOutputOrigin,
+        source: SourceMode,
+        route: DefRoute,
+    },
     /// Allocated for this definition's entrypoint wrapper.
     Wrapper(DefId),
 }
@@ -501,11 +929,8 @@ pub(crate) enum LabelOrigin {
 #[derive(Clone, Debug)]
 pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
-    /// Entry labels for each definition (in definition order).
-    pub(in crate::compiler::lower) def_entries: IndexMap<DefId, Label>,
-    /// Entry labels for consuming-only definition bodies, emitted on demand for
-    /// guarded recursive nullable calls.
-    pub(in crate::compiler::lower) def_entries_consuming: IndexMap<DefId, Label>,
+    /// Entry labels for every emitted definition-body variant.
+    pub(in crate::compiler::lower) def_entries: IndexMap<DefVariant, Label>,
     /// Entry labels for each emitted entrypoint wrapper, in definition order.
     pub(in crate::compiler::lower) entrypoint_wrappers: IndexMap<DefId, Label>,
     /// Inspection span table, present iff the query was compiled with inspection.

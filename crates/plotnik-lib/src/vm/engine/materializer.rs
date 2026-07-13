@@ -60,6 +60,10 @@ enum ValueAccumulator<'s> {
         tag: &'s str,
         fields: Vec<(&'s str, Value<'s>)>,
     },
+    /// Marker into the scalar-only range stack. Keeping the marker here
+    /// preserves heterogeneous frame nesting checks without making ScalarMark
+    /// scan arrays, structs, and enums.
+    Scalar(usize),
 }
 
 impl ValueAccumulator<'_> {
@@ -68,6 +72,7 @@ impl ValueAccumulator<'_> {
             ValueAccumulator::Array(_) => "Array",
             ValueAccumulator::Struct(_) => "Struct",
             ValueAccumulator::Enum { .. } => "Enum",
+            ValueAccumulator::Scalar(_) => "Scalar",
         }
     }
 }
@@ -75,6 +80,7 @@ impl ValueAccumulator<'_> {
 impl<'a> ValueMaterializer<'a> {
     pub fn materialize(&self, effects: &[RuntimeEffect<'_>]) -> Value<'a> {
         let mut stack: Vec<ValueAccumulator<'a>> = vec![];
+        let mut scalar_ranges: Vec<Option<std::ops::Range<usize>>> = vec![];
 
         // Pending value from Node/Null (consumed by Set/Push)
         let mut pending: Option<Value<'a>> = None;
@@ -86,6 +92,70 @@ impl<'a> ValueMaterializer<'a> {
                 }
                 RuntimeEffect::Null => {
                     pending = Some(Value::Null);
+                }
+                RuntimeEffect::NodeStr(node) => {
+                    pending = Some(Value::Str(plotnik_rt::node_text(self.source, node)));
+                }
+                RuntimeEffect::NodeBool(_) => {
+                    pending = Some(Value::Bool(true));
+                }
+                RuntimeEffect::BoolValue(value) => {
+                    pending = Some(Value::Bool(*value));
+                }
+                RuntimeEffect::ScalarOpen => {
+                    let scalar = scalar_ranges.len();
+                    scalar_ranges.push(None);
+                    stack.push(ValueAccumulator::Scalar(scalar));
+                }
+                RuntimeEffect::ScalarMark(node) => {
+                    let mark = node.start_byte()..node.end_byte();
+                    for range in &mut scalar_ranges {
+                        *range = Some(match range.take() {
+                            Some(current) => {
+                                current.start.min(mark.start)..current.end.max(mark.end)
+                            }
+                            None => mark.clone(),
+                        });
+                    }
+                }
+                RuntimeEffect::StrClose => {
+                    let top = stack.pop();
+                    let Some(ValueAccumulator::Scalar(scalar)) = top else {
+                        panic!(
+                            "effect {effect_idx}: StrClose expects Scalar on stack, found {:?}",
+                            top.as_ref().map(|frame| frame.kind())
+                        );
+                    };
+                    assert_eq!(
+                        scalar + 1,
+                        scalar_ranges.len(),
+                        "effect {effect_idx}: StrClose violates scalar frame nesting"
+                    );
+                    let range = scalar_ranges
+                        .pop()
+                        .expect("Scalar marker owns a range frame");
+                    pending = Some(match range {
+                        Some(range) => Value::Str(plotnik_rt::source_text(self.source, range)),
+                        None => Value::Null,
+                    });
+                }
+                RuntimeEffect::BoolClose(value) => {
+                    let top = stack.pop();
+                    let Some(ValueAccumulator::Scalar(scalar)) = top else {
+                        panic!(
+                            "effect {effect_idx}: BoolClose expects Scalar on stack, found {:?}",
+                            top.as_ref().map(|frame| frame.kind())
+                        );
+                    };
+                    assert_eq!(
+                        scalar + 1,
+                        scalar_ranges.len(),
+                        "effect {effect_idx}: BoolClose violates scalar frame nesting"
+                    );
+                    scalar_ranges
+                        .pop()
+                        .expect("Scalar marker owns a range frame");
+                    pending = Some(Value::Bool(*value));
                 }
                 RuntimeEffect::SpanStart { .. } | RuntimeEffect::SpanEnd(_) => {}
                 RuntimeEffect::ArrayOpen => {
@@ -175,6 +245,10 @@ impl<'a> ValueMaterializer<'a> {
         assert!(
             stack.is_empty(),
             "unclosed builder frames after materialization"
+        );
+        assert!(
+            scalar_ranges.is_empty(),
+            "unclosed scalar frames after materialization"
         );
         pending.unwrap_or(Value::Null)
     }

@@ -38,9 +38,10 @@ pub struct Engine<'t> {
     /// frame, so it is bounded by call-nesting depth (`recursion_depth`) times
     /// a per-query constant — and call depth is itself capped by the
     /// `u32`-indexed frame arena. A `u16` was far too narrow (deep `@_`
-    /// recursion overflowed it at 65_536); `u64` cannot overflow before the
-    /// frame arena does.
-    suppress_depth: u64,
+    /// recursion overflowed it at 65_536).
+    suppress_depth: u32,
+    /// Number of non-suppressed `ScalarOpen`s on the current effect path.
+    scalar_depth: u32,
     /// Whether the cursor's lazy snapshot pool has activated (see
     /// [`CursorWrapper::snapshot`]); once true, every checkpoint push pairs
     /// with a pooled cursor snapshot.
@@ -61,7 +62,7 @@ impl<'t> Engine<'t> {
         Self::with_initial_suppression(cursor, 1)
     }
 
-    fn with_initial_suppression(cursor: TreeCursor<'t>, suppress_depth: u64) -> Self {
+    fn with_initial_suppression(cursor: TreeCursor<'t>, suppress_depth: u32) -> Self {
         Self {
             cursor: CursorWrapper::new(cursor),
             frames: FrameArena::new(),
@@ -69,6 +70,7 @@ impl<'t> Engine<'t> {
             effects: EffectLog::new(),
             recursion_depth: 0,
             suppress_depth,
+            scalar_depth: 0,
             snapshot_cursor_active: false,
         }
     }
@@ -108,7 +110,7 @@ impl<'t> Engine<'t> {
             effect_watermark: self.effects.len(),
             frame_index: self.frames.current(),
             recursion_depth: self.recursion_depth,
-            suppress_depth: self.suppress_depth,
+            effect_depths: crate::EffectDepths::new(self.suppress_depth, self.scalar_depth),
         }
     }
 
@@ -126,7 +128,8 @@ impl<'t> Engine<'t> {
         self.effects.truncate(state.effect_watermark);
         self.frames.restore(state.frame_index);
         self.recursion_depth = state.recursion_depth;
-        self.suppress_depth = state.suppress_depth;
+        self.suppress_depth = state.effect_depths.suppression();
+        self.scalar_depth = state.effect_depths.scalar();
         debug_assert_eq!(
             self.recursion_depth,
             self.frames.depth(),
@@ -152,6 +155,7 @@ impl<'t> Engine<'t> {
             effects,
             recursion_depth,
             suppress_depth,
+            scalar_depth,
             // Deliberately outside `CheckpointState`:
             checkpoints: _, // the stack this checkpoint was just popped from
             snapshot_cursor_active: _, // cumulative optimization state
@@ -177,8 +181,14 @@ impl<'t> Engine<'t> {
             "checkpoint restore: recursion depth"
         );
         debug_assert_eq!(
-            *suppress_depth, state.suppress_depth,
+            *suppress_depth,
+            state.effect_depths.suppression(),
             "checkpoint restore: suppress depth"
+        );
+        debug_assert_eq!(
+            *scalar_depth,
+            state.effect_depths.scalar(),
+            "checkpoint restore: scalar depth"
         );
     }
 
@@ -230,9 +240,19 @@ impl<'t> Engine<'t> {
             .expect("snapshot cursor active flag tracks cursor pool activation")
     }
 
-    /// Enter a callee: push a frame returning to `return_addr`.
+    /// Enter an ordinary callee with one matched continuation.
     pub fn enter_frame(&mut self, return_addr: u16) {
-        self.frames.push(return_addr);
+        self.enter_frame_with(crate::FrameReturns::single(return_addr));
+    }
+
+    /// Enter a nullable callee whose matched and zero-width outcomes resume at
+    /// different continuations.
+    pub fn enter_split_frame(&mut self, matched: u16, zero: u16) {
+        self.enter_frame_with(crate::FrameReturns::split(matched, zero));
+    }
+
+    fn enter_frame_with(&mut self, returns: crate::FrameReturns) {
+        self.frames.push(returns);
         self.recursion_depth += 1;
         debug_assert_eq!(
             self.recursion_depth,
@@ -246,8 +266,8 @@ impl<'t> Engine<'t> {
     ///
     /// Panics if no frame is active; executors gate on [`Engine::frames_empty`]
     /// (an empty frame stack at Return means entrypoint acceptance).
-    pub fn exit_frame(&mut self) -> u16 {
-        let return_addr = self.frames.pop();
+    pub fn exit_frame(&mut self, outcome: crate::ReturnOutcome) -> u16 {
+        let return_addr = self.frames.pop(outcome);
         self.recursion_depth = self
             .recursion_depth
             .checked_sub(1)
@@ -270,7 +290,10 @@ impl<'t> Engine<'t> {
     /// were already suppressed *before* this open — what a tracer reports.
     pub fn suppress_begin(&mut self) -> bool {
         let was_suppressed = self.suppress_depth > 0;
-        self.suppress_depth += 1;
+        self.suppress_depth = self
+            .suppress_depth
+            .checked_add(1)
+            .expect("suppression depth exceeds u32");
         was_suppressed
     }
 
@@ -306,6 +329,62 @@ impl<'t> Engine<'t> {
     #[inline]
     pub fn emit_span(&mut self, effect: RuntimeEffect<'t>) {
         self.effects.push(effect);
+    }
+
+    /// Open a scalar frame through the data-suppression gate.
+    pub fn scalar_open(&mut self) -> Option<&RuntimeEffect<'t>> {
+        if self.suppress_depth > 0 {
+            return None;
+        }
+        self.scalar_depth = self
+            .scalar_depth
+            .checked_add(1)
+            .expect("scalar frame depth exceeds u32");
+        self.effects.push(RuntimeEffect::ScalarOpen);
+        Some(self.effects.as_slice().last().expect("just pushed"))
+    }
+
+    /// Mark the current node when any scalar frame is live. Marks deliberately
+    /// cross data-suppression brackets so an enclosing scalar retains the
+    /// provenance of a suppressed nested value.
+    pub fn scalar_mark(&mut self) -> Option<&RuntimeEffect<'t>> {
+        if self.scalar_depth == 0 {
+            return None;
+        }
+        self.effects.push(RuntimeEffect::ScalarMark(self.node()));
+        Some(self.effects.as_slice().last().expect("just pushed"))
+    }
+
+    pub fn scalar_close_str(&mut self) -> Option<&RuntimeEffect<'t>> {
+        self.scalar_close(RuntimeEffect::StrClose)
+    }
+
+    pub fn scalar_close_bool(&mut self, value: bool) -> Option<&RuntimeEffect<'t>> {
+        self.scalar_close(RuntimeEffect::BoolClose(value))
+    }
+
+    pub fn node_str(&mut self) -> Option<&RuntimeEffect<'t>> {
+        self.emit_data(|cursor| RuntimeEffect::NodeStr(cursor.node()))
+    }
+
+    pub fn node_bool(&mut self) -> Option<&RuntimeEffect<'t>> {
+        self.emit_data(|cursor| RuntimeEffect::NodeBool(cursor.node()))
+    }
+
+    pub fn bool_value(&mut self, value: bool) -> Option<&RuntimeEffect<'t>> {
+        self.emit_data(|_| RuntimeEffect::BoolValue(value))
+    }
+
+    fn scalar_close(&mut self, effect: RuntimeEffect<'t>) -> Option<&RuntimeEffect<'t>> {
+        if self.suppress_depth > 0 {
+            return None;
+        }
+        self.scalar_depth = self
+            .scalar_depth
+            .checked_sub(1)
+            .expect("scalar close without an open scalar frame");
+        self.effects.push(effect);
+        Some(self.effects.as_slice().last().expect("just pushed"))
     }
 
     /// Live bytes across the growable runtime arenas — the quantity a memory

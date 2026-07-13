@@ -1,6 +1,6 @@
 Q = (identifier) @x :: Node
 ------------------ DIAGNOSTICS -------------------
-warning: this type annotation `Node` is already the default type; omit it
+warning: this capture type `Node` is already the default type; omit it
  --> query.ptk:1:24
   |
 1 | Q = (identifier) @x :: Node
@@ -9,6 +9,8 @@ warning: this type annotation `Node` is already the default type; omit it
 export interface Q {
   x: Node;
 }
+
+export type Node = Node;
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;
 
@@ -16,3 +18,5 @@ use ::plotnik_rt::Node;
 pub struct Q<'t> {
     pub x: Node<'t>,
 }
+
+pub type Node<'t> = Node<'t>;

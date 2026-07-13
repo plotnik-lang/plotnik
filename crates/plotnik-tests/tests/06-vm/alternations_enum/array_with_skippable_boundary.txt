@@ -11,12 +11,12 @@ Q = (program
 --------------------- INPUT ----------------------
 a; b;
 ------------------- TYPESCRIPT -------------------
-export interface QItems {
-  a: Node;
-}
-
 export interface Q {
   items: QItems[];
+}
+
+export interface QItems {
+  a: Node;
 }
 ------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture

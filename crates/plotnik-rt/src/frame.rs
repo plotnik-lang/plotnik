@@ -3,10 +3,59 @@
 //! Implements the cactus stack pattern: frames are append-only,
 //! with a current pointer that can be restored for backtracking.
 
+/// Which continuation a returning nullable definition selects.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum ReturnOutcome {
+    Matched = 0,
+    Zero = 1,
+}
+
+impl ReturnOutcome {
+    pub fn from_byte(byte: u8) -> Option<Self> {
+        match byte {
+            0 => Some(Self::Matched),
+            1 => Some(Self::Zero),
+            _ => None,
+        }
+    }
+
+    pub const fn to_byte(self) -> u8 {
+        self as u8
+    }
+}
+
+/// Continuations owned by one call frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FrameReturns {
+    matched: u16,
+    zero: u16,
+}
+
+impl FrameReturns {
+    pub fn single(target: u16) -> Self {
+        Self {
+            matched: target,
+            zero: target,
+        }
+    }
+
+    pub fn split(matched: u16, zero: u16) -> Self {
+        Self { matched, zero }
+    }
+
+    fn target(self, outcome: ReturnOutcome) -> u16 {
+        match outcome {
+            ReturnOutcome::Matched => self.matched,
+            ReturnOutcome::Zero => self.zero,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Frame {
-    /// Where to jump on Return (raw step index).
-    pub return_addr: u16,
+    /// Where to jump for each admitted return outcome.
+    pub returns: FrameReturns,
     /// Parent frame index (for cactus stack).
     pub parent: Option<u32>,
 }
@@ -32,10 +81,10 @@ impl FrameArena {
     }
 
     /// Push a new frame, returns its index.
-    pub fn push(&mut self, return_addr: u16) -> u32 {
+    pub fn push(&mut self, returns: FrameReturns) -> u32 {
         let idx = self.frames.len() as u32;
         self.frames.push(Frame {
-            return_addr,
+            returns,
             parent: self.current,
         });
         self.current = Some(idx);
@@ -45,11 +94,11 @@ impl FrameArena {
     /// Pop the current frame, returning its return address.
     ///
     /// Panics if the stack is empty.
-    pub fn pop(&mut self) -> u16 {
+    pub fn pop(&mut self, outcome: ReturnOutcome) -> u16 {
         let current_idx = self.current.expect("pop on empty frame stack");
         let frame = self.frames[current_idx as usize];
         self.current = frame.parent;
-        frame.return_addr
+        frame.returns.target(outcome)
     }
 
     /// Restore frame state for backtracking.

@@ -38,7 +38,7 @@ Root
             ParenClose ")"
         BracketClose "]"
       CaptureToken "@chain"
-      TypeAnnotation
+      CaptureType
         DoubleColon "::"
         Id "MemberChain"
 ---------------------- AST -----------------------

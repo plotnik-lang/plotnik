@@ -1,0 +1,71 @@
+Q = (program
+  (expression_statement)? @has_statement :: bool
+)
+--------------------- INPUT ----------------------
+// only a comment
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  has_statement: boolean;
+}
+--------------------- OUTPUT ---------------------
+{
+  "has_statement": false
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "has_statement"
+S2 "Q"
+S3 "program"
+S4 "expression_statement"
+
+[type_defs]
+T0 = <Bool>
+T1 = Struct  M0:1  ; { has_statement }
+
+[type_members]
+M0: S1 → T0  ; has_statement: <Bool>
+
+[type_names]
+N0: S2 → T1  ; Q
+
+[entrypoints]
+Q = 00 :: T1
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@18)                            18 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06   !   (expression_statement)           08
+  07  ...
+  08  ─‣┘  _ [BoolValue(1) Set(M0)]         10
+  10                                        ▶
+  11  ──!  _                                06, 11
+  13  └─!  _                                06, 11
+  15  ...
+  16  -ε-  [BoolValue(0) Set(M0)]           10
+  18   !   (program)                        13, 16
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@18)                            18 : 03
+       ▶   (@18)
+
+@18:
+  18       (program)                        13, 16
+       ●   program
+  13       _                                06, 11
+       ●   comment
+  06       (expression_statement)           08
+       ○   comment
+  13  ❮❮❮ 
+  11       _                                06, 11
+  18  ❮❮❮ 
+  16  -ε-  [BoolValue(0) Set(M0)]           10
+  10   ◀   (@18)                            
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

@@ -13,7 +13,7 @@ Q = (program
 
 use ::plotnik_rt as rt;
 
-pub const REQUIRED_RUNTIME_ABI: u32 = 1;
+pub const REQUIRED_RUNTIME_ABI: u32 = 2;
 
 use ::plotnik_rt::Node;
 
@@ -39,7 +39,7 @@ impl<'t> Inner<'t> {
         let Some(log) = matcher::inner_safe(tree, source)? else {
             return Ok(None);
         };
-        let mut t = rt::TraceReader::new(&log);
+        let mut t = rt::TraceReader::new(&log, source);
         let value = read_inner(&mut t);
         t.finish();
         Ok(Some(value))
@@ -60,10 +60,10 @@ impl<'t> rt::Matches for Inner<'t> {
     }
 }
 
-impl<'t> rt::Parse<'t> for Inner<'t> {
+impl<'t, 's> rt::Parse<'t, 's> for Inner<'t> {
     fn parse(
         tree: &'t rt::Tree,
-        source: &str,
+        source: &'s str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
         Inner::parse(tree, source)
     }
@@ -81,7 +81,7 @@ impl<'t> Q<'t> {
         let Some(log) = matcher::q_safe(tree, source)? else {
             return Ok(None);
         };
-        let mut t = rt::TraceReader::new(&log);
+        let mut t = rt::TraceReader::new(&log, source);
         let value = read_q(&mut t);
         t.finish();
         Ok(Some(value))
@@ -102,17 +102,17 @@ impl<'t> rt::Matches for Q<'t> {
     }
 }
 
-impl<'t> rt::Parse<'t> for Q<'t> {
+impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
     fn parse(
         tree: &'t rt::Tree,
-        source: &str,
+        source: &'s str,
     ) -> ::core::result::Result<::core::option::Option<Self>, rt::LimitExceeded> {
         Q::parse(tree, source)
     }
 }
 
 /// Replay one committed `Inner` value.
-fn read_inner<'t>(t: &mut rt::TraceReader<'_, 't>) -> Inner<'t> {
+fn read_inner<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Inner<'t> {
     t.expect_struct_open();
     let mut v0 = None; // id
     while !t.at_struct_close() {
@@ -130,7 +130,7 @@ fn read_inner<'t>(t: &mut rt::TraceReader<'_, 't>) -> Inner<'t> {
 }
 
 /// Replay one committed `Q` value.
-fn read_q<'t>(t: &mut rt::TraceReader<'_, 't>) -> Q<'t> {
+fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'t> {
     t.expect_struct_open();
     let mut v0 = None; // second
     while !t.at_struct_close() {
@@ -235,10 +235,10 @@ mod matcher {
 
     // Dense runtime state ids, in NFA label order.
     // Inner:
-    const S02_INNER: u16 = 0;
-    const S03_INNER: u16 = 1;
-    const S04_INNER: u16 = 2;
-    const S05_INNER: u16 = 3;
+    const S01_INNER: u16 = 0;
+    const S02_INNER: u16 = 1;
+    const S03_INNER: u16 = 2;
+    const S04_INNER: u16 = 3;
     // Q:
     const S06_Q: u16 = 4;
     const S07_Q: u16 = 5;
@@ -377,35 +377,36 @@ mod matcher {
 
     fn step<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
-            //   02                                        ▶
-            S02_INNER => {
+            //   01                                        ▶
+            S01_INNER => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   03   !   (expression_statement)           05
-            S03_INNER => 'state: {
-                if !cand_s03_inner(eng) {
+            //   02   !   (expression_statement)           04
+            S02_INNER => 'state: {
+                if !cand_s02_inner(eng) {
                     break 'state Flow::Backtrack;
                 }
-                Flow::Jump(S05_INNER)
+                Flow::Jump(S04_INNER)
             }
-            //   04  ─‣┘  _                                02
-            S04_INNER => 'state: {
+            //   03  ─‣┘  _                                01
+            S03_INNER => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                Flow::Jump(S02_INNER)
+                Flow::Jump(S01_INNER)
             }
-            //   05  └‣─  (identifier) [Node Set(id)]      04
-            S05_INNER => 'state: {
+            //   04  └‣─  (identifier) [Node Set(id)]      03
+            S04_INNER => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
                 }
                 loop {
-                    if cand_s05_inner(eng) {
+                    if cand_s04_inner(eng) {
                         break;
                     }
                     if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
@@ -413,16 +414,17 @@ mod matcher {
                     }
                 }
                 if rt::SkipPolicy::Any.admits(&eng.node()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_INNER));
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S04_INNER));
                 }
-                finish_s05_inner(eng)
+                finish_s04_inner(eng)
             }
             //   06                                        ▶
             S06_Q => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
             //   07   !   (program) [SuppressBegin]        14
@@ -446,7 +448,7 @@ mod matcher {
                 eng.emit_data(|_| rt::RuntimeEffect::StructClose);
                 Flow::Jump(S08_Q)
             }
-            //   11  ─‣─  (Inner)                          03 : 10
+            //   11  ─‣─  (Inner)                          02 : 10
             S11_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Next).is_none() {
                     break 'state Flow::Backtrack;
@@ -454,10 +456,10 @@ mod matcher {
                 eng.push_checkpoint(rt::Checkpoint::call_retry(
                     eng.checkpoint_state(),
                     S11_Q,
-                    rt::CallResume { target: S03_INNER, next: S10_Q, field: None, policy: rt::SkipPolicy::Any },
+                    rt::CallResume { target: S02_INNER, next: S10_Q, field: None, policy: rt::SkipPolicy::Any },
                 ));
                 eng.enter_frame(S10_Q);
-                Flow::Jump(S03_INNER)
+                Flow::Jump(S02_INNER)
             }
             //   13  -ε-  [SuppressEnd StructOpen]         11
             S13_Q => {
@@ -465,7 +467,7 @@ mod matcher {
                 eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
                 Flow::Jump(S11_Q)
             }
-            //   14  └‣─  (Inner)                          03 : 13
+            //   14  └‣─  (Inner)                          02 : 13
             S14_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
@@ -473,17 +475,18 @@ mod matcher {
                 eng.push_checkpoint(rt::Checkpoint::call_retry(
                     eng.checkpoint_state(),
                     S14_Q,
-                    rt::CallResume { target: S03_INNER, next: S13_Q, field: None, policy: rt::SkipPolicy::Any },
+                    rt::CallResume { target: S02_INNER, next: S13_Q, field: None, policy: rt::SkipPolicy::Any },
                 ));
                 eng.enter_frame(S13_Q);
-                Flow::Jump(S03_INNER)
+                Flow::Jump(S02_INNER)
             }
             //   16                                        ▶
             S16_INNER_EP => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
             //   17  -ε-  [StructClose]                    16
@@ -491,10 +494,10 @@ mod matcher {
                 eng.emit_data(|_| rt::RuntimeEffect::StructClose);
                 Flow::Jump(S16_INNER_EP)
             }
-            //   18       (Inner)                          03 : 17
+            //   18       (Inner)                          02 : 17
             S18_INNER_EP => {
                 eng.enter_frame(S17_INNER_EP);
-                Flow::Jump(S03_INNER)
+                Flow::Jump(S02_INNER)
             }
             //   19  -ε-  [StructOpen]                     18
             S19_INNER_EP => {
@@ -504,9 +507,10 @@ mod matcher {
             //   20                                        ▶
             S20_Q_EP => {
                 if eng.frames_empty() {
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
                     Flow::Accept
                 } else {
-                    Flow::Jump(eng.exit_frame())
+                    Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
             //   21  -ε-  [StructClose]                    20
@@ -528,9 +532,9 @@ mod matcher {
         }
     }
 
-    /// `S03_INNER` candidate: `(expression_statement)`.
+    /// `S02_INNER` candidate: `(expression_statement)`.
     #[inline]
-    fn cand_s03_inner(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s02_inner(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
         // (expression_statement)
         if node.kind_id() != 150 || !node.is_named() {
@@ -539,9 +543,9 @@ mod matcher {
         true
     }
 
-    /// `S05_INNER` candidate: `(identifier)`.
+    /// `S04_INNER` candidate: `(identifier)`.
     #[inline]
-    fn cand_s05_inner(eng: &rt::Engine<'_>) -> bool {
+    fn cand_s04_inner(eng: &rt::Engine<'_>) -> bool {
         let node = eng.node();
         // (identifier)
         if node.kind_id() != 1 || !node.is_named() {
@@ -561,14 +565,14 @@ mod matcher {
         true
     }
 
-    /// `S05_INNER` post-acceptance: effects, then branch. Shared by the dispatch
+    /// `S04_INNER` post-acceptance: effects, then branch. Shared by the dispatch
     /// path and the match-retry resume, so a retried candidate replays exactly
     /// what the original acceptance would have.
     #[inline]
-    fn finish_s05_inner(eng: &mut rt::Engine<'_>) -> Flow {
+    fn finish_s04_inner(eng: &mut rt::Engine<'_>) -> Flow {
         eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
         eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(id)
-        Flow::Jump(S04_INNER)
+        Flow::Jump(S03_INNER)
     }
 
     /// Unwind the checkpoint stack: branch alternatives resume dispatch, Call and
@@ -624,12 +628,12 @@ mod matcher {
 
     fn match_retry<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Option<Flow> {
         match ip {
-            S05_INNER => {
+            S04_INNER => {
                 if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
                     return None;
                 }
                 loop {
-                    if cand_s05_inner(eng) {
+                    if cand_s04_inner(eng) {
                         break;
                     }
                     if !eng.cursor_mut().continue_search(rt::SkipPolicy::Any) {
@@ -637,9 +641,9 @@ mod matcher {
                     }
                 }
                 if rt::SkipPolicy::Any.admits(&eng.node()) {
-                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S05_INNER));
+                    eng.push_checkpoint(rt::Checkpoint::match_retry(eng.checkpoint_state(), S04_INNER));
                 }
-                Some(finish_s05_inner(eng))
+                Some(finish_s04_inner(eng))
             }
             _ => unreachable!("match-retry checkpoint ip {ip} must address a sibling-search Match"),
         }

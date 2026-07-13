@@ -267,5 +267,12 @@ pub fn format_effect(effect: &Effect) -> String {
         EffectKind::SpanStartAt => format!("SpanStartAt#{}", effect.payload),
         EffectKind::SpanStart => format!("SpanStart#{}", effect.payload),
         EffectKind::SpanEnd => format!("SpanEnd#{}", effect.payload),
+        EffectKind::ScalarOpen => "ScalarOpen".to_string(),
+        EffectKind::ScalarMark => "ScalarMark".to_string(),
+        EffectKind::StrClose => "StrClose".to_string(),
+        EffectKind::BoolClose => format!("BoolClose({})", effect.payload),
+        EffectKind::NodeStr => "NodeStr".to_string(),
+        EffectKind::NodeBool => "NodeBool".to_string(),
+        EffectKind::BoolValue => format!("BoolValue({})", effect.payload),
     }
 }

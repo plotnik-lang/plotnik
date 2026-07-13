@@ -1,0 +1,14 @@
+Q = (program
+  [
+    {
+      (identifier) @flag :: bool
+    } @row
+    (number)
+  ]
+)
+------------------ DIAGNOSTICS -------------------
+error: capture type `bool` requires a value that may be absent; this capture is always present
+ --> query.ptk:4:26
+  |
+4 |       (identifier) @flag :: bool
+  |                          ^^^^^^^

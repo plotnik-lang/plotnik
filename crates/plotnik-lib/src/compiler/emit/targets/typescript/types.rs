@@ -1,9 +1,9 @@
 //! TypeScript declarations rendered directly from target-neutral output facts.
 
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use crate::compiler::analyze::output::{OutputItem, OutputItemKind, OutputSchema};
-use crate::compiler::analyze::types::type_shape::{TYPE_NODE, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
 use crate::compiler::emit::sink::{Sink, Style};
 use crate::core::Symbol;
 
@@ -37,9 +37,7 @@ pub(crate) fn emit_schema_mapped(
 struct SchemaEmitter<'a> {
     schema: &'a OutputSchema<'a>,
     config: Config,
-    items_by_type: HashMap<TypeId, OutputItem>,
     items_by_name: HashMap<Symbol, OutputItem>,
-    wire_ids: HashMap<TypeId, u32>,
     declared_names: HashSet<String>,
     needs_node_type: bool,
     sink: Sink<SemanticTag>,
@@ -48,23 +46,15 @@ struct SchemaEmitter<'a> {
 
 impl<'a> SchemaEmitter<'a> {
     fn new(schema: &'a OutputSchema<'a>, config: Config) -> Self {
-        let items_by_type = schema
-            .items()
-            .iter()
-            .filter(|item| item.kind != OutputItemKind::VoidDef)
-            .map(|item| (item.ty, *item))
-            .collect();
         let items_by_name = schema
-            .items()
+            .entrypoint_items()
             .iter()
             .map(|item| (item.name, *item))
             .collect();
         Self {
             schema,
             config,
-            items_by_type,
             items_by_name,
-            wire_ids: wire_ids(schema),
             declared_names: HashSet::new(),
             needs_node_type: false,
             sink: Sink::new(),
@@ -78,15 +68,14 @@ impl<'a> SchemaEmitter<'a> {
     }
 
     fn emit(mut self) -> (String, Vec<DtsRange>) {
-        self.needs_node_type = self
-            .schema
-            .items()
+        let items = self.schema.entrypoint_items().to_vec();
+        self.needs_node_type = items
             .iter()
             .any(|item| self.type_uses_node(item.ty, &mut HashSet::new()));
         if self.config.emit_node_interface && self.needs_node_type {
             self.emit_node_interface();
         }
-        for item in self.sorted_items() {
+        for item in items {
             self.emit_item(item);
         }
 
@@ -109,159 +98,6 @@ impl<'a> SchemaEmitter<'a> {
             })
             .collect();
         (output, ranges)
-    }
-
-    fn sorted_items(&self) -> Vec<OutputItem> {
-        let mut reachable = HashSet::new();
-        let mut seen = HashSet::new();
-        for (_, ty) in self.schema.types.iter_entrypoint_output() {
-            self.collect_reachable(ty, &mut reachable, &mut seen);
-        }
-        let items: HashMap<TypeId, OutputItem> = self
-            .items_by_type
-            .iter()
-            .filter(|(ty, _)| reachable.contains(ty))
-            .map(|(&ty, &item)| (ty, item))
-            .collect();
-        let mut deps: HashMap<TypeId, HashSet<TypeId>> = items
-            .keys()
-            .copied()
-            .map(|ty| (ty, self.direct_deps(ty)))
-            .collect();
-        for values in deps.values_mut() {
-            values.retain(|dep| items.contains_key(dep));
-        }
-        let mut reverse: HashMap<TypeId, Vec<TypeId>> = HashMap::new();
-        for (&ty, values) in &deps {
-            for &dependency in values {
-                reverse.entry(dependency).or_default().push(ty);
-            }
-        }
-        let mut ready: BinaryHeap<(u32, TypeId)> = deps
-            .iter()
-            .filter_map(|(&ty, values)| values.is_empty().then_some((self.wire_id(ty), ty)))
-            .collect();
-        let mut output = Vec::with_capacity(items.len());
-        while output.len() < items.len() {
-            let ty = match ready.pop() {
-                Some((_, ty)) => ty,
-                None => deps
-                    .values()
-                    .flatten()
-                    .copied()
-                    .max_by_key(|ty| self.wire_id(*ty))
-                    .expect("pending output items contain a dependency cycle"),
-            };
-            if deps.remove(&ty).is_none() {
-                continue;
-            }
-            output.push(items[&ty]);
-            if let Some(dependents) = reverse.get(&ty) {
-                for dependent in dependents {
-                    if let Some(values) = deps.get_mut(dependent) {
-                        values.remove(&ty);
-                        if values.is_empty() {
-                            ready.push((self.wire_id(*dependent), *dependent));
-                        }
-                    }
-                }
-            }
-        }
-        output.extend(
-            self.schema
-                .items()
-                .iter()
-                .copied()
-                .filter(|item| item.kind == OutputItemKind::VoidDef),
-        );
-        output
-    }
-
-    fn direct_deps(&self, ty: TypeId) -> HashSet<TypeId> {
-        let mut out = HashSet::new();
-        match self.schema.types.expect_type_shape(ty) {
-            TypeShape::Struct(fields) => {
-                for field in fields.values() {
-                    self.collect_wire_dep(field.type_id, &mut out, &mut HashSet::new());
-                }
-            }
-            TypeShape::Enum(_) => {}
-            TypeShape::Array { element, .. } | TypeShape::Optional(element) => {
-                self.collect_wire_dep(*element, &mut out, &mut HashSet::new());
-            }
-            TypeShape::Ref(definition) => {
-                self.collect_wire_dep(
-                    self.schema.types.expect_def_output(*definition),
-                    &mut out,
-                    &mut HashSet::new(),
-                );
-            }
-            TypeShape::Custom(_) => {
-                if self.items_by_type.contains_key(&ty) {
-                    out.insert(ty);
-                }
-            }
-            TypeShape::Void | TypeShape::Node => {}
-        }
-        out.remove(&ty);
-        out
-    }
-
-    fn collect_wire_dep(&self, ty: TypeId, out: &mut HashSet<TypeId>, seen: &mut HashSet<TypeId>) {
-        if !seen.insert(ty) {
-            return;
-        }
-        match self.schema.types.expect_type_shape(ty) {
-            TypeShape::Array { element, .. } | TypeShape::Optional(element) => {
-                self.collect_wire_dep(*element, out, seen);
-            }
-            TypeShape::Ref(definition) => {
-                self.collect_wire_dep(self.schema.types.expect_def_output(*definition), out, seen);
-            }
-            TypeShape::Struct(_) | TypeShape::Enum(_) => {
-                if let Some(item) = self.item_for_type(ty) {
-                    out.insert(item.ty);
-                }
-            }
-            TypeShape::Custom(_) => {
-                if let Some(item) = self.item_for_type(ty) {
-                    out.insert(item.ty);
-                }
-            }
-            TypeShape::Void | TypeShape::Node => {}
-        }
-    }
-
-    fn collect_reachable(&self, ty: TypeId, out: &mut HashSet<TypeId>, seen: &mut HashSet<TypeId>) {
-        if !seen.insert(ty) {
-            return;
-        }
-        if self.items_by_type.contains_key(&ty) {
-            out.insert(ty);
-        }
-        match self.schema.types.expect_type_shape(ty) {
-            TypeShape::Struct(fields) => {
-                for field in fields.values() {
-                    self.collect_reachable(field.type_id, out, seen);
-                }
-            }
-            TypeShape::Enum(variants) => {
-                for payload in variants.values() {
-                    self.collect_reachable(*payload, out, seen);
-                }
-            }
-            TypeShape::Array { element, .. } | TypeShape::Optional(element) => {
-                self.collect_reachable(*element, out, seen);
-            }
-            TypeShape::Ref(definition) => {
-                let name = self.schema.deps.def_name_sym(*definition);
-                if let Some(item) = self.items_by_name.get(&name) {
-                    out.insert(item.ty);
-                }
-                self.collect_reachable(self.schema.types.expect_def_output(*definition), out, seen);
-            }
-            TypeShape::Void | TypeShape::Node | TypeShape::Custom(_) => {}
-        }
     }
 
     fn type_uses_node(&self, ty: TypeId, seen: &mut HashSet<TypeId>) -> bool {
@@ -421,6 +257,8 @@ impl<'a> SchemaEmitter<'a> {
                 VoidType::Null => text("null"),
             },
             TypeShape::Node | TypeShape::Custom(_) => text("Node"),
+            TypeShape::Str => self.render_builtin("string", ty),
+            TypeShape::Bool => self.render_builtin("boolean", ty),
             TypeShape::Optional(inner) => self.render_nullable(*inner),
             TypeShape::Array { element, non_empty } => self.render_array(*element, *non_empty),
             TypeShape::Ref(definition) => {
@@ -618,80 +456,28 @@ impl<'a> SchemaEmitter<'a> {
         self.sink.tagged(tag, |sink| sink.push(value));
     }
 
-    fn wire_id(&self, ty: TypeId) -> u32 {
-        *self
-            .wire_ids
-            .get(&ty)
-            .expect("every rendered output type has a projected identity")
+    fn render_builtin(&self, value: &str, ty: TypeId) -> Sink<SemanticTag> {
+        let mut out = Sink::new();
+        if !self.map_enabled {
+            out.push(value);
+            return out;
+        }
+        out.tagged(
+            SemanticTag {
+                type_id: self.wire_id(ty),
+                member: None,
+            },
+            |out| out.push(value),
+        );
+        out
     }
 
-    fn item_for_type(&self, ty: TypeId) -> Option<OutputItem> {
-        self.items_by_type.get(&ty).copied().or_else(|| {
-            self.schema
-                .type_name_of(ty)
-                .and_then(|name| self.items_by_name.get(&name).copied())
-        })
+    fn wire_id(&self, ty: TypeId) -> u32 {
+        self.schema.type_layout().output_id(ty)
     }
 
     fn name(&self, symbol: Symbol) -> String {
         self.schema.interner.resolve(symbol).to_string()
-    }
-}
-
-fn wire_ids(schema: &OutputSchema<'_>) -> HashMap<TypeId, u32> {
-    let mut uses_void = false;
-    let mut uses_node = false;
-    let mut seen = HashSet::new();
-    for &ty in schema.ordered_types() {
-        collect_builtin_usage(schema, ty, &mut seen, &mut uses_void, &mut uses_node);
-    }
-    for (_, ty) in schema.types.iter_def_output() {
-        uses_void |= ty == TYPE_VOID;
-        uses_node |= ty == TYPE_NODE;
-    }
-    let mut ids = HashMap::new();
-    let mut next = 0u32;
-    if uses_void {
-        ids.insert(TYPE_VOID, next);
-        next += 1;
-    }
-    if uses_node {
-        ids.insert(TYPE_NODE, next);
-        next += 1;
-    }
-    for &ty in schema.ordered_types() {
-        ids.insert(ty, next);
-        next += 1;
-    }
-    ids
-}
-
-fn collect_builtin_usage(
-    schema: &OutputSchema<'_>,
-    ty: TypeId,
-    seen: &mut HashSet<TypeId>,
-    uses_void: &mut bool,
-    uses_node: &mut bool,
-) {
-    if !seen.insert(ty) {
-        return;
-    }
-    match schema.types.expect_type_shape(ty) {
-        TypeShape::Void => *uses_void = true,
-        TypeShape::Node | TypeShape::Custom(_) => *uses_node = true,
-        TypeShape::Ref(definition) => {
-            let target = schema.types.expect_def_output(*definition);
-            if target == TYPE_VOID {
-                *uses_node = true;
-            } else {
-                collect_builtin_usage(schema, target, seen, uses_void, uses_node);
-            }
-        }
-        shape => {
-            for child in shape.child_type_ids() {
-                collect_builtin_usage(schema, child, seen, uses_void, uses_node);
-            }
-        }
     }
 }
 

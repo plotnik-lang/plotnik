@@ -42,9 +42,36 @@ fn span_effects_roundtrip() {
 }
 
 #[test]
-fn reserved_span_extension_kind_is_rejected() {
-    let raw = (15u16 << EFFECT_PAYLOAD_BITS).to_le_bytes();
+fn opcode_after_scalar_effects_is_rejected() {
+    let invalid = EffectKind::BoolValue as u16 + 1;
+    let raw = (invalid << EFFECT_PAYLOAD_BITS).to_le_bytes();
     assert!(Effect::try_from_bytes(raw).is_none());
+}
+
+#[test]
+fn scalar_effect_metadata_preserves_motion_and_frame_boundaries() {
+    assert_eq!(
+        EffectKind::ScalarOpen.frame_action(),
+        Some(FrameAction::Open(ValueFrameKind::Scalar))
+    );
+    assert_eq!(
+        EffectKind::StrClose.frame_action(),
+        Some(FrameAction::Close(ValueFrameKind::Scalar))
+    );
+    assert_eq!(
+        EffectKind::BoolClose.frame_action(),
+        Some(FrameAction::Close(ValueFrameKind::Scalar))
+    );
+    assert!(EffectKind::ScalarMark.reads_cursor());
+    assert!(EffectKind::ScalarOpen.is_motion_barrier());
+    assert!(EffectKind::StrClose.is_motion_barrier());
+    assert!(EffectKind::BoolClose.is_motion_barrier());
+    assert!(EffectKind::NodeStr.reads_cursor());
+    assert!(EffectKind::NodeBool.reads_cursor());
+    assert!(!EffectKind::BoolValue.reads_cursor());
+    assert!(EffectKind::BoolValue.accepts_payload(0, 0, 0));
+    assert!(EffectKind::BoolValue.accepts_payload(1, 0, 0));
+    assert!(!EffectKind::BoolValue.accepts_payload(2, 0, 0));
 }
 
 #[test]

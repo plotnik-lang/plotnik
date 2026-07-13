@@ -6,13 +6,17 @@
 //! source backend chooses a representation.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::OnceLock;
 
 use thiserror::Error;
 
 use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
-use crate::compiler::analyze::types::type_shape::{FieldInfo, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{
+    FieldInfo, TYPE_BOOL, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId, TypeShape,
+};
+use crate::compiler::ids::DefId;
 use crate::core::{Interner, Symbol};
 
 const MAX_MEMBERS: usize = u16::MAX as usize;
@@ -122,6 +126,61 @@ pub(crate) struct CaptureLayout {
     member_count: usize,
 }
 
+/// Stable analysis-type to emitted-type numbering shared by every output
+/// backend. Built-ins lead in canonical order; custom wire types retain the
+/// compiler's historical post-order.
+#[derive(Clone, Debug)]
+pub(crate) struct OutputTypeLayout {
+    builtins: Vec<TypeId>,
+    custom_types: Vec<TypeId>,
+    output_ids: HashMap<TypeId, u32>,
+}
+
+impl OutputTypeLayout {
+    fn build(used_builtins: &HashSet<TypeId>, custom_types: Vec<TypeId>) -> Self {
+        let builtins = [TYPE_VOID, TYPE_NODE, TYPE_STR, TYPE_BOOL]
+            .into_iter()
+            .filter(|builtin| used_builtins.contains(builtin))
+            .collect::<Vec<_>>();
+
+        let output_ids = builtins
+            .iter()
+            .chain(&custom_types)
+            .enumerate()
+            .map(|(index, &type_id)| {
+                (
+                    type_id,
+                    u32::try_from(index).expect("output type count fits the wire type space"),
+                )
+            })
+            .collect();
+        Self {
+            builtins,
+            custom_types,
+            output_ids,
+        }
+    }
+
+    pub(crate) fn builtins(&self) -> &[TypeId] {
+        &self.builtins
+    }
+
+    pub(crate) fn custom_types(&self) -> &[TypeId] {
+        &self.custom_types
+    }
+
+    pub(crate) fn output_id(&self, type_id: TypeId) -> u32 {
+        *self
+            .output_ids
+            .get(&type_id)
+            .expect("reachable output type has a projected identity")
+    }
+
+    pub(crate) fn contains(&self, type_id: TypeId) -> bool {
+        self.output_ids.contains_key(&type_id)
+    }
+}
+
 impl CaptureLayout {
     pub(super) fn build(
         types: &TypeAnalysis,
@@ -199,10 +258,11 @@ pub(crate) struct OutputSchema<'a> {
     pub(crate) types: &'a TypeAnalysis,
     pub(crate) deps: &'a DependencyAnalysis,
     pub(crate) interner: &'a Interner,
-    ordered_types: Vec<TypeId>,
-    type_names: HashMap<TypeId, Symbol>,
-    items: Vec<OutputItem>,
-    layout: CaptureLayout,
+    collected_types: CollectedTypes,
+    type_layout: OnceLock<OutputTypeLayout>,
+    type_names: BTreeMap<TypeId, Symbol>,
+    entrypoint_items: Vec<OutputItem>,
+    capture_layout: CaptureLayout,
 }
 
 impl<'a> OutputSchema<'a> {
@@ -221,35 +281,65 @@ impl<'a> OutputSchema<'a> {
         deps: &'a DependencyAnalysis,
         interner: &'a Interner,
     ) -> Result<Self, OutputSchemaError> {
-        let ordered_types = collect_ordered_types(types);
-        let layout = CaptureLayout::build(types, &ordered_types)?;
-        let type_names: HashMap<TypeId, Symbol> = types.iter_type_names().collect();
-        let items = collect_items(types, deps, &type_names);
+        let reachable_defs =
+            deps.reachable_from(types.iter_entrypoint_output().map(|(def_id, _)| def_id));
+        let collected_types = CollectedTypes::collect(types, reachable_defs.iter());
+        let capture_layout = CaptureLayout::build(types, &collected_types.custom)?;
+        let mut type_names: BTreeMap<TypeId, Symbol> = types.iter_type_names().collect();
+        // Leaf wrappers are structurally interned, so an unreachable definition
+        // can share its TypeId with a reachable one. Reassert reachable nominal
+        // names here: type reachability alone must never retain the dead name.
+        for def_id in reachable_defs.iter() {
+            let output = types.expect_def_output(def_id);
+            if output == TYPE_VOID {
+                continue;
+            }
+            type_names.insert(output, deps.def_name_sym(def_id));
+        }
+        let entrypoint_items = ItemCollector::new(types, deps, &type_names).collect();
         Ok(Self {
             types,
             deps,
             interner,
-            ordered_types,
+            collected_types,
+            type_layout: OnceLock::new(),
             type_names,
-            items,
-            layout,
+            entrypoint_items,
+            capture_layout,
         })
     }
 
-    pub(crate) fn ordered_types(&self) -> &[TypeId] {
-        &self.ordered_types
+    pub(crate) fn type_layout(&self) -> &OutputTypeLayout {
+        self.type_layout.get_or_init(|| {
+            OutputTypeLayout::build(
+                &self.collected_types.builtins,
+                self.collected_types.custom.clone(),
+            )
+        })
     }
 
     pub(crate) fn type_name_of(&self, type_id: TypeId) -> Option<Symbol> {
         self.type_names.get(&type_id).copied()
     }
 
-    pub(crate) fn items(&self) -> &[OutputItem] {
-        &self.items
+    pub(crate) fn iter_type_names(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
+        self.type_names
+            .iter()
+            .map(|(&type_id, &name)| (type_id, name))
+    }
+
+    /// Public output items reachable from callable definition outputs.
+    ///
+    /// Reachable fragment definitions still need capture slots and wire types
+    /// for matching. A source target, however, must not publish an
+    /// unspecialized fragment type merely because a scalar-specialized call
+    /// uses the same matcher body.
+    pub(crate) fn entrypoint_items(&self) -> &[OutputItem] {
+        &self.entrypoint_items
     }
 
     pub(crate) fn layout(&self) -> &CaptureLayout {
-        &self.layout
+        &self.capture_layout
     }
 
     pub(crate) fn dependency_analysis(&self) -> &DependencyAnalysis {
@@ -261,53 +351,58 @@ impl<'a> OutputSchema<'a> {
     }
 }
 
-fn collect_items(
-    types: &TypeAnalysis,
-    deps: &DependencyAnalysis,
-    type_names: &HashMap<TypeId, Symbol>,
-) -> Vec<OutputItem> {
-    let mut collector = ItemCollector {
-        types,
-        type_names,
-        declared: HashSet::new(),
-        items: Vec::new(),
-    };
-    for (def_id, output) in types.iter_def_output() {
-        let name = deps.def_name_sym(def_id);
-        if output == TYPE_VOID {
-            if types.is_entrypoint_def(def_id) {
-                collector.items.push(OutputItem::void_definition(name));
-            }
-            continue;
-        }
-        collector.add_item(name, output);
-    }
-    collector.items
-}
-
 struct ItemCollector<'a> {
     types: &'a TypeAnalysis,
-    type_names: &'a HashMap<TypeId, Symbol>,
-    declared: HashSet<Symbol>,
+    deps: &'a DependencyAnalysis,
+    type_names: &'a BTreeMap<TypeId, Symbol>,
+    declared_names: HashSet<Symbol>,
+    walked_types: HashSet<TypeId>,
     items: Vec<OutputItem>,
 }
 
-impl ItemCollector<'_> {
+impl<'a> ItemCollector<'a> {
+    fn new(
+        types: &'a TypeAnalysis,
+        deps: &'a DependencyAnalysis,
+        type_names: &'a BTreeMap<TypeId, Symbol>,
+    ) -> Self {
+        Self {
+            types,
+            deps,
+            type_names,
+            declared_names: HashSet::new(),
+            walked_types: HashSet::new(),
+            items: Vec::new(),
+        }
+    }
+
+    fn collect(mut self) -> Vec<OutputItem> {
+        for (def_id, output) in self.types.iter_entrypoint_output() {
+            let name = self.deps.def_name_sym(def_id);
+            if output == TYPE_VOID {
+                self.items.push(OutputItem::void_definition(name));
+                continue;
+            }
+            self.add_item(name, output);
+        }
+        self.items
+    }
+
     fn add_item(&mut self, name: Symbol, ty: TypeId) {
-        if !self.declared.insert(name) {
+        if !self.declared_names.insert(name) {
             return;
         }
 
         let item = OutputItem::for_output(name, ty, self.types.expect_type_shape(ty));
         self.items.push(item);
-        match item.kind {
-            OutputItemKind::Struct | OutputItemKind::Enum => self.collect_composite_children(ty),
-            OutputItemKind::Alias => self.collect_alias_interior(ty),
-            OutputItemKind::VoidDef => unreachable!("void definitions are inserted directly"),
-        }
+        self.walk(ty);
     }
 
-    fn collect_composite_children(&mut self, ty: TypeId) {
+    fn walk(&mut self, ty: TypeId) {
+        if !self.walked_types.insert(ty) {
+            return;
+        }
+
         match self.types.expect_type_shape(ty) {
             TypeShape::Struct(fields) => {
                 for info in fields.values() {
@@ -327,7 +422,15 @@ impl ItemCollector<'_> {
                     }
                 }
             }
-            _ => unreachable!("children collection runs on composites only"),
+            TypeShape::Array { element, .. } | TypeShape::Optional(element) => {
+                self.collect_position(*element)
+            }
+            TypeShape::Ref(def_id) => self.collect_reference(*def_id),
+            TypeShape::Void
+            | TypeShape::Node
+            | TypeShape::Str
+            | TypeShape::Bool
+            | TypeShape::Custom(_) => {}
         }
     }
 
@@ -340,48 +443,65 @@ impl ItemCollector<'_> {
                     .expect("naming pass names every non-payload composite");
                 self.add_item(name, ty);
             }
-            TypeShape::Custom(_) => {
-                if let Some(&name) = self.type_names.get(&ty) {
-                    self.add_item(name, ty);
-                }
+            TypeShape::Custom(name) => self.add_item(*name, ty),
+            TypeShape::Array { .. } | TypeShape::Optional(_) => {
+                let Some(&name) = self.type_names.get(&ty) else {
+                    self.walk(ty);
+                    return;
+                };
+                self.add_item(name, ty);
             }
-            TypeShape::Array { element, .. } => self.collect_position(*element),
-            TypeShape::Optional(inner) => self.collect_position(*inner),
-            TypeShape::Node | TypeShape::Ref(_) => {}
+            TypeShape::Ref(def_id) => self.collect_reference(*def_id),
+            TypeShape::Node | TypeShape::Str | TypeShape::Bool => {}
             TypeShape::Void => unreachable!("void cannot appear in an output position"),
         }
     }
 
-    fn collect_alias_interior(&mut self, ty: TypeId) {
-        match self.types.expect_type_shape(ty) {
-            TypeShape::Array { element, .. } => self.collect_position(*element),
-            TypeShape::Optional(inner) => self.collect_position(*inner),
-            TypeShape::Node | TypeShape::Custom(_) | TypeShape::Ref(_) => {}
-            TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Void => {
-                unreachable!("alias items cover non-composite outputs only")
-            }
+    fn collect_reference(&mut self, def_id: DefId) {
+        let output = self.types.expect_def_output(def_id);
+        if output == TYPE_VOID {
+            return;
         }
+        self.add_item(self.deps.def_name_sym(def_id), output);
     }
 }
 
 /// Custom types in the exact post-order the wire table historically used.
+#[cfg(test)]
 pub(super) fn collect_ordered_types(types: &TypeAnalysis) -> Vec<TypeId> {
-    let mut collector = TypeCollector::new();
-    for (_def_id, type_id) in types.iter_def_output() {
-        collector.collect(type_id, types);
-        if !matches!(types.expect_type_shape(type_id), TypeShape::Ref(_)) {
-            continue;
+    CollectedTypes::collect(types, types.iter_def_output().map(|(def_id, _)| def_id)).custom
+}
+
+#[derive(Clone, Debug)]
+struct CollectedTypes {
+    custom: Vec<TypeId>,
+    builtins: HashSet<TypeId>,
+}
+
+impl CollectedTypes {
+    fn collect(types: &TypeAnalysis, definitions: impl IntoIterator<Item = DefId>) -> Self {
+        let mut collector = TypeCollector::new();
+        for def_id in definitions {
+            let type_id = types.expect_def_output(def_id);
+            collector.collect(type_id, types);
+            if !matches!(types.expect_type_shape(type_id), TypeShape::Ref(_)) {
+                continue;
+            }
+            if collector.seen.insert(type_id) {
+                collector.out.push(type_id);
+            }
         }
-        if collector.seen.insert(type_id) {
-            collector.out.push(type_id);
+        Self {
+            custom: collector.out,
+            builtins: collector.builtins,
         }
     }
-    collector.out
 }
 
 struct TypeCollector {
     out: Vec<TypeId>,
     seen: HashSet<TypeId>,
+    builtins: HashSet<TypeId>,
 }
 
 impl TypeCollector {
@@ -389,20 +509,33 @@ impl TypeCollector {
         Self {
             out: Vec::new(),
             seen: HashSet::new(),
+            builtins: HashSet::new(),
         }
     }
 
     fn collect(&mut self, type_id: TypeId, types: &TypeAnalysis) {
-        if type_id.is_builtin() || self.seen.contains(&type_id) {
+        if type_id.is_builtin() {
+            self.builtins.insert(type_id);
+            return;
+        }
+        if self.seen.contains(&type_id) {
             return;
         }
         let shape = types.expect_type_shape(type_id);
         if let TypeShape::Ref(def_id) = shape {
-            self.collect(types.expect_def_output(*def_id), types);
+            let target = types.expect_def_output(*def_id);
+            if target == TYPE_VOID {
+                self.builtins.insert(TYPE_NODE);
+                return;
+            }
+            self.collect(target, types);
             return;
         }
 
         self.seen.insert(type_id);
+        if matches!(shape, TypeShape::Custom(_)) {
+            self.builtins.insert(TYPE_NODE);
+        }
         for child in shape.child_type_ids() {
             self.collect(child, types);
         }

@@ -11,8 +11,8 @@ Q     = 20
 
 [transitions]
 Inner:
-  02                                        ▶
-  03   !   (identifier) [Node Set(x)]       02
+  01                                        ▶
+  02   !   (identifier) [Node Set(x)]       01
 
 Q:
   04                                        ▶
@@ -20,12 +20,12 @@ Q:
   07  └‣─  (expression_statement) [StructOpen]  11
   08  ─‣┘² _ [Set(v)]                       04
   10  -ε-  [StructClose]                    08
-  11  └‣─  (Inner)                          03 : 10
+  11  └‣─  (Inner)                          02 : 10
 
 Inner (entrypoint):
   13                                        ▶
   14  -ε-  [StructClose]                    13
-  15       (Inner)                          03 : 14
+  15       (Inner)                          02 : 14
   16  -ε-  [StructOpen]                     15
 
 Q (entrypoint):

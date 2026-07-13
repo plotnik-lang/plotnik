@@ -1,9 +1,9 @@
 Q = (identifier) @name :: (
 ------------------ DIAGNOSTICS -------------------
-error: expected a type name after `::`
+error: expected a capture type after `::`
  --> query.ptk:1:27
   |
 1 | Q = (identifier) @name :: (
   |                           ^
   |
-help: e.g., `::MyType`
+help: e.g., `:: str` or `:: MyType`

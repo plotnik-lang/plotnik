@@ -9,8 +9,9 @@ use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::lower::ir::NfaGraph;
 
 pub(crate) use super::matcher::{
-    CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, MatcherPlan, PredicatePlan,
-    PredicateValuePlan, RegexId, StateId, StateOrigin, StatePlan, StatePlanKind,
+    CallPlan, CheckPlan, EffectPlan, FlowPlan, KindClass, MatchPlan, MatcherPlan, OrdinaryCallPlan,
+    PredicatePlan, PredicateValuePlan, RegexId, RoutedCallPlan, SplitCallPlan, StateId,
+    StateOrigin, StatePlan, StatePlanKind,
 };
 pub(crate) use super::replay::{
     ReplayItem, ReplayItemKind, ReplayPlan, ReplayScopePlan, ReplayValuePlan, ReplayVariantPlan,

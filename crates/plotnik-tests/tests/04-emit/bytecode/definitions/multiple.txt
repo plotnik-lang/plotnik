@@ -7,8 +7,8 @@ Foo = 09
 
 [transitions]
 Foo:
-  02                                        ▶
-  03   !   (identifier) [Node Set(id)]      02
+  01                                        ▶
+  02   !   (identifier) [Node Set(id)]      01
 
 Bar:
   04                                        ▶
@@ -17,7 +17,7 @@ Bar:
 Foo (entrypoint):
   06                                        ▶
   07  -ε-  [StructClose]                    06
-  08       (Foo)                            03 : 07
+  08       (Foo)                            02 : 07
   09  -ε-  [StructOpen]                     08
 
 Bar (entrypoint):

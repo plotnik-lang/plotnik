@@ -1,0 +1,90 @@
+Comments = (comment)*
+
+Q = (program
+  (Comments) @comments :: str
+)
+--------------------- INPUT ----------------------
+// first
+
+// second
+------------------- TYPESCRIPT -------------------
+export interface Q {
+  comments: string[];
+}
+--------------------- OUTPUT ---------------------
+{
+  "comments": [
+    "// first",
+    "// second"
+  ]
+}
+-------------------- BYTECODE --------------------
+[strings]
+S0 "Beauty will save the world"
+S1 "comments"
+S2 "Comments"
+S3 "Q"
+S4 "comment"
+S5 "program"
+
+[type_defs]
+T0 = <Node>
+T1 = <Str>
+T2 = ArrayStar(T0)  ; <Node>*
+T3 = ArrayStar(T1)  ; <Str>*
+T4 = Struct  M0:1  ; { comments }
+
+[type_members]
+M0: S1 → T3  ; comments: T3
+
+[type_names]
+N0: S2 → T2  ; Comments
+N1: S3 → T4  ; Q
+
+[entrypoints]
+Q = 00 :: T4
+
+[transitions]
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@22)                            22 : 03
+  03  -ε-  [StructClose]                    05
+  05                                        ▶
+  06  -ε-  [ArrayClose]                     08
+  08  ─‣┘  _ [Set(M0)]                      10
+  10                                        ▶
+  11  -ε-  [ArrayClose Set(M0)]             10
+  13   !   (comment) [NodeStr Push]         16, 06
+  15  ...
+  16  ──!  _                                13, 16
+  18  └─!  _                                13, 16
+  20  -ε-  [ArrayOpen]                      18, 11
+  22   !   (program)                        20
+--------------------- TRACE ----------------------
+Q:
+  00  -ε-  [StructOpen]                     02
+  02       (@22)                            22 : 03
+       ▶   (@22)
+
+@22:
+  22       (program)                        20
+       ●   program
+  20  -ε-  [ArrayOpen]                      18, 11
+  18       _                                13, 16
+       ●   comment
+  13       (comment) [NodeStr Push]         16, 06
+       ●   comment
+  16       _                                13, 16
+       ●   comment
+  13       (comment) [NodeStr Push]         16, 06
+       ●   comment
+  16       _                                13, 16
+  13  ❮❮❮ 
+  06  -ε-  [ArrayClose]                     08
+  08       _ [Set(M0)]                      10
+       ●   program
+  10   ◀   (@22)                            
+
+Q:
+  03  -ε-  [StructClose]                    05
+  05   ◀   (Q)                              ◼

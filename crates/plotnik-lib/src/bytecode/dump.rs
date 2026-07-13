@@ -14,8 +14,7 @@ use super::module::{Instruction, Module};
 use super::node_kind_constraint::NodeKindConstraint;
 use super::render::ModuleRenderContext;
 use super::type_meta::{TypeDefKind, TypeKind};
-use super::{Call, Match, Return, SPAN_NO_BINDING};
-use crate::bytecode::type_system::TYPE_CUSTOM_START;
+use super::{Call, Match, Return, RoutedCall, SPAN_NO_BINDING, SplitCall};
 use plotnik_rt::Nav;
 
 /// Generate a human-readable dump of the bytecode module.
@@ -70,8 +69,8 @@ impl DumpContext {
         let str_count = header.str_table_count as usize;
 
         let types = module.types();
-        // Builtins precede custom types; widen for both.
-        let type_count = TYPE_CUSTOM_START as usize + types.defs_count();
+        // `defs_count` already includes every emitted builtin and custom type.
+        let type_count = types.defs_count();
         let str_width = width_for_count(str_count);
         let type_width = width_for_count(type_count);
         let member_width = width_for_count(types.members_count());
@@ -147,6 +146,8 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
                 let name = match kind {
                     TypeKind::Void => "<Void>",
                     TypeKind::Node => "<Node>",
+                    TypeKind::Str => "<Str>",
+                    TypeKind::Bool => "<Bool>",
                     _ => unreachable!(),
                 };
                 (name.to_string(), String::new())
@@ -420,7 +421,10 @@ struct DumpFormatter<'a> {
 fn instruction_step_count(instr: &Instruction) -> u16 {
     match instr {
         Instruction::Match(m) => m.step_count(),
-        Instruction::Call(_) | Instruction::Return(_) => 1,
+        Instruction::Call(_)
+        | Instruction::RoutedCall(_)
+        | Instruction::SplitCall(_)
+        | Instruction::Return(_) => 1,
     }
 }
 
@@ -439,8 +443,59 @@ impl DumpFormatter<'_> {
         match instr {
             Instruction::Match(m) => self.format_match(step, m),
             Instruction::Call(c) => self.format_call(step, c),
+            Instruction::RoutedCall(c) => self.format_routed_call(step, c),
+            Instruction::SplitCall(c) => self.format_split_call(step, c),
             Instruction::Return(r) => self.format_return(step, r),
         }
+    }
+
+    fn format_routed_call(&self, step: u16, call: &RoutedCall) -> String {
+        let colors = &self.ctx.colors;
+        let builder = LineBuilder::new(self.step_width);
+        let prefix = format!(
+            "  {:0sw$} {} ",
+            step,
+            Symbol::EMPTY.format(),
+            sw = self.step_width
+        );
+        let target_name = self
+            .ctx
+            .label_for(call.target)
+            .map(String::from)
+            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.step_width));
+        let content = format!("({}{}{})", colors.blue, target_name, colors.reset);
+        let successors = format!(
+            "{:0w$} : {:0w$}",
+            u16::from(call.target),
+            u16::from(call.next),
+            w = self.step_width
+        );
+        builder.pad_successors(format!("{prefix}{content}"), &successors)
+    }
+
+    fn format_split_call(&self, step: u16, call: &SplitCall) -> String {
+        let colors = &self.ctx.colors;
+        let builder = LineBuilder::new(self.step_width);
+        let prefix = format!(
+            "  {:0sw$} {} ",
+            step,
+            Symbol::EMPTY.format(),
+            sw = self.step_width
+        );
+        let target_name = self
+            .ctx
+            .label_for(call.target)
+            .map(String::from)
+            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.step_width));
+        let content = format!("({}{}{})", colors.blue, target_name, colors.reset);
+        let successors = format!(
+            "{:0w$} : {:0w$} / {:0w$}",
+            u16::from(call.target),
+            u16::from(call.returns.matched),
+            u16::from(call.returns.zero),
+            w = self.step_width
+        );
+        builder.pad_successors(format!("{prefix}{content}"), &successors)
     }
 
     fn format_match(&self, step: u16, m: &Match) -> String {
@@ -503,7 +558,7 @@ impl DumpFormatter<'_> {
         builder.pad_successors(base, &successors)
     }
 
-    fn format_return(&self, step: u16, _r: &Return) -> String {
+    fn format_return(&self, step: u16, return_: &Return) -> String {
         let builder = LineBuilder::new(self.step_width);
         let prefix = format!(
             "  {:0sw$} {} ",
@@ -511,7 +566,11 @@ impl DumpFormatter<'_> {
             Symbol::EMPTY.format(),
             sw = self.step_width
         );
-        builder.pad_successors(prefix, "▶")
+        let outcome = match return_.mode.outcome() {
+            plotnik_rt::ReturnOutcome::Matched => "▶",
+            plotnik_rt::ReturnOutcome::Zero => "▶ zero",
+        };
+        builder.pad_successors(prefix, outcome)
     }
 
     fn format_step(&self, step: StepId) -> String {

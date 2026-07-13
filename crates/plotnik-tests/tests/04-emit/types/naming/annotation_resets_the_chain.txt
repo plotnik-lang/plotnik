@@ -10,16 +10,16 @@ Foo = (function_declaration
   )
 )
 ------------------- TYPESCRIPT -------------------
-export interface BarInner {
-  v: Node;
+export interface Foo {
+  outer: Bar;
 }
 
 export interface Bar {
   inner: BarInner;
 }
 
-export interface Foo {
-  outer: Bar;
+export interface BarInner {
+  v: Node;
 }
 ---------------------- RUST ----------------------
 use ::plotnik_rt::Node;

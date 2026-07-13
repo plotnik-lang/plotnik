@@ -8,12 +8,12 @@ Q = (program
 --------------------- INPUT ----------------------
 a;
 ------------------- TYPESCRIPT -------------------
-export type QY =
-  | { $tag: "In"; $data: { a: Node } };
-
 export interface Q {
   y: QY;
 }
+
+export type QY =
+  | { $tag: "In"; $data: { a: Node } };
 ------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
  --> query.ptk:2:3

@@ -4,7 +4,7 @@ use super::*;
 fn span_kind_names_are_stable() {
     assert_eq!(SpanKind::Def.name(), "def");
     assert_eq!(SpanKind::NegField.name(), "neg_field");
-    assert_eq!(SpanKind::Annotation.name(), "annotation");
+    assert_eq!(SpanKind::CaptureType.name(), "capture_type");
     assert!(SpanKind::try_from_u8(13).is_none());
 }
 

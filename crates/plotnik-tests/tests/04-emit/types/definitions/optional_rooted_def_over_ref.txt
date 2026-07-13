@@ -32,9 +32,9 @@ pub struct Row<'t> {
     pub val: Node<'t>,
 }
 
-pub type MaybeRow<'t> = ::core::option::Option<Row<'t>>;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'t> {
     pub first: ::core::option::Option<Row<'t>>,
 }
+
+pub type MaybeRow<'t> = ::core::option::Option<Row<'t>>;

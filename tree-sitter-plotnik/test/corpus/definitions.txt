@@ -142,5 +142,5 @@ Q = (comment)+ @comments :: CommentList
           (identifier))
         (quantifier))
       (capture)
-      (type_annotation
-        (type_identifier)))))
+      (capture_type
+        (capture_type_identifier)))))

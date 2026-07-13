@@ -7,6 +7,8 @@
 
 ; Definitions, references, branch labels, type names
 (type_identifier) @type
+(capture_type_identifier) @type
+(builtin_capture_type) @type.builtin
 
 ; Captures
 (capture) @label

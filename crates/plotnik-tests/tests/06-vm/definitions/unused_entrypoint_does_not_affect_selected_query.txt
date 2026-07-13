@@ -6,12 +6,12 @@ Q = (program
 --------------------- INPUT ----------------------
 foo;
 ------------------- TYPESCRIPT -------------------
-export interface Q {
-  name: Node;
-}
-
 export interface Other {
   fn: Node;
+}
+
+export interface Q {
+  name: Node;
 }
 --------------------- OUTPUT ---------------------
 {

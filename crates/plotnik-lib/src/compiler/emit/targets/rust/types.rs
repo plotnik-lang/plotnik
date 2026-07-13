@@ -55,7 +55,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
 
     fn render_sections(&mut self) -> Vec<String> {
         let mut sections: Vec<String> = Vec::new();
-        for item in self.schema.items().to_vec() {
+        for item in self.model.items().to_vec() {
             sections.push(self.render_item(&item));
         }
 
@@ -63,7 +63,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
             return sections;
         }
 
-        for item in self.schema.items().to_vec() {
+        for item in self.model.items().to_vec() {
             if !item.is_composite() {
                 continue;
             }
@@ -76,8 +76,8 @@ impl<'m, 'a> Emitter<'m, 'a> {
         self.model.item_ident(name)
     }
 
-    pub(super) fn needs_lifetime(&self, ty: TypeId) -> bool {
-        self.model.needs_lifetime(ty)
+    pub(super) fn lifetime_usage(&self, ty: TypeId) -> super::representation::LifetimeUsage {
+        self.model.lifetime_usage(ty)
     }
 
     fn render_item(&mut self, item: &Item) -> String {
@@ -182,6 +182,8 @@ impl<'m, 'a> Emitter<'m, 'a> {
         let types = self.schema.types;
         match types.expect_type_shape(ty) {
             TypeShape::Node | TypeShape::Custom(_) => self.node_type(),
+            TypeShape::Str => "&'s str".to_string(),
+            TypeShape::Bool => "bool".to_string(),
             TypeShape::Array { element, .. } => {
                 format!(
                     "::std::vec::Vec<{}>",
@@ -219,6 +221,8 @@ impl<'m, 'a> Emitter<'m, 'a> {
         let types = self.schema.types;
         match types.expect_type_shape(ty) {
             TypeShape::Node => self.node_type(),
+            TypeShape::Str => "&'s str".to_string(),
+            TypeShape::Bool => "bool".to_string(),
             TypeShape::Custom(_) => match self.schema.type_name_of(ty) {
                 Some(name) => self.named_type(name, ty),
                 None => self.node_type(),
@@ -278,6 +282,12 @@ impl<'m, 'a> Emitter<'m, 'a> {
     }
 
     pub(super) fn lifetime_args(&self, ty: TypeId) -> &'static str {
-        if self.needs_lifetime(ty) { "<'t>" } else { "" }
+        let usage = self.model.lifetime_usage(ty);
+        match (usage.tree, usage.source) {
+            (false, false) => "",
+            (true, false) => "<'t>",
+            (false, true) => "<'s>",
+            (true, true) => "<'t, 's>",
+        }
     }
 }

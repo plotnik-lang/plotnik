@@ -13,12 +13,12 @@ Q = (program
 --------------------- INPUT ----------------------
 5 * x
 ------------------- TYPESCRIPT -------------------
-export interface QT {
-  n: Node | null;
-}
-
 export interface Q {
   t: QT;
+}
+
+export interface QT {
+  n: Node | null;
 }
 --------------------- OUTPUT ---------------------
 {

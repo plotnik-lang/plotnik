@@ -12,14 +12,14 @@ Q = (program
 --------------------- INPUT ----------------------
 a; b;
 ------------------- TYPESCRIPT -------------------
-export interface QLead {
-  c: Node;
-}
-
 export interface Q {
   a: Node;
   b: Node;
   lead: QLead | null;
+}
+
+export interface QLead {
+  c: Node;
 }
 ------------------ DIAGNOSTICS -------------------
 warning: branch labels have no effect without capture
