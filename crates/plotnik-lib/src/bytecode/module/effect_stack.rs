@@ -54,7 +54,7 @@
 //!   never rebalance — every exit requires an empty local stack, so some path
 //!   through such a cycle is provably ill-formed. The suppression counter and
 //!   span stack get the same treatment against their own opener counts.
-//! - **A state budget.** Frame payloads (variant member, `got_data`, pending) are
+//! - **A state budget.** Frame payloads (variant member, `wrote_payload_fields`, pending) are
 //!   finite but can multiply across nesting; a hard cap on states explored per
 //!   body bounds load time on pathological compiler output. Valid output stays
 //!   far below it: the states at a merged instruction correspond to the pre-dedup
@@ -80,9 +80,9 @@
 //!
 //! `record_sets_caller_top` exists because a below-entry `RecordSet` mutates state the
 //! caller's walk otherwise cannot see: setting a field on the caller's *variant*
-//! frame flips the data the frame will carry at its `VariantClose`. A call site
+//! frame gives the frame a payload at its `VariantClose`. A call site
 //! whose local top is a variant therefore forks the state — one path assumes
-//! the write happened, one that it did not — so a stale `got_data` can never
+//! the write happened, one that it did not — so stale payload-field state can never
 //! smuggle a "payload arrived both as pending value and as direct fields"
 //! panic past the check.
 //!
@@ -122,7 +122,10 @@ use crate::bytecode::{
 enum FrameKind {
     List,
     Record,
-    Variant { member: u16, got_data: bool },
+    Variant {
+        member: u16,
+        wrote_payload_fields: bool,
+    },
     Scalar,
 }
 
@@ -543,12 +546,17 @@ fn analyze(
                 .unwrap_or(PendingState::Unknown);
             if summary.record_sets_caller_top
                 && let Some(FrameKind::Variant {
-                    got_data: false, ..
+                    wrote_payload_fields: false,
+                    ..
                 }) = stack.last()
             {
                 let mut written = stack.clone();
-                if let Some(FrameKind::Variant { got_data, .. }) = written.last_mut() {
-                    *got_data = true;
+                if let Some(FrameKind::Variant {
+                    wrote_payload_fields,
+                    ..
+                }) = written.last_mut()
+                {
+                    *wrote_payload_fields = true;
                 }
                 call.push_returns(
                     &mut work,
@@ -760,7 +768,10 @@ fn apply_effect(
             }
             match state.stack.last_mut() {
                 Some(FrameKind::Record) => {}
-                Some(FrameKind::Variant { got_data, .. }) => *got_data = true,
+                Some(FrameKind::Variant {
+                    wrote_payload_fields,
+                    ..
+                }) => *wrote_payload_fields = true,
                 Some(FrameKind::List | FrameKind::Scalar) => return Err(err()),
                 None => {
                     *state.entry_tos &= KS_RECORD_SET_TARGET;
@@ -798,21 +809,26 @@ fn apply_frame_action(
                 ValueFrameKind::Record => FrameKind::Record,
                 ValueFrameKind::Variant => FrameKind::Variant {
                     member: effect.payload as u16,
-                    got_data: false,
+                    wrote_payload_fields: false,
                 },
                 ValueFrameKind::Scalar => FrameKind::Scalar,
             };
             state.stack.push(frame);
         }
         FrameAction::Close(ValueFrameKind::Variant) => match state.stack.pop() {
-            Some(FrameKind::Variant { member, got_data }) => {
+            Some(FrameKind::Variant {
+                member,
+                wrote_payload_fields,
+            }) => {
                 let has_no_payload = variant_member_has_no_payload(module, member, addr)?;
-                let data_pending = match *state.pending {
+                let payload_pending = match *state.pending {
                     PendingState::Full => true,
                     PendingState::Empty => false,
-                    PendingState::Unknown => !got_data && !has_no_payload,
+                    PendingState::Unknown => !wrote_payload_fields && !has_no_payload,
                 };
-                if data_pending && got_data || (data_pending || got_data) == has_no_payload {
+                if payload_pending && wrote_payload_fields
+                    || (payload_pending || wrote_payload_fields) == has_no_payload
+                {
                     return Err(err());
                 }
                 *state.pending = PendingState::Full;

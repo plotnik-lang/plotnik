@@ -156,7 +156,7 @@ enum FrameKind {
     Record,
     Variant {
         has_no_payload: bool,
-        got_data: bool,
+        wrote_payload_fields: bool,
     },
     Scalar,
 }
@@ -620,12 +620,17 @@ impl<'a> Program<'a> {
                         .unwrap_or(PendingState::Unknown);
                     if summary.record_sets_caller_top
                         && let Some(FrameKind::Variant {
-                            got_data: false, ..
+                            wrote_payload_fields: false,
+                            ..
                         }) = stack.last()
                     {
                         let mut written = stack.clone();
-                        if let Some(FrameKind::Variant { got_data, .. }) = written.last_mut() {
-                            *got_data = true;
+                        if let Some(FrameKind::Variant {
+                            wrote_payload_fields,
+                            ..
+                        }) = written.last_mut()
+                        {
+                            *wrote_payload_fields = true;
                         }
                         push_call_returns(
                             &mut work,
@@ -710,7 +715,10 @@ impl<'a> Program<'a> {
                 require_pending(state.pending, label)?;
                 match state.stack.last_mut() {
                     Some(FrameKind::Record) => {}
-                    Some(FrameKind::Variant { got_data, .. }) => *got_data = true,
+                    Some(FrameKind::Variant {
+                        wrote_payload_fields,
+                        ..
+                    }) => *wrote_payload_fields = true,
                     Some(FrameKind::List | FrameKind::Scalar) => {
                         return Err(SemanticVerifyError::EffectStack(label));
                     }
@@ -746,7 +754,7 @@ impl<'a> Program<'a> {
                     ValueFrameKind::Record => FrameKind::Record,
                     ValueFrameKind::Variant => FrameKind::Variant {
                         has_no_payload: self.case_has_no_payload(member(effect, label)?, label)?,
-                        got_data: false,
+                        wrote_payload_fields: false,
                     },
                     ValueFrameKind::Scalar => FrameKind::Scalar,
                 };
@@ -755,14 +763,16 @@ impl<'a> Program<'a> {
             FrameAction::Close(ValueFrameKind::Variant) => match state.stack.pop() {
                 Some(FrameKind::Variant {
                     has_no_payload,
-                    got_data,
+                    wrote_payload_fields,
                 }) => {
-                    let data_pending = match *state.pending {
+                    let payload_pending = match *state.pending {
                         PendingState::Full => true,
                         PendingState::Empty => false,
-                        PendingState::Unknown => !got_data && !has_no_payload,
+                        PendingState::Unknown => !wrote_payload_fields && !has_no_payload,
                     };
-                    if data_pending && got_data || (data_pending || got_data) == has_no_payload {
+                    if payload_pending && wrote_payload_fields
+                        || (payload_pending || wrote_payload_fields) == has_no_payload
+                    {
                         return Err(SemanticVerifyError::EffectStack(label));
                     }
                     *state.pending = PendingState::Full;
