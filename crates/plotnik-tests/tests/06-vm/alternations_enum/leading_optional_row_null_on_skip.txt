@@ -22,7 +22,7 @@ export interface QLead {
   c: Node;
 }
 ------------------ DIAGNOSTICS -------------------
-warning: alternative labels have no output effect here
+warning: alternative labels have no output effect here: captures from the alternatives merge into the enclosing result
   --> query.ptk:2:3
    |
  2 | /   [

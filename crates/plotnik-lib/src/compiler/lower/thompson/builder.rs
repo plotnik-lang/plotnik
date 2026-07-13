@@ -22,7 +22,7 @@ use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::AnchorSemantics;
 use super::scope::{CaptureExits, SkipExit, Struct};
 use crate::compiler::analyze::nullability::compute_nullable_defs;
-use crate::compiler::analyze::types::type_check::consumable_value_root;
+use crate::compiler::analyze::types::type_check::definition_value_root;
 
 /// NfaBuilder state for Thompson construction.
 pub struct NfaBuilder<'a> {
@@ -355,7 +355,7 @@ impl<'a> NfaBuilder<'a> {
                 exit: match_exit,
                 nav,
                 capture: CaptureEffects::default(),
-                value: consumable_value_root(body),
+                value: definition_value_root(body),
             };
             return self.compile_nullable_pattern(body, pattern_ctx, skip_exit);
         }
@@ -364,7 +364,7 @@ impl<'a> NfaBuilder<'a> {
             unreachable!("split definition exits returned above")
         };
 
-        let ctx = if consumable_value_root(body) {
+        let ctx = if definition_value_root(body) {
             PatternCtx::with_value(exit, nav)
         } else {
             PatternCtx::with_nav(exit, nav)
@@ -425,11 +425,10 @@ impl<'a> NfaBuilder<'a> {
             Pattern::TokenPattern(n) => self.compile_token_pattern(n, ctx),
             Pattern::SeqPattern(s) => self.compile_seq(s, ctx),
             Pattern::Alternation(alternation) => {
-                // Inference decides tagging by consumption: a consumed labeled
-                // alternation flows `Value(variant)`; an unconsumed one degrades
-                // (fields or void) and compiles without variant scopes. A
-                // suppressed region discards the value, so even a consumed
-                // labeled alternation compiles structurally there.
+                // Inference decides tagging from output context. A labeled
+                // alternation has `Value(variant)` flow where its value is
+                // materialized; in a fields context, its captures merge. A
+                // discarded region compiles structurally without variant scopes.
                 let flow = &self
                     .ctx
                     .analysis

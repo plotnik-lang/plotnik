@@ -92,8 +92,8 @@ impl RawCaptureObservation {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum RawDefinitionValueRole {
-    Consumed,
-    Suppressed,
+    Fields,
+    Value,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -178,9 +178,7 @@ impl RawDefinitionOutput {
         match &graph.flow(self.body).flow {
             RawPatternFlow::Void => TYPE_VOID,
             RawPatternFlow::Fields(fields) => fields.type_id,
-            RawPatternFlow::Value(type_id)
-                if self.value_role == RawDefinitionValueRole::Consumed =>
-            {
+            RawPatternFlow::Value(type_id) if self.value_role == RawDefinitionValueRole::Value => {
                 *type_id
             }
             RawPatternFlow::Value(_) => TYPE_VOID,
@@ -188,7 +186,7 @@ impl RawDefinitionOutput {
     }
 }
 
-/// Frozen, builtin-only provenance projection consumed by the capture-type
+/// Frozen, builtin-only provenance projection read by the capture-type
 /// normalizer. It never leaks raw producer identities into public output.
 #[derive(Clone, Debug)]
 pub(crate) struct RawOutputGraph {

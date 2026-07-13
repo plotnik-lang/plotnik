@@ -14,14 +14,13 @@
 //!
 //! - **References are opaque.** A definition has one context-free result type.
 //!   `(Foo) @val` stores that result in `val`; a bare `(Foo)` matches
-//!   structurally and its output is suppressed. Fields never bubble through a
+//!   structurally and contributes no output. Fields never bubble through a
 //!   reference boundary, recursive or not.
-//! - **Labeled alternations tag on consumption.** An alternation `[A: … B: …]`
-//!   produces a variant type only where the value is consumed — captured, row-captured
-//!   by a quantifier, or standing as a definition body's root. Anywhere else
-//!   the labels are inert: the alternation degrades to an unlabeled alternation (alternative
-//!   captures bubble as optional fields) and a warning points at the dead
-//!   labels.
+//! - **Labeled alternations produce variants in value contexts.** An alternation
+//!   `[A: … B: …]` produces a variant type when captured, collected by a
+//!   quantifier, or used as a definition body. In a fields context, labels have
+//!   no output effect: captures from the alternatives merge into the enclosing
+//!   result, and a warning points at the ineffective labels.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -78,21 +77,18 @@ pub struct InferVisitor<'a, 'd> {
     source: SourceId,
 }
 
-/// Whether a quantifier sits under a capture. A captured quantifier owns its
-/// repeats (row semantics for `*`/`+`, optionality for `?`) and consumes an
-/// variant-type inner; a bare one is structural and produces nothing. A suppressed one
-/// (under `@_`) consumes like a captured one — labels stay meaningful, no
-/// degradation warning — but every value is discarded, so neither
-/// dimensionality demand applies. In a quantifier-rooted definition body
-/// (`Consumed`) the quantifier collects into the definition's own output: the
-/// definition name is a consuming position, so the output type is the
-/// container (array/optional) itself.
+/// Whether a quantifier contributes fields, materializes a captured value, is
+/// explicitly discarded, or supplies a definition's value. Captured `*`/`+`
+/// quantifiers establish a list element boundary; captured `?` establishes an
+/// optional value boundary. A bare quantifier is structural. Under `@_`, output
+/// is discarded, so no collection boundary is required. At a definition root,
+/// the quantifier's list or option is the definition value.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum QuantifiedContext {
     Bare,
     Captured,
-    Suppressed,
-    Consumed,
+    Discard,
+    DefinitionValue,
 }
 
 struct CaptureInner {
@@ -243,10 +239,10 @@ fn suggested_builtin_capture_type(name: &str) -> Option<&'static str> {
     }
 }
 
-/// A case's payload comes from the alternative body's bubbling captures. A body
-/// producing an unconsumed value (a bare reference) is suppressed like
-/// anywhere else — the case carries the tag alone. `[Fn: (FnDef)]` tags
-/// which alternative matched; `[Fn: (FnDef) @fn]` also carries the data.
+/// A case's payload comes from the alternative body's bubbling captures. A bare
+/// reference contributes no payload, so the case carries the tag alone.
+/// `[Fn: (FnDef)]` tags which alternative matched; `[Fn: (FnDef) @fn]` also
+/// carries the data.
 fn case_payload_type(flow: &PatternFlow) -> TypeId {
     match flow {
         PatternFlow::Void | PatternFlow::Value(_) => TYPE_VOID,
@@ -281,12 +277,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         self.record_result(pattern, info)
     }
 
-    /// Infer a pattern standing in a consuming position: a capture's inner, or
-    /// a definition body's root. The only difference from [`infer_pattern`] is
-    /// that a labeled alternation here produces its variant type instead of degrading;
-    /// the consumption threads through field constraints (`f: [...] @x`), which
-    /// are navigation, not structure.
-    pub fn infer_pattern_consumed(&mut self, pattern: &Located<Pattern>) -> PatternShape {
+    /// Infer a pattern whose value is materialized by a capture or definition.
+    /// The value context threads through grammar-field constraints, which
+    /// navigate to the value without creating a result scope.
+    pub fn infer_pattern_value(&mut self, pattern: &Located<Pattern>) -> PatternShape {
         if let Some(info) = self
             .ctx
             .type_ctx
@@ -300,16 +294,50 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Pattern::Alternation(alternation) if alternation.labeling() == Labeling::Labeled => {
                 self.infer_labeled_alternation(
                     &pattern.wrap(alternation.clone()),
-                    Consumption::Consumed,
+                    OutputContext::Value,
                 )
             }
             Pattern::FieldPattern(f) => {
-                self.infer_field_pattern_in(&pattern.wrap(f.clone()), Consumption::Consumed)
+                self.infer_field_pattern_in(&pattern.wrap(f.clone()), OutputContext::Value)
             }
             Pattern::QuantifiedPattern(q) => {
                 return self.infer_quantified_pattern_in(
                     &pattern.wrap(q.clone()),
-                    QuantifiedContext::Consumed,
+                    QuantifiedContext::DefinitionValue,
+                );
+            }
+            _ => return self.infer_pattern(pattern),
+        };
+        self.record_result(pattern, info)
+    }
+
+    /// Infer a pattern under an explicit discard. Labels remain valid syntax,
+    /// but no warning is needed because the user deliberately suppressed the
+    /// result.
+    fn infer_pattern_discarded(&mut self, pattern: &Located<Pattern>) -> PatternShape {
+        if let Some(info) = self
+            .ctx
+            .type_ctx
+            .in_progress()
+            .pattern_result(pattern.node())
+        {
+            return info.clone();
+        }
+
+        let info = match pattern.node() {
+            Pattern::Alternation(alternation) if alternation.labeling() == Labeling::Labeled => {
+                self.infer_labeled_alternation(
+                    &pattern.wrap(alternation.clone()),
+                    OutputContext::Discard,
+                )
+            }
+            Pattern::FieldPattern(field) => {
+                self.infer_field_pattern_in(&pattern.wrap(field.clone()), OutputContext::Discard)
+            }
+            Pattern::QuantifiedPattern(quantifier) => {
+                return self.infer_quantified_pattern_in(
+                    &pattern.wrap(quantifier.clone()),
+                    QuantifiedContext::Discard,
                 );
             }
             _ => return self.infer_pattern(pattern),
@@ -346,7 +374,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Pattern::Alternation(alternation) => match alternation.labeling() {
                 Labeling::Labeled => self.infer_labeled_alternation(
                     &pattern.wrap(alternation.clone()),
-                    Consumption::Plain,
+                    OutputContext::Fields,
                 ),
                 Labeling::Unlabeled | Labeling::Mixed => {
                     self.infer_unlabeled_alternation(&pattern.wrap(alternation.clone()))
@@ -357,7 +385,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 self.infer_quantified_pattern_in(&pattern.wrap(q.clone()), QuantifiedContext::Bare)
             }
             Pattern::FieldPattern(f) => {
-                self.infer_field_pattern_in(&pattern.wrap(f.clone()), Consumption::Plain)
+                self.infer_field_pattern_in(&pattern.wrap(f.clone()), OutputContext::Fields)
             }
         }
     }
@@ -376,8 +404,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     /// Reference: an opaque boundary producing the definition's result value.
     ///
-    /// The definition's fields never bubble here — whether the value becomes
-    /// output is the capture layer's decision (a bare reference is suppressed).
+    /// The definition's fields never bubble here. A capture may materialize the
+    /// value, while a bare reference contributes no output in a fields context.
     /// Non-recursive targets are already inferred (reverse-topological SCC
     /// order), so their concrete output type stands in directly; a recursive
     /// target's output is not known mid-SCC, so it is referenced as
@@ -453,9 +481,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         PatternShape::new(arity, self.merged_fields_flow(merged))
     }
 
-    /// Merge the bubbling fields of a scope's children. `Value` children are
-    /// suppressed: an uncaptured pending value (a bare reference) contributes
-    /// nothing — output exists only where output syntax is written.
+    /// Merge the bubbling fields of a scope's children. A `Value` child does not
+    /// bubble in a fields context: an uncaptured bare reference contributes no
+    /// output.
     fn collect_child_fields(
         &mut self,
         children: impl IntoIterator<Item = Located<Pattern>>,
@@ -496,15 +524,16 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn infer_labeled_alternation(
         &mut self,
         alternation: &Located<AlternationPattern>,
-        consumption: Consumption,
+        output: OutputContext,
     ) -> PatternShape {
-        match consumption {
-            Consumption::Consumed => self.infer_labeled_alternation_consumed(alternation),
-            Consumption::Plain => self.infer_labeled_alternation_degraded(alternation),
+        match output {
+            OutputContext::Value => self.infer_labeled_alternation_value(alternation),
+            OutputContext::Fields => self.infer_labeled_alternation_fields(alternation),
+            OutputContext::Discard => self.infer_labeled_alternation_discarded(alternation),
         }
     }
 
-    fn infer_labeled_alternation_consumed(
+    fn infer_labeled_alternation_value(
         &mut self,
         alternation: &Located<AlternationPattern>,
     ) -> PatternShape {
@@ -541,10 +570,27 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         PatternShape::new(combined_arity, PatternFlow::Value(variant_type))
     }
 
-    /// An alternation whose labels nothing consumes: warn, then infer it as the
-    /// plain union it effectively is — branch captures bubble as optional
-    /// fields, the labels are inert.
-    fn infer_labeled_alternation_degraded(
+    fn infer_labeled_alternation_discarded(
+        &mut self,
+        alternation: &Located<AlternationPattern>,
+    ) -> PatternShape {
+        self.check_duplicate_labels(alternation);
+
+        let mut combined_arity = Arity::One;
+        for alternative in alternation.node().alternatives() {
+            let Some(body) = alternative.body() else {
+                continue;
+            };
+            let body_info = self.infer_pattern_discarded(&alternation.wrap(body));
+            combined_arity = combined_arity.combine(body_info.arity);
+        }
+
+        PatternShape::new(combined_arity, PatternFlow::Void)
+    }
+
+    /// In a fields context, labels have no output effect. Warn, then merge the
+    /// captures produced by each alternative into the enclosing result.
+    fn infer_labeled_alternation_fields(
         &mut self,
         alternation: &Located<AlternationPattern>,
     ) -> PatternShape {
@@ -646,19 +692,16 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn infer_captured_pattern(&mut self, cap: &Located<CapturedPattern>) -> PatternShape {
         let node = cap.node();
 
-        // Suppressive captures don't contribute to output type. The inner is
-        // still inferred for structural validation — in consumed position, so
-        // an explicitly suppressed alternation keeps its tags (and warns about
-        // nothing): the user said "discard all of it". A quantified inner is
-        // consumed the same way, with no dimensionality demand — nothing is
-        // collected, so no association can be lost.
+        // Suppressive captures don't contribute to the output type. The inner
+        // is still inferred for structural validation, but the explicit discard
+        // needs neither an ineffective-label warning nor a collection boundary.
         if node.is_suppressive() {
             let info = match node.inner() {
                 None => return PatternShape::void(),
                 Some(Pattern::QuantifiedPattern(q)) => {
-                    self.infer_quantified_pattern_in(&cap.wrap(q), QuantifiedContext::Suppressed)
+                    self.infer_quantified_pattern_in(&cap.wrap(q), QuantifiedContext::Discard)
                 }
-                Some(i) => self.infer_pattern_consumed(&cap.wrap(i)),
+                Some(i) => self.infer_pattern_discarded(&cap.wrap(i)),
             };
             return PatternShape::new(info.arity, PatternFlow::Void);
         }
@@ -981,13 +1024,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             let info = self.infer_quantified_pattern_in(&located, QuantifiedContext::Captured);
             CaptureInner {
                 info,
-                // ? makes the resulting capture field optional; * and + collect
-                // rows instead (the array itself is always present).
+                // `?` makes the resulting capture field optional; `*` and `+`
+                // collect record elements into a list that is always present.
                 makes_field_optional: quantifier == QuantifierKind::Optional,
             }
         } else {
             CaptureInner {
-                info: self.infer_pattern_consumed(inner),
+                info: self.infer_pattern_value(inner),
                 makes_field_optional: false,
             }
         }
@@ -1041,9 +1084,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let inner = quant.wrap(inner);
 
         let inner_info = match context {
-            QuantifiedContext::Captured
-            | QuantifiedContext::Suppressed
-            | QuantifiedContext::Consumed => self.infer_pattern_consumed(&inner),
+            QuantifiedContext::Captured | QuantifiedContext::DefinitionValue => {
+                self.infer_pattern_value(&inner)
+            }
+            QuantifiedContext::Discard => self.infer_pattern_discarded(&inner),
             QuantifiedContext::Bare => self.infer_pattern(&inner),
         };
         let quantifier = self.quantifier_kind(quant.node());
@@ -1067,12 +1111,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     self.report_internal_capture_dimensionality(quant.node(), &inner_info);
                     self.make_flow_optional(inner_info.flow)
                 }
-                QuantifiedContext::Suppressed => self.make_flow_optional(inner_info.flow),
+                QuantifiedContext::Discard => PatternFlow::Void,
                 // The definition collects the skip as its own null: the output
                 // is the optional type itself, not a field-optionality flag.
-                QuantifiedContext::Consumed => {
-                    let element =
-                        self.consumed_quantifier_element(quant.node(), &inner, &inner_info);
+                QuantifiedContext::DefinitionValue => {
+                    let element = self.definition_element_type(quant.node(), &inner, &inner_info);
                     PatternFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Optional(element)))
                 }
             },
@@ -1082,13 +1125,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 // lowering has to give the loop an exit it cannot have.
                 if matches!(
                     context,
-                    QuantifiedContext::Captured | QuantifiedContext::Consumed
+                    QuantifiedContext::Captured | QuantifiedContext::DefinitionValue
                 ) {
                     self.reject_zero_width_repeat(quant.node(), &inner);
                 }
-                if context == QuantifiedContext::Consumed {
-                    let element =
-                        self.consumed_quantifier_element(quant.node(), &inner, &inner_info);
+                if context == QuantifiedContext::DefinitionValue {
+                    let element = self.definition_element_type(quant.node(), &inner, &inner_info);
                     PatternFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Array {
                         element,
                         non_empty: quantifier.is_non_empty(),
@@ -1122,8 +1164,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 self.report_multi_element_scalar(quant, inner_info);
             }
             // Everything is discarded; there is nothing to collect wrongly.
-            QuantifiedContext::Suppressed => {}
-            QuantifiedContext::Consumed => {
+            QuantifiedContext::Discard => {}
+            QuantifiedContext::DefinitionValue => {
                 unreachable!("quantifier-rooted definitions resolve their element type instead")
             }
         }
@@ -1179,12 +1221,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// The definition names its output — the container — so the element must
     /// be a type that needs no fresh name: a matched node (void inner) or
     /// another definition's output (a reference). Anonymous element shapes — a
-    /// row of captures, a labeled alternation — have no name source (names
+    /// record of captures or a labeled alternation — have no name source (names
     /// come only from defs, captures, custom capture types, and case tags) and are
     /// rejected with a hint to split the element into its own definition. The
     /// plausible element type is still returned so downstream inference isn't
     /// poisoned by void.
-    fn consumed_quantifier_element(
+    fn definition_element_type(
         &mut self,
         quant: &QuantifiedPattern,
         inner: &Located<Pattern>,
@@ -1196,13 +1238,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 TYPE_NODE
             }
             PatternFlow::Value(t) => {
-                if consumable_labeled_alternation_root(inner.node()) {
+                if labeled_alternation_value_root(inner.node()) {
                     self.report_unnamed_quantified_element(quant, "a labeled alternation");
                 }
                 *t
             }
             PatternFlow::Fields(t) => {
-                self.report_unnamed_quantified_element(quant, "a row of captures");
+                self.report_unnamed_quantified_element(quant, "an anonymous record of captures");
                 *t
             }
         }
@@ -1239,19 +1281,19 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         };
 
         match (context, flow) {
-            // A bare repeat is structural: nothing consumes its values, so a
-            // void or suppressed-value inner produces nothing. A suppressed
-            // repeat discards everything outright.
+            // A bare repeat is structural: no output context observes its
+            // values, so a void or unobserved value produces nothing. A
+            // discarded repeat produces nothing outright.
             (QuantifiedContext::Bare, PatternFlow::Void | PatternFlow::Value(_))
-            | (QuantifiedContext::Suppressed, _) => PatternFlow::Void,
+            | (QuantifiedContext::Discard, _) => PatternFlow::Void,
             // Bare with bubbling captures: `report_internal_capture_dimensionality`
             // already errored. Produce the plausible array type anyway so
             // downstream inference isn't poisoned by void.
             (QuantifiedContext::Bare, PatternFlow::Fields(struct_type)) => {
                 intern_array(self.ctx.type_ctx, struct_type)
             }
-            // Captured (row) repeats collect elements: matched nodes, pending
-            // values (variant/reference results), or row structs.
+            // Captured repeats collect elements: matched nodes, pending values
+            // (variant/reference results), or records of captured fields.
             (QuantifiedContext::Captured, PatternFlow::Void) => {
                 intern_array(self.ctx.type_ctx, TYPE_NODE)
             }
@@ -1259,7 +1301,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 QuantifiedContext::Captured,
                 PatternFlow::Value(element) | PatternFlow::Fields(element),
             ) => intern_array(self.ctx.type_ctx, element),
-            (QuantifiedContext::Consumed, _) => {
+            (QuantifiedContext::DefinitionValue, _) => {
                 unreachable!("quantifier-rooted definitions resolve their element type instead")
             }
         }
@@ -1269,16 +1311,17 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn infer_field_pattern_in(
         &mut self,
         field: &Located<FieldPattern>,
-        consumption: Consumption,
+        output: OutputContext,
     ) -> PatternShape {
         let Some(value) = field.node().value() else {
             return PatternShape::void();
         };
         let value = field.wrap(value);
 
-        let value_info = match consumption {
-            Consumption::Consumed => self.infer_pattern_consumed(&value),
-            Consumption::Plain => self.infer_pattern(&value),
+        let value_info = match output {
+            OutputContext::Fields => self.infer_pattern(&value),
+            OutputContext::Value => self.infer_pattern_value(&value),
+            OutputContext::Discard => self.infer_pattern_discarded(&value),
         };
 
         // A field names exactly one child per match. Under any quantifier/capture
@@ -1334,43 +1377,42 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 }
 
-/// Whether the position consumes a pending value. In a consumed position a
-/// labeled alternation produces its variant type; anywhere else its labels are inert.
-/// Threads through field constraints (`f: pattern`), which are
-/// navigation, not structure.
+/// How a pattern contributes to its enclosing result. Grammar-field constraints
+/// thread the context through because they navigate to a pattern without
+/// creating a result boundary.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Consumption {
-    Consumed,
-    Plain,
+enum OutputContext {
+    Fields,
+    Value,
+    Discard,
 }
 
-/// A definition body's root is a consuming position for a labeled alternation
-/// (`Expr = [Lit: … Neg: …]` produces the variant type), reached through any field
-/// wrappers. Everything else — a bare reference in particular — is suppressed
-/// at the root like anywhere else.
-fn consumable_labeled_alternation_root(pattern: &Pattern) -> bool {
+/// Whether a definition root is a labeled alternation, possibly reached through
+/// grammar-field constraints. Such a root produces the definition's variant
+/// value; a bare reference remains structural.
+fn labeled_alternation_value_root(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::Alternation(alternation) => alternation.labeling() == Labeling::Labeled,
         Pattern::FieldPattern(f) => f
             .value()
-            .is_some_and(|v| consumable_labeled_alternation_root(&v)),
+            .is_some_and(|v| labeled_alternation_value_root(&v)),
         _ => false,
     }
 }
 
-/// A definition body's root consumes a pending value: a labeled alternation
-/// produces its variant type, a quantifier collects into the definition's output
-/// (array for `*`/`+`, optional for `?`). Reached through field wrappers.
+/// Whether a definition root directly supplies a value: a labeled alternation
+/// supplies a variant, while a quantifier supplies a list or option. Grammar-
+/// field constraints forward the root role to their value.
 ///
 /// Shared with lowering, which keys its pending-value emission on the same
-/// predicate: a `Value`-flow pattern compiles to producer effects only where
-/// this (or a consuming capture) says the value is observed. Diverging answers
+/// predicate: a `Value`-flow pattern emits producer effects only where a
+/// definition or capture materializes the value. Diverging answers
 /// would make the bytecode effect-stack verifier reject valid queries.
-pub(crate) fn consumable_value_root(pattern: &Pattern) -> bool {
+pub(crate) fn definition_value_root(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::Alternation(alternation) => alternation.labeling() == Labeling::Labeled,
         Pattern::QuantifiedPattern(_) => true,
-        Pattern::FieldPattern(f) => f.value().is_some_and(|v| consumable_value_root(&v)),
+        Pattern::FieldPattern(f) => f.value().is_some_and(|v| definition_value_root(&v)),
         _ => false,
     }
 }
@@ -1384,7 +1426,7 @@ pub(super) struct InferPassEnv<'a, 'd> {
 }
 
 /// Syntax-only fixpoints computed once before raw inference. Capture-type
-/// normalization consumes the builtin-only provenance projection and never
+/// normalization reads the builtin-only provenance projection and never
 /// recomputes them.
 pub(super) struct StructuralFacts {
     nullable_defs: HashSet<DefId>,
@@ -1503,19 +1545,18 @@ impl<'a, 'd> InferPass<'a, 'd> {
         // resolve to their precomputed results.
         let located_body = Located::new(source_id, body.clone());
         let info = self.visit(source_id, |visitor| {
-            visitor.infer_pattern_consumed(&located_body)
+            visitor.infer_pattern_value(&located_body)
         });
 
         let type_id = match &info.flow {
             PatternFlow::Void => TYPE_VOID,
             PatternFlow::Fields(t) => *t,
-            // A root value is the definition's result only when the root is a
-            // consuming position: a labeled alternation (its labels are output
-            // syntax) or a quantifier (the def name collects it). A bare
-            // reference is suppressed: no capture, no output — the definition
-            // still matches, like a capture-less regex.
+            // A root value is the definition's result only when a labeled
+            // alternation or quantifier supplies it directly. A bare reference
+            // is structural: no capture, no output — the definition still
+            // matches, like a capture-less regex.
             PatternFlow::Value(t) => {
-                if consumable_value_root(&body) {
+                if definition_value_root(&body) {
                     *t
                 } else {
                     TYPE_VOID
@@ -1523,10 +1564,10 @@ impl<'a, 'd> InferPass<'a, 'd> {
             }
         };
         self.ctx.record_def_output(def_id, type_id);
-        let value_role = if consumable_value_root(&body) {
-            RawDefinitionValueRole::Consumed
+        let value_role = if definition_value_root(&body) {
+            RawDefinitionValueRole::Value
         } else {
-            RawDefinitionValueRole::Suppressed
+            RawDefinitionValueRole::Fields
         };
         self.ctx.record_raw_definition(def_id, &body, value_role);
 

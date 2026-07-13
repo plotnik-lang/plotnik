@@ -13,5 +13,5 @@ error: captures `@x` repeat with `*` but aren't collected into a list
 5 | |   }*
   | |____^
   |
-help: add a row capture so each repeat becomes one element: `{...}* @rows`
+help: add a repetition capture so each repeat becomes one record in a list: `{...}* @matches`
 help: or discard the captures if only the structure matters: `{...}* @_`

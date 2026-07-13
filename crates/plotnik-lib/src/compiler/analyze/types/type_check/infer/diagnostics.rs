@@ -182,8 +182,8 @@ impl InferVisitor<'_, '_> {
             .emit();
     }
 
-    /// Report repeated bubbling captures that need an enclosing row capture:
-    /// each repeat produces captured fields with no list to collect them into.
+    /// Report bubbling captures that need a repetition or optional capture to
+    /// package one record value per quantifier occurrence.
     pub(super) fn report_internal_capture_dimensionality(
         &mut self,
         quant: &QuantifiedPattern,
@@ -231,15 +231,15 @@ impl InferVisitor<'_, '_> {
                 .filter_map(|tok| tok.text().get(1..).map(str::to_owned)),
         );
         let placeholder = fresh_capture_name(&taken);
-        let brackets = row_capture_brackets(quant);
+        let brackets = capture_brackets(quant);
         let hint = if op.starts_with('?') {
             format!(
-                "capture the group so the skip is a single null: `{}{} @{}`",
+                "add an optional capture so the group becomes one optional record: `{}{} @{}`",
                 brackets, op, placeholder
             )
         } else {
             format!(
-                "add a row capture so each repeat becomes one element: `{}{} @{}`",
+                "add a repetition capture so each repeat becomes one record in a list: `{}{} @{}`",
                 brackets, op, placeholder
             )
         };
@@ -256,10 +256,11 @@ impl InferVisitor<'_, '_> {
         .emit();
     }
 
-    /// Warn about a labeled alternation whose value nothing consumes: the
-    /// labels are inert and the alternation behaves as a plain union.
+    /// Warn when labels appear in a fields context: they have no output effect,
+    /// and captures from the alternatives merge into the enclosing result.
     pub(super) fn report_unused_alternative_labels(&mut self, alternation: &AlternationPattern) {
         self.report(DiagnosticKind::UnusedBranchLabels, alternation.text_range())
+            .detail("captures from the alternatives merge into the enclosing result")
             .emit();
     }
 
@@ -300,10 +301,10 @@ impl InferVisitor<'_, '_> {
     }
 }
 
-/// The bracket shorthand for the row-capture hint, matching the shape the
-/// user actually wrote: `[...]` for alternations, `(...)` for nodes and refs,
-/// `{...}` for sequences (and anything else).
-fn row_capture_brackets(quant: &QuantifiedPattern) -> &'static str {
+/// The bracket shorthand for a capture hint, matching the shape the user wrote:
+/// `[...]` for alternations, `(...)` for nodes and references, and `{...}` for
+/// sequences and other groups.
+fn capture_brackets(quant: &QuantifiedPattern) -> &'static str {
     match quant.inner() {
         Some(Pattern::Alternation(_)) => "[...]",
         Some(Pattern::DefRef(_) | Pattern::NodePattern(_)) => "(...)",
@@ -312,7 +313,8 @@ fn row_capture_brackets(quant: &QuantifiedPattern) -> &'static str {
 }
 
 /// Find same-named captures that belong to the alternation's output scope.
-/// Nested row scopes are excluded because their fields cannot conflict here.
+/// Nested structured-capture scopes are excluded because their fields cannot
+/// conflict here.
 fn capture_sites(alternation: &SyntaxNode, field_name: &str) -> Vec<TextRange> {
     let mut tokens = Vec::new();
     direct_scope_capture_tokens(alternation, &mut tokens);
@@ -339,7 +341,7 @@ fn direct_scope_capture_tokens(scope_root: &SyntaxNode, out: &mut Vec<SyntaxToke
     }
 }
 
-/// Find the output scope that would receive a row-capture suggestion.
+/// Find the output scope that would receive the suggested capture.
 fn enclosing_scope_root(node: &SyntaxNode) -> SyntaxNode {
     let mut root = node.clone();
     for ancestor in node.ancestors().skip(1) {
@@ -387,7 +389,7 @@ fn inner_captures_bubble_up(cap: &CapturedPattern) -> bool {
 
 /// Pick a suggestion that will not collide with captures already in scope.
 fn fresh_capture_name(taken: &[String]) -> &'static str {
-    ["items", "rows", "matches", "entries", "elements"]
+    ["items", "matches", "entries", "elements", "records"]
         .into_iter()
         .find(|candidate| !taken.iter().any(|t| t == candidate))
         .unwrap_or("items")
