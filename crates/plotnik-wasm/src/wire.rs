@@ -9,7 +9,7 @@
 //! Offsets in any payload are byte offsets into the exact text the caller
 //! passed in; the web side converts to UTF-16 at its edge (`byte-offsets.ts`).
 
-use plotnik_lib::bytecode::{Entrypoint, Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
+use plotnik_lib::bytecode::{EntryPoint, Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
 use plotnik_lib::{
     Colors, MatchJournal, RunStats, RuntimeError, extract_result_provenance, materialize_verified,
 };
@@ -56,7 +56,7 @@ pub fn info_json(parts: InfoParts) -> JsonValue {
 /// trace attached when tracing.
 pub fn result_json(
     module: &Module,
-    entrypoint: &Entrypoint,
+    entrypoint: &EntryPoint,
     source: &str,
     result: (Result<MatchJournal<'_>, RuntimeError>, RunStats),
     execution_trace: Option<JsonValue>,

@@ -16,7 +16,7 @@ mod aligned_vec;
 mod constants;
 mod dump;
 mod effects;
-mod entrypoint;
+mod entry_point;
 mod format;
 mod header;
 mod ids;
@@ -31,10 +31,10 @@ mod type_meta;
 pub mod type_system;
 
 pub use dump::dump;
-pub use entrypoint::Entrypoint;
+pub use entry_point::EntryPoint;
 pub use ids::{StringId, TypeId};
 pub use instructions::{CodeAddr, EncodeError};
-pub use module::{EntrypointsView, Module, StringsView, TypesView};
+pub use module::{EntryPointsView, Module, StringsView, TypesView};
 pub use spans::{SPAN_NO_BINDING, SpanEntry, SpanKind, SpansView};
 pub use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
 pub use type_system::{PrimitiveType, TypeKind};
@@ -70,7 +70,7 @@ mod aligned_vec_tests;
 #[cfg(test)]
 mod effects_tests;
 #[cfg(test)]
-mod entrypoint_tests;
+mod entry_point_tests;
 #[cfg(test)]
 mod format_tests;
 #[cfg(test)]

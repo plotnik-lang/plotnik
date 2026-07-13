@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 
-use plotnik_lib::bytecode::{Entrypoint, Module};
+use plotnik_lib::bytecode::{EntryPoint, Module};
 use plotnik_lib::text_utils::find_similar;
 
 use super::compile::compile_query;
@@ -96,7 +96,7 @@ pub fn resolve_run_lang(
 }
 
 /// Resolve the selected entrypoint after defaulting has already happened.
-pub fn resolve_entrypoint(module: &Module, name: Option<&str>) -> Result<Entrypoint, CliError> {
+pub fn resolve_entrypoint(module: &Module, name: Option<&str>) -> Result<EntryPoint, CliError> {
     match name {
         Some(name) => module.entrypoint(name).ok_or_else(|| {
             let names: Vec<&str> = module.entrypoint_names().collect();
@@ -146,7 +146,7 @@ pub struct ExecRequest<'a> {
 /// Prepared query ready for execution.
 pub struct ExecPlan {
     pub module: Module,
-    pub entrypoint: Entrypoint,
+    pub entrypoint: EntryPoint,
     pub tree: tree_sitter::Tree,
     pub source_code: String,
 }

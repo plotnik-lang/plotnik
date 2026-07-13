@@ -14,7 +14,7 @@ use super::sections::SymbolNameEntry;
 use super::spans::SpansView;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
-    BYTECODE_WORD_SIZE, CodeAddr, Entrypoint, REGEX_TABLE_ENTRY_SIZE, SPAN_ENTRY_SIZE,
+    BYTECODE_WORD_SIZE, CodeAddr, EntryPoint, REGEX_TABLE_ENTRY_SIZE, SPAN_ENTRY_SIZE,
     STRING_TABLE_ENTRY_SIZE,
 };
 use plotnik_rt::RegexDfas;
@@ -242,11 +242,11 @@ impl Module {
         }
     }
 
-    pub fn entrypoints(&self) -> EntrypointsView<'_> {
+    pub fn entrypoints(&self) -> EntryPointsView<'_> {
         let offset = self.offsets.entrypoints as usize;
         let count = self.header.entrypoints_count as usize;
-        EntrypointsView {
-            bytes: &self.storage[offset..offset + count * Entrypoint::SIZE],
+        EntryPointsView {
+            bytes: &self.storage[offset..offset + count * EntryPoint::SIZE],
             count,
         }
     }
@@ -259,11 +259,11 @@ impl Module {
         self.header.entrypoints_count as usize
     }
 
-    pub fn entrypoint_at(&self, idx: usize) -> Option<Entrypoint> {
+    pub fn entrypoint_at(&self, idx: usize) -> Option<EntryPoint> {
         (idx < self.entrypoint_count()).then(|| self.entrypoints().get(idx))
     }
 
-    pub fn entrypoint(&self, name: &str) -> Option<Entrypoint> {
+    pub fn entrypoint(&self, name: &str) -> Option<EntryPoint> {
         self.entrypoints().find_by_name(name, &self.strings())
     }
 
@@ -495,16 +495,16 @@ impl<'a> TypesView<'a> {
     }
 }
 
-pub struct EntrypointsView<'a> {
+pub struct EntryPointsView<'a> {
     bytes: &'a [u8],
     count: usize,
 }
 
-impl<'a> EntrypointsView<'a> {
-    pub fn get(&self, idx: usize) -> Entrypoint {
+impl<'a> EntryPointsView<'a> {
+    pub fn get(&self, idx: usize) -> EntryPoint {
         assert!(idx < self.count, "entrypoint index out of bounds");
-        let offset = idx * Entrypoint::SIZE;
-        Entrypoint::from_bytes(&self.bytes[offset..])
+        let offset = idx * EntryPoint::SIZE;
+        EntryPoint::from_bytes(&self.bytes[offset..])
     }
 
     /// Number of entrypoints.
@@ -516,12 +516,12 @@ impl<'a> EntrypointsView<'a> {
         self.count == 0
     }
 
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = Entrypoint> + '_ {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = EntryPoint> + '_ {
         (0..self.count).map(|idx| self.get(idx))
     }
 
     /// Find an entrypoint by name (requires StringsView for comparison).
-    pub fn find_by_name(&self, name: &str, strings: &StringsView<'_>) -> Option<Entrypoint> {
+    pub fn find_by_name(&self, name: &str, strings: &StringsView<'_>) -> Option<EntryPoint> {
         self.iter().find(|e| strings.get(e.name()) == name)
     }
 }

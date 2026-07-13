@@ -185,7 +185,7 @@ fn bundle_json(parts: BundleParts<'_>) -> Value {
 
 fn run_module(
     module: &Module,
-    entrypoint: &plotnik_lib::bytecode::Entrypoint,
+    entrypoint: &plotnik_lib::bytecode::EntryPoint,
     source_code: &str,
     tree: &tree_sitter::Tree,
     limits: RuntimeLimitSpec,
@@ -212,7 +212,7 @@ fn run_module(
 
 fn run_payload_from_result(
     module: &Module,
-    entrypoint: &plotnik_lib::bytecode::Entrypoint,
+    entrypoint: &plotnik_lib::bytecode::EntryPoint,
     source_code: &str,
     result: (
         Result<plotnik_lib::MatchJournal<'_>, RuntimeError>,

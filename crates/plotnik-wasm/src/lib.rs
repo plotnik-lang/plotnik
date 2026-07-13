@@ -27,7 +27,7 @@ mod wire_tests;
 use std::cell::OnceCell;
 
 use langs::Lang;
-use plotnik_lib::bytecode::{Entrypoint, Module};
+use plotnik_lib::bytecode::{EntryPoint, Module};
 use plotnik_lib::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CompiledQuery, NoopTracer, QueryBuilder,
     RecordingTracer, RuntimeLimitSpec, RustCodegenConfig, TypeScriptCodegenConfig, VM, dump_tree,
@@ -212,7 +212,7 @@ fn resolve_entrypoint(
     module: &Module,
     requested: Option<&str>,
     entrypoints: &[String],
-) -> Result<Entrypoint, String> {
+) -> Result<EntryPoint, String> {
     let selected = match requested {
         Some(name) => name.to_string(),
         None => entrypoints

@@ -2,10 +2,10 @@
 //!
 //! Offsets are computed from counts + SECTION_ALIGN (64 bytes); no stored offsets.
 //! Section order: Header → StringBlob → RegexBlob → StringTable → RegexTable →
-//! NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
+//! NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames → EntryPoints →
 //! Instructions → Spans
 
-use super::entrypoint::Entrypoint;
+use super::entry_point::EntryPoint;
 use super::sections::SymbolNameEntry;
 use super::type_meta::{TypeDef, TypeMember, TypeNameEntry};
 use super::{
@@ -88,7 +88,7 @@ impl Default for Header {
 /// Computed section offsets derived from header counts.
 ///
 /// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeKinds →
-/// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints → Instructions → Spans
+/// NodeFields → TypeDefs → TypeMembers → TypeNames → EntryPoints → Instructions → Spans
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SectionOffsets {
     pub(crate) str_blob: u32,
@@ -209,7 +209,7 @@ impl Header {
     /// Widened to `u64` so a corrupt header cannot overflow a running layout.
     ///
     /// Order: StringBlob → RegexBlob → StringTable → RegexTable → NodeKinds →
-    /// NodeFields → TypeDefs → TypeMembers → TypeNames → Entrypoints →
+    /// NodeFields → TypeDefs → TypeMembers → TypeNames → EntryPoints →
     /// Instructions → Spans
     pub(crate) fn section_data_sizes(&self) -> [u64; SECTION_COUNT] {
         // Tables carry a trailing sentinel entry, hence the `+ 1`.
@@ -223,7 +223,7 @@ impl Header {
             self.type_defs_count as u64 * TypeDef::SIZE as u64,
             self.type_members_count as u64 * TypeMember::SIZE as u64,
             self.type_names_count as u64 * TypeNameEntry::SIZE as u64,
-            self.entrypoints_count as u64 * Entrypoint::SIZE as u64,
+            self.entrypoints_count as u64 * EntryPoint::SIZE as u64,
             self.instruction_word_count as u64 * BYTECODE_WORD_SIZE as u64,
             self.spans_count as u64 * SPAN_ENTRY_SIZE as u64,
         ]

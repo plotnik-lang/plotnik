@@ -4,7 +4,7 @@ use tree_sitter::Tree;
 
 use crate::bytecode::{
     CodeAddr, DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedRoutedCall,
-    DecodedSplitCall, Effect, EffectKind, Entrypoint, Module, Nav, NodeKindConstraint, PredicateOp,
+    DecodedSplitCall, Effect, EffectKind, EntryPoint, Module, Nav, NodeKindConstraint, PredicateOp,
     SuccessorAddr,
 };
 
@@ -106,7 +106,7 @@ impl<'t> VM<'t> {
     pub fn execute(
         self,
         module: &Module,
-        entrypoint: &Entrypoint,
+        entrypoint: &EntryPoint,
     ) -> Result<MatchJournal<'t>, RuntimeError> {
         self.execute_with(module, entrypoint, &mut NoopTracer)
     }
@@ -119,7 +119,7 @@ impl<'t> VM<'t> {
     pub fn execute_with<T: Tracer>(
         self,
         module: &Module,
-        entrypoint: &Entrypoint,
+        entrypoint: &EntryPoint,
         tracer: &mut T,
     ) -> Result<MatchJournal<'t>, RuntimeError> {
         let (result, _) = self.execute_with_stats(module, entrypoint, tracer);
@@ -130,7 +130,7 @@ impl<'t> VM<'t> {
     pub fn execute_with_stats<T: Tracer>(
         mut self,
         module: &Module,
-        entrypoint: &Entrypoint,
+        entrypoint: &EntryPoint,
         tracer: &mut T,
     ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
         self.ip = entrypoint.target();

@@ -123,7 +123,7 @@ impl RustRepresentation {
                 let suffix = match state.origin {
                     StateOrigin::Definition => "",
                     StateOrigin::ConsumingDefinition => "_plus",
-                    StateOrigin::Entrypoint => "_ep",
+                    StateOrigin::EntryPoint => "_ep",
                 };
                 StateInfo {
                     id: state.id.raw(),

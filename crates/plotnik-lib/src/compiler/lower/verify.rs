@@ -150,7 +150,7 @@ mod debug_impl {
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     enum WalkRoot {
-        Entrypoint(DefId),
+        EntryPoint(DefId),
         Def(DefVariant),
     }
 
@@ -619,7 +619,7 @@ mod debug_impl {
 
         for (root, entry) in entries(nfa) {
             let route = match &root {
-                WalkRoot::Entrypoint(_) => DefRoute::Caller,
+                WalkRoot::EntryPoint(_) => DefRoute::Caller,
                 WalkRoot::Def(variant) => variant.route(),
             };
             check_depth_root(root, entry, route, &instr_map)?;
@@ -806,7 +806,7 @@ mod debug_impl {
     fn entries(nfa: &NfaGraph) -> Vec<(WalkRoot, Label)> {
         let mut v = Vec::new();
         for (&def_id, &label) in &nfa.entrypoint_wrappers {
-            v.push((WalkRoot::Entrypoint(def_id), label));
+            v.push((WalkRoot::EntryPoint(def_id), label));
         }
         for (variant, &label) in &nfa.def_entries {
             v.push((WalkRoot::Def(variant.clone()), label));
@@ -888,7 +888,7 @@ mod debug_impl {
     }
 
     /// Run a pass that may intentionally remove internal definition roots.
-    /// Entrypoint behavior and every surviving definition body must remain
+    /// Entry-point behavior and every surviving definition body must remain
     /// unchanged; fingerprints for roots the pass deleted are discarded.
     pub fn run_root_pruning_verified(
         name: &str,
@@ -899,7 +899,7 @@ mod debug_impl {
         let mut before = snapshot(nfa, ctx);
         pass(nfa);
         before.fingerprints.retain(|(root, _, _)| match root {
-            WalkRoot::Entrypoint(_) => true,
+            WalkRoot::EntryPoint(_) => true,
             WalkRoot::Def(variant) => nfa.def_entries.contains_key(variant),
         });
         verify_after_pass(name, &before, nfa, ctx);

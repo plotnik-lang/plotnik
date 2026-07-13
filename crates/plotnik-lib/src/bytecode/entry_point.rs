@@ -1,4 +1,4 @@
-//! Entrypoint section types.
+//! Entry-point section types.
 
 use super::instructions::CodeAddr;
 use super::{StringId, TypeId};
@@ -6,7 +6,7 @@ use super::{StringId, TypeId};
 /// Named query definition entry point (8 bytes).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
-pub struct Entrypoint {
+pub struct EntryPoint {
     /// Definition name.
     name: StringId,
     /// Starting instruction address.
@@ -16,9 +16,9 @@ pub struct Entrypoint {
     _pad: u16,
 }
 
-const _: () = assert!(std::mem::size_of::<Entrypoint>() == Entrypoint::SIZE);
+const _: () = assert!(std::mem::size_of::<EntryPoint>() == EntryPoint::SIZE);
 
-impl Entrypoint {
+impl EntryPoint {
     /// Serialized size in bytes.
     pub const SIZE: usize = 8;
 

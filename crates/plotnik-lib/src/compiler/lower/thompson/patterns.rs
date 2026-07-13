@@ -537,7 +537,7 @@ impl NfaBuilder<'_> {
             value: _,
         } = ctx;
 
-        // Entrypoints are compiled eagerly; fragments arrive here through a
+        // Entry points are compiled eagerly; fragments arrive here through a
         // reference and are compiled on demand with the exact output protocol
         // this call site needs.
         let compile_time_suppressed = variant.mode().suppresses_output();

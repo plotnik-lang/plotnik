@@ -1,6 +1,6 @@
 mod support;
 
-use plotnik_lib::bytecode::{Entrypoint, Module};
+use plotnik_lib::bytecode::{EntryPoint, Module};
 use plotnik_lib::{
     BytecodeConfig, Limit, NoopTracer, QueryBuilder, RuntimeError, RuntimeLimitSpec, VM,
 };
@@ -21,7 +21,7 @@ fn compile(src: &str) -> Module {
         .expect("valid query emits module")
 }
 
-fn module_and_entry() -> (Module, Entrypoint) {
+fn module_and_entry() -> (Module, EntryPoint) {
     let module = compile("Q = (program (expression_statement (identifier) @id))");
     let entry = module.entrypoint("Q").expect("Q entrypoint exists");
     (module, entry)

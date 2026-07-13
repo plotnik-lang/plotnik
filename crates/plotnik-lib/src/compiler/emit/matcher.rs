@@ -47,7 +47,7 @@ impl RegexId {
 pub(crate) enum StateOrigin {
     Definition,
     ConsumingDefinition,
-    Entrypoint,
+    EntryPoint,
 }
 
 #[derive(Clone, Debug)]
@@ -402,7 +402,7 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
                     StateOrigin::Definition
                 }
             }
-            LabelOrigin::Wrapper(_) => StateOrigin::Entrypoint,
+            LabelOrigin::Wrapper(_) => StateOrigin::EntryPoint,
         };
         let kind = match instruction {
             InstructionIR::Match(instruction) => self.match_state(instruction),

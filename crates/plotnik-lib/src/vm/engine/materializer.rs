@@ -1,6 +1,6 @@
 //! Materializes committed match journals into output values.
 
-use crate::bytecode::{Entrypoint, Module};
+use crate::bytecode::{EntryPoint, Module};
 use crate::core::Colors;
 
 use super::value::{NodeHandle, Value};
@@ -42,7 +42,7 @@ impl<'a> ValueMaterializer<'a> {
 pub fn materialize_verified<'s>(
     source: &'s str,
     module: &'s Module,
-    entrypoint: &Entrypoint,
+    entrypoint: &EntryPoint,
     events: &[JournalEvent<'_>],
     colors: Colors,
 ) -> Value<'s> {

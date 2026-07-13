@@ -272,7 +272,7 @@ impl Module {
         self.validate_spans()?;
         // Bound every embedded `StringId` before any later check constructs a
         // (`NonZero`) `StringId` from one — e.g. `validate_entrypoints` builds an
-        // `Entrypoint`, which would otherwise panic on a malformed zero name.
+        // `EntryPoint`, which would otherwise panic on a malformed zero name.
         self.validate_string_ids()?;
         self.validate_symbol_ids()?;
         let is_start = self.validate_instructions()?;
@@ -534,7 +534,7 @@ impl Module {
         Ok(())
     }
 
-    /// Entrypoint targets must address a real instruction so the VM's first
+    /// Entry-point targets must address a real instruction so the VM's first
     /// [`decode_instruction`](Self::decode_instruction) cannot read out of bounds.
     /// `is_start` is the instruction-start bitmap from
     /// [`Self::validate_instructions`]: a `target` that lands inside a multi-word
@@ -563,7 +563,7 @@ impl Module {
                 return Err(invalid());
             }
 
-            // Bytes 6-7 are the reserved `_pad`; `Entrypoint::from_bytes` discards
+            // Bytes 6-7 are the reserved `_pad`; `EntryPoint::from_bytes` discards
             // them, so a malformed non-zero pad would otherwise pass unnoticed.
             if read_u16_le(storage, base + i * 8 + 6) != 0 {
                 return Err(invalid());
@@ -828,7 +828,7 @@ impl Module {
         // entrypoint name: u16 at entry+0
         check(
             self.offsets.entrypoints,
-            Entrypoint::SIZE,
+            EntryPoint::SIZE,
             0,
             0,
             self.header.entrypoints_count as usize,

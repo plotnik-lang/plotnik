@@ -5,7 +5,7 @@
 use crate::core::NodeKind;
 
 use crate::bytecode::{
-    Entrypoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SPAN_NO_BINDING,
+    EntryPoint, FieldEntry, HEADER_SIZE, Header, NodeKindEntry, SECTION_ALIGN, SPAN_NO_BINDING,
     SpanEntry, SymbolNameEntry,
 };
 
@@ -27,7 +27,7 @@ use super::type_table::build_type_table;
 pub struct ModuleTables {
     node_kinds: Vec<NodeKindEntry>,
     fields: Vec<FieldEntry>,
-    entrypoints: Vec<Entrypoint>,
+    entrypoints: Vec<EntryPoint>,
 }
 
 pub(in crate::compiler::emit) struct EmitPipeline<'a> {
@@ -95,7 +95,7 @@ impl<'a> EmitPipeline<'a> {
             fields.push(FieldEntry::new(u16::from(field_id), name));
         }
 
-        let mut entrypoints: Vec<Entrypoint> = Vec::new();
+        let mut entrypoints: Vec<EntryPoint> = Vec::new();
         for (def_id, type_id) in self.input.type_analysis.iter_entry_point_outputs() {
             let name_sym = self.input.dependency_analysis.def_name_sym(def_id);
             let name = self.strings.intern(name_sym, self.input.interner)?;
@@ -109,7 +109,7 @@ impl<'a> EmitPipeline<'a> {
                 .copied()
                 .expect("entrypoint must have compiled target");
 
-            entrypoints.push(Entrypoint::new(name, target, result_type));
+            entrypoints.push(EntryPoint::new(name, target, result_type));
         }
 
         self.strings.validate()?;
@@ -150,7 +150,7 @@ impl<'a> EmitPipeline<'a> {
         // Section order matches the bytecode layout:
         // Header → StringBlob → RegexBlob → StringTable → RegexTable →
         // NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames →
-        // Entrypoints → Instructions → Spans
+        // EntryPoints → Instructions → Spans
         let mut writer = SectionWriter::new();
 
         writer.emit_section(&str_blob);
@@ -360,8 +360,8 @@ fn emit_symbol_name_table(symbols: &[SymbolNameEntry]) -> Vec<u8> {
     bytes
 }
 
-fn emit_entrypoints(entrypoints: &[Entrypoint]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(entrypoints.len() * Entrypoint::SIZE);
+fn emit_entrypoints(entrypoints: &[EntryPoint]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(entrypoints.len() * EntryPoint::SIZE);
     for ep in entrypoints {
         bytes.extend_from_slice(&u16::from(ep.name()).to_le_bytes());
         bytes.extend_from_slice(&ep.target().to_le_bytes());
