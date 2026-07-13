@@ -146,7 +146,7 @@ impl Default for RustCodegenConfig {
             runtime_crate: Cow::Borrowed("::plotnik_rt"),
             serde: false,
             limits: RuntimeLimitSpec {
-                steps: Limit::Auto,
+                fuel_limit: Limit::Auto,
                 memory: Limit::Auto,
             },
             depth: Limit::Auto,

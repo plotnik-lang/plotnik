@@ -63,7 +63,7 @@ pub struct MacroArgs {
 
 #[derive(Default)]
 pub struct LimitArgs {
-    pub steps: Option<LimitArg>,
+    pub fuel: Option<LimitArg>,
     pub memory: Option<LimitArg>,
     pub depth: Option<LimitArg>,
 }
@@ -76,7 +76,7 @@ impl LimitArgs {
 
 #[derive(Clone, Copy)]
 enum LimitKey {
-    Steps,
+    Fuel,
     Memory,
     Depth,
 }
@@ -84,7 +84,7 @@ enum LimitKey {
 impl LimitKey {
     fn parse(name: &str) -> Option<Self> {
         match name {
-            "steps" => Some(Self::Steps),
+            "fuel" => Some(Self::Fuel),
             "memory" => Some(Self::Memory),
             "depth" => Some(Self::Depth),
             _ => None,
@@ -93,7 +93,7 @@ impl LimitKey {
 
     fn name(self) -> &'static str {
         match self {
-            Self::Steps => "steps",
+            Self::Fuel => "fuel",
             Self::Memory => "memory",
             Self::Depth => "depth",
         }
@@ -108,7 +108,7 @@ impl LimitKey {
 
     fn slot(self, args: &mut LimitArgs) -> &mut Option<LimitArg> {
         match self {
-            Self::Steps => &mut args.steps,
+            Self::Fuel => &mut args.fuel,
             Self::Memory => &mut args.memory,
             Self::Depth => &mut args.depth,
         }
@@ -313,7 +313,7 @@ pub fn parse(input: TokenStream) -> Result<MacroArgs, ExpandError> {
                                 key_span,
                                 format!(
                                     "unknown argument `{other}`; `query!` accepts `grammar`, \
-                                     `file`, `crate`, `steps`, `memory`, `depth`, and the \
+                                     `file`, `crate`, `fuel`, `memory`, `depth`, and the \
                                      query string"
                                 ),
                             ));

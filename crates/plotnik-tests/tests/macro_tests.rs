@@ -58,7 +58,7 @@ mod limited {
     plotnik::query! {
         "Q = (program (expression_statement (identifier) @id))",
         grammar = "arborium-javascript",
-        steps = 1,
+        fuel = 1,
     }
 }
 
@@ -217,17 +217,17 @@ fn file_form_reads_next_to_the_invoking_file() {
 }
 
 #[test]
-fn compiled_in_step_limit_trips_safe_surfaces() {
+fn compiled_in_fuel_limit_trips_safe_surfaces() {
     let source = "x;";
     let tree = parse(&js(), source);
 
     assert!(matches!(
         limited::Q::parse(&tree, source),
-        Err(LimitExceeded::Steps(1))
+        Err(LimitExceeded::OutOfFuel(1))
     ));
     assert!(matches!(
         limited::Q::matches(&tree, source),
-        Err(LimitExceeded::Steps(1))
+        Err(LimitExceeded::OutOfFuel(1))
     ));
 }
 

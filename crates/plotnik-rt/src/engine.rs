@@ -23,7 +23,7 @@ use crate::{
 
 /// Execution state shared by the bytecode VM and generated matchers.
 ///
-/// Instruction pointers, step budgets, and limit policy stay with the
+/// Instruction pointers, fuel budgets, and limit policy stay with the
 /// executor: they are dispatch concerns, and each executor represents "where
 /// am I" differently (decoded step address vs. generated state id).
 pub struct Engine<'t> {
@@ -144,7 +144,7 @@ impl<'t> Engine<'t> {
     /// intentionally-excluded-from [`CheckpointState`]. The exhaustive
     /// destructure is the point: a newly-added engine field will not compile
     /// until it is classified here, so it cannot silently escape the
-    /// checkpoint contract. Executor-side state (instruction pointer, step
+    /// checkpoint contract. Executor-side state (instruction pointer, fuel
     /// budget) is resumed separately by the executor's backtrack. Debug-only.
     #[cfg(debug_assertions)]
     fn assert_checkpoint_restored(&self, state: &CheckpointState) {

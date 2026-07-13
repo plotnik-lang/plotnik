@@ -3,8 +3,10 @@
 /// Errors during VM execution.
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
-    #[error("exceeded the step limit of {0} steps")]
-    StepLimitExceeded(u64),
+    /// The matcher exhausted its fuel before the run finished. The value is
+    /// the resolved fuel limit for that run.
+    #[error("exhausted the fuel limit of {0}")]
+    OutOfFuel(u64),
 
     /// `used` is the live-heap measurement at the trip point; because the arenas
     /// grow geometrically it can overshoot `limit` by up to a doubling, so it is

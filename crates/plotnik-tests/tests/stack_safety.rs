@@ -94,7 +94,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
             .spawn_scoped(scope, || {
                 let vm = VM::builder(&source, &tree)
                     .limits(RuntimeLimitSpec {
-                        steps: Limit::Unbounded,
+                        fuel_limit: Limit::Unbounded,
                         memory: Limit::Unbounded,
                     })
                     .build();
@@ -103,7 +103,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
                 match result {
                     Ok(_) => "matched",
                     Err(RuntimeError::NoMatch) => "no-match",
-                    Err(RuntimeError::StepLimitExceeded(_)) => "steps",
+                    Err(RuntimeError::OutOfFuel(_)) => "fuel",
                     Err(RuntimeError::MemoryLimitExceeded { .. }) => "memory",
                 }
             })

@@ -29,7 +29,7 @@ impl Default for Config {
         Self {
             rust_types: RustTypesConfig::new(),
             limits: RuntimeLimitSpec {
-                steps: Limit::Auto,
+                fuel_limit: Limit::Auto,
                 memory: Limit::Auto,
             },
             depth: Limit::Auto,

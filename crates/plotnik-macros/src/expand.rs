@@ -224,7 +224,7 @@ fn invoking_dir() -> Option<PathBuf> {
 
 fn runtime_limits(args: &LimitArgs) -> RuntimeLimitSpec {
     RuntimeLimitSpec {
-        steps: limit(&args.steps),
+        fuel_limit: limit(&args.fuel),
         memory: limit(&args.memory),
     }
 }

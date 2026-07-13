@@ -188,7 +188,7 @@ struct Generator<'a> {
 
 #[derive(Clone, Copy)]
 struct RustLimits {
-    steps: Limit,
+    fuel: Limit,
     memory: Limit,
     replay_depth: Limit,
 }
@@ -196,7 +196,7 @@ struct RustLimits {
 impl<'a> Generator<'a> {
     fn new(plan: &'a CodegenPlan<'a>, config: &'a Config) -> Self {
         let limits = RustLimits {
-            steps: config.limits.steps,
+            fuel: config.limits.fuel_limit,
             memory: config.limits.memory,
             replay_depth: config.depth,
         };
@@ -257,7 +257,7 @@ impl<'a> Generator<'a> {
         self.state_consts(&mut machinery);
         self.entry_fns(&mut machinery);
         machinery.push_str(DRIVER_SKELETON);
-        self.step_fn(&mut machinery);
+        self.dispatch_fn(&mut machinery);
         self.cand_fns(&mut machinery);
         self.finish_fns(&mut machinery);
         self.backtrack_fn(&mut machinery);
@@ -314,7 +314,7 @@ impl<'a> Generator<'a> {
             MOD_HEADER,
             &[
                 ("RT", self.config.rt_crate_path()),
-                ("STEPS", &limit_expr(limits.steps)),
+                ("FUEL", &limit_expr(limits.fuel)),
                 ("MEMORY", &limit_expr(limits.memory)),
                 ("READER_FRAME", &max_reader_frame_bytes.to_string()),
                 (
@@ -436,14 +436,14 @@ impl<'a> Generator<'a> {
         // resolve, so the safe entries pass `NO_LIMITS` rather than pay for a
         // per-call node count that nothing reads.
         let limits = self.limits;
-        let steps_metered = limits.steps != Limit::Unbounded;
+        let fuel_metered = limits.fuel != Limit::Unbounded;
         let memory_metered = limits.memory != Limit::Unbounded;
-        let safe_limits = if steps_metered || memory_metered {
+        let safe_limits = if fuel_metered || memory_metered {
             "resolved_limits(tree)"
         } else {
             "NO_LIMITS"
         };
-        let steps_metered = if steps_metered { "true" } else { "false" };
+        let fuel_metered = if fuel_metered { "true" } else { "false" };
         let memory_metered = if memory_metered { "true" } else { "false" };
         for entry in self.plan.matcher().entrypoints() {
             let def = entry.name.as_str();
@@ -454,7 +454,7 @@ impl<'a> Generator<'a> {
                 ("SAFE_FN", &safe_entry_fn_name(def)),
                 ("ACCEPTS_FN", &accepts_entry_fn_name(def)),
                 ("ENTRY", info.const_name.as_str()),
-                ("STEPS_METERED", steps_metered),
+                ("FUEL_METERED", fuel_metered),
                 ("MEMORY_METERED", memory_metered),
                 ("SAFE_LIMITS", safe_limits),
             ];
@@ -467,14 +467,14 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn step_fn(&self, out: &mut String) {
+    fn dispatch_fn(&self, out: &mut String) {
         let source_param = if self.plan.matcher().any_predicate() {
             "source"
         } else {
             "_source"
         };
         out.push('\n');
-        splice(out, "", STEP_OPEN, &[("SOURCE", source_param)]);
+        splice(out, "", DISPATCH_OPEN, &[("SOURCE", source_param)]);
         for state in self.plan.matcher().states() {
             for line in state.provenance.lines() {
                 let _ = writeln!(out, "        // {}", line.trim_end());
@@ -498,7 +498,7 @@ impl<'a> Generator<'a> {
                 }
             }
         }
-        out.push_str(STEP_CLOSE);
+        out.push_str(DISPATCH_CLOSE);
     }
 
     fn epsilon_arm(
@@ -1086,17 +1086,17 @@ use @RT@ as rt;
 /// each input's node count. Chosen at generation time, never at the call
 /// site: the query is trusted, the input is not.
 const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
-    steps: @STEPS@,
+    fuel_limit: @FUEL@,
     memory: @MEMORY@,
 };
 
 /// No ceilings — what the unmetered trace entry points run under.
 const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
-    max_steps: None,
+    fuel_limit: None,
     max_memory: None,
 };
 
-/// Bitmask selecting the dispatch steps on which the memory ceiling is
+/// Bitmask selecting the matcher dispatches on which the memory ceiling is
 /// sampled; must be a power of two minus one. Twin of the VM's constant.
 const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
@@ -1205,7 +1205,7 @@ pub fn @FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::EffectLog<'t>> {
 }
 "#;
 
-// The metering const generics (`@STEPS_METERED@`, `@MEMORY_METERED@`) are fixed
+// The metering const generics (`@FUEL_METERED@`, `@MEMORY_METERED@`) are fixed
 // at generation time from the compiled-in policy: an unbounded resource emits
 // `false`, folding its check out of the monomorphized `run`. When both are
 // unbounded there is nothing to resolve, so the entries pass `NO_LIMITS` and
@@ -1216,14 +1216,14 @@ pub(super) fn @SAFE_FN@<'t>(
     tree: &'t rt::Tree,
     source: &str,
 ) -> Result<Option<rt::EffectLog<'t>>, rt::LimitExceeded> {
-    run::<@STEPS_METERED@, @MEMORY_METERED@, true>(tree, source, @ENTRY@, @SAFE_LIMITS@)
+    run::<@FUEL_METERED@, @MEMORY_METERED@, true>(tree, source, @ENTRY@, @SAFE_LIMITS@)
 }
 "#;
 
 const ENTRY_ACCEPTS_SAFE: &str = r#"
 /// Whether `@DEF@` accepts, under [`LIMITS`], with data effects suppressed.
 pub(super) fn @ACCEPTS_FN@(tree: &rt::Tree, source: &str) -> Result<bool, rt::LimitExceeded> {
-    Ok(run::<@STEPS_METERED@, @MEMORY_METERED@, false>(tree, source, @ENTRY@, @SAFE_LIMITS@)?.is_some())
+    Ok(run::<@FUEL_METERED@, @MEMORY_METERED@, false>(tree, source, @ENTRY@, @SAFE_LIMITS@)?.is_some())
 }
 "#;
 
@@ -1246,14 +1246,14 @@ enum Unwound {
 }
 
 /// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
-/// `METERED_STEPS` and `METERED_MEMORY` gate the two budget checks
+/// `METERED_FUEL` and `METERED_MEMORY` gate the two budget checks
 /// independently: each folds away when its resource is unbounded, so a fully
 /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
 /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
 /// `TRACE` controls whether data effects are recorded; `matches` disables it to
 /// avoid output allocation and replay-depth failures. (No let-chains: generated
 /// code targets the embedding crate's edition.)
-fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: bool>(
+fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const TRACE: bool>(
     tree: &'t rt::Tree,
     source: &str,
     entry: u16,
@@ -1265,26 +1265,26 @@ fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: b
     } else {
         rt::Engine::new_data_suppressed(tree.walk())
     };
-    let mut steps: u64 = 0;
+    let mut fuel_used: u64 = 0;
     let mut ip = entry;
     loop {
-        if METERED_STEPS || METERED_MEMORY {
-            // Step ceiling: bound total work. Folded out when steps are
-            // unbounded; the counter still advances under a memory-only
-            // policy because the sample cadence below rides on it.
-            if METERED_STEPS {
-                if let Some(max) = limits.max_steps {
-                    if steps >= max {
-                        return Err(rt::LimitExceeded::Steps(max));
+        if METERED_FUEL || METERED_MEMORY {
+            // One matcher dispatch currently consumes one fuel unit. The check
+            // folds out when fuel is unbounded; the counter still advances under
+            // a memory-only policy because the sample cadence below rides on it.
+            if METERED_FUEL {
+                if let Some(limit) = limits.fuel_limit {
+                    if fuel_used >= limit {
+                        return Err(rt::LimitExceeded::OutOfFuel(limit));
                     }
                 }
             }
-            steps += 1;
+            fuel_used += 1;
             // Memory ceiling: the live runtime heap, sampled every
-            // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded,
+            // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-dispatch growth is bounded,
             // so the unobserved overshoot is noise (see the VM loop). Folded
             // out when memory is unbounded, so no `heap_bytes` read survives.
-            if METERED_MEMORY && steps & MEMORY_SAMPLE_MASK == 0 {
+            if METERED_MEMORY && fuel_used & MEMORY_SAMPLE_MASK == 0 {
                 let used = eng.heap_bytes();
                 if let Some(max) = limits.max_memory {
                     if used > max {
@@ -1293,7 +1293,7 @@ fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: b
                 }
             }
         }
-        match step(&mut eng, source, ip) {
+        match dispatch(&mut eng, source, ip) {
             Flow::Jump(next) => ip = next,
             Flow::Accept => return Ok(Some(eng.into_effects())),
             Flow::Backtrack => match backtrack(&mut eng, source) {
@@ -1306,12 +1306,12 @@ fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: b
 }
 "#;
 
-const STEP_OPEN: &str = r#"
-fn step<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str, ip: u16) -> Flow {
+const DISPATCH_OPEN: &str = r#"
+fn dispatch<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str, ip: u16) -> Flow {
     match ip {
 "#;
 
-const STEP_CLOSE: &str = "        _ => unreachable!(\"ip {ip} is not a generated state\"),
+const DISPATCH_CLOSE: &str = "        _ => unreachable!(\"ip {ip} is not a generated state\"),
     }
 }
 ";

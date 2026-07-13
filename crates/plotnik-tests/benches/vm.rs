@@ -15,7 +15,7 @@
 //! - `pred_eq` / `pred_regex`: string and regex predicates that mostly fail —
 //!   per-candidate navigation plus `utf8_text` extraction.
 //! - `backtrack_storm`: greedy any-star that never finds its tail, capped by
-//!   an explicit step budget — pure dispatch + backtracking, zero output.
+//!   an explicit fuel budget — pure dispatch + backtracking, zero output.
 //!
 //! Run: `make bench` (or `make bench FILTER=scan_rows`).
 //! Save/compare: `cargo bench -p plotnik-tests --bench vm -- --save-baseline
@@ -275,10 +275,11 @@ fn bench_scan_execute(c: &mut Criterion) {
 
 /// Raw dispatch + backtrack throughput. The anchorless star lets every `(_)`
 /// element re-bind to any later sibling on backtrack, so the search space is
-/// exponential and the run always exhausts its step budget; a fixed budget
-/// turns that storm into a stable time-per-step measurement.
+/// exponential and the run always exhausts its fuel budget; a fixed budget
+/// turns that storm into a stable dispatch-throughput measurement while fuel
+/// and matcher dispatches have their current one-to-one relationship.
 fn bench_backtrack_storm(c: &mut Criterion) {
-    const STEP_BUDGET: u64 = 50_000;
+    const FUEL_BUDGET: u64 = 50_000;
     let module = compile("Missing = (program {(_)* (debugger_statement)})");
     let entry = module
         .entrypoint("Missing")
@@ -286,12 +287,12 @@ fn bench_backtrack_storm(c: &mut Criterion) {
     let source: &str = &SMALL;
     let tree = parse_js(source);
     let mut group = c.benchmark_group("backtrack_storm");
-    group.throughput(Throughput::Elements(STEP_BUDGET));
-    group.bench_function("50k_steps", |b| {
+    group.throughput(Throughput::Elements(FUEL_BUDGET));
+    group.bench_function("50k_dispatches", |b| {
         b.iter(|| {
             let vm = VM::builder(source, &tree)
                 .limits(RuntimeLimitSpec {
-                    steps: Limit::Of(STEP_BUDGET),
+                    fuel_limit: Limit::Of(FUEL_BUDGET),
                     memory: Limit::Auto,
                 })
                 .build();

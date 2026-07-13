@@ -63,8 +63,8 @@ pub use dfa::{RegexDfas, StaticDfa, deserialize_dfa};
 pub use frame::{Frame, FrameArena, FrameReturns, ReturnOutcome};
 pub use ids::{NodeFieldId, NodeKindId, ZeroIdError};
 pub use limits::{
-    Limit, LimitError, LimitExceeded, REPLAY_DEPTH_AUTO, ReplayDepth, ResolvedRuntimeLimits,
-    RuntimeLimitSpec, replay_depth_auto,
+    Limit, LimitExceeded, REPLAY_DEPTH_AUTO, ReplayDepth, ResolvedRuntimeLimits, RuntimeLimitSpec,
+    replay_depth_auto,
 };
 pub use nav::{Nav, SkipPolicy};
 pub use node_class::{NodeClass, SkipClass};

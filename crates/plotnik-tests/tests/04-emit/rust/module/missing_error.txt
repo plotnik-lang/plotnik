@@ -161,17 +161,17 @@ mod matcher {
     /// each input's node count. Chosen at generation time, never at the call
     /// site: the query is trusted, the input is not.
     const LIMITS: rt::RuntimeLimitSpec = rt::RuntimeLimitSpec {
-        steps: rt::Limit::Auto,
+        fuel_limit: rt::Limit::Auto,
         memory: rt::Limit::Auto,
     };
 
     /// No ceilings — what the unmetered trace entry points run under.
     const NO_LIMITS: rt::ResolvedRuntimeLimits = rt::ResolvedRuntimeLimits {
-        max_steps: None,
+        fuel_limit: None,
         max_memory: None,
     };
 
-    /// Bitmask selecting the dispatch steps on which the memory ceiling is
+    /// Bitmask selecting the matcher dispatches on which the memory ceiling is
     /// sampled; must be a power of two minus one. Twin of the VM's constant.
     const MEMORY_SAMPLE_MASK: u64 = 1024 - 1;
 
@@ -323,14 +323,14 @@ mod matcher {
     }
 
     /// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
-    /// `METERED_STEPS` and `METERED_MEMORY` gate the two budget checks
+    /// `METERED_FUEL` and `METERED_MEMORY` gate the two budget checks
     /// independently: each folds away when its resource is unbounded, so a fully
     /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
     /// When either is on, the loop head transcribes the VM's `execute_with_stats`.
     /// `TRACE` controls whether data effects are recorded; `matches` disables it to
     /// avoid output allocation and replay-depth failures. (No let-chains: generated
     /// code targets the embedding crate's edition.)
-    fn run<'t, const METERED_STEPS: bool, const METERED_MEMORY: bool, const TRACE: bool>(
+    fn run<'t, const METERED_FUEL: bool, const METERED_MEMORY: bool, const TRACE: bool>(
         tree: &'t rt::Tree,
         source: &str,
         entry: u16,
@@ -342,26 +342,26 @@ mod matcher {
         } else {
             rt::Engine::new_data_suppressed(tree.walk())
         };
-        let mut steps: u64 = 0;
+        let mut fuel_used: u64 = 0;
         let mut ip = entry;
         loop {
-            if METERED_STEPS || METERED_MEMORY {
-                // Step ceiling: bound total work. Folded out when steps are
-                // unbounded; the counter still advances under a memory-only
-                // policy because the sample cadence below rides on it.
-                if METERED_STEPS {
-                    if let Some(max) = limits.max_steps {
-                        if steps >= max {
-                            return Err(rt::LimitExceeded::Steps(max));
+            if METERED_FUEL || METERED_MEMORY {
+                // One matcher dispatch currently consumes one fuel unit. The check
+                // folds out when fuel is unbounded; the counter still advances under
+                // a memory-only policy because the sample cadence below rides on it.
+                if METERED_FUEL {
+                    if let Some(limit) = limits.fuel_limit {
+                        if fuel_used >= limit {
+                            return Err(rt::LimitExceeded::OutOfFuel(limit));
                         }
                     }
                 }
-                steps += 1;
+                fuel_used += 1;
                 // Memory ceiling: the live runtime heap, sampled every
-                // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-step growth is bounded,
+                // `MEMORY_SAMPLE_MASK + 1` dispatches. Per-dispatch growth is bounded,
                 // so the unobserved overshoot is noise (see the VM loop). Folded
                 // out when memory is unbounded, so no `heap_bytes` read survives.
-                if METERED_MEMORY && steps & MEMORY_SAMPLE_MASK == 0 {
+                if METERED_MEMORY && fuel_used & MEMORY_SAMPLE_MASK == 0 {
                     let used = eng.heap_bytes();
                     if let Some(max) = limits.max_memory {
                         if used > max {
@@ -370,7 +370,7 @@ mod matcher {
                     }
                 }
             }
-            match step(&mut eng, source, ip) {
+            match dispatch(&mut eng, source, ip) {
                 Flow::Jump(next) => ip = next,
                 Flow::Accept => return Ok(Some(eng.into_effects())),
                 Flow::Backtrack => match backtrack(&mut eng, source) {
@@ -382,7 +382,7 @@ mod matcher {
         }
     }
 
-    fn step<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
+    fn dispatch<'t>(eng: &mut rt::Engine<'t>, _source: &str, ip: u16) -> Flow {
         match ip {
             //   01                                        ▶
             S01_ERR => {

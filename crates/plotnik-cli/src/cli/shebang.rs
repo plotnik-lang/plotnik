@@ -16,7 +16,7 @@
 use clap::Command;
 
 use super::args::*;
-use super::limits::{limits_preset_arg, max_memory_arg, max_steps_arg};
+use super::limits::{fuel_arg, limits_preset_arg, max_memory_arg};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ShebangDecl {
@@ -81,7 +81,7 @@ fn shebang_parser() -> Command {
         .arg(verbose_nodes_arg())
         .arg(verbose_arg())
         .arg(no_result_arg())
-        .arg(max_steps_arg())
+        .arg(fuel_arg())
         .arg(max_memory_arg())
         .arg(limits_preset_arg())
         .arg(format_arg())

@@ -1,23 +1,23 @@
 //! Runtime execution-limit flags and their parsing.
 //!
 //! Three knobs feed one [`RuntimeLimitSpec`]:
-//!   - `--max-steps  <auto|unbounded|N>`     work ceiling
+//!   - `--fuel       <auto|unbounded|N>`     matcher work budget
 //!   - `--max-memory <auto|unbounded|SIZE>`  live-heap ceiling (binary units)
 //!   - `--limits     <auto|unbounded>`       preset baseline for both runtime resources
 //!
-//! Precedence is order-independent: `--limits` sets the baseline and an explicit
-//! `--max-*` overrides that one resource. So `--limits unbounded --max-steps 5`
-//! means "unbounded runtime limits except steps = 5", regardless of flag order.
+//! Precedence is order-independent: `--limits` sets the baseline and a
+//! resource-specific flag overrides that resource. So `--limits unbounded --fuel 5`
+//! means "unbounded runtime limits except fuel = 5", regardless of flag order.
 
 use clap::{Arg, ArgMatches};
 use plotnik_lib::{Limit, RuntimeLimitSpec};
 
-pub fn max_steps_arg() -> Arg {
-    Arg::new("max_steps")
-        .long("max-steps")
+pub fn fuel_arg() -> Arg {
+    Arg::new("fuel")
+        .long("fuel")
         .value_name("LIMIT")
-        .value_parser(parse_steps)
-        .help("Work limit: a step count, 'auto' (size-based), or 'unbounded'")
+        .value_parser(parse_fuel)
+        .help("Matcher work budget: a fuel amount, 'auto' (size-based), or 'unbounded'")
 }
 
 pub fn max_memory_arg() -> Arg {
@@ -36,12 +36,12 @@ pub fn limits_preset_arg() -> Arg {
         .help("Runtime limit preset: 'auto' (default) or 'unbounded'")
 }
 
-/// Combine the `--limits` preset baseline with per-resource `--max-*` overrides.
+/// Combine the `--limits` preset baseline with resource-specific overrides.
 /// Reads the final parsed values, so flag order does not matter.
 pub fn resolve_limit_spec(m: &ArgMatches) -> RuntimeLimitSpec {
     let base = match m.get_one::<String>("limits").map(String::as_str) {
         Some("unbounded") => RuntimeLimitSpec {
-            steps: Limit::Unbounded,
+            fuel_limit: Limit::Unbounded,
             memory: Limit::Unbounded,
         },
         // `auto` and the absent flag both mean the size-based default; the
@@ -49,10 +49,10 @@ pub fn resolve_limit_spec(m: &ArgMatches) -> RuntimeLimitSpec {
         _ => RuntimeLimitSpec::default(),
     };
     RuntimeLimitSpec {
-        steps: m
-            .get_one::<Limit>("max_steps")
+        fuel_limit: m
+            .get_one::<Limit>("fuel")
             .copied()
-            .unwrap_or(base.steps),
+            .unwrap_or(base.fuel_limit),
         memory: m
             .get_one::<Limit>("max_memory")
             .copied()
@@ -60,13 +60,13 @@ pub fn resolve_limit_spec(m: &ArgMatches) -> RuntimeLimitSpec {
     }
 }
 
-/// `auto` | `unbounded` | a non-negative step count.
-pub(crate) fn parse_steps(raw: &str) -> Result<Limit, String> {
+/// `auto` | `unbounded` | a non-negative fuel amount.
+pub(crate) fn parse_fuel(raw: &str) -> Result<Limit, String> {
     if let Some(limit) = keyword(raw) {
         return Ok(limit);
     }
     raw.trim().parse::<u64>().map(Limit::Of).map_err(|_| {
-        format!("invalid step limit '{raw}': expected a number, 'auto', or 'unbounded'")
+        format!("invalid fuel limit '{raw}': expected a number, 'auto', or 'unbounded'")
     })
 }
 

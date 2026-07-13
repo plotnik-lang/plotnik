@@ -4,7 +4,7 @@
 //! deliberately *not* routed through the diagnostics engine (which requires a
 //! span and a `SourceMap` already dropped before execution). Instead the limit
 //! errors get a four-line "what / halted / why / how" message with a stable
-//! `E-limit-*` code; other variants fall back to their `Display`. `NoMatch` is a
+//! error code; other variants fall back to their `Display`. `NoMatch` is a
 //! domain answer the callers handle (exit 1), not a failure rendered here.
 
 use plotnik_lib::RuntimeError;
@@ -13,17 +13,17 @@ use plotnik_lib::text_utils::escape_json_into;
 /// Render a runtime error for stderr, or as a one-line JSON object when `json`.
 pub fn render_runtime_error(error: &RuntimeError, json: bool) -> String {
     match error {
-        RuntimeError::StepLimitExceeded(limit) => render_limit(
+        RuntimeError::OutOfFuel(limit) => render_limit(
             LimitReport {
-                code: "E-limit-steps",
-                title: "step limit exceeded",
-                ceiling: format!("{} steps", group_thousands(*limit)),
-                // Steps trip exactly at the ceiling, so usage adds nothing.
+                code: "E-out-of-fuel",
+                title: "out of fuel",
+                ceiling: format!("{} fuel units", group_thousands(*limit)),
+                // Fuel trips exactly at the ceiling, so usage adds nothing.
                 used: None,
-                why: "the query did more work than the step limit allows — usually \
+                why: "the query needs more fuel than its budget allows — usually \
                       catastrophic backtracking, or an unusually large input",
-                flag: "--max-steps",
-                json_key: "max_steps",
+                flag: "--fuel",
+                json_key: "fuel_limit",
                 json_value: limit.to_string(),
             },
             json,
@@ -55,14 +55,14 @@ pub fn render_runtime_error(error: &RuntimeError, json: bool) -> String {
     }
 }
 
-/// The fields a limit error renders from — uniform across steps and memory.
+/// The fields a limit error renders from — uniform across fuel and memory.
 struct LimitReport {
     code: &'static str,
     title: &'static str,
-    /// The ceiling, already formatted for humans (`"2,000,000 steps"`, `"64.0 MiB"`).
+    /// The ceiling, already formatted for humans (`"2,000,000 fuel units"`, `"64.0 MiB"`).
     ceiling: String,
     /// Actual usage at the trip point, when it is worth reporting separately from
-    /// the ceiling (memory). `None` for steps, where usage equals the limit.
+    /// the ceiling (memory). `None` for fuel, where usage equals the limit.
     used: Option<Usage>,
     why: &'static str,
     flag: &'static str,

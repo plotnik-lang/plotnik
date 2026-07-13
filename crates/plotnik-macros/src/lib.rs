@@ -42,9 +42,9 @@ mod grammar_source_tests;
 ///   invoking file) instead of an inline literal.
 /// - `crate = ::path::to::rt` — respell the runtime-crate path baked into
 ///   generated code; defaults to `::plotnik::rt`.
-/// - `steps = <n> | auto | unbounded`, `memory = <n> | auto | unbounded`,
+/// - `fuel = <n> | auto | unbounded`, `memory = <n> | auto | unbounded`,
 ///   `depth = <n> | auto` — the limit policy compiled into the safe entry
-///   points (default `auto`). `steps` bound total work,
+///   points (default `auto`). `fuel` bounds matcher work,
 ///   `memory` bounds live backtracking state, `depth` bounds the committed
 ///   value's nesting (the typed replay recurses once per nested value, so
 ///   this is its native-stack guard).

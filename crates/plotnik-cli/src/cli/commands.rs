@@ -7,7 +7,7 @@
 use clap::Command;
 
 use super::args::*;
-use super::limits::{limits_preset_arg, max_memory_arg, max_steps_arg};
+use super::limits::{fuel_arg, limits_preset_arg, max_memory_arg};
 
 fn with_hidden_source_args(cmd: Command) -> Command {
     cmd.arg(source_path_arg().hide(true))
@@ -32,9 +32,9 @@ fn with_hidden_trace_args(cmd: Command) -> Command {
 }
 
 // Runtime-limit flags, hidden. Added to non-exec commands so the unified flag
-// set parses them without error; only `run`/`trace` surface them visibly.
+// set parses them without error; `run`/`trace`/`inspect` surface them visibly.
 fn with_hidden_runtime_limit_args(cmd: Command) -> Command {
-    cmd.arg(max_steps_arg().hide(true))
+    cmd.arg(fuel_arg().hide(true))
         .arg(max_memory_arg().hide(true))
         .arg(limits_preset_arg().hide(true))
 }
@@ -264,7 +264,7 @@ pub fn run_command() -> Command {
         .arg(compact_arg())
         .arg(verbose_nodes_arg().hide(true))
         .next_help_heading("Limit options")
-        .arg(max_steps_arg())
+        .arg(fuel_arg())
         .arg(max_memory_arg())
         .arg(limits_preset_arg())
         .next_help_heading("Global options")
@@ -299,7 +299,7 @@ pub fn trace_command() -> Command {
         .arg(verbose_arg())
         .arg(no_result_arg())
         .next_help_heading("Limit options")
-        .arg(max_steps_arg())
+        .arg(fuel_arg())
         .arg(max_memory_arg())
         .arg(limits_preset_arg())
         .next_help_heading("Global options")
@@ -337,7 +337,7 @@ pub fn inspect_command() -> Command {
         .arg(json_arg().help("Output the full inspect bundle as JSON"))
         .arg(verbose_arg().help("Include VM recording in the JSON bundle"))
         .next_help_heading("Limit options")
-        .arg(max_steps_arg())
+        .arg(fuel_arg())
         .arg(max_memory_arg())
         .arg(limits_preset_arg())
         .next_help_heading("Global options")
