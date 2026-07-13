@@ -233,7 +233,7 @@ struct SplitCall {
 `SplitCall` performs no navigation or field check. `entry_nav` records the
 navigation routed into its specialized callee so the loader can verify cursor
 depth without reconstructing compiler provenance. Candidate-search checkpoints
-therefore remain inside the nullable body's authored branch order. A matched
+therefore remain inside the nullable body's authored alternative order. A matched
 `Return` resumes at `matched` at the routed navigation depth; a zero-width
 `Return` resumes at `zero` at the caller's original depth.
 

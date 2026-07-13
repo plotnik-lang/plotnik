@@ -84,12 +84,11 @@ fn fields_256_are_source_capable_but_exceed_the_bytecode_target() {
 }
 
 #[test]
-fn enum_variant_count_overflow_is_emit_error() {
-    // 256 enum branches → an enum with 256 variants, past the u8 limit. Each branch
-    // is `(_)` so every variant is a valid program child and the query is matchable —
-    // an enum of `(identifier)` would be rejected (a program holds no bare identifier).
-    // The alternation is captured so it is consumed (produces the enum) rather
-    // than degrading to a union.
+fn variant_case_count_overflow_is_emit_error() {
+    // 256 labeled alternatives produce a variant with 256 cases, past the u8 limit.
+    // Each alternative is `(_)` so every case is a valid program child and the query
+    // is matchable; `(identifier)` would be rejected because a program has no bare
+    // identifier child. Capturing the alternation makes its labels produce cases.
     let mut query = String::from("Q = (program [");
     for i in 0..256 {
         write!(query, " L{i}: (_) @v{i}").unwrap();

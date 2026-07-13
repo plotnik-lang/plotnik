@@ -130,7 +130,7 @@ On error: prints diagnostics to stderr, exits 1.
 
 `check` does not test bytecode-format capacities. A query can pass `check` and
 emit source while a later VM-bytecode emission reports a target limit (for
-example, the bytecode type table's per-struct field width).
+example, the bytecode type table's per-record field width).
 
 With `--json`, on exit 0 or 1 stdout is a JSON array of diagnostics (`[]`
 when the query is clean), each with `code`, `severity`, `message`, `span`

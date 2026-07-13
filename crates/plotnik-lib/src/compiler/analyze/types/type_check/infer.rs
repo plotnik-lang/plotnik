@@ -695,7 +695,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     fn infer_captured_pattern(&mut self, cap: &Located<CapturedPattern>) -> PatternShape {
         let node = cap.node();
 
-        // Suppressive captures don't contribute to the output type. The inner
+        // Discards don't contribute to the output type. The inner
         // is still inferred for structural validation, but the explicit discard
         // needs neither an ineffective-label warning nor a collection boundary.
         if node.is_discard() {

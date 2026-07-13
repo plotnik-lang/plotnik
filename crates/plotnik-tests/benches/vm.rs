@@ -8,7 +8,7 @@
 //!
 //! Scenarios, each isolating a different runtime path:
 //! - `scan_rows`: enum rows over every top-level statement — sibling
-//!   navigation, alternation checkpoints, and effect logging in bulk.
+//!   navigation, alternation checkpoints, and match-journal recording in bulk.
 //! - `fn_params`: nested field constraints plus an inner list per row.
 //! - `deep_calls`: self-recursive definition descending nested call chains —
 //!   Call/Return frames and call-retry checkpoints.

@@ -458,7 +458,7 @@ impl NfaBuilder<'_> {
         // A captured optional/star at this navigating position shares the single
         // mechanism dispatch with the ordinary capture path (`compile_captured`),
         // split exits and all, so the two can never drift — the gap behind both
-        // #470 and the suppressive `@_` panic. It emits the scope that matches the
+        // #470 and the `@_` discard panic. It emits the scope that matches the
         // declared scope (`Record`/`List`/`Suppress`), closing it on both exits.
         if let Pattern::CapturedPattern(cap) = pattern
             && cap.inner().is_some()

@@ -183,14 +183,14 @@ pub enum JournalEvent<'t> {
 | NodeStr                | Produce one matched node's source text directly          |
 | NodeBool               | Produce `true` for one matched node directly             |
 | BoolValue(value)       | Produce a boolean without source provenance              |
-| SpanStart/SpanEnd      | Bracket query-inspection provenance                      |
+| SpanStart/SpanEnd      | Bracket result-provenance scopes                         |
 
 `ScalarMark` stores the matched node, not a byte sentinel. Each open scalar
 frame unions its marks into an optional byte-range hull. No marks means no
 matched node; a real zero-byte node contributes `Some(n..n)`. Consequently
 `StrClose` distinguishes an absent value (`null`) from a zero-byte node (`""`).
 `BoolClose` takes its value only from its encoded boolean; marks provide
-inspection provenance and never implement truthiness.
+result provenance and never implement truthiness.
 Direct node scalars use `NodeStr` or `NodeBool` instead of allocating a scalar
 frame; framed effects remain the general source-hull representation.
 Non-inspection lowering has no consumer for boolean source provenance, so it

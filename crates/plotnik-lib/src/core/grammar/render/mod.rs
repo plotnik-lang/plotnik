@@ -104,7 +104,7 @@ pub enum Shape {
     Splice(String),
     /// An ordered sibling sequence: `{...}`.
     Seq(Vec<Shape>),
-    /// An alternation, first match wins: `[...]`.
+    /// An alternation with source-order preference and backtracking: `[...]`.
     Choice(Vec<Shape>),
     /// A quantified shape: `?`, `*`, `+`.
     Quantified(Box<Shape>, Quant),

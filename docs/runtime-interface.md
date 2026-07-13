@@ -291,7 +291,7 @@ Generated runtimes implement this vocabulary:
 | Journal event          | Payload and meaning                                |
 | ---------------------- | -------------------------------------------------- |
 | `Node`                 | Current binding-native node.                       |
-| `Absent`               | One absent option/union value.                     |
+| `Absent`               | One absent option value.                           |
 | `ListOpen`             | Begin a list value.                                |
 | `ArrayPush`            | Append the pending value to its backing array.     |
 | `ListClose`            | Close the list and make it pending.                |
@@ -329,10 +329,10 @@ Scalar effects use balanced value semantics. `ScalarOpen` starts with no range;
 every mark unions the node's half-open UTF-8 byte span into the frame's hull.
 `StrClose` returns `null` when the hull is absent and otherwise borrows that
 slice from the source. A real `n..n` mark therefore returns `""`, not `null`.
-`BoolClose` uses its boolean payload and retains the hull only as inspection
+`BoolClose` uses its boolean payload and retains the hull only as result
 provenance; it never derives truthiness from marks.
 For a scalar whose raw value is one node, `NodeStr` and `NodeBool` are the
-equivalent one-entry fast path; the node also carries inspection provenance.
+equivalent one-entry fast path; the node also carries result provenance.
 Production lowering uses `BoolValue(true)` for presence booleans because their
 source range is not observable there; `NodeBool` and balanced boolean frames
 are emitted only when inspection requests that provenance.
@@ -407,9 +407,9 @@ provides a test-side serializer with this recursive JSON mapping:
 - option absence and match-only output: `null`;
 - source string: JSON string;
 - boolean: JSON boolean;
-- array: JSON array;
-- struct: object keyed by generated member name;
-- enum: `{ "$tag": "Variant" }`, plus `$data` when the selected variant has a
+- list: JSON array;
+- record: object keyed by generated member name;
+- variant: `{ "$tag": "Variant" }`, plus `$data` when the selected case has a
   payload;
 - captured node:
 

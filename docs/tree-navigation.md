@@ -12,19 +12,19 @@ struct VM<'t> {
     ip: CodeAddr,                    // current instruction address
     frames: Vec<Frame>,              // call stack
     journal: MatchJournal<'t>,       // rollbackable match journal
-    suppress_depth: u64,             // suppressive capture depth
+    suppress_depth: u64,             // output-suppression depth
 }
 
 struct Checkpoint {
     descendant_index: u32,             // cursor position (4 bytes)
     journal_watermark: usize,          // match journal length
     frame_index: Option<u32>,          // call stack state
-    ip: CodeAddr,                      // branch target, or the owning Call/Match
-    resume: Resume,                    // Branch | Call(CallResume) | Match
+    ip: CodeAddr,                      // successor address, or the owning Call/Match
+    resume: Resume,                    // Successor | Call(CallResume) | Match
 }
 ```
 
-A `Branch` checkpoint resumes dispatch at `ip`. A `Call` resume carries everything needed to retry a `Call` at a later sibling — callee entry, return address, field constraint, and skip policy — so backtracking advances the cursor and re-enters the callee without re-running the `Call`'s navigation. A `Match` resume marks the accepted candidate of an in-pattern sibling search: backtracking advances past it (per the skip policy re-derived from the instruction at `ip`) and re-runs the same match's candidate search from there. Keeping resume state on the checkpoint, rather than in ambient VM state, is what gives every sibling search — Call-driven or in-pattern — the same backtracking power (see [Call Navigation](#call-navigation)).
+A `Successor` checkpoint resumes dispatch at `ip`. A `Call` resume carries everything needed to retry a `Call` at a later sibling — callee entry, return address, field constraint, and skip policy — so backtracking advances the cursor and re-enters the callee without re-running the `Call`'s navigation. A `Match` resume marks the accepted candidate of an in-pattern sibling search: backtracking advances past it (per the skip policy re-derived from the instruction at `ip`) and re-runs the same match's candidate search from there. Keeping resume state on the checkpoint, rather than in ambient VM state, is what gives every sibling search — Call-driven or in-pattern — the same backtracking power (see [Call Navigation](#call-navigation)).
 
 **Critical constraint**: The cursor must be created at the tree root and never call `reset()`. The `descendant_index` is relative to the cursor's root — `reset(node)` would invalidate all checkpoints.
 
@@ -191,7 +191,7 @@ The split fires when the alternation's exit is the follower's own single `Match`
 
 Using dump format from [08-dump-format.md](binary-format/08-dump-format.md):
 
-> These examples show the _logical_ anchor lowering — the nav mode each anchor produces. An item that must be located among its siblings (an unpinned first item, or any item reached past a skipping anchor) additionally compiles to a small search wrapper: a branch into the candidate plus an advance-and-retry edge, converging on the anchored continuation. The wrapper is uniform across alternations, anchors, and quantifiers (one `emit_position_search` combinator). Run `dump` for the exact instructions; the rows below omit the wrapper for readability.
+> These examples show the _logical_ anchor lowering — the nav mode each anchor produces. An item that must be located among its siblings (an unpinned first item, or any item reached past a skipping anchor) additionally compiles to a small search wrapper: a fork to the candidate plus an advance-and-retry edge, converging on the anchored continuation. The wrapper is uniform across alternations, anchors, and quantifiers (one `emit_position_search` combinator). Run `dump` for the exact instructions; the rows below omit the wrapper for readability.
 
 **Simple**: `(function (identifier) @name)`
 

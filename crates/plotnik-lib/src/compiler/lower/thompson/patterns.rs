@@ -1101,7 +1101,7 @@ impl NfaBuilder<'_> {
     /// the navigating-first-child skippable path
     /// ([`compile_nullable_pattern`](Self::compile_nullable_pattern)) both
     /// route here, so a mechanism can never be handled by one and dropped by the
-    /// other (the drift behind #470 and the suppressive `@_` panic).
+    /// other (the drift behind #470 and the `@_` discard panic).
     ///
     /// Capture effects land on the innermost match / scope-close instruction:
     /// - Node:   inner_pattern[Node, RecordSet] → exit

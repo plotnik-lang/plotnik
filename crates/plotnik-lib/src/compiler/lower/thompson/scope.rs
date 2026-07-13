@@ -22,7 +22,7 @@ pub struct RecordScope(pub TypeId);
 /// closes its scope on *every* continuation, so the only difference between the
 /// two modes is how many close steps it emits. Threading this through one
 /// mechanism dispatch (`compile_captured`) keeps the single- and split-exit paths
-/// from drifting — the gap behind both #470 and the suppressive `@_` panic.
+/// from drifting — the gap behind both #470 and the `@_` discard panic.
 #[derive(Clone, Copy)]
 pub(super) enum CaptureExits {
     /// One continuation for the matched path (a non-skippable capture, or the
