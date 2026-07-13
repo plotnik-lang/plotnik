@@ -98,12 +98,12 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
     fn bind(&mut self, source: SourceId, root: &Root) {
         self.resolve_symbols(source, root);
         if self.strict_lints {
-            self.check_entrypoint_roots(source, root);
+            self.check_entry_point_roots(source, root);
         }
         self.check_grammar(source, root);
     }
 
-    fn check_entrypoint_roots(&mut self, source: SourceId, root: &Root) {
+    fn check_entry_point_roots(&mut self, source: SourceId, root: &Root) {
         let Some(grammar_root) = self.grammar.root() else {
             return;
         };
@@ -128,7 +128,7 @@ impl<'a, 'q> GrammarBinder<'a, 'q> {
 
             self.diag
                 .report(
-                    DiagnosticKind::EntrypointNeverMatchesRoot,
+                    DiagnosticKind::EntryPointNeverMatchesRoot,
                     Span::new(source, located.node().text_range()),
                 )
                 .emit();

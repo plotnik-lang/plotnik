@@ -262,7 +262,7 @@ pub(crate) struct OutputSchema<'a> {
     type_layout: OnceLock<OutputTypeLayout>,
     named_types: BTreeMap<TypeId, Symbol>,
     type_declarations: Vec<TypeDeclaration>,
-    entrypoint_items: Vec<OutputItem>,
+    entry_point_items: Vec<OutputItem>,
     capture_layout: CaptureLayout,
 }
 
@@ -309,7 +309,7 @@ impl<'a> OutputSchema<'a> {
         }
         type_declarations.sort_by_key(|declaration| (declaration.body, declaration.name));
         type_declarations.dedup();
-        let entrypoint_items = ItemCollector::new(types, deps, &named_types).collect();
+        let entry_point_items = ItemCollector::new(types, deps, &named_types).collect();
         Ok(Self {
             types,
             deps,
@@ -318,7 +318,7 @@ impl<'a> OutputSchema<'a> {
             type_layout: OnceLock::new(),
             named_types,
             type_declarations,
-            entrypoint_items,
+            entry_point_items,
             capture_layout,
         })
     }
@@ -347,7 +347,7 @@ impl<'a> OutputSchema<'a> {
     /// unspecialized fragment type merely because a scalar-specialized call
     /// uses the same matcher body.
     pub(crate) fn entry_point_items(&self) -> &[OutputItem] {
-        &self.entrypoint_items
+        &self.entry_point_items
     }
 
     pub(crate) fn layout(&self) -> &CaptureLayout {

@@ -46,7 +46,7 @@ pub struct TypeAnalysis {
     pub(super) types: Vec<TypeShape>,
 
     /// Each definition's output type, keyed by `DefId`. `BTreeMap` so iteration
-    /// is in `DefId` order — the SCC/emission order entrypoints rely on. Total
+    /// is in `DefId` order — the SCC/emission order entry points rely on. Total
     /// over every scheduled definition: a captureless structural body maps to
     /// `TYPE_NO_VALUE`, so a lookup for any admitted `DefId` hits. `finish` admits
     /// the map only after checking its type ids and every `Ref` target are

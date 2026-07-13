@@ -92,7 +92,7 @@ pub enum DiagnosticKind {
     CaptureTypeSuppressesData,
     RedundantCaptureType,
     InspectionSpansDegraded,
-    EntrypointNeverMatchesRoot,
+    EntryPointNeverMatchesRoot,
 
     PredicateOnNonLeaf,
     UnknownStringEscape,
@@ -138,7 +138,7 @@ impl DiagnosticKind {
             | Self::CaptureTypeSuppressesData
             | Self::RedundantCaptureType
             | Self::InspectionSpansDegraded
-            | Self::EntrypointNeverMatchesRoot
+            | Self::EntryPointNeverMatchesRoot
             | Self::TreeSitterSequenceSyntaxDeprecated
             | Self::NegationSyntaxDeprecated
             | Self::SupertypeSlashDeprecated => Severity::Warning,
@@ -318,7 +318,7 @@ impl DiagnosticKind {
             Self::RefCannotHaveChildren => {
                 "a reference reuses a definition as a whole: write `(Expr)`, or define a node kind to add children"
             }
-            Self::EntrypointNeverMatchesRoot => {
+            Self::EntryPointNeverMatchesRoot => {
                 "wrap the pattern in the grammar's root node, e.g. `(program ...)`"
             }
             Self::NoEntryPoints => {
@@ -418,7 +418,7 @@ impl DiagnosticKind {
             Self::CaptureTypeSuppressesData => "capture type suppresses data",
             Self::RedundantCaptureType => "redundant capture type",
             Self::InspectionSpansDegraded => "query too large for full inspection detail",
-            Self::EntrypointNeverMatchesRoot => {
+            Self::EntryPointNeverMatchesRoot => {
                 "entry point can never match: matching starts at the syntax-tree root"
             }
             Self::PredicateOnNonLeaf => {
