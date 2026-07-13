@@ -287,15 +287,15 @@ impl DefVariant {
     }
 }
 
-/// Symbolic reference to a struct field or enum variant.
+/// Symbolic reference to a struct field or variant case.
 ///
 /// Resolved to an absolute member index at emit time: the parent type's member
 /// base (`member_base`) plus `relative_index`. The parent type is a scope or
-/// enum that an entrypoint result reaches, so it is always present in the emitted
+/// variant type that an entrypoint result reaches, so it is always present in the emitted
 /// type table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct MemberRef {
-    /// The query type whose member table this indexes (struct or enum).
+    /// The query type whose member table this indexes (struct or variant type).
     pub parent_type: TypeId,
     /// Relative index within the parent type's members.
     pub relative_index: u16,
@@ -319,7 +319,7 @@ pub struct EffectIR {
 }
 
 /// An effect's argument: a literal value, or a symbolic member reference — used by
-/// Set/Enum effects — resolved to a member index during emission.
+/// Set/VariantOpen effects — resolved to a member index during emission.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EffectArg {
     Literal(usize),
@@ -387,9 +387,9 @@ impl EffectIR {
         Self::literal(EffectKind::StructClose, 0)
     }
 
-    /// End enum scope.
-    pub fn end_enum() -> Self {
-        Self::literal(EffectKind::EnumClose, 0)
+    /// End variant scope.
+    pub fn end_variant() -> Self {
+        Self::literal(EffectKind::VariantClose, 0)
     }
 
     /// Begin suppression (suppress effects within).

@@ -6,7 +6,7 @@
 //! # Output model
 //!
 //! Output exists exactly where output syntax is written: `@capture` makes a
-//! field, a branch label makes an enum variant, `:: Name` names a type, and a
+//! field, an alternative label makes a variant case, `:: Name` names a type, and a
 //! definition name names the definition's result type. Everything else is
 //! structural: it matches, and produces nothing.
 //!
@@ -17,9 +17,9 @@
 //!   structurally and its output is suppressed. Fields never bubble through a
 //!   reference boundary, recursive or not.
 //! - **Labeled alternations tag on consumption.** An alternation `[A: … B: …]`
-//!   produces an enum only where the value is consumed — captured, row-captured
+//!   produces a variant type only where the value is consumed — captured, row-captured
 //!   by a quantifier, or standing as a definition body's root. Anywhere else
-//!   the labels are inert: the alternation degrades to a plain union (branch
+//!   the labels are inert: the alternation degrades to an unlabeled alternation (alternative
 //!   captures bubble as optional fields) and a warning points at the dead
 //!   labels.
 
@@ -80,7 +80,7 @@ pub struct InferVisitor<'a, 'd> {
 
 /// Whether a quantifier sits under a capture. A captured quantifier owns its
 /// repeats (row semantics for `*`/`+`, optionality for `?`) and consumes an
-/// enum inner; a bare one is structural and produces nothing. A suppressed one
+/// variant-type inner; a bare one is structural and produces nothing. A suppressed one
 /// (under `@_`) consumes like a captured one — labels stay meaningful, no
 /// degradation warning — but every value is discarded, so neither
 /// dimensionality demand applies. In a quantifier-rooted definition body
@@ -243,11 +243,11 @@ fn suggested_builtin_capture_type(name: &str) -> Option<&'static str> {
     }
 }
 
-/// A variant's payload comes from the branch body's bubbling captures. A body
+/// A case's payload comes from the alternative body's bubbling captures. A body
 /// producing an unconsumed value (a bare reference) is suppressed like
-/// anywhere else — the variant carries the tag alone. `[Fn: (FnDef)]` tags
-/// which branch matched; `[Fn: (FnDef) @fn]` also carries the data.
-fn variant_payload_type(flow: &PatternFlow) -> TypeId {
+/// anywhere else — the case carries the tag alone. `[Fn: (FnDef)]` tags
+/// which alternative matched; `[Fn: (FnDef) @fn]` also carries the data.
+fn case_payload_type(flow: &PatternFlow) -> TypeId {
     match flow {
         PatternFlow::Void | PatternFlow::Value(_) => TYPE_VOID,
         PatternFlow::Fields(t) => *t,
@@ -283,7 +283,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     /// Infer a pattern standing in a consuming position: a capture's inner, or
     /// a definition body's root. The only difference from [`infer_pattern`] is
-    /// that a labeled alternation here produces its enum instead of degrading;
+    /// that a labeled alternation here produces its variant type instead of degrading;
     /// the consumption threads through field constraints (`f: [...] @x`), which
     /// are navigation, not structure.
     pub fn infer_pattern_consumed(&mut self, pattern: &Located<Pattern>) -> PatternShape {
@@ -324,7 +324,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         if let Some(type_id) = info.flow.type_id()
             && matches!(
                 self.ctx.type_ctx.in_progress().type_shape(type_id),
-                Some(TypeShape::Struct(_) | TypeShape::Enum(_))
+                Some(TypeShape::Struct(_) | TypeShape::Variant(_))
             )
         {
             let span = Span::new(self.source, pattern.node().text_range());
@@ -508,7 +508,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         &mut self,
         alternation: &Located<AlternationPattern>,
     ) -> PatternShape {
-        let mut variants: BTreeMap<Symbol, TypeId> = BTreeMap::new();
+        let mut cases: BTreeMap<Symbol, TypeId> = BTreeMap::new();
         let mut combined_arity = Arity::One;
 
         for alternative in alternation.node().alternatives() {
@@ -517,10 +517,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 .expect("labeled alternative must have a label");
             let label_sym = self.ctx.interner.intern(label.text());
 
-            // A BTreeMap would silently collapse duplicate labels, leaving the enum
-            // with fewer variants than the emitter expects. Reject them instead.
-            if variants.contains_key(&label_sym) {
-                self.report_duplicate_enum_label(label.text_range(), label.text());
+            // A BTreeMap would silently collapse duplicate labels, leaving the variant type
+            // with fewer cases than the emitter expects. Reject them instead.
+            if cases.contains_key(&label_sym) {
+                self.report_duplicate_case_label(label.text_range(), label.text());
                 if let Some(body_info) = self.infer_alternative_body(alternation, &alternative) {
                     combined_arity = combined_arity.combine(body_info.arity);
                 }
@@ -528,17 +528,17 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
 
             let Some(body_info) = self.infer_alternative_body(alternation, &alternative) else {
-                // Empty variant -> Void (no payload)
-                variants.insert(label_sym, TYPE_VOID);
+                // Tag-only case -> Void (no payload).
+                cases.insert(label_sym, TYPE_VOID);
                 continue;
             };
 
             combined_arity = combined_arity.combine(body_info.arity);
-            variants.insert(label_sym, variant_payload_type(&body_info.flow));
+            cases.insert(label_sym, case_payload_type(&body_info.flow));
         }
 
-        let enum_type = self.ctx.type_ctx.intern_type(TypeShape::Enum(variants));
-        PatternShape::new(combined_arity, PatternFlow::Value(enum_type))
+        let variant_type = self.ctx.type_ctx.intern_type(TypeShape::Variant(cases));
+        PatternShape::new(combined_arity, PatternFlow::Value(variant_type))
     }
 
     /// An alternation whose labels nothing consumes: warn, then infer it as the
@@ -575,12 +575,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             };
             let label_sym = self.ctx.interner.intern(label.text());
             if seen.insert(label_sym, ()).is_some() {
-                self.report_duplicate_enum_label(label.text_range(), label.text());
+                self.report_duplicate_case_label(label.text_range(), label.text());
             }
         }
     }
 
-    fn report_duplicate_enum_label(&mut self, range: TextRange, label: &str) {
+    fn report_duplicate_case_label(&mut self, range: TextRange, label: &str) {
         self.report(DiagnosticKind::DuplicateAlternationLabel, range)
             .detail(label)
             .emit();
@@ -786,7 +786,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         range: TextRange,
     ) -> TypeId {
         match self.ctx.type_ctx.in_progress().type_shape(type_id).cloned() {
-            Some(TypeShape::Struct(_) | TypeShape::Enum(_)) => {
+            Some(TypeShape::Struct(_) | TypeShape::Variant(_)) => {
                 self.ctx
                     .type_ctx
                     .record_custom_capture_type(CustomCaptureTypeOccurrence {
@@ -1180,7 +1180,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// be a type that needs no fresh name: a matched node (void inner) or
     /// another definition's output (a reference). Anonymous element shapes — a
     /// row of captures, a labeled alternation — have no name source (names
-    /// come only from defs, captures, custom capture types, and variant tags) and are
+    /// come only from defs, captures, custom capture types, and case tags) and are
     /// rejected with a hint to split the element into its own definition. The
     /// plausible element type is still returned so downstream inference isn't
     /// poisoned by void.
@@ -1251,7 +1251,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 intern_array(self.ctx.type_ctx, struct_type)
             }
             // Captured (row) repeats collect elements: matched nodes, pending
-            // values (enum/ref results), or row structs.
+            // values (variant/reference results), or row structs.
             (QuantifiedContext::Captured, PatternFlow::Void) => {
                 intern_array(self.ctx.type_ctx, TYPE_NODE)
             }
@@ -1335,8 +1335,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 }
 
 /// Whether the position consumes a pending value. In a consumed position a
-/// labeled alternation produces its enum; anywhere else it degrades to a plain
-/// union. Threads through field constraints (`f: pattern`), which are
+/// labeled alternation produces its variant type; anywhere else its labels are inert.
+/// Threads through field constraints (`f: pattern`), which are
 /// navigation, not structure.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Consumption {
@@ -1345,7 +1345,7 @@ enum Consumption {
 }
 
 /// A definition body's root is a consuming position for a labeled alternation
-/// (`Expr = [Lit: … Neg: …]` produces the enum), reached through any field
+/// (`Expr = [Lit: … Neg: …]` produces the variant type), reached through any field
 /// wrappers. Everything else — a bare reference in particular — is suppressed
 /// at the root like anywhere else.
 fn consumable_labeled_alternation_root(pattern: &Pattern) -> bool {
@@ -1359,7 +1359,7 @@ fn consumable_labeled_alternation_root(pattern: &Pattern) -> bool {
 }
 
 /// A definition body's root consumes a pending value: a labeled alternation
-/// produces its enum, a quantifier collects into the definition's output
+/// produces its variant type, a quantifier collects into the definition's output
 /// (array for `*`/`+`, optional for `?`). Reached through field wrappers.
 ///
 /// Shared with lowering, which keys its pending-value emission on the same

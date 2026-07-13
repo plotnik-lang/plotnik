@@ -70,7 +70,7 @@ pub struct TypeAnalysis {
     /// Every named type, assigned by the naming pass: definition results carry
     /// their definition's name, nested composites carry path-derived names
     /// (`FooItems`), and custom `:: TypeName` capture types override. Complete: every
-    /// struct/enum reachable from a definition output outside an enum-variant
+    /// struct/variant type reachable from a definition output outside a case
     /// payload position has exactly one name. `BTreeMap` for deterministic
     /// emission order.
     type_names: BTreeMap<TypeId, Symbol>,
@@ -107,7 +107,7 @@ impl TypeAnalysis {
         }
     }
 
-    /// Whether a type is a meaningful structured output (enum/struct, or an
+    /// Whether a type is a meaningful structured output (variant/struct, or a
     /// array/optional thereof). Plain `Node` is not — it is the matched node,
     /// captured directly.
     ///
@@ -118,7 +118,7 @@ impl TypeAnalysis {
     /// lowering reads always resolves.
     pub fn is_structured_output(&self, type_id: TypeId) -> bool {
         match self.type_shape(type_id) {
-            Some(TypeShape::Enum(_) | TypeShape::Struct(_)) => true,
+            Some(TypeShape::Variant(_) | TypeShape::Struct(_)) => true,
             Some(TypeShape::Ref(def_id)) => self
                 .def_output(*def_id)
                 .is_none_or(|t| self.is_structured_output(t)),
@@ -314,13 +314,13 @@ pub struct TypeAnalysisBuilder {
     pub(super) analysis: TypeAnalysis,
 
     /// Reverse index for `intern_type` deduplication of leaf and wrapper shapes.
-    /// Structs and enums are deliberately NOT deduplicated: they are nominal —
+    /// Structs and variant types are deliberately NOT deduplicated: they are nominal —
     /// two definitions with identical capture profiles are two distinct types,
     /// each carrying its own name. Scratch: the frozen result looks types up by
     /// `TypeId`, never by shape.
     intern_index: HashMap<TypeShape, TypeId>,
 
-    /// Creation site of every fresh struct/enum, for naming-pass diagnostics.
+    /// Creation site of every fresh struct/variant type, for naming-pass diagnostics.
     /// Scratch: only the naming pass consults it.
     type_provenance: HashMap<TypeId, Span>,
 
@@ -427,10 +427,10 @@ impl TypeAnalysisBuilder {
     }
 
     /// Intern a type shape. Leaf and wrapper shapes deduplicate structurally;
-    /// structs and enums always mint a fresh id (they are nominal — see the
+    /// structs and variant types always mint a fresh id (they are nominal — see the
     /// `intern_index` field docs).
     pub fn intern_type(&mut self, shape: TypeShape) -> TypeId {
-        if matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)) {
+        if matches!(shape, TypeShape::Struct(_) | TypeShape::Variant(_)) {
             let id = TypeId(self.analysis.types.len() as u32);
             self.analysis.types.push(shape);
             return id;
@@ -458,7 +458,7 @@ impl TypeAnalysisBuilder {
         self.intern_type(TypeShape::Custom(name))
     }
 
-    /// Record where a fresh struct/enum came from, for naming-pass diagnostics.
+    /// Record where a fresh struct/variant type came from, for naming-pass diagnostics.
     pub fn record_type_provenance(&mut self, type_id: TypeId, span: Span) {
         self.type_provenance.entry(type_id).or_insert(span);
     }
@@ -585,7 +585,7 @@ impl TypeAnalysisBuilder {
 
     /// Deep structural equality over the in-progress type registry.
     ///
-    /// Structs and enums mint a fresh id per occurrence (nominal typing), so
+    /// Structs and variant types mint a fresh id per occurrence (nominal typing), so
     /// two structurally identical composites can carry different ids; interned
     /// shapes (Node, Custom, Ref, and wrappers over shared ids) compare by id.
     /// `Ref` cuts recursion, so the walk terminates on recursive types.
@@ -609,7 +609,7 @@ impl TypeAnalysisBuilder {
                             && self.types_structurally_equal(ia.type_id, ib.type_id)
                     })
             }
-            (TypeShape::Enum(va), TypeShape::Enum(vb)) => {
+            (TypeShape::Variant(va), TypeShape::Variant(vb)) => {
                 va.len() == vb.len()
                     && va.iter().zip(vb.iter()).all(|((ka, pa), (kb, pb))| {
                         ka == kb && self.types_structurally_equal(*pa, *pb)

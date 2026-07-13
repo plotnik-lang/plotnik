@@ -71,7 +71,7 @@ S6 "Q"
 
 [type_defs]
 T0 = <Void>
-T1 = Enum    M0:2  ; Rec | Base
+T1 = Variant M0:2  ; Rec | Base
 
 [type_members]
 M0: S1 → T0  ; Rec: <Void>

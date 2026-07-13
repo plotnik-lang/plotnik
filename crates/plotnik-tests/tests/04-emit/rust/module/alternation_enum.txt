@@ -92,11 +92,11 @@ fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'t> {
 
 /// Replay one committed `QExpr` value.
 fn read_q_expr<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> QExpr<'t> {
-    match t.expect_enum_open() {
+    match t.expect_variant_open() {
         // Id
         2 => {
             let mut v0 = None; // id
-            while !t.at_enum_close() {
+            while !t.at_variant_close() {
                 match t.peek_set() {
                     // id
                     0 => v0 = Some(t.expect_node()),
@@ -104,7 +104,7 @@ fn read_q_expr<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> QExpr<'t> {
                 }
                 t.expect_set();
             }
-            t.expect_enum_close();
+            t.expect_variant_close();
             QExpr::Id {
                 id: v0.expect("field-stability: every accepting path sets `id`"),
             }
@@ -112,7 +112,7 @@ fn read_q_expr<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> QExpr<'t> {
         // Num
         3 => {
             let mut v0 = None; // num
-            while !t.at_enum_close() {
+            while !t.at_variant_close() {
                 match t.peek_set() {
                     // num
                     1 => v0 = Some(t.expect_node()),
@@ -120,7 +120,7 @@ fn read_q_expr<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> QExpr<'t> {
                 }
                 t.expect_set();
             }
-            t.expect_enum_close();
+            t.expect_variant_close();
             QExpr::Num {
                 num: v0.expect("field-stability: every accepting path sets `num`"),
             }
@@ -372,26 +372,26 @@ mod matcher {
                 eng.emit_data(|_| rt::RuntimeEffect::Set(4)); // Set(expr)
                 Flow::Jump(S01_Q)
             }
-            //   07   !   (identifier) [EnumOpen(Id) Node Set(id) EnumClose]  05
+            //   07   !   (identifier) [VariantOpen(Id) Node Set(id) VariantClose]  05
             S07_Q => 'state: {
                 if !cand_s07_q(eng) {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::RuntimeEffect::EnumOpen(2)); // EnumOpen(Id)
+                eng.emit_data(|_| rt::RuntimeEffect::VariantOpen(2)); // VariantOpen(Id)
                 eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
                 eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(id)
-                eng.emit_data(|_| rt::RuntimeEffect::EnumClose);
+                eng.emit_data(|_| rt::RuntimeEffect::VariantClose);
                 Flow::Jump(S05_Q)
             }
-            //   08   !   (number) [EnumOpen(Num) Node Set(num) EnumClose]  05
+            //   08   !   (number) [VariantOpen(Num) Node Set(num) VariantClose]  05
             S08_Q => 'state: {
                 if !cand_s08_q(eng) {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::RuntimeEffect::EnumOpen(3)); // EnumOpen(Num)
+                eng.emit_data(|_| rt::RuntimeEffect::VariantOpen(3)); // VariantOpen(Num)
                 eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
                 eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(num)
-                eng.emit_data(|_| rt::RuntimeEffect::EnumClose);
+                eng.emit_data(|_| rt::RuntimeEffect::VariantClose);
                 Flow::Jump(S05_Q)
             }
             //   11  ──!  _                                07, 08, 11

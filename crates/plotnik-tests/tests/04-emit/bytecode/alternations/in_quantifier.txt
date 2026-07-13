@@ -17,8 +17,8 @@ Q:
   03  ─‣┘  _ [ArrayClose Set(items)]        01
   05  -ε-  [ArrayClose Set(items)]          01
   07  -ε-  [StructClose Push]               14, 03
-  09   !   (pair) [EnumOpen(A) Node Set(a) EnumClose Set(item)]  07
-  10   !   (shorthand_property_identifier) [EnumOpen(B) Node Set(b) EnumClose Set(item)]  07
+  09   !   (pair) [VariantOpen(A) Node Set(a) VariantClose Set(item)]  07
+  10   !   (shorthand_property_identifier) [VariantOpen(B) Node Set(b) VariantClose Set(item)]  07
   12  -ε-  [StructOpen]                     09, 10
   14  ──!  _                                12, 14
   15  └─!  _                                12, 14
@@ -49,7 +49,7 @@ S12 "shorthand_property_identifier"
 T0 = <Node>
 T1 = Struct  M0:1  ; { a }
 T2 = Struct  M1:1  ; { b }
-T3 = Enum    M2:2  ; A | B
+T3 = Variant M2:2  ; A | B
 T4 = Struct  M4:1  ; { item }
 T5 = ArrayStar(T4)  ; QItems*
 T6 = Struct  M5:1  ; { items }
@@ -80,9 +80,9 @@ Q:
   07  ...
   08  -ε-  [ArrayClose Set(M5)]             06
   10  -ε-  [StructClose Push]               21, 28
-  12   !   (pair) [EnumOpen(M2) Node Set(M0) EnumClose Set(M4)]  10
+  12   !   (pair) [VariantOpen(M2) Node Set(M0) VariantClose Set(M4)]  10
   15  ...
-  16   !   (shorthand_property_identifier) [EnumOpen(M3) Node Set(M1) EnumClose Set(M4)]  10
+  16   !   (shorthand_property_identifier) [VariantOpen(M3) Node Set(M1) VariantClose Set(M4)]  10
   19  -ε-  [StructOpen]                     12, 16
   21  ──!  _                                19, 21
   23  ...

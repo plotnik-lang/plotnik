@@ -14,7 +14,7 @@
 //!   between instances of the same type. Struct scopes therefore peek ahead
 //!   to the balancing `Set` (`TraceReader::peek_set`) to pick the field's
 //!   typed reader, then consume linearly.
-//! - **`Set`/`EnumOpen` payloads are absolute member-table indices**, baked
+//! - **`Set`/`VariantOpen` payloads are absolute member-table indices**, baked
 //!   from the same emit tables the matcher folded into its states. Nominal
 //!   twins (one name, several structurally-identical analysis types) own
 //!   distinct member runs, so an arm matches the union of its twins' indices.
@@ -30,7 +30,7 @@ use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::type_shape::TypeId;
 use crate::compiler::emit::plan::{
-    ReplayItem, ReplayItemKind, ReplayPlan, ReplayScopePlan, ReplayValuePlan, ReplayVariantPlan,
+    ReplayCasePlan, ReplayItem, ReplayItemKind, ReplayPlan, ReplayScopePlan, ReplayValuePlan,
 };
 use crate::compiler::emit::sink::indentation;
 use crate::compiler::emit::targets::rust::ident::{rust_scope_idents, snake_ident};
@@ -158,7 +158,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
             out.push('\n');
             let item = self.replay.item(name);
             match item.kind {
-                ReplayItemKind::Struct(_) | ReplayItemKind::Enum(_) => {
+                ReplayItemKind::Struct(_) | ReplayItemKind::Variant(_) => {
                     self.parse_impl(&mut out, &def, item);
                 }
                 ReplayItemKind::Alias(_) => {
@@ -308,7 +308,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         for item in self.replay.items() {
             match &item.kind {
                 ReplayItemKind::Struct(scope) => self.struct_reader(&mut out, item, scope),
-                ReplayItemKind::Enum(variants) => self.enum_reader(&mut out, item, variants),
+                ReplayItemKind::Variant(cases) => self.enum_reader(&mut out, item, cases),
                 ReplayItemKind::Alias(value) => self.alias_reader(&mut out, item, value),
                 ReplayItemKind::VoidDefinition => {}
             }
@@ -355,23 +355,23 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         out.push_str("}\n");
     }
 
-    fn enum_reader(&self, out: &mut String, item: &ReplayItem, variants: &[ReplayVariantPlan]) {
+    fn enum_reader(&self, out: &mut String, item: &ReplayItem, cases: &[ReplayCasePlan]) {
         let ident = self.model.item_ident(item.name).to_string();
         let variant_idents = rust_scope_idents(
-            variants
+            cases
                 .iter()
                 .map(|variant| self.interner.resolve(variant.name)),
         );
         out.push('\n');
         self.reader_open(out, item);
-        out.push_str("    match t.expect_enum_open() {\n");
-        for (variant, variant_ident) in variants.iter().zip(&variant_idents) {
-            let indices = arm_pattern(&variant.indices);
-            let label = self.interner.resolve(variant.name);
+        out.push_str("    match t.expect_variant_open() {\n");
+        for (case, variant_ident) in cases.iter().zip(&variant_idents) {
+            let indices = arm_pattern(&case.indices);
+            let label = self.interner.resolve(case.name);
             let _ = writeln!(out, "        // {label}");
             let _ = writeln!(out, "        {indices} => {{");
-            let Some(payload) = &variant.payload else {
-                let _ = writeln!(out, "            t.expect_enum_close();");
+            let Some(payload) = &case.payload else {
+                let _ = writeln!(out, "            t.expect_variant_close();");
                 if item.fallible {
                     let _ = writeln!(out, "            Ok({ident}::{variant_ident})");
                 } else {
@@ -381,9 +381,9 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
                 continue;
             };
 
-            let scope = Scope::enum_payload(item.ty, &ident, variant_ident);
+            let scope = Scope::variant_payload(item.ty, &ident, variant_ident);
             self.field_scope(out, &scope, payload);
-            out.push_str("            t.expect_enum_close();\n");
+            out.push_str("            t.expect_variant_close();\n");
             self.construct(out, &scope, payload, item.fallible);
             out.push_str("        }\n");
         }
@@ -409,8 +409,8 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
 
     /// The field-collection loop of one struct-like scope: positional locals,
     /// the peek-dispatch loop over member indices, one `Set` consumed per
-    /// field value. Enum payloads reuse it with `EnumClose` as the terminator
-    /// (payload `Set`s attach directly to the enum frame — the materializer's
+    /// field value. Variant payloads reuse it with `VariantClose` as the terminator
+    /// (payload `Set`s attach directly to the variant frame — the materializer's
     /// contract).
     fn field_scope(&self, out: &mut String, scope: &Scope<'_>, plan: &ReplayScopePlan) {
         let p = indentation(scope.level());
@@ -586,14 +586,14 @@ struct Scope<'a> {
 #[derive(Clone, Copy)]
 enum ScopeKind<'a> {
     Struct,
-    EnumPayload { variant_ident: &'a str },
+    VariantPayload { variant_ident: &'a str },
 }
 
 impl ScopeKind<'_> {
     fn probe(self) -> &'static str {
         match self {
             ScopeKind::Struct => "at_struct_close",
-            ScopeKind::EnumPayload { .. } => "at_enum_close",
+            ScopeKind::VariantPayload { .. } => "at_variant_close",
         }
     }
 }
@@ -607,10 +607,10 @@ impl<'a> Scope<'a> {
         }
     }
 
-    fn enum_payload(owner: TypeId, name: &'a str, variant_ident: &'a str) -> Self {
+    fn variant_payload(owner: TypeId, name: &'a str, variant_ident: &'a str) -> Self {
         Self {
             context: ReadContext::item(owner, 3),
-            kind: ScopeKind::EnumPayload { variant_ident },
+            kind: ScopeKind::VariantPayload { variant_ident },
             name,
         }
     }
@@ -626,7 +626,7 @@ impl<'a> Scope<'a> {
     fn construction_head(&self) -> String {
         match self.kind {
             ScopeKind::Struct => self.name.to_string(),
-            ScopeKind::EnumPayload { variant_ident } => {
+            ScopeKind::VariantPayload { variant_ident } => {
                 format!("{}::{variant_ident}", self.name)
             }
         }

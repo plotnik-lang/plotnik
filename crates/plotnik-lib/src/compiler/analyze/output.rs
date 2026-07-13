@@ -2,7 +2,7 @@
 //!
 //! Analysis assigns types and names; this view turns them into the one ordered
 //! output model every downstream consumer shares. In particular, absolute
-//! `Set`/`EnumOpen` member slots are assigned here, before bytecode or any
+//! composite member slots are assigned here, before bytecode or any
 //! source backend chooses a representation.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -30,7 +30,7 @@ pub(crate) enum OutputSchemaError {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum OutputItemKind {
     Struct,
-    Enum,
+    Variant,
     Alias,
     /// A callable void definition has a nominal marker and a `matches` API,
     /// but no replay value.
@@ -48,7 +48,7 @@ impl OutputItem {
     fn for_output(name: Symbol, ty: TypeId, shape: &TypeShape) -> Self {
         let kind = match shape {
             TypeShape::Struct(_) => OutputItemKind::Struct,
-            TypeShape::Enum(_) => OutputItemKind::Enum,
+            TypeShape::Variant(_) => OutputItemKind::Variant,
             _ => OutputItemKind::Alias,
         };
         Self { name, ty, kind }
@@ -63,7 +63,7 @@ impl OutputItem {
     }
 
     pub(crate) fn is_composite(self) -> bool {
-        matches!(self.kind, OutputItemKind::Struct | OutputItemKind::Enum)
+        matches!(self.kind, OutputItemKind::Struct | OutputItemKind::Variant)
     }
 
     pub(crate) fn is_struct(self) -> bool {
@@ -74,13 +74,13 @@ impl OutputItem {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CaptureScopeKind {
     Struct,
-    Enum,
+    Variant,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CaptureMemberKind {
     Field(FieldInfo),
-    Variant(TypeId),
+    Case(TypeId),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -201,13 +201,13 @@ impl CaptureLayout {
                             })
                             .collect(),
                     ),
-                    TypeShape::Enum(variants) => (
-                        CaptureScopeKind::Enum,
-                        variants
+                    TypeShape::Variant(cases) => (
+                        CaptureScopeKind::Variant,
+                        cases
                             .iter()
                             .map(|(&name, &payload)| CaptureMember {
                                 name,
-                                kind: CaptureMemberKind::Variant(payload),
+                                kind: CaptureMemberKind::Case(payload),
                             })
                             .collect(),
                     ),
@@ -409,13 +409,13 @@ impl<'a> ItemCollector<'a> {
                     self.collect_position(info.type_id);
                 }
             }
-            TypeShape::Enum(variants) => {
-                for &payload in variants.values() {
+            TypeShape::Variant(cases) => {
+                for &payload in cases.values() {
                     if payload == TYPE_VOID {
                         continue;
                     }
                     let TypeShape::Struct(fields) = self.types.expect_type_shape(payload) else {
-                        unreachable!("enum variant payload is void or an anonymous struct");
+                        unreachable!("variant case payload is void or an anonymous struct");
                     };
                     for info in fields.values() {
                         self.collect_position(info.type_id);
@@ -436,7 +436,7 @@ impl<'a> ItemCollector<'a> {
 
     fn collect_position(&mut self, ty: TypeId) {
         match self.types.expect_type_shape(ty) {
-            TypeShape::Struct(_) | TypeShape::Enum(_) => {
+            TypeShape::Struct(_) | TypeShape::Variant(_) => {
                 let name = *self
                     .type_names
                     .get(&ty)
@@ -542,7 +542,7 @@ impl TypeCollector {
         if matches!(
             shape,
             TypeShape::Struct(_)
-                | TypeShape::Enum(_)
+                | TypeShape::Variant(_)
                 | TypeShape::Array { .. }
                 | TypeShape::Optional(_)
                 | TypeShape::Custom(_)

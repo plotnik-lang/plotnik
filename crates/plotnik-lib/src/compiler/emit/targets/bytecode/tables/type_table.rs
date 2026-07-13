@@ -58,7 +58,7 @@ impl TypeTableBuilder {
         self.type_defs[slot_index] = def;
     }
 
-    /// Member-table length, i.e. the base index for the next struct/enum's members.
+    /// Member-table length: the base index for the next struct or variant type's members.
     pub fn members_len(&self) -> u16 {
         u16::try_from(self.type_members.len())
             .expect("capture layout validates the type-member index space")

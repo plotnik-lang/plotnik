@@ -12,9 +12,9 @@ Expr = 7
 Expr:
   0  -ε-                                    2, 3, 4
   1                                         ▶
-  2   !   (identifier) [EnumOpen(Id) Node Set(id) EnumClose]  1
-  3   !   (number) [EnumOpen(Num) Node Set(num) EnumClose]  1
-  4   !   (string) [EnumOpen(Str) EnumClose]  1
+  2   !   (identifier) [VariantOpen(Id) Node Set(id) VariantClose]  1
+  3   !   (number) [VariantOpen(Num) Node Set(num) VariantClose]  1
+  4   !   (string) [VariantOpen(Str) VariantClose]  1
 
 Expr (entrypoint):
   6                                         ▶
@@ -37,7 +37,7 @@ T0 = <Void>
 T1 = <Node>
 T2 = Struct  M0:1  ; { id }
 T3 = Struct  M1:1  ; { num }
-T4 = Enum    M2:3  ; Id | Num | Str
+T4 = Variant M2:3  ; Id | Num | Str
 
 [type_members]
 M0: S1 → T1  ; id: <Node>
@@ -74,11 +74,11 @@ Expr:
   05  ...
   06  ...
   07  ...
-  08   !   (identifier) [SpanStart#1 SpanStart#2 EnumOpen(M2) SpanStartAt#4 SpanStart#3 Node Set(M0) SpanEnd#3 SpanEnd#4 EnumClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  02
+  08   !   (identifier) [SpanStart#1 SpanStart#2 VariantOpen(M2) SpanStartAt#4 SpanStart#3 Node Set(M0) SpanEnd#3 SpanEnd#4 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0]  02
   14  ...
   15  ...
-  16   !   (number) [SpanStart#1 SpanStart#5 EnumOpen(M3) SpanStartAt#7 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#7 EnumClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  02
+  16   !   (number) [SpanStart#1 SpanStart#5 VariantOpen(M3) SpanStartAt#7 SpanStart#6 Node Set(M1) SpanEnd#6 SpanEnd#7 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  02
   22  ...
   23  ...
-  24   !   (string) [SpanStart#1 SpanStart#8 EnumOpen(M4) SpanStartAt#9 SpanEnd#9 EnumClose SpanEnd#8 SpanEnd#1 SpanEnd#0]  02
+  24   !   (string) [SpanStart#1 SpanStart#8 VariantOpen(M4) SpanStartAt#9 SpanEnd#9 VariantClose SpanEnd#8 SpanEnd#1 SpanEnd#0]  02
   28  -ε-  [SpanStart#0]                    08, 16, 24

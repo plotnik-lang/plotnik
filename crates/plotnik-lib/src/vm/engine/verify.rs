@@ -213,14 +213,14 @@ impl<'a> TypeVerifier<'a> {
                     ));
                 }
             },
-            TypeDefKind::Enum { .. } => match value {
-                Value::Enum { tag, data } => {
-                    let variant = self
+            TypeDefKind::Variant { .. } => match value {
+                Value::Variant { tag, data } => {
+                    let case = self
                         .types
                         .members_of(&type_def)
                         .find(|m| self.strings.get(m.name_id) == *tag);
 
-                    match variant {
+                    match case {
                         Some(member) => {
                             let is_void = self.types.get(member.type_id).is_some_and(|d| {
                                 matches!(d.decode(), TypeDefKind::Primitive(TypeKind::Void))
@@ -229,7 +229,7 @@ impl<'a> TypeVerifier<'a> {
                             if is_void {
                                 if data.is_some() {
                                     self.errors.push(format!(
-                                        "{}: void variant '{}' should have no $data",
+                                        "{}: void case '{}' should have no $data",
                                         append_path(&self.path, "$data"),
                                         tag
                                     ));
@@ -244,7 +244,7 @@ impl<'a> TypeVerifier<'a> {
                                     }
                                     None => {
                                         self.errors.push(format!(
-                                            "{}: non-void variant '{}' should have $data",
+                                            "{}: non-void case '{}' should have $data",
                                             append_path(&self.path, "$data"),
                                             tag
                                         ));
@@ -254,7 +254,7 @@ impl<'a> TypeVerifier<'a> {
                         }
                         None => {
                             self.errors.push(format!(
-                                "{}: unknown variant '{}'",
+                                "{}: unknown case '{}'",
                                 append_path(&self.path, "$tag"),
                                 tag
                             ));
@@ -264,7 +264,7 @@ impl<'a> TypeVerifier<'a> {
                 _ => {
                     self.errors.push(format_error(
                         &self.path,
-                        &format!("type: enum, value: {}", value_kind_name(value)),
+                        &format!("type: variant, value: {}", value_kind_name(value)),
                     ));
                 }
             },
@@ -281,7 +281,7 @@ fn value_kind_name(value: &Value) -> &'static str {
         Value::Bool(_) => "Bool",
         Value::Array(_) => "array",
         Value::Struct(_) => "struct",
-        Value::Enum { .. } => "enum",
+        Value::Variant { .. } => "variant",
     }
 }
 

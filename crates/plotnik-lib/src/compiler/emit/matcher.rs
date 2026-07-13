@@ -166,7 +166,7 @@ pub(crate) enum FlowPlan {
 #[derive(Clone, Debug)]
 pub(crate) struct EffectPlan {
     pub(crate) kind: EffectKind,
-    /// Absolute capture-member slot for `Set`/`EnumOpen`; literal payload for
+    /// Absolute capture-member slot for `Set`/`VariantOpen`; literal payload for
     /// the other effect kinds.
     pub(crate) payload: u16,
     pub(crate) display: String,

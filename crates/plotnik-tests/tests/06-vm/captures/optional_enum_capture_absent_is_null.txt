@@ -30,7 +30,7 @@ S7 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:1  ; { a }
-T2 = Enum    M1:1  ; A
+T2 = Variant M1:1  ; A
 T3 = Struct  M2:1  ; { e }
 T4 = Optional(T2)  ; QE?
 
@@ -54,7 +54,7 @@ Q:
   05                                        ▶
   06  ...
   07  ...
-  08   !   (identifier) [EnumOpen(M1) Node Set(M0) EnumClose]  11
+  08   !   (identifier) [VariantOpen(M1) Node Set(M0) VariantClose]  11
   11  ─‣┘  _ [Set(M2)]                      13
   13                                        ▶
   14  -ε-  [Null Set(M2)]                   13
@@ -72,7 +72,7 @@ Q:
        ●   program
   18       _                                08, 16
        ●   lexical_declaration
-  08       (identifier) [EnumOpen(M1) Node Set(M0) EnumClose]  11
+  08       (identifier) [VariantOpen(M1) Node Set(M0) VariantClose]  11
        ○   lexical_declaration
   18  ❮❮❮ 
   16       _                                08, 16

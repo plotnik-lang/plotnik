@@ -14,8 +14,8 @@ Q:
   02   !   (program)                        11, 04
   03  ─‣┘  _ [Set(statement)]               01
   04  -ε-  [Null Set(statement)]            01
-  06   !   (expression_statement) [EnumOpen(Expression) Node Set(expression) EnumClose]  03
-  07   !   (debugger_statement) [EnumOpen(Debugger) Node Set(debugger) EnumClose]  03
+  06   !   (expression_statement) [VariantOpen(Expression) Node Set(expression) VariantClose]  03
+  07   !   (debugger_statement) [VariantOpen(Debugger) Node Set(debugger) VariantClose]  03
   10  ──!  _                                06, 07, 10
   11  └─!  _                                06, 07, 10
 
@@ -42,7 +42,7 @@ S10 "debugger_statement"
 T0 = <Node>
 T1 = Struct  M0:1  ; { expression }
 T2 = Struct  M1:1  ; { debugger }
-T3 = Enum    M2:2  ; Expression | Debugger
+T3 = Variant M2:2  ; Expression | Debugger
 T4 = Struct  M4:1  ; { statement }
 T5 = Optional(T3)  ; QStatement?
 
@@ -69,8 +69,8 @@ Q:
   06                                        ▶
   07  ...
   08  -ε-  [Null Set(M4)]                   06
-  10   !   (expression_statement) [EnumOpen(M2) Node Set(M0) EnumClose]  20
-  13   !   (debugger_statement) [EnumOpen(M3) Node Set(M1) EnumClose]  20
+  10   !   (expression_statement) [VariantOpen(M2) Node Set(M0) VariantClose]  20
+  13   !   (debugger_statement) [VariantOpen(M3) Node Set(M1) VariantClose]  20
   16  ──!  _                                10, 13, 16
   18  └─!  _                                10, 13, 16
   20  ─‣┘  _ [Set(M4)]                      06

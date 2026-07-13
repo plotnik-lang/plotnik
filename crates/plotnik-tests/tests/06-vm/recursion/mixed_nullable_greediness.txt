@@ -37,7 +37,7 @@ warning: capture type `str` replaces structured data with source text
 16 |     (B) @x :: str
    |            ^^^^^^
    |
-help: the replaced fields, variants, or scalar payload will not be returned
+help: the replaced fields, cases, or scalar payload will not be returned
 --------------------- OUTPUT ---------------------
 {
   "x": "//a\n//b",
@@ -66,7 +66,7 @@ T0 = <Node>
 T1 = <Str>
 T2 = Struct  M0:1  ; { c }
 T3 = Struct  M1:1  ; { c }
-T4 = Enum    M2:2  ; Rec | Base
+T4 = Variant M2:2  ; Rec | Base
 T5 = Struct  M4:2  ; { first, second }
 T6 = Optional(T1)  ; <Str>?
 T7 = Struct  M6:2  ; { x, rest }

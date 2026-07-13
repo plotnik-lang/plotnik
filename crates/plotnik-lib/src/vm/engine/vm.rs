@@ -807,8 +807,8 @@ impl<'t> VM<'t> {
                         StructOpen => RuntimeEffect::StructOpen,
                         StructClose => RuntimeEffect::StructClose,
                         Set => RuntimeEffect::Set(op.payload as u16),
-                        EnumOpen => RuntimeEffect::EnumOpen(op.payload as u16),
-                        EnumClose => RuntimeEffect::EnumClose,
+                        VariantOpen => RuntimeEffect::VariantOpen(op.payload as u16),
+                        VariantClose => RuntimeEffect::VariantClose,
                         Null => RuntimeEffect::Null,
                         SuppressBegin | SuppressEnd | SpanStartAt | SpanStart | SpanEnd
                         | ScalarOpen | ScalarMark | StrClose | BoolClose | NodeStr | NodeBool

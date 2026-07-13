@@ -16,13 +16,13 @@ impl TypeKind {
 ///
 /// Semantics of `payload` and `count` depend on `kind`:
 /// - Wrappers (Optional, ArrayStar, ArrayPlus): `payload` = inner TypeId, `count` = 0
-/// - Struct/Enum: `payload` = member index, `count` = member count
+/// - Struct/Variant: `payload` = member index, `count` = member count
 /// - Alias: `payload` = target TypeId, `count` = 0
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct TypeDef {
     /// For wrappers/alias: inner/target TypeId.
-    /// For Struct/Enum: index into TypeMembers section.
+    /// For Struct/Variant: index into TypeMembers section.
     payload: u16,
     /// Member count (0 for wrappers/alias, field/variant count for composites).
     count: u8,
@@ -41,8 +41,8 @@ pub enum TypeDefKind {
     Wrapper { kind: TypeKind, inner: TypeId },
     /// A fixed set of named fields.
     Struct { member_start: u16, member_count: u8 },
-    /// Discriminated union with named variants.
-    Enum { member_start: u16, member_count: u8 },
+    /// Variant type with named cases.
+    Variant { member_start: u16, member_count: u8 },
 }
 
 impl TypeDef {
@@ -76,9 +76,9 @@ impl TypeDef {
         }
     }
 
-    /// Shared byte-writer for the two member-run kinds (Struct, Enum). The
+    /// Shared byte-writer for the two member-run kinds (Struct, Variant). The
     /// `kind as u8` write here is the on-wire discriminant — `for_struct` and
-    /// `for_enum` are the only callers.
+    /// `for_variant` are the only callers.
     fn composite(kind: TypeKind, member_start: u16, member_count: u8) -> Self {
         Self {
             payload: member_start,
@@ -109,8 +109,8 @@ impl TypeDef {
         Self::composite(TypeKind::Struct, member_start, member_count)
     }
 
-    pub fn for_enum(member_start: u16, member_count: u8) -> Self {
-        Self::composite(TypeKind::Enum, member_start, member_count)
+    pub fn for_variant(member_start: u16, member_count: u8) -> Self {
+        Self::composite(TypeKind::Variant, member_start, member_count)
     }
 
     pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
@@ -131,7 +131,7 @@ impl TypeDef {
 
     /// Member range `(start, count)` as stored, regardless of kind.
     ///
-    /// Meaningful only for Struct/Enum, where `start` indexes TypeMembers and
+    /// Meaningful only for Struct/Variant, where `start` indexes TypeMembers and
     /// `count` is the field/variant count.
     pub fn member_range(&self) -> (u16, u8) {
         (self.payload, self.count)
@@ -166,7 +166,7 @@ impl TypeDef {
                 member_start: self.payload,
                 member_count: self.count,
             },
-            TypeKind::Enum => TypeDefKind::Enum {
+            TypeKind::Variant => TypeDefKind::Variant {
                 member_start: self.payload,
                 member_count: self.count,
             },
@@ -205,13 +205,13 @@ impl TypeNameEntry {
     }
 }
 
-/// Field or variant entry (4 bytes).
+/// Field or case entry (4 bytes).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct TypeMember {
-    /// Field/variant name.
+    /// Field/case name.
     pub name_id: StringId,
-    /// Type of this field/variant.
+    /// Type of this field/case.
     pub type_id: TypeId,
 }
 

@@ -34,7 +34,7 @@ S8 "expression_statement"
 
 [type_defs]
 T0 = <Void>
-T1 = Enum    M0:2  ; A | B
+T1 = Variant M0:2  ; A | B
 T2 = Struct  M2:1  ; { v }
 
 [type_members]
@@ -57,8 +57,8 @@ Q:
   05                                        ▶
   06                                        ▶
   07  ...
-  08   !   (debugger_statement) [EnumOpen(M0) EnumClose]  16
-  10   !   (expression_statement) [EnumOpen(M1) EnumClose]  16
+  08   !   (debugger_statement) [VariantOpen(M0) VariantClose]  16
+  10   !   (expression_statement) [VariantOpen(M1) VariantClose]  16
   12  ──!  _                                08, 10, 12
   14  └─!  _                                08, 10, 12
   16  ─‣┘  _ [Set(M2)]                      06
@@ -74,7 +74,7 @@ Q:
        ●   program
   14       _                                08, 10, 12
        ●   debugger_statement
-  08       (debugger_statement) [EnumOpen(M0) EnumClose]  16
+  08       (debugger_statement) [VariantOpen(M0) VariantClose]  16
        ●   debugger_statement
   16       _ [Set(M2)]                      06
        ●   program

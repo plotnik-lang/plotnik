@@ -40,7 +40,7 @@ S10 "debugger_statement"
 T0 = <Node>
 T1 = Struct  M0:1  ; { id }
 T2 = Struct  M1:1  ; { d }
-T3 = Enum    M2:2  ; A | B
+T3 = Variant M2:2  ; A | B
 T4 = Struct  M4:1  ; { x }
 T5 = Optional(T0)  ; <Node>?
 
@@ -66,12 +66,12 @@ Q:
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08   !   (identifier) [Node Set(M0) EnumClose Set(M4)]  07
+  08   !   (identifier) [Node Set(M0) VariantClose Set(M4)]  07
   11  ──!  _                                08, 11
-  13   !   _ [EnumOpen(M2)]                 08, 11
+  13   !   _ [VariantOpen(M2)]              08, 11
   15  ...
-  16  -ε-  [EnumOpen(M2) Null Set(M0) EnumClose Set(M4)]  06
-  19   !   (debugger_statement) [EnumOpen(M3) Node Set(M1) EnumClose Set(M4)]  07
+  16  -ε-  [VariantOpen(M2) Null Set(M0) VariantClose Set(M4)]  06
+  19   !   (debugger_statement) [VariantOpen(M3) Node Set(M1) VariantClose Set(M4)]  07
   22  ──!  _                                13, 19, 22
   24  └─!  _                                13, 19, 22
   26   !   (program)                        24, 16
@@ -86,7 +86,7 @@ Q:
        ●   program
   24       _                                13, 19, 22
   26  ❮❮❮ 
-  16  -ε-  [EnumOpen(M2) Null Set(M0) EnumClose Set(M4)]  06
+  16  -ε-  [VariantOpen(M2) Null Set(M0) VariantClose Set(M4)]  06
   06   ◀   (@26)                            
 
 Q:

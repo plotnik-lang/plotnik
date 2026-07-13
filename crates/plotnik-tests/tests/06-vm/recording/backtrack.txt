@@ -254,7 +254,7 @@ export type QExpr =
       "ip": 24,
       "event": {
         "kind": "effect",
-        "effect": "EnumOpen \"Bad\""
+        "effect": "VariantOpen \"Bad\""
       },
       "span": 4,
       "node": null,
@@ -378,7 +378,7 @@ export type QExpr =
       "ip": 27,
       "event": {
         "kind": "effect",
-        "effect": "EnumOpen \"Good\""
+        "effect": "VariantOpen \"Good\""
       },
       "span": 8,
       "node": null,
@@ -559,7 +559,7 @@ export type QExpr =
       "ip": 19,
       "event": {
         "kind": "effect",
-        "effect": "EnumClose"
+        "effect": "VariantClose"
       },
       "span": 8,
       "node": null,
@@ -747,7 +747,7 @@ S11 "identifier"
 T0 = <Node>
 T1 = Struct  M0:1  ; { bad }
 T2 = Struct  M1:1  ; { good }
-T3 = Enum    M2:2  ; Bad | Good
+T3 = Variant M2:2  ; Bad | Good
 T4 = Struct  M4:1  ; { expr }
 
 [type_members]
@@ -787,14 +787,14 @@ Q:
   06  ...
   07  ...
   08  └‣─  (identifier) [SpanStartAt#7 SpanStart#6 Node Set(M0) SpanEnd#6 SpanEnd#7] == "nope"  12
-  12  ─‣┘  _ [SpanEnd#5 EnumClose SpanEnd#4 SpanEnd#3]  34
+  12  ─‣┘  _ [SpanEnd#5 VariantClose SpanEnd#4 SpanEnd#3]  34
   15  ...
   16  └‣─  (identifier) [SpanStartAt#11 SpanStart#10 Node Set(M1) SpanEnd#10 SpanEnd#11]  19
-  19  ─‣┘  _ [SpanEnd#9 EnumClose SpanEnd#8 SpanEnd#3]  34
+  19  ─‣┘  _ [SpanEnd#9 VariantClose SpanEnd#8 SpanEnd#3]  34
   22                                        ▶
   23  ...
-  24   !   (expression_statement) [SpanStart#3 SpanStart#4 EnumOpen(M2) SpanStartAt#5]  08
-  27   !   (expression_statement) [SpanStart#3 SpanStart#8 EnumOpen(M3) SpanStartAt#9]  16
+  24   !   (expression_statement) [SpanStart#3 SpanStart#4 VariantOpen(M2) SpanStartAt#5]  08
+  27   !   (expression_statement) [SpanStart#3 SpanStart#8 VariantOpen(M3) SpanStartAt#9]  16
   30  ──!  _                                24, 27, 30
   32  └─!  _                                24, 27, 30
   34  ─‣┘  _ [SpanStart#2 Set(M4) SpanEnd#2 SpanEnd#1 SpanEnd#0]  22

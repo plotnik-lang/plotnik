@@ -28,7 +28,7 @@ pub enum CaptureKind {
     /// returns a struct) and consumes the result — the capture emits no `Node`.
     Ref,
     /// The inner expression itself leaves the captured value pending — a
-    /// consumed enum alternation (`Enum … EndEnum`). Emit the inner, then a
+    /// consumed labeled alternation (lowered as `Enum … EndEnum`). Emit the inner, then a
     /// trailing `Set`; the capture contributes no `Node` and no wrapper.
     PendingValue,
     /// An array collected by `*` or `+` (`Arr … Push … EndArr`).
@@ -100,8 +100,8 @@ impl TypeAnalysis {
             // scope; a named node instead captures its matched node and lets the
             // children bubble alongside as sibling fields.
             PatternFlow::Fields(_) => {
-                // A captured alternation is a consumed position, so an enum
-                // flows `Value` (handled below); only a union flows `Fields`.
+                // A captured labeled alternation is a consumed position, so its variant type
+                // flows as `Value` (handled below); an unlabeled alternation flows `Fields`.
                 if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Alternation(_)) {
                     CaptureKind::Struct
                 } else {
@@ -109,7 +109,7 @@ impl TypeAnalysis {
                 }
             }
             // A structured scalar left pending by the inner itself — a consumed
-            // enum alternation (`Enum`/`EndEnum`).
+            // variant type lowered through `Enum`/`EndEnum`.
             PatternFlow::Value(type_id) if self.is_structured_output(*type_id) => {
                 CaptureKind::PendingValue
             }
@@ -152,7 +152,7 @@ impl TypeAnalysis {
             return matches!(
                 self.expect_type_shape(output_type),
                 TypeShape::Struct(_)
-                    | TypeShape::Enum(_)
+                    | TypeShape::Variant(_)
                     | TypeShape::Array { .. }
                     | TypeShape::Optional(_)
             );
@@ -163,7 +163,7 @@ impl TypeAnalysis {
                 self.type_shape(output_type),
                 Some(
                     TypeShape::Struct(_)
-                        | TypeShape::Enum(_)
+                        | TypeShape::Variant(_)
                         | TypeShape::Array { .. }
                         | TypeShape::Optional(_)
                 )

@@ -465,14 +465,14 @@ impl<'a> TypesView<'a> {
         self.names_count
     }
 
-    /// Iterate over members of a struct or enum type.
+    /// Iterate over members of a struct or variant type.
     pub fn members_of(&self, def: &TypeDef) -> impl Iterator<Item = TypeMember> + '_ {
         let (start, count) = match def.decode() {
             TypeDefKind::Struct {
                 member_start,
                 member_count,
             }
-            | TypeDefKind::Enum {
+            | TypeDefKind::Variant {
                 member_start,
                 member_count,
             } => (member_start as usize, member_count as usize),

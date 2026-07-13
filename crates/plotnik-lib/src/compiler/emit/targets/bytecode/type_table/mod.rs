@@ -191,32 +191,32 @@ fn emit_type_at_slot(
             Ok(())
         }
 
-        TypeShape::Enum(variants) => {
-            // Resolve variant types (this may create types at later indices)
-            let mut resolved_variants = Vec::with_capacity(variants.len());
-            for (variant_sym, variant_type_id) in variants {
-                let variant_name = ctx.strings.intern(*variant_sym, ctx.interner)?;
-                let variant_type = types.resolve_type(*variant_type_id, ctx.type_analysis)?;
-                resolved_variants.push((variant_name, variant_type));
+        TypeShape::Variant(cases) => {
+            // Resolve case types (this may create types at later indices).
+            let mut resolved_cases = Vec::with_capacity(cases.len());
+            for (case_sym, case_type_id) in cases {
+                let case_name = ctx.strings.intern(*case_sym, ctx.interner)?;
+                let case_type = types.resolve_type(*case_type_id, ctx.type_analysis)?;
+                resolved_cases.push((case_name, case_type));
             }
 
             let scope = layout
                 .scope(type_id)
-                .expect("every emitted enum has a capture scope");
-            assert_eq!(scope.kind(), CaptureScopeKind::Enum);
+                .expect("every emitted variant type has a capture scope");
+            assert_eq!(scope.kind(), CaptureScopeKind::Variant);
             let member_start = scope.base();
             assert_eq!(
                 types.members_len(),
                 member_start,
                 "wire members consume the shared capture layout in order"
             );
-            for (variant_name, variant_type) in resolved_variants {
-                types.push_member(TypeMember::new(variant_name, variant_type));
+            for (case_name, case_type) in resolved_cases {
+                types.push_member(TypeMember::new(case_name, case_type));
             }
 
             let member_count = u8::try_from(scope.members().len())
-                .map_err(|_| EmitError::TooManyVariants(scope.members().len()))?;
-            types.fill_slot(slot_index, TypeDef::for_enum(member_start, member_count));
+                .map_err(|_| EmitError::TooManyCases(scope.members().len()))?;
+            types.fill_slot(slot_index, TypeDef::for_variant(member_start, member_count));
             Ok(())
         }
 

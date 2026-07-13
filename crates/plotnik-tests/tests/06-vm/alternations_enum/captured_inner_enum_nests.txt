@@ -53,7 +53,7 @@ S7 "expression_statement"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:1  ; { a }
-T2 = Enum    M1:1  ; In
+T2 = Variant M1:1  ; In
 T3 = Struct  M2:1  ; { y }
 
 [type_members]
@@ -76,7 +76,7 @@ Q:
   05                                        ▶
   06  ...
   07  ...
-  08   !   (expression_statement) [EnumOpen(M1) Node Set(M0) EnumClose]  11
+  08   !   (expression_statement) [VariantOpen(M1) Node Set(M0) VariantClose]  11
   11  ─‣┘  _ [Set(M2)]                      13
   13                                        ▶
   14  ──!  _                                08, 14
@@ -93,7 +93,7 @@ Q:
        ●   program
   16       _                                08, 14
        ●   expression_statement
-  08       (expression_statement) [EnumOpen(M1) Node Set(M0) EnumClose]  11
+  08       (expression_statement) [VariantOpen(M1) Node Set(M0) VariantClose]  11
        ●   expression_statement
   11       _ [Set(M2)]                      13
        ●   program

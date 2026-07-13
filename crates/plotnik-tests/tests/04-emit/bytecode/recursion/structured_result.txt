@@ -20,9 +20,9 @@ Test = 25
 Expr:
   00  -ε-                                   02, 03
   01                                        ▶
-  02   !   (number) [EnumOpen(Lit) Node Set(value) EnumClose]  01
-  03   !   (call_expression) [EnumOpen(Nested)]  10
-  05  ─‣┘  _ [EnumClose]                    01
+  02   !   (number) [VariantOpen(Lit) Node Set(value) VariantClose]  01
+  03   !   (call_expression) [VariantOpen(Nested)]  10
+  05  ─‣┘  _ [VariantClose]                 01
   06  ─‣─  arguments: (arguments)           09
   07  ─‣┘  _ [Set(inner)]                   05
   09  └‣─  (Expr)                           00 : 07
@@ -67,7 +67,7 @@ S15 "function"
 T0 = <Node>
 T1 = Struct  M0:1  ; { value }
 T2 = Struct  M1:2  ; { fn, inner }
-T3 = Enum    M3:2  ; Lit | Nested
+T3 = Variant M3:2  ; Lit | Nested
 T4 = Struct  M5:1  ; { expr }
 
 [type_members]
@@ -98,15 +98,15 @@ Test:
   07                                        ▶
   08  └‣─  (@26)                            26 : 09
   09  ─‣┘  _ [Set(M2)]                      11
-  11  ─‣┘  _ [EnumClose]                    16
+  11  ─‣┘  _ [VariantClose]                 16
   13  └‣─  (@26)                            26 : 14
   14  ─‣┘² _ [Set(M5)]                      23
   16                                        ▶
-  17   !   (number) [EnumOpen(M3) Node Set(M0) EnumClose]  16
+  17   !   (number) [VariantOpen(M3) Node Set(M0) VariantClose]  16
   20  ─‣─  arguments: (arguments)           08
   21  └‣─  function: (identifier) [Node Set(M1)]  20
   23                                        ▶
-  24   !   (call_expression) [EnumOpen(M4)]  21
+  24   !   (call_expression) [VariantOpen(M4)]  21
   26  -ε-                                   17, 24
   28  └‣─  (expression_statement)           13
   29   !   (program)                        28

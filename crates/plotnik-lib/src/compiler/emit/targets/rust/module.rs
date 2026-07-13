@@ -667,13 +667,13 @@ impl<'a> Generator<'a> {
             EffectKind::ArrayClose => unit(out, "ArrayClose"),
             EffectKind::StructOpen => unit(out, "StructOpen"),
             EffectKind::StructClose => unit(out, "StructClose"),
-            EffectKind::EnumClose => unit(out, "EnumClose"),
+            EffectKind::VariantClose => unit(out, "VariantClose"),
             EffectKind::Null => unit(out, "Null"),
-            EffectKind::Set | EffectKind::EnumOpen => {
+            EffectKind::Set | EffectKind::VariantOpen => {
                 let variant = if effect.kind == EffectKind::Set {
                     "Set"
                 } else {
-                    "EnumOpen"
+                    "VariantOpen"
                 };
                 let _ = writeln!(
                     out,

@@ -55,9 +55,9 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
         let guard_bytes = if item.fallible { WORD_BYTES } else { 0 };
         let local_bytes = match self.types.expect_type_shape(item.ty) {
             TypeShape::Struct(fields) => self.field_scope_frame_bytes(item.ty, fields),
-            TypeShape::Enum(variants) => variants
+            TypeShape::Variant(cases) => cases
                 .values()
-                .map(|&payload| self.enum_payload_frame_bytes(item.ty, payload))
+                .map(|&payload| self.variant_payload_frame_bytes(item.ty, payload))
                 .max()
                 .unwrap_or(0),
             TypeShape::Void => 0,
@@ -69,12 +69,12 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
             .saturating_add(local_bytes)
     }
 
-    fn enum_payload_frame_bytes(&self, owner: TypeId, payload: TypeId) -> u64 {
+    fn variant_payload_frame_bytes(&self, owner: TypeId, payload: TypeId) -> u64 {
         if payload == TYPE_VOID {
             return 0;
         }
         let TypeShape::Struct(fields) = self.types.expect_type_shape(payload) else {
-            unreachable!("enum variant payload is void or an anonymous struct");
+            unreachable!("variant case payload is void or an anonymous struct");
         };
         self.field_scope_frame_bytes(owner, fields)
     }
@@ -148,8 +148,8 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
                     self.field_value_bytes_seen(info, context, &mut field_seen)
                 })
                 .fold(0_u64, u64::saturating_add),
-            TypeShape::Enum(variants) => {
-                let widest = variants
+            TypeShape::Variant(cases) => {
+                let widest = cases
                     .values()
                     .map(|&payload| {
                         let mut variant_seen = seen.clone();

@@ -290,7 +290,7 @@ impl NfaBuilder<'_> {
         }
 
         // In a suppressed region there is no output shape to keep stable (and a
-        // consumed labeled alternation routed here still flows `Value(enum)`, not a struct).
+        // consumed labeled alternation routed here still flows `Value(variant)`, not a struct).
         let alternation_type_id = if self.is_suppressed() {
             None
         } else {
@@ -479,7 +479,7 @@ impl NfaBuilder<'_> {
     }
 
     /// A labeled alternation opens each alternative's variant scope
-    /// (`EnumOpen`...`EnumClose`) and compiles its payload inside it.
+    /// (`VariantOpen`...`VariantClose`) and compiles its payload inside it.
     pub(super) fn compile_labeled_alternation(
         &mut self,
         alternation: &ast::AlternationPattern,
@@ -511,25 +511,25 @@ impl NfaBuilder<'_> {
             return exit;
         }
 
-        let enum_type_id = self
+        let variant_type_id = self
             .ctx
             .analysis
             .type_analysis
             .expect_pattern_result(&Pattern::Alternation(alternation.clone()))
             .flow
             .type_id()
-            .expect("an analyzed enum must produce an enum type");
+            .expect("an analyzed labeled alternation must produce a variant type");
 
         // BTreeMap order gives stable variant indices independent of AST iteration order.
-        let TypeShape::Enum(variants) = self
+        let TypeShape::Variant(cases) = self
             .ctx
             .analysis
             .type_analysis
-            .expect_type_shape(enum_type_id)
+            .expect_type_shape(variant_type_id)
         else {
-            panic!("an analyzed enum must produce an enum type");
+            panic!("an analyzed labeled alternation must produce a variant type");
         };
-        let variant_info: BTreeMap<Symbol, (u16, TypeId)> = variants
+        let case_info: BTreeMap<Symbol, (u16, TypeId)> = cases
             .iter()
             .enumerate()
             .map(|(idx, (&sym, &type_id))| (sym, (idx as u16, type_id)))
@@ -554,24 +554,24 @@ impl NfaBuilder<'_> {
             let label = alternative
                 .label()
                 .expect("labeled alternative must have label");
-            let (variant_idx, payload_type_id) = self
+            let (case_idx, payload_type_id) = self
                 .ctx
                 .analysis
                 .interner
                 .get(label.text())
-                .and_then(|sym| variant_info.get(&sym))
+                .and_then(|sym| case_info.get(&sym))
                 .map(|&(idx, type_id)| (idx, type_id))
-                .expect("variant must exist for labeled alternative");
+                .expect("case must exist for labeled alternative");
 
             let e_effect = EffectIR::with_member(
-                EffectKind::EnumOpen,
-                MemberRef::new(enum_type_id, variant_idx),
+                EffectKind::VariantOpen,
+                MemberRef::new(variant_type_id, case_idx),
             );
             let alternative_span = self.span_id(alternative.syntax(), SpanKind::Alternative);
             if let Some(id) = alternative_span {
                 self.bind_span(
                     id,
-                    SpanBindingIR::Member(MemberRef::new(enum_type_id, variant_idx)),
+                    SpanBindingIR::Member(MemberRef::new(variant_type_id, case_idx)),
                 );
             }
             let alternative_start = alternative_span.map(|id| EffectIR::span_start(id.0));
@@ -580,7 +580,7 @@ impl NfaBuilder<'_> {
             let alternative_nullable = self.pattern_is_nullable(&body);
             let body_entry = self.with_scope(payload_type_id, |this| {
                 if alternative_nullable {
-                    let mut close_effects = vec![EffectIR::end_enum()];
+                    let mut close_effects = vec![EffectIR::end_variant()];
                     if let Some(end) = alternative_end.clone() {
                         close_effects.push(end);
                     }
@@ -610,11 +610,11 @@ impl NfaBuilder<'_> {
                         capture
                             .clone()
                             .nest_span(start, end)
-                            .nest_scope(e_effect.clone(), EffectIR::end_enum())
+                            .nest_scope(e_effect.clone(), EffectIR::end_variant())
                     } else {
                         capture
                             .clone()
-                            .nest_scope(e_effect.clone(), EffectIR::end_enum())
+                            .nest_scope(e_effect.clone(), EffectIR::end_variant())
                     };
                     let pattern_ctx = PatternCtx {
                         exit: alternative_exit,
@@ -634,9 +634,11 @@ impl NfaBuilder<'_> {
                         capture
                             .clone()
                             .nest_span(start, end)
-                            .nest_scope(e_effect, EffectIR::end_enum())
+                            .nest_scope(e_effect, EffectIR::end_variant())
                     } else {
-                        capture.clone().nest_scope(e_effect, EffectIR::end_enum())
+                        capture
+                            .clone()
+                            .nest_scope(e_effect, EffectIR::end_variant())
                     };
                 let zero_exit = self.emit_effects_epsilon(
                     skip,

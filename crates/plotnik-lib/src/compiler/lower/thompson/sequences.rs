@@ -159,7 +159,7 @@ impl NfaBuilder<'_> {
 
         // Scope open/close effects merge onto the boundary items to avoid extra epsilons.
         // That merge is unsound when the boundary item is skippable: its skip path drops
-        // the merged effect, unbalancing the path (e.g. EndEnum with no Enum). So a
+        // the merged effect, unbalancing the path (e.g. VariantClose without VariantOpen). So a
         // skippable boundary's *scope* effects move to a dominating epsilon every path
         // crosses. Value effects (Node/Set/…) stay on the matched item — they need its
         // cursor position and its skip-path null injection — so only scope effects move.
@@ -254,7 +254,7 @@ impl NfaBuilder<'_> {
     /// and must re-derive first-position navigation instead of the sibling `Next` the
     /// match path uses. This requires compiling the continuation twice.
     ///
-    /// Sequence-level scope effects (`capture`: e.g. `Enum`/`EndEnum` for an enum
+    /// Sequence-level scope effects (`capture`: e.g. `VariantOpen`/`VariantClose` for a variant
     /// variant) wrap the whole body on single dominating epsilons — open before the
     /// skippable item, close after the continuation — so they execute exactly once on
     /// both the skip and match paths. Merging them onto items instead would drop the

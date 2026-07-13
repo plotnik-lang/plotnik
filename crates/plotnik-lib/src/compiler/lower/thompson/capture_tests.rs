@@ -8,16 +8,16 @@ fn nest_scope_preserves_outer_and_nests_inner() {
     let outer = CaptureEffects::new(vec![EffectIR::start_struct()], vec![EffectIR::end_struct()]);
 
     let result = outer.nest_scope(
-        EffectIR::with_member(EffectKind::EnumOpen, MemberRef::new(TypeId(0), 0)),
-        EffectIR::end_enum(),
+        EffectIR::with_member(EffectKind::VariantOpen, MemberRef::new(TypeId(0), 0)),
+        EffectIR::end_variant(),
     );
 
     assert_eq!(result.pre.len(), 2);
     assert_eq!(result.pre[0].kind(), EffectKind::StructOpen);
-    assert_eq!(result.pre[1].kind(), EffectKind::EnumOpen);
+    assert_eq!(result.pre[1].kind(), EffectKind::VariantOpen);
 
     assert_eq!(result.post.len(), 2);
-    assert_eq!(result.post[0].kind(), EffectKind::EnumClose);
+    assert_eq!(result.post[0].kind(), EffectKind::VariantClose);
     assert_eq!(result.post[1].kind(), EffectKind::StructClose);
 }
 

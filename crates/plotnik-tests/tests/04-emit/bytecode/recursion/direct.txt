@@ -13,9 +13,9 @@ Expr = 11
 Expr:
   00  -ε-                                   02, 03
   01                                        ▶
-  02   !   (number) [EnumOpen(Lit) Node Set(value) EnumClose]  01
-  03   !   (call_expression) [EnumOpen(Rec)]  08
-  05  ─‣┘  _ [Set(inner) EnumClose]         01
+  02   !   (number) [VariantOpen(Lit) Node Set(value) VariantClose]  01
+  03   !   (call_expression) [VariantOpen(Rec)]  08
+  05  ─‣┘  _ [Set(inner) VariantClose]      01
   07  ─‣─  arguments: (Expr)                00 : 05
   08  └‣─  function: (identifier) [Node Set(fn)]  07
 
@@ -41,7 +41,7 @@ S11 "arguments"
 T0 = <Node>
 T1 = Struct  M0:1  ; { value }
 T2 = Struct  M1:2  ; { fn, inner }
-T3 = Enum    M3:2  ; Lit | Rec
+T3 = Variant M3:2  ; Lit | Rec
 
 [type_members]
 M0: S01 → T0  ; value: <Node>
@@ -61,12 +61,12 @@ Expr:
   00       (@16)                            16 : 01
   01                                        ▶
   02  ─‣─  arguments: (@16)                 16 : 03
-  03  ─‣┘  _ [Set(M2) EnumClose]            05
+  03  ─‣┘  _ [Set(M2) VariantClose]         05
   05                                        ▶
   06  ...
   07  ...
-  08   !   (number) [EnumOpen(M3) Node Set(M0) EnumClose]  05
+  08   !   (number) [VariantOpen(M3) Node Set(M0) VariantClose]  05
   11  └‣─  function: (identifier) [Node Set(M1)]  02
-  13   !   (call_expression) [EnumOpen(M4)]  11
+  13   !   (call_expression) [VariantOpen(M4)]  11
   15  ...
   16  -ε-                                   08, 13

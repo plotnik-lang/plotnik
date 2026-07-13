@@ -97,10 +97,7 @@ fn enum_variant_count_overflow_is_emit_error() {
     query.push_str("] @alt)");
 
     let err = try_emit(&query).expect_err("256 enum variants must not encode");
-    assert!(
-        matches!(err, EmitError::TooManyVariants(256)),
-        "got {err:?}"
-    );
+    assert!(matches!(err, EmitError::TooManyCases(256)), "got {err:?}");
 }
 
 #[test]
@@ -147,7 +144,7 @@ fn variants_256_are_source_capable_but_exceed_the_bytecode_target() {
 #[test]
 fn emit_error_classification_respects_limit_ownership() {
     assert!(EmitError::TooManyFields(256).is_target_limit());
-    assert!(EmitError::TooManyVariants(256).is_target_limit());
+    assert!(EmitError::TooManyCases(256).is_target_limit());
     assert!(EmitError::Encode(EncodeError::TooManyEffects(8)).is_target_limit());
 
     assert!(!EmitError::TooManyTypeMembers(65_536).is_target_limit());

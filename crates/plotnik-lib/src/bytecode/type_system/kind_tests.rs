@@ -8,7 +8,7 @@ fn from_u8_valid() {
     assert_eq!(TypeKind::from_u8(3), Some(TypeKind::ArrayZeroOrMore));
     assert_eq!(TypeKind::from_u8(4), Some(TypeKind::ArrayOneOrMore));
     assert_eq!(TypeKind::from_u8(5), Some(TypeKind::Struct));
-    assert_eq!(TypeKind::from_u8(6), Some(TypeKind::Enum));
+    assert_eq!(TypeKind::from_u8(6), Some(TypeKind::Variant));
     assert_eq!(TypeKind::from_u8(7), Some(TypeKind::Alias));
     assert_eq!(TypeKind::from_u8(8), Some(TypeKind::Str));
     assert_eq!(TypeKind::from_u8(9), Some(TypeKind::Bool));
@@ -36,7 +36,7 @@ fn is_wrapper() {
     assert!(TypeKind::ArrayZeroOrMore.is_wrapper());
     assert!(TypeKind::ArrayOneOrMore.is_wrapper());
     assert!(!TypeKind::Struct.is_wrapper());
-    assert!(!TypeKind::Enum.is_wrapper());
+    assert!(!TypeKind::Variant.is_wrapper());
     assert!(!TypeKind::Alias.is_wrapper());
     assert!(!TypeKind::Void.is_wrapper());
 }
@@ -47,7 +47,7 @@ fn is_array() {
     assert!(TypeKind::ArrayZeroOrMore.is_array());
     assert!(TypeKind::ArrayOneOrMore.is_array());
     assert!(!TypeKind::Struct.is_array());
-    assert!(!TypeKind::Enum.is_array());
+    assert!(!TypeKind::Variant.is_array());
     assert!(!TypeKind::Alias.is_array());
 }
 
@@ -63,7 +63,7 @@ fn is_alias() {
     assert!(!TypeKind::ArrayZeroOrMore.is_alias());
     assert!(!TypeKind::ArrayOneOrMore.is_alias());
     assert!(!TypeKind::Struct.is_alias());
-    assert!(!TypeKind::Enum.is_alias());
+    assert!(!TypeKind::Variant.is_alias());
     assert!(TypeKind::Alias.is_alias());
 }
 

@@ -154,7 +154,7 @@ mod tests {
 enum FrameKind {
     Array,
     Struct,
-    Enum { is_void: bool, got_data: bool },
+    Variant { is_void: bool, got_data: bool },
     Scalar,
 }
 
@@ -163,7 +163,7 @@ impl FrameKind {
         match self {
             Self::Array => KS_ARRAY,
             Self::Struct => KS_STRUCT,
-            Self::Enum { .. } => KS_ENUM,
+            Self::Variant { .. } => KS_VARIANT,
             Self::Scalar => KS_SCALAR,
         }
     }
@@ -192,10 +192,10 @@ impl PendingState {
 
 const KS_ARRAY: u8 = 0b001;
 const KS_STRUCT: u8 = 0b010;
-const KS_ENUM: u8 = 0b100;
+const KS_VARIANT: u8 = 0b100;
 const KS_SCALAR: u8 = 0b1000;
-const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_ENUM | KS_SCALAR;
-const KS_SET: u8 = KS_STRUCT | KS_ENUM;
+const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_VARIANT | KS_SCALAR;
+const KS_SET: u8 = KS_STRUCT | KS_VARIANT;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct DefSummary {
@@ -501,7 +501,7 @@ impl<'a> Program<'a> {
                         match effect.kind() {
                             EffectKind::ArrayOpen
                             | EffectKind::StructOpen
-                            | EffectKind::EnumOpen
+                            | EffectKind::VariantOpen
                             | EffectKind::ScalarOpen => frame_openers += 1,
                             EffectKind::SuppressBegin => suppression_openers += 1,
                             EffectKind::SpanStartAt | EffectKind::SpanStart => span_openers += 1,
@@ -611,12 +611,12 @@ impl<'a> Program<'a> {
                         .map(PendingState::from_bool)
                         .unwrap_or(PendingState::Unknown);
                     if summary.sets_caller_top
-                        && let Some(FrameKind::Enum {
+                        && let Some(FrameKind::Variant {
                             got_data: false, ..
                         }) = stack.last()
                     {
                         let mut written = stack.clone();
-                        if let Some(FrameKind::Enum { got_data, .. }) = written.last_mut() {
+                        if let Some(FrameKind::Variant { got_data, .. }) = written.last_mut() {
                             *got_data = true;
                         }
                         push_call_returns(
@@ -702,7 +702,7 @@ impl<'a> Program<'a> {
                 require_pending(state.pending, label)?;
                 match state.stack.last_mut() {
                     Some(FrameKind::Struct) => {}
-                    Some(FrameKind::Enum { got_data, .. }) => *got_data = true,
+                    Some(FrameKind::Variant { got_data, .. }) => *got_data = true,
                     Some(FrameKind::Array | FrameKind::Scalar) => {
                         return Err(SemanticVerifyError::EffectStack(label));
                     }
@@ -713,7 +713,7 @@ impl<'a> Program<'a> {
                 }
                 *state.pending = PendingState::Empty;
             }
-            ArrayOpen | ArrayClose | StructOpen | StructClose | EnumOpen | EnumClose
+            ArrayOpen | ArrayClose | StructOpen | StructClose | VariantOpen | VariantClose
             | ScalarOpen | StrClose | BoolClose => {
                 unreachable!("frame effects return before data dispatch")
             }
@@ -736,16 +736,16 @@ impl<'a> Program<'a> {
                 let frame = match kind {
                     ValueFrameKind::Array => FrameKind::Array,
                     ValueFrameKind::Struct => FrameKind::Struct,
-                    ValueFrameKind::Enum => FrameKind::Enum {
-                        is_void: self.enum_member_is_void(member(effect, label)?, label)?,
+                    ValueFrameKind::Variant => FrameKind::Variant {
+                        is_void: self.case_is_void(member(effect, label)?, label)?,
                         got_data: false,
                     },
                     ValueFrameKind::Scalar => FrameKind::Scalar,
                 };
                 open_frame(state.stack, state.pending, frame, label)?;
             }
-            FrameAction::Close(ValueFrameKind::Enum) => match state.stack.pop() {
-                Some(FrameKind::Enum { is_void, got_data }) => {
+            FrameAction::Close(ValueFrameKind::Variant) => match state.stack.pop() {
+                Some(FrameKind::Variant { is_void, got_data }) => {
                     let data_pending = match *state.pending {
                         PendingState::Full => true,
                         PendingState::Empty => false,
@@ -763,7 +763,7 @@ impl<'a> Program<'a> {
                     ValueFrameKind::Array => FrameKind::Array,
                     ValueFrameKind::Struct => FrameKind::Struct,
                     ValueFrameKind::Scalar => FrameKind::Scalar,
-                    ValueFrameKind::Enum => unreachable!("enum close handled above"),
+                    ValueFrameKind::Variant => unreachable!("variant close handled above"),
                 };
                 close_simple_frame(state.stack, state.pending, expected, label)?;
             }
@@ -771,24 +771,19 @@ impl<'a> Program<'a> {
         Ok(())
     }
 
-    fn enum_member_is_void(
-        &self,
-        member: MemberRef,
-        label: Label,
-    ) -> Result<bool, SemanticVerifyError> {
+    fn case_is_void(&self, member: MemberRef, label: Label) -> Result<bool, SemanticVerifyError> {
         let scope = self.member_scope(member, label)?;
-        if scope.kind() != CaptureScopeKind::Enum {
+        if scope.kind() != CaptureScopeKind::Variant {
             return Err(capture_error(
                 label,
-                "EnumOpen does not reference an enum variant",
+                "VariantOpen does not reference a variant case",
             ));
         }
-        let CaptureMemberKind::Variant(payload) =
-            scope.members()[member.relative_index as usize].kind
+        let CaptureMemberKind::Case(payload) = scope.members()[member.relative_index as usize].kind
         else {
             return Err(capture_error(
                 label,
-                "EnumOpen does not reference an enum variant",
+                "VariantOpen does not reference a variant case",
             ));
         };
         Ok(payload == TYPE_VOID

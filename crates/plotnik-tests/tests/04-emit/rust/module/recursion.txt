@@ -121,11 +121,11 @@ impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
 /// Replay one committed `Expr` value.
 fn read_expr<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>, depth: &rt::ReplayDepth) -> ::core::result::Result<Expr<'t>, rt::LimitExceeded> {
     let _depth = depth.enter()?;
-    match t.expect_enum_open() {
+    match t.expect_variant_open() {
         // Paren
         2 => {
             let mut v0 = None; // inner
-            while !t.at_enum_close() {
+            while !t.at_variant_close() {
                 match t.peek_set() {
                     // inner
                     0 => v0 = Some(::std::boxed::Box::new(read_expr(t, depth)?)),
@@ -133,7 +133,7 @@ fn read_expr<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>, depth: &rt::ReplayDept
                 }
                 t.expect_set();
             }
-            t.expect_enum_close();
+            t.expect_variant_close();
             Ok(Expr::Paren {
                 inner: v0.expect("field-stability: every accepting path sets `inner`"),
             })
@@ -141,7 +141,7 @@ fn read_expr<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>, depth: &rt::ReplayDept
         // Id
         3 => {
             let mut v0 = None; // id
-            while !t.at_enum_close() {
+            while !t.at_variant_close() {
                 match t.peek_set() {
                     // id
                     1 => v0 = Some(t.expect_node()),
@@ -149,7 +149,7 @@ fn read_expr<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>, depth: &rt::ReplayDept
                 }
                 t.expect_set();
             }
-            t.expect_enum_close();
+            t.expect_variant_close();
             Ok(Expr::Id {
                 id: v0.expect("field-stability: every accepting path sets `id`"),
             })
@@ -419,21 +419,21 @@ mod matcher {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   02   !   (parenthesized_expression) [EnumOpen(Paren)]  06
+            //   02   !   (parenthesized_expression) [VariantOpen(Paren)]  06
             S02_EXPR => 'state: {
                 if !cand_s02_expr(eng) {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::RuntimeEffect::EnumOpen(2)); // EnumOpen(Paren)
+                eng.emit_data(|_| rt::RuntimeEffect::VariantOpen(2)); // VariantOpen(Paren)
                 Flow::Jump(S06_EXPR)
             }
-            //   04  ─‣┘  _ [Set(inner) EnumClose]         01
+            //   04  ─‣┘  _ [Set(inner) VariantClose]      01
             S04_EXPR => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
                     break 'state Flow::Backtrack;
                 }
                 eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(inner)
-                eng.emit_data(|_| rt::RuntimeEffect::EnumClose);
+                eng.emit_data(|_| rt::RuntimeEffect::VariantClose);
                 Flow::Jump(S01_EXPR)
             }
             //   06  └‣─  (Expr)                           00 : 04
@@ -449,15 +449,15 @@ mod matcher {
                 eng.enter_frame(S04_EXPR);
                 Flow::Jump(S00_EXPR)
             }
-            //   07   !   (identifier) [EnumOpen(Id) Node Set(id) EnumClose]  01
+            //   07   !   (identifier) [VariantOpen(Id) Node Set(id) VariantClose]  01
             S07_EXPR => 'state: {
                 if !cand_s07_expr(eng) {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::RuntimeEffect::EnumOpen(3)); // EnumOpen(Id)
+                eng.emit_data(|_| rt::RuntimeEffect::VariantOpen(3)); // VariantOpen(Id)
                 eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
                 eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(id)
-                eng.emit_data(|_| rt::RuntimeEffect::EnumClose);
+                eng.emit_data(|_| rt::RuntimeEffect::VariantClose);
                 Flow::Jump(S01_EXPR)
             }
             //   10                                        ▶

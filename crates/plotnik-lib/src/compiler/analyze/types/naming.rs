@@ -5,9 +5,9 @@
 //!
 //! - A definition's result type carries the definition's name.
 //! - A composite reached through field `f` of a type named `T` is `T` +
-//!   PascalCase(`f`), landing on array/optional *elements*. Enum variant
+//!   PascalCase(`f`), landing on array/optional *elements*. Variant-case
 //!   payload structs stay anonymous (rendered inline); composites inside a
-//!   payload field are named enum name + verbatim label + PascalCase(field).
+//!   payload fields are named variant type name + verbatim label + PascalCase(field).
 //! - A custom `:: TypeName` capture type overrides the generated name and
 //!   restarts the chain below it.
 //!
@@ -131,7 +131,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         }
     }
 
-    /// Descend a struct/enum that already carries `name`, naming its nested
+    /// Descend a struct/variant type that already carries `name`, naming its nested
     /// composites.
     fn walk_named(&mut self, type_id: TypeId, name: &str) {
         let shape = self
@@ -148,11 +148,11 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     self.visit_field_element(info.type_id, name, &field);
                 }
             }
-            TypeShape::Enum(variants) => {
+            TypeShape::Variant(cases) => {
                 // Variant payload structs are anonymous (rendered inline as the
-                // variant's data); composites inside their fields are named
-                // through the enum name + the verbatim label.
-                for (label_sym, payload) in &variants {
+                // case's data); composites inside their fields are named
+                // through the variant type name + the verbatim label.
+                for (label_sym, payload) in &cases {
                     let Some(TypeShape::Struct(payload_fields)) =
                         self.ctx.in_progress().type_shape(*payload).cloned()
                     else {
@@ -182,7 +182,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             .expect("field element type is registered");
 
         match shape {
-            TypeShape::Struct(_) | TypeShape::Enum(_) => {
+            TypeShape::Struct(_) | TypeShape::Variant(_) => {
                 if let Some(&existing) = self.names.get(&element) {
                     // A definition's result keeps its own name here (`(Foo) @val`
                     // renders as `val: Foo`); a custom capture type on it is

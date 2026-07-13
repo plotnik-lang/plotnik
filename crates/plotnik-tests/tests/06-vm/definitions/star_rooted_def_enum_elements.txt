@@ -78,7 +78,7 @@ S13 "array"
 T0 = <Node>
 T1 = Struct  M0:1  ; { id }
 T2 = Struct  M1:1  ; { num }
-T3 = Enum    M2:2  ; Id | Num
+T3 = Variant M2:2  ; Id | Num
 T4 = ArrayStar(T3)  ; Entry*
 T5 = Struct  M4:1  ; { items }
 
@@ -111,8 +111,8 @@ Q:
   08  -ε-  [ArrayClose]                     10
   10  ─‣┘  _ [Set(M4)]                      31
   12                                        ▶
-  13   !   (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
-  16   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
+  13   !   (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  12
+  16   !   (number) [VariantOpen(M3) Node Set(M1) VariantClose]  12
   19  -ε-                                   13, 16
   21                                        ▶
   22  -ε-  [ArrayClose Set(M4)]             31
@@ -146,10 +146,10 @@ Q:
 
 @19:
   19  -ε-                                   13, 16
-  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+  13       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  12
        ○   [
   19  ❮❮❮ 
-  16       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
+  16       (number) [VariantOpen(M3) Node Set(M1) VariantClose]  12
        ○   [
   29  ❮❮❮ 
   27       _                                26, 27
@@ -159,7 +159,7 @@ Q:
 
 @19:
   19  -ε-                                   13, 16
-  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+  13       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  12
        ●   identifier
   12   ◀   (@19)                            
 
@@ -172,10 +172,10 @@ Q:
 
 @19:
   19  -ε-                                   13, 16
-  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+  13       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  12
        ○   ,
   19  ❮❮❮ 
-  16       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
+  16       (number) [VariantOpen(M3) Node Set(M1) VariantClose]  12
        ○   ,
   27  ❮❮❮ 
   27       _                                26, 27
@@ -185,10 +185,10 @@ Q:
 
 @19:
   19  -ε-                                   13, 16
-  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+  13       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  12
        ○   number
   19  ❮❮❮ 
-  16       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
+  16       (number) [VariantOpen(M3) Node Set(M1) VariantClose]  12
        ●   number
   12   ◀   (@19)                            
 
@@ -201,10 +201,10 @@ Q:
 
 @19:
   19  -ε-                                   13, 16
-  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+  13       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  12
        ○   ,
   19  ❮❮❮ 
-  16       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
+  16       (number) [VariantOpen(M3) Node Set(M1) VariantClose]  12
        ○   ,
   27  ❮❮❮ 
   27       _                                26, 27
@@ -214,7 +214,7 @@ Q:
 
 @19:
   19  -ε-                                   13, 16
-  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+  13       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  12
        ●   identifier
   12   ◀   (@19)                            
 
@@ -227,10 +227,10 @@ Q:
 
 @19:
   19  -ε-                                   13, 16
-  13       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  12
+  13       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  12
        ○   ]
   19  ❮❮❮ 
-  16       (number) [EnumOpen(M3) Node Set(M1) EnumClose]  12
+  16       (number) [VariantOpen(M3) Node Set(M1) VariantClose]  12
        ○   ]
   27  ❮❮❮ 
   27       _                                26, 27

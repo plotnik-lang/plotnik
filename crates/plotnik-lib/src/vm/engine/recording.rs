@@ -149,8 +149,10 @@ impl RecordingTracer {
             RuntimeEffect::StructOpen => "StructOpen".to_string(),
             RuntimeEffect::StructClose => "StructClose".to_string(),
             RuntimeEffect::Set(idx) => format!("Set \"{}\"", self.member_name(*idx)),
-            RuntimeEffect::EnumOpen(idx) => format!("EnumOpen \"{}\"", self.member_name(*idx)),
-            RuntimeEffect::EnumClose => "EnumClose".to_string(),
+            RuntimeEffect::VariantOpen(idx) => {
+                format!("VariantOpen \"{}\"", self.member_name(*idx))
+            }
+            RuntimeEffect::VariantClose => "VariantClose".to_string(),
             RuntimeEffect::Null => "Null".to_string(),
             RuntimeEffect::ScalarOpen => "ScalarOpen".to_string(),
             RuntimeEffect::ScalarMark(_) => "ScalarMark".to_string(),
@@ -179,8 +181,10 @@ impl RecordingTracer {
             EffectKind::StructOpen => "StructOpen".to_string(),
             EffectKind::StructClose => "StructClose".to_string(),
             EffectKind::Set => format!("Set \"{}\"", self.member_name(payload as u16)),
-            EffectKind::EnumOpen => format!("EnumOpen \"{}\"", self.member_name(payload as u16)),
-            EffectKind::EnumClose => "EnumClose".to_string(),
+            EffectKind::VariantOpen => {
+                format!("VariantOpen \"{}\"", self.member_name(payload as u16))
+            }
+            EffectKind::VariantClose => "VariantClose".to_string(),
             EffectKind::Null => "Null".to_string(),
             EffectKind::SuppressBegin => "SuppressBegin".to_string(),
             EffectKind::SuppressEnd => "SuppressEnd".to_string(),

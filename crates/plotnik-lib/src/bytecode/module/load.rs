@@ -430,7 +430,7 @@ impl Module {
 
     /// Validate every TypeDef: a known kind, member runs that stay inside the
     /// TypeMembers section, and every referenced TypeId — a wrapper/alias inner
-    /// type or a struct/enum member type — addressing a real def, so the
+    /// type or a struct/variant member type — addressing a real def, so the
     /// materializer never resolves a type out of range
     /// (`docs/binary-format/04-types.md`).
     fn validate_type_defs(&self) -> Result<(), ModuleError> {
@@ -463,11 +463,11 @@ impl Module {
                     member_start,
                     member_count,
                 }
-                | TypeDefKind::Enum {
+                | TypeDefKind::Variant {
                     member_start,
                     member_count,
                 } => {
-                    // Member-run bounds are identical for struct and enum.
+                    // Member-run bounds are identical for struct and variant types.
                     if member_start as u32 + member_count as u32 > members {
                         return Err(invalid());
                     }
@@ -909,7 +909,7 @@ impl Module {
     /// Two passes over the stream:
     /// 1. Decode each instruction's fixed-size slot (the slot size is fixed by
     ///    the opcode, so the walk is unambiguous), validating opcode, segment,
-    ///    nav, node kind, effect opcodes, `Set`/`Enum` member operands, and
+    ///    nav, node kind, effect opcodes, `Set`/`Variant` member operands, and
     ///    predicate operands, and rejecting any zero successor address. Record
     ///    each instruction start and collect every jump target.
     /// 2. Every collected jump target — successor or call next/target — must land

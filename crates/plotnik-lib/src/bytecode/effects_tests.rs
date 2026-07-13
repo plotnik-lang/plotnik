@@ -21,7 +21,7 @@ fn roundtrip_no_payload() {
 
 #[test]
 fn max_payload() {
-    let op = Effect::new(EffectKind::EnumOpen, 1023);
+    let op = Effect::new(EffectKind::VariantOpen, 1023);
     let bytes = op.to_bytes();
     let decoded = Effect::from_bytes(bytes);
     assert_eq!(decoded.payload, 1023);

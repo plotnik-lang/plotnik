@@ -48,7 +48,7 @@ impl Emitter<'_, '_> {
 
         let body = match item.kind {
             ItemKind::Struct => self.struct_body(item),
-            ItemKind::Enum => self.enum_body(item, &ident),
+            ItemKind::Variant => self.enum_body(item, &ident),
             _ => unreachable!("serde impls are generated for structs and enums only"),
         };
 
@@ -105,8 +105,8 @@ impl Emitter<'_, '_> {
     fn enum_body(&mut self, item: &Item, ident: &str) -> SerdeBody {
         let types = self.schema.types;
         let interner = self.schema.interner;
-        let TypeShape::Enum(variants) = types.expect_type_shape(item.ty) else {
-            unreachable!("enum item must have an enum shape");
+        let TypeShape::Variant(variants) = types.expect_type_shape(item.ty) else {
+            unreachable!("Rust enum item must have a variant shape");
         };
         let variant_idents = rust_scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
 

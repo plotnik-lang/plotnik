@@ -67,8 +67,8 @@ pub enum Value<'s> {
     Array(Vec<Value<'s>>),
     /// Struct with ordered fields.
     Struct(Vec<(&'s str, Value<'s>)>),
-    /// Enum variant. `data` is None for Void payloads.
-    Enum {
+    /// Variant case. `data` is `None` for void payloads.
+    Variant {
         tag: &'s str,
         data: Option<Box<Value<'s>>>,
     },
@@ -94,7 +94,7 @@ fn take_children<'s>(value: &mut Value<'s>, worklist: &mut Vec<Value<'s>>) {
     match value {
         Value::Array(items) => worklist.append(items),
         Value::Struct(fields) => worklist.extend(fields.drain(..).map(|(_, v)| v)),
-        Value::Enum { data, .. } => {
+        Value::Variant { data, .. } => {
             if let Some(boxed) = data.take() {
                 worklist.push(*boxed);
             }
@@ -131,7 +131,7 @@ impl Serialize for Value<'_> {
                 }
                 map.end()
             }
-            Value::Enum { tag, data } => {
+            Value::Variant { tag, data } => {
                 let len = if data.is_some() { 2 } else { 1 };
                 let mut map = serializer.serialize_map(Some(len))?;
                 map.serialize_entry("$tag", tag)?;
@@ -177,7 +177,7 @@ enum Step<'a> {
     /// Render a value: a leaf writes directly, a composite pushes its expansion.
     Value(&'a Value<'a>, usize),
     /// Write a borrowed slice verbatim. Color codes are `'static`; struct keys and
-    /// enum tags borrow the value.
+    /// variant tags borrow the value.
     Str(&'a str),
     /// Write a struct field key `"key":` (colored, escaped, trailing space in pretty).
     Key(&'a str),
@@ -383,7 +383,7 @@ fn emit_value<'a>(
             deferred.push(Step::Str(c.reset));
             stack.extend(deferred.into_iter().rev());
         }
-        Value::Enum { tag, data } => {
+        Value::Variant { tag, data } => {
             ctx.out.push_str(c.dim);
             ctx.out.push('{');
             ctx.out.push_str(c.reset);

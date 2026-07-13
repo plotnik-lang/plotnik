@@ -42,7 +42,7 @@ enum Frame {
     Struct {
         provenance: ValueProvenance,
     },
-    Enum {
+    Variant {
         provenance: ValueProvenance,
     },
 }
@@ -151,11 +151,11 @@ impl<'m> Inspector<'m> {
                         frame_kind(other.as_ref())
                     ),
                 },
-                RuntimeEffect::EnumOpen(member) => self.open_enum(*member, effect_idx),
-                RuntimeEffect::EnumClose => match self.frames.pop() {
-                    Some(Frame::Enum { provenance }) => self.pending = Some(provenance),
+                RuntimeEffect::VariantOpen(member) => self.open_variant(*member, effect_idx),
+                RuntimeEffect::VariantClose => match self.frames.pop() {
+                    Some(Frame::Variant { provenance }) => self.pending = Some(provenance),
                     other => panic!(
-                        "EnumClose expects Enum on inspection frame stack, found {:?}",
+                        "VariantClose expects Variant on inspection frame stack, found {:?}",
                         frame_kind(other.as_ref())
                     ),
                 },
@@ -285,12 +285,12 @@ impl<'m> Inspector<'m> {
         self.bind_current(path, effect_idx);
     }
 
-    fn open_enum(&mut self, _member: u16, effect_idx: u32) {
+    fn open_variant(&mut self, _member: u16, effect_idx: u32) {
         let mut path = path_for_frames(&self.frames);
         push_segment(&mut path, "$tag");
         self.bind_current(path, effect_idx);
         let provenance = self.open_value();
-        self.frames.push(Frame::Enum { provenance });
+        self.frames.push(Frame::Variant { provenance });
     }
 
     fn bind_current(&mut self, path: String, effect_idx: u32) {
@@ -344,7 +344,7 @@ impl<'m> Inspector<'m> {
         let provenance = match frame {
             Frame::Array { provenance, .. }
             | Frame::Struct { provenance }
-            | Frame::Enum { provenance } => provenance,
+            | Frame::Variant { provenance } => provenance,
         };
         union_hull(&mut provenance.hull, hull);
     }
@@ -390,7 +390,7 @@ fn path_for_frames(frames: &[Frame]) -> String {
         match frame {
             Frame::Array { len, .. } => push_segment(&mut path, &len.to_string()),
             Frame::Struct { .. } => {}
-            Frame::Enum { .. } => push_segment(&mut path, "$data"),
+            Frame::Variant { .. } => push_segment(&mut path, "$data"),
         }
     }
     path
@@ -411,6 +411,6 @@ fn frame_kind(frame: Option<&Frame>) -> Option<&'static str> {
     frame.map(|frame| match frame {
         Frame::Array { .. } => "Array",
         Frame::Struct { .. } => "Struct",
-        Frame::Enum { .. } => "Enum",
+        Frame::Variant { .. } => "Variant",
     })
 }

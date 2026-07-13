@@ -1,6 +1,6 @@
 //! Target-neutral typed replay plan.
 //!
-//! Capture traces name struct fields and enum variants with absolute layout
+//! Capture traces name struct fields and variant cases with absolute layout
 //! slots. This plan resolves every nominal twin to the complete set of slots
 //! it may produce and turns output types into a small value-reading algebra.
 //! Backends choose identifiers, error syntax, recursion representation, and
@@ -71,7 +71,7 @@ impl ReplayItem {
 #[derive(Clone, Debug)]
 pub(crate) enum ReplayItemKind {
     Struct(ReplayScopePlan),
-    Enum(Vec<ReplayVariantPlan>),
+    Variant(Vec<ReplayCasePlan>),
     Alias(ReplayValuePlan),
     VoidDefinition,
 }
@@ -90,9 +90,9 @@ pub(crate) struct ReplayFieldPlan {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ReplayVariantPlan {
+pub(crate) struct ReplayCasePlan {
     pub(crate) name: Symbol,
-    /// Every absolute `EnumOpen` slot this variant may use across twins.
+    /// Every absolute `VariantOpen` slot this case may use across twins.
     pub(crate) indices: Vec<u16>,
     pub(crate) payload: Option<ReplayScopePlan>,
 }
@@ -127,7 +127,7 @@ impl ReplayPlanBuilder<'_, '_> {
                 let twins = collect_twins(self.schema.types, self.schema.layout(), item);
                 ReplayItemKind::Struct(self.scope(fields.iter(), &twins))
             }
-            OutputItemKind::Enum => ReplayItemKind::Enum(self.enum_variants(item)),
+            OutputItemKind::Variant => ReplayItemKind::Variant(self.variant_cases(item)),
             OutputItemKind::Alias => ReplayItemKind::Alias(self.value(item.ty)),
             OutputItemKind::VoidDef => ReplayItemKind::VoidDefinition,
         };
@@ -140,12 +140,12 @@ impl ReplayPlanBuilder<'_, '_> {
         }
     }
 
-    fn enum_variants(&self, item: OutputItem) -> Vec<ReplayVariantPlan> {
-        let TypeShape::Enum(variants) = self.schema.types.expect_type_shape(item.ty) else {
-            unreachable!("enum output item has an enum shape");
+    fn variant_cases(&self, item: OutputItem) -> Vec<ReplayCasePlan> {
+        let TypeShape::Variant(cases) = self.schema.types.expect_type_shape(item.ty) else {
+            unreachable!("variant output item has a variant shape");
         };
         let twins = collect_twins(self.schema.types, self.schema.layout(), item);
-        variants
+        cases
             .iter()
             .enumerate()
             .map(|(index, (&name, &payload))| {
@@ -154,12 +154,12 @@ impl ReplayPlanBuilder<'_, '_> {
                 } else {
                     let TypeShape::Struct(fields) = self.schema.types.expect_type_shape(payload)
                     else {
-                        unreachable!("enum variant payload is void or an anonymous struct");
+                        unreachable!("variant case payload is void or an anonymous struct");
                     };
                     let payloads = payload_twins(self.schema.types, &twins, index);
                     Some(self.scope(fields.iter(), &payloads))
                 };
-                ReplayVariantPlan {
+                ReplayCasePlan {
                     name,
                     indices: member_indices(self.schema.layout(), &twins, index),
                     payload,
@@ -201,7 +201,7 @@ impl ReplayPlanBuilder<'_, '_> {
             TypeShape::Array { element, .. } => {
                 ReplayValuePlan::Array(Box::new(self.value(*element)))
             }
-            TypeShape::Struct(_) | TypeShape::Enum(_) => ReplayValuePlan::Read {
+            TypeShape::Struct(_) | TypeShape::Variant(_) => ReplayValuePlan::Read {
                 item: self
                     .schema
                     .type_name_of(ty)
@@ -271,7 +271,7 @@ fn collect_twins(types: &TypeAnalysis, layout: &CaptureLayout, item: OutputItem)
         }
         let matches_kind = match types.expect_type_shape(ty) {
             TypeShape::Struct(_) => wants_struct,
-            TypeShape::Enum(_) => !wants_struct,
+            TypeShape::Variant(_) => !wants_struct,
             _ => false,
         };
         if !matches_kind || layout.member_base(ty).is_none() {
@@ -283,23 +283,23 @@ fn collect_twins(types: &TypeAnalysis, layout: &CaptureLayout, item: OutputItem)
     twins.into_iter().collect()
 }
 
-/// Variant `index`'s payload struct across every twin enum.
+/// Case `index`'s payload struct across every twin variant type.
 fn payload_twins(types: &TypeAnalysis, twins: &[TypeId], index: usize) -> Vec<TypeId> {
     twins
         .iter()
         .map(|&ty| {
-            let TypeShape::Enum(variants) = types.expect_type_shape(ty) else {
-                unreachable!("enum twins share the enum shape");
+            let TypeShape::Variant(cases) = types.expect_type_shape(ty) else {
+                unreachable!("variant twins share the variant shape");
             };
-            *variants
+            *cases
                 .values()
                 .nth(index)
-                .expect("twins share the variant list")
+                .expect("twins share the case list")
         })
         .collect()
 }
 
-/// Absolute member indices for one field/variant position across all twins.
+/// Absolute member indices for one field/case position across all twins.
 fn member_indices(layout: &CaptureLayout, twins: &[TypeId], index: usize) -> Vec<u16> {
     let relative = u16::try_from(index).expect("capture scope member count fits u16");
     let mut indices = twins

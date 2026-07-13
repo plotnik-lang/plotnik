@@ -766,7 +766,7 @@ impl NfaBuilder<'_> {
             }
         };
 
-        // Emit Arr step at entry (with outer pre-effects like Enum)
+        // Emit the array-open step at entry with outer pre-effects such as VariantOpen.
         self.emit_arr_step(inner_entry, outer_capture.pre, quant_start)
     }
 

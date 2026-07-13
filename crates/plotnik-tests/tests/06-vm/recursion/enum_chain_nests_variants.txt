@@ -61,7 +61,7 @@ S12 "function"
 T0 = <Node>
 T1 = Struct  M0:1  ; { name }
 T2 = Struct  M1:1  ; { inner }
-T3 = Enum    M2:2  ; Base | Step
+T3 = Variant M2:2  ; Base | Step
 T4 = Struct  M4:1  ; { top }
 
 [type_members]
@@ -90,13 +90,13 @@ Q:
   05  -ε-  [StructClose]                    07
   07                                        ▶
   08  └‣─  function: (@21)                  21 : 09
-  09  ─‣┘  _ [Set(M1) EnumClose]            14
+  09  ─‣┘  _ [Set(M1) VariantClose]         14
   11  └‣─  (@21)                            21 : 12
   12  ─‣┘² _ [Set(M4)]                      15
   14                                        ▶
   15                                        ▶
-  16   !   (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  14
-  19   !   (call_expression) [EnumOpen(M3)]  08
+  16   !   (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  14
+  19   !   (call_expression) [VariantOpen(M3)]  08
   21  -ε-                                   16, 19
   23  ...
   24  └‣─  (expression_statement)           11
@@ -117,37 +117,37 @@ Q:
 
 @21:
   21  -ε-                                   16, 19
-  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  14
+  16       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  14
        ○   call_expression
   21  ❮❮❮ 
-  19       (call_expression) [EnumOpen(M3)]  08
+  19       (call_expression) [VariantOpen(M3)]  08
        ●   call_expression
   08       (@21)                            21 : 09
        ▶   (@21)
 
 @21:
   21  -ε-                                   16, 19
-  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  14
+  16       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  14
        ○   call_expression
   21  ❮❮❮ 
-  19       (call_expression) [EnumOpen(M3)]  08
+  19       (call_expression) [VariantOpen(M3)]  08
        ●   call_expression
   08       (@21)                            21 : 09
        ▶   (@21)
 
 @21:
   21  -ε-                                   16, 19
-  16       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  14
+  16       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  14
        ●   identifier
   14   ◀   (@21)                            
 
 @21:
-  09       _ [Set(M1) EnumClose]            14
+  09       _ [Set(M1) VariantClose]         14
        ●   call_expression
   14   ◀   (@21)                            
 
 @21:
-  09       _ [Set(M1) EnumClose]            14
+  09       _ [Set(M1) VariantClose]         14
        ●   call_expression
   14   ◀   (@21)                            
 

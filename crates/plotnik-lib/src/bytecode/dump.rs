@@ -190,16 +190,16 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
                 let comment = format!("{}  ; {{ {} }}{}", c.dim, fields.join(", "), c.reset);
                 (formatted, comment)
             }
-            TypeDefKind::Enum {
+            TypeDefKind::Variant {
                 member_start,
                 member_count,
             } => {
-                let formatted = format!("Enum    M{:0mw$}:{}", member_start, member_count);
-                let variants: Vec<_> = types
+                let formatted = format!("Variant M{:0mw$}:{}", member_start, member_count);
+                let cases: Vec<_> = types
                     .members_of(&def)
                     .map(|m| strings.get(m.name_id).to_string())
                     .collect();
-                let comment = format!("{}  ; {}{}", c.dim, variants.join(" | "), c.reset);
+                let comment = format!("{}  ; {}{}", c.dim, cases.join(" | "), c.reset);
                 (formatted, comment)
             }
         };

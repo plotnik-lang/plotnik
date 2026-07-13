@@ -165,7 +165,7 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
                         "capture type `bool` replaces the captured value with a boolean"
                     }
                 })
-                .hint("the replaced fields, variants, or scalar payload will not be returned")
+                .hint("the replaced fields, cases, or scalar payload will not be returned")
                 .emit();
         }
 

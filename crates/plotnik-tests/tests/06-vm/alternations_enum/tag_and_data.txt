@@ -48,7 +48,7 @@ S11 "number"
 T0 = <Node>
 T1 = Struct  M0:1  ; { a }
 T2 = Struct  M1:1  ; { b }
-T3 = Enum    M2:2  ; A | B
+T3 = Variant M2:2  ; A | B
 T4 = Struct  M4:1  ; { e }
 
 [type_members]
@@ -73,8 +73,8 @@ Q:
   05                                        ▶
   06                                        ▶
   07  ...
-  08   !   (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  18
-  11   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose]  18
+  08   !   (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  18
+  11   !   (number) [VariantOpen(M3) Node Set(M1) VariantClose]  18
   14  ──!  _                                08, 11, 14
   16  └─!  _                                08, 11, 14
   18  ─‣┘² _ [Set(M4)]                      06
@@ -93,7 +93,7 @@ Q:
        ●   expression_statement
   16       _                                08, 11, 14
        ●   identifier
-  08       (identifier) [EnumOpen(M2) Node Set(M0) EnumClose]  18
+  08       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  18
        ●   identifier
   18       _ [Set(M4)]                      06
        ●   program

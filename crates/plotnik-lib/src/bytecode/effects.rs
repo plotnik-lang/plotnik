@@ -17,8 +17,8 @@ pub enum EffectKind {
     StructOpen = 4,
     Set = 5,
     StructClose = 6,
-    EnumOpen = 7,
-    EnumClose = 8,
+    VariantOpen = 7,
+    VariantClose = 8,
     Null = 9,
     SuppressBegin = 10,
     SuppressEnd = 11,
@@ -55,7 +55,7 @@ pub enum EffectSuppression {
 pub enum ValueFrameKind {
     Array,
     Struct,
-    Enum,
+    Variant,
     Scalar,
 }
 
@@ -81,8 +81,8 @@ impl EffectKind {
             4 => Self::StructOpen,
             5 => Self::Set,
             6 => Self::StructClose,
-            7 => Self::EnumOpen,
-            8 => Self::EnumClose,
+            7 => Self::VariantOpen,
+            8 => Self::VariantClose,
             9 => Self::Null,
             10 => Self::SuppressBegin,
             11 => Self::SuppressEnd,
@@ -128,8 +128,8 @@ impl EffectKind {
             Self::ArrayClose => FrameAction::Close(ValueFrameKind::Array),
             Self::StructOpen => FrameAction::Open(ValueFrameKind::Struct),
             Self::StructClose => FrameAction::Close(ValueFrameKind::Struct),
-            Self::EnumOpen => FrameAction::Open(ValueFrameKind::Enum),
-            Self::EnumClose => FrameAction::Close(ValueFrameKind::Enum),
+            Self::VariantOpen => FrameAction::Open(ValueFrameKind::Variant),
+            Self::VariantClose => FrameAction::Close(ValueFrameKind::Variant),
             Self::ScalarOpen => FrameAction::Open(ValueFrameKind::Scalar),
             Self::StrClose | Self::BoolClose => FrameAction::Close(ValueFrameKind::Scalar),
             _ => return None,
@@ -141,7 +141,7 @@ impl EffectKind {
     /// effects decoded at the trust boundary pass through this one contract.
     pub fn accepts_payload(self, payload: usize, member_count: usize, span_count: usize) -> bool {
         match self {
-            Self::Set | Self::EnumOpen => payload < member_count,
+            Self::Set | Self::VariantOpen => payload < member_count,
             Self::SpanStartAt | Self::SpanStart | Self::SpanEnd => payload < span_count,
             Self::BoolClose | Self::BoolValue => payload <= 1,
             _ => payload == 0,

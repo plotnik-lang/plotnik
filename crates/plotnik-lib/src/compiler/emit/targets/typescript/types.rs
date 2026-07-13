@@ -123,7 +123,7 @@ impl<'a> SchemaEmitter<'a> {
         }
         match item.kind {
             OutputItemKind::Struct => self.emit_interface(&name, item.ty),
-            OutputItemKind::Enum => self.emit_enum(&name, item.ty),
+            OutputItemKind::Variant => self.emit_variant(&name, item.ty),
             OutputItemKind::Alias | OutputItemKind::VoidDef => {
                 let body = self.render_shape(item.ty);
                 self.emit_type_decl(&name, item.ty, body);
@@ -193,7 +193,7 @@ impl<'a> SchemaEmitter<'a> {
         self.sink.push("\n\n");
     }
 
-    fn emit_enum(&mut self, name: &str, ty: TypeId) {
+    fn emit_variant(&mut self, name: &str, ty: TypeId) {
         emit_export(&mut self.sink, self.config.export);
         self.sink.styled(Style::Dim, "type");
         self.sink.push(" ");
@@ -204,16 +204,16 @@ impl<'a> SchemaEmitter<'a> {
         self.sink.styled(Style::Dim, "=");
         self.sink.push("\n");
 
-        let TypeShape::Enum(variants) = self.schema.types.expect_type_shape(ty) else {
-            unreachable!("enum output item has an enum shape");
+        let TypeShape::Variant(cases) = self.schema.types.expect_type_shape(ty) else {
+            unreachable!("variant output item has a variant shape");
         };
         let scope = self
             .schema
             .layout()
             .scope(ty)
-            .expect("enum output has a capture scope");
-        let last = variants.len().saturating_sub(1);
-        for (position, (&symbol, &payload)) in variants.iter().enumerate() {
+            .expect("variant output has a capture scope");
+        let last = cases.len().saturating_sub(1);
+        for (position, (&symbol, &payload)) in cases.iter().enumerate() {
             let member = scope.absolute_index(position as u16);
             let rendered = self.render_variant(
                 &self.name(symbol),
@@ -272,9 +272,9 @@ impl<'a> SchemaEmitter<'a> {
                 out
             }
             TypeShape::Struct(_) => self.inline_struct(ty, false),
-            TypeShape::Enum(variants) => {
+            TypeShape::Variant(cases) => {
                 let mut out = Sink::new();
-                for (position, (&name, &payload)) in variants.iter().enumerate() {
+                for (position, (&name, &payload)) in cases.iter().enumerate() {
                     if position > 0 {
                         out.push(" ");
                         out.styled(Style::Dim, "|");

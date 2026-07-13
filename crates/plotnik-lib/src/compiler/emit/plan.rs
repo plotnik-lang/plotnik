@@ -14,7 +14,7 @@ pub(crate) use super::matcher::{
     StateOrigin, StatePlan, StatePlanKind,
 };
 pub(crate) use super::replay::{
-    ReplayItem, ReplayItemKind, ReplayPlan, ReplayScopePlan, ReplayValuePlan, ReplayVariantPlan,
+    ReplayCasePlan, ReplayItem, ReplayItemKind, ReplayPlan, ReplayScopePlan, ReplayValuePlan,
 };
 
 /// Everything a generated module shares across target languages.

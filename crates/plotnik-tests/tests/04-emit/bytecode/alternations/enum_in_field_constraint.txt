@@ -13,8 +13,8 @@ Q:
   01                                        ▶
   02   !   (pair)                           08
   03  ─‣┘  _ [Set(kind)]                    01
-  05   !   (identifier) [EnumOpen(A) Node Set(a) EnumClose]  03
-  06   !   (number) [EnumOpen(B) EnumClose]  03
+  05   !   (identifier) [VariantOpen(A) Node Set(a) VariantClose]  03
+  06   !   (number) [VariantOpen(B) VariantClose]  03
   08  └‣─  key: _                           05, 06
 
 Q (entrypoint):
@@ -40,7 +40,7 @@ S10 "key"
 T0 = <Void>
 T1 = <Node>
 T2 = Struct  M0:1  ; { a }
-T3 = Enum    M1:2  ; A | B
+T3 = Variant M1:2  ; A | B
 T4 = Struct  M3:1  ; { kind }
 
 [type_members]
@@ -64,8 +64,8 @@ Q:
   05                                        ▶
   06                                        ▶
   07  ...
-  08   !   (identifier) [EnumOpen(M1) Node Set(M0) EnumClose]  16
-  11   !   (number) [EnumOpen(M2) EnumClose]  16
+  08   !   (identifier) [VariantOpen(M1) Node Set(M0) VariantClose]  16
+  11   !   (number) [VariantOpen(M2) VariantClose]  16
   13  └‣─  key: _                           08, 11
   15  ...
   16  ─‣┘  _ [Set(M3)]                      06

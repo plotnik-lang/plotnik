@@ -587,7 +587,7 @@ impl NfaBuilder<'_> {
                 // Suppress bracket keeps the structural match but discards the
                 // definition's output effects, matching the void that inference
                 // assigns to a bare reference. Non-consuming post effects (an
-                // enclosing variant's EnumClose, a scope close) run after the
+                // enclosing variant type's VariantClose, a scope close) run after the
                 // bracket, outside the discarded region.
                 let mut close_effects = vec![EffectIR::suppress_end()];
                 close_effects.extend(capture.post);
@@ -617,7 +617,7 @@ impl NfaBuilder<'_> {
             return call_entry;
         }
 
-        // Wrap with pre-effects epsilon (e.g., EnumOpen for labeled alternations).
+        // Wrap with pre-effects epsilon (e.g., VariantOpen for labeled alternations).
         self.emit_effects_epsilon(call_entry, capture.pre, CaptureEffects::default())
     }
 
@@ -794,7 +794,7 @@ impl NfaBuilder<'_> {
             let body_entry = self.wrap_def_body_entry(body_entry, def_span);
             self.emit_struct_step_with_pre(body_entry, pre)
         } else if is_captured {
-            // Scalar-valued (enum) body: it leaves its value pending; the
+            // Scalar-valued (variant) body: it leaves its value pending; the
             // consumer chain runs after it on either continuation.
             let set_match = self.emit_effects_if_nonempty(match_exit, post.clone());
             let set_skip = match skip_exit {
@@ -1211,7 +1211,7 @@ impl NfaBuilder<'_> {
             self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
         let inner_entry =
             self.dispatch_pattern(&inner, PatternCtx::with_value(set_step, nav_override));
-        // The enclosing variant's `Enum`-open (in `pre`) must run before the
+        // The enclosing variant type's `VariantOpen` (in `pre`) must run before the
         // inner produces its pending value; routing it through the trailing
         // `Set` step would drop it and unbalance the scope.
         self.wrap_entry_pre(inner_entry, pre)
@@ -1275,7 +1275,7 @@ impl NfaBuilder<'_> {
     /// The one output source that survives is a definition call (shared code),
     /// which the call site brackets itself (`RefLowering::SuppressedCall`).
     ///
-    /// `outer.pre`/`outer.post` (e.g. an enum variant's `Enum`-open/`EndEnum`)
+    /// `outer.pre`/`outer.post` (e.g. a case's `VariantOpen`/`VariantClose`)
     /// belong to the enclosing scope and run outside the suppressed region.
     fn compile_suppressive(
         &mut self,

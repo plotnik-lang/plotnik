@@ -182,7 +182,7 @@ impl NfaBuilder<'_> {
     ///
     /// `outer_capture.pre` runs in the enclosing scope before the struct opens
     /// (e.g. an alternative's default-value effects, or a variant's
-    /// `Enum`); dropping it would lose those and close a scope that never opened.
+    /// `VariantOpen`); dropping it would lose those and close a scope that never opened.
     /// `@cap` is resolved by the caller, against the enclosing scope.
     pub(super) fn compile_struct_capture(
         &mut self,
@@ -398,7 +398,7 @@ impl NfaBuilder<'_> {
     ///
     /// The struct-scope counterpart of [`emit_arr_step`](Self::emit_arr_step),
     /// used by split-exit struct captures to open the struct after the enclosing
-    /// scope's pre-effects (e.g. an enum variant's `Enum`).
+    /// scope's pre-effects (e.g. a variant case's `VariantOpen`).
     pub(super) fn emit_struct_step_with_pre(
         &mut self,
         successor: Label,

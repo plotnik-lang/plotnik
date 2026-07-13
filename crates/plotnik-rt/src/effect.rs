@@ -24,10 +24,10 @@ pub enum RuntimeEffect<'t> {
     Set(u16),
     /// End struct scope.
     StructClose,
-    /// Begin enum variant at variant index.
-    EnumOpen(u16),
-    /// End enum variant.
-    EnumClose,
+    /// Begin a variant case at its member index.
+    VariantOpen(u16),
+    /// End a variant case.
+    VariantClose,
     /// Null placeholder (for optional/alternation).
     Null,
     /// Begin one value-local scalar provenance frame.

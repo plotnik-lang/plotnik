@@ -13,7 +13,7 @@ warning: capture type `bool` replaces the captured value with a boolean
 5 |     } @seen :: bool
   |             ^^^^^^^
   |
-help: the replaced fields, variants, or scalar payload will not be returned
+help: the replaced fields, cases, or scalar payload will not be returned
 ---------------------- NFA -----------------------
 [entrypoints]
 Q = 14

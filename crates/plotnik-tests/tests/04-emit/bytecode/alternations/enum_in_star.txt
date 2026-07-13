@@ -14,8 +14,8 @@ Q:
   02   !   (program)                        17
   03  ─‣┘  _ [ArrayClose Set(statements)]   01
   05  -ε-  [ArrayClose Set(statements)]     01
-  07   !   (expression_statement) [EnumOpen(Expression) Node Set(expression) EnumClose Push]  11, 03
-  08   !   (debugger_statement) [EnumOpen(Debugger) Node Set(debugger) EnumClose Push]  11, 03
+  07   !   (expression_statement) [VariantOpen(Expression) Node Set(expression) VariantClose Push]  11, 03
+  08   !   (debugger_statement) [VariantOpen(Debugger) Node Set(debugger) VariantClose Push]  11, 03
   11  ──!  _                                07, 08, 11
   12  └─!  _                                07, 08, 11
   17  -ε-  [ArrayOpen]                      12, 05
@@ -43,7 +43,7 @@ S10 "debugger_statement"
 T0 = <Node>
 T1 = Struct  M0:1  ; { expression }
 T2 = Struct  M1:1  ; { debugger }
-T3 = Enum    M2:2  ; Expression | Debugger
+T3 = Variant M2:2  ; Expression | Debugger
 T4 = ArrayStar(T3)  ; QStatements*
 T5 = Struct  M4:1  ; { statements }
 
@@ -70,8 +70,8 @@ Q:
   06                                        ▶
   07  ...
   08  -ε-  [ArrayClose Set(M4)]             06
-  10   !   (expression_statement) [EnumOpen(M2) Node Set(M0) EnumClose Push]  16, 22
-  13   !   (debugger_statement) [EnumOpen(M3) Node Set(M1) EnumClose Push]  16, 22
+  10   !   (expression_statement) [VariantOpen(M2) Node Set(M0) VariantClose Push]  16, 22
+  13   !   (debugger_statement) [VariantOpen(M3) Node Set(M1) VariantClose Push]  16, 22
   16  ──!  _                                10, 13, 16
   18  └─!  _                                10, 13, 16
   20  -ε-  [ArrayOpen]                      18, 08

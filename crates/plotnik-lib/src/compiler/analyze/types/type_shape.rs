@@ -23,7 +23,7 @@ pub const TYPE_BOOL: TypeId = TypeId(PrimitiveType::Bool.index() as u32);
 /// The shape of an inferred type, determining its structure.
 ///
 /// This represents the inference-time type representation which carries
-/// actual data (fields, variants, inner types). Distinct from
+/// actual data (fields, cases, inner types). Distinct from
 /// `type_system::TypeKind`, the bytecode discriminant.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeShape {
@@ -39,8 +39,8 @@ pub enum TypeShape {
     Custom(Symbol),
     /// Struct with named fields.
     Struct(BTreeMap<Symbol, FieldInfo>),
-    /// Enum from an alternation with branch labels.
-    Enum(BTreeMap<Symbol, TypeId>),
+    /// Variant type from a labeled alternation.
+    Variant(BTreeMap<Symbol, TypeId>),
     /// Array type with element type.
     Array { element: TypeId, non_empty: bool },
     /// Optional wrapper.
@@ -53,14 +53,14 @@ type FieldTypeIds<'a> = std::iter::Map<
     std::collections::btree_map::Values<'a, Symbol, FieldInfo>,
     fn(&FieldInfo) -> TypeId,
 >;
-type VariantTypeIds<'a> =
+type CasePayloadTypeIds<'a> =
     std::iter::Copied<std::collections::btree_map::Values<'a, Symbol, TypeId>>;
 
 pub struct TypeShapeChildIds<'a>(TypeShapeChildIdsInner<'a>);
 
 enum TypeShapeChildIdsInner<'a> {
     Fields(FieldTypeIds<'a>),
-    Variants(VariantTypeIds<'a>),
+    Cases(CasePayloadTypeIds<'a>),
     One(std::option::IntoIter<TypeId>),
     Empty(std::iter::Empty<TypeId>),
 }
@@ -71,7 +71,7 @@ impl Iterator for TypeShapeChildIds<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         match &mut self.0 {
             TypeShapeChildIdsInner::Fields(ids) => ids.next(),
-            TypeShapeChildIdsInner::Variants(ids) => ids.next(),
+            TypeShapeChildIdsInner::Cases(ids) => ids.next(),
             TypeShapeChildIdsInner::One(id) => id.next(),
             TypeShapeChildIdsInner::Empty(ids) => ids.next(),
         }
@@ -86,7 +86,7 @@ impl TypeShape {
                     .values()
                     .map(field_type_id as fn(&FieldInfo) -> TypeId),
             ),
-            Self::Enum(variants) => TypeShapeChildIdsInner::Variants(variants.values().copied()),
+            Self::Variant(cases) => TypeShapeChildIdsInner::Cases(cases.values().copied()),
             Self::Array { element, .. } | Self::Optional(element) => {
                 TypeShapeChildIdsInner::One(Some(*element).into_iter())
             }

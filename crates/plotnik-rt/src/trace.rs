@@ -140,8 +140,8 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         matches!(self.peek(), Some(RuntimeEffect::StructClose))
     }
 
-    pub fn at_enum_close(&self) -> bool {
-        matches!(self.peek(), Some(RuntimeEffect::EnumClose))
+    pub fn at_variant_close(&self) -> bool {
+        matches!(self.peek(), Some(RuntimeEffect::VariantClose))
     }
 
     pub fn expect_node(&mut self) -> Node<'t> {
@@ -218,10 +218,10 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         }
     }
 
-    pub fn expect_enum_open(&mut self) -> u16 {
+    pub fn expect_variant_open(&mut self) -> u16 {
         match self.next() {
-            RuntimeEffect::EnumOpen(index) => *index,
-            other => self.mismatch("EnumOpen", other),
+            RuntimeEffect::VariantOpen(index) => *index,
+            other => self.mismatch("VariantOpen", other),
         }
     }
 
@@ -260,10 +260,10 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         }
     }
 
-    pub fn expect_enum_close(&mut self) {
+    pub fn expect_variant_close(&mut self) {
         match self.next() {
-            RuntimeEffect::EnumClose => {}
-            other => self.mismatch("EnumClose", other),
+            RuntimeEffect::VariantClose => {}
+            other => self.mismatch("VariantClose", other),
         }
     }
 
@@ -303,7 +303,7 @@ fn build_set_index(entries: &[RuntimeEffect<'_>]) -> Vec<u32> {
             }
             RuntimeEffect::ArrayClose
             | RuntimeEffect::StructClose
-            | RuntimeEffect::EnumClose
+            | RuntimeEffect::VariantClose
             | RuntimeEffect::StrClose
             | RuntimeEffect::BoolClose(_) => {
                 outer.push(cur);
@@ -311,7 +311,7 @@ fn build_set_index(entries: &[RuntimeEffect<'_>]) -> Vec<u32> {
             }
             RuntimeEffect::ArrayOpen
             | RuntimeEffect::StructOpen
-            | RuntimeEffect::EnumOpen(_)
+            | RuntimeEffect::VariantOpen(_)
             | RuntimeEffect::ScalarOpen => {
                 cur = outer
                     .pop()

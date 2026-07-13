@@ -426,7 +426,7 @@ impl<'a> NfaBuilder<'a> {
             Pattern::SeqPattern(s) => self.compile_seq(s, ctx),
             Pattern::Alternation(alternation) => {
                 // Inference decides tagging by consumption: a consumed labeled
-                // alternation flows `Value(enum)`; an unconsumed one degrades
+                // alternation flows `Value(variant)`; an unconsumed one degrades
                 // (fields or void) and compiles without variant scopes. A
                 // suppressed region discards the value, so even a consumed
                 // labeled alternation compiles structurally there.

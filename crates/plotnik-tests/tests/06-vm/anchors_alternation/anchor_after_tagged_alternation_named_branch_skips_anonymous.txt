@@ -43,7 +43,7 @@ S11 "identifier"
 
 [type_defs]
 T0 = <Void>
-T1 = Enum    M0:2  ; A | B
+T1 = Variant M0:2  ; A | B
 T2 = Struct  M2:1  ; { t }
 
 [type_members]
@@ -68,8 +68,8 @@ Q:
   07  ─‣┘³ _                                06
   08  ─◦─  (identifier) [Set(M2)]           07
   10  ─•─  (identifier) [Set(M2)]           07
-  12   !   (number) [EnumOpen(M0) EnumClose]  10
-  14   !   "+" [EnumOpen(M1) EnumClose]     08
+  12   !   (number) [VariantOpen(M0) VariantClose]  10
+  14   !   "+" [VariantOpen(M1) VariantClose]  08
   16  ──!  _                                12, 14, 16
   18  └─!  _                                12, 14, 16
   20  └‣─  (binary_expression)              18
@@ -90,7 +90,7 @@ Q:
        ●   binary_expression
   18       _                                12, 14, 16
        ●   number
-  12       (number) [EnumOpen(M0) EnumClose]  10
+  12       (number) [VariantOpen(M0) VariantClose]  10
        ●   number
   10       (identifier) [Set(M2)]           07
        ○   *

@@ -35,7 +35,7 @@ S7 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:1  ; { id }
-T2 = Enum    M1:1  ; A
+T2 = Variant M1:1  ; A
 T3 = Struct  M2:1  ; { x }
 T4 = Optional(T0)  ; <Node>?
 
@@ -58,12 +58,12 @@ Q:
   03  -ε-  [StructClose]                    05
   05                                        ▶
   06   !   (identifier) [Node Set(M0)]      08
-  08  ─‣┘  _ [EnumClose Set(M2)]            10
+  08  ─‣┘  _ [VariantClose Set(M2)]         10
   10                                        ▶
   11  ──!  _                                06, 11
-  13   !   _ [EnumOpen(M1)]                 06, 11
+  13   !   _ [VariantOpen(M1)]              06, 11
   15  ...
-  16  -ε-  [EnumOpen(M1) Null Set(M0) EnumClose Set(M2)]  10
+  16  -ε-  [VariantOpen(M1) Null Set(M0) VariantClose Set(M2)]  10
   19  ──!  _                                13, 19
   21  └─!  _                                13, 19
   23  ...
@@ -79,7 +79,7 @@ Q:
        ●   program
   21       _                                13, 19
        ●   lexical_declaration
-  13       _ [EnumOpen(M1)]                 06, 11
+  13       _ [VariantOpen(M1)]              06, 11
        ●   lexical_declaration
   06       (identifier) [Node Set(M0)]      08
        ○   lexical_declaration
@@ -88,7 +88,7 @@ Q:
   21  ❮❮❮ 
   19       _                                13, 19
   24  ❮❮❮ 
-  16  -ε-  [EnumOpen(M1) Null Set(M0) EnumClose Set(M2)]  10
+  16  -ε-  [VariantOpen(M1) Null Set(M0) VariantClose Set(M2)]  10
   10   ◀   (@24)                            
 
 Q:

@@ -578,7 +578,7 @@ fn forged_span_effect_payload_out_of_range_is_rejected() {
 
 #[test]
 fn forged_oob_member_operand_is_rejected() {
-    // A `Set`/`EnumOpen` payload indexes the type-member table via the materializer's
+    // A `Set`/`VariantOpen` payload indexes the type-member table via the materializer's
     // `get_member`, which asserts the index is in bounds.
     let mut bytes = emit_bytes(STRUCT_QUERY);
     let members = Module::load_compiler_output(&bytes)
@@ -591,10 +591,10 @@ fn forged_oob_member_operand_is_rejected() {
             let e = u16::from_le_bytes([bytes[off], bytes[off + 1]]);
             matches!(
                 EffectKind::try_from_u8((e >> EFFECT_PAYLOAD_BITS) as u8),
-                Some(EffectKind::Set | EffectKind::EnumOpen)
+                Some(EffectKind::Set | EffectKind::VariantOpen)
             )
         })
-        .expect("struct query must emit a Set/EnumOpen effect");
+        .expect("struct query must emit a Set/VariantOpen effect");
     let opcode_bits =
         u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & !(EFFECT_PAYLOAD_MAX as u16);
     let forged = opcode_bits | (members & EFFECT_PAYLOAD_MAX as u16);
@@ -1046,20 +1046,20 @@ fn forged_set_without_producer_is_rejected() {
 }
 
 #[test]
-fn forged_void_enum_variant_with_data_is_rejected() {
-    // The enum branch emits direct fields for a structured variant. Lie that the
-    // variant is tag-only (`Void`): `EnumClose` must reject the data-bearing
+fn forged_void_variant_case_with_data_is_rejected() {
+    // The alternative emits direct fields for a structured variant. Lie that the
+    // variant is tag-only (`Void`): `VariantClose` must reject the data-bearing
     // payload instead of letting materialization silently drop or mis-shape it.
     let mut bytes = emit_bytes(r#"Q = [A: (identifier) @a B: (number)]"#);
-    let enum_open = first_effect_op(&bytes, |op| op == EffectKind::EnumOpen as u16);
-    let variant_member = effect_payload(&bytes, enum_open);
+    let variant_open = first_effect_op(&bytes, |op| op == EffectKind::VariantOpen as u16);
+    let variant_member = effect_payload(&bytes, variant_open);
     let type_id_off = type_member_type_id_off(&bytes, variant_member);
 
     bytes[type_id_off..type_id_off + 2].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged void enum data must be rejected");
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("forged void variant data must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -1067,9 +1067,9 @@ fn forged_void_enum_variant_with_data_is_rejected() {
 }
 
 #[test]
-fn forged_data_enum_variant_without_data_is_rejected() {
-    // A tag-only branch emits `EnumOpen`/`EnumClose` and has no payload effects.
-    // Lie that the variant is non-void by pointing it at the enum type itself.
+fn forged_data_variant_case_without_data_is_rejected() {
+    // A tag-only case emits `VariantOpen`/`VariantClose` and has no payload effects.
+    // Lie that the variant is non-void by pointing it at the variant type itself.
     let mut bytes = emit_bytes(r#"Q = [A: (identifier)]"#);
     let type_count = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
@@ -1080,15 +1080,15 @@ fn forged_data_enum_variant_without_data_is_rejected() {
         "query must emit a non-void type to point at"
     );
 
-    let enum_open = first_effect_op(&bytes, |op| op == EffectKind::EnumOpen as u16);
-    let variant_member = effect_payload(&bytes, enum_open);
+    let variant_open = first_effect_op(&bytes, |op| op == EffectKind::VariantOpen as u16);
+    let variant_member = effect_payload(&bytes, variant_open);
     let type_id_off = type_member_type_id_off(&bytes, variant_member);
 
     bytes[type_id_off..type_id_off + 2].copy_from_slice(&1u16.to_le_bytes());
     reseal(&mut bytes);
 
     let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged missing enum data must be rejected");
+        .expect_err("forged missing variant data must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -1212,10 +1212,10 @@ fn forged_accept_inside_called_def_is_rejected() {
 }
 
 #[test]
-fn forged_enum_wrapper_hiding_callee_write_is_rejected() {
+fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
     // A definition body `Set`s its capture below entry, into the frame its
     // wrapper opened. Retarget that write: swap the wrapper's root
-    // `StructOpen`/`StructClose` for `EnumOpen`/`EnumClose` on a void
+    // `StructOpen`/`StructClose` for `VariantOpen`/`VariantClose` on a void
     // (tag-only) member borrowed from the other entrypoint. The callee's
     // below-entry `Set` then lands data on a void variant — invisible to the
     // wrapper's own walk, because the write happens inside the callee. Only a
@@ -1237,16 +1237,18 @@ fn forged_enum_wrapper_hiding_callee_write_is_rejected() {
                         matches!(def.decode(), TypeDefKind::Primitive(TypeKind::Void))
                     })
             })
-            .expect("query must emit a void (tag-only) enum member")
+            .expect("query must emit a void (tag-only) variant member")
     };
 
     // Both wrappers precede the bodies and only wrappers open frames, so slot
     // order is A's pair then Z's pair; forge Z's.
     let open_slot = nth_effect_op(&bytes, 1, |op| op == EffectKind::StructOpen as u16);
     let close_slot = nth_effect_op(&bytes, 1, |op| op == EffectKind::StructClose as u16);
-    bytes[open_slot..open_slot + 2]
-        .copy_from_slice(&effect_word_with_payload(EffectKind::EnumOpen, void_member));
-    bytes[close_slot..close_slot + 2].copy_from_slice(&effect_word(EffectKind::EnumClose));
+    bytes[open_slot..open_slot + 2].copy_from_slice(&effect_word_with_payload(
+        EffectKind::VariantOpen,
+        void_member,
+    ));
+    bytes[close_slot..close_slot + 2].copy_from_slice(&effect_word(EffectKind::VariantClose));
     reseal(&mut bytes);
 
     let err = Module::load_compiler_output(&bytes)

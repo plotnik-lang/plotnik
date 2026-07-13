@@ -52,7 +52,7 @@ T0 = <Void>
 T1 = <Node>
 T2 = ArrayStar(T1)  ; <Node>*
 T3 = Struct  M0:1  ; { stmts }
-T4 = Enum    M1:2  ; A | B
+T4 = Variant M1:2  ; A | B
 T5 = Struct  M3:1  ; { x }
 
 [type_members]
@@ -76,15 +76,15 @@ Q:
   05                                        ▶
   06                                        ▶
   07  ...
-  08  -ε-  [ArrayClose Set(M0) EnumClose Set(M3)]  23
+  08  -ε-  [ArrayClose Set(M0) VariantClose Set(M3)]  23
   11   !   (expression_statement) [Node Push]  13, 08
   13  ──!  _                                11, 13
   15  ...
   16   !   _ [ArrayOpen]                    11, 13
-  18  -ε-  [EnumOpen(M1)]                   16
-  20  -ε-  [EnumOpen(M1) ArrayOpen ArrayClose Set(M0) EnumClose Set(M3)]  06
+  18  -ε-  [VariantOpen(M1)]                16
+  20  -ε-  [VariantOpen(M1) ArrayOpen ArrayClose Set(M0) VariantClose Set(M3)]  06
   23  ─‣┘  _                                06
-  24   !   (debugger_statement) [EnumOpen(M2) EnumClose Set(M3)]  23
+  24   !   (debugger_statement) [VariantOpen(M2) VariantClose Set(M3)]  23
   26  ──!  _                                18, 24, 26
   28  └─!  _                                18, 24, 26
   30  ...
@@ -101,7 +101,7 @@ Q:
        ●   program
   28       _                                18, 24, 26
        ●   expression_statement
-  18  -ε-  [EnumOpen(M1)]                   16
+  18  -ε-  [VariantOpen(M1)]                16
   16       _ [ArrayOpen]                    11, 13
        ●   expression_statement
   11       (expression_statement) [Node Push]  13, 08
@@ -112,7 +112,7 @@ Q:
        ●   expression_statement
   13       _                                11, 13
   11  ❮❮❮ 
-  08  -ε-  [ArrayClose Set(M0) EnumClose Set(M3)]  23
+  08  -ε-  [ArrayClose Set(M0) VariantClose Set(M3)]  23
   23       _                                06
        ●   program
   06   ◀   (@32)                            

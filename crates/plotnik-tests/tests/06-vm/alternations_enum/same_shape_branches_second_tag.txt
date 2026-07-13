@@ -50,7 +50,7 @@ S11 "string"
 T0 = <Node>
 T1 = Struct  M0:1  ; { x }
 T2 = Struct  M1:1  ; { y }
-T3 = Enum    M2:2  ; A | B
+T3 = Variant M2:2  ; A | B
 T4 = Struct  M4:1  ; { item }
 
 [type_members]
@@ -73,14 +73,14 @@ Q:
   02       (@24)                            24 : 03
   03  -ε-  [StructClose]                    05
   05                                        ▶
-  06  ─‣┘  _ [EnumClose]                    08
+  06  ─‣┘  _ [VariantClose]                 08
   08  ─‣┘  _ [Set(M4)]                      10
   10                                        ▶
   11  └‣─  (identifier) [Node Set(M0)]      06
-  13   !   (expression_statement) [EnumOpen(M2)]  11
+  13   !   (expression_statement) [VariantOpen(M2)]  11
   15  ...
   16  └‣─  (string) [Node Set(M1)]          06
-  18   !   (expression_statement) [EnumOpen(M3)]  16
+  18   !   (expression_statement) [VariantOpen(M3)]  16
   20  ──!  _                                13, 18, 20
   22  └─!  _                                13, 18, 20
   24   !   (program)                        22
@@ -95,16 +95,16 @@ Q:
        ●   program
   22       _                                13, 18, 20
        ●   expression_statement
-  13       (expression_statement) [EnumOpen(M2)]  11
+  13       (expression_statement) [VariantOpen(M2)]  11
        ●   expression_statement
   11       (identifier) [Node Set(M0)]      06
        ○   string
   22  ❮❮❮ 
-  18       (expression_statement) [EnumOpen(M3)]  16
+  18       (expression_statement) [VariantOpen(M3)]  16
        ●   expression_statement
   16       (string) [Node Set(M1)]          06
        ●   string
-  06       _ [EnumClose]                    08
+  06       _ [VariantClose]                 08
        ●   expression_statement
   08       _ [Set(M4)]                      10
        ●   program

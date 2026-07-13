@@ -286,7 +286,7 @@ impl InferVisitor<'_, '_> {
                         builder.related_to(Span::new(source, site), "and a different type here");
                 }
                 builder
-                    .hint("make every branch produce the same type, or label the branches for an enum")
+                    .hint("make every alternative produce the same type, or label the alternatives for a variant type")
                     .emit();
             }
         }

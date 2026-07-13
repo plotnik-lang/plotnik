@@ -19,8 +19,8 @@ pub enum TypeKind {
     ArrayOneOrMore = 4,
     /// Record with named fields.
     Struct = 5,
-    /// Discriminated union with named variants.
-    Enum = 6,
+    /// Variant type with named cases.
+    Variant = 6,
     /// Named reference to another type (e.g., `type Foo = Bar`).
     Alias = 7,
     /// Borrowed source text.
@@ -39,7 +39,7 @@ impl TypeKind {
             3 => Some(Self::ArrayZeroOrMore),
             4 => Some(Self::ArrayOneOrMore),
             5 => Some(Self::Struct),
-            6 => Some(Self::Enum),
+            6 => Some(Self::Variant),
             7 => Some(Self::Alias),
             8 => Some(Self::Str),
             9 => Some(Self::Bool),
@@ -55,7 +55,7 @@ impl TypeKind {
     /// Whether this is a wrapper type (Optional, ArrayZeroOrMore, ArrayOneOrMore).
     ///
     /// Wrapper types contain a single inner type.
-    /// Struct and Enum types carry named members instead.
+    /// Struct and Variant types carry named members instead.
     pub fn is_wrapper(self) -> bool {
         matches!(
             self,

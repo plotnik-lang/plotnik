@@ -500,10 +500,12 @@ mod debug_impl {
     fn scope_role(op: EffectKind) -> Option<ScopeRole> {
         use EffectKind::*;
         let role = match op {
-            ArrayOpen | StructOpen | EnumOpen | SuppressBegin | ScalarOpen => ScopeRole::Open(op),
+            ArrayOpen | StructOpen | VariantOpen | SuppressBegin | ScalarOpen => {
+                ScopeRole::Open(op)
+            }
             ArrayClose => ScopeRole::Close(ArrayOpen),
             StructClose => ScopeRole::Close(StructOpen),
-            EnumClose => ScopeRole::Close(EnumOpen),
+            VariantClose => ScopeRole::Close(VariantOpen),
             SuppressEnd => ScopeRole::Close(SuppressBegin),
             StrClose | BoolClose => ScopeRole::Close(ScalarOpen),
             Node | Push | Set | Null | ScalarMark | NodeStr | NodeBool | BoolValue

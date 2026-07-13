@@ -42,7 +42,7 @@ S7 "comment"
 [type_defs]
 T0 = <Node>
 T1 = Struct  M0:1  ; { c }
-T2 = Enum    M1:1  ; A
+T2 = Variant M1:1  ; A
 T3 = ArrayStar(T2)  ; QItems*
 T4 = Struct  M2:1  ; { items }
 T5 = Optional(T0)  ; <Node>?
@@ -68,10 +68,10 @@ Q:
   06                                        ▶
   07  ...
   08  -ε-  [ArrayClose Set(M2)]             06
-  10  -ε-  [EnumClose Push]                 18, 24
+  10  -ε-  [VariantClose Push]              18, 24
   12   !   (comment) [Node Set(M0)]         10
   14  ──!  _                                12, 14
-  16   !   _ [EnumOpen(M1)]                 12, 14
+  16   !   _ [VariantOpen(M1)]              12, 14
   18  ──!  _                                16, 18
   20  └─!  _                                16, 18
   22  -ε-  [ArrayOpen]                      20, 08
@@ -89,14 +89,14 @@ Q:
   22  -ε-  [ArrayOpen]                      20, 08
   20       _                                16, 18
        ●   comment
-  16       _ [EnumOpen(M1)]                 12, 14
+  16       _ [VariantOpen(M1)]              12, 14
        ●   comment
   12       (comment) [Node Set(M0)]         10
        ●   comment
-  10  -ε-  [EnumClose Push]                 18, 24
+  10  -ε-  [VariantClose Push]              18, 24
   18       _                                16, 18
        ●   expression_statement
-  16       _ [EnumOpen(M1)]                 12, 14
+  16       _ [VariantOpen(M1)]              12, 14
        ●   expression_statement
   12       (comment) [Node Set(M0)]         10
        ○   expression_statement

@@ -17,10 +17,10 @@ Inner:
 Q:
   03  -ε-                                   09, 10
   04                                        ▶
-  06  -ε-  [SuppressEnd EnumClose Set(item)]  04
+  06  -ε-  [SuppressEnd VariantClose Set(item)]  04
   07   !   (Inner)                          02 : 06
-  09  -ε-  [EnumOpen(A) SuppressBegin]      07
-  10   !   (number) [EnumOpen(B) Node Set(b) EnumClose Set(item)]  04
+  09  -ε-  [VariantOpen(A) SuppressBegin]   07
+  10   !   (number) [VariantOpen(B) Node Set(b) VariantClose Set(item)]  04
 
 Inner (entrypoint):
   12                                        ▶
@@ -52,7 +52,7 @@ T0 = <Void>
 T1 = <Node>
 T2 = Struct  M0:1  ; { name }
 T3 = Struct  M1:1  ; { b }
-T4 = Enum    M2:2  ; A | B
+T4 = Variant M2:2  ; A | B
 T5 = Struct  M4:1  ; { item }
 
 [type_members]
@@ -86,8 +86,8 @@ Q:
   12                                        ▶
   13   !   (identifier) [Node Set(M0)]      12
   15                                        ▶
-  16  -ε-  [SuppressEnd EnumClose Set(M4)]  15
+  16  -ε-  [SuppressEnd VariantClose Set(M4)]  15
   18   !   (@13)                            13 : 16
-  19  -ε-  [EnumOpen(M2) SuppressBegin]     18
-  21   !   (number) [EnumOpen(M3) Node Set(M1) EnumClose Set(M4)]  15
+  19  -ε-  [VariantOpen(M2) SuppressBegin]  18
+  21   !   (number) [VariantOpen(M3) Node Set(M1) VariantClose Set(M4)]  15
   24  -ε-                                   19, 21

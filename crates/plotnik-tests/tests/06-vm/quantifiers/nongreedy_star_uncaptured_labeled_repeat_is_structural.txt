@@ -28,7 +28,7 @@ S6 "Q"
 
 [type_defs]
 T0 = <Void>
-T1 = Enum    M0:1  ; X
+T1 = Variant M0:1  ; X
 
 [type_members]
 M0: S1 → T0  ; X: <Void>
@@ -49,7 +49,7 @@ Q:
   02       (@20)                            20 : 03
   03                                        ▶
   04                                        ▶
-  05   !   (expression_statement) [EnumOpen(M0) EnumClose]  04
+  05   !   (expression_statement) [VariantOpen(M0) VariantClose]  04
   07                                        ▶
   08  └•─  (debugger_statement)             15
   09  ─•─  (debugger_statement)             15
@@ -78,7 +78,7 @@ Q:
        ▶   (@05)
 
 @05:
-  05       (expression_statement) [EnumOpen(M0) EnumClose]  04
+  05       (expression_statement) [VariantOpen(M0) VariantClose]  04
        ●   expression_statement
   04   ◀   (@05)                            
 
@@ -94,7 +94,7 @@ Q:
        ▶   (@05)
 
 @05:
-  05       (expression_statement) [EnumOpen(M0) EnumClose]  04
+  05       (expression_statement) [VariantOpen(M0) VariantClose]  04
        ●   expression_statement
   04   ◀   (@05)                            
 

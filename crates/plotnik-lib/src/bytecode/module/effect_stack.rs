@@ -3,8 +3,8 @@
 //! The runtime `ValueMaterializer` is a stack machine over the flat effect
 //! sequence of the winning path. Five of its operations panic on an ill-shaped
 //! builder stack — `Push`/`ArrayClose` want an `Array` on top, `Set` a `Struct` or
-//! `Enum`, `StructClose` a `Struct`, `EnumClose` an `Enum`
-//! (`crates/plotnik-lib/src/vm/engine/materializer.rs`) — plus `EnumClose`
+//! `Variant`, `StructClose` a `Struct`, `VariantClose` a `Variant`
+//! (`crates/plotnik-lib/src/vm/engine/materializer.rs`) — plus `VariantClose`
 //! panics when a payload arrives both as the pending value and as direct
 //! fields, the end-of-log assert panics on unclosed frames, and the VM's
 //! `emit_effect` panics if a `SuppressEnd` underflows the suppression counter
@@ -34,8 +34,8 @@
 //! The panic-freedom property is per *path*: every graph path must replay to a
 //! well-shaped effect sequence. Distinct paths may legally reach the same step
 //! with different abstract states — the dedup pass hash-conses structurally
-//! identical branch tails, so e.g. two enum branches share one `EnumClose`
-//! step, reached once under `Enum(A)` and once under `Enum(B)`. Each arrival
+//! identical branch tails, so e.g. two alternatives share one `VariantClose`
+//! step, reached once under `Variant(A)` and once under `Variant(B)`. Each arrival
 //! is individually sound (dedup is a bisimulation quotient: it preserves the
 //! op-labeled path set exactly), so the walk keeps a *set* of states per step
 //! and verifies every effect against every state that reaches it. Requiring a
@@ -54,7 +54,7 @@
 //!   never rebalance — every exit requires an empty local stack, so some path
 //!   through such a cycle is provably ill-formed. The suppression counter and
 //!   span stack get the same treatment against their own opener counts.
-//! - **A state budget.** Frame payloads (enum member, `got_data`, pending) are
+//! - **A state budget.** Frame payloads (variant member, `got_data`, pending) are
 //!   finite but can multiply across nesting; a hard cap on states explored per
 //!   body bounds load time on pathological compiler output. Valid output stays
 //!   far below it: the states at a merged step correspond to the pre-dedup
@@ -79,9 +79,9 @@
 //! wrapper against the stabilized summaries.
 //!
 //! `sets_caller_top` exists because a below-entry `Set` mutates state the
-//! caller's walk otherwise cannot see: setting a field on the caller's *enum*
-//! frame flips the data the frame will carry at its `EnumClose`. A call site
-//! whose local top is an enum therefore forks the state — one branch assumes
+//! caller's walk otherwise cannot see: setting a field on the caller's *variant*
+//! frame flips the data the frame will carry at its `VariantClose`. A call site
+//! whose local top is a variant therefore forks the state — one path assumes
 //! the write happened, one that it did not — so a stale `got_data` can never
 //! smuggle a "payload arrived both as pending value and as direct fields"
 //! panic past the check.
@@ -100,7 +100,7 @@
 //! ## Scope
 //!
 //! This pass proves the release-build panic surface unreachable, plus the
-//! span-pairing and enum void/data-consistency assertions. Full agreement
+//! span-pairing and variant void/data-consistency assertions. Full agreement
 //! between materialized values and the declared type tables (checked by
 //! `debug_verify_type` in debug builds) is a compiler self-check, not a load
 //! guarantee: malformed bytecode can still declare types its effects do not
@@ -120,7 +120,7 @@ use crate::bytecode::{Effect, EffectKind, FrameAction, TypeDefKind, TypeKind, Va
 enum FrameKind {
     Array,
     Struct,
-    Enum { member: u16, got_data: bool },
+    Variant { member: u16, got_data: bool },
     Scalar,
 }
 
@@ -129,7 +129,7 @@ impl FrameKind {
         match self {
             FrameKind::Array => KS_ARRAY,
             FrameKind::Struct => KS_STRUCT,
-            FrameKind::Enum { .. } => KS_ENUM,
+            FrameKind::Variant { .. } => KS_VARIANT,
             FrameKind::Scalar => KS_SCALAR,
         }
     }
@@ -165,12 +165,12 @@ impl PendingState {
 // `entry_tos` is a set of tolerated caller-top kinds, a 3-bit mask.
 const KS_ARRAY: u8 = 0b001;
 const KS_STRUCT: u8 = 0b010;
-const KS_ENUM: u8 = 0b100;
+const KS_VARIANT: u8 = 0b100;
 const KS_SCALAR: u8 = 0b1000;
 /// No constraint (every kind tolerated): the body never reads its caller's top.
-const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_ENUM | KS_SCALAR;
-/// `Set` targets — a `Struct` or an `Enum` frame.
-const KS_SET: u8 = KS_STRUCT | KS_ENUM;
+const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_VARIANT | KS_SCALAR;
+/// `Set` targets — a `Struct` or a `Variant` frame.
+const KS_SET: u8 = KS_STRUCT | KS_VARIANT;
 
 /// Hard cap on abstract states explored per body walk. Valid output is bounded
 /// by the pre-dedup instruction count (`u16` step space); pathological compiler
@@ -457,7 +457,7 @@ fn analyze(
                     match eff.kind {
                         EffectKind::ArrayOpen
                         | EffectKind::StructOpen
-                        | EffectKind::EnumOpen
+                        | EffectKind::VariantOpen
                         | EffectKind::ScalarOpen => {
                             frame_openers += 1;
                         }
@@ -540,12 +540,12 @@ fn analyze(
                 .map(PendingState::from_bool)
                 .unwrap_or(PendingState::Unknown);
             if summary.sets_caller_top
-                && let Some(FrameKind::Enum {
+                && let Some(FrameKind::Variant {
                     got_data: false, ..
                 }) = stack.last()
             {
                 let mut written = stack.clone();
-                if let Some(FrameKind::Enum { got_data, .. }) = written.last_mut() {
+                if let Some(FrameKind::Variant { got_data, .. }) = written.last_mut() {
                     *got_data = true;
                 }
                 call.push_returns(
@@ -758,7 +758,7 @@ fn apply_effect(
             }
             match state.stack.last_mut() {
                 Some(FrameKind::Struct) => {}
-                Some(FrameKind::Enum { got_data, .. }) => *got_data = true,
+                Some(FrameKind::Variant { got_data, .. }) => *got_data = true,
                 Some(FrameKind::Array | FrameKind::Scalar) => return Err(err()),
                 None => {
                     *state.entry_tos &= KS_SET;
@@ -767,8 +767,10 @@ fn apply_effect(
             }
             *state.pending = PendingState::Empty;
         }
-        ArrayOpen | ArrayClose | StructOpen | StructClose | EnumOpen | EnumClose | ScalarOpen
-        | StrClose | BoolClose => unreachable!("frame effects return before data dispatch"),
+        ArrayOpen | ArrayClose | StructOpen | StructClose | VariantOpen | VariantClose
+        | ScalarOpen | StrClose | BoolClose => {
+            unreachable!("frame effects return before data dispatch")
+        }
     }
     Ok(())
 }
@@ -792,7 +794,7 @@ fn apply_frame_action(
             let frame = match kind {
                 ValueFrameKind::Array => FrameKind::Array,
                 ValueFrameKind::Struct => FrameKind::Struct,
-                ValueFrameKind::Enum => FrameKind::Enum {
+                ValueFrameKind::Variant => FrameKind::Variant {
                     member: effect.payload as u16,
                     got_data: false,
                 },
@@ -800,9 +802,9 @@ fn apply_frame_action(
             };
             state.stack.push(frame);
         }
-        FrameAction::Close(ValueFrameKind::Enum) => match state.stack.pop() {
-            Some(FrameKind::Enum { member, got_data }) => {
-                let is_void = enum_member_is_void(module, member, step)?;
+        FrameAction::Close(ValueFrameKind::Variant) => match state.stack.pop() {
+            Some(FrameKind::Variant { member, got_data }) => {
+                let is_void = variant_member_is_void(module, member, step)?;
                 let data_pending = match *state.pending {
                     PendingState::Full => true,
                     PendingState::Empty => false,
@@ -820,7 +822,7 @@ fn apply_frame_action(
                 ValueFrameKind::Array => FrameKind::Array,
                 ValueFrameKind::Struct => FrameKind::Struct,
                 ValueFrameKind::Scalar => FrameKind::Scalar,
-                ValueFrameKind::Enum => unreachable!("enum close handled above"),
+                ValueFrameKind::Variant => unreachable!("variant close handled above"),
             };
             if state.stack.pop() != Some(expected) || *state.pending == PendingState::Full {
                 return Err(err());
@@ -849,7 +851,7 @@ fn close_span(span_stack: &mut Vec<u16>, id: u16, step: u16) -> Result<(), Modul
     }
 }
 
-fn enum_member_is_void(module: &Module, member: u16, step: u16) -> Result<bool, ModuleError> {
+fn variant_member_is_void(module: &Module, member: u16, step: u16) -> Result<bool, ModuleError> {
     let types = module.types();
     let type_id = types.member_type_id(member as usize);
     let Some(type_def) = types.get(type_id) else {

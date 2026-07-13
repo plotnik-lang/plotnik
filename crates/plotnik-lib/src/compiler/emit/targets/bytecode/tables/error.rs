@@ -23,9 +23,9 @@ pub(in crate::compiler) enum EmitError {
     /// Struct has more fields than the format's u8 member count allows.
     #[error("too many struct fields: {0} (max {max})", max = EmitError::MAX_FIELDS)]
     TooManyFields(usize),
-    /// Enum has more variants than the format's u8 member count allows.
-    #[error("too many enum variants: {0} (max {max})", max = EmitError::MAX_VARIANTS)]
-    TooManyVariants(usize),
+    /// Variant type has more cases than the format's u8 member count allows.
+    #[error("too many variant cases: {0} (max {max})", max = EmitError::MAX_CASES)]
+    TooManyCases(usize),
     /// Too many distinct node kinds (exceeds u16 max).
     #[error("too many node kinds: {0} (max {max})", max = EmitError::MAX_NODE_KINDS)]
     TooManyNodeKinds(usize),
@@ -69,7 +69,7 @@ impl EmitError {
     pub(in crate::compiler) const MAX_TYPE_MEMBERS: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_TYPE_NAMES: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_FIELDS: usize = u8::MAX as usize;
-    pub(in crate::compiler) const MAX_VARIANTS: usize = u8::MAX as usize;
+    pub(in crate::compiler) const MAX_CASES: usize = u8::MAX as usize;
     pub(in crate::compiler) const MAX_NODE_KINDS: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_NODE_FIELDS: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_ENTRYPOINTS: usize = u16::MAX as usize;
@@ -84,7 +84,7 @@ impl EmitError {
                 | Self::TooManyTypes(_)
                 | Self::TooManyTypeNames(_)
                 | Self::TooManyFields(_)
-                | Self::TooManyVariants(_)
+                | Self::TooManyCases(_)
                 | Self::TooManyTransitions(_)
                 | Self::TooManyRegexes(_)
                 | Self::TooManySpans(_)

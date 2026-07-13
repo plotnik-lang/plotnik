@@ -9,7 +9,7 @@ use plotnik_rt::RuntimeEffect;
 
 pub struct ValueMaterializer<'a> {
     source: &'a str,
-    /// Member names resolved once, indexed by the Set/EnumOpen payload.
+    /// Member names resolved once, indexed by the `Set`/`VariantOpen` payload.
     /// Kills the two-table lookup and the string-table UTF-8 walk per effect.
     member_names: Box<[&'a str]>,
 }
@@ -56,7 +56,7 @@ pub fn materialize_verified<'s>(
 enum ValueAccumulator<'s> {
     Array(Vec<Value<'s>>),
     Struct(Vec<(&'s str, Value<'s>)>),
-    Enum {
+    Variant {
         tag: &'s str,
         fields: Vec<(&'s str, Value<'s>)>,
     },
@@ -71,7 +71,7 @@ impl ValueAccumulator<'_> {
         match self {
             ValueAccumulator::Array(_) => "Array",
             ValueAccumulator::Struct(_) => "Struct",
-            ValueAccumulator::Enum { .. } => "Enum",
+            ValueAccumulator::Variant { .. } => "Variant",
             ValueAccumulator::Scalar(_) => "Scalar",
         }
     }
@@ -193,11 +193,11 @@ impl<'a> ValueMaterializer<'a> {
                         .expect("Set requires a produced value (verified at load)");
                     match stack.last_mut() {
                         Some(ValueAccumulator::Struct(fields)) => fields.push((field_name, val)),
-                        Some(ValueAccumulator::Enum { fields, .. }) => {
+                        Some(ValueAccumulator::Variant { fields, .. }) => {
                             fields.push((field_name, val))
                         }
                         other => panic!(
-                            "effect {effect_idx}: Set expects Struct/Enum on stack, found {:?}",
+                            "effect {effect_idx}: Set expects Struct/Variant on stack, found {:?}",
                             other.map(|b| b.kind())
                         ),
                     }
@@ -212,18 +212,18 @@ impl<'a> ValueMaterializer<'a> {
                     };
                     pending = Some(Value::Struct(fields));
                 }
-                RuntimeEffect::EnumOpen(idx) => {
+                RuntimeEffect::VariantOpen(idx) => {
                     let tag = self.resolve_member_name(*idx);
-                    stack.push(ValueAccumulator::Enum {
+                    stack.push(ValueAccumulator::Variant {
                         tag,
                         fields: vec![],
                     });
                 }
-                RuntimeEffect::EnumClose => {
+                RuntimeEffect::VariantClose => {
                     let top = stack.pop();
-                    let Some(ValueAccumulator::Enum { tag, fields }) = top else {
+                    let Some(ValueAccumulator::Variant { tag, fields }) = top else {
                         panic!(
-                            "effect {effect_idx}: EnumClose expects Enum on stack, found {:?}",
+                            "effect {effect_idx}: VariantClose expects Variant on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
@@ -233,11 +233,11 @@ impl<'a> ValueMaterializer<'a> {
                         (None, true) => None,
                         (Some(_), false) => {
                             panic!(
-                                "enum payload arrived both as pending value and as direct fields"
+                                "variant payload arrived both as pending value and as direct fields"
                             )
                         }
                     };
-                    pending = Some(Value::Enum { tag, data });
+                    pending = Some(Value::Variant { tag, data });
                 }
             }
         }

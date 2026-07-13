@@ -36,7 +36,7 @@ S8 "identifier"
 
 [type_defs]
 T0 = <Void>
-T1 = Enum    M0:2  ; A | B
+T1 = Variant M0:2  ; A | B
 T2 = Struct  M2:1  ; { v }
 
 [type_members]
@@ -59,8 +59,8 @@ Q:
   05                                        ▶
   06                                        ▶
   07  ...
-  08   !   (_) [EnumOpen(M0) EnumClose]     16
-  10   !   (identifier) [EnumOpen(M1) EnumClose]  16
+  08   !   (_) [VariantOpen(M0) VariantClose]  16
+  10   !   (identifier) [VariantOpen(M1) VariantClose]  16
   12  ──!  _                                08, 10, 12
   14  └─!  _                                08, 10, 12
   16  ─‣┘² _ [Set(M2)]                      06
@@ -79,7 +79,7 @@ Q:
        ●   expression_statement
   14       _                                08, 10, 12
        ●   identifier
-  08       (_) [EnumOpen(M0) EnumClose]     16
+  08       (_) [VariantOpen(M0) VariantClose]  16
        ●   identifier
   16       _ [Set(M2)]                      06
        ●   program

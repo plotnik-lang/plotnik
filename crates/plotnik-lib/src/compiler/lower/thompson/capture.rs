@@ -24,8 +24,8 @@ use super::scope::Struct;
 /// - `post` effects go on the last item (exit)
 ///
 /// For labeled alternations `[A: body]`:
-/// - `pre` contains `EnumOpen(variant)` for alternative entry
-/// - `post` contains `EnumClose` for alternative exit
+/// - `pre` contains `VariantOpen(case)` for alternative entry
+/// - `post` contains `VariantClose` for alternative exit
 #[derive(Clone, Default)]
 pub struct CaptureEffects {
     /// Effects to place before the compiled subgraph's own effects.
@@ -45,7 +45,7 @@ impl CaptureEffects {
 
     /// Add an inner scope (opens after existing scopes, closes before them).
     ///
-    /// Use for: Struct/EndStruct, Enum/EndEnum, Arr/EndArr, SuppressBegin/SuppressEnd
+    /// Use for paired struct, variant, array, and suppression effects.
     ///
     /// Given existing `pre=[A_Open]`, `post=[A_Close]`, adding inner scope B:
     /// - Result: `pre=[A_Open, B_Open]`, `post=[B_Close, A_Close]`
@@ -55,7 +55,7 @@ impl CaptureEffects {
             matches!(
                 open.kind(),
                 EffectKind::StructOpen
-                    | EffectKind::EnumOpen
+                    | EffectKind::VariantOpen
                     | EffectKind::ArrayOpen
                     | EffectKind::SuppressBegin
             ),
@@ -66,7 +66,7 @@ impl CaptureEffects {
             matches!(
                 close.kind(),
                 EffectKind::StructClose
-                    | EffectKind::EnumClose
+                    | EffectKind::VariantClose
                     | EffectKind::ArrayClose
                     | EffectKind::SuppressEnd
             ),
@@ -138,7 +138,7 @@ pub(super) fn first_unmatched_close(post: &[EffectIR]) -> Option<usize> {
             }
             EffectKind::ArrayClose
             | EffectKind::StructClose
-            | EffectKind::EnumClose
+            | EffectKind::VariantClose
             | EffectKind::SuppressEnd
             | EffectKind::StrClose
             | EffectKind::BoolClose => return Some(i),
@@ -203,8 +203,8 @@ impl NfaBuilder<'_> {
         let mut member_ref = None;
 
         // Only the `Node` mechanism captures the matched node directly. Every
-        // other mechanism (struct scope, pass-through ref/enum/forward, array)
-        // produces its value via EndStruct/EndEnum/EndArr/Call, so the capture itself
+        // other mechanism (struct scope, pass-through ref/variant/forward, array)
+        // produces its value via StructClose/VariantClose/ArrayClose/Call, so the capture itself
         // emits no Node. A bare capture (`@x` with no inner) is a Node.
         let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureKind::Node);
         if is_node_mechanism {
@@ -218,7 +218,7 @@ impl NfaBuilder<'_> {
             let capture_name = &name_token.text()[1..];
             // Suppressed regions never reach here (their captures are inert), so
             // the enclosing scope is a struct at every real capture site — except
-            // an enum-rooted definition body, whose scope carries no fields. Once
+            // a variant-rooted definition body, whose scope carries no fields. Once
             // a struct scope exists, a missing member is our bug.
             if let Some(Struct(type_id)) = self.scope_stack.last().copied()
                 && self
@@ -251,7 +251,7 @@ impl NfaBuilder<'_> {
     ///
     /// For scalar array elements (Node type), we need [Node, Push]
     /// to capture the matched node value.
-    /// For structured elements (Struct/Enum), EndStruct/EndEnum provides the value.
+    /// For structured elements, StructClose/VariantClose provides the value.
     /// For refs returning structured types, Call provides the value.
     pub(super) fn quantifier_needs_node_for_push(&self, pattern: &Pattern) -> bool {
         let Pattern::QuantifiedPattern(quant) = pattern else {
@@ -267,7 +267,7 @@ impl NfaBuilder<'_> {
     /// Whether a quantifier element needs a `Node` effect to produce its value.
     ///
     /// A ref returning a structured type leaves its value pending via Call/Return;
-    /// a struct- or enum-shaped element leaves it pending via EndStruct/EndEnum.
+    /// a struct- or variant-shaped element leaves it pending via StructClose/VariantClose.
     /// Everything else (a plain node match) needs an explicit `Node`.
     pub(super) fn element_needs_node(&self, element: &Pattern) -> bool {
         if self.is_ref_returning_structured(element) {
@@ -286,13 +286,13 @@ impl NfaBuilder<'_> {
             .flow
             .type_id()
             .map(|id| self.ctx.analysis.type_analysis.expect_type_shape(id))
-            .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Enum(_)))
+            .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Variant(_)))
     }
 
     /// Check if pattern is (or wraps) a ref returning a structured type.
     ///
     /// For such refs, we skip the Node effect in captures - the Call leaves
-    /// the structured result (Enum/Struct) pending for Set to consume.
+    /// the structured result pending for Set to consume.
     pub(super) fn is_ref_returning_structured(&self, pattern: &Pattern) -> bool {
         match pattern {
             Pattern::DefRef(_) => self.ctx.analysis.type_analysis.ref_returns_structured(
@@ -321,7 +321,7 @@ impl NfaBuilder<'_> {
 /// - Sequences/alternations with captures: `{(a) @x (b) @y}*`
 /// - Named nodes with bubble captures: `(node (child) @x)*`
 ///
-/// Enums use Enum/EndEnum instead (handled separately).
+/// Variant types use VariantOpen/VariantClose instead (handled separately).
 pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
     let info = type_ctx.expect_pattern_result(inner);
 

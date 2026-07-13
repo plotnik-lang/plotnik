@@ -83,7 +83,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
     fn render_item(&mut self, item: &Item) -> String {
         match item.kind {
             ItemKind::Struct => self.render_struct(item),
-            ItemKind::Enum => self.render_enum(item),
+            ItemKind::Variant => self.render_enum(item),
             ItemKind::Alias => self.render_alias(item),
             ItemKind::VoidDef => self.render_void_marker(item),
         }
@@ -120,8 +120,8 @@ impl<'m, 'a> Emitter<'m, 'a> {
     fn render_enum(&mut self, item: &Item) -> String {
         let types = self.schema.types;
         let interner = self.schema.interner;
-        let TypeShape::Enum(variants) = types.expect_type_shape(item.ty) else {
-            unreachable!("enum item must have an enum shape");
+        let TypeShape::Variant(variants) = types.expect_type_shape(item.ty) else {
+            unreachable!("Rust enum item must have a variant shape");
         };
         let variant_idents = rust_scope_idents(variants.keys().map(|&sym| interner.resolve(sym)));
         let ident = self.item_ident(item.name).to_string();
@@ -197,7 +197,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
                 )
             }
             TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
-            TypeShape::Struct(_) | TypeShape::Enum(_) | TypeShape::Void => {
+            TypeShape::Struct(_) | TypeShape::Variant(_) | TypeShape::Void => {
                 unreachable!("alias items cover non-composite outputs only")
             }
         }
@@ -227,7 +227,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
                 Some(name) => self.named_type(name, ty),
                 None => self.node_type(),
             },
-            TypeShape::Struct(_) | TypeShape::Enum(_) => {
+            TypeShape::Struct(_) | TypeShape::Variant(_) => {
                 let name = self
                     .schema
                     .type_name_of(ty)

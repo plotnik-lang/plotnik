@@ -1,7 +1,7 @@
 //! Unification logic for alternation branches.
 //!
 //! Handles merging PatternFlow from different branches of union alternations.
-//! Consumed enum alternations don't unify — they produce Enum types directly.
+//! Consumed labeled alternations don't unify — they produce variant types directly.
 
 use std::collections::BTreeMap;
 
@@ -162,7 +162,7 @@ fn merge_fields(
 
 /// Unify two type IDs.
 ///
-/// Structs and enums mint a fresh id per occurrence (nominal typing), so two
+/// Structs and variant types mint a fresh id per occurrence (nominal typing), so two
 /// branches capturing structurally identical anonymous composites carry
 /// different ids for the same shape — compare structurally, keeping the first
 /// branch's id. `Void` is the identity element (compatible with any type).

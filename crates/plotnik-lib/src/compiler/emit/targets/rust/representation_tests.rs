@@ -43,7 +43,7 @@ fn recursive_def(wrap: impl FnOnce(&mut TypeAnalysisBuilder, TypeId) -> TypeId) 
         (interner.intern("Leaf"), TYPE_VOID),
         (interner.intern("Rec"), payload),
     ]);
-    let enum_ty = builder.intern_type(TypeShape::Enum(variants));
+    let enum_ty = builder.intern_type(TypeShape::Variant(variants));
     record_def(&mut builder, def, enum_ty);
 
     Fixture {
@@ -91,7 +91,7 @@ fn shared_ref_node_boxes_only_inside_the_cycle() {
         (interner.intern("Leaf"), TYPE_VOID),
         (interner.intern("Rec"), payload),
     ]);
-    let enum_ty = builder.intern_type(TypeShape::Enum(variants));
+    let enum_ty = builder.intern_type(TypeShape::Variant(variants));
     record_def(&mut builder, expr_def, enum_ty);
     let top_struct = builder.intern_struct(BTreeMap::from([(
         interner.intern("expr"),
@@ -210,7 +210,7 @@ fn node_free_enum_needs_no_lifetime() {
         (interner.intern("On"), TYPE_VOID),
         (interner.intern("Off"), TYPE_VOID),
     ]);
-    let enum_ty = builder.intern_type(TypeShape::Enum(variants));
+    let enum_ty = builder.intern_type(TypeShape::Variant(variants));
     let holder = builder.intern_struct(BTreeMap::from([(
         interner.intern("state"),
         FieldInfo::required(enum_ty),

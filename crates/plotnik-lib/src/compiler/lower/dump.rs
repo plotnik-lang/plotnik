@@ -4,7 +4,7 @@
 //! in label space, keeping the resolution the wire format erases: symbolic labels
 //! instead of packed step addresses, definition-name section headers from label
 //! provenance (`Name (consuming):` for the guarded-recursion body variant,
-//! `Name (entrypoint):` for wrappers), real member names on `Set`/`EnumOpen`,
+//! `Name (entrypoint):` for wrappers), real member names on `Set`/`VariantOpen`,
 //! callee names on calls (`(Name+)` marks a consuming-body callee), and inline
 //! predicate text — the IR has no string table to index into.
 
@@ -302,12 +302,12 @@ impl NfaDumper<'_> {
             EffectKind::ArrayClose => "ArrayClose".to_string(),
             EffectKind::StructOpen => "StructOpen".to_string(),
             EffectKind::StructClose => "StructClose".to_string(),
-            EffectKind::EnumClose => "EnumClose".to_string(),
+            EffectKind::VariantClose => "VariantClose".to_string(),
             EffectKind::Null => "Null".to_string(),
             EffectKind::SuppressBegin => "SuppressBegin".to_string(),
             EffectKind::SuppressEnd => "SuppressEnd".to_string(),
             EffectKind::Set => format!("Set({})", self.member_name(e.payload())),
-            EffectKind::EnumOpen => format!("EnumOpen({})", self.member_name(e.payload())),
+            EffectKind::VariantOpen => format!("VariantOpen({})", self.member_name(e.payload())),
             EffectKind::SpanStartAt => format!("SpanStartAt#{}", literal(e.payload())),
             EffectKind::SpanStart => format!("SpanStart#{}", literal(e.payload())),
             EffectKind::SpanEnd => format!("SpanEnd#{}", literal(e.payload())),
@@ -323,7 +323,7 @@ impl NfaDumper<'_> {
 
     fn member_name(&self, payload: &EffectArg) -> String {
         let EffectArg::Member(member) = payload else {
-            unreachable!("Set/EnumOpen effects are built with member refs");
+            unreachable!("Set/VariantOpen effects are built with member refs");
         };
 
         let shape = self
@@ -332,10 +332,10 @@ impl NfaDumper<'_> {
             .expect_type_shape(member.parent_type);
         let sym = match shape {
             TypeShape::Struct(fields) => fields.keys().nth(member.relative_index as usize),
-            TypeShape::Enum(variants) => variants.keys().nth(member.relative_index as usize),
+            TypeShape::Variant(cases) => cases.keys().nth(member.relative_index as usize),
             _ => None,
         }
-        .expect("member ref parent must be a struct or enum containing the indexed member");
+        .expect("member ref parent must be a struct or variant type containing the indexed member");
 
         self.artifacts.interner.resolve(*sym).to_string()
     }
