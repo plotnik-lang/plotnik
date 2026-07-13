@@ -84,7 +84,7 @@ prove the nonzero matched return depth without a flag or sentinel.
 `Return` reports matched or zero-width, pops a frame, and jumps to the
 corresponding return address. The bytecode also records whether the returning
 body owns entry navigation; the loader consumes that contract and the hot
-runtime drops it. Returning with an empty frame stack accepts the entrypoint
+runtime drops it. Returning with an empty frame stack accepts the entry point
 only for a matched, caller-owned body.
 
 ## Navigation
@@ -197,11 +197,11 @@ Non-inspection lowering has no consumer for boolean source provenance, so it
 emits `BoolValue(true)` for a present value instead of `NodeBool` or a balanced
 boolean frame. Inspection lowering retains the provenance-carrying forms.
 
-## Entrypoint Wrappers
+## Entry Point Wrappers
 
-Every entrypoint targets a wrapper compiled for that definition's result shape.
+Every entry point targets a wrapper compiled for that definition's result shape.
 Wrappers call the definition body and add only the effects needed to expose the
-entrypoint value:
+entry point value:
 
 - Record result: `RecordOpen`, call body, `RecordClose`, return.
 - Node result: call body, `Node`, return.

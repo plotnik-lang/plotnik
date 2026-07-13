@@ -31,7 +31,7 @@ a runtime must change together, including changes to:
 - navigation, checkpoint, or resume behavior;
 - the match-journal vocabulary or payload meanings;
 - the document and tree-adapter operations generated matchers call;
-- limit accounting or the errors returned by safe entrypoints.
+- limit accounting or the errors returned by safe entry points.
 
 Adding a backend-only helper or a source-compatible convenience API does not
 change the ABI. Rust gets the same compatibility check from Cargo dependency
@@ -41,7 +41,7 @@ integer gate.
 An ABI mismatch is a module initialization error. It must report the required
 ABI and the runtime's supported range.
 
-## 2. Entrypoints and documents
+## 2. Entry points and documents
 
 Every generated definition exposes two logical operations:
 
@@ -220,7 +220,7 @@ created after accepting that candidate. All alternatives at one candidate are
 therefore exhausted before the search advances.
 
 A `Call` enters a frame carrying its return state. `Return` exits that frame;
-returning with no active frame accepts the entrypoint. Frames that no live
+returning with no active frame accepts the entry point. Frames that no live
 checkpoint can restore may be pruned, but pruning must not change behavior.
 
 ## 5. Candidate checks and predicates
@@ -395,8 +395,8 @@ LimitExceeded::Memory { used, limit }
 LimitExceeded::DecodeDepth(limit)
 ```
 
-Limit exhaustion is an ordinary safe-entrypoint result. Exhausted checkpoints
-mean no match, not an error. An unmetered/internal entrypoint may assert that
+Limit exhaustion is an ordinary safe entry point result. Exhausted checkpoints
+mean no match, not an error. An unmetered/internal entry point may assert that
 limit exhaustion is impossible.
 
 ## 8. Debug value format
@@ -430,7 +430,7 @@ not a commitment that public output objects are JSON-shaped.
 
 Generated code bakes numeric kind and field ids. A parser built from another
 grammar revision can renumber them while still returning a valid tree, so every
-entrypoint verifies the tree's language before matching.
+entry point verifies the tree's language before matching.
 
 The generated module records this provenance:
 

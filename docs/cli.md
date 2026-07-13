@@ -177,7 +177,7 @@ plotnik infer -q 'Q = (identifier) @id' -l js --no-node-type --no-export
 ### generate
 
 Generate a self-contained compiled matcher module. Rust is the first target;
-the generated file contains typed output types, `parse`/`matches` entrypoints,
+the generated file contains typed output types, `parse`/`matches` entry points,
 and the matcher that runs on `plotnik-rt`.
 
 ```sh
@@ -442,7 +442,7 @@ source file extension.
 ### Shebang (Language Declaration)
 
 Line 1 of a `.ptk` file may declare its language (and optionally an
-entrypoint) via a shebang:
+entry point) via a shebang:
 
 ```
 #!/usr/bin/env -S plotnik run -l typescript
