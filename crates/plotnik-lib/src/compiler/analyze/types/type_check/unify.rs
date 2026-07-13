@@ -1,7 +1,7 @@
 //! Unification logic for alternation alternatives.
 //!
 //! Handles merging `PatternFlow` from different alternatives.
-//! Consumed labeled alternations don't unify — they produce variant types directly.
+//! Value-producing labeled alternations don't unify — they produce variant types directly.
 
 use std::collections::BTreeMap;
 

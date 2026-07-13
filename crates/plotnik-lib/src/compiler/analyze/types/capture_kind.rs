@@ -23,11 +23,11 @@ pub enum CaptureKind {
     /// A fresh record built from the inner sequence/alternation's bubbling captures.
     Record,
     /// A reference whose definition returns a structured type. The call site wraps
-    /// the `Call`/`Return` in a record scope when needed and consumes the result —
+    /// the `Call`/`Return` in a record scope when needed and observes the result —
     /// the capture emits no `Node`.
     Ref,
     /// The inner expression itself leaves the captured value pending — a
-    /// consumed labeled alternation (lowered as `VariantOpen … VariantClose`). Emit
+    /// value-producing labeled alternation (lowered as `VariantOpen … VariantClose`). Emit
     /// the inner, then a trailing `RecordSet`; the capture contributes no `Node` and no wrapper.
     PendingValue,
     /// A list collected by `*` or `+` (`ListOpen … ArrayPush … ListClose`).
@@ -100,7 +100,7 @@ impl TypeAnalysis {
             // scope; a named node instead captures its matched node and lets the
             // children bubble alongside as sibling fields.
             PatternFlow::Fields(_) => {
-                // A captured labeled alternation is a consumed position, so its variant type
+                // A captured labeled alternation is a value context, so its variant type
                 // flows as `Value` (handled below); an unlabeled alternation flows `Fields`.
                 if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Alternation(_)) {
                     CaptureKind::Record
@@ -108,7 +108,7 @@ impl TypeAnalysis {
                     CaptureKind::Node
                 }
             }
-            // A structured value left pending by the inner itself — a consumed
+            // A structured value left pending by the inner itself — a value-producing
             // variant type lowered through `VariantOpen`/`VariantClose`.
             PatternFlow::Value(type_id) if self.is_structured_output(*type_id) => {
                 CaptureKind::PendingValue

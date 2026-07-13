@@ -29,8 +29,8 @@ use super::sequences::SeqItemsCtx;
 
 #[derive(Clone, Copy)]
 enum RefLowering {
-    ScopedCapture,
-    CapturedValue,
+    ScopedValue,
+    PendingValue,
     SuppressedCall,
     PlainCall,
 }
@@ -519,7 +519,7 @@ impl NfaBuilder<'_> {
     /// - Bare ref to a match-only or node-valued definition: `Call → exit`
     ///   (nothing to discard)
     ///
-    /// `ctx.value` selects consumed lowering even with no consumer effect at
+    /// `ctx.value` selects value-producing lowering even with no consumer effect at
     /// this site: the callee's pending value must survive the call because it
     /// is the caller's own return value (a quantifier at a definition's root).
     fn compile_ref_call(
@@ -529,7 +529,7 @@ impl NfaBuilder<'_> {
         field_override: Option<NodeFieldId>,
     ) -> Label {
         let def_id = specialization.def_id();
-        let is_captured = ctx.consumes_value();
+        let needs_value = ctx.needs_value();
         let PatternCtx {
             exit,
             nav: nav_override,
@@ -542,7 +542,7 @@ impl NfaBuilder<'_> {
         // this call site needs.
         let compile_time_suppressed = specialization.mode().suppresses_output();
         assert!(
-            !compile_time_suppressed || !is_captured,
+            !compile_time_suppressed || !needs_value,
             "compile-time suppressed specializations are only used for bare references"
         );
         let route = specialization.route();
@@ -553,7 +553,7 @@ impl NfaBuilder<'_> {
         let lowering = if compile_time_suppressed {
             RefLowering::PlainCall
         } else {
-            self.ref_call_lowering(def_output, is_captured)
+            self.ref_call_lowering(def_output, needs_value)
         };
 
         let nav = nav_override.unwrap_or(Nav::Stay);
@@ -570,7 +570,7 @@ impl NfaBuilder<'_> {
 
         // Call instructions cannot carry effects, so emit epsilon if needed.
         let call_entry = match lowering {
-            RefLowering::ScopedCapture => {
+            RefLowering::ScopedValue => {
                 // A record scope isolates the definition's internal captures before `RecordSet`.
                 let capture_state =
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
@@ -578,7 +578,7 @@ impl NfaBuilder<'_> {
                 let call_label = emit_call(self, ReturnAddr(record_close));
                 self.emit_record_open(call_label)
             }
-            RefLowering::CapturedValue => {
+            RefLowering::PendingValue => {
                 let return_addr =
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
                 emit_call(self, ReturnAddr(return_addr))
@@ -624,19 +624,19 @@ impl NfaBuilder<'_> {
     fn ref_call_lowering(
         &self,
         def_output: crate::compiler::analyze::types::type_shape::DefinitionOutput,
-        is_captured: bool,
+        needs_value: bool,
     ) -> RefLowering {
-        if is_captured {
+        if needs_value {
             if def_output.value().is_some_and(|type_id| {
                 matches!(
                     self.ctx.analysis.type_analysis.expect_type_shape(type_id),
                     TypeShape::Record(_)
                 )
             }) {
-                return RefLowering::ScopedCapture;
+                return RefLowering::ScopedValue;
             }
 
-            return RefLowering::CapturedValue;
+            return RefLowering::PendingValue;
         }
 
         // References are opaque: a bare reference matches structurally and its
@@ -735,7 +735,7 @@ impl NfaBuilder<'_> {
         matched: PatternCtx,
         skip_exit: SkipExit,
     ) -> Label {
-        let is_captured = matched.consumes_value();
+        let needs_value = matched.needs_value();
         let PatternCtx {
             exit: match_exit,
             nav: nav_override,
@@ -747,7 +747,7 @@ impl NfaBuilder<'_> {
                 exit: match_exit,
                 nav: nav_override,
                 capture,
-                value: is_captured,
+                value: needs_value,
             };
             return self.compile_ref_guarded_call(def_id, pattern_ctx, skip_exit);
         }
@@ -769,7 +769,7 @@ impl NfaBuilder<'_> {
             .type_analysis
             .expect_def_output(def_id)
             .value();
-        let inline_scoped_capture = is_captured
+        let inline_scoped_value = needs_value
             && def_output_id.is_some_and(|type_id| {
                 matches!(
                     self.ctx.analysis.type_analysis.expect_type_shape(type_id),
@@ -779,7 +779,7 @@ impl NfaBuilder<'_> {
         let CaptureEffects { pre, post } = capture;
 
         self.inline_stack.push(def_id);
-        let entry = if inline_scoped_capture {
+        let entry = if inline_scoped_value {
             // A record scope isolates the definition's internal captures before the
             // `RecordSet`; both continuations close it (an empty body still
             // produced its record of skip-path values, e.g. `{x: null}`).
@@ -811,7 +811,7 @@ impl NfaBuilder<'_> {
             });
             let body_entry = self.wrap_def_body_entry(body_entry, def_span);
             self.emit_record_open_with_pre(body_entry, pre)
-        } else if is_captured {
+        } else if needs_value {
             // Non-record body: it leaves its value pending; the
             // consumer chain runs after it on either continuation.
             let set_match = self.emit_effects_if_nonempty(match_exit, post.clone());
@@ -961,8 +961,8 @@ impl NfaBuilder<'_> {
                 GuardedRefOutput::CompileTimeSuppressed
             }
             RefLowering::SuppressedCall => GuardedRefOutput::RuntimeSuppressed,
-            RefLowering::ScopedCapture | RefLowering::CapturedValue => {
-                unreachable!("recursive captured references are rejected by analysis")
+            RefLowering::ScopedValue | RefLowering::PendingValue => {
+                unreachable!("recursive value-producing references are rejected by analysis")
             }
         }
     }

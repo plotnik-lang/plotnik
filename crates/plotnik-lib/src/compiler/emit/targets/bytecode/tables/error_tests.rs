@@ -95,12 +95,12 @@ fn variant_case_count_overflow_is_emit_error() {
     }
     query.push_str("] @alt)");
 
-    let err = try_emit(&query).expect_err("256 enum variants must not encode");
+    let err = try_emit(&query).expect_err("256 variant cases must not encode");
     assert!(matches!(err, EmitError::TooManyCases(256)), "got {err:?}");
 }
 
 #[test]
-fn variants_256_are_source_capable_but_exceed_the_bytecode_target() {
+fn variant_cases_256_are_source_capable_but_exceed_the_bytecode_target() {
     let mut query = String::from("Q = (program [");
     for index in 0..=u8::MAX {
         write!(query, " Variant{index}: (_) @value_{index}").unwrap();

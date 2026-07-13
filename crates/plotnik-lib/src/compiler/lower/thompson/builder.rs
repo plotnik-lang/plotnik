@@ -452,7 +452,7 @@ impl<'a> NfaBuilder<'a> {
                     .type_analysis
                     .expect_pattern_result(pattern)
                     .flow;
-                if ctx.consumes_value()
+                if ctx.needs_value()
                     && matches!(flow, PatternFlow::Value(_))
                     && !self.is_suppressed()
                 {

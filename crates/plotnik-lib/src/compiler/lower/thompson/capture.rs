@@ -183,7 +183,7 @@ impl PatternCtx {
         }
     }
 
-    pub(super) fn consumes_value(&self) -> bool {
+    pub(super) fn needs_value(&self) -> bool {
         self.value || self.capture.post_consumes_value()
     }
 }

@@ -377,7 +377,7 @@ impl<'a> RegexView<'a> {
 ///
 /// Types are stored in three sub-sections:
 /// - TypeDefs: structural topology (4 bytes each)
-/// - TypeMembers: fields and variants (4 bytes each)
+/// - TypeMembers: record fields and variant cases (4 bytes each)
 /// - TypeNames: name → TypeId mapping (4 bytes each)
 pub struct TypesView<'a> {
     defs_bytes: &'a [u8],

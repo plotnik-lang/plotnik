@@ -288,27 +288,27 @@ after acceptance.
 
 Generated runtimes implement this vocabulary:
 
-| Journal event          | Payload and meaning                                |
-| ---------------------- | -------------------------------------------------- |
-| `Node`                 | Current binding-native node.                       |
-| `Absent`               | One absent option value.                           |
-| `ListOpen`             | Begin a list value.                                |
-| `ArrayPush`            | Append the pending value to its backing list.      |
-| `ListClose`            | Close the list and make it pending.                |
-| `RecordOpen`           | Begin a record value.                              |
-| `RecordSet(member)`    | Assign the pending value to a record member index. |
-| `RecordClose`          | Close the record and make it pending.              |
-| `VariantOpen(variant)` | Begin the selected variant.                        |
-| `VariantClose`         | Close the variant and make it pending.             |
-| `ScalarOpen`           | Begin one value-local source-provenance frame.     |
-| `ScalarMark(node)`     | Add an explicit matched node to every open scalar. |
-| `StrClose`             | Close a scalar and produce source text or null.    |
-| `BoolClose(value)`     | Close a scalar and produce the supplied boolean.   |
-| `NodeStr(node)`        | Produce one matched node's source text directly.   |
-| `NodeBool(node)`       | Produce `true` for one matched node directly.      |
-| `BoolValue(value)`     | Produce a boolean without source provenance.       |
+| Journal event       | Payload and meaning                                |
+| ------------------- | -------------------------------------------------- |
+| `Node`              | Current binding-native node.                       |
+| `Absent`            | One absent option value.                           |
+| `ListOpen`          | Begin a list value.                                |
+| `ArrayPush`         | Append the pending value to its backing list.      |
+| `ListClose`         | Close the list and make it pending.                |
+| `RecordOpen`        | Begin a record value.                              |
+| `RecordSet(member)` | Assign the pending value to a record member index. |
+| `RecordClose`       | Close the record and make it pending.              |
+| `VariantOpen(case)` | Begin the selected variant case.                   |
+| `VariantClose`      | Close the variant value and make it pending.       |
+| `ScalarOpen`        | Begin one value-local source-provenance frame.     |
+| `ScalarMark(node)`  | Add an explicit matched node to every open scalar. |
+| `StrClose`          | Close a scalar and produce source text or null.    |
+| `BoolClose(value)`  | Close a scalar and produce the supplied boolean.   |
+| `NodeStr(node)`     | Produce one matched node's source text directly.   |
+| `NodeBool(node)`    | Produce `true` for one matched node directly.      |
+| `BoolValue(value)`  | Produce a boolean without source provenance.       |
 
-Member and variant payloads are the indices assigned by the compiler's shared
+`RecordSet` and `VariantOpen` payloads are the member indices assigned by the compiler's shared
 `CaptureLayout`; they are not target-specific field ordinals. Values appear
 before their closing `RecordSet`. The order of sibling `RecordSet` entries inside one
 record is not stable and must not be used as declaration order.

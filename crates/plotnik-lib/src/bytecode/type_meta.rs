@@ -17,7 +17,7 @@ pub struct TypeDef {
     /// For wrappers/alias: inner/target TypeId.
     /// For Record/Variant: index into TypeMembers section.
     payload: u16,
-    /// Member count (0 for wrappers/alias, field/variant count for composites).
+    /// Member count (0 for wrappers/alias, field/case count for composites).
     count: u8,
     /// TypeKind discriminant.
     kind: u8,
@@ -123,12 +123,12 @@ impl TypeDef {
     /// Member range `(start, count)` as stored, regardless of kind.
     ///
     /// Meaningful only for Record/Variant, where `start` indexes TypeMembers and
-    /// `count` is the field/variant count.
+    /// `count` is the field/case count.
     pub fn member_range(&self) -> (u16, u8) {
         (self.payload, self.count)
     }
 
-    /// Decode this type definition into a variant.
+    /// Decode this type definition into its structured kind.
     ///
     /// # Panics
     /// Panics if the kind byte is invalid (corrupted bytecode). Trusted side only;

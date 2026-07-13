@@ -497,15 +497,15 @@ impl NfaBuilder<'_> {
                 capture,
                 value: value_context,
             };
-            // Mirrors dispatch_pattern: only a consumed labeled alternation outside
-            // suppression tags its variants.
+            // Mirrors dispatch_pattern: only a labeled alternation whose value is
+            // observed outside suppression emits variant events.
             let flow = &self
                 .ctx
                 .analysis
                 .type_analysis
                 .expect_pattern_result(pattern)
                 .flow;
-            return if pattern_ctx.consumes_value()
+            return if pattern_ctx.needs_value()
                 && matches!(flow, PatternFlow::Value(_))
                 && !self.is_suppressed()
             {
