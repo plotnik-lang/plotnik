@@ -359,7 +359,7 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
         let output = self.session.graph.flow(id).clone();
         let raw_fields = match &output.flow {
             RawPatternFlow::Fields(fields) => fields.clone(),
-            RawPatternFlow::Void | RawPatternFlow::Value(_) => {
+            RawPatternFlow::NoValue | RawPatternFlow::Value(_) => {
                 self.visiting.remove(&id);
                 return None;
             }

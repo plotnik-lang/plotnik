@@ -164,15 +164,15 @@ plotnik infer -q 'Q = (identifier) @id' -l js --no-node-type --no-export
 
 **Flags:**
 
-| Flag                | Purpose                                       |
-| ------------------- | --------------------------------------------- |
-| `-l, --lang LANG`   | Target language grammar (required)            |
-| `-o, --output FILE` | Write output to file                          |
-| `--format FORMAT`   | Output format (`typescript`, `ts`)            |
-| `--include-points`  | Include row/byte-column points in `Node`      |
-| `--no-node-type`    | Don't emit the `Node` definition              |
-| `--no-export`       | Don't add `export` keyword                    |
-| `--void-type TYPE`  | Type for void results (`undefined` or `null`) |
+| Flag                     | Purpose                                             |
+| ------------------------ | --------------------------------------------------- |
+| `-l, --lang LANG`        | Target language grammar (required)                  |
+| `-o, --output FILE`      | Write output to file                                |
+| `--format FORMAT`        | Output format (`typescript`, `ts`)                  |
+| `--include-points`       | Include row/byte-column points in `Node`            |
+| `--no-node-type`         | Don't emit the `Node` definition                    |
+| `--no-export`            | Don't add `export` keyword                          |
+| `--match-only-type TYPE` | Type for match-only results (`undefined` or `null`) |
 
 ### generate
 

@@ -15,7 +15,7 @@ fn invalid_containment_propagates_through_recursive_cycle() {
     let invalid = TypeId(6);
     let definition = DefId::from_raw(0);
     let types = vec![
-        TypeShape::Void,
+        TypeShape::NoValue,
         TypeShape::Node,
         TypeShape::Text,
         TypeShape::Bool,

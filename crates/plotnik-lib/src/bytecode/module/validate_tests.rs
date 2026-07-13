@@ -1059,9 +1059,9 @@ fn forged_record_set_without_producer_is_rejected() {
 }
 
 #[test]
-fn forged_void_variant_case_with_data_is_rejected() {
+fn forged_no_payload_variant_case_with_data_is_rejected() {
     // The alternative emits direct fields for a structured variant. Lie that the
-    // variant is tag-only (`Void`): `VariantClose` must reject the data-bearing
+    // variant case has no payload: `VariantClose` must reject the data-bearing
     // payload instead of letting materialization silently drop or mis-shape it.
     let mut bytes = emit_bytes(r#"Q = [A: (identifier) @a B: (number)]"#);
     let variant_open = first_effect_op(&bytes, |op| op == EffectKind::VariantOpen as u16);
@@ -1072,7 +1072,7 @@ fn forged_void_variant_case_with_data_is_rejected() {
     reseal(&mut bytes);
 
     let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged void variant data must be rejected");
+        .expect_err("forged data on a no-payload variant case must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -1082,16 +1082,13 @@ fn forged_void_variant_case_with_data_is_rejected() {
 #[test]
 fn forged_data_variant_case_without_data_is_rejected() {
     // A tag-only case emits `VariantOpen`/`VariantClose` and has no payload effects.
-    // Lie that the variant is non-void by pointing it at the variant type itself.
+    // Lie that the case has a payload by pointing it at the variant type itself.
     let mut bytes = emit_bytes(r#"Q = [A: (identifier)]"#);
     let type_count = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .header()
         .type_defs_count;
-    assert!(
-        type_count > 1,
-        "query must emit a non-void type to point at"
-    );
+    assert!(type_count > 1, "query must emit a value type to point at");
 
     let variant_open = first_effect_op(&bytes, |op| op == EffectKind::VariantOpen as u16);
     let variant_member = effect_payload(&bytes, variant_open);
@@ -1233,9 +1230,9 @@ fn forged_accept_inside_called_def_is_rejected() {
 fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
     // A definition body applies `RecordSet` to its capture below entry, into the frame its
     // wrapper opened. Retarget that write: swap the wrapper's root
-    // `RecordOpen`/`RecordClose` for `VariantOpen`/`VariantClose` on a void
+    // `RecordOpen`/`RecordClose` for `VariantOpen`/`VariantClose` on a no-payload
     // (tag-only) member borrowed from the other entrypoint. The callee's
-    // below-entry `RecordSet` then lands data on a void variant — invisible to the
+    // below-entry `RecordSet` then lands data on a no-payload case — invisible to the
     // wrapper's own walk, because the write happens inside the callee. Only a
     // call site that forks on the callee's may-write (`record_sets_caller_top`)
     // rejects it; a stale `got_data` would let it load and mis-materialize.
@@ -1244,7 +1241,7 @@ fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
         Z = (program (function_declaration) @fn)
     "#});
 
-    let void_member = {
+    let no_payload_member = {
         let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         let types = m.types();
         (0..m.header().type_members_count)
@@ -1252,10 +1249,10 @@ fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
                 types
                     .get(types.member_type_id(i as usize))
                     .is_some_and(|def| {
-                        matches!(def.decode(), TypeDefKind::Primitive(TypeKind::Void))
+                        matches!(def.decode(), TypeDefKind::Primitive(TypeKind::NoValue))
                     })
             })
-            .expect("query must emit a void (tag-only) variant member")
+            .expect("query must emit a no-payload variant member")
     };
 
     // Both wrappers precede the bodies and only wrappers open frames, so slot
@@ -1264,13 +1261,13 @@ fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
     let close_slot = nth_effect_op(&bytes, 1, |op| op == EffectKind::RecordClose as u16);
     bytes[open_slot..open_slot + 2].copy_from_slice(&effect_word_with_payload(
         EffectKind::VariantOpen,
-        void_member,
+        no_payload_member,
     ));
     bytes[close_slot..close_slot + 2].copy_from_slice(&effect_word(EffectKind::VariantClose));
     reseal(&mut bytes);
 
     let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged void-variant callee write must be rejected");
+        .expect_err("forged no-payload case callee write must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -1675,7 +1672,7 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
 
 #[test]
 fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
-    // Void/Node/Text/Bool carry no payload: both `data` (bytes 0-1) and `count`
+    // NoValue/Node/Text/Bool carry no metadata: both `data` (bytes 0-1) and `count`
     // (byte 2) are reserved-zero (docs/binary-format/04-types.md). Smuggled state
     // in either must be rejected, not silently ignored by the typed view.
     for byte in [0usize, 2] {

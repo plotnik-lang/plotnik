@@ -36,7 +36,7 @@ use crate::compiler::analyze::types::type_analysis::{
     CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
 };
 use crate::compiler::analyze::types::type_shape::{
-    ListMinimum, PatternFlow, PatternShape, QuantifierKind, RecordField, TYPE_NODE, TYPE_VOID,
+    ListMinimum, PatternFlow, PatternShape, QuantifierKind, RecordField, TYPE_NO_VALUE, TYPE_NODE,
     TypeId, TypeShape,
 };
 use crate::compiler::analyze::types::{
@@ -247,7 +247,7 @@ fn suggested_builtin_capture_type(name: &str) -> Option<&'static str> {
 /// carries the data.
 fn case_payload_type(flow: &PatternFlow) -> TypeId {
     match flow {
-        PatternFlow::Void | PatternFlow::Value(_) => TYPE_VOID,
+        PatternFlow::NoValue | PatternFlow::Value(_) => TYPE_NO_VALUE,
         PatternFlow::Fields(t) => *t,
     }
 }
@@ -401,28 +401,28 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     /// Anonymous node (literal or wildcard): matches one position, produces nothing.
     fn infer_anonymous_node(&mut self, _node: &TokenPattern) -> PatternShape {
-        PatternShape::new(RootExtent::SingleNode, PatternFlow::Void)
+        PatternShape::new(RootExtent::SingleNode, PatternFlow::NoValue)
     }
 
     /// Reference: an opaque boundary producing the definition's result value.
     ///
     /// The definition's fields never bubble here. A capture may materialize the
     /// value, while a bare reference contributes no output in a fields context.
-    /// Every non-void reference retains the definition identity as a
+    /// Every value-producing reference retains the definition identity as a
     /// `TypeShape::Ref`. The declaration body is structural, but a use of that
     /// declaration must not acquire some other name merely because its shape
     /// happens to be interned with another type.
     fn infer_ref(&mut self, r: &DefRef) -> PatternShape {
         let Some(name_tok) = r.name() else {
-            return PatternShape::void();
+            return PatternShape::no_value();
         };
         let name = name_tok.text();
         let name_sym = self.ctx.interner.intern(name);
 
         // No definition: an undefined reference, already diagnosed upstream
-        // (`UndefinedReference`). Outside the trust boundary — answer with void.
+        // (`UndefinedReference`). Outside the trust boundary — answer with no value.
         let Some(_body) = self.ctx.symbol_table.body(name) else {
-            return PatternShape::void();
+            return PatternShape::no_value();
         };
 
         // Every symbol-table definition is assigned a DefId during dependency
@@ -445,14 +445,14 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         if self.ctx.dependency_analysis.is_recursive_def(def_id) {
             // A recursive target's output type is not known yet. Its
-            // void-ness, however, is real as soon
-            // as the def is registered: a completed void target must flow
-            // Void so the single-referent check sees it. A same-SCC target
+            // no-value flow, however, is real as soon as the definition is
+            // registered: a completed match-only target must flow NoValue so
+            // the single-referent check sees it. A same-SCC target
             // not yet registered is a pending value here; those capture
             // sites are re-checked once the SCC completes.
             let resolved_output = self.ctx.type_ctx.in_progress().def_output(def_id);
             let flow = match resolved_output {
-                Some(output) if output == TYPE_VOID => PatternFlow::Void,
+                Some(output) if output == TYPE_NO_VALUE => PatternFlow::NoValue,
                 _ => {
                     let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
                     PatternFlow::Value(ref_type)
@@ -465,8 +465,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             self.ctx.type_ctx.in_progress().def_output(def_id).expect(
                 "non-recursive reference target is inferred before the referrer (SCC order)",
             );
-        let flow = if output == TYPE_VOID {
-            PatternFlow::Void
+        let flow = if output == TYPE_NO_VALUE {
+            PatternFlow::NoValue
         } else {
             let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
             PatternFlow::Value(ref_type)
@@ -511,7 +511,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     fn merged_fields_flow(&mut self, merged: BTreeMap<Symbol, RecordField>) -> PatternFlow {
         if merged.is_empty() {
-            return PatternFlow::Void;
+            return PatternFlow::NoValue;
         }
         PatternFlow::Fields(self.ctx.type_ctx.intern_record(merged))
     }
@@ -560,8 +560,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
 
             let Some(body_info) = self.infer_alternative_body(alternation, &alternative) else {
-                // Tag-only case -> Void (no payload).
-                cases.insert(label_sym, TYPE_VOID);
+                // Tag-only case has no payload.
+                cases.insert(label_sym, TYPE_NO_VALUE);
                 continue;
             };
 
@@ -588,7 +588,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             combined_extent = combined_extent.combine(body_info.root_extent);
         }
 
-        PatternShape::new(combined_extent, PatternFlow::Void)
+        PatternShape::new(combined_extent, PatternFlow::NoValue)
     }
 
     /// In a fields context, labels have no output effect. Warn, then merge the
@@ -680,7 +680,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     .type_ctx
                     .record_alternation_incompatibility(pattern.clone(), error.field());
                 self.report_alternative_unify_error(pattern.syntax(), &error);
-                PatternFlow::Void
+                PatternFlow::NoValue
             }
         }
     }
@@ -700,13 +700,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // needs neither an ineffective-label warning nor a collection boundary.
         if node.is_discard() {
             let info = match node.inner() {
-                None => return PatternShape::void(),
+                None => return PatternShape::no_value(),
                 Some(Pattern::QuantifiedPattern(q)) => {
                     self.infer_quantified_pattern_in(&cap.wrap(q), QuantifiedContext::Discard)
                 }
                 Some(i) => self.infer_pattern_discarded(&cap.wrap(i)),
             };
-            return PatternShape::new(info.root_extent, PatternFlow::Void);
+            return PatternShape::new(info.root_extent, PatternFlow::NoValue);
         }
 
         let Some(name_tok) = node.name() else {
@@ -714,7 +714,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             return node
                 .inner()
                 .map(|i| self.infer_pattern(&cap.wrap(i)))
-                .unwrap_or_else(PatternShape::void);
+                .unwrap_or_else(PatternShape::no_value);
         };
         let capture_name = self.ctx.interner.intern(&name_tok.text()[1..]); // Strip @ prefix
 
@@ -751,7 +751,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let captured_inner = self.resolve_capture_inner(&inner);
         let inner_info = captured_inner.info;
 
-        // A void inner that doesn't match exactly one node has no single node
+        // A no-value inner that doesn't match exactly one node has no single node
         // for the capture to bind. Recover as `Node` — the error is already
         // reported. Direct quantifiers are exempt: the captured-quantifier
         // machinery defines their value (list, or optional node), and the
@@ -794,7 +794,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // captures own their inner output, so an error in that output does
         // invalidate their raw contract.
         let inner_has_capture_error = !matches!(inner.node(), Pattern::QuantifiedPattern(_))
-            && inner_info.flow.is_void()
+            && inner_info.flow.is_no_value()
             && (inner_info.root_extent == RootExtent::Other
                 || matches!(inner.node(), Pattern::DefRef(_)));
         let owned_inner_error = mechanism != CaptureKind::Node
@@ -894,7 +894,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             Some(TypeShape::Text | TypeShape::Bool) => {
                 unreachable!("ordinary captures cannot produce scalar roots")
             }
-            // Recovery-only void falls back to a Node alias, matching the raw
+            // Recovery-only no-value flow falls back to a Node alias, matching the raw
             // capture's recovery type.
             _ => {
                 let custom = self.ctx.type_ctx.intern_custom(name);
@@ -1062,9 +1062,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         inner_info: &PatternShape,
     ) -> TypeId {
         match &inner_info.flow {
-            // A truly empty scope (`{}`) captures an empty record; any other void
+            // A truly empty scope (`{}`) captures an empty record; any other no-value
             // capture is the matched node.
-            PatternFlow::Void => {
+            PatternFlow::NoValue => {
                 if is_empty_group(inner) {
                     let empty = self.ctx.type_ctx.intern_record(BTreeMap::new());
                     let span = Span::new(self.source, inner.text_range());
@@ -1098,7 +1098,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         context: QuantifiedContext,
     ) -> PatternShape {
         let Some(inner) = quant.node().inner() else {
-            return PatternShape::void();
+            return PatternShape::no_value();
         };
         let inner = quant.wrap(inner);
 
@@ -1113,7 +1113,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         let flow = match quantifier {
             QuantifierKind::Optional => match context {
-                // A captured `?` of a multi-node void group has no single node
+                // A captured `?` of a multi-node no-value group has no single node
                 // to bind (or null), just like a captured repeat. Otherwise the
                 // inner flow passes through untouched: the capture collects it
                 // as one nullable value — fields keep their true modality, the
@@ -1130,7 +1130,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     self.report_uncollected_quantified_captures(quant.node(), &inner_info);
                     self.make_flow_optional(inner_info.flow)
                 }
-                QuantifiedContext::Discard => PatternFlow::Void,
+                QuantifiedContext::Discard => PatternFlow::NoValue,
                 // The definition collects the skip as its own null: the output
                 // is the option type itself, not a field-optionality flag.
                 QuantifiedContext::DefinitionValue => {
@@ -1183,7 +1183,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             QuantifiedContext::Bare => {
                 self.report_uncollected_quantified_captures(quant, inner_info);
             }
-            // A captured repeat of a multi-node void group has no defined
+            // A captured repeat of a multi-node no-value group has no defined
             // element value.
             QuantifiedContext::Captured => {
                 self.report_quantified_capture_without_single_node(quant, inner_info);
@@ -1244,13 +1244,13 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// Resolve the element type of a quantifier-rooted definition body.
     ///
     /// The definition names its output — the container — so the element must
-    /// be a type that needs no fresh name: a matched node (void inner) or
+    /// be a type that needs no fresh name: a matched node (no-value inner) or
     /// another definition's output (a reference). Anonymous element shapes — a
     /// record of captures or a labeled alternation — have no name source (names
     /// come only from defs, captures, custom capture types, and case tags) and are
     /// rejected with a hint to split the element into its own definition. The
     /// plausible element type is still returned so downstream inference isn't
-    /// poisoned by void.
+    /// poisoned by no-value flow.
     fn definition_element_type(
         &mut self,
         quant: &QuantifiedPattern,
@@ -1258,7 +1258,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         inner_info: &PatternShape,
     ) -> TypeId {
         match &inner_info.flow {
-            PatternFlow::Void => {
+            PatternFlow::NoValue => {
                 self.report_quantified_capture_without_single_node(quant, inner_info);
                 TYPE_NODE
             }
@@ -1277,7 +1277,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
     fn make_flow_optional(&mut self, flow: PatternFlow) -> PatternFlow {
         match flow {
-            PatternFlow::Void => PatternFlow::Void,
+            PatternFlow::NoValue => PatternFlow::NoValue,
             PatternFlow::Value(t) => PatternFlow::Value(self.ctx.type_ctx.intern_option(t)),
             PatternFlow::Fields(type_id) => {
                 let fields = self
@@ -1310,19 +1310,19 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
 
         match (context, flow) {
             // A bare repeat is structural: no output context observes its
-            // values, so a void or unobserved value produces nothing. A
+            // values, so a no-value or unobserved value produces nothing. A
             // discarded repeat produces nothing outright.
-            (QuantifiedContext::Bare, PatternFlow::Void | PatternFlow::Value(_))
-            | (QuantifiedContext::Discard, _) => PatternFlow::Void,
+            (QuantifiedContext::Bare, PatternFlow::NoValue | PatternFlow::Value(_))
+            | (QuantifiedContext::Discard, _) => PatternFlow::NoValue,
             // Bare with bubbling captures: `report_uncollected_quantified_captures`
             // already errored. Produce the plausible list type anyway so
-            // downstream inference isn't poisoned by void.
+            // downstream inference isn't poisoned by no-value flow.
             (QuantifiedContext::Bare, PatternFlow::Fields(record_type)) => {
                 intern_list(self.ctx.type_ctx, record_type)
             }
             // Captured repeats collect elements: matched nodes, pending values
             // (variant/reference results), or records of captured fields.
-            (QuantifiedContext::Captured, PatternFlow::Void) => {
+            (QuantifiedContext::Captured, PatternFlow::NoValue) => {
                 intern_list(self.ctx.type_ctx, TYPE_NODE)
             }
             (
@@ -1343,7 +1343,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         output: OutputContext,
     ) -> PatternShape {
         let Some(value) = field.node().value() else {
-            return PatternShape::void();
+            return PatternShape::no_value();
         };
         let value = field.wrap(value);
 
@@ -1578,7 +1578,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
         });
 
         let type_id = match &info.flow {
-            PatternFlow::Void => TYPE_VOID,
+            PatternFlow::NoValue => TYPE_NO_VALUE,
             PatternFlow::Fields(t) => *t,
             // A root value is the definition's result only when a labeled
             // alternation or quantifier supplies it directly. A bare reference
@@ -1588,7 +1588,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
                 if definition_value_root(&body) {
                     *t
                 } else {
-                    TYPE_VOID
+                    TYPE_NO_VALUE
                 }
             }
         };

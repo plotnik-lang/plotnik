@@ -11,9 +11,13 @@ fn unify_suppresses_uncaptured_value() {
     // not an error: `[(Foo) (bar)]` is a plain structural alternation.
     let mut ctx = TypeAnalysisBuilder::new();
 
-    let result = unify_flow(&mut ctx, PatternFlow::Value(TYPE_NODE), PatternFlow::Void);
+    let result = unify_flow(
+        &mut ctx,
+        PatternFlow::Value(TYPE_NODE),
+        PatternFlow::NoValue,
+    );
 
-    assert!(matches!(result, Ok(PatternFlow::Void)));
+    assert!(matches!(result, Ok(PatternFlow::NoValue)));
 }
 
 #[test]
@@ -23,8 +27,12 @@ fn record_field_absence_is_an_idempotent_option() {
     let name = interner.intern("name");
     let required = ctx.intern_record(BTreeMap::from([(name, RecordField::new(TYPE_NODE))]));
 
-    let absent = unify_flow(&mut ctx, PatternFlow::Void, PatternFlow::Fields(required))
-        .expect("a missing record branch is compatible");
+    let absent = unify_flow(
+        &mut ctx,
+        PatternFlow::NoValue,
+        PatternFlow::Fields(required),
+    )
+    .expect("a missing record branch is compatible");
     let merged = unify_flow(&mut ctx, absent, PatternFlow::Fields(required))
         .expect("an option field is compatible with its inner type");
 

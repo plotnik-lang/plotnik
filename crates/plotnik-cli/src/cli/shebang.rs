@@ -87,7 +87,7 @@ fn shebang_parser() -> Command {
         .arg(format_arg())
         .arg(no_node_type_arg())
         .arg(no_export_arg())
-        .arg(void_type_arg())
+        .arg(match_only_type_arg())
         .arg(output_file_arg())
 }
 

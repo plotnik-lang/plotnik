@@ -37,7 +37,7 @@ S8 "identifier"
 S9 "number"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
 T2 = Record  M0:1  ; { id }
 T3 = Variant M1:2  ; A | B
@@ -46,7 +46,7 @@ T4 = Record  M3:1  ; { kind }
 [type_members]
 M0: S1 → T1  ; id: <Node>
 M1: S2 → T2  ; A: T2
-M2: S3 → T0  ; B: <Void>
+M2: S3 → T0  ; B: <NoValue>
 M3: S4 → T3  ; kind: QKind
 
 [type_names]

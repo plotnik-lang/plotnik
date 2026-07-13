@@ -123,12 +123,12 @@ pub fn no_export_arg() -> Arg {
         .help("Don't export types")
 }
 
-pub fn void_type_arg() -> Arg {
-    Arg::new("void_type")
-        .long("void-type")
+pub fn match_only_type_arg() -> Arg {
+    Arg::new("match_only_type")
+        .long("match-only-type")
         .value_name("TYPE")
         .value_parser(["undefined", "null"])
-        .help("Type for void results: undefined (default) or null")
+        .help("Type for match-only results: undefined (default) or null")
 }
 
 pub fn output_file_arg() -> Arg {

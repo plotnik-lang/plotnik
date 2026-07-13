@@ -59,7 +59,7 @@ S7 "expression_statement"
 S8 "Bare"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
 T2 = Record  M0:1  ; { name }
 T3 = Record  M1:1  ; { item }

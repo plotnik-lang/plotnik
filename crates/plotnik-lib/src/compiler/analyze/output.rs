@@ -14,7 +14,7 @@ use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeId, TypeShape,
+    RecordField, TYPE_BOOL, TYPE_NO_VALUE, TYPE_NODE, TYPE_TEXT, TypeId, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::core::{Interner, Symbol};
@@ -34,7 +34,7 @@ pub(crate) enum OutputItemKind {
     Alias,
     /// A selectable match-only definition has a nominal marker and a `matches` API,
     /// but no decoded value.
-    VoidDef,
+    MatchOnlyDef,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,11 +54,11 @@ impl OutputItem {
         Self { name, ty, kind }
     }
 
-    fn void_definition(name: Symbol) -> Self {
+    fn match_only_definition(name: Symbol) -> Self {
         Self {
             name,
-            ty: TYPE_VOID,
-            kind: OutputItemKind::VoidDef,
+            ty: TYPE_NO_VALUE,
+            kind: OutputItemKind::MatchOnlyDef,
         }
     }
 
@@ -138,7 +138,7 @@ pub(crate) struct OutputTypeLayout {
 
 impl OutputTypeLayout {
     fn build(used_builtins: &HashSet<TypeId>, custom_types: Vec<TypeId>) -> Self {
-        let builtins = [TYPE_VOID, TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
+        let builtins = [TYPE_NO_VALUE, TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
             .into_iter()
             .filter(|builtin| used_builtins.contains(builtin))
             .collect::<Vec<_>>();
@@ -299,7 +299,7 @@ impl<'a> OutputSchema<'a> {
             .collect::<Vec<_>>();
         for def_id in reachable_defs.iter() {
             let body = types.expect_def_output(def_id);
-            if body == TYPE_VOID {
+            if body == TYPE_NO_VALUE {
                 continue;
             }
             type_declarations.push(TypeDeclaration {
@@ -391,8 +391,8 @@ impl<'a> ItemCollector<'a> {
     fn collect(mut self) -> Vec<OutputItem> {
         for (def_id, output) in self.types.iter_entry_point_outputs() {
             let name = self.deps.def_name_sym(def_id);
-            if output == TYPE_VOID {
-                self.items.push(OutputItem::void_definition(name));
+            if output == TYPE_NO_VALUE {
+                self.items.push(OutputItem::match_only_definition(name));
                 continue;
             }
             self.add_item(name, output);
@@ -423,11 +423,11 @@ impl<'a> ItemCollector<'a> {
             }
             TypeShape::Variant(cases) => {
                 for &payload in cases.values() {
-                    if payload == TYPE_VOID {
+                    if payload == TYPE_NO_VALUE {
                         continue;
                     }
                     let TypeShape::Record(fields) = self.types.expect_type_shape(payload) else {
-                        unreachable!("variant case payload is void or an anonymous record");
+                        unreachable!("variant case has no payload or an anonymous record payload");
                     };
                     for info in fields.values() {
                         self.collect_position(info.final_type);
@@ -438,7 +438,7 @@ impl<'a> ItemCollector<'a> {
                 self.collect_position(*element)
             }
             TypeShape::Ref(def_id) => self.collect_reference(*def_id),
-            TypeShape::Void
+            TypeShape::NoValue
             | TypeShape::Node
             | TypeShape::Text
             | TypeShape::Bool
@@ -465,13 +465,13 @@ impl<'a> ItemCollector<'a> {
             }
             TypeShape::Ref(def_id) => self.collect_reference(*def_id),
             TypeShape::Node | TypeShape::Text | TypeShape::Bool => {}
-            TypeShape::Void => unreachable!("void cannot appear in an output position"),
+            TypeShape::NoValue => unreachable!("no-value flow cannot appear in a value position"),
         }
     }
 
     fn collect_reference(&mut self, def_id: DefId) {
         let output = self.types.expect_def_output(def_id);
-        if output == TYPE_VOID {
+        if output == TYPE_NO_VALUE {
             return;
         }
         self.add_item(self.deps.def_name_sym(def_id), output);
@@ -536,7 +536,7 @@ impl TypeCollector {
         let shape = types.expect_type_shape(type_id);
         if let TypeShape::Ref(def_id) = shape {
             let target = types.expect_def_output(*def_id);
-            if target == TYPE_VOID {
+            if target == TYPE_NO_VALUE {
                 self.builtins.insert(TYPE_NODE);
                 return;
             }

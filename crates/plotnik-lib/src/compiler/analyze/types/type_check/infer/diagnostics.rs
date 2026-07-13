@@ -45,7 +45,7 @@ impl InferVisitor<'_, '_> {
         Some((source, body.text_range()))
     }
 
-    /// Report a captured quantifier whose void inner doesn't match exactly one
+    /// Report a captured quantifier whose no-value inner doesn't match exactly one
     /// node: there is no single node to bind (per element, for repeats).
     pub(super) fn report_quantified_capture_without_single_node(
         &mut self,
@@ -53,7 +53,7 @@ impl InferVisitor<'_, '_> {
         inner_info: &PatternShape,
     ) {
         let capture_has_no_single_node =
-            inner_info.root_extent == RootExtent::Other && inner_info.flow.is_void();
+            inner_info.root_extent == RootExtent::Other && inner_info.flow.is_no_value();
         if !capture_has_no_single_node {
             return;
         }
@@ -80,7 +80,7 @@ impl InferVisitor<'_, '_> {
             .emit();
     }
 
-    /// Report a capture whose void inner doesn't match exactly one node —
+    /// Report a capture whose no-value inner doesn't match exactly one node —
     /// whether several or possibly none, there is no single node to bind.
     /// Without this, the capture would silently bind an arbitrary node (or one
     /// per repeat), or dangle on a zero-width match.
@@ -89,7 +89,7 @@ impl InferVisitor<'_, '_> {
         inner: &Pattern,
         inner_info: &PatternShape,
     ) {
-        if inner_info.root_extent != RootExtent::Other || !inner_info.flow.is_void() {
+        if inner_info.root_extent != RootExtent::Other || !inner_info.flow.is_no_value() {
             return;
         }
 
@@ -125,7 +125,7 @@ impl InferVisitor<'_, '_> {
         inner: &Pattern,
         inner_info: &PatternShape,
     ) -> bool {
-        if !matches!(inner, Pattern::DefRef(_)) || !inner_info.flow.is_void() {
+        if !matches!(inner, Pattern::DefRef(_)) || !inner_info.flow.is_no_value() {
             return false;
         }
 

@@ -10,7 +10,7 @@ Type system metadata for code generation and runtime validation. Describes the s
 
 | Value | Kind             | Description                     |
 | ----- | ---------------- | ------------------------------- |
-| 0     | `Void`           | Unit type, captures nothing     |
+| 0     | `NoValue`        | Successful match with no value  |
 | 1     | `Node`           | AST node reference              |
 | 2     | `Option`         | Zero or one value               |
 | 3     | `ListZeroOrMore` | Zero or more (T\*)              |
@@ -62,7 +62,7 @@ struct TypeDef {
 
 | Kind             | `data`        | `count`    |
 | :--------------- | :------------ | :--------- |
-| `Void`           | 0             | 0          |
+| `NoValue`        | 0             | 0          |
 | `Node`           | 0             | 0          |
 | `Text`           | 0             | 0          |
 | `Bool`           | 0             | 0          |
@@ -90,8 +90,8 @@ struct TypeMember {
 ```
 
 For record fields, `name` is the field name and `ty` is the field type. For
-variant cases, `name` is the case name and `ty` is the payload type (`Void`
-means no payload).
+variant cases, `name` is the case name and `ty` is the payload type (`NoValue`
+marks a no-payload case).
 
 ### TypeNames
 
@@ -118,7 +118,7 @@ Sorted lexicographically by name (resolved via String Table) for binary search.
 ## Examples
 
 > **Note**: Only **used** primitives are emitted to TypeDefs. The emitter writes
-> them first in order (`Void`, `Node`, `Text`, `Bool`), then custom output types.
+> them first in order (`NoValue`, `Node`, `Text`, `Bool`), then custom output types.
 
 ### Simple Record
 
@@ -149,7 +149,7 @@ List = [
 
 ```
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
 T2 = Record  M0:2  ; { head, tail }
 T3 = Variant M2:2  ; Nil | Cons
@@ -157,7 +157,7 @@ T3 = Variant M2:2  ; Nil | Cons
 [type_members]
 M0: S1 → T1  ; head: <Node>
 M1: S2 → T3  ; tail: List
-M2: S3 → T0  ; Nil: <Void>
+M2: S3 → T0  ; Nil: <NoValue>
 M3: S4 → T2  ; Cons: T2
 
 [type_names]
@@ -190,7 +190,7 @@ Loaders must verify:
   member's `ty` is a valid TypeId (`< type_defs_count`).
 - Wrapper/`Alias`: `data` (inner/target TypeId) is `< type_defs_count`, and the
   reserved `count` is `0`.
-- `Void`/`Node`/`Text`/`Bool`: the reserved `data` and `count` are both `0`.
+- `NoValue`/`Node`/`Text`/`Bool`: the reserved `data` and `count` are both `0`.
 
 The bounds checks prevent out-of-bounds reads from malformed binaries; the
 reserved-zero checks reject smuggled state where the format pins a field to zero.

@@ -15,7 +15,7 @@ use super::RootExtent;
 use crate::bytecode::type_system::PrimitiveType;
 pub use crate::compiler::parse::ast::QuantifierKind;
 
-pub const TYPE_VOID: TypeId = TypeId(PrimitiveType::Void.index() as u32);
+pub const TYPE_NO_VALUE: TypeId = TypeId(PrimitiveType::NoValue.index() as u32);
 pub const TYPE_NODE: TypeId = TypeId(PrimitiveType::Node.index() as u32);
 pub const TYPE_TEXT: TypeId = TypeId(PrimitiveType::Text.index() as u32);
 pub const TYPE_BOOL: TypeId = TypeId(PrimitiveType::Bool.index() as u32);
@@ -33,8 +33,8 @@ pub enum ListMinimum {
 /// `type_system::TypeKind`, the bytecode discriminant.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeShape {
-    /// Produces nothing, transparent to parent scope.
-    Void,
+    /// Sentinel for successful matching that produces no value.
+    NoValue,
     /// A tree-sitter node.
     Node,
     /// Borrowed source text.
@@ -99,9 +99,12 @@ impl TypeShape {
             Self::List { element, .. } | Self::Option(element) => {
                 TypeShapeChildIdsInner::One(Some(*element).into_iter())
             }
-            Self::Void | Self::Node | Self::Text | Self::Bool | Self::Custom(_) | Self::Ref(_) => {
-                TypeShapeChildIdsInner::Empty(std::iter::empty())
-            }
+            Self::NoValue
+            | Self::Node
+            | Self::Text
+            | Self::Bool
+            | Self::Custom(_)
+            | Self::Ref(_) => TypeShapeChildIdsInner::Empty(std::iter::empty()),
         };
         TypeShapeChildIds(inner)
     }
@@ -126,8 +129,8 @@ impl RecordField {
 /// Data flow through an expression.
 #[derive(Clone, Debug)]
 pub enum PatternFlow {
-    /// Transparent, produces nothing.
-    Void,
+    /// Transparent, produces no value.
+    NoValue,
     /// Opaque single value that doesn't bubble (scope boundary).
     Value(TypeId),
     /// Record field set that bubbles to the parent scope.
@@ -135,8 +138,8 @@ pub enum PatternFlow {
 }
 
 impl PatternFlow {
-    pub fn is_void(&self) -> bool {
-        matches!(self, Self::Void)
+    pub fn is_no_value(&self) -> bool {
+        matches!(self, Self::NoValue)
     }
 
     pub fn has_fields(&self) -> bool {
@@ -145,7 +148,7 @@ impl PatternFlow {
 
     pub fn type_id(&self) -> Option<TypeId> {
         match self {
-            Self::Void => None,
+            Self::NoValue => None,
             Self::Value(id) | Self::Fields(id) => Some(*id),
         }
     }
@@ -165,10 +168,10 @@ impl PatternShape {
         Self { root_extent, flow }
     }
 
-    pub fn void() -> Self {
+    pub fn no_value() -> Self {
         Self {
             root_extent: RootExtent::SingleNode,
-            flow: PatternFlow::Void,
+            flow: PatternFlow::NoValue,
         }
     }
 }

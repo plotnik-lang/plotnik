@@ -2,9 +2,9 @@
 
 use crate::core::Colors;
 
-/// How to represent the void type in TypeScript.
+/// How to represent match-only output in TypeScript.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum VoidType {
+pub enum MatchOnlyType {
     /// `undefined` - the absence of a value
     #[default]
     Undefined,
@@ -17,7 +17,7 @@ pub struct Config {
     pub(crate) export: bool,
     pub(crate) emit_node_interface: bool,
     pub(crate) include_points: bool,
-    pub(crate) void_type: VoidType,
+    pub(crate) match_only_type: MatchOnlyType,
     pub(crate) colors: Colors,
 }
 
@@ -27,7 +27,7 @@ impl Default for Config {
             export: true,
             emit_node_interface: true,
             include_points: false,
-            void_type: VoidType::default(),
+            match_only_type: MatchOnlyType::default(),
             colors: Colors::OFF,
         }
     }
@@ -54,8 +54,8 @@ impl Config {
         self
     }
 
-    pub fn void_type(mut self, value: VoidType) -> Self {
-        self.void_type = value;
+    pub fn match_only_type(mut self, value: MatchOnlyType) -> Self {
+        self.match_only_type = value;
         self
     }
 

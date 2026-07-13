@@ -18,7 +18,7 @@ S4 "identifier"
 S5 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 
 [type_members]
 

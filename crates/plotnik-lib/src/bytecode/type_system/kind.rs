@@ -7,8 +7,8 @@
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
 pub enum TypeKind {
-    /// Unit type - used for definitions with no captures.
-    Void = 0,
+    /// Sentinel for successful matching that produces no value.
+    NoValue = 0,
     /// AST node reference.
     Node = 1,
     /// `T?` - option type containing zero or one value.
@@ -33,7 +33,7 @@ impl TypeKind {
     /// Convert from raw discriminant.
     pub fn from_u8(v: u8) -> Option<Self> {
         match v {
-            0 => Some(Self::Void),
+            0 => Some(Self::NoValue),
             1 => Some(Self::Node),
             2 => Some(Self::Option),
             3 => Some(Self::ListZeroOrMore),
@@ -49,7 +49,7 @@ impl TypeKind {
 
     /// Whether this is a primitive/builtin type.
     pub fn is_primitive(self) -> bool {
-        matches!(self, Self::Void | Self::Node | Self::Text | Self::Bool)
+        matches!(self, Self::NoValue | Self::Node | Self::Text | Self::Bool)
     }
 
     /// Whether this is a wrapper type (`Option`, `ListZeroOrMore`, or
@@ -74,7 +74,7 @@ impl TypeKind {
 
     pub fn primitive_name(self) -> Option<&'static str> {
         match self {
-            Self::Void => Some("Void"),
+            Self::NoValue => Some("NoValue"),
             Self::Node => Some("Node"),
             Self::Text => Some("Text"),
             Self::Bool => Some("Bool"),

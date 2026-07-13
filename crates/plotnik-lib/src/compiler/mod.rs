@@ -35,8 +35,8 @@ pub use crate::compiler::diagnostics::{
 pub use emit::{
     BytecodeConfig, BytecodeInspection, CodegenProvenance, CodegenTarget, Emission,
     EmitConfigError, EmitTarget, RustCodegenConfig, RustModuleOutput, RustTypesOutput,
-    TypeScriptBinding, TypeScriptCodegenConfig, TypeScriptNodeRepresentation,
-    TypeScriptTypesOutput, TypeScriptVoidType, entry_fn_name,
+    TypeScriptBinding, TypeScriptCodegenConfig, TypeScriptMatchOnlyType,
+    TypeScriptNodeRepresentation, TypeScriptTypesOutput, entry_fn_name,
 };
 pub use fmt::{FormatError, FormatResult, format_query};
 pub use parse::{QueryToken, tokenize};

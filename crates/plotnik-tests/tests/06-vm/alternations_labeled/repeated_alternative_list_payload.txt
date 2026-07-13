@@ -48,7 +48,7 @@ S8 "expression_statement"
 S9 "debugger_statement"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
 T2 = ListZeroOrMore(T1)  ; <Node>*
 T3 = Record  M0:1  ; { stmts }
@@ -58,7 +58,7 @@ T5 = Record  M3:1  ; { x }
 [type_members]
 M0: S1 → T2  ; stmts: T2
 M1: S2 → T3  ; A: T3
-M2: S3 → T0  ; B: <Void>
+M2: S3 → T0  ; B: <NoValue>
 M3: S4 → T4  ; x: QX
 
 [type_names]

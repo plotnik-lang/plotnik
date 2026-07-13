@@ -1,7 +1,7 @@
 //! Post-SCC re-check of captures on in-progress reference targets.
 //!
 //! While an SCC is being inferred, a reference to a member that hasn't been
-//! registered yet flows as a pending value (`TypeShape::Ref`) — its void-ness
+//! registered yet flows as a pending value (`TypeShape::Ref`) — its no-value state
 //! is unknown, so the single-referent checks at capture sites stay silent.
 //! Once the SCC completes, every member's facts are final; this pass walks
 //! exactly those sites again. Sites whose target registered *before* the
@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 
 use crate::compiler::analyze::types::type_shape::{
-    PatternFlow, PatternShape, TYPE_VOID, TypeShape,
+    PatternFlow, PatternShape, TYPE_NO_VALUE, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast::Pattern;
@@ -167,8 +167,8 @@ impl InferVisitor<'_, '_> {
             .type_ctx
             .def_root_extent(def_id)
             .expect("definition root extents are precomputed before inference");
-        let flow = if output == TYPE_VOID {
-            PatternFlow::Void
+        let flow = if output == TYPE_NO_VALUE {
+            PatternFlow::NoValue
         } else {
             let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
             PatternFlow::Value(ref_type)

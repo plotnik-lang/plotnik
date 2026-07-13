@@ -21,7 +21,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::compiler::analyze::types::TypeAnalysis;
-use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{TYPE_NO_VALUE, TypeId, TypeShape};
 
 pub(super) struct TypeFacts {
     lifetimes: HashMap<TypeId, LifetimeUsage>,
@@ -78,7 +78,7 @@ fn collect_reachable(types: &TypeAnalysis) -> Vec<TypeId> {
     let mut out = Vec::new();
     let mut stack: Vec<TypeId> = types
         .iter_def_output()
-        .filter(|&(_, ty)| ty != TYPE_VOID)
+        .filter(|&(_, ty)| ty != TYPE_NO_VALUE)
         .map(|(_, ty)| ty)
         .collect();
 
@@ -90,7 +90,7 @@ fn collect_reachable(types: &TypeAnalysis) -> Vec<TypeId> {
         stack.extend(types.expect_type_shape(ty).child_type_ids());
         if let TypeShape::Ref(def_id) = types.expect_type_shape(ty) {
             let target = types.expect_def_output(*def_id);
-            if target != TYPE_VOID {
+            if target != TYPE_NO_VALUE {
                 stack.push(target);
             }
         }
@@ -119,7 +119,7 @@ fn lifetime_fixpoint(types: &TypeAnalysis, reachable: &[TypeId]) -> HashMap<Type
                 },
                 TypeShape::Ref(def_id) => {
                     let target = types.expect_def_output(*def_id);
-                    if target == TYPE_VOID {
+                    if target == TYPE_NO_VALUE {
                         LifetimeUsage {
                             tree: true,
                             source: false,
@@ -153,7 +153,7 @@ fn ref_target_closures(
         .filter_map(|&ty| match types.expect_type_shape(ty) {
             TypeShape::Ref(def_id) => {
                 let target = types.expect_def_output(*def_id);
-                (target != TYPE_VOID).then(|| (ty, by_value_closure(types, target)))
+                (target != TYPE_NO_VALUE).then(|| (ty, by_value_closure(types, target)))
             }
             _ => None,
         })
@@ -175,7 +175,7 @@ fn by_value_closure(types: &TypeAnalysis, from: TypeId) -> HashSet<TypeId> {
             TypeShape::List { .. } => {}
             TypeShape::Ref(def_id) => {
                 let target = types.expect_def_output(*def_id);
-                if target != TYPE_VOID {
+                if target != TYPE_NO_VALUE {
                     stack.push(target);
                 }
             }

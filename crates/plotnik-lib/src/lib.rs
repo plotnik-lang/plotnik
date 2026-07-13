@@ -44,7 +44,7 @@ pub mod diagnostics {
 }
 
 pub use crate::compiler::entry_fn_name as matcher_entry_fn_name;
-pub use crate::compiler::{TypeScriptBinding, TypeScriptVoidType};
+pub use crate::compiler::{TypeScriptBinding, TypeScriptMatchOnlyType};
 
 pub use crate::core::Colors;
 pub use crate::core::grammar::GrammarIdentity;

@@ -41,7 +41,7 @@ S3 "number"
 S4 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 
 [type_members]
 

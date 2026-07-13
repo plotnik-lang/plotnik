@@ -17,7 +17,7 @@ use crate::compiler::analyze::types::raw_output::{
     RawCaptureObservation, RawDefinitionValueRole, RawOutputGraphBuilder,
 };
 use crate::compiler::analyze::types::type_shape::{
-    PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeId,
+    PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_NO_VALUE, TYPE_NODE, TYPE_TEXT, TypeId,
     TypeShape,
 };
 use crate::compiler::analyze::types::{CaptureFact, FieldCompletions, RootExtent};
@@ -48,7 +48,7 @@ pub struct TypeAnalysis {
     /// Each definition's output type, keyed by `DefId`. `BTreeMap` so iteration
     /// is in `DefId` order — the SCC/emission order entrypoints rely on. Total
     /// over every scheduled definition: a captureless structural body maps to
-    /// `TYPE_VOID`, so a lookup for any admitted `DefId` hits. `finish` admits
+    /// `TYPE_NO_VALUE`, so a lookup for any admitted `DefId` hits. `finish` admits
     /// the map only after checking its type ids and every `Ref` target are
     /// consistent.
     pub(super) def_output: BTreeMap<DefId, TypeId>,
@@ -125,7 +125,7 @@ impl TypeAnalysis {
     /// list/option thereof). Plain `Node` is not — it is the matched node,
     /// captured directly.
     ///
-    /// A `Ref` resolves through its target: a reference to a void definition
+    /// A `Ref` resolves through its target: a reference to a match-only definition
     /// leaves no pending value at runtime (the capture takes the matched node),
     /// so it must not classify as structured. Mid-inference a same-SCC target
     /// has no output yet; assume structured — the admitted classification that
@@ -202,7 +202,7 @@ impl TypeAnalysis {
     /// resolve to themselves. The accessor type-table emission uses to map a
     /// query type to the concrete shape it stands for.
     ///
-    /// A `Ref` whose definition ended up void resolves to `Node`: the runtime
+    /// A `Ref` whose definition is match-only resolves to `Node`: the runtime
     /// capture of such a reference takes the matched node (the callee leaves no
     /// pending value), so `Node` is the shape the reference stands for.
     pub fn resolve_underlying_type_id(&self, type_id: TypeId) -> TypeId {
@@ -210,7 +210,7 @@ impl TypeAnalysis {
             return type_id;
         };
         let target = self.expect_def_output(*def_id);
-        if target == TYPE_VOID {
+        if target == TYPE_NO_VALUE {
             return TYPE_NODE;
         }
         self.resolve_underlying_type_id(target)
@@ -241,8 +241,8 @@ impl TypeAnalysis {
     /// loudly — the same discipline `DependencyAnalysis::new` follows.
     fn assert_well_formed(&self) {
         assert!(
-            matches!(self.type_shape(TYPE_VOID), Some(TypeShape::Void)),
-            "TYPE_VOID must be interned at its canonical id",
+            matches!(self.type_shape(TYPE_NO_VALUE), Some(TypeShape::NoValue)),
+            "TYPE_NO_VALUE must be interned at its canonical id",
         );
         assert!(
             matches!(self.type_shape(TYPE_NODE), Some(TypeShape::Node)),
@@ -347,7 +347,7 @@ impl TypeAnalysis {
 
     fn assert_flow_well_formed(&self, flow: &PatternFlow) {
         match flow {
-            PatternFlow::Void => {}
+            PatternFlow::NoValue => {}
             PatternFlow::Value(type_id) => {
                 self.assert_type_id_registered(*type_id, "value flow type id out of range");
             }
@@ -448,8 +448,8 @@ impl TypeAnalysisBuilder {
         };
 
         // Pre-register builtin types at their expected IDs.
-        let void_id = builder.intern_type(TypeShape::Void);
-        debug_assert_eq!(void_id, TYPE_VOID);
+        let no_value_id = builder.intern_type(TypeShape::NoValue);
+        debug_assert_eq!(no_value_id, TYPE_NO_VALUE);
 
         let node_id = builder.intern_type(TypeShape::Node);
         debug_assert_eq!(node_id, TYPE_NODE);

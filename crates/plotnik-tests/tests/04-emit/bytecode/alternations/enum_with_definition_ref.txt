@@ -48,7 +48,7 @@ S09 "identifier"
 S10 "number"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
 T2 = Record  M0:1  ; { name }
 T3 = Record  M1:1  ; { b }
@@ -58,7 +58,7 @@ T5 = Record  M4:1  ; { item }
 [type_members]
 M0: S01 → T1  ; name: <Node>
 M1: S02 → T1  ; b: <Node>
-M2: S03 → T0  ; A: <Void>
+M2: S03 → T0  ; A: <NoValue>
 M3: S04 → T3  ; B: T3
 M4: S05 → T4  ; item: QItem
 

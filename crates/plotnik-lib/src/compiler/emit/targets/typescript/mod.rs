@@ -3,7 +3,7 @@
 mod config;
 mod types;
 
-pub use config::{Config, VoidType};
+pub use config::{Config, MatchOnlyType};
 pub(crate) use types::{emit_schema, emit_schema_mapped};
 
 #[derive(Debug, Clone, Copy, serde::Serialize)]

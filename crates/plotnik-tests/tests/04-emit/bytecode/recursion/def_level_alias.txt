@@ -49,7 +49,7 @@ S8 "identifier"
 S9 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
 T2 = Record  M0:1  ; { inner }
 T3 = Record  M1:1  ; { id }

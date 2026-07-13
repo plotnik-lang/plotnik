@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn from_u8_valid() {
-    assert_eq!(TypeKind::from_u8(0), Some(TypeKind::Void));
+    assert_eq!(TypeKind::from_u8(0), Some(TypeKind::NoValue));
     assert_eq!(TypeKind::from_u8(1), Some(TypeKind::Node));
     assert_eq!(TypeKind::from_u8(2), Some(TypeKind::Option));
     assert_eq!(TypeKind::from_u8(3), Some(TypeKind::ListZeroOrMore));
@@ -22,7 +22,7 @@ fn from_u8_invalid() {
 
 #[test]
 fn is_primitive() {
-    assert!(TypeKind::Void.is_primitive());
+    assert!(TypeKind::NoValue.is_primitive());
     assert!(TypeKind::Node.is_primitive());
     assert!(TypeKind::Text.is_primitive());
     assert!(TypeKind::Bool.is_primitive());
@@ -38,7 +38,7 @@ fn is_wrapper() {
     assert!(!TypeKind::Record.is_wrapper());
     assert!(!TypeKind::Variant.is_wrapper());
     assert!(!TypeKind::Alias.is_wrapper());
-    assert!(!TypeKind::Void.is_wrapper());
+    assert!(!TypeKind::NoValue.is_wrapper());
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn is_alias() {
 
 #[test]
 fn primitive_name() {
-    assert_eq!(TypeKind::Void.primitive_name(), Some("Void"));
+    assert_eq!(TypeKind::NoValue.primitive_name(), Some("NoValue"));
     assert_eq!(TypeKind::Node.primitive_name(), Some("Node"));
     assert_eq!(TypeKind::Text.primitive_name(), Some("Text"));
     assert_eq!(TypeKind::Bool.primitive_name(), Some("Bool"));

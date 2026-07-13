@@ -153,7 +153,7 @@ pub struct InferOpts {
     pub include_points: bool,
     pub no_node_type: bool,
     pub no_export: bool,
-    pub void_type: Option<String>,
+    pub match_only_type: Option<String>,
     pub output: Option<PathBuf>,
     pub color: ColorChoice,
 }
@@ -171,7 +171,7 @@ impl InferOpts {
             include_points: m.get_flag("include_points"),
             no_node_type: m.get_flag("no_node_type"),
             no_export: m.get_flag("no_export"),
-            void_type: m.get_one::<String>("void_type").cloned(),
+            match_only_type: m.get_one::<String>("match_only_type").cloned(),
             output: m.get_one::<PathBuf>("output").cloned(),
             color: ColorChoice::from_matches(m),
         }
@@ -190,7 +190,7 @@ impl From<InferOpts> for InferArgs {
             export: !p.no_export,
             output: p.output,
             color: p.color.should_colorize(),
-            void_type: p.void_type,
+            match_only_type: p.match_only_type,
         }
     }
 }

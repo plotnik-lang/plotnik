@@ -16,8 +16,8 @@ use crate::compiler::analyze::types::capture_type::{
 };
 use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    ListMinimum, PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_TEXT, TYPE_VOID, TypeId,
-    TypeShape,
+    ListMinimum, PatternFlow, PatternShape, RecordField, TYPE_BOOL, TYPE_NO_VALUE, TYPE_TEXT,
+    TypeId, TypeShape,
 };
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::source::SourceId;
@@ -126,7 +126,7 @@ struct RawFieldsFlow {
 
 #[derive(Clone, Debug)]
 enum RawPatternFlow {
-    Void,
+    NoValue,
     Value(TypeId),
     Fields(RawFieldsFlow),
 }
@@ -135,7 +135,7 @@ impl RawPatternFlow {
     fn fields(&self) -> Option<&BTreeMap<Symbol, RawFieldOutput>> {
         match self {
             Self::Fields(fields) => Some(&fields.fields),
-            Self::Void | Self::Value(_) => None,
+            Self::NoValue | Self::Value(_) => None,
         }
     }
 }
@@ -173,12 +173,12 @@ struct RawDefinitionOutput {
 impl RawDefinitionOutput {
     fn type_id(self, graph: &RawOutputGraph) -> TypeId {
         match &graph.flow(self.body).flow {
-            RawPatternFlow::Void => TYPE_VOID,
+            RawPatternFlow::NoValue => TYPE_NO_VALUE,
             RawPatternFlow::Fields(fields) => fields.type_id,
             RawPatternFlow::Value(type_id) if self.value_role == RawDefinitionValueRole::Value => {
                 *type_id
             }
-            RawPatternFlow::Value(_) => TYPE_VOID,
+            RawPatternFlow::Value(_) => TYPE_NO_VALUE,
         }
     }
 }
@@ -252,7 +252,7 @@ impl RawOutputGraphBuilder {
         // producer identities to the accepted PatternShape. The builder is
         // enabled only for queries whose cheap pre-scan found a builtin.
         let flow = match &shape.flow {
-            PatternFlow::Void => RawPatternFlow::Void,
+            PatternFlow::NoValue => RawPatternFlow::NoValue,
             PatternFlow::Value(type_id) => RawPatternFlow::Value(*type_id),
             PatternFlow::Fields(type_id) => {
                 let mut sources = self.pattern_field_sources(&occurrence);

@@ -12,7 +12,7 @@ S1 "program"
 S2 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 
 [type_members]
 

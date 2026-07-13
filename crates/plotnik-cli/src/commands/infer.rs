@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use plotnik_lib::{TypeScriptCodegenConfig, TypeScriptVoidType};
+use plotnik_lib::{TypeScriptCodegenConfig, TypeScriptMatchOnlyType};
 
 use super::compile::compile_query;
 use super::lang_resolver::require_lang;
@@ -19,7 +19,7 @@ pub struct InferArgs {
     pub export: bool,
     pub output: Option<PathBuf>,
     pub color: bool,
-    pub void_type: Option<String>,
+    pub match_only_type: Option<String>,
 }
 
 pub fn run(args: InferArgs) -> CliResult {
@@ -42,9 +42,9 @@ pub fn run(args: InferArgs) -> CliResult {
 
     let compiled = compile_query(loaded.sources, lang, args.color)?;
 
-    let void_type = match args.void_type.as_deref() {
-        Some("null") => TypeScriptVoidType::Null,
-        _ => TypeScriptVoidType::Undefined,
+    let match_only_type = match args.match_only_type.as_deref() {
+        Some("null") => TypeScriptMatchOnlyType::Null,
+        _ => TypeScriptMatchOnlyType::Undefined,
     };
     // Only use colors when outputting to stdout (not to file)
     let use_colors = args.color && args.output.is_none();
@@ -52,7 +52,7 @@ pub fn run(args: InferArgs) -> CliResult {
         .export(args.export)
         .emit_node_interface(!args.no_node_type)
         .include_points(args.include_points)
-        .void_type(void_type)
+        .match_only_type(match_only_type)
         .colored(use_colors);
     let emission = compiled
         .emit_types(config)

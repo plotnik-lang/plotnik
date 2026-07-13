@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use crate::compiler::analyze::types::TypeAnalysis;
-use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_NO_VALUE, TypeId, TypeShape};
 use crate::compiler::emit::plan::{DecodeItem, ResultDecodePlan};
 use crate::compiler::emit::targets::rust::{TypeContext, TypeModel};
 use crate::core::Symbol;
@@ -60,7 +60,7 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
                 .map(|&payload| self.variant_payload_frame_bytes(item.ty, payload))
                 .max()
                 .unwrap_or(0),
-            TypeShape::Void => 0,
+            TypeShape::NoValue => 0,
             _ => self.value_temp_bytes(item.ty, TypeContext::item(item.ty)),
         };
 
@@ -70,11 +70,11 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
     }
 
     fn variant_payload_frame_bytes(&self, owner: TypeId, payload: TypeId) -> u64 {
-        if payload == TYPE_VOID {
+        if payload == TYPE_NO_VALUE {
             return 0;
         }
         let TypeShape::Record(fields) = self.types.expect_type_shape(payload) else {
-            unreachable!("variant case payload is void or an anonymous record");
+            unreachable!("variant case has no payload or an anonymous record payload");
         };
         self.field_scope_frame_bytes(owner, fields)
     }
@@ -130,7 +130,7 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
         }
 
         match self.types.expect_type_shape(ty) {
-            TypeShape::Void => 0,
+            TypeShape::NoValue => 0,
             TypeShape::Node | TypeShape::Custom(_) => NODE_VALUE_BYTES,
             TypeShape::Text => 2 * WORD_BYTES,
             TypeShape::Bool => 1,
@@ -160,7 +160,7 @@ impl<'m, 'a> DecoderFrameEstimator<'m, 'a> {
             }
             TypeShape::Ref(def_id) => {
                 let target = self.types.expect_def_output(*def_id);
-                if target == TYPE_VOID {
+                if target == TYPE_NO_VALUE {
                     return NODE_VALUE_BYTES;
                 }
                 if self.model.is_boxed_ref(context, ty) {

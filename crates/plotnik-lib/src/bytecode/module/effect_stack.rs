@@ -100,7 +100,7 @@
 //! ## Scope
 //!
 //! This pass proves the release-build panic surface unreachable, plus the
-//! span-pairing and variant void/data-consistency assertions. Full agreement
+//! span-pairing and variant payload-consistency assertions. Full agreement
 //! between materialized values and the declared type tables (checked by
 //! `debug_verify_type` in debug builds) is a compiler self-check, not a load
 //! guarantee: malformed bytecode can still declare types its effects do not
@@ -806,13 +806,13 @@ fn apply_frame_action(
         }
         FrameAction::Close(ValueFrameKind::Variant) => match state.stack.pop() {
             Some(FrameKind::Variant { member, got_data }) => {
-                let is_void = variant_member_is_void(module, member, addr)?;
+                let has_no_payload = variant_member_has_no_payload(module, member, addr)?;
                 let data_pending = match *state.pending {
                     PendingState::Full => true,
                     PendingState::Empty => false,
-                    PendingState::Unknown => !got_data && !is_void,
+                    PendingState::Unknown => !got_data && !has_no_payload,
                 };
-                if data_pending && got_data || (data_pending || got_data) == is_void {
+                if data_pending && got_data || (data_pending || got_data) == has_no_payload {
                     return Err(err());
                 }
                 *state.pending = PendingState::Full;
@@ -853,7 +853,7 @@ fn close_span(span_stack: &mut Vec<u16>, id: u16, addr: CodeAddr) -> Result<(), 
     }
 }
 
-fn variant_member_is_void(
+fn variant_member_has_no_payload(
     module: &Module,
     member: u16,
     addr: CodeAddr,
@@ -865,6 +865,6 @@ fn variant_member_is_void(
     };
     Ok(matches!(
         type_def.decode(),
-        TypeDefKind::Primitive(TypeKind::Void)
+        TypeDefKind::Primitive(TypeKind::NoValue)
     ))
 }

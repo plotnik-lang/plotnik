@@ -67,7 +67,7 @@ pub enum Value<'s> {
     Array(Vec<Value<'s>>),
     /// Record with ordered fields.
     Record(Vec<(&'s str, Value<'s>)>),
-    /// Variant case. `data` is `None` for void payloads.
+    /// Variant case. `data` is `None` when the case has no payload.
     Variant {
         tag: &'s str,
         data: Option<Box<Value<'s>>>,

@@ -65,13 +65,13 @@ S8 "program"
 S9 "expression_statement"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = Variant M0:2  ; Empty | Wrap
 T2 = Record  M2:1  ; { expr }
 
 [type_members]
-M0: S1 → T0  ; Empty: <Void>
-M1: S2 → T0  ; Wrap: <Void>
+M0: S1 → T0  ; Empty: <NoValue>
+M1: S2 → T0  ; Wrap: <NoValue>
 M2: S3 → T1  ; expr: Expr
 
 [type_names]

@@ -88,11 +88,11 @@ impl<'a> TypeVerifier<'a> {
 
         match type_def.decode() {
             TypeDefKind::Primitive(kind) => match kind {
-                TypeKind::Void => {
+                TypeKind::NoValue => {
                     if !matches!(value, Value::Null) {
                         self.errors.push(format_error(
                             &self.path,
-                            &format!("type: void, value: {}", value_kind_name(value)),
+                            &format!("type: no value, value: {}", value_kind_name(value)),
                         ));
                     }
                 }
@@ -223,14 +223,14 @@ impl<'a> TypeVerifier<'a> {
 
                     match case {
                         Some(member) => {
-                            let is_void = self.types.get(member.type_id).is_some_and(|d| {
-                                matches!(d.decode(), TypeDefKind::Primitive(TypeKind::Void))
+                            let has_no_payload = self.types.get(member.type_id).is_some_and(|d| {
+                                matches!(d.decode(), TypeDefKind::Primitive(TypeKind::NoValue))
                             });
 
-                            if is_void {
+                            if has_no_payload {
                                 if data.is_some() {
                                     self.errors.push(format!(
-                                        "{}: void case '{}' should have no $data",
+                                        "{}: no-payload case '{}' should have no $data",
                                         append_path(&self.path, "$data"),
                                         tag
                                     ));
@@ -245,7 +245,7 @@ impl<'a> TypeVerifier<'a> {
                                     }
                                     None => {
                                         self.errors.push(format!(
-                                            "{}: non-void case '{}' should have $data",
+                                            "{}: payload-bearing case '{}' should have $data",
                                             append_path(&self.path, "$data"),
                                             tag
                                         ));

@@ -8,7 +8,7 @@ use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeN
 use crate::compiler::analyze::output::{CaptureLayout, CaptureScopeKind, OutputSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    ListMinimum, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeShape,
+    ListMinimum, RecordField, TYPE_BOOL, TYPE_NO_VALUE, TYPE_NODE, TYPE_TEXT, TypeShape,
 };
 use crate::compiler::emit::targets::bytecode::tables::{
     EmitError, StringTableBuilder, TypeTableBuilder,
@@ -66,7 +66,7 @@ fn build(
 fn emit_builtins(types: &mut TypeTableBuilder, builtins: &[TypeId]) -> Result<(), EmitError> {
     for &builtin in builtins {
         let kind = match builtin {
-            TYPE_VOID => TypeKind::Void,
+            TYPE_NO_VALUE => TypeKind::NoValue,
             TYPE_NODE => TypeKind::Node,
             TYPE_TEXT => TypeKind::Text,
             TYPE_BOOL => TypeKind::Bool,
@@ -127,7 +127,7 @@ fn emit_type_at_slot(
     let slot_index = usize::from(u16::from(wire_type));
     let type_shape = ctx.type_analysis.expect_type_shape(type_id);
     match type_shape {
-        TypeShape::Void | TypeShape::Node | TypeShape::Text | TypeShape::Bool => {
+        TypeShape::NoValue | TypeShape::Node | TypeShape::Text | TypeShape::Bool => {
             unreachable!("builtins should be handled separately")
         }
 
@@ -217,11 +217,11 @@ fn emit_type_at_slot(
         }
 
         TypeShape::Ref(def_id) => {
-            // A recursive reference to a definition that ended up void (its
+            // A recursive reference to a definition that is match-only (its
             // captures all suppressed) leaves no pending value at runtime: the
             // capture takes the matched node, so the alias targets Node.
             let target = ctx.type_analysis.expect_def_output(*def_id);
-            let alias = if target == TYPE_VOID {
+            let alias = if target == TYPE_NO_VALUE {
                 types
                     .lookup(TYPE_NODE)
                     .expect("Node is mapped before a Ref alias that targets it is emitted")

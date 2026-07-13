@@ -10,7 +10,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::compiler::analyze::output::{CaptureLayout, OutputItem, OutputItemKind, OutputSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
-use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_NO_VALUE, TypeId, TypeShape};
 use crate::core::Symbol;
 
 #[derive(Clone, Debug)]
@@ -64,7 +64,7 @@ pub(crate) struct DecodeItem {
 
 impl DecodeItem {
     pub(crate) fn has_decoder(&self) -> bool {
-        !matches!(self.kind, DecodeItemKind::VoidDefinition)
+        !matches!(self.kind, DecodeItemKind::MatchOnlyDefinition)
     }
 }
 
@@ -73,7 +73,7 @@ pub(crate) enum DecodeItemKind {
     Record(DecodeScope),
     Variant(Vec<DecodeCase>),
     Alias(DecodeValue),
-    VoidDefinition,
+    MatchOnlyDefinition,
 }
 
 #[derive(Clone, Debug)]
@@ -129,7 +129,7 @@ impl DecodePlanBuilder<'_, '_> {
             }
             OutputItemKind::Variant => DecodeItemKind::Variant(self.variant_cases(item)),
             OutputItemKind::Alias => DecodeItemKind::Alias(self.value(item.ty)),
-            OutputItemKind::VoidDef => DecodeItemKind::VoidDefinition,
+            OutputItemKind::MatchOnlyDef => DecodeItemKind::MatchOnlyDefinition,
         };
         DecodeItem {
             name: item.name,
@@ -149,12 +149,12 @@ impl DecodePlanBuilder<'_, '_> {
             .iter()
             .enumerate()
             .map(|(index, (&name, &payload))| {
-                let payload = if payload == TYPE_VOID {
+                let payload = if payload == TYPE_NO_VALUE {
                     None
                 } else {
                     let TypeShape::Record(fields) = self.schema.types.expect_type_shape(payload)
                     else {
-                        unreachable!("variant case payload is void or an anonymous record");
+                        unreachable!("variant case has no payload or an anonymous record payload");
                     };
                     let payloads = payload_twins(self.schema.types, &twins, index);
                     Some(self.scope(fields.iter(), &payloads))
@@ -201,7 +201,7 @@ impl DecodePlanBuilder<'_, '_> {
             },
             TypeShape::Ref(definition) => {
                 let target = self.schema.types.expect_def_output(*definition);
-                if target == TYPE_VOID {
+                if target == TYPE_NO_VALUE {
                     return DecodeValue::Node;
                 }
                 DecodeValue::Nested {
@@ -209,7 +209,9 @@ impl DecodePlanBuilder<'_, '_> {
                     source_type: ty,
                 }
             }
-            TypeShape::Void => unreachable!("void cannot appear in an output position"),
+            TypeShape::NoValue => {
+                unreachable!("no-value flow cannot appear in a value position")
+            }
         }
     }
 
@@ -237,7 +239,7 @@ impl DecodePlanBuilder<'_, '_> {
         match self.schema.types.expect_type_shape(ty) {
             TypeShape::Ref(definition) => {
                 let target = self.schema.types.expect_def_output(*definition);
-                if target == TYPE_VOID {
+                if target == TYPE_NO_VALUE {
                     return false;
                 }
                 self.schema.deps.is_recursive_def(*definition)

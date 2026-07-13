@@ -6,7 +6,7 @@ use plotnik_rt::{Limit, RuntimeLimitSpec};
 
 use crate::bytecode::Module;
 use crate::compiler::diagnostics::{Diagnostics, QueryResult};
-use crate::compiler::emit::targets::typescript::{TypeScriptBinding, VoidType};
+use crate::compiler::emit::targets::typescript::{MatchOnlyType, TypeScriptBinding};
 use crate::compiler::query::CompiledQuery;
 use crate::core::Colors;
 
@@ -256,7 +256,7 @@ pub struct TypeScriptCodegenConfig {
     export: bool,
     emit_node_interface: bool,
     include_points: bool,
-    void_type: VoidType,
+    match_only_type: MatchOnlyType,
     colors: Colors,
     node_representation: TypeScriptNodeRepresentation,
 }
@@ -267,7 +267,7 @@ impl Default for TypeScriptCodegenConfig {
             export: true,
             emit_node_interface: true,
             include_points: false,
-            void_type: VoidType::Undefined,
+            match_only_type: MatchOnlyType::Undefined,
             colors: Colors::OFF,
             node_representation: TypeScriptNodeRepresentation::SerializedValue,
         }
@@ -294,8 +294,8 @@ impl TypeScriptCodegenConfig {
         self
     }
 
-    pub fn void_type(mut self, void_type: VoidType) -> Self {
-        self.void_type = void_type;
+    pub fn match_only_type(mut self, match_only_type: MatchOnlyType) -> Self {
+        self.match_only_type = match_only_type;
         self
     }
 
@@ -314,7 +314,7 @@ impl TypeScriptCodegenConfig {
             .export(self.export)
             .emit_node_interface(self.emit_node_interface)
             .include_points(self.include_points)
-            .void_type(self.void_type)
+            .match_only_type(self.match_only_type)
             .colored(!self.colors.blue.is_empty())
     }
 

@@ -207,7 +207,7 @@ entrypoint value:
 - Node result: call body, `Node`, return.
 - Option/list/variant/scalar result: call body, return; the body already
   produces the pending value.
-- Void result: call body, return; materialization falls back to `null`.
+- Match-only output: call body, return; materialization produces `null`.
 
 ## Materialization
 
@@ -223,8 +223,8 @@ exactly one of `StrClose` or `BoolClose` closes it. Source text is sliced once
 from the validated source and remains borrowed; booleans are stored directly.
 The bytecode loader rejects mis-nested scalar effects before execution.
 
-Void output is represented by an empty stream and materializes as `null`.
-Tag-only enum variants emit no payload effects, so the rendered value has
+Match-only output is represented by an empty event stream and materializes as `null`.
+Tag-only variant cases emit no payload events, so the rendered value has
 `$tag` without `$data`.
 
 Materialized values borrow captured node text from the source and member/tag

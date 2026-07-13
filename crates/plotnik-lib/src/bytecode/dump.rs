@@ -146,7 +146,7 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
         let (formatted, comment) = match def.decode() {
             TypeDefKind::Primitive(kind) => {
                 let name = match kind {
-                    TypeKind::Void => "<Void>",
+                    TypeKind::NoValue => "<NoValue>",
                     TypeKind::Node => "<Node>",
                     TypeKind::Text => "<Text>",
                     TypeKind::Bool => "<Bool>",

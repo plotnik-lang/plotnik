@@ -3,12 +3,12 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::compiler::analyze::output::{OutputItem, OutputItemKind, OutputSchema};
-use crate::compiler::analyze::types::type_shape::{ListMinimum, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{ListMinimum, TYPE_NO_VALUE, TypeId, TypeShape};
 use crate::compiler::emit::sink::{Sink, Style};
 use crate::core::Symbol;
 
 use super::TypeScriptBinding;
-use super::config::{Config, VoidType};
+use super::config::{Config, MatchOnlyType};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct SemanticTag {
@@ -110,7 +110,7 @@ impl<'a> SchemaEmitter<'a> {
             TypeShape::Node | TypeShape::Custom(_) => true,
             TypeShape::Ref(definition) => {
                 let target = self.schema.types.expect_def_output(*definition);
-                target == TYPE_VOID || self.type_uses_node(target, seen)
+                target == TYPE_NO_VALUE || self.type_uses_node(target, seen)
             }
             shape => shape
                 .child_type_ids()
@@ -126,7 +126,7 @@ impl<'a> SchemaEmitter<'a> {
         match item.kind {
             OutputItemKind::Record => self.emit_interface(&name, item.ty),
             OutputItemKind::Variant => self.emit_variant(&name, item.ty),
-            OutputItemKind::Alias | OutputItemKind::VoidDef => {
+            OutputItemKind::Alias | OutputItemKind::MatchOnlyDef => {
                 let body = self.render_shape(item.ty);
                 self.emit_type_decl(&name, item.ty, body);
             }
@@ -254,9 +254,9 @@ impl<'a> SchemaEmitter<'a> {
 
     fn render_shape(&self, ty: TypeId) -> Sink<SemanticTag> {
         match self.schema.types.expect_type_shape(ty) {
-            TypeShape::Void => match self.config.void_type {
-                VoidType::Undefined => text("undefined"),
-                VoidType::Null => text("null"),
+            TypeShape::NoValue => match self.config.match_only_type {
+                MatchOnlyType::Undefined => text("undefined"),
+                MatchOnlyType::Null => text("null"),
             },
             TypeShape::Node | TypeShape::Custom(_) => text("Node"),
             TypeShape::Text => self.render_builtin("string", ty),
@@ -265,7 +265,7 @@ impl<'a> SchemaEmitter<'a> {
             TypeShape::List { element, minimum } => self.render_array(*element, *minimum),
             TypeShape::Ref(definition) => {
                 let target = self.schema.types.expect_def_output(*definition);
-                if target == TYPE_VOID {
+                if target == TYPE_NO_VALUE {
                     return text("Node");
                 }
                 let name = self.schema.deps.def_name_sym(*definition);
@@ -386,7 +386,7 @@ impl<'a> SchemaEmitter<'a> {
         }
         out.push("\"");
         out.reset_style();
-        if payload == TYPE_VOID {
+        if payload == TYPE_NO_VALUE {
             out.push(" ");
             out.styled(Style::Dim, "}");
             return out;

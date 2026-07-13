@@ -70,12 +70,12 @@ S5 "program"
 S6 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = Variant M0:2  ; Rec | Base
 
 [type_members]
-M0: S1 → T0  ; Rec: <Void>
-M1: S2 → T0  ; Base: <Void>
+M0: S1 → T0  ; Rec: <NoValue>
+M1: S2 → T0  ; Base: <NoValue>
 
 [type_names]
 N0: S3 → T1  ; Body

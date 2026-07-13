@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::bytecode::{EffectKind, FrameAction, ValueFrameKind};
 use crate::compiler::analyze::output::{CaptureMemberKind, CaptureScopeKind, OutputSchema};
-use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeShape};
+use crate::compiler::analyze::types::type_shape::{TYPE_NO_VALUE, TypeShape};
 use crate::compiler::lower::ir::{
     CallProtocol, DefRoute, EffectArg, EffectIR, InstructionIR, Label, MemberRef, NfaGraph,
     ReturnEntry, ReturnOutcome, SemanticNfa,
@@ -154,7 +154,10 @@ mod tests {
 enum FrameKind {
     List,
     Record,
-    Variant { is_void: bool, got_data: bool },
+    Variant {
+        has_no_payload: bool,
+        got_data: bool,
+    },
     Scalar,
 }
 
@@ -742,7 +745,7 @@ impl<'a> Program<'a> {
                     ValueFrameKind::List => FrameKind::List,
                     ValueFrameKind::Record => FrameKind::Record,
                     ValueFrameKind::Variant => FrameKind::Variant {
-                        is_void: self.case_is_void(member(effect, label)?, label)?,
+                        has_no_payload: self.case_has_no_payload(member(effect, label)?, label)?,
                         got_data: false,
                     },
                     ValueFrameKind::Scalar => FrameKind::Scalar,
@@ -750,13 +753,16 @@ impl<'a> Program<'a> {
                 open_frame(state.stack, state.pending, frame, label)?;
             }
             FrameAction::Close(ValueFrameKind::Variant) => match state.stack.pop() {
-                Some(FrameKind::Variant { is_void, got_data }) => {
+                Some(FrameKind::Variant {
+                    has_no_payload,
+                    got_data,
+                }) => {
                     let data_pending = match *state.pending {
                         PendingState::Full => true,
                         PendingState::Empty => false,
-                        PendingState::Unknown => !got_data && !is_void,
+                        PendingState::Unknown => !got_data && !has_no_payload,
                     };
-                    if data_pending && got_data || (data_pending || got_data) == is_void {
+                    if data_pending && got_data || (data_pending || got_data) == has_no_payload {
                         return Err(SemanticVerifyError::EffectStack(label));
                     }
                     *state.pending = PendingState::Full;
@@ -776,7 +782,11 @@ impl<'a> Program<'a> {
         Ok(())
     }
 
-    fn case_is_void(&self, member: MemberRef, label: Label) -> Result<bool, SemanticVerifyError> {
+    fn case_has_no_payload(
+        &self,
+        member: MemberRef,
+        label: Label,
+    ) -> Result<bool, SemanticVerifyError> {
         let scope = self.member_scope(member, label)?;
         if scope.kind() != CaptureScopeKind::Variant {
             return Err(capture_error(
@@ -791,10 +801,10 @@ impl<'a> Program<'a> {
                 "VariantOpen does not reference a variant case",
             ));
         };
-        Ok(payload == TYPE_VOID
+        Ok(payload == TYPE_NO_VALUE
             || matches!(
                 self.schema.types.expect_type_shape(payload),
-                TypeShape::Void
+                TypeShape::NoValue
             ))
     }
 

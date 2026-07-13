@@ -404,7 +404,7 @@ limit exhaustion is impossible.
 Conformance compares values rather than platform object layouts. Every runtime
 provides a test-side serializer with this recursive JSON mapping:
 
-- optional absence and void output: `null`;
+- option absence and match-only output: `null`;
 - source string: JSON string;
 - boolean: JSON boolean;
 - array: JSON array;

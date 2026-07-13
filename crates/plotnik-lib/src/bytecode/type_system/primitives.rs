@@ -3,8 +3,8 @@
 //! These are the fundamental types that exist in every query,
 //! with fixed indices 0 through 3 reserved across analysis and bytecode.
 
-/// Index for the Void type (produces nothing).
-pub const TYPE_VOID: u16 = 0;
+/// Index for the no-value sentinel.
+pub const TYPE_NO_VALUE: u16 = 0;
 
 /// Index for the Node type (tree-sitter AST node reference).
 pub const TYPE_NODE: u16 = 1;
@@ -22,8 +22,8 @@ pub const TYPE_CUSTOM_START: u16 = 4;
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u16)]
 pub enum PrimitiveType {
-    /// Produces nothing, transparent to parent scope.
-    Void = TYPE_VOID,
+    /// Successful matching that produces no value.
+    NoValue = TYPE_NO_VALUE,
     /// A tree-sitter AST node reference.
     Node = TYPE_NODE,
     /// Borrowed source text.
@@ -37,7 +37,7 @@ impl PrimitiveType {
     #[inline]
     pub fn from_index(index: u16) -> Option<Self> {
         match index {
-            TYPE_VOID => Some(Self::Void),
+            TYPE_NO_VALUE => Some(Self::NoValue),
             TYPE_NODE => Some(Self::Node),
             TYPE_TEXT => Some(Self::Text),
             TYPE_BOOL => Some(Self::Bool),
@@ -60,7 +60,7 @@ impl PrimitiveType {
     /// Get the display name for this primitive (for bytecode dumps).
     pub const fn name(self) -> &'static str {
         match self {
-            Self::Void => "Void",
+            Self::NoValue => "NoValue",
             Self::Node => "Node",
             Self::Text => "Text",
             Self::Bool => "Bool",

@@ -516,7 +516,7 @@ impl NfaBuilder<'_> {
     /// - Captured ref returning scalar: `Call → RecordSet → exit`
     /// - Bare ref returning output effects: `SuppressBegin → Call → SuppressEnd → exit`
     ///   (matches structurally, output discarded)
-    /// - Bare ref to a void or node-scalar definition: `Call → exit`
+    /// - Bare ref to a match-only or node-valued definition: `Call → exit`
     ///   (nothing to discard)
     ///
     /// `ctx.value` selects consumed lowering even with no consumer effect at
@@ -590,8 +590,8 @@ impl NfaBuilder<'_> {
             }
             RefLowering::SuppressedCall => {
                 // Suppress bracket keeps the structural match but discards the
-                // definition's output effects, matching the void that inference
-                // assigns to a bare reference. Non-consuming post effects (an
+                // definition's output events, matching the no-value flow that
+                // inference assigns to a bare reference. Non-consuming post effects (an
                 // enclosing variant type's VariantClose, a scope close) run after the
                 // bracket, outside the discarded region.
                 let mut close_effects = vec![EffectIR::suppress_end()];
@@ -606,7 +606,7 @@ impl NfaBuilder<'_> {
                 )
             }
             RefLowering::PlainCall => {
-                // Void and node-scalar definitions emit no output effects in
+                // Match-only and node-valued definitions emit no output events in
                 // their bodies; the call needs no bracket. Enclosing-scope post
                 // effects still run after it.
                 let return_addr = if capture.post.is_empty() {
@@ -636,10 +636,10 @@ impl NfaBuilder<'_> {
         }
 
         // References are opaque: a bare reference matches structurally and its
-        // output is suppressed (inference types it void). Void and node-scalar
-        // definitions emit no output effects in their bodies, so there is
+        // output is discarded (inference gives it no-value flow). Match-only
+        // and node-valued definitions emit no output events in their bodies, so there is
         // nothing to bracket.
-        if matches!(def_output_shape, TypeShape::Void | TypeShape::Node) {
+        if matches!(def_output_shape, TypeShape::NoValue | TypeShape::Node) {
             return RefLowering::PlainCall;
         }
 
@@ -827,7 +827,7 @@ impl NfaBuilder<'_> {
         } else {
             // Bare reference: opaque, so the body compiles structurally.
             // Suppression is compile-time here — captures are inert and
-            // alternations tag nothing — which matches the void that
+            // alternations tag nothing — which matches the no-value flow that
             // inference assigns without any runtime discard brackets.
             // Non-consuming post effects (an enclosing scope's close) run
             // after the body, outside the suppressed region.
@@ -1276,7 +1276,7 @@ impl NfaBuilder<'_> {
     /// already-suppressed region: compile the inner structurally, in suppress
     /// mode, so nothing in the region emits output effects — captures are
     /// inert, alternations tag nothing, skip paths inject no nulls. That
-    /// matches the `void` the type system infers without any runtime discard.
+    /// matches the no-value flow that type inference produces without any runtime discard.
     /// The one output source that survives is a definition call (shared code),
     /// which the call site brackets itself (`RefLowering::SuppressedCall`).
     ///

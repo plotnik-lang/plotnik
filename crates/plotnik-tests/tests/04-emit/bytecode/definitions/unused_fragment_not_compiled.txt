@@ -34,7 +34,7 @@ S3 "program"
 S4 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
 T2 = ListOneOrMore(T1)  ; <Node>+
 

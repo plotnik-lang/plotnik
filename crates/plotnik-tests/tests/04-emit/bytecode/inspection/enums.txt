@@ -33,7 +33,7 @@ S8 "number"
 S9 "string"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
 T2 = Record  M0:1  ; { id }
 T3 = Record  M1:1  ; { num }
@@ -44,7 +44,7 @@ M0: S1 → T1  ; id: <Node>
 M1: S2 → T1  ; num: <Node>
 M2: S3 → T2  ; Id: T2
 M3: S4 → T3  ; Num: T3
-M4: S5 → T0  ; Str: <Void>
+M4: S5 → T0  ; Str: <NoValue>
 
 [type_names]
 N0: S6 → T4  ; Expr

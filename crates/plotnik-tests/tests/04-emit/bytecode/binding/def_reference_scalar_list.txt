@@ -41,7 +41,7 @@ S4 "program"
 S5 "Func"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = <Node>
 T2 = ListOneOrMore(T1)  ; <Node>+
 T3 = Record  M0:1  ; { funcs }

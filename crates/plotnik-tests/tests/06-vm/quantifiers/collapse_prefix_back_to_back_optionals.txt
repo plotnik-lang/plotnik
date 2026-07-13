@@ -17,7 +17,7 @@ S2 "comment"
 S3 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 
 [type_members]
 

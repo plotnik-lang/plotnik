@@ -149,7 +149,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
     }
 
     /// The `parse`/`matches` surface, one block per entry-point definition.
-    /// Selectable definitions are nominal (parse + matches) or void (matches).
+    /// Selectable definitions are nominal (`parse` + `matches`) or match-only (`matches`).
     pub(super) fn parse_api(&self, entry_points: impl Iterator<Item = DefId>) -> String {
         let mut out = String::new();
         for def_id in entry_points {
@@ -164,13 +164,13 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
                 DecodeItemKind::Alias(_) => {
                     unreachable!("selectable definitions are nominal or match-only")
                 }
-                DecodeItemKind::VoidDefinition => self.matches_impl(&mut out, &def, item),
+                DecodeItemKind::MatchOnlyDefinition => self.matches_impl(&mut out, &def, item),
             }
         }
         out
     }
 
-    /// `matches` for a void definition: it can only answer matched-or-not, and
+    /// `matches` for a match-only definition: it can only answer matched-or-not, and
     /// the public API is always metered.
     fn matches_impl(&self, out: &mut String, def: &str, item: &DecodeItem) {
         let ident = self.model.item_ident(item.name);
@@ -265,13 +265,13 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
 
     fn matches_trait_impl(&self, out: &mut String, item: &DecodeItem) {
         let ident = self.model.item_ident(item.name).to_string();
-        let (impl_generics, type_generics) = if matches!(item.kind, DecodeItemKind::VoidDefinition)
-        {
-            ("", "")
-        } else {
-            let sig = InherentParseSignature::for_item(self.model, item);
-            (sig.impl_generics, sig.type_generics)
-        };
+        let (impl_generics, type_generics) =
+            if matches!(item.kind, DecodeItemKind::MatchOnlyDefinition) {
+                ("", "")
+            } else {
+                let sig = InherentParseSignature::for_item(self.model, item);
+                (sig.impl_generics, sig.type_generics)
+            };
         let _ = writeln!(
             out,
             "impl{} rt::Matches for {}{} {{",
@@ -313,7 +313,7 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
                 DecodeItemKind::Record(scope) => self.record_decoder(&mut out, item, scope),
                 DecodeItemKind::Variant(cases) => self.variant_decoder(&mut out, item, cases),
                 DecodeItemKind::Alias(value) => self.alias_decoder(&mut out, item, value),
-                DecodeItemKind::VoidDefinition => {}
+                DecodeItemKind::MatchOnlyDefinition => {}
             }
         }
         out

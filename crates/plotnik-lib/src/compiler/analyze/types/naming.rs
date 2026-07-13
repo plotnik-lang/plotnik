@@ -25,7 +25,7 @@ use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::type_analysis::{
     CustomCaptureTypeOccurrence, TypeAnalysisBuilder,
 };
-use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{TYPE_NO_VALUE, TypeId, TypeShape};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::span::Span;
 use crate::compiler::ids::DefId;
@@ -35,7 +35,7 @@ use crate::core::{Interner, Symbol};
 
 struct Claim {
     /// The type this name stands for; `None` reserves the name without a type
-    /// (builtins, void definitions).
+    /// (builtins, match-only definitions).
     type_id: Option<TypeId>,
     span: Option<Span>,
 }
@@ -107,7 +107,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
 
     /// Pass 1: every definition claims its declaration name. Definition names
     /// stay attached to their declarations rather than to an interned body
-    /// shape; void definitions still reserve the name.
+    /// shape; match-only definitions still reserve the name.
     fn claim_definitions(&mut self, symbol_table: &SymbolTable, deps: &DependencyAnalysis) {
         for &def_id in deps.sccs().iter().flatten() {
             let name_sym = deps.def_name_sym(def_id);
@@ -118,7 +118,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                 .expect("every definition is inferred before naming");
 
             let span = definition_name_span(symbol_table, self.interner, name_sym);
-            let type_id = (output != TYPE_VOID).then_some(output);
+            let type_id = (output != TYPE_NO_VALUE).then_some(output);
 
             self.claim(name_sym, type_id, span);
         }
@@ -132,7 +132,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                 .in_progress()
                 .def_output(def_id)
                 .expect("every definition is inferred before naming");
-            if output == TYPE_VOID {
+            if output == TYPE_NO_VALUE {
                 continue;
             }
             let name = self.interner.resolve(deps.def_name_sym(def_id)).to_owned();
@@ -261,7 +261,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     self.warn_redundant_capture_type(capture_type.span, &detail);
                 }
             }
-            TypeShape::Void
+            TypeShape::NoValue
             | TypeShape::Node
             | TypeShape::Text
             | TypeShape::Bool

@@ -27,11 +27,11 @@ S5 "debugger_statement"
 S6 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 T1 = Variant M0:1  ; X
 
 [type_members]
-M0: S1 → T0  ; X: <Void>
+M0: S1 → T0  ; X: <NoValue>
 
 [type_names]
 N0: S2 → T1  ; A

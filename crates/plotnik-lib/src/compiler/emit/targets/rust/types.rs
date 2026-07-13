@@ -1,6 +1,6 @@
 //! Item collection and rendering.
 //!
-//! One item per named type: every non-void definition (struct, enum, or a
+//! One item per named type: every value-producing definition (struct, enum, or a
 //! `pub type` alias for scalar/wrapper outputs), plus every named composite
 //! its output reaches, emitted parent-first right after their owner. Names
 //! come verbatim from the naming pass; the only unnamed composites are enum
@@ -13,7 +13,7 @@
 
 use crate::compiler::analyze::output::OutputSchema;
 pub(crate) use crate::compiler::analyze::output::{OutputItem as Item, OutputItemKind as ItemKind};
-use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_NO_VALUE, TypeId, TypeShape};
 use crate::compiler::emit::sink::Sink;
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
 use crate::compiler::ids::DefId;
@@ -85,11 +85,11 @@ impl<'m, 'a> Emitter<'m, 'a> {
             ItemKind::Record => self.render_struct(item),
             ItemKind::Variant => self.render_enum(item),
             ItemKind::Alias => self.render_alias(item),
-            ItemKind::VoidDef => self.render_void_marker(item),
+            ItemKind::MatchOnlyDef => self.render_match_only_marker(item),
         }
     }
 
-    fn render_void_marker(&mut self, item: &Item) -> String {
+    fn render_match_only_marker(&mut self, item: &Item) -> String {
         let ident = self.item_ident(item.name).to_string();
         format!("{DERIVES}\npub struct {ident};")
     }
@@ -141,14 +141,14 @@ impl<'m, 'a> Emitter<'m, 'a> {
     }
 
     fn render_variant_payload(&mut self, item_ty: TypeId, payload: TypeId) -> String {
-        if payload == TYPE_VOID {
+        if payload == TYPE_NO_VALUE {
             return String::new();
         }
 
         let types = self.schema.types;
         let interner = self.schema.interner;
         let TypeShape::Record(fields) = types.expect_type_shape(payload) else {
-            unreachable!("enum variant payload is void or an anonymous record");
+            unreachable!("enum variant has no payload or an anonymous record payload");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let rendered: Vec<String> = fields
@@ -197,7 +197,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
                 )
             }
             TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
-            TypeShape::Record(_) | TypeShape::Variant(_) | TypeShape::Void => {
+            TypeShape::Record(_) | TypeShape::Variant(_) | TypeShape::NoValue => {
                 unreachable!("alias items cover non-composite outputs only")
             }
         }
@@ -238,7 +238,9 @@ impl<'m, 'a> Emitter<'m, 'a> {
                 )
             }
             TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
-            TypeShape::Void => unreachable!("void cannot appear in an output position"),
+            TypeShape::NoValue => {
+                unreachable!("no-value flow cannot appear in a value position")
+            }
         }
     }
 
@@ -255,11 +257,11 @@ impl<'m, 'a> Emitter<'m, 'a> {
 
     /// A reference renders as its target definition's type name, boxed when
     /// this occurrence closes a by-value cycle through the enclosing item's
-    /// declaration. A void target contributes no value, so the capture holds
+    /// declaration. A match-only target contributes no value, so the capture holds
     /// the matched node itself.
     fn ref_type(&mut self, context: TypeContext, def_id: DefId, ref_ty: TypeId) -> String {
         let target = self.schema.types.expect_def_output(def_id);
-        if target == TYPE_VOID {
+        if target == TYPE_NO_VALUE {
             return self.node_type();
         }
 

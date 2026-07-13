@@ -4,7 +4,7 @@ use super::representation::TypeFacts;
 use crate::compiler::analyze::types::RootExtent;
 use crate::compiler::analyze::types::type_analysis::{TypeAnalysis, TypeAnalysisBuilder};
 use crate::compiler::analyze::types::type_shape::{
-    ListMinimum, RecordField, TYPE_NODE, TYPE_VOID, TypeId, TypeShape,
+    ListMinimum, RecordField, TYPE_NO_VALUE, TYPE_NODE, TypeId, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::core::Interner;
@@ -41,7 +41,7 @@ fn recursive_def(wrap: impl FnOnce(&mut TypeAnalysisBuilder, TypeId) -> TypeId) 
         RecordField::new(payload_ty),
     )]));
     let variants = BTreeMap::from([
-        (interner.intern("Leaf"), TYPE_VOID),
+        (interner.intern("Leaf"), TYPE_NO_VALUE),
         (interner.intern("Rec"), payload),
     ]);
     let enum_ty = builder.intern_type(TypeShape::Variant(variants));
@@ -89,7 +89,7 @@ fn shared_ref_node_boxes_only_inside_the_cycle() {
         RecordField::new(ref_ty),
     )]));
     let variants = BTreeMap::from([
-        (interner.intern("Leaf"), TYPE_VOID),
+        (interner.intern("Leaf"), TYPE_NO_VALUE),
         (interner.intern("Rec"), payload),
     ]);
     let enum_ty = builder.intern_type(TypeShape::Variant(variants));
@@ -208,8 +208,8 @@ fn node_free_enum_needs_no_lifetime() {
     let def = DefId::from_raw(0);
 
     let variants = BTreeMap::from([
-        (interner.intern("On"), TYPE_VOID),
-        (interner.intern("Off"), TYPE_VOID),
+        (interner.intern("On"), TYPE_NO_VALUE),
+        (interner.intern("Off"), TYPE_NO_VALUE),
     ]);
     let enum_ty = builder.intern_type(TypeShape::Variant(variants));
     let holder = builder.intern_record(BTreeMap::from([(

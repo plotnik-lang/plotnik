@@ -77,8 +77,9 @@ impl TypeAnalysis {
         }
 
         // A reference whose definition returns a structured type: the call site does
-        // its own Call/Return and record scoping. A reference to a node/void
-        // definition falls through to `Node` — its matched node is captured directly.
+        // its own Call/Return and record scoping. A reference to a node-valued or
+        // match-only definition falls through to `Node` — its matched node is captured
+        // directly.
         if self.ref_structured(&pattern, deps, interner, mode) {
             return CaptureKind::Ref;
         }
@@ -112,7 +113,7 @@ impl TypeAnalysis {
             PatternFlow::Value(type_id) if self.is_structured_output(*type_id) => {
                 CaptureKind::PendingValue
             }
-            // Void, or a plain scalar node: the matched node is captured directly.
+            // Match-only, or a plain node value: the matched node is captured directly.
             _ => CaptureKind::Node,
         }
     }

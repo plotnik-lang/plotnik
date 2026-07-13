@@ -73,7 +73,7 @@ pub(crate) fn pattern_nullable(
         Pattern::FieldPattern(_) => false,
         Pattern::QuantifiedPattern(q) => {
             let Some(inner) = q.inner() else {
-                // Recovery stub with no inner: void, never admitted for
+                // Recovery stub with no inner: no-value, never admitted for
                 // execution — matches the root-extent pass's `SingleNode`
                 // recovery.
                 return false;

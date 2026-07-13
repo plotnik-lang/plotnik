@@ -36,7 +36,7 @@ S5 "null"
 S6 "Q"
 
 [type_defs]
-T0 = <Void>
+T0 = <NoValue>
 
 [type_members]
 

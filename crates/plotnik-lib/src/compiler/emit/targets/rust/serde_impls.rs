@@ -14,7 +14,7 @@
 
 use std::fmt::Write as _;
 
-use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
+use crate::compiler::analyze::types::type_shape::{TYPE_NO_VALUE, TypeId, TypeShape};
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
 
 use super::type_model::TypeContext;
@@ -114,7 +114,7 @@ impl Emitter<'_, '_> {
         let mut uses_source = false;
         for ((&label_sym, &payload), variant_ident) in variants.iter().zip(&variant_idents) {
             let label = interner.resolve(label_sym);
-            let arm = if payload != TYPE_VOID {
+            let arm = if payload != TYPE_NO_VALUE {
                 uses_source = true;
                 self.payload_arm(item, payload, variant_ident, label)
             } else {
@@ -141,7 +141,7 @@ impl Emitter<'_, '_> {
         let rt = self.config.rt_crate.clone();
         let ident = self.item_ident(item.name).to_string();
         let TypeShape::Record(fields) = types.expect_type_shape(payload) else {
-            unreachable!("enum variant payload is void or an anonymous record");
+            unreachable!("enum variant has no payload or an anonymous record payload");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let usage = fields
