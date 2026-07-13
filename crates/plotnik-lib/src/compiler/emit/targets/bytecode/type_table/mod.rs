@@ -8,7 +8,7 @@ use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeN
 use crate::compiler::analyze::output::{CaptureLayout, CaptureScopeKind, OutputSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, TYPE_BOOL, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeShape,
+    FieldInfo, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeShape,
 };
 use crate::compiler::emit::targets::bytecode::tables::{
     EmitError, StringTableBuilder, TypeTableBuilder,
@@ -68,7 +68,7 @@ fn emit_builtins(types: &mut TypeTableBuilder, builtins: &[TypeId]) -> Result<()
         let kind = match builtin {
             TYPE_VOID => TypeKind::Void,
             TYPE_NODE => TypeKind::Node,
-            TYPE_STR => TypeKind::Str,
+            TYPE_TEXT => TypeKind::Text,
             TYPE_BOOL => TypeKind::Bool,
             _ => unreachable!("output type layout exposes only primitive built-ins"),
         };
@@ -131,7 +131,7 @@ fn emit_type_at_slot(
     let slot_index = usize::from(u16::from(wire_type));
     let type_shape = ctx.type_analysis.expect_type_shape(type_id);
     match type_shape {
-        TypeShape::Void | TypeShape::Node | TypeShape::Str | TypeShape::Bool => {
+        TypeShape::Void | TypeShape::Node | TypeShape::Text | TypeShape::Bool => {
             unreachable!("builtins should be handled separately")
         }
 

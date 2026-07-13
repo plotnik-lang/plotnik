@@ -484,7 +484,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
     fn value_expr(&self, plan: &ReplayValuePlan, context: ReadContext) -> String {
         match plan {
             ReplayValuePlan::Node => "t.expect_node()".to_string(),
-            ReplayValuePlan::Str => "t.expect_str()".to_string(),
+            ReplayValuePlan::Text => "t.expect_str()".to_string(),
             ReplayValuePlan::Bool => "t.expect_bool()".to_string(),
             ReplayValuePlan::Nullable(inner) => self.nullable_expr(inner, context),
             ReplayValuePlan::Array(element) => self.array_expr(element, context),

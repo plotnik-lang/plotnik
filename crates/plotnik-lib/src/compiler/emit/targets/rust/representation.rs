@@ -113,7 +113,7 @@ fn lifetime_fixpoint(types: &TypeAnalysis, reachable: &[TypeId]) -> HashMap<Type
                     tree: true,
                     source: false,
                 },
-                TypeShape::Str => LifetimeUsage {
+                TypeShape::Text => LifetimeUsage {
                     tree: false,
                     source: true,
                 },

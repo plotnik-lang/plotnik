@@ -873,7 +873,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     });
                 custom
             }
-            Some(TypeShape::Str | TypeShape::Bool) => {
+            Some(TypeShape::Text | TypeShape::Bool) => {
                 unreachable!("ordinary captures cannot produce scalar roots")
             }
             // Recovery-only void falls back to a Node alias, matching the raw

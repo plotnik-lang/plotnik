@@ -17,7 +17,7 @@ use crate::compiler::analyze::types::raw_output::{
     RawCaptureObservation, RawDefinitionValueRole, RawOutputGraphBuilder,
 };
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, PatternFlow, PatternShape, TYPE_BOOL, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId,
+    FieldInfo, PatternFlow, PatternShape, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeId,
     TypeShape,
 };
 use crate::compiler::analyze::types::{CaptureFact, FieldCompletions, RootExtent};
@@ -232,8 +232,8 @@ impl TypeAnalysis {
             "TYPE_NODE must be interned at its canonical id",
         );
         assert!(
-            matches!(self.type_shape(TYPE_STR), Some(TypeShape::Str)),
-            "TYPE_STR must be interned at its canonical id",
+            matches!(self.type_shape(TYPE_TEXT), Some(TypeShape::Text)),
+            "TYPE_TEXT must be interned at its canonical id",
         );
         assert!(
             matches!(self.type_shape(TYPE_BOOL), Some(TypeShape::Bool)),
@@ -433,8 +433,8 @@ impl TypeAnalysisBuilder {
         let node_id = builder.intern_type(TypeShape::Node);
         debug_assert_eq!(node_id, TYPE_NODE);
 
-        let str_id = builder.intern_type(TypeShape::Str);
-        debug_assert_eq!(str_id, TYPE_STR);
+        let text_id = builder.intern_type(TypeShape::Text);
+        debug_assert_eq!(text_id, TYPE_TEXT);
 
         let bool_id = builder.intern_type(TypeShape::Bool);
         debug_assert_eq!(bool_id, TYPE_BOOL);

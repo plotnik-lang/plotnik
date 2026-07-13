@@ -1654,7 +1654,7 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
 
 #[test]
 fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
-    // Void/Node/Str/Bool carry no payload: both `data` (bytes 0-1) and `count`
+    // Void/Node/Text/Bool carry no payload: both `data` (bytes 0-1) and `count`
     // (byte 2) are reserved-zero (docs/binary-format/04-types.md). Smuggled state
     // in either must be rejected, not silently ignored by the typed view.
     for byte in [0usize, 2] {
@@ -1684,7 +1684,7 @@ fn forged_nonzero_primitive_typedef_reserved_is_rejected() {
 #[test]
 fn scalar_primitive_typedefs_use_reserved_zero_metadata() {
     for (query, expected) in [
-        (r#"Q = (identifier) @id :: str"#, TypeKind::Str),
+        (r#"Q = (identifier) @id :: str"#, TypeKind::Text),
         (
             r#"Q = (program (identifier)? @present :: bool)"#,
             TypeKind::Bool,

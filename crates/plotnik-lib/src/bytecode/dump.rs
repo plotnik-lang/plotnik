@@ -146,7 +146,7 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
                 let name = match kind {
                     TypeKind::Void => "<Void>",
                     TypeKind::Node => "<Node>",
-                    TypeKind::Str => "<Str>",
+                    TypeKind::Text => "<Text>",
                     TypeKind::Bool => "<Bool>",
                     _ => unreachable!(),
                 };

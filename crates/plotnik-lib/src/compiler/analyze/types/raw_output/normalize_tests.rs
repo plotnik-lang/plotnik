@@ -17,7 +17,7 @@ fn invalid_containment_propagates_through_recursive_cycle() {
     let types = vec![
         TypeShape::Void,
         TypeShape::Node,
-        TypeShape::Str,
+        TypeShape::Text,
         TypeShape::Bool,
         TypeShape::Struct(BTreeMap::from([
             (cycle, FieldInfo::required(reference)),

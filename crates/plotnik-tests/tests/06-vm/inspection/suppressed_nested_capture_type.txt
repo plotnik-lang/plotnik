@@ -96,8 +96,8 @@ S3 "program"
 S4 "expression_statement"
 
 [type_defs]
-T0 = <Str>
-T1 = Optional(T0)  ; <Str>?
+T0 = <Text>
+T1 = Optional(T0)  ; <Text>?
 T2 = Struct  M0:1  ; { outer }
 
 [type_members]

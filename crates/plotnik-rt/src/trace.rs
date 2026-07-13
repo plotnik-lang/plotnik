@@ -161,7 +161,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         if !matches!(close, RuntimeEffect::StrClose) {
             self.mismatch("StrClose", close);
         }
-        let range = range.expect("a non-null Str reader requires at least one scalar mark");
+        let range = range.expect("a non-null text reader requires at least one scalar mark");
         source_text(self.source, range)
     }
 

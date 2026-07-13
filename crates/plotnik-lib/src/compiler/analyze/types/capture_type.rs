@@ -50,7 +50,7 @@ pub enum OptionalCaptureTypeMode {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum CaptureTypePlanKind {
-    StrTerminal {
+    TextTerminal {
         data: TerminalData,
     },
     BoolTerminal {
@@ -72,10 +72,10 @@ pub struct CaptureTypePlan {
 }
 
 impl CaptureTypePlan {
-    pub fn str_terminal(final_type: TypeId, data: TerminalData) -> Self {
+    pub fn text_terminal(final_type: TypeId, data: TerminalData) -> Self {
         Self {
             final_type,
-            kind: CaptureTypePlanKind::StrTerminal { data },
+            kind: CaptureTypePlanKind::TextTerminal { data },
         }
     }
 
@@ -119,7 +119,7 @@ impl CaptureTypePlan {
 
     pub fn suppresses_semantic_data(&self) -> bool {
         match &self.kind {
-            CaptureTypePlanKind::StrTerminal { data }
+            CaptureTypePlanKind::TextTerminal { data }
             | CaptureTypePlanKind::BoolTerminal { data } => data.suppresses_semantic_data(),
             CaptureTypePlanKind::Optional { inner, .. } => inner.suppresses_semantic_data(),
             CaptureTypePlanKind::Array { element } => element.suppresses_semantic_data(),

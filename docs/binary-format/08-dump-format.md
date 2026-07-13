@@ -88,7 +88,7 @@ Inspection effects render as `SpanStartAt#5`, `SpanStart#5`, and `SpanEnd#5`.
 Scalar effects use the stable names `ScalarOpen`, `ScalarMark`, `StrClose`, and
 `BoolClose(0)` / `BoolClose(1)`; direct node scalars use `NodeStr` and
 `NodeBool`; provenance-free booleans use `BoolValue(0)` / `BoolValue(1)`. Primitive type definitions render as
-`<Str>` and `<Bool>`.
+`<Text>` and `<Bool>`.
 
 ## Navigation Symbols
 

@@ -18,7 +18,7 @@ Type system metadata for code generation and runtime validation. Describes the s
 | 5     | `Struct`          | Record with named fields        |
 | 6     | `Enum`            | Discriminated union             |
 | 7     | `Alias`           | Named reference to another type |
-| 8     | `Str`             | Borrowed source text            |
+| 8     | `Text`            | Borrowed source text            |
 | 9     | `Bool`            | Boolean value                   |
 
 ### Node Semantics
@@ -31,9 +31,9 @@ The `Node` type represents a platform-dependent handle to a tree-sitter AST node
 | TypeScript | Binding-provided object with `startPosition`, `text`, etc. |
 | JSON       | Unique node identifier (e.g., `"node:42"`)                 |
 
-### Scalar Semantics
+### Text and Boolean Semantics
 
-`Str` is the UTF-8 source slice selected by a direct node-scalar effect or a
+`Text` is the UTF-8 source slice selected by a direct node-scalar effect or a
 balanced scalar-provenance frame; it renders as `string` in TypeScript and
 `&'s str` in Rust. `Bool` is an explicit boolean carried by a scalar effect;
 the runtime does not infer list or text truthiness. Neither primitive contains
@@ -64,7 +64,7 @@ struct TypeDef {
 | :---------------- | :------------ | :----------- |
 | `Void`            | 0             | 0            |
 | `Node`            | 0             | 0            |
-| `Str`             | 0             | 0            |
+| `Text`            | 0             | 0            |
 | `Bool`            | 0             | 0            |
 | `Optional`        | Inner TypeId  | 0            |
 | `ArrayZeroOrMore` | Inner TypeId  | 0            |
@@ -117,7 +117,7 @@ Sorted lexicographically by name (resolved via String Table) for binary search.
 ## Examples
 
 > **Note**: Only **used** primitives are emitted to TypeDefs. The emitter writes
-> them first in order (`Void`, `Node`, `Str`, `Bool`), then custom output types.
+> them first in order (`Void`, `Node`, `Text`, `Bool`), then custom output types.
 
 ### Simple Struct
 
@@ -189,7 +189,7 @@ Loaders must verify:
   member's `ty` is a valid TypeId (`< type_defs_count`).
 - Wrapper/`Alias`: `data` (inner/target TypeId) is `< type_defs_count`, and the
   reserved `count` is `0`.
-- `Void`/`Node`/`Str`/`Bool`: the reserved `data` and `count` are both `0`.
+- `Void`/`Node`/`Text`/`Bool`: the reserved `data` and `count` are both `0`.
 
 The bounds checks prevent out-of-bounds reads from malformed binaries; the
 reserved-zero checks reject smuggled state where the format pins a field to zero.

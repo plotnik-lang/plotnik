@@ -100,7 +100,7 @@ pub(crate) struct ReplayCasePlan {
 #[derive(Clone, Debug)]
 pub(crate) enum ReplayValuePlan {
     Node,
-    Str,
+    Text,
     Bool,
     Nullable(Box<ReplayValuePlan>),
     Array(Box<ReplayValuePlan>),
@@ -195,7 +195,7 @@ impl ReplayPlanBuilder<'_, '_> {
     fn value(&self, ty: TypeId) -> ReplayValuePlan {
         match self.schema.types.expect_type_shape(ty) {
             TypeShape::Node | TypeShape::Custom(_) => ReplayValuePlan::Node,
-            TypeShape::Str => ReplayValuePlan::Str,
+            TypeShape::Text => ReplayValuePlan::Text,
             TypeShape::Bool => ReplayValuePlan::Bool,
             TypeShape::Optional(inner) => ReplayValuePlan::Nullable(Box::new(self.value(*inner))),
             TypeShape::Array { element, .. } => {

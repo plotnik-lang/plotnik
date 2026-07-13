@@ -14,7 +14,7 @@ use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::refs::DependencyAnalysis;
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
-    FieldInfo, TYPE_BOOL, TYPE_NODE, TYPE_STR, TYPE_VOID, TypeId, TypeShape,
+    FieldInfo, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TYPE_VOID, TypeId, TypeShape,
 };
 use crate::compiler::ids::DefId;
 use crate::core::{Interner, Symbol};
@@ -138,7 +138,7 @@ pub(crate) struct OutputTypeLayout {
 
 impl OutputTypeLayout {
     fn build(used_builtins: &HashSet<TypeId>, custom_types: Vec<TypeId>) -> Self {
-        let builtins = [TYPE_VOID, TYPE_NODE, TYPE_STR, TYPE_BOOL]
+        let builtins = [TYPE_VOID, TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
             .into_iter()
             .filter(|builtin| used_builtins.contains(builtin))
             .collect::<Vec<_>>();
@@ -428,7 +428,7 @@ impl<'a> ItemCollector<'a> {
             TypeShape::Ref(def_id) => self.collect_reference(*def_id),
             TypeShape::Void
             | TypeShape::Node
-            | TypeShape::Str
+            | TypeShape::Text
             | TypeShape::Bool
             | TypeShape::Custom(_) => {}
         }
@@ -452,7 +452,7 @@ impl<'a> ItemCollector<'a> {
                 self.add_item(name, ty);
             }
             TypeShape::Ref(def_id) => self.collect_reference(*def_id),
-            TypeShape::Node | TypeShape::Str | TypeShape::Bool => {}
+            TypeShape::Node | TypeShape::Text | TypeShape::Bool => {}
             TypeShape::Void => unreachable!("void cannot appear in an output position"),
         }
     }

@@ -245,7 +245,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             }
             TypeShape::Void
             | TypeShape::Node
-            | TypeShape::Str
+            | TypeShape::Text
             | TypeShape::Bool
             | TypeShape::Array { .. }
             | TypeShape::Optional(_) => {}

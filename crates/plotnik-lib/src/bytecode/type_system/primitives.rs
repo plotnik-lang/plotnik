@@ -10,7 +10,7 @@ pub const TYPE_VOID: u16 = 0;
 pub const TYPE_NODE: u16 = 1;
 
 /// Index for borrowed source text.
-pub const TYPE_STR: u16 = 2;
+pub const TYPE_TEXT: u16 = 2;
 
 /// Index for boolean values.
 pub const TYPE_BOOL: u16 = 3;
@@ -18,7 +18,7 @@ pub const TYPE_BOOL: u16 = 3;
 /// First index available for user-defined/composite types.
 pub const TYPE_CUSTOM_START: u16 = 4;
 
-/// Builtin scalar types; no additional metadata in the type table.
+/// Builtin primitive types; no additional metadata in the type table.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u16)]
 pub enum PrimitiveType {
@@ -27,7 +27,7 @@ pub enum PrimitiveType {
     /// A tree-sitter AST node reference.
     Node = TYPE_NODE,
     /// Borrowed source text.
-    Str = TYPE_STR,
+    Text = TYPE_TEXT,
     /// Boolean value.
     Bool = TYPE_BOOL,
 }
@@ -39,7 +39,7 @@ impl PrimitiveType {
         match index {
             TYPE_VOID => Some(Self::Void),
             TYPE_NODE => Some(Self::Node),
-            TYPE_STR => Some(Self::Str),
+            TYPE_TEXT => Some(Self::Text),
             TYPE_BOOL => Some(Self::Bool),
             _ => None,
         }
@@ -62,7 +62,7 @@ impl PrimitiveType {
         match self {
             Self::Void => "Void",
             Self::Node => "Node",
-            Self::Str => "Str",
+            Self::Text => "Text",
             Self::Bool => "Bool",
         }
     }

@@ -94,7 +94,7 @@ impl<'a> ValueMaterializer<'a> {
                     pending = Some(Value::Null);
                 }
                 RuntimeEffect::NodeStr(node) => {
-                    pending = Some(Value::Str(plotnik_rt::node_text(self.source, node)));
+                    pending = Some(Value::Text(plotnik_rt::node_text(self.source, node)));
                 }
                 RuntimeEffect::NodeBool(_) => {
                     pending = Some(Value::Bool(true));
@@ -135,7 +135,7 @@ impl<'a> ValueMaterializer<'a> {
                         .pop()
                         .expect("Scalar marker owns a range frame");
                     pending = Some(match range {
-                        Some(range) => Value::Str(plotnik_rt::source_text(self.source, range)),
+                        Some(range) => Value::Text(plotnik_rt::source_text(self.source, range)),
                         None => Value::Null,
                     });
                 }

@@ -104,11 +104,11 @@ impl<'a> TypeVerifier<'a> {
                         ));
                     }
                 }
-                TypeKind::Str => {
-                    if !matches!(value, Value::Str(_)) {
+                TypeKind::Text => {
+                    if !matches!(value, Value::Text(_)) {
                         self.errors.push(format_error(
                             &self.path,
-                            &format!("type: Str, value: {}", value_kind_name(value)),
+                            &format!("type: Text, value: {}", value_kind_name(value)),
                         ));
                     }
                 }
@@ -277,7 +277,7 @@ fn value_kind_name(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
         Value::Node(_) => "Node",
-        Value::Str(_) => "Str",
+        Value::Text(_) => "Text",
         Value::Bool(_) => "Bool",
         Value::Array(_) => "array",
         Value::Struct(_) => "struct",

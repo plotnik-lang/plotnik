@@ -15,7 +15,7 @@ pub const MAGIC: [u8; 4] = *b"PTKQ";
 /// v8: single effects list per Match; per-entrypoint wrappers.
 /// v9: `Childless*` navigation family (anchors over a zero-width child list).
 /// v10: inspection spans — three span effect kinds and the `spans` section.
-/// v11: `Str`/`Bool` types and balanced scalar-provenance effects.
+/// v11: `Text`/`Bool` types and balanced scalar-provenance effects.
 pub const VERSION: u32 = 11;
 
 /// Section alignment in bytes.

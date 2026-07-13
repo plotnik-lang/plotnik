@@ -6,7 +6,7 @@ use rowan::TextRange;
 
 use crate::bytecode::{MAX_SPANS, SpanKind};
 use crate::compiler::analyze::types::BuiltInCaptureType;
-use crate::compiler::analyze::types::type_shape::{TYPE_BOOL, TYPE_STR};
+use crate::compiler::analyze::types::type_shape::{TYPE_BOOL, TYPE_TEXT};
 use crate::compiler::diagnostics::SourceId;
 use crate::compiler::ids::TypeId;
 use crate::compiler::lower::LowerInput;
@@ -264,7 +264,7 @@ fn collect_pattern(
                     .built_in_plan()
                     .map(|(capture_type, _)| {
                         let primitive = match capture_type {
-                            BuiltInCaptureType::Str => TYPE_STR,
+                            BuiltInCaptureType::Str => TYPE_TEXT,
                             BuiltInCaptureType::Bool => TYPE_BOOL,
                         };
                         SpanBindingIR::Type(primitive)

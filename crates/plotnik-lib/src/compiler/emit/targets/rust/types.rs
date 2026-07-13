@@ -182,7 +182,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
         let types = self.schema.types;
         match types.expect_type_shape(ty) {
             TypeShape::Node | TypeShape::Custom(_) => self.node_type(),
-            TypeShape::Str => "&'s str".to_string(),
+            TypeShape::Text => "&'s str".to_string(),
             TypeShape::Bool => "bool".to_string(),
             TypeShape::Array { element, .. } => {
                 format!(
@@ -221,7 +221,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
         let types = self.schema.types;
         match types.expect_type_shape(ty) {
             TypeShape::Node => self.node_type(),
-            TypeShape::Str => "&'s str".to_string(),
+            TypeShape::Text => "&'s str".to_string(),
             TypeShape::Bool => "bool".to_string(),
             TypeShape::Custom(_) => match self.schema.type_name_of(ty) {
                 Some(name) => self.named_type(name, ty),

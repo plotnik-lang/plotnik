@@ -17,7 +17,7 @@ pub use crate::compiler::parse::ast::QuantifierKind;
 
 pub const TYPE_VOID: TypeId = TypeId(PrimitiveType::Void.index() as u32);
 pub const TYPE_NODE: TypeId = TypeId(PrimitiveType::Node.index() as u32);
-pub const TYPE_STR: TypeId = TypeId(PrimitiveType::Str.index() as u32);
+pub const TYPE_TEXT: TypeId = TypeId(PrimitiveType::Text.index() as u32);
 pub const TYPE_BOOL: TypeId = TypeId(PrimitiveType::Bool.index() as u32);
 
 /// The shape of an inferred type, determining its structure.
@@ -32,7 +32,7 @@ pub enum TypeShape {
     /// A tree-sitter node.
     Node,
     /// Borrowed source text.
-    Str,
+    Text,
     /// Boolean value.
     Bool,
     /// User-specified name for a captured node via `@x :: TypeName`.
@@ -90,7 +90,7 @@ impl TypeShape {
             Self::Array { element, .. } | Self::Optional(element) => {
                 TypeShapeChildIdsInner::One(Some(*element).into_iter())
             }
-            Self::Void | Self::Node | Self::Str | Self::Bool | Self::Custom(_) | Self::Ref(_) => {
+            Self::Void | Self::Node | Self::Text | Self::Bool | Self::Custom(_) | Self::Ref(_) => {
                 TypeShapeChildIdsInner::Empty(std::iter::empty())
             }
         };

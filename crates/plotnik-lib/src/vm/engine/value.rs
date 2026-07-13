@@ -62,7 +62,7 @@ impl Serialize for NodeHandle<'_> {
 pub enum Value<'s> {
     Null,
     Node(NodeHandle<'s>),
-    Str(&'s str),
+    Text(&'s str),
     Bool(bool),
     Array(Vec<Value<'s>>),
     /// Struct with ordered fields.
@@ -99,7 +99,7 @@ fn take_children<'s>(value: &mut Value<'s>, worklist: &mut Vec<Value<'s>>) {
                 worklist.push(*boxed);
             }
         }
-        Value::Null | Value::Node(_) | Value::Str(_) | Value::Bool(_) => {}
+        Value::Null | Value::Node(_) | Value::Text(_) | Value::Bool(_) => {}
     }
 }
 
@@ -115,7 +115,7 @@ impl Serialize for Value<'_> {
         match self {
             Value::Null => serializer.serialize_none(),
             Value::Node(h) => h.serialize(serializer),
-            Value::Str(value) => serializer.serialize_str(value),
+            Value::Text(value) => serializer.serialize_str(value),
             Value::Bool(value) => serializer.serialize_bool(*value),
             Value::Array(arr) => {
                 let mut seq = serializer.serialize_seq(Some(arr.len()))?;
@@ -312,7 +312,7 @@ fn emit_value<'a>(
             ctx.out.push_str(c.reset);
         }
         Value::Node(h) => format_node_handle(ctx, h, indent),
-        Value::Str(value) => {
+        Value::Text(value) => {
             ctx.out.push_str(c.green);
             ctx.out.push('"');
             escape_json_into(ctx.out, value);

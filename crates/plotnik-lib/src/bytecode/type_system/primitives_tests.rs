@@ -4,7 +4,7 @@ use super::*;
 fn primitive_indices() {
     assert_eq!(PrimitiveType::Void.index(), 0);
     assert_eq!(PrimitiveType::Node.index(), 1);
-    assert_eq!(PrimitiveType::Str.index(), 2);
+    assert_eq!(PrimitiveType::Text.index(), 2);
     assert_eq!(PrimitiveType::Bool.index(), 3);
 }
 
@@ -12,7 +12,7 @@ fn primitive_indices() {
 fn from_index() {
     assert_eq!(PrimitiveType::from_index(0), Some(PrimitiveType::Void));
     assert_eq!(PrimitiveType::from_index(1), Some(PrimitiveType::Node));
-    assert_eq!(PrimitiveType::from_index(2), Some(PrimitiveType::Str));
+    assert_eq!(PrimitiveType::from_index(2), Some(PrimitiveType::Text));
     assert_eq!(PrimitiveType::from_index(3), Some(PrimitiveType::Bool));
     assert_eq!(PrimitiveType::from_index(4), None);
 }

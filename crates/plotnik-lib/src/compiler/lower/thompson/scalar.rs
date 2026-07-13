@@ -47,7 +47,7 @@ struct CaptureBinding {
 
 #[derive(Clone, Copy)]
 enum ScalarTerminal {
-    Str(TerminalData),
+    Text(TerminalData),
     Presence(TerminalData),
 }
 
@@ -58,20 +58,20 @@ impl ScalarTerminal {
 
     fn data(self) -> TerminalData {
         match self {
-            Self::Str(data) | Self::Presence(data) => data,
+            Self::Text(data) | Self::Presence(data) => data,
         }
     }
 
     fn close(self) -> EffectIR {
         match self {
-            Self::Str(_) => EffectIR::str_close(),
+            Self::Text(_) => EffectIR::str_close(),
             Self::Presence(_) => EffectIR::bool_close(true),
         }
     }
 
     fn node_value(self) -> EffectIR {
         match self {
-            Self::Str(_) => EffectIR::node_str(),
+            Self::Text(_) => EffectIR::node_str(),
             Self::Presence(_) => EffectIR::node_bool(),
         }
     }
@@ -186,8 +186,8 @@ impl CaptureTypeLowerer<'_, '_> {
         }
 
         match self.plan.kind().clone() {
-            CaptureTypePlanKind::StrTerminal { data, .. } => {
-                self.scalar_terminal(pattern, destination, ScalarTerminal::Str(data))
+            CaptureTypePlanKind::TextTerminal { data, .. } => {
+                self.scalar_terminal(pattern, destination, ScalarTerminal::Text(data))
             }
             CaptureTypePlanKind::BoolTerminal { data } => {
                 self.scalar_terminal(pattern, destination, ScalarTerminal::Presence(data))

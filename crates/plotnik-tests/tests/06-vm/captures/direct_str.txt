@@ -34,13 +34,13 @@ S6 "expression_statement"
 S7 "identifier"
 
 [type_defs]
-T0 = <Str>
-T1 = ArrayStar(T0)  ; <Str>*
+T0 = <Text>
+T1 = ArrayStar(T0)  ; <Text>*
 T2 = Struct  M0:2  ; { comments, name }
 
 [type_members]
 M0: S1 → T1  ; comments: T1
-M1: S2 → T0  ; name: <Str>
+M1: S2 → T0  ; name: <Text>
 
 [type_names]
 N0: S3 → T2  ; Q

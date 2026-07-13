@@ -24,7 +24,7 @@ pub enum TypeKind {
     /// Named reference to another type (e.g., `type Foo = Bar`).
     Alias = 7,
     /// Borrowed source text.
-    Str = 8,
+    Text = 8,
     /// Boolean value.
     Bool = 9,
 }
@@ -41,7 +41,7 @@ impl TypeKind {
             5 => Some(Self::Struct),
             6 => Some(Self::Variant),
             7 => Some(Self::Alias),
-            8 => Some(Self::Str),
+            8 => Some(Self::Text),
             9 => Some(Self::Bool),
             _ => None,
         }
@@ -49,7 +49,7 @@ impl TypeKind {
 
     /// Whether this is a primitive/builtin type.
     pub fn is_primitive(self) -> bool {
-        matches!(self, Self::Void | Self::Node | Self::Str | Self::Bool)
+        matches!(self, Self::Void | Self::Node | Self::Text | Self::Bool)
     }
 
     /// Whether this is a wrapper type (Optional, ArrayZeroOrMore, ArrayOneOrMore).
@@ -80,7 +80,7 @@ impl TypeKind {
         match self {
             Self::Void => Some("Void"),
             Self::Node => Some("Node"),
-            Self::Str => Some("Str"),
+            Self::Text => Some("Text"),
             Self::Bool => Some("Bool"),
             _ => None,
         }

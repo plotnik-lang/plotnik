@@ -99,11 +99,11 @@ S4 "expression_statement"
 S5 "identifier"
 
 [type_defs]
-T0 = <Str>
+T0 = <Text>
 T1 = Struct  M0:1  ; { name }
 
 [type_members]
-M0: S1 → T0  ; name: <Str>
+M0: S1 → T0  ; name: <Text>
 
 [type_names]
 N0: S2 → T1  ; Q

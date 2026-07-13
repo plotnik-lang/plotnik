@@ -31,8 +31,8 @@ S4 "comment"
 S5 "expression_statement"
 
 [type_defs]
-T0 = <Str>
-T1 = Optional(T0)  ; <Str>?
+T0 = <Text>
+T1 = Optional(T0)  ; <Text>?
 T2 = Struct  M0:1  ; { span }
 
 [type_members]

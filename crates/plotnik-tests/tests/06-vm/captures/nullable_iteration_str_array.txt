@@ -30,8 +30,8 @@ S3 "program"
 S4 "comment"
 
 [type_defs]
-T0 = <Str>
-T1 = ArrayStar(T0)  ; <Str>*
+T0 = <Text>
+T1 = ArrayStar(T0)  ; <Text>*
 T2 = Struct  M0:1  ; { comments }
 
 [type_members]

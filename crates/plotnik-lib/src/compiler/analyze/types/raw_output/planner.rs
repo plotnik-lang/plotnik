@@ -78,17 +78,17 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
 
         let result = match self.raw.shape(type_id) {
             TypeShape::Node => Ok((
-                CaptureTypePlan::str_terminal(TYPE_STR, TerminalData::NodeRepresentation),
+                CaptureTypePlan::text_terminal(TYPE_TEXT, TerminalData::NodeRepresentation),
                 false,
             )),
             TypeShape::Struct(_) | TypeShape::Variant(_) => {
                 let final_type = if zero_node_terminal {
-                    self.types.intern_type(TypeShape::Optional(TYPE_STR))
+                    self.types.intern_type(TypeShape::Optional(TYPE_TEXT))
                 } else {
-                    TYPE_STR
+                    TYPE_TEXT
                 };
                 Ok((
-                    CaptureTypePlan::str_terminal(final_type, TerminalData::Semantic),
+                    CaptureTypePlan::text_terminal(final_type, TerminalData::Semantic),
                     zero_node_terminal,
                 ))
             }
@@ -114,7 +114,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 self.str_plan(self.raw.definition(*target), zero_node_terminal, visiting)
             }
             TypeShape::Void => Err("a capture type requires an ordinary captured value"),
-            TypeShape::Str | TypeShape::Bool | TypeShape::Custom(_) => {
+            TypeShape::Text | TypeShape::Bool | TypeShape::Custom(_) => {
                 unreachable!("a capture type cannot feed another capture type")
             }
         };
@@ -177,7 +177,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 "capture type `bool` requires a value that may be absent; this capture is always present",
             ),
             TypeShape::Void => Err("a capture type requires an ordinary captured value"),
-            TypeShape::Str | TypeShape::Bool | TypeShape::Custom(_) => {
+            TypeShape::Text | TypeShape::Bool | TypeShape::Custom(_) => {
                 unreachable!("a capture type cannot feed another capture type")
             }
         };
@@ -201,7 +201,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 terminal_data(self.raw.shape(type_id)),
             )),
             TypeShape::Void => Err("a capture type requires an ordinary captured value"),
-            TypeShape::Str | TypeShape::Bool | TypeShape::Custom(_) => {
+            TypeShape::Text | TypeShape::Bool | TypeShape::Custom(_) => {
                 unreachable!("a capture type cannot feed another capture type")
             }
         }

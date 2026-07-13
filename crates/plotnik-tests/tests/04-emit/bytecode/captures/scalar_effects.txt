@@ -38,13 +38,13 @@ S6 "expression_statement"
 S7 "identifier"
 
 [type_defs]
-T0 = <Str>
+T0 = <Text>
 T1 = <Bool>
 T2 = Struct  M0:2  ; { has_comment, name }
 
 [type_members]
 M0: S1 → T1  ; has_comment: <Bool>
-M1: S2 → T0  ; name: <Str>
+M1: S2 → T0  ; name: <Text>
 
 [type_names]
 N0: S3 → T2  ; Q
