@@ -23,7 +23,7 @@ Q = (function_declaration (decorator)* @decorators name: (identifier) @name)
         (capture)))))
 
 ================================================================================
-Suppressive captures
+Discards
 ================================================================================
 Q = (program
   (expression_statement (identifier) @x) @_
@@ -43,11 +43,11 @@ Q = (program
             (named_node
               (identifier))
             (capture)))
-        (suppressive_capture))
+        (discard))
       (captured_pattern
         (named_node
           (identifier))
-        (suppressive_capture)))))
+        (discard)))))
 
 ================================================================================
 Capture types
@@ -106,10 +106,10 @@ Q = (p
           (capture_type_identifier)))
       (captured_pattern
         (alternation
-          (branch
+          (alternative
             (named_node
               (identifier)))
-          (branch
+          (alternative
             (named_node
               (identifier))))
         (capture)

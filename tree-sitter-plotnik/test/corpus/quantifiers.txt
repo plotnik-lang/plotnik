@@ -70,10 +70,10 @@ Q = (p "x"? {(a) (b)}* [(c) (d)]+ (Ref)*)
         (quantifier))
       (quantified_pattern
         (alternation
-          (branch
+          (alternative
             (named_node
               (identifier)))
-          (branch
+          (alternative
             (named_node
               (identifier))))
         (quantifier))

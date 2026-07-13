@@ -31,12 +31,12 @@ AllIdentifiers = (program (DeepSearch)* @found)
   (definition
     (type_identifier)
     (alternation
-      (branch
+      (alternative
         (captured_pattern
           (def_ref
             (type_identifier))
           (capture)))
-      (branch
+      (alternative
         (named_node
           (wildcard)
           (quantified_pattern
@@ -114,10 +114,10 @@ Field = name: (identifier)
   (definition
     (type_identifier)
     (alternation
-      (branch
+      (alternative
         (named_node
           (identifier)))
-      (branch
+      (alternative
         (named_node
           (identifier)))))
   (definition
