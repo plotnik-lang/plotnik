@@ -26,5 +26,5 @@ error: empty `[]` matches nothing
 4 |   []
   |   ^^
   |
-help: alternations must contain at least one branch
+help: alternations must contain at least one alternative
 -------------------- SYMBOLS ---------------------

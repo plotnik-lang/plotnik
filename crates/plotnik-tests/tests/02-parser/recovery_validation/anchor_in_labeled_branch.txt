@@ -9,4 +9,4 @@ error: anchors cannot appear directly in alternations
 2 |   Foo: .
   |        ^
   |
-help: use `[{(a) . (b)} (c)]` to anchor within a branch
+help: use `[{(a) . (b)} (c)]` to anchor within an alternative

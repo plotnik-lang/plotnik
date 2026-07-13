@@ -23,7 +23,7 @@ error: infinite recursion: no escape path
 10 | D = (d (A))
    |         - references A
    |
-help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
+help: add a non-recursive alternative to terminate: `[Base: ... Rec: (Self)]`
 -------------------- SYMBOLS ---------------------
 A
   B

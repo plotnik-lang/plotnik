@@ -3,7 +3,7 @@ Q = [
   (number)* @x
 ]
 ------------------ DIAGNOSTICS -------------------
-error: capture `@x` has incompatible types across branches
+error: capture `@x` has incompatible types across alternatives
  --> query.ptk:2:16
   |
 2 |   (identifier) @x

@@ -8,7 +8,7 @@ Q = (program
 )
 --------------------- INPUT ----------------------
 ------------------ DIAGNOSTICS -------------------
-error: capture `@value` has incompatible types across branches
+error: capture `@value` has incompatible types across alternatives
  --> query.ptk:5:7
   |
 5 |     } @value :: bool

@@ -9,4 +9,4 @@ error: negated fields cannot appear directly in alternations
 3 |   -key
   |   ^^^^
   |
-help: negate the field inside a node branch: `[(a -field) (b)]`
+help: negate the field inside a node alternative: `[(a -field) (b)]`

@@ -20,7 +20,7 @@ warning: capture type `str` replaces structured data with source text
   |
 help: the replaced fields, cases, or scalar payload will not be returned
 
-error: capture `@x` has incompatible types across branches
+error: capture `@x` has incompatible types across alternatives
   --> query.ptk:8:18
    |
  8 |     (identifier) @x

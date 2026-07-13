@@ -104,7 +104,7 @@ fn invalid_three_way_mutual_recursion_across_files() {
         "c.ptk": "C = (c (A))",
     };
 
-    insta::assert_snapshot!(res, @r"
+    insta::assert_snapshot!(res, @"
     error: infinite recursion: no escape path
      --> c.ptk:1:9
       |
@@ -124,7 +124,7 @@ fn invalid_three_way_mutual_recursion_across_files() {
     1 | B = (b (C))
       |         - references C (completing cycle)
       |
-    help: add a non-recursive branch to terminate: `[Base: ... Rec: (Self)]`
+    help: add a non-recursive alternative to terminate: `[Base: ... Rec: (Self)]`
     ");
 }
 
@@ -148,7 +148,7 @@ fn compile_rejects_value_less_definition() {
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
-    assert!(rendered.contains("no entrypoint"), "{rendered}");
+    assert!(rendered.contains("no entry points"), "{rendered}");
 }
 
 #[test]
@@ -176,7 +176,7 @@ fn compile_flags_dropped_value_less_def_among_valid() {
     let diag = compiled.diagnostics();
     assert!(diag.has_errors());
     let rendered = diag.render(compiled.source_map());
-    assert!(rendered.contains("no entrypoint"), "{rendered}");
+    assert!(rendered.contains("no entry points"), "{rendered}");
 }
 
 #[test]
@@ -246,7 +246,7 @@ fn multifile_ref_to_body_with_internal_error_attributes_to_defining_file() {
     1 | Foo = (program (identifier) @x (identifier) @x)
       |                                ^^^^^^^^^^^^^^^
       |
-    help: rename one capture, or use an enum if they are mutually exclusive branches
+    help: rename one capture, or use labeled alternatives to preserve which alternative matched
     ");
 }
 

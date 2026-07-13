@@ -18,7 +18,7 @@ Q = (program
   )
 )
 ------------------ DIAGNOSTICS -------------------
-error: capture `@x` has incompatible types across branches
+error: capture `@x` has incompatible types across alternatives
   --> query.ptk:13:17
    |
 13 |           (Row) @x

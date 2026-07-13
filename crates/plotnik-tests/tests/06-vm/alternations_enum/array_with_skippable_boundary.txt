@@ -19,7 +19,7 @@ export interface QItems {
   a: Node;
 }
 ------------------ DIAGNOSTICS -------------------
-warning: branch labels have no effect without capture
+warning: alternative labels have no output effect here
  --> query.ptk:3:5
   |
 3 | /     [
@@ -30,7 +30,7 @@ warning: branch labels have no effect without capture
 8 | |     ]
   | |_____^
   |
-help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
+help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
 --------------------- OUTPUT ---------------------
 {
   "items": [

@@ -1,6 +1,6 @@
 Q = .
 ------------------ DIAGNOSTICS -------------------
-error: query produces no entrypoints
+error: query produces no entry points
  --> query.ptk:1:1
   |
 1 | Q = .

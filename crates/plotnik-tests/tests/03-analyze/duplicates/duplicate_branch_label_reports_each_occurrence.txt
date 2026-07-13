@@ -4,20 +4,20 @@ Q = [
   A: (c)
 ]
 ------------------ DIAGNOSTICS -------------------
-error: branch label `A` is already used in this alternation
+error: alternative label `A` is already used in this alternation
  --> query.ptk:3:3
   |
 3 |   A: (b)
   |   ^
   |
-help: each branch label must be unique within an alternation
+help: each alternative label must be unique within an alternation
 
-error: branch label `A` is already used in this alternation
+error: alternative label `A` is already used in this alternation
  --> query.ptk:4:3
   |
 4 |   A: (c)
   |   ^
   |
-help: each branch label must be unique within an alternation
+help: each alternative label must be unique within an alternation
 -------------------- SYMBOLS ---------------------
 Q

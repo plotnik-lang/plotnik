@@ -8,7 +8,7 @@ Bad = (identifier) @bad
 ------------------- INPUT (ts) -------------------
 let x = 1;
 ------------------ DIAGNOSTICS -------------------
-warning: entrypoint can never match: matching starts at the tree root
+warning: entry point can never match: matching starts at the syntax-tree root
  --> query.ptk:7:7
   |
 7 | Bad = (identifier) @bad

@@ -1,6 +1,6 @@
 Q = [My.branch: (a) Other: (b)]
 ------------------ DIAGNOSTICS -------------------
-error: branch labels must be PascalCase
+error: alternative labels must be PascalCase
  --> query.ptk:1:6
   |
 1 | Q = [My.branch: (a) Other: (b)]
@@ -11,4 +11,4 @@ help: use `MyBranch`
 1 - Q = [My.branch: (a) Other: (b)]
 1 + Q = [MyBranch: (a) Other: (b)]
   |
-help: branch labels become variants of an enum in the output
+help: alternative labels name variant cases when the alternation produces a value

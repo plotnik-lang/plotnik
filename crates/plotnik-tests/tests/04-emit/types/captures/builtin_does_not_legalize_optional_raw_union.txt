@@ -7,7 +7,7 @@ Q = (program
   ]
 )
 ------------------ DIAGNOSTICS -------------------
-error: capture `@x` has incompatible types across branches
+error: capture `@x` has incompatible types across alternatives
  --> query.ptk:3:19
   |
 3 |     (identifier)? @x :: bool

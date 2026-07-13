@@ -10,4 +10,4 @@ error: capture `@value` already defined in this scope
 4 |   ) @value :: bool
   |     ^^^^^^
   |
-help: rename one capture, or use an enum if they are mutually exclusive branches
+help: rename one capture, or use labeled alternatives to preserve which alternative matched

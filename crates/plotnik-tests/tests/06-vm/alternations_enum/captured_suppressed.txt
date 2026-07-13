@@ -8,7 +8,7 @@ a;
 ------------------- TYPESCRIPT -------------------
 export type Q = undefined;
 ------------------ DIAGNOSTICS -------------------
-warning: branch labels have no effect without capture
+warning: alternative labels have no output effect here
  --> query.ptk:2:3
   |
 2 | /   [
@@ -16,7 +16,7 @@ warning: branch labels have no effect without capture
 4 | |   ]
   | |___^
   |
-help: capture the alternation (`[...] @name`) to make the labels enum variants, or remove them
+help: capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them
 --------------------- OUTPUT ---------------------
 null
 -------------------- BYTECODE --------------------
