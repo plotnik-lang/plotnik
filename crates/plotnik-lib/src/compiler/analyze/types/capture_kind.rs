@@ -20,16 +20,15 @@ pub enum CaptureKind {
     /// The matched tree-sitter node itself (`Node` effect). If the inner has
     /// bubbling child captures, they set into the enclosing scope as siblings.
     Node,
-    /// A fresh struct built from the inner sequence/alternation's bubbling
-    /// captures (`Struct … EndStruct`).
-    Struct,
+    /// A fresh record built from the inner sequence/alternation's bubbling captures.
+    Record,
     /// A reference whose definition returns a structured type. The call site wraps
-    /// the `Call`/`Return` (with an `Struct`/`EndStruct` scope when the definition
-    /// returns a struct) and consumes the result — the capture emits no `Node`.
+    /// the `Call`/`Return` in a record scope when needed and consumes the result —
+    /// the capture emits no `Node`.
     Ref,
     /// The inner expression itself leaves the captured value pending — a
-    /// consumed labeled alternation (lowered as `Enum … EndEnum`). Emit the inner, then a
-    /// trailing `Set`; the capture contributes no `Node` and no wrapper.
+    /// consumed labeled alternation (lowered as `VariantOpen … VariantClose`). Emit
+    /// the inner, then a trailing `Set`; the capture contributes no `Node` and no wrapper.
     PendingValue,
     /// An array collected by `*` or `+` (`Arr … Push … EndArr`).
     Array,
@@ -55,7 +54,7 @@ impl TypeAnalysis {
                 QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => CaptureKind::Array,
                 // `?` adds optionality to the inner's value mechanism — except a
                 // fields-flow inner, whose captures the `?` collects as one
-                // nullable row (the `?` counterpart of `*`'s Array). That holds
+                // optional record (the `?` counterpart of `*`'s list). That holds
                 // for a named node too, even though its bare capture is a
                 // `Node`: quantified, its fields have nowhere to bubble.
                 QuantifierKind::Optional => {
@@ -70,7 +69,7 @@ impl TypeAnalysis {
                     if kind == CaptureKind::Node
                         && matches!(inner_flow, Some(PatternFlow::Fields(_)))
                     {
-                        return CaptureKind::Struct;
+                        return CaptureKind::Record;
                     }
                     kind
                 }
@@ -78,15 +77,15 @@ impl TypeAnalysis {
         }
 
         // A reference whose definition returns a structured type: the call site does
-        // its own Call/Return (and Struct/EndStruct) scoping. A reference to a node/void
+        // its own Call/Return and record scoping. A reference to a node/void
         // definition falls through to `Node` — its matched node is captured directly.
         if self.ref_structured(&pattern, deps, interner, mode) {
             return CaptureKind::Ref;
         }
 
-        // An empty `{}` is an empty struct scope.
+        // An empty `{}` is an empty record scope.
         if is_empty_group(&pattern) {
-            return CaptureKind::Struct;
+            return CaptureKind::Record;
         }
 
         // Everything else is decided by the inner's inferred data flow, so the type
@@ -96,20 +95,20 @@ impl TypeAnalysis {
         };
 
         match flow {
-            // Bubbling captures: a sequence/alternation wraps them in a fresh struct
+            // Bubbling captures: a sequence/alternation wraps them in a fresh record
             // scope; a named node instead captures its matched node and lets the
             // children bubble alongside as sibling fields.
             PatternFlow::Fields(_) => {
                 // A captured labeled alternation is a consumed position, so its variant type
                 // flows as `Value` (handled below); an unlabeled alternation flows `Fields`.
                 if matches!(pattern, Pattern::SeqPattern(_) | Pattern::Alternation(_)) {
-                    CaptureKind::Struct
+                    CaptureKind::Record
                 } else {
                     CaptureKind::Node
                 }
             }
             // A structured scalar left pending by the inner itself — a consumed
-            // variant type lowered through `Enum`/`EndEnum`.
+            // variant type lowered through `VariantOpen`/`VariantClose`.
             PatternFlow::Value(type_id) if self.is_structured_output(*type_id) => {
                 CaptureKind::PendingValue
             }
@@ -151,7 +150,7 @@ impl TypeAnalysis {
             let output_type = self.expect_def_output(def_id);
             return matches!(
                 self.expect_type_shape(output_type),
-                TypeShape::Struct(_)
+                TypeShape::Record(_)
                     | TypeShape::Variant(_)
                     | TypeShape::Array { .. }
                     | TypeShape::Optional(_)
@@ -162,7 +161,7 @@ impl TypeAnalysis {
             return matches!(
                 self.type_shape(output_type),
                 Some(
-                    TypeShape::Struct(_)
+                    TypeShape::Record(_)
                         | TypeShape::Variant(_)
                         | TypeShape::Array { .. }
                         | TypeShape::Optional(_)

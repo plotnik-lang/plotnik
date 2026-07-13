@@ -199,7 +199,7 @@ impl InferVisitor<'_, '_> {
             return;
         };
         let type_ctx = self.ctx.type_ctx.in_progress();
-        let fields = type_ctx.expect_struct_fields(*type_id);
+        let fields = type_ctx.expect_record_fields(*type_id);
         if fields.is_empty() {
             return;
         }

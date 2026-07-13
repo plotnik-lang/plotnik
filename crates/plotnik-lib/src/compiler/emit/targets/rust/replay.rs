@@ -10,8 +10,8 @@
 //! consumer):
 //!
 //! - **Values are value-first.** A field's entries arrive *before* the
-//!   `Set` that names the field, and `Set` order inside one struct varies
-//!   between instances of the same type. Struct scopes therefore peek ahead
+//!   `Set` that names the field, and `Set` order inside one record varies
+//!   between instances of the same type. Record scopes therefore peek ahead
 //!   to the balancing `Set` (`TraceReader::peek_set`) to pick the field's
 //!   typed reader, then consume linearly.
 //! - **`Set`/`VariantOpen` payloads are absolute member-table indices**, baked
@@ -149,7 +149,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
     }
 
     /// The `parse`/`matches` surface, one block per entrypoint definition.
-    /// Callable definitions are nominal (parse + matches) or void (matches).
+    /// Selectable definitions are nominal (parse + matches) or void (matches).
     pub(super) fn parse_api(&self, entrypoints: impl Iterator<Item = DefId>) -> String {
         let mut out = String::new();
         for def_id in entrypoints {
@@ -158,7 +158,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
             out.push('\n');
             let item = self.replay.item(name);
             match item.kind {
-                ReplayItemKind::Struct(_) | ReplayItemKind::Variant(_) => {
+                ReplayItemKind::Record(_) | ReplayItemKind::Variant(_) => {
                     self.parse_impl(&mut out, &def, item);
                 }
                 ReplayItemKind::Alias(_) => {
@@ -307,7 +307,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         let mut out = String::new();
         for item in self.replay.items() {
             match &item.kind {
-                ReplayItemKind::Struct(scope) => self.struct_reader(&mut out, item, scope),
+                ReplayItemKind::Record(scope) => self.struct_reader(&mut out, item, scope),
                 ReplayItemKind::Variant(cases) => self.enum_reader(&mut out, item, cases),
                 ReplayItemKind::Alias(value) => self.alias_reader(&mut out, item, value),
                 ReplayItemKind::VoidDefinition => {}

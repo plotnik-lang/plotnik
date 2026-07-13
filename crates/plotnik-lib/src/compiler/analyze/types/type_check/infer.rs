@@ -123,7 +123,9 @@ impl CaptureFieldDestination {
         field: FieldInfo,
     ) -> PatternFlow {
         match self {
-            Self::OwnScope => PatternFlow::Fields(types.intern_single_field(capture_name, field)),
+            Self::OwnScope => {
+                PatternFlow::Fields(types.intern_single_field_record(capture_name, field))
+            }
             Self::Bubbling {
                 mut fields,
                 admits_capture,
@@ -135,7 +137,7 @@ impl CaptureFieldDestination {
                         "capture destination was validated vacant"
                     );
                 }
-                PatternFlow::Fields(types.intern_struct(fields))
+                PatternFlow::Fields(types.intern_record(fields))
             }
         }
     }
@@ -351,7 +353,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         if let Some(type_id) = info.flow.type_id()
             && matches!(
                 self.ctx.type_ctx.in_progress().type_shape(type_id),
-                Some(TypeShape::Struct(_) | TypeShape::Variant(_))
+                Some(TypeShape::Record(_) | TypeShape::Variant(_))
             )
         {
             let span = Span::new(self.source, pattern.node().text_range());
@@ -496,7 +498,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     .ctx
                     .type_ctx
                     .in_progress()
-                    .expect_struct_fields(*type_id)
+                    .expect_record_fields(*type_id)
                     .clone();
                 self.merge_scope_fields(&mut merged_fields, &fields, child.node().text_range());
             }
@@ -509,7 +511,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         if merged.is_empty() {
             return PatternFlow::Void;
         }
-        PatternFlow::Fields(self.ctx.type_ctx.intern_struct(merged))
+        PatternFlow::Fields(self.ctx.type_ctx.intern_record(merged))
     }
 
     fn sequence_root_extent(&mut self, children: &[Located<Pattern>]) -> RootExtent {
@@ -734,7 +736,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             }
             return PatternShape::new(
                 RootExtent::SingleNode,
-                PatternFlow::Fields(self.ctx.type_ctx.intern_single_field(capture_name, field)),
+                PatternFlow::Fields(
+                    self.ctx
+                        .type_ctx
+                        .intern_single_field_record(capture_name, field),
+                ),
             );
         };
         let inner = cap.wrap(inner);
@@ -829,7 +835,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         range: TextRange,
     ) -> TypeId {
         match self.ctx.type_ctx.in_progress().type_shape(type_id).cloned() {
-            Some(TypeShape::Struct(_) | TypeShape::Variant(_)) => {
+            Some(TypeShape::Record(_) | TypeShape::Variant(_)) => {
                 self.ctx
                     .type_ctx
                     .record_custom_capture_type(CustomCaptureTypeOccurrence {
@@ -1000,7 +1006,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .ctx
             .type_ctx
             .in_progress()
-            .expect_struct_fields(*type_id)
+            .expect_record_fields(*type_id)
             .clone();
         let admits_capture = !fields.contains_key(&capture_name);
         if !admits_capture {
@@ -1043,11 +1049,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         inner_info: &PatternShape,
     ) -> TypeId {
         match &inner_info.flow {
-            // A truly empty scope (`{}`) captures an empty struct; any other void
+            // A truly empty scope (`{}`) captures an empty record; any other void
             // capture is the matched node.
             PatternFlow::Void => {
                 if is_empty_group(inner) {
-                    let empty = self.ctx.type_ctx.intern_struct(BTreeMap::new());
+                    let empty = self.ctx.type_ctx.intern_record(BTreeMap::new());
                     let span = Span::new(self.source, inner.text_range());
                     self.ctx.type_ctx.record_type_provenance(empty, span);
                     empty
@@ -1176,7 +1182,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// iteration completes without consuming, so the loop collects a spurious
     /// null/empty element at every non-matching candidate. Scoped to
     /// wrapper-shaped outputs — the surface quantifier-rooted definitions
-    /// introduce — so nullable struct-valued definitions (a captured `?` at
+    /// introduce — so nullable record-valued definitions (a captured `?` at
     /// the root) keep their existing repeat behavior.
     fn reject_zero_width_repeat(&mut self, quant: &QuantifiedPattern, inner: &Located<Pattern>) {
         let mut element = inner.node().clone();
@@ -1261,11 +1267,11 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     .ctx
                     .type_ctx
                     .in_progress()
-                    .expect_struct_fields(type_id)
+                    .expect_record_fields(type_id)
                     .iter()
                     .map(|(&k, &v)| (k, v.make_optional()))
                     .collect();
-                PatternFlow::Fields(self.ctx.type_ctx.intern_struct(optional_fields))
+                PatternFlow::Fields(self.ctx.type_ctx.intern_record(optional_fields))
             }
         }
     }
@@ -1289,8 +1295,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             // Bare with bubbling captures: `report_internal_capture_dimensionality`
             // already errored. Produce the plausible array type anyway so
             // downstream inference isn't poisoned by void.
-            (QuantifiedContext::Bare, PatternFlow::Fields(struct_type)) => {
-                intern_array(self.ctx.type_ctx, struct_type)
+            (QuantifiedContext::Bare, PatternFlow::Fields(record_type)) => {
+                intern_array(self.ctx.type_ctx, record_type)
             }
             // Captured repeats collect elements: matched nodes, pending values
             // (variant/reference results), or records of captured fields.
@@ -1585,7 +1591,7 @@ impl<'a, 'd> InferPass<'a, 'd> {
 
 pub(super) fn freeze_field_completions(types: &mut TypeAnalysisBuilder) {
     for (pattern, type_id) in types.alternation_field_results() {
-        let fields = types.in_progress().expect_struct_fields(type_id).clone();
+        let fields = types.in_progress().expect_record_fields(type_id).clone();
         let alternative_fields = alternation_alternative_fields(types, &pattern);
         let completions = fields
             .into_iter()
@@ -1638,7 +1644,7 @@ fn alternation_alternative_fields(
             let PatternFlow::Fields(type_id) = shape.flow else {
                 return HashSet::new();
             };
-            view.expect_struct_fields(type_id).keys().copied().collect()
+            view.expect_record_fields(type_id).keys().copied().collect()
         })
         .collect()
 }

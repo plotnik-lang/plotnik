@@ -20,7 +20,7 @@ use crate::compiler::parse::cst::SyntaxNode;
 
 use super::capture::{CaptureEffects, PatternCtx};
 use super::navigation::AnchorSemantics;
-use super::scope::{CaptureExits, SkipExit, Struct};
+use super::scope::{CaptureExits, RecordScope, SkipExit};
 use crate::compiler::analyze::nullability::compute_nullable_defs;
 use crate::compiler::analyze::types::type_check::definition_value_root;
 
@@ -39,7 +39,7 @@ pub struct NfaBuilder<'a> {
     active_def_variants: HashSet<DefVariant>,
     /// Stack of active struct scopes for capture lookup.
     /// Innermost scope is at the end.
-    pub(super) scope_stack: Vec<Struct>,
+    pub(super) scope_stack: Vec<RecordScope>,
     /// Non-zero while compiling under a suppressive capture (`@_`). The whole
     /// region compiles structurally: captures are inert, alternations emit no
     /// variant tags or null defaults. Only definition calls still produce
@@ -163,9 +163,9 @@ impl<'a> NfaBuilder<'a> {
 
         let output = self.ctx.analysis.type_analysis.expect_def_output(def_id);
         let output_shape = self.ctx.analysis.type_analysis.expect_type_shape(output);
-        let wraps_struct = matches!(output_shape, TypeShape::Struct(_));
+        let wraps_record = matches!(output_shape, TypeShape::Record(_));
 
-        let after_body = if wraps_struct {
+        let after_body = if wraps_record {
             self.emit_struct_close_step(return_label)
         } else if matches!(output_shape, TypeShape::Node) {
             self.emit_effects_epsilon(
@@ -183,7 +183,7 @@ impl<'a> NfaBuilder<'a> {
             CalleeEntry(self.def_entries[&DefVariant::ordinary(def_id)]),
         );
 
-        if wraps_struct {
+        if wraps_record {
             self.emit_struct_step(call)
         } else {
             call
@@ -286,7 +286,7 @@ impl<'a> NfaBuilder<'a> {
         let body_nav = Some(variant.route().body_nav());
 
         // Definitions are compiled in normalized form: body -> Return
-        // No Struct/EndStruct wrapper - that's the caller's responsibility (call-site scoping).
+        // No record wrapper - that's the caller's responsibility (call-site scoping).
         // We still use with_scope for member index lookup during compilation.
         // The inline-stack entry keeps a nullable self-reference inside this
         // body (`A = (x (A) (y))?`) from inlining itself endlessly.

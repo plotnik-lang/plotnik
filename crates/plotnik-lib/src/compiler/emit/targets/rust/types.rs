@@ -82,7 +82,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
 
     fn render_item(&mut self, item: &Item) -> String {
         match item.kind {
-            ItemKind::Struct => self.render_struct(item),
+            ItemKind::Record => self.render_struct(item),
             ItemKind::Variant => self.render_enum(item),
             ItemKind::Alias => self.render_alias(item),
             ItemKind::VoidDef => self.render_void_marker(item),
@@ -97,8 +97,8 @@ impl<'m, 'a> Emitter<'m, 'a> {
     fn render_struct(&mut self, item: &Item) -> String {
         let types = self.schema.types;
         let interner = self.schema.interner;
-        let TypeShape::Struct(fields) = types.expect_type_shape(item.ty) else {
-            unreachable!("struct item must have a struct shape");
+        let TypeShape::Record(fields) = types.expect_type_shape(item.ty) else {
+            unreachable!("struct item must have a record shape");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let ident = self.item_ident(item.name).to_string();
@@ -147,8 +147,8 @@ impl<'m, 'a> Emitter<'m, 'a> {
 
         let types = self.schema.types;
         let interner = self.schema.interner;
-        let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
-            unreachable!("enum variant payload is void or an anonymous struct");
+        let TypeShape::Record(fields) = types.expect_type_shape(payload) else {
+            unreachable!("enum variant payload is void or an anonymous record");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let rendered: Vec<String> = fields
@@ -197,7 +197,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
                 )
             }
             TypeShape::Ref(def_id) => self.ref_type(context, *def_id, ty),
-            TypeShape::Struct(_) | TypeShape::Variant(_) | TypeShape::Void => {
+            TypeShape::Record(_) | TypeShape::Variant(_) | TypeShape::Void => {
                 unreachable!("alias items cover non-composite outputs only")
             }
         }
@@ -227,7 +227,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
                 Some(name) => self.named_type(name, ty),
                 None => self.node_type(),
             },
-            TypeShape::Struct(_) | TypeShape::Variant(_) => {
+            TypeShape::Record(_) | TypeShape::Variant(_) => {
                 let name = self
                     .schema
                     .type_name_of(ty)

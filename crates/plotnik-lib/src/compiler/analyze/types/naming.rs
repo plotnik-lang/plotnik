@@ -6,7 +6,7 @@
 //! - A definition's result type carries the definition's name.
 //! - A composite reached through field `f` of a type named `T` is `T` +
 //!   PascalCase(`f`), landing on array/optional *elements*. Variant-case
-//!   payload structs stay anonymous (rendered inline); composites inside a
+//!   payload records stay anonymous (rendered inline); composites inside a
 //!   payload fields are named variant type name + verbatim label + PascalCase(field).
 //! - A custom `:: TypeName` capture type overrides the generated name and
 //!   restarts the chain below it.
@@ -131,7 +131,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         }
     }
 
-    /// Descend a struct/variant type that already carries `name`, naming its nested
+    /// Descend a record/variant type that already carries `name`, naming its nested
     /// composites.
     fn walk_named(&mut self, type_id: TypeId, name: &str) {
         let shape = self
@@ -142,18 +142,18 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             .expect("named type is registered");
 
         match shape {
-            TypeShape::Struct(fields) => {
+            TypeShape::Record(fields) => {
                 for (field_sym, info) in &fields {
                     let field = self.interner.resolve(*field_sym).to_owned();
                     self.visit_field_element(info.type_id, name, &field);
                 }
             }
             TypeShape::Variant(cases) => {
-                // Variant payload structs are anonymous (rendered inline as the
+                // Variant payload records are anonymous (rendered inline as the
                 // case's data); composites inside their fields are named
                 // through the variant type name + the verbatim label.
                 for (label_sym, payload) in &cases {
-                    let Some(TypeShape::Struct(payload_fields)) =
+                    let Some(TypeShape::Record(payload_fields)) =
                         self.ctx.in_progress().type_shape(*payload).cloned()
                     else {
                         continue;
@@ -182,7 +182,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             .expect("field element type is registered");
 
         match shape {
-            TypeShape::Struct(_) | TypeShape::Variant(_) => {
+            TypeShape::Record(_) | TypeShape::Variant(_) => {
                 if let Some(&existing) = self.names.get(&element) {
                     // A definition's result keeps its own name here (`(Foo) @val`
                     // renders as `val: Foo`); a custom capture type on it is

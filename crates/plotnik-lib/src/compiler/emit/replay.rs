@@ -1,6 +1,6 @@
 //! Target-neutral typed replay plan.
 //!
-//! Capture traces name struct fields and variant cases with absolute layout
+//! Capture traces name record fields and variant cases with absolute layout
 //! slots. This plan resolves every nominal twin to the complete set of slots
 //! it may produce and turns output types into a small value-reading algebra.
 //! Backends choose identifiers, error syntax, recursion representation, and
@@ -70,7 +70,7 @@ impl ReplayItem {
 
 #[derive(Clone, Debug)]
 pub(crate) enum ReplayItemKind {
-    Struct(ReplayScopePlan),
+    Record(ReplayScopePlan),
     Variant(Vec<ReplayCasePlan>),
     Alias(ReplayValuePlan),
     VoidDefinition,
@@ -120,12 +120,12 @@ struct ReplayPlanBuilder<'p, 'a> {
 impl ReplayPlanBuilder<'_, '_> {
     fn item(&self, item: OutputItem) -> ReplayItem {
         let kind = match item.kind {
-            OutputItemKind::Struct => {
-                let TypeShape::Struct(fields) = self.schema.types.expect_type_shape(item.ty) else {
-                    unreachable!("struct output item has a struct shape");
+            OutputItemKind::Record => {
+                let TypeShape::Record(fields) = self.schema.types.expect_type_shape(item.ty) else {
+                    unreachable!("record output item has a record shape");
                 };
                 let twins = collect_twins(self.schema.types, self.schema.layout(), item);
-                ReplayItemKind::Struct(self.scope(fields.iter(), &twins))
+                ReplayItemKind::Record(self.scope(fields.iter(), &twins))
             }
             OutputItemKind::Variant => ReplayItemKind::Variant(self.variant_cases(item)),
             OutputItemKind::Alias => ReplayItemKind::Alias(self.value(item.ty)),
@@ -152,9 +152,9 @@ impl ReplayPlanBuilder<'_, '_> {
                 let payload = if payload == TYPE_VOID {
                     None
                 } else {
-                    let TypeShape::Struct(fields) = self.schema.types.expect_type_shape(payload)
+                    let TypeShape::Record(fields) = self.schema.types.expect_type_shape(payload)
                     else {
-                        unreachable!("variant case payload is void or an anonymous struct");
+                        unreachable!("variant case payload is void or an anonymous record");
                     };
                     let payloads = payload_twins(self.schema.types, &twins, index);
                     Some(self.scope(fields.iter(), &payloads))
@@ -201,7 +201,7 @@ impl ReplayPlanBuilder<'_, '_> {
             TypeShape::Array { element, .. } => {
                 ReplayValuePlan::Array(Box::new(self.value(*element)))
             }
-            TypeShape::Struct(_) | TypeShape::Variant(_) => ReplayValuePlan::Read {
+            TypeShape::Record(_) | TypeShape::Variant(_) => ReplayValuePlan::Read {
                 item: self
                     .schema
                     .type_name_of(ty)
@@ -263,15 +263,15 @@ impl ReplayPlanBuilder<'_, '_> {
 /// kind. Structural identity is enforced upstream; twins differ only in
 /// their member-run offsets.
 fn collect_twins(types: &TypeAnalysis, layout: &CaptureLayout, item: OutputItem) -> Vec<TypeId> {
-    let wants_struct = item.is_struct();
+    let wants_record = item.is_record();
     let mut twins = BTreeSet::new();
     for (ty, name) in types.iter_type_names() {
         if name != item.name {
             continue;
         }
         let matches_kind = match types.expect_type_shape(ty) {
-            TypeShape::Struct(_) => wants_struct,
-            TypeShape::Variant(_) => !wants_struct,
+            TypeShape::Record(_) => wants_record,
+            TypeShape::Variant(_) => !wants_record,
             _ => false,
         };
         if !matches_kind || layout.member_base(ty).is_none() {
@@ -283,7 +283,7 @@ fn collect_twins(types: &TypeAnalysis, layout: &CaptureLayout, item: OutputItem)
     twins.into_iter().collect()
 }
 
-/// Case `index`'s payload struct across every twin variant type.
+/// Case `index`'s payload record across every twin variant type.
 fn payload_twins(types: &TypeAnalysis, twins: &[TypeId], index: usize) -> Vec<TypeId> {
     twins
         .iter()

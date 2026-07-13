@@ -1,6 +1,6 @@
 //! Builtin-gated producer provenance for capture-type normalization.
 //!
-//! The public type graph intentionally collapses provenance: a struct field says
+//! The public type graph intentionally collapses provenance: a record field says
 //! what type is returned, not which capture occurrences produced it or which
 //! alternation alternatives omitted it. Capture-type normalization needs the latter
 //! facts. When a query contains a builtin capture type, this projection records
@@ -260,7 +260,7 @@ impl RawOutputGraphBuilder {
             PatternFlow::Fields(type_id) => {
                 let mut sources = self.pattern_field_sources(&occurrence);
                 let fields = analysis
-                    .expect_struct_fields(*type_id)
+                    .expect_record_fields(*type_id)
                     .iter()
                     .map(|(&name, &info)| {
                         let sources = sources

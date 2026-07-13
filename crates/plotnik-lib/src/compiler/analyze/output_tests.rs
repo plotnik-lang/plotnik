@@ -14,11 +14,11 @@ use super::output::{CaptureLayout, OutputSchemaError, collect_ordered_types};
 fn capture_layout_assigns_one_absolute_member_sequence() {
     let mut interner = Interner::new();
     let mut types = TypeAnalysisBuilder::new();
-    let child = types.intern_struct(BTreeMap::from([(
+    let child = types.intern_record(BTreeMap::from([(
         interner.intern("value"),
         FieldInfo::required(TYPE_NODE),
     )]));
-    let parent = types.intern_struct(BTreeMap::from([
+    let parent = types.intern_record(BTreeMap::from([
         (interner.intern("child"), FieldInfo::required(child)),
         (interner.intern("name"), FieldInfo::required(TYPE_NODE)),
     ]));
@@ -51,7 +51,7 @@ fn capture_layout_accepts_256_fields() {
             )
         })
         .collect();
-    let output = types.intern_struct(fields);
+    let output = types.intern_record(fields);
     let def = DefId::from_raw(0);
     types.record_def_output(def, output);
     types.record_def_root_extent(def, RootExtent::SingleNode);
@@ -77,7 +77,7 @@ fn capture_layout_reports_the_actual_total_member_count() {
                 )
             })
             .collect();
-        ordered.push(types.intern_struct(fields));
+        ordered.push(types.intern_record(fields));
     }
     let fields = (0..10)
         .map(|field| {
@@ -87,7 +87,7 @@ fn capture_layout_reports_the_actual_total_member_count() {
             )
         })
         .collect();
-    ordered.push(types.intern_struct(fields));
+    ordered.push(types.intern_record(fields));
     let types = types.finish();
 
     let error = CaptureLayout::build(&types, &ordered)

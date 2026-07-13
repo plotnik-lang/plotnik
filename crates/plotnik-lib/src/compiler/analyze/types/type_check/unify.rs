@@ -69,17 +69,17 @@ fn unify_flow_in(
         // Void ∪ Fields -> Fields (every field is absent in the Void branch)
         (PatternFlow::Void, PatternFlow::Fields(id))
         | (PatternFlow::Fields(id), PatternFlow::Void) => {
-            let fields = ctx.in_progress().expect_struct_fields(id).clone();
+            let fields = ctx.in_progress().expect_record_fields(id).clone();
             let relaxed = relax_all_for_absence(ctx, fields);
-            Ok(PatternFlow::Fields(ctx.intern_struct(relaxed)))
+            Ok(PatternFlow::Fields(ctx.intern_record(relaxed)))
         }
 
         (PatternFlow::Fields(a_id), PatternFlow::Fields(b_id)) => {
-            let a_fields = ctx.in_progress().expect_struct_fields(a_id).clone();
-            let b_fields = ctx.in_progress().expect_struct_fields(b_id).clone();
+            let a_fields = ctx.in_progress().expect_record_fields(a_id).clone();
+            let b_fields = ctx.in_progress().expect_record_fields(b_id).clone();
 
             let merged = merge_fields(ctx, a_fields, b_fields)?;
-            Ok(PatternFlow::Fields(ctx.intern_struct(merged)))
+            Ok(PatternFlow::Fields(ctx.intern_record(merged)))
         }
 
         // `suppress_value` above rewrites every Value to Void; the remaining
@@ -162,7 +162,7 @@ fn merge_fields(
 
 /// Unify two type IDs.
 ///
-/// Structs and variant types mint a fresh id per occurrence (nominal typing), so two
+/// Records and variant types mint a fresh id per occurrence (nominal typing), so two
 /// branches capturing structurally identical anonymous composites carry
 /// different ids for the same shape — compare structurally, keeping the first
 /// branch's id. `Void` is the identity element (compatible with any type).

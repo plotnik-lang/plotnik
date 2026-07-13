@@ -459,7 +459,7 @@ impl NfaBuilder<'_> {
         // mechanism dispatch with the ordinary capture path (`compile_captured`),
         // split exits and all, so the two can never drift — the gap behind both
         // #470 and the suppressive `@_` panic. It emits the scope that matches the
-        // declared type (`Struct`/`Arr`/`Suppress`), closing it on both exits.
+        // declared scope (`Record`/`Array`/`Suppress`), closing it on both exits.
         if let Pattern::CapturedPattern(cap) = pattern
             && cap.inner().is_some()
         {
@@ -602,7 +602,7 @@ impl NfaBuilder<'_> {
     /// mechanism, since `*`/`+` classify as `Array`.
     ///
     /// The row is optional as a whole. Mirroring how arrays scope each element
-    /// row, the `Struct → body → EndStruct+Set` wrapper lives inside the
+    /// record, the `StructOpen → body → StructClose+Set` wrapper lives inside the
     /// iteration; the skip path emits a bare `Null` for the capture instead of
     /// a hollow `{ field: null }` struct, matching the declared
     /// `{ … } | null` type.
@@ -625,7 +625,7 @@ impl NfaBuilder<'_> {
         };
         assert!(
             matches!(kind.kind(), QuantifierKind::Optional),
-            "`*`/`+` captures classify as Array, never Struct"
+            "`*`/`+` captures classify as Array, never Record"
         );
 
         let (match_exit, skip_exit) = match exits {

@@ -37,8 +37,8 @@ pub enum TypeShape {
     Bool,
     /// User-specified name for a captured node via `@x :: TypeName`.
     Custom(Symbol),
-    /// Struct with named fields.
-    Struct(BTreeMap<Symbol, FieldInfo>),
+    /// Record with named fields.
+    Record(BTreeMap<Symbol, FieldInfo>),
     /// Variant type from a labeled alternation.
     Variant(BTreeMap<Symbol, TypeId>),
     /// Array type with element type.
@@ -49,7 +49,7 @@ pub enum TypeShape {
     Ref(DefId),
 }
 
-type FieldTypeIds<'a> = std::iter::Map<
+type RecordFieldTypeIds<'a> = std::iter::Map<
     std::collections::btree_map::Values<'a, Symbol, FieldInfo>,
     fn(&FieldInfo) -> TypeId,
 >;
@@ -59,7 +59,7 @@ type CasePayloadTypeIds<'a> =
 pub struct TypeShapeChildIds<'a>(TypeShapeChildIdsInner<'a>);
 
 enum TypeShapeChildIdsInner<'a> {
-    Fields(FieldTypeIds<'a>),
+    Fields(RecordFieldTypeIds<'a>),
     Cases(CasePayloadTypeIds<'a>),
     One(std::option::IntoIter<TypeId>),
     Empty(std::iter::Empty<TypeId>),
@@ -81,7 +81,7 @@ impl Iterator for TypeShapeChildIds<'_> {
 impl TypeShape {
     pub fn child_type_ids(&self) -> TypeShapeChildIds<'_> {
         let inner = match self {
-            Self::Struct(fields) => TypeShapeChildIdsInner::Fields(
+            Self::Record(fields) => TypeShapeChildIdsInner::Fields(
                 fields
                     .values()
                     .map(field_type_id as fn(&FieldInfo) -> TypeId),
@@ -102,7 +102,7 @@ fn field_type_id(field: &FieldInfo) -> TypeId {
     field.type_id
 }
 
-/// Field information within a struct type.
+/// Field information within a record type.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct FieldInfo {
     /// The type of this field's value.
@@ -138,7 +138,7 @@ pub enum PatternFlow {
     Void,
     /// Opaque single value that doesn't bubble (scope boundary).
     Value(TypeId),
-    /// Struct type whose fields bubble to parent scope.
+    /// Record field set that bubbles to the parent scope.
     Fields(TypeId),
 }
 

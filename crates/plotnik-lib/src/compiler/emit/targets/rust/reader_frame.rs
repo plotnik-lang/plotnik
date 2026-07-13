@@ -54,7 +54,7 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
     fn reader_frame_bytes(&self, item: &ReplayItem) -> u64 {
         let guard_bytes = if item.fallible { WORD_BYTES } else { 0 };
         let local_bytes = match self.types.expect_type_shape(item.ty) {
-            TypeShape::Struct(fields) => self.field_scope_frame_bytes(item.ty, fields),
+            TypeShape::Record(fields) => self.field_scope_frame_bytes(item.ty, fields),
             TypeShape::Variant(cases) => cases
                 .values()
                 .map(|&payload| self.variant_payload_frame_bytes(item.ty, payload))
@@ -73,8 +73,8 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
         if payload == TYPE_VOID {
             return 0;
         }
-        let TypeShape::Struct(fields) = self.types.expect_type_shape(payload) else {
-            unreachable!("variant case payload is void or an anonymous struct");
+        let TypeShape::Record(fields) = self.types.expect_type_shape(payload) else {
+            unreachable!("variant case payload is void or an anonymous record");
         };
         self.field_scope_frame_bytes(owner, fields)
     }
@@ -141,7 +141,7 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
             }
             TypeShape::Array { element, .. } => VEC_VALUE_BYTES
                 .saturating_add(self.type_value_bytes(*element, context.array_element(), seen)),
-            TypeShape::Struct(fields) => fields
+            TypeShape::Record(fields) => fields
                 .values()
                 .map(|info| {
                     let mut field_seen = seen.clone();

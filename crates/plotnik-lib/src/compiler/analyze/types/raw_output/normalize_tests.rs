@@ -19,7 +19,7 @@ fn invalid_containment_propagates_through_recursive_cycle() {
         TypeShape::Node,
         TypeShape::Text,
         TypeShape::Bool,
-        TypeShape::Struct(BTreeMap::from([
+        TypeShape::Record(BTreeMap::from([
             (cycle, FieldInfo::required(reference)),
             (bad, FieldInfo::required(invalid)),
         ])),

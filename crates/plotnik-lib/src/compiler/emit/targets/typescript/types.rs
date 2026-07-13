@@ -122,7 +122,7 @@ impl<'a> SchemaEmitter<'a> {
             return;
         }
         match item.kind {
-            OutputItemKind::Struct => self.emit_interface(&name, item.ty),
+            OutputItemKind::Record => self.emit_interface(&name, item.ty),
             OutputItemKind::Variant => self.emit_variant(&name, item.ty),
             OutputItemKind::Alias | OutputItemKind::VoidDef => {
                 let body = self.render_shape(item.ty);
@@ -158,14 +158,14 @@ impl<'a> SchemaEmitter<'a> {
         self.sink.set_style(Style::Dim);
         self.sink.push("{\n");
 
-        let TypeShape::Struct(fields) = self.schema.types.expect_type_shape(ty) else {
-            unreachable!("struct output item has a struct shape");
+        let TypeShape::Record(fields) = self.schema.types.expect_type_shape(ty) else {
+            unreachable!("record output item has a record shape");
         };
         let scope = self
             .schema
             .layout()
             .scope(ty)
-            .expect("struct output has a capture scope");
+            .expect("record output has a capture scope");
         let mut fields = fields
             .iter()
             .enumerate()
@@ -271,7 +271,7 @@ impl<'a> SchemaEmitter<'a> {
                 out.styled(Style::Blue, &self.name(name));
                 out
             }
-            TypeShape::Struct(_) => self.inline_struct(ty, false),
+            TypeShape::Record(_) => self.inline_record(ty, false),
             TypeShape::Variant(cases) => {
                 let mut out = Sink::new();
                 for (position, (&name, &payload)) in cases.iter().enumerate() {
@@ -321,8 +321,8 @@ impl<'a> SchemaEmitter<'a> {
         out
     }
 
-    fn inline_struct(&self, ty: TypeId, tags: bool) -> Sink<SemanticTag> {
-        let TypeShape::Struct(fields) = self.schema.types.expect_type_shape(ty) else {
+    fn inline_record(&self, ty: TypeId, tags: bool) -> Sink<SemanticTag> {
+        let TypeShape::Record(fields) = self.schema.types.expect_type_shape(ty) else {
             return self.render_ty(ty);
         };
         if fields.is_empty() {
@@ -334,7 +334,7 @@ impl<'a> SchemaEmitter<'a> {
             .schema
             .layout()
             .scope(ty)
-            .expect("inline struct has a capture scope");
+            .expect("inline record has a capture scope");
         let mut fields = fields
             .iter()
             .enumerate()
@@ -406,7 +406,7 @@ impl<'a> SchemaEmitter<'a> {
         out.push(":");
         out.reset_style();
         out.push(" ");
-        out.append(self.inline_struct(payload, payload_tags));
+        out.append(self.inline_record(payload, payload_tags));
         out.push(" ");
         out.styled(Style::Dim, "}");
         out

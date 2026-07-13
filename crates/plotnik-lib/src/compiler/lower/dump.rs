@@ -331,11 +331,11 @@ impl NfaDumper<'_> {
             .type_analysis
             .expect_type_shape(member.parent_type);
         let sym = match shape {
-            TypeShape::Struct(fields) => fields.keys().nth(member.relative_index as usize),
+            TypeShape::Record(fields) => fields.keys().nth(member.relative_index as usize),
             TypeShape::Variant(cases) => cases.keys().nth(member.relative_index as usize),
             _ => None,
         }
-        .expect("member ref parent must be a struct or variant type containing the indexed member");
+        .expect("member ref parent must be a record or variant type containing the indexed member");
 
         self.artifacts.interner.resolve(*sym).to_string()
     }

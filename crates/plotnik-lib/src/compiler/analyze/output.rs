@@ -29,7 +29,7 @@ pub(crate) enum OutputSchemaError {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum OutputItemKind {
-    Struct,
+    Record,
     Variant,
     Alias,
     /// A selectable match-only definition has a nominal marker and a `matches` API,
@@ -47,7 +47,7 @@ pub(crate) struct OutputItem {
 impl OutputItem {
     fn for_output(name: Symbol, ty: TypeId, shape: &TypeShape) -> Self {
         let kind = match shape {
-            TypeShape::Struct(_) => OutputItemKind::Struct,
+            TypeShape::Record(_) => OutputItemKind::Record,
             TypeShape::Variant(_) => OutputItemKind::Variant,
             _ => OutputItemKind::Alias,
         };
@@ -63,17 +63,17 @@ impl OutputItem {
     }
 
     pub(crate) fn is_composite(self) -> bool {
-        matches!(self.kind, OutputItemKind::Struct | OutputItemKind::Variant)
+        matches!(self.kind, OutputItemKind::Record | OutputItemKind::Variant)
     }
 
-    pub(crate) fn is_struct(self) -> bool {
-        self.kind == OutputItemKind::Struct
+    pub(crate) fn is_record(self) -> bool {
+        self.kind == OutputItemKind::Record
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CaptureScopeKind {
-    Struct,
+    Record,
     Variant,
 }
 
@@ -191,8 +191,8 @@ impl CaptureLayout {
         for &type_id in ordered_types {
             let (kind, members): (CaptureScopeKind, Vec<CaptureMember>) =
                 match types.expect_type_shape(type_id) {
-                    TypeShape::Struct(fields) => (
-                        CaptureScopeKind::Struct,
+                    TypeShape::Record(fields) => (
+                        CaptureScopeKind::Record,
                         fields
                             .iter()
                             .map(|(&name, &info)| CaptureMember {
@@ -404,7 +404,7 @@ impl<'a> ItemCollector<'a> {
         }
 
         match self.types.expect_type_shape(ty) {
-            TypeShape::Struct(fields) => {
+            TypeShape::Record(fields) => {
                 for info in fields.values() {
                     self.collect_position(info.type_id);
                 }
@@ -414,8 +414,8 @@ impl<'a> ItemCollector<'a> {
                     if payload == TYPE_VOID {
                         continue;
                     }
-                    let TypeShape::Struct(fields) = self.types.expect_type_shape(payload) else {
-                        unreachable!("variant case payload is void or an anonymous struct");
+                    let TypeShape::Record(fields) = self.types.expect_type_shape(payload) else {
+                        unreachable!("variant case payload is void or an anonymous record");
                     };
                     for info in fields.values() {
                         self.collect_position(info.type_id);
@@ -436,7 +436,7 @@ impl<'a> ItemCollector<'a> {
 
     fn collect_position(&mut self, ty: TypeId) {
         match self.types.expect_type_shape(ty) {
-            TypeShape::Struct(_) | TypeShape::Variant(_) => {
+            TypeShape::Record(_) | TypeShape::Variant(_) => {
                 let name = *self
                     .type_names
                     .get(&ty)
@@ -541,7 +541,7 @@ impl TypeCollector {
         }
         if matches!(
             shape,
-            TypeShape::Struct(_)
+            TypeShape::Record(_)
                 | TypeShape::Variant(_)
                 | TypeShape::Array { .. }
                 | TypeShape::Optional(_)

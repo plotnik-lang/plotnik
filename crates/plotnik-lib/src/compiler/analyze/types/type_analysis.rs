@@ -69,7 +69,7 @@ pub struct TypeAnalysis {
     /// Every named type, assigned by the naming pass: definition results carry
     /// their definition's name, nested composites carry path-derived names
     /// (`FooItems`), and custom `:: TypeName` capture types override. Complete: every
-    /// struct/variant type reachable from a definition output outside a case
+    /// record/variant type reachable from a definition output outside a case
     /// payload position has exactly one name. `BTreeMap` for deterministic
     /// emission order.
     type_names: BTreeMap<TypeId, Symbol>,
@@ -85,28 +85,28 @@ impl TypeAnalysis {
             .expect("admitted type id must reference a registered type")
     }
 
-    pub fn struct_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, FieldInfo>> {
+    pub fn record_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, FieldInfo>> {
         match self.type_shape(id)? {
-            TypeShape::Struct(fields) => Some(fields),
+            TypeShape::Record(fields) => Some(fields),
             _ => None,
         }
     }
 
-    /// Fields of the struct a `Fields` flow points to.
+    /// Fields of the record a `Fields` flow points to.
     ///
-    /// Every `PatternFlow::Fields` is constructed by interning a `Struct` (see the
-    /// `intern_struct`/`intern_single_field` calls at every `Fields` construction
-    /// site), so a non-`Struct` id here is a broken type-system invariant, not a
+    /// Every `PatternFlow::Fields` is constructed by interning a `Record` (see the
+    /// `intern_record`/`intern_single_field_record` calls at every `Fields` construction
+    /// site), so a non-`Record` id here is a broken type-system invariant, not a
     /// runtime condition the query can trigger. We surface it loudly instead of
-    /// fabricating an empty struct that would silently mistype the output.
-    pub fn expect_struct_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
+    /// fabricating an empty record that would silently mistype the output.
+    pub fn expect_record_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
         match self.expect_type_shape(id) {
-            TypeShape::Struct(fields) => fields,
-            _ => panic!("Fields flow must point to a Struct type"),
+            TypeShape::Record(fields) => fields,
+            _ => panic!("Fields flow must point to a Record type"),
         }
     }
 
-    /// Whether a type is a meaningful structured output (variant/struct, or a
+    /// Whether a type is a meaningful structured output (variant/record, or a
     /// array/optional thereof). Plain `Node` is not — it is the matched node,
     /// captured directly.
     ///
@@ -117,7 +117,7 @@ impl TypeAnalysis {
     /// lowering reads always resolves.
     pub fn is_structured_output(&self, type_id: TypeId) -> bool {
         match self.type_shape(type_id) {
-            Some(TypeShape::Variant(_) | TypeShape::Struct(_)) => true,
+            Some(TypeShape::Variant(_) | TypeShape::Record(_)) => true,
             Some(TypeShape::Ref(def_id)) => self
                 .def_output(*def_id)
                 .is_none_or(|t| self.is_structured_output(t)),
@@ -305,7 +305,7 @@ impl TypeAnalysis {
             else {
                 panic!("field completions must belong to a field-producing alternation")
             };
-            let fields = self.expect_struct_fields(*type_id);
+            let fields = self.expect_record_fields(*type_id);
             assert_eq!(
                 completions.fields().count(),
                 fields.len(),
@@ -333,8 +333,8 @@ impl TypeAnalysis {
             PatternFlow::Fields(type_id) => {
                 self.assert_type_id_registered(*type_id, "fields flow type id out of range");
                 assert!(
-                    matches!(self.type_shape(*type_id), Some(TypeShape::Struct(_))),
-                    "Fields flow must point to a Struct type",
+                    matches!(self.type_shape(*type_id), Some(TypeShape::Record(_))),
+                    "Fields flow must point to a Record type",
                 );
             }
         }
@@ -355,13 +355,13 @@ pub struct TypeAnalysisBuilder {
     pub(super) analysis: TypeAnalysis,
 
     /// Reverse index for `intern_type` deduplication of leaf and wrapper shapes.
-    /// Structs and variant types are deliberately NOT deduplicated: they are nominal —
+    /// Records and variant types are deliberately NOT deduplicated: they are nominal —
     /// two definitions with identical capture profiles are two distinct types,
     /// each carrying its own name. Scratch: the frozen result looks types up by
     /// `TypeId`, never by shape.
     intern_index: HashMap<TypeShape, TypeId>,
 
-    /// Creation site of every fresh struct/variant type, for naming-pass diagnostics.
+    /// Creation site of every fresh record/variant type, for naming-pass diagnostics.
     /// Scratch: only the naming pass consults it.
     type_provenance: HashMap<TypeId, Span>,
 
@@ -388,8 +388,8 @@ impl TypeAnalysisView<'_> {
         self.analysis.type_shape(id)
     }
 
-    pub(crate) fn expect_struct_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
-        self.analysis.expect_struct_fields(id)
+    pub(crate) fn expect_record_fields(&self, id: TypeId) -> &BTreeMap<Symbol, FieldInfo> {
+        self.analysis.expect_record_fields(id)
     }
 
     pub(crate) fn pattern_result(&self, pattern: &Pattern) -> Option<&PatternShape> {
@@ -468,10 +468,10 @@ impl TypeAnalysisBuilder {
     }
 
     /// Intern a type shape. Leaf and wrapper shapes deduplicate structurally;
-    /// structs and variant types always mint a fresh id (they are nominal — see the
+    /// records and variant types always mint a fresh id (they are nominal — see the
     /// `intern_index` field docs).
     pub fn intern_type(&mut self, shape: TypeShape) -> TypeId {
-        if matches!(shape, TypeShape::Struct(_) | TypeShape::Variant(_)) {
+        if matches!(shape, TypeShape::Record(_) | TypeShape::Variant(_)) {
             let id = TypeId(self.analysis.types.len() as u32);
             self.analysis.types.push(shape);
             return id;
@@ -487,19 +487,19 @@ impl TypeAnalysisBuilder {
         id
     }
 
-    pub fn intern_struct(&mut self, fields: BTreeMap<Symbol, FieldInfo>) -> TypeId {
-        self.intern_type(TypeShape::Struct(fields))
+    pub fn intern_record(&mut self, fields: BTreeMap<Symbol, FieldInfo>) -> TypeId {
+        self.intern_type(TypeShape::Record(fields))
     }
 
-    pub fn intern_single_field(&mut self, name: Symbol, info: FieldInfo) -> TypeId {
-        self.intern_type(TypeShape::Struct(BTreeMap::from([(name, info)])))
+    pub fn intern_single_field_record(&mut self, name: Symbol, info: FieldInfo) -> TypeId {
+        self.intern_type(TypeShape::Record(BTreeMap::from([(name, info)])))
     }
 
     pub fn intern_custom(&mut self, name: Symbol) -> TypeId {
         self.intern_type(TypeShape::Custom(name))
     }
 
-    /// Record where a fresh struct/variant type came from, for naming-pass diagnostics.
+    /// Record where a fresh record/variant type came from, for naming-pass diagnostics.
     pub fn record_type_provenance(&mut self, type_id: TypeId, span: Span) {
         self.type_provenance.entry(type_id).or_insert(span);
     }
@@ -626,7 +626,7 @@ impl TypeAnalysisBuilder {
 
     /// Deep structural equality over the in-progress type registry.
     ///
-    /// Structs and variant types mint a fresh id per occurrence (nominal typing), so
+    /// Records and variant types mint a fresh id per occurrence (nominal typing), so
     /// two structurally identical composites can carry different ids; interned
     /// shapes (Node, Custom, Ref, and wrappers over shared ids) compare by id.
     /// `Ref` cuts recursion, so the walk terminates on recursive types.
@@ -642,7 +642,7 @@ impl TypeAnalysisBuilder {
         };
 
         match (shape_a, shape_b) {
-            (TypeShape::Struct(fa), TypeShape::Struct(fb)) => {
+            (TypeShape::Record(fa), TypeShape::Record(fb)) => {
                 fa.len() == fb.len()
                     && fa.iter().zip(fb.iter()).all(|((ka, ia), (kb, ib))| {
                         ka == kb

@@ -111,8 +111,8 @@ impl NfaBuilder<'_> {
     /// the enclosing scope. Returns the new entry, or `entry` unchanged when
     /// `pre` is empty.
     ///
-    /// Scope-opening captures (`compile_struct_capture`, `compile_array_capture`)
-    /// fold `outer_capture.pre` onto their own `Struct`/`Arr` step. Captures that
+    /// Scope-opening captures (`compile_record_capture`, `compile_array_capture`)
+    /// fold `outer_capture.pre` onto their own `StructOpen`/`Arr` step. Captures that
     /// own no such step — `PendingValue` and suppressive — have nowhere to fold it,
     /// so they call this. Dropping it loses a case's `VariantOpen` (or an
     /// an alternative's injected defaults), and the path then closes a

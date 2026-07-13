@@ -1,6 +1,6 @@
 //! Scope management for structured captures.
 //!
-//! Handles StructOpen/StructClose and Arr/EndArr wrapper emission for struct and array captures.
+//! Handles StructOpen/StructClose and Arr/EndArr wrapper emission for record and array captures.
 
 use crate::bytecode::Nav;
 use crate::compiler::ids::TypeId;
@@ -11,7 +11,7 @@ use super::NfaBuilder;
 use super::capture::{CaptureEffects, PatternCtx};
 
 #[derive(Clone, Copy, Debug)]
-pub struct Struct(pub TypeId);
+pub struct RecordScope(pub TypeId);
 
 /// Where a captured pattern's compiled scope continues.
 ///
@@ -86,7 +86,7 @@ pub(super) struct SplitExits {
 
 /// The per-capture inputs shared by every capture lowering. The continuation is
 /// not among them: it is a sibling argument whose type encodes the capability —
-/// the scope-emitting helpers ([`NfaBuilder::compile_struct_capture`] /
+/// the scope-emitting helpers ([`NfaBuilder::compile_record_capture`] /
 /// [`NfaBuilder::compile_array_capture`]) take a [`CaptureExits`], so a zero-match
 /// can `Split` to a skip path; the non-scope pass-throughs (`Node`/`Ref`/
 /// `PendingValue`) take a plain [`Label`] — they own no skip path, so a `Split` is
@@ -150,7 +150,7 @@ impl NfaBuilder<'_> {
     }
 
     pub(super) fn with_scope<T>(&mut self, type_id: TypeId, f: impl FnOnce(&mut Self) -> T) -> T {
-        self.scope_stack.push(Struct(type_id));
+        self.scope_stack.push(RecordScope(type_id));
         let result = f(self);
         self.scope_stack.pop();
         result
@@ -158,7 +158,7 @@ impl NfaBuilder<'_> {
 
     /// Returns a `MemberRef` keyed by (struct_type, relative_index).
     pub(super) fn lookup_member(&self, capture_name: &str, type_id: TypeId) -> Option<MemberRef> {
-        let fields = self.ctx.analysis.type_analysis.struct_fields(type_id)?;
+        let fields = self.ctx.analysis.type_analysis.record_fields(type_id)?;
         for (relative_index, (&field_sym, _)) in fields.iter().enumerate() {
             if self.ctx.analysis.interner.resolve(field_sym) == capture_name {
                 return Some(MemberRef::new(type_id, relative_index as u16));
@@ -168,11 +168,11 @@ impl NfaBuilder<'_> {
     }
 
     pub(super) fn lookup_member_in_scope(&self, capture_name: &str) -> Option<MemberRef> {
-        let Struct(type_id) = *self.scope_stack.last()?;
+        let RecordScope(type_id) = *self.scope_stack.last()?;
         self.lookup_member(capture_name, type_id)
     }
 
-    /// Compile a struct-scope capture: `Struct → inner → EndStruct+capture → exit(s)`.
+    /// Compile a record-scope capture: `StructOpen → inner → StructClose+capture → exit(s)`.
     ///
     /// A quantified inner (`{...}? @cap`) routes to
     /// [`compile_optional_row_capture`](Self::compile_optional_row_capture): the
@@ -184,7 +184,7 @@ impl NfaBuilder<'_> {
     /// (e.g. an alternative's default-value effects, or a variant's
     /// `VariantOpen`); dropping it would lose those and close a scope that never opened.
     /// `@cap` is resolved by the caller, against the enclosing scope.
-    pub(super) fn compile_struct_capture(
+    pub(super) fn compile_record_capture(
         &mut self,
         req: CaptureRequest,
         exits: CaptureExits,
@@ -254,7 +254,7 @@ impl NfaBuilder<'_> {
     /// Compile a node capture that also contains bubbling inner captures.
     ///
     /// `capture_effects` land on the inner match instruction (not an EndStruct step).
-    /// The inner captures use the already-open outer scope, so no Struct/EndStruct
+    /// The inner captures use the already-open outer scope, so no StructOpen/StructClose
     /// wrapper is emitted.
     pub(super) fn compile_bubble_with_node_capture(
         &mut self,
@@ -290,10 +290,10 @@ impl NfaBuilder<'_> {
         self.dispatch_pattern(&inner, pattern_ctx)
     }
 
-    /// Compile a pattern with Struct/EndStruct wrapping for array iteration.
+    /// Compile a pattern with StructOpen/StructClose wrapping for array iteration.
     ///
     /// Used when inner is a scope-creating pattern (sequence/alternation) with
-    /// internal captures. Each iteration produces: Struct → inner → EndStruct Push
+    /// internal captures. Each iteration produces: StructOpen → inner → StructClose Push
     pub(super) fn compile_struct_for_array(
         &mut self,
         inner: &Pattern,

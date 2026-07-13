@@ -799,7 +799,7 @@ impl<'a> Program<'a> {
         label: Label,
     ) -> Result<(), SemanticVerifyError> {
         let scope = self.member_scope(member, label)?;
-        if scope.kind() == CaptureScopeKind::Struct
+        if scope.kind() == CaptureScopeKind::Record
             && !matches!(
                 scope.members()[member.relative_index as usize].kind,
                 CaptureMemberKind::Field(_)

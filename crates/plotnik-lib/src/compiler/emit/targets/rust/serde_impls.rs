@@ -7,7 +7,7 @@
 //! Serialized keys and tags always use the original query-side names, even
 //! when the Rust identifier had to be keyword-renamed.
 //!
-//! Enum variant payloads are anonymous structs, so each payload arm defines a
+//! Enum variant payloads are anonymous records, so each payload arm defines a
 //! local `Data` adapter borrowing the matched fields; bindings are positional
 //! (`v0`, `v1`, ...) to keep a capture literally named `source` from
 //! shadowing the source parameter.
@@ -47,7 +47,7 @@ impl Emitter<'_, '_> {
         };
 
         let body = match item.kind {
-            ItemKind::Struct => self.struct_body(item),
+            ItemKind::Record => self.struct_body(item),
             ItemKind::Variant => self.enum_body(item, &ident),
             _ => unreachable!("serde impls are generated for structs and enums only"),
         };
@@ -78,8 +78,8 @@ impl Emitter<'_, '_> {
         let types = self.schema.types;
         let interner = self.schema.interner;
         let rt = self.config.rt_crate.clone();
-        let TypeShape::Struct(fields) = types.expect_type_shape(item.ty) else {
-            unreachable!("struct item must have a struct shape");
+        let TypeShape::Record(fields) = types.expect_type_shape(item.ty) else {
+            unreachable!("struct item must have a record shape");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
 
@@ -140,8 +140,8 @@ impl Emitter<'_, '_> {
         let interner = self.schema.interner;
         let rt = self.config.rt_crate.clone();
         let ident = self.item_ident(item.name).to_string();
-        let TypeShape::Struct(fields) = types.expect_type_shape(payload) else {
-            unreachable!("enum variant payload is void or an anonymous struct");
+        let TypeShape::Record(fields) = types.expect_type_shape(payload) else {
+            unreachable!("enum variant payload is void or an anonymous record");
         };
         let field_idents = rust_scope_idents(fields.keys().map(|&sym| interner.resolve(sym)));
         let usage = fields

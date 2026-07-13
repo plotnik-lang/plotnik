@@ -302,7 +302,7 @@ impl NfaBuilder<'_> {
                 .type_id()
         };
         let merged_fields =
-            alternation_type_id.map(|id| self.ctx.analysis.type_analysis.expect_struct_fields(id));
+            alternation_type_id.map(|id| self.ctx.analysis.type_analysis.expect_record_fields(id));
         let field_completions = alternation_type_id.map(|_| {
             self.ctx
                 .analysis
@@ -343,7 +343,7 @@ impl NfaBuilder<'_> {
                         .ctx
                         .analysis
                         .type_analysis
-                        .expect_struct_fields(*id)
+                        .expect_record_fields(*id)
                         .keys()
                         .copied()
                         .collect(),

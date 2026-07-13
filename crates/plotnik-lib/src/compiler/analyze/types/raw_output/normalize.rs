@@ -406,8 +406,8 @@ impl<'s, 'c, 'a, 'd> FlowNormalizer<'s, 'c, 'a, 'd> {
             .types
             .get_mut(raw_fields.type_id.0 as usize)
             .expect("raw fields flow type must be registered");
-        let TypeShape::Struct(current) = shape else {
-            unreachable!("raw fields flow must reference a struct")
+        let TypeShape::Record(current) = shape else {
+            unreachable!("raw fields flow must reference a record")
         };
         *current = fields;
 

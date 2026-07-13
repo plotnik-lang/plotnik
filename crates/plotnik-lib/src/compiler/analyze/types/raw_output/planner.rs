@@ -81,7 +81,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                 CaptureTypePlan::text_terminal(TYPE_TEXT, TerminalData::NodeRepresentation),
                 false,
             )),
-            TypeShape::Struct(_) | TypeShape::Variant(_) => {
+            TypeShape::Record(_) | TypeShape::Variant(_) => {
                 let final_type = if zero_node_terminal {
                     self.types.intern_type(TypeShape::Optional(TYPE_TEXT))
                 } else {
@@ -170,10 +170,10 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             TypeShape::Array { .. } => Err(
                 "capture type `bool` cannot be applied to this list; capture an optional value inside the list, or inspect whether the list is empty after parsing",
             ),
-            TypeShape::Node | TypeShape::Struct(_) | TypeShape::Variant(_) if may_be_absent => Ok(
+            TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) if may_be_absent => Ok(
                 CaptureTypePlan::bool_terminal(TYPE_BOOL, terminal_data(self.raw.shape(type_id))),
             ),
-            TypeShape::Node | TypeShape::Struct(_) | TypeShape::Variant(_) => Err(
+            TypeShape::Node | TypeShape::Record(_) | TypeShape::Variant(_) => Err(
                 "capture type `bool` requires a value that may be absent; this capture is always present",
             ),
             TypeShape::Void => Err("a capture type requires an ordinary captured value"),
@@ -194,7 +194,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             TypeShape::Optional(_) => self.bool_required(type_id, false, visiting),
             TypeShape::Ref(target) => self.bool_present(self.raw.definition(*target), visiting),
             TypeShape::Node
-            | TypeShape::Struct(_)
+            | TypeShape::Record(_)
             | TypeShape::Variant(_)
             | TypeShape::Array { .. } => Ok(CaptureTypePlan::bool_terminal(
                 TYPE_BOOL,

@@ -11,7 +11,7 @@ use crate::compiler::lower::spans::SpanBindingIR;
 use crate::compiler::parse::ast::{self, Pattern};
 
 use super::NfaBuilder;
-use super::scope::Struct;
+use super::scope::RecordScope;
 
 /// Capture effects to attach to match instructions.
 ///
@@ -220,12 +220,12 @@ impl NfaBuilder<'_> {
             // the enclosing scope is a struct at every real capture site — except
             // a variant-rooted definition body, whose scope carries no fields. Once
             // a struct scope exists, a missing member is our bug.
-            if let Some(Struct(type_id)) = self.scope_stack.last().copied()
+            if let Some(RecordScope(type_id)) = self.scope_stack.last().copied()
                 && self
                     .ctx
                     .analysis
                     .type_analysis
-                    .struct_fields(type_id)
+                    .record_fields(type_id)
                     .is_some()
             {
                 let member = self
@@ -286,7 +286,7 @@ impl NfaBuilder<'_> {
             .flow
             .type_id()
             .map(|id| self.ctx.analysis.type_analysis.expect_type_shape(id))
-            .is_some_and(|shape| matches!(shape, TypeShape::Struct(_) | TypeShape::Variant(_)))
+            .is_some_and(|shape| matches!(shape, TypeShape::Record(_) | TypeShape::Variant(_)))
     }
 
     /// Check if pattern is (or wraps) a ref returning a structured type.
@@ -316,7 +316,7 @@ impl NfaBuilder<'_> {
 
 /// Check if inner needs struct wrapper for array iterations.
 ///
-/// Returns true when the inner pattern produces a Struct type (bubbling fields).
+/// Returns true when the inner pattern produces a record type (bubbling fields).
 /// This includes:
 /// - Sequences/alternations with captures: `{(a) @x (b) @y}*`
 /// - Named nodes with bubble captures: `(node (child) @x)*`
@@ -333,7 +333,7 @@ pub fn needs_struct_wrapper(inner: &Pattern, type_ctx: &TypeAnalysis) -> bool {
     info.flow
         .type_id()
         .map(|id| type_ctx.expect_type_shape(id))
-        .is_some_and(|shape| matches!(shape, TypeShape::Struct(_)))
+        .is_some_and(|shape| matches!(shape, TypeShape::Record(_)))
 }
 
 /// Get row type ID for array element scoping.

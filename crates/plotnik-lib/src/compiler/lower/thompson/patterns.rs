@@ -504,10 +504,10 @@ impl NfaBuilder<'_> {
 
     /// Compile a reference as a `Call` to the definition's standalone body.
     ///
-    /// Call-site scoping: the caller decides whether to wrap with Struct/EndStruct based on
+    /// Call-site scoping: the caller decides whether to wrap with a record scope based on
     /// whether the ref is captured and the called definition returns a struct.
     ///
-    /// - Captured ref returning struct: `Struct → Call → EndStruct → Set → exit`
+    /// - Captured ref returning a record: `StructOpen → Call → StructClose → Set → exit`
     /// - Captured ref returning scalar: `Call → Set → exit`
     /// - Bare ref returning output effects: `SuppressBegin → Call → SuppressEnd → exit`
     ///   (matches structurally, output discarded)
@@ -571,7 +571,7 @@ impl NfaBuilder<'_> {
         // Call instructions cannot carry effects, so emit epsilon if needed.
         let call_entry = match lowering {
             RefLowering::ScopedCapture => {
-                // Struct isolates the definition's internal captures before the Set.
+                // A record scope isolates the definition's internal captures before the Set.
                 let set_step =
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
                 let struct_close_step = self.emit_struct_close_step(set_step);
@@ -623,7 +623,7 @@ impl NfaBuilder<'_> {
 
     fn ref_call_lowering(&self, def_output_shape: &TypeShape, is_captured: bool) -> RefLowering {
         if is_captured {
-            if matches!(def_output_shape, TypeShape::Struct(_)) {
+            if matches!(def_output_shape, TypeShape::Record(_)) {
                 return RefLowering::ScopedCapture;
             }
 
@@ -656,7 +656,7 @@ impl NfaBuilder<'_> {
     /// The lowering mirrors [`ref_call_lowering`](Self::ref_call_lowering) with
     /// the body substituted for the `Call`:
     ///
-    /// - Captured ref returning struct: `Struct → body → EndStruct → Set → exit(s)`
+    /// - Captured ref returning a record: `StructOpen → body → StructClose → Set → exit(s)`
     /// - Captured ref returning scalar: `body → Set → exit(s)`
     /// - Bare ref: body compiled under suppression (compile-time — no
     ///   `SuppressBegin`/`SuppressEnd` brackets needed)
@@ -755,12 +755,12 @@ impl NfaBuilder<'_> {
             .analysis
             .type_analysis
             .expect_type_shape(def_output_id);
-        let inline_scoped_capture = is_captured && matches!(def_output_shape, TypeShape::Struct(_));
+        let inline_scoped_capture = is_captured && matches!(def_output_shape, TypeShape::Record(_));
         let CaptureEffects { pre, post } = capture;
 
         self.inline_stack.push(def_id);
         let entry = if inline_scoped_capture {
-            // Struct isolates the definition's internal captures before the
+            // A record scope isolates the definition's internal captures before the
             // Set; both continuations close it (a zero-width body still
             // produced its row of skip-path values, e.g. `{x: null}`).
             let end = ScopeCloseEffects {
@@ -1100,7 +1100,7 @@ impl NfaBuilder<'_> {
     ///
     /// Capture effects land on the innermost match / scope-close instruction:
     /// - Node:   inner_pattern[Node, Set] → exit
-    /// - Struct: Struct → inner[…] → EndStruct+capture → exit
+    /// - Record: StructOpen → inner[…] → StructClose+capture → exit
     /// - Array:  Arr → quantifier (with Push) → EndArr+capture → exit
     /// - Ref:    Call → Set epsilon → exit
     /// - Suppressive: SuppressBegin → inner → SuppressEnd → outer_effects → exit
@@ -1152,10 +1152,10 @@ impl NfaBuilder<'_> {
             // Array: Arr → quantifier (with Push) → EndArr+capture → exit(s).
             CaptureKind::Array => self.compile_array_capture(req, exits),
 
-            // Struct scope: Struct → inner → EndStruct+capture → exit(s) (also empty `{}`).
+            // Record scope: StructOpen → inner → StructClose+capture → exit(s) (also empty `{}`).
             // Without the wrapper the Set lands on the raw inner node and both the
             // struct scope and the inner Sets are lost (#470).
-            CaptureKind::Struct => self.compile_struct_capture(req, exits),
+            CaptureKind::Record => self.compile_record_capture(req, exits),
 
             // Node/Ref/PendingValue own no capture-site scope (their wrapper, if any, is
             // part of the inner). With split exits all three fold the capture onto the
@@ -1188,7 +1188,7 @@ impl NfaBuilder<'_> {
                         CaptureKind::PendingValue => self.compile_setafter_capture(req, exit),
                         CaptureKind::Ref => self.compile_ref_capture(req, exit),
                         CaptureKind::Node => self.compile_node_capture(req, exit),
-                        CaptureKind::Array | CaptureKind::Struct => {
+                        CaptureKind::Array | CaptureKind::Record => {
                             unreachable!("scope mechanisms are handled above in compile_captured")
                         }
                     },
@@ -1218,7 +1218,7 @@ impl NfaBuilder<'_> {
     }
 
     /// Single-exit lowering for a `Ref` capture: hand the capture to the call
-    /// site, which wraps Call/Return (and Struct/EndStruct for struct-returning
+    /// site, which wraps Call/Return (and StructOpen/StructClose for record-returning
     /// definitions) to isolate the definition's internal captures before the Set.
     fn compile_ref_capture(&mut self, req: CaptureRequest, exit: Label) -> Label {
         let CaptureRequest {

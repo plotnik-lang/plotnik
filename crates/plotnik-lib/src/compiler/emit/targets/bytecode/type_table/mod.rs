@@ -163,7 +163,7 @@ fn emit_type_at_slot(
             Ok(())
         }
 
-        TypeShape::Struct(fields) => {
+        TypeShape::Record(fields) => {
             // Resolve field types (this may create Optional wrappers at later indices)
             let mut resolved_fields = Vec::with_capacity(fields.len());
             for (field_sym, field_info) in fields {
@@ -175,7 +175,7 @@ fn emit_type_at_slot(
             let scope = layout
                 .scope(type_id)
                 .expect("every emitted struct has a capture scope");
-            assert_eq!(scope.kind(), CaptureScopeKind::Struct);
+            assert_eq!(scope.kind(), CaptureScopeKind::Record);
             let member_start = scope.base();
             assert_eq!(
                 types.members_len(),
