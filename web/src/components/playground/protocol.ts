@@ -7,7 +7,7 @@
    column is a Unicode-scalar count — a third unit; the playground only ever
    reads `offset`.) */
 
-/** `tokenize()` output — crates/plotnik-lib/src/compiler/parse/mod.rs `TokenSpan`. */
+/** `tokenize()` output — crates/plotnik-lib/src/compiler/parse/mod.rs `QueryToken`. */
 export interface QueryToken {
   kind:
     | "whitespace"
@@ -18,8 +18,7 @@ export interface QueryToken {
     | "ident"
     | "error"
     | "punct";
-  start: number;
-  end: number;
+  span: [number, number];
 }
 
 /** Diagnostics — crates/plotnik-lib/src/compiler/diagnostics/report/json.rs. */
@@ -49,20 +48,21 @@ export interface WireDiagnostic {
     through (docs/wip/playground-design.md §2). The array index is the SpanId. */
 export interface QuerySpan {
   id: number;
-  source: number;
+  source_id: number;
   kind: string;
-  start: number;
-  end: number;
-  type: number | null;
-  member: number | null;
+  labeling?: "unlabeled" | "labeled";
+  span: [number, number];
+  binding?: {
+    type_id: number;
+    member_id?: number;
+  };
 }
 
-/** `.d.ts` source map — typegen `DtsRange`. */
+/** TypeScript declaration binding — typegen `TypeScriptBinding`. */
 export interface TypeScriptBinding {
-  start: number;
-  end: number;
+  span: [number, number];
   type_id: number;
-  member: number | null;
+  member_id: number | null;
 }
 
 /** `Session::info()`. */

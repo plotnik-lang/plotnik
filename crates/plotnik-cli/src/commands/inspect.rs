@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use plotnik_lib::bytecode::{Module, SPAN_NO_BINDING};
+use plotnik_lib::bytecode::{Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
 use plotnik_lib::{
     BytecodeConfig, BytecodeInspection, Colors, NoopTracer, QueryBuilder, RecordingTracer,
     RuntimeError, RuntimeLimitSpec, TypeScriptCodegenConfig, VM, extract_result_provenance,
@@ -98,7 +98,7 @@ pub fn run(args: InspectArgs) -> CliResult {
     let module = bytecode.into_artifact();
     let query_spans = module
         .as_ref()
-        .map(spans_json)
+        .map(query_spans_json)
         .unwrap_or_else(|| Value::Array(Vec::new()));
     let entrypoints = module.as_ref().map(entrypoint_names).unwrap_or_default();
 
@@ -285,31 +285,52 @@ enum InspectExit {
     RuntimeError,
 }
 
-fn spans_json(module: &Module) -> Value {
+fn query_spans_json(module: &Module) -> Value {
     let spans = module
         .spans()
         .iter()
         .enumerate()
-        .map(|(id, span)| {
-            json!({
-                "id": id,
-                "source": span.source,
-                "kind": span.kind.name(),
-                "start": span.start,
-                "end": span.end,
-                "type": binding_value(span.type_id),
-                "member": binding_value(span.member),
-            })
-        })
+        .map(|(id, span)| query_span_json(id, span))
         .collect::<Vec<_>>();
     Value::Array(spans)
 }
 
-fn binding_value(value: u16) -> Value {
-    if value == SPAN_NO_BINDING {
-        Value::Null
-    } else {
-        json!(value)
+fn query_span_json(id: usize, span: SpanEntry) -> Value {
+    let (kind, labeling) = query_span_kind(span.kind);
+    let mut object = Map::new();
+    object.insert("id".to_string(), json!(id));
+    object.insert("source_id".to_string(), json!(span.source));
+    object.insert("kind".to_string(), json!(kind));
+    if let Some(labeling) = labeling {
+        object.insert("labeling".to_string(), json!(labeling));
+    }
+    object.insert("span".to_string(), json!([span.start, span.end]));
+    if span.type_id != SPAN_NO_BINDING {
+        let mut binding = Map::new();
+        binding.insert("type_id".to_string(), json!(span.type_id));
+        if span.member != SPAN_NO_BINDING {
+            binding.insert("member_id".to_string(), json!(span.member));
+        }
+        object.insert("binding".to_string(), Value::Object(binding));
+    }
+    Value::Object(object)
+}
+
+fn query_span_kind(kind: SpanKind) -> (&'static str, Option<&'static str>) {
+    match kind {
+        SpanKind::Def => ("definition", None),
+        SpanKind::Ref => ("reference", None),
+        SpanKind::Pattern => ("pattern", None),
+        SpanKind::Capture => ("capture", None),
+        SpanKind::Field => ("field", None),
+        SpanKind::NegField => ("negated_field", None),
+        SpanKind::Predicate => ("predicate", None),
+        SpanKind::Quantifier => ("quantifier", None),
+        SpanKind::Sequence => ("sequence", None),
+        SpanKind::UnlabeledAlternation => ("alternation", Some("unlabeled")),
+        SpanKind::LabeledAlternation => ("alternation", Some("labeled")),
+        SpanKind::Alternative => ("alternative", None),
+        SpanKind::CaptureType => ("capture_type", None),
     }
 }
 

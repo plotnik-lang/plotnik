@@ -21,4 +21,4 @@ pub use target::{
 
 pub(crate) use plan::CodegenPlan;
 pub use targets::rust::entry_fn_name;
-pub use targets::typescript::{DtsRange, VoidType as TypeScriptVoidType};
+pub use targets::typescript::{TypeScriptBinding, VoidType as TypeScriptVoidType};

@@ -6,7 +6,7 @@ use plotnik_rt::{Limit, RuntimeLimitSpec};
 
 use crate::bytecode::Module;
 use crate::compiler::diagnostics::{Diagnostics, QueryResult};
-use crate::compiler::emit::targets::typescript::{DtsRange, VoidType};
+use crate::compiler::emit::targets::typescript::{TypeScriptBinding, VoidType};
 use crate::compiler::query::CompiledQuery;
 use crate::core::Colors;
 
@@ -376,23 +376,23 @@ source_output!(RustTypesOutput);
 
 pub struct TypeScriptTypesOutput {
     source: String,
-    mappings: Vec<DtsRange>,
+    bindings: Vec<TypeScriptBinding>,
 }
 
 impl TypeScriptTypesOutput {
-    pub(crate) fn new(source: String, mappings: Vec<DtsRange>) -> Self {
-        Self { source, mappings }
+    pub(crate) fn new(source: String, bindings: Vec<TypeScriptBinding>) -> Self {
+        Self { source, bindings }
     }
 
     pub fn source(&self) -> &str {
         &self.source
     }
 
-    pub fn mappings(&self) -> &[DtsRange] {
-        &self.mappings
+    pub fn bindings(&self) -> &[TypeScriptBinding] {
+        &self.bindings
     }
 
-    pub fn into_parts(self) -> (String, Vec<DtsRange>) {
-        (self.source, self.mappings)
+    pub fn into_parts(self) -> (String, Vec<TypeScriptBinding>) {
+        (self.source, self.bindings)
     }
 }

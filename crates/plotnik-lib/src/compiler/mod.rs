@@ -33,11 +33,11 @@ pub use crate::compiler::diagnostics::{
     SourceKind, SourceMap, SourcePath, Span,
 };
 pub use emit::{
-    BytecodeConfig, BytecodeInspection, CodegenProvenance, CodegenTarget, DtsRange, Emission,
+    BytecodeConfig, BytecodeInspection, CodegenProvenance, CodegenTarget, Emission,
     EmitConfigError, EmitTarget, RustCodegenConfig, RustModuleOutput, RustTypesOutput,
-    TypeScriptCodegenConfig, TypeScriptNodeRepresentation, TypeScriptTypesOutput,
-    TypeScriptVoidType, entry_fn_name,
+    TypeScriptBinding, TypeScriptCodegenConfig, TypeScriptNodeRepresentation,
+    TypeScriptTypesOutput, TypeScriptVoidType, entry_fn_name,
 };
 pub use fmt::{FormatError, FormatResult, format_query};
-pub use parse::{TokenSpan, tokenize};
+pub use parse::{QueryToken, tokenize};
 pub use query::{CompiledQuery, Query, QueryBuilder};

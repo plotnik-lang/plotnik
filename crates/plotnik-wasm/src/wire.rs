@@ -9,11 +9,11 @@
 //! Offsets in any payload are byte offsets into the exact text the caller
 //! passed in; the web side converts to UTF-16 at its edge (`byte-offsets.ts`).
 
-use plotnik_lib::bytecode::{Entrypoint, Module, SPAN_NO_BINDING};
+use plotnik_lib::bytecode::{Entrypoint, Module, SPAN_NO_BINDING, SpanEntry, SpanKind};
 use plotnik_lib::{
     Colors, MatchJournal, RunStats, RuntimeError, extract_result_provenance, materialize_verified,
 };
-use serde_json::{Value as JsonValue, json};
+use serde_json::{Map, Value as JsonValue, json};
 use wasm_bindgen::JsValue;
 
 /// Serialize an engine-produced value, asserting success: everything past
@@ -41,7 +41,7 @@ pub fn info_json(parts: InfoParts) -> JsonValue {
     json!({
         // Version marker for the day the shape needs a breaking change.
         "version": 1,
-        "query_spans": parts.module.map(spans_json).unwrap_or_else(|| json!([])),
+        "query_spans": parts.module.map(query_spans_json).unwrap_or_else(|| json!([])),
         "query_tokens": parts.query_tokens,
         "diagnostics": parts.diagnostics,
         "typescript_declarations": parts.typescript_declarations,
@@ -91,31 +91,52 @@ pub fn error_json(error: impl Into<String>) -> JsonValue {
 /// The static query-span table (`QuerySpan[]` in protocol.ts): the hub the
 /// playground joins every view through — see `docs/wip/playground-design.md`
 /// §2. The array index is the SpanId.
-fn spans_json(module: &Module) -> JsonValue {
+fn query_spans_json(module: &Module) -> JsonValue {
     let spans = module
         .spans()
         .iter()
         .enumerate()
-        .map(|(id, span)| {
-            json!({
-                "id": id,
-                "source": span.source,
-                "kind": span.kind.name(),
-                "start": span.start,
-                "end": span.end,
-                "type": binding_value(span.type_id),
-                "member": binding_value(span.member),
-            })
-        })
+        .map(|(id, span)| query_span_json(id, span))
         .collect::<Vec<_>>();
     JsonValue::Array(spans)
 }
 
-fn binding_value(value: u16) -> JsonValue {
-    if value == SPAN_NO_BINDING {
-        JsonValue::Null
-    } else {
-        json!(value)
+pub(super) fn query_span_json(id: usize, span: SpanEntry) -> JsonValue {
+    let (kind, labeling) = query_span_kind(span.kind);
+    let mut object = Map::new();
+    object.insert("id".to_string(), json!(id));
+    object.insert("source_id".to_string(), json!(span.source));
+    object.insert("kind".to_string(), json!(kind));
+    if let Some(labeling) = labeling {
+        object.insert("labeling".to_string(), json!(labeling));
+    }
+    object.insert("span".to_string(), json!([span.start, span.end]));
+    if span.type_id != SPAN_NO_BINDING {
+        let mut binding = Map::new();
+        binding.insert("type_id".to_string(), json!(span.type_id));
+        if span.member != SPAN_NO_BINDING {
+            binding.insert("member_id".to_string(), json!(span.member));
+        }
+        object.insert("binding".to_string(), JsonValue::Object(binding));
+    }
+    JsonValue::Object(object)
+}
+
+fn query_span_kind(kind: SpanKind) -> (&'static str, Option<&'static str>) {
+    match kind {
+        SpanKind::Def => ("definition", None),
+        SpanKind::Ref => ("reference", None),
+        SpanKind::Pattern => ("pattern", None),
+        SpanKind::Capture => ("capture", None),
+        SpanKind::Field => ("field", None),
+        SpanKind::NegField => ("negated_field", None),
+        SpanKind::Predicate => ("predicate", None),
+        SpanKind::Quantifier => ("quantifier", None),
+        SpanKind::Sequence => ("sequence", None),
+        SpanKind::UnlabeledAlternation => ("alternation", Some("unlabeled")),
+        SpanKind::LabeledAlternation => ("alternation", Some("labeled")),
+        SpanKind::Alternative => ("alternative", None),
+        SpanKind::CaptureType => ("capture_type", None),
     }
 }
 

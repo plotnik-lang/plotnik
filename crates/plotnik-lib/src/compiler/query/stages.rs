@@ -543,7 +543,7 @@ impl CompiledQuery {
         let schema = OutputSchema::from_artifacts(bound.analysis_input())
             .expect("target-neutral compilation validated the output schema");
         let legacy = config.legacy_config();
-        let (source, mappings) = if config.colored_output() {
+        let (source, bindings) = if config.colored_output() {
             (
                 crate::compiler::emit::targets::typescript::emit_schema(&schema, legacy),
                 Vec::new(),
@@ -552,7 +552,7 @@ impl CompiledQuery {
             crate::compiler::emit::targets::typescript::emit_schema_mapped(&schema, legacy)
         };
         Ok(Emission::success(
-            TypeScriptTypesOutput::new(source, mappings),
+            TypeScriptTypesOutput::new(source, bindings),
             Diagnostics::new(),
         ))
     }

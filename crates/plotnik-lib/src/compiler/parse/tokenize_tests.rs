@@ -6,13 +6,9 @@ fn tokenize_reports_editor_classes_and_byte_ranges() {
 
     let rendered: Vec<_> = tokenize(query)
         .into_iter()
-        .map(|span| {
-            (
-                span.kind,
-                &query[span.start as usize..span.end as usize],
-                span.start,
-                span.end,
-            )
+        .map(|token| {
+            let (start, end) = token.span;
+            (token.kind, &query[start as usize..end as usize], start, end)
         })
         .collect();
 

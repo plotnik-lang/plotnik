@@ -44,7 +44,7 @@ pub mod diagnostics {
 }
 
 pub use crate::compiler::entry_fn_name as matcher_entry_fn_name;
-pub use crate::compiler::{DtsRange, TypeScriptVoidType};
+pub use crate::compiler::{TypeScriptBinding, TypeScriptVoidType};
 
 pub use crate::core::Colors;
 pub use crate::core::grammar::GrammarIdentity;
@@ -56,8 +56,8 @@ pub use crate::compiler::{
     Span, TypeScriptCodegenConfig, TypeScriptNodeRepresentation, TypeScriptTypesOutput,
 };
 pub use crate::compiler::{
-    CompiledQuery, Query, QueryBuilder, Source, SourceId, SourceKind, SourceMap, SourcePath,
-    TokenSpan, format_query, tokenize,
+    CompiledQuery, Query, QueryBuilder, QueryToken, Source, SourceId, SourceKind, SourceMap,
+    SourcePath, format_query, tokenize,
 };
 
 #[cfg(feature = "vm")]

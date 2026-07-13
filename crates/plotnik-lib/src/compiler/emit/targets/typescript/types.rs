@@ -7,7 +7,7 @@ use crate::compiler::analyze::types::type_shape::{ListMinimum, TYPE_VOID, TypeId
 use crate::compiler::emit::sink::{Sink, Style};
 use crate::core::Symbol;
 
-use super::DtsRange;
+use super::TypeScriptBinding;
 use super::config::{Config, VoidType};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,7 +23,7 @@ pub(crate) fn emit_schema(schema: &OutputSchema<'_>, config: Config) -> String {
 pub(crate) fn emit_schema_mapped(
     schema: &OutputSchema<'_>,
     config: Config,
-) -> (String, Vec<DtsRange>) {
+) -> (String, Vec<TypeScriptBinding>) {
     assert!(
         config.colors.blue.is_empty()
             && config.colors.green.is_empty()
@@ -67,7 +67,7 @@ impl<'a> SchemaEmitter<'a> {
         self
     }
 
-    fn emit(mut self) -> (String, Vec<DtsRange>) {
+    fn emit(mut self) -> (String, Vec<TypeScriptBinding>) {
         let items = self.schema.entrypoint_items().to_vec();
         self.needs_node_type = items
             .iter()
@@ -90,11 +90,13 @@ impl<'a> SchemaEmitter<'a> {
             .sink
             .tags()
             .iter()
-            .map(|range| DtsRange {
-                start: u32::try_from(range.start).expect("d.ts range start fits in u32"),
-                end: u32::try_from(range.end).expect("d.ts range end fits in u32"),
+            .map(|range| TypeScriptBinding {
+                span: (
+                    u32::try_from(range.start).expect("TypeScript span start fits in u32"),
+                    u32::try_from(range.end).expect("TypeScript span end fits in u32"),
+                ),
                 type_id: range.tag.type_id,
-                member: range.tag.member,
+                member_id: range.tag.member,
             })
             .collect();
         (output, ranges)

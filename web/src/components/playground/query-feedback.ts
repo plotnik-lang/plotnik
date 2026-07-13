@@ -31,7 +31,7 @@ function isFieldName(
   if (
     prev !== undefined &&
     prev.kind === "punct" &&
-    prev.end === ident.start &&
+    prev.span[1] === ident.span[0] &&
     text(prev) === "-"
   ) {
     return true;
@@ -92,7 +92,7 @@ export function pushQueryFeedback(
   });
 
   const tokenText = (token: QueryToken) =>
-    compiledText.slice(b2u(token.start), b2u(token.end));
+    compiledText.slice(b2u(token.span[0]), b2u(token.span[1]));
 
   const ranges: TokenRange[] = [];
   for (let i = 0; i < tokens.length; i++) {
@@ -101,8 +101,8 @@ export function pushQueryFeedback(
       token.kind === "ident" && isFieldName(tokens, i, tokenText)
         ? "tok-propertyName"
         : TOKEN_CLASS[token.kind];
-    if (!cls || token.start === token.end) continue;
-    ranges.push({ from: b2u(token.start), to: b2u(token.end), cls });
+    if (!cls || token.span[0] === token.span[1]) continue;
+    ranges.push({ from: b2u(token.span[0]), to: b2u(token.span[1]), cls });
   }
 
   view.dispatch(setDiagnostics(view.state, cmDiagnostics), {

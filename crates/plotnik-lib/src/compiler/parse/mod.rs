@@ -71,27 +71,27 @@ pub(crate) fn parse_lossless(
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize)]
-pub struct TokenSpan {
+pub struct QueryToken {
     /// Stable lowercase token class for editor/highlighter consumers.
     pub kind: &'static str,
-    /// Start byte offset in the query text.
-    pub start: u32,
-    /// End byte offset in the query text.
-    pub end: u32,
+    /// Half-open byte span in the query text.
+    pub span: (u32, u32),
 }
 
 /// Editor-grade tokenization from the real query lexer.
 ///
 /// Tokenization is total: malformed input is represented with `error` spans.
-pub fn tokenize(text: &str) -> Vec<TokenSpan> {
+pub fn tokenize(text: &str) -> Vec<QueryToken> {
     lex(text)
         .into_iter()
         .map(|token| {
             let range = std::ops::Range::<usize>::from(token.span);
-            TokenSpan {
+            QueryToken {
                 kind: class_name(token.kind),
-                start: u32::try_from(range.start).expect("token start byte fits in u32"),
-                end: u32::try_from(range.end).expect("token end byte fits in u32"),
+                span: (
+                    u32::try_from(range.start).expect("token start byte fits in u32"),
+                    u32::try_from(range.end).expect("token end byte fits in u32"),
+                ),
             }
         })
         .collect()

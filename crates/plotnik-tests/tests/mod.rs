@@ -63,8 +63,8 @@ use tree_sitter::{Language as TsLanguage, Parser as TsParser, Tree};
 use plotnik_lib::bytecode::{Module, dump as dump_bytecode};
 use plotnik_lib::grammar::{Grammar, raw::RawGrammar};
 use plotnik_lib::{
-    BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, DtsRange, PrintTracer, QueryBuilder,
-    RecordingTracer, RuntimeError, RustCodegenConfig, SourceMap, SourcePath,
+    BytecodeConfig, BytecodeInspection, Colors, CompiledQuery, PrintTracer, QueryBuilder,
+    RecordingTracer, RuntimeError, RustCodegenConfig, SourceMap, SourcePath, TypeScriptBinding,
     TypeScriptCodegenConfig, VM, Verbosity, extract_result_provenance, materialize_verified,
 };
 use plotnik_tests::fixture::parse_section_header;
@@ -476,20 +476,20 @@ fn emit_bytecode(
     compiled.emit(config).expect("bytecode emission answers")
 }
 
-fn render_mapped(dts: &str, ranges: &[DtsRange]) -> String {
+fn render_mapped(dts: &str, bindings: &[TypeScriptBinding]) -> String {
     let mut out = String::new();
-    for range in ranges {
-        let start = range.start as usize;
-        let end = range.end as usize;
-        let member = range
-            .member
+    for binding in bindings {
+        let start = binding.span.0 as usize;
+        let end = binding.span.1 as usize;
+        let member = binding
+            .member_id
             .map(|idx| format!(".M{idx}"))
             .unwrap_or_default();
         out.push_str(&format!(
             "{}..{} T{}{} {:?}\n",
-            range.start,
-            range.end,
-            range.type_id,
+            binding.span.0,
+            binding.span.1,
+            binding.type_id,
             member,
             &dts[start..end]
         ));
