@@ -24,6 +24,6 @@ pub use result_provenance::{
     ProvenanceBinding, ResultProvenance, ResultProvenanceEntry, extract_result_provenance,
 };
 pub use trace::{NoopTracer, PrintTracer, PrintTracerBuilder, Tracer, Verbosity};
-pub use value::{NodeHandle, Value};
+pub use value::{NodeValue, Value};
 pub use verify::debug_verify_type;
 pub use vm::{RunStats, VM, VMBuilder};

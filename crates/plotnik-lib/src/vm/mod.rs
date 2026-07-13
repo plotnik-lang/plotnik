@@ -8,7 +8,7 @@
 mod engine;
 
 pub use engine::{
-    ExecutionTrace, JournalEvent, Limit, MatchJournal, NodeHandle, NoopTracer, PrintTracer,
+    ExecutionTrace, JournalEvent, Limit, MatchJournal, NodeValue, NoopTracer, PrintTracer,
     PrintTracerBuilder, ProvenanceBinding, ResolvedRuntimeLimits, ResultProvenance,
     ResultProvenanceEntry, RunStats, RuntimeError, RuntimeLimitSpec, TraceEvent, TraceNode,
     TraceRecord, TraceRecorder, Tracer, VM, VMBuilder, Value, ValueMaterializer, Verbosity,

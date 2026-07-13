@@ -3,7 +3,7 @@
 use crate::bytecode::{EntryPoint, Module};
 use crate::core::Colors;
 
-use super::value::{NodeHandle, Value};
+use super::value::{NodeValue, Value};
 use super::verify::debug_verify_type;
 use plotnik_rt::JournalEvent;
 
@@ -57,7 +57,7 @@ enum ValueAccumulator<'s> {
     List(Vec<Value<'s>>),
     Record(Vec<(&'s str, Value<'s>)>),
     Variant {
-        tag: &'s str,
+        case: &'s str,
         fields: Vec<(&'s str, Value<'s>)>,
     },
     /// Marker into the scalar-only range stack. Keeping the marker here
@@ -88,10 +88,10 @@ impl<'a> ValueMaterializer<'a> {
         for (event_idx, event) in events.iter().enumerate() {
             match event {
                 JournalEvent::Node(n) => {
-                    pending = Some(Value::Node(NodeHandle::from_node(*n, self.source)));
+                    pending = Some(Value::Node(NodeValue::from_node(*n, self.source)));
                 }
                 JournalEvent::Absent => {
-                    pending = Some(Value::Null);
+                    pending = Some(Value::Absent);
                 }
                 JournalEvent::NodeStr(node) => {
                     pending = Some(Value::Text(plotnik_rt::node_text(self.source, node)));
@@ -136,7 +136,7 @@ impl<'a> ValueMaterializer<'a> {
                         .expect("Scalar marker owns a range frame");
                     pending = Some(match range {
                         Some(range) => Value::Text(plotnik_rt::source_text(self.source, range)),
-                        None => Value::Null,
+                        None => Value::Absent,
                     });
                 }
                 JournalEvent::BoolClose(value) => {
@@ -213,21 +213,21 @@ impl<'a> ValueMaterializer<'a> {
                     pending = Some(Value::Record(fields));
                 }
                 JournalEvent::VariantOpen(idx) => {
-                    let tag = self.resolve_member_name(*idx);
+                    let case = self.resolve_member_name(*idx);
                     stack.push(ValueAccumulator::Variant {
-                        tag,
+                        case,
                         fields: vec![],
                     });
                 }
                 JournalEvent::VariantClose => {
                     let top = stack.pop();
-                    let Some(ValueAccumulator::Variant { tag, fields }) = top else {
+                    let Some(ValueAccumulator::Variant { case, fields }) = top else {
                         panic!(
                             "event {event_idx}: VariantClose expects Variant on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
-                    let data = match (pending.take(), fields.is_empty()) {
+                    let payload = match (pending.take(), fields.is_empty()) {
                         (Some(v), true) => Some(Box::new(v)),
                         (None, false) => Some(Box::new(Value::Record(fields))),
                         (None, true) => None,
@@ -237,7 +237,7 @@ impl<'a> ValueMaterializer<'a> {
                             )
                         }
                     };
-                    pending = Some(Value::Variant { tag, data });
+                    pending = Some(Value::Variant { case, payload });
                 }
             }
         }
@@ -250,6 +250,6 @@ impl<'a> ValueMaterializer<'a> {
             scalar_ranges.is_empty(),
             "unclosed scalar frames after materialization"
         );
-        pending.unwrap_or(Value::Null)
+        pending.unwrap_or(Value::Absent)
     }
 }

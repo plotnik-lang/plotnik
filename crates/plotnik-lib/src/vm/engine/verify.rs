@@ -89,7 +89,7 @@ impl<'a> TypeVerifier<'a> {
         match type_def.decode() {
             TypeDefKind::Primitive(kind) => match kind {
                 TypeKind::NoValue => {
-                    if !matches!(value, Value::Null) {
+                    if !matches!(value, Value::Absent) {
                         self.errors.push(format_error(
                             &self.path,
                             &format!("type: no value, value: {}", value_kind_name(value)),
@@ -128,7 +128,7 @@ impl<'a> TypeVerifier<'a> {
                     self.verify(value, inner);
                 }
                 TypeKind::Option => {
-                    if !matches!(value, Value::Null) {
+                    if !matches!(value, Value::Absent) {
                         self.verify(value, inner);
                     }
                 }
@@ -185,7 +185,7 @@ impl<'a> TypeVerifier<'a> {
                             Some((_, v)) => {
                                 let field_type = match (self.types.option_inner(member.type_id), v)
                                 {
-                                    (Some(_), Value::Null) => continue,
+                                    (Some(_), Value::Absent) => continue,
                                     (Some(inner), _) => inner,
                                     (None, _) => member.type_id,
                                 };
@@ -215,28 +215,31 @@ impl<'a> TypeVerifier<'a> {
                 }
             },
             TypeDefKind::Variant { .. } => match value {
-                Value::Variant { tag, data } => {
-                    let case = self
+                Value::Variant {
+                    case: case_name,
+                    payload,
+                } => {
+                    let case_member = self
                         .types
                         .members_of(&type_def)
-                        .find(|m| self.strings.get(m.name_id) == *tag);
+                        .find(|m| self.strings.get(m.name_id) == *case_name);
 
-                    match case {
+                    match case_member {
                         Some(member) => {
                             let has_no_payload = self.types.get(member.type_id).is_some_and(|d| {
                                 matches!(d.decode(), TypeDefKind::Primitive(TypeKind::NoValue))
                             });
 
                             if has_no_payload {
-                                if data.is_some() {
+                                if payload.is_some() {
                                     self.errors.push(format!(
                                         "{}: no-payload case '{}' should have no $data",
                                         append_path(&self.path, "$data"),
-                                        tag
+                                        case_name
                                     ));
                                 }
                             } else {
-                                match data {
+                                match payload {
                                     Some(d) => {
                                         let prev_len = self.path.len();
                                         self.path.push_str(".$data");
@@ -247,7 +250,7 @@ impl<'a> TypeVerifier<'a> {
                                         self.errors.push(format!(
                                             "{}: payload-bearing case '{}' should have $data",
                                             append_path(&self.path, "$data"),
-                                            tag
+                                            case_name
                                         ));
                                     }
                                 }
@@ -257,7 +260,7 @@ impl<'a> TypeVerifier<'a> {
                             self.errors.push(format!(
                                 "{}: unknown case '{}'",
                                 append_path(&self.path, "$tag"),
-                                tag
+                                case_name
                             ));
                         }
                     }
@@ -276,7 +279,7 @@ impl<'a> TypeVerifier<'a> {
 #[cfg(debug_assertions)]
 fn value_kind_name(value: &Value) -> &'static str {
     match value {
-        Value::Null => "null",
+        Value::Absent => "absent",
         Value::Node(_) => "Node",
         Value::Text(_) => "Text",
         Value::Bool(_) => "Bool",

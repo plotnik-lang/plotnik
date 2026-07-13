@@ -132,7 +132,7 @@ fn deep_value_render_and_drop_do_not_overflow_native_stack() {
             .stack_size(STACK_SIZE)
             .spawn_scoped(scope, || {
                 // Bottom-up so construction itself never recurses.
-                let mut value = Value::Null;
+                let mut value = Value::Absent;
                 for _ in 0..VALUE_DEPTH {
                     value = Value::Record(vec![("inner", value)]);
                 }
