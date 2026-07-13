@@ -227,8 +227,8 @@ impl<'a> Generator<'a> {
 
     fn render(&self) -> String {
         let rust_config = &self.config.rust_types;
-        let type_model = TypeModel::new(self.plan.output().clone());
-        let decoders = DecoderGen::new(self.plan.output(), &type_model, self.plan.decode());
+        let type_model = TypeModel::new(self.plan.result().clone());
+        let decoders = DecoderGen::new(self.plan.result(), &type_model, self.plan.decode());
 
         let mut out = String::new();
         self.header(&mut out);

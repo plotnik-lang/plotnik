@@ -1,7 +1,7 @@
-//! Target-neutral output schema and capture-member layout.
+//! Target-neutral result schema and capture-member layout.
 //!
 //! Analysis assigns types and names; this view turns them into the one ordered
-//! output model every downstream consumer shares. In particular, absolute
+//! result model every downstream consumer shares. In particular, absolute
 //! composite member slots are assigned here, before bytecode or any
 //! source backend chooses a representation.
 
@@ -22,13 +22,13 @@ use crate::core::{Interner, Symbol};
 const MAX_MEMBERS: usize = u16::MAX as usize;
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
-pub(crate) enum OutputSchemaError {
+pub(crate) enum ResultSchemaError {
     #[error("too many type members: {0} (max {MAX_MEMBERS})")]
     Members(usize),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum OutputItemKind {
+pub(crate) enum ResultItemKind {
     Record,
     Variant,
     Alias,
@@ -38,18 +38,18 @@ pub(crate) enum OutputItemKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct OutputItem {
+pub(crate) struct ResultItem {
     pub(crate) name: Symbol,
     pub(crate) output: DefinitionOutput,
-    pub(crate) kind: OutputItemKind,
+    pub(crate) kind: ResultItemKind,
 }
 
-impl OutputItem {
-    fn for_output(name: Symbol, ty: TypeId, shape: &TypeShape) -> Self {
+impl ResultItem {
+    fn for_result(name: Symbol, ty: TypeId, shape: &TypeShape) -> Self {
         let kind = match shape {
-            TypeShape::Record(_) => OutputItemKind::Record,
-            TypeShape::Variant(_) => OutputItemKind::Variant,
-            _ => OutputItemKind::Alias,
+            TypeShape::Record(_) => ResultItemKind::Record,
+            TypeShape::Variant(_) => ResultItemKind::Variant,
+            _ => ResultItemKind::Alias,
         };
         Self {
             name,
@@ -62,22 +62,22 @@ impl OutputItem {
         Self {
             name,
             output: DefinitionOutput::MatchOnly,
-            kind: OutputItemKind::MatchOnlyDef,
+            kind: ResultItemKind::MatchOnlyDef,
         }
     }
 
     pub(crate) fn is_composite(self) -> bool {
-        matches!(self.kind, OutputItemKind::Record | OutputItemKind::Variant)
+        matches!(self.kind, ResultItemKind::Record | ResultItemKind::Variant)
     }
 
     pub(crate) fn is_record(self) -> bool {
-        self.kind == OutputItemKind::Record
+        self.kind == ResultItemKind::Record
     }
 
     pub(crate) fn value_type(self) -> TypeId {
         self.output
             .value()
-            .expect("value-bearing output item must have a value type")
+            .expect("value-bearing result item must have a value type")
     }
 }
 
@@ -140,14 +140,14 @@ pub(crate) struct CaptureLayout {
 /// backend. Built-ins lead in canonical order, followed by value types in
 /// dependency order.
 #[derive(Clone, Debug)]
-pub(crate) struct OutputTypeLayout {
+pub(crate) struct ResultTypeLayout {
     no_value: bool,
     builtins: Vec<TypeId>,
     value_types: Vec<TypeId>,
     output_ids: HashMap<TypeId, u32>,
 }
 
-impl OutputTypeLayout {
+impl ResultTypeLayout {
     fn build(no_value: bool, used_builtins: &HashSet<TypeId>, value_types: Vec<TypeId>) -> Self {
         let builtins = [TYPE_NODE, TYPE_TEXT, TYPE_BOOL]
             .into_iter()
@@ -185,7 +185,7 @@ impl OutputTypeLayout {
     pub(crate) fn no_value_output_id(&self) -> u32 {
         assert!(
             self.no_value,
-            "output layout must include the no-value wire type"
+            "result layout must include the no-value wire type"
         );
         0
     }
@@ -210,7 +210,7 @@ impl CaptureLayout {
     pub(super) fn build(
         types: &TypeAnalysis,
         ordered_types: &[TypeId],
-    ) -> Result<Self, OutputSchemaError> {
+    ) -> Result<Self, ResultSchemaError> {
         let mut scopes = BTreeMap::new();
         let mut member_count = 0;
         for &type_id in ordered_types {
@@ -241,7 +241,7 @@ impl CaptureLayout {
 
             let next_member_count = member_count + members.len();
             if next_member_count > MAX_MEMBERS {
-                return Err(OutputSchemaError::Members(next_member_count));
+                return Err(ResultSchemaError::Members(next_member_count));
             }
             let base = u16::try_from(member_count)
                 .expect("member count was checked against the u16 format limit");
@@ -275,19 +275,19 @@ impl CaptureLayout {
     }
 }
 
-/// The name-assigned, reachable output model shared by bytecode and generated
+/// The name-assigned, reachable result model shared by bytecode and generated
 /// source backends. It contains semantic shapes and capture slots only; target
 /// representation choices such as Rust `Box` placement live downstream.
 #[derive(Clone)]
-pub(crate) struct OutputSchema<'a> {
+pub(crate) struct ResultSchema<'a> {
     pub(crate) types: &'a TypeAnalysis,
     pub(crate) deps: &'a DependencyAnalysis,
     pub(crate) interner: &'a Interner,
     collected_types: CollectedTypes,
-    type_layout: OnceLock<OutputTypeLayout>,
+    type_layout: OnceLock<ResultTypeLayout>,
     named_types: BTreeMap<TypeId, Symbol>,
     type_name_bindings: Vec<TypeNameBinding>,
-    entry_point_items: Vec<OutputItem>,
+    entry_point_items: Vec<ResultItem>,
     capture_layout: CaptureLayout,
 }
 
@@ -297,10 +297,10 @@ pub(crate) struct TypeNameBinding {
     pub(crate) type_id: TypeId,
 }
 
-impl<'a> OutputSchema<'a> {
+impl<'a> ResultSchema<'a> {
     pub(crate) fn from_artifacts(
         artifacts: AnalysisArtifacts<'a>,
-    ) -> Result<Self, OutputSchemaError> {
+    ) -> Result<Self, ResultSchemaError> {
         Self::new(
             artifacts.type_analysis,
             artifacts.dependency_analysis,
@@ -312,7 +312,7 @@ impl<'a> OutputSchema<'a> {
         types: &'a TypeAnalysis,
         deps: &'a DependencyAnalysis,
         interner: &'a Interner,
-    ) -> Result<Self, OutputSchemaError> {
+    ) -> Result<Self, ResultSchemaError> {
         let reachable_defs =
             deps.reachable_from(types.iter_entry_point_outputs().map(|(def_id, _)| def_id));
         let collected_types = CollectedTypes::collect(types, reachable_defs.iter());
@@ -347,9 +347,9 @@ impl<'a> OutputSchema<'a> {
         })
     }
 
-    pub(crate) fn type_layout(&self) -> &OutputTypeLayout {
+    pub(crate) fn type_layout(&self) -> &ResultTypeLayout {
         self.type_layout.get_or_init(|| {
-            OutputTypeLayout::build(
+            ResultTypeLayout::build(
                 self.collected_types.no_value,
                 &self.collected_types.builtins,
                 self.collected_types.value_types.clone(),
@@ -365,13 +365,13 @@ impl<'a> OutputSchema<'a> {
         self.type_name_bindings.iter().copied()
     }
 
-    /// Public output items reachable from selectable definition outputs.
+    /// Public result items reachable from selectable definition outputs.
     ///
     /// Reachable fragment definitions still need capture slots and wire types
     /// for matching. A source-code target, however, must not publish an
     /// unspecialized fragment type merely because a capture-type-specialized call
     /// uses the same matcher body.
-    pub(crate) fn entry_point_items(&self) -> &[OutputItem] {
+    pub(crate) fn entry_point_items(&self) -> &[ResultItem] {
         &self.entry_point_items
     }
 
@@ -394,7 +394,7 @@ struct ItemCollector<'a> {
     named_types: &'a BTreeMap<TypeId, Symbol>,
     declared_names: HashSet<Symbol>,
     walked_types: HashSet<TypeId>,
-    items: Vec<OutputItem>,
+    items: Vec<ResultItem>,
 }
 
 impl<'a> ItemCollector<'a> {
@@ -413,12 +413,12 @@ impl<'a> ItemCollector<'a> {
         }
     }
 
-    fn collect(mut self) -> Vec<OutputItem> {
+    fn collect(mut self) -> Vec<ResultItem> {
         for (def_id, output) in self.types.iter_entry_point_outputs() {
             let name = self.deps.def_name_sym(def_id);
             match output {
                 DefinitionOutput::MatchOnly => {
-                    self.items.push(OutputItem::match_only_definition(name));
+                    self.items.push(ResultItem::match_only_definition(name));
                 }
                 DefinitionOutput::Value(type_id) => self.add_item(name, type_id),
             }
@@ -431,7 +431,7 @@ impl<'a> ItemCollector<'a> {
             return;
         }
 
-        let item = OutputItem::for_output(name, ty, self.types.expect_type_shape(ty));
+        let item = ResultItem::for_result(name, ty, self.types.expect_type_shape(ty));
         self.items.push(item);
         self.walk(ty);
     }

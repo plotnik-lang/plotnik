@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::compiler::analyze::output::{OutputItem, OutputItemKind, OutputSchema};
+use crate::compiler::analyze::result::{ResultItem, ResultItemKind, ResultSchema};
 use crate::compiler::analyze::types::type_shape::{
     CasePayload, DefinitionOutput, ListMinimum, TypeId, TypeShape,
 };
@@ -18,12 +18,12 @@ struct SemanticTag {
     member: Option<u16>,
 }
 
-pub(crate) fn emit_schema(schema: &OutputSchema<'_>, config: Config) -> String {
+pub(crate) fn emit_schema(schema: &ResultSchema<'_>, config: Config) -> String {
     SchemaEmitter::new(schema, config).emit().0
 }
 
 pub(crate) fn emit_schema_mapped(
-    schema: &OutputSchema<'_>,
+    schema: &ResultSchema<'_>,
     config: Config,
 ) -> (String, Vec<TypeScriptBinding>) {
     assert!(
@@ -37,9 +37,9 @@ pub(crate) fn emit_schema_mapped(
 }
 
 struct SchemaEmitter<'a> {
-    schema: &'a OutputSchema<'a>,
+    schema: &'a ResultSchema<'a>,
     config: Config,
-    items_by_name: HashMap<Symbol, OutputItem>,
+    items_by_name: HashMap<Symbol, ResultItem>,
     declared_names: HashSet<String>,
     needs_node_type: bool,
     sink: Sink<SemanticTag>,
@@ -47,7 +47,7 @@ struct SchemaEmitter<'a> {
 }
 
 impl<'a> SchemaEmitter<'a> {
-    fn new(schema: &'a OutputSchema<'a>, config: Config) -> Self {
+    fn new(schema: &'a ResultSchema<'a>, config: Config) -> Self {
         let items_by_name = schema
             .entry_point_items()
             .iter()
@@ -122,19 +122,19 @@ impl<'a> SchemaEmitter<'a> {
         }
     }
 
-    fn emit_item(&mut self, item: OutputItem) {
+    fn emit_item(&mut self, item: ResultItem) {
         let name = self.name(item.name);
         if !self.declared_names.insert(name.clone()) {
             return;
         }
         match item.kind {
-            OutputItemKind::Record => self.emit_interface(&name, item.value_type()),
-            OutputItemKind::Variant => self.emit_variant(&name, item.value_type()),
-            OutputItemKind::Alias => {
+            ResultItemKind::Record => self.emit_interface(&name, item.value_type()),
+            ResultItemKind::Variant => self.emit_variant(&name, item.value_type()),
+            ResultItemKind::Alias => {
                 let body = self.render_shape(item.value_type());
                 self.emit_type_decl(&name, item.output, body);
             }
-            OutputItemKind::MatchOnlyDef => {
+            ResultItemKind::MatchOnlyDef => {
                 let body = match self.config.match_only_type {
                     MatchOnlyType::Undefined => text("undefined"),
                     MatchOnlyType::Null => text("null"),
@@ -172,7 +172,7 @@ impl<'a> SchemaEmitter<'a> {
         self.sink.push("{\n");
 
         let TypeShape::Record(fields) = self.schema.types.expect_type_shape(ty) else {
-            unreachable!("record output item has a record shape");
+            unreachable!("record result item has a record shape");
         };
         let scope = self
             .schema
@@ -218,7 +218,7 @@ impl<'a> SchemaEmitter<'a> {
         self.sink.push("\n");
 
         let TypeShape::Variant(cases) = self.schema.types.expect_type_shape(ty) else {
-            unreachable!("variant output item has a variant shape");
+            unreachable!("variant result item has a variant shape");
         };
         let scope = self
             .schema

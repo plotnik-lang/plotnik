@@ -3,7 +3,7 @@
 use crate::core::Symbol;
 
 use crate::bytecode::{EncodeError, MAX_SPANS};
-use crate::compiler::analyze::output::OutputSchemaError;
+use crate::compiler::analyze::result::ResultSchemaError;
 
 /// Error during bytecode emission.
 #[derive(Clone, Debug, thiserror::Error)]
@@ -55,10 +55,10 @@ pub(in crate::compiler) enum EmitError {
     Encode(#[from] EncodeError),
 }
 
-impl From<OutputSchemaError> for EmitError {
-    fn from(error: OutputSchemaError) -> Self {
+impl From<ResultSchemaError> for EmitError {
+    fn from(error: ResultSchemaError) -> Self {
         match error {
-            OutputSchemaError::Members(count) => Self::TooManyTypeMembers(count),
+            ResultSchemaError::Members(count) => Self::TooManyTypeMembers(count),
         }
     }
 }

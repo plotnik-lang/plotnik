@@ -5,8 +5,8 @@ use crate::compiler::analyze::AnalysisArtifacts;
 use crate::compiler::analyze::grammar::bind;
 use crate::compiler::analyze::grammar::{GrammarBinding, GrammarBindingBuilder};
 use crate::compiler::analyze::names::{SymbolTable, resolve_names};
-use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::analyze::refs::{dependencies, validate_recursion};
+use crate::compiler::analyze::result::ResultSchema;
 use crate::compiler::analyze::shape::validation::{ShapeValidationInput, validate_ast};
 use crate::compiler::analyze::types::check_entry_points;
 use crate::compiler::analyze::types::type_check::{self, RootExtent, TypeAnalysis};
@@ -540,8 +540,8 @@ impl CompiledQuery {
             .bound
             .bound()
             .expect("valid compiled query is grammar-bound");
-        let schema = OutputSchema::from_artifacts(bound.analysis_input())
-            .expect("target-neutral compilation validated the output schema");
+        let schema = ResultSchema::from_artifacts(bound.analysis_input())
+            .expect("target-neutral compilation validated the result schema");
         let legacy = config.legacy_config();
         let (source, bindings) = if config.colored_output() {
             (
@@ -662,7 +662,7 @@ impl BindOutcome {
             });
         }
 
-        let schema = match OutputSchema::from_artifacts(bound.analysis_input()) {
+        let schema = match ResultSchema::from_artifacts(bound.analysis_input()) {
             Ok(schema) => schema,
             Err(error) => {
                 self.report_shared_limit_error(&mut diagnostics, error.to_string());

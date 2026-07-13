@@ -26,8 +26,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
-use crate::compiler::analyze::output::OutputSchema;
 use crate::compiler::analyze::refs::DependencyAnalysis;
+use crate::compiler::analyze::result::ResultSchema;
 use crate::compiler::analyze::types::type_shape::TypeId;
 use crate::compiler::emit::plan::{
     DecodeCase, DecodeItem, DecodeItemKind, DecodeScope, DecodeValue, ResultDecodePlan,
@@ -112,7 +112,7 @@ impl InherentParseSignature {
 
 impl<'m, 'a> DecoderGen<'m, 'a> {
     pub(super) fn new(
-        schema: &'a OutputSchema<'a>,
+        schema: &'a ResultSchema<'a>,
         model: &'m TypeModel<'a>,
         decode: &'a ResultDecodePlan,
     ) -> Self {

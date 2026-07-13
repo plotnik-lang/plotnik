@@ -11,8 +11,8 @@
 //! declarations shadow the prelude inside the generated module. `Node` alone
 //! can stay bare: the naming pass reserves it.
 
-use crate::compiler::analyze::output::OutputSchema;
-pub(crate) use crate::compiler::analyze::output::{OutputItem as Item, OutputItemKind as ItemKind};
+use crate::compiler::analyze::result::ResultSchema;
+pub(crate) use crate::compiler::analyze::result::{ResultItem as Item, ResultItemKind as ItemKind};
 use crate::compiler::analyze::types::type_shape::{CasePayload, RecordField, TypeId, TypeShape};
 use crate::compiler::emit::sink::Sink;
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
@@ -26,7 +26,7 @@ const DERIVES: &str = "#[derive(Debug, Clone, PartialEq, Eq, Hash)]";
 
 pub(crate) struct Emitter<'m, 'a> {
     model: &'m TypeModel<'a>,
-    pub(super) schema: &'m OutputSchema<'a>,
+    pub(super) schema: &'m ResultSchema<'a>,
     pub(super) config: &'m Config,
     uses_node: bool,
 }

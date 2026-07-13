@@ -10,7 +10,7 @@ use crate::bytecode::{
 };
 
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::output::{CaptureLayout, OutputSchema};
+use crate::compiler::analyze::result::{CaptureLayout, ResultSchema};
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::emit::targets::bytecode::tables::{
     ConstantPool, EmitError, StringTableBuilder, TypeTableBuilder,
@@ -49,7 +49,7 @@ impl<'a> EmitPipeline<'a> {
     pub(in crate::compiler::emit) fn prepare(
         input: AnalysisArtifacts<'a>,
         ir: &'a NfaGraph,
-        schema: &'a OutputSchema<'a>,
+        schema: &'a ResultSchema<'a>,
     ) -> Result<Self, EmitError> {
         let strings = seed_string_table(ir)?;
         let (types, strings) = build_type_table(schema, strings)?;

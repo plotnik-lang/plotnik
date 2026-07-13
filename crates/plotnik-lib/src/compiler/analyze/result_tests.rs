@@ -8,7 +8,7 @@ use crate::compiler::test_utils::synthetic_grammar;
 use crate::compiler::{QueryBuilder, TypeScriptCodegenConfig};
 use crate::core::Interner;
 
-use super::output::{CaptureLayout, OutputSchemaError, collect_ordered_types};
+use super::result::{CaptureLayout, ResultSchemaError, collect_ordered_types};
 
 #[test]
 fn capture_layout_assigns_one_absolute_member_sequence() {
@@ -95,7 +95,7 @@ fn capture_layout_reports_the_actual_total_member_count() {
     let error = CaptureLayout::build(&types, &ordered)
         .expect_err("65,545 members exceed the capture layout limit");
 
-    assert_eq!(error, OutputSchemaError::Members(65_545));
+    assert_eq!(error, ResultSchemaError::Members(65_545));
 }
 
 #[test]

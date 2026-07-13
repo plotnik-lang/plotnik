@@ -13,7 +13,7 @@ use regex_syntax::hir::Hir;
 
 use crate::bytecode::{EffectKind, NodeKindConstraint, PredicateOp};
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::output::CaptureLayout;
+use crate::compiler::analyze::result::CaptureLayout;
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::dump::NfaDumper;
 use crate::compiler::lower::ir::{

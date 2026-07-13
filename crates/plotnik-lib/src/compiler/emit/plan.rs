@@ -5,7 +5,7 @@
 //! representation and syntax.
 
 use crate::compiler::analyze::AnalysisArtifacts;
-use crate::compiler::analyze::output::OutputSchema;
+use crate::compiler::analyze::result::ResultSchema;
 use crate::compiler::lower::ir::NfaGraph;
 
 pub(crate) use super::decode::{
@@ -19,26 +19,26 @@ pub(crate) use super::matcher::{
 
 /// Everything a generated module shares across target languages.
 pub(crate) struct CodegenPlan<'a> {
-    output: OutputSchema<'a>,
+    result: ResultSchema<'a>,
     matcher: MatcherPlan,
     decode: ResultDecodePlan,
 }
 
 impl<'a> CodegenPlan<'a> {
     pub(crate) fn build(graph: &NfaGraph, artifacts: AnalysisArtifacts<'a>) -> Self {
-        let output = OutputSchema::from_artifacts(artifacts)
-            .expect("target-neutral compilation validated the output schema");
-        let matcher = MatcherPlan::build(graph, artifacts, output.layout());
-        let decode = ResultDecodePlan::build(&output);
+        let result = ResultSchema::from_artifacts(artifacts)
+            .expect("target-neutral compilation validated the result schema");
+        let matcher = MatcherPlan::build(graph, artifacts, result.layout());
+        let decode = ResultDecodePlan::build(&result);
         Self {
-            output,
+            result,
             matcher,
             decode,
         }
     }
 
-    pub(crate) fn output(&self) -> &OutputSchema<'a> {
-        &self.output
+    pub(crate) fn result(&self) -> &ResultSchema<'a> {
+        &self.result
     }
 
     pub(crate) fn matcher(&self) -> &MatcherPlan {

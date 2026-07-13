@@ -41,8 +41,8 @@ pub(crate) fn emit_types(
     interner: &Interner,
     config: &TypesConfig,
 ) -> String {
-    let schema = crate::compiler::analyze::output::OutputSchema::new(types, deps, interner)
-        .expect("target-neutral compilation validated the output schema");
+    let schema = crate::compiler::analyze::result::ResultSchema::new(types, deps, interner)
+        .expect("target-neutral compilation validated the result schema");
     let model = TypeModel::new(schema);
     emit_model(&model, config)
 }

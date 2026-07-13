@@ -1,11 +1,11 @@
 //! Rust-specific representation decisions shared by declarations and decoding.
 //!
 //! This model assigns Rust identifiers and computes lifetime/boxing facts once.
-//! Renderers borrow it; they never collect or rename the output schema again.
+//! Renderers borrow it; they never collect or rename the result schema again.
 
 use std::collections::HashMap;
 
-use crate::compiler::analyze::output::{OutputItem, OutputSchema};
+use crate::compiler::analyze::result::{ResultItem, ResultSchema};
 use crate::compiler::analyze::types::type_shape::TypeId;
 use crate::compiler::emit::targets::rust::ident::rust_scope_idents;
 use crate::core::Symbol;
@@ -13,8 +13,8 @@ use crate::core::Symbol;
 use super::representation::{LifetimeUsage, TypeFacts};
 
 pub(crate) struct TypeModel<'a> {
-    schema: OutputSchema<'a>,
-    items: Vec<OutputItem>,
+    schema: ResultSchema<'a>,
+    items: Vec<ResultItem>,
     facts: TypeFacts,
     /// Hygienic module-scope identifier for every declared item name.
     item_idents: HashMap<Symbol, String>,
@@ -36,7 +36,7 @@ impl TypeContext {
 }
 
 impl<'a> TypeModel<'a> {
-    pub(crate) fn new(schema: OutputSchema<'a>) -> Self {
+    pub(crate) fn new(schema: ResultSchema<'a>) -> Self {
         let facts = TypeFacts::compute(schema.types);
         let interner = schema.interner;
         let items = schema.entry_point_items().to_vec();
@@ -54,11 +54,11 @@ impl<'a> TypeModel<'a> {
         }
     }
 
-    pub(crate) fn schema(&self) -> &OutputSchema<'a> {
+    pub(crate) fn schema(&self) -> &ResultSchema<'a> {
         &self.schema
     }
 
-    pub(crate) fn items(&self) -> &[OutputItem] {
+    pub(crate) fn items(&self) -> &[ResultItem] {
         &self.items
     }
 

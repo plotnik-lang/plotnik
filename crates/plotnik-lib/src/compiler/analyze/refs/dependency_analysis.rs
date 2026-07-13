@@ -230,7 +230,7 @@ impl DependencyAnalysis {
     ///
     /// The closure includes the roots themselves and is safe for recursive
     /// components. Its iterator is deterministic `DefId` order, making the same
-    /// result reusable by output layout and inspection projection.
+    /// result reusable by result layout and inspection projection.
     pub fn reachable_from(&self, roots: impl IntoIterator<Item = DefId>) -> DefinitionReachability {
         self.dependencies.reachable_from(roots)
     }

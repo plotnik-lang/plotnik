@@ -5,7 +5,7 @@
 
 use crate::bytecode::{TypeDef, TypeId as WireTypeId, TypeKind, TypeMember, TypeNameEntry};
 
-use crate::compiler::analyze::output::{CaptureLayout, CaptureScopeKind, OutputSchema};
+use crate::compiler::analyze::result::{CaptureLayout, CaptureScopeKind, ResultSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
     DefinitionOutput, ListMinimum, RecordField, TYPE_BOOL, TYPE_NODE, TYPE_TEXT, TypeShape,
@@ -19,7 +19,7 @@ use crate::core::Interner;
 /// Build the type table, interning type, member, and name strings into the
 /// shared string table. Threads the string table by value because it extends it.
 pub fn build_type_table(
-    schema: &OutputSchema<'_>,
+    schema: &ResultSchema<'_>,
     mut strings: StringTableBuilder,
 ) -> Result<(TypeTableBuilder, StringTableBuilder), EmitError> {
     let mut types = TypeTableBuilder::new();
@@ -37,7 +37,7 @@ pub fn build_type_table(
 /// depth-first.
 fn build(
     types: &mut TypeTableBuilder,
-    schema: &OutputSchema<'_>,
+    schema: &ResultSchema<'_>,
     strings: &mut StringTableBuilder,
 ) -> Result<(), EmitError> {
     let type_analysis = schema.types;
@@ -65,7 +65,7 @@ fn build(
 
 fn emit_builtins(
     types: &mut TypeTableBuilder,
-    layout: &crate::compiler::analyze::output::OutputTypeLayout,
+    layout: &crate::compiler::analyze::result::ResultTypeLayout,
 ) -> Result<(), EmitError> {
     if layout.has_no_value() {
         types.push_no_value()?;
@@ -103,7 +103,7 @@ fn fill_slots(
 
 fn emit_type_names(
     types: &mut TypeTableBuilder,
-    schema: &OutputSchema<'_>,
+    schema: &ResultSchema<'_>,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
     for binding in schema.iter_type_name_bindings() {

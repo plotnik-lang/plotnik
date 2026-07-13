@@ -8,7 +8,7 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-use crate::compiler::analyze::output::{CaptureLayout, OutputItem, OutputItemKind, OutputSchema};
+use crate::compiler::analyze::result::{CaptureLayout, ResultItem, ResultItemKind, ResultSchema};
 use crate::compiler::analyze::types::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{
     DefinitionOutput, RecordField, TypeId, TypeShape,
@@ -22,7 +22,7 @@ pub(crate) struct ResultDecodePlan {
 }
 
 impl ResultDecodePlan {
-    pub(super) fn build(schema: &OutputSchema<'_>) -> Self {
+    pub(super) fn build(schema: &ResultSchema<'_>) -> Self {
         let builder = DecodePlanBuilder { schema };
         let items = schema
             .entry_point_items()
@@ -48,7 +48,7 @@ impl ResultDecodePlan {
         let index = self
             .items_by_name
             .get(&name)
-            .expect("every decode target declares an output item");
+            .expect("every decode target declares a result item");
         &self.items[*index]
     }
 }
@@ -122,24 +122,24 @@ pub(crate) enum DecodeValue {
 }
 
 struct DecodePlanBuilder<'p, 'a> {
-    schema: &'p OutputSchema<'a>,
+    schema: &'p ResultSchema<'a>,
 }
 
 impl DecodePlanBuilder<'_, '_> {
-    fn item(&self, item: OutputItem) -> DecodeItem {
+    fn item(&self, item: ResultItem) -> DecodeItem {
         let kind = match item.kind {
-            OutputItemKind::Record => {
+            ResultItemKind::Record => {
                 let TypeShape::Record(fields) =
                     self.schema.types.expect_type_shape(item.value_type())
                 else {
-                    unreachable!("record output item has a record shape");
+                    unreachable!("record result item has a record shape");
                 };
                 let twins = collect_twins(self.schema.types, self.schema.layout(), item);
                 DecodeItemKind::Record(self.scope(fields.iter(), &twins))
             }
-            OutputItemKind::Variant => DecodeItemKind::Variant(self.variant_cases(item)),
-            OutputItemKind::Alias => DecodeItemKind::Alias(self.value(item.value_type())),
-            OutputItemKind::MatchOnlyDef => DecodeItemKind::MatchOnlyDefinition,
+            ResultItemKind::Variant => DecodeItemKind::Variant(self.variant_cases(item)),
+            ResultItemKind::Alias => DecodeItemKind::Alias(self.value(item.value_type())),
+            ResultItemKind::MatchOnlyDef => DecodeItemKind::MatchOnlyDefinition,
         };
         DecodeItem {
             name: item.name,
@@ -150,10 +150,10 @@ impl DecodePlanBuilder<'_, '_> {
         }
     }
 
-    fn variant_cases(&self, item: OutputItem) -> Vec<DecodeCase> {
+    fn variant_cases(&self, item: ResultItem) -> Vec<DecodeCase> {
         let TypeShape::Variant(cases) = self.schema.types.expect_type_shape(item.value_type())
         else {
-            unreachable!("variant output item has a variant shape");
+            unreachable!("variant result item has a variant shape");
         };
         let twins = collect_twins(self.schema.types, self.schema.layout(), item);
         cases
@@ -227,7 +227,7 @@ impl DecodePlanBuilder<'_, '_> {
             .is_some_and(|definition| self.schema.deps.is_recursive_def(definition))
     }
 
-    fn item_is_fallible(&self, item: OutputItem) -> bool {
+    fn item_is_fallible(&self, item: ResultItem) -> bool {
         self.item_enters_depth(item.name)
             || item.output.value().is_some_and(|type_id| {
                 self.type_reaches_recursive_ref(type_id, &mut HashSet::new())
@@ -264,7 +264,7 @@ impl DecodePlanBuilder<'_, '_> {
 /// Every table-reachable analysis type sharing this item's name and shape
 /// kind. Structural identity is enforced upstream; twins differ only in
 /// their member-run offsets.
-fn collect_twins(types: &TypeAnalysis, layout: &CaptureLayout, item: OutputItem) -> Vec<TypeId> {
+fn collect_twins(types: &TypeAnalysis, layout: &CaptureLayout, item: ResultItem) -> Vec<TypeId> {
     let wants_record = item.is_record();
     let mut twins = BTreeSet::new();
     for (ty, name) in types.iter_named_types() {

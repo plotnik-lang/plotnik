@@ -4,8 +4,8 @@ pub mod grammar;
 pub mod located;
 pub mod names;
 pub mod nullability;
-pub mod output;
 pub mod refs;
+pub mod result;
 pub mod shape;
 pub mod types;
 pub mod visitor;
@@ -16,4 +16,4 @@ pub use located::Located;
 #[cfg(test)]
 mod anchors_tests;
 #[cfg(test)]
-mod output_tests;
+mod result_tests;

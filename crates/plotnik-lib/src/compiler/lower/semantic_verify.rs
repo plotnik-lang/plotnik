@@ -10,7 +10,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::bytecode::{EffectKind, FrameAction, ValueFrameKind};
-use crate::compiler::analyze::output::{CaptureMemberKind, CaptureScopeKind, OutputSchema};
+use crate::compiler::analyze::result::{CaptureMemberKind, CaptureScopeKind, ResultSchema};
 use crate::compiler::analyze::types::type_shape::CasePayload;
 use crate::compiler::lower::ir::{
     CallProtocol, DefRoute, EffectArg, EffectIR, InstructionIR, Label, MemberRef, NfaGraph,
@@ -66,7 +66,7 @@ pub(crate) enum SemanticVerifyError {
 
 pub(crate) fn verify(
     semantic: &SemanticNfa,
-    schema: &OutputSchema<'_>,
+    schema: &ResultSchema<'_>,
 ) -> Result<(), SemanticVerifyError> {
     verify_state_count(semantic)?;
 
@@ -280,12 +280,12 @@ impl ReturnContract {
 
 struct Program<'a> {
     graph: &'a NfaGraph,
-    schema: &'a OutputSchema<'a>,
+    schema: &'a ResultSchema<'a>,
     instructions: HashMap<Label, &'a InstructionIR>,
 }
 
 impl<'a> Program<'a> {
-    fn new(graph: &'a NfaGraph, schema: &'a OutputSchema<'a>) -> Result<Self, SemanticVerifyError> {
+    fn new(graph: &'a NfaGraph, schema: &'a ResultSchema<'a>) -> Result<Self, SemanticVerifyError> {
         let mut instructions = HashMap::with_capacity(graph.instructions().len());
         for instruction in graph.instructions() {
             if instructions
@@ -838,7 +838,7 @@ impl<'a> Program<'a> {
         &self,
         member: MemberRef,
         label: Label,
-    ) -> Result<&crate::compiler::analyze::output::CaptureScope, SemanticVerifyError> {
+    ) -> Result<&crate::compiler::analyze::result::CaptureScope, SemanticVerifyError> {
         let Some(scope) = self.schema.layout().scope(member.parent_type) else {
             return Err(capture_error(label, "member parent has no capture scope"));
         };
