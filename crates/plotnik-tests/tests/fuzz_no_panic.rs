@@ -81,9 +81,9 @@ fn parse_js(source: &str) -> Tree {
 /// here fails the property.
 fn exercise_pipeline(module: &Module, source: &str) {
     let tree = parse_js(source);
-    for i in 0..module.entrypoint_count() {
+    for i in 0..module.entry_point_count() {
         let entry = module
-            .entrypoint_at(i)
+            .entry_point_at(i)
             .expect("entrypoint_count bounds entrypoint_at");
         let vm = VM::builder(source, &tree).build();
         if let Ok(effects) = vm.execute(module, &entry) {

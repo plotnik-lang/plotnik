@@ -58,7 +58,7 @@ impl DumpContext {
     fn new(module: &Module, colors: Colors) -> Self {
         let header = module.header();
         let strings = module.strings();
-        let entrypoints = module.entrypoints();
+        let entrypoints = module.entry_points();
 
         let mut addr_labels = BTreeMap::new();
         for ep in entrypoints.iter() {
@@ -292,7 +292,7 @@ fn format_type_name(type_id: TypeId, module: &Module, ctx: &DumpContext) -> Stri
 fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
     let c = &ctx.colors;
     let strings = module.strings();
-    let entrypoints = module.entrypoints();
+    let entrypoints = module.entry_points();
     let stw = ctx.addr_width;
     let tw = ctx.type_width;
 

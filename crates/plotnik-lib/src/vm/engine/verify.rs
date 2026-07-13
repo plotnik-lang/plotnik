@@ -341,7 +341,7 @@ fn panic_with_mismatch(
     const WIDTH: usize = 80;
     let separator = "=".repeat(WIDTH);
 
-    let entrypoints = module.entrypoints();
+    let entrypoints = module.entry_points();
     let strings = module.strings();
 
     let type_name = entrypoints

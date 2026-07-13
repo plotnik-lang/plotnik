@@ -81,7 +81,7 @@ fn deep_backtrack_does_not_overflow_native_stack() {
     // concern; this test isolates the VM's backtracking.
     let tree = support::parse_javascript(&source);
 
-    let entry = module.entrypoint("Top").expect("Top is an entrypoint");
+    let entry = module.entry_point("Top").expect("Top is an entrypoint");
 
     // Run the VM on a tiny stack so the pre-fix recursive `backtrack` would abort
     // here. Both runtime limits are Unbounded so no resource ceiling cuts the run

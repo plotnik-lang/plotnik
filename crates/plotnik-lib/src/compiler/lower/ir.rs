@@ -944,7 +944,7 @@ impl NfaGraph {
         &self.instructions
     }
 
-    pub(crate) fn entrypoint_wrappers(&self) -> &IndexMap<DefId, Label> {
+    pub(crate) fn entry_point_wrappers(&self) -> &IndexMap<DefId, Label> {
         &self.entrypoint_wrappers
     }
 

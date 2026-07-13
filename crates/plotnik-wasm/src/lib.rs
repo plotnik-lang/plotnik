@@ -80,7 +80,7 @@ impl Session {
             .into_artifact()
             .map(|output| output.into_parts())
             .unwrap_or_else(|| (String::new(), Vec::new()));
-        let entrypoints = module.as_ref().map(entrypoint_names).unwrap_or_default();
+        let entrypoints = module.as_ref().map(entry_point_names).unwrap_or_default();
         let info = info_json(InfoParts {
             module: module.as_ref(),
             query_tokens: json_value!(tokens),
@@ -172,7 +172,7 @@ impl Session {
             return error_json("query did not compile");
         };
 
-        let entrypoint = match resolve_entrypoint(module, entry, &self.entrypoints) {
+        let entrypoint = match resolve_entry_point(module, entry, &self.entrypoints) {
             Ok(entrypoint) => entrypoint,
             Err(error) => return error_json(error),
         };
@@ -208,7 +208,7 @@ enum TraceMode {
     Recording(usize),
 }
 
-fn resolve_entrypoint(
+fn resolve_entry_point(
     module: &Module,
     requested: Option<&str>,
     entrypoints: &[String],
@@ -221,7 +221,7 @@ fn resolve_entrypoint(
             .ok_or_else(|| "no entrypoints in module".to_string())?,
     };
 
-    let Some(entrypoint) = module.entrypoint(&selected) else {
+    let Some(entrypoint) = module.entry_point(&selected) else {
         return Err(format!(
             "invalid entrypoint: {}; available entrypoints: {}",
             selected,
@@ -231,6 +231,6 @@ fn resolve_entrypoint(
     Ok(entrypoint)
 }
 
-fn entrypoint_names(module: &Module) -> Vec<String> {
-    module.entrypoint_names().map(str::to_string).collect()
+fn entry_point_names(module: &Module) -> Vec<String> {
+    module.entry_point_names().map(str::to_string).collect()
 }

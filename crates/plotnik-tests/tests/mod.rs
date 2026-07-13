@@ -394,7 +394,7 @@ fn render_compile(
                 "06-vm fixtures require an `INPUT` section; compile-only fixtures belong in 04-emit".to_string()
             })?;
             let entry = module
-                .entrypoint_names()
+                .entry_point_names()
                 .last()
                 .ok_or_else(|| "06-vm fixture produced no selectable entry points".to_string())?
                 .to_string();
@@ -521,7 +521,7 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
     let tree = scenario.lang.parse(scenario.source);
     let entrypoint = scenario
         .module
-        .entrypoint(scenario.entry)
+        .entry_point(scenario.entry)
         .expect("selected definition must be an entrypoint");
 
     let vm = VM::builder(scenario.source, &tree).build();

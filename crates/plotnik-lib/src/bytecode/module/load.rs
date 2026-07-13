@@ -541,7 +541,7 @@ impl Module {
     /// instruction would make the VM start decoding mid-instruction, so it must
     /// be an instruction start, not merely in range.
     fn validate_entrypoints(&self, is_start: &[bool]) -> Result<(), ModuleError> {
-        let entrypoints = self.entrypoints();
+        let entrypoints = self.entry_points();
         let word_count = self.header.instruction_word_count;
         let type_defs = self.header.type_defs_count;
         let storage: &[u8] = &self.storage;
@@ -581,7 +581,7 @@ impl Module {
     fn validate_depth_neutrality(&self) -> Result<(), ModuleError> {
         let mut roots = HashMap::new();
 
-        for entrypoint in self.entrypoints().iter() {
+        for entrypoint in self.entry_points().iter() {
             let target = entrypoint.target();
             let route = DepthRoute::Caller;
             if let Some(expected) = roots.insert(target, route)
@@ -645,7 +645,7 @@ impl Module {
     fn validate_return_routes(&self) -> Result<(), ModuleError> {
         let mut cache = HashMap::new();
 
-        for entrypoint in self.entrypoints().iter() {
+        for entrypoint in self.entry_points().iter() {
             let target = entrypoint.target();
             if !self
                 .return_contract(target, &mut cache)

@@ -96,10 +96,10 @@ pub fn resolve_run_lang(
 }
 
 /// Resolve the selected entrypoint after defaulting has already happened.
-pub fn resolve_entrypoint(module: &Module, name: Option<&str>) -> Result<EntryPoint, CliError> {
+pub fn resolve_entry_point(module: &Module, name: Option<&str>) -> Result<EntryPoint, CliError> {
     match name {
-        Some(name) => module.entrypoint(name).ok_or_else(|| {
-            let names: Vec<&str> = module.entrypoint_names().collect();
+        Some(name) => module.entry_point(name).ok_or_else(|| {
+            let names: Vec<&str> = module.entry_point_names().collect();
             let mut msg = format!("invalid entrypoint: {}", name);
             if let Some(similar) = find_similar(name, &names) {
                 msg.push_str(&format!("\n\nDid you mean '{}'?", similar));
@@ -187,14 +187,14 @@ pub fn plan_exec(input: ExecRequest) -> Result<ExecPlan, CliError> {
     };
     let module = super::compile::emit_module(&compiled, config, input.color)?;
     // Queries conventionally put the preferred selectable definition last.
-    let default_entry = module.entrypoint_names().last().map(str::to_owned);
+    let default_entry = module.entry_point_names().last().map(str::to_owned);
 
     let entry = input
         .entry
         .map(str::to_owned)
         .or_else(|| loaded.shebang.entry.clone())
         .or(default_entry);
-    let entrypoint = resolve_entrypoint(&module, entry.as_deref())?;
+    let entrypoint = resolve_entry_point(&module, entry.as_deref())?;
     let tree = lang.parse_source(&source_code);
 
     Ok(ExecPlan {

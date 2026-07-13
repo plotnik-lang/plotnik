@@ -23,7 +23,7 @@ impl ResultDecodePlan {
     pub(super) fn build(schema: &OutputSchema<'_>) -> Self {
         let builder = DecodePlanBuilder { schema };
         let items = schema
-            .entrypoint_items()
+            .entry_point_items()
             .iter()
             .map(|item| builder.item(*item))
             .collect::<Vec<_>>();

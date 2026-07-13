@@ -242,7 +242,7 @@ impl Module {
         }
     }
 
-    pub fn entrypoints(&self) -> EntryPointsView<'_> {
+    pub fn entry_points(&self) -> EntryPointsView<'_> {
         let offset = self.offsets.entrypoints as usize;
         let count = self.header.entrypoints_count as usize;
         EntryPointsView {
@@ -255,23 +255,23 @@ impl Module {
         SpansView::new(self.spans_slice(), self.header.spans_count as usize)
     }
 
-    pub fn entrypoint_count(&self) -> usize {
+    pub fn entry_point_count(&self) -> usize {
         self.header.entrypoints_count as usize
     }
 
-    pub fn entrypoint_at(&self, idx: usize) -> Option<EntryPoint> {
-        (idx < self.entrypoint_count()).then(|| self.entrypoints().get(idx))
+    pub fn entry_point_at(&self, idx: usize) -> Option<EntryPoint> {
+        (idx < self.entry_point_count()).then(|| self.entry_points().get(idx))
     }
 
-    pub fn entrypoint(&self, name: &str) -> Option<EntryPoint> {
-        self.entrypoints().find_by_name(name, &self.strings())
+    pub fn entry_point(&self, name: &str) -> Option<EntryPoint> {
+        self.entry_points().find_by_name(name, &self.strings())
     }
 
     /// Names of all entrypoints, in table order.
-    pub fn entrypoint_names(&self) -> impl Iterator<Item = &str> {
+    pub fn entry_point_names(&self) -> impl Iterator<Item = &str> {
         let strings = self.strings();
-        let entrypoints = self.entrypoints();
-        (0..self.entrypoint_count()).map(move |i| strings.get(entrypoints.get(i).name()))
+        let entrypoints = self.entry_points();
+        (0..self.entry_point_count()).map(move |i| strings.get(entrypoints.get(i).name()))
     }
 
     /// `count + 1` entries: the extra sentinel offset gives the final string's end.

@@ -229,7 +229,9 @@ fn bench_parse(c: &mut Criterion) {
 fn bench_scenarios(c: &mut Criterion) {
     for s in SCENARIOS {
         let module = compile(s.query);
-        let entry = module.entrypoint(s.entry).expect("bench entrypoint exists");
+        let entry = module
+            .entry_point(s.entry)
+            .expect("bench entrypoint exists");
         let mut group = c.benchmark_group(s.name);
         for (size_name, source) in corpora_for(s.name) {
             let source: &str = source;
@@ -258,7 +260,9 @@ fn bench_scenarios(c: &mut Criterion) {
 fn bench_scan_execute(c: &mut Criterion) {
     let s = &SCENARIOS[0];
     let module = compile(s.query);
-    let entry = module.entrypoint(s.entry).expect("bench entrypoint exists");
+    let entry = module
+        .entry_point(s.entry)
+        .expect("bench entrypoint exists");
     let source: &str = &MEDIUM;
     let tree = parse_js(source);
     let mut group = c.benchmark_group("scan_rows_execute");
@@ -282,7 +286,7 @@ fn bench_backtrack_storm(c: &mut Criterion) {
     const FUEL_BUDGET: u64 = 50_000;
     let module = compile("Missing = (program {(_)* (debugger_statement)})");
     let entry = module
-        .entrypoint("Missing")
+        .entry_point("Missing")
         .expect("bench entrypoint exists");
     let source: &str = &SMALL;
     let tree = parse_js(source);

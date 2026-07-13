@@ -569,7 +569,7 @@ impl CompiledQuery {
         self.bound.definition_names()
     }
 
-    pub fn entrypoint_names(&self) -> impl Iterator<Item = String> + '_ {
+    pub fn entry_point_names(&self) -> impl Iterator<Item = String> + '_ {
         self.bound.bound().into_iter().flat_map(|bound| {
             bound
                 .type_analysis()

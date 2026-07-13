@@ -346,7 +346,7 @@ impl<'a> OutputSchema<'a> {
     /// for matching. A source target, however, must not publish an
     /// unspecialized fragment type merely because a scalar-specialized call
     /// uses the same matcher body.
-    pub(crate) fn entrypoint_items(&self) -> &[OutputItem] {
+    pub(crate) fn entry_point_items(&self) -> &[OutputItem] {
         &self.entrypoint_items
     }
 

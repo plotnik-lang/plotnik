@@ -100,12 +100,12 @@ pub fn run(args: InspectArgs) -> CliResult {
         .as_ref()
         .map(query_spans_json)
         .unwrap_or_else(|| Value::Array(Vec::new()));
-    let entrypoints = module.as_ref().map(entrypoint_names).unwrap_or_default();
+    let entrypoints = module.as_ref().map(entry_point_names).unwrap_or_default();
 
     let run = if let Some(module) = module.as_ref() {
-        let default_entry = module.entrypoint_names().last().map(str::to_owned);
+        let default_entry = module.entry_point_names().last().map(str::to_owned);
         let entry = args.entry.clone().or(shebang_entry).or(default_entry);
-        let entrypoint = run_common::resolve_entrypoint(module, entry.as_deref())?;
+        let entrypoint = run_common::resolve_entry_point(module, entry.as_deref())?;
         let tree = lang.parse_source(&source_code);
         run_module(
             module,
@@ -334,8 +334,8 @@ fn query_span_kind(kind: SpanKind) -> (&'static str, Option<&'static str>) {
     }
 }
 
-fn entrypoint_names(module: &Module) -> Vec<String> {
-    module.entrypoint_names().map(str::to_string).collect()
+fn entry_point_names(module: &Module) -> Vec<String> {
+    module.entry_point_names().map(str::to_string).collect()
 }
 
 fn runtime_error_value(error: &RuntimeError) -> Value {

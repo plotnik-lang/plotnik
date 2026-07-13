@@ -333,7 +333,7 @@ impl<'s> PrintTracer<'s> {
     /// dump renders the same target.
     fn def_ref_name(&self, ip: CodeAddr) -> String {
         self.render
-            .entrypoint_name(ip.get())
+            .entry_point_name(ip.get())
             .map(str::to_string)
             .unwrap_or_else(|| format!("@{:0w$}", ip, w = self.addr_width))
     }

@@ -242,7 +242,7 @@ type DefSummaries = HashMap<CodeAddr, DefSummary>;
 /// into a panic. Assumes [`Module::validate_instructions`] has already run, so
 /// every instruction decode and every jump target is safe.
 pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> {
-    let entrypoints = module.entrypoints();
+    let entrypoints = module.entry_points();
 
     let mut defs = Vec::new();
     let mut known = HashSet::new();

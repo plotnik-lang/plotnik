@@ -283,7 +283,7 @@ impl MatcherPlan {
             })
             .collect::<BTreeMap<_, _>>();
         let entrypoints = graph
-            .entrypoint_wrappers()
+            .entry_point_wrappers()
             .iter()
             .map(|(&definition, &label)| {
                 let symbol = artifacts.dependency_analysis.def_name_sym(definition);
@@ -319,7 +319,7 @@ impl MatcherPlan {
         &self.states
     }
 
-    pub(crate) fn entrypoints(&self) -> &[EntryPlan] {
+    pub(crate) fn entry_points(&self) -> &[EntryPlan] {
         &self.entrypoints
     }
 

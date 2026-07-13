@@ -47,7 +47,7 @@ struct SchemaEmitter<'a> {
 impl<'a> SchemaEmitter<'a> {
     fn new(schema: &'a OutputSchema<'a>, config: Config) -> Self {
         let items_by_name = schema
-            .entrypoint_items()
+            .entry_point_items()
             .iter()
             .map(|item| (item.name, *item))
             .collect();
@@ -68,7 +68,7 @@ impl<'a> SchemaEmitter<'a> {
     }
 
     fn emit(mut self) -> (String, Vec<TypeScriptBinding>) {
-        let items = self.schema.entrypoint_items().to_vec();
+        let items = self.schema.entry_point_items().to_vec();
         self.needs_node_type = items
             .iter()
             .any(|item| self.type_uses_node(item.ty, &mut HashSet::new()));

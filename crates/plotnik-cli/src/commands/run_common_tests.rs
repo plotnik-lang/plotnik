@@ -25,7 +25,7 @@ fn defaults_to_last_definition_when_entry_omitted() {
     let plan = exec_plan(TWO_DEFS, None);
     let expected = plan
         .module
-        .entrypoint("Second")
+        .entry_point("Second")
         .expect("last selectable definition can be an entry point");
     assert_eq!(plan.entrypoint, expected);
 }
@@ -35,7 +35,7 @@ fn explicit_entry_overrides_the_default() {
     let plan = exec_plan(TWO_DEFS, Some("First"));
     let expected = plan
         .module
-        .entrypoint("First")
+        .entry_point("First")
         .expect("named selectable definition can be an entry point");
     assert_eq!(plan.entrypoint, expected);
 }

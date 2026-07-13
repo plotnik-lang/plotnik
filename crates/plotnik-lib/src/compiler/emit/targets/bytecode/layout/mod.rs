@@ -11,7 +11,7 @@ use crate::compiler::lower::ir::{Label, NfaGraph};
 
 /// Assign a cache-aligned bytecode-word address to every label.
 pub fn compute_layout(ir: &NfaGraph) -> Result<LayoutMap, EmitError> {
-    let entry_labels: Vec<Label> = ir.entrypoint_wrappers().values().copied().collect();
+    let entry_labels: Vec<Label> = ir.entry_point_wrappers().values().copied().collect();
     // With no selectable definitions, no VM can enter this module. Fragment-only
     // definitions still contribute type metadata, but their instructions are
     // unreachable and would otherwise make an arbitrary label occupy address 0.

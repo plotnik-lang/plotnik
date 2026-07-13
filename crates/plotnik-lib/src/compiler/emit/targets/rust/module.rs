@@ -241,7 +241,7 @@ impl<'a> Generator<'a> {
             &decoders.parse_api(
                 self.plan
                     .matcher()
-                    .entrypoints()
+                    .entry_points()
                     .iter()
                     .map(|entry| entry.definition),
             ),
@@ -298,7 +298,7 @@ impl<'a> Generator<'a> {
         let names: Vec<String> = self
             .plan
             .matcher()
-            .entrypoints()
+            .entry_points()
             .iter()
             .map(|entry| entry_fn_name(&entry.name))
             .collect();
@@ -445,7 +445,7 @@ impl<'a> Generator<'a> {
         };
         let fuel_metered = if fuel_metered { "true" } else { "false" };
         let memory_metered = if memory_metered { "true" } else { "false" };
-        for entry in self.plan.matcher().entrypoints() {
+        for entry in self.plan.matcher().entry_points() {
             let def = entry.name.as_str();
             let info = self.state(entry.entry);
             let subs = [

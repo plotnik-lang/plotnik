@@ -101,7 +101,7 @@ impl NfaDumper<'_> {
 
         let mut entries: Vec<(&str, Label)> = self
             .graph
-            .entrypoint_wrappers()
+            .entry_point_wrappers()
             .iter()
             .map(|(&def_id, &label)| (self.def_name(def_id), label))
             .collect();

@@ -112,7 +112,7 @@ fn many_callable_definitions_load_without_global_fixpoint_rescans() {
     let reload_analyses = loader_body_analyses();
     assert_linear_body_analyses("module reload", reload_analyses);
 
-    assert_eq!(module.entrypoints().len(), MANY_DEFINITIONS);
+    assert_eq!(module.entry_points().len(), MANY_DEFINITIONS);
 }
 
 /// Byte offset of the first predicated Match's 4-byte predicate

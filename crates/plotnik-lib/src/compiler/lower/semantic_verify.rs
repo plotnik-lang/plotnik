@@ -71,9 +71,9 @@ pub(crate) fn verify(
     verify_state_count(semantic)?;
 
     let graph = semantic.raw();
-    if graph.entrypoint_wrappers().len() > u16::MAX as usize {
+    if graph.entry_point_wrappers().len() > u16::MAX as usize {
         return Err(SemanticVerifyError::EntrypointLimit(
-            graph.entrypoint_wrappers().len(),
+            graph.entry_point_wrappers().len(),
         ));
     }
     verify_regexes(graph)?;
@@ -324,7 +324,7 @@ impl<'a> Program<'a> {
 
     fn verify_return_routes(&self) -> Result<(), SemanticVerifyError> {
         let mut cache = HashMap::new();
-        for &entry in self.graph.entrypoint_wrappers().values() {
+        for &entry in self.graph.entry_point_wrappers().values() {
             if !self
                 .return_contract(entry, &mut cache)
                 .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
@@ -383,7 +383,12 @@ impl<'a> Program<'a> {
     }
 
     fn verify_effects(&self) -> Result<(), SemanticVerifyError> {
-        let wrappers: Vec<Label> = self.graph.entrypoint_wrappers().values().copied().collect();
+        let wrappers: Vec<Label> = self
+            .graph
+            .entry_point_wrappers()
+            .values()
+            .copied()
+            .collect();
         let mut definitions = Vec::new();
         let mut known = HashSet::new();
         let mut called = HashSet::new();
