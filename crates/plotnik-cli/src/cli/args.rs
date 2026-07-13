@@ -155,7 +155,7 @@ pub fn grammar_arg() -> Arg {
         .value_name("GRAMMAR_JSON")
         .value_parser(value_parser!(PathBuf))
         .conflicts_with("lang")
-        .help("Link against this exact grammar.json instead of the registry")
+        .help("Bind query names using this exact grammar.json instead of the registry")
 }
 
 pub fn compact_arg() -> Arg {

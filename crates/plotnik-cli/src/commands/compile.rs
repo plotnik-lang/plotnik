@@ -7,7 +7,7 @@ use plotnik_lib::{BytecodeConfig, CompiledQuery, QueryBuilder, SourceMap};
 use crate::error::CliError;
 use crate::language_registry::Lang;
 
-/// Parse, analyze, link, lower, and validate target-neutral compiler IR.
+/// Parse, analyze, bind, lower, and validate target-neutral compiler IR.
 pub fn compile_query(
     sources: SourceMap,
     lang: &Lang,

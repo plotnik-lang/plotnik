@@ -53,7 +53,7 @@ const TEMPLATES: &[&str] = &[
     ),
 ];
 
-/// Compile a query without ever panicking: `None` if it does not parse, link
+/// Compile a query without ever panicking: `None` if it does not parse, bind
 /// cleanly, or emit. Mirrors the production `run` path (validity gate + `emit`).
 fn try_compile(query: &str) -> Option<Module> {
     let compiled = QueryBuilder::from_inline(query)

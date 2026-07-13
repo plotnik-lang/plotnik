@@ -18,7 +18,7 @@ pub struct Config {
     /// rendering is iterative; decode depth is a generated-executor resource
     /// (its typed decoder recurses once per nested value).
     pub(crate) decode_depth: Limit,
-    /// Diagnostic provenance for the exact grammar used during linking.
+    /// Diagnostic provenance for the exact grammar used during binding.
     /// Proc-macro output leaves this absent because Cargo already couples its
     /// parser and generated module; product `generate` paths always set it.
     pub(crate) grammar_identity: Option<GrammarIdentity>,
@@ -67,7 +67,7 @@ impl Config {
         self
     }
 
-    /// Record the exact grammar artifact used to link this generated module.
+    /// Record the exact grammar artifact used to bind this generated module.
     pub fn grammar_identity(mut self, identity: GrammarIdentity) -> Self {
         self.grammar_identity = Some(identity);
         self

@@ -43,7 +43,7 @@ use super::entry_names::{accepts_entry_fn_name, entry_fn_name, safe_entry_fn_nam
 
 /// Generate the Rust query module for a compiled query's fork-point NFA.
 ///
-/// The caller guarantees the query compiled successfully (all ids linked, the
+/// The caller guarantees the query compiled successfully (all ids bound, the
 /// target-neutral verifier accepted the same semantic NFA) and was built *without*
 /// inspection — spans are a VM/playground concern and never reach generated
 /// code.

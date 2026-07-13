@@ -35,7 +35,7 @@ plotnik lang dump typescript
 | `ast`         | both  | Show AST of query and/or source | Shebang or extension                  |
 | `infer`       | query | Generate type definitions       | Required                              |
 | `generate`    | query | Generate a compiled matcher     | Required unless `--grammar` is used   |
-| `dump`        | query | Show bytecode                   | Optional (enables linking)            |
+| `dump`        | query | Show bytecode                   | Optional (enables grammar binding)    |
 | `trace`       | both  | Trace query execution           | Shebang or extension                  |
 | `inspect`     | both  | Emit playground inspection JSON | Shebang or extension                  |
 | `lang list`   | —     | List supported languages        | —                                     |
@@ -176,10 +176,10 @@ the generated file contains typed output types, `parse`/`matches` entrypoints,
 and the matcher that runs on `plotnik-rt`.
 
 ```sh
-# Link against the bundled language registry
+# Bind using the bundled language registry
 plotnik generate query.ptk --target rust -l typescript -o query.rs
 
-# Link against the exact grammar shipped by the production parser package
+# Bind using the exact grammar shipped by the production parser package
 plotnik generate query.ptk --target rust \
   --grammar node_modules/tree-sitter-typescript/typescript/src/grammar.json \
   -o query.rs
@@ -195,12 +195,12 @@ with `--grammar` pointing at the parser package used in production.
 
 **Flags:**
 
-| Flag                     | Purpose                                              |
-| ------------------------ | ---------------------------------------------------- |
-| `--target rust`          | Generated-code target (currently Rust)               |
-| `-l, --lang LANG`        | Link against the bundled registry grammar            |
-| `--grammar GRAMMAR_JSON` | Bypass the registry and link against this exact file |
-| `-o, --output FILE`      | Write the generated module instead of stdout         |
+| Flag                     | Purpose                                            |
+| ------------------------ | -------------------------------------------------- |
+| `--target rust`          | Generated-code target (currently Rust)             |
+| `-l, --lang LANG`        | Bind using the bundled registry grammar            |
+| `--grammar GRAMMAR_JSON` | Bypass the registry and bind using this exact file |
+| `-o, --output FILE`      | Write the generated module instead of stdout       |
 
 ### lang
 

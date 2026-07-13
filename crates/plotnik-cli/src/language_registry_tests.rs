@@ -481,7 +481,7 @@ fn grammar_admits_every_field_and_child_in_real_trees() {
 
 /// Walk `node`'s real children, asserting the grammar admits each one where it appears:
 /// a fielded child against its field, a bare named child against its parent. Mirrors the
-/// admissibility the linker applies (`check.rs`), expanding each declared supertype to its
+/// admissibility the grammar binder applies (`check.rs`), expanding each declared supertype to its
 /// concrete members via `collect_subtypes` before comparing.
 #[cfg(any(
     feature = "lang-lua",

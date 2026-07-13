@@ -1355,7 +1355,7 @@ impl NfaBuilder<'_> {
             .analysis
             .interner
             .get(text)
-            .expect("linked anonymous token must be interned");
+            .expect("bound anonymous token must be interned");
         NodeKindConstraint::Anonymous(Some(self.ctx.analysis.grammar.expect_anonymous_kind(sym)))
     }
 
@@ -1390,7 +1390,7 @@ impl NfaBuilder<'_> {
                         .analysis
                         .interner
                         .get(id_tok.text())
-                        .expect("linked missing kind must be interned");
+                        .expect("bound missing kind must be interned");
                     NodeKindConstraint::Named(Some(
                         self.ctx.analysis.grammar.expect_named_kind(sym),
                     ))
@@ -1407,7 +1407,7 @@ impl NfaBuilder<'_> {
             .analysis
             .interner
             .get(type_name)
-            .expect("linked named node kind must be interned");
+            .expect("bound named node kind must be interned");
         NodeKindConstraint::Named(Some(self.ctx.analysis.grammar.expect_named_kind(sym)))
     }
 
@@ -1427,7 +1427,7 @@ impl NfaBuilder<'_> {
             .analysis
             .interner
             .get(field_name)
-            .expect("linked field name must be interned");
+            .expect("bound field name must be interned");
         self.ctx.analysis.grammar.expect_field(sym)
     }
 

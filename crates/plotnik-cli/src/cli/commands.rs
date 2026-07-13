@@ -95,7 +95,7 @@ pub fn generate_command() -> Command {
   plotnik generate query.ptk --target rust -l javascript -o query.rs
 
 The generated module depends on the `plotnik-rt` crate and records the exact
-grammar name, SHA-256, and source used during linking."#,
+grammar name, SHA-256, and source used during binding."#,
         )
         .arg(query_path_arg())
         .next_help_heading("Input options")

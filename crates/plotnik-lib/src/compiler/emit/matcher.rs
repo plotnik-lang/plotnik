@@ -556,14 +556,14 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
         self.artifacts
             .grammar
             .kind_name(id, self.artifacts.interner)
-            .expect("linked query binds every referenced node kind")
+            .expect("grammar-bound query binds every referenced node kind")
     }
 
     fn field_name(&self, id: NodeFieldId) -> String {
         self.artifacts
             .grammar
             .field_name(id, self.artifacts.interner)
-            .expect("linked query binds every referenced field")
+            .expect("grammar-bound query binds every referenced field")
     }
 
     fn predicate(&mut self, predicate: &PredicateIR) -> PredicatePlan {

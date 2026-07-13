@@ -443,7 +443,7 @@ GrammarIdentity {
 
 - `name` is the grammar's declared name;
 - `grammar_sha256` is lowercase SHA-256 of the exact `grammar.json` bytes used
-  for linking;
+  for binding;
 - `source` is a diagnostic label, such as a registry language/version or the
   path passed to `--grammar`.
 
