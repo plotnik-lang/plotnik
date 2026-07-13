@@ -40,7 +40,7 @@ pub struct NfaBuilder<'a> {
     /// Stack of active struct scopes for capture lookup.
     /// Innermost scope is at the end.
     pub(super) scope_stack: Vec<RecordScope>,
-    /// Non-zero while compiling under a suppressive capture (`@_`). The whole
+    /// Non-zero while compiling under a discard (`@_`). The whole
     /// region compiles structurally: captures are inert, alternations emit no
     /// variant tags or null defaults. Only definition calls still produce
     /// output — shared code emits unconditionally — and the call site brackets

@@ -536,14 +536,14 @@ impl CapturedPattern {
     /// The token text includes the @ prefix.
     pub fn name(&self) -> Option<SyntaxToken> {
         find_token(&self.0, |k| {
-            matches!(k, SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture)
+            matches!(k, SyntaxKind::CaptureToken | SyntaxKind::DiscardToken)
         })
     }
 
-    /// Returns true if this is a suppressive capture (@_ or @_name).
-    /// Suppressive captures match structurally but don't contribute to output.
-    pub fn is_suppressive(&self) -> bool {
-        find_token(&self.0, |k| k == SyntaxKind::SuppressiveCapture).is_some()
+    /// Returns true if this is a discard (`@_` or `@_name`).
+    /// Discards match structurally but don't contribute to output.
+    pub fn is_discard(&self) -> bool {
+        find_token(&self.0, |k| k == SyntaxKind::DiscardToken).is_some()
     }
 
     pub fn inner(&self) -> Option<Pattern> {

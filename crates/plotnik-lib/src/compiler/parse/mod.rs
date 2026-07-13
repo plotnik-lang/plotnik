@@ -109,7 +109,7 @@ fn class_name(kind: SyntaxKind) -> &'static str {
         SyntaxKind::RegexLiteral
         | SyntaxKind::RegexPredicateMatch
         | SyntaxKind::RegexPredicateNoMatch => "regex",
-        SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture | SyntaxKind::At => "capture",
+        SyntaxKind::CaptureToken | SyntaxKind::DiscardToken | SyntaxKind::At => "capture",
         SyntaxKind::Id | SyntaxKind::KwError | SyntaxKind::KwMissing => "ident",
         SyntaxKind::Garbage | SyntaxKind::Error => "error",
         SyntaxKind::ParenOpen

@@ -371,9 +371,9 @@ fn is_pattern_node(node: &SyntaxNode) -> bool {
 }
 
 /// Decide whether a capture exposes its inner fields to the surrounding output scope.
-/// Plain node captures do; structured, repeating, and suppressive captures contain them.
+/// Plain node captures do; structured captures, repetition captures, and discards contain them.
 fn inner_captures_bubble_up(cap: &CapturedPattern) -> bool {
-    if cap.is_suppressive() {
+    if cap.is_discard() {
         return false;
     }
     let mut inner = cap.inner();

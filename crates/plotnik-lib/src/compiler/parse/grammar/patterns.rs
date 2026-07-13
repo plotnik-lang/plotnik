@@ -238,7 +238,7 @@ impl Parser<'_, '_> {
                 });
             } else if matches!(
                 self.current(),
-                SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture
+                SyntaxKind::CaptureToken | SyntaxKind::DiscardToken
             ) {
                 self.report_current_and_bump(captured, |report| {
                     report.fix("remove the capture", "")

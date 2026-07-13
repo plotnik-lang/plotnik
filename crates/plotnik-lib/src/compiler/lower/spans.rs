@@ -243,7 +243,7 @@ fn collect_pattern(
             }
         }
         Pattern::CapturedPattern(capture) => {
-            if !capture.is_suppressive() {
+            if !capture.is_discard() {
                 let name = capture.name().expect("capture must have a name token");
                 out.push(Candidate {
                     node: capture.syntax().clone(),
@@ -293,7 +293,7 @@ fn collect_pattern(
 
             if let Some(inner) = capture.inner() {
                 let capture_pattern = Pattern::CapturedPattern(capture.clone());
-                let suppresses_output = capture.is_suppressive()
+                let suppresses_output = capture.is_discard()
                     || input
                         .analysis
                         .type_analysis

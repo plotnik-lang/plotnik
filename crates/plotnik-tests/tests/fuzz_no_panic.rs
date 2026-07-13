@@ -7,7 +7,7 @@
 //!      and formatting the result — never panics or overflows the native stack.
 //!
 //! The query side of (2) is covered by a fixed set of diverse templates
-//! (recursive, alternation, quantifier, fields, suppressive capture) rather than
+//! (recursive, alternation, quantifier, fields, discard) rather than
 //! fuzzed query text,
 //! because randomly generated queries almost never compile; the *source* is
 //! fuzzed, including deep nests that exercise the iterative backtrack/output
@@ -31,7 +31,7 @@ mod support;
 
 /// Queries known to compile, spanning the shapes whose runtime paths matter:
 /// a root match, a leaf match, an alternation, a scalar quantifier, a row
-/// quantifier, a self-recursive definition, and a recursive suppressive capture
+/// quantifier, a self-recursive definition, and a recursive discard
 /// (the `@_` SuppressBegin/skip/SuppressEnd path).
 const TEMPLATES: &[&str] = &[
     "Q = (program) @p",

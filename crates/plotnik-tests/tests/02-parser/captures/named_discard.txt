@@ -13,7 +13,7 @@ Root
           ParenOpen "("
           Id "arguments"
           ParenClose ")"
-        SuppressiveCapture "@_args"
+        DiscardToken "@_args"
       ParenClose ")"
 ---------------------- AST -----------------------
 # query.ptk

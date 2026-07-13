@@ -698,7 +698,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // Suppressive captures don't contribute to the output type. The inner
         // is still inferred for structural validation, but the explicit discard
         // needs neither an ineffective-label warning nor a collection boundary.
-        if node.is_suppressive() {
+        if node.is_discard() {
             let info = match node.inner() {
                 None => return PatternShape::void(),
                 Some(Pattern::QuantifiedPattern(q)) => {

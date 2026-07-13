@@ -152,9 +152,9 @@ impl Parser<'_, '_> {
 
     pub(crate) fn try_parse_capture(&mut self, checkpoint: Checkpoint) {
         let is_capture = self.at(SyntaxKind::CaptureToken);
-        let is_suppressive = self.at(SyntaxKind::SuppressiveCapture);
+        let is_discard = self.at(SyntaxKind::DiscardToken);
 
-        if !is_capture && !is_suppressive {
+        if !is_capture && !is_discard {
             return;
         }
 

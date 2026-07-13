@@ -1117,12 +1117,12 @@ impl NfaBuilder<'_> {
         exits: CaptureExits,
     ) -> Label {
         let inner_opt = cap.inner();
-        // Must precede mechanism dispatch: suppressive captures ignore the mechanism
+        // Must precede mechanism dispatch: discards ignore the mechanism
         // entirely and must not build any capture effects for it. Inside an
         // already-suppressed region every capture is equally inert — inference
         // dropped its field, so emitting `RecordSet` would resolve against the wrong
         // scope (the panic behind #470).
-        if cap.is_suppressive() || self.is_suppressed() {
+        if cap.is_discard() || self.is_suppressed() {
             return self.compile_suppressive(
                 inner_opt.as_ref(),
                 nav_override,
@@ -1272,7 +1272,7 @@ impl NfaBuilder<'_> {
         self.dispatch_pattern(&inner, pattern_ctx)
     }
 
-    /// Compile a suppressive capture (`@_`/`@_name`), or any capture inside an
+    /// Compile a discard (`@_`/`@_name`), or any capture inside a
     /// already-suppressed region: compile the inner structurally, in suppress
     /// mode, so nothing in the region emits output effects — captures are
     /// inert, alternations tag nothing, skip paths inject no nulls. That

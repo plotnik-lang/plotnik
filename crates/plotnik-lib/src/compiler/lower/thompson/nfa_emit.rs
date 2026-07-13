@@ -326,7 +326,7 @@ impl NfaBuilder<'_> {
 fn collect_capture_occurrences(pattern: &Pattern) -> Vec<ast::CapturedPattern> {
     fn collect(pattern: &Pattern, captures: &mut Vec<ast::CapturedPattern>) {
         if let Pattern::CapturedPattern(capture) = pattern
-            && !capture.is_suppressive()
+            && !capture.is_discard()
             && capture.name().is_some()
         {
             captures.push(capture.clone());

@@ -140,7 +140,7 @@ impl TokenRole {
             SyntaxKind::DoubleColon => Self::TypeSeparator,
             kind if is_predicate_operator(kind) => Self::PredicateOperator,
             SyntaxKind::Equals => Self::DefinitionSeparator,
-            SyntaxKind::CaptureToken | SyntaxKind::SuppressiveCapture => Self::Capture,
+            SyntaxKind::CaptureToken | SyntaxKind::DiscardToken => Self::Capture,
             _ => Self::Other,
         }
     }

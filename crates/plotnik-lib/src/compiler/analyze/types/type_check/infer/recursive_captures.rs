@@ -69,7 +69,7 @@ impl InferVisitor<'_, '_> {
             Pattern::CapturedPattern(cap) => {
                 // A suppressed subtree makes no output demands (inline checks
                 // skip it too).
-                if cap.is_suppressive() {
+                if cap.is_discard() {
                     return;
                 }
                 let Some(inner) = cap.inner() else { return };
