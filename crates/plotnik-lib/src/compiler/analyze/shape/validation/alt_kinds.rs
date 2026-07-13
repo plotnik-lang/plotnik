@@ -36,7 +36,7 @@ pub fn validate_alt_kinds(input: ValidationInput) {
             .text_range();
 
         diag.report(
-            DiagnosticKind::MixedAltBranches,
+            DiagnosticKind::MixedAlternativeLabels,
             Span::new(source_id, unlabeled.text_range()),
         )
         .related_to(

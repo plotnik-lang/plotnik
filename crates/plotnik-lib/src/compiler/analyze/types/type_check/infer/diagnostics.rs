@@ -47,14 +47,14 @@ impl InferVisitor<'_, '_> {
 
     /// Report a captured quantifier whose void inner doesn't match exactly one
     /// node: there is no single node to bind (per element, for repeats).
-    pub(super) fn report_multi_element_scalar(
+    pub(super) fn report_quantified_capture_without_single_node(
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
     ) {
-        let is_multi_element_scalar =
+        let capture_has_no_single_node =
             inner_info.root_extent == RootExtent::Other && inner_info.flow.is_void();
-        if !is_multi_element_scalar {
+        if !capture_has_no_single_node {
             return;
         }
 
@@ -74,13 +74,10 @@ impl InferVisitor<'_, '_> {
                 format!("add internal captures: `{{(a) @a (b) @b}}{op} @items`"),
             )
         };
-        self.report(
-            DiagnosticKind::MultiElementScalarCapture,
-            quant.text_range(),
-        )
-        .detail(detail)
-        .hint(hint)
-        .emit();
+        self.report(DiagnosticKind::CaptureWithoutSingleNode, quant.text_range())
+            .detail(detail)
+            .hint(hint)
+            .emit();
     }
 
     /// Report a capture whose void inner doesn't match exactly one node —
@@ -113,10 +110,7 @@ impl InferVisitor<'_, '_> {
 
         let related = self.referenced_definition_range(inner);
         let mut builder = self
-            .report(
-                DiagnosticKind::MultiElementScalarCapture,
-                inner.text_range(),
-            )
+            .report(DiagnosticKind::CaptureWithoutSingleNode, inner.text_range())
             .detail(detail)
             .hint(hint);
         if let Some((src, range)) = related {
@@ -126,7 +120,7 @@ impl InferVisitor<'_, '_> {
     }
 
     /// Report a captured reference whose definition has no value to capture.
-    pub(super) fn report_capture_on_void_ref(
+    pub(super) fn report_capture_on_match_only_ref(
         &mut self,
         inner: &Pattern,
         inner_info: &PatternShape,
@@ -139,7 +133,10 @@ impl InferVisitor<'_, '_> {
             return false;
         };
         let mut builder = self
-            .report(DiagnosticKind::VoidReferenceCapture, inner.text_range())
+            .report(
+                DiagnosticKind::MatchOnlyReferenceCapture,
+                inner.text_range(),
+            )
             .detail(
                 "the referenced definition produces no value; add a capture inside it or capture a node pattern directly",
             );
@@ -190,7 +187,7 @@ impl InferVisitor<'_, '_> {
 
     /// Report bubbling captures that need a repetition or optional capture to
     /// package one record value per quantifier occurrence.
-    pub(super) fn report_internal_capture_dimensionality(
+    pub(super) fn report_uncollected_quantified_captures(
         &mut self,
         quant: &QuantifiedPattern,
         inner_info: &PatternShape,
@@ -250,7 +247,7 @@ impl InferVisitor<'_, '_> {
             )
         };
         self.report(
-            DiagnosticKind::StrictDimensionalityViolation,
+            DiagnosticKind::UncollectedQuantifiedCaptures,
             quant.text_range(),
         )
         .detail(detail)
@@ -265,9 +262,12 @@ impl InferVisitor<'_, '_> {
     /// Warn when labels appear in a fields context: they have no output effect,
     /// and captures from the alternatives merge into the enclosing result.
     pub(super) fn report_unused_alternative_labels(&mut self, alternation: &AlternationPattern) {
-        self.report(DiagnosticKind::UnusedBranchLabels, alternation.text_range())
-            .detail("captures from the alternatives merge into the enclosing result")
-            .emit();
+        self.report(
+            DiagnosticKind::UnusedAlternativeLabels,
+            alternation.text_range(),
+        )
+        .detail("captures from the alternatives merge into the enclosing result")
+        .emit();
     }
 
     pub(super) fn report_alternative_unify_error(

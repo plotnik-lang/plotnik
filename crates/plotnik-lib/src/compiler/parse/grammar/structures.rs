@@ -670,7 +670,7 @@ impl<'q> Parser<'q, '_> {
         let label_text = self.current_text();
         let pascal = to_pascal_case(label_text);
 
-        if let Some(report) = self.report_at(DiagnosticKind::BranchLabelInvalid, span) {
+        if let Some(report) = self.report_at(DiagnosticKind::AlternativeLabelInvalid, span) {
             report.fix(format!("use `{}`", pascal), pascal).emit();
         }
 

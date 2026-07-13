@@ -6,7 +6,7 @@ E = [
   (x)
 ]
 ------------------ DIAGNOSTICS -------------------
-error: infinite recursion: cycle consumes no input
+error: infinite recursion: cycle makes no progress
  --> query.ptk:3:6
   |
 3 |     (E)
@@ -14,7 +14,7 @@ error: infinite recursion: cycle consumes no input
   |      |
   |      references itself
   |
-help: recursive references must consume input before recursing
+help: match at least one syntax-tree node before recursing
 -------------------- SYMBOLS ---------------------
 E
   E (cycle)

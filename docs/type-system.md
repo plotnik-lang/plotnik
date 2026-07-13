@@ -373,10 +373,11 @@ item-boundary requirement — nothing is collected, so nothing can be lost.
 ## Recursion
 
 Definitions can reference themselves (or each other) when every cycle both
-**escapes** and **descends**:
+**escapes** and **makes progress**:
 
 1. **Escape**: some alternative must terminate without recursing.
-2. **Descent**: each pass around the cycle must descend into a child.
+2. **Progress**: each pass around the cycle must match at least one syntax-tree
+   node before recursing.
 
 ```
 Loop = (Loop)
@@ -384,11 +385,11 @@ Loop = (Loop)
 
 A = [X: (identifier) @i  Y: (B) @b]
 B = (A)
-; ERROR: infinite recursion: cycle never descends into a child
+; ERROR: infinite recursion: cycle makes no progress
 
 A = (parenthesized_expression (B))
 B = (array (A))
-; ERROR: no escape path — descending is not enough, some alternative must terminate
+; ERROR: no escape path — progress is not enough; some alternative must terminate
 
 MemberChain = [
   Base: (identifier) @name
@@ -396,7 +397,7 @@ MemberChain = [
     object: (MemberChain) @object
     property: (property_identifier) @property)
 ]
-; OK: Base escapes, Access descends
+; OK: Base escapes, Access matches a member_expression before recursing
 ```
 
 ```typescript

@@ -1,17 +1,17 @@
-A = [
-  (A)
-  _
+E = [
+  (E)+
+  (x)
 ]
 ------------------ DIAGNOSTICS -------------------
-error: infinite recursion: cycle consumes no input
+error: infinite recursion: cycle makes no progress
  --> query.ptk:2:4
   |
-2 |   (A)
+2 |   (E)+
   |    ^
   |    |
   |    references itself
   |
-help: recursive references must consume input before recursing
+help: match at least one syntax-tree node before recursing
 -------------------- SYMBOLS ---------------------
-A
-  A (cycle)
+E
+  E (cycle)

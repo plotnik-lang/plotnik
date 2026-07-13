@@ -62,7 +62,9 @@ impl<'q> Parser<'q, '_> {
         let name = ident.text();
         if name.contains(['_', '-', '.']) {
             let suggested = to_pascal_case(name);
-            if let Some(report) = self.report_at(DiagnosticKind::BranchLabelInvalid, ident.span()) {
+            if let Some(report) =
+                self.report_at(DiagnosticKind::AlternativeLabelInvalid, ident.span())
+            {
                 report.fix(format!("use `{suggested}`"), suggested).emit();
             }
         }

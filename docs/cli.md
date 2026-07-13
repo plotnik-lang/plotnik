@@ -558,12 +558,12 @@ help: did you mean 'function_declaration'?
 
 Common errors:
 
-| Error                             | Cause                                | Fix                                       |
-| --------------------------------- | ------------------------------------ | ----------------------------------------- |
-| `unknown node kind`               | Typo in node kind                    | Check `plotnik tree file` for valid kinds |
-| `missing closing )`               | Unclosed tree pattern                | Match parentheses                         |
-| `expected expression`             | Invalid syntax                       | Check query syntax                        |
-| `strict dimensionality violation` | Quantified captures need row wrapper | Use `{...}* @rows` pattern                |
+| Error                                                    | Cause                                     | Fix                                       |
+| -------------------------------------------------------- | ----------------------------------------- | ----------------------------------------- |
+| `unknown node kind`                                      | Typo in node kind                         | Check `plotnik tree file` for valid kinds |
+| `missing closing )`                                      | Unclosed tree pattern                     | Match parentheses                         |
+| `expected expression`                                    | Invalid syntax                            | Check query syntax                        |
+| `captures under a quantifier must be collected together` | Quantified captures have no item boundary | Capture the quantified group              |
 
 ---
 

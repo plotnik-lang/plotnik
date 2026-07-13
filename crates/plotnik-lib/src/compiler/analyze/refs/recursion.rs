@@ -2,7 +2,7 @@
 //!
 //! Validates that recursive definitions are well-formed:
 //! - Escapable: at least one non-recursive path exists
-//! - Guarded: every recursive cycle consumes input
+//! - Progressing: every recursive cycle matches a node before recursing
 
 use indexmap::{IndexMap, IndexSet};
 use rowan::TextRange;
@@ -44,29 +44,29 @@ struct RecursionValidator<'a, 'd> {
 
 #[derive(Clone, Copy)]
 enum RecursionFlaw {
-    Escapeless,
-    Unguarded,
+    NoEscape,
+    NoProgress,
 }
 
 impl RecursionFlaw {
-    fn search_mode(self) -> CycleSearchScope {
+    fn search_scope(self) -> CycleSearchScope {
         match self {
-            Self::Escapeless => CycleSearchScope::All,
-            Self::Unguarded => CycleSearchScope::Unguarded,
+            Self::NoEscape => CycleSearchScope::All,
+            Self::NoProgress => CycleSearchScope::BeforeProgress,
         }
     }
 
     fn diagnostic_kind(self) -> DiagnosticKind {
         match self {
-            Self::Escapeless => DiagnosticKind::RecursionNoEscape,
-            Self::Unguarded => DiagnosticKind::DirectRecursion,
+            Self::NoEscape => DiagnosticKind::RecursionWithoutEscape,
+            Self::NoProgress => DiagnosticKind::RecursionWithoutProgress,
         }
     }
 
     fn self_reference_message(self, target: &str) -> String {
         match self {
-            Self::Escapeless => format!("{target} references itself"),
-            Self::Unguarded => "references itself".to_string(),
+            Self::NoEscape => format!("{target} references itself"),
+            Self::NoProgress => "references itself".to_string(),
         }
     }
 }
@@ -103,7 +103,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
 
         if !has_escape {
             // Every cycle is an infinite loop — no escape path exists anywhere in the SCC.
-            let kind = RecursionFlaw::Escapeless;
+            let kind = RecursionFlaw::NoEscape;
             if let Some(raw_chain) = self.find_cycle(scc, &scc_set, kind) {
                 let chain = self.format_chain(raw_chain, kind);
                 self.report_cycle(kind.diagnostic_kind(), scc, chain);
@@ -111,7 +111,7 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
             return;
         }
 
-        let kind = RecursionFlaw::Unguarded;
+        let kind = RecursionFlaw::NoProgress;
         if let Some(raw_chain) = self.find_cycle(scc, &scc_set, kind) {
             let chain = self.format_chain(raw_chain, kind);
             self.report_cycle(kind.diagnostic_kind(), scc, chain);
@@ -125,14 +125,14 @@ impl<'a, 'd> RecursionValidator<'a, 'd> {
         domain: &IndexSet<&'b str>,
         kind: RecursionFlaw,
     ) -> Option<Vec<(Span, &'b str)>> {
-        let search_mode = kind.search_mode();
+        let search_scope = kind.search_scope();
         let mut adj = IndexMap::new();
         for &name in nodes {
             if let Some((source_id, body)) = self.symbol_table.definition(name) {
                 let neighbors = domain
                     .iter()
                     .filter_map(|target| {
-                        search_mode
+                        search_scope
                             .find_ref_range(source_id, body, target)
                             .map(|range| (*target, Span::new(source_id, range)))
                     })
@@ -323,29 +323,33 @@ fn pattern_has_escape(pattern: &Pattern, scc_names: &IndexSet<&str>) -> bool {
     }
 }
 
-fn pattern_consumes_input(pattern: &Pattern) -> bool {
+fn pattern_guarantees_progress(pattern: &Pattern) -> bool {
     match pattern {
         Pattern::NodePattern(_) | Pattern::TokenPattern(_) => true,
         Pattern::DefRef(_) => false,
-        Pattern::Alternation(_) => pattern.children().all(|c| pattern_consumes_input(&c)),
-        Pattern::SeqPattern(_) => pattern.children().any(|c| pattern_consumes_input(&c)),
+        Pattern::Alternation(_) => pattern
+            .children()
+            .all(|child| pattern_guarantees_progress(&child)),
+        Pattern::SeqPattern(_) => pattern
+            .children()
+            .any(|child| pattern_guarantees_progress(&child)),
         Pattern::QuantifiedPattern(q) => {
             !q.is_optional()
-                && pattern_consumes_input(
+                && pattern_guarantees_progress(
                     &q.inner().expect("quantified pattern has inner after parse"),
                 )
         }
-        Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => {
-            pattern.children().all(|c| pattern_consumes_input(&c))
-        }
+        Pattern::CapturedPattern(_) | Pattern::FieldPattern(_) => pattern
+            .children()
+            .all(|child| pattern_guarantees_progress(&child)),
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum CycleSearchScope {
     All,
-    /// Not inside a `NodePattern`/`TokenPattern` (those consume input, so the cycle is guarded).
-    Unguarded,
+    /// No preceding pattern on this path is guaranteed to match a node.
+    BeforeProgress,
 }
 
 impl CycleSearchScope {
@@ -380,15 +384,15 @@ impl Visitor for RefFinder<'_> {
     }
 
     fn visit_node_pattern(&mut self, node: &Located<NodePattern>) {
-        if self.mode == CycleSearchScope::Unguarded {
-            return; // Guarded: stop recursion
+        if self.mode == CycleSearchScope::BeforeProgress {
+            return; // Matching this node establishes progress before any nested reference.
         }
         walk_node_pattern(self, node);
     }
 
     fn visit_token_pattern(&mut self, _node: &Located<TokenPattern>) {
         // TokenPattern has no child patterns, so nothing to walk.
-        // In Unguarded mode this also acts as a guard (stops recursion).
+        // In BeforeProgress mode this also stops the search once the path has progressed.
     }
 
     fn visit_def_ref(&mut self, r: &Located<DefRef>) {
@@ -409,7 +413,9 @@ impl Visitor for RefFinder<'_> {
             if self.found.is_some() {
                 return;
             }
-            if self.mode == CycleSearchScope::Unguarded && pattern_consumes_input(child.node()) {
+            if self.mode == CycleSearchScope::BeforeProgress
+                && pattern_guarantees_progress(child.node())
+            {
                 return;
             }
         }

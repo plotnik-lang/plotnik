@@ -5,7 +5,7 @@ A = [
 
 B = (A)
 ------------------ DIAGNOSTICS -------------------
-error: infinite recursion: cycle consumes no input
+error: infinite recursion: cycle makes no progress
  --> query.ptk:6:6
   |
 2 |   (B)
@@ -17,7 +17,7 @@ error: infinite recursion: cycle consumes no input
   | |    references A
   | B is defined here
   |
-help: recursive references must consume input before recursing
+help: match at least one syntax-tree node before recursing
 -------------------- SYMBOLS ---------------------
 A
   B

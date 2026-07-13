@@ -630,7 +630,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     }
 
     fn report_duplicate_case_label(&mut self, range: TextRange, label: &str) {
-        self.report(DiagnosticKind::DuplicateAlternationLabel, range)
+        self.report(DiagnosticKind::DuplicateAlternativeLabel, range)
             .detail(label)
             .emit();
     }
@@ -757,7 +757,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         // machinery defines their value (list, or optional node), and the
         // exactly-one check runs on their element instead.
         if !matches!(inner.node(), Pattern::QuantifiedPattern(_))
-            && !self.report_capture_on_void_ref(inner.node(), &inner_info)
+            && !self.report_capture_on_match_only_ref(inner.node(), &inner_info)
         {
             self.report_capture_without_single_node(inner.node(), &inner_info);
         }
@@ -1119,7 +1119,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 // as one nullable value — fields keep their true modality, the
                 // null lives on the capture field alone.
                 QuantifiedContext::Captured => {
-                    self.report_multi_element_scalar(quant.node(), &inner_info);
+                    self.report_quantified_capture_without_single_node(quant.node(), &inner_info);
                     inner_info.flow
                 }
                 // Internal captures of a bare `?` have nothing to collect them,
@@ -1127,7 +1127,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 // nulls into the enclosing scope. Recover with the legacy
                 // bubbling shape so downstream inference stays coherent.
                 QuantifiedContext::Bare => {
-                    self.report_internal_capture_dimensionality(quant.node(), &inner_info);
+                    self.report_uncollected_quantified_captures(quant.node(), &inner_info);
                     self.make_flow_optional(inner_info.flow)
                 }
                 QuantifiedContext::Discard => PatternFlow::Void,
@@ -1181,12 +1181,12 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         match context {
             // Repeated captures with no list to land in.
             QuantifiedContext::Bare => {
-                self.report_internal_capture_dimensionality(quant, inner_info);
+                self.report_uncollected_quantified_captures(quant, inner_info);
             }
             // A captured repeat of a multi-node void group has no defined
             // element value.
             QuantifiedContext::Captured => {
-                self.report_multi_element_scalar(quant, inner_info);
+                self.report_quantified_capture_without_single_node(quant, inner_info);
             }
             // Everything is discarded; there is nothing to collect wrongly.
             QuantifiedContext::Discard => {}
@@ -1259,7 +1259,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     ) -> TypeId {
         match &inner_info.flow {
             PatternFlow::Void => {
-                self.report_multi_element_scalar(quant, inner_info);
+                self.report_quantified_capture_without_single_node(quant, inner_info);
                 TYPE_NODE
             }
             PatternFlow::Value(t) => {
@@ -1314,7 +1314,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             // discarded repeat produces nothing outright.
             (QuantifiedContext::Bare, PatternFlow::Void | PatternFlow::Value(_))
             | (QuantifiedContext::Discard, _) => PatternFlow::Void,
-            // Bare with bubbling captures: `report_internal_capture_dimensionality`
+            // Bare with bubbling captures: `report_uncollected_quantified_captures`
             // already errored. Produce the plausible list type anyway so
             // downstream inference isn't poisoned by void.
             (QuantifiedContext::Bare, PatternFlow::Fields(record_type)) => {

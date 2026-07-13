@@ -60,7 +60,7 @@ pub enum DiagnosticKind {
 
     CaptureNameInvalid,
     DefNameInvalid,
-    BranchLabelInvalid,
+    AlternativeLabelInvalid,
     FieldNameInvalid,
     CaptureTypeNameInvalid,
     TreeSitterSequenceSyntaxDeprecated,
@@ -69,23 +69,23 @@ pub enum DiagnosticKind {
 
     DuplicateDefinition,
     UndefinedReference,
-    MixedAltBranches,
-    DuplicateAlternationLabel,
-    RecursionNoEscape,
-    DirectRecursion,
+    MixedAlternativeLabels,
+    DuplicateAlternativeLabel,
+    RecursionWithoutEscape,
+    RecursionWithoutProgress,
     FieldSequenceValue,
     AnchorWithoutContext,
 
     IncompatibleTypes,
-    UnusedBranchLabels,
-    StrictDimensionalityViolation,
-    MultiElementScalarCapture,
-    VoidReferenceCapture,
+    UnusedAlternativeLabels,
+    UncollectedQuantifiedCaptures,
+    CaptureWithoutSingleNode,
+    MatchOnlyReferenceCapture,
     UnnamedQuantifiedElement,
     ZeroWidthRepeat,
     DuplicateCaptureInScope,
     IncompatibleCaptureTypes,
-    IncompatibleStructShapes,
+    IncompatibleRecordShapes,
     TypeNameConflict,
     UnknownCaptureType,
     InvalidCaptureType,
@@ -134,7 +134,7 @@ impl DiagnosticKind {
     /// Severity for this kind.
     pub fn severity(&self) -> Severity {
         match self {
-            Self::UnusedBranchLabels
+            Self::UnusedAlternativeLabels
             | Self::CaptureTypeSuppressesData
             | Self::RedundantCaptureType
             | Self::InspectionSpansDegraded
@@ -208,7 +208,7 @@ impl DiagnosticKind {
             }
             Self::CaptureNameInvalid => "captures become fields in the output",
             Self::DefNameInvalid => "definitions become types in the output",
-            Self::BranchLabelInvalid => {
+            Self::AlternativeLabelInvalid => {
                 "alternative labels name variant cases when the alternation produces a value"
             }
             Self::FieldNameInvalid => "fields come from the grammar and are snake_case",
@@ -219,14 +219,16 @@ impl DiagnosticKind {
             Self::SupertypeSlashDeprecated => {
                 "use `supertype#subtype` instead of `supertype/subtype`"
             }
-            Self::MixedAltBranches => "either label every alternative or remove all labels",
-            Self::DuplicateAlternationLabel => {
+            Self::MixedAlternativeLabels => "either label every alternative or remove all labels",
+            Self::DuplicateAlternativeLabel => {
                 "each alternative label must be unique within an alternation"
             }
-            Self::RecursionNoEscape => {
+            Self::RecursionWithoutEscape => {
                 "add a non-recursive alternative to terminate: `[Base: ... Rec: (Self)]`"
             }
-            Self::DirectRecursion => "recursive references must consume input before recursing",
+            Self::RecursionWithoutProgress => {
+                "match at least one syntax-tree node before recursing"
+            }
             Self::AnchorWithoutContext => "wrap in a named node: `(parent . (child))`",
             Self::AnchorInAlternation => "use `[{(a) . (b)} (c)]` to anchor within an alternative",
             Self::QuantifiedAnchor | Self::CapturedAnchor => {
@@ -247,7 +249,7 @@ impl DiagnosticKind {
             Self::NegatedFieldAsFieldValue => {
                 "a negated field stands alone as a child: `(node -field)`"
             }
-            Self::UnusedBranchLabels => {
+            Self::UnusedAlternativeLabels => {
                 "capture the alternation (`[...] @name`) to make its labels produce variant cases, or remove them"
             }
             Self::UnclosedTree => "add `)` to close the node",
@@ -376,7 +378,7 @@ impl DiagnosticKind {
             Self::CaptureTypeWithoutCapture => "capture type has no capture",
             Self::CaptureNameInvalid => "capture names must be snake_case",
             Self::DefNameInvalid => "definition names must be PascalCase",
-            Self::BranchLabelInvalid => "alternative labels must be PascalCase",
+            Self::AlternativeLabelInvalid => "alternative labels must be PascalCase",
             Self::FieldNameInvalid => "field names must be snake_case",
             Self::CaptureTypeNameInvalid => {
                 "capture type names cannot contain punctuation or custom-name separators"
@@ -388,28 +390,28 @@ impl DiagnosticKind {
             Self::SupertypeSlashDeprecated => "`supertype/subtype` paths are tree-sitter syntax",
             Self::DuplicateDefinition => "duplicate definition",
             Self::UndefinedReference => "undefined reference",
-            Self::MixedAltBranches => {
+            Self::MixedAlternativeLabels => {
                 "an alternation cannot mix labeled and unlabeled alternatives"
             }
-            Self::DuplicateAlternationLabel => "duplicate alternative label",
-            Self::RecursionNoEscape => "infinite recursion: no escape path",
-            Self::DirectRecursion => "infinite recursion: cycle consumes no input",
+            Self::DuplicateAlternativeLabel => "duplicate alternative label",
+            Self::RecursionWithoutEscape => "infinite recursion: no escape path",
+            Self::RecursionWithoutProgress => "infinite recursion: cycle makes no progress",
             Self::FieldSequenceValue => "field cannot match a sequence",
             Self::AnchorWithoutContext => "anchor needs an enclosing node",
             Self::IncompatibleTypes => "incompatible types",
-            Self::UnusedBranchLabels => "alternative labels have no output effect here",
-            Self::StrictDimensionalityViolation => {
-                "a repeated capture must be collected into a list"
+            Self::UnusedAlternativeLabels => "alternative labels have no output effect here",
+            Self::UncollectedQuantifiedCaptures => {
+                "captures under a quantifier must be collected together"
             }
-            Self::MultiElementScalarCapture => "a captured pattern must match exactly one node",
-            Self::VoidReferenceCapture => "cannot capture a match-only definition",
+            Self::CaptureWithoutSingleNode => "a captured pattern must match exactly one node",
+            Self::MatchOnlyReferenceCapture => "cannot capture a match-only definition",
             Self::UnnamedQuantifiedElement => {
                 "quantifier at definition root leaves its element type unnamed"
             }
             Self::ZeroWidthRepeat => "cannot repeat a nullable pattern",
             Self::DuplicateCaptureInScope => "duplicate capture in scope",
             Self::IncompatibleCaptureTypes => "incompatible capture types",
-            Self::IncompatibleStructShapes => "incompatible record shapes",
+            Self::IncompatibleRecordShapes => "incompatible record shapes",
             Self::TypeNameConflict => "conflicting type name",
             Self::UnknownCaptureType => "unknown capture type",
             Self::InvalidCaptureType => "invalid capture type",
@@ -473,9 +475,9 @@ impl DiagnosticKind {
             Self::UndefinedReference => "`{}` is not defined".to_string(),
             // The detail leads with the specific conflict; the kind name is not prefixed.
             Self::IncompatibleTypes => "{}".to_string(),
-            Self::StrictDimensionalityViolation => "{}".to_string(),
-            Self::MultiElementScalarCapture => "{}".to_string(),
-            Self::VoidReferenceCapture => "{}".to_string(),
+            Self::UncollectedQuantifiedCaptures => "{}".to_string(),
+            Self::CaptureWithoutSingleNode => "{}".to_string(),
+            Self::MatchOnlyReferenceCapture => "{}".to_string(),
             Self::UnnamedQuantifiedElement => "{}".to_string(),
             Self::ZeroWidthRepeat => "{}".to_string(),
             Self::TypeNameConflict => {
@@ -491,7 +493,7 @@ impl DiagnosticKind {
             Self::IncompatibleCaptureTypes => {
                 "capture `@{}` has incompatible types across alternatives".to_string()
             }
-            Self::IncompatibleStructShapes => {
+            Self::IncompatibleRecordShapes => {
                 "capture `@{}` has incompatible record fields across alternatives".to_string()
             }
             Self::UnknownNodeKind => "`{}` is not a valid node kind".to_string(),
@@ -510,10 +512,10 @@ impl DiagnosticKind {
             Self::NegatedRequiredField => "`-{}` can never match".to_string(),
             // The detail, when present, is the crafted message; bare emits use the summary.
             Self::UnsatisfiablePattern => "{}".to_string(),
-            Self::MixedAltBranches => {
+            Self::MixedAlternativeLabels => {
                 "an alternation cannot mix labeled and unlabeled alternatives: {}".to_string()
             }
-            Self::DuplicateAlternationLabel => {
+            Self::DuplicateAlternativeLabel => {
                 "alternative label `{}` is already used in this alternation".to_string()
             }
             // The detail (an `EmitError`/`ModuleError` Display) is already a complete message.

@@ -77,7 +77,7 @@ impl InferVisitor<'_, '_> {
                     Pattern::DefRef(_) => {
                         if let Some(shape) =
                             self.in_progress_target_shape(&inner, registration_order, captor_order)
-                            && !self.report_capture_on_void_ref(&inner, &shape)
+                            && !self.report_capture_on_match_only_ref(&inner, &shape)
                         {
                             self.report_capture_without_single_node(&inner, &shape);
                         }
@@ -91,7 +91,7 @@ impl InferVisitor<'_, '_> {
                                 captor_order,
                             )
                         {
-                            self.report_multi_element_scalar(q, &shape);
+                            self.report_quantified_capture_without_single_node(q, &shape);
                         }
                     }
                     _ => {}
