@@ -42,7 +42,7 @@ T1 = Record  M0:1  ; { id }
 T2 = Record  M1:1  ; { d }
 T3 = Variant M2:2  ; A | B
 T4 = Record  M4:1  ; { x }
-T5 = Optional(T0)  ; <Node>?
+T5 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S01 → T5  ; id: T5

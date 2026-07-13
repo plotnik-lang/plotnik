@@ -42,7 +42,7 @@ S11 "call_expression"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:5  ; { a, b, c, d, e }
-T2 = Optional(T0)  ; <Node>?
+T2 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S01 → T2  ; a: T2

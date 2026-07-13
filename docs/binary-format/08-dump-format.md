@@ -138,7 +138,7 @@ S6 "string"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:2  ; { n, s }
-T2 = Optional(T0)  ; <Node>?
+T2 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S1 → T2  ; n: T2

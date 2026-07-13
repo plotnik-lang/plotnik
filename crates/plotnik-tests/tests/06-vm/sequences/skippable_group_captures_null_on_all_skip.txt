@@ -38,7 +38,7 @@ S8 "debugger_statement"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:3  ; { e, s, d }
-T2 = Optional(T0)  ; <Node>?
+T2 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S1 → T2  ; e: T2

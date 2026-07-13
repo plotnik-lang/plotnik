@@ -64,8 +64,8 @@ fn direct_recursive_ref_is_boxed_in_its_own_item() {
 }
 
 #[test]
-fn ref_under_optional_is_boxed() {
-    let fx = recursive_def(|builder, ref_ty| builder.intern_type(TypeShape::Optional(ref_ty)));
+fn ref_under_option_is_boxed() {
+    let fx = recursive_def(|builder, ref_ty| builder.intern_type(TypeShape::Option(ref_ty)));
 
     let facts = TypeFacts::compute(&fx.types);
 
@@ -180,14 +180,14 @@ fn mutual_recursion_boxes_both_edges() {
     let b_def = DefId::from_raw(1);
 
     let ref_to_b = builder.intern_type(TypeShape::Ref(b_def));
-    let opt_ref_to_b = builder.intern_type(TypeShape::Optional(ref_to_b));
+    let opt_ref_to_b = builder.intern_type(TypeShape::Option(ref_to_b));
     let a_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("b"),
         FieldInfo::required(opt_ref_to_b),
     )]));
     record_def(&mut builder, a_def, a_struct);
     let ref_to_a = builder.intern_type(TypeShape::Ref(a_def));
-    let opt_ref_to_a = builder.intern_type(TypeShape::Optional(ref_to_a));
+    let opt_ref_to_a = builder.intern_type(TypeShape::Option(ref_to_a));
     let b_struct = builder.intern_record(BTreeMap::from([(
         interner.intern("a"),
         FieldInfo::required(opt_ref_to_a),
@@ -264,7 +264,7 @@ fn lifetime_crosses_mutual_recursion() {
     )]));
     record_def(&mut builder, a_def, a_struct);
     let ref_to_a = builder.intern_type(TypeShape::Ref(a_def));
-    let opt_ref_to_a = builder.intern_type(TypeShape::Optional(ref_to_a));
+    let opt_ref_to_a = builder.intern_type(TypeShape::Option(ref_to_a));
     let b_struct = builder.intern_record(BTreeMap::from([
         (interner.intern("name"), FieldInfo::required(TYPE_NODE)),
         (interner.intern("parent"), FieldInfo::required(opt_ref_to_a)),

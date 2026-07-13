@@ -154,14 +154,14 @@ fn dump_types_defs(out: &mut String, module: &Module, ctx: &DumpContext) {
             }
             TypeDefKind::Wrapper { kind, inner } => {
                 let formatted = match kind {
-                    TypeKind::Optional => format!("Optional(T{:0tw$})", u16::from(inner)),
+                    TypeKind::Option => format!("Option(T{:0tw$})", u16::from(inner)),
                     TypeKind::ArrayZeroOrMore => format!("ArrayStar(T{:0tw$})", u16::from(inner)),
                     TypeKind::ArrayOneOrMore => format!("ArrayPlus(T{:0tw$})", u16::from(inner)),
                     TypeKind::Alias => format!("Alias(T{:0tw$})", u16::from(inner)),
                     _ => unreachable!(),
                 };
                 let comment = match kind {
-                    TypeKind::Optional => {
+                    TypeKind::Option => {
                         let inner_name = format_type_name(inner, module, ctx);
                         format!("{}  ; {}?{}", c.dim, inner_name, c.reset)
                     }

@@ -32,7 +32,7 @@ S6 "debugger_statement"
 [type_defs]
 T0 = <Void>
 T1 = <Node>
-T2 = Optional(T1)  ; <Node>?
+T2 = Option(T1)  ; <Node>?
 T3 = Record  M0:1  ; { d }
 
 [type_members]

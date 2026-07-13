@@ -13,7 +13,7 @@ pub mod type_shape;
 pub use capture_kind::CaptureKind;
 pub use capture_type::{
     BuiltInCaptureType, CaptureFact, CaptureTypePlan, CaptureTypePlanKind, FieldCompletion,
-    FieldCompletions, OptionalCaptureTypeMode, RawCaptureFact, TerminalData,
+    FieldCompletions, OptionMode, RawCaptureFact, TerminalData,
 };
 pub use entrypoints::check_entrypoints;
 pub use root_extent::RootExtent;

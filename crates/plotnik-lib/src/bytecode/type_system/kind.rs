@@ -11,8 +11,8 @@ pub enum TypeKind {
     Void = 0,
     /// AST node reference.
     Node = 1,
-    /// `T?` - optional wrapper, contains zero or one value.
-    Optional = 2,
+    /// `T?` - option type containing zero or one value.
+    Option = 2,
     /// `T*` - array of zero or more values.
     ArrayZeroOrMore = 3,
     /// `T+` - array of one or more values (non-empty).
@@ -35,7 +35,7 @@ impl TypeKind {
         match v {
             0 => Some(Self::Void),
             1 => Some(Self::Node),
-            2 => Some(Self::Optional),
+            2 => Some(Self::Option),
             3 => Some(Self::ArrayZeroOrMore),
             4 => Some(Self::ArrayOneOrMore),
             5 => Some(Self::Record),
@@ -52,14 +52,14 @@ impl TypeKind {
         matches!(self, Self::Void | Self::Node | Self::Text | Self::Bool)
     }
 
-    /// Whether this is a wrapper type (Optional, ArrayZeroOrMore, ArrayOneOrMore).
+    /// Whether this is a wrapper type (Option, ArrayZeroOrMore, ArrayOneOrMore).
     ///
     /// Wrapper types contain a single inner type.
     /// Record and Variant types carry named members instead.
     pub fn is_wrapper(self) -> bool {
         matches!(
             self,
-            Self::Optional | Self::ArrayZeroOrMore | Self::ArrayOneOrMore
+            Self::Option | Self::ArrayZeroOrMore | Self::ArrayOneOrMore
         )
     }
 

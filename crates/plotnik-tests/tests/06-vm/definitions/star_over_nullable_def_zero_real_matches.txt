@@ -42,7 +42,7 @@ T1 = Record  M0:1  ; { id }
 T2 = Record  M1:1  ; { x }
 T3 = ArrayStar(T2)  ; A*
 T4 = Record  M2:1  ; { xs }
-T5 = Optional(T1)  ; AX?
+T5 = Option(T1)  ; AX?
 
 [type_members]
 M0: S1 → T0  ; id: <Node>

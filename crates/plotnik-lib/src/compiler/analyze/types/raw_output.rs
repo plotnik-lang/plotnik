@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use crate::compiler::analyze::types::capture_kind::CaptureKind;
 use crate::compiler::analyze::types::capture_type::{
     BuiltInCaptureType, CaptureFact, CaptureTypePlan, FieldCompletion, FieldCompletions,
-    OptionalCaptureTypeMode, RawCaptureFact, TerminalData,
+    OptionMode, RawCaptureFact, TerminalData,
 };
 use crate::compiler::analyze::types::type_analysis::TypeAnalysis;
 use crate::compiler::analyze::types::type_shape::{

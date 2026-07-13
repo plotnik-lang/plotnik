@@ -15,7 +15,7 @@ impl TypeKind {
 /// Type definition entry (4 bytes).
 ///
 /// Semantics of `payload` and `count` depend on `kind`:
-/// - Wrappers (Optional, ArrayStar, ArrayPlus): `payload` = inner TypeId, `count` = 0
+/// - Wrappers (Option, ArrayStar, ArrayPlus): `payload` = inner TypeId, `count` = 0
 /// - Record/Variant: `payload` = member index, `count` = member count
 /// - Alias: `payload` = target TypeId, `count` = 0
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,7 +37,7 @@ const _: () = assert!(std::mem::size_of::<TypeDef>() == TypeDef::SIZE);
 pub enum TypeDefKind {
     /// Primitive types: Void, Node, Text, Bool.
     Primitive(TypeKind),
-    /// Wrapper types: Optional, ArrayZeroOrMore, ArrayOneOrMore, Alias.
+    /// Wrapper types: Option, ArrayZeroOrMore, ArrayOneOrMore, Alias.
     Wrapper { kind: TypeKind, inner: TypeId },
     /// A fixed set of named fields.
     Record { member_start: u16, member_count: u8 },
@@ -67,7 +67,7 @@ impl TypeDef {
         }
     }
 
-    /// Create a wrapper type (Optional, ArrayStar, ArrayPlus).
+    /// Create a wrapper type (Option, ArrayStar, ArrayPlus).
     pub fn wrapper(kind: TypeKind, inner: TypeId) -> Self {
         Self {
             payload: u16::from(inner),
@@ -87,8 +87,8 @@ impl TypeDef {
         }
     }
 
-    pub fn optional(inner: TypeId) -> Self {
-        Self::wrapper(TypeKind::Optional, inner)
+    pub fn option(inner: TypeId) -> Self {
+        Self::wrapper(TypeKind::Option, inner)
     }
 
     pub fn alias(target: TypeId) -> Self {
@@ -155,7 +155,7 @@ impl TypeDef {
             TypeKind::Void | TypeKind::Node | TypeKind::Text | TypeKind::Bool => {
                 TypeDefKind::Primitive(kind)
             }
-            TypeKind::Optional
+            TypeKind::Option
             | TypeKind::ArrayZeroOrMore
             | TypeKind::ArrayOneOrMore
             | TypeKind::Alias => TypeDefKind::Wrapper {

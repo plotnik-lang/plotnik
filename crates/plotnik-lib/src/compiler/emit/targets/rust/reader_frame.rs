@@ -135,7 +135,7 @@ impl<'m, 'a> ReaderFrameEstimator<'m, 'a> {
             TypeShape::Node | TypeShape::Custom(_) => NODE_VALUE_BYTES,
             TypeShape::Text => 2 * WORD_BYTES,
             TypeShape::Bool => 1,
-            TypeShape::Optional(inner) => {
+            TypeShape::Option(inner) => {
                 let inner = self.type_value_bytes(*inner, context, seen);
                 self.option_value_bytes(inner)
             }

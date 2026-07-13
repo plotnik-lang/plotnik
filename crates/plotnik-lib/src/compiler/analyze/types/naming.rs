@@ -248,7 +248,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             | TypeShape::Text
             | TypeShape::Bool
             | TypeShape::Array { .. }
-            | TypeShape::Optional(_) => {}
+            | TypeShape::Option(_) => {}
         }
     }
 
@@ -283,7 +283,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         loop {
             match self.ctx.in_progress().type_shape(current) {
                 Some(TypeShape::Array { element, .. }) => current = *element,
-                Some(TypeShape::Optional(inner)) => current = *inner,
+                Some(TypeShape::Option(inner)) => current = *inner,
                 _ => return current,
             }
         }

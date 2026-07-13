@@ -41,9 +41,9 @@ S9 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = Optional(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
 T2 = Record  M0:2  ; { x, n }
-T3 = Optional(T1)  ; MaybeId?
+T3 = Option(T1)  ; MaybeId?
 
 [type_members]
 M0: S1 → T3  ; x: T3

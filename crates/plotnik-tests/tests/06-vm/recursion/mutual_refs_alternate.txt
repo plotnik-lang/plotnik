@@ -55,8 +55,8 @@ S12 "value"
 T0 = Record  M0:1  ; { obj }
 T1 = Record  M1:1  ; { arr }
 T2 = Record  M2:1  ; { top }
-T3 = Optional(T1)  ; Obj?
-T4 = Optional(T0)  ; Arr?
+T3 = Option(T1)  ; Obj?
+T4 = Option(T0)  ; Arr?
 
 [type_members]
 M0: S01 → T3  ; obj: T3

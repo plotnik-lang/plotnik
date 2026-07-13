@@ -59,7 +59,7 @@ T0 = <Node>
 T1 = Record  M0:2  ; { a, b }
 T2 = ArrayStar(T1)  ; QItems*
 T3 = Record  M2:1  ; { items }
-T4 = Optional(T0)  ; <Node>?
+T4 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S01 → T4  ; a: T4

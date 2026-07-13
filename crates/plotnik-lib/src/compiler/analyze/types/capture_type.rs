@@ -43,7 +43,7 @@ impl TerminalData {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum OptionalCaptureTypeMode {
+pub enum OptionMode {
     Preserve,
     Bool,
 }
@@ -56,8 +56,8 @@ pub enum CaptureTypePlanKind {
     BoolTerminal {
         data: TerminalData,
     },
-    Optional {
-        mode: OptionalCaptureTypeMode,
+    Option {
+        mode: OptionMode,
         inner: Box<CaptureTypePlan>,
     },
     Array {
@@ -86,14 +86,10 @@ impl CaptureTypePlan {
         }
     }
 
-    pub fn optional(
-        final_type: TypeId,
-        mode: OptionalCaptureTypeMode,
-        inner: CaptureTypePlan,
-    ) -> Self {
+    pub fn option(final_type: TypeId, mode: OptionMode, inner: CaptureTypePlan) -> Self {
         Self {
             final_type,
-            kind: CaptureTypePlanKind::Optional {
+            kind: CaptureTypePlanKind::Option {
                 mode,
                 inner: Box::new(inner),
             },
@@ -121,7 +117,7 @@ impl CaptureTypePlan {
         match &self.kind {
             CaptureTypePlanKind::TextTerminal { data }
             | CaptureTypePlanKind::BoolTerminal { data } => data.suppresses_semantic_data(),
-            CaptureTypePlanKind::Optional { inner, .. } => inner.suppresses_semantic_data(),
+            CaptureTypePlanKind::Option { inner, .. } => inner.suppresses_semantic_data(),
             CaptureTypePlanKind::Array { element } => element.suppresses_semantic_data(),
         }
     }

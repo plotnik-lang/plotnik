@@ -42,7 +42,7 @@ S8 "identifier"
 T0 = <Node>
 T1 = ArrayStar(T0)  ; <Node>*
 T2 = Record  M0:2  ; { args, id }
-T3 = Optional(T0)  ; <Node>?
+T3 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S1 → T1  ; args: T1

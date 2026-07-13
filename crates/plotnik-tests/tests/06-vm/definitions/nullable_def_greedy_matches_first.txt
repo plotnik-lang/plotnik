@@ -29,7 +29,7 @@ S5 "program"
 
 [type_defs]
 T0 = <Node>
-T1 = Optional(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
 T2 = Record  M0:1  ; { e }
 
 [type_members]

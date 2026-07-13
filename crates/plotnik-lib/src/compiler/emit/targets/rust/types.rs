@@ -190,7 +190,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
                     self.position_type(context.array_element(), *element)
                 )
             }
-            TypeShape::Optional(inner) => {
+            TypeShape::Option(inner) => {
                 format!(
                     "::core::option::Option<{}>",
                     self.position_type(context, *inner)
@@ -240,7 +240,7 @@ impl<'m, 'a> Emitter<'m, 'a> {
                     self.position_type(context.array_element(), *element)
                 )
             }
-            TypeShape::Optional(inner) => {
+            TypeShape::Option(inner) => {
                 format!(
                     "::core::option::Option<{}>",
                     self.position_type(context, *inner)

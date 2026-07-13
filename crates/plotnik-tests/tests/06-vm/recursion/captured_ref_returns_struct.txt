@@ -51,8 +51,8 @@ S10 "function"
 T0 = <Node>
 T1 = Record  M0:2  ; { name, inner }
 T2 = Record  M2:1  ; { top }
-T3 = Optional(T0)  ; <Node>?
-T4 = Optional(T1)  ; Nested?
+T3 = Option(T0)  ; <Node>?
+T4 = Option(T1)  ; Nested?
 
 [type_members]
 M0: S01 → T3  ; name: T3

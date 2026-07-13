@@ -48,7 +48,7 @@ S10 "identifier"
 T0 = <Node>
 T1 = Record  M0:1  ; { n }
 T2 = Record  M1:1  ; { t }
-T3 = Optional(T0)  ; <Node>?
+T3 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S01 → T3  ; n: T3

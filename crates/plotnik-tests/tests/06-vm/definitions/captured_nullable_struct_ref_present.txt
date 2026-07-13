@@ -58,7 +58,7 @@ T0 = <Node>
 T1 = Record  M0:1  ; { id }
 T2 = Record  M1:1  ; { x }
 T3 = Record  M2:2  ; { a, d }
-T4 = Optional(T1)  ; AX?
+T4 = Option(T1)  ; AX?
 
 [type_members]
 M0: S01 → T0  ; id: <Node>

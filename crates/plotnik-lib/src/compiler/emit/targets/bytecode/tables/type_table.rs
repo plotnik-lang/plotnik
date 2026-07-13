@@ -21,12 +21,12 @@ pub struct TypeTableBuilder {
     mapping: HashMap<TypeId, WireTypeId>,
     /// Type definitions (4 bytes each).
     type_defs: Vec<TypeDef>,
-    /// Type members for structs/enums (4 bytes each).
+    /// Type members for records/variants (4 bytes each).
     type_members: Vec<TypeMember>,
     /// Type names for named types (4 bytes each).
     type_names: Vec<TypeNameEntry>,
-    /// Cache for dynamically created Optional wrappers: base_type -> Optional(base_type)
-    optional_wrappers: HashMap<WireTypeId, WireTypeId>,
+    /// Cache for dynamically created Option wrappers: base type -> Option(base type).
+    option_wrappers: HashMap<WireTypeId, WireTypeId>,
 }
 
 impl TypeTableBuilder {
@@ -36,7 +36,7 @@ impl TypeTableBuilder {
             type_defs: Vec::new(),
             type_members: Vec::new(),
             type_names: Vec::new(),
-            optional_wrappers: HashMap::new(),
+            option_wrappers: HashMap::new(),
         }
     }
 
@@ -77,20 +77,20 @@ impl TypeTableBuilder {
         Ok(())
     }
 
-    /// Intern an `Optional(base_type)` wrapper, deduplicating by base type.
-    pub fn intern_optional(&mut self, base_type: WireTypeId) -> Result<WireTypeId, EmitError> {
-        if let Some(&optional_id) = self.optional_wrappers.get(&base_type) {
-            return Ok(optional_id);
+    /// Intern an `Option(base_type)` wrapper, deduplicating by base type.
+    pub fn intern_option(&mut self, base_type: WireTypeId) -> Result<WireTypeId, EmitError> {
+        if let Some(&option_id) = self.option_wrappers.get(&base_type) {
+            return Ok(option_id);
         }
 
         if self.type_defs.len() >= EmitError::MAX_TYPES {
             return Err(EmitError::TooManyTypes(self.type_defs.len() + 1));
         }
 
-        let optional_id = WireTypeId::from(self.type_defs.len() as u16);
-        self.type_defs.push(TypeDef::optional(base_type));
-        self.optional_wrappers.insert(base_type, optional_id);
-        Ok(optional_id)
+        let option_id = WireTypeId::from(self.type_defs.len() as u16);
+        self.type_defs.push(TypeDef::option(base_type));
+        self.option_wrappers.insert(base_type, option_id);
+        Ok(option_id)
     }
 
     /// Resolve a query TypeId to its underlying bytecode WireTypeId.

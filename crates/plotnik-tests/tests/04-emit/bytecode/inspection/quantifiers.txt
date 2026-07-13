@@ -137,7 +137,7 @@ T06 = Record  M3:1  ; { stmts }
 T07 = Record  M4:1  ; { name }
 T08 = ArrayStar(T07)  ; FuncsFuncs*
 T09 = Record  M5:1  ; { funcs }
-T10 = Optional(T00)  ; <Node>?
+T10 = Option(T00)  ; <Node>?
 
 [type_members]
 M0: S01 → T10  ; stmt: T10

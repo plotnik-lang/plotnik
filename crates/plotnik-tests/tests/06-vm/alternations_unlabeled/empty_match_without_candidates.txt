@@ -29,7 +29,7 @@ S6 "debugger_statement"
 T0 = <Node>
 T1 = ArrayStar(T0)  ; <Node>*
 T2 = Record  M0:2  ; { ids, d }
-T3 = Optional(T0)  ; <Node>?
+T3 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S1 → T1  ; ids: T1

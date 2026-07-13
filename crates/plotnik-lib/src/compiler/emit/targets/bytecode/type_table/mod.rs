@@ -146,9 +146,9 @@ fn emit_type_at_slot(
             Ok(())
         }
 
-        TypeShape::Optional(inner) => {
+        TypeShape::Option(inner) => {
             let inner_bc = types.resolve_type(*inner, ctx.type_analysis)?;
-            types.fill_slot(slot_index, TypeDef::optional(inner_bc));
+            types.fill_slot(slot_index, TypeDef::option(inner_bc));
             Ok(())
         }
 
@@ -164,7 +164,7 @@ fn emit_type_at_slot(
         }
 
         TypeShape::Record(fields) => {
-            // Resolve field types (this may create Optional wrappers at later indices)
+            // Resolve field types (this may create Option wrappers at later indices)
             let mut resolved_fields = Vec::with_capacity(fields.len());
             for (field_sym, field_info) in fields {
                 let field_name = ctx.strings.intern(*field_sym, ctx.interner)?;
@@ -247,13 +247,13 @@ fn resolve_field_type(
     let base_type = types.resolve_type(field_info.type_id, type_ctx)?;
 
     if field_info.optional {
-        // Wrappers compose: a base that is itself `Optional` (a reference to
+        // Wrappers compose: a base that is itself `Option` (a reference to
         // an optional-rooted definition under a call-site `?`) legitimately
         // nests — the two nulls come from two distinct syntax sites, the
         // definition's `?` and the capture's. For everything else inference
         // keeps field optionality single-sourced (the captured `?`'s null
         // lives on the capture field alone, never on the base type too).
-        types.intern_optional(base_type)
+        types.intern_option(base_type)
     } else {
         Ok(base_type)
     }

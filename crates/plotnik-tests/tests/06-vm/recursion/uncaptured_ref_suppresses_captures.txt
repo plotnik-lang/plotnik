@@ -41,7 +41,7 @@ S9 "function"
 T0 = <Node>
 T1 = Record  M0:1  ; { name }
 T2 = Record  M1:1  ; { c }
-T3 = Optional(T0)  ; <Node>?
+T3 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S1 → T3  ; name: T3

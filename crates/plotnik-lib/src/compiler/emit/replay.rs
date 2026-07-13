@@ -197,7 +197,7 @@ impl ReplayPlanBuilder<'_, '_> {
             TypeShape::Node | TypeShape::Custom(_) => ReplayValuePlan::Node,
             TypeShape::Text => ReplayValuePlan::Text,
             TypeShape::Bool => ReplayValuePlan::Bool,
-            TypeShape::Optional(inner) => ReplayValuePlan::Nullable(Box::new(self.value(*inner))),
+            TypeShape::Option(inner) => ReplayValuePlan::Nullable(Box::new(self.value(*inner))),
             TypeShape::Array { element, .. } => {
                 ReplayValuePlan::Array(Box::new(self.value(*element)))
             }

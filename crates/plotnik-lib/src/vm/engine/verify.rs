@@ -127,7 +127,7 @@ impl<'a> TypeVerifier<'a> {
                 TypeKind::Alias => {
                     self.verify(value, inner);
                 }
-                TypeKind::Optional => {
+                TypeKind::Option => {
                     if !matches!(value, Value::Null) {
                         self.verify(value, inner);
                     }
@@ -180,26 +180,27 @@ impl<'a> TypeVerifier<'a> {
                     let members: Vec<_> = self.types.members_of(&type_def).collect();
                     for member in members {
                         let field_name = self.strings.get(member.name_id);
-                        let (inner_type, is_optional) = self.types.unwrap_optional(member.type_id);
-
                         let field_value = fields.iter().find(|(k, _)| *k == field_name);
                         match field_value {
                             Some((_, v)) => {
-                                if is_optional && matches!(v, Value::Null) {
-                                    continue;
-                                }
+                                let field_type = match (self.types.option_inner(member.type_id), v)
+                                {
+                                    (Some(_), Value::Null) => continue,
+                                    (Some(inner), _) => inner,
+                                    (None, _) => member.type_id,
+                                };
                                 let prev_len = self.path.len();
                                 self.path.push('.');
                                 self.path.push_str(field_name);
-                                self.verify(v, inner_type);
+                                self.verify(v, field_type);
                                 self.path.truncate(prev_len);
                             }
                             None => {
                                 // Policy: every declared field is always present in
-                                // the output — optional fields materialize as null,
+                                // the output — option-typed fields materialize as null,
                                 // never as an absent key. A missing key is always a bug.
                                 self.errors.push(format!(
-                                        "{}: field missing (declared fields are always present; optionals as null)",
+                                        "{}: field missing (declared fields are always present; option values use null)",
                                         append_path(&self.path, field_name)
                                     ));
                             }

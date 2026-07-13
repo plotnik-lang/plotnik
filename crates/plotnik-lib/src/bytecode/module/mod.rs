@@ -481,18 +481,15 @@ impl<'a> TypesView<'a> {
         (0..count).map(move |i| self.get_member(start + i))
     }
 
-    /// Unwrap Optional wrapper and return (inner_type, is_optional).
-    /// If not Optional, returns (type_id, false).
-    pub fn unwrap_optional(&self, type_id: TypeId) -> (TypeId, bool) {
-        let Some(type_def) = self.get(type_id) else {
-            return (type_id, false);
-        };
+    /// Return the inner type when `type_id` names an Option.
+    pub fn option_inner(&self, type_id: TypeId) -> Option<TypeId> {
+        let type_def = self.get(type_id)?;
         match type_def.decode() {
             TypeDefKind::Wrapper {
-                kind: TypeKind::Optional,
+                kind: TypeKind::Option,
                 inner,
-            } => (inner, true),
-            _ => (type_id, false),
+            } => Some(inner),
+            _ => None,
         }
     }
 }

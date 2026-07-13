@@ -153,7 +153,7 @@ impl TypeAnalysis {
                 TypeShape::Record(_)
                     | TypeShape::Variant(_)
                     | TypeShape::Array { .. }
-                    | TypeShape::Optional(_)
+                    | TypeShape::Option(_)
             );
         }
 
@@ -164,7 +164,7 @@ impl TypeAnalysis {
                     TypeShape::Record(_)
                         | TypeShape::Variant(_)
                         | TypeShape::Array { .. }
-                        | TypeShape::Optional(_)
+                        | TypeShape::Option(_)
                 )
             );
         }

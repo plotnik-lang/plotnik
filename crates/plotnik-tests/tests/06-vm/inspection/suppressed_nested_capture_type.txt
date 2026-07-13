@@ -97,7 +97,7 @@ S4 "expression_statement"
 
 [type_defs]
 T0 = <Text>
-T1 = Optional(T0)  ; <Text>?
+T1 = Option(T0)  ; <Text>?
 T2 = Record  M0:1  ; { outer }
 
 [type_members]

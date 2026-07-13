@@ -36,7 +36,7 @@ S7 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:2  ; { b, a }
-T2 = Optional(T0)  ; <Node>?
+T2 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S1 → T2  ; b: T2

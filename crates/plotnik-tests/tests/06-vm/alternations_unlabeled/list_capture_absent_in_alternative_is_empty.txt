@@ -37,7 +37,7 @@ S7 "expression_statement"
 T0 = <Node>
 T1 = ArrayStar(T0)  ; <Node>*
 T2 = Record  M0:2  ; { vs, s }
-T3 = Optional(T0)  ; <Node>?
+T3 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S1 → T1  ; vs: T1

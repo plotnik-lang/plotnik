@@ -44,7 +44,7 @@ T1 = Record  M0:1  ; { expression }
 T2 = Record  M1:1  ; { debugger }
 T3 = Variant M2:2  ; Expression | Debugger
 T4 = Record  M4:1  ; { statement }
-T5 = Optional(T3)  ; QStatement?
+T5 = Option(T3)  ; QStatement?
 
 [type_members]
 M0: S01 → T0  ; expression: <Node>

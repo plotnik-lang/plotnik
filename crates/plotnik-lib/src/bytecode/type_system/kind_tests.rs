@@ -4,7 +4,7 @@ use super::*;
 fn from_u8_valid() {
     assert_eq!(TypeKind::from_u8(0), Some(TypeKind::Void));
     assert_eq!(TypeKind::from_u8(1), Some(TypeKind::Node));
-    assert_eq!(TypeKind::from_u8(2), Some(TypeKind::Optional));
+    assert_eq!(TypeKind::from_u8(2), Some(TypeKind::Option));
     assert_eq!(TypeKind::from_u8(3), Some(TypeKind::ArrayZeroOrMore));
     assert_eq!(TypeKind::from_u8(4), Some(TypeKind::ArrayOneOrMore));
     assert_eq!(TypeKind::from_u8(5), Some(TypeKind::Record));
@@ -26,13 +26,13 @@ fn is_primitive() {
     assert!(TypeKind::Node.is_primitive());
     assert!(TypeKind::Text.is_primitive());
     assert!(TypeKind::Bool.is_primitive());
-    assert!(!TypeKind::Optional.is_primitive());
+    assert!(!TypeKind::Option.is_primitive());
     assert!(!TypeKind::Record.is_primitive());
 }
 
 #[test]
 fn is_wrapper() {
-    assert!(TypeKind::Optional.is_wrapper());
+    assert!(TypeKind::Option.is_wrapper());
     assert!(TypeKind::ArrayZeroOrMore.is_wrapper());
     assert!(TypeKind::ArrayOneOrMore.is_wrapper());
     assert!(!TypeKind::Record.is_wrapper());
@@ -43,7 +43,7 @@ fn is_wrapper() {
 
 #[test]
 fn is_array() {
-    assert!(!TypeKind::Optional.is_array());
+    assert!(!TypeKind::Option.is_array());
     assert!(TypeKind::ArrayZeroOrMore.is_array());
     assert!(TypeKind::ArrayOneOrMore.is_array());
     assert!(!TypeKind::Record.is_array());
@@ -59,7 +59,7 @@ fn is_non_empty_array() {
 
 #[test]
 fn is_alias() {
-    assert!(!TypeKind::Optional.is_alias());
+    assert!(!TypeKind::Option.is_alias());
     assert!(!TypeKind::ArrayZeroOrMore.is_alias());
     assert!(!TypeKind::ArrayOneOrMore.is_alias());
     assert!(!TypeKind::Record.is_alias());

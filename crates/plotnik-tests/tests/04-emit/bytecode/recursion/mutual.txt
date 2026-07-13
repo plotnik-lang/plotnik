@@ -53,8 +53,8 @@ S6 "number"
 T0 = <Node>
 T1 = Record  M0:1  ; { next }
 T2 = Record  M1:2  ; { leaf, next }
-T3 = Optional(T0)  ; <Node>?
-T4 = Optional(T1)  ; Odd?
+T3 = Option(T0)  ; <Node>?
+T4 = Option(T1)  ; Odd?
 
 [type_members]
 M0: S1 → T2  ; next: Even

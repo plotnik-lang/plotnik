@@ -588,17 +588,17 @@ fn unify_normalized_types(
         .cloned()
         .expect("normalized type must be registered");
     match (a_shape, b_shape) {
-        (TypeShape::Optional(a), TypeShape::Optional(b)) => {
+        (TypeShape::Option(a), TypeShape::Option(b)) => {
             let inner = unify_normalized_types(types, a, b)?;
-            Ok(types.intern_type(TypeShape::Optional(inner)))
+            Ok(types.intern_type(TypeShape::Option(inner)))
         }
-        (TypeShape::Optional(inner), _) => {
+        (TypeShape::Option(inner), _) => {
             let inner = unify_normalized_types(types, inner, b)?;
-            Ok(types.intern_type(TypeShape::Optional(inner)))
+            Ok(types.intern_type(TypeShape::Option(inner)))
         }
-        (_, TypeShape::Optional(inner)) => {
+        (_, TypeShape::Option(inner)) => {
             let inner = unify_normalized_types(types, a, inner)?;
-            Ok(types.intern_type(TypeShape::Optional(inner)))
+            Ok(types.intern_type(TypeShape::Option(inner)))
         }
         (
             TypeShape::Array {

@@ -41,10 +41,8 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             &mut HashSet::new(),
         )?;
         if raw.optional {
-            let optional = self
-                .types
-                .intern_type(TypeShape::Optional(plan.final_type()));
-            plan = CaptureTypePlan::optional(optional, OptionalCaptureTypeMode::Preserve, plan);
+            let option = self.types.intern_type(TypeShape::Option(plan.final_type()));
+            plan = CaptureTypePlan::option(option, OptionMode::Preserve, plan);
             absorbs_null = true;
         }
         let on_absence = if absorbs_null {
@@ -83,7 +81,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             )),
             TypeShape::Record(_) | TypeShape::Variant(_) => {
                 let final_type = if zero_node_terminal {
-                    self.types.intern_type(TypeShape::Optional(TYPE_TEXT))
+                    self.types.intern_type(TypeShape::Option(TYPE_TEXT))
                 } else {
                     TYPE_TEXT
                 };
@@ -92,13 +90,13 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
                     zero_node_terminal,
                 ))
             }
-            TypeShape::Optional(inner) => {
+            TypeShape::Option(inner) => {
                 let (inner, _) = self.str_plan(*inner, false, visiting)?;
-                let optional = self
+                let option = self
                     .types
-                    .intern_type(TypeShape::Optional(inner.final_type()));
+                    .intern_type(TypeShape::Option(inner.final_type()));
                 Ok((
-                    CaptureTypePlan::optional(optional, OptionalCaptureTypeMode::Preserve, inner),
+                    CaptureTypePlan::option(option, OptionMode::Preserve, inner),
                     true,
                 ))
             }
@@ -129,7 +127,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
     ) -> Result<PlannedCapture, &'static str> {
         let plan = if raw.optional {
             let inner = self.bool_present(raw.type_id, &mut HashSet::new())?;
-            CaptureTypePlan::optional(TYPE_BOOL, OptionalCaptureTypeMode::Bool, inner)
+            CaptureTypePlan::option(TYPE_BOOL, OptionMode::Bool, inner)
         } else {
             self.bool_required(raw.type_id, may_be_absent, &mut HashSet::new())?
         };
@@ -152,13 +150,9 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
             return Err("capture type `bool` cannot normalize a recursive container type");
         }
         let result = match self.raw.shape(type_id) {
-            TypeShape::Optional(inner) => {
+            TypeShape::Option(inner) => {
                 let inner = self.bool_present(*inner, visiting)?;
-                Ok(CaptureTypePlan::optional(
-                    TYPE_BOOL,
-                    OptionalCaptureTypeMode::Bool,
-                    inner,
-                ))
+                Ok(CaptureTypePlan::option(TYPE_BOOL, OptionMode::Bool, inner))
             }
             TypeShape::Ref(target) => {
                 self.bool_required(self.raw.definition(*target), may_be_absent, visiting)
@@ -191,7 +185,7 @@ impl<'a, 'b> CaptureTypePlanner<'a, 'b> {
         visiting: &mut HashSet<TypeId>,
     ) -> Result<CaptureTypePlan, &'static str> {
         match self.raw.shape(type_id) {
-            TypeShape::Optional(_) => self.bool_required(type_id, false, visiting),
+            TypeShape::Option(_) => self.bool_required(type_id, false, visiting),
             TypeShape::Ref(target) => self.bool_present(self.raw.definition(*target), visiting),
             TypeShape::Node
             | TypeShape::Record(_)

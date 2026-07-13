@@ -16,7 +16,7 @@ S4 "Q"
 [type_defs]
 T0 = <Void>
 T1 = <Node>
-T2 = Optional(T1)  ; <Node>?
+T2 = Option(T1)  ; <Node>?
 
 [type_members]
 

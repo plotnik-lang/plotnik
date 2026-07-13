@@ -851,9 +851,9 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                     .type_ctx
                     .intern_type(TypeShape::Array { element, non_empty })
             }
-            Some(TypeShape::Optional(inner)) => {
+            Some(TypeShape::Option(inner)) => {
                 let inner = self.apply_custom_capture_type(inner, name, range);
-                self.ctx.type_ctx.intern_type(TypeShape::Optional(inner))
+                self.ctx.type_ctx.intern_type(TypeShape::Option(inner))
             }
             // A recursive reference keeps its definition's type; the naming
             // pass warns that the capture type is inert.
@@ -1119,10 +1119,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 }
                 QuantifiedContext::Discard => PatternFlow::Void,
                 // The definition collects the skip as its own null: the output
-                // is the optional type itself, not a field-optionality flag.
+                // is the option type itself, not a field-optionality flag.
                 QuantifiedContext::DefinitionValue => {
                     let element = self.definition_element_type(quant.node(), &inner, &inner_info);
-                    PatternFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Optional(element)))
+                    PatternFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Option(element)))
                 }
             },
             QuantifierKind::ZeroOrMore | QuantifierKind::OneOrMore => {
@@ -1214,7 +1214,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let wrapper_output = view.def_output(def_id).is_some_and(|output| {
             matches!(
                 view.type_shape(output),
-                Some(TypeShape::Optional(_) | TypeShape::Array { .. })
+                Some(TypeShape::Option(_) | TypeShape::Array { .. })
             )
         });
         if wrapper_output {
@@ -1260,7 +1260,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         match flow {
             PatternFlow::Void => PatternFlow::Void,
             PatternFlow::Value(t) => {
-                PatternFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Optional(t)))
+                PatternFlow::Value(self.ctx.type_ctx.intern_type(TypeShape::Option(t)))
             }
             PatternFlow::Fields(type_id) => {
                 let optional_fields: BTreeMap<_, _> = self

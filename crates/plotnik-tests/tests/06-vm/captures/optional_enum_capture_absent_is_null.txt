@@ -32,7 +32,7 @@ T0 = <Node>
 T1 = Record  M0:1  ; { a }
 T2 = Variant M1:1  ; A
 T3 = Record  M2:1  ; { e }
-T4 = Optional(T2)  ; QE?
+T4 = Option(T2)  ; QE?
 
 [type_members]
 M0: S1 → T0  ; a: <Node>

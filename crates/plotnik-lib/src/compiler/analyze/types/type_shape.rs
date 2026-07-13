@@ -43,8 +43,8 @@ pub enum TypeShape {
     Variant(BTreeMap<Symbol, TypeId>),
     /// Array type with element type.
     Array { element: TypeId, non_empty: bool },
-    /// Optional wrapper.
-    Optional(TypeId),
+    /// Option type containing zero or one value.
+    Option(TypeId),
     /// Forward reference to a recursive type.
     Ref(DefId),
 }
@@ -87,7 +87,7 @@ impl TypeShape {
                     .map(field_type_id as fn(&FieldInfo) -> TypeId),
             ),
             Self::Variant(cases) => TypeShapeChildIdsInner::Cases(cases.values().copied()),
-            Self::Array { element, .. } | Self::Optional(element) => {
+            Self::Array { element, .. } | Self::Option(element) => {
                 TypeShapeChildIdsInner::One(Some(*element).into_iter())
             }
             Self::Void | Self::Node | Self::Text | Self::Bool | Self::Custom(_) | Self::Ref(_) => {

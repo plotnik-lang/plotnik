@@ -41,7 +41,7 @@ S9 "debugger_statement"
 T0 = <Node>
 T1 = Record  M0:1  ; { id }
 T2 = Record  M1:2  ; { x, d }
-T3 = Optional(T1)  ; QX?
+T3 = Option(T1)  ; QX?
 
 [type_members]
 M0: S1 → T0  ; id: <Node>

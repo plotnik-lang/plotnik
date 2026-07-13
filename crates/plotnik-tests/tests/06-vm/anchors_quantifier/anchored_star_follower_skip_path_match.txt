@@ -56,7 +56,7 @@ S10 "identifier"
 T0 = <Node>
 T1 = ArrayStar(T0)  ; <Node>*
 T2 = Record  M0:3  ; { a, b, c }
-T3 = Optional(T0)  ; <Node>?
+T3 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S02 → T3  ; a: T3

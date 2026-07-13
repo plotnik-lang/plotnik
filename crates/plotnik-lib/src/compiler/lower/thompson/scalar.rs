@@ -2,7 +2,7 @@
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::types::{
-    CaptureTypePlan, CaptureTypePlanKind, OptionalCaptureTypeMode, TerminalData,
+    CaptureTypePlan, CaptureTypePlanKind, OptionMode, TerminalData,
 };
 use crate::compiler::ids::DefId;
 use crate::compiler::lower::ir::{
@@ -192,7 +192,7 @@ impl CaptureTypeLowerer<'_, '_> {
             CaptureTypePlanKind::BoolTerminal { data } => {
                 self.scalar_terminal(pattern, destination, ScalarTerminal::Presence(data))
             }
-            CaptureTypePlanKind::Optional { mode, inner } => {
+            CaptureTypePlanKind::Option { mode, inner } => {
                 let Pattern::QuantifiedPattern(quant) = pattern else {
                     return self.specialized_reference(pattern, destination);
                 };
@@ -333,7 +333,7 @@ impl CaptureTypeLowerer<'_, '_> {
     fn optional(
         &mut self,
         quant: &ast::QuantifiedPattern,
-        mode: OptionalCaptureTypeMode,
+        mode: OptionMode,
         inner_plan: CaptureTypePlan,
         destination: ValueDestination,
     ) -> Label {
@@ -360,13 +360,13 @@ impl CaptureTypeLowerer<'_, '_> {
 
         let skipped = match skip_exit {
             SkipExit::To(exit) => Some(match mode {
-                OptionalCaptureTypeMode::Preserve => {
+                OptionMode::Preserve => {
                     let mut effects = vec![EffectIR::null()];
                     effects.extend(destination.into_effects());
                     self.compiler
                         .emit_effects_epsilon(exit, effects, CaptureEffects::default())
                 }
-                OptionalCaptureTypeMode::Bool => {
+                OptionMode::Bool => {
                     let mut effects = vec![EffectIR::bool_value(false)];
                     effects.extend(destination.into_effects());
                     self.compiler

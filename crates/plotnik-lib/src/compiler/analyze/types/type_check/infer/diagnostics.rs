@@ -165,7 +165,7 @@ impl InferVisitor<'_, '_> {
     }
 
     /// Report a quantifier-rooted definition whose element shape has no name
-    /// source. The definition names the collection (the array/optional type);
+    /// source. The definition names the collection (the list/option type);
     /// naming the element takes its own definition.
     pub(super) fn report_unnamed_quantified_element(
         &mut self,
@@ -174,7 +174,7 @@ impl InferVisitor<'_, '_> {
     ) {
         let op = self.quantifier_operator(quant);
         let (collection, example_op) = if op.starts_with('?') {
-            ("optional", op.as_str())
+            ("option", op.as_str())
         } else {
             ("list", op.as_str())
         };

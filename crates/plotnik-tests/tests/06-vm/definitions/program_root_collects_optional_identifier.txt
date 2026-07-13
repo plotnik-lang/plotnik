@@ -22,7 +22,7 @@ S4 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:1  ; { id }
-T2 = Optional(T0)  ; <Node>?
+T2 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S1 → T2  ; id: T2

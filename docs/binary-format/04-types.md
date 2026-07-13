@@ -12,7 +12,7 @@ Type system metadata for code generation and runtime validation. Describes the s
 | ----- | ----------------- | ------------------------------- |
 | 0     | `Void`            | Unit type, captures nothing     |
 | 1     | `Node`            | AST node reference              |
-| 2     | `Optional`        | Wraps another type              |
+| 2     | `Option`          | Zero or one value               |
 | 3     | `ArrayZeroOrMore` | Zero or more (T\*)              |
 | 4     | `ArrayOneOrMore`  | One or more (T+)                |
 | 5     | `Record`          | Record with named fields        |
@@ -66,7 +66,7 @@ struct TypeDef {
 | `Node`            | 0             | 0          |
 | `Text`            | 0             | 0          |
 | `Bool`            | 0             | 0          |
-| `Optional`        | Inner TypeId  | 0          |
+| `Option`          | Inner TypeId  | 0          |
 | `ArrayZeroOrMore` | Inner TypeId  | 0          |
 | `ArrayOneOrMore`  | Inner TypeId  | 0          |
 | `Alias`           | Target TypeId | 0          |

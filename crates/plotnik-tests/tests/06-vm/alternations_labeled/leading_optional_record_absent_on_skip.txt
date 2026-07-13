@@ -65,7 +65,7 @@ S9 "call_expression"
 T0 = <Node>
 T1 = Record  M0:1  ; { c }
 T2 = Record  M1:3  ; { lead, a, b }
-T3 = Optional(T1)  ; QLead?
+T3 = Option(T1)  ; QLead?
 
 [type_members]
 M0: S1 → T0  ; c: <Node>

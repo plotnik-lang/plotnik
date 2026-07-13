@@ -41,7 +41,7 @@ S8 "identifier"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:2  ; { left, right }
-T2 = Optional(T0)  ; <Node>?
+T2 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S2 → T2  ; left: T2

@@ -46,8 +46,8 @@ S8 "identifier"
 T0 = <Node>
 T1 = Record  M0:1  ; { x }
 T2 = Record  M1:2  ; { x, row }
-T3 = Optional(T0)  ; <Node>?
-T4 = Optional(T1)  ; QRow?
+T3 = Option(T0)  ; <Node>?
+T4 = Option(T1)  ; QRow?
 
 [type_members]
 M0: S1 → T0  ; x: <Node>

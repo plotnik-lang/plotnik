@@ -2,7 +2,7 @@ Bad = (expression_statement
   (identifier) @id
 )?
 ------------------ DIAGNOSTICS -------------------
-error: the definition names the optional itself, so each `?` element — an anonymous record of captures — is left without a type name
+error: the definition names the option itself, so each `?` element — an anonymous record of captures — is left without a type name
  --> query.ptk:1:7
   |
 1 |   Bad = (expression_statement

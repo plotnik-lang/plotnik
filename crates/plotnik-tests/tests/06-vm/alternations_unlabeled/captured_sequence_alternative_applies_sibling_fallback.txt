@@ -53,8 +53,8 @@ T0 = <Node>
 T1 = Record  M0:1  ; { a }
 T2 = Record  M1:2  ; { grp, b }
 T3 = Record  M3:1  ; { w }
-T4 = Optional(T1)  ; QWGrp?
-T5 = Optional(T0)  ; <Node>?
+T4 = Option(T1)  ; QWGrp?
+T5 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S01 → T0  ; a: <Node>

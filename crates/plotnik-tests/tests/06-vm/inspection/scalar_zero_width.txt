@@ -98,7 +98,7 @@ S4 "comment"
 
 [type_defs]
 T0 = <Text>
-T1 = Optional(T0)  ; <Text>?
+T1 = Option(T0)  ; <Text>?
 T2 = Record  M0:1  ; { value }
 
 [type_members]

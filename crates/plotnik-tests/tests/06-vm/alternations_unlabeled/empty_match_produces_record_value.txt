@@ -46,9 +46,9 @@ T0 = <Node>
 T1 = Record  M0:1  ; { comment }
 T2 = Record  M1:1  ; { identifier }
 T3 = Record  M2:2  ; { left, right }
-T4 = Optional(T0)  ; <Node>?
-T5 = Optional(T1)  ; QLeft?
-T6 = Optional(T2)  ; QRight?
+T4 = Option(T0)  ; <Node>?
+T5 = Option(T1)  ; QLeft?
+T6 = Option(T2)  ; QRight?
 
 [type_members]
 M0: S1 → T4  ; comment: T4

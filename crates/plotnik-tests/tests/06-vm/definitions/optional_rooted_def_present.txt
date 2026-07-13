@@ -45,7 +45,7 @@ S9 "number"
 
 [type_defs]
 T0 = <Node>
-T1 = Optional(T0)  ; <Node>?
+T1 = Option(T0)  ; <Node>?
 T2 = Record  M0:2  ; { first, n }
 
 [type_members]

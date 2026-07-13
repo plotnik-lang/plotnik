@@ -259,7 +259,7 @@ impl<'a> SchemaEmitter<'a> {
             TypeShape::Node | TypeShape::Custom(_) => text("Node"),
             TypeShape::Text => self.render_builtin("string", ty),
             TypeShape::Bool => self.render_builtin("boolean", ty),
-            TypeShape::Optional(inner) => self.render_nullable(*inner),
+            TypeShape::Option(inner) => self.render_nullable(*inner),
             TypeShape::Array { element, non_empty } => self.render_array(*element, *non_empty),
             TypeShape::Ref(definition) => {
                 let target = self.schema.types.expect_def_output(*definition);

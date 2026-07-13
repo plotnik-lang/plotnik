@@ -43,7 +43,7 @@ S6 ";"
 [type_defs]
 T0 = <Node>
 T1 = Record  M0:2  ; { x, y }
-T2 = Optional(T0)  ; <Node>?
+T2 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S1 → T2  ; x: T2

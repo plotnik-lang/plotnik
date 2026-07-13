@@ -45,7 +45,7 @@ T1 = Record  M0:1  ; { c }
 T2 = Variant M1:1  ; A
 T3 = ArrayStar(T2)  ; QItems*
 T4 = Record  M2:1  ; { items }
-T5 = Optional(T0)  ; <Node>?
+T5 = Option(T0)  ; <Node>?
 
 [type_members]
 M0: S1 → T5  ; c: T5

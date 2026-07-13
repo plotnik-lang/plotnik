@@ -52,8 +52,8 @@ S7 "array"
 T0 = <Node>
 T1 = Record  M0:2  ; { leaf, inner }
 T2 = Record  M2:1  ; { top }
-T3 = Optional(T0)  ; <Node>?
-T4 = Optional(T1)  ; Nested?
+T3 = Option(T0)  ; <Node>?
+T4 = Option(T1)  ; Nested?
 
 [type_members]
 M0: S1 → T3  ; leaf: T3
