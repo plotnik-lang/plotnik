@@ -403,7 +403,7 @@ impl<'p, 'q, W: Write> AstWriter<'p, 'q, W> {
     }
 
     fn mark_anchor(&mut self, anchor: &ast::Anchor, depth: usize) -> std::fmt::Result {
-        let spelling = if anchor.is_strict() { ".!" } else { "." };
+        let spelling = if anchor.is_exact() { ".!" } else { "." };
         writeln!(self.w, "{}{}", indent(depth), spelling)
     }
 

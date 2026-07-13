@@ -1,23 +1,9 @@
-Q = [
-  (function_declaration .! (identifier))
-  (binary_expression
-    left: (_)
-    left: (_)
-  )
-]
+Q = (function_declaration .! (identifier))
 ------------------ DIAGNOSTICS -------------------
 error: with the exact anchor (`.!`), the first child of `function_declaration` must be `identifier`, but `function_declaration` begins with `"async"` or `"function"`
- --> query.ptk:2:4
+ --> query.ptk:1:6
   |
-2 |   (function_declaration .! (identifier))
-  |    ^^^^^^^^^^^^^^^^^^^^
+1 | Q = (function_declaration .! (identifier))
+  |      ^^^^^^^^^^^^^^^^^^^^
   |
 help: `.!` allows no syntax-tree node in its gap — not even an anonymous token or comment; the soft anchor `.` skips those: `(function_declaration . (identifier))`
-
-error: a `binary_expression` has one `left`, but this pattern binds `left` 2 times
- --> query.ptk:3:4
-  |
-3 |   (binary_expression
-  |    ^^^^^^^^^^^^^^^^^
-  |
-help: keep a single `left:` child

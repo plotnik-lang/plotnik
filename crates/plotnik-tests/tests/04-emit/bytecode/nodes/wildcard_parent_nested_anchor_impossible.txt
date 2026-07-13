@@ -5,13 +5,13 @@ Q = (_
   ) @a
 )
 ------------------ DIAGNOSTICS -------------------
-error: with strict adjacency (`.!`), the first child of `array` must be `identifier`, but `array` begins with `"["`
+error: with the exact anchor (`.!`), the first child of `array` must be `identifier`, but `array` begins with `"["`
  --> query.ptk:2:4
   |
 2 |   (array
   |    ^^^^^
   |
-help: `.!` allows nothing between — not even anonymous tokens or comments; the soft anchor `.` skips those: `(array
+help: `.!` allows no syntax-tree node in its gap — not even an anonymous token or comment; the soft anchor `.` skips those: `(array
           .
           (identifier)
         )`

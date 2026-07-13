@@ -19,7 +19,7 @@ fn is_non_empty() {
 
 #[test]
 fn operator_tracks_arity_and_greediness() {
-    let op = QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::NonGreedy);
+    let op = QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::Lazy);
 
     assert_eq!(op.kind(), QuantifierKind::ZeroOrMore);
     assert!(!op.is_greedy());

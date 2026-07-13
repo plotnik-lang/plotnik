@@ -27,7 +27,7 @@ Plotnik has three sibling-navigation tiers:
 
 1. **Default navigation is permissive.** Without an anchor, sibling patterns advance until they find a match, skipping named nodes, anonymous tokens, and tree-sitter `extra` nodes such as comments.
 2. **`.` narrows navigation.** It always skips extras. When both sides are named, it also skips anonymous tokens such as punctuation. When either side is anonymous, it skips extras only.
-3. **`.!` is exact.** It allows nothing between operands.
+3. **`.!` is exact.** It allows no intervening syntax-tree node.
 
 This unanchored query uses default navigation:
 
@@ -66,7 +66,7 @@ An anchor next to an alternation applies per branch on both sides. Before: `(a) 
 Use `.!` for exact adjacency:
 
 ```
-(call_expression (identifier) @fn .! "(")  ; nothing between name and paren
+(call_expression (identifier) @fn .! "(")  ; no intervening syntax-tree node
 ```
 
 ### Partial Matching
@@ -658,7 +658,7 @@ Output types:
 
 The `+` quantifier always produces non-empty arrays — no opt-out.
 
-Plotnik also supports non-greedy variants: `*?`, `+?`, `??`
+Plotnik also supports lazy variants: `*?`, `+?`, `??`
 
 A repeat iteration must consume input. When the element can itself match
 zero nodes — a reference to a definition rooted at `?`, or an alternation
@@ -897,9 +897,9 @@ interface Q {
 
 Anchors constrain sibling positions. They don't affect types — they're structural constraints.
 
-### Anchor Strictness
+### Anchor Modes
 
-`.` is soft adjacency: it skips extras and disallows other named nodes between operands. When both sides are named, it also skips anonymous tokens. `.!` is exact adjacency: it allows nothing between operands.
+`.` is soft adjacency: it skips extras and disallows other named nodes between operands. When both sides are named, it also skips anonymous tokens. `.!` is exact: it allows no intervening syntax-tree node.
 
 | Pattern      | Extras Between | Anonymous Nodes Between | Named Nodes Between |
 | ------------ | -------------- | ----------------------- | ------------------- |
@@ -945,13 +945,13 @@ With an anonymous operand, comments are still tolerated but other anonymous toke
 (array "," . (string) @next)
 ```
 
-For strict token-level adjacency:
+For exact syntax-tree adjacency:
 
 ```
 (call_expression (identifier) @fn .! "(")
 ```
 
-Here, no trivia is allowed between the function name and the opening parenthesis because the anchor is explicit strict adjacency.
+Here, no syntax-tree node may occur between the function name and the opening parenthesis because `.!` requests exact adjacency.
 
 ### Anchors After Optional Items
 
@@ -964,7 +964,7 @@ When the item before an anchor is optional (`?` or `*`), the anchor's meaning de
 - **When `@a` matches**, the anchor is enforced between the two siblings: `@b` must be the adjacent sibling, so `let x; debugger;` matches but `let x; foo; debugger;` does not.
 - **When `@a` is skipped**, the anchor degrades to a leading anchor relative to the parent — as if the query were `(program . (debugger_statement) @b)`. `@b` must be the first child (trivia aside): `debugger;` and `/* c */ debugger;` match, but `foo; debugger;` does not.
 
-Strictness carries through both paths: with `.!`, no trivia is tolerated on either the adjacency or the leading interpretation.
+The exact constraint carries through both paths: with `.!`, no trivia node is tolerated on either the adjacency or the leading interpretation.
 
 The anchor pins where a **quantified follower** begins, not just a single node:
 
@@ -1166,7 +1166,7 @@ Enums render as one multi-line union with inline variants — variant payloads n
 | Field constraint     | `field: pattern`   | `field: pattern`            |
 | Negated field        | `!field`           | `-field`                    |
 | Quantifiers          | `?` `*` `+`        | `?` `*` `+`                 |
-| Non-greedy           |                    | `??` `*?` `+?`              |
+| Lazy                 |                    | `??` `*?` `+?`              |
 | Sequence             | `((a) (b))`        | `{(a) (b)}`                 |
 | Alternation          | `[a b]`            | `[a b]`                     |
 | Enum alternation     |                    | `[A: (a) B: (b)]`           |

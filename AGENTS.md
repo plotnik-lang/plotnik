@@ -108,7 +108,7 @@ Full spec: `docs/lang-reference.md`, `docs/type-system.md`. The essentials:
 | `@x :: T`           | Capture type (`str`, `bool`, or PascalCase) |
 | `field: pattern`    | Field constraint                            |
 | `-field`            | Negated field (assert absent)               |
-| `?` `*` `+`         | Quantifiers (non-greedy: `??` etc)          |
+| `?` `*` `+`         | Quantifiers (lazy: `??` etc)                |
 | `.` / `.!`          | Soft / strict anchor                        |
 | `{...}`             | Sequence (siblings in order)                |
 | `[...]`             | Union / enum (first match wins)             |

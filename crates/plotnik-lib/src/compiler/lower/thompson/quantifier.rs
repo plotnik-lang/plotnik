@@ -1,4 +1,4 @@
-//! Unified quantifier compilation (`?`, `*`, `+` and non-greedy variants).
+//! Unified quantifier compilation (`?`, `*`, `+` and lazy variants).
 //!
 //! All quantifier paths — plain, array-context, and split-exit — share one
 //! `compile_quantified` entry point so greediness and search-nav logic

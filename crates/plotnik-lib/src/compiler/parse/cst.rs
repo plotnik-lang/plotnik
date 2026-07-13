@@ -61,15 +61,15 @@ pub enum SyntaxKind {
     #[token("?")]
     Question,
 
-    /// Non-greedy `*?` quantifier
+    /// Lazy `*?` quantifier.
     #[token("*?")]
     StarQuestion,
 
-    /// Non-greedy `+?` quantifier
+    /// Lazy `+?` quantifier.
     #[token("+?")]
     PlusQuestion,
 
-    /// Non-greedy `??` quantifier
+    /// Lazy `??` quantifier.
     #[token("??")]
     QuestionQuestion,
 

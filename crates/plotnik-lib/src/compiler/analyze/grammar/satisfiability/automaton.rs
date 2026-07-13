@@ -469,8 +469,8 @@ impl<'a, 'b> Builder<'a, 'b> {
                 .expect("compute_nav_modes yields one entry per pattern item");
             // A sequence spliced under an outer anchor (a `{…}` group, a referenced
             // body) inherits that anchor's gap on its first child: the outer level
-            // already chose it, so recomputing here would drop the adjacency and let a
-            // strict anchor leak through the boundary.
+            // already chose it, so recomputing here would drop the anchor constraint
+            // and let an exact anchor leak through the boundary.
             let gap = match (first, inherited_first_gap) {
                 (true, Some(g)) => g,
                 _ => satisfiability_gap(
@@ -723,8 +723,8 @@ fn checked_anonymous_node(ctx: AutomatonContext<'_>, text: &str) -> NodeKindId {
 /// Widen a narrow skip to the broad one for direct alternation positions. The VM
 /// computes per-branch navs there, so a named branch may skip an anonymous token
 /// the conservative whole-pattern nav would not; the checker reasons over all
-/// branches at once and so takes the most permissive gap. Strict (`Nothing`) is
-/// never widened — it is the user's adjacency demand.
+/// branches at once and so takes the most permissive gap. Exact is
+/// never widened — it is the user's exact-anchor constraint.
 fn satisfiability_gap(gap: GapClass, pattern: &Pattern) -> GapClass {
     if gap == GapClass::ExtrasOnly && has_direct_alternative_nav(pattern) {
         GapClass::AnonymousAndExtras

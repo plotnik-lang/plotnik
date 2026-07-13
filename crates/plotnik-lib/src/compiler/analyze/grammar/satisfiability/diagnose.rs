@@ -8,7 +8,7 @@
 //!
 //! It then names the obstacle. If relaxing the node's anchors would let it match
 //! (proven by re-solving with every gap widened), the anchors are to blame, and the
-//! message contrasts the adjacency they demand with what the grammar actually places
+//! message contrasts the positions they demand with what the grammar actually places
 //! first or last. Otherwise the children's kinds or order are the obstacle, and the
 //! message lists what a node of that kind does allow. Each branch produces its own
 //! shape of message — a leading anchor reads differently from a trailing one, which
@@ -459,20 +459,20 @@ fn emit_anchor_failure(
     let node_pattern = culprit.node.node();
     let kind_name = culprit.kind_name(ctx);
     let span = culprit.span();
-    let strict = strictest_anchor(node_pattern);
+    let exact = has_exact_anchor(node_pattern);
 
     // A leading anchor pins the first child; a trailing one the last. The two read
     // differently, so each gets its own message naming the boundary the grammar fixes.
     let Some(boundary) = Boundary::of(node_pattern) else {
-        return emit_interior_anchor_failure(ctx, culprit, strict, diag);
+        return emit_interior_anchor_failure(ctx, culprit, exact, diag);
     };
     let boundary_name = boundary.name();
     let boundary_verb = boundary.verb();
     let allowed = boundary.child_kinds(solver, culprit.kind);
     let wanted = boundary.pattern_label(&culprit.node, ctx);
 
-    let demand = if strict {
-        "with strict adjacency (`.!`)"
+    let demand = if exact {
+        "with the exact anchor (`.!`)"
     } else {
         "after the soft anchor (`.`)"
     };
@@ -495,7 +495,7 @@ fn emit_anchor_failure(
     let mut builder = diag
         .report(DiagnosticKind::UnsatisfiablePattern, span)
         .detail(detail);
-    builder = builder.hint(anchor_fix_hint(&culprit.node, ctx, strict));
+    builder = builder.hint(anchor_fix_hint(&culprit.node, ctx, exact));
     builder.emit();
 }
 
@@ -503,14 +503,14 @@ fn emit_anchor_failure(
 fn emit_interior_anchor_failure(
     ctx: AutomatonContext<'_>,
     culprit: &ConcreteCulprit,
-    strict: bool,
+    exact: bool,
     diag: &mut Diagnostics,
 ) {
     let kind_name = culprit.kind_name(ctx);
     let detail = format!("no {kind_name} places these children in this adjacency");
     diag.report(DiagnosticKind::UnsatisfiablePattern, culprit.span())
         .detail(detail)
-        .hint(anchor_fix_hint(&culprit.node, ctx, strict))
+        .hint(anchor_fix_hint(&culprit.node, ctx, exact))
         .emit();
 }
 
@@ -754,18 +754,19 @@ fn describe_allowed_children(
     Some(format!("{kind_name} allows {}", parts.join("; ")))
 }
 
-/// The fix hint: for a strict anchor, the soft form often matches; for a soft anchor,
+/// The fix hint: for an exact anchor, the soft form often matches; for a soft anchor,
 /// dropping it does. Shows the rewritten node where it can be derived by swapping the
 /// anchor token in the node's own source.
-fn anchor_fix_hint(node: &Located<NodePattern>, ctx: AutomatonContext<'_>, strict: bool) -> String {
-    if strict {
+fn anchor_fix_hint(node: &Located<NodePattern>, ctx: AutomatonContext<'_>, exact: bool) -> String {
+    if exact {
         match relaxed_anchor_text(node, ctx) {
             Some(soft) => format!(
-                "`.!` allows nothing between — not even anonymous tokens or comments; \
+                "`.!` allows no syntax-tree node in its gap — not even an anonymous \
+                 token or comment; \
                  the soft anchor `.` skips those: `{soft}`"
             ),
-            None => "`.!` allows nothing between — not even anonymous tokens or comments; \
-                 try the soft anchor `.`, which skips them"
+            None => "`.!` allows no syntax-tree node in its gap — not even an anonymous \
+                 token or comment; try the soft anchor `.`, which skips them"
                 .to_string(),
         }
     } else {
@@ -858,11 +859,11 @@ impl Boundary {
     }
 }
 
-/// Whether any anchor in the node is strict — strict adjacency is the harsher demand,
+/// Whether any anchor in the node is exact — exact anchoring is the tighter constraint,
 /// so its explanation governs when both kinds are present.
-fn strictest_anchor(node: &NodePattern) -> bool {
+fn has_exact_anchor(node: &NodePattern) -> bool {
     node.items()
-        .any(|item| matches!(item, SeqItem::Anchor(a) if a.is_strict()))
+        .any(|item| matches!(item, SeqItem::Anchor(a) if a.is_exact()))
 }
 
 fn seq_pattern(item: SeqItem) -> Option<Pattern> {

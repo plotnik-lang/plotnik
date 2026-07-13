@@ -15,7 +15,7 @@ use super::scope::SkipExit;
 /// The sibling nav implied by a sequence's trailing anchor, used to mark the
 /// last pattern as anchor-followed.
 ///
-/// A trailing anchor (`{… .}`) enforces last-child adjacency via the parent
+/// A trailing anchor (`{… .}`) constrains the last-child boundary via the parent
 /// node's `Up*` nav. That check can still fail — the matched child is not the
 /// last one — and must then retry at a later sibling. Treating the last item as
 /// "followed by an anchor" routes its child search through the resumable
@@ -23,7 +23,7 @@ use super::scope::SkipExit;
 /// the retry can happen. Returns `None` when the sequence has no trailing anchor.
 fn trailing_anchor_follow_nav(items: &[SeqItem]) -> Option<Nav> {
     match items.last()? {
-        SeqItem::Anchor(a) if a.is_strict() => Some(Nav::NextExact),
+        SeqItem::Anchor(a) if a.is_exact() => Some(Nav::NextExact),
         SeqItem::Anchor(_) => Some(Nav::NextSkip),
         SeqItem::Pattern(_) => None,
     }
@@ -209,7 +209,7 @@ impl NfaBuilder<'_> {
                 },
             };
 
-            // An anchored follower checks adjacency at its exact position, so this
+            // An anchored follower checks the gap at its exact position, so this
             // item must own a resumable search: the in-instruction candidate search
             // commits to its first match without a checkpoint and could never retry
             // at a later sibling when the anchored follower fails. Wrap it in a
@@ -309,7 +309,7 @@ impl NfaBuilder<'_> {
         // - Match path (first item present): the follower is the first item's sibling.
         //   Slice *from* the follower (dropping the now-consumed leading anchor) and
         //   reuse the sibling navigation `compute_nav_modes` already derived for it,
-        //   which carries the anchor's adjacency (`Next*`).
+        //   which carries the anchor's gap policy (`Next*`).
         let (skip_exit, match_exit, first_post) = if nav_modes.len() < 2 {
             // The skippable item is the only (and last) item, so it carries `post_keep`.
             (

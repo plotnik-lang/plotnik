@@ -9,7 +9,7 @@ use crate::core::NodeFieldId;
 use super::NfaBuilder;
 use super::capture::CaptureEffects;
 
-/// `prefer` is tried first when greedy, `other` first when non-greedy. Bundled
+/// `prefer` is tried first when greedy, `other` first when lazy. Bundled
 /// so the two same-type `Label`s can't be transposed — a swap would silently
 /// flip greediness.
 #[derive(Clone, Copy)]
@@ -21,7 +21,7 @@ pub(super) struct BranchTargets {
 #[derive(Clone, Copy)]
 pub(super) enum Greediness {
     Greedy,
-    NonGreedy,
+    Lazy,
 }
 
 impl From<QuantifierOperator> for Greediness {
@@ -30,7 +30,7 @@ impl From<QuantifierOperator> for Greediness {
             return Self::Greedy;
         }
 
-        Self::NonGreedy
+        Self::Lazy
     }
 }
 
@@ -39,7 +39,7 @@ impl Greediness {
         let BranchTargets { prefer, other } = targets;
         match self {
             Self::Greedy => vec![prefer, other],
-            Self::NonGreedy => vec![other, prefer],
+            Self::Lazy => vec![other, prefer],
         }
     }
 }
@@ -258,7 +258,7 @@ impl NfaBuilder<'_> {
     }
 
     /// Emit an epsilon branch preferring `targets.prefer` when greedy,
-    /// `targets.other` when non-greedy.
+    /// `targets.other` when lazy.
     pub(super) fn emit_branch_epsilon(
         &mut self,
         targets: BranchTargets,

@@ -167,13 +167,13 @@ The VM reads the parser's `Node::is_extra()` bit at runtime; there is no bytecod
 
 Anchors compile to `Nav` variants by spelling and operand type:
 
-| Position              | Named-only `.`    | Anonymous-involved `.` | `.!` strict anchor |
-| --------------------- | ----------------- | ---------------------- | ------------------ |
-| Start of children     | `DownSkip`        | `DownSkipExtras`       | `DownExact`        |
-| Between sibling items | `NextSkip`        | `NextSkipExtras`       | `NextExact`        |
-| End of children       | `UpSkipTrivia(1)` | `UpSkipExtras(1)`      | `UpExact(1)`       |
+| Position              | Named-only `.`    | Anonymous-involved `.` | `.!` exact anchor |
+| --------------------- | ----------------- | ---------------------- | ----------------- |
+| Start of children     | `DownSkip`        | `DownSkipExtras`       | `DownExact`       |
+| Between sibling items | `NextSkip`        | `NextSkipExtras`       | `NextExact`       |
+| End of children       | `UpSkipTrivia(1)` | `UpSkipExtras(1)`      | `UpExact(1)`      |
 
-`.` skips extras in all cases. It also skips anonymous nodes when both sides are named. `.!` allows literally nothing between operands.
+`.` skips extras in all cases. It also skips anonymous nodes when both sides are named. `.!` allows no child node in the constrained gap.
 
 Bare `_` is an anonymous wildcard, so `(a) . _` uses extras-only navigation. `(_)` is a named wildcard, so `(a) . (_)` uses trivia-skipping navigation.
 
@@ -209,7 +209,7 @@ Using dump format from [08-dump-format.md](binary-format/08-dump-format.md):
   03  ─‣┘                                       ◼
 ```
 
-**Strict first child anchor**: `(function .! (identifier))`
+**Exact first-child anchor**: `(function .! (identifier))`
 
 ```
   01       (function)                           02
@@ -225,7 +225,7 @@ Using dump format from [08-dump-format.md](binary-format/08-dump-format.md):
   03  ─•┘                                       ◼
 ```
 
-**Strict last child anchor**: `(function (identifier) .!)`
+**Exact last-child anchor**: `(function (identifier) .!)`
 
 ```
   01       (function)                           02
@@ -251,9 +251,9 @@ Using dump format from [08-dump-format.md](binary-format/08-dump-format.md):
   04  ─‣┘                                       ◼
 ```
 
-Anonymous operands make `.` skip extras only. Comments can appear between the operands; other anonymous tokens cannot. Use `.!` when byte-adjacency matters.
+Anonymous operands make `.` skip extras only. Comments can appear between the operands; other anonymous tokens cannot. Use `.!` when no syntax-tree node may intervene; it does not require adjacent source bytes.
 
-**Strict adjacency**: `(call (identifier) .! "(")`
+**Exact adjacency**: `(call (identifier) .! "(")`
 
 ```
   01       (call)                               02

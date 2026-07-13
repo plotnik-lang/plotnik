@@ -39,9 +39,9 @@ fn admits_mirrors_vm_skip_policy() {
     assert!(!GapClass::ExtrasOnly.admits(anon));
     assert!(GapClass::ExtrasOnly.admits(named_extra));
 
-    // Strict admits nothing.
-    assert!(!GapClass::Nothing.admits(anon));
-    assert!(!GapClass::Nothing.admits(named_extra));
+    // Exact admits no skipped node.
+    assert!(!GapClass::Exact.admits(anon));
+    assert!(!GapClass::Exact.admits(named_extra));
 }
 
 #[test]
@@ -77,9 +77,9 @@ fn from_nav_projects_skip_suffix() {
         Some(GapClass::ExtrasOnly)
     );
 
-    assert_eq!(GapClass::from_nav(Nav::NextExact), Some(GapClass::Nothing));
-    assert_eq!(GapClass::from_nav(Nav::DownExact), Some(GapClass::Nothing));
-    assert_eq!(GapClass::from_nav(Nav::UpExact(1)), Some(GapClass::Nothing));
+    assert_eq!(GapClass::from_nav(Nav::NextExact), Some(GapClass::Exact));
+    assert_eq!(GapClass::from_nav(Nav::DownExact), Some(GapClass::Exact));
+    assert_eq!(GapClass::from_nav(Nav::UpExact(1)), Some(GapClass::Exact));
 
     // Control-flow navs open no sibling gap.
     assert_eq!(GapClass::from_nav(Nav::Epsilon), None);

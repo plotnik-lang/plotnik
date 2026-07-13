@@ -32,8 +32,8 @@ pub enum GapClass {
     AnonymousAndExtras,
     /// Soft `.` with an anonymous operand: skip extras only.
     ExtrasOnly,
-    /// Strict `.!`: nothing may intervene.
-    Nothing,
+    /// Exact `.!`: no syntax-tree node may intervene.
+    Exact,
 }
 
 impl GapClass {
@@ -42,7 +42,7 @@ impl GapClass {
             Self::Any => SkipClass::Any,
             Self::AnonymousAndExtras => SkipClass::Trivia,
             Self::ExtrasOnly => SkipClass::Extras,
-            Self::Nothing => SkipClass::Exact,
+            Self::Exact => SkipClass::Exact,
         }
     }
 
@@ -51,13 +51,13 @@ impl GapClass {
         self.skip_class().admits(node)
     }
 
-    /// Rank by permissiveness. The classes nest — `Nothing ⊂ ExtrasOnly ⊂
+    /// Rank by permissiveness. The classes nest — `Exact ⊂ ExtrasOnly ⊂
     /// AnonymousAndExtras ⊂ Any` — so a total order captures their intersection and
     /// union exactly, which is what [`tighten`](Self::tighten)/[`loosen`](Self::loosen)
     /// need.
     fn permissiveness(self) -> u8 {
         match self {
-            Self::Nothing => 0,
+            Self::Exact => 0,
             Self::ExtrasOnly => 1,
             Self::AnonymousAndExtras => 2,
             Self::Any => 3,
@@ -96,7 +96,7 @@ impl GapClass {
             Nav::Next | Nav::Down | Nav::Up(_) => Self::Any,
             Nav::NextSkip | Nav::DownSkip | Nav::UpSkipTrivia(_) => Self::AnonymousAndExtras,
             Nav::NextSkipExtras | Nav::DownSkipExtras | Nav::UpSkipExtras(_) => Self::ExtrasOnly,
-            Nav::NextExact | Nav::DownExact | Nav::UpExact(_) => Self::Nothing,
+            Nav::NextExact | Nav::DownExact | Nav::UpExact(_) => Self::Exact,
             // Childless asserts at the current position without moving; it
             // opens no sibling gap, like the other stay-in-place navs.
             Nav::Epsilon
@@ -245,7 +245,7 @@ impl<'a> AnchorSemantics<'a> {
     /// Check for trailing anchor in items, descending into a sole-child sequence if needed.
     pub fn check_trailing_anchor(&self, items: &[SeqItem]) -> (bool, Option<Nav>) {
         if let Some(SeqItem::Anchor(anchor)) = items.last() {
-            if anchor.is_strict() {
+            if anchor.is_exact() {
                 return (true, Some(Nav::UpExact(1)));
             }
 
@@ -305,14 +305,14 @@ impl<'a> AnchorSemantics<'a> {
         is_inside_node: bool,
     ) -> Vec<(usize, Option<Nav>)> {
         let mut result = Vec::new();
-        let mut pending_anchor_strict = None;
+        let mut pending_anchor_exact = None;
         let mut prev_is_anonymous = false;
         let mut is_first_pattern = true;
 
         for (idx, item) in items.iter().enumerate() {
             match item {
                 SeqItem::Anchor(anchor) => {
-                    pending_anchor_strict = Some(anchor.is_strict());
+                    pending_anchor_exact = Some(anchor.is_exact());
                 }
                 SeqItem::Pattern(pattern) => {
                     let current_is_anonymous =
@@ -324,7 +324,7 @@ impl<'a> AnchorSemantics<'a> {
                     } else {
                         current_is_anonymous
                     };
-                    let nav = if let Some(is_exact) = pending_anchor_strict {
+                    let nav = if let Some(is_exact) = pending_anchor_exact {
                         if is_first_pattern && is_inside_node {
                             Some(if is_exact {
                                 Nav::DownExact
@@ -351,7 +351,7 @@ impl<'a> AnchorSemantics<'a> {
                     };
 
                     result.push((idx, nav));
-                    pending_anchor_strict = None;
+                    pending_anchor_exact = None;
                     prev_is_anonymous = current_is_anonymous;
                     is_first_pattern = false;
                 }

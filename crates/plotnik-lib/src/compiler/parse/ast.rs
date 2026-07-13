@@ -175,7 +175,7 @@ ast_node!(NodePredicate, NodePredicate);
 ast_node!(RegexLiteral, Regex);
 
 impl Anchor {
-    pub fn is_strict(&self) -> bool {
+    pub fn is_exact(&self) -> bool {
         find_token(&self.0, |k| k == SyntaxKind::DotBang).is_some()
     }
 }
@@ -288,7 +288,7 @@ fn predicate_op_from_syntax_kind(kind: SyntaxKind) -> Option<PredicateOperator> 
     }
 }
 
-/// Syntactic quantifier arity parsed from `?`, `*`, `+`, and non-greedy twins.
+/// Syntactic quantifier arity parsed from `?`, `*`, `+`, and lazy twins.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum QuantifierKind {
     /// `?` or `??` - zero or one.
@@ -309,7 +309,7 @@ impl QuantifierKind {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Greediness {
     Greedy,
-    NonGreedy,
+    Lazy,
 }
 
 impl Greediness {
@@ -318,7 +318,7 @@ impl Greediness {
     }
 }
 
-/// Syntactic quantifier operator parsed from `?`, `*`, `+`, and non-greedy twins.
+/// Syntactic quantifier operator parsed from `?`, `*`, `+`, and lazy twins.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct QuantifierOperator {
     kind: QuantifierKind,
@@ -345,15 +345,15 @@ fn quantifier_operator_from_syntax_kind(kind: SyntaxKind) -> Option<QuantifierOp
             QuantifierOperator::new(QuantifierKind::Optional, Greediness::Greedy)
         }
         SyntaxKind::QuestionQuestion => {
-            QuantifierOperator::new(QuantifierKind::Optional, Greediness::NonGreedy)
+            QuantifierOperator::new(QuantifierKind::Optional, Greediness::Lazy)
         }
         SyntaxKind::Star => QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::Greedy),
         SyntaxKind::StarQuestion => {
-            QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::NonGreedy)
+            QuantifierOperator::new(QuantifierKind::ZeroOrMore, Greediness::Lazy)
         }
         SyntaxKind::Plus => QuantifierOperator::new(QuantifierKind::OneOrMore, Greediness::Greedy),
         SyntaxKind::PlusQuestion => {
-            QuantifierOperator::new(QuantifierKind::OneOrMore, Greediness::NonGreedy)
+            QuantifierOperator::new(QuantifierKind::OneOrMore, Greediness::Lazy)
         }
         _ => return None,
     })
@@ -601,7 +601,7 @@ impl QuantifiedPattern {
 
     /// Whether the quantifier repeats (`*`/`+`, greedy or not) — i.e. collects an
     /// array, as opposed to `?`. Reads [`quantifier_kind`](Self::quantifier_kind)
-    /// rather than re-listing operators so the non-greedy twins stay included (#469).
+    /// rather than re-listing operators so the lazy twins stay included (#469).
     pub fn is_repeating(&self) -> bool {
         matches!(
             self.quantifier_kind(),

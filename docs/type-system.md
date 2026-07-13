@@ -201,9 +201,9 @@ no single node to bind. Both directions fail for the same reason:
 (SeqDef) @x                       ; ERROR when SeqDef is void
 ```
 
-Greediness never matters here: `?` and `??` (and `*`/`*?`, `+`/`+?`) are
-identical to the type system — they differ only in which alternative the
-runtime tries first.
+Greedy versus lazy preference never matters here: `?` and `??` (and
+`*`/`*?`, `+`/`+?`) are identical to the type system. At runtime, they differ
+only in whether another repetition or the continuation is tried first.
 
 The fix is always to say what you mean: capture individual nodes inside the
 group, capture the quantifier directly (`(a)+ @xs` → a list), or capture

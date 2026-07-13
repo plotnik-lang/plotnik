@@ -737,7 +737,7 @@ impl Solve {
                 break;
             }
             // The state's *effective* gap (tightest erasure path that reaches it),
-            // so a strict anchor erased into this position still forbids the skip.
+            // so an exact anchor erased into this position still forbids the skip.
             if thread.gaps[q as usize].admits(node_class) {
                 next.insert(q);
             }
@@ -790,7 +790,7 @@ impl Solve {
         // child matching an inserted extra advances without a production step). Alongside
         // membership, carry each state's effective skip gap: tightest *along* a path
         // (every erased step bounds what may be skipped after it), loosest *across* paths
-        // (a skip is open if any path opens it). So a strict anchor survives erasure — a
+        // (a skip is open if any path opens it). So an exact anchor survives erasure — a
         // state reached only by erasing optionals under `.!` cannot then skip what the
         // anchor forbids — while a state also reachable by consuming keeps its own gap.
         let mut result = set.clone();
