@@ -1,6 +1,6 @@
 Q = (identifier *= "foo") @id
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 6
 
 [transitions]
@@ -8,7 +8,7 @@ Q:
   1                                         ▶
   2   !   (identifier) [Node RecordSet(id)] *= "foo"  1
 
-Q (entrypoint):
+Q (entry point):
   3                                         ▶
   4  -ε-  [RecordClose]                     3
   5       (Q)                               2 : 4
@@ -31,7 +31,7 @@ M0: S2 → T0  ; id: <Node>
 [type_names]
 N0: S3 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
 [instructions]

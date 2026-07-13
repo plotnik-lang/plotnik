@@ -761,7 +761,7 @@ M4: S06 → T3  ; expr: QExpr
 N0: S07 → T3  ; QExpr
 N1: S08 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T4
 
 [spans]

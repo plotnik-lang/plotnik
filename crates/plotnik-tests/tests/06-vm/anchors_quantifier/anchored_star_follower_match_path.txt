@@ -70,7 +70,7 @@ M2: S04 → T0  ; c: <Node>
 [type_names]
 N0: S05 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T3
 
 [instructions]

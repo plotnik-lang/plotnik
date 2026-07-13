@@ -68,7 +68,7 @@ M1: S2 → T1  ; x: QX
 N0: S3 → T1  ; QX
 N1: S4 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
 [instructions]

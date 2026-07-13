@@ -5,7 +5,7 @@ Nested = [
 
 Q = (array (Nested) @top)
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Nested = 21
 Q      = 25
 
@@ -26,13 +26,13 @@ Q:
   15  -ε-  [RecordClose]                    13
   16  └‣─  (Nested)                         00 : 15
 
-Nested (entrypoint):
+Nested (entry point):
   18                                        ▶
   19  -ε-  [RecordClose]                    18
   20       (Nested)                         00 : 19
   21  -ε-  [RecordOpen]                     20
 
-Q (entrypoint):
+Q (entry point):
   22                                        ▶
   23  -ε-  [RecordClose]                    22
   24       (Q)                              12 : 23
@@ -64,7 +64,7 @@ M2: S3 → T3  ; top: Nested
 N0: S4 → T3  ; Nested
 N1: S5 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Nested = 00 :: T3
 Q      = 06 :: T4
 

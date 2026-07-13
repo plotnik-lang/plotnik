@@ -5,7 +5,7 @@ Q = (expression_statement
   ] @x
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 13
 
 [transitions]
@@ -18,7 +18,7 @@ Q:
   08  ──!  _                                04, 05, 08
   09  └─!  _                                04, 05, 08
 
-Q (entrypoint):
+Q (entry point):
   10                                        ▶
   11  -ε-  [RecordClose]                    10
   12       (Q)                              02 : 11
@@ -42,7 +42,7 @@ M0: S1 → T0  ; x: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
 [instructions]

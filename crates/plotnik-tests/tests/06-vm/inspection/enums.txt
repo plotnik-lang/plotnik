@@ -210,7 +210,7 @@ M4: S05 → T3  ; expr: Expr
 N0: S06 → T3  ; Expr
 N1: S07 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Expr = 00 :: T3
 Q    = 02 :: T4
 

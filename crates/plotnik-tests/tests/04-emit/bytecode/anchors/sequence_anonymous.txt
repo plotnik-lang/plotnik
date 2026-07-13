@@ -7,7 +7,7 @@ Q = (array
   }
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 11
 
 [transitions]
@@ -21,7 +21,7 @@ Q:
   08  ──!  _                                06, 08
   09  └─!  _                                06, 08
 
-Q (entrypoint):
+Q (entry point):
   10                                        ▶
   11       (Q)                              02 : 10
 -------------------- BYTECODE --------------------
@@ -40,7 +40,7 @@ T0 = <Void>
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T0
 
 [instructions]

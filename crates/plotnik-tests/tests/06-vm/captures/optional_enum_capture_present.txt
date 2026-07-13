@@ -55,7 +55,7 @@ M2: S3 → T3  ; e: T3
 N0: S4 → T2  ; QE
 N1: S5 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T4
 
 [instructions]

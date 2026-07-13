@@ -4,7 +4,7 @@ Q = (program
   )* @x
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 22
 
 [transitions]
@@ -21,7 +21,7 @@ Q:
   13  └─!  _                                07, 12
   18  -ε-  [ListOpen]                       13, 05
 
-Q (entrypoint):
+Q (entry point):
   19                                        ▶
   20  -ε-  [RecordClose]                    19
   21       (Q)                              02 : 20
@@ -46,7 +46,7 @@ M0: S1 → T1  ; x: T1
 [type_names]
 N0: S2 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
 [instructions]

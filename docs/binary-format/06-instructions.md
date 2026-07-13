@@ -7,7 +7,7 @@ The Instructions section stores VM instructions in 8-byte bytecode words. A
 instructions_offset + CodeAddr * 8
 ```
 
-`CodeAddr(0)` is a valid instruction address, including as an entrypoint target.
+`CodeAddr(0)` is a valid instruction address, including as an entry-point target.
 In an encoded successor operand, raw `0` may instead mean terminal; non-terminal
 successors decode as `SuccessorAddr`, which cannot contain zero. Call targets and
 return addresses are always nonzero.
@@ -39,7 +39,7 @@ header (u8)
 | 0x4    | Match48    | 48 bytes | Extended match with inline payload             |
 | 0x5    | Match64    | 64 bytes | Extended match with inline payload             |
 | 0x6    | Call       | 8 bytes  | Definition call                                |
-| 0x7    | Return     | 8 bytes  | Return from definition or entrypoint           |
+| 0x7    | Return     | 8 bytes  | Return from definition or entry point          |
 | 0x8    | SplitCall  | 8 bytes  | Nullable call with two continuations           |
 | 0x9    | RoutedCall | 8 bytes  | Matched-only call with callee-owned navigation |
 
@@ -272,7 +272,7 @@ Reserved bytes must be zero. `entry` lets the loader prove that ordinary calls
 target caller-navigated bodies while routed and split calls target bodies that
 own entry navigation; it is not needed by the VM after validation. Return pops
 a frame and selects the continuation for its outcome. If no frame exists, only
-a matched, caller-owned return may accept the entrypoint.
+a matched, caller-owned return may accept the entry point.
 
 ## Validation
 
@@ -287,7 +287,7 @@ The loader verifies:
   every unit effect has a zero payload;
 - calls and returns uphold cursor-depth neutrality;
 - ordinary calls target matched-only bodies, split calls target bodies with
-  both outcomes, and entrypoint wrappers return matched only;
+  both outcomes, and entry-point wrappers return matched only;
 - the committed match journal cannot underflow the materializer stack or
   suppression depth, and all list/record/variant/scalar frames are balanced;
 - the committed match journal cannot underflow or mis-nest the inspection span

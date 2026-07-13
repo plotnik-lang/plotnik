@@ -76,7 +76,7 @@ M2: S03 → T2  ; rows: T2
 N0: S04 → T1  ; QRows
 N1: S05 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T3
 
 [instructions]

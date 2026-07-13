@@ -6,7 +6,7 @@ Q = [
   (call_expression) @e
 ]
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 11
 
 [transitions]
@@ -19,7 +19,7 @@ Q:
   05   !   (binary_expression) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(e) Node RecordSet(d)]  01
   06   !   (call_expression) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Node RecordSet(e)]  01
 
-Q (entrypoint):
+Q (entry point):
   08                                        ▶
   09  -ε-  [RecordClose]                    08
   10       (Q)                              00 : 09
@@ -54,7 +54,7 @@ M4: S05 → T1  ; e: T1
 [type_names]
 N0: S06 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
 [instructions]

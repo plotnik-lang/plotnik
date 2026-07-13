@@ -3,7 +3,7 @@ Q = (array
   (number) @n
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 18
 
 [transitions]
@@ -17,7 +17,7 @@ Q:
   09  ──!  _                                07, 09
   10  └─!  _                                07, 09
 
-Q (entrypoint):
+Q (entry point):
   15                                        ▶
   16  -ε-  [RecordClose]                    15
   17       (Q)                              02 : 16
@@ -41,7 +41,7 @@ M0: S1 → T0  ; n: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
 [instructions]

@@ -4,7 +4,7 @@ Q = (program
   (Comments) @comments :: str
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 21
 
 [transitions]
@@ -19,7 +19,7 @@ Q:
   12  └─!  _                                09, 11
   17  -ε-  [ListOpen]                       12, 07
 
-Q (entrypoint):
+Q (entry point):
   18                                        ▶
   19  -ε-  [RecordClose]                    18
   20       (Q)                              02 : 19
@@ -47,7 +47,7 @@ M0: S1 → T3  ; comments: T3
 N0: S2 → T2  ; Comments
 N1: S3 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T4
 
 [instructions]

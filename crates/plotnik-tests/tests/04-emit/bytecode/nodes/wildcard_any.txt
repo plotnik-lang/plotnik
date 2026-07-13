@@ -2,7 +2,7 @@ Q = (pair
   key: _ @key
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 8
 
 [transitions]
@@ -12,7 +12,7 @@ Q:
   3  ─‣┘  _                                 1
   4  └‣─  key: _ [Node RecordSet(key)]      3
 
-Q (entrypoint):
+Q (entry point):
   5                                         ▶
   6  -ε-  [RecordClose]                     5
   7       (Q)                               2 : 6
@@ -34,7 +34,7 @@ M0: S1 → T0  ; key: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
 [instructions]

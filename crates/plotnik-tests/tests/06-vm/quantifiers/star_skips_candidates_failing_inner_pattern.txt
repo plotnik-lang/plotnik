@@ -50,7 +50,7 @@ M1: S2 → T2  ; rows: T2
 N0: S3 → T1  ; QRows
 N1: S4 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T3
 
 [instructions]

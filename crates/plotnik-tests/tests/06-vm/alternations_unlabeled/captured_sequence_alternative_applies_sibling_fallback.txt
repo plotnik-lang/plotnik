@@ -67,7 +67,7 @@ N0: S05 → T1  ; QWGrp
 N1: S06 → T4  ; QW
 N2: S07 → T5  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T5
 
 [instructions]

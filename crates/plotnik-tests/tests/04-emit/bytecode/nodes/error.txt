@@ -1,6 +1,6 @@
 Q = (ERROR) @err
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 6
 
 [transitions]
@@ -8,7 +8,7 @@ Q:
   1                                         ▶
   2   !   (ERROR) [Node RecordSet(err)]     1
 
-Q (entrypoint):
+Q (entry point):
   3                                         ▶
   4  -ε-  [RecordClose]                     3
   5       (Q)                               2 : 4
@@ -29,7 +29,7 @@ M0: S1 → T0  ; err: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 0 :: T1
 
 [instructions]

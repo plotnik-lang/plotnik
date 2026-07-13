@@ -52,7 +52,7 @@ M2: S3 → T0  ; d: <Node>
 N0: S4 → T1  ; QX
 N1: S5 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T3
 
 [instructions]

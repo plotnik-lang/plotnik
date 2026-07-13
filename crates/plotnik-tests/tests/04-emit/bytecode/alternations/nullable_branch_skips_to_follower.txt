@@ -6,7 +6,7 @@ Q = (array
   (string) @s
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 25
 
 [transitions]
@@ -23,7 +23,7 @@ Q:
   19  ──!  _                                09, 16, 19
   20  └─!  _                                09, 16, 19
 
-Q (entrypoint):
+Q (entry point):
   22                                        ▶
   23  -ε-  [RecordClose]                    22
   24       (Q)                              02 : 23
@@ -48,7 +48,7 @@ M0: S1 → T0  ; s: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
 [instructions]

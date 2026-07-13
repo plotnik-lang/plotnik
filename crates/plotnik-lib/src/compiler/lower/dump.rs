@@ -4,7 +4,7 @@
 //! in label space, keeping the resolution the wire format erases: symbolic labels
 //! instead of packed step addresses, definition-name section headers from label
 //! provenance (`Name (consuming):` for the guarded-recursion body variant,
-//! `Name (entrypoint):` for wrappers), real member names on
+//! `Name (entry point):` for wrappers), real member names on
 //! `RecordSet`/`VariantOpen`,
 //! callee names on calls (`(Name+)` marks a consuming-body callee), and inline
 //! predicate text — the IR has no string table to index into.
@@ -96,7 +96,7 @@ impl<'a> NfaDumper<'a> {
 impl NfaDumper<'_> {
     fn dump_entrypoints(&self, out: &mut String) {
         let c = &self.colors;
-        writeln!(out, "{}[entrypoints]{}", c.blue, c.reset)
+        writeln!(out, "{}[entry_points]{}", c.blue, c.reset)
             .expect("writing to a String is infallible");
 
         let mut entries: Vec<(&str, Label)> = self
@@ -164,7 +164,7 @@ impl NfaDumper<'_> {
             origin @ LabelOrigin::DefVariant { .. } => {
                 format!("{}:", self.variant_name(origin))
             }
-            LabelOrigin::Wrapper(id) => format!("{} (entrypoint):", self.def_name(id)),
+            LabelOrigin::Wrapper(id) => format!("{} (entry point):", self.def_name(id)),
         }
     }
 

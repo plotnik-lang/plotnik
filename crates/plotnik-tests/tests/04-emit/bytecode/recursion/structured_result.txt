@@ -12,7 +12,7 @@ Test = (program
   (expression_statement (Expr) @expr)
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Expr = 21
 Test = 25
 
@@ -35,11 +35,11 @@ Test:
   17  ─‣┘² _ [RecordSet(expr)]              13
   19  └‣─  (Expr)                           00 : 17
 
-Expr (entrypoint):
+Expr (entry point):
   20                                        ▶
   21       (Expr)                           00 : 20
 
-Test (entrypoint):
+Test (entry point):
   22                                        ▶
   23  -ε-  [RecordClose]                    22
   24       (Test)                           14 : 23
@@ -82,7 +82,7 @@ M5: S06 → T3  ; expr: Expr
 N0: S07 → T3  ; Expr
 N1: S08 → T4  ; Test
 
-[entrypoints]
+[entry_points]
 Expr = 00 :: T3
 Test = 02 :: T4
 

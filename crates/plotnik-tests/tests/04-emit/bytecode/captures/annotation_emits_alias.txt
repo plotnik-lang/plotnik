@@ -1,6 +1,6 @@
 Q = (identifier) @name :: Identifier
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 6
 
 [transitions]
@@ -8,7 +8,7 @@ Q:
   1                                         ▶
   2   !   (identifier) [Node RecordSet(name)]  1
 
-Q (entrypoint):
+Q (entry point):
   3                                         ▶
   4  -ε-  [RecordClose]                     3
   5       (Q)                               2 : 4
@@ -33,7 +33,7 @@ M0: S1 → T1  ; name: Identifier
 N0: S2 → T1  ; Identifier
 N1: S3 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 0 :: T2
 
 [instructions]

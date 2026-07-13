@@ -3,7 +3,7 @@ Used = (comment)+
 Q = (program (Used))
 --------------------- INPUT ----------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 20
 
 [transitions]
@@ -22,7 +22,7 @@ Used:
 Q:
   17  └‣─  (Used)                           11 : 03
 
-Q (entrypoint):
+Q (entry point):
   19                                        ▶
   20       (Q)                              02 : 19
 -------------------- BYTECODE --------------------
@@ -43,7 +43,7 @@ T2 = ListOneOrMore(T1)  ; <Node>+
 [type_names]
 N0: S1 → T2  ; Used
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T0
 
 [instructions]

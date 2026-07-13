@@ -94,7 +94,7 @@ N0: S06 → T3  ; Entry
 N1: S07 → T4  ; Items
 N2: S08 → T5  ; Q
 
-[entrypoints]
+[entry_points]
 Entry = 00 :: T3
 Q     = 02 :: T5
 

@@ -44,7 +44,7 @@ Sections appear in fixed order, each starting on a 64-byte boundary:
 | 7   | [TypeDefs]     | 4           | `type_defs_count`        |
 | 8   | [TypeMembers]  | 4           | `type_members_count`     |
 | 9   | [TypeNames]    | 4           | `type_names_count`       |
-| 10  | [Entrypoints]  | 8           | `entrypoints_count`      |
+| 10  | [Entry points] | 8           | `entry_points_count`     |
 | 11  | [Instructions] | 8           | `instruction_word_count` |
 | 12  | [Spans]        | 16          | `spans_count`            |
 
@@ -57,7 +57,7 @@ Sections appear in fixed order, each starting on a 64-byte boundary:
 [TypeDefs]: 04-types.md
 [TypeMembers]: 04-types.md
 [TypeNames]: 04-types.md
-[Entrypoints]: 05-entrypoints.md
+[Entry points]: 05-entry-points.md
 [Instructions]: 06-instructions.md
 [Spans]: 07-spans.md
 
@@ -100,7 +100,7 @@ struct Header {
     type_defs_count: u16,
     type_members_count: u16,
     type_names_count: u16,
-    entrypoints_count: u16,
+    entry_points_count: u16,
     instruction_word_count: u16,
 
     // Bytes 42-43: spans_count
@@ -138,7 +138,7 @@ checks uphold the no-panic guarantee. Validation runs in this order:
    type/member bindings that are either `0xFFFF` or in range (a live member with
    no type is rejected). Span effect payloads in the instruction stream must address this
    table.
-9. **String IDs** — every _required_ embedded `StringId` (entrypoint, node/field
+9. **String IDs** — every _required_ embedded `StringId` (entry point, node/field
    symbol, type, member, and regex pattern names) must address a real string-table
    entry (`1..str_table_count`), so the `NonZeroU16` accessors never panic.
 10. **Instructions** — the instruction stream is walked twice. Pass 1 decodes each
@@ -148,8 +148,8 @@ checks uphold the no-panic guarantee. Validation runs in this order:
     the section exactly. Pass 2 requires every jump target (successor, call
     next/target) to land on a recorded instruction start. This
     makes every lazy `decode_instruction` / view / materializer access panic-free.
-11. **Entrypoints** — each `target` must land on a recorded instruction start
-    (not merely in range — an entrypoint into the interior of a multi-word
+11. **Entry points** — each `target` must land on a recorded instruction start
+    (not merely in range — an entry point into the interior of a multi-word
     instruction would start decoding mid-instruction) and `result_type` must
     address a real TypeDef.
 12. **Effect stack** — an interprocedural walk of the committed-effect order

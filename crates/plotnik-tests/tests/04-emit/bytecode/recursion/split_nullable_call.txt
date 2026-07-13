@@ -13,7 +13,7 @@ B = {
 
 Q = (program (B))
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 56
 
 [transitions]
@@ -56,7 +56,7 @@ Q:
   52  ──!  _                                50, 52
   53  └─!  _                                50, 52
 
-Q (entrypoint):
+Q (entry point):
   55                                        ▶
   56       (Q)                              02 : 55
 -------------------- BYTECODE --------------------
@@ -80,7 +80,7 @@ M1: S2 → T0  ; Base: <Void>
 [type_names]
 N0: S3 → T1  ; Body
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T0
 
 [instructions]

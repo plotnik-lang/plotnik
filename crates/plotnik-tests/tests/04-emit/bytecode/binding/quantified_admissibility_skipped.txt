@@ -1,6 +1,6 @@
 Q = (statement_block (identifier)?)
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 10
 
 [transitions]
@@ -12,7 +12,7 @@ Q:
   06  ──!  _                                04, 06
   07  └─!  _                                04, 06
 
-Q (entrypoint):
+Q (entry point):
   09                                        ▶
   10       (Q)                              02 : 09
 -------------------- BYTECODE --------------------
@@ -29,7 +29,7 @@ T0 = <Void>
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T0
 
 [instructions]

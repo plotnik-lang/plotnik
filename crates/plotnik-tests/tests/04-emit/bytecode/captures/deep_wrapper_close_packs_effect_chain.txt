@@ -16,7 +16,7 @@ Q = {
   } @h
 }
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 20
 
 [transitions]
@@ -25,7 +25,7 @@ Q:
   01                                        ▶
   09   !   (identifier) [RecordOpen Node RecordSet(a) RecordClose RecordSet(b) RecordClose RecordSet(c) RecordClose RecordSet(d) RecordClose RecordSet(e) RecordClose RecordSet(f) RecordClose RecordSet(g) RecordClose RecordSet(h)]  01
 
-Q (entrypoint):
+Q (entry point):
   17                                        ▶
   18  -ε-  [RecordClose]                    17
   19       (Q)                              00 : 18
@@ -82,7 +82,7 @@ N5: S14 → T6  ; QHG
 N6: S15 → T7  ; QH
 N7: S16 → T8  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T8
 
 [instructions]

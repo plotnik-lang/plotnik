@@ -7,7 +7,7 @@ Q = (object
   }* @items
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 24
 
 [transitions]
@@ -24,7 +24,7 @@ Q:
   15  └─!  _                                12, 14
   20  -ε-  [ListOpen]                       15, 05
 
-Q (entrypoint):
+Q (entry point):
   21                                        ▶
   22  -ε-  [RecordClose]                    21
   23       (Q)                              02 : 22
@@ -67,7 +67,7 @@ N0: S07 → T3  ; QItemsItem
 N1: S08 → T4  ; QItems
 N2: S09 → T6  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T6
 
 [instructions]

@@ -41,7 +41,7 @@ M0: S1 → T3  ; comments: T3
 N0: S2 → T2  ; Comments
 N1: S3 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T4
 
 [instructions]

@@ -59,7 +59,7 @@ N0: S4 → T1  ; QOuterInner
 N1: S5 → T2  ; QOuter
 N2: S6 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T3
 
 [instructions]

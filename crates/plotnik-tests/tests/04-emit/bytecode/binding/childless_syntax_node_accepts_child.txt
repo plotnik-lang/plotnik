@@ -1,6 +1,6 @@
 Q = (debugger_statement (_))
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 6
 
 [transitions]
@@ -10,7 +10,7 @@ Q:
   3  ─‣┘  _                                 1
   4  └‣─  (_)                               3
 
-Q (entrypoint):
+Q (entry point):
   5                                         ▶
   6       (Q)                               2 : 5
 -------------------- BYTECODE --------------------
@@ -26,7 +26,7 @@ T0 = <Void>
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 0 :: T0
 
 [instructions]

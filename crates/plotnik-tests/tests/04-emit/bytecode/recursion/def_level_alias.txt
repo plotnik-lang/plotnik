@@ -7,7 +7,7 @@ Rec = [
 
 Q = (Rec)
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q   = 19
 Rec = 17
 
@@ -28,11 +28,11 @@ Q:
   13  -ε-  [SuppressEnd]                    12
   14   !   (Rec)                            00 : 13
 
-Rec (entrypoint):
+Rec (entry point):
   16                                        ▶
   17       (Rec)                            00 : 16
 
-Q (entrypoint):
+Q (entry point):
   18                                        ▶
   19       (Q)                              11 : 18
 -------------------- BYTECODE --------------------
@@ -64,7 +64,7 @@ M3: S4 → T3  ; B: T3
 [type_names]
 N0: S5 → T4  ; Rec
 
-[entrypoints]
+[entry_points]
 Q   = 02 :: T0
 Rec = 00 :: T4
 

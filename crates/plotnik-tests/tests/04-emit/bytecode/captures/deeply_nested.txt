@@ -6,7 +6,7 @@ Q = (array
   ) @b
 ) @a
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 12
 
 [transitions]
@@ -18,7 +18,7 @@ Q:
   07  ─‣┘³ _                                01
   08  └‣─  (identifier) [Node RecordSet(d)]  07
 
-Q (entrypoint):
+Q (entry point):
   09                                        ▶
   10  -ε-  [RecordClose]                    09
   11       (Q)                              02 : 10
@@ -47,7 +47,7 @@ M3: S4 → T0  ; d: <Node>
 [type_names]
 N0: S5 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
 [instructions]

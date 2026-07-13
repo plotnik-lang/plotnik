@@ -5,7 +5,7 @@ Q = (array
   (number) @n
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 14
 
 [transitions]
@@ -19,7 +19,7 @@ Q:
   08  ──!  _                                06, 08
   09  └─!  _                                06, 08
 
-Q (entrypoint):
+Q (entry point):
   11                                        ▶
   12  -ε-  [RecordClose]                    11
   13       (Q)                              02 : 12
@@ -46,7 +46,7 @@ M0: S1 → T0  ; n: <Node>
 N0: S2 → T1  ; MaybeId
 N1: S3 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
 [instructions]

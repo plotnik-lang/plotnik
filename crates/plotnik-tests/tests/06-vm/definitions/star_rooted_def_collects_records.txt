@@ -86,7 +86,7 @@ N0: S04 → T1  ; Row
 N1: S05 → T2  ; Rows
 N2: S06 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Q   = 06 :: T3
 Row = 00 :: T1
 

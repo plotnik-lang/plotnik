@@ -68,7 +68,7 @@ N0: S04 → T3  ; Obj
 N1: S05 → T1  ; Arr
 N2: S06 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Arr = 06 :: T1
 Obj = 00 :: T3
 Q   = 12 :: T4

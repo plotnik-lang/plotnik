@@ -5,7 +5,7 @@ Q = (program
   ]? @statement
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 16
 
 [transitions]
@@ -19,7 +19,7 @@ Q:
   10  ──!  _                                06, 07, 10
   11  └─!  _                                06, 07, 10
 
-Q (entrypoint):
+Q (entry point):
   13                                        ▶
   14  -ε-  [RecordClose]                    13
   15       (Q)                              02 : 14
@@ -57,7 +57,7 @@ M4: S05 → T4  ; statement: T4
 N0: S06 → T3  ; QStatement
 N1: S07 → T5  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T5
 
 [instructions]

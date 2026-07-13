@@ -13,7 +13,7 @@ Q = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 18
 
 [transitions]
@@ -32,7 +32,7 @@ Q:
   15  ──!  _                                06, 11, 12, 15
   16  └─!  _                                06, 11, 12, 15
 
-Q (entrypoint):
+Q (entry point):
   17                                        ▶
   18       (Q)                              02 : 17
 -------------------- BYTECODE --------------------
@@ -52,7 +52,7 @@ T0 = <Void>
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T0
 
 [spans]

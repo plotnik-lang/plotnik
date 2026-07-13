@@ -296,7 +296,8 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
     let stw = ctx.addr_width;
     let tw = ctx.type_width;
 
-    writeln!(out, "{}[entrypoints]{}", c.blue, c.reset).expect("writing to a String is infallible");
+    writeln!(out, "{}[entry_points]{}", c.blue, c.reset)
+        .expect("writing to a String is infallible");
 
     let mut entries: Vec<_> = entrypoints
         .iter()

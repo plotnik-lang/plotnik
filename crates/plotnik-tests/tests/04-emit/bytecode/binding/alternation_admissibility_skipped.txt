@@ -5,7 +5,7 @@ Q = (function_declaration
   ]
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 11
 
 [transitions]
@@ -17,7 +17,7 @@ Q:
   05   !   (class_declaration) [Absent RecordSet(a) Node RecordSet(b)]  03
   07  └‣─  body: _                          04, 05
 
-Q (entrypoint):
+Q (entry point):
   08                                        ▶
   09  -ε-  [RecordClose]                    08
   10       (Q)                              02 : 09
@@ -45,7 +45,7 @@ M1: S2 → T1  ; b: T1
 [type_names]
 N0: S3 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
 [instructions]

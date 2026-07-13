@@ -13,7 +13,7 @@ TrailingSkip = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 LeadingSkip  = 24
 TrailingSkip = 28
 
@@ -36,13 +36,13 @@ TrailingSkip:
   17  ──!  _                                15, 17
   20  └‣─  (function_declaration) [Node RecordSet(fn)]  17, 14
 
-LeadingSkip (entrypoint):
+LeadingSkip (entry point):
   21                                        ▶
   22  -ε-  [RecordClose]                    21
   23       (LeadingSkip)                    02 : 22
   24  -ε-  [RecordOpen]                     23
 
-TrailingSkip (entrypoint):
+TrailingSkip (entry point):
   25                                        ▶
   26  -ε-  [RecordClose]                    25
   27       (TrailingSkip)                   13 : 26
@@ -70,7 +70,7 @@ M1: S1 → T0  ; fn: <Node>
 N0: S2 → T1  ; LeadingSkip
 N1: S3 → T2  ; TrailingSkip
 
-[entrypoints]
+[entry_points]
 LeadingSkip  = 00 :: T1
 TrailingSkip = 06 :: T2
 

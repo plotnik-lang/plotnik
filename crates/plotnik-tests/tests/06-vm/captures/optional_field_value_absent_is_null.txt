@@ -48,7 +48,7 @@ M1: S02 → T1  ; v: T1
 [type_names]
 N0: S03 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
 [instructions]

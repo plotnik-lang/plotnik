@@ -51,7 +51,7 @@ M1: S2 → T2  ; c: Nested
 N0: S3 → T2  ; Nested
 N1: S4 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Nested = 00 :: T2
 Q      = 06 :: T3
 

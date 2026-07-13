@@ -56,7 +56,7 @@ M2: S3 → T4  ; items: T4
 N0: S4 → T3  ; QItems
 N1: S5 → T5  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T5
 
 [instructions]

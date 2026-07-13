@@ -8,7 +8,7 @@ Q = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 29
 
 [transitions]
@@ -31,7 +31,7 @@ Q:
   23  └─!  _                                20, 22
   25  -ε-  [RecordOpen]                     23, 19
 
-Q (entrypoint):
+Q (entry point):
   26                                        ▶
   27  -ε-  [RecordClose]                    26
   28       (Q)                              02 : 27
@@ -63,7 +63,7 @@ M2: S3 → T2  ; second: MaybeName
 N0: S4 → T2  ; MaybeName
 N1: S5 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T3
 
 [spans]

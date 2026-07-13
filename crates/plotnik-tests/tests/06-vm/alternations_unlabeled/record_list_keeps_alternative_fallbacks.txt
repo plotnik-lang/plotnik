@@ -70,7 +70,7 @@ M2: S03 → T3  ; items: T3
 N0: S04 → T2  ; QItems
 N1: S05 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T4
 
 [instructions]

@@ -3,7 +3,7 @@ Q = [
   B: (number) @b
 ] @item
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 9
 
 [transitions]
@@ -13,7 +13,7 @@ Q:
   3   !   (identifier) [VariantOpen(A) Node RecordSet(a) VariantClose RecordSet(item)]  1
   4   !   (number) [VariantOpen(B) Node RecordSet(b) VariantClose RecordSet(item)]  1
 
-Q (entrypoint):
+Q (entry point):
   6                                         ▶
   7  -ε-  [RecordClose]                     6
   8       (Q)                               0 : 7
@@ -49,7 +49,7 @@ M4: S5 → T3  ; item: QItem
 N0: S6 → T3  ; QItem
 N1: S7 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T4
 
 [instructions]

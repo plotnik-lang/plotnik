@@ -5,7 +5,7 @@ Expr = [
 ]
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Expr = 7
 
 [transitions]
@@ -16,7 +16,7 @@ Expr:
   3   !   (number) [VariantOpen(Num) Node RecordSet(num) VariantClose]  1
   4   !   (string) [VariantOpen(Str) VariantClose]  1
 
-Expr (entrypoint):
+Expr (entry point):
   6                                         ▶
   7       (Expr)                            0 : 6
 -------------------- BYTECODE --------------------
@@ -49,7 +49,7 @@ M4: S5 → T0  ; Str: <Void>
 [type_names]
 N0: S6 → T4  ; Expr
 
-[entrypoints]
+[entry_points]
 Expr = 00 :: T4
 
 [spans]

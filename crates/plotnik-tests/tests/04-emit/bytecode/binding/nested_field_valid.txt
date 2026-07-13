@@ -4,7 +4,7 @@ Q = (function_declaration
   ) @body
 ) @fn
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 10
 
 [transitions]
@@ -15,7 +15,7 @@ Q:
   05  ─‣┘² _                                01
   06  └‣─  (return_statement) [Node RecordSet(ret)]  05
 
-Q (entrypoint):
+Q (entry point):
   07                                        ▶
   08  -ε-  [RecordClose]                    07
   09       (Q)                              02 : 08
@@ -43,7 +43,7 @@ M2: S3 → T0  ; ret: <Node>
 [type_names]
 N0: S4 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
 [instructions]

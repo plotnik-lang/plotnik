@@ -31,7 +31,7 @@ Q = [
   A29: (identifier) @x29
 ]
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 34
 
 [transitions]
@@ -69,7 +69,7 @@ Q:
   30   !   (identifier) [VariantOpen(A28) Node RecordSet(x28) VariantClose]  01
   31   !   (identifier) [VariantOpen(A29) Node RecordSet(x29) VariantClose]  01
 
-Q (entrypoint):
+Q (entry point):
   33                                        ▶
   34       (Q)                              00 : 33
 -------------------- BYTECODE --------------------
@@ -237,7 +237,7 @@ M59: S60 → T30  ; A29: T30
 [type_names]
 N0: S61 → T31  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 000 :: T31
 
 [instructions]

@@ -21,7 +21,7 @@ Funcs = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Funcs = 95
 Lazy  = 91
 Many  = 83
@@ -79,31 +79,31 @@ Funcs:
   70  └─!  _                                64, 69
   75  -ε-  [ListOpen]                       70, 61
 
-Maybe (entrypoint):
+Maybe (entry point):
   76                                        ▶
   77  -ε-  [RecordClose]                    76
   78       (Maybe)                          02 : 77
   79  -ε-  [RecordOpen]                     78
 
-Many (entrypoint):
+Many (entry point):
   80                                        ▶
   81  -ε-  [RecordClose]                    80
   82       (Many)                           12 : 81
   83  -ε-  [RecordOpen]                     82
 
-Some (entrypoint):
+Some (entry point):
   84                                        ▶
   85  -ε-  [RecordClose]                    84
   86       (Some)                           28 : 85
   87  -ε-  [RecordOpen]                     86
 
-Lazy (entrypoint):
+Lazy (entry point):
   88                                        ▶
   89  -ε-  [RecordClose]                    88
   90       (Lazy)                           42 : 89
   91  -ε-  [RecordOpen]                     90
 
-Funcs (entrypoint):
+Funcs (entry point):
   92                                        ▶
   93  -ε-  [RecordClose]                    92
   94       (Funcs)                          58 : 93
@@ -155,7 +155,7 @@ N3: S08 → T07  ; Lazy
 N4: S09 → T08  ; FuncsFuncs
 N5: S10 → T10  ; Funcs
 
-[entrypoints]
+[entry_points]
 Funcs = 024 :: T10
 Lazy  = 019 :: T07
 Many  = 006 :: T04

@@ -1,7 +1,7 @@
 Inner = (identifier) @name
 Q = (expression_statement (Inner))
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Inner = 13
 Q     = 15
 
@@ -16,13 +16,13 @@ Q:
   06  ─‣┘  _ [SuppressEnd]                  04
   08  └‣─  (Inner)                          02 : 06
 
-Inner (entrypoint):
+Inner (entry point):
   10                                        ▶
   11  -ε-  [RecordClose]                    10
   12       (Inner)                          02 : 11
   13  -ε-  [RecordOpen]                     12
 
-Q (entrypoint):
+Q (entry point):
   14                                        ▶
   15       (Q)                              05 : 14
 -------------------- BYTECODE --------------------
@@ -45,7 +45,7 @@ M0: S1 → T1  ; name: <Node>
 [type_names]
 N0: S2 → T2  ; Inner
 
-[entrypoints]
+[entry_points]
 Inner = 00 :: T2
 Q     = 06 :: T0
 

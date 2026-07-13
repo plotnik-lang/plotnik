@@ -67,7 +67,7 @@ N0: S05 → T1  ; Inner
 N1: S06 → T3  ; QV
 N2: S07 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Inner = 00 :: T1
 Q     = 06 :: T4
 

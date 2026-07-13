@@ -9,7 +9,7 @@ Q = [
   (object) @h
 ]
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 14
 
 [transitions]
@@ -25,7 +25,7 @@ Q:
   08   !   (array) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(e) Absent RecordSet(f) Absent RecordSet(h) Node RecordSet(g)]  01
   09   !   (object) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(e) Absent RecordSet(f) Absent RecordSet(g) Node RecordSet(h)]  01
 
-Q (entrypoint):
+Q (entry point):
   11                                        ▶
   12  -ε-  [RecordClose]                    11
   13       (Q)                              00 : 12
@@ -69,7 +69,7 @@ M7: S08 → T1  ; h: T1
 [type_names]
 N0: S09 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
 [instructions]

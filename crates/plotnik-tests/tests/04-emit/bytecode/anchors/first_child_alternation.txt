@@ -9,7 +9,7 @@ Q = (program
   )
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 15
 
 [transitions]
@@ -22,7 +22,7 @@ Q:
   10  ─‣┘⁴ _                                01
   11  └•─  (identifier) [Node RecordSet(arg)]  10
 
-Q (entrypoint):
+Q (entry point):
   12                                        ▶
   13  -ε-  [RecordClose]                    12
   14       (Q)                              02 : 13
@@ -48,7 +48,7 @@ M0: S1 → T0  ; arg: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
 [instructions]

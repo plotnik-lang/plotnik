@@ -5,7 +5,7 @@ Q = [
   B: (number) @b
 ] @item
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Inner = 15
 Q     = 19
 
@@ -22,13 +22,13 @@ Q:
   09  -ε-  [VariantOpen(A) SuppressBegin]   07
   10   !   (number) [VariantOpen(B) Node RecordSet(b) VariantClose RecordSet(item)]  04
 
-Inner (entrypoint):
+Inner (entry point):
   12                                        ▶
   13  -ε-  [RecordClose]                    12
   14       (Inner)                          02 : 13
   15  -ε-  [RecordOpen]                     14
 
-Q (entrypoint):
+Q (entry point):
   16                                        ▶
   17  -ε-  [RecordClose]                    16
   18       (Q)                              03 : 17
@@ -67,7 +67,7 @@ N0: S06 → T2  ; Inner
 N1: S07 → T4  ; QItem
 N2: S08 → T5  ; Q
 
-[entrypoints]
+[entry_points]
 Inner = 00 :: T2
 Q     = 06 :: T5
 

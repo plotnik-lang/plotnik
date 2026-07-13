@@ -19,7 +19,7 @@ Q = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q     = 47
 Value = 43
 
@@ -48,11 +48,11 @@ Q:
   36  ──!  _                                34, 36
   37  └─!  _                                34, 36
 
-Value (entrypoint):
+Value (entry point):
   42                                        ▶
   43       (Value)                          00 : 42
 
-Q (entrypoint):
+Q (entry point):
   44                                        ▶
   45  -ε-  [RecordClose]                    44
   46       (Q)                              07 : 45
@@ -102,7 +102,7 @@ N0: S08 → T3  ; Value
 N1: S09 → T4  ; Name
 N2: S10 → T6  ; Q
 
-[entrypoints]
+[entry_points]
 Q     = 02 :: T6
 Value = 00 :: T3
 

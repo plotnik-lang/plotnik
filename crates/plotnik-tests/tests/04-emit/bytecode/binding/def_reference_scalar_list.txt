@@ -4,7 +4,7 @@ Q = (program
   (Func)+ @funcs
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Func = 19
 Q    = 23
 
@@ -22,11 +22,11 @@ Q:
   12  ──!  _                                10, 12
   13  └─!  _ [ListOpen]                     10, 12
 
-Func (entrypoint):
+Func (entry point):
   18                                        ▶
   19       (Func)                           02 : 18
 
-Q (entrypoint):
+Q (entry point):
   20                                        ▶
   21  -ε-  [RecordClose]                    20
   22       (Q)                              05 : 21
@@ -52,7 +52,7 @@ M0: S1 → T2  ; funcs: T2
 [type_names]
 N0: S2 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Func = 00 :: T0
 Q    = 02 :: T3
 

@@ -2,7 +2,7 @@ Q = (statement_block
   (function_declaration)+ @fns
 ) @block
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 17
 
 [transitions]
@@ -14,7 +14,7 @@ Q:
   08  ──!  _                                06, 08
   09  └─!  _ [ListOpen]                     06, 08
 
-Q (entrypoint):
+Q (entry point):
   14                                        ▶
   15  -ε-  [RecordClose]                    14
   16       (Q)                              02 : 15
@@ -40,7 +40,7 @@ M1: S2 → T1  ; fns: T1
 [type_names]
 N0: S3 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
 [instructions]

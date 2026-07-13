@@ -16,7 +16,7 @@ warning: entry point can never match: matching starts at the syntax-tree root
   |
 help: wrap the pattern in the grammar's root node, e.g. `(program ...)`
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Bad  = 27
 Leaf = 19
 Q    = 23
@@ -38,19 +38,19 @@ Bad:
   14                                        ▶
   15   !   (identifier) [Node RecordSet(bad)]  14
 
-Leaf (entrypoint):
+Leaf (entry point):
   16                                        ▶
   17  -ε-  [RecordClose]                    16
   18       (Leaf)                           02 : 17
   19  -ε-  [RecordOpen]                     18
 
-Q (entrypoint):
+Q (entry point):
   20                                        ▶
   21  -ε-  [RecordClose]                    20
   22       (Q)                              05 : 21
   23  -ε-  [RecordOpen]                     22
 
-Bad (entrypoint):
+Bad (entry point):
   24                                        ▶
   25  -ε-  [RecordClose]                    24
   26       (Bad)                            15 : 25
@@ -84,7 +84,7 @@ N0: S4 → T1  ; Leaf
 N1: S5 → T2  ; Q
 N2: S6 → T3  ; Bad
 
-[entrypoints]
+[entry_points]
 Bad  = 12 :: T3
 Leaf = 00 :: T1
 Q    = 06 :: T2

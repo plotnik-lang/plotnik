@@ -1,6 +1,6 @@
 Q = (MISSING ";") @m
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 6
 
 [transitions]
@@ -8,7 +8,7 @@ Q:
   1                                         ▶
   2   !   (MISSING ";") [Node RecordSet(m)]  1
 
-Q (entrypoint):
+Q (entry point):
   3                                         ▶
   4  -ε-  [RecordClose]                     3
   5       (Q)                               2 : 4
@@ -30,7 +30,7 @@ M0: S1 → T0  ; m: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 0 :: T1
 
 [instructions]

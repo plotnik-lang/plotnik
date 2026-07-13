@@ -1,7 +1,7 @@
 Foo = (identifier)
 Q = (function_declaration name: (Foo))
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Foo = 09
 Q   = 11
 
@@ -16,11 +16,11 @@ Q:
   06  ─‣┘  _                                04
   07  └‣─  name: (Foo)                      02 : 06
 
-Foo (entrypoint):
+Foo (entry point):
   08                                        ▶
   09       (Foo)                            02 : 08
 
-Q (entrypoint):
+Q (entry point):
   10                                        ▶
   11       (Q)                              05 : 10
 -------------------- BYTECODE --------------------
@@ -39,7 +39,7 @@ T0 = <Void>
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Foo = 0 :: T0
 Q   = 2 :: T0
 

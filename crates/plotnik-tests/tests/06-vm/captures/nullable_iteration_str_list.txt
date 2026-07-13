@@ -40,7 +40,7 @@ M0: S1 → T1  ; comments: T1
 [type_names]
 N0: S2 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
 [instructions]

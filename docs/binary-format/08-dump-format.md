@@ -16,7 +16,7 @@ The dump prints sections in this fixed order (matching the wire layout, except
 [type_defs]
 [type_members]
 [type_names]
-[entrypoints]
+[entry_points]
 [spans]       ; only when inspection spans exist
 [instructions]
 ```
@@ -147,7 +147,7 @@ M1: S2 → T2  ; s: T2
 [type_names]
 N0: S3 → T1  ; Value
 
-[entrypoints]
+[entry_points]
 Value = 00 :: T1
 
 [instructions]

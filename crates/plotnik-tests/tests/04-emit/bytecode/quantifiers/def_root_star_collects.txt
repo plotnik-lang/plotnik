@@ -1,6 +1,6 @@
 Q = (identifier)*
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 
 [transitions]
 -------------------- BYTECODE --------------------
@@ -14,6 +14,6 @@ S1 "identifier"
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 
 [instructions]

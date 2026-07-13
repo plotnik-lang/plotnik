@@ -1,7 +1,7 @@
 Inner = (identifier) @name
 Q = (expression_statement (Inner) @item)
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Inner = 14
 Q     = 18
 
@@ -17,13 +17,13 @@ Q:
   08  -ε-  [RecordClose]                    06
   09  └‣─  (Inner)                          02 : 08
 
-Inner (entrypoint):
+Inner (entry point):
   11                                        ▶
   12  -ε-  [RecordClose]                    11
   13       (Inner)                          02 : 12
   14  -ε-  [RecordOpen]                     13
 
-Q (entrypoint):
+Q (entry point):
   15                                        ▶
   16  -ε-  [RecordClose]                    15
   17       (Q)                              05 : 16
@@ -51,7 +51,7 @@ M1: S2 → T1  ; item: Inner
 N0: S3 → T1  ; Inner
 N1: S4 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Inner = 00 :: T1
 Q     = 06 :: T2
 

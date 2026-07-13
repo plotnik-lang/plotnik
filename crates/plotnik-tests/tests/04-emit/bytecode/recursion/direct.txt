@@ -6,7 +6,7 @@ Expr = [
   )
 ]
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Expr = 11
 
 [transitions]
@@ -19,7 +19,7 @@ Expr:
   07  ─‣─  arguments: (Expr)                00 : 05
   08  └‣─  function: (identifier) [Node RecordSet(fn)]  07
 
-Expr (entrypoint):
+Expr (entry point):
   10                                        ▶
   11       (Expr)                           00 : 10
 -------------------- BYTECODE --------------------
@@ -53,7 +53,7 @@ M4: S05 → T2  ; Rec: T2
 [type_names]
 N0: S06 → T3  ; Expr
 
-[entrypoints]
+[entry_points]
 Expr = 00 :: T3
 
 [instructions]

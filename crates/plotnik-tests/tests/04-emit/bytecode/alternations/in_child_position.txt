@@ -2,7 +2,7 @@ Q = (program
   [(expression_statement) @expr]
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 11
 
 [transitions]
@@ -14,7 +14,7 @@ Q:
   06  ──!  _                                04, 06
   07  └─!  _                                04, 06
 
-Q (entrypoint):
+Q (entry point):
   08                                        ▶
   09  -ε-  [RecordClose]                    08
   10       (Q)                              02 : 09
@@ -37,7 +37,7 @@ M0: S1 → T0  ; expr: <Node>
 [type_names]
 N0: S2 → T1  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T1
 
 [instructions]

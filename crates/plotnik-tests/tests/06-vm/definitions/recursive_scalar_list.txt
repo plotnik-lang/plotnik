@@ -57,7 +57,7 @@ N0: S3 → T2  ; B
 N1: S4 → T4  ; A
 N2: S5 → T5  ; Q
 
-[entrypoints]
+[entry_points]
 A = 00 :: T4
 Q = 06 :: T5
 

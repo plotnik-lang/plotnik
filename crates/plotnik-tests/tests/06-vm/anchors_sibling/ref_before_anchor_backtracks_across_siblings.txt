@@ -48,7 +48,7 @@ M0: S1 → T1  ; s: <Node>
 [type_names]
 N0: S2 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Comma = 00 :: T0
 Q     = 02 :: T2
 

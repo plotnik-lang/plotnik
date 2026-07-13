@@ -3,7 +3,7 @@ Q = [
   (object (spread_element))
 ]
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 10
 
 [transitions]
@@ -16,7 +16,7 @@ Q:
   05   !   (object)                         07
   07  └‣─  (spread_element)                 03
 
-Q (entrypoint):
+Q (entry point):
   09                                        ▶
   10       (Q)                              00 : 09
 -------------------- BYTECODE --------------------
@@ -34,7 +34,7 @@ T0 = <Void>
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 0 :: T0
 
 [instructions]

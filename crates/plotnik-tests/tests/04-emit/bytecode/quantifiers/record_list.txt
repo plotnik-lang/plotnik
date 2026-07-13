@@ -5,7 +5,7 @@ Q = (array
   }* @items
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 22
 
 [transitions]
@@ -21,7 +21,7 @@ Q:
   13  └─!  _                                09, 12
   18  -ε-  [ListOpen]                       13, 05
 
-Q (entrypoint):
+Q (entry point):
   19                                        ▶
   20  -ε-  [RecordClose]                    19
   21       (Q)                              02 : 20
@@ -53,7 +53,7 @@ M2: S3 → T2  ; items: T2
 N0: S4 → T1  ; QItems
 N1: S5 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T3
 
 [instructions]

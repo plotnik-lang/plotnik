@@ -44,7 +44,7 @@ M1: S2 → T1  ; e: E
 N0: S3 → T1  ; E
 N1: S4 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 E = 00 :: T1
 Q = 06 :: T2
 

@@ -10,7 +10,7 @@ Assignment = (assignment_expression
   right: (Expression) @value
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Assignment = 24
 Expression = 20
 Ident      = 18
@@ -33,17 +33,17 @@ Assignment:
   13  ─‣─  right: (Expression)              03 : 11
   14  └‣─  left: (identifier) [Node RecordSet(target)]  13
 
-Ident (entrypoint):
+Ident (entry point):
   15                                        ▶
   16  -ε-  [RecordClose]                    15
   17       (Ident)                          02 : 16
   18  -ε-  [RecordOpen]                     17
 
-Expression (entrypoint):
+Expression (entry point):
   19                                        ▶
   20       (Expression)                     03 : 19
 
-Assignment (entrypoint):
+Assignment (entry point):
   21                                        ▶
   22  -ε-  [RecordClose]                    21
   23       (Assignment)                     10 : 22
@@ -87,7 +87,7 @@ N0: S06 → T1  ; Ident
 N1: S07 → T4  ; Expression
 N2: S08 → T5  ; Assignment
 
-[entrypoints]
+[entry_points]
 Assignment = 08 :: T5
 Expression = 06 :: T4
 Ident      = 00 :: T1

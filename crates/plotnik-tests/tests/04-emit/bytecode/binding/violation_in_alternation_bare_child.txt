@@ -3,7 +3,7 @@ Q = [
   (identifier)
 ]
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 8
 
 [transitions]
@@ -15,7 +15,7 @@ Q:
   4  └‣─  (class_declaration)               3
   5   !   (identifier)                      1
 
-Q (entrypoint):
+Q (entry point):
   7                                         ▶
   8       (Q)                               0 : 7
 -------------------- BYTECODE --------------------
@@ -33,7 +33,7 @@ T0 = <Void>
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 0 :: T0
 
 [instructions]

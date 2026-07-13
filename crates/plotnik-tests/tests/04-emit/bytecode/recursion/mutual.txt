@@ -5,7 +5,7 @@ Even = [
   (array (Odd) @next)
 ]
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Even = 21
 Odd  = 25
 
@@ -28,13 +28,13 @@ Even:
   14  -ε-  [RecordClose]                    04
   15  └‣─  (Odd)                            07 : 14
 
-Even (entrypoint):
+Even (entry point):
   18                                        ▶
   19  -ε-  [RecordClose]                    18
   20       (Even)                           00 : 19
   21  -ε-  [RecordOpen]                     20
 
-Odd (entrypoint):
+Odd (entry point):
   22                                        ▶
   23  -ε-  [RecordClose]                    22
   24       (Odd)                            07 : 23
@@ -65,7 +65,7 @@ M2: S1 → T3  ; next: T3
 N0: S3 → T4  ; Even
 N1: S4 → T2  ; Odd
 
-[entrypoints]
+[entry_points]
 Even = 00 :: T4
 Odd  = 06 :: T2
 

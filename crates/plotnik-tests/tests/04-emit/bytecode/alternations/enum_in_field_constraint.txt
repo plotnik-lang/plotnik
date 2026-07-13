@@ -5,7 +5,7 @@ Q = (pair
   ] @kind
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 12
 
 [transitions]
@@ -17,7 +17,7 @@ Q:
   06   !   (number) [VariantOpen(B) VariantClose]  03
   08  └‣─  key: _                           05, 06
 
-Q (entrypoint):
+Q (entry point):
   09                                        ▶
   10  -ε-  [RecordClose]                    09
   11       (Q)                              02 : 10
@@ -53,7 +53,7 @@ M3: S04 → T3  ; kind: QKind
 N0: S05 → T3  ; QKind
 N1: S06 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T4
 
 [instructions]

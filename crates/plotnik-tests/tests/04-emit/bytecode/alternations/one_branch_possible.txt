@@ -3,7 +3,7 @@ Q = [
   (identifier) @id
 ]
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 10
 
 [transitions]
@@ -15,7 +15,7 @@ Q:
   04  └‣─  (program)                        03
   05   !   (identifier) [Absent RecordSet(fn) Node RecordSet(id)]  01
 
-Q (entrypoint):
+Q (entry point):
   07                                        ▶
   08  -ε-  [RecordClose]                    07
   09       (Q)                              00 : 08
@@ -42,7 +42,7 @@ M1: S2 → T1  ; id: T1
 [type_names]
 N0: S3 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T2
 
 [instructions]

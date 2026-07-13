@@ -201,7 +201,7 @@ The compiler's naming pass makes the name table complete and consistent, so a
 code generator is a pure renderer:
 
 1. Build reverse map: `TypeId → Option<StringId>` from TypeNames
-2. Start from entrypoints, walk reachable types
+2. Start from entry points, walk reachable types
 3. For each type:
    - Look up structure in TypeDefs
    - Named → emit a declaration under that name, verbatim; anonymous (variant

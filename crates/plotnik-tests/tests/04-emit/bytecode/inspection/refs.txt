@@ -6,7 +6,7 @@ Captured = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Bare     = 27
 Captured = 31
 Name     = 25
@@ -31,17 +31,17 @@ Captured:
   19  -ε-  [RecordClose]                    17
   20  └‣─  (Name)                           02 : 19
 
-Name (entrypoint):
+Name (entry point):
   22                                        ▶
   23  -ε-  [RecordClose]                    22
   24       (Name)                           02 : 23
   25  -ε-  [RecordOpen]                     24
 
-Bare (entrypoint):
+Bare (entry point):
   26                                        ▶
   27       (Bare)                           05 : 26
 
-Captured (entrypoint):
+Captured (entry point):
   28                                        ▶
   29  -ε-  [RecordClose]                    28
   30       (Captured)                       14 : 29
@@ -72,7 +72,7 @@ M1: S2 → T2  ; item: Name
 N0: S3 → T2  ; Name
 N1: S4 → T3  ; Captured
 
-[entrypoints]
+[entry_points]
 Bare     = 06 :: T0
 Captured = 08 :: T3
 Name     = 00 :: T2

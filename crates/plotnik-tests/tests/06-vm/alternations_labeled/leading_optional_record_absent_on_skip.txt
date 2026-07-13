@@ -77,7 +77,7 @@ M3: S4 → T0  ; b: <Node>
 N0: S5 → T1  ; QLead
 N1: S6 → T3  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T3
 
 [instructions]

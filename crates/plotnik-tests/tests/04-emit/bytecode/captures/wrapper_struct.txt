@@ -5,7 +5,7 @@ Q = {
   } @row
 }* @rows
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 
 [transitions]
 -------------------- BYTECODE --------------------
@@ -20,6 +20,6 @@ S2 "number"
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 
 [instructions]

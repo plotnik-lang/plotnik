@@ -6,7 +6,7 @@ Outer = (array
   }* @items
 )
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Inner = 29
 Outer = 33
 
@@ -30,13 +30,13 @@ Outer:
   20  └─!  _                                17, 19
   25  -ε-  [ListOpen]                       20, 10
 
-Inner (entrypoint):
+Inner (entry point):
   26                                        ▶
   27  -ε-  [RecordClose]                    26
   28       (Inner)                          02 : 27
   29  -ε-  [RecordOpen]                     28
 
-Outer (entrypoint):
+Outer (entry point):
   30                                        ▶
   31  -ε-  [RecordClose]                    30
   32       (Outer)                          07 : 31
@@ -71,7 +71,7 @@ N0: S4 → T1  ; Inner
 N1: S5 → T2  ; OuterItems
 N2: S6 → T4  ; Outer
 
-[entrypoints]
+[entry_points]
 Inner = 00 :: T1
 Outer = 06 :: T4
 

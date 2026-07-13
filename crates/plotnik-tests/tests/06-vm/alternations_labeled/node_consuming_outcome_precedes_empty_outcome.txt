@@ -60,7 +60,7 @@ M4: S05 → T4  ; x: QX
 N0: S06 → T4  ; QX
 N1: S07 → T5  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T5
 
 [instructions]

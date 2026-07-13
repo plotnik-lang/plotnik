@@ -64,7 +64,7 @@ M4: S05 → T3  ; item: QItem
 N0: S06 → T3  ; QItem
 N1: S07 → T4  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T4
 
 [instructions]

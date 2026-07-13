@@ -61,7 +61,7 @@ N0: S5 → T2  ; QLeft
 N1: S6 → T4  ; QRight
 N2: S7 → T6  ; Q
 
-[entrypoints]
+[entry_points]
 Q = 00 :: T6
 
 [instructions]

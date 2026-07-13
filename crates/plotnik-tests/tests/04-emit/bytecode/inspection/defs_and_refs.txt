@@ -5,7 +5,7 @@ Q = (program
 )
 ------------------- INPUT (ts) -------------------
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Ident = 16
 Q     = 20
 
@@ -22,13 +22,13 @@ Q:
   10  -ε-  [RecordClose]                    08
   11  └‣─  (Ident)                          02 : 10
 
-Ident (entrypoint):
+Ident (entry point):
   13                                        ▶
   14  -ε-  [RecordClose]                    13
   15       (Ident)                          02 : 14
   16  -ε-  [RecordOpen]                     15
 
-Q (entrypoint):
+Q (entry point):
   17                                        ▶
   18  -ε-  [RecordClose]                    17
   19       (Q)                              05 : 18
@@ -57,7 +57,7 @@ M1: S2 → T1  ; item: Ident
 N0: S3 → T1  ; Ident
 N1: S4 → T2  ; Q
 
-[entrypoints]
+[entry_points]
 Ident = 00 :: T1
 Q     = 06 :: T2
 

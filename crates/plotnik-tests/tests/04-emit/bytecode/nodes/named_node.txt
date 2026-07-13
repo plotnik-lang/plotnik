@@ -1,6 +1,6 @@
 Q = (identifier)
 ---------------------- NFA -----------------------
-[entrypoints]
+[entry_points]
 Q = 4
 
 [transitions]
@@ -8,7 +8,7 @@ Q:
   1                                         ▶
   2   !   (identifier)                      1
 
-Q (entrypoint):
+Q (entry point):
   3                                         ▶
   4       (Q)                               2 : 3
 -------------------- BYTECODE --------------------
@@ -24,7 +24,7 @@ T0 = <Void>
 
 [type_names]
 
-[entrypoints]
+[entry_points]
 Q = 0 :: T0
 
 [instructions]
