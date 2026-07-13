@@ -76,48 +76,48 @@ Q = 00 :: T4
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  (identifier) [Node Set(M0)]      08
-  08  ─‣┘  _ [StructClose Set(M1)]          16
+  06  └‣─  (identifier) [Node RecordSet(M0)]  08
+  08  ─‣┘  _ [RecordClose RecordSet(M1)]    16
   10                                        ▶
-  11  └‣─  (debugger_statement) [StructClose Set(M2) Node Set(M3)]  14
+  11  └‣─  (debugger_statement) [RecordClose RecordSet(M2) Node RecordSet(M3)]  14
   14  ─‣┘  _                                10
   15  ...
-  16  ─‣─  (debugger_statement) [StructClose Set(M2) Node Set(M3)]  14
-  19  -ε-  [Null Set(M1)]                   11
-  21   !   (expression_statement) [StructOpen]  06
+  16  ─‣─  (debugger_statement) [RecordClose RecordSet(M2) Node RecordSet(M3)]  14
+  19  -ε-  [Absent RecordSet(M1)]           11
+  21   !   (expression_statement) [RecordOpen]  06
   23  ...
   24  ──!  _                                21, 24
   26  └─!  _                                21, 24
-  28  -ε-  [StructOpen]                     26, 19
+  28  -ε-  [RecordOpen]                     26, 19
   30   !   (program)                        28
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03
        ▶   (@30)
 
 @30:
   30       (program)                        28
        ●   program
-  28  -ε-  [StructOpen]                     26, 19
+  28  -ε-  [RecordOpen]                     26, 19
   26       _                                21, 24
        ●   expression_statement
-  21       (expression_statement) [StructOpen]  06
+  21       (expression_statement) [RecordOpen]  06
        ●   expression_statement
-  06       (identifier) [Node Set(M0)]      08
+  06       (identifier) [Node RecordSet(M0)]  08
        ●   identifier
-  08       _ [StructClose Set(M1)]          16
+  08       _ [RecordClose RecordSet(M1)]    16
        ●   expression_statement
-  16       (debugger_statement) [StructClose Set(M2) Node Set(M3)]  14
+  16       (debugger_statement) [RecordClose RecordSet(M2) Node RecordSet(M3)]  14
        ●   debugger_statement
   14       _                                10
        ●   program
   10   ◀   (@30)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

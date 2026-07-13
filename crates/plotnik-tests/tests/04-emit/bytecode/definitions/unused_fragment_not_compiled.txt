@@ -14,10 +14,10 @@ Q:
 
 Used:
   05                                        ▶
-  06  -ε-  [ArrayClose]                     05
-  08   !   (comment) [Node Push]            10, 06
+  06  -ε-  [ListClose]                      05
+  08   !   (comment) [Node ArrayPush]       10, 06
   10  ──!  _                                08, 10
-  11   !   _ [ArrayOpen]                    08, 10
+  11   !   _ [ListOpen]                     08, 10
 
 Q:
   17  └‣─  (Used)                           11 : 03
@@ -55,8 +55,8 @@ Q:
   05                                        ▶
   06                                        ▶
   07  ...
-  08  -ε-  [ArrayClose]                     06
-  10   !   (comment) [Node Push]            12, 08
+  08  -ε-  [ListClose]                      06
+  10   !   (comment) [Node ArrayPush]       12, 08
   12  ──!  _                                10, 12
-  14   !   _ [ArrayOpen]                    10, 12
+  14   !   _ [ListOpen]                     10, 12
   16   !   (program) [SuppressBegin]        02

@@ -56,29 +56,29 @@ Q = 00 :: T3
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@34)                            34 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  └‣─  (debugger_statement) [Node Set(M2)]  07
-  10  ─‣─  (debugger_statement) [Node Set(M2)]  07
-  12  -ε-  [ArrayClose Set(M0)]             10
-  14   !   (identifier) [Node Push]         16, 12
+  08  └‣─  (debugger_statement) [Node RecordSet(M2)]  07
+  10  ─‣─  (debugger_statement) [Node RecordSet(M2)]  07
+  12  -ε-  [ListClose RecordSet(M0)]        10
+  14   !   (identifier) [Node ArrayPush]    16, 12
   16  ──!  _                                14, 16
-  18   !   _ [ArrayOpen]                    14, 16
-  20  -ε-  [Null Set(M1)]                   18
+  18   !   _ [ListOpen]                     14, 16
+  20  -ε-  [Absent RecordSet(M1)]           18
   22  ...
   23  ...
-  24  -ε-  [Null Set(M1) ArrayOpen ArrayClose Set(M0)]  08
-  27   !   (empty_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  10
+  24  -ε-  [Absent RecordSet(M1) ListOpen ListClose RecordSet(M0)]  08
+  27   !   (empty_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  10
   30  ──!  _                                20, 27, 30
   32  └─!  _                                20, 27, 30
   34   !   (program)                        32, 24
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@34)                            34 : 03
        ▶   (@34)
 
@@ -87,26 +87,26 @@ Q:
        ●   program
   32       _                                20, 27, 30
        ●   debugger_statement
-  20  -ε-  [Null Set(M1)]                   18
-  18       _ [ArrayOpen]                    14, 16
+  20  -ε-  [Absent RecordSet(M1)]           18
+  18       _ [ListOpen]                     14, 16
        ●   debugger_statement
-  14       (identifier) [Node Push]         16, 12
+  14       (identifier) [Node ArrayPush]    16, 12
        ○   debugger_statement
   18  ❮❮❮ 
   16       _                                14, 16
   32  ❮❮❮ 
-  27       (empty_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  10
+  27       (empty_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  10
        ○   debugger_statement
   32  ❮❮❮ 
   30       _                                20, 27, 30
   34  ❮❮❮ 
-  24  -ε-  [Null Set(M1) ArrayOpen ArrayClose Set(M0)]  08
-  08       (debugger_statement) [Node Set(M2)]  07
+  24  -ε-  [Absent RecordSet(M1) ListOpen ListClose RecordSet(M0)]  08
+  08       (debugger_statement) [Node RecordSet(M2)]  07
        ●   debugger_statement
   07       _                                06
        ●   program
   06   ◀   (@34)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

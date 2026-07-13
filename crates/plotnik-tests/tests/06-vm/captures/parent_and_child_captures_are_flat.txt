@@ -49,27 +49,27 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@12)                            12 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  name: (identifier) [Node Set(M1)]  08
+  06  └‣─  name: (identifier) [Node RecordSet(M1)]  08
   08  ─‣┘² _                                09
   09                                        ▶
-  10  └‣─  (function_declaration) [Node Set(M0)]  06
+  10  └‣─  (function_declaration) [Node RecordSet(M0)]  06
   12   !   (program)                        10
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@12)                            12 : 03
        ▶   (@12)
 
 @12:
   12       (program)                        10
        ●   program
-  10       (function_declaration) [Node Set(M0)]  06
+  10       (function_declaration) [Node RecordSet(M0)]  06
        ●   function_declaration
-  06       name: (identifier) [Node Set(M1)]  08
+  06       name: (identifier) [Node RecordSet(M1)]  08
        ○   function
        ●   identifier
   08       _                                09
@@ -77,5 +77,5 @@ Q:
   09   ◀   (@12)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

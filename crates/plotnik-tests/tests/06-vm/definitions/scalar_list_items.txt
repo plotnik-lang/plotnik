@@ -46,45 +46,45 @@ Q = 00 :: T4
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  -ε-  [ArrayClose]                     08
-  08  ─‣┘  _ [Set(M0)]                      10
+  06  -ε-  [ListClose]                      08
+  08  ─‣┘  _ [RecordSet(M0)]                10
   10                                        ▶
-  11  -ε-  [ArrayClose Set(M0)]             10
-  13   !   (comment) [NodeStr Push]         16, 06
+  11  -ε-  [ListClose RecordSet(M0)]        10
+  13   !   (comment) [NodeStr ArrayPush]    16, 06
   15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16
-  20  -ε-  [ArrayOpen]                      18, 11
+  20  -ε-  [ListOpen]                       18, 11
   22   !   (program)                        20
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
        ▶   (@22)
 
 @22:
   22       (program)                        20
        ●   program
-  20  -ε-  [ArrayOpen]                      18, 11
+  20  -ε-  [ListOpen]                       18, 11
   18       _                                13, 16
        ●   comment
-  13       (comment) [NodeStr Push]         16, 06
+  13       (comment) [NodeStr ArrayPush]    16, 06
        ●   comment
   16       _                                13, 16
        ●   comment
-  13       (comment) [NodeStr Push]         16, 06
+  13       (comment) [NodeStr ArrayPush]    16, 06
        ●   comment
   16       _                                13, 16
   13  ❮❮❮ 
-  06  -ε-  [ArrayClose]                     08
-  08       _ [Set(M0)]                      10
+  06  -ε-  [ListClose]                      08
+  08       _ [RecordSet(M0)]                10
        ●   program
   10   ◀   (@22)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

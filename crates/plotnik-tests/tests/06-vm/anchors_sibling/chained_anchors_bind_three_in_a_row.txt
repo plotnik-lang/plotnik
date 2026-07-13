@@ -62,21 +62,21 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  ─•─  (debugger_statement) [Node Set(M2)]  08
+  06  ─•─  (debugger_statement) [Node RecordSet(M2)]  08
   08  ─‣┘  _                                09
   09                                        ▶
-  10  ─•─  (empty_statement) [Node Set(M1)]  06
-  12   !   (lexical_declaration) [Node Set(M0)]  10
+  10  ─•─  (empty_statement) [Node RecordSet(M1)]  06
+  12   !   (lexical_declaration) [Node RecordSet(M0)]  10
   14  ──!  _                                12, 14
   16  └─!  _                                12, 14
   18   !   (program)                        16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
        ▶   (@18)
 
@@ -85,16 +85,16 @@ Q:
        ●   program
   16       _                                12, 14
        ●   lexical_declaration
-  12       (lexical_declaration) [Node Set(M0)]  10
+  12       (lexical_declaration) [Node RecordSet(M0)]  10
        ●   lexical_declaration
-  10       (empty_statement) [Node Set(M1)]  06
+  10       (empty_statement) [Node RecordSet(M1)]  06
        ●   empty_statement
-  06       (debugger_statement) [Node Set(M2)]  08
+  06       (debugger_statement) [Node RecordSet(M2)]  08
        ●   debugger_statement
   08       _                                09
        ●   program
   09   ◀   (@18)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

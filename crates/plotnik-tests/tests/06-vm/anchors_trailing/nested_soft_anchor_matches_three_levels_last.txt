@@ -51,11 +51,11 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06   !   (number) [Node Set(M0)]          08
+  06   !   (number) [Node RecordSet(M0)]    08
   08  ─•┘³ _                                09
   09  ─‣┘² _                                10
   10                                        ▶
@@ -73,7 +73,7 @@ Q:
   28   !   (program)                        27
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03
        ▶   (@28)
 
@@ -104,12 +104,12 @@ Q:
        ●   array
   13       _                                06, 11
        ●   [
-  06       (number) [Node Set(M0)]          08
+  06       (number) [Node RecordSet(M0)]    08
        ○   [
   13  ❮❮❮ 
   11       _                                06, 11
        ●   number
-  06       (number) [Node Set(M0)]          08
+  06       (number) [Node RecordSet(M0)]    08
        ●   number
   08       _                                09
        ●   array
@@ -118,5 +118,5 @@ Q:
   10   ◀   (@28)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

@@ -12,19 +12,19 @@ Q = 21
 Q:
   01                                        ▶
   02   !   (program)                        17
-  03  ─‣┘  _ [ArrayClose Set(statements)]   01
-  05  -ε-  [ArrayClose Set(statements)]     01
-  07   !   (expression_statement) [VariantOpen(Expression) Node Set(expression) VariantClose Push]  11, 03
-  08   !   (debugger_statement) [VariantOpen(Debugger) Node Set(debugger) VariantClose Push]  11, 03
+  03  ─‣┘  _ [ListClose RecordSet(statements)]  01
+  05  -ε-  [ListClose RecordSet(statements)]  01
+  07   !   (expression_statement) [VariantOpen(Expression) Node RecordSet(expression) VariantClose ArrayPush]  11, 03
+  08   !   (debugger_statement) [VariantOpen(Debugger) Node RecordSet(debugger) VariantClose ArrayPush]  11, 03
   11  ──!  _                                07, 08, 11
   12  └─!  _                                07, 08, 11
-  17  -ε-  [ArrayOpen]                      12, 05
+  17  -ε-  [ListOpen]                       12, 05
 
 Q (entrypoint):
   18                                        ▶
-  19  -ε-  [StructClose]                    18
+  19  -ε-  [RecordClose]                    18
   20       (Q)                              02 : 19
-  21  -ε-  [StructOpen]                     20
+  21  -ε-  [RecordOpen]                     20
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -63,17 +63,17 @@ Q = 00 :: T5
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08  -ε-  [ArrayClose Set(M4)]             06
-  10   !   (expression_statement) [VariantOpen(M2) Node Set(M0) VariantClose Push]  16, 22
-  13   !   (debugger_statement) [VariantOpen(M3) Node Set(M1) VariantClose Push]  16, 22
+  08  -ε-  [ListClose RecordSet(M4)]        06
+  10   !   (expression_statement) [VariantOpen(M2) Node RecordSet(M0) VariantClose ArrayPush]  16, 22
+  13   !   (debugger_statement) [VariantOpen(M3) Node RecordSet(M1) VariantClose ArrayPush]  16, 22
   16  ──!  _                                10, 13, 16
   18  └─!  _                                10, 13, 16
-  20  -ε-  [ArrayOpen]                      18, 08
-  22  ─‣┘  _ [ArrayClose Set(M4)]           06
+  20  -ε-  [ListOpen]                       18, 08
+  22  ─‣┘  _ [ListClose RecordSet(M4)]      06
   24   !   (program)                        20

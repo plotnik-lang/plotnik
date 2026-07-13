@@ -140,9 +140,9 @@ P6 ref        61..67  src0  T2
 
 [transitions]
 Name:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Q:
@@ -154,7 +154,7 @@ Q:
   13                                        ▶
   14                                        ▶
   15  ...
-  16   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  13
+  16   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  13
   20  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  08
   22  ...
   23  ...
@@ -173,7 +173,7 @@ Q:
        ▶   (@16)
 
 @16:
-  16       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  13
+  16       (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  13
        ●   identifier
   13   ◀   (@16)                            
 

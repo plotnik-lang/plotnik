@@ -41,11 +41,11 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@13)                            13 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  name: (identifier) [Node Set(M0)]  08
+  06  └‣─  name: (identifier) [Node RecordSet(M0)]  08
   08  ─‣┘³ _                                09
   09                                        ▶
   10  └‣─  -value (variable_declarator)     06
@@ -53,7 +53,7 @@ Q:
   13   !   (program)                        12
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@13)                            13 : 03
        ▶   (@13)
 

@@ -145,7 +145,7 @@ fn routed_call_roundtrip() {
 #[test]
 fn encode_rejects_effect_payload_overflow() {
     let instr = MatchInstr {
-        effects: vec![Effect::new(EffectKind::Set, 0x400)],
+        effects: vec![Effect::new(EffectKind::RecordSet, 0x400)],
         successors: vec![StepId::try_from(1).expect("step id must be non-zero")],
         ..Default::default()
     };
@@ -212,15 +212,15 @@ fn arb_node_type() -> impl Strategy<Value = NodeKindConstraint> {
 fn arb_effect() -> impl Strategy<Value = Effect> {
     let kind = prop::sample::select(vec![
         EffectKind::Node,
-        EffectKind::ArrayOpen,
-        EffectKind::Push,
-        EffectKind::ArrayClose,
-        EffectKind::StructOpen,
-        EffectKind::StructClose,
-        EffectKind::Set,
+        EffectKind::ListOpen,
+        EffectKind::ArrayPush,
+        EffectKind::ListClose,
+        EffectKind::RecordOpen,
+        EffectKind::RecordClose,
+        EffectKind::RecordSet,
         EffectKind::VariantOpen,
         EffectKind::VariantClose,
-        EffectKind::Null,
+        EffectKind::Absent,
         EffectKind::SuppressBegin,
         EffectKind::SuppressEnd,
         EffectKind::SpanStartAt,

@@ -44,24 +44,24 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06   !   (comment)                        08
   07  ...
-  08  ─‣┘  _ [BoolValue(1) Set(M0)]         10
+  08  ─‣┘  _ [BoolValue(1) RecordSet(M0)]   10
   10                                        ▶
   11  ──!  _                                06, 11
   13   !   _                                06, 11
   15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16
-  20  -ε-  [BoolValue(0) Set(M0)]           10
+  20  -ε-  [BoolValue(0) RecordSet(M0)]     10
   22   !   (program)                        18, 20
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
        ▶   (@22)
 
@@ -79,9 +79,9 @@ Q:
   18  ❮❮❮ 
   16       _                                13, 16
   22  ❮❮❮ 
-  20  -ε-  [BoolValue(0) Set(M0)]           10
+  20  -ε-  [BoolValue(0) RecordSet(M0)]     10
   10   ◀   (@22)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

@@ -233,15 +233,15 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
 
 enum TraceEffect {
     Node,
-    ArrayOpen,
-    Push,
-    ArrayClose,
-    StructOpen,
-    StructClose,
-    Set(u16),
+    ListOpen,
+    ArrayPush,
+    ListClose,
+    RecordOpen,
+    RecordClose,
+    RecordSet(u16),
     VariantOpen(u16),
     VariantClose,
-    Null,
+    Absent,
     SpanStartAt(u16),
     SpanStart(u16),
     SpanEnd(u16),
@@ -258,15 +258,15 @@ impl TraceEffect {
     fn from_runtime(effect: &RuntimeEffect<'_>) -> Self {
         match effect {
             RuntimeEffect::Node(_) => Self::Node,
-            RuntimeEffect::ArrayOpen => Self::ArrayOpen,
-            RuntimeEffect::Push => Self::Push,
-            RuntimeEffect::ArrayClose => Self::ArrayClose,
-            RuntimeEffect::StructOpen => Self::StructOpen,
-            RuntimeEffect::StructClose => Self::StructClose,
-            RuntimeEffect::Set(idx) => Self::Set(*idx),
+            RuntimeEffect::ListOpen => Self::ListOpen,
+            RuntimeEffect::ArrayPush => Self::ArrayPush,
+            RuntimeEffect::ListClose => Self::ListClose,
+            RuntimeEffect::RecordOpen => Self::RecordOpen,
+            RuntimeEffect::RecordClose => Self::RecordClose,
+            RuntimeEffect::RecordSet(idx) => Self::RecordSet(*idx),
             RuntimeEffect::VariantOpen(idx) => Self::VariantOpen(*idx),
             RuntimeEffect::VariantClose => Self::VariantClose,
-            RuntimeEffect::Null => Self::Null,
+            RuntimeEffect::Absent => Self::Absent,
             RuntimeEffect::SpanStart { id, node } => {
                 if node.is_some() {
                     Self::SpanStartAt(*id)
@@ -288,15 +288,15 @@ impl TraceEffect {
     fn from_opcode(opcode: EffectKind, payload: usize) -> Self {
         match opcode {
             EffectKind::Node => Self::Node,
-            EffectKind::ArrayOpen => Self::ArrayOpen,
-            EffectKind::Push => Self::Push,
-            EffectKind::ArrayClose => Self::ArrayClose,
-            EffectKind::StructOpen => Self::StructOpen,
-            EffectKind::StructClose => Self::StructClose,
-            EffectKind::Set => Self::Set(payload as u16),
+            EffectKind::ListOpen => Self::ListOpen,
+            EffectKind::ArrayPush => Self::ArrayPush,
+            EffectKind::ListClose => Self::ListClose,
+            EffectKind::RecordOpen => Self::RecordOpen,
+            EffectKind::RecordClose => Self::RecordClose,
+            EffectKind::RecordSet => Self::RecordSet(payload as u16),
             EffectKind::VariantOpen => Self::VariantOpen(payload as u16),
             EffectKind::VariantClose => Self::VariantClose,
-            EffectKind::Null => Self::Null,
+            EffectKind::Absent => Self::Absent,
             EffectKind::SpanStartAt => Self::SpanStartAt(payload as u16),
             EffectKind::SpanStart => Self::SpanStart(payload as u16),
             EffectKind::SpanEnd => Self::SpanEnd(payload as u16),
@@ -377,15 +377,17 @@ impl<'s> PrintTracer<'s> {
     fn format_effect(&self, effect: TraceEffect) -> String {
         match effect {
             TraceEffect::Node => "Node".to_string(),
-            TraceEffect::ArrayOpen => "ArrayOpen".to_string(),
-            TraceEffect::Push => "Push".to_string(),
-            TraceEffect::ArrayClose => "ArrayClose".to_string(),
-            TraceEffect::StructOpen => "StructOpen".to_string(),
-            TraceEffect::StructClose => "StructClose".to_string(),
-            TraceEffect::Set(idx) => format!("Set \"{}\"", self.member_name(idx)),
+            TraceEffect::ListOpen => "ListOpen".to_string(),
+            TraceEffect::ArrayPush => "ArrayPush".to_string(),
+            TraceEffect::ListClose => "ListClose".to_string(),
+            TraceEffect::RecordOpen => "RecordOpen".to_string(),
+            TraceEffect::RecordClose => "RecordClose".to_string(),
+            TraceEffect::RecordSet(idx) => {
+                format!("RecordSet \"{}\"", self.member_name(idx))
+            }
             TraceEffect::VariantOpen(idx) => format!("VariantOpen \"{}\"", self.member_name(idx)),
             TraceEffect::VariantClose => "VariantClose".to_string(),
-            TraceEffect::Null => "Null".to_string(),
+            TraceEffect::Absent => "Absent".to_string(),
             TraceEffect::SpanStartAt(id) => format!("SpanStartAt#{id}"),
             TraceEffect::SpanStart(id) => format!("SpanStart#{id}"),
             TraceEffect::SpanEnd(id) => format!("SpanEnd#{id}"),

@@ -662,16 +662,16 @@ impl<'a> Generator<'a> {
                     "{indent}eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));"
                 );
             }
-            EffectKind::ArrayOpen => unit(out, "ArrayOpen"),
-            EffectKind::Push => unit(out, "Push"),
-            EffectKind::ArrayClose => unit(out, "ArrayClose"),
-            EffectKind::StructOpen => unit(out, "StructOpen"),
-            EffectKind::StructClose => unit(out, "StructClose"),
+            EffectKind::ListOpen => unit(out, "ListOpen"),
+            EffectKind::ArrayPush => unit(out, "ArrayPush"),
+            EffectKind::ListClose => unit(out, "ListClose"),
+            EffectKind::RecordOpen => unit(out, "RecordOpen"),
+            EffectKind::RecordClose => unit(out, "RecordClose"),
             EffectKind::VariantClose => unit(out, "VariantClose"),
-            EffectKind::Null => unit(out, "Null"),
-            EffectKind::Set | EffectKind::VariantOpen => {
-                let variant = if effect.kind == EffectKind::Set {
-                    "Set"
+            EffectKind::Absent => unit(out, "Absent"),
+            EffectKind::RecordSet | EffectKind::VariantOpen => {
+                let variant = if effect.kind == EffectKind::RecordSet {
+                    "RecordSet"
                 } else {
                     "VariantOpen"
                 };

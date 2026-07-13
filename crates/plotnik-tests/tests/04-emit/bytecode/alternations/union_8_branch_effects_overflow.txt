@@ -16,20 +16,20 @@ Q = 14
 Q:
   00  -ε-                                   02, 03, 04, 05, 06, 07, 08, 09
   01                                        ▶
-  02   !   (identifier) [Null Set(b) Null Set(c) Null Set(d) Null Set(e) Null Set(f) Null Set(g) Null Set(h) Node Set(a)]  01
-  03   !   (number) [Null Set(a) Null Set(c) Null Set(d) Null Set(e) Null Set(f) Null Set(g) Null Set(h) Node Set(b)]  01
-  04   !   (string) [Null Set(a) Null Set(b) Null Set(d) Null Set(e) Null Set(f) Null Set(g) Null Set(h) Node Set(c)]  01
-  05   !   (binary_expression) [Null Set(a) Null Set(b) Null Set(c) Null Set(e) Null Set(f) Null Set(g) Null Set(h) Node Set(d)]  01
-  06   !   (call_expression) [Null Set(a) Null Set(b) Null Set(c) Null Set(d) Null Set(f) Null Set(g) Null Set(h) Node Set(e)]  01
-  07   !   (member_expression) [Null Set(a) Null Set(b) Null Set(c) Null Set(d) Null Set(e) Null Set(g) Null Set(h) Node Set(f)]  01
-  08   !   (array) [Null Set(a) Null Set(b) Null Set(c) Null Set(d) Null Set(e) Null Set(f) Null Set(h) Node Set(g)]  01
-  09   !   (object) [Null Set(a) Null Set(b) Null Set(c) Null Set(d) Null Set(e) Null Set(f) Null Set(g) Node Set(h)]  01
+  02   !   (identifier) [Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(e) Absent RecordSet(f) Absent RecordSet(g) Absent RecordSet(h) Node RecordSet(a)]  01
+  03   !   (number) [Absent RecordSet(a) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(e) Absent RecordSet(f) Absent RecordSet(g) Absent RecordSet(h) Node RecordSet(b)]  01
+  04   !   (string) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(d) Absent RecordSet(e) Absent RecordSet(f) Absent RecordSet(g) Absent RecordSet(h) Node RecordSet(c)]  01
+  05   !   (binary_expression) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(e) Absent RecordSet(f) Absent RecordSet(g) Absent RecordSet(h) Node RecordSet(d)]  01
+  06   !   (call_expression) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(f) Absent RecordSet(g) Absent RecordSet(h) Node RecordSet(e)]  01
+  07   !   (member_expression) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(e) Absent RecordSet(g) Absent RecordSet(h) Node RecordSet(f)]  01
+  08   !   (array) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(e) Absent RecordSet(f) Absent RecordSet(h) Node RecordSet(g)]  01
+  09   !   (object) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(e) Absent RecordSet(f) Absent RecordSet(g) Node RecordSet(h)]  01
 
 Q (entrypoint):
   11                                        ▶
-  12  -ε-  [StructClose]                    11
+  12  -ε-  [RecordClose]                    11
   13       (Q)                              00 : 12
-  14  -ε-  [StructOpen]                     13
+  14  -ε-  [RecordOpen]                     13
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -74,26 +74,26 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@72)                            72 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08  -ε-  [Set(M0)]                        06
-  10   !   (identifier) [Null Set(M1) Null Set(M2) Null Set(M3) Null Set(M4) Null Set(M5) Null Set(M6) Null Set(M7) Node]  08
-  16  -ε-  [Set(M1)]                        06
-  18   !   (number) [Null Set(M0) Null Set(M2) Null Set(M3) Null Set(M4) Null Set(M5) Null Set(M6) Null Set(M7) Node]  16
-  24  -ε-  [Set(M2)]                        06
-  26   !   (string) [Null Set(M0) Null Set(M1) Null Set(M3) Null Set(M4) Null Set(M5) Null Set(M6) Null Set(M7) Node]  24
-  32  -ε-  [Set(M3)]                        06
-  34   !   (binary_expression) [Null Set(M0) Null Set(M1) Null Set(M2) Null Set(M4) Null Set(M5) Null Set(M6) Null Set(M7) Node]  32
-  40  -ε-  [Set(M4)]                        06
-  42   !   (call_expression) [Null Set(M0) Null Set(M1) Null Set(M2) Null Set(M3) Null Set(M5) Null Set(M6) Null Set(M7) Node]  40
-  48  -ε-  [Set(M5)]                        06
-  50   !   (member_expression) [Null Set(M0) Null Set(M1) Null Set(M2) Null Set(M3) Null Set(M4) Null Set(M6) Null Set(M7) Node]  48
-  56  -ε-  [Set(M6)]                        06
-  58   !   (array) [Null Set(M0) Null Set(M1) Null Set(M2) Null Set(M3) Null Set(M4) Null Set(M5) Null Set(M7) Node]  56
-  64  -ε-  [Set(M7)]                        06
-  66   !   (object) [Null Set(M0) Null Set(M1) Null Set(M2) Null Set(M3) Null Set(M4) Null Set(M5) Null Set(M6) Node]  64
+  08  -ε-  [RecordSet(M0)]                  06
+  10   !   (identifier) [Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M3) Absent RecordSet(M4) Absent RecordSet(M5) Absent RecordSet(M6) Absent RecordSet(M7) Node]  08
+  16  -ε-  [RecordSet(M1)]                  06
+  18   !   (number) [Absent RecordSet(M0) Absent RecordSet(M2) Absent RecordSet(M3) Absent RecordSet(M4) Absent RecordSet(M5) Absent RecordSet(M6) Absent RecordSet(M7) Node]  16
+  24  -ε-  [RecordSet(M2)]                  06
+  26   !   (string) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M3) Absent RecordSet(M4) Absent RecordSet(M5) Absent RecordSet(M6) Absent RecordSet(M7) Node]  24
+  32  -ε-  [RecordSet(M3)]                  06
+  34   !   (binary_expression) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M4) Absent RecordSet(M5) Absent RecordSet(M6) Absent RecordSet(M7) Node]  32
+  40  -ε-  [RecordSet(M4)]                  06
+  42   !   (call_expression) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M3) Absent RecordSet(M5) Absent RecordSet(M6) Absent RecordSet(M7) Node]  40
+  48  -ε-  [RecordSet(M5)]                  06
+  50   !   (member_expression) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M3) Absent RecordSet(M4) Absent RecordSet(M6) Absent RecordSet(M7) Node]  48
+  56  -ε-  [RecordSet(M6)]                  06
+  58   !   (array) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M3) Absent RecordSet(M4) Absent RecordSet(M5) Absent RecordSet(M7) Node]  56
+  64  -ε-  [RecordSet(M7)]                  06
+  66   !   (object) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M3) Absent RecordSet(M4) Absent RecordSet(M5) Absent RecordSet(M6) Node]  64
   72  -ε-                                   10, 18, 26, 34, 42, 50, 58, 66

@@ -116,17 +116,17 @@ impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
 
 /// Replay one committed `Err` value.
 fn read_err<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Err<'t> {
-    t.expect_struct_open();
+    t.expect_record_open();
     let mut v0 = None; // err
-    while !t.at_struct_close() {
-        match t.peek_set() {
+    while !t.at_record_close() {
+        match t.peek_record_set() {
             // err
             0 => v0 = Some(t.expect_node()),
             other => unreachable!("trace shape proven at emit: `Err` has no member index {other}"),
         }
-        t.expect_set();
+        t.expect_record_set();
     }
-    t.expect_struct_close();
+    t.expect_record_close();
     Err {
         err: v0.expect("field-stability: every accepting path sets `err`"),
     }
@@ -134,17 +134,17 @@ fn read_err<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Err<'t> {
 
 /// Replay one committed `Q` value.
 fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'t> {
-    t.expect_struct_open();
+    t.expect_record_open();
     let mut v0 = None; // gap
-    while !t.at_struct_close() {
-        match t.peek_set() {
+    while !t.at_record_close() {
+        match t.peek_record_set() {
             // gap
             1 => v0 = Some(t.expect_node()),
             other => unreachable!("trace shape proven at emit: `Q` has no member index {other}"),
         }
-        t.expect_set();
+        t.expect_record_set();
     }
-    t.expect_struct_close();
+    t.expect_record_close();
     Q {
         gap: v0.expect("field-stability: every accepting path sets `gap`"),
     }
@@ -407,7 +407,7 @@ mod matcher {
                 }
                 Flow::Jump(S01_ERR)
             }
-            //   04  └‣─  (ERROR) [Node Set(err)]          03
+            //   04  └‣─  (ERROR) [Node RecordSet(err)]    03
             S04_ERR => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
@@ -484,7 +484,7 @@ mod matcher {
                 }
                 Flow::Jump(S06_Q)
             }
-            //   13  └‣─  (MISSING "}") [Node Set(gap)]    12
+            //   13  └‣─  (MISSING "}") [Node RecordSet(gap)]  12
             S13_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
@@ -511,9 +511,9 @@ mod matcher {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   15  -ε-  [StructClose]                    14
+            //   15  -ε-  [RecordClose]                    14
             S15_ERR_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordClose);
                 Flow::Jump(S14_ERR_EP)
             }
             //   16       (Err)                            02 : 15
@@ -521,9 +521,9 @@ mod matcher {
                 eng.enter_frame(S15_ERR_EP);
                 Flow::Jump(S02_ERR)
             }
-            //   17  -ε-  [StructOpen]                     16
+            //   17  -ε-  [RecordOpen]                     16
             S17_ERR_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordOpen);
                 Flow::Jump(S16_ERR_EP)
             }
             //   18                                        ▶
@@ -535,9 +535,9 @@ mod matcher {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   19  -ε-  [StructClose]                    18
+            //   19  -ε-  [RecordClose]                    18
             S19_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordClose);
                 Flow::Jump(S18_Q_EP)
             }
             //   20       (Q)                              07 : 19
@@ -545,9 +545,9 @@ mod matcher {
                 eng.enter_frame(S19_Q_EP);
                 Flow::Jump(S07_Q)
             }
-            //   21  -ε-  [StructOpen]                     20
+            //   21  -ε-  [RecordOpen]                     20
             S21_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordOpen);
                 Flow::Jump(S20_Q_EP)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
@@ -634,7 +634,7 @@ mod matcher {
     #[inline]
     fn finish_s04_err(eng: &mut rt::Engine<'_>) -> Flow {
         eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
-        eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(err)
+        eng.emit_data(|_| rt::RuntimeEffect::RecordSet(0)); // RecordSet(err)
         Flow::Jump(S03_ERR)
     }
 
@@ -660,7 +660,7 @@ mod matcher {
     #[inline]
     fn finish_s13_q(eng: &mut rt::Engine<'_>) -> Flow {
         eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
-        eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(gap)
+        eng.emit_data(|_| rt::RuntimeEffect::RecordSet(1)); // RecordSet(gap)
         Flow::Jump(S12_Q)
     }
 

@@ -70,21 +70,21 @@ Q = 00 :: T3
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ...
   07  ...
-  08   !   (expression_statement) [VariantOpen(M1) Node Set(M0) VariantClose]  11
-  11  ─‣┘  _ [Set(M2)]                      13
+  08   !   (expression_statement) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  11
+  11  ─‣┘  _ [RecordSet(M2)]                13
   13                                        ▶
   14  ──!  _                                08, 14
   16  └─!  _                                08, 14
   18   !   (program)                        16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
        ▶   (@18)
 
@@ -93,12 +93,12 @@ Q:
        ●   program
   16       _                                08, 14
        ●   expression_statement
-  08       (expression_statement) [VariantOpen(M1) Node Set(M0) VariantClose]  11
+  08       (expression_statement) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  11
        ●   expression_statement
-  11       _ [Set(M2)]                      13
+  11       _ [RecordSet(M2)]                13
        ●   program
   13   ◀   (@18)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

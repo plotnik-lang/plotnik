@@ -45,13 +45,13 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@15)                            15 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ...
   07  ...
-  08  └‣─  (identifier) [Node Set(M0)] == "b"  11
+  08  └‣─  (identifier) [Node RecordSet(M0)] == "b"  11
   11  ─‣┘³ _                                12
   12                                        ▶
   13  └‣─  (binary_expression)              08
@@ -59,7 +59,7 @@ Q:
   15   !   (program)                        14
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@15)                            15 : 03
        ▶   (@15)
 
@@ -70,7 +70,7 @@ Q:
        ●   expression_statement
   13       (binary_expression)              08
        ●   binary_expression
-  08       (identifier) [Node Set(M0)] == "b"  11
+  08       (identifier) [Node RecordSet(M0)] == "b"  11
        ○   +
        ●   identifier
   11       _                                12
@@ -78,5 +78,5 @@ Q:
   12   ◀   (@15)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

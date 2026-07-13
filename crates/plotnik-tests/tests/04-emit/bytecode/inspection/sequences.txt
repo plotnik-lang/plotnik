@@ -15,16 +15,16 @@ Q:
   02   !   (program)                        07
   04  ─‣─  (expression_statement)           06
   05  ─‣┘² _                                01
-  06  └‣─  (number) [Node Set(b)]           05
+  06  └‣─  (number) [Node RecordSet(b)]     05
   07  └‣─  (expression_statement)           09
   08  ─‣┘  _                                04
-  09  └‣─  (identifier) [Node Set(a)]       08
+  09  └‣─  (identifier) [Node RecordSet(a)]  08
 
 Q (entrypoint):
   10                                        ▶
-  11  -ε-  [StructClose]                    10
+  11  -ε-  [RecordClose]                    10
   12       (Q)                              02 : 11
-  13  -ε-  [StructOpen]                     12
+  13  -ε-  [RecordOpen]                     12
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -63,17 +63,17 @@ P8 pattern    86..94  src0
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@26)                            26 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ...
   07  ...
-  08  └‣─  (number) [SpanStartAt#8 SpanStart#7 Node Set(M1) SpanEnd#7 SpanEnd#8]  11
+  08  └‣─  (number) [SpanStartAt#8 SpanStart#7 Node RecordSet(M1) SpanEnd#7 SpanEnd#8]  11
   11  ─‣┘  _                                12
   12  ─‣┘  _ [SpanEnd#6 SpanEnd#2 SpanEnd#1 SpanEnd#0]  15
   15                                        ▶
-  16  └‣─  (identifier) [SpanStartAt#5 SpanStart#4 Node Set(M0) SpanEnd#4 SpanEnd#5]  19
+  16  └‣─  (identifier) [SpanStartAt#5 SpanStart#4 Node RecordSet(M0) SpanEnd#4 SpanEnd#5]  19
   19  ─‣┘  _                                20
   20  ─‣─  (expression_statement) [SpanEnd#3 SpanStartAt#6]  08
   22  ...

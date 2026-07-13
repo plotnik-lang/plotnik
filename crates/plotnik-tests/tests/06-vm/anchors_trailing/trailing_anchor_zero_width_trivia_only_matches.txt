@@ -38,40 +38,40 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08  └•┘  _ [ArrayClose Set(M0)]           06
-  10   !   (debugger_statement) [Node Push]  12, 18
+  08  └•┘  _ [ListClose RecordSet(M0)]      06
+  10   !   (debugger_statement) [Node ArrayPush]  12, 18
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
-  16  -ε-  [ArrayOpen]                      14, 08
-  18  ─•┘  _ [ArrayClose Set(M0)]           06
+  16  -ε-  [ListOpen]                       14, 08
+  18  ─•┘  _ [ListClose RecordSet(M0)]      06
   20   !   (program)                        16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
        ▶   (@20)
 
 @20:
   20       (program)                        16
        ●   program
-  16  -ε-  [ArrayOpen]                      14, 08
+  16  -ε-  [ListOpen]                       14, 08
   14       _                                10, 12
        ●   comment
-  10       (debugger_statement) [Node Push]  12, 18
+  10       (debugger_statement) [Node ArrayPush]  12, 18
        ○   comment
   14  ❮❮❮ 
   12       _                                10, 12
   16  ❮❮❮ 
-  08       _ [ArrayClose Set(M0)]           06
+  08       _ [ListClose RecordSet(M0)]      06
        ●   program
   06   ◀   (@20)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

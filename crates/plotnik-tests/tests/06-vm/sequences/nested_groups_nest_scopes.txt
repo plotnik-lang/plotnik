@@ -64,31 +64,31 @@ Q = 00 :: T3
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@14)                            14 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ...
   07  ...
-  08  └‣─  (expression_statement) [StructOpen Node Set(M0) StructClose Set(M1)]  11
-  11  ─‣┘  _ [StructClose Set(M2)]          13
+  08  └‣─  (expression_statement) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  11
+  11  ─‣┘  _ [RecordClose RecordSet(M2)]    13
   13                                        ▶
-  14   !   (program) [StructOpen]           08
+  14   !   (program) [RecordOpen]           08
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@14)                            14 : 03
        ▶   (@14)
 
 @14:
-  14       (program) [StructOpen]           08
+  14       (program) [RecordOpen]           08
        ●   program
-  08       (expression_statement) [StructOpen Node Set(M0) StructClose Set(M1)]  11
+  08       (expression_statement) [RecordOpen Node RecordSet(M0) RecordClose RecordSet(M1)]  11
        ●   expression_statement
-  11       _ [StructClose Set(M2)]          13
+  11       _ [RecordClose RecordSet(M2)]    13
        ●   program
   13   ◀   (@14)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

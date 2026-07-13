@@ -75,62 +75,62 @@ Q   = 12 :: T4
 
 [transitions]
 Obj:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@58)                            58 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Arr:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@46)                            46 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
 
 Q:
-  12  -ε-  [StructOpen]                     14
+  12  -ε-  [RecordOpen]                     14
   14       (@64)                            64 : 16
   15  ...
-  16  -ε-  [StructClose]                    18
+  16  -ε-  [RecordClose]                    18
   18                                        ▶
-  19  -ε-  [StructClose]                    21
-  21  ─‣┘  _ [Set(M0)]                      23
+  19  -ε-  [RecordClose]                    21
+  21  ─‣┘  _ [RecordSet(M0)]                23
   23                                        ▶
-  24  -ε-  [StructClose]                    26
-  26  ─‣┘  _ [Set(M1)]                      38
-  28  -ε-  [StructClose]                    30
-  30  ─‣┘² _ [Set(M2)]                      55
+  24  -ε-  [RecordClose]                    26
+  26  ─‣┘  _ [RecordSet(M1)]                38
+  28  -ε-  [RecordClose]                    30
+  30  ─‣┘² _ [RecordSet(M2)]                55
   32                                        ▶
-  33  -ε-  [Null Set(M1)]                   38
-  35  -ε-  [Null Set(M0)]                   23
+  33  -ε-  [Absent RecordSet(M1)]           38
+  35  -ε-  [Absent RecordSet(M0)]           23
   37   !   (@58)                            58 : 19
   38  ─‣┘  _                                32
   39  ...
-  40  -ε-  [StructOpen]                     37
+  40  -ε-  [RecordOpen]                     37
   42  ──!  _                                40, 42
   44  └─!  _                                40, 42
   46   !   (array)                          44, 35
   48   !   value: (@46)                     46 : 24
-  49  -ε-  [StructOpen]                     48
+  49  -ε-  [RecordOpen]                     48
   51  ──!  _                                49, 51
   53  └─!  _                                49, 51
   55                                        ▶
   56  └‣─  (pair)                           53, 33
   58   !   (object)                         56
   59  └‣─  (@46)                            46 : 28
-  60  └‣─  (expression_statement) [StructOpen]  59
+  60  └‣─  (expression_statement) [RecordOpen]  59
   62  ...
   63  ...
   64   !   (program)                        60
 --------------------- TRACE ----------------------
 Q:
-  12  -ε-  [StructOpen]                     14
+  12  -ε-  [RecordOpen]                     14
   14       (@64)                            64 : 16
        ▶   (@64)
 
 @64:
   64       (program)                        60
        ●   program
-  60       (expression_statement) [StructOpen]  59
+  60       (expression_statement) [RecordOpen]  59
        ●   expression_statement
   59       (@46)                            46 : 28
        ▶   (@46)
@@ -140,7 +140,7 @@ Q:
        ●   array
   44       _                                40, 42
        ●   [
-  40  -ε-  [StructOpen]                     37
+  40  -ε-  [RecordOpen]                     37
   37       (@58)                            58 : 19
        ▶   (@58)
 
@@ -150,7 +150,7 @@ Q:
   44  ❮❮❮ 
   42       _                                40, 42
        ●   object
-  40  -ε-  [StructOpen]                     37
+  40  -ε-  [RecordOpen]                     37
   37       (@58)                            58 : 19
        ▶   (@58)
 
@@ -162,17 +162,17 @@ Q:
        ●   pair
   53       _                                49, 51
        ●   property_identifier
-  49  -ε-  [StructOpen]                     48
+  49  -ε-  [RecordOpen]                     48
   48       (@46)                            46 : 24
   53  ❮❮❮ 
   51       _                                49, 51
        ●   :
-  49  -ε-  [StructOpen]                     48
+  49  -ε-  [RecordOpen]                     48
   48       (@46)                            46 : 24
   51  ❮❮❮ 
   51       _                                49, 51
        ●   array
-  49  -ε-  [StructOpen]                     48
+  49  -ε-  [RecordOpen]                     48
   48       (@46)                            46 : 24
        ▶   (@46)
 
@@ -181,7 +181,7 @@ Q:
        ●   array
   44       _                                40, 42
        ●   [
-  40  -ε-  [StructOpen]                     37
+  40  -ε-  [RecordOpen]                     37
   37       (@58)                            58 : 19
        ▶   (@58)
 
@@ -191,7 +191,7 @@ Q:
   44  ❮❮❮ 
   42       _                                40, 42
        ●   number
-  40  -ε-  [StructOpen]                     37
+  40  -ε-  [RecordOpen]                     37
   37       (@58)                            58 : 19
        ▶   (@58)
 
@@ -201,7 +201,7 @@ Q:
   42  ❮❮❮ 
   42       _                                40, 42
        ●   ]
-  40  -ε-  [StructOpen]                     37
+  40  -ε-  [RecordOpen]                     37
   37       (@58)                            58 : 19
        ▶   (@58)
 
@@ -211,29 +211,29 @@ Q:
   42  ❮❮❮ 
   42       _                                40, 42
   46  ❮❮❮ 
-  35  -ε-  [Null Set(M0)]                   23
+  35  -ε-  [Absent RecordSet(M0)]           23
   23   ◀   (@46)                            
 
 @58:
-  24  -ε-  [StructClose]                    26
-  26       _ [Set(M1)]                      38
+  24  -ε-  [RecordClose]                    26
+  26       _ [RecordSet(M1)]                38
        ●   pair
   38       _                                32
        ●   object
   32   ◀   (@58)                            
 
 @46:
-  19  -ε-  [StructClose]                    21
-  21       _ [Set(M0)]                      23
+  19  -ε-  [RecordClose]                    21
+  21       _ [RecordSet(M0)]                23
        ●   array
   23   ◀   (@46)                            
 
 @64:
-  28  -ε-  [StructClose]                    30
-  30       _ [Set(M2)]                      55
+  28  -ε-  [RecordClose]                    30
+  30       _ [RecordSet(M2)]                55
        ●   program
   55   ◀   (@64)                            
 
 Q:
-  16  -ε-  [StructClose]                    18
+  16  -ε-  [RecordClose]                    18
   18   ◀   (Q)                              ◼

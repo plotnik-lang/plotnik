@@ -84,7 +84,7 @@ pub(crate) struct ReplayScopePlan {
 #[derive(Clone, Debug)]
 pub(crate) struct ReplayFieldPlan {
     pub(crate) name: Symbol,
-    /// Every absolute `Set` slot this field may use across nominal twins.
+    /// Every absolute `RecordSet` slot this field may use across nominal twins.
     pub(crate) indices: Vec<u16>,
     pub(crate) value: ReplayValuePlan,
 }

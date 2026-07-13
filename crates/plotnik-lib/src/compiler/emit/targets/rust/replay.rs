@@ -10,11 +10,11 @@
 //! consumer):
 //!
 //! - **Values are value-first.** A field's entries arrive *before* the
-//!   `Set` that names the field, and `Set` order inside one record varies
+//!   `RecordSet` that names the field, and `RecordSet` order inside one record varies
 //!   between instances of the same type. Record scopes therefore peek ahead
-//!   to the balancing `Set` (`TraceReader::peek_set`) to pick the field's
+//!   to the balancing `RecordSet` (`TraceReader::peek_record_set`) to pick the field's
 //!   typed reader, then consume linearly.
-//! - **`Set`/`VariantOpen` payloads are absolute member-table indices**, baked
+//! - **`RecordSet`/`VariantOpen` payloads are absolute member-table indices**, baked
 //!   from the same emit tables the matcher folded into its states. Nominal
 //!   twins (one name, several structurally-identical analysis types) own
 //!   distinct member runs, so an arm matches the union of its twins' indices.
@@ -347,10 +347,10 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         let ident = self.model.item_ident(item.name).to_string();
         out.push('\n');
         self.reader_open(out, item);
-        out.push_str("    t.expect_struct_open();\n");
+        out.push_str("    t.expect_record_open();\n");
         let scope = Scope::struct_body(item.ty, &ident);
         self.field_scope(out, &scope, plan);
-        out.push_str("    t.expect_struct_close();\n");
+        out.push_str("    t.expect_record_close();\n");
         self.construct(out, &scope, plan, item.fallible);
         out.push_str("}\n");
     }
@@ -408,9 +408,9 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
     }
 
     /// The field-collection loop of one struct-like scope: positional locals,
-    /// the peek-dispatch loop over member indices, one `Set` consumed per
+    /// the peek-dispatch loop over member indices, one `RecordSet` consumed per
     /// field value. Variant payloads reuse it with `VariantClose` as the terminator
-    /// (payload `Set`s attach directly to the variant frame — the materializer's
+    /// (payload `RecordSet`s attach directly to the variant frame — the materializer's
     /// contract).
     fn field_scope(&self, out: &mut String, scope: &Scope<'_>, plan: &ReplayScopePlan) {
         let p = indentation(scope.level());
@@ -422,7 +422,7 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
             );
         }
         let _ = writeln!(out, "{p}while !t.{}() {{", scope.kind.probe());
-        let _ = writeln!(out, "{p}    match t.peek_set() {{");
+        let _ = writeln!(out, "{p}    match t.peek_record_set() {{");
         for (index, field) in plan.fields.iter().enumerate() {
             let indices = arm_pattern(&field.indices);
             let expr = self.value_expr(&field.value, scope.field_context());
@@ -435,12 +435,12 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
             scope.name
         );
         let _ = writeln!(out, "{p}    }}");
-        let _ = writeln!(out, "{p}    t.expect_set();");
+        let _ = writeln!(out, "{p}    t.expect_record_set();");
         let _ = writeln!(out, "{p}}}");
     }
 
     /// The construction expression closing a scope: every field was set
-    /// exactly once (field-stability null-defaulting guarantees a `Set` per
+    /// exactly once (field completion guarantees a `RecordSet` per
     /// field on every accepting path), so the positional locals unwrap.
     fn construct(
         &self,
@@ -499,14 +499,14 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         }
     }
 
-    /// `Null` is the whole absent value — one flat null, however many
+    /// `Absent` is the whole absent value — one flat absence, however many
     /// `Option` layers the type carries; a present value wraps `Some` at
     /// every layer (the VM never nests nulls).
     fn nullable_expr(&self, inner: &ReplayValuePlan, context: ReadContext) -> String {
         let p = indentation(context.level);
         let inner_expr = self.value_expr(inner, context.in_some_branch());
         let mut out = String::new();
-        let _ = writeln!(out, "if t.take_null() {{");
+        let _ = writeln!(out, "if t.take_absent() {{");
         let _ = writeln!(out, "{p}    None");
         let _ = writeln!(out, "{p}}} else {{");
         let _ = writeln!(out, "{p}    Some({inner_expr})");
@@ -520,13 +520,13 @@ impl<'m, 'a> ReaderGen<'m, 'a> {
         let elem = self.value_expr(element, context.list_element());
         let mut out = String::new();
         let _ = writeln!(out, "{{");
-        let _ = writeln!(out, "{p}    t.expect_array_open();");
+        let _ = writeln!(out, "{p}    t.expect_list_open();");
         let _ = writeln!(out, "{p}    let mut {items} = ::std::vec::Vec::new();");
-        let _ = writeln!(out, "{p}    while !t.at_array_close() {{");
+        let _ = writeln!(out, "{p}    while !t.at_list_close() {{");
         let _ = writeln!(out, "{p}        {items}.push({elem});");
-        let _ = writeln!(out, "{p}        t.expect_push();");
+        let _ = writeln!(out, "{p}        t.expect_array_push();");
         let _ = writeln!(out, "{p}    }}");
-        let _ = writeln!(out, "{p}    t.expect_array_close();");
+        let _ = writeln!(out, "{p}    t.expect_list_close();");
         let _ = writeln!(out, "{p}    {items}");
         let _ = write!(out, "{p}}}");
         out
@@ -592,7 +592,7 @@ enum ScopeKind<'a> {
 impl ScopeKind<'_> {
     fn probe(self) -> &'static str {
         match self {
-            ScopeKind::Struct => "at_struct_close",
+            ScopeKind::Struct => "at_record_close",
             ScopeKind::VariantPayload { .. } => "at_variant_close",
         }
     }

@@ -18,16 +18,16 @@ Q:
   04  └‣─  (expression_statement)           06
   06  └‣─  (binary_expression)              12
   07  ─‣┘³ _                                01
-  08  ─•─  (identifier) [Node Set(right)]   07
-  09   !   (identifier) [Node Set(left)]    08
+  08  ─•─  (identifier) [Node RecordSet(right)]  07
+  09   !   (identifier) [Node RecordSet(left)]  08
   11  ──!  _                                09, 11
   12  └─!  _                                09, 11
 
 Q (entrypoint):
   13                                        ▶
-  14  -ε-  [StructClose]                    13
+  14  -ε-  [RecordClose]                    13
   15       (Q)                              02 : 14
-  16  -ε-  [StructOpen]                     15
+  16  -ε-  [RecordOpen]                     15
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -55,14 +55,14 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  ─•─  (identifier) [Node Set(M1)]      08
+  06  ─•─  (identifier) [Node RecordSet(M1)]  08
   08  ─‣┘³ _                                09
   09                                        ▶
-  10   !   (identifier) [Node Set(M0)]      06
+  10   !   (identifier) [Node RecordSet(M0)]  06
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
   16  └‣─  (binary_expression)              14

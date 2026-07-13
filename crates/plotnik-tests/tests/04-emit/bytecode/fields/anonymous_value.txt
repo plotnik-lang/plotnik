@@ -8,15 +8,15 @@ Q = 8
 [transitions]
 Q:
   1                                         ▶
-  2   !   (binary_expression) [Node Set(expr)]  4
+  2   !   (binary_expression) [Node RecordSet(expr)]  4
   3  ─‣┘  _                                 1
   4  └‣─  operator: "+"                     3
 
 Q (entrypoint):
   5                                         ▶
-  6  -ε-  [StructClose]                     5
+  6  -ε-  [RecordClose]                     5
   7       (Q)                               2 : 6
-  8  -ε-  [StructOpen]                      7
+  8  -ε-  [RecordOpen]                      7
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -41,11 +41,11 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@09)                            09 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  └‣─  operator: "+"                    07
   07  ─‣┘  _                                08
   08                                        ▶
-  09   !   (binary_expression) [Node Set(M0)]  06
+  09   !   (binary_expression) [Node RecordSet(M0)]  06

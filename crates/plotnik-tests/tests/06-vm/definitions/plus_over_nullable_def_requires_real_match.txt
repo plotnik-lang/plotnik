@@ -57,36 +57,36 @@ Q = 00 :: T5
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@26)                            26 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  (identifier) [Node Set(M0)]      08
-  08  ─‣┘  _ [StructClose Set(M1)]          11
+  06  └‣─  (identifier) [Node RecordSet(M0)]  08
+  08  ─‣┘  _ [RecordClose RecordSet(M1)]    11
   10                                        ▶
-  11  -ε-  [StructClose Push]               20, 24
-  13   !   (expression_statement) [StructOpen]  06
+  11  -ε-  [RecordClose ArrayPush]          20, 24
+  13   !   (expression_statement) [RecordOpen]  06
   15  ...
   16  ──!  _                                13, 16
-  18   !   _ [StructOpen]                   13, 16
+  18   !   _ [RecordOpen]                   13, 16
   20  ──!  _                                18, 20
-  22  └─!  _ [ArrayOpen]                    18, 20
-  24  ─‣┘  _ [ArrayClose Set(M2)]           10
+  22  └─!  _ [ListOpen]                     18, 20
+  24  ─‣┘  _ [ListClose RecordSet(M2)]      10
   26   !   (program)                        22
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@26)                            26 : 03
        ▶   (@26)
 
 @26:
   26       (program)                        22
        ●   program
-  22       _ [ArrayOpen]                    18, 20
+  22       _ [ListOpen]                     18, 20
        ●   debugger_statement
-  18       _ [StructOpen]                   13, 16
+  18       _ [RecordOpen]                   13, 16
        ●   debugger_statement
-  13       (expression_statement) [StructOpen]  06
+  13       (expression_statement) [RecordOpen]  06
        ○   debugger_statement
   18  ❮❮❮ 
   16       _                                13, 16

@@ -52,28 +52,28 @@ Q = 00 :: T3
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@32)                            32 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  └‣─  (identifier) == "foo"            08
   08  ─‣┘  _                                09
   09  ─‣┘  _                                10
   10                                        ▶
-  11  ─•─  (expression_statement) [ArrayClose Set(M1) Node Set(M2)]  06
+  11  ─•─  (expression_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  06
   14  ...
   15  ...
-  16  └•─  (debugger_statement) [ArrayOpen Node Push]  19, 11
-  19  ─•─  (debugger_statement) [Node Push]  19, 11
-  21  ─•─  (debugger_statement) [ArrayOpen Node Push]  19, 11
-  24  -ε-  [Null Set(M0)]                   16
-  26   !   (lexical_declaration) [Node Set(M0)]  21
+  16  └•─  (debugger_statement) [ListOpen Node ArrayPush]  19, 11
+  19  ─•─  (debugger_statement) [Node ArrayPush]  19, 11
+  21  ─•─  (debugger_statement) [ListOpen Node ArrayPush]  19, 11
+  24  -ε-  [Absent RecordSet(M0)]           16
+  26   !   (lexical_declaration) [Node RecordSet(M0)]  21
   28  ──!  _                                26, 28
   30  └─!  _                                26, 28
   32   !   (program)                        30, 24
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@32)                            32 : 03
        ▶   (@32)
 
@@ -82,21 +82,21 @@ Q:
        ●   program
   30       _                                26, 28
        ●   expression_statement
-  26       (lexical_declaration) [Node Set(M0)]  21
+  26       (lexical_declaration) [Node RecordSet(M0)]  21
        ○   expression_statement
   30  ❮❮❮ 
   28       _                                26, 28
        ●   debugger_statement
-  26       (lexical_declaration) [Node Set(M0)]  21
+  26       (lexical_declaration) [Node RecordSet(M0)]  21
        ○   debugger_statement
   28  ❮❮❮ 
   28       _                                26, 28
        ●   expression_statement
-  26       (lexical_declaration) [Node Set(M0)]  21
+  26       (lexical_declaration) [Node RecordSet(M0)]  21
        ○   expression_statement
   28  ❮❮❮ 
   28       _                                26, 28
   32  ❮❮❮ 
-  24  -ε-  [Null Set(M0)]                   16
-  16       (debugger_statement) [ArrayOpen Node Push]  19, 11
+  24  -ε-  [Absent RecordSet(M0)]           16
+  16       (debugger_statement) [ListOpen Node ArrayPush]  19, 11
        ○   expression_statement

@@ -41,24 +41,24 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  └‣─  (identifier)                     08
   07  ─‣┘  _                                12
-  08  ─‣┘  _ [BoolValue(1) Set(M0)]         07
+  08  ─‣┘  _ [BoolValue(1) RecordSet(M0)]   07
   10  └‣─  (number)                         11
   11  ─‣┘  _                                07
   12                                        ▶
   13   !   (expression_statement)           06
-  14   !   (expression_statement) [BoolValue(0) Set(M0)]  10
+  14   !   (expression_statement) [BoolValue(0) RecordSet(M0)]  10
   16  ──!  _                                13, 14, 16
   18  └─!  _                                13, 14, 16
   20   !   (program)                        18
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
        ▶   (@20)
 
@@ -73,7 +73,7 @@ Q:
        ○   number
        ○   ;
   18  ❮❮❮ 
-  14       (expression_statement) [BoolValue(0) Set(M0)]  10
+  14       (expression_statement) [BoolValue(0) RecordSet(M0)]  10
        ●   expression_statement
   10       (number)                         11
        ●   number
@@ -84,5 +84,5 @@ Q:
   12   ◀   (@20)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

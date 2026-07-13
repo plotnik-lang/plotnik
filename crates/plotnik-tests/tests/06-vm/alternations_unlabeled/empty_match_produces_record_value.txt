@@ -66,32 +66,32 @@ Q = 00 :: T6
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@40)                            40 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08   !   (comment) [Node Set(M0) StructClose Set(M2)]  07
+  08   !   (comment) [Node RecordSet(M0) RecordClose RecordSet(M2)]  07
   11  ──!  _                                08, 11
-  13   !   _ [StructOpen]                   08, 11
+  13   !   _ [RecordOpen]                   08, 11
   15  ...
-  16  -ε-  [Null Set(M3)]                   13
-  18  -ε-  [Null Set(M3) StructOpen Null Set(M0) StructClose Set(M2)]  06
-  21   !   (identifier) [Node Set(M1) StructClose Set(M3)]  07
+  16  -ε-  [Absent RecordSet(M3)]           13
+  18  -ε-  [Absent RecordSet(M3) RecordOpen Absent RecordSet(M0) RecordClose RecordSet(M2)]  06
+  21   !   (identifier) [Node RecordSet(M1) RecordClose RecordSet(M3)]  07
   24  ──!  _                                21, 24
-  26   !   _ [StructOpen]                   21, 24
-  28  -ε-  [Null Set(M2)]                   26
+  26   !   _ [RecordOpen]                   21, 24
+  28  -ε-  [Absent RecordSet(M2)]           26
   30  ...
   31  ...
-  32  -ε-  [Null Set(M2) StructOpen Null Set(M1) StructClose Set(M3)]  06
+  32  -ε-  [Absent RecordSet(M2) RecordOpen Absent RecordSet(M1) RecordClose RecordSet(M3)]  06
   35  ──!  _                                16, 28, 35
   37  └─!  _                                16, 28, 35
   39  ...
   40   !   (program)                        37, 18, 32
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@40)                            40 : 03
        ▶   (@40)
 
@@ -100,9 +100,9 @@ Q:
        ●   program
   37       _                                16, 28, 35
   40  ❮❮❮ 
-  18  -ε-  [Null Set(M3) StructOpen Null Set(M0) StructClose Set(M2)]  06
+  18  -ε-  [Absent RecordSet(M3) RecordOpen Absent RecordSet(M0) RecordClose RecordSet(M2)]  06
   06   ◀   (@40)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

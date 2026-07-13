@@ -81,8 +81,8 @@ Trace with `-v --no-result`:
 
 ```text
 Value:
-  00  -ε-  [StructOpen]                     02
-       ⬥   StructOpen
+  00  -ε-  [RecordOpen]                     02
+       ⬥   RecordOpen
   02       (?)                              18 : 03
        ▶   (?)
 
@@ -95,13 +95,13 @@ Value:
       └‣─  number
        ●   number 42
   --------------------------------------------
-  08       (number) [Null Set(M1) Node Set(M0)]  07
+  08       (number) [Absent RecordSet(M1) Node RecordSet(M0)]  07
        !   number
        ●   number 42
-       ⬥   Null
-       ⬥   Set "s"
+       ⬥   Absent
+       ⬥   RecordSet "s"
        ⬥   Node
-       ⬥   Set "n"
+       ⬥   RecordSet "n"
   --------------------------------------------
   07       _                                06
       ─‣┘  document
@@ -109,8 +109,8 @@ Value:
   06   ◀   (?)
 
 Value:
-  03  -ε-  [StructClose]                    05
-       ⬥   StructClose
+  03  -ε-  [RecordClose]                    05
+       ⬥   RecordClose
   05   ◀   (Value)                          ◼
 ```
 

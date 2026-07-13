@@ -33,18 +33,18 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@11)                            11 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  (number) [Node Set(M0)]          08
+  06  └‣─  (number) [Node RecordSet(M0)]    08
   08  ─‣┘² _                                09
   09                                        ▶
   10  └‣─  (expression_statement)           06
   11   !   (program)                        10
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@11)                            11 : 03
        ▶   (@11)
 
@@ -53,7 +53,7 @@ Q:
        ●   program
   10       (expression_statement)           06
        ●   expression_statement
-  06       (number) [Node Set(M0)]          08
+  06       (number) [Node RecordSet(M0)]    08
        ○   identifier
        ○   ;
   10  ❮❮❮ 

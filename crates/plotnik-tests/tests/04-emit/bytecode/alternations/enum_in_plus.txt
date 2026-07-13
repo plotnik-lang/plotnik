@@ -12,17 +12,17 @@ Q = 19
 Q:
   01                                        ▶
   02   !   (program)                        11
-  03  ─‣┘  _ [ArrayClose Set(statements)]   01
-  06   !   (expression_statement) [VariantOpen(Expression) Node Set(expression) VariantClose Push]  10, 03
-  07   !   (debugger_statement) [VariantOpen(Debugger) Node Set(debugger) VariantClose Push]  10, 03
+  03  ─‣┘  _ [ListClose RecordSet(statements)]  01
+  06   !   (expression_statement) [VariantOpen(Expression) Node RecordSet(expression) VariantClose ArrayPush]  10, 03
+  07   !   (debugger_statement) [VariantOpen(Debugger) Node RecordSet(debugger) VariantClose ArrayPush]  10, 03
   10  ──!  _                                06, 07, 10
-  11  └─!  _ [ArrayOpen]                    06, 07, 10
+  11  └─!  _ [ListOpen]                     06, 07, 10
 
 Q (entrypoint):
   16                                        ▶
-  17  -ε-  [StructClose]                    16
+  17  -ε-  [RecordClose]                    16
   18       (Q)                              02 : 17
-  19  -ε-  [StructOpen]                     18
+  19  -ε-  [RecordOpen]                     18
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -61,15 +61,15 @@ Q = 00 :: T5
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08   !   (expression_statement) [VariantOpen(M2) Node Set(M0) VariantClose Push]  14, 18
-  11   !   (debugger_statement) [VariantOpen(M3) Node Set(M1) VariantClose Push]  14, 18
+  08   !   (expression_statement) [VariantOpen(M2) Node RecordSet(M0) VariantClose ArrayPush]  14, 18
+  11   !   (debugger_statement) [VariantOpen(M3) Node RecordSet(M1) VariantClose ArrayPush]  14, 18
   14  ──!  _                                08, 11, 14
-  16  └─!  _ [ArrayOpen]                    08, 11, 14
-  18  ─‣┘  _ [ArrayClose Set(M4)]           06
+  16  └─!  _ [ListOpen]                     08, 11, 14
+  18  ─‣┘  _ [ListClose RecordSet(M4)]      06
   20   !   (program)                        16

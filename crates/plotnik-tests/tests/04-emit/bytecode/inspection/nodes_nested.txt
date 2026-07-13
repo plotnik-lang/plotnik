@@ -18,14 +18,14 @@ Q:
   04  └‣─  (expression_statement)           06
   06  └‣─  (binary_expression)              09
   07  ─‣┘³ _                                01
-  08  ─‣─  right: (identifier) [Node Set(right)]  07
-  09  └‣─  left: (identifier) [Node Set(left)]  08
+  08  ─‣─  right: (identifier) [Node RecordSet(right)]  07
+  09  └‣─  left: (identifier) [Node RecordSet(left)]  08
 
 Q (entrypoint):
   10                                        ▶
-  11  -ε-  [StructClose]                    10
+  11  -ε-  [RecordClose]                    10
   12       (Q)                              02 : 11
-  13  -ε-  [StructOpen]                     12
+  13  -ε-  [RecordOpen]                     12
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -65,17 +65,17 @@ P9 pattern    104..116  src0
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  16
-  08  ─‣─  right: (identifier) [SpanStart#8 SpanStartAt#9 SpanStart#7 Node Set(M1) SpanEnd#7 SpanEnd#9 SpanEnd#8]  12
+  08  ─‣─  right: (identifier) [SpanStart#8 SpanStartAt#9 SpanStart#7 Node RecordSet(M1) SpanEnd#7 SpanEnd#9 SpanEnd#8]  12
   12  ─‣┘  _                                13
   13  ─‣┘  _ [SpanEnd#3]                    06
   15  ...
   16                                        ▶
-  17  └‣─  left: (identifier) [SpanStart#5 SpanStartAt#6 SpanStart#4 Node Set(M0) SpanEnd#4 SpanEnd#6 SpanEnd#5]  08
+  17  └‣─  left: (identifier) [SpanStart#5 SpanStartAt#6 SpanStart#4 Node RecordSet(M0) SpanEnd#4 SpanEnd#6 SpanEnd#5]  08
   21  ...
   22  ...
   23  ...

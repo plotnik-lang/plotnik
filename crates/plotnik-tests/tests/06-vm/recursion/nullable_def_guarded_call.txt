@@ -49,14 +49,14 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@40)                            40 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  └‣─  (expression_statement) [Node Set(M0)]  07
-  10  ─‣─  (expression_statement) [Node Set(M0)]  07
+  08  └‣─  (expression_statement) [Node RecordSet(M0)]  07
+  10  ─‣─  (expression_statement) [Node RecordSet(M0)]  07
   12  └‣─  (debugger_statement) [SuppressEnd]  33
   14  ─‣─  (debugger_statement) [SuppressEnd]  33
   16                                        ▶
@@ -77,7 +77,7 @@ Q:
   40   !   (program)                        38, 08
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@40)                            40 : 03
        ▶   (@40)
 
@@ -139,12 +139,12 @@ Q:
        ●   debugger_statement
   33       _                                10
        ●   statement_block
-  10       (expression_statement) [Node Set(M0)]  07
+  10       (expression_statement) [Node RecordSet(M0)]  07
        ●   expression_statement
   07       _                                06
        ●   program
   06   ◀   (@40)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

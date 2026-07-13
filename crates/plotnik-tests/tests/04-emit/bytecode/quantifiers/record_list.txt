@@ -12,20 +12,20 @@ Q = 22
 Q:
   01                                        ▶
   02   !   (array)                          18
-  03  ─‣┘  _ [ArrayClose Set(items)]        01
-  05  -ε-  [ArrayClose Set(items)]          01
-  07  -ε-  [StructClose Push]               12, 03
-  08  ─‣─  (number) [Node Set(b)]           07
-  09   !   (identifier) [StructOpen Node Set(a)]  08
+  03  ─‣┘  _ [ListClose RecordSet(items)]   01
+  05  -ε-  [ListClose RecordSet(items)]     01
+  07  -ε-  [RecordClose ArrayPush]          12, 03
+  08  ─‣─  (number) [Node RecordSet(b)]     07
+  09   !   (identifier) [RecordOpen Node RecordSet(a)]  08
   12  ──!  _                                09, 12
   13  └─!  _                                09, 12
-  18  -ε-  [ArrayOpen]                      13, 05
+  18  -ε-  [ListOpen]                       13, 05
 
 Q (entrypoint):
   19                                        ▶
-  20  -ε-  [StructClose]                    19
+  20  -ε-  [RecordClose]                    19
   21       (Q)                              02 : 20
-  22  -ε-  [StructOpen]                     21
+  22  -ε-  [RecordOpen]                     21
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -58,18 +58,18 @@ Q = 00 :: T3
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08  -ε-  [ArrayClose Set(M2)]             06
-  10  -ε-  [StructClose Push]               16, 22
-  12  ─‣─  (number) [Node Set(M1)]          10
-  14   !   (identifier) [StructOpen Node Set(M0)]  12
+  08  -ε-  [ListClose RecordSet(M2)]        06
+  10  -ε-  [RecordClose ArrayPush]          16, 22
+  12  ─‣─  (number) [Node RecordSet(M1)]    10
+  14   !   (identifier) [RecordOpen Node RecordSet(M0)]  12
   16  ──!  _                                14, 16
   18  └─!  _                                14, 16
-  20  -ε-  [ArrayOpen]                      18, 08
-  22  ─‣┘  _ [ArrayClose Set(M2)]           06
+  20  -ε-  [ListOpen]                       18, 08
+  22  ─‣┘  _ [ListClose RecordSet(M2)]      06
   24   !   (array)                          20

@@ -146,15 +146,15 @@ open and close effects obey suppression, so `matches` records no scalar trace.
 ```rust
 pub enum RuntimeEffect<'t> {
     Node(tree_sitter::Node<'t>),
-    ArrayOpen,
-    Push,
-    ArrayClose,
-    StructOpen,
-    Set(u16),
-    StructClose,
-    EnumOpen(u16),
-    EnumClose,
-    Null,
+    ListOpen,
+    ArrayPush,
+    ListClose,
+    RecordOpen,
+    RecordSet(u16),
+    RecordClose,
+    VariantOpen(u16),
+    VariantClose,
+    Absent,
     ScalarOpen,
     ScalarMark(tree_sitter::Node<'t>),
     StrClose,
@@ -170,12 +170,12 @@ pub enum RuntimeEffect<'t> {
 | Effect                 | Action                                                   |
 | ---------------------- | -------------------------------------------------------- |
 | Node                   | Produce the current cursor node                          |
-| Null                   | Produce a null value                                     |
-| ArrayOpen/ArrayClose   | Build an array value                                     |
-| Push                   | Append the pending value to array                        |
-| StructOpen/StructClose | Build a struct value                                     |
-| Set(idx)               | Assign pending value to member idx                       |
-| EnumOpen/EnumClose     | Build an enum variant                                    |
+| Absent                 | Produce an absent value                                  |
+| ListOpen/ListClose     | Build a list value                                       |
+| ArrayPush              | Append the pending value to the list's backing array     |
+| RecordOpen/RecordClose | Build a record value                                     |
+| RecordSet(idx)         | Assign the pending value to a record member              |
+| VariantOpen/Close      | Build a variant value                                    |
 | ScalarOpen             | Begin one value-local source-provenance frame            |
 | ScalarMark             | Add the current explicit node match to every open scalar |
 | StrClose               | Close a scalar and produce its source slice or `null`    |
@@ -203,22 +203,22 @@ Every entrypoint targets a wrapper compiled for that definition's result shape.
 Wrappers call the definition body and add only the effects needed to expose the
 entrypoint value:
 
-- Struct result: `StructOpen`, call body, `StructClose`, return.
+- Record result: `RecordOpen`, call body, `RecordClose`, return.
 - Node result: call body, `Node`, return.
-- Optional/array/enum/scalar result: call body, return; the body already
+- Option/list/variant/scalar result: call body, return; the body already
   produces the pending value.
 - Void result: call body, return; materialization falls back to `null`.
 
 ## Materialization
 
 The materializer is a stack machine over the committed effect stream. Producers
-(`Node`, `Null`, and close effects) place a value in a `pending` register.
-Consumers (`Set`, `Push`) take that pending value and attach it to the current
+(`Node`, `Absent`, and close effects) place a value in a `pending` register.
+Consumers (`RecordSet`, `ArrayPush`) take that pending value and attach it to the current
 builder frame. Open effects push builder frames; close effects pop them and
 produce the completed value.
 
-Scalar frames are part of the same balanced frame algebra as arrays, structs,
-and enums. `ScalarOpen` pushes a frame, `ScalarMark` expands its hull, and
+Scalar frames are part of the same balanced frame algebra as lists, records,
+and variants. `ScalarOpen` pushes a frame, `ScalarMark` expands its hull, and
 exactly one of `StrClose` or `BoolClose` closes it. Source text is sliced once
 from the validated source and remains borrowed; booleans are stored directly.
 The bytecode loader rejects mis-nested scalar effects before execution.

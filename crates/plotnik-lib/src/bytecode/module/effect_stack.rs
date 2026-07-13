@@ -2,8 +2,8 @@
 //!
 //! The runtime `ValueMaterializer` is a stack machine over the flat effect
 //! sequence of the winning path. Five of its operations panic on an ill-shaped
-//! builder stack — `Push`/`ArrayClose` want an `Array` on top, `Set` a `Struct` or
-//! `Variant`, `StructClose` a `Struct`, `VariantClose` a `Variant`
+//! builder stack — `ArrayPush`/`ListClose` want a `List` on top, `RecordSet` a
+//! `Record` or `Variant`, `RecordClose` a `Record`, `VariantClose` a `Variant`
 //! (`crates/plotnik-lib/src/vm/engine/materializer.rs`) — plus `VariantClose`
 //! panics when a payload arrives both as the pending value and as direct
 //! fields, the end-of-log assert panics on unclosed frames, and the VM's
@@ -69,8 +69,8 @@
 //! builder stack (it closes every frame it opens) and reads at most the caller's
 //! top frame before pushing one of its own. So a body's whole interprocedural
 //! effect collapses to a small summary — the set of caller-top kinds it
-//! tolerates (`entry_tos`), whether it may `Set` into the caller's top frame
-//! (`sets_caller_top`), and the pending state it returns — plus the verified
+//! tolerates (`entry_tos`), whether it may `RecordSet` into the caller's top frame
+//! (`record_sets_caller_top`), and the pending state it returns — plus the verified
 //! facts that it is net-neutral and suppression-balanced. Calls apply that
 //! summary instead of inlining, which both terminates and stays sound. The
 //! summaries are computed by a monotone fixpoint (a callee that reads its
@@ -78,7 +78,7 @@
 //! callers), then a final pass checks every call site and every entrypoint
 //! wrapper against the stabilized summaries.
 //!
-//! `sets_caller_top` exists because a below-entry `Set` mutates state the
+//! `record_sets_caller_top` exists because a below-entry `RecordSet` mutates state the
 //! caller's walk otherwise cannot see: setting a field on the caller's *variant*
 //! frame flips the data the frame will carry at its `VariantClose`. A call site
 //! whose local top is a variant therefore forks the state — one path assumes
@@ -118,8 +118,8 @@ use crate::bytecode::{Effect, EffectKind, FrameAction, TypeDefKind, TypeKind, Va
 /// scalar, but compiled effects only push these three frame kinds.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum FrameKind {
-    Array,
-    Struct,
+    List,
+    Record,
     Variant { member: u16, got_data: bool },
     Scalar,
 }
@@ -127,8 +127,8 @@ enum FrameKind {
 impl FrameKind {
     fn bit(self) -> u8 {
         match self {
-            FrameKind::Array => KS_ARRAY,
-            FrameKind::Struct => KS_STRUCT,
+            FrameKind::List => KS_LIST,
+            FrameKind::Record => KS_RECORD,
             FrameKind::Variant { .. } => KS_VARIANT,
             FrameKind::Scalar => KS_SCALAR,
         }
@@ -163,14 +163,14 @@ impl PendingState {
 }
 
 // `entry_tos` is a set of tolerated caller-top kinds, a 3-bit mask.
-const KS_ARRAY: u8 = 0b001;
-const KS_STRUCT: u8 = 0b010;
+const KS_LIST: u8 = 0b001;
+const KS_RECORD: u8 = 0b010;
 const KS_VARIANT: u8 = 0b100;
 const KS_SCALAR: u8 = 0b1000;
 /// No constraint (every kind tolerated): the body never reads its caller's top.
-const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_VARIANT | KS_SCALAR;
-/// `Set` targets — a `Struct` or a `Variant` frame.
-const KS_SET: u8 = KS_STRUCT | KS_VARIANT;
+const KS_ANY: u8 = KS_LIST | KS_RECORD | KS_VARIANT | KS_SCALAR;
+/// `RecordSet` targets — a `Record` or a `Variant` frame.
+const KS_RECORD_SET_TARGET: u8 = KS_RECORD | KS_VARIANT;
 
 /// Hard cap on abstract states explored per body walk. Valid output is bounded
 /// by the pre-dedup instruction count (`u16` step space); pathological compiler
@@ -202,10 +202,10 @@ fn record_body_analysis() {
 struct DefSummary {
     entry_tos: u8,
     returns_pending: Option<bool>,
-    /// Some path in the body `Set`s the caller's top frame (directly or via a
+    /// Some path in the body applies `RecordSet` to the caller's top frame (directly or via a
     /// transitive callee). Call sites must account for the write both having
     /// and not having happened.
-    sets_caller_top: bool,
+    record_sets_caller_top: bool,
 }
 
 impl DefSummary {
@@ -213,7 +213,7 @@ impl DefSummary {
         Self {
             entry_tos: KS_ANY,
             returns_pending: None,
-            sets_caller_top: false,
+            record_sets_caller_top: false,
         }
     }
 
@@ -228,7 +228,7 @@ impl DefSummary {
         Some(Self {
             entry_tos: self.entry_tos & next.entry_tos,
             returns_pending,
-            sets_caller_top: self.sets_caller_top | next.sets_caller_top,
+            record_sets_caller_top: self.record_sets_caller_top | next.record_sets_caller_top,
         })
     }
 }
@@ -264,7 +264,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     let mut call_edges = HashSet::new();
 
     // Monotone fixpoint: `entry_tos` only ever shrinks (intersection),
-    // `sets_caller_top` only flips on, `returns_pending` only becomes known,
+    // `record_sets_caller_top` only flips on, `returns_pending` only becomes known,
     // and the definition/called sets only grow. FIFO scheduling coalesces a
     // batch of callee changes before a wide caller is revisited.
     while let Some(entry) = queue.pop_front() {
@@ -294,7 +294,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
         let analysis_summary = DefSummary {
             entry_tos: analysis.entry_tos,
             returns_pending: analysis.returns_pending,
-            sets_caller_top: analysis.sets_caller_top,
+            record_sets_caller_top: analysis.record_sets_caller_top,
         };
         let old = summaries[&entry];
         let Some(next) = old.refine(analysis_summary) else {
@@ -354,8 +354,8 @@ struct Analysis {
     entry_tos: u8,
     /// Whether every exit from this body leaves a pending value.
     returns_pending: Option<bool>,
-    /// Whether some path `Set`s into the caller's top frame.
-    sets_caller_top: bool,
+    /// Whether some path applies `RecordSet` to the caller's top frame.
+    record_sets_caller_top: bool,
     /// Call targets reached — definitions to summarize.
     discovered: Vec<u16>,
 }
@@ -432,7 +432,7 @@ fn analyze(
 
     let mut entry_tos = KS_ANY;
     let mut returns_pending = None;
-    let mut sets_caller_top = false;
+    let mut record_sets_caller_top = false;
     let mut discovered = Vec::new();
     let mut discovered_set = HashSet::new();
 
@@ -455,8 +455,8 @@ fn analyze(
             if let Instruction::Match(m) = &instruction {
                 for eff in m.effects() {
                     match eff.kind {
-                        EffectKind::ArrayOpen
-                        | EffectKind::StructOpen
+                        EffectKind::ListOpen
+                        | EffectKind::RecordOpen
                         | EffectKind::VariantOpen
                         | EffectKind::ScalarOpen => {
                             frame_openers += 1;
@@ -530,7 +530,7 @@ fn analyze(
                     // The callee's reads and writes land on *our* caller's top
                     // frame: inherit the constraint and the write flag.
                     entry_tos &= summary.entry_tos;
-                    sets_caller_top |= summary.sets_caller_top;
+                    record_sets_caller_top |= summary.record_sets_caller_top;
                 }
                 Some(_) => {}
             }
@@ -539,7 +539,7 @@ fn analyze(
                 .returns_pending
                 .map(PendingState::from_bool)
                 .unwrap_or(PendingState::Unknown);
-            if summary.sets_caller_top
+            if summary.record_sets_caller_top
                 && let Some(FrameKind::Variant {
                     got_data: false, ..
                 }) = stack.last()
@@ -584,7 +584,7 @@ fn analyze(
                             span_stack: &mut span_stack,
                             pending: &mut pending,
                             entry_tos: &mut entry_tos,
-                            sets_caller_top: &mut sets_caller_top,
+                            record_sets_caller_top: &mut record_sets_caller_top,
                         },
                         step,
                     )?;
@@ -626,7 +626,7 @@ fn analyze(
     Ok(Analysis {
         entry_tos,
         returns_pending,
-        sets_caller_top,
+        record_sets_caller_top,
         discovered,
     })
 }
@@ -728,7 +728,7 @@ fn apply_effect(
 
     let err = || ModuleError::EffectStackImbalance(step);
     match effect.kind {
-        Node | Null | NodeStr | NodeBool | BoolValue => {
+        Node | Absent | NodeStr | NodeBool | BoolValue => {
             if *state.pending == PendingState::Full {
                 return Err(err());
             }
@@ -741,33 +741,33 @@ fn apply_effect(
         SpanStartAt | SpanStart => state.span_stack.push(effect.payload as u16),
         SpanEnd => close_span(state.span_stack, effect.payload as u16, step)?,
         ScalarMark => {}
-        Push => {
+        ArrayPush => {
             if *state.pending == PendingState::Empty {
                 return Err(err());
             }
             match state.stack.last() {
-                Some(FrameKind::Array) => {}
+                Some(FrameKind::List) => {}
                 Some(_) => return Err(err()),
-                None => *state.entry_tos &= KS_ARRAY,
+                None => *state.entry_tos &= KS_LIST,
             }
             *state.pending = PendingState::Empty;
         }
-        Set => {
+        RecordSet => {
             if *state.pending == PendingState::Empty {
                 return Err(err());
             }
             match state.stack.last_mut() {
-                Some(FrameKind::Struct) => {}
+                Some(FrameKind::Record) => {}
                 Some(FrameKind::Variant { got_data, .. }) => *got_data = true,
-                Some(FrameKind::Array | FrameKind::Scalar) => return Err(err()),
+                Some(FrameKind::List | FrameKind::Scalar) => return Err(err()),
                 None => {
-                    *state.entry_tos &= KS_SET;
-                    *state.sets_caller_top = true;
+                    *state.entry_tos &= KS_RECORD_SET_TARGET;
+                    *state.record_sets_caller_top = true;
                 }
             }
             *state.pending = PendingState::Empty;
         }
-        ArrayOpen | ArrayClose | StructOpen | StructClose | VariantOpen | VariantClose
+        ListOpen | ListClose | RecordOpen | RecordClose | VariantOpen | VariantClose
         | ScalarOpen | StrClose | BoolClose => {
             unreachable!("frame effects return before data dispatch")
         }
@@ -792,8 +792,8 @@ fn apply_frame_action(
                 return Err(err());
             }
             let frame = match kind {
-                ValueFrameKind::Array => FrameKind::Array,
-                ValueFrameKind::Struct => FrameKind::Struct,
+                ValueFrameKind::List => FrameKind::List,
+                ValueFrameKind::Record => FrameKind::Record,
                 ValueFrameKind::Variant => FrameKind::Variant {
                     member: effect.payload as u16,
                     got_data: false,
@@ -819,8 +819,8 @@ fn apply_frame_action(
         },
         FrameAction::Close(kind) => {
             let expected = match kind {
-                ValueFrameKind::Array => FrameKind::Array,
-                ValueFrameKind::Struct => FrameKind::Struct,
+                ValueFrameKind::List => FrameKind::List,
+                ValueFrameKind::Record => FrameKind::Record,
                 ValueFrameKind::Scalar => FrameKind::Scalar,
                 ValueFrameKind::Variant => unreachable!("variant close handled above"),
             };
@@ -839,7 +839,7 @@ struct EffectState<'a> {
     span_stack: &'a mut Vec<u16>,
     pending: &'a mut PendingState,
     entry_tos: &'a mut u8,
-    sets_caller_top: &'a mut bool,
+    record_sets_caller_top: &'a mut bool,
 }
 
 /// A `SpanEnd` must close the innermost open span, with the id the matching

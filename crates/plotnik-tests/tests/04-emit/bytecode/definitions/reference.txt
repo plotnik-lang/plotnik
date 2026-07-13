@@ -8,26 +8,26 @@ Q     = 18
 [transitions]
 Inner:
   01                                        ▶
-  02   !   (identifier) [Node Set(name)]    01
+  02   !   (identifier) [Node RecordSet(name)]  01
 
 Q:
   04                                        ▶
-  05   !   (expression_statement) [StructOpen]  09
-  06  ─‣┘  _ [Set(item)]                    04
-  08  -ε-  [StructClose]                    06
+  05   !   (expression_statement) [RecordOpen]  09
+  06  ─‣┘  _ [RecordSet(item)]              04
+  08  -ε-  [RecordClose]                    06
   09  └‣─  (Inner)                          02 : 08
 
 Inner (entrypoint):
   11                                        ▶
-  12  -ε-  [StructClose]                    11
+  12  -ε-  [RecordClose]                    11
   13       (Inner)                          02 : 12
-  14  -ε-  [StructOpen]                     13
+  14  -ε-  [RecordOpen]                     13
 
 Q (entrypoint):
   15                                        ▶
-  16  -ε-  [StructClose]                    15
+  16  -ε-  [RecordClose]                    15
   17       (Q)                              05 : 16
-  18  -ε-  [StructOpen]                     17
+  18  -ε-  [RecordOpen]                     17
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -57,20 +57,20 @@ Q     = 06 :: T2
 
 [transitions]
 Inner:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@17)                            17 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@21)                            21 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
-  12  -ε-  [StructClose]                    14
-  14  ─‣┘  _ [Set(M1)]                      19
+  12  -ε-  [RecordClose]                    14
+  14  ─‣┘  _ [RecordSet(M1)]                19
   16                                        ▶
-  17   !   (identifier) [Node Set(M0)]      16
+  17   !   (identifier) [Node RecordSet(M0)]  16
   19                                        ▶
   20  └‣─  (@17)                            17 : 12
-  21   !   (expression_statement) [StructOpen]  20
+  21   !   (expression_statement) [RecordOpen]  20

@@ -11,15 +11,15 @@ pub const EFFECT_PAYLOAD_MAX: usize = (1 << EFFECT_PAYLOAD_BITS) - 1;
 #[repr(u8)]
 pub enum EffectKind {
     Node = 0,
-    ArrayOpen = 1,
-    Push = 2,
-    ArrayClose = 3,
-    StructOpen = 4,
-    Set = 5,
-    StructClose = 6,
+    ListOpen = 1,
+    ArrayPush = 2,
+    ListClose = 3,
+    RecordOpen = 4,
+    RecordSet = 5,
+    RecordClose = 6,
     VariantOpen = 7,
     VariantClose = 8,
-    Null = 9,
+    Absent = 9,
     SuppressBegin = 10,
     SuppressEnd = 11,
     /// Open an inspection span and snapshot the current cursor node.
@@ -53,8 +53,8 @@ pub enum EffectSuppression {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ValueFrameKind {
-    Array,
-    Struct,
+    List,
+    Record,
     Variant,
     Scalar,
 }
@@ -75,15 +75,15 @@ impl EffectKind {
     pub(crate) fn try_from_u8(v: u8) -> Option<Self> {
         let op = match v {
             0 => Self::Node,
-            1 => Self::ArrayOpen,
-            2 => Self::Push,
-            3 => Self::ArrayClose,
-            4 => Self::StructOpen,
-            5 => Self::Set,
-            6 => Self::StructClose,
+            1 => Self::ListOpen,
+            2 => Self::ArrayPush,
+            3 => Self::ListClose,
+            4 => Self::RecordOpen,
+            5 => Self::RecordSet,
+            6 => Self::RecordClose,
             7 => Self::VariantOpen,
             8 => Self::VariantClose,
-            9 => Self::Null,
+            9 => Self::Absent,
             10 => Self::SuppressBegin,
             11 => Self::SuppressEnd,
             12 => Self::SpanStartAt,
@@ -124,10 +124,10 @@ impl EffectKind {
 
     pub fn frame_action(self) -> Option<FrameAction> {
         let action = match self {
-            Self::ArrayOpen => FrameAction::Open(ValueFrameKind::Array),
-            Self::ArrayClose => FrameAction::Close(ValueFrameKind::Array),
-            Self::StructOpen => FrameAction::Open(ValueFrameKind::Struct),
-            Self::StructClose => FrameAction::Close(ValueFrameKind::Struct),
+            Self::ListOpen => FrameAction::Open(ValueFrameKind::List),
+            Self::ListClose => FrameAction::Close(ValueFrameKind::List),
+            Self::RecordOpen => FrameAction::Open(ValueFrameKind::Record),
+            Self::RecordClose => FrameAction::Close(ValueFrameKind::Record),
             Self::VariantOpen => FrameAction::Open(ValueFrameKind::Variant),
             Self::VariantClose => FrameAction::Close(ValueFrameKind::Variant),
             Self::ScalarOpen => FrameAction::Open(ValueFrameKind::Scalar),
@@ -141,7 +141,7 @@ impl EffectKind {
     /// effects decoded at the trust boundary pass through this one contract.
     pub fn accepts_payload(self, payload: usize, member_count: usize, span_count: usize) -> bool {
         match self {
-            Self::Set | Self::VariantOpen => payload < member_count,
+            Self::RecordSet | Self::VariantOpen => payload < member_count,
             Self::SpanStartAt | Self::SpanStart | Self::SpanEnd => payload < span_count,
             Self::BoolClose | Self::BoolValue => payload <= 1,
             _ => payload == 0,

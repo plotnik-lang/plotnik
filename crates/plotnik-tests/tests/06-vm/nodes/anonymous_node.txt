@@ -42,11 +42,11 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@12)                            12 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  "+" [Node Set(M0)]               08
+  06  └‣─  "+" [Node RecordSet(M0)]         08
   08  ─‣┘³ _                                09
   09                                        ▶
   10  └‣─  (binary_expression)              06
@@ -54,7 +54,7 @@ Q:
   12   !   (program)                        11
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@12)                            12 : 03
        ▶   (@12)
 
@@ -65,7 +65,7 @@ Q:
        ●   expression_statement
   10       (binary_expression)              06
        ●   binary_expression
-  06       "+" [Node Set(M0)]               08
+  06       "+" [Node RecordSet(M0)]         08
        ○   identifier
        ●   +
   08       _                                09
@@ -73,5 +73,5 @@ Q:
   09   ◀   (@12)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

@@ -18,26 +18,26 @@ Ident      = 18
 [transitions]
 Ident:
   01                                        ▶
-  02   !   (identifier) [Node Set(name)]    01
+  02   !   (identifier) [Node RecordSet(name)]  01
 
 Expression:
   03  -ε-                                   05, 06
   04                                        ▶
-  05   !   (number) [VariantOpen(Literal) Node Set(value) VariantClose]  04
-  06   !   (identifier) [VariantOpen(Variable) Node Set(name) VariantClose]  04
+  05   !   (number) [VariantOpen(Literal) Node RecordSet(value) VariantClose]  04
+  06   !   (identifier) [VariantOpen(Variable) Node RecordSet(name) VariantClose]  04
 
 Assignment:
   09                                        ▶
   10   !   (assignment_expression)          14
-  11  ─‣┘  _ [Set(value)]                   09
+  11  ─‣┘  _ [RecordSet(value)]             09
   13  ─‣─  right: (Expression)              03 : 11
-  14  └‣─  left: (identifier) [Node Set(target)]  13
+  14  └‣─  left: (identifier) [Node RecordSet(target)]  13
 
 Ident (entrypoint):
   15                                        ▶
-  16  -ε-  [StructClose]                    15
+  16  -ε-  [RecordClose]                    15
   17       (Ident)                          02 : 16
-  18  -ε-  [StructOpen]                     17
+  18  -ε-  [RecordOpen]                     17
 
 Expression (entrypoint):
   19                                        ▶
@@ -45,9 +45,9 @@ Expression (entrypoint):
 
 Assignment (entrypoint):
   21                                        ▶
-  22  -ε-  [StructClose]                    21
+  22  -ε-  [RecordClose]                    21
   23       (Assignment)                     10 : 22
-  24  -ε-  [StructOpen]                     23
+  24  -ε-  [RecordOpen]                     23
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -94,9 +94,9 @@ Ident      = 00 :: T1
 
 [transitions]
 Ident:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@19)                            19 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Expression:
@@ -104,20 +104,20 @@ Expression:
   07                                        ▶
 
 Assignment:
-  08  -ε-  [StructOpen]                     10
+  08  -ε-  [RecordOpen]                     10
   10       (@34)                            34 : 11
-  11  -ε-  [StructClose]                    13
+  11  -ε-  [RecordClose]                    13
   13                                        ▶
   14  ─‣─  right: (@30)                     30 : 16
   15  ...
-  16  ─‣┘  _ [Set(M5)]                      22
+  16  ─‣┘  _ [RecordSet(M5)]                22
   18                                        ▶
-  19   !   (identifier) [Node Set(M0)]      18
+  19   !   (identifier) [Node RecordSet(M0)]  18
   21                                        ▶
   22                                        ▶
   23  ...
-  24   !   (number) [VariantOpen(M3) Node Set(M1) VariantClose]  21
-  27   !   (identifier) [VariantOpen(M4) Node Set(M2) VariantClose]  21
+  24   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose]  21
+  27   !   (identifier) [VariantOpen(M4) Node RecordSet(M2) VariantClose]  21
   30  -ε-                                   24, 27
-  32  └‣─  left: (identifier) [Node Set(M6)]  14
+  32  └‣─  left: (identifier) [Node RecordSet(M6)]  14
   34   !   (assignment_expression)          32

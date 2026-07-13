@@ -98,7 +98,7 @@ impl NfaBuilder<'_> {
     /// the order is irrelevant until packing.
     ///
     /// A captured/tagged alternation does not exit straight into the follower:
-    /// capture lowering interposes effect epsilons (`Set`, scope closes) between
+    /// capture lowering interposes effect epsilons (`RecordSet`, scope closes) between
     /// alternation exit and follower (#472). The walk below sees through that
     /// chain and clones it along with the follower, so each alternative runs the
     /// chain's effects exactly once — via the named twin or the conservative
@@ -461,14 +461,14 @@ impl NfaBuilder<'_> {
                 let member_ref = self
                     .lookup_member_in_scope(name)
                     .expect("alternation field must resolve in enclosing scope");
-                let set = EffectIR::with_member(EffectKind::Set, member_ref);
+                let set = EffectIR::with_member(EffectKind::RecordSet, member_ref);
                 match completion {
                     FieldCompletion::AlwaysPresent => {
                         unreachable!("an always-present field cannot be absent from an alternative")
                     }
-                    FieldCompletion::Absent => vec![EffectIR::null(), set],
+                    FieldCompletion::Absent => vec![EffectIR::absent(), set],
                     FieldCompletion::EmptyList => {
-                        vec![EffectIR::start_arr(), EffectIR::end_arr(), set]
+                        vec![EffectIR::list_open(), EffectIR::list_close(), set]
                     }
                     FieldCompletion::False => {
                         vec![EffectIR::bool_value(false), set]

@@ -50,34 +50,34 @@ Q = 06 :: T2
 
 [transitions]
 E:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@24)                            24 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
-  12  └‣─  (number) [Node Set(M0)]          14
+  12  └‣─  (number) [Node RecordSet(M0)]    14
   14  ─‣┘  _                                15
   15                                        ▶
-  16  -ε-  [StructClose]                    18
-  18  ─‣┘  _ [Set(M1)]                      21
+  16  -ε-  [RecordClose]                    18
+  18  ─‣┘  _ [RecordSet(M1)]                21
   20   !   (expression_statement)           12
   21                                        ▶
   22  └‣─  (@20)                            20 : 16
   23  ...
-  24   !   (program) [StructOpen]           22
+  24   !   (program) [RecordOpen]           22
 --------------------- TRACE ----------------------
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@24)                            24 : 09
        ▶   (@24)
 
 @24:
-  24       (program) [StructOpen]           22
+  24       (program) [RecordOpen]           22
        ●   program
   22       (@20)                            20 : 16
        ▶   (@20)
@@ -85,7 +85,7 @@ Q:
 @20:
   20       (expression_statement)           12
        ●   expression_statement
-  12       (number) [Node Set(M0)]          14
+  12       (number) [Node RecordSet(M0)]    14
        ○   identifier
        ○   ;
   22  ❮❮❮ 
@@ -94,18 +94,18 @@ Q:
 @20:
   20       (expression_statement)           12
        ●   expression_statement
-  12       (number) [Node Set(M0)]          14
+  12       (number) [Node RecordSet(M0)]    14
        ●   number
   14       _                                15
        ●   expression_statement
   15   ◀   (@20)                            
 
 @24:
-  16  -ε-  [StructClose]                    18
-  18       _ [Set(M1)]                      21
+  16  -ε-  [RecordClose]                    18
+  18       _ [RecordSet(M1)]                21
        ●   program
   21   ◀   (@24)                            
 
 Q:
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11   ◀   (Q)                              ◼

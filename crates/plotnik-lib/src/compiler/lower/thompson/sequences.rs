@@ -161,7 +161,7 @@ impl NfaBuilder<'_> {
         // That merge is unsound when the boundary item is skippable: its skip path drops
         // the merged effect, unbalancing the path (e.g. VariantClose without VariantOpen). So a
         // skippable boundary's *scope* effects move to a dominating epsilon every path
-        // crosses. Value effects (Node/Set/…) stay on the matched item — they need its
+        // crosses. Value effects (`Node`/`RecordSet`/…) stay on the matched item — they need its
         // cursor position and its skip-path null injection — so only scope effects move.
         let last_is_skippable = nav_modes
             .last()
@@ -285,7 +285,7 @@ impl NfaBuilder<'_> {
         // prefix (`post_keep`) instead rides the sequence's last matched item — it needs
         // that item's cursor position and skip null injection, so an epsilon would capture
         // the wrong node or miss null on the skip path. Split positionally so a
-        // close and its consumer (e.g. `[EndEnum, Push]`) stay together and in order.
+        // close and its consumer (e.g. `[VariantClose, ArrayPush]`) stay together and in order.
         let tail_effects = split_sequence_tail_effects(capture.post);
         let exit_post = tail_effects.exit_post;
         let exit = self.emit_effects_if_nonempty(exit, exit_post.clone());

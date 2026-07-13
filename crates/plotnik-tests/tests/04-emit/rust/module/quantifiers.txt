@@ -70,26 +70,26 @@ impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
 
 /// Replay one committed `Q` value.
 fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'t> {
-    t.expect_struct_open();
+    t.expect_record_open();
     let mut v0 = None; // funcs
-    while !t.at_struct_close() {
-        match t.peek_set() {
+    while !t.at_record_close() {
+        match t.peek_record_set() {
             // funcs
             1 => v0 = Some({
-                t.expect_array_open();
+                t.expect_list_open();
                 let mut items0 = ::std::vec::Vec::new();
-                while !t.at_array_close() {
+                while !t.at_list_close() {
                     items0.push(read_q_funcs(t));
-                    t.expect_push();
+                    t.expect_array_push();
                 }
-                t.expect_array_close();
+                t.expect_list_close();
                 items0
             }),
             other => unreachable!("trace shape proven at emit: `Q` has no member index {other}"),
         }
-        t.expect_set();
+        t.expect_record_set();
     }
-    t.expect_struct_close();
+    t.expect_record_close();
     Q {
         funcs: v0.expect("field-stability: every accepting path sets `funcs`"),
     }
@@ -97,17 +97,17 @@ fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'t> {
 
 /// Replay one committed `QFuncs` value.
 fn read_q_funcs<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> QFuncs<'t> {
-    t.expect_struct_open();
+    t.expect_record_open();
     let mut v0 = None; // name
-    while !t.at_struct_close() {
-        match t.peek_set() {
+    while !t.at_record_close() {
+        match t.peek_record_set() {
             // name
             0 => v0 = Some(t.expect_node()),
             other => unreachable!("trace shape proven at emit: `QFuncs` has no member index {other}"),
         }
-        t.expect_set();
+        t.expect_record_set();
     }
-    t.expect_struct_close();
+    t.expect_record_close();
     QFuncs {
         name: v0.expect("field-stability: every accepting path sets `name`"),
     }
@@ -336,34 +336,34 @@ mod matcher {
                 }
                 Flow::Jump(S19_Q)
             }
-            //   03  ─‣┘  _ [ArrayClose Set(funcs)]        01
+            //   03  ─‣┘  _ [ListClose RecordSet(funcs)]   01
             S03_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(1)).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::RuntimeEffect::ArrayClose);
-                eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(funcs)
+                eng.emit_data(|_| rt::RuntimeEffect::ListClose);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(1)); // RecordSet(funcs)
                 Flow::Jump(S01_Q)
             }
-            //   05  -ε-  [ArrayClose Set(funcs)]          01
+            //   05  -ε-  [ListClose RecordSet(funcs)]     01
             S05_Q => {
-                eng.emit_data(|_| rt::RuntimeEffect::ArrayClose);
-                eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(funcs)
+                eng.emit_data(|_| rt::RuntimeEffect::ListClose);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(1)); // RecordSet(funcs)
                 Flow::Jump(S01_Q)
             }
-            //   07  -ε-  [StructClose Push]               13, 03
+            //   07  -ε-  [RecordClose ArrayPush]          13, 03
             S07_Q => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
-                eng.emit_data(|_| rt::RuntimeEffect::Push);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordClose);
+                eng.emit_data(|_| rt::RuntimeEffect::ArrayPush);
                 eng.push_branches(&[S03_Q]);
                 Flow::Jump(S13_Q)
             }
-            //   08   !   (function_declaration) [StructOpen]  10
+            //   08   !   (function_declaration) [RecordOpen]  10
             S08_Q => 'state: {
                 if !cand_s08_q(eng) {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordOpen);
                 Flow::Jump(S10_Q)
             }
             //   09  ─‣┘  _                                07
@@ -373,7 +373,7 @@ mod matcher {
                 }
                 Flow::Jump(S07_Q)
             }
-            //   10  └‣─  name: (identifier) [Node Set(name)]  09
+            //   10  └‣─  name: (identifier) [Node RecordSet(name)]  09
             S10_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
@@ -407,9 +407,9 @@ mod matcher {
                 eng.push_branches(&[S13_Q]);
                 Flow::Jump(S08_Q)
             }
-            //   19  -ε-  [ArrayOpen]                      14, 05
+            //   19  -ε-  [ListOpen]                       14, 05
             S19_Q => {
-                eng.emit_data(|_| rt::RuntimeEffect::ArrayOpen);
+                eng.emit_data(|_| rt::RuntimeEffect::ListOpen);
                 eng.push_branches(&[S05_Q]);
                 Flow::Jump(S14_Q)
             }
@@ -422,9 +422,9 @@ mod matcher {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   21  -ε-  [StructClose]                    20
+            //   21  -ε-  [RecordClose]                    20
             S21_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordClose);
                 Flow::Jump(S20_Q_EP)
             }
             //   22       (Q)                              02 : 21
@@ -432,9 +432,9 @@ mod matcher {
                 eng.enter_frame(S21_Q_EP);
                 Flow::Jump(S02_Q)
             }
-            //   23  -ε-  [StructOpen]                     22
+            //   23  -ε-  [RecordOpen]                     22
             S23_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordOpen);
                 Flow::Jump(S22_Q_EP)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
@@ -484,7 +484,7 @@ mod matcher {
     #[inline]
     fn finish_s10_q(eng: &mut rt::Engine<'_>) -> Flow {
         eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
-        eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(name)
+        eng.emit_data(|_| rt::RuntimeEffect::RecordSet(0)); // RecordSet(name)
         Flow::Jump(S09_Q)
     }
 

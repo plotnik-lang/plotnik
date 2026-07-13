@@ -8,7 +8,7 @@ Q     = 15
 [transitions]
 Inner:
   01                                        ▶
-  02   !   (identifier) [Node Set(name)]    01
+  02   !   (identifier) [Node RecordSet(name)]  01
 
 Q:
   04                                        ▶
@@ -18,9 +18,9 @@ Q:
 
 Inner (entrypoint):
   10                                        ▶
-  11  -ε-  [StructClose]                    10
+  11  -ε-  [RecordClose]                    10
   12       (Inner)                          02 : 11
-  13  -ε-  [StructOpen]                     12
+  13  -ε-  [RecordOpen]                     12
 
 Q (entrypoint):
   14                                        ▶
@@ -51,9 +51,9 @@ Q     = 06 :: T0
 
 [transitions]
 Inner:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@12)                            12 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Q:
@@ -62,7 +62,7 @@ Q:
   08  └‣─  (@12)                            12 : 09
   09  ─‣┘  _ [SuppressEnd]                  14
   11                                        ▶
-  12   !   (identifier) [Node Set(M0)]      11
+  12   !   (identifier) [Node RecordSet(M0)]  11
   14                                        ▶
   15  ...
   16   !   (expression_statement) [SuppressBegin]  08

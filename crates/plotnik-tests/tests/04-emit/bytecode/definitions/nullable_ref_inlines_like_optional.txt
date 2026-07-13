@@ -13,17 +13,17 @@ Q:
   01                                        ▶
   02   !   (array)                          09, 04
   03  ─‣┘  _                                01
-  04  └‣─  (number) [Node Set(n)]           03
-  05  ─‣─  (number) [Node Set(n)]           03
+  04  └‣─  (number) [Node RecordSet(n)]     03
+  05  ─‣─  (number) [Node RecordSet(n)]     03
   06   !   (identifier)                     05
   08  ──!  _                                06, 08
   09  └─!  _                                06, 08
 
 Q (entrypoint):
   11                                        ▶
-  12  -ε-  [StructClose]                    11
+  12  -ε-  [RecordClose]                    11
   13       (Q)                              02 : 12
-  14  -ε-  [StructOpen]                     13
+  14  -ε-  [RecordOpen]                     13
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -51,14 +51,14 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  └‣─  (number) [Node Set(M0)]          07
-  10  ─‣─  (number) [Node Set(M0)]          07
+  08  └‣─  (number) [Node RecordSet(M0)]    07
+  10  ─‣─  (number) [Node RecordSet(M0)]    07
   12   !   (identifier)                     10
   13  ──!  _                                12, 13
   15  ...

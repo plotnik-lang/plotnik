@@ -212,7 +212,7 @@ fn forged_invalid_predicate_op_is_rejected() {
     );
 }
 
-/// A record-producing query that emits extended Matches carrying `Node`/`Set` effects and
+/// A record-producing query that emits extended Matches carrying `Node`/`RecordSet` effects and
 /// successors — the shapes the per-instruction forging tests below target.
 const RECORD_QUERY: &str =
     r#"Top = (binary_expression left: (identifier) @l right: (identifier) @r)"#;
@@ -578,7 +578,7 @@ fn forged_span_effect_payload_out_of_range_is_rejected() {
 
 #[test]
 fn forged_oob_member_operand_is_rejected() {
-    // A `Set`/`VariantOpen` payload indexes the type-member table via the materializer's
+    // A `RecordSet`/`VariantOpen` payload indexes the type-member table via the materializer's
     // `get_member`, which asserts the index is in bounds.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let members = Module::load_compiler_output(&bytes)
@@ -591,10 +591,10 @@ fn forged_oob_member_operand_is_rejected() {
             let e = u16::from_le_bytes([bytes[off], bytes[off + 1]]);
             matches!(
                 EffectKind::try_from_u8((e >> EFFECT_PAYLOAD_BITS) as u8),
-                Some(EffectKind::Set | EffectKind::VariantOpen)
+                Some(EffectKind::RecordSet | EffectKind::VariantOpen)
             )
         })
-        .expect("record query must emit a Set/VariantOpen effect");
+        .expect("record query must emit a RecordSet/VariantOpen effect");
     let opcode_bits =
         u16::from_le_bytes([bytes[slot], bytes[slot + 1]]) & !(EFFECT_PAYLOAD_MAX as u16);
     let forged = opcode_bits | (members & EFFECT_PAYLOAD_MAX as u16);
@@ -993,16 +993,17 @@ fn forged_entrypoint_into_instruction_interior_is_rejected() {
 }
 
 #[test]
-fn forged_effect_set_to_push_is_rejected() {
-    // Swap an executed `Set` for `Push`. A validated representation would accept it, then
-    // the materializer would panic because the builder on top is a Struct, not
-    // an Array. The effect-stack verifier rejects it at load instead.
+fn forged_record_set_to_array_push_is_rejected() {
+    // Swap an executed `RecordSet` for `ArrayPush`. A validated representation
+    // would accept it, then the materializer would panic because the builder on
+    // top is a Record, not a List. The effect-stack verifier rejects it at load.
     let mut bytes = emit_bytes(RECORD_QUERY);
-    let slot = first_effect_op(&bytes, |op| op == EffectKind::Set as u16);
-    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Push));
+    let slot = first_effect_op(&bytes, |op| op == EffectKind::RecordSet as u16);
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::ArrayPush));
     reseal(&mut bytes);
 
-    let err = Module::load_compiler_output(&bytes).expect_err("forged Set->Push must be rejected");
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("forged RecordSet->ArrayPush must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -1010,18 +1011,18 @@ fn forged_effect_set_to_push_is_rejected() {
 }
 
 #[test]
-fn forged_scalar_capture_set_to_push_is_rejected() {
-    // The minimal case: a scalar record whose only effect is a `Set` into the
-    // entrypoint wrapper's root record. Forged to `Push`, the body now demands
-    // an Array top while the wrapper hands it a Struct — caught when the entrypoint
+fn forged_scalar_capture_record_set_to_array_push_is_rejected() {
+    // The minimal case: a scalar record whose only effect is a `RecordSet` into
+    // the entrypoint wrapper's root record. Forged to `ArrayPush`, the body now
+    // demands a List top while the wrapper hands it a Record — caught when the entrypoint
     // wrapper is checked as a root.
     let mut bytes = emit_bytes(r#"Q = (identifier) @id"#);
-    let slot = first_effect_op(&bytes, |op| op == EffectKind::Set as u16);
-    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Push));
+    let slot = first_effect_op(&bytes, |op| op == EffectKind::RecordSet as u16);
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::ArrayPush));
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged scalar Set->Push must be rejected");
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("forged scalar RecordSet->ArrayPush must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -1029,16 +1030,16 @@ fn forged_scalar_capture_set_to_push_is_rejected() {
 }
 
 #[test]
-fn forged_set_without_producer_is_rejected() {
-    // Replace the producer in `[Node Set]` with a frame opener. The following
-    // `Set` has a valid Struct target, but no pending value to consume.
+fn forged_record_set_without_producer_is_rejected() {
+    // Replace the producer in `[Node RecordSet]` with a frame opener. The
+    // following `RecordSet` has a valid Record target but no pending value.
     let mut bytes = emit_bytes(r#"Q = (identifier) @id"#);
     let slot = first_effect_op(&bytes, |op| op == EffectKind::Node as u16);
-    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::StructOpen));
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::RecordOpen));
     reseal(&mut bytes);
 
-    let err =
-        Module::load_compiler_output(&bytes).expect_err("forged producerless Set must be rejected");
+    let err = Module::load_compiler_output(&bytes)
+        .expect_err("forged producerless RecordSet must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -1097,16 +1098,16 @@ fn forged_data_variant_case_without_data_is_rejected() {
 
 #[test]
 fn forged_dropped_scope_close_is_rejected() {
-    // Turn a `StructClose` into a no-op `Node`: the struct's `StructOpen` is
+    // Turn a `RecordClose` into a no-op `Node`: the struct's `RecordOpen` is
     // never closed, so the body returns with an open frame — the materializer
     // would leave the builder stack unbalanced. Rejected as a non-neutral body.
     let mut bytes = emit_bytes(RECORD_QUERY);
-    let slot = first_effect_op(&bytes, |op| op == EffectKind::StructClose as u16);
+    let slot = first_effect_op(&bytes, |op| op == EffectKind::RecordClose as u16);
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::Node));
     reseal(&mut bytes);
 
     let err = Module::load_compiler_output(&bytes)
-        .expect_err("forged dropped StructClose must be rejected");
+        .expect_err("forged dropped RecordClose must be rejected");
     assert!(
         matches!(err, ModuleError::EffectStackImbalance(_)),
         "expected EffectStackImbalance, got {err:?}"
@@ -1124,7 +1125,7 @@ fn forged_mismatched_scalar_frame_is_rejected() {
         )
     "#});
     let slot = first_effect_op(&bytes, |op| op == EffectKind::ScalarOpen as u16);
-    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::StructOpen));
+    bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::RecordOpen));
     reseal(&mut bytes);
 
     let err =
@@ -1139,7 +1140,7 @@ fn forged_suppress_underflow_is_rejected() {
     // and `.expect()` panic; the verifier rejects it at load.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let slot = first_effect_op(&bytes, |op| {
-        op == EffectKind::StructOpen as u16 || op == EffectKind::Set as u16
+        op == EffectKind::RecordOpen as u16 || op == EffectKind::RecordSet as u16
     });
     bytes[slot..slot + 2].copy_from_slice(&effect_word(EffectKind::SuppressEnd));
     reseal(&mut bytes);
@@ -1181,7 +1182,7 @@ fn forged_accept_inside_called_def_is_rejected() {
     // Zero the `next` of the Match8 that flows into the definition body's
     // `Return`, turning it into a terminal (accepting) match. A successor-less
     // match accepts the whole run from any call depth, so the wrapper's root
-    // `StructOpen` would still be open in the committed log and the
+    // `RecordOpen` would still be open in the committed log and the
     // materializer's end-of-log balance assert would panic. The body is locally
     // balanced at that point — only the rule that called bodies must not
     // contain accepts catches it.
@@ -1213,13 +1214,13 @@ fn forged_accept_inside_called_def_is_rejected() {
 
 #[test]
 fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
-    // A definition body `Set`s its capture below entry, into the frame its
+    // A definition body applies `RecordSet` to its capture below entry, into the frame its
     // wrapper opened. Retarget that write: swap the wrapper's root
-    // `StructOpen`/`StructClose` for `VariantOpen`/`VariantClose` on a void
+    // `RecordOpen`/`RecordClose` for `VariantOpen`/`VariantClose` on a void
     // (tag-only) member borrowed from the other entrypoint. The callee's
-    // below-entry `Set` then lands data on a void variant — invisible to the
+    // below-entry `RecordSet` then lands data on a void variant — invisible to the
     // wrapper's own walk, because the write happens inside the callee. Only a
-    // call site that forks on the callee's may-write (`sets_caller_top`)
+    // call site that forks on the callee's may-write (`record_sets_caller_top`)
     // rejects it; a stale `got_data` would let it load and mis-materialize.
     let mut bytes = emit_bytes(indoc! {r#"
         A = (program [T: (comment)] @e)
@@ -1242,8 +1243,8 @@ fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
 
     // Both wrappers precede the bodies and only wrappers open frames, so slot
     // order is A's pair then Z's pair; forge Z's.
-    let open_slot = nth_effect_op(&bytes, 1, |op| op == EffectKind::StructOpen as u16);
-    let close_slot = nth_effect_op(&bytes, 1, |op| op == EffectKind::StructClose as u16);
+    let open_slot = nth_effect_op(&bytes, 1, |op| op == EffectKind::RecordOpen as u16);
+    let close_slot = nth_effect_op(&bytes, 1, |op| op == EffectKind::RecordClose as u16);
     bytes[open_slot..open_slot + 2].copy_from_slice(&effect_word_with_payload(
         EffectKind::VariantOpen,
         void_member,
@@ -1261,10 +1262,10 @@ fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
 
 #[test]
 fn forged_record_wrapper_without_root_frame_is_rejected() {
-    // A record-producing entrypoint wrapper opens a root `StructOpen` before calling the
-    // body, so the body always has a Struct to `Set` into. Neutralize that
-    // `StructOpen` and its matching `StructClose` (turn both into no-op `Null`s)
-    // and lie that the result type is scalar: the entry's `Set` would then hit
+    // A record-producing entrypoint wrapper opens a root `RecordOpen` before calling the
+    // body, so the body always has a Record to apply `RecordSet` to. Neutralize
+    // `RecordOpen` and its matching `RecordClose` (turn both into no-op `Absent`s)
+    // and lie that the result type is scalar: the entry's `RecordSet` would then hit
     // the materializer's scalar root frame and panic. The wrapper has no caller,
     // so a requirement bubbling out of it must be rejected, not silently dropped.
     let mut bytes = emit_bytes(r#"Q = (_) @x"#);
@@ -1272,12 +1273,12 @@ fn forged_record_wrapper_without_root_frame_is_rejected() {
         .expect("module validates before tampering")
         .offsets()
         .entrypoints as usize;
-    let struct_open_slot = first_effect_op(&bytes, |op| op == EffectKind::StructOpen as u16);
-    let struct_close_slot = first_effect_op(&bytes, |op| op == EffectKind::StructClose as u16);
+    let record_open_slot = first_effect_op(&bytes, |op| op == EffectKind::RecordOpen as u16);
+    let record_close_slot = first_effect_op(&bytes, |op| op == EffectKind::RecordClose as u16);
 
-    let null = effect_word(EffectKind::Null);
-    bytes[struct_open_slot..struct_open_slot + 2].copy_from_slice(&null);
-    bytes[struct_close_slot..struct_close_slot + 2].copy_from_slice(&null);
+    let absent = effect_word(EffectKind::Absent);
+    bytes[record_open_slot..record_open_slot + 2].copy_from_slice(&absent);
+    bytes[record_close_slot..record_close_slot + 2].copy_from_slice(&absent);
     // Result type T1 (record) -> T0 (scalar <Node>): the root frame is now a Scalar.
     bytes[ep_off + 4..ep_off + 6].copy_from_slice(&0u16.to_le_bytes());
     reseal(&mut bytes);

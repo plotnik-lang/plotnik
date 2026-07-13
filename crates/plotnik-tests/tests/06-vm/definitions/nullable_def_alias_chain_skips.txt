@@ -47,14 +47,14 @@ Q = 00 :: T3
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  └‣─  (debugger_statement) [Node Set(M0)]  07
-  10  ─‣─  (debugger_statement) [Node Set(M0)]  07
+  08  └‣─  (debugger_statement) [Node RecordSet(M0)]  07
+  10  ─‣─  (debugger_statement) [Node RecordSet(M0)]  07
   12   !   (expression_statement)           10
   13  ──!  _                                12, 13
   15  ...
@@ -62,7 +62,7 @@ Q:
   18   !   (program)                        16, 08
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
        ▶   (@18)
 
@@ -76,12 +76,12 @@ Q:
   16  ❮❮❮ 
   13       _                                12, 13
   18  ❮❮❮ 
-  08       (debugger_statement) [Node Set(M0)]  07
+  08       (debugger_statement) [Node RecordSet(M0)]  07
        ●   debugger_statement
   07       _                                06
        ●   program
   06   ◀   (@18)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

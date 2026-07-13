@@ -6,13 +6,13 @@ Q = 6
 [transitions]
 Q:
   1                                         ▶
-  2   !   (identifier) [Node Set(id)] ^= "foo"  1
+  2   !   (identifier) [Node RecordSet(id)] ^= "foo"  1
 
 Q (entrypoint):
   3                                         ▶
-  4  -ε-  [StructClose]                     3
+  4  -ε-  [RecordClose]                     3
   5       (Q)                               2 : 4
-  6  -ε-  [StructOpen]                      5
+  6  -ε-  [RecordOpen]                      5
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -36,10 +36,10 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@08)                            08 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08   !   (identifier) [Node Set(M0)] ^= "foo"  06
+  08   !   (identifier) [Node RecordSet(M0)] ^= "foo"  06

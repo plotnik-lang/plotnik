@@ -28,7 +28,7 @@ pub enum CaptureKind {
     Ref,
     /// The inner expression itself leaves the captured value pending — a
     /// consumed labeled alternation (lowered as `VariantOpen … VariantClose`). Emit
-    /// the inner, then a trailing `Set`; the capture contributes no `Node` and no wrapper.
+    /// the inner, then a trailing `RecordSet`; the capture contributes no `Node` and no wrapper.
     PendingValue,
     /// A list collected by `*` or `+` (`Arr … ArrayPush … EndArr`).
     List,

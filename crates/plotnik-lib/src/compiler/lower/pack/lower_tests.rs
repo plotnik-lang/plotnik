@@ -8,7 +8,7 @@ use crate::compiler::lower::ir::{EffectIR, InstructionIR, Label, MatchIR};
 const MAX_NEG_FIELDS: usize = 7;
 
 fn make_effect(_idx: u16) -> EffectIR {
-    EffectIR::literal(EffectKind::Null, 0)
+    EffectIR::literal(EffectKind::Absent, 0)
 }
 
 #[test]

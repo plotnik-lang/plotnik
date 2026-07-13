@@ -60,14 +60,14 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘³ _                                06
-  08  ─◦─  (identifier) [Set(M2)]           07
-  10  ─•─  (identifier) [Set(M2)]           07
+  08  ─◦─  (identifier) [RecordSet(M2)]     07
+  10  ─•─  (identifier) [RecordSet(M2)]     07
   12   !   (number) [VariantOpen(M0) VariantClose]  10
   14   !   "+" [VariantOpen(M1) VariantClose]  08
   16  ──!  _                                12, 14, 16
@@ -77,7 +77,7 @@ Q:
   22   !   (program)                        21
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
        ▶   (@22)
 
@@ -92,7 +92,7 @@ Q:
        ●   number
   12       (number) [VariantOpen(M0) VariantClose]  10
        ●   number
-  10       (identifier) [Set(M2)]           07
+  10       (identifier) [RecordSet(M2)]     07
        ○   *
        ●   identifier
   07       _                                06
@@ -100,5 +100,5 @@ Q:
   06   ◀   (@22)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

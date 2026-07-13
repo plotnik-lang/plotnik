@@ -12,14 +12,14 @@ Q:
   1                                         ▶
   2   !   (list_literal)                    5
   3  ─‣┘  _                                 1
-  4  ─‣─  (list_literal) [Node Set(inner)]  3
-  5  └‣─  (list_literal) [Node Set(outer)]  4
+  4  ─‣─  (list_literal) [Node RecordSet(inner)]  3
+  5  └‣─  (list_literal) [Node RecordSet(outer)]  4
 
 Q (entrypoint):
   6                                         ▶
-  7  -ε-  [StructClose]                     6
+  7  -ε-  [RecordClose]                     6
   8       (Q)                               2 : 7
-  9  -ε-  [StructOpen]                      8
+  9  -ε-  [RecordOpen]                      8
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -44,12 +44,12 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@12)                            12 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  ─‣─  (list_literal) [Node Set(M1)]    08
+  06  ─‣─  (list_literal) [Node RecordSet(M1)]  08
   08  ─‣┘  _                                09
   09                                        ▶
-  10  └‣─  (list_literal) [Node Set(M0)]    06
+  10  └‣─  (list_literal) [Node RecordSet(M0)]  06
   12   !   (list_literal)                   10

@@ -141,7 +141,7 @@ checks uphold the no-panic guarantee. Validation runs in this order:
    entry (`1..str_table_count`), so the `NonZeroU16` accessors never panic.
 10. **Transitions** — the instruction stream is walked twice. Pass 1 decodes each
     instruction's fixed-size slot, validating opcode, segment, nav, node kind,
-    effect opcodes, `Set`/`EnumOpen` member operands, and predicate operands, and
+    effect opcodes, `RecordSet`/`VariantOpen` member operands, and predicate operands, and
     rejecting any zero successor; it records each instruction start and must tile
     the section exactly. Pass 2 requires every jump target (successor, call
     next/target) to land on a recorded instruction start. This
@@ -152,8 +152,8 @@ checks uphold the no-panic guarantee. Validation runs in this order:
     address a real TypeDef.
 12. **Effect stack** — an interprocedural walk of the committed-effect order
     (across `Call`/`Return`, under the suppression filter) proves no path can
-    drive the materializer's builder stack (`Push`/`Set`/`ArrayClose`/
-    `StructClose`/`EnumClose`), the VM's suppression counter, or the inspection
+    drive the materializer's builder stack (`ArrayPush`/`RecordSet`/`ListClose`/
+    `RecordClose`/`VariantClose`), the VM's suppression counter, or the inspection
     span bracket stack into a panic.
     This closes the last malformed-representation panic class — the materializer's
     builder-stack panics and the VM's `SuppressEnd` underflow — that

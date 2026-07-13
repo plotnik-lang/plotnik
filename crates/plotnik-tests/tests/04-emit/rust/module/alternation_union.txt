@@ -69,28 +69,28 @@ impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
 
 /// Replay one committed `Q` value.
 fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'t> {
-    t.expect_struct_open();
+    t.expect_record_open();
     let mut v0 = None; // id
     let mut v1 = None; // num
-    while !t.at_struct_close() {
-        match t.peek_set() {
+    while !t.at_record_close() {
+        match t.peek_record_set() {
             // id
-            0 => v0 = Some(if t.take_null() {
+            0 => v0 = Some(if t.take_absent() {
                 None
             } else {
                 Some(t.expect_node())
             }),
             // num
-            1 => v1 = Some(if t.take_null() {
+            1 => v1 = Some(if t.take_absent() {
                 None
             } else {
                 Some(t.expect_node())
             }),
             other => unreachable!("trace shape proven at emit: `Q` has no member index {other}"),
         }
-        t.expect_set();
+        t.expect_record_set();
     }
-    t.expect_struct_close();
+    t.expect_record_close();
     Q {
         id: v0.expect("field-stability: every accepting path sets `id`"),
         num: v1.expect("field-stability: every accepting path sets `num`"),
@@ -339,26 +339,26 @@ mod matcher {
                 }
                 Flow::Jump(S01_Q)
             }
-            //   06   !   (identifier) [Null Set(num) Node Set(id)]  05
+            //   06   !   (identifier) [Absent RecordSet(num) Node RecordSet(id)]  05
             S06_Q => 'state: {
                 if !cand_s06_q(eng) {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::RuntimeEffect::Null);
-                eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(num)
+                eng.emit_data(|_| rt::RuntimeEffect::Absent);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(1)); // RecordSet(num)
                 eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
-                eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(id)
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(0)); // RecordSet(id)
                 Flow::Jump(S05_Q)
             }
-            //   07   !   (number) [Null Set(id) Node Set(num)]  05
+            //   07   !   (number) [Absent RecordSet(id) Node RecordSet(num)]  05
             S07_Q => 'state: {
                 if !cand_s07_q(eng) {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::RuntimeEffect::Null);
-                eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(id)
+                eng.emit_data(|_| rt::RuntimeEffect::Absent);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(0)); // RecordSet(id)
                 eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
-                eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(num)
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(1)); // RecordSet(num)
                 Flow::Jump(S05_Q)
             }
             //   10  ──!  _                                06, 07, 10
@@ -386,9 +386,9 @@ mod matcher {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   13  -ε-  [StructClose]                    12
+            //   13  -ε-  [RecordClose]                    12
             S13_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordClose);
                 Flow::Jump(S12_Q_EP)
             }
             //   14       (Q)                              02 : 13
@@ -396,9 +396,9 @@ mod matcher {
                 eng.enter_frame(S13_Q_EP);
                 Flow::Jump(S02_Q)
             }
-            //   15  -ε-  [StructOpen]                     14
+            //   15  -ε-  [RecordOpen]                     14
             S15_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordOpen);
                 Flow::Jump(S14_Q_EP)
             }
             _ => unreachable!("ip {ip} is not a generated state"),

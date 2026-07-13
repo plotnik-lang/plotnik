@@ -22,7 +22,7 @@ fn make_epsilon_with_start(label: u32, succs: Vec<u32>) -> InstructionIR {
     InstructionIR::Match(
         MatchIR::terminal(Label(label))
             .nav(Nav::Epsilon)
-            .append_effect(EffectIR::start_struct())
+            .append_effect(EffectIR::record_open())
             .successors(succs.into_iter().map(Label).collect()),
     )
 }
@@ -31,7 +31,7 @@ fn make_epsilon_with_end(label: u32, succs: Vec<u32>) -> InstructionIR {
     InstructionIR::Match(
         MatchIR::terminal(Label(label))
             .nav(Nav::Epsilon)
-            .append_effect(EffectIR::end_struct())
+            .append_effect(EffectIR::record_close())
             .successors(succs.into_iter().map(Label).collect()),
     )
 }
@@ -55,7 +55,7 @@ fn see_through_effectless_chain() {
 
 #[test]
 fn see_through_with_effects() {
-    // 0 (ε+Struct) → 1 (ε+EndStruct) → 2 (match)
+    // 0 (ε+RecordOpen) → 1 (ε+RecordClose) → 2 (match)
     let instructions = vec![
         make_epsilon_with_start(0, vec![1]),
         make_epsilon_with_end(1, vec![2]),
@@ -67,7 +67,7 @@ fn see_through_with_effects() {
         .see_through(Label(0))
         .unwrap();
     assert_eq!(target, Label(2));
-    assert_eq!(effects.len(), 2); // Struct from 0, EndStruct from 1
+    assert_eq!(effects.len(), 2); // RecordOpen from 0, RecordClose from 1
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn see_through_blocked_by_branch() {
 
 #[test]
 fn forward_migrate_to_exclusive_successor() {
-    // 0 (ε+Struct) → 1 (match), only 0 points to 1
+    // 0 (ε+RecordOpen) → 1 (match), only 0 points to 1
     let mut instructions = vec![
         make_epsilon_with_start(0, vec![1]),
         make_match(1, Nav::Down, vec![]),
@@ -141,7 +141,7 @@ fn forward_migrate_blocked_by_multi_pred() {
 
 #[test]
 fn laser_vision_single_succ_absorbs_effects() {
-    // 0 (match, single succ) → 1 (ε+Struct) → 2 (match)
+    // 0 (match, single succ) → 1 (ε+RecordOpen) → 2 (match)
     let instructions = vec![
         make_match(0, Nav::Down, vec![1]),
         make_epsilon_with_start(1, vec![2]),
@@ -170,7 +170,7 @@ fn laser_vision_single_succ_absorbs_effects() {
 #[test]
 fn laser_vision_multi_succ_effectless_only() {
     // 0 (match) → [1 (ε), 3]
-    // 1 (ε+Struct) → 2
+    // 1 (ε+RecordOpen) → 2
     let instructions = vec![
         make_match(0, Nav::Down, vec![1, 3]),
         make_epsilon_with_start(1, vec![2]),
@@ -199,8 +199,8 @@ fn laser_vision_multi_succ_effectless_only() {
 
 #[test]
 fn laser_vision_epsilon_source_absorbs_chain() {
-    // 0 (ε+Struct) → 1 (ε+EndStruct) → 2 (match)
-    // The head epsilon absorbs the chain: 0 (ε, Struct, EndStruct) → 2
+    // 0 (ε+RecordOpen) → 1 (ε+RecordClose) → 2 (match)
+    // The head epsilon absorbs the chain: 0 (ε, RecordOpen, RecordClose) → 2
     let instructions = vec![
         make_epsilon_with_start(0, vec![1]),
         make_epsilon_with_end(1, vec![2]),
@@ -227,7 +227,7 @@ fn laser_vision_epsilon_source_absorbs_chain() {
 
 #[test]
 fn laser_vision_branching_epsilon_skips_pure_jump() {
-    // 0 (ε+Struct, branching) → [1 (ε pure) → 3, 4]
+    // 0 (ε+RecordOpen, branching) → [1 (ε pure) → 3, 4]
     // The pure jump is bypassed per-successor; effects stay on the branch point.
     let instructions = vec![
         make_epsilon_with_start(0, vec![1, 4]),
@@ -258,7 +258,7 @@ fn laser_vision_branching_epsilon_skips_pure_jump() {
 fn epsilon_chain_around_call_coalesces() {
     // Scope brackets around a Call ride separate epsilons (CallIR carries no
     // effects). The chain head must absorb the rest:
-    // 0 (ε+Struct) → 1 (ε+EndStruct) → 2 (call → 4, next 3)
+    // 0 (ε+RecordOpen) → 1 (ε+RecordClose) → 2 (call → 4, next 3)
     let instructions = vec![
         make_epsilon_with_start(0, vec![1]),
         make_epsilon_with_end(1, vec![2]),
@@ -288,10 +288,10 @@ fn epsilon_chain_around_call_coalesces() {
 #[test]
 fn combined_forward_then_laser() {
     // The tricky case:
-    // 0 (match) → [1 (ε+Struct), 3]
+    // 0 (match) → [1 (ε+RecordOpen), 3]
     // 1 → 2 (match), only 1 points to 2
     //
-    // Phase A: 1 forward-migrates Struct to 2, 1 becomes effectless
+    // Phase A: 1 forward-migrates RecordOpen to 2, 1 becomes effectless
     // Phase B: 0 sees through 1 (now effectless) to 2
     let instructions = vec![
         make_match(0, Nav::Down, vec![1, 3]),

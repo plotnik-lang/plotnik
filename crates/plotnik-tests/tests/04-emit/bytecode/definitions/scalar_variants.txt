@@ -11,19 +11,19 @@ Q = 21
 Q:
   01                                        ▶
   02   !   (program)                        17
-  03  ─‣┘  _ [Set(comments)]                01
-  06  -ε-  [ArrayClose]                     03
-  07  -ε-  [ArrayClose Set(comments)]       01
-  09   !   (comment) [NodeStr Push]         11, 06
+  03  ─‣┘  _ [RecordSet(comments)]          01
+  06  -ε-  [ListClose]                      03
+  07  -ε-  [ListClose RecordSet(comments)]  01
+  09   !   (comment) [NodeStr ArrayPush]    11, 06
   11  ──!  _                                09, 11
   12  └─!  _                                09, 11
-  17  -ε-  [ArrayOpen]                      12, 07
+  17  -ε-  [ListOpen]                       12, 07
 
 Q (entrypoint):
   18                                        ▶
-  19  -ε-  [StructClose]                    18
+  19  -ε-  [RecordClose]                    18
   20       (Q)                              02 : 19
-  21  -ε-  [StructOpen]                     20
+  21  -ε-  [RecordOpen]                     20
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -52,17 +52,17 @@ Q = 00 :: T4
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  -ε-  [ArrayClose]                     08
-  08  ─‣┘  _ [Set(M0)]                      10
+  06  -ε-  [ListClose]                      08
+  08  ─‣┘  _ [RecordSet(M0)]                10
   10                                        ▶
-  11  -ε-  [ArrayClose Set(M0)]             10
-  13   !   (comment) [NodeStr Push]         16, 06
+  11  -ε-  [ListClose RecordSet(M0)]        10
+  13   !   (comment) [NodeStr ArrayPush]    16, 06
   15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16
-  20  -ε-  [ArrayOpen]                      18, 11
+  20  -ε-  [ListOpen]                       18, 11
   22   !   (program)                        20

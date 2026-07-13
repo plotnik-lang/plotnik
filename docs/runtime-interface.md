@@ -288,30 +288,30 @@ after acceptance.
 
 Generated runtimes implement this vocabulary:
 
-| Effect              | Payload and meaning                                |
-| ------------------- | -------------------------------------------------- |
-| `Node`              | Current binding-native node.                       |
-| `Null`              | One absent optional/union value.                   |
-| `ArrayOpen`         | Begin an array value.                              |
-| `Push`              | Append the pending value to the current array.     |
-| `ArrayClose`        | Close the array and make it pending.               |
-| `StructOpen`        | Begin a struct value.                              |
-| `Set(member)`       | Assign the pending value to a layout member index. |
-| `StructClose`       | Close the struct and make it pending.              |
-| `EnumOpen(variant)` | Begin the selected layout variant.                 |
-| `EnumClose`         | Close the enum and make it pending.                |
-| `ScalarOpen`        | Begin one value-local source-provenance frame.     |
-| `ScalarMark(node)`  | Add an explicit matched node to every open scalar. |
-| `StrClose`          | Close a scalar and produce source text or null.    |
-| `BoolClose(value)`  | Close a scalar and produce the supplied boolean.   |
-| `NodeStr(node)`     | Produce one matched node's source text directly.   |
-| `NodeBool(node)`    | Produce `true` for one matched node directly.      |
-| `BoolValue(value)`  | Produce a boolean without source provenance.       |
+| Effect                 | Payload and meaning                                |
+| ---------------------- | -------------------------------------------------- |
+| `Node`                 | Current binding-native node.                       |
+| `Absent`               | One absent option/union value.                     |
+| `ListOpen`             | Begin a list value.                                |
+| `ArrayPush`            | Append the pending value to its backing array.     |
+| `ListClose`            | Close the list and make it pending.                |
+| `RecordOpen`           | Begin a record value.                              |
+| `RecordSet(member)`    | Assign the pending value to a record member index. |
+| `RecordClose`          | Close the record and make it pending.              |
+| `VariantOpen(variant)` | Begin the selected variant.                        |
+| `VariantClose`         | Close the variant and make it pending.             |
+| `ScalarOpen`           | Begin one value-local source-provenance frame.     |
+| `ScalarMark(node)`     | Add an explicit matched node to every open scalar. |
+| `StrClose`             | Close a scalar and produce source text or null.    |
+| `BoolClose(value)`     | Close a scalar and produce the supplied boolean.   |
+| `NodeStr(node)`        | Produce one matched node's source text directly.   |
+| `NodeBool(node)`       | Produce `true` for one matched node directly.      |
+| `BoolValue(value)`     | Produce a boolean without source provenance.       |
 
 Member and variant payloads are the indices assigned by the compiler's shared
 `CaptureLayout`; they are not target-specific field ordinals. Values appear
-before their closing `Set`. The order of sibling `Set` entries inside one
-struct is not stable and must not be used as declaration order.
+before their closing `RecordSet`. The order of sibling `RecordSet` entries inside one
+record is not stable and must not be used as declaration order.
 
 `SuppressBegin` and `SuppressEnd` change the suppression depth but are not
 capture-trace entries. While suppression is nonzero, ordinary data effects,
@@ -341,18 +341,18 @@ are emitted only when inspection requests that provenance.
 
 Typed readers consume the committed trace linearly. A runtime reader provides:
 
-- `take_null`;
-- `expect_node`, `expect_set`, and `expect_enum_open`;
+- `take_absent`;
+- `expect_node`, `expect_record_set`, and `expect_variant_open`;
 - `expect_str` and `expect_bool` scalar leaves;
-- `expect_*_open` and `expect_*_close` for arrays and structs;
-- `expect_push` and close lookahead for repeated values;
-- `peek_set`, which returns the first `Set` after the balanced value beginning
+- `expect_*_open` and `expect_*_close` for lists and records;
+- `expect_array_push` and close lookahead for repeated values;
+- `peek_record_set`, which returns the first `RecordSet` after the balanced value beginning
   at the current position;
 - `finish`, which asserts that the whole trace was consumed.
 
-`peek_set` is required because a field's value precedes its member index and
+`peek_record_set` is required because a field's value precedes its member index and
 different members may require different typed readers. Implementations should
-precompute matching `Set` positions in one backward pass so replay remains
+precompute matching `RecordSet` positions in one backward pass so decoding remains
 linear on deeply nested output. Its balanced-value scan treats `ScalarOpen`
 through either scalar close as one value, including nested scalar frames.
 

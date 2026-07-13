@@ -183,7 +183,7 @@ The split fires when the alternation's exit is the follower's own single `Match`
 
 - The follower is itself anonymous (`. ","`) or `_`: both-sides-named never holds, so extras-only is in fact correct.
 - The follower is a ref (`. (Rule)`, a `Call`) or scope-wrapped (`. (a (b) @c) @x`, an epsilon entry): no single named `Match` to clone.
-- The alternation's value is materialized through a trailing effect epsilon rather than inline — a struct/array scope capture, or an enum alternation captured by name (`[A: (b) B: ","] @t . (a)`) — so its exit is that epsilon (the `Set`/`StructClose`), not the follower's `Match`.
+- The alternation's value is materialized through a trailing effect epsilon rather than inline — a record/list scope capture, or a variant alternation captured by name (`[A: (b) B: ","] @t . (a)`) — so its exit is that epsilon (the `RecordSet`/`RecordClose`), not the follower's `Match`.
 - A branch is quantified (`[(b)? ","] . (a)`): its zero-match path leaves no named node on the anchor's left, so the upgrade is unsound. The whole branch stays extras-only.
 - A branch is a sequence ending in a named node (`[{(b) "," (c)} ";"] . (a)`): branch namedness is classified over the whole branch (matching the before-anchor classifier), so a branch containing any anonymous token is treated as anonymous even when its tail is named. Conservative, not a wrong match. A trailing-position classifier would lift this.
 

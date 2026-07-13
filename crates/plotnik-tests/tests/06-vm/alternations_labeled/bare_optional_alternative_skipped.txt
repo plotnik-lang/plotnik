@@ -47,22 +47,22 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06   !   (identifier) [Node Set(M0)]      08
+  06   !   (identifier) [Node RecordSet(M0)]  08
   08  ─‣┘  _                                09
   09                                        ▶
   10  ──!  _                                06, 10
   12   !   _                                06, 10
-  14  -ε-  [Null Set(M0)]                   09
+  14  -ε-  [Absent RecordSet(M0)]           09
   16  ──!  _                                12, 16
   18  └─!  _                                12, 16
   20   !   (program)                        18, 14
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
        ▶   (@20)
 
@@ -73,16 +73,16 @@ Q:
        ●   lexical_declaration
   12       _                                06, 10
        ●   lexical_declaration
-  06       (identifier) [Node Set(M0)]      08
+  06       (identifier) [Node RecordSet(M0)]  08
        ○   lexical_declaration
   12  ❮❮❮ 
   10       _                                06, 10
   18  ❮❮❮ 
   16       _                                12, 16
   20  ❮❮❮ 
-  14  -ε-  [Null Set(M0)]                   09
+  14  -ε-  [Absent RecordSet(M0)]           09
   09   ◀   (@20)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

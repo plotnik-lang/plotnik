@@ -82,18 +82,18 @@ Q = 00 :: T3
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  ─‣─  (expression_statement) [Node Set(M3)]  08
+  06  ─‣─  (expression_statement) [Node RecordSet(M3)]  08
   08  ─‣┘  _                                12
-  09  └‣─  (call_expression) [Node Set(M0)]  11
+  09  └‣─  (call_expression) [Node RecordSet(M0)]  11
   11  ─‣┘  _                                16
   12                                        ▶
-  13   !   (expression_statement) [Null Set(M1) Node Set(M2)]  06
-  16  ─‣─  (expression_statement) [StructClose Set(M1) Node Set(M2)]  06
-  19   !   (expression_statement) [StructOpen]  09
+  13   !   (expression_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  06
+  16  ─‣─  (expression_statement) [RecordClose RecordSet(M1) Node RecordSet(M2)]  06
+  19   !   (expression_statement) [RecordOpen]  09
   21  ──!  _                                19, 21
   23  ...
   24   !   _                                19, 21
@@ -102,7 +102,7 @@ Q:
   30   !   (program)                        28
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03
        ▶   (@30)
 
@@ -113,30 +113,30 @@ Q:
        ●   expression_statement
   24       _                                19, 21
        ●   expression_statement
-  19       (expression_statement) [StructOpen]  09
+  19       (expression_statement) [RecordOpen]  09
        ●   expression_statement
-  09       (call_expression) [Node Set(M0)]  11
+  09       (call_expression) [Node RecordSet(M0)]  11
        ○   identifier
        ○   ;
   24  ❮❮❮ 
   21       _                                19, 21
        ●   expression_statement
-  19       (expression_statement) [StructOpen]  09
+  19       (expression_statement) [RecordOpen]  09
        ●   expression_statement
-  09       (call_expression) [Node Set(M0)]  11
+  09       (call_expression) [Node RecordSet(M0)]  11
        ○   identifier
        ○   ;
   21  ❮❮❮ 
   21       _                                19, 21
   28  ❮❮❮ 
-  13       (expression_statement) [Null Set(M1) Node Set(M2)]  06
+  13       (expression_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  06
        ●   expression_statement
-  06       (expression_statement) [Node Set(M3)]  08
+  06       (expression_statement) [Node RecordSet(M3)]  08
        ●   expression_statement
   08       _                                12
        ●   program
   12   ◀   (@30)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

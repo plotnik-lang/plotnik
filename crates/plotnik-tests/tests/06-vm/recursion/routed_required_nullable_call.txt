@@ -52,14 +52,14 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@52)                            52 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                13
-  08  └‣─  (expression_statement) [Node Set(M0)]  15
-  10  ─‣─  (expression_statement) [Node Set(M0)]  15
+  08  └‣─  (expression_statement) [Node RecordSet(M0)]  15
+  10  ─‣─  (expression_statement) [Node RecordSet(M0)]  15
   12  ─‣─  (debugger_statement)             23
   13                                        ▶
   14  ─‣─  (debugger_statement)             07
@@ -91,7 +91,7 @@ Q:
   52   !   (program)                        50, 08
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@52)                            52 : 03
        ▶   (@52)
 
@@ -257,12 +257,12 @@ Q:
        ●   debugger_statement
   23       _                                10
        ●   statement_block
-  10       (expression_statement) [Node Set(M0)]  15
+  10       (expression_statement) [Node RecordSet(M0)]  15
        ●   expression_statement
   15       _                                06
        ●   program
   06   ◀   (@52)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

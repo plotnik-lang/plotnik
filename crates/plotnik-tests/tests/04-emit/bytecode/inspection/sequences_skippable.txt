@@ -22,8 +22,8 @@ LeadingSkip:
   01                                        ▶
   02   !   (program)                        09, 04
   03  ─‣┘  _                                01
-  04  └‣─  (function_declaration) [Node Set(fn)]  03
-  05  ─‣─  (function_declaration) [Node Set(fn)]  03
+  04  └‣─  (function_declaration) [Node RecordSet(fn)]  03
+  05  ─‣─  (function_declaration) [Node RecordSet(fn)]  03
   06   !   (expression_statement)           05
   08  ──!  _                                06, 08
   09  └─!  _                                06, 08
@@ -34,19 +34,19 @@ TrailingSkip:
   14  ─‣┘  _                                12
   15   !   (expression_statement)           14
   17  ──!  _                                15, 17
-  20  └‣─  (function_declaration) [Node Set(fn)]  17, 14
+  20  └‣─  (function_declaration) [Node RecordSet(fn)]  17, 14
 
 LeadingSkip (entrypoint):
   21                                        ▶
-  22  -ε-  [StructClose]                    21
+  22  -ε-  [RecordClose]                    21
   23       (LeadingSkip)                    02 : 22
-  24  -ε-  [StructOpen]                     23
+  24  -ε-  [RecordOpen]                     23
 
 TrailingSkip (entrypoint):
   25                                        ▶
-  26  -ε-  [StructClose]                    25
+  26  -ε-  [RecordClose]                    25
   27       (TrailingSkip)                   13 : 26
-  28  -ε-  [StructOpen]                     27
+  28  -ε-  [RecordOpen]                     27
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -92,19 +92,19 @@ P13 pattern    156..178  src0
 
 [transitions]
 LeadingSkip:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 TrailingSkip:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@48)                            48 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
   12                                        ▶
-  13  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#6]  28
-  16  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node Set(M0) SpanEnd#5 SpanEnd#6]  28
+  13  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node RecordSet(M0) SpanEnd#5 SpanEnd#6]  28
+  16  ─‣─  (function_declaration) [SpanEnd#3 SpanStartAt#6 SpanStart#5 Node RecordSet(M0) SpanEnd#5 SpanEnd#6]  28
   19   !   (expression_statement) [SpanStartAt#4 SpanEnd#4]  16
   21  ──!  _                                19, 21
   23  ...
@@ -118,7 +118,7 @@ TrailingSkip:
   37  ──!  _                                35, 37
   39  ...
   40  -ε-  [SpanStart#12]                   37, 33
-  42  └‣─  (function_declaration) [SpanStart#9 SpanStartAt#11 SpanStart#10 Node Set(M1) SpanEnd#10 SpanEnd#11]  40
+  42  └‣─  (function_declaration) [SpanStart#9 SpanStartAt#11 SpanStart#10 Node RecordSet(M1) SpanEnd#10 SpanEnd#11]  40
   45  ─‣┘  _ [SpanEnd#9 SpanEnd#8 SpanEnd#7]  32
   47  ...
   48   !   (program) [SpanStart#7 SpanStartAt#8]  42

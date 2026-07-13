@@ -16,11 +16,11 @@ Func:
 Q:
   04                                        ▶
   05   !   (program)                        13
-  06  ─‣┘  _ [ArrayClose Set(funcs)]        04
-  09  -ε-  [Node Push]                      12, 06
+  06  ─‣┘  _ [ListClose RecordSet(funcs)]   04
+  09  -ε-  [Node ArrayPush]                 12, 06
   10   !   (Func)                           02 : 09
   12  ──!  _                                10, 12
-  13  └─!  _ [ArrayOpen]                    10, 12
+  13  └─!  _ [ListOpen]                     10, 12
 
 Func (entrypoint):
   18                                        ▶
@@ -28,9 +28,9 @@ Func (entrypoint):
 
 Q (entrypoint):
   20                                        ▶
-  21  -ε-  [StructClose]                    20
+  21  -ε-  [RecordClose]                    20
   22       (Q)                              05 : 21
-  23  -ε-  [StructOpen]                     22
+  23  -ε-  [RecordOpen]                     22
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -62,16 +62,16 @@ Func:
   01                                        ▶
 
 Q:
-  02  -ε-  [StructOpen]                     04
+  02  -ε-  [RecordOpen]                     04
   04       (@20)                            20 : 05
-  05  -ε-  [StructClose]                    07
+  05  -ε-  [RecordClose]                    07
   07                                        ▶
   08                                        ▶
   09   !   (function_declaration)           08
   10                                        ▶
-  11  -ε-  [Node Push]                      14, 18
+  11  -ε-  [Node ArrayPush]                 14, 18
   13   !   (@09)                            09 : 11
   14  ──!  _                                13, 14
-  16  └─!  _ [ArrayOpen]                    13, 14
-  18  ─‣┘  _ [ArrayClose Set(M0)]           10
+  16  └─!  _ [ListOpen]                     13, 14
+  18  ─‣┘  _ [ListClose RecordSet(M0)]      10
   20   !   (program)                        16

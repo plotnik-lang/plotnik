@@ -58,11 +58,11 @@ Comma:
   01                                        ▶
 
 Q:
-  02  -ε-  [StructOpen]                     04
+  02  -ε-  [RecordOpen]                     04
   04       (@22)                            22 : 05
-  05  -ε-  [StructClose]                    07
+  05  -ε-  [RecordClose]                    07
   07                                        ▶
-  08  ─◦─  (string) [Node Set(M0)]          10
+  08  ─◦─  (string) [Node RecordSet(M0)]    10
   10  ─‣┘³ _                                13
   11                                        ▶
   12   !   ","                              11
@@ -76,7 +76,7 @@ Q:
   22   !   (program)                        21
 --------------------- TRACE ----------------------
 Q:
-  02  -ε-  [StructOpen]                     04
+  02  -ε-  [RecordOpen]                     04
   04       (@22)                            22 : 05
        ▶   (@22)
 
@@ -116,7 +116,7 @@ Q:
   11   ◀   (@12)                            
 
 @22:
-  08       (string) [Node Set(M0)]          10
+  08       (string) [Node RecordSet(M0)]    10
        ○   number
   16  ❮❮❮ 
   16       _                                14, 16
@@ -139,12 +139,12 @@ Q:
   11   ◀   (@12)                            
 
 @22:
-  08       (string) [Node Set(M0)]          10
+  08       (string) [Node RecordSet(M0)]    10
        ●   string
   10       _                                13
        ●   program
   13   ◀   (@22)                            
 
 Q:
-  05  -ε-  [StructClose]                    07
+  05  -ε-  [RecordClose]                    07
   07   ◀   (Q)                              ◼

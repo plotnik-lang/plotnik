@@ -57,16 +57,16 @@ Q = 00 :: T3
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  (identifier) [Node Set(M0)]      08
+  06  └‣─  (identifier) [Node RecordSet(M0)]  08
   08  ─‣┘  _                                13
   09                                        ▶
-  10  └‣─  (debugger_statement) [Null Set(M1) Node Set(M2)]  22
-  13  ─‣─  (debugger_statement) [StructClose Set(M1) Node Set(M2)]  22
-  16   !   (expression_statement) [StructOpen]  06
+  10  └‣─  (debugger_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  22
+  13  ─‣─  (debugger_statement) [RecordClose RecordSet(M1) Node RecordSet(M2)]  22
+  16   !   (expression_statement) [RecordOpen]  06
   18  ──!  _                                16, 18
   20  └─!  _                                16, 18
   22  ─‣┘  _                                09
@@ -74,7 +74,7 @@ Q:
   24   !   (program)                        20, 10
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
        ▶   (@24)
 
@@ -83,17 +83,17 @@ Q:
        ●   program
   20       _                                16, 18
        ●   debugger_statement
-  16       (expression_statement) [StructOpen]  06
+  16       (expression_statement) [RecordOpen]  06
        ○   debugger_statement
   20  ❮❮❮ 
   18       _                                16, 18
   24  ❮❮❮ 
-  10       (debugger_statement) [Null Set(M1) Node Set(M2)]  22
+  10       (debugger_statement) [Absent RecordSet(M1) Node RecordSet(M2)]  22
        ●   debugger_statement
   22       _                                09
        ●   program
   09   ◀   (@24)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

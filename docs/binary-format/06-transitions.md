@@ -88,15 +88,15 @@ EffectOp (u16)
 | Opcode | Name            | Payload       |
 | :----- | :-------------- | :------------ |
 | 0      | `Node`          | -             |
-| 1      | `ArrayOpen`     | -             |
-| 2      | `Push`          | -             |
-| 3      | `ArrayClose`    | -             |
-| 4      | `StructOpen`    | -             |
-| 5      | `Set`           | Member index  |
-| 6      | `StructClose`   | -             |
-| 7      | `EnumOpen`      | Variant index |
-| 8      | `EnumClose`     | -             |
-| 9      | `Null`          | -             |
+| 1      | `ListOpen`      | -             |
+| 2      | `ArrayPush`     | -             |
+| 3      | `ListClose`     | -             |
+| 4      | `RecordOpen`    | -             |
+| 5      | `RecordSet`     | Member index  |
+| 6      | `RecordClose`   | -             |
+| 7      | `VariantOpen`   | Variant index |
+| 8      | `VariantClose`  | -             |
+| 9      | `Absent`        | -             |
 | 10     | `SuppressBegin` | -             |
 | 11     | `SuppressEnd`   | -             |
 | 12     | `SpanStartAt`   | Span index    |
@@ -282,12 +282,12 @@ The loader verifies:
 - every target and successor lands on an instruction boundary;
 - effect, predicate, member, type, node-kind, and field operands are in range;
 - span effect operands address a real span entry;
-- `Set`/`EnumOpen` payloads address a real member, `BoolClose`/`BoolValue` are `0..=1`, and
+- `RecordSet`/`VariantOpen` payloads address a real member, `BoolClose`/`BoolValue` are `0..=1`, and
   every unit effect has a zero payload;
 - calls and returns uphold cursor-depth neutrality;
 - ordinary calls target matched-only bodies, split calls target bodies with
   both outcomes, and entrypoint wrappers return matched only;
 - the committed effect stream cannot underflow the materializer stack or
-  suppression depth, and all array/struct/enum/scalar frames are balanced;
+  suppression depth, and all list/record/variant/scalar frames are balanced;
 - the committed effect stream cannot underflow or mis-nest the inspection span
   stack.

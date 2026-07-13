@@ -63,29 +63,29 @@ impl<'t, 's> rt::Parse<'t, 's> for Q<'s> {
 
 /// Replay one committed `Q` value.
 fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'s> {
-    t.expect_struct_open();
+    t.expect_record_open();
     let mut v0 = None; // comments
     let mut v1 = None; // has_statement
-    while !t.at_struct_close() {
-        match t.peek_set() {
+    while !t.at_record_close() {
+        match t.peek_record_set() {
             // comments
             0 => v0 = Some({
-                t.expect_array_open();
+                t.expect_list_open();
                 let mut items0 = ::std::vec::Vec::new();
-                while !t.at_array_close() {
+                while !t.at_list_close() {
                     items0.push(t.expect_str());
-                    t.expect_push();
+                    t.expect_array_push();
                 }
-                t.expect_array_close();
+                t.expect_list_close();
                 items0
             }),
             // has_statement
             1 => v1 = Some(t.expect_bool()),
             other => unreachable!("trace shape proven at emit: `Q` has no member index {other}"),
         }
-        t.expect_set();
+        t.expect_record_set();
     }
-    t.expect_struct_close();
+    t.expect_record_close();
     Q {
         comments: v0.expect("field-stability: every accepting path sets `comments`"),
         has_statement: v1.expect("field-stability: every accepting path sets `has_statement`"),
@@ -321,13 +321,13 @@ mod matcher {
                 }
                 Flow::Jump(S01_Q)
             }
-            //   05   !   (expression_statement) [BoolValue(1) Set(has_statement)]  03
+            //   05   !   (expression_statement) [BoolValue(1) RecordSet(has_statement)]  03
             S05_Q => 'state: {
                 if !cand_s05_q(eng) {
                     break 'state Flow::Backtrack;
                 }
                 eng.bool_value(true);
-                eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(has_statement)
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(1)); // RecordSet(has_statement)
                 Flow::Jump(S03_Q)
             }
             //   07  ──!  _                                05, 07
@@ -346,39 +346,39 @@ mod matcher {
                 eng.push_branches(&[S07_Q]);
                 Flow::Jump(S05_Q)
             }
-            //   09  -ε-  [BoolValue(0) Set(has_statement)]  01
+            //   09  -ε-  [BoolValue(0) RecordSet(has_statement)]  01
             S09_Q => {
                 eng.bool_value(false);
-                eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(has_statement)
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(1)); // RecordSet(has_statement)
                 Flow::Jump(S01_Q)
             }
-            //   16  -ε-  [BoolValue(0) Set(has_statement)]  03
+            //   16  -ε-  [BoolValue(0) RecordSet(has_statement)]  03
             S16_Q => {
                 eng.bool_value(false);
-                eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(has_statement)
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(1)); // RecordSet(has_statement)
                 Flow::Jump(S03_Q)
             }
-            //   18  -ε-  [ArrayClose Set(comments)]       07, 16
+            //   18  -ε-  [ListClose RecordSet(comments)]  07, 16
             S18_Q => {
-                eng.emit_data(|_| rt::RuntimeEffect::ArrayClose);
-                eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(comments)
+                eng.emit_data(|_| rt::RuntimeEffect::ListClose);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(0)); // RecordSet(comments)
                 eng.push_branches(&[S16_Q]);
                 Flow::Jump(S07_Q)
             }
-            //   19  -ε-  [ArrayClose Set(comments)]       08, 09
+            //   19  -ε-  [ListClose RecordSet(comments)]  08, 09
             S19_Q => {
-                eng.emit_data(|_| rt::RuntimeEffect::ArrayClose);
-                eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(comments)
+                eng.emit_data(|_| rt::RuntimeEffect::ListClose);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(0)); // RecordSet(comments)
                 eng.push_branches(&[S09_Q]);
                 Flow::Jump(S08_Q)
             }
-            //   21   !   (comment) [NodeStr Push]         23, 18
+            //   21   !   (comment) [NodeStr ArrayPush]    23, 18
             S21_Q => 'state: {
                 if !cand_s21_q(eng) {
                     break 'state Flow::Backtrack;
                 }
                 eng.node_str();
-                eng.emit_data(|_| rt::RuntimeEffect::Push);
+                eng.emit_data(|_| rt::RuntimeEffect::ArrayPush);
                 eng.push_branches(&[S18_Q]);
                 Flow::Jump(S23_Q)
             }
@@ -398,9 +398,9 @@ mod matcher {
                 eng.push_branches(&[S23_Q]);
                 Flow::Jump(S21_Q)
             }
-            //   29  -ε-  [ArrayOpen]                      24, 19
+            //   29  -ε-  [ListOpen]                       24, 19
             S29_Q => {
-                eng.emit_data(|_| rt::RuntimeEffect::ArrayOpen);
+                eng.emit_data(|_| rt::RuntimeEffect::ListOpen);
                 eng.push_branches(&[S19_Q]);
                 Flow::Jump(S24_Q)
             }
@@ -413,9 +413,9 @@ mod matcher {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   31  -ε-  [StructClose]                    30
+            //   31  -ε-  [RecordClose]                    30
             S31_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordClose);
                 Flow::Jump(S30_Q_EP)
             }
             //   32       (Q)                              02 : 31
@@ -423,9 +423,9 @@ mod matcher {
                 eng.enter_frame(S31_Q_EP);
                 Flow::Jump(S02_Q)
             }
-            //   33  -ε-  [StructOpen]                     32
+            //   33  -ε-  [RecordOpen]                     32
             S33_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordOpen);
                 Flow::Jump(S32_Q_EP)
             }
             _ => unreachable!("ip {ip} is not a generated state"),

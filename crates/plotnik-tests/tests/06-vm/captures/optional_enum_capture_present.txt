@@ -60,23 +60,23 @@ Q = 00 :: T4
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ─‣┘  _                                13
   07  ...
-  08   !   (identifier) [VariantOpen(M1) Node Set(M0) VariantClose]  11
-  11  ─‣┘  _ [Set(M2)]                      06
+  08   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  11
+  11  ─‣┘  _ [RecordSet(M2)]                06
   13                                        ▶
-  14  -ε-  [Null Set(M2)]                   06
+  14  -ε-  [Absent RecordSet(M2)]           06
   16  ──!  _                                08, 16
   18  └─!  _                                08, 16
   20  └‣─  (expression_statement)           18, 14
   22   !   (program)                        20
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
        ▶   (@22)
 
@@ -87,14 +87,14 @@ Q:
        ●   expression_statement
   18       _                                08, 16
        ●   identifier
-  08       (identifier) [VariantOpen(M1) Node Set(M0) VariantClose]  11
+  08       (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  11
        ●   identifier
-  11       _ [Set(M2)]                      06
+  11       _ [RecordSet(M2)]                06
        ●   expression_statement
   06       _                                13
        ●   program
   13   ◀   (@22)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

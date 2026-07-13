@@ -70,21 +70,21 @@ Q = 00 :: T5
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@32)                            32 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08  -ε-  [ArrayClose Set(M0) VariantClose Set(M3)]  23
-  11   !   (expression_statement) [Node Push]  13, 08
+  08  -ε-  [ListClose RecordSet(M0) VariantClose RecordSet(M3)]  23
+  11   !   (expression_statement) [Node ArrayPush]  13, 08
   13  ──!  _                                11, 13
   15  ...
-  16   !   _ [ArrayOpen]                    11, 13
+  16   !   _ [ListOpen]                     11, 13
   18  -ε-  [VariantOpen(M1)]                16
-  20  -ε-  [VariantOpen(M1) ArrayOpen ArrayClose Set(M0) VariantClose Set(M3)]  06
+  20  -ε-  [VariantOpen(M1) ListOpen ListClose RecordSet(M0) VariantClose RecordSet(M3)]  06
   23  ─‣┘  _                                06
-  24   !   (debugger_statement) [VariantOpen(M2) VariantClose Set(M3)]  23
+  24   !   (debugger_statement) [VariantOpen(M2) VariantClose RecordSet(M3)]  23
   26  ──!  _                                18, 24, 26
   28  └─!  _                                18, 24, 26
   30  ...
@@ -92,7 +92,7 @@ Q:
   32   !   (program)                        28, 20
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@32)                            32 : 03
        ▶   (@32)
 
@@ -102,21 +102,21 @@ Q:
   28       _                                18, 24, 26
        ●   expression_statement
   18  -ε-  [VariantOpen(M1)]                16
-  16       _ [ArrayOpen]                    11, 13
+  16       _ [ListOpen]                     11, 13
        ●   expression_statement
-  11       (expression_statement) [Node Push]  13, 08
+  11       (expression_statement) [Node ArrayPush]  13, 08
        ●   expression_statement
   13       _                                11, 13
        ●   expression_statement
-  11       (expression_statement) [Node Push]  13, 08
+  11       (expression_statement) [Node ArrayPush]  13, 08
        ●   expression_statement
   13       _                                11, 13
   11  ❮❮❮ 
-  08  -ε-  [ArrayClose Set(M0) VariantClose Set(M3)]  23
+  08  -ε-  [ListClose RecordSet(M0) VariantClose RecordSet(M3)]  23
   23       _                                06
        ●   program
   06   ◀   (@32)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

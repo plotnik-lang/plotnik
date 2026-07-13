@@ -11,18 +11,18 @@ Q:
   01                                        ▶
   02   !   (array)                          17
   03  ─‣┘  _                                01
-  04  └‣─  (number) [ArrayClose Set(ids) Node Set(n)]  03
-  05  ─‣─  (number) [ArrayClose Set(ids) Node Set(n)]  03
-  09   !   (identifier) [Node Push]         11, 05
+  04  └‣─  (number) [ListClose RecordSet(ids) Node RecordSet(n)]  03
+  05  ─‣─  (number) [ListClose RecordSet(ids) Node RecordSet(n)]  03
+  09   !   (identifier) [Node ArrayPush]    11, 05
   11  ──!  _                                09, 11
   12  └─!  _                                09, 11
-  17  -ε-  [ArrayOpen]                      12, 04
+  17  -ε-  [ListOpen]                       12, 04
 
 Q (entrypoint):
   18                                        ▶
-  19  -ε-  [StructClose]                    18
+  19  -ε-  [RecordClose]                    18
   20       (Q)                              02 : 19
-  21  -ε-  [StructOpen]                     20
+  21  -ε-  [RecordOpen]                     20
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -50,16 +50,16 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@22)                            22 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  └‣─  (number) [ArrayClose Set(M0) Node Set(M1)]  07
-  11  ─‣─  (number) [ArrayClose Set(M0) Node Set(M1)]  07
-  14   !   (identifier) [Node Push]         16, 11
+  08  └‣─  (number) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  11  ─‣─  (number) [ListClose RecordSet(M0) Node RecordSet(M1)]  07
+  14   !   (identifier) [Node ArrayPush]    16, 11
   16  ──!  _                                14, 16
   18  └─!  _                                14, 16
-  20  -ε-  [ArrayOpen]                      18, 08
+  20  -ε-  [ListOpen]                       18, 08
   22   !   (array)                          20

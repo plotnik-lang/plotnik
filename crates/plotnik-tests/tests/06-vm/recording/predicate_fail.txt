@@ -38,7 +38,7 @@ export interface Q {
       "ip": 0,
       "event": {
         "kind": "effect",
-        "effect": "StructOpen"
+        "effect": "RecordOpen"
       },
       "span": null,
       "node": null,
@@ -260,13 +260,13 @@ P4 pattern    41..60  src0
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ...
   07  ...
-  08  └‣─  (identifier) [SpanStartAt#4 SpanStart#3 Node Set(M0) SpanEnd#3 SpanEnd#4] == "y"  12
+  08  └‣─  (identifier) [SpanStartAt#4 SpanStart#3 Node RecordSet(M0) SpanEnd#3 SpanEnd#4] == "y"  12
   12  ─‣┘  _                                13
   13  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  15
   15                                        ▶

@@ -298,7 +298,7 @@ impl NfaBuilder<'_> {
 
     /// Compile a quantified pattern for list capture with element-level effects.
     ///
-    /// The element_capture effects (typically [Push]) are placed on each iteration.
+    /// The element-capture effects (typically `[ArrayPush]`) are placed on each iteration.
     pub(super) fn compile_quantified_for_list(
         &mut self,
         quant: &ast::QuantifiedPattern,
@@ -459,7 +459,7 @@ impl NfaBuilder<'_> {
         // mechanism dispatch with the ordinary capture path (`compile_captured`),
         // split exits and all, so the two can never drift — the gap behind both
         // #470 and the suppressive `@_` panic. It emits the scope that matches the
-        // declared scope (`Record`/`Array`/`Suppress`), closing it on both exits.
+        // declared scope (`Record`/`List`/`Suppress`), closing it on both exits.
         if let Pattern::CapturedPattern(cap) = pattern
             && cap.inner().is_some()
         {
@@ -578,9 +578,9 @@ impl NfaBuilder<'_> {
         let skip_exit = match skip_exit {
             SkipExit::To(skip) => {
                 let end_step = self.quant_end_for(&brackets, skip);
-                let skip_with_null =
-                    self.emit_null_for_skip_path(end_step, &brackets.inner_capture);
-                SkipExit::To(self.emit_null_for_internal_captures(skip_with_null, &inner))
+                let skip_with_absence =
+                    self.emit_absence_for_skip_path(end_step, &brackets.inner_capture);
+                SkipExit::To(self.emit_absence_for_internal_captures(skip_with_absence, &inner))
             }
             SkipExit::Fail => SkipExit::Fail,
         };
@@ -602,8 +602,8 @@ impl NfaBuilder<'_> {
     /// mechanism, since `*`/`+` classify as `List`.
     ///
     /// The row is optional as a whole. Mirroring how lists scope each element
-    /// record, the `StructOpen → body → StructClose+Set` wrapper lives inside the
-    /// iteration; the skip path emits a bare `Null` for the capture instead of
+    /// record, the `RecordOpen → body → RecordClose+RecordSet` wrapper lives inside the
+    /// iteration; the skip path emits a bare `Absent` for the capture instead of
     /// a hollow `{ field: null }` struct, matching the declared
     /// `{ … } | null` type.
     pub(super) fn compile_optional_row_capture(
@@ -644,8 +644,8 @@ impl NfaBuilder<'_> {
                 let end_step = self.quant_end_for(&brackets, skip);
                 let mut skip_effects: Vec<EffectIR> = capture_effects
                     .iter()
-                    .filter(|eff| eff.kind() == EffectKind::Set)
-                    .flat_map(|set_eff| [EffectIR::null(), set_eff.clone()])
+                    .filter(|eff| eff.kind() == EffectKind::RecordSet)
+                    .flat_map(|set_eff| [EffectIR::absent(), set_eff.clone()])
                     .collect();
                 skip_effects.extend(brackets.inner_capture.post.iter().cloned());
                 Some(self.emit_effects_if_nonempty(end_step, skip_effects))
@@ -653,7 +653,7 @@ impl NfaBuilder<'_> {
             SkipExit::Fail => None,
         };
 
-        // The row scope's type drives the inner captures' Set member resolution.
+        // The row scope's type drives the inner captures' `RecordSet` member resolution.
         let row_type_id = self
             .ctx
             .analysis
@@ -672,14 +672,14 @@ impl NfaBuilder<'_> {
             brackets.exit,
             |this, target| {
                 let ExitNav { exit, nav } = target;
-                let struct_close = this.emit_struct_close_step_with_effects(end_effects, exit);
+                let record_close = this.emit_record_close_step_with_effects(end_effects, exit);
                 let body = this.compile_with_optional_scope(row_type_id, |t| {
                     t.compile_iteration_element(
                         &inner,
-                        PatternCtx::with_nav(struct_close, Some(nav)),
+                        PatternCtx::with_nav(record_close, Some(nav)),
                     )
                 });
-                this.emit_struct_step(body)
+                this.emit_record_open_step(body)
             },
         );
 
@@ -697,8 +697,8 @@ impl NfaBuilder<'_> {
         self.wrap_entry_pre(entry, brackets.entry_pre)
     }
 
-    /// Compile a list capture (`(x)* @cap`) — `Arr → quantifier (with Push)
-    /// → EndArr+capture → exit(s)`. With `Single` exits the loop falls straight
+    /// Compile a list capture (`(x)* @cap`) — `ListOpen → quantifier (with ArrayPush)
+    /// → ListClose+capture → exit(s)`. With `Single` exits the loop falls straight
     /// through; with `Split` exits a zero-match takes `skip_exit` and a loop-exit
     /// takes `match_exit`, each closing the list. `capture_effects` is built once
     /// by the caller; the matched element's `Node` is pushed only when the
@@ -717,9 +717,9 @@ impl NfaBuilder<'_> {
         } = req;
         let push_effects =
             CaptureEffects::new_post(if self.quantifier_needs_node_for_push(&inner) {
-                vec![EffectIR::node(), EffectIR::push()]
+                vec![EffectIR::node(), EffectIR::array_push()]
             } else {
-                vec![EffectIR::push()]
+                vec![EffectIR::array_push()]
             });
 
         let mut quant_start = Vec::new();
@@ -738,27 +738,29 @@ impl NfaBuilder<'_> {
         };
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
-                let endarr = self.emit_endarr_step(end_effects, exit);
+                let list_close = self.emit_list_close_step(end_effects, exit);
                 if let Pattern::QuantifiedPattern(quant) = &inner {
-                    self.compile_quantified_for_list(quant, endarr, nav, push_effects)
+                    self.compile_quantified_for_list(quant, list_close, nav, push_effects)
                 } else {
-                    self.compile_pattern(&inner, endarr, nav)
+                    self.compile_pattern(&inner, list_close, nav)
                 }
             }
             CaptureExits::Split {
                 match_exit,
                 skip_exit,
             } => {
-                let match_endarr = self.emit_endarr_step(end_effects, match_exit);
-                let skip_endarr = match skip_exit {
-                    SkipExit::To(skip) => SkipExit::To(self.emit_endarr_step(end_effects, skip)),
+                let match_list_close = self.emit_list_close_step(end_effects, match_exit);
+                let skip_list_close = match skip_exit {
+                    SkipExit::To(skip) => {
+                        SkipExit::To(self.emit_list_close_step(end_effects, skip))
+                    }
                     SkipExit::Fail => SkipExit::Fail,
                 };
                 self.compile_star_for_list_with_exits(
                     &inner,
                     SplitExits {
-                        match_exit: match_endarr,
-                        skip_exit: skip_endarr,
+                        match_exit: match_list_close,
+                        skip_exit: skip_list_close,
                     },
                     nav,
                     push_effects,
@@ -767,7 +769,7 @@ impl NfaBuilder<'_> {
         };
 
         // Emit the list-open step at entry with outer pre-effects such as VariantOpen.
-        self.emit_arr_step(inner_entry, outer_capture.pre, quant_start)
+        self.emit_list_open_step(inner_entry, outer_capture.pre, quant_start)
     }
 
     fn compile_star_for_list_with_exits(
@@ -995,7 +997,7 @@ impl NfaBuilder<'_> {
             },
 
             QuantifierKind::Optional => {
-                let skip_with_null = match exits {
+                let skip_with_absence = match exits {
                     CaptureExits::Split {
                         skip_exit: SkipExit::To(skip_exit),
                         ..
@@ -1008,19 +1010,19 @@ impl NfaBuilder<'_> {
                         return self.emit_iteration(first_nav_mode, match_exit, compile_body);
                     }
                     CaptureExits::Single(_) => {
-                        let null_exit =
-                            self.emit_null_for_skip_path(match_exit, element_scope.capture());
-                        self.emit_null_for_internal_captures(null_exit, &inner)
+                        let absence_exit =
+                            self.emit_absence_for_skip_path(match_exit, element_scope.capture());
+                        self.emit_absence_for_internal_captures(absence_exit, &inner)
                     }
                 };
 
                 // Any failure backtracks to the entry epsilon's checkpoint, restoring
-                // the pre-navigation cursor and taking skip_with_null.
+                // the pre-navigation cursor and taking `skip_with_absence`.
                 let iterate = self.emit_iteration(first_nav_mode, match_exit, compile_body);
                 self.emit_branch_epsilon(
                     BranchTargets {
                         prefer: iterate,
-                        other: skip_with_null,
+                        other: skip_with_absence,
                     },
                     greediness,
                 )
@@ -1031,8 +1033,8 @@ impl NfaBuilder<'_> {
     /// Compile a quantifier that IS a definition's output: the collected
     /// value is left pending as the call's return value — a captured
     /// quantifier with no consumer of its own. `*`/`+` collect a list
-    /// (`Arr → iterations with Push → EndArr`); `?` leaves the element's
-    /// value pending on the match path and a bare `Null` on the skip path.
+    /// (`ListOpen → iterations with ArrayPush → ListClose`); `?` leaves the element's
+    /// value pending on the match path and a bare `Absent` on the skip path.
     fn compile_valued_quantifier(
         &mut self,
         quant: &ast::QuantifiedPattern,
@@ -1060,7 +1062,7 @@ impl NfaBuilder<'_> {
     ///
     /// The element's value must survive as the pending call value, so a
     /// reference element compiles with the keep-value ref lowering (a plain
-    /// `Set`-consumer chain doesn't exist at a definition's root); a scalar
+    /// `RecordSet`-consumer chain doesn't exist at a definition's root); a scalar
     /// element pends its matched node via a `Node` effect, while structured
     /// elements leave their own value pending.
     fn compile_valued_optional(
@@ -1087,7 +1089,7 @@ impl NfaBuilder<'_> {
         let skip_target = match skip_exit {
             SkipExit::To(skip) => {
                 let end_step = self.quant_end_for(&brackets, skip);
-                let mut skip_effects = vec![EffectIR::null()];
+                let mut skip_effects = vec![EffectIR::absent()];
                 skip_effects.extend(brackets.inner_capture.post.iter().cloned());
                 Some(self.emit_effects_if_nonempty(end_step, skip_effects))
             }

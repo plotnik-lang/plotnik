@@ -43,13 +43,13 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@15)                            15 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  ...
   07  ...
-  08  └‣─  (string_fragment) [Node Set(M0)] =~ /c$/  11
+  08  └‣─  (string_fragment) [Node RecordSet(M0)] =~ /c$/  11
   11  ─‣┘³ _                                12
   12                                        ▶
   13  └‣─  (template_string)                08
@@ -57,7 +57,7 @@ Q:
   15   !   (program)                        14
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@15)                            15 : 03
        ▶   (@15)
 
@@ -68,7 +68,7 @@ Q:
        ●   expression_statement
   13       (template_string)                08
        ●   template_string
-  08       (string_fragment) [Node Set(M0)] =~ /c$/  11
+  08       (string_fragment) [Node RecordSet(M0)] =~ /c$/  11
        ○   `
        ○   template_substitution
        ○   `

@@ -138,7 +138,7 @@ impl NfaBuilder<'_> {
             Nav::Up(1)
         };
 
-        // Split capture.post: Node effects (and their Set) go on entry so
+        // Split capture.post: `Node` effects (and their `RecordSet`) go on entry so
         // they read the cursor immediately after this node matched. Other
         // effects run after child constraints have completed.
         let mut post = capture.post;
@@ -148,16 +148,19 @@ impl NfaBuilder<'_> {
         let mut iter = post.into_iter().peekable();
         while let Some(eff) = iter.next() {
             match eff.kind() {
-                // A capture unit `[SpanStart, Node, Set, SpanEnd]` moves to
-                // the entry as a whole: the Set must stay adjacent to its
-                // pending Node, and the markers must keep hugging the Set.
+                // A capture unit `[SpanStart, Node, RecordSet, SpanEnd]` moves to
+                // the entry as a whole: `RecordSet` must stay adjacent to its
+                // pending `Node`, and the markers must keep hugging `RecordSet`.
                 EffectKind::SpanStart
                     if iter.peek().is_some_and(|e| e.kind() == EffectKind::Node) =>
                 {
                     entry_effects.push(eff);
                     entry_effects.push(iter.next().expect("peeked Node"));
-                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::Set) {
-                        entry_effects.push(iter.next().expect("peeked Set"));
+                    if iter
+                        .peek()
+                        .is_some_and(|e| e.kind() == EffectKind::RecordSet)
+                    {
+                        entry_effects.push(iter.next().expect("peeked RecordSet"));
                     }
                     if iter.peek().is_some_and(|e| e.kind() == EffectKind::SpanEnd) {
                         entry_effects.push(iter.next().expect("peeked SpanEnd"));
@@ -165,8 +168,11 @@ impl NfaBuilder<'_> {
                 }
                 EffectKind::Node => {
                     entry_effects.push(eff);
-                    if iter.peek().is_some_and(|e| e.kind() == EffectKind::Set) {
-                        entry_effects.push(iter.next().expect("peeked Set"));
+                    if iter
+                        .peek()
+                        .is_some_and(|e| e.kind() == EffectKind::RecordSet)
+                    {
+                        entry_effects.push(iter.next().expect("peeked RecordSet"));
                     }
                 }
                 _ => exit_effects.push(eff),
@@ -324,10 +330,9 @@ fn take_scalar_close_prefix(
     }
 
     let consumer_index = close_index + 1;
-    let end = if effects
-        .get(consumer_index)
-        .is_some_and(|effect| matches!(effect.kind(), EffectKind::Set | EffectKind::Push))
-    {
+    let end = if effects.get(consumer_index).is_some_and(|effect| {
+        matches!(effect.kind(), EffectKind::RecordSet | EffectKind::ArrayPush)
+    }) {
         consumer_index + 1
     } else {
         consumer_index
@@ -507,8 +512,8 @@ impl NfaBuilder<'_> {
     /// Call-site scoping: the caller decides whether to wrap with a record scope based on
     /// whether the ref is captured and the called definition returns a struct.
     ///
-    /// - Captured ref returning a record: `StructOpen → Call → StructClose → Set → exit`
-    /// - Captured ref returning scalar: `Call → Set → exit`
+    /// - Captured ref returning a record: `RecordOpen → Call → RecordClose → RecordSet → exit`
+    /// - Captured ref returning scalar: `Call → RecordSet → exit`
     /// - Bare ref returning output effects: `SuppressBegin → Call → SuppressEnd → exit`
     ///   (matches structurally, output discarded)
     /// - Bare ref to a void or node-scalar definition: `Call → exit`
@@ -571,12 +576,12 @@ impl NfaBuilder<'_> {
         // Call instructions cannot carry effects, so emit epsilon if needed.
         let call_entry = match lowering {
             RefLowering::ScopedCapture => {
-                // A record scope isolates the definition's internal captures before the Set.
+                // A record scope isolates the definition's internal captures before `RecordSet`.
                 let set_step =
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
-                let struct_close_step = self.emit_struct_close_step(set_step);
-                let call_label = emit_call(self, ReturnAddr(struct_close_step));
-                self.emit_struct_step(call_label)
+                let record_close_step = self.emit_record_close_step(set_step);
+                let call_label = emit_call(self, ReturnAddr(record_close_step));
+                self.emit_record_open_step(call_label)
             }
             RefLowering::CapturedValue => {
                 let return_addr =
@@ -656,8 +661,8 @@ impl NfaBuilder<'_> {
     /// The lowering mirrors [`ref_call_lowering`](Self::ref_call_lowering) with
     /// the body substituted for the `Call`:
     ///
-    /// - Captured ref returning a record: `StructOpen → body → StructClose → Set → exit(s)`
-    /// - Captured ref returning scalar: `body → Set → exit(s)`
+    /// - Captured ref returning a record: `RecordOpen → body → RecordClose → RecordSet → exit(s)`
+    /// - Captured ref returning scalar: `body → RecordSet → exit(s)`
     /// - Bare ref: body compiled under suppression (compile-time — no
     ///   `SuppressBegin`/`SuppressEnd` brackets needed)
     ///
@@ -761,18 +766,18 @@ impl NfaBuilder<'_> {
         self.inline_stack.push(def_id);
         let entry = if inline_scoped_capture {
             // A record scope isolates the definition's internal captures before the
-            // Set; both continuations close it (a zero-width body still
+            // `RecordSet`; both continuations close it (a zero-width body still
             // produced its row of skip-path values, e.g. `{x: null}`).
             let end = ScopeCloseEffects {
                 leading: &[],
                 capture: &post,
                 outer: &[],
             };
-            let close_match = self.emit_struct_close_step_with_effects(end, match_exit);
+            let close_match = self.emit_record_close_step_with_effects(end, match_exit);
             let close_skip = match skip_exit {
                 SkipExit::To(skip) if skip == match_exit => SkipExit::To(close_match),
                 SkipExit::To(skip) => {
-                    SkipExit::To(self.emit_struct_close_step_with_effects(end, skip))
+                    SkipExit::To(self.emit_record_close_step_with_effects(end, skip))
                 }
                 SkipExit::Fail => SkipExit::Fail,
             };
@@ -792,7 +797,7 @@ impl NfaBuilder<'_> {
                 this.compile_nullable_pattern(body, pattern_ctx, body_skip_exit)
             });
             let body_entry = self.wrap_def_body_entry(body_entry, def_span);
-            self.emit_struct_step_with_pre(body_entry, pre)
+            self.emit_record_open_step_with_pre(body_entry, pre)
         } else if is_captured {
             // Scalar-valued (variant) body: it leaves its value pending; the
             // consumer chain runs after it on either continuation.
@@ -1099,10 +1104,10 @@ impl NfaBuilder<'_> {
     /// other (the drift behind #470 and the suppressive `@_` panic).
     ///
     /// Capture effects land on the innermost match / scope-close instruction:
-    /// - Node:   inner_pattern[Node, Set] → exit
-    /// - Record: StructOpen → inner[…] → StructClose+capture → exit
-    /// - List: Arr → quantifier (with Push) → EndArr+capture → exit
-    /// - Ref:    Call → Set epsilon → exit
+    /// - Node:   inner_pattern[Node, RecordSet] → exit
+    /// - Record: RecordOpen → inner[…] → RecordClose+capture → exit
+    /// - List: ListOpen → quantifier (with ArrayPush) → ListClose+capture → exit
+    /// - Ref:    Call → RecordSet epsilon → exit
     /// - Suppressive: SuppressBegin → inner → SuppressEnd → outer_effects → exit
     pub(super) fn compile_captured(
         &mut self,
@@ -1115,7 +1120,7 @@ impl NfaBuilder<'_> {
         // Must precede mechanism dispatch: suppressive captures ignore the mechanism
         // entirely and must not build any capture effects for it. Inside an
         // already-suppressed region every capture is equally inert — inference
-        // dropped its field, so emitting a Set would resolve against the wrong
+        // dropped its field, so emitting `RecordSet` would resolve against the wrong
         // scope (the panic behind #470).
         if cap.is_suppressive() || self.is_suppressed() {
             return self.compile_suppressive(
@@ -1149,11 +1154,11 @@ impl NfaBuilder<'_> {
         let req = CaptureRequest::for_capture(self, cap, nav_override, mechanism, outer_capture);
 
         match mechanism {
-            // List: Arr → quantifier (with Push) → EndArr+capture → exit(s).
+            // List: `ListOpen → quantifier (with ArrayPush) → ListClose+capture → exit(s)`.
             CaptureKind::List => self.compile_list_capture(req, exits),
 
-            // Record scope: StructOpen → inner → StructClose+capture → exit(s) (also empty `{}`).
-            // Without the wrapper the Set lands on the raw inner node and both the
+            // Record scope: RecordOpen → inner → RecordClose+capture → exit(s) (also empty `{}`).
+            // Without the wrapper `RecordSet` lands on the raw inner node and both the
             // struct scope and the inner Sets are lost (#470).
             CaptureKind::Record => self.compile_record_capture(req, exits),
 
@@ -1161,7 +1166,7 @@ impl NfaBuilder<'_> {
             // part of the inner). With split exits all three fold the capture onto the
             // body and recurse, letting the inner optional/star own the skip/match
             // split; that context always enters with empty `pre`, so the per-mechanism
-            // single-exit handling (PendingValue's trailing Set, Node's bubble) is
+            // single-exit handling (PendingValue's trailing `RecordSet`, Node's bubble) is
             // unnecessary there.
             mechanism @ (CaptureKind::Node | CaptureKind::Ref | CaptureKind::PendingValue) => {
                 match exits {
@@ -1213,13 +1218,13 @@ impl NfaBuilder<'_> {
             self.dispatch_pattern(&inner, PatternCtx::with_value(set_step, nav_override));
         // The enclosing variant type's `VariantOpen` (in `pre`) must run before the
         // inner produces its pending value; routing it through the trailing
-        // `Set` step would drop it and unbalance the scope.
+        // `RecordSet` step would drop it and unbalance the scope.
         self.wrap_entry_pre(inner_entry, pre)
     }
 
     /// Single-exit lowering for a `Ref` capture: hand the capture to the call
-    /// site, which wraps Call/Return (and StructOpen/StructClose for record-returning
-    /// definitions) to isolate the definition's internal captures before the Set.
+    /// site, which wraps Call/Return (and RecordOpen/RecordClose for record-returning
+    /// definitions) to isolate the definition's internal captures before `RecordSet`.
     fn compile_ref_capture(&mut self, req: CaptureRequest, exit: Label) -> Label {
         let CaptureRequest {
             inner,

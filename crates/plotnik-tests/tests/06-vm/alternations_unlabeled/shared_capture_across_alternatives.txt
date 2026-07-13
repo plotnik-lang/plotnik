@@ -45,21 +45,21 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@17)                            17 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘² _                                06
-  08   !   (identifier) [Node Set(M0)]      07
-  10   !   (number) [Node Set(M0)]          07
+  08   !   (identifier) [Node RecordSet(M0)]  07
+  10   !   (number) [Node RecordSet(M0)]    07
   12  ──!  _                                08, 10, 12
   14  └─!  _                                08, 10, 12
   16  └‣─  (expression_statement)           14
   17   !   (program)                        16
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@17)                            17 : 03
        ▶   (@17)
 
@@ -70,15 +70,15 @@ Q:
        ●   expression_statement
   14       _                                08, 10, 12
        ●   number
-  08       (identifier) [Node Set(M0)]      07
+  08       (identifier) [Node RecordSet(M0)]  07
        ○   number
   14  ❮❮❮ 
-  10       (number) [Node Set(M0)]          07
+  10       (number) [Node RecordSet(M0)]    07
        ●   number
   07       _                                06
        ●   program
   06   ◀   (@17)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

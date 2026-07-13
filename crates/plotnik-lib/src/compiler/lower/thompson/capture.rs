@@ -1,6 +1,6 @@
 //! Capture effects handling for query compilation.
 //!
-//! Manages the construction and propagation of capture effects (Node + Set)
+//! Manages the construction and propagation of capture effects (`Node` + `RecordSet`).
 //! through the compilation pipeline.
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
@@ -54,9 +54,9 @@ impl CaptureEffects {
         assert!(
             matches!(
                 open.kind(),
-                EffectKind::StructOpen
+                EffectKind::RecordOpen
                     | EffectKind::VariantOpen
-                    | EffectKind::ArrayOpen
+                    | EffectKind::ListOpen
                     | EffectKind::SuppressBegin
             ),
             "nest_scope expects scope-opening effect, got {:?}",
@@ -65,9 +65,9 @@ impl CaptureEffects {
         assert!(
             matches!(
                 close.kind(),
-                EffectKind::StructClose
+                EffectKind::RecordClose
                     | EffectKind::VariantClose
-                    | EffectKind::ArrayClose
+                    | EffectKind::ListClose
                     | EffectKind::SuppressEnd
             ),
             "nest_scope expects scope-closing effect, got {:?}",
@@ -91,7 +91,7 @@ impl CaptureEffects {
 
     /// Add post-match value effects (run before any scope closes).
     ///
-    /// Use for: Node+Set capture effects, Push for lists
+    /// Use for `Node` + `RecordSet` capture effects and `ArrayPush` for lists.
     ///
     /// Given `post=[Scope_Close]`, adding value effects:
     /// - Result: `post=[Value1, Value2, Scope_Close]`
@@ -111,7 +111,7 @@ impl CaptureEffects {
         effects
             .iter()
             .find(|e| !e.is_span_marker())
-            .is_some_and(|e| matches!(e.kind(), EffectKind::Set | EffectKind::Push))
+            .is_some_and(|e| matches!(e.kind(), EffectKind::RecordSet | EffectKind::ArrayPush))
     }
 
     /// Wrap this channel in a construct's span brackets. The start runs after
@@ -136,8 +136,8 @@ pub(super) fn first_unmatched_close(post: &[EffectIR]) -> Option<usize> {
                 }
                 span_depth -= 1;
             }
-            EffectKind::ArrayClose
-            | EffectKind::StructClose
+            EffectKind::ListClose
+            | EffectKind::RecordClose
             | EffectKind::VariantClose
             | EffectKind::SuppressEnd
             | EffectKind::StrClose
@@ -189,7 +189,7 @@ impl PatternCtx {
 }
 
 impl NfaBuilder<'_> {
-    /// Build capture effects (Node + Set) for a capture whose inner was
+    /// Build capture effects (`Node` + `RecordSet`) for a capture whose inner was
     /// classified as `mechanism` (or `None` for a bare `@x`).
     ///
     /// The caller already classifies the inner to dispatch, so it passes the
@@ -204,14 +204,14 @@ impl NfaBuilder<'_> {
 
         // Only the `Node` mechanism captures the matched node directly. Every
         // other mechanism (record scope, pass-through ref/variant/forward, list)
-        // produces its value via StructClose/VariantClose/ArrayClose/Call, so the capture itself
+        // produces its value via RecordClose/VariantClose/ListClose/Call, so the capture itself
         // emits no Node. A bare capture (`@x` with no inner) is a Node.
         let is_node_mechanism = mechanism.is_none_or(|m| m == CaptureKind::Node);
         if is_node_mechanism {
             effects.push(EffectIR::node());
         }
 
-        // Add Set effect if we have a capture name.
+        // Add `RecordSet` if we have a capture name.
         // Always look up in the current scope - bubble captures don't create new scopes,
         // so all fields (including nested bubble captures) reference the same root struct.
         if let Some(name_token) = cap.name() {
@@ -231,7 +231,7 @@ impl NfaBuilder<'_> {
                 let member = self
                     .lookup_member(capture_name, type_id)
                     .expect("captured field must resolve in the current scope");
-                effects.push(EffectIR::with_member(EffectKind::Set, member));
+                effects.push(EffectIR::with_member(EffectKind::RecordSet, member));
                 member_ref = Some(member);
             }
         }
@@ -247,11 +247,11 @@ impl NfaBuilder<'_> {
         effects
     }
 
-    /// Check if a quantifier body needs Node effect before Push.
+    /// Check if a quantifier body needs `Node` before `ArrayPush`.
     ///
-    /// For scalar list elements (Node type), we need [Node, Push]
+    /// For scalar list elements (`Node` type), we need `[Node, ArrayPush]`.
     /// to capture the matched node value.
-    /// For structured elements, StructClose/VariantClose provides the value.
+    /// For structured elements, RecordClose/VariantClose provides the value.
     /// For refs returning structured types, Call provides the value.
     pub(super) fn quantifier_needs_node_for_push(&self, pattern: &Pattern) -> bool {
         let Pattern::QuantifiedPattern(quant) = pattern else {
@@ -267,7 +267,7 @@ impl NfaBuilder<'_> {
     /// Whether a quantifier element needs a `Node` effect to produce its value.
     ///
     /// A ref returning a structured type leaves its value pending via Call/Return;
-    /// a struct- or variant-shaped element leaves it pending via StructClose/VariantClose.
+    /// a struct- or variant-shaped element leaves it pending via RecordClose/VariantClose.
     /// Everything else (a plain node match) needs an explicit `Node`.
     pub(super) fn element_needs_node(&self, element: &Pattern) -> bool {
         if self.is_ref_returning_structured(element) {
@@ -292,7 +292,7 @@ impl NfaBuilder<'_> {
     /// Check if pattern is (or wraps) a ref returning a structured type.
     ///
     /// For such refs, we skip the Node effect in captures - the Call leaves
-    /// the structured result pending for Set to consume.
+    /// the structured result pending for `RecordSet` to consume.
     pub(super) fn is_ref_returning_structured(&self, pattern: &Pattern) -> bool {
         match pattern {
             Pattern::DefRef(_) => self.ctx.analysis.type_analysis.ref_returns_structured(

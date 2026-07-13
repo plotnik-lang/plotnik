@@ -11,15 +11,15 @@ Q:
   01                                        ▶
   02   !   (statement_block)                08
   04  ─◦┘  _                                01
-  05   !   "}" [Node Set(op)]               04
+  05   !   "}" [Node RecordSet(op)]         04
   07  ──!  _                                05, 07
   08  └─!  _                                05, 07
 
 Q (entrypoint):
   09                                        ▶
-  10  -ε-  [StructClose]                    09
+  10  -ε-  [RecordClose]                    09
   11       (Q)                              02 : 10
-  12  -ε-  [StructOpen]                     11
+  12  -ε-  [RecordOpen]                     11
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -43,11 +43,11 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@14)                            14 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06   !   "}" [Node Set(M0)]               08
+  06   !   "}" [Node RecordSet(M0)]         08
   08  ─◦┘  _                                09
   09                                        ▶
   10  ──!  _                                06, 10

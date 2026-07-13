@@ -27,7 +27,7 @@ fn match_ir_size_extended() {
         .node_kind(NodeKindConstraint::Named(
             NonZeroU16::new(10).map(NodeKindId::from),
         ))
-        .prepend_effect(EffectIR::start_struct())
+        .prepend_effect(EffectIR::record_open())
         .append_effect(EffectIR::node())
         .next(Label(1));
 

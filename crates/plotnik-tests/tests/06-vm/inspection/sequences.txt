@@ -168,13 +168,13 @@ P8 pattern    83..95  src0
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08  └‣─  name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node Set(M0) SpanEnd#6 SpanEnd#8 SpanEnd#7]  12
+  08  └‣─  name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node RecordSet(M0) SpanEnd#6 SpanEnd#8 SpanEnd#7]  12
   12  ─‣┘  _ [SpanEnd#5]                    14
   14  ─‣┘  _ [SpanEnd#2 SpanEnd#1 SpanEnd#0]  06
   16  └‣─  (function_declaration) [SpanEnd#3 SpanStartAt#5]  08
@@ -188,7 +188,7 @@ Q:
   30   !   (program) [SpanStart#0 SpanStartAt#1 SpanStart#2]  28
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03
        ▶   (@30)
 
@@ -205,7 +205,7 @@ Q:
   28  ❮❮❮ 
   16       (function_declaration) [SpanEnd#3 SpanStartAt#5]  08
        ●   function_declaration
-  08       name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node Set(M0) SpanEnd#6 SpanEnd#8 SpanEnd#7]  12
+  08       name: (identifier) [SpanStart#7 SpanStartAt#8 SpanStart#6 Node RecordSet(M0) SpanEnd#6 SpanEnd#8 SpanEnd#7]  12
        ○   function
        ●   identifier
   12       _ [SpanEnd#5]                    14
@@ -215,5 +215,5 @@ Q:
   06   ◀   (@30)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

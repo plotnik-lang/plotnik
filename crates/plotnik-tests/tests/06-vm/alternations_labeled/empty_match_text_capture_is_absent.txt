@@ -48,14 +48,14 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@26)                            26 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  -ε-  [StrClose Set(M0)]               08
+  06  -ε-  [StrClose RecordSet(M0)]         08
   08  ─‣┘  _                                09
   09                                        ▶
-  10  -ε-  [StrClose Set(M0)]               09
+  10  -ε-  [StrClose RecordSet(M0)]         09
   12   !   (comment) [ScalarMark]           06
   14  ──!  _                                12, 14
   16   !   _                                12, 14
@@ -66,7 +66,7 @@ Q:
   26   !   (program)                        24
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@26)                            26 : 03
        ▶   (@26)
 
@@ -76,9 +76,9 @@ Q:
   24  -ε-  [ScalarOpen]                     22, 10
   22       _                                16, 18, 20
   24  ❮❮❮ 
-  10  -ε-  [StrClose Set(M0)]               09
+  10  -ε-  [StrClose RecordSet(M0)]         09
   09   ◀   (@26)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

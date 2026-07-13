@@ -49,21 +49,21 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@19)                            19 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘² _                                06
-  08   !   (_) [Null Set(M1) Node Set(M0)]  07
-  11   !   (identifier) [Null Set(M0) Node Set(M1)]  07
+  08   !   (_) [Absent RecordSet(M1) Node RecordSet(M0)]  07
+  11   !   (identifier) [Absent RecordSet(M0) Node RecordSet(M1)]  07
   14  ──!  _                                08, 11, 14
   16  └─!  _                                08, 11, 14
   18  └‣─  (expression_statement)           16
   19   !   (program)                        18
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@19)                            19 : 03
        ▶   (@19)
 
@@ -74,12 +74,12 @@ Q:
        ●   expression_statement
   16       _                                08, 11, 14
        ●   identifier
-  08       (_) [Null Set(M1) Node Set(M0)]  07
+  08       (_) [Absent RecordSet(M1) Node RecordSet(M0)]  07
        ●   identifier
   07       _                                06
        ●   program
   06   ◀   (@19)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

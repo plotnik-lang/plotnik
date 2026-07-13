@@ -803,15 +803,15 @@ impl<'t> VM<'t> {
                     BoolValue => self.engine.bool_value(op.payload != 0),
                     _ => self.engine.emit_data(|cursor| match op.kind {
                         Node => RuntimeEffect::Node(cursor.node()),
-                        ArrayOpen => RuntimeEffect::ArrayOpen,
-                        Push => RuntimeEffect::Push,
-                        ArrayClose => RuntimeEffect::ArrayClose,
-                        StructOpen => RuntimeEffect::StructOpen,
-                        StructClose => RuntimeEffect::StructClose,
-                        Set => RuntimeEffect::Set(op.payload as u16),
+                        ListOpen => RuntimeEffect::ListOpen,
+                        ArrayPush => RuntimeEffect::ArrayPush,
+                        ListClose => RuntimeEffect::ListClose,
+                        RecordOpen => RuntimeEffect::RecordOpen,
+                        RecordClose => RuntimeEffect::RecordClose,
+                        RecordSet => RuntimeEffect::RecordSet(op.payload as u16),
                         VariantOpen => RuntimeEffect::VariantOpen(op.payload as u16),
                         VariantClose => RuntimeEffect::VariantClose,
-                        Null => RuntimeEffect::Null,
+                        Absent => RuntimeEffect::Absent,
                         SuppressBegin | SuppressEnd | SpanStartAt | SpanStart | SpanEnd
                         | ScalarOpen | ScalarMark | StrClose | BoolClose | NodeStr | NodeBool
                         | BoolValue => {

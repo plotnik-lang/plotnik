@@ -34,7 +34,7 @@ impl ValueDestination {
     fn into_effects(self) -> Vec<EffectIR> {
         match self {
             Self::Pending => vec![],
-            Self::ListItem => vec![EffectIR::push()],
+            Self::ListItem => vec![EffectIR::array_push()],
             Self::Effects(effects) => effects,
         }
     }
@@ -139,7 +139,7 @@ impl<'a> NfaBuilder<'a> {
             .lookup_member_in_scope(&name.text()[1..])
             .expect("capture field resolves in its output scope");
         let mut entry = Vec::new();
-        let mut effects = vec![EffectIR::with_member(EffectKind::Set, member)];
+        let mut effects = vec![EffectIR::with_member(EffectKind::RecordSet, member)];
         if let Some(id) = self.span_id(capture.syntax(), SpanKind::Capture) {
             self.bind_span(id, SpanBindingIR::Member(member));
             entry.push(EffectIR::span_start(id.0));
@@ -361,7 +361,7 @@ impl CaptureTypeLowerer<'_, '_> {
         let skipped = match skip_exit {
             SkipExit::To(exit) => Some(match mode {
                 OptionMode::Preserve => {
-                    let mut effects = vec![EffectIR::null()];
+                    let mut effects = vec![EffectIR::absent()];
                     effects.extend(destination.into_effects());
                     self.compiler
                         .emit_effects_epsilon(exit, effects, CaptureEffects::default())
@@ -395,7 +395,7 @@ impl CaptureTypeLowerer<'_, '_> {
         destination: ValueDestination,
     ) -> Label {
         let close = |compiler: &mut NfaBuilder<'_>, exit, destination: ValueDestination| {
-            let mut effects = vec![EffectIR::end_arr()];
+            let mut effects = vec![EffectIR::list_close()];
             effects.extend(destination.into_effects());
             compiler.emit_effects_epsilon(exit, effects, CaptureEffects::default())
         };
@@ -422,7 +422,7 @@ impl CaptureTypeLowerer<'_, '_> {
         );
         self.compiler.emit_effects_epsilon(
             iterations,
-            vec![EffectIR::start_arr()],
+            vec![EffectIR::list_open()],
             CaptureEffects::default(),
         )
     }

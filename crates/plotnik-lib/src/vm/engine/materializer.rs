@@ -9,7 +9,7 @@ use plotnik_rt::RuntimeEffect;
 
 pub struct ValueMaterializer<'a> {
     source: &'a str,
-    /// Member names resolved once, indexed by the `Set`/`VariantOpen` payload.
+    /// Member names resolved once, indexed by the `RecordSet`/`VariantOpen` payload.
     /// Kills the two-table lookup and the string-table UTF-8 walk per effect.
     member_names: Box<[&'a str]>,
 }
@@ -54,7 +54,7 @@ pub fn materialize_verified<'s>(
 
 /// Value accumulator for stack-based materialization.
 enum ValueAccumulator<'s> {
-    Array(Vec<Value<'s>>),
+    List(Vec<Value<'s>>),
     Record(Vec<(&'s str, Value<'s>)>),
     Variant {
         tag: &'s str,
@@ -69,7 +69,7 @@ enum ValueAccumulator<'s> {
 impl ValueAccumulator<'_> {
     fn kind(&self) -> &'static str {
         match self {
-            ValueAccumulator::Array(_) => "Array",
+            ValueAccumulator::List(_) => "List",
             ValueAccumulator::Record(_) => "Record",
             ValueAccumulator::Variant { .. } => "Variant",
             ValueAccumulator::Scalar(_) => "Scalar",
@@ -82,7 +82,7 @@ impl<'a> ValueMaterializer<'a> {
         let mut stack: Vec<ValueAccumulator<'a>> = vec![];
         let mut scalar_ranges: Vec<Option<std::ops::Range<usize>>> = vec![];
 
-        // Pending value from Node/Null (consumed by Set/Push)
+        // Pending output value consumed by `RecordSet` or `ArrayPush`.
         let mut pending: Option<Value<'a>> = None;
 
         for (effect_idx, effect) in effects.iter().enumerate() {
@@ -90,7 +90,7 @@ impl<'a> ValueMaterializer<'a> {
                 RuntimeEffect::Node(n) => {
                     pending = Some(Value::Node(NodeHandle::from_node(*n, self.source)));
                 }
-                RuntimeEffect::Null => {
+                RuntimeEffect::Absent => {
                     pending = Some(Value::Null);
                 }
                 RuntimeEffect::NodeStr(node) => {
@@ -158,55 +158,55 @@ impl<'a> ValueMaterializer<'a> {
                     pending = Some(Value::Bool(*value));
                 }
                 RuntimeEffect::SpanStart { .. } | RuntimeEffect::SpanEnd(_) => {}
-                RuntimeEffect::ArrayOpen => {
-                    stack.push(ValueAccumulator::Array(vec![]));
+                RuntimeEffect::ListOpen => {
+                    stack.push(ValueAccumulator::List(vec![]));
                 }
-                RuntimeEffect::Push => {
+                RuntimeEffect::ArrayPush => {
                     let val = pending
                         .take()
-                        .expect("Push requires a produced value (verified at load)");
-                    let Some(ValueAccumulator::Array(arr)) = stack.last_mut() else {
+                        .expect("ArrayPush requires a produced value (verified at load)");
+                    let Some(ValueAccumulator::List(arr)) = stack.last_mut() else {
                         panic!(
-                            "effect {effect_idx}: Push expects Array on stack, found {:?}",
+                            "effect {effect_idx}: ArrayPush expects List on stack, found {:?}",
                             stack.last().map(|b| b.kind())
                         );
                     };
                     arr.push(val);
                 }
-                RuntimeEffect::ArrayClose => {
+                RuntimeEffect::ListClose => {
                     let top = stack.pop();
-                    let Some(ValueAccumulator::Array(arr)) = top else {
+                    let Some(ValueAccumulator::List(arr)) = top else {
                         panic!(
-                            "effect {effect_idx}: ArrayClose expects Array on stack, found {:?}",
+                            "effect {effect_idx}: ListClose expects List on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };
                     pending = Some(Value::Array(arr));
                 }
-                RuntimeEffect::StructOpen => {
+                RuntimeEffect::RecordOpen => {
                     stack.push(ValueAccumulator::Record(vec![]));
                 }
-                RuntimeEffect::Set(idx) => {
+                RuntimeEffect::RecordSet(idx) => {
                     let field_name = self.resolve_member_name(*idx);
                     let val = pending
                         .take()
-                        .expect("Set requires a produced value (verified at load)");
+                        .expect("RecordSet requires a produced value (verified at load)");
                     match stack.last_mut() {
                         Some(ValueAccumulator::Record(fields)) => fields.push((field_name, val)),
                         Some(ValueAccumulator::Variant { fields, .. }) => {
                             fields.push((field_name, val))
                         }
                         other => panic!(
-                            "effect {effect_idx}: Set expects Record/Variant on stack, found {:?}",
+                            "effect {effect_idx}: RecordSet expects Record/Variant on stack, found {:?}",
                             other.map(|b| b.kind())
                         ),
                     }
                 }
-                RuntimeEffect::StructClose => {
+                RuntimeEffect::RecordClose => {
                     let top = stack.pop();
                     let Some(ValueAccumulator::Record(fields)) = top else {
                         panic!(
-                            "effect {effect_idx}: StructClose expects Record on stack, found {:?}",
+                            "effect {effect_idx}: RecordClose expects Record on stack, found {:?}",
                             top.as_ref().map(|b| b.kind())
                         );
                     };

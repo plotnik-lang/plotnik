@@ -13,19 +13,19 @@ Q:
   01                                        ▶
   02   !   (program)                        14, 04
   03  ─‣┘  _                                01
-  04  └‣─  (expression_statement) [BoolValue(0) Set(has_comment)]  06
+  04  └‣─  (expression_statement) [BoolValue(0) RecordSet(has_comment)]  06
   05  ─‣┘  _                                03
-  06  └‣─  (identifier) [NodeStr Set(name)]  05
-  07  ─‣─  (expression_statement) [BoolValue(1) Set(has_comment)]  06
+  06  └‣─  (identifier) [NodeStr RecordSet(name)]  05
+  07  ─‣─  (expression_statement) [BoolValue(1) RecordSet(has_comment)]  06
   11   !   (comment)                        07
   13  ──!  _                                11, 13
   14  └─!  _                                11, 13
 
 Q (entrypoint):
   17                                        ▶
-  18  -ε-  [StructClose]                    17
+  18  -ε-  [RecordClose]                    17
   19       (Q)                              02 : 18
-  20  -ε-  [StructOpen]                     19
+  20  -ε-  [RecordOpen]                     19
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -54,16 +54,16 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  └‣─  (identifier) [NodeStr Set(M1)]   08
+  06  └‣─  (identifier) [NodeStr RecordSet(M1)]  08
   08  ─‣┘  _                                09
   09  ─‣┘  _                                10
   10                                        ▶
-  11  └‣─  (expression_statement) [BoolValue(0) Set(M0)]  06
-  13  ─‣─  (expression_statement) [BoolValue(1) Set(M0)]  06
+  11  └‣─  (expression_statement) [BoolValue(0) RecordSet(M0)]  06
+  13  ─‣─  (expression_statement) [BoolValue(1) RecordSet(M0)]  06
   15   !   (comment)                        13
   16  ──!  _                                15, 16
   18  └─!  _                                15, 16

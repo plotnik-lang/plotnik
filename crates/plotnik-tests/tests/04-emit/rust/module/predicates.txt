@@ -65,17 +65,17 @@ impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
 
 /// Replay one committed `Q` value.
 fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'t> {
-    t.expect_struct_open();
+    t.expect_record_open();
     let mut v0 = None; // id
-    while !t.at_struct_close() {
-        match t.peek_set() {
+    while !t.at_record_close() {
+        match t.peek_record_set() {
             // id
             0 => v0 = Some(t.expect_node()),
             other => unreachable!("trace shape proven at emit: `Q` has no member index {other}"),
         }
-        t.expect_set();
+        t.expect_record_set();
     }
-    t.expect_struct_close();
+    t.expect_record_close();
     Q {
         id: v0.expect("field-stability: every accepting path sets `id`"),
     }
@@ -319,7 +319,7 @@ mod matcher {
                 }
                 Flow::Jump(S01_Q)
             }
-            //   06  └‣─  (identifier) [Node Set(id)] == "foo"  05
+            //   06  └‣─  (identifier) [Node RecordSet(id)] == "foo"  05
             S06_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Down).is_none() {
                     break 'state Flow::Backtrack;
@@ -346,9 +346,9 @@ mod matcher {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   08  -ε-  [StructClose]                    07
+            //   08  -ε-  [RecordClose]                    07
             S08_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordClose);
                 Flow::Jump(S07_Q_EP)
             }
             //   09       (Q)                              02 : 08
@@ -356,9 +356,9 @@ mod matcher {
                 eng.enter_frame(S08_Q_EP);
                 Flow::Jump(S02_Q)
             }
-            //   10  -ε-  [StructOpen]                     09
+            //   10  -ε-  [RecordOpen]                     09
             S10_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordOpen);
                 Flow::Jump(S09_Q_EP)
             }
             _ => unreachable!("ip {ip} is not a generated state"),
@@ -416,7 +416,7 @@ mod matcher {
     #[inline]
     fn finish_s06_q(eng: &mut rt::Engine<'_>) -> Flow {
         eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
-        eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(id)
+        eng.emit_data(|_| rt::RuntimeEffect::RecordSet(0)); // RecordSet(id)
         Flow::Jump(S05_Q)
     }
 

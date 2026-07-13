@@ -15,32 +15,32 @@ Inner:
   01                                        ▶
   02   !   (call_expression)                04
   03  ─‣┘  _                                01
-  04  └‣─  (identifier) [Node Set(name)]    03
+  04  └‣─  (identifier) [Node RecordSet(name)]  03
 
 Outer:
   06                                        ▶
   07   !   (array)                          25
-  08  ─‣┘  _ [ArrayClose Set(items)]        06
-  10  -ε-  [ArrayClose Set(items)]          06
-  12  -ε-  [StructClose Push]               19, 08
-  14  -ε-  [StructClose Set(item)]          12
+  08  ─‣┘  _ [ListClose RecordSet(items)]   06
+  10  -ε-  [ListClose RecordSet(items)]     06
+  12  -ε-  [RecordClose ArrayPush]          19, 08
+  14  -ε-  [RecordClose RecordSet(item)]    12
   15   !   (Inner)                          02 : 14
-  17  -ε-  [StructOpen StructOpen]          15
+  17  -ε-  [RecordOpen RecordOpen]          15
   19  ──!  _                                17, 19
   20  └─!  _                                17, 19
-  25  -ε-  [ArrayOpen]                      20, 10
+  25  -ε-  [ListOpen]                       20, 10
 
 Inner (entrypoint):
   26                                        ▶
-  27  -ε-  [StructClose]                    26
+  27  -ε-  [RecordClose]                    26
   28       (Inner)                          02 : 27
-  29  -ε-  [StructOpen]                     28
+  29  -ε-  [RecordOpen]                     28
 
 Outer (entrypoint):
   30                                        ▶
-  31  -ε-  [StructClose]                    30
+  31  -ε-  [RecordClose]                    30
   32       (Outer)                          07 : 31
-  33  -ε-  [StructOpen]                     32
+  33  -ε-  [RecordOpen]                     32
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -77,29 +77,29 @@ Outer = 06 :: T4
 
 [transitions]
 Inner:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Outer:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@36)                            36 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
-  12  └‣─  (identifier) [Node Set(M0)]      14
+  12  └‣─  (identifier) [Node RecordSet(M0)]  14
   14  ─‣┘  _                                15
   15                                        ▶
   16   !   (call_expression)                12
   17                                        ▶
-  18  -ε-  [ArrayClose Set(M2)]             17
-  20  -ε-  [StructClose Push]               27, 34
-  22  -ε-  [StructClose Set(M1)]            20
+  18  -ε-  [ListClose RecordSet(M2)]        17
+  20  -ε-  [RecordClose ArrayPush]          27, 34
+  22  -ε-  [RecordClose RecordSet(M1)]      20
   24   !   (@16)                            16 : 22
-  25  -ε-  [StructOpen StructOpen]          24
+  25  -ε-  [RecordOpen RecordOpen]          24
   27  ──!  _                                25, 27
   29  └─!  _                                25, 27
   31  ...
-  32  -ε-  [ArrayOpen]                      29, 18
-  34  ─‣┘  _ [ArrayClose Set(M2)]           17
+  32  -ε-  [ListOpen]                       29, 18
+  34  ─‣┘  _ [ListClose RecordSet(M2)]      17
   36   !   (array)                          32

@@ -4,7 +4,8 @@
 //! in label space, keeping the resolution the wire format erases: symbolic labels
 //! instead of packed step addresses, definition-name section headers from label
 //! provenance (`Name (consuming):` for the guarded-recursion body variant,
-//! `Name (entrypoint):` for wrappers), real member names on `Set`/`VariantOpen`,
+//! `Name (entrypoint):` for wrappers), real member names on
+//! `RecordSet`/`VariantOpen`,
 //! callee names on calls (`(Name+)` marks a consuming-body callee), and inline
 //! predicate text — the IR has no string table to index into.
 
@@ -297,16 +298,16 @@ impl NfaDumper<'_> {
     fn effect(&self, e: &EffectIR) -> String {
         match e.kind() {
             EffectKind::Node => "Node".to_string(),
-            EffectKind::ArrayOpen => "ArrayOpen".to_string(),
-            EffectKind::Push => "Push".to_string(),
-            EffectKind::ArrayClose => "ArrayClose".to_string(),
-            EffectKind::StructOpen => "StructOpen".to_string(),
-            EffectKind::StructClose => "StructClose".to_string(),
+            EffectKind::ListOpen => "ListOpen".to_string(),
+            EffectKind::ArrayPush => "ArrayPush".to_string(),
+            EffectKind::ListClose => "ListClose".to_string(),
+            EffectKind::RecordOpen => "RecordOpen".to_string(),
+            EffectKind::RecordClose => "RecordClose".to_string(),
             EffectKind::VariantClose => "VariantClose".to_string(),
-            EffectKind::Null => "Null".to_string(),
+            EffectKind::Absent => "Absent".to_string(),
             EffectKind::SuppressBegin => "SuppressBegin".to_string(),
             EffectKind::SuppressEnd => "SuppressEnd".to_string(),
-            EffectKind::Set => format!("Set({})", self.member_name(e.payload())),
+            EffectKind::RecordSet => format!("RecordSet({})", self.member_name(e.payload())),
             EffectKind::VariantOpen => format!("VariantOpen({})", self.member_name(e.payload())),
             EffectKind::SpanStartAt => format!("SpanStartAt#{}", literal(e.payload())),
             EffectKind::SpanStart => format!("SpanStart#{}", literal(e.payload())),
@@ -323,7 +324,7 @@ impl NfaDumper<'_> {
 
     fn member_name(&self, payload: &EffectArg) -> String {
         let EffectArg::Member(member) = payload else {
-            unreachable!("Set/VariantOpen effects are built with member refs");
+            unreachable!("RecordSet/VariantOpen effects are built with member refs");
         };
 
         let shape = self

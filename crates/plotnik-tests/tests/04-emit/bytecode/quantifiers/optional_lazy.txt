@@ -10,16 +10,16 @@ Q:
   01                                        ▶
   02   !   (function_declaration)           04, 08
   03  ─‣┘  _                                01
-  04  -ε-  [Null Set(dec)]                  01
-  05   !   (decorator) [Node Set(dec)]      03
+  04  -ε-  [Absent RecordSet(dec)]          01
+  05   !   (decorator) [Node RecordSet(dec)]  03
   07  ──!  _                                05, 07
   08  └─!  _                                05, 07
 
 Q (entrypoint):
   10                                        ▶
-  11  -ε-  [StructClose]                    10
+  11  -ε-  [RecordClose]                    10
   12       (Q)                              02 : 11
-  13  -ε-  [StructOpen]                     12
+  13  -ε-  [RecordOpen]                     12
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -44,14 +44,14 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06   !   (decorator) [Node Set(M0)]       08
+  06   !   (decorator) [Node RecordSet(M0)]  08
   08  ─‣┘  _                                09
   09                                        ▶
-  10  -ε-  [Null Set(M0)]                   09
+  10  -ε-  [Absent RecordSet(M0)]           09
   12  ──!  _                                06, 12
   14  └─!  _                                06, 12
   16   !   (function_declaration)           10, 14

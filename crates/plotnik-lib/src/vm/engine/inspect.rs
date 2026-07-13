@@ -26,7 +26,7 @@ pub struct InspectionEntry {
 pub struct Binding {
     /// JSON-pointer-style path of the bound value, relative to the builder
     /// frames open when the binding effect fired. Not absolute: a container
-    /// assigned after its close (`Set`/`Push` following `ArrayClose` etc.)
+    /// assigned after its close (`RecordSet`/`ArrayPush` following `ListClose` etc.)
     /// binds on its own entry, while the elements bound under indices on the
     /// entries active during construction — a consumer absolutizes by joining
     /// paths down the entry parent chain.
@@ -35,11 +35,11 @@ pub struct Binding {
 }
 
 enum Frame {
-    Array {
+    List {
         len: u32,
         provenance: ValueProvenance,
     },
-    Struct {
+    Record {
         provenance: ValueProvenance,
     },
     Variant {
@@ -127,27 +127,27 @@ impl<'m> Inspector<'m> {
                         union_hull(&mut entry.hull, Some(node_hull(*node)));
                     }
                 }
-                RuntimeEffect::ArrayOpen => {
+                RuntimeEffect::ListOpen => {
                     let provenance = self.open_value();
-                    self.frames.push(Frame::Array { len: 0, provenance });
+                    self.frames.push(Frame::List { len: 0, provenance });
                 }
-                RuntimeEffect::Push => self.bind_push(effect_idx),
-                RuntimeEffect::ArrayClose => match self.frames.pop() {
-                    Some(Frame::Array { provenance, .. }) => self.pending = Some(provenance),
+                RuntimeEffect::ArrayPush => self.bind_push(effect_idx),
+                RuntimeEffect::ListClose => match self.frames.pop() {
+                    Some(Frame::List { provenance, .. }) => self.pending = Some(provenance),
                     other => panic!(
-                        "ArrayClose expects Array on inspection frame stack, found {:?}",
+                        "ListClose expects List on inspection frame stack, found {:?}",
                         frame_kind(other.as_ref())
                     ),
                 },
-                RuntimeEffect::StructOpen => {
+                RuntimeEffect::RecordOpen => {
                     let provenance = self.open_value();
-                    self.frames.push(Frame::Struct { provenance });
+                    self.frames.push(Frame::Record { provenance });
                 }
-                RuntimeEffect::Set(member) => self.bind_set(*member, effect_idx),
-                RuntimeEffect::StructClose => match self.frames.pop() {
-                    Some(Frame::Struct { provenance }) => self.pending = Some(provenance),
+                RuntimeEffect::RecordSet(member) => self.bind_set(*member, effect_idx),
+                RuntimeEffect::RecordClose => match self.frames.pop() {
+                    Some(Frame::Record { provenance }) => self.pending = Some(provenance),
                     other => panic!(
-                        "StructClose expects Struct on inspection frame stack, found {:?}",
+                        "RecordClose expects Record on inspection frame stack, found {:?}",
                         frame_kind(other.as_ref())
                     ),
                 },
@@ -159,7 +159,7 @@ impl<'m> Inspector<'m> {
                         frame_kind(other.as_ref())
                     ),
                 },
-                RuntimeEffect::Null => {
+                RuntimeEffect::Absent => {
                     self.pending = Some(ValueProvenance {
                         item_owner: None,
                         hull: None,
@@ -240,8 +240,8 @@ impl<'m> Inspector<'m> {
     }
 
     fn bind_push(&mut self, effect_idx: u32) {
-        let Some(Frame::Array { len, .. }) = self.frames.last() else {
-            panic!("Push expects Array on inspection frame stack");
+        let Some(Frame::List { len, .. }) = self.frames.last() else {
+            panic!("ArrayPush expects List on inspection frame stack");
         };
         let index = *len;
         let mut path = path_for_frames(&self.frames[..self.frames.len() - 1]);
@@ -255,12 +255,12 @@ impl<'m> Inspector<'m> {
             }
         }
 
-        let Some(Frame::Array {
+        let Some(Frame::List {
             len,
             provenance: array,
         }) = self.frames.last_mut()
         else {
-            unreachable!("array frame was checked before binding Push");
+            unreachable!("list frame was checked before binding ArrayPush");
         };
         if let Some(value) = provenance {
             union_hull(&mut array.hull, value.hull);
@@ -342,8 +342,8 @@ impl<'m> Inspector<'m> {
             return;
         };
         let provenance = match frame {
-            Frame::Array { provenance, .. }
-            | Frame::Struct { provenance }
+            Frame::List { provenance, .. }
+            | Frame::Record { provenance }
             | Frame::Variant { provenance } => provenance,
         };
         union_hull(&mut provenance.hull, hull);
@@ -388,8 +388,8 @@ fn path_for_frames(frames: &[Frame]) -> String {
     let mut path = String::new();
     for frame in frames {
         match frame {
-            Frame::Array { len, .. } => push_segment(&mut path, &len.to_string()),
-            Frame::Struct { .. } => {}
+            Frame::List { len, .. } => push_segment(&mut path, &len.to_string()),
+            Frame::Record { .. } => {}
             Frame::Variant { .. } => push_segment(&mut path, "$data"),
         }
     }
@@ -409,8 +409,8 @@ fn push_segment(path: &mut String, segment: &str) {
 
 fn frame_kind(frame: Option<&Frame>) -> Option<&'static str> {
     frame.map(|frame| match frame {
-        Frame::Array { .. } => "Array",
-        Frame::Struct { .. } => "Struct",
+        Frame::List { .. } => "List",
+        Frame::Record { .. } => "Record",
         Frame::Variant { .. } => "Variant",
     })
 }

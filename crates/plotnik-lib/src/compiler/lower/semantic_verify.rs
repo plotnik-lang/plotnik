@@ -152,8 +152,8 @@ mod tests {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum FrameKind {
-    Array,
-    Struct,
+    List,
+    Record,
     Variant { is_void: bool, got_data: bool },
     Scalar,
 }
@@ -161,8 +161,8 @@ enum FrameKind {
 impl FrameKind {
     fn bit(self) -> u8 {
         match self {
-            Self::Array => KS_ARRAY,
-            Self::Struct => KS_STRUCT,
+            Self::List => KS_LIST,
+            Self::Record => KS_RECORD,
             Self::Variant { .. } => KS_VARIANT,
             Self::Scalar => KS_SCALAR,
         }
@@ -190,18 +190,18 @@ impl PendingState {
     }
 }
 
-const KS_ARRAY: u8 = 0b001;
-const KS_STRUCT: u8 = 0b010;
+const KS_LIST: u8 = 0b001;
+const KS_RECORD: u8 = 0b010;
 const KS_VARIANT: u8 = 0b100;
 const KS_SCALAR: u8 = 0b1000;
-const KS_ANY: u8 = KS_ARRAY | KS_STRUCT | KS_VARIANT | KS_SCALAR;
-const KS_SET: u8 = KS_STRUCT | KS_VARIANT;
+const KS_ANY: u8 = KS_LIST | KS_RECORD | KS_VARIANT | KS_SCALAR;
+const KS_RECORD_SET_TARGET: u8 = KS_RECORD | KS_VARIANT;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct DefSummary {
     entry_tos: u8,
     returns_pending: Option<bool>,
-    sets_caller_top: bool,
+    record_sets_caller_top: bool,
 }
 
 impl DefSummary {
@@ -209,7 +209,7 @@ impl DefSummary {
         Self {
             entry_tos: KS_ANY,
             returns_pending: None,
-            sets_caller_top: false,
+            record_sets_caller_top: false,
         }
     }
 
@@ -224,7 +224,7 @@ impl DefSummary {
         Some(Self {
             entry_tos: self.entry_tos & next.entry_tos,
             returns_pending,
-            sets_caller_top: self.sets_caller_top | next.sets_caller_top,
+            record_sets_caller_top: self.record_sets_caller_top | next.record_sets_caller_top,
         })
     }
 }
@@ -429,7 +429,7 @@ impl<'a> Program<'a> {
             let analysis_summary = DefSummary {
                 entry_tos: analysis.entry_tos,
                 returns_pending: analysis.returns_pending,
-                sets_caller_top: analysis.sets_caller_top,
+                record_sets_caller_top: analysis.record_sets_caller_top,
             };
             let old = summaries[&entry];
             let Some(next) = old.refine(analysis_summary) else {
@@ -480,7 +480,7 @@ impl<'a> Program<'a> {
 
         let mut entry_tos = KS_ANY;
         let mut returns_pending = None;
-        let mut sets_caller_top = false;
+        let mut record_sets_caller_top = false;
         let mut discovered = Vec::new();
         let mut discovered_set = HashSet::new();
         let mut memo: HashMap<Label, HashMap<AbsState, ()>> = HashMap::new();
@@ -499,8 +499,8 @@ impl<'a> Program<'a> {
                 if let InstructionIR::Match(matched) = instruction {
                     for effect in &matched.effects {
                         match effect.kind() {
-                            EffectKind::ArrayOpen
-                            | EffectKind::StructOpen
+                            EffectKind::ListOpen
+                            | EffectKind::RecordOpen
                             | EffectKind::VariantOpen
                             | EffectKind::ScalarOpen => frame_openers += 1,
                             EffectKind::SuppressBegin => suppression_openers += 1,
@@ -546,7 +546,7 @@ impl<'a> Program<'a> {
                                 span_stack: &mut span_stack,
                                 pending: &mut pending,
                                 entry_tos: &mut entry_tos,
-                                sets_caller_top: &mut sets_caller_top,
+                                record_sets_caller_top: &mut record_sets_caller_top,
                             },
                             label,
                         )?;
@@ -602,7 +602,7 @@ impl<'a> Program<'a> {
                         }
                         None => {
                             entry_tos &= summary.entry_tos;
-                            sets_caller_top |= summary.sets_caller_top;
+                            record_sets_caller_top |= summary.record_sets_caller_top;
                         }
                         Some(_) => {}
                     }
@@ -610,7 +610,7 @@ impl<'a> Program<'a> {
                         .returns_pending
                         .map(PendingState::from_bool)
                         .unwrap_or(PendingState::Unknown);
-                    if summary.sets_caller_top
+                    if summary.record_sets_caller_top
                         && let Some(FrameKind::Variant {
                             got_data: false, ..
                         }) = stack.last()
@@ -647,7 +647,7 @@ impl<'a> Program<'a> {
         Ok(BodyAnalysis {
             entry_tos,
             returns_pending,
-            sets_caller_top,
+            record_sets_caller_top,
             discovered,
         })
     }
@@ -677,7 +677,7 @@ impl<'a> Program<'a> {
         }
 
         match effect.kind() {
-            Node | Null | NodeStr | NodeBool | BoolValue => {
+            Node | Absent | NodeStr | NodeBool | BoolValue => {
                 if *state.pending == PendingState::Full {
                     return Err(SemanticVerifyError::EffectStack(label));
                 }
@@ -688,32 +688,32 @@ impl<'a> Program<'a> {
             SpanStartAt | SpanStart => state.span_stack.push(literal(effect, label)?),
             SpanEnd => close_span(state.span_stack, literal(effect, label)?, label)?,
             ScalarMark => {}
-            Push => {
+            ArrayPush => {
                 require_pending(state.pending, label)?;
                 match state.stack.last() {
-                    Some(FrameKind::Array) => {}
+                    Some(FrameKind::List) => {}
                     Some(_) => return Err(SemanticVerifyError::EffectStack(label)),
-                    None => *state.entry_tos &= KS_ARRAY,
+                    None => *state.entry_tos &= KS_LIST,
                 }
                 *state.pending = PendingState::Empty;
             }
-            Set => {
-                self.validate_set_member(member(effect, label)?, label)?;
+            RecordSet => {
+                self.validate_record_set_member(member(effect, label)?, label)?;
                 require_pending(state.pending, label)?;
                 match state.stack.last_mut() {
-                    Some(FrameKind::Struct) => {}
+                    Some(FrameKind::Record) => {}
                     Some(FrameKind::Variant { got_data, .. }) => *got_data = true,
-                    Some(FrameKind::Array | FrameKind::Scalar) => {
+                    Some(FrameKind::List | FrameKind::Scalar) => {
                         return Err(SemanticVerifyError::EffectStack(label));
                     }
                     None => {
-                        *state.entry_tos &= KS_SET;
-                        *state.sets_caller_top = true;
+                        *state.entry_tos &= KS_RECORD_SET_TARGET;
+                        *state.record_sets_caller_top = true;
                     }
                 }
                 *state.pending = PendingState::Empty;
             }
-            ArrayOpen | ArrayClose | StructOpen | StructClose | VariantOpen | VariantClose
+            ListOpen | ListClose | RecordOpen | RecordClose | VariantOpen | VariantClose
             | ScalarOpen | StrClose | BoolClose => {
                 unreachable!("frame effects return before data dispatch")
             }
@@ -734,8 +734,8 @@ impl<'a> Program<'a> {
         match action {
             FrameAction::Open(kind) => {
                 let frame = match kind {
-                    ValueFrameKind::Array => FrameKind::Array,
-                    ValueFrameKind::Struct => FrameKind::Struct,
+                    ValueFrameKind::List => FrameKind::List,
+                    ValueFrameKind::Record => FrameKind::Record,
                     ValueFrameKind::Variant => FrameKind::Variant {
                         is_void: self.case_is_void(member(effect, label)?, label)?,
                         got_data: false,
@@ -760,8 +760,8 @@ impl<'a> Program<'a> {
             },
             FrameAction::Close(kind) => {
                 let expected = match kind {
-                    ValueFrameKind::Array => FrameKind::Array,
-                    ValueFrameKind::Struct => FrameKind::Struct,
+                    ValueFrameKind::List => FrameKind::List,
+                    ValueFrameKind::Record => FrameKind::Record,
                     ValueFrameKind::Scalar => FrameKind::Scalar,
                     ValueFrameKind::Variant => unreachable!("variant close handled above"),
                 };
@@ -793,7 +793,7 @@ impl<'a> Program<'a> {
             ))
     }
 
-    fn validate_set_member(
+    fn validate_record_set_member(
         &self,
         member: MemberRef,
         label: Label,
@@ -805,7 +805,10 @@ impl<'a> Program<'a> {
                 CaptureMemberKind::Field(_)
             )
         {
-            return Err(capture_error(label, "Set references a non-field member"));
+            return Err(capture_error(
+                label,
+                "RecordSet references a non-field member",
+            ));
         }
         Ok(())
     }
@@ -994,7 +997,7 @@ enum VerifyPhase {
 struct BodyAnalysis {
     entry_tos: u8,
     returns_pending: Option<bool>,
-    sets_caller_top: bool,
+    record_sets_caller_top: bool,
     discovered: Vec<Label>,
 }
 
@@ -1058,7 +1061,7 @@ struct EffectState<'a> {
     span_stack: &'a mut Vec<usize>,
     pending: &'a mut PendingState,
     entry_tos: &'a mut u8,
-    sets_caller_top: &'a mut bool,
+    record_sets_caller_top: &'a mut bool,
 }
 
 fn literal(effect: &EffectIR, label: Label) -> Result<usize, SemanticVerifyError> {

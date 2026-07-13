@@ -143,17 +143,19 @@ impl RecordingTracer {
     fn format_runtime_effect(&self, effect: &RuntimeEffect<'_>) -> String {
         match effect {
             RuntimeEffect::Node(_) => "Node".to_string(),
-            RuntimeEffect::ArrayOpen => "ArrayOpen".to_string(),
-            RuntimeEffect::Push => "Push".to_string(),
-            RuntimeEffect::ArrayClose => "ArrayClose".to_string(),
-            RuntimeEffect::StructOpen => "StructOpen".to_string(),
-            RuntimeEffect::StructClose => "StructClose".to_string(),
-            RuntimeEffect::Set(idx) => format!("Set \"{}\"", self.member_name(*idx)),
+            RuntimeEffect::ListOpen => "ListOpen".to_string(),
+            RuntimeEffect::ArrayPush => "ArrayPush".to_string(),
+            RuntimeEffect::ListClose => "ListClose".to_string(),
+            RuntimeEffect::RecordOpen => "RecordOpen".to_string(),
+            RuntimeEffect::RecordClose => "RecordClose".to_string(),
+            RuntimeEffect::RecordSet(idx) => {
+                format!("RecordSet \"{}\"", self.member_name(*idx))
+            }
             RuntimeEffect::VariantOpen(idx) => {
                 format!("VariantOpen \"{}\"", self.member_name(*idx))
             }
             RuntimeEffect::VariantClose => "VariantClose".to_string(),
-            RuntimeEffect::Null => "Null".to_string(),
+            RuntimeEffect::Absent => "Absent".to_string(),
             RuntimeEffect::ScalarOpen => "ScalarOpen".to_string(),
             RuntimeEffect::ScalarMark(_) => "ScalarMark".to_string(),
             RuntimeEffect::StrClose => "StrClose".to_string(),
@@ -175,17 +177,19 @@ impl RecordingTracer {
     fn format_opcode(&self, opcode: EffectKind, payload: usize) -> String {
         match opcode {
             EffectKind::Node => "Node".to_string(),
-            EffectKind::ArrayOpen => "ArrayOpen".to_string(),
-            EffectKind::Push => "Push".to_string(),
-            EffectKind::ArrayClose => "ArrayClose".to_string(),
-            EffectKind::StructOpen => "StructOpen".to_string(),
-            EffectKind::StructClose => "StructClose".to_string(),
-            EffectKind::Set => format!("Set \"{}\"", self.member_name(payload as u16)),
+            EffectKind::ListOpen => "ListOpen".to_string(),
+            EffectKind::ArrayPush => "ArrayPush".to_string(),
+            EffectKind::ListClose => "ListClose".to_string(),
+            EffectKind::RecordOpen => "RecordOpen".to_string(),
+            EffectKind::RecordClose => "RecordClose".to_string(),
+            EffectKind::RecordSet => {
+                format!("RecordSet \"{}\"", self.member_name(payload as u16))
+            }
             EffectKind::VariantOpen => {
                 format!("VariantOpen \"{}\"", self.member_name(payload as u16))
             }
             EffectKind::VariantClose => "VariantClose".to_string(),
-            EffectKind::Null => "Null".to_string(),
+            EffectKind::Absent => "Absent".to_string(),
             EffectKind::SuppressBegin => "SuppressBegin".to_string(),
             EffectKind::SuppressEnd => "SuppressEnd".to_string(),
             EffectKind::SpanStartAt => format!("SpanStartAt#{payload}"),

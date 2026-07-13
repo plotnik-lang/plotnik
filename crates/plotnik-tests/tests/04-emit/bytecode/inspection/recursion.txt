@@ -17,11 +17,11 @@ Q:
   02   !   (program)                        04
   03  ─‣┘  _                                01
   04  └‣─  (expression_statement)           59, 20
-  05  ─‣┘  _ [Set(expr)]                    03
+  05  ─‣┘  _ [RecordSet(expr)]              03
   09   !   (identifier) [VariantClose]      05
   11  ──!  _                                09, 11
   12   !   _ [VariantOpen(Empty)]           09, 11
-  20  -ε-  [VariantOpen(Empty) VariantClose Set(expr)]  03
+  20  -ε-  [VariantOpen(Empty) VariantClose RecordSet(expr)]  03
   21   !   (parenthesized_expression) [VariantOpen(Wrap) SuppressBegin]  54
   23  ─‣┘  _ [SuppressEnd VariantClose]     05
   25  -ε-  [SuppressEnd VariantClose]       05
@@ -48,9 +48,9 @@ Q:
 
 Q (entrypoint):
   61                                        ▶
-  62  -ε-  [StructClose]                    61
+  62  -ε-  [RecordClose]                    61
   63       (Q)                              02 : 62
-  64  -ε-  [StructOpen]                     63
+  64  -ε-  [RecordOpen]                     63
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -98,9 +98,9 @@ P12 ref        114..120  src0  T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@80)                            80 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
@@ -109,7 +109,7 @@ Q:
   13   !   _ [SpanStart#3]                  08, 11
   15  ...
   16  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0)]  13
-  18  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0) SpanStart#3 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0 SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  38
+  18  -ε-  [SpanStart#1 SpanStart#2 VariantOpen(M0) SpanStart#3 SpanEnd#3 VariantClose SpanEnd#2 SpanEnd#1 SpanEnd#0 SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  38
   24  -ε-  [SuppressEnd SpanEnd#7 SpanEnd#6 VariantClose SpanEnd#5 SpanEnd#1 SpanEnd#0]  74
   27                                        ▶
   28                                        ▶ zero
@@ -133,7 +133,7 @@ Q:
   69  └─!  _                                16, 64, 67
   71  ...
   72  -ε-  [SpanStart#0]                    69, 18
-  74  ─‣┘  _ [SpanStart#11 Set(M2) SpanEnd#11 SpanEnd#12]  38
+  74  ─‣┘  _ [SpanStart#11 RecordSet(M2) SpanEnd#11 SpanEnd#12]  38
   77  └‣─  (expression_statement) [SpanStartAt#10 SpanStart#12]  72
   79  ...
   80   !   (program) [SpanStart#8 SpanStartAt#9]  77

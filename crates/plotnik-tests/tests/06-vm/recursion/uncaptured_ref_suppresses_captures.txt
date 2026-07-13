@@ -57,40 +57,40 @@ Q      = 06 :: T3
 
 [transitions]
 Nested:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@27)                            27 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@32)                            32 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
-  12  -ε-  [StructClose]                    14
-  14  ─‣┘² _ [Set(M1)]                      28
+  12  -ε-  [RecordClose]                    14
+  14  ─‣┘² _ [RecordSet(M1)]                28
   16                                        ▶
-  17   !   (identifier) [Node Set(M0)]      26
+  17   !   (identifier) [Node RecordSet(M0)]  26
   19  -ε-  [SuppressEnd]                    26
   21   !   (@27)                            27 : 19
-  22  -ε-  [Null Set(M0) SuppressBegin]     21
+  22  -ε-  [Absent RecordSet(M0) SuppressBegin]  21
   24  └‣─  function: _                      17, 22
   26  ─‣┘  _                                16
   27   !   (call_expression)                24
   28                                        ▶
   29  └‣─  (@27)                            27 : 12
-  30  └‣─  (expression_statement) [StructOpen]  29
+  30  └‣─  (expression_statement) [RecordOpen]  29
   32   !   (program)                        30
 --------------------- TRACE ----------------------
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@32)                            32 : 09
        ▶   (@32)
 
 @32:
   32       (program)                        30
        ●   program
-  30       (expression_statement) [StructOpen]  29
+  30       (expression_statement) [RecordOpen]  29
        ●   expression_statement
   29       (@27)                            27 : 12
        ▶   (@27)
@@ -100,10 +100,10 @@ Q:
        ●   call_expression
   24       function: _                      17, 22
        ●   call_expression
-  17       (identifier) [Node Set(M0)]      26
+  17       (identifier) [Node RecordSet(M0)]  26
        ○   call_expression
   24  ❮❮❮ 
-  22  -ε-  [Null Set(M0) SuppressBegin]     21
+  22  -ε-  [Absent RecordSet(M0) SuppressBegin]  21
   21       (@27)                            27 : 19
        ▶   (@27)
 
@@ -112,7 +112,7 @@ Q:
        ●   call_expression
   24       function: _                      17, 22
        ●   identifier
-  17       (identifier) [Node Set(M0)]      26
+  17       (identifier) [Node RecordSet(M0)]  26
        ●   identifier
   26       _                                16
        ●   call_expression
@@ -125,11 +125,11 @@ Q:
   16   ◀   (@27)                            
 
 @32:
-  12  -ε-  [StructClose]                    14
-  14       _ [Set(M1)]                      28
+  12  -ε-  [RecordClose]                    14
+  14       _ [RecordSet(M1)]                28
        ●   program
   28   ◀   (@32)                            
 
 Q:
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11   ◀   (Q)                              ◼

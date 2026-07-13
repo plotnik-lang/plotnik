@@ -40,20 +40,20 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  ──!  (expression_statement) [Node Set(M1)]  08
+  06  ──!  (expression_statement) [Node RecordSet(M1)]  08
   08  ─‣┘  _                                09
   09                                        ▶
-  10   !   (lexical_declaration) [Node Set(M0)]  06
+  10   !   (lexical_declaration) [Node RecordSet(M0)]  06
   12  ──!  _                                10, 12
   14  └─!  _                                10, 12
   16   !   (program)                        14
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03
        ▶   (@16)
 
@@ -62,19 +62,19 @@ Q:
        ●   program
   14       _                                10, 12
        ●   lexical_declaration
-  10       (lexical_declaration) [Node Set(M0)]  06
+  10       (lexical_declaration) [Node RecordSet(M0)]  06
        ●   lexical_declaration
-  06       (expression_statement) [Node Set(M1)]  08
+  06       (expression_statement) [Node RecordSet(M1)]  08
        ○   comment
   14  ❮❮❮ 
   12       _                                10, 12
        ●   comment
-  10       (lexical_declaration) [Node Set(M0)]  06
+  10       (lexical_declaration) [Node RecordSet(M0)]  06
        ○   comment
   12  ❮❮❮ 
   12       _                                10, 12
        ●   expression_statement
-  10       (lexical_declaration) [Node Set(M0)]  06
+  10       (lexical_declaration) [Node RecordSet(M0)]  06
        ○   expression_statement
   12  ❮❮❮ 
   12       _                                10, 12

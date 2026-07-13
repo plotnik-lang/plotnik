@@ -12,16 +12,16 @@ Q = 12
 Q:
   01                                        ▶
   02   !   (pair)                           08
-  03  ─‣┘  _ [Set(kind)]                    01
-  05   !   (identifier) [VariantOpen(A) Node Set(a) VariantClose]  03
+  03  ─‣┘  _ [RecordSet(kind)]              01
+  05   !   (identifier) [VariantOpen(A) Node RecordSet(a) VariantClose]  03
   06   !   (number) [VariantOpen(B) VariantClose]  03
   08  └‣─  key: _                           05, 06
 
 Q (entrypoint):
   09                                        ▶
-  10  -ε-  [StructClose]                    09
+  10  -ε-  [RecordClose]                    09
   11       (Q)                              02 : 10
-  12  -ε-  [StructOpen]                     11
+  12  -ε-  [RecordOpen]                     11
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -58,15 +58,15 @@ Q = 00 :: T4
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08   !   (identifier) [VariantOpen(M1) Node Set(M0) VariantClose]  16
+  08   !   (identifier) [VariantOpen(M1) Node RecordSet(M0) VariantClose]  16
   11   !   (number) [VariantOpen(M2) VariantClose]  16
   13  └‣─  key: _                           08, 11
   15  ...
-  16  ─‣┘  _ [Set(M3)]                      06
+  16  ─‣┘  _ [RecordSet(M3)]                06
   18   !   (pair)                           13

@@ -51,25 +51,25 @@ Q = 00 :: T3
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@26)                            26 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08   !   (variable_declarator) [Node Push]  10, 14
+  08   !   (variable_declarator) [Node ArrayPush]  10, 14
   10  ──!  _                                08, 10
-  12  └─!  _ [ArrayOpen]                    08, 10
-  14  ─‣┘  _ [ArrayClose Set(M0)]           07
-  16   !   (lexical_declaration) [Null Set(M1)]  12
-  18   !   (expression_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  07
+  12  └─!  _ [ListOpen]                     08, 10
+  14  ─‣┘  _ [ListClose RecordSet(M0)]      07
+  16   !   (lexical_declaration) [Absent RecordSet(M1)]  12
+  18   !   (expression_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
   21  ──!  _                                16, 18, 21
   23  ...
   24  └─!  _                                16, 18, 21
   26   !   (program)                        24
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@26)                            26 : 03
        ▶   (@26)
 
@@ -78,15 +78,15 @@ Q:
        ●   program
   24       _                                16, 18, 21
        ●   expression_statement
-  16       (lexical_declaration) [Null Set(M1)]  12
+  16       (lexical_declaration) [Absent RecordSet(M1)]  12
        ○   expression_statement
   24  ❮❮❮ 
-  18       (expression_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  07
+  18       (expression_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
        ●   expression_statement
   07       _                                06
        ●   program
   06   ◀   (@26)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

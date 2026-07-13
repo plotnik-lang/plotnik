@@ -11,21 +11,21 @@ Q = 22
 Q:
   01                                        ▶
   02   !   (program)                        18
-  03  ─‣┘  _ [ArrayClose Set(x)]            01
-  05  -ε-  [ArrayClose Set(x)]              01
+  03  ─‣┘  _ [ListClose RecordSet(x)]       01
+  05  -ε-  [ListClose RecordSet(x)]         01
   07   !   (function_declaration) [Node]    10
-  08  -ε-  [Push]                           12, 03
+  08  -ε-  [ArrayPush]                      12, 03
   09  ─‣┘  _                                08
   10  └‣─  (class_declaration)              09
   12  ──!  _                                07, 12
   13  └─!  _                                07, 12
-  18  -ε-  [ArrayOpen]                      13, 05
+  18  -ε-  [ListOpen]                       13, 05
 
 Q (entrypoint):
   19                                        ▶
-  20  -ε-  [StructClose]                    19
+  20  -ε-  [RecordClose]                    19
   21       (Q)                              02 : 20
-  22  -ε-  [StructOpen]                     21
+  22  -ε-  [RecordOpen]                     21
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -51,19 +51,19 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06  └‣─  (class_declaration)              07
   07  ─‣┘  _                                11
   08                                        ▶
-  09  -ε-  [ArrayClose Set(M0)]             08
-  11  -ε-  [Push]                           16, 22
+  09  -ε-  [ListClose RecordSet(M0)]        08
+  11  -ε-  [ArrayPush]                      16, 22
   13   !   (function_declaration) [Node]    06
   15  ...
   16  ──!  _                                13, 16
   18  └─!  _                                13, 16
-  20  -ε-  [ArrayOpen]                      18, 09
-  22  ─‣┘  _ [ArrayClose Set(M0)]           08
+  20  -ε-  [ListOpen]                       18, 09
+  22  ─‣┘  _ [ListClose RecordSet(M0)]      08
   24   !   (program)                        20

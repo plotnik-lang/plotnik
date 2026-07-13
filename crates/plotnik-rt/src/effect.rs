@@ -12,24 +12,24 @@ use tree_sitter::Node;
 pub enum RuntimeEffect<'t> {
     /// Capture a node reference.
     Node(Node<'t>),
-    /// Begin array scope.
-    ArrayOpen,
-    /// Push current value to array.
-    Push,
-    /// End array scope.
-    ArrayClose,
-    /// Begin struct scope.
-    StructOpen,
-    /// Set field at member index.
-    Set(u16),
-    /// End struct scope.
-    StructClose,
+    /// Begin a list value.
+    ListOpen,
+    /// Append the current value to the open list's backing array.
+    ArrayPush,
+    /// End a list value.
+    ListClose,
+    /// Begin a record value.
+    RecordOpen,
+    /// Set the record field at the given member index.
+    RecordSet(u16),
+    /// End a record value.
+    RecordClose,
     /// Begin a variant case at its member index.
     VariantOpen(u16),
     /// End a variant case.
     VariantClose,
-    /// Null placeholder (for optional/alternation).
-    Null,
+    /// Produce an absent value for field completion or an unmatched option.
+    Absent,
     /// Begin one value-local scalar provenance frame.
     ScalarOpen,
     /// Contribute an explicit node-pattern match to every open scalar frame.

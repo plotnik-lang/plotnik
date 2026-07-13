@@ -287,7 +287,7 @@ impl DefVariant {
     }
 }
 
-/// Symbolic reference to a struct field or variant case.
+/// Symbolic reference to a record field or variant case.
 ///
 /// Resolved to an absolute member index at emit time: the parent type's member
 /// base (`member_base`) plus `relative_index`. The parent type is a scope or
@@ -295,7 +295,7 @@ impl DefVariant {
 /// type table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct MemberRef {
-    /// The query type whose member table this indexes (struct or variant type).
+    /// The query type whose member table this indexes (record or variant type).
     pub parent_type: TypeId,
     /// Relative index within the parent type's members.
     pub relative_index: u16,
@@ -319,7 +319,7 @@ pub struct EffectIR {
 }
 
 /// An effect's argument: a literal value, or a symbolic member reference — used by
-/// Set/VariantOpen effects — resolved to a member index during emission.
+/// `RecordSet`/`VariantOpen` effects — resolved to a member index during emission.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EffectArg {
     Literal(usize),
@@ -357,34 +357,34 @@ impl EffectIR {
         Self::literal(EffectKind::Node, 0)
     }
 
-    /// Push null value.
-    pub fn null() -> Self {
-        Self::literal(EffectKind::Null, 0)
+    /// Produce an absent value.
+    pub fn absent() -> Self {
+        Self::literal(EffectKind::Absent, 0)
     }
 
-    /// Push accumulated value to array.
-    pub fn push() -> Self {
-        Self::literal(EffectKind::Push, 0)
+    /// Append the pending value to the open list's backing array.
+    pub fn array_push() -> Self {
+        Self::literal(EffectKind::ArrayPush, 0)
     }
 
-    /// Begin array scope.
-    pub fn start_arr() -> Self {
-        Self::literal(EffectKind::ArrayOpen, 0)
+    /// Begin a list value.
+    pub fn list_open() -> Self {
+        Self::literal(EffectKind::ListOpen, 0)
     }
 
-    /// End array scope.
-    pub fn end_arr() -> Self {
-        Self::literal(EffectKind::ArrayClose, 0)
+    /// End a list value.
+    pub fn list_close() -> Self {
+        Self::literal(EffectKind::ListClose, 0)
     }
 
-    /// Begin struct scope.
-    pub fn start_struct() -> Self {
-        Self::literal(EffectKind::StructOpen, 0)
+    /// Begin a record value.
+    pub fn record_open() -> Self {
+        Self::literal(EffectKind::RecordOpen, 0)
     }
 
-    /// End struct scope.
-    pub fn end_struct() -> Self {
-        Self::literal(EffectKind::StructClose, 0)
+    /// End a record value.
+    pub fn record_close() -> Self {
+        Self::literal(EffectKind::RecordClose, 0)
     }
 
     /// End variant scope.

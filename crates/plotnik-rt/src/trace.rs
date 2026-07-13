@@ -14,19 +14,19 @@ use tree_sitter::Node;
 
 use crate::{EffectLog, RuntimeEffect, node_text, source_text};
 
-/// `set_index` sentinel: no `Set` closes a value starting at this position.
-const NO_SET: u32 = u32::MAX;
+/// `record_set_index` sentinel: no `RecordSet` closes a value starting here.
+const NO_RECORD_SET: u32 = u32::MAX;
 
 pub struct TraceReader<'a, 't, 's> {
     entries: &'a [RuntimeEffect<'t>],
     source: &'s str,
     pos: usize,
-    /// For each position, where the `Set` that closes a field value starting
-    /// there sits — [`Self::peek_set`]'s answer, precomputed. One backward
+    /// For each position, where the `RecordSet` that closes a field value
+    /// starting there sits — [`Self::peek_record_set`]'s answer, precomputed. One backward
     /// pass at construction keeps replay linear; peeking on demand would
     /// rescan every nested composite once per enclosing scope, going
     /// quadratic on deep recursive values.
-    set_index: Vec<u32>,
+    record_set_index: Vec<u32>,
 }
 
 impl<'a, 't, 's> TraceReader<'a, 't, 's> {
@@ -36,7 +36,7 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
             entries,
             source,
             pos: 0,
-            set_index: build_set_index(entries),
+            record_set_index: build_record_set_index(entries),
         }
     }
 
@@ -64,34 +64,36 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         self.entries.get(self.pos)
     }
 
-    /// The member index of the `Set` that will close the field value starting
-    /// at the cursor. Struct scopes need it because the stream is
-    /// value-first: the entries of a field's value arrive *before* the `Set`
-    /// that names the field, and sibling fields of one struct can differ in
+    /// The member index of the `RecordSet` that will close the field value
+    /// starting at the cursor. Record scopes need it because the stream is
+    /// value-first: the entries of a field's value arrive *before* the
+    /// `RecordSet` that names the field, and sibling fields of one record can differ in
     /// type — so the reader peeks ahead to pick the right typed reader, then
-    /// consumes the value linearly. The answer — the first `Set` past the
+    /// consumes the value linearly. The answer — the first `RecordSet` past the
     /// cursor's balanced composite values — comes from the precomputed
-    /// [`Self::set_index`].
-    pub fn peek_set(&self) -> u16 {
-        let set_pos = *self
-            .set_index
+    /// [`Self::record_set_index`].
+    pub fn peek_record_set(&self) -> u16 {
+        let record_set_pos = *self
+            .record_set_index
             .get(self.pos)
             .expect("trace reader: peeked past the end of the committed trace");
         assert!(
-            set_pos != NO_SET,
-            "trace reader: no Set closes the field value at {}",
+            record_set_pos != NO_RECORD_SET,
+            "trace reader: no RecordSet closes the field value at {}",
             self.pos
         );
-        match &self.entries[set_pos as usize] {
-            RuntimeEffect::Set(index) => *index,
-            other => unreachable!("set_index addresses Set entries, found {other:?}"),
+        match &self.entries[record_set_pos as usize] {
+            RuntimeEffect::RecordSet(index) => *index,
+            other => {
+                unreachable!("record_set_index addresses RecordSet entries, found {other:?}")
+            }
         }
     }
 
-    /// Consume a `Null` if it is next. How optional values read: `Null` is the
+    /// Consume `Absent` if it is next. For options, `Absent` is the
     /// whole absent value, anything else is the present value.
-    pub fn take_null(&mut self) -> bool {
-        if matches!(self.peek(), Some(RuntimeEffect::Null)) {
+    pub fn take_absent(&mut self) -> bool {
+        if matches!(self.peek(), Some(RuntimeEffect::Absent)) {
             self.pos += 1;
             return true;
         }
@@ -132,12 +134,12 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         unreachable!("validated trace balances every scalar frame")
     }
 
-    pub fn at_array_close(&self) -> bool {
-        matches!(self.peek(), Some(RuntimeEffect::ArrayClose))
+    pub fn at_list_close(&self) -> bool {
+        matches!(self.peek(), Some(RuntimeEffect::ListClose))
     }
 
-    pub fn at_struct_close(&self) -> bool {
-        matches!(self.peek(), Some(RuntimeEffect::StructClose))
+    pub fn at_record_close(&self) -> bool {
+        matches!(self.peek(), Some(RuntimeEffect::RecordClose))
     }
 
     pub fn at_variant_close(&self) -> bool {
@@ -211,10 +213,10 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         }
     }
 
-    pub fn expect_set(&mut self) -> u16 {
+    pub fn expect_record_set(&mut self) -> u16 {
         match self.next() {
-            RuntimeEffect::Set(index) => *index,
-            other => self.mismatch("Set", other),
+            RuntimeEffect::RecordSet(index) => *index,
+            other => self.mismatch("RecordSet", other),
         }
     }
 
@@ -225,38 +227,38 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
         }
     }
 
-    pub fn expect_array_open(&mut self) {
+    pub fn expect_list_open(&mut self) {
         match self.next() {
-            RuntimeEffect::ArrayOpen => {}
-            other => self.mismatch("ArrayOpen", other),
+            RuntimeEffect::ListOpen => {}
+            other => self.mismatch("ListOpen", other),
         }
     }
 
-    pub fn expect_array_close(&mut self) {
+    pub fn expect_list_close(&mut self) {
         match self.next() {
-            RuntimeEffect::ArrayClose => {}
-            other => self.mismatch("ArrayClose", other),
+            RuntimeEffect::ListClose => {}
+            other => self.mismatch("ListClose", other),
         }
     }
 
-    pub fn expect_push(&mut self) {
+    pub fn expect_array_push(&mut self) {
         match self.next() {
-            RuntimeEffect::Push => {}
-            other => self.mismatch("Push", other),
+            RuntimeEffect::ArrayPush => {}
+            other => self.mismatch("ArrayPush", other),
         }
     }
 
-    pub fn expect_struct_open(&mut self) {
+    pub fn expect_record_open(&mut self) {
         match self.next() {
-            RuntimeEffect::StructOpen => {}
-            other => self.mismatch("StructOpen", other),
+            RuntimeEffect::RecordOpen => {}
+            other => self.mismatch("RecordOpen", other),
         }
     }
 
-    pub fn expect_struct_close(&mut self) {
+    pub fn expect_record_close(&mut self) {
         match self.next() {
-            RuntimeEffect::StructClose => {}
-            other => self.mismatch("StructClose", other),
+            RuntimeEffect::RecordClose => {}
+            other => self.mismatch("RecordClose", other),
         }
     }
 
@@ -275,42 +277,42 @@ impl<'a, 't, 's> TraceReader<'a, 't, 's> {
     }
 }
 
-/// For each position, the position of the first `Set` past the balanced
-/// composite values starting there — the `Set` that closes a field value
-/// beginning at that entry, or [`NO_SET`] where none does (positions no
-/// reader ever peeks at: closes, and value starts whose `Set` lives in an
+/// For each position, the position of the first `RecordSet` past the balanced
+/// composite values starting there — the `RecordSet` that closes a field value
+/// beginning at that entry, or [`NO_RECORD_SET`] where none does (positions no
+/// reader ever peeks at: closes, and value starts whose `RecordSet` lives in an
 /// enclosing scope).
 ///
 /// One backward pass. `cur` is the answer for the level being scanned;
 /// meeting a `*Close` right-to-left *enters* that group, so the outer level's
 /// answer is parked on `outer` and `cur` restarts; meeting the matching
-/// `*Open` leaves the group, and the parked answer — the first `Set` after
+/// `*Open` leaves the group, and the parked answer — the first `RecordSet` after
 /// the group — is exactly the answer *at* the open (a composite field value
 /// starts there) and for whatever precedes it on the outer level.
-fn build_set_index(entries: &[RuntimeEffect<'_>]) -> Vec<u32> {
+fn build_record_set_index(entries: &[RuntimeEffect<'_>]) -> Vec<u32> {
     assert!(
-        u32::try_from(entries.len()).is_ok_and(|len| len < NO_SET),
+        u32::try_from(entries.len()).is_ok_and(|len| len < NO_RECORD_SET),
         "trace length fits the u32 index space"
     );
-    let mut index = vec![NO_SET; entries.len()];
-    let mut cur = NO_SET;
+    let mut index = vec![NO_RECORD_SET; entries.len()];
+    let mut cur = NO_RECORD_SET;
     let mut outer: Vec<u32> = Vec::new();
     for (i, entry) in entries.iter().enumerate().rev() {
         match entry {
-            RuntimeEffect::Set(_) => {
+            RuntimeEffect::RecordSet(_) => {
                 cur = i as u32;
                 index[i] = cur;
             }
-            RuntimeEffect::ArrayClose
-            | RuntimeEffect::StructClose
+            RuntimeEffect::ListClose
+            | RuntimeEffect::RecordClose
             | RuntimeEffect::VariantClose
             | RuntimeEffect::StrClose
             | RuntimeEffect::BoolClose(_) => {
                 outer.push(cur);
-                cur = NO_SET;
+                cur = NO_RECORD_SET;
             }
-            RuntimeEffect::ArrayOpen
-            | RuntimeEffect::StructOpen
+            RuntimeEffect::ListOpen
+            | RuntimeEffect::RecordOpen
             | RuntimeEffect::VariantOpen(_)
             | RuntimeEffect::ScalarOpen => {
                 cur = outer

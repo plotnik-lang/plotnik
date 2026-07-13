@@ -128,10 +128,10 @@ fn different_effects_do_not_merge() {
         vec![
             eps(0, vec![10, 20]),
             MatchIR::epsilon(Label(10), Label(1))
-                .prepend_effect(EffectIR::start_struct())
+                .prepend_effect(EffectIR::record_open())
                 .into(),
             MatchIR::epsilon(Label(20), Label(1))
-                .prepend_effect(EffectIR::end_struct())
+                .prepend_effect(EffectIR::record_close())
                 .into(),
             eps(1, vec![]),
         ],

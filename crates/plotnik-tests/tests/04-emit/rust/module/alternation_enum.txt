@@ -74,17 +74,17 @@ impl<'t, 's> rt::Parse<'t, 's> for Q<'t> {
 
 /// Replay one committed `Q` value.
 fn read_q<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> Q<'t> {
-    t.expect_struct_open();
+    t.expect_record_open();
     let mut v0 = None; // expr
-    while !t.at_struct_close() {
-        match t.peek_set() {
+    while !t.at_record_close() {
+        match t.peek_record_set() {
             // expr
             4 => v0 = Some(read_q_expr(t)),
             other => unreachable!("trace shape proven at emit: `Q` has no member index {other}"),
         }
-        t.expect_set();
+        t.expect_record_set();
     }
-    t.expect_struct_close();
+    t.expect_record_close();
     Q {
         expr: v0.expect("field-stability: every accepting path sets `expr`"),
     }
@@ -97,12 +97,12 @@ fn read_q_expr<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> QExpr<'t> {
         2 => {
             let mut v0 = None; // id
             while !t.at_variant_close() {
-                match t.peek_set() {
+                match t.peek_record_set() {
                     // id
                     0 => v0 = Some(t.expect_node()),
                     other => unreachable!("trace shape proven at emit: `QExpr` has no member index {other}"),
                 }
-                t.expect_set();
+                t.expect_record_set();
             }
             t.expect_variant_close();
             QExpr::Id {
@@ -113,12 +113,12 @@ fn read_q_expr<'t, 's>(t: &mut rt::TraceReader<'_, 't, 's>) -> QExpr<'t> {
         3 => {
             let mut v0 = None; // num
             while !t.at_variant_close() {
-                match t.peek_set() {
+                match t.peek_record_set() {
                     // num
                     1 => v0 = Some(t.expect_node()),
                     other => unreachable!("trace shape proven at emit: `QExpr` has no member index {other}"),
                 }
-                t.expect_set();
+                t.expect_record_set();
             }
             t.expect_variant_close();
             QExpr::Num {
@@ -364,33 +364,33 @@ mod matcher {
                 }
                 finish_s04_q(eng)
             }
-            //   05  ─‣┘² _ [Set(expr)]                    01
+            //   05  ─‣┘² _ [RecordSet(expr)]              01
             S05_Q => 'state: {
                 if eng.cursor_mut().navigate(rt::Nav::Up(2)).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.emit_data(|_| rt::RuntimeEffect::Set(4)); // Set(expr)
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(4)); // RecordSet(expr)
                 Flow::Jump(S01_Q)
             }
-            //   07   !   (identifier) [VariantOpen(Id) Node Set(id) VariantClose]  05
+            //   07   !   (identifier) [VariantOpen(Id) Node RecordSet(id) VariantClose]  05
             S07_Q => 'state: {
                 if !cand_s07_q(eng) {
                     break 'state Flow::Backtrack;
                 }
                 eng.emit_data(|_| rt::RuntimeEffect::VariantOpen(2)); // VariantOpen(Id)
                 eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
-                eng.emit_data(|_| rt::RuntimeEffect::Set(0)); // Set(id)
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(0)); // RecordSet(id)
                 eng.emit_data(|_| rt::RuntimeEffect::VariantClose);
                 Flow::Jump(S05_Q)
             }
-            //   08   !   (number) [VariantOpen(Num) Node Set(num) VariantClose]  05
+            //   08   !   (number) [VariantOpen(Num) Node RecordSet(num) VariantClose]  05
             S08_Q => 'state: {
                 if !cand_s08_q(eng) {
                     break 'state Flow::Backtrack;
                 }
                 eng.emit_data(|_| rt::RuntimeEffect::VariantOpen(3)); // VariantOpen(Num)
                 eng.emit_data(|c| rt::RuntimeEffect::Node(c.node()));
-                eng.emit_data(|_| rt::RuntimeEffect::Set(1)); // Set(num)
+                eng.emit_data(|_| rt::RuntimeEffect::RecordSet(1)); // RecordSet(num)
                 eng.emit_data(|_| rt::RuntimeEffect::VariantClose);
                 Flow::Jump(S05_Q)
             }
@@ -419,9 +419,9 @@ mod matcher {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
                 }
             }
-            //   14  -ε-  [StructClose]                    13
+            //   14  -ε-  [RecordClose]                    13
             S14_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructClose);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordClose);
                 Flow::Jump(S13_Q_EP)
             }
             //   15       (Q)                              02 : 14
@@ -429,9 +429,9 @@ mod matcher {
                 eng.enter_frame(S14_Q_EP);
                 Flow::Jump(S02_Q)
             }
-            //   16  -ε-  [StructOpen]                     15
+            //   16  -ε-  [RecordOpen]                     15
             S16_Q_EP => {
-                eng.emit_data(|_| rt::RuntimeEffect::StructOpen);
+                eng.emit_data(|_| rt::RuntimeEffect::RecordOpen);
                 Flow::Jump(S15_Q_EP)
             }
             _ => unreachable!("ip {ip} is not a generated state"),

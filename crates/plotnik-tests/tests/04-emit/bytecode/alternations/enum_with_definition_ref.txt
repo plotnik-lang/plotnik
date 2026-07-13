@@ -12,27 +12,27 @@ Q     = 19
 [transitions]
 Inner:
   01                                        ▶
-  02   !   (identifier) [Node Set(name)]    01
+  02   !   (identifier) [Node RecordSet(name)]  01
 
 Q:
   03  -ε-                                   09, 10
   04                                        ▶
-  06  -ε-  [SuppressEnd VariantClose Set(item)]  04
+  06  -ε-  [SuppressEnd VariantClose RecordSet(item)]  04
   07   !   (Inner)                          02 : 06
   09  -ε-  [VariantOpen(A) SuppressBegin]   07
-  10   !   (number) [VariantOpen(B) Node Set(b) VariantClose Set(item)]  04
+  10   !   (number) [VariantOpen(B) Node RecordSet(b) VariantClose RecordSet(item)]  04
 
 Inner (entrypoint):
   12                                        ▶
-  13  -ε-  [StructClose]                    12
+  13  -ε-  [RecordClose]                    12
   14       (Inner)                          02 : 13
-  15  -ε-  [StructOpen]                     14
+  15  -ε-  [RecordOpen]                     14
 
 Q (entrypoint):
   16                                        ▶
-  17  -ε-  [StructClose]                    16
+  17  -ε-  [RecordClose]                    16
   18       (Q)                              03 : 17
-  19  -ε-  [StructOpen]                     18
+  19  -ε-  [RecordOpen]                     18
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -73,21 +73,21 @@ Q     = 06 :: T5
 
 [transitions]
 Inner:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@13)                            13 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Q:
-  06  -ε-  [StructOpen]                     08
+  06  -ε-  [RecordOpen]                     08
   08       (@24)                            24 : 09
-  09  -ε-  [StructClose]                    11
+  09  -ε-  [RecordClose]                    11
   11                                        ▶
   12                                        ▶
-  13   !   (identifier) [Node Set(M0)]      12
+  13   !   (identifier) [Node RecordSet(M0)]  12
   15                                        ▶
-  16  -ε-  [SuppressEnd VariantClose Set(M4)]  15
+  16  -ε-  [SuppressEnd VariantClose RecordSet(M4)]  15
   18   !   (@13)                            13 : 16
   19  -ε-  [VariantOpen(M2) SuppressBegin]  18
-  21   !   (number) [VariantOpen(M3) Node Set(M1) VariantClose Set(M4)]  15
+  21   !   (number) [VariantOpen(M3) Node RecordSet(M1) VariantClose RecordSet(M4)]  15
   24  -ε-                                   19, 21

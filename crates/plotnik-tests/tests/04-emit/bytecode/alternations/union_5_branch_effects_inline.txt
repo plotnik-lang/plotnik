@@ -13,17 +13,17 @@ Q = 11
 Q:
   00  -ε-                                   02, 03, 04, 05, 06
   01                                        ▶
-  02   !   (identifier) [Null Set(b) Null Set(c) Null Set(d) Null Set(e) Node Set(a)]  01
-  03   !   (number) [Null Set(a) Null Set(c) Null Set(d) Null Set(e) Node Set(b)]  01
-  04   !   (string) [Null Set(a) Null Set(b) Null Set(d) Null Set(e) Node Set(c)]  01
-  05   !   (binary_expression) [Null Set(a) Null Set(b) Null Set(c) Null Set(e) Node Set(d)]  01
-  06   !   (call_expression) [Null Set(a) Null Set(b) Null Set(c) Null Set(d) Node Set(e)]  01
+  02   !   (identifier) [Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(e) Node RecordSet(a)]  01
+  03   !   (number) [Absent RecordSet(a) Absent RecordSet(c) Absent RecordSet(d) Absent RecordSet(e) Node RecordSet(b)]  01
+  04   !   (string) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(d) Absent RecordSet(e) Node RecordSet(c)]  01
+  05   !   (binary_expression) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(e) Node RecordSet(d)]  01
+  06   !   (call_expression) [Absent RecordSet(a) Absent RecordSet(b) Absent RecordSet(c) Absent RecordSet(d) Node RecordSet(e)]  01
 
 Q (entrypoint):
   08                                        ▶
-  09  -ε-  [StructClose]                    08
+  09  -ε-  [RecordClose]                    08
   10       (Q)                              00 : 09
-  11  -ε-  [StructOpen]                     10
+  11  -ε-  [RecordOpen]                     10
 -------------------- BYTECODE --------------------
 [strings]
 S00 "Beauty will save the world"
@@ -59,15 +59,15 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
-  08   !   (identifier) [Null Set(M1) Null Set(M2) Null Set(M3) Null Set(M4) Node Set(M0)]  06
-  12   !   (number) [Null Set(M0) Null Set(M2) Null Set(M3) Null Set(M4) Node Set(M1)]  06
-  16   !   (string) [Null Set(M0) Null Set(M1) Null Set(M3) Null Set(M4) Node Set(M2)]  06
-  20   !   (binary_expression) [Null Set(M0) Null Set(M1) Null Set(M2) Null Set(M4) Node Set(M3)]  06
-  24   !   (call_expression) [Null Set(M0) Null Set(M1) Null Set(M2) Null Set(M3) Node Set(M4)]  06
+  08   !   (identifier) [Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M3) Absent RecordSet(M4) Node RecordSet(M0)]  06
+  12   !   (number) [Absent RecordSet(M0) Absent RecordSet(M2) Absent RecordSet(M3) Absent RecordSet(M4) Node RecordSet(M1)]  06
+  16   !   (string) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M3) Absent RecordSet(M4) Node RecordSet(M2)]  06
+  20   !   (binary_expression) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M4) Node RecordSet(M3)]  06
+  24   !   (call_expression) [Absent RecordSet(M0) Absent RecordSet(M1) Absent RecordSet(M2) Absent RecordSet(M3) Node RecordSet(M4)]  06
   28  -ε-                                   08, 12, 16, 20, 24

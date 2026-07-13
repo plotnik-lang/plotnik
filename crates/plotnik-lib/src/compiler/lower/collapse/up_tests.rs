@@ -206,7 +206,7 @@ fn collapse_up_with_effects_no_merge() {
                 .into(),
             MatchIR::terminal(Label(1))
                 .nav(Nav::Up(1))
-                .append_effects(vec![EffectIR::literal(EffectKind::Null, 0)])
+                .append_effects(vec![EffectIR::literal(EffectKind::Absent, 0)])
                 .next(Label(2))
                 .into(),
             MatchIR::terminal(Label(2)).into(),

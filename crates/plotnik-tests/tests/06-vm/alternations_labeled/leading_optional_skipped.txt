@@ -66,15 +66,15 @@ Q = 00 :: T1
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  ─‣─  (expression_statement) [Node Set(M1)]  08
+  06  ─‣─  (expression_statement) [Node RecordSet(M1)]  08
   08  ─‣┘  _                                09
   09                                        ▶
-  10   !   (expression_statement) [Node Set(M0)]  06
-  12  ─‣─  (expression_statement) [Node Set(M0)]  06
+  10   !   (expression_statement) [Node RecordSet(M0)]  06
+  12  ─‣─  (expression_statement) [Node RecordSet(M0)]  06
   14   !   (comment)                        12
   15  ...
   16  ──!  _                                14, 16
@@ -84,7 +84,7 @@ Q:
   24   !   (program)                        22
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
        ▶   (@24)
 
@@ -105,14 +105,14 @@ Q:
   16  ❮❮❮ 
   16       _                                14, 16
   22  ❮❮❮ 
-  10       (expression_statement) [Node Set(M0)]  06
+  10       (expression_statement) [Node RecordSet(M0)]  06
        ●   expression_statement
-  06       (expression_statement) [Node Set(M1)]  08
+  06       (expression_statement) [Node RecordSet(M1)]  08
        ●   expression_statement
   08       _                                09
        ●   program
   09   ◀   (@24)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

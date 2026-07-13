@@ -112,7 +112,7 @@ impl NfaBuilder<'_> {
     /// `pre` is empty.
     ///
     /// Scope-opening captures (`compile_record_capture`, `compile_list_capture`)
-    /// fold `outer_capture.pre` onto their own `StructOpen`/`Arr` step. Captures that
+    /// fold `outer_capture.pre` onto their own `RecordOpen`/`ListOpen` step. Captures that
     /// own no such step — `PendingValue` and suppressive — have nowhere to fold it,
     /// so they call this. Dropping it loses a case's `VariantOpen` (or an
     /// an alternative's injected defaults), and the path then closes a
@@ -130,10 +130,10 @@ impl NfaBuilder<'_> {
         pre_step
     }
 
-    /// Null-inject captures on the skip path of an optional/star quantifier,
+    /// Produce absent captures on the skip path of an optional/star quantifier,
     /// mirroring what alternations do for asymmetric alternatives.
-    /// Returns `exit` unchanged when no Set effects are present.
-    pub(super) fn emit_null_for_skip_path(
+    /// Returns `exit` unchanged when no `RecordSet` effects are present.
+    pub(super) fn emit_absence_for_skip_path(
         &mut self,
         exit: Label,
         capture: &CaptureEffects,
@@ -151,28 +151,28 @@ impl NfaBuilder<'_> {
                 .is_some_and(|entry| entry.kind == crate::bytecode::SpanKind::Capture)
                 .then_some(*id as u16)
         });
-        let null_effects: Vec<_> = capture
+        let absence_effects: Vec<_> = capture
             .post
             .iter()
-            .filter(|eff| eff.kind() == EffectKind::Set)
-            .flat_map(|set_eff| {
+            .filter(|eff| eff.kind() == EffectKind::RecordSet)
+            .flat_map(|record_set| {
                 capture_span
                     .map(EffectIR::span_start)
                     .into_iter()
-                    .chain([EffectIR::null(), set_eff.clone()])
+                    .chain([EffectIR::absent(), record_set.clone()])
                     .chain(capture_span.map(EffectIR::span_end))
             })
             .collect();
 
-        self.emit_effects_if_nonempty(exit, null_effects)
+        self.emit_effects_if_nonempty(exit, absence_effects)
     }
 
-    /// Emit null effects for internal captures when skipping an optional/star pattern.
+    /// Emit absence events for internal captures when skipping an optional/star pattern.
     ///
-    /// Unlike `emit_null_for_skip_path` which handles captures passed as effects,
+    /// Unlike `emit_absence_for_skip_path` which handles captures passed as effects,
     /// this function handles captures defined INSIDE the pattern (e.g., `{(x) @cap}?`).
-    /// It collects all capture names from the pattern and emits Null Set for each.
-    pub(super) fn emit_null_for_internal_captures(
+    /// It collects all capture names from the pattern and emits `Absent RecordSet` for each.
+    pub(super) fn emit_absence_for_internal_captures(
         &mut self,
         exit: Label,
         inner: &Pattern,
@@ -188,7 +188,7 @@ impl NfaBuilder<'_> {
             return exit;
         }
 
-        let mut null_effects = Vec::new();
+        let mut absence_effects = Vec::new();
         for capture in captures {
             let name = capture
                 .name()
@@ -197,17 +197,17 @@ impl NfaBuilder<'_> {
                 let span = self.span_id(capture.syntax(), crate::bytecode::SpanKind::Capture);
                 if let Some(span) = span {
                     self.bind_span(span, SpanBindingIR::Member(member_ref));
-                    null_effects.push(EffectIR::span_start(span.0));
+                    absence_effects.push(EffectIR::span_start(span.0));
                 }
-                null_effects.push(EffectIR::null());
-                null_effects.push(EffectIR::with_member(EffectKind::Set, member_ref));
+                absence_effects.push(EffectIR::absent());
+                absence_effects.push(EffectIR::with_member(EffectKind::RecordSet, member_ref));
                 if let Some(span) = span {
-                    null_effects.push(EffectIR::span_end(span.0));
+                    absence_effects.push(EffectIR::span_end(span.0));
                 }
             }
         }
 
-        self.emit_effects_if_nonempty(exit, null_effects)
+        self.emit_effects_if_nonempty(exit, absence_effects)
     }
 
     pub(super) fn emit_effects_if_nonempty(

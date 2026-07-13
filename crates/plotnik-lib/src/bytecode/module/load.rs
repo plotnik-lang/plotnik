@@ -909,7 +909,7 @@ impl Module {
     /// Two passes over the stream:
     /// 1. Decode each instruction's fixed-size slot (the slot size is fixed by
     ///    the opcode, so the walk is unambiguous), validating opcode, segment,
-    ///    nav, node kind, effect opcodes, `Set`/`Variant` member operands, and
+    ///    nav, node kind, effect opcodes, `RecordSet`/`Variant` member operands, and
     ///    predicate operands, and rejecting any zero successor address. Record
     ///    each instruction start and collect every jump target.
     /// 2. Every collected jump target — successor or call next/target — must land

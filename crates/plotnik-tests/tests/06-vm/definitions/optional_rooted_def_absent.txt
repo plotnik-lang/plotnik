@@ -57,15 +57,15 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘³ _                                06
-  08  └‣─  (number) [Set(M0) Node Set(M1)]  07
-  10  ─‣─  (number) [Set(M0) Node Set(M1)]  07
-  12  -ε-  [Null]                           08
+  08  └‣─  (number) [RecordSet(M0) Node RecordSet(M1)]  07
+  10  ─‣─  (number) [RecordSet(M0) Node RecordSet(M1)]  07
+  12  -ε-  [Absent]                         08
   14   !   (identifier) [Node]              10
   16  ──!  _                                14, 16
   18  └─!  _                                14, 16
@@ -75,7 +75,7 @@ Q:
   24   !   (program)                        22
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
        ▶   (@24)
 
@@ -103,8 +103,8 @@ Q:
   16  ❮❮❮ 
   16       _                                14, 16
   20  ❮❮❮ 
-  12  -ε-  [Null]                           08
-  08       (number) [Set(M0) Node Set(M1)]  07
+  12  -ε-  [Absent]                         08
+  08       (number) [RecordSet(M0) Node RecordSet(M1)]  07
        ○   [
        ●   number
   07       _                                06
@@ -112,5 +112,5 @@ Q:
   06   ◀   (@24)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

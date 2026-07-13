@@ -85,17 +85,17 @@ Chain:
   01                                        ▶
 
 Q:
-  02  -ε-  [StructOpen]                     04
+  02  -ε-  [RecordOpen]                     04
   04       (@25)                            25 : 05
-  05  -ε-  [StructClose]                    07
+  05  -ε-  [RecordClose]                    07
   07                                        ▶
   08  └‣─  function: (@21)                  21 : 09
-  09  ─‣┘  _ [Set(M1) VariantClose]         14
+  09  ─‣┘  _ [RecordSet(M1) VariantClose]   14
   11  └‣─  (@21)                            21 : 12
-  12  ─‣┘² _ [Set(M4)]                      15
+  12  ─‣┘² _ [RecordSet(M4)]                15
   14                                        ▶
   15                                        ▶
-  16   !   (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  14
+  16   !   (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  14
   19   !   (call_expression) [VariantOpen(M3)]  08
   21  -ε-                                   16, 19
   23  ...
@@ -103,7 +103,7 @@ Q:
   25   !   (program)                        24
 --------------------- TRACE ----------------------
 Q:
-  02  -ε-  [StructOpen]                     04
+  02  -ε-  [RecordOpen]                     04
   04       (@25)                            25 : 05
        ▶   (@25)
 
@@ -117,7 +117,7 @@ Q:
 
 @21:
   21  -ε-                                   16, 19
-  16       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  14
+  16       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  14
        ○   call_expression
   21  ❮❮❮ 
   19       (call_expression) [VariantOpen(M3)]  08
@@ -127,7 +127,7 @@ Q:
 
 @21:
   21  -ε-                                   16, 19
-  16       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  14
+  16       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  14
        ○   call_expression
   21  ❮❮❮ 
   19       (call_expression) [VariantOpen(M3)]  08
@@ -137,25 +137,25 @@ Q:
 
 @21:
   21  -ε-                                   16, 19
-  16       (identifier) [VariantOpen(M2) Node Set(M0) VariantClose]  14
+  16       (identifier) [VariantOpen(M2) Node RecordSet(M0) VariantClose]  14
        ●   identifier
   14   ◀   (@21)                            
 
 @21:
-  09       _ [Set(M1) VariantClose]         14
+  09       _ [RecordSet(M1) VariantClose]   14
        ●   call_expression
   14   ◀   (@21)                            
 
 @21:
-  09       _ [Set(M1) VariantClose]         14
+  09       _ [RecordSet(M1) VariantClose]   14
        ●   call_expression
   14   ◀   (@21)                            
 
 @25:
-  12       _ [Set(M4)]                      15
+  12       _ [RecordSet(M4)]                15
        ●   program
   15   ◀   (@25)                            
 
 Q:
-  05  -ε-  [StructClose]                    07
+  05  -ε-  [RecordClose]                    07
   07   ◀   (Q)                              ◼

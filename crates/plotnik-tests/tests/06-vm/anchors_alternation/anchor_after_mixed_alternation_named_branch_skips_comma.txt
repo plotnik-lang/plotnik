@@ -62,16 +62,16 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘⁴ _                                06
-  08  ─◦─  (identifier) [Node Set(M1)]      07
-  10  ─•─  (identifier) [Node Set(M1)]      07
-  12   !   (identifier) [Node Set(M0)]      10
-  14   !   ";" [Null Set(M0)]               08
+  08  ─◦─  (identifier) [Node RecordSet(M1)]  07
+  10  ─•─  (identifier) [Node RecordSet(M1)]  07
+  12   !   (identifier) [Node RecordSet(M0)]  10
+  14   !   ";" [Absent RecordSet(M0)]       08
   16  ──!  _                                12, 14, 16
   18  └─!  _                                12, 14, 16
   20  └‣─  arguments: (arguments)           18
@@ -81,7 +81,7 @@ Q:
   24   !   (program)                        22
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
        ▶   (@24)
 
@@ -97,17 +97,17 @@ Q:
        ●   arguments
   18       _                                12, 14, 16
        ●   (
-  12       (identifier) [Node Set(M0)]      10
+  12       (identifier) [Node RecordSet(M0)]  10
        ○   (
   18  ❮❮❮ 
-  14       ";" [Null Set(M0)]               08
+  14       ";" [Absent RecordSet(M0)]       08
        ○   (
   18  ❮❮❮ 
   16       _                                12, 14, 16
        ●   identifier
-  12       (identifier) [Node Set(M0)]      10
+  12       (identifier) [Node RecordSet(M0)]  10
        ●   identifier
-  10       (identifier) [Node Set(M1)]      07
+  10       (identifier) [Node RecordSet(M1)]  07
        ○   ,
        ●   identifier
   07       _                                06
@@ -115,5 +115,5 @@ Q:
   06   ◀   (@24)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

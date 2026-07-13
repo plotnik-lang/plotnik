@@ -14,7 +14,7 @@ Name     = 25
 [transitions]
 Name:
   01                                        ▶
-  02   !   (identifier) [Node Set(name)]    01
+  02   !   (identifier) [Node RecordSet(name)]  01
 
 Bare:
   04                                        ▶
@@ -26,16 +26,16 @@ Bare:
 Captured:
   13                                        ▶
   14   !   (program)                        16
-  16  └‣─  (expression_statement) [StructOpen]  20
-  17  ─‣┘² _ [Set(item)]                    13
-  19  -ε-  [StructClose]                    17
+  16  └‣─  (expression_statement) [RecordOpen]  20
+  17  ─‣┘² _ [RecordSet(item)]              13
+  19  -ε-  [RecordClose]                    17
   20  └‣─  (Name)                           02 : 19
 
 Name (entrypoint):
   22                                        ▶
-  23  -ε-  [StructClose]                    22
+  23  -ε-  [RecordClose]                    22
   24       (Name)                           02 : 23
-  25  -ε-  [StructOpen]                     24
+  25  -ε-  [RecordOpen]                     24
 
 Bare (entrypoint):
   26                                        ▶
@@ -43,9 +43,9 @@ Bare (entrypoint):
 
 Captured (entrypoint):
   28                                        ▶
-  29  -ε-  [StructClose]                    28
+  29  -ε-  [RecordClose]                    28
   30       (Captured)                       14 : 29
-  31  -ε-  [StructOpen]                     30
+  31  -ε-  [RecordOpen]                     30
 -------------------- BYTECODE --------------------
 [strings]
 S0 "Beauty will save the world"
@@ -93,9 +93,9 @@ P11 ref        118..124  src0  T2
 
 [transitions]
 Name:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@32)                            32 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
 
 Bare:
@@ -103,27 +103,27 @@ Bare:
   07                                        ▶
 
 Captured:
-  08  -ε-  [StructOpen]                     10
+  08  -ε-  [RecordOpen]                     10
   10       (@45)                            45 : 11
-  11  -ε-  [StructClose]                    13
+  11  -ε-  [RecordClose]                    13
   13                                        ▶
   14  └‣─  (@32)                            32 : 16
   15                                        ▶
   16  ─‣┘  _ [SuppressEnd SpanEnd#6]        18
   18  ─‣┘  _ [SpanEnd#5 SpanEnd#4 SpanEnd#3]  15
-  20  -ε-  [StructClose]                    24
+  20  -ε-  [RecordClose]                    24
   22  ...
   23  ...
-  24  ─‣┘  _ [SpanStart#10 Set(M1) SpanEnd#10 SpanEnd#11]  27
+  24  ─‣┘  _ [SpanStart#10 RecordSet(M1) SpanEnd#10 SpanEnd#11]  27
   27  ─‣┘  _ [SpanEnd#9 SpanEnd#8 SpanEnd#7]  38
   29                                        ▶
   30  ...
   31  ...
-  32   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node Set(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  29
+  32   !   (identifier) [SpanStart#0 SpanStartAt#2 SpanStart#1 Node RecordSet(M0) SpanEnd#1 SpanEnd#2 SpanEnd#0]  29
   36  └‣─  (expression_statement) [SpanStartAt#5 SpanStart#6 SuppressBegin]  14
   38                                        ▶
   39  ...
   40   !   (program) [SpanStart#3 SpanStartAt#4]  36
   42  └‣─  (@32)                            32 : 20
-  43  └‣─  (expression_statement) [SpanStartAt#9 SpanStart#11 StructOpen]  42
+  43  └‣─  (expression_statement) [SpanStartAt#9 SpanStart#11 RecordOpen]  42
   45   !   (program) [SpanStart#7 SpanStartAt#8]  43

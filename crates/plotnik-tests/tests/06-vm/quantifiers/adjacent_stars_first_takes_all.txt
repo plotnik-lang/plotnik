@@ -63,68 +63,68 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@40)                            40 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  └‣─  (debugger_statement) [ArrayClose Set(M1) Node Set(M2)]  07
-  11  ─‣─  (debugger_statement) [ArrayClose Set(M1) Node Set(M2)]  07
-  14   !   (expression_statement) [Node Push]  16, 11
+  08  └‣─  (debugger_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  07
+  11  ─‣─  (debugger_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  07
+  14   !   (expression_statement) [Node ArrayPush]  16, 11
   16  ──!  _                                14, 16
   18  └─!  _                                14, 16
-  20  -ε-  [ArrayOpen]                      18, 08
-  22   !   (expression_statement) [Node Push]  24, 11
+  20  -ε-  [ListOpen]                       18, 08
+  22   !   (expression_statement) [Node ArrayPush]  24, 11
   24  ──!  _                                22, 24
-  26  -ε-  [ArrayOpen]                      24, 11
-  28  -ε-  [ArrayClose Set(M0)]             26
-  30  -ε-  [ArrayClose Set(M0)]             20
-  32   !   (expression_statement) [Node Push]  34, 28
+  26  -ε-  [ListOpen]                       24, 11
+  28  -ε-  [ListClose RecordSet(M0)]        26
+  30  -ε-  [ListClose RecordSet(M0)]        20
+  32   !   (expression_statement) [Node ArrayPush]  34, 28
   34  ──!  _                                32, 34
   36  └─!  _                                32, 34
-  38  -ε-  [ArrayOpen]                      36, 30
+  38  -ε-  [ListOpen]                       36, 30
   40   !   (program)                        38
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@40)                            40 : 03
        ▶   (@40)
 
 @40:
   40       (program)                        38
        ●   program
-  38  -ε-  [ArrayOpen]                      36, 30
+  38  -ε-  [ListOpen]                       36, 30
   36       _                                32, 34
        ●   expression_statement
-  32       (expression_statement) [Node Push]  34, 28
+  32       (expression_statement) [Node ArrayPush]  34, 28
        ●   expression_statement
   34       _                                32, 34
        ●   expression_statement
-  32       (expression_statement) [Node Push]  34, 28
+  32       (expression_statement) [Node ArrayPush]  34, 28
        ●   expression_statement
   34       _                                32, 34
        ●   debugger_statement
-  32       (expression_statement) [Node Push]  34, 28
+  32       (expression_statement) [Node ArrayPush]  34, 28
        ○   debugger_statement
   34  ❮❮❮ 
   34       _                                32, 34
   32  ❮❮❮ 
-  28  -ε-  [ArrayClose Set(M0)]             26
-  26  -ε-  [ArrayOpen]                      24, 11
+  28  -ε-  [ListClose RecordSet(M0)]        26
+  26  -ε-  [ListOpen]                       24, 11
   24       _                                22, 24
        ●   debugger_statement
-  22       (expression_statement) [Node Push]  24, 11
+  22       (expression_statement) [Node ArrayPush]  24, 11
        ○   debugger_statement
   24  ❮❮❮ 
   24       _                                22, 24
   26  ❮❮❮ 
-  11       (debugger_statement) [ArrayClose Set(M1) Node Set(M2)]  07
+  11       (debugger_statement) [ListClose RecordSet(M1) Node RecordSet(M2)]  07
        ●   debugger_statement
   07       _                                06
        ●   program
   06   ◀   (@40)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

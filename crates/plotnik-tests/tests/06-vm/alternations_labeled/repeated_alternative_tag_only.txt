@@ -51,9 +51,9 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ...
@@ -64,11 +64,11 @@ Q:
   16   !   (debugger_statement) [VariantOpen(M1) VariantClose]  22
   18  ──!  _                                14, 16, 18
   20  └─!  _                                14, 16, 18
-  22  ─‣┘  _ [Set(M2)]                      06
+  22  ─‣┘  _ [RecordSet(M2)]                06
   24   !   (program)                        20
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03
        ▶   (@24)
 
@@ -92,10 +92,10 @@ Q:
   12       _                                10, 12
   10  ❮❮❮ 
   08  -ε-  [VariantClose]                   22
-  22       _ [Set(M2)]                      06
+  22       _ [RecordSet(M2)]                06
        ●   program
   06   ◀   (@24)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

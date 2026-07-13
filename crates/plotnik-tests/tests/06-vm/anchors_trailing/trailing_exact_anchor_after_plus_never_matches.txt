@@ -44,23 +44,23 @@ Q = 00 :: T2
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@19)                            19 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  06  !─┘  _ [ArrayClose Set(M0)]           08
+  06  !─┘  _ [ListClose RecordSet(M0)]      08
   08  ─‣┘³ _                                09
   09                                        ▶
-  10   !   (identifier) [Node Push]         12, 06
+  10   !   (identifier) [Node ArrayPush]    12, 06
   12  ──!  _                                10, 12
-  14  └─!  _ [ArrayOpen]                    10, 12
+  14  └─!  _ [ListOpen]                     10, 12
   16  └‣─  right: (array)                   14
   17  └‣─  (assignment_expression)          16
   18  └‣─  (expression_statement)           17
   19   !   (program)                        18
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@19)                            19 : 03
        ▶   (@19)
 
@@ -75,27 +75,27 @@ Q:
        ○   identifier
        ○   =
        ●   array
-  14       _ [ArrayOpen]                    10, 12
+  14       _ [ListOpen]                     10, 12
        ●   [
-  10       (identifier) [Node Push]         12, 06
+  10       (identifier) [Node ArrayPush]    12, 06
        ○   [
   14  ❮❮❮ 
   12       _                                10, 12
        ●   identifier
-  10       (identifier) [Node Push]         12, 06
+  10       (identifier) [Node ArrayPush]    12, 06
        ●   identifier
   12       _                                10, 12
        ●   ]
-  10       (identifier) [Node Push]         12, 06
+  10       (identifier) [Node ArrayPush]    12, 06
        ○   ]
   12  ❮❮❮ 
   12       _                                10, 12
   10  ❮❮❮ 
-  06       _ [ArrayClose Set(M0)]           08
+  06       _ [ListClose RecordSet(M0)]      08
   12  ❮❮❮ 
   12       _                                10, 12
        ●   ]
-  10       (identifier) [Node Push]         12, 06
+  10       (identifier) [Node ArrayPush]    12, 06
        ○   ]
   12  ❮❮❮ 
   12       _                                10, 12

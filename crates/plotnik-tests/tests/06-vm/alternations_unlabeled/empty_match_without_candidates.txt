@@ -43,25 +43,25 @@ Q = 00 :: T3
 
 [transitions]
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08  -ε-  [ArrayClose Set(M0)]             07
-  10   !   (identifier) [Node Push]         12, 08
+  08  -ε-  [ListClose RecordSet(M0)]        07
+  10   !   (identifier) [Node ArrayPush]    12, 08
   12  ──!  _                                10, 12
-  14   !   _ [ArrayOpen]                    10, 12
-  16  -ε-  [Null Set(M1)]                   14
-  18  -ε-  [Null Set(M1) ArrayOpen ArrayClose Set(M0)]  06
-  21   !   (debugger_statement) [ArrayOpen ArrayClose Set(M0) Node Set(M1)]  07
+  14   !   _ [ListOpen]                     10, 12
+  16  -ε-  [Absent RecordSet(M1)]           14
+  18  -ε-  [Absent RecordSet(M1) ListOpen ListClose RecordSet(M0)]  06
+  21   !   (debugger_statement) [ListOpen ListClose RecordSet(M0) Node RecordSet(M1)]  07
   24  ──!  _                                16, 21, 24
   26  └─!  _                                16, 21, 24
   28   !   (program)                        26, 18
 --------------------- TRACE ----------------------
 Q:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03
        ▶   (@28)
 
@@ -70,9 +70,9 @@ Q:
        ●   program
   26       _                                16, 21, 24
   28  ❮❮❮ 
-  18  -ε-  [Null Set(M1) ArrayOpen ArrayClose Set(M0)]  06
+  18  -ε-  [Absent RecordSet(M1) ListOpen ListClose RecordSet(M0)]  06
   06   ◀   (@28)                            
 
 Q:
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05   ◀   (Q)                              ◼

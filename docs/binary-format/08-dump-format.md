@@ -59,11 +59,11 @@ Each transition line uses fixed columns:
 Examples:
 
 ```text
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
-  08   !   (number) [Null Set(M1) Node Set(M0)]  07
+  08   !   (number) [Absent RecordSet(M1) Node RecordSet(M0)]  07
 ```
 
 Instruction forms:
@@ -152,14 +152,14 @@ Value = 00 :: T1
 
 [transitions]
 Value:
-  00  -ε-  [StructOpen]                     02
+  00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03
-  03  -ε-  [StructClose]                    05
+  03  -ε-  [RecordClose]                    05
   05                                        ▶
   06                                        ▶
   07  ─‣┘  _                                06
-  08   !   (number) [Null Set(M1) Node Set(M0)]  07
-  11   !   (string) [Null Set(M0) Node Set(M1)]  07
+  08   !   (number) [Absent RecordSet(M1) Node RecordSet(M0)]  07
+  11   !   (string) [Absent RecordSet(M0) Node RecordSet(M1)]  07
   14  ─‣─  _                                08, 11, 14
   16  └‣─  _                                08, 11, 14
   18   !   (document)                       16
