@@ -1,6 +1,0 @@
-Value = (string) @text
-Main = (array (Value) @item)
--------------------- SYMBOLS ---------------------
-Value
-Main
-  Value

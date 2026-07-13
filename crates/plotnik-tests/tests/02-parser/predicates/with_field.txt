@@ -1,0 +1,30 @@
+Q = (pair == "entry" key: (identifier))
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "pair"
+      NodePredicate
+        OpEq "=="
+        DoubleQuote "\""
+        StringContent "entry"
+        DoubleQuote "\""
+      Field
+        Id "key"
+        Colon ":"
+        NamedNode
+          ParenOpen "("
+          Id "identifier"
+          ParenClose ")"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode pair
+      FieldPattern key:
+        NamedNode identifier
