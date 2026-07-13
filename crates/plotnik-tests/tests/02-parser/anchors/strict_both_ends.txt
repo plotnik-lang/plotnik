@@ -1,0 +1,27 @@
+Q = (array .! (element) .!)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "array"
+      Anchor
+        DotBang ".!"
+      NamedNode
+        ParenOpen "("
+        Id "element"
+        ParenClose ")"
+      Anchor
+        DotBang ".!"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode array
+      .!
+      NamedNode element
+      .!

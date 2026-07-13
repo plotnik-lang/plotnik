@@ -1,0 +1,24 @@
+Q = (block (statement) .!)
+---------------------- CST -----------------------
+# query.ptk
+Root
+  Def
+    Id "Q"
+    Equals "="
+    NamedNode
+      ParenOpen "("
+      Id "block"
+      NamedNode
+        ParenOpen "("
+        Id "statement"
+        ParenClose ")"
+      Anchor
+        DotBang ".!"
+      ParenClose ")"
+---------------------- AST -----------------------
+# query.ptk
+Root
+  Def Q
+    NamedNode block
+      NamedNode statement
+      .!

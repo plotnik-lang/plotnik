@@ -44,6 +44,14 @@
 //! `alternations`, `definitions`, `predicates`, `recursion`. That last form only
 //! stays complete because every stage spells a construct identically; keep new
 //! folders on that vocabulary.
+//!
+//! Organize the corpus like a specification. Give each behavior a small fixture of
+//! its own before adding fixtures for interactions with other behaviors. Atomic
+//! fixtures use the shortest unambiguous name in their construct folder; interaction
+//! fixtures name the dimensions that make them more specific. A fixture should not
+//! contain unrelated behavior merely to exercise several features at once. Stage and
+//! folder boundaries follow the current compiler pipeline and subsystem ownership,
+//! not historical implementation phases.
 
 use std::fs;
 use std::path::Path;
