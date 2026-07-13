@@ -25,4 +25,4 @@ S3 "+"
 
 [entrypoints]
 
-[transitions]
+[instructions]

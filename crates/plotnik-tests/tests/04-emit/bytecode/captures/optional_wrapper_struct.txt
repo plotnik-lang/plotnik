@@ -20,4 +20,4 @@ S1 "identifier"
 
 [entrypoints]
 
-[transitions]
+[instructions]

@@ -35,7 +35,7 @@ T0 = <Void>
 [entrypoints]
 Q = 0 :: T0
 
-[transitions]
+[instructions]
 Q:
   0       (@6)                              6 : 1
   1                                         ▶

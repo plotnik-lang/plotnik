@@ -80,7 +80,7 @@ N1: S6 → T3  ; Q
 [entrypoints]
 Q = 00 :: T3
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03

@@ -59,7 +59,7 @@ N1: S3 → T2  ; Q
 [entrypoints]
 Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@25)                            25 : 03

@@ -229,7 +229,7 @@ P10 pattern    71..106  src0
 P11 capture    100..105  src0  T4.M4
 P12 ref        93..99  src0  T3
 
-[transitions]
+[instructions]
 Expr:
   00       (@30)                            30 : 01
   01                                        ▶

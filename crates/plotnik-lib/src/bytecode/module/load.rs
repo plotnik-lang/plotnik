@@ -63,8 +63,8 @@ pub enum ModuleError {
     InvalidNodeSymbol(usize),
     #[error("predicate operand out of range at instruction address {0}")]
     InvalidPredicateOperand(CodeAddr),
-    #[error("malformed transitions section")]
-    MalformedTransitions,
+    #[error("malformed instruction stream")]
+    MalformedInstructionStream,
     #[error("effect stack imbalance at instruction address {0}")]
     EffectStackImbalance(CodeAddr),
     #[error("effect stack analysis budget exceeded at instruction address {0}")]
@@ -166,11 +166,11 @@ fn align_up_u64(value: u64, align: u64) -> u64 {
     (value + align - 1) & !(align - 1)
 }
 
-fn read_transition_u16(storage: &[u8], off: usize) -> Result<u16, ModuleError> {
+fn read_operand_u16(storage: &[u8], off: usize) -> Result<u16, ModuleError> {
     storage
         .get(off..off + 2)
         .map(|b| u16::from_le_bytes([b[0], b[1]]))
-        .ok_or(ModuleError::MalformedTransitions)
+        .ok_or(ModuleError::MalformedInstructionStream)
 }
 
 impl Module {
@@ -225,7 +225,7 @@ impl Module {
         }
         #[cfg(not(debug_assertions))]
         let _ = is_start;
-        module.decoded = decoded::build(module.transitions_slice());
+        module.decoded = decoded::build(module.instructions_slice());
         Ok(module)
     }
 
@@ -243,7 +243,7 @@ impl Module {
     /// The CRC32 detects accidental corruption between emission and
     /// construction. It is not a substitute for structural validation, so a
     /// test buffer with a recomputed checksum must still fail the checks below;
-    /// [`Self::validate_transitions`] therefore re-verifies the lazily-decoded
+    /// [`Self::validate_instructions`] therefore re-verifies the lazily-decoded
     /// instruction stream structurally, and
     /// [`validate_effect_stack`](super::effect_stack::validate_effect_stack)
     /// proves no path can panic the materializer's builder stack or the VM's
@@ -275,7 +275,7 @@ impl Module {
         // `Entrypoint`, which would otherwise panic on a malformed zero name.
         self.validate_string_ids()?;
         self.validate_symbol_ids()?;
-        let is_start = self.validate_transitions()?;
+        let is_start = self.validate_instructions()?;
         self.validate_entrypoints(&is_start)?;
         self.validate_return_routes()?;
         self.validate_depth_neutrality()?;
@@ -537,12 +537,12 @@ impl Module {
     /// Entrypoint targets must address a real instruction so the VM's first
     /// [`decode_instruction`](Self::decode_instruction) cannot read out of bounds.
     /// `is_start` is the instruction-start bitmap from
-    /// [`Self::validate_transitions`]: a `target` that lands inside a multi-word
+    /// [`Self::validate_instructions`]: a `target` that lands inside a multi-word
     /// instruction would make the VM start decoding mid-instruction, so it must
     /// be an instruction start, not merely in range.
     fn validate_entrypoints(&self, is_start: &[bool]) -> Result<(), ModuleError> {
         let entrypoints = self.entrypoints();
-        let word_count = self.header.transitions_count;
+        let word_count = self.header.instruction_word_count;
         let type_defs = self.header.type_defs_count;
         let storage: &[u8] = &self.storage;
         let base = self.offsets.entrypoints as usize;
@@ -587,12 +587,12 @@ impl Module {
             if let Some(expected) = roots.insert(target, route)
                 && expected != route
             {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
         }
 
         let mut addr = CodeAddr::ZERO;
-        while addr.get() < self.header.transitions_count {
+        while addr.get() < self.header.instruction_word_count {
             let words = match self.decode_instruction(addr) {
                 Instruction::Match(m) => m.word_count(),
                 Instruction::Call(c) => {
@@ -601,7 +601,7 @@ impl Module {
                     if let Some(expected) = roots.insert(target, route)
                         && expected != route
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     1
                 }
@@ -611,7 +611,7 @@ impl Module {
                     if let Some(previous) = roots.insert(target, route)
                         && previous != route
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     1
                 }
@@ -621,7 +621,7 @@ impl Module {
                     if let Some(previous) = roots.insert(target, route)
                         && previous != route
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     1
                 }
@@ -651,12 +651,12 @@ impl Module {
                 .return_contract(target, &mut cache)
                 .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
             {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
         }
 
         let mut addr = CodeAddr::ZERO;
-        while addr.get() < self.header.transitions_count {
+        while addr.get() < self.header.instruction_word_count {
             let words = match self.decode_instruction(addr) {
                 Instruction::Match(matched) => matched.word_count(),
                 Instruction::Call(call) => {
@@ -665,7 +665,7 @@ impl Module {
                         .return_contract(target, &mut cache)
                         .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     1
                 }
@@ -675,7 +675,7 @@ impl Module {
                         .return_contract(target, &mut cache)
                         .is(ReturnOutcomes::MATCHED, ReturnEntry::Routed)
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     1
                 }
@@ -685,7 +685,7 @@ impl Module {
                         .return_contract(target, &mut cache)
                         .is(ReturnOutcomes::BOTH, ReturnEntry::Routed)
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     1
                 }
@@ -935,21 +935,21 @@ impl Module {
     /// resolved against the tree-sitter grammar at match time, and member
     /// `type_id`s, which the materializer reads through the checked `Types::get`
     /// that returns `Option`.
-    fn validate_transitions(&self) -> Result<Vec<bool>, ModuleError> {
+    fn validate_instructions(&self) -> Result<Vec<bool>, ModuleError> {
         let storage: &[u8] = &self.storage;
-        let base = self.offsets.transitions as usize;
-        let word_count = self.header.transitions_count;
+        let base = self.offsets.instructions as usize;
+        let word_count = self.header.instruction_word_count;
 
         let read_u8 = |off: usize| {
             storage
                 .get(off)
                 .copied()
-                .ok_or(ModuleError::MalformedTransitions)
+                .ok_or(ModuleError::MalformedInstructionStream)
         };
         // A reserved padding run inside an instruction slot must be all zero.
         let check_zero = |off: usize, len: usize| match storage.get(off..off + len) {
             Some(run) if run.iter().all(|&b| b == 0) => Ok(()),
-            _ => Err(ModuleError::MalformedTransitions),
+            _ => Err(ModuleError::MalformedInstructionStream),
         };
 
         let mut is_start = vec![false; word_count as usize];
@@ -971,7 +971,7 @@ impl Module {
             // Every opcode reserves the segment bits; the call/return
             // decoders `assert!` segment == 0, and a non-zero segment is unused.
             if header_byte::segment(header) != 0 {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
             // node_class_bits (header bits 4-5) is meaningful only for Match
             // variants; Call/Return ignore it, so the format pins those bits to
@@ -981,54 +981,54 @@ impl Module {
                 Opcode::Call | Opcode::RoutedCall | Opcode::Return | Opcode::SplitCall
             ) && header_byte::node_class_bits(header) != 0
             {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
 
             match opcode {
                 Opcode::Return => {
                     if plotnik_rt::ReturnOutcome::from_byte(read_u8(instr_off + 1)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     if ReturnEntry::from_byte(read_u8(instr_off + 2)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     check_zero(instr_off + 3, 5)?;
                 }
                 Opcode::Call => {
                     // `Call::from_bytes` decodes a nav and two non-zero successor addresses.
                     if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    let next = read_transition_u16(storage, instr_off + 4)?;
-                    let target = read_transition_u16(storage, instr_off + 6)?;
+                    let next = read_operand_u16(storage, instr_off + 4)?;
+                    let target = read_operand_u16(storage, instr_off + 6)?;
                     if next == 0 || target == 0 {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     targets.push(CodeAddr::from(next));
                     targets.push(CodeAddr::from(target));
                 }
                 Opcode::RoutedCall => {
                     if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     check_zero(instr_off + 2, 2)?;
-                    let next = read_transition_u16(storage, instr_off + 4)?;
-                    let target = read_transition_u16(storage, instr_off + 6)?;
+                    let next = read_operand_u16(storage, instr_off + 4)?;
+                    let target = read_operand_u16(storage, instr_off + 6)?;
                     if next == 0 || target == 0 {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     targets.push(CodeAddr::from(next));
                     targets.push(CodeAddr::from(target));
                 }
                 Opcode::SplitCall => {
                     if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
-                    let matched = read_transition_u16(storage, instr_off + 2)?;
-                    let zero = read_transition_u16(storage, instr_off + 4)?;
-                    let target = read_transition_u16(storage, instr_off + 6)?;
+                    let matched = read_operand_u16(storage, instr_off + 2)?;
+                    let zero = read_operand_u16(storage, instr_off + 4)?;
+                    let target = read_operand_u16(storage, instr_off + 6)?;
                     if matched == 0 || zero == 0 || target == 0 {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     targets.extend([
                         CodeAddr::from(matched),
@@ -1041,19 +1041,19 @@ impl Module {
                     let node_kind = header_byte::node_class_bits(header);
                     if NodeKindConstraint::try_from_bytes(
                         node_kind,
-                        read_transition_u16(storage, instr_off + 2)?,
+                        read_operand_u16(storage, instr_off + 2)?,
                     )
                     .is_none()
                     {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
                     if Nav::try_from_byte(read_u8(instr_off + 1)?).is_none() {
-                        return Err(ModuleError::MalformedTransitions);
+                        return Err(ModuleError::MalformedInstructionStream);
                     }
 
                     if opcode == Opcode::Match8 {
                         // bytes 6-7 hold the single successor; `0` means terminal.
-                        let next = read_transition_u16(storage, instr_off + 6)?;
+                        let next = read_operand_u16(storage, instr_off + 6)?;
                         if next != 0 {
                             targets.push(CodeAddr::from(next));
                         }
@@ -1066,19 +1066,19 @@ impl Module {
 
             addr = addr
                 .checked_add(opcode.word_count())
-                .ok_or(ModuleError::MalformedTransitions)?;
+                .ok_or(ModuleError::MalformedInstructionStream)?;
         }
 
         // A well-formed stream tiles the section in whole instructions. An
         // overrun means a trailing instruction's slot crosses the section end,
         // so a successor pointing into it could later decode past the buffer.
         if addr.get() != word_count {
-            return Err(ModuleError::MalformedTransitions);
+            return Err(ModuleError::MalformedInstructionStream);
         }
 
         for target in targets {
             if target.get() >= word_count || !is_start[target.as_usize()] {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
         }
         Ok(is_start)
@@ -1086,7 +1086,7 @@ impl Module {
 
     /// Validate the payload of one extended `Match` (`Match16`..`Match64`):
     /// effects, predicate, and successors. Appends each successor to `targets`
-    /// for the pass-2 jump-target check in [`Self::validate_transitions`].
+    /// for the pass-2 jump-target check in [`Self::validate_instructions`].
     fn validate_extended_match(
         &self,
         opcode: Opcode,
@@ -1096,12 +1096,12 @@ impl Module {
     ) -> Result<(), ModuleError> {
         let storage: &[u8] = &self.storage;
 
-        let counts = read_transition_u16(storage, instr_off + 6)?;
+        let counts = read_operand_u16(storage, instr_off + 6)?;
         // Bits 1-0 of the counts word are reserved (bit 2 is the `missing` flag,
         // which the decoder does read); the decoder never reads the reserved bits,
         // so a malformed set bit would pass validation unnoticed.
         if MatchCounts::reserved_bits_set(counts) {
-            return Err(ModuleError::MalformedTransitions);
+            return Err(ModuleError::MalformedInstructionStream);
         }
         let c = MatchCounts::unpack(counts);
         let effects = c.effects as usize;
@@ -1114,7 +1114,7 @@ impl Module {
         // read into the next instruction (or past the buffer at the stream end).
         let used = effects + neg + if has_predicate { PREDICATE_SLOTS } else { 0 } + succ;
         if used > opcode.payload_slots() {
-            return Err(ModuleError::MalformedTransitions);
+            return Err(ModuleError::MalformedInstructionStream);
         }
 
         // Every decoded effect validates its payload through `EffectKind`'s
@@ -1125,9 +1125,9 @@ impl Module {
             let off = instr_off + MATCH_PAYLOAD_START + slot * PAYLOAD_SLOT_SIZE;
             let b = storage
                 .get(off..off + PAYLOAD_SLOT_SIZE)
-                .ok_or(ModuleError::MalformedTransitions)?;
-            let op =
-                Effect::try_from_bytes([b[0], b[1]]).ok_or(ModuleError::MalformedTransitions)?;
+                .ok_or(ModuleError::MalformedInstructionStream)?;
+            let op = Effect::try_from_bytes([b[0], b[1]])
+                .ok_or(ModuleError::MalformedInstructionStream)?;
             if op.kind.accepts_payload(op.payload, members, spans) {
                 return Ok(());
             }
@@ -1137,7 +1137,7 @@ impl Module {
             ) {
                 return Err(ModuleError::InvalidSpanPayload(addr));
             }
-            Err(ModuleError::MalformedTransitions)
+            Err(ModuleError::MalformedInstructionStream)
         };
         for i in 0..effects {
             check_effect(i)?;
@@ -1150,9 +1150,9 @@ impl Module {
             let off = instr_off + MATCH_PAYLOAD_START + (effects + i) * PAYLOAD_SLOT_SIZE;
             let b = storage
                 .get(off..off + PAYLOAD_SLOT_SIZE)
-                .ok_or(ModuleError::MalformedTransitions)?;
+                .ok_or(ModuleError::MalformedInstructionStream)?;
             if u16::from_le_bytes([b[0], b[1]]) == 0 {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
         }
 
@@ -1160,13 +1160,13 @@ impl Module {
             let pred_off = instr_off + MATCH_PAYLOAD_START + (effects + neg) * PAYLOAD_SLOT_SIZE;
             let b = storage
                 .get(pred_off..pred_off + PREDICATE_SIZE)
-                .ok_or(ModuleError::MalformedTransitions)?;
+                .ok_or(ModuleError::MalformedInstructionStream)?;
             let op_and_flags = u16::from_le_bytes([b[0], b[1]]);
             let (op, is_regex) = MatchPredicate::unpack_op_flags(op_and_flags);
             let value_ref = u16::from_le_bytes([b[2], b[3]]);
 
             // Bits above the operator and regex flag are reserved-zero
-            // (docs/binary-format/06-transitions.md), so a malformed set bit must
+            // (docs/binary-format/06-instructions.md), so a malformed set bit must
             // not pass validation.
             if MatchPredicate::reserved_bits_set(op_and_flags) {
                 return Err(ModuleError::InvalidPredicateOperand(addr));
@@ -1199,11 +1199,11 @@ impl Module {
             + (effects + neg) * PAYLOAD_SLOT_SIZE
             + if has_predicate { PREDICATE_SIZE } else { 0 };
         for i in 0..succ {
-            let next = read_transition_u16(storage, succ_off + i * PAYLOAD_SLOT_SIZE)?;
+            let next = read_operand_u16(storage, succ_off + i * PAYLOAD_SLOT_SIZE)?;
             // An extended successor decodes through `SuccessorAddr`, which panics
             // on zero; `0` is the terminal marker only for the `Match8` slot.
             if next == 0 {
-                return Err(ModuleError::MalformedTransitions);
+                return Err(ModuleError::MalformedInstructionStream);
             }
             targets.push(CodeAddr::from(next));
         }

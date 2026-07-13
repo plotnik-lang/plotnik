@@ -90,7 +90,7 @@ N2: S06 → T3  ; Q
 Q   = 06 :: T3
 Row = 00 :: T1
 
-[transitions]
+[instructions]
 Row:
   00  -ε-  [RecordOpen]                     02
   02       (@23)                            23 : 03

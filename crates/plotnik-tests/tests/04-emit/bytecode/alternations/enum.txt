@@ -45,7 +45,7 @@ N0: S5 → T3  ; Q
 [entrypoints]
 Q = 00 :: T3
 
-[transitions]
+[instructions]
 Q:
   00       (@11)                            11 : 01
   01                                        ▶

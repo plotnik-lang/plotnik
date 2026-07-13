@@ -72,7 +72,7 @@ N0: S09 → T2  ; Q
 [entrypoints]
 Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@72)                            72 : 03

@@ -92,7 +92,7 @@ Assignment = 08 :: T5
 Expression = 06 :: T4
 Ident      = 00 :: T1
 
-[transitions]
+[instructions]
 Ident:
   00  -ε-  [RecordOpen]                     02
   02       (@19)                            19 : 03

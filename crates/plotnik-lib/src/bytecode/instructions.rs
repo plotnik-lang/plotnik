@@ -442,7 +442,7 @@ impl<'a> Match<'a> {
         }
     }
 
-    /// Iterate over effects executed after transition acceptance, in bytecode order.
+    /// Iterate over effects executed after match acceptance, in bytecode order.
     #[inline]
     pub fn effects(&self) -> impl Iterator<Item = Effect> + '_ {
         let start = MATCH_PAYLOAD_START;

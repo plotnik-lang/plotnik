@@ -71,7 +71,7 @@ N2: S07 → T4  ; Q
 Inner = 00 :: T1
 Q     = 06 :: T4
 
-[transitions]
+[instructions]
 Inner:
   00  -ε-  [RecordOpen]                     02
   02       (@17)                            17 : 03

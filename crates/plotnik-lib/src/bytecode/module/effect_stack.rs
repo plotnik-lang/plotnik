@@ -239,7 +239,7 @@ impl DefSummary {
 type DefSummaries = HashMap<CodeAddr, DefSummary>;
 
 /// Verify that no path can drive the materializer or the suppression counter
-/// into a panic. Assumes [`Module::validate_transitions`] has already run, so
+/// into a panic. Assumes [`Module::validate_instructions`] has already run, so
 /// every instruction decode and every jump target is safe.
 pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> {
     let entrypoints = module.entrypoints();

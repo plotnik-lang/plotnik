@@ -64,7 +64,7 @@ N2: S7 → T6  ; Q
 [entrypoints]
 Q = 00 :: T6
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@40)                            40 : 03

@@ -123,7 +123,7 @@ pub struct Module {
     /// indexes this instead of re-parsing bytes; see `decoded`).
     decoded: DecodedProgram,
     /// Per-word "is an instruction start" bitmap from load validation
-    /// ([`validate_transitions`](Self::validate_transitions)), retained only in
+    /// ([`validate_instructions`](Self::validate_instructions)), retained only in
     /// debug builds to back the VM's pre-decode IP assertion. It does not
     /// exist in release, so the steady-state module carries no extra memory.
     #[cfg(debug_assertions)]
@@ -159,7 +159,7 @@ impl Module {
 
     #[inline]
     pub(crate) fn decode_instruction(&self, addr: CodeAddr) -> Instruction<'_> {
-        let offset = self.offsets.transitions as usize + addr.as_usize() * BYTECODE_WORD_SIZE;
+        let offset = self.offsets.instructions as usize + addr.as_usize() * BYTECODE_WORD_SIZE;
         Instruction::from_bytes(&self.storage[offset..])
     }
 
@@ -288,9 +288,9 @@ impl Module {
         &self.storage[offset..offset + (count + 1) * REGEX_TABLE_ENTRY_SIZE]
     }
 
-    fn transitions_slice(&self) -> &[u8] {
-        let offset = self.offsets.transitions as usize;
-        let len = self.header.transitions_count as usize * BYTECODE_WORD_SIZE;
+    fn instructions_slice(&self) -> &[u8] {
+        let offset = self.offsets.instructions as usize;
+        let len = self.header.instruction_word_count as usize * BYTECODE_WORD_SIZE;
         &self.storage[offset..offset + len]
     }
 

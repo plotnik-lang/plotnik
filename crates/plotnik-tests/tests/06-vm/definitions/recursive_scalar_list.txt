@@ -61,7 +61,7 @@ N2: S5 → T5  ; Q
 A = 00 :: T4
 Q = 06 :: T5
 
-[transitions]
+[instructions]
 A:
   00  -ε-  [RecordOpen]                     02
   02       (@70)                            70 : 03

@@ -69,7 +69,7 @@ N1: S4 → T2  ; Odd
 Even = 00 :: T4
 Odd  = 06 :: T2
 
-[transitions]
+[instructions]
 Even:
   00  -ε-  [RecordOpen]                     02
   02       (@32)                            32 : 03

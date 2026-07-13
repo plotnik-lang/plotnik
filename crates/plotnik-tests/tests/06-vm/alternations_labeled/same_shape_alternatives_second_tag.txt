@@ -67,7 +67,7 @@ N1: S07 → T4  ; Q
 [entrypoints]
 Q = 00 :: T4
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03

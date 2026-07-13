@@ -71,7 +71,7 @@ P5 pattern    40..73  src0
 P6 capture    70..72  src0  T2.M1
 P7 ref        62..69  src0  T1
 
-[transitions]
+[instructions]
 Inner:
   00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03

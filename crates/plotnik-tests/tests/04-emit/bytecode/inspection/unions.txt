@@ -75,7 +75,7 @@ P10 alternative 92..101  src0
 P11 quantifier 100..101  src0
 P12 pattern    92..100  src0
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@48)                            48 : 03

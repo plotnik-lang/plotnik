@@ -35,9 +35,9 @@ pub(in crate::compiler) enum EmitError {
     /// Too many entrypoints (exceeds u16 max).
     #[error("too many entrypoints: {0} (max {max})", max = EmitError::MAX_ENTRYPOINTS)]
     TooManyEntrypoints(usize),
-    /// Too many transitions (exceeds u16 max).
-    #[error("too many transitions: {0} (max {max})", max = EmitError::MAX_TRANSITIONS)]
-    TooManyTransitions(usize),
+    /// Too many instruction words (exceeds u16 max).
+    #[error("too many instruction words: {0} (max {max})", max = EmitError::MAX_INSTRUCTION_WORDS)]
+    TooManyInstructionWords(usize),
     /// Too many regexes (exceeds u16 max).
     #[error("too many regexes: {0} (max {max})", max = EmitError::MAX_REGEXES)]
     TooManyRegexes(usize),
@@ -73,7 +73,7 @@ impl EmitError {
     pub(in crate::compiler) const MAX_NODE_KINDS: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_NODE_FIELDS: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_ENTRYPOINTS: usize = u16::MAX as usize;
-    pub(in crate::compiler) const MAX_TRANSITIONS: usize = u16::MAX as usize;
+    pub(in crate::compiler) const MAX_INSTRUCTION_WORDS: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_REGEXES: usize = u16::MAX as usize;
     pub(in crate::compiler) const MAX_SPANS: usize = MAX_SPANS;
 
@@ -85,7 +85,7 @@ impl EmitError {
                 | Self::TooManyTypeNames(_)
                 | Self::TooManyFields(_)
                 | Self::TooManyCases(_)
-                | Self::TooManyTransitions(_)
+                | Self::TooManyInstructionWords(_)
                 | Self::TooManyRegexes(_)
                 | Self::TooManySpans(_)
                 | Self::Encode(_)

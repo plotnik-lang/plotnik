@@ -50,7 +50,7 @@ N1: S4 → T2  ; Q
 Other = 00 :: T1
 Q     = 06 :: T2
 
-[transitions]
+[instructions]
 Other:
   00  -ε-  [RecordOpen]                     02
   02       (@19)                            19 : 03

@@ -1,24 +1,25 @@
-# Binary Format: Transitions
+# Binary Format: Instructions
 
-The transitions section stores VM instructions as 8-byte-aligned steps addressed
-by `StepId`. Byte offset is:
+The Instructions section stores VM instructions in 8-byte bytecode words. A
+`CodeAddr` identifies a word; its byte offset is:
 
 ```text
-transitions_offset + StepId * 8
+instructions_offset + CodeAddr * 8
 ```
 
-StepId `0` is also the terminal successor sentinel. A real instruction may live
-at step 0 as an entrypoint target, but encoded successors and call return/target
-operands use `0` only for terminal where that operand allows it.
+`CodeAddr(0)` is a valid instruction address, including as an entrypoint target.
+In an encoded successor operand, raw `0` may instead mean terminal; non-terminal
+successors decode as `SuccessorAddr`, which cannot contain zero. Call targets and
+return addresses are always nonzero.
 
-Multi-step `Match` instructions occupy consecutive 8-byte slots. For example,
-`Match32` at step 5 occupies steps 5 through 8, and the next instruction starts
-at step 9.
+Multi-word `Match` instructions occupy consecutive bytecode words. For example,
+`Match32` at address 5 occupies words 5 through 8, and the next instruction
+starts at address 9.
 
 ## Header Byte
 
 ```text
-type_id (u8)
+header (u8)
 ┌───────────┬──────────────┬────────────┐
 │ segment(2)│ node_kind(2) │ opcode(4)  │
 └───────────┴──────────────┴────────────┘
@@ -177,7 +178,7 @@ counts (u16)
 
 ### Payload Order
 
-Payload slots are 16-bit little-endian words placed immediately after the
+Operand slots are 16-bit little-endian values placed immediately after the
 header:
 
 1. `effects`
@@ -208,8 +209,8 @@ struct Call {
     type_id: u8,
     nav: u8,
     node_field: u16, // 0 = no field constraint
-    next: u16,       // return address
-    target: u16,     // callee entry
+    next: u16,       // SuccessorAddr: return address
+    target: u16,     // SuccessorAddr: callee entry
 }
 ```
 
@@ -223,9 +224,9 @@ callee.
 struct SplitCall {
     type_id: u8,
     entry_nav: u8,
-    matched: u16, // matched return address
-    zero: u16,    // zero-width return address
-    target: u16,  // callee entry
+    matched: u16, // SuccessorAddr: matched return address
+    zero: u16,    // SuccessorAddr: zero-width return address
+    target: u16,  // SuccessorAddr: callee entry
 }
 ```
 
@@ -244,8 +245,8 @@ struct RoutedCall {
     type_id: u8,
     entry_nav: u8,
     reserved: u16,
-    next: u16,
-    target: u16,
+    next: u16,     // SuccessorAddr: return address
+    target: u16,   // SuccessorAddr: callee entry
 }
 ```
 

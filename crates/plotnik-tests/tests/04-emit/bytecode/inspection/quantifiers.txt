@@ -192,7 +192,7 @@ P25 capture    273..278  src0  T08.M4
 P26 field      254..258  src0
 P27 pattern    260..272  src0
 
-[transitions]
+[instructions]
 Maybe:
   000  -ε-  [RecordOpen]                    002
   002       (@058)                          058 : 003

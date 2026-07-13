@@ -42,7 +42,7 @@ T0 = <Void>
 Blank = 0 :: T0
 Q     = 2 :: T0
 
-[transitions]
+[instructions]
 Blank:
   0       (@7)                              7 : 1
   1                                         ▶

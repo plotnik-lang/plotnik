@@ -52,7 +52,7 @@ N1: S4 → T2  ; Bar
 Bar = 06 :: T2
 Foo = 00 :: T1
 
-[transitions]
+[instructions]
 Foo:
   00  -ε-  [RecordOpen]                     02
   02       (@13)                            13 : 03

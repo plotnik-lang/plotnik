@@ -56,7 +56,7 @@ N0: S06 → T3  ; Expr
 [entrypoints]
 Expr = 00 :: T3
 
-[transitions]
+[instructions]
 Expr:
   00       (@16)                            16 : 01
   01                                        ▶

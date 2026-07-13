@@ -103,7 +103,7 @@ P3 capture_type 48..55  src0  T0
 P4 quantifier 37..38  src0
 P5 pattern    15..37  src0
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03

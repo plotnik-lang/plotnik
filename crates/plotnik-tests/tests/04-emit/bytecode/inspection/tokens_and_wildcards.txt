@@ -70,7 +70,7 @@ P10 pattern    127..130  src0
 P11 alternative 137..138  src0
 P12 pattern    137..138  src0
 
-[transitions]
+[instructions]
 Q:
   00       (@30)                            30 : 01
   01                                        ▶

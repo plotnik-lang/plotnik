@@ -81,7 +81,7 @@ P10 pattern    100..142  src0
 P11 capture    134..141  src0  T3.M2
 P12 ref        122..133  src0  T2
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@56)                            56 : 03

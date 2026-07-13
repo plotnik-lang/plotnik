@@ -37,7 +37,7 @@ fn decoded_program_matches_byte_decoder() {
     let mut saw_predicate = false;
 
     let mut addr = CodeAddr::ZERO;
-    while addr.get() < module.header().transitions_count {
+    while addr.get() < module.header().instruction_word_count {
         match (
             module.decode_instruction(addr),
             module.decoded().instruction_at(addr),

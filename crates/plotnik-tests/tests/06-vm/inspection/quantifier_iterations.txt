@@ -172,7 +172,7 @@ P2 capture    39..45  src0  T2.M0
 P3 quantifier 37..38  src0
 P4 pattern    15..37  src0
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03

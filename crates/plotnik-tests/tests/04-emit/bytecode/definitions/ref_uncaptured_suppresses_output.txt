@@ -49,7 +49,7 @@ N0: S2 → T2  ; Inner
 Inner = 00 :: T2
 Q     = 06 :: T0
 
-[transitions]
+[instructions]
 Inner:
   00  -ε-  [RecordOpen]                     02
   02       (@12)                            12 : 03

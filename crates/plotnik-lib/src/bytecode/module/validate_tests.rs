@@ -116,13 +116,13 @@ fn many_callable_definitions_load_without_global_fixpoint_rescans() {
 }
 
 /// Byte offset of the first predicated Match's 4-byte predicate
-/// (`op_and_flags` u16 || `value_ref` u16) in the transitions stream.
+/// (`op_and_flags` u16 || `value_ref` u16) in the instruction stream.
 fn find_predicate_off(bytes: &[u8]) -> usize {
     let (base, word_count) = {
         let m = Module::load_compiler_output(bytes).expect("module validates before tampering");
         (
-            m.offsets().transitions as usize,
-            m.header().transitions_count,
+            m.offsets().instructions as usize,
+            m.header().instruction_word_count,
         )
     };
     let mut addr = CodeAddr::ZERO;
@@ -220,11 +220,11 @@ fn forged_invalid_predicate_op_is_rejected() {
 const RECORD_QUERY: &str =
     r#"Top = (binary_expression left: (identifier) @l right: (identifier) @r)"#;
 
-fn transitions(bytes: &[u8]) -> (usize, u16) {
+fn instruction_section(bytes: &[u8]) -> (usize, u16) {
     let m = Module::load_compiler_output(bytes).expect("module validates before tampering");
     (
-        m.offsets().transitions as usize,
-        m.header().transitions_count,
+        m.offsets().instructions as usize,
+        m.header().instruction_word_count,
     )
 }
 
@@ -242,7 +242,7 @@ fn instr_size(opcode: u8) -> usize {
 }
 
 fn first_instr(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
-    let (base, word_count) = transitions(bytes);
+    let (base, word_count) = instruction_section(bytes);
     let mut addr = CodeAddr::ZERO;
     while addr.get() < word_count {
         let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
@@ -254,11 +254,11 @@ fn first_instr(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
             .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
             .expect("instruction address fits in u16");
     }
-    panic!("no matching instruction in transitions");
+    panic!("no matching instruction in the instruction stream");
 }
 
 fn first_match_nav(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
-    let (base, word_count) = transitions(bytes);
+    let (base, word_count) = instruction_section(bytes);
     let mut addr = CodeAddr::ZERO;
     while addr.get() < word_count {
         let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
@@ -270,13 +270,13 @@ fn first_match_nav(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
             .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
             .expect("instruction address fits in u16");
     }
-    panic!("no matching match nav in transitions");
+    panic!("no matching match nav in the instruction stream");
 }
 
 /// Byte offsets of every effect slot in the stream. Negated-field slots are
 /// skipped: those are plain field ids, not decoded effects.
 fn effect_slots(bytes: &[u8]) -> Vec<usize> {
-    let (base, word_count) = transitions(bytes);
+    let (base, word_count) = instruction_section(bytes);
     let mut slots = Vec::new();
     let mut addr = CodeAddr::ZERO;
     while addr.get() < word_count {
@@ -296,7 +296,7 @@ fn effect_slots(bytes: &[u8]) -> Vec<usize> {
 
 /// Address of the first interior word of the first multi-word instruction.
 fn first_multiword_interior_addr(bytes: &[u8]) -> CodeAddr {
-    let (base, word_count) = transitions(bytes);
+    let (base, word_count) = instruction_section(bytes);
     let mut addr = CodeAddr::ZERO;
     while addr.get() < word_count {
         let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
@@ -308,11 +308,11 @@ fn first_multiword_interior_addr(bytes: &[u8]) -> CodeAddr {
             .checked_add(words)
             .expect("instruction address fits in u16");
     }
-    panic!("no multi-word instruction in transitions");
+    panic!("no multi-word instruction in the instruction stream");
 }
 
 fn first_ext_successor(bytes: &[u8]) -> usize {
-    let (base, word_count) = transitions(bytes);
+    let (base, word_count) = instruction_section(bytes);
     let mut addr = CodeAddr::ZERO;
     while addr.get() < word_count {
         let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
@@ -331,7 +331,7 @@ fn first_ext_successor(bytes: &[u8]) -> usize {
             .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
             .expect("instruction address fits in u16");
     }
-    panic!("no extended-match successor in transitions");
+    panic!("no extended-match successor in the instruction stream");
 }
 
 /// Byte offset of the first effect slot whose opcode satisfies `want`.
@@ -339,7 +339,7 @@ fn first_effect_op(bytes: &[u8], want: impl Fn(u16) -> bool) -> usize {
     effect_slots(bytes)
         .into_iter()
         .find(|&off| want(u16::from_le_bytes([bytes[off], bytes[off + 1]]) >> EFFECT_PAYLOAD_BITS))
-        .expect("no matching effect slot in transitions")
+        .expect("no matching effect slot in the instruction stream")
 }
 
 fn effect_word(kind: EffectKind) -> [u8; 2] {
@@ -377,7 +377,7 @@ fn first_section_gap(bytes: &[u8]) -> usize {
         (o.type_members, h.type_members_count as u32 * 4),
         (o.type_names, h.type_names_count as u32 * 4),
         (o.entrypoints, h.entrypoints_count as u32 * 8),
-        (o.transitions, h.transitions_count as u32 * 8),
+        (o.instructions, h.instruction_word_count as u32 * 8),
         (o.spans, h.spans_count as u32 * SPAN_ENTRY_SIZE as u32),
         (h.total_size, 0),
     ];
@@ -435,8 +435,8 @@ fn forged_nonzero_segment_is_rejected() {
 
     let err = Module::load_compiler_output(&bytes).expect_err("forged segment must be rejected");
     assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
+        matches!(err, ModuleError::MalformedInstructionStream),
+        "expected MalformedInstructionStream, got {err:?}"
     );
 }
 
@@ -460,8 +460,8 @@ fn forged_nonzero_call_return_node_kind_is_rejected() {
         let err = Module::load_compiler_output(&bytes)
             .expect_err("forged node_class_bits must be rejected");
         assert!(
-            matches!(err, ModuleError::MalformedTransitions),
-            "opcode {opcode}: expected MalformedTransitions, got {err:?}"
+            matches!(err, ModuleError::MalformedInstructionStream),
+            "opcode {opcode}: expected MalformedInstructionStream, got {err:?}"
         );
     }
 }
@@ -478,8 +478,8 @@ fn forged_reserved_node_kind_is_rejected() {
     let err =
         Module::load_compiler_output(&bytes).expect_err("forged node_class_bits must be rejected");
     assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
+        matches!(err, ModuleError::MalformedInstructionStream),
+        "expected MalformedInstructionStream, got {err:?}"
     );
 }
 
@@ -494,8 +494,8 @@ fn forged_invalid_nav_is_rejected() {
 
     let err = Module::load_compiler_output(&bytes).expect_err("forged nav must be rejected");
     assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
+        matches!(err, ModuleError::MalformedInstructionStream),
+        "expected MalformedInstructionStream, got {err:?}"
     );
 }
 
@@ -514,8 +514,8 @@ fn forged_invalid_effect_opcode_is_rejected() {
     let err =
         Module::load_compiler_output(&bytes).expect_err("forged effect opcode must be rejected");
     assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
+        matches!(err, ModuleError::MalformedInstructionStream),
+        "expected MalformedInstructionStream, got {err:?}"
     );
 }
 
@@ -529,8 +529,8 @@ fn forged_nonzero_unit_effect_payload_is_rejected() {
     let err = Module::load_compiler_output(&bytes)
         .expect_err("unit effects must reject a nonzero payload");
     assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
+        matches!(err, ModuleError::MalformedInstructionStream),
+        "expected MalformedInstructionStream, got {err:?}"
     );
 }
 
@@ -544,8 +544,8 @@ fn forged_bool_close_payload_out_of_range_is_rejected() {
     let err = Module::load_compiler_output(&bytes)
         .expect_err("BoolClose payload must be exactly zero or one");
     assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
+        matches!(err, ModuleError::MalformedInstructionStream),
+        "expected MalformedInstructionStream, got {err:?}"
     );
 }
 
@@ -616,8 +616,8 @@ fn forged_oob_member_operand_is_rejected() {
     let err =
         Module::load_compiler_output(&bytes).expect_err("forged member operand must be rejected");
     assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
+        matches!(err, ModuleError::MalformedInstructionStream),
+        "expected MalformedInstructionStream, got {err:?}"
     );
 }
 
@@ -735,7 +735,7 @@ fn emit_inspection_bytes(query_src: &str) -> Vec<u8> {
         .to_vec()
 }
 
-/// Effect slots holding one of the given opcodes, in transition order.
+/// Effect slots holding one of the given opcodes, in instruction order.
 fn effect_slots_of(bytes: &[u8], kinds: &[EffectKind]) -> Vec<usize> {
     effect_slots(bytes)
         .into_iter()
@@ -849,8 +849,8 @@ fn forged_zero_successor_is_rejected() {
     let err =
         Module::load_compiler_output(&bytes).expect_err("forged zero successor must be rejected");
     assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
+        matches!(err, ModuleError::MalformedInstructionStream),
+        "expected MalformedInstructionStream, got {err:?}"
     );
 }
 
@@ -865,8 +865,8 @@ fn forged_out_of_range_successor_is_rejected() {
     let err = Module::load_compiler_output(&bytes)
         .expect_err("forged out-of-range successor must be rejected");
     assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
+        matches!(err, ModuleError::MalformedInstructionStream),
+        "expected MalformedInstructionStream, got {err:?}"
     );
 }
 
@@ -1162,9 +1162,9 @@ fn forged_suppress_underflow_is_rejected() {
     assert!(matches!(err, ModuleError::EffectStackImbalance(_)));
 }
 
-/// Address of the last `Return` instruction in the transitions stream.
+/// Address of the last `Return` instruction in the instruction stream.
 fn last_return_addr(bytes: &[u8]) -> CodeAddr {
-    let (base, word_count) = transitions(bytes);
+    let (base, word_count) = instruction_section(bytes);
     let mut found = None;
     let mut addr = CodeAddr::ZERO;
     while addr.get() < word_count {
@@ -1177,7 +1177,7 @@ fn last_return_addr(bytes: &[u8]) -> CodeAddr {
             .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
             .expect("instruction address fits in u16");
     }
-    found.expect("no Return in transitions")
+    found.expect("no Return in the instruction stream")
 }
 
 /// Byte offset of the `n`th (0-based) effect slot whose opcode satisfies `want`.
@@ -1188,7 +1188,7 @@ fn nth_effect_op(bytes: &[u8], n: usize, want: impl Fn(u16) -> bool) -> usize {
             want(u16::from_le_bytes([bytes[off], bytes[off + 1]]) >> EFFECT_PAYLOAD_BITS)
         })
         .nth(n)
-        .expect("no matching effect slot in transitions")
+        .expect("no matching effect slot in the instruction stream")
 }
 
 #[test]
@@ -1203,7 +1203,7 @@ fn forged_accept_inside_called_def_is_rejected() {
     let mut bytes = emit_bytes(r#"Q = (program (expression_statement (identifier) @name))"#);
 
     let def_return = last_return_addr(&bytes);
-    let (base, word_count) = transitions(&bytes);
+    let (base, word_count) = instruction_section(&bytes);
     let mut addr = CodeAddr::ZERO;
     let mut patched = false;
     while addr.get() < word_count {
@@ -1226,7 +1226,7 @@ fn forged_accept_inside_called_def_is_rejected() {
         .expect_err("forged accept inside a called body must be rejected");
     // Return-route validation rejects the now-returnless callee before the
     // effect-stack pass reaches the open wrapper frame.
-    assert!(matches!(err, ModuleError::MalformedTransitions));
+    assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
 
 #[test]
@@ -1311,7 +1311,7 @@ fn forged_record_wrapper_without_root_frame_is_rejected() {
 #[test]
 fn forged_set_extended_match_reserved_count_bit_is_rejected() {
     // Bit 0 of an extended-Match counts word (low bit of byte 6) is reserved-zero
-    // (docs/binary-format/06-transitions.md); the decoder never reads it, so a
+    // (docs/binary-format/06-instructions.md); the decoder never reads it, so a
     // forged set bit must be rejected at load.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let off = first_instr(&bytes, |o| (1..=5).contains(&o)); // extended Match
@@ -1321,8 +1321,8 @@ fn forged_set_extended_match_reserved_count_bit_is_rejected() {
     let err = Module::load_compiler_output(&bytes)
         .expect_err("forged reserved count bit must be rejected");
     assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
+        matches!(err, ModuleError::MalformedInstructionStream),
+        "expected MalformedInstructionStream, got {err:?}"
     );
 }
 
@@ -1338,8 +1338,8 @@ fn forged_nonzero_return_pad_is_rejected() {
         let err =
             Module::load_compiler_output(&bytes).expect_err("forged return pad must be rejected");
         assert!(
-            matches!(err, ModuleError::MalformedTransitions),
-            "forged byte {byte}: expected MalformedTransitions, got {err:?}"
+            matches!(err, ModuleError::MalformedInstructionStream),
+            "forged byte {byte}: expected MalformedInstructionStream, got {err:?}"
         );
     }
 }
@@ -1353,7 +1353,7 @@ fn forged_invalid_return_entry_is_rejected() {
 
     let err = Module::load_compiler_output(&bytes)
         .expect_err("unknown return entry contract must be rejected");
-    assert!(matches!(err, ModuleError::MalformedTransitions));
+    assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
 
 #[test]
@@ -1365,7 +1365,7 @@ fn forged_invalid_return_outcome_is_rejected() {
 
     let err =
         Module::load_compiler_output(&bytes).expect_err("unknown return outcome must be rejected");
-    assert!(matches!(err, ModuleError::MalformedTransitions));
+    assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
 
 #[test]
@@ -1382,7 +1382,7 @@ fn forged_split_call_invalid_nav_and_zero_targets_are_rejected() {
 
         let err = Module::load_compiler_output(&bytes)
             .expect_err("malformed split call must be rejected");
-        assert!(matches!(err, ModuleError::MalformedTransitions));
+        assert!(matches!(err, ModuleError::MalformedInstructionStream));
     }
 }
 
@@ -1401,7 +1401,7 @@ fn forged_routed_call_invalid_metadata_and_targets_are_rejected() {
 
         let err = Module::load_compiler_output(&bytes)
             .expect_err("malformed routed call must be rejected");
-        assert!(matches!(err, ModuleError::MalformedTransitions));
+        assert!(matches!(err, ModuleError::MalformedInstructionStream));
     }
 }
 
@@ -1416,7 +1416,7 @@ fn forged_ordinary_and_routed_call_target_mismatches_are_rejected() {
 
     let err = Module::load_compiler_output(&bytes)
         .expect_err("ordinary call cannot target a routed body");
-    assert!(matches!(err, ModuleError::MalformedTransitions));
+    assert!(matches!(err, ModuleError::MalformedInstructionStream));
 
     let mut bytes = emit_bytes(ROUTED_CALL_QUERY);
     let ordinary = first_instr(&bytes, |opcode| opcode == 6);
@@ -1427,7 +1427,7 @@ fn forged_ordinary_and_routed_call_target_mismatches_are_rejected() {
 
     let err = Module::load_compiler_output(&bytes)
         .expect_err("routed call cannot target an ordinary body");
-    assert!(matches!(err, ModuleError::MalformedTransitions));
+    assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
 
 #[test]
@@ -1441,7 +1441,7 @@ fn forged_call_and_callee_return_contract_mismatch_is_rejected() {
 
     let err = Module::load_compiler_output(&bytes)
         .expect_err("ordinary call cannot target a split-return body");
-    assert!(matches!(err, ModuleError::MalformedTransitions));
+    assert!(matches!(err, ModuleError::MalformedInstructionStream));
 
     let mut bytes = emit_bytes(SPLIT_CALL_QUERY);
     let split = first_instr(&bytes, |opcode| opcode == 8);
@@ -1452,7 +1452,7 @@ fn forged_call_and_callee_return_contract_mismatch_is_rejected() {
 
     let err = Module::load_compiler_output(&bytes)
         .expect_err("split call requires a body with both return outcomes");
-    assert!(matches!(err, ModuleError::MalformedTransitions));
+    assert!(matches!(err, ModuleError::MalformedInstructionStream));
 }
 
 #[test]
@@ -1798,26 +1798,26 @@ fn forged_oob_type_name_type_id_is_rejected() {
     );
 }
 
-/// Build a minimal-but-valid module whose only populated section is Transitions,
-/// carrying `transitions_count` bytecode words drawn from `transitions`.
+/// Build a minimal-but-valid module whose only populated section is Instructions,
+/// carrying `instruction_word_count` bytecode words drawn from `instructions`.
 ///
 /// Everything else (strings, regex, types, entrypoints) is empty, which the
 /// other `validate_*` passes accept: the empty string/regex tables collapse to a
 /// single zero sentinel that already lives in the zero-filled body. The checksum
 /// is recomputed the same way `Module::validate` checks it (CRC32 over the
-/// post-header bytes), so the only thing under test is `validate_transitions`.
-fn module_with_transitions(transitions: &[u8], transitions_count: u16) -> Vec<u8> {
+/// post-header bytes), so the only thing under test is `validate_instructions`.
+fn module_with_instructions(instructions: &[u8], instruction_word_count: u16) -> Vec<u8> {
     let mut header = Header {
-        transitions_count,
+        instruction_word_count,
         ..Default::default()
     };
 
     let offsets = header.compute_offsets();
-    let base = offsets.transitions as usize;
+    let base = offsets.instructions as usize;
     let total = offsets.spans as usize;
 
     let mut bytes = vec![0u8; total];
-    bytes[base..base + transitions.len()].copy_from_slice(transitions);
+    bytes[base..base + instructions.len()].copy_from_slice(instructions);
 
     header.total_size = total as u32;
     header.checksum = crc32fast::hash(&bytes[64..]);
@@ -1865,12 +1865,12 @@ fn load_accepts_single_terminal_match8() {
     // Sanity baseline: one Match8 terminal (opcode 0x0, no successor) loads.
     let mut word = [0u8; BYTECODE_WORD_SIZE];
     word[0] = match_header(0x0);
-    let bytes = module_with_transitions(&word, 1);
+    let bytes = module_with_instructions(&word, 1);
 
     let module =
         Module::load_compiler_output(&bytes).expect("valid representation should validate");
 
-    assert_eq!(module.header().transitions_count, 1);
+    assert_eq!(module.header().instruction_word_count, 1);
 }
 
 #[test]
@@ -1879,7 +1879,7 @@ fn load_rejects_invalid_opcode_at_reachable_address() {
     // immediately and rejects.
     let mut word = [0u8; BYTECODE_WORD_SIZE];
     word[0] = 0xF;
-    let bytes = module_with_transitions(&word, 1);
+    let bytes = module_with_instructions(&word, 1);
 
     let err = Module::load_compiler_output(&bytes).expect_err("unknown opcode must be rejected");
 
@@ -1899,20 +1899,20 @@ fn load_walks_past_extended_match_payload() {
     // `addr += word_count` walk advances from address 0 straight to address 2 and
     // never inspects it, so the representation still validates. A buggy walk that advanced
     // one word at a time would land on the poison and false-reject.
-    let mut transitions = [0u8; BYTECODE_WORD_SIZE * 2];
-    transitions[0] = match_header(0x1);
-    transitions[BYTECODE_WORD_SIZE] = 0xF; // interior payload, not an instruction boundary
-    let bytes = module_with_transitions(&transitions, 2);
+    let mut instructions = [0u8; BYTECODE_WORD_SIZE * 2];
+    instructions[0] = match_header(0x1);
+    instructions[BYTECODE_WORD_SIZE] = 0xF; // interior payload, not an instruction boundary
+    let bytes = module_with_instructions(&instructions, 2);
 
     let module =
         Module::load_compiler_output(&bytes).expect("extended match payload must not false-reject");
 
-    assert_eq!(module.header().transitions_count, 2);
+    assert_eq!(module.header().instruction_word_count, 2);
 }
 
-/// Byte offset of the first negated-field slot in the transitions stream.
+/// Byte offset of the first negated-field slot in the instruction stream.
 fn first_neg_slot(bytes: &[u8]) -> usize {
-    let (base, word_count) = transitions(bytes);
+    let (base, word_count) = instruction_section(bytes);
     let mut addr = CodeAddr::ZERO;
     while addr.get() < word_count {
         let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
@@ -1945,8 +1945,8 @@ fn forged_zero_neg_field_is_rejected() {
     let err =
         Module::load_compiler_output(&bytes).expect_err("forged zero neg field must be rejected");
     assert!(
-        matches!(err, ModuleError::MalformedTransitions),
-        "expected MalformedTransitions, got {err:?}"
+        matches!(err, ModuleError::MalformedInstructionStream),
+        "expected MalformedInstructionStream, got {err:?}"
     );
 }
 

@@ -8,7 +8,7 @@ The command does not create or consume a bytecode artifact.
 
 The dump prints sections in this fixed order (matching the wire layout, except
 `[spans]` — the final wire section — which is grouped with the other tables so
-`[transitions]` stays last):
+`[instructions]` stays last):
 
 ```text
 [strings]
@@ -18,7 +18,7 @@ The dump prints sections in this fixed order (matching the wire layout, except
 [type_names]
 [entrypoints]
 [spans]       ; only when inspection spans exist
-[transitions]
+[instructions]
 ```
 
 Indexes are printed with prefixes:
@@ -48,12 +48,12 @@ the bytecode entry. The section is omitted when `spans_count == 0`.
 For degraded inspection modules, only admitted span ids are printed. Dropped
 detail tiers have no `Pxx` line and no corresponding span effects.
 
-## Transition Lines
+## Instruction Lines
 
-Each transition line uses fixed columns:
+Each instruction line uses fixed columns:
 
 ```text
-  step  nav  content                         successors
+  addr  nav  content                         successors
 ```
 
 Examples:
@@ -70,13 +70,13 @@ Instruction forms:
 
 | Instruction | Format                                   |
 | ----------- | ---------------------------------------- |
-| Match       | `step nav field: (kind) [effects] succs` |
-| Epsilon     | `step -ε- [effects] succs`               |
-| Call        | `step nav field: (@target) target : ret` |
-| RoutedCall  | `step (@target) target : ret`            |
-| SplitCall   | `step (@target) target : matched / zero` |
-| Return      | `step ▶` or `step ▶ zero`                |
-| Padding     | `step ...`                               |
+| Match       | `addr nav field: (kind) [effects] succs` |
+| Epsilon     | `addr -ε- [effects] succs`               |
+| Call        | `addr nav field: (@target) target : ret` |
+| RoutedCall  | `addr (@target) target : ret`            |
+| SplitCall   | `addr (@target) target : matched / zero` |
+| Return      | `addr ▶` or `addr ▶ zero`                |
+| Padding     | `addr ...`                               |
 
 An empty navigation column means `Stay`. `-ε-` means `Nav::Epsilon`, a distinct
 mode with no cursor movement or node check.
@@ -150,7 +150,7 @@ N0: S3 → T1  ; Value
 [entrypoints]
 Value = 00 :: T1
 
-[transitions]
+[instructions]
 Value:
   00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03

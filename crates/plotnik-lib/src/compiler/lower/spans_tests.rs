@@ -124,7 +124,7 @@ fn ladder_drops_whole_lower_priority_tiers() {
 }
 
 #[test]
-fn capture_markers_change_transition_bytes_when_inspection_is_enabled() {
+fn capture_markers_change_instruction_bytes_when_inspection_is_enabled() {
     let src = "Q = (program (expression_statement (identifier) @id))";
     let plain = QueryBuilder::from_inline(src)
         .compile(synthetic_grammar())
@@ -139,8 +139,8 @@ fn capture_markers_change_transition_bytes_when_inspection_is_enabled() {
         .expect("plain module emits");
 
     assert_ne!(
-        transition_bytes(plain.bytes()),
-        transition_bytes(inspected.bytes()),
+        instruction_bytes(plain.bytes()),
+        instruction_bytes(inspected.bytes()),
     );
     assert!(plain.spans().is_empty());
     assert!(!inspected.spans().is_empty());
@@ -190,10 +190,10 @@ fn span_text(src: &str, span: SpanEntry) -> &str {
     &src[span.start as usize..span.end as usize]
 }
 
-fn transition_bytes(bytes: &[u8]) -> &[u8] {
+fn instruction_bytes(bytes: &[u8]) -> &[u8] {
     let header = Header::from_bytes(&bytes[..HEADER_SIZE]);
     let offsets = header.compute_offsets();
-    let start = offsets.transitions as usize;
-    let len = header.transitions_count as usize * BYTECODE_WORD_SIZE;
+    let start = offsets.instructions as usize;
+    let len = header.instruction_word_count as usize * BYTECODE_WORD_SIZE;
     &bytes[start..start + len]
 }

@@ -56,7 +56,7 @@ N0: S2 → T3  ; Q
 Func = 00 :: T0
 Q    = 02 :: T3
 
-[transitions]
+[instructions]
 Func:
   00       (@09)                            09 : 01
   01                                        ▶

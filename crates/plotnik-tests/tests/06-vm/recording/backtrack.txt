@@ -778,7 +778,7 @@ P09 pattern    98..150  src0
 P10 capture    139..144  src0  T2.M1
 P11 pattern    126..138  src0
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@37)                            37 : 03

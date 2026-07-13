@@ -64,7 +64,7 @@ P7 pattern    39..47  src0
 P8 alternative 55..68  src0  T4.M4
 P9 pattern    60..68  src0
 
-[transitions]
+[instructions]
 Expr:
   00       (@28)                            28 : 01
   01                                        ▶

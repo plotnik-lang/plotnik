@@ -21,7 +21,7 @@ do not appear in this table.
 #[repr(C)]
 struct Entrypoint {
     name: u16,          // StringId
-    target: u16,        // StepAddr (into Transitions section)
+    target: u16,        // CodeAddr (into Instructions section)
     result_type: u16,   // TypeId
     _pad: u16,          // Padding to 8 bytes
 }
@@ -30,9 +30,9 @@ struct Entrypoint {
 ### Fields
 
 - **name**: The selectable definition name (e.g., "Func", "Class"). `StringId`.
-- **target**: The instruction pointer (`StepAddr`) where execution begins for
+- **target**: The instruction address (`CodeAddr`) where execution begins for
   this definition. It points at the definition's entrypoint wrapper in the
-  **Transitions** section.
+  **Instructions** section.
 - **result_type**: The `TypeId` of the structure produced by this query definition.
 - **\_pad**: Reserved for alignment. Must be zero; loaders reject a non-zero pad.
 

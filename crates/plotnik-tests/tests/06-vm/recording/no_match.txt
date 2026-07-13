@@ -255,7 +255,7 @@ P2 pattern    15..49  src0
 P3 capture    46..48  src0  T1.M0
 P4 pattern    37..45  src0
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@18)                            18 : 03

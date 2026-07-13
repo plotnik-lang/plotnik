@@ -136,7 +136,7 @@ impl<'a> EmitPipeline<'a> {
         &self,
         pool: ConstantPool<'_>,
         tables: &ModuleTables,
-        transitions: &[u8],
+        instructions: &[u8],
     ) -> Result<Vec<u8>, EmitError> {
         let (str_blob, str_table) = pool.emit_strings();
         let (regex_blob, regex_table) = pool.emit_regexes();
@@ -150,7 +150,7 @@ impl<'a> EmitPipeline<'a> {
         // Section order matches the bytecode layout:
         // Header → StringBlob → RegexBlob → StringTable → RegexTable →
         // NodeKinds → NodeFields → TypeDefs → TypeMembers → TypeNames →
-        // Entrypoints → Transitions → Spans
+        // Entrypoints → Instructions → Spans
         let mut writer = SectionWriter::new();
 
         writer.emit_section(&str_blob);
@@ -163,7 +163,7 @@ impl<'a> EmitPipeline<'a> {
         writer.emit_section(&type_members_bytes);
         writer.emit_section(&type_names_bytes);
         writer.emit_section(&entrypoints_bytes);
-        writer.emit_section(transitions);
+        writer.emit_section(instructions);
         writer.emit_section(&spans_bytes);
 
         writer.finish_sections();
@@ -208,10 +208,10 @@ impl<'a> EmitPipeline<'a> {
             EmitError::MAX_ENTRYPOINTS,
             EmitError::TooManyEntrypoints,
         )?;
-        let transitions_count = checked_count(
+        let instruction_word_count = checked_count(
             self.layout.total_words() as usize,
-            EmitError::MAX_TRANSITIONS,
-            EmitError::TooManyTransitions,
+            EmitError::MAX_INSTRUCTION_WORDS,
+            EmitError::TooManyInstructionWords,
         )?;
         let spans_count = checked_count(
             spans_count(self.ir.spans()),
@@ -228,7 +228,7 @@ impl<'a> EmitPipeline<'a> {
             type_members_count,
             type_names_count,
             entrypoints_count,
-            transitions_count,
+            instruction_word_count,
             spans_count,
             str_blob_size: str_blob.len() as u32,
             regex_blob_size: regex_blob.len() as u32,

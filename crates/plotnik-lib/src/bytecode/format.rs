@@ -64,7 +64,7 @@ impl Symbol {
     /// Empty symbol (5 spaces).
     pub const EMPTY: Symbol = Symbol::new("  ", " ", "  ");
 
-    /// Epsilon symbol for unconditional transitions.
+    /// Epsilon symbol for unconditional instructions.
     pub const EPSILON: Symbol = Symbol::new(" ", "-ε-", " ");
 
     /// Padding indicator (centered "..." in 5-char column).

@@ -98,7 +98,7 @@ N2: S08 → T5  ; Q
 Entry = 00 :: T3
 Q     = 02 :: T5
 
-[transitions]
+[instructions]
 Entry:
   00       (@19)                            19 : 01
   01                                        ▶

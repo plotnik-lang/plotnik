@@ -214,7 +214,7 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
     /// Build the PrintTracer.
     pub fn build(self) -> PrintTracer<'s> {
         let header = self.module.header();
-        let addr_width = width_for_count(header.transitions_count as usize);
+        let addr_width = width_for_count(header.instruction_word_count as usize);
 
         PrintTracer {
             source: self.source.as_bytes(),
@@ -511,7 +511,7 @@ impl Tracer for PrintTracer<'_> {
 
         match instr {
             Instruction::Match(m) => {
-                // Show ε for epsilon transitions, empty otherwise (nav shown in sublines)
+                // Show ε for epsilon instructions, empty otherwise (nav shown in sublines)
                 let symbol = if m.is_epsilon() {
                     Symbol::EPSILON
                 } else {

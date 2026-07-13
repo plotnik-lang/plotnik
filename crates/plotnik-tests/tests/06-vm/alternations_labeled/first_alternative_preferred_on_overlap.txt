@@ -51,7 +51,7 @@ N1: S5 → T2  ; Q
 [entrypoints]
 Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@19)                            19 : 03

@@ -68,7 +68,7 @@ N0: S5 → T4  ; Rec
 Q   = 02 :: T0
 Rec = 00 :: T4
 
-[transitions]
+[instructions]
 Rec:
   00       (@19)                            19 : 01
   01                                        ▶

@@ -36,6 +36,6 @@ pub(in crate::compiler) fn emit(
         &regexes,
         schema.layout(),
     );
-    let transitions = emit_instructions(nfa.instructions(), pipeline.layout(), pool)?;
-    pipeline.write_module(pool, &tables, &transitions)
+    let instructions = emit_instructions(nfa.instructions(), pipeline.layout(), pool)?;
+    pipeline.write_module(pool, &tables, &instructions)
 }

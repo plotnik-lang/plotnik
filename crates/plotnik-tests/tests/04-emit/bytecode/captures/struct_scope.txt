@@ -20,4 +20,4 @@ S2 "number"
 
 [entrypoints]
 
-[transitions]
+[instructions]

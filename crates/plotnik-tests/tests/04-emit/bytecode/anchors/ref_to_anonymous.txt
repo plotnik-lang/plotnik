@@ -58,7 +58,7 @@ N0: S2 → T2  ; Test
 Comma = 00 :: T0
 Test  = 02 :: T2
 
-[transitions]
+[instructions]
 Comma:
   00       (@12)                            12 : 01
   01                                        ▶

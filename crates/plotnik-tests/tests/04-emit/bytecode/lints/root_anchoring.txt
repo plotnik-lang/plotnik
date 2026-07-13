@@ -89,7 +89,7 @@ Bad  = 12 :: T3
 Leaf = 00 :: T1
 Q    = 06 :: T2
 
-[transitions]
+[instructions]
 Leaf:
   00  -ε-  [RecordOpen]                     02
   02       (@24)                            24 : 03

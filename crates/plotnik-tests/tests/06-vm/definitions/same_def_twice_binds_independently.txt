@@ -62,7 +62,7 @@ N1: S5 → T2  ; Q
 Id = 00 :: T1
 Q  = 06 :: T2
 
-[transitions]
+[instructions]
 Id:
   00  -ε-  [RecordOpen]                     02
   02       (@21)                            21 : 03

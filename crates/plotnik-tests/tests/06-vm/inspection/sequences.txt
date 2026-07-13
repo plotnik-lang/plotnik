@@ -166,7 +166,7 @@ P6 capture    96..101  src0  T1.M0
 P7 field      77..81  src0
 P8 pattern    83..95  src0
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03

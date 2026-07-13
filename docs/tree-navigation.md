@@ -1,6 +1,6 @@
 # Tree Navigation
 
-How the VM navigates tree-sitter syntax trees. This covers API choice, search loop mechanics, and anchor lowering. For execution semantics, see [runtime-engine.md](runtime-engine.md). For instruction encoding, see [06-transitions.md](binary-format/06-transitions.md).
+How the VM navigates tree-sitter syntax trees. This covers API choice, search loop mechanics, and anchor lowering. For execution semantics, see [runtime-engine.md](runtime-engine.md). For instruction encoding, see [06-instructions.md](binary-format/06-instructions.md).
 
 ## TreeCursor API
 
@@ -45,7 +45,7 @@ The `Node` API's `next_sibling()` is O(siblings) — unacceptable for repeated b
 
 ## Nav Encoding
 
-`Nav` is a single byte encoding movement and skip policy. See [06-transitions.md § 3.1](binary-format/06-transitions.md) for bit layout.
+`Nav` is a single byte encoding movement and skip policy. See [06-instructions.md § 3.1](binary-format/06-instructions.md) for bit layout.
 
 | Nav                   | Dump Symbol | Movement                                |
 | --------------------- | ----------- | --------------------------------------- |

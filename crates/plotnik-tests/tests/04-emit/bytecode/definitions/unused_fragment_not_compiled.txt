@@ -46,7 +46,7 @@ N0: S1 → T2  ; Used
 [entrypoints]
 Q = 00 :: T0
 
-[transitions]
+[instructions]
 Q:
   00       (@16)                            16 : 01
   01                                        ▶

@@ -33,7 +33,7 @@ N0: S2 → T2  ; Q
 [entrypoints]
 Q = 00 :: T2
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@20)                            20 : 03

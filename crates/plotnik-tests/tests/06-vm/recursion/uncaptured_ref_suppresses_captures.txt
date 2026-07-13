@@ -55,7 +55,7 @@ N1: S4 → T3  ; Q
 Nested = 00 :: T2
 Q      = 06 :: T3
 
-[transitions]
+[instructions]
 Nested:
   00  -ε-  [RecordOpen]                     02
   02       (@27)                            27 : 03

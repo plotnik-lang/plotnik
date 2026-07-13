@@ -138,7 +138,7 @@ P4 pattern    30..69  src0
 P5 pattern    39..68  src0
 P6 ref        61..67  src0  T2
 
-[transitions]
+[instructions]
 Name:
   00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03

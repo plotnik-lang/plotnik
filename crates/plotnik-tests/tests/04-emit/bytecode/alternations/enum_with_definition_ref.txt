@@ -71,7 +71,7 @@ N2: S08 → T5  ; Q
 Inner = 00 :: T2
 Q     = 06 :: T5
 
-[transitions]
+[instructions]
 Inner:
   00  -ε-  [RecordOpen]                     02
   02       (@13)                            13 : 03

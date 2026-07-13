@@ -240,7 +240,7 @@ N0: S61 → T31  ; Q
 [entrypoints]
 Q = 000 :: T31
 
-[transitions]
+[instructions]
 Q:
   000       (@128)                          128 : 001
   001                                       ▶

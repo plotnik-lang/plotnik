@@ -35,7 +35,7 @@ name. Returns show `◀`; top-level return shows `◼`.
 
 ## Sub-Lines
 
-Sub-lines leave the step column blank and use the symbol column for the event:
+Sub-lines leave the address column blank and use the symbol column for the event:
 
 | Symbol | Meaning                   |
 | ------ | ------------------------- |

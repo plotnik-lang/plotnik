@@ -25,7 +25,7 @@ T0 = <Void>
 [entrypoints]
 Q = 00 :: T0
 
-[transitions]
+[instructions]
 Q:
   00       (@11)                            11 : 01
   01                                        ▶

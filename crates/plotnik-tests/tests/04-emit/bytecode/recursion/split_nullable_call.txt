@@ -83,7 +83,7 @@ N0: S3 → T1  ; Body
 [entrypoints]
 Q = 00 :: T0
 
-[transitions]
+[instructions]
 Q:
   00       (@48)                            48 : 01
   01                                        ▶

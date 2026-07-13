@@ -69,7 +69,7 @@ N2: S6 → T5  ; Collect
 Item = 00 :: T2
 Q    = 06 :: T0
 
-[transitions]
+[instructions]
 Item:
   00  -ε-  [RecordOpen]                     02
   02       (@09)                            09 : 03

@@ -6,7 +6,7 @@
 
 #![allow(clippy::comparison_chain)]
 // Without the `vm` feature the engine-serving half of this module (the
-// pre-decoded transition stream, trace rendering) has no callers. It stays
+// pre-decoded instruction stream, trace rendering) has no callers. It stays
 // compiled anyway so `Module` is the same object in every configuration —
 // load-time validation must not drift between the compiler-only build and the
 // executing one.

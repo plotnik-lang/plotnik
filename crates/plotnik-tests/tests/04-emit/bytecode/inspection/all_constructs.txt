@@ -135,7 +135,7 @@ P24 alternative 243..256  src0
 P25 capture    252..256  src0  T6.M6
 P26 pattern    243..251  src0
 
-[transitions]
+[instructions]
 Value:
   00       (@30)                            30 : 01
   01                                        ▶

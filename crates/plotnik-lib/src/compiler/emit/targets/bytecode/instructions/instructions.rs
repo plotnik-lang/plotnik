@@ -1,4 +1,4 @@
-//! Transition instruction emission.
+//! Bytecode instruction emission.
 
 use std::collections::BTreeMap;
 
@@ -65,7 +65,7 @@ fn resolve_match(
     let predicate = m.predicate.as_ref().map(|pred| {
         let string_id = pool
             .lookup_str(pred.value.text())
-            .expect("predicate string must be interned before transition emission");
+            .expect("predicate string must be interned before instruction emission");
         let value_ref = if pred.value.is_regex() {
             u16::from(
                 pool.lookup_regex(string_id)

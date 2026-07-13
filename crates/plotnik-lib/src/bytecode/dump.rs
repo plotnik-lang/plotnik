@@ -75,7 +75,7 @@ impl DumpContext {
         let type_width = width_for_count(type_count);
         let member_width = width_for_count(types.members_count());
         let name_width = width_for_count(types.names_count());
-        let addr_width = width_for_count(header.transitions_count as usize);
+        let addr_width = width_for_count(header.instruction_word_count as usize);
 
         Self {
             addr_labels,
@@ -377,17 +377,18 @@ fn is_padding(instr: &Instruction) -> bool {
 fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     let c = &ctx.colors;
     let header = module.header();
-    let transitions_count = header.transitions_count as usize;
+    let total_words = header.instruction_word_count as usize;
     let fmt = DumpFormatter {
         ctx,
         addr_width: ctx.addr_width,
     };
 
-    writeln!(out, "{}[transitions]{}", c.blue, c.reset).expect("writing to a String is infallible");
+    writeln!(out, "{}[instructions]{}", c.blue, c.reset)
+        .expect("writing to a String is infallible");
 
     let mut addr = CodeAddr::ZERO;
     let mut first_label = true;
-    while addr.as_usize() < transitions_count {
+    while addr.as_usize() < total_words {
         if let Some(label) = ctx.addr_labels.get(&addr) {
             if first_label {
                 writeln!(out, "{}{label}{}:", c.blue, c.reset)

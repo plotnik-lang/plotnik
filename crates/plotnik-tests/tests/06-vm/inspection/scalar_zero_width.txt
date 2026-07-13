@@ -120,7 +120,7 @@ P5 capture    32..40  src0
 P6 quantifier 30..31  src0
 P7 pattern    21..30  src0
 
-[transitions]
+[instructions]
 Q:
   00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03

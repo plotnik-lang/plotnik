@@ -90,7 +90,7 @@ P11 pattern    125..147  src0
 P12 quantifier 178..179  src0
 P13 pattern    156..178  src0
 
-[transitions]
+[instructions]
 LeadingSkip:
   00  -ε-  [RecordOpen]                     02
   02       (@30)                            30 : 03

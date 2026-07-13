@@ -294,7 +294,7 @@ P09 pattern    89..126  src0
 P10 capture    118..125  src0  T2.M2
 P11 ref        111..117  src0  T1
 
-[transitions]
+[instructions]
 Name:
   00  -ε-  [RecordOpen]                     02
   02       (@28)                            28 : 03

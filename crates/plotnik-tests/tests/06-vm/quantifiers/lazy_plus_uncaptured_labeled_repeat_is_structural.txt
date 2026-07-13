@@ -40,7 +40,7 @@ N0: S2 → T1  ; A
 A = 00 :: T1
 Q = 02 :: T0
 
-[transitions]
+[instructions]
 A:
   00       (@08)                            08 : 01
   01                                        ▶

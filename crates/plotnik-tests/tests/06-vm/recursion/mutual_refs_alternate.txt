@@ -73,7 +73,7 @@ Arr = 06 :: T1
 Obj = 00 :: T3
 Q   = 12 :: T4
 
-[transitions]
+[instructions]
 Obj:
   00  -ε-  [RecordOpen]                     02
   02       (@58)                            58 : 03

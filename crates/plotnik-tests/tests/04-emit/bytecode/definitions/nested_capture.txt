@@ -75,7 +75,7 @@ N2: S6 → T4  ; Outer
 Inner = 00 :: T1
 Outer = 06 :: T4
 
-[transitions]
+[instructions]
 Inner:
   00  -ε-  [RecordOpen]                     02
   02       (@16)                            16 : 03

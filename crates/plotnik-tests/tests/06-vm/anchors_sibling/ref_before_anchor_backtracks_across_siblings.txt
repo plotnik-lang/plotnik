@@ -52,7 +52,7 @@ N0: S2 → T2  ; Q
 Comma = 00 :: T0
 Q     = 02 :: T2
 
-[transitions]
+[instructions]
 Comma:
   00       (@12)                            12 : 01
   01                                        ▶

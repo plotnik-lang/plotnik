@@ -48,7 +48,7 @@ not emit them yet.
 
 ## Span Effects
 
-Transitions may carry three span effect kinds:
+Instructions may carry three span effect kinds:
 
 | Effect        | Meaning                                          |
 | ------------- | ------------------------------------------------ |

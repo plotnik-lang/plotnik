@@ -25,4 +25,4 @@ S3 "identifier"
 
 [entrypoints]
 
-[transitions]
+[instructions]
