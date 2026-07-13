@@ -30,7 +30,7 @@ pub struct RunStats {
     /// consumes one unit; this is not a stable cross-version performance metric.
     pub fuel_used: u64,
     /// Peak live runtime heap observed at memory-sampling points and run exit.
-    pub heap_high_water: u64,
+    pub peak_live_heap_bytes: u64,
 }
 
 /// Virtual machine state for query execution.
@@ -138,14 +138,14 @@ impl<'t> VM<'t> {
             tracer.trace_enter_entrypoint(self.ip);
         }
 
-        let mut heap_high_water = self.engine.heap_bytes();
+        let mut peak_live_heap_bytes = self.engine.heap_bytes();
 
         loop {
             // One matcher dispatch currently consumes one fuel unit.
             if let Some(limit) = self.limits.fuel_limit
                 && self.fuel_used >= limit
             {
-                let stats = self.finish_stats(&mut heap_high_water);
+                let stats = self.finish_stats(&mut peak_live_heap_bytes);
                 return (Err(RuntimeError::OutOfFuel(limit)), stats);
             }
             self.fuel_used += 1;
@@ -158,11 +158,11 @@ impl<'t> VM<'t> {
             // `None` opts out (Unbounded), but the sample still feeds stats.
             if self.fuel_used & MEMORY_SAMPLE_MASK == 0 {
                 let used = self.engine.heap_bytes();
-                heap_high_water = heap_high_water.max(used);
+                peak_live_heap_bytes = peak_live_heap_bytes.max(used);
                 if let Some(max) = self.limits.max_memory
                     && used > max
                 {
-                    let stats = self.finish_stats_with(&mut heap_high_water, used);
+                    let stats = self.finish_stats_with(&mut peak_live_heap_bytes, used);
                     return (
                         Err(RuntimeError::MemoryLimitExceeded { used, limit: max }),
                         stats,
@@ -196,27 +196,27 @@ impl<'t> VM<'t> {
             match result {
                 Ok(()) | Err(Signal::Flow(ControlFlow::Backtracked)) => continue,
                 Err(Signal::Flow(ControlFlow::Accept)) => {
-                    let stats = self.finish_stats(&mut heap_high_water);
+                    let stats = self.finish_stats(&mut peak_live_heap_bytes);
                     return (Ok(self.engine.into_journal()), stats);
                 }
                 Err(Signal::Error(e)) => {
-                    let stats = self.finish_stats(&mut heap_high_water);
+                    let stats = self.finish_stats(&mut peak_live_heap_bytes);
                     return (Err(e), stats);
                 }
             }
         }
     }
 
-    fn finish_stats(&self, heap_high_water: &mut u64) -> RunStats {
+    fn finish_stats(&self, peak_live_heap_bytes: &mut u64) -> RunStats {
         let used = self.engine.heap_bytes();
-        self.finish_stats_with(heap_high_water, used)
+        self.finish_stats_with(peak_live_heap_bytes, used)
     }
 
-    fn finish_stats_with(&self, heap_high_water: &mut u64, used: u64) -> RunStats {
-        *heap_high_water = (*heap_high_water).max(used);
+    fn finish_stats_with(&self, peak_live_heap_bytes: &mut u64, used: u64) -> RunStats {
+        *peak_live_heap_bytes = (*peak_live_heap_bytes).max(used);
         RunStats {
             fuel_used: self.fuel_used,
-            heap_high_water: *heap_high_water,
+            peak_live_heap_bytes: *peak_live_heap_bytes,
         }
     }
 

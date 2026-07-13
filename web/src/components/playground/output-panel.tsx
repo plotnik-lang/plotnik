@@ -171,7 +171,7 @@ function OutputBody({
           {runResult.run_stats.fuel_used.toLocaleString()} fuel
         </Badge>
         <Badge variant="secondary">
-          {formatBytes(runResult.run_stats.heap_high_water)} peak heap
+          {formatBytes(runResult.run_stats.peak_live_heap_bytes)} peak heap
         </Badge>
       </div>
     </div>

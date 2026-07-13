@@ -39,7 +39,7 @@ fn execute_with_stats_reports_success_usage() {
 
     assert!(result.is_ok(), "run should match");
     assert!(stats.fuel_used > 0);
-    assert!(stats.heap_high_water > 0);
+    assert!(stats.peak_live_heap_bytes > 0);
 }
 
 #[test]
@@ -59,5 +59,5 @@ fn execute_with_stats_reports_fuel_usage() {
 
     assert!(matches!(result, Err(RuntimeError::OutOfFuel(1))));
     assert_eq!(stats.fuel_used, 1);
-    assert!(stats.heap_high_water > 0);
+    assert!(stats.peak_live_heap_bytes > 0);
 }

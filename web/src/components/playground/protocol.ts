@@ -90,7 +90,7 @@ export interface GeneratedCode {
 
 export interface RunStats {
   fuel_used: number;
-  heap_high_water: number;
+  peak_live_heap_bytes: number;
 }
 
 /** `Session::run()`/`trace()` — either a result or a runtime error ("no
