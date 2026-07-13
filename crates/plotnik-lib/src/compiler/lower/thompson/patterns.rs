@@ -510,10 +510,10 @@ impl NfaBuilder<'_> {
     /// Compile a reference as a `Call` to the definition's standalone body.
     ///
     /// Call-site scoping: the caller decides whether to wrap with a record scope based on
-    /// whether the ref is captured and the called definition returns a struct.
+    /// whether the ref is captured and the called definition returns a record.
     ///
     /// - Captured ref returning a record: `RecordOpen → Call → RecordClose → RecordSet → exit`
-    /// - Captured ref returning scalar: `Call → RecordSet → exit`
+    /// - Captured ref returning another value: `Call → RecordSet → exit`
     /// - Bare ref returning output effects: `SuppressBegin → Call → SuppressEnd → exit`
     ///   (matches structurally, output discarded)
     /// - Bare ref to a match-only or node-valued definition: `Call → exit`
@@ -662,7 +662,7 @@ impl NfaBuilder<'_> {
     /// the body substituted for the `Call`:
     ///
     /// - Captured ref returning a record: `RecordOpen → body → RecordClose → RecordSet → exit(s)`
-    /// - Captured ref returning scalar: `body → RecordSet → exit(s)`
+    /// - Captured ref returning another value: `body → RecordSet → exit(s)`
     /// - Bare ref: body compiled under suppression (compile-time — no
     ///   `SuppressBegin`/`SuppressEnd` brackets needed)
     ///
@@ -799,7 +799,7 @@ impl NfaBuilder<'_> {
             let body_entry = self.wrap_def_body_entry(body_entry, def_span);
             self.emit_record_open_step_with_pre(body_entry, pre)
         } else if is_captured {
-            // Scalar-valued (variant) body: it leaves its value pending; the
+            // Non-record body: it leaves its value pending; the
             // consumer chain runs after it on either continuation.
             let set_match = self.emit_effects_if_nonempty(match_exit, post.clone());
             let set_skip = match skip_exit {

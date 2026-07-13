@@ -344,7 +344,7 @@ impl<'a> OutputSchema<'a> {
     ///
     /// Reachable fragment definitions still need capture slots and wire types
     /// for matching. A source target, however, must not publish an
-    /// unspecialized fragment type merely because a scalar-specialized call
+    /// unspecialized fragment type merely because a capture-type-specialized call
     /// uses the same matcher body.
     pub(crate) fn entry_point_items(&self) -> &[OutputItem] {
         &self.entry_point_items

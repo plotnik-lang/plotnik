@@ -1,4 +1,4 @@
-//! Lowering for built-in scalar capture types.
+//! Lowering for built-in text and boolean capture types.
 
 use crate::bytecode::{EffectKind, Nav, SpanKind};
 use crate::compiler::analyze::types::{
@@ -46,12 +46,12 @@ struct CaptureBinding {
 }
 
 #[derive(Clone, Copy)]
-enum ScalarTerminal {
+enum CaptureTerminal {
     Text(TerminalData),
     Presence(TerminalData),
 }
 
-impl ScalarTerminal {
+impl CaptureTerminal {
     fn is_presence(self) -> bool {
         matches!(self, Self::Presence(_))
     }
@@ -187,10 +187,10 @@ impl CaptureTypeLowerer<'_, '_> {
 
         match self.plan.kind().clone() {
             CaptureTypePlanKind::TextTerminal { data, .. } => {
-                self.scalar_terminal(pattern, destination, ScalarTerminal::Text(data))
+                self.capture_terminal(pattern, destination, CaptureTerminal::Text(data))
             }
             CaptureTypePlanKind::BoolTerminal { data } => {
-                self.scalar_terminal(pattern, destination, ScalarTerminal::Presence(data))
+                self.capture_terminal(pattern, destination, CaptureTerminal::Presence(data))
             }
             CaptureTypePlanKind::Option { mode, inner } => {
                 let Pattern::QuantifiedPattern(quant) = pattern else {
@@ -207,11 +207,11 @@ impl CaptureTypeLowerer<'_, '_> {
         }
     }
 
-    fn scalar_terminal(
+    fn capture_terminal(
         &mut self,
         pattern: &Pattern,
         destination: ValueDestination,
-        terminal: ScalarTerminal,
+        terminal: CaptureTerminal,
     ) -> Label {
         if terminal.is_presence() && !self.compiler.records_inspection() {
             return self.bool_without_provenance(pattern, destination, terminal.data());
@@ -305,7 +305,7 @@ impl CaptureTypeLowerer<'_, '_> {
         &mut self,
         pattern: &Pattern,
         destination: ValueDestination,
-        terminal: ScalarTerminal,
+        terminal: CaptureTerminal,
     ) -> Label {
         let mut effects = vec![terminal.node_value()];
         effects.extend(destination.into_effects());
@@ -322,7 +322,7 @@ impl CaptureTypeLowerer<'_, '_> {
         &mut self,
         exit: Label,
         destination: ValueDestination,
-        terminal: ScalarTerminal,
+        terminal: CaptureTerminal,
     ) -> Label {
         let mut effects = vec![terminal.close()];
         effects.extend(destination.into_effects());

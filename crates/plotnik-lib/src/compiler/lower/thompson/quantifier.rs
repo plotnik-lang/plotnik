@@ -1058,8 +1058,8 @@ impl NfaBuilder<'_> {
     ///
     /// The element's value must survive as the pending call value, so a
     /// reference element compiles with the keep-value ref lowering (a plain
-    /// `RecordSet`-consumer chain doesn't exist at a definition's root); a scalar
-    /// element pends its matched node via a `Node` effect, while structured
+    /// `RecordSet`-consumer chain doesn't exist at a definition's root); a node
+    /// element pends its match via a `Node` effect, while structured
     /// elements leave their own value pending.
     fn compile_valued_optional(
         &mut self,

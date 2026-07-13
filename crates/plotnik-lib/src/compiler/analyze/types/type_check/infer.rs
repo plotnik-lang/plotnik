@@ -892,7 +892,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
                 custom
             }
             Some(TypeShape::Text | TypeShape::Bool) => {
-                unreachable!("ordinary captures cannot produce scalar roots")
+                unreachable!("ordinary captures cannot produce text or boolean roots")
             }
             // Recovery-only no-value flow falls back to a Node alias, matching the raw
             // capture's recovery type.
