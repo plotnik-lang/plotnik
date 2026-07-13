@@ -162,7 +162,7 @@ fn forged_invalid_entrypoint_name_is_rejected() {
         let ep_off = Module::load_compiler_output(&bytes)
             .expect("module validates before tampering")
             .offsets()
-            .entrypoints as usize;
+            .entry_points as usize;
 
         bytes[ep_off..ep_off + 2].copy_from_slice(&forged.to_le_bytes());
         reseal(&mut bytes);
@@ -376,7 +376,7 @@ fn first_section_gap(bytes: &[u8]) -> usize {
         (o.type_defs, h.type_defs_count as u32 * 4),
         (o.type_members, h.type_members_count as u32 * 4),
         (o.type_names, h.type_names_count as u32 * 4),
-        (o.entrypoints, h.entrypoints_count as u32 * 8),
+        (o.entry_points, h.entry_points_count as u32 * 8),
         (o.instructions, h.instruction_word_count as u32 * 8),
         (o.spans, h.spans_count as u32 * SPAN_ENTRY_SIZE as u32),
         (h.total_size, 0),
@@ -987,7 +987,7 @@ fn forged_entrypoint_into_instruction_interior_is_rejected() {
     let (ep_off, interior) = {
         let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         (
-            m.offsets().entrypoints as usize,
+            m.offsets().entry_points as usize,
             first_multiword_interior_addr(&bytes).get(),
         )
     };
@@ -1289,7 +1289,7 @@ fn forged_record_wrapper_without_root_frame_is_rejected() {
     let ep_off = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .offsets()
-        .entrypoints as usize;
+        .entry_points as usize;
     let record_open_slot = first_effect_op(&bytes, |op| op == EffectKind::RecordOpen as u16);
     let record_close_slot = first_effect_op(&bytes, |op| op == EffectKind::RecordClose as u16);
 
@@ -1540,7 +1540,7 @@ fn forged_out_of_range_entrypoint_target_is_rejected() {
     let ep_off = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .offsets()
-        .entrypoints as usize;
+        .entry_points as usize;
     bytes[ep_off + 2..ep_off + 4].copy_from_slice(&u16::MAX.to_le_bytes());
     reseal(&mut bytes);
 
@@ -1560,7 +1560,7 @@ fn forged_nonzero_entrypoint_pad_is_rejected() {
     let ep_off = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
         .offsets()
-        .entrypoints as usize;
+        .entry_points as usize;
     bytes[ep_off + 6..ep_off + 8].copy_from_slice(&1u16.to_le_bytes());
     reseal(&mut bytes);
 
@@ -1580,7 +1580,10 @@ fn forged_out_of_range_entrypoint_result_type_is_rejected() {
     let mut bytes = emit_bytes(RECORD_QUERY);
     let (ep_off, type_defs) = {
         let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
-        (m.offsets().entrypoints as usize, m.header().type_defs_count)
+        (
+            m.offsets().entry_points as usize,
+            m.header().type_defs_count,
+        )
     };
     bytes[ep_off + 4..ep_off + 6].copy_from_slice(&type_defs.to_le_bytes());
     reseal(&mut bytes);

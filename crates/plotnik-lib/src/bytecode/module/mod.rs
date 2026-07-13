@@ -243,8 +243,8 @@ impl Module {
     }
 
     pub fn entry_points(&self) -> EntryPointsView<'_> {
-        let offset = self.offsets.entrypoints as usize;
-        let count = self.header.entrypoints_count as usize;
+        let offset = self.offsets.entry_points as usize;
+        let count = self.header.entry_points_count as usize;
         EntryPointsView {
             bytes: &self.storage[offset..offset + count * EntryPoint::SIZE],
             count,
@@ -256,7 +256,7 @@ impl Module {
     }
 
     pub fn entry_point_count(&self) -> usize {
-        self.header.entrypoints_count as usize
+        self.header.entry_points_count as usize
     }
 
     pub fn entry_point_at(&self, idx: usize) -> Option<EntryPoint> {
@@ -267,11 +267,11 @@ impl Module {
         self.entry_points().find_by_name(name, &self.strings())
     }
 
-    /// Names of all entrypoints, in table order.
+    /// Names of all entry points, in table order.
     pub fn entry_point_names(&self) -> impl Iterator<Item = &str> {
         let strings = self.strings();
-        let entrypoints = self.entry_points();
-        (0..self.entry_point_count()).map(move |i| strings.get(entrypoints.get(i).name()))
+        let entry_points = self.entry_points();
+        (0..self.entry_point_count()).map(move |i| strings.get(entry_points.get(i).name()))
     }
 
     /// `count + 1` entries: the extra sentinel offset gives the final string's end.
@@ -502,12 +502,12 @@ pub struct EntryPointsView<'a> {
 
 impl<'a> EntryPointsView<'a> {
     pub fn get(&self, idx: usize) -> EntryPoint {
-        assert!(idx < self.count, "entrypoint index out of bounds");
+        assert!(idx < self.count, "entry-point index out of bounds");
         let offset = idx * EntryPoint::SIZE;
         EntryPoint::from_bytes(&self.bytes[offset..])
     }
 
-    /// Number of entrypoints.
+    /// Number of entry points.
     pub fn len(&self) -> usize {
         self.count
     }
@@ -520,7 +520,7 @@ impl<'a> EntryPointsView<'a> {
         (0..self.count).map(|idx| self.get(idx))
     }
 
-    /// Find an entrypoint by name (requires StringsView for comparison).
+    /// Find an entry point by name (requires StringsView for comparison).
     pub fn find_by_name(&self, name: &str, strings: &StringsView<'_>) -> Option<EntryPoint> {
         self.iter().find(|e| strings.get(e.name()) == name)
     }

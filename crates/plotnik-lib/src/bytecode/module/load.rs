@@ -53,7 +53,7 @@ pub enum ModuleError {
     InvalidTypeDef(usize),
     #[error("invalid type name at index {0}")]
     InvalidTypeName(usize),
-    #[error("invalid entrypoint at index {0}")]
+    #[error("invalid entry point at index {0}")]
     InvalidEntrypoint(usize),
     #[error("invalid opcode {opcode:#x} at instruction address {addr}")]
     InvalidOpcode { addr: CodeAddr, opcode: u8 },
@@ -238,7 +238,7 @@ impl Module {
     /// out-of-bounds slicing: the reserved bytes are zero, the CRC32 over the
     /// post-header body matches, the string/regex table sentinels are
     /// well-formed, the documented TypeDef member ranges stay in bounds, and
-    /// entrypoint targets address real instructions.
+    /// entry-point targets address real instructions.
     ///
     /// The CRC32 detects accidental corruption between emission and
     /// construction. It is not a substitute for structural validation, so a
@@ -541,14 +541,14 @@ impl Module {
     /// instruction would make the VM start decoding mid-instruction, so it must
     /// be an instruction start, not merely in range.
     fn validate_entrypoints(&self, is_start: &[bool]) -> Result<(), ModuleError> {
-        let entrypoints = self.entry_points();
+        let entry_points = self.entry_points();
         let word_count = self.header.instruction_word_count;
         let type_defs = self.header.type_defs_count;
         let storage: &[u8] = &self.storage;
-        let base = self.offsets.entrypoints as usize;
-        for i in 0..entrypoints.len() {
+        let base = self.offsets.entry_points as usize;
+        for i in 0..entry_points.len() {
             let invalid = || ModuleError::InvalidEntrypoint(i);
-            let ep = entrypoints.get(i);
+            let ep = entry_points.get(i);
             let target = ep.target();
 
             if target.get() >= word_count {
@@ -581,8 +581,8 @@ impl Module {
     fn validate_depth_neutrality(&self) -> Result<(), ModuleError> {
         let mut roots = HashMap::new();
 
-        for entrypoint in self.entry_points().iter() {
-            let target = entrypoint.target();
+        for entry_point in self.entry_points().iter() {
+            let target = entry_point.target();
             let route = DepthRoute::Caller;
             if let Some(expected) = roots.insert(target, route)
                 && expected != route
@@ -645,8 +645,8 @@ impl Module {
     fn validate_return_routes(&self) -> Result<(), ModuleError> {
         let mut cache = HashMap::new();
 
-        for entrypoint in self.entry_points().iter() {
-            let target = entrypoint.target();
+        for entry_point in self.entry_points().iter() {
+            let target = entry_point.target();
             if !self
                 .return_contract(target, &mut cache)
                 .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
@@ -797,7 +797,7 @@ impl Module {
         Ok(())
     }
 
-    /// Every *required* `StringId` held in a section — entrypoint names,
+    /// Every *required* `StringId` held in a section — entry-point names,
     /// node/field symbol names, type names, type member names, and regex pattern
     /// names — must address a real string-table entry, so the view accessors that
     /// resolve them (and `find_by_name`, the materializer's record-field keys,
@@ -825,13 +825,13 @@ impl Module {
             Ok(())
         };
 
-        // entrypoint name: u16 at entry+0
+        // Entry-point name: u16 at entry+0
         check(
-            self.offsets.entrypoints,
+            self.offsets.entry_points,
             EntryPoint::SIZE,
             0,
             0,
-            self.header.entrypoints_count as usize,
+            self.header.entry_points_count as usize,
         )?;
         // node/field symbol name: u16 at entry+2
         check(
@@ -927,7 +927,7 @@ impl Module {
     ///    on a recorded instruction start.
     ///
     /// Returns the instruction-start bitmap so [`Self::validate_entrypoints`] can
-    /// hold entrypoint targets to the same rule: an entrypoint pointing into the
+    /// hold entry-point targets to the same rule: an entry point pointing into the
     /// interior of a multi-word instruction would otherwise begin decoding
     /// mid-instruction.
     ///

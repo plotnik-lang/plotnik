@@ -148,11 +148,11 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         DecoderFrameEstimator::new(self.model, self.decode).max_bytes()
     }
 
-    /// The `parse`/`matches` surface, one block per entrypoint definition.
+    /// The `parse`/`matches` surface, one block per entry-point definition.
     /// Selectable definitions are nominal (parse + matches) or void (matches).
-    pub(super) fn parse_api(&self, entrypoints: impl Iterator<Item = DefId>) -> String {
+    pub(super) fn parse_api(&self, entry_points: impl Iterator<Item = DefId>) -> String {
         let mut out = String::new();
-        for def_id in entrypoints {
+        for def_id in entry_points {
             let name = self.deps.def_name_sym(def_id);
             let def = self.interner.resolve(name).to_string();
             out.push('\n');

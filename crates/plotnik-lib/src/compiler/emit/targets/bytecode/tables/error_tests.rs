@@ -150,7 +150,7 @@ fn emit_error_classification_respects_limit_ownership() {
     assert!(!EmitError::TooManyTypeMembers(65_536).is_target_limit());
     assert!(!EmitError::TooManyNodeKinds(65_536).is_target_limit());
     assert!(!EmitError::TooManyNodeFields(65_536).is_target_limit());
-    assert!(!EmitError::TooManyEntrypoints(65_536).is_target_limit());
+    assert!(!EmitError::TooManyEntryPoints(65_536).is_target_limit());
     assert!(!EmitError::RegexCompile("[".into(), "invalid".into()).is_target_limit());
 }
 
@@ -197,7 +197,7 @@ fn truncated_or_corrupted_module_is_rejected() {
 
     // Flipping any single byte is caught: the CRC covers everything after the
     // 64-byte header, and structural checks (bounds, sentinels, reserved bytes,
-    // type defs, entrypoints) cover the header itself.
+    // type defs, entry points) cover the header itself.
     for i in 0..bytes.len() {
         let mut corrupt = bytes.clone();
         corrupt[i] ^= 0xFF;

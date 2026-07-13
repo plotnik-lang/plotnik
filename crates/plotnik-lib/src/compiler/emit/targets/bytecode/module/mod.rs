@@ -1,4 +1,4 @@
-//! Module-assembly emission phase: build the node-kind/field/entrypoint wire
+//! Module-assembly emission phase: build the node-kind/field/entry-point wire
 //! tables, serialize every section, and frame the module with its header and
 //! checksum.
 
@@ -22,12 +22,12 @@ use super::layout::compute_layout;
 use super::string_table::seed_string_table;
 use super::type_table::build_type_table;
 
-/// The node-kind, field, and entrypoint wire tables. Built together because all
+/// The node-kind, field, and entry-point wire tables. Built together because all
 /// three intern their names into the one string table.
 pub struct ModuleTables {
     node_kinds: Vec<NodeKindEntry>,
     fields: Vec<FieldEntry>,
-    entrypoints: Vec<EntryPoint>,
+    entry_points: Vec<EntryPoint>,
 }
 
 pub(in crate::compiler::emit) struct EmitPipeline<'a> {
@@ -76,7 +76,7 @@ impl<'a> EmitPipeline<'a> {
         &self.layout
     }
 
-    /// Assemble the node-kind, field, and entrypoint tables, interning the last
+    /// Assemble the node-kind, field, and entry-point tables, interning the last
     /// names into the string table. As the final string-table writer, this is where
     /// the string, type, and table capacities are sealed.
     pub(in crate::compiler::emit) fn build_tables(&mut self) -> Result<ModuleTables, EmitError> {
@@ -95,7 +95,7 @@ impl<'a> EmitPipeline<'a> {
             fields.push(FieldEntry::new(u16::from(field_id), name));
         }
 
-        let mut entrypoints: Vec<EntryPoint> = Vec::new();
+        let mut entry_points: Vec<EntryPoint> = Vec::new();
         for (def_id, type_id) in self.input.type_analysis.iter_entry_point_outputs() {
             let name_sym = self.input.dependency_analysis.def_name_sym(def_id);
             let name = self.strings.intern(name_sym, self.input.interner)?;
@@ -107,9 +107,9 @@ impl<'a> EmitPipeline<'a> {
                 .get(&def_id)
                 .and_then(|label| self.layout.code_addrs().get(label))
                 .copied()
-                .expect("entrypoint must have compiled target");
+                .expect("entry point must have compiled target");
 
-            entrypoints.push(EntryPoint::new(name, target, result_type));
+            entry_points.push(EntryPoint::new(name, target, result_type));
         }
 
         self.strings.validate()?;
@@ -120,14 +120,14 @@ impl<'a> EmitPipeline<'a> {
         if fields.len() > EmitError::MAX_NODE_FIELDS {
             return Err(EmitError::TooManyNodeFields(fields.len()));
         }
-        if entrypoints.len() > EmitError::MAX_ENTRYPOINTS {
-            return Err(EmitError::TooManyEntrypoints(entrypoints.len()));
+        if entry_points.len() > EmitError::MAX_ENTRY_POINTS {
+            return Err(EmitError::TooManyEntryPoints(entry_points.len()));
         }
 
         Ok(ModuleTables {
             node_kinds,
             fields,
-            entrypoints,
+            entry_points,
         })
     }
 
@@ -144,7 +144,7 @@ impl<'a> EmitPipeline<'a> {
 
         let node_kinds_bytes = emit_symbol_name_table(&tables.node_kinds);
         let node_fields_bytes = emit_symbol_name_table(&tables.fields);
-        let entrypoints_bytes = emit_entrypoints(&tables.entrypoints);
+        let entry_points_bytes = emit_entry_points(&tables.entry_points);
         let spans_bytes = self.emit_spans()?;
 
         // Section order matches the bytecode layout:
@@ -162,7 +162,7 @@ impl<'a> EmitPipeline<'a> {
         writer.emit_section(&type_defs_bytes);
         writer.emit_section(&type_members_bytes);
         writer.emit_section(&type_names_bytes);
-        writer.emit_section(&entrypoints_bytes);
+        writer.emit_section(&entry_points_bytes);
         writer.emit_section(instructions);
         writer.emit_section(&spans_bytes);
 
@@ -203,10 +203,10 @@ impl<'a> EmitPipeline<'a> {
             EmitError::MAX_TYPE_NAMES,
             EmitError::TooManyTypeNames,
         )?;
-        let entrypoints_count = checked_count(
-            tables.entrypoints.len(),
-            EmitError::MAX_ENTRYPOINTS,
-            EmitError::TooManyEntrypoints,
+        let entry_points_count = checked_count(
+            tables.entry_points.len(),
+            EmitError::MAX_ENTRY_POINTS,
+            EmitError::TooManyEntryPoints,
         )?;
         let instruction_word_count = checked_count(
             self.layout.total_words() as usize,
@@ -227,7 +227,7 @@ impl<'a> EmitPipeline<'a> {
             type_defs_count,
             type_members_count,
             type_names_count,
-            entrypoints_count,
+            entry_points_count,
             instruction_word_count,
             spans_count,
             str_blob_size: str_blob.len() as u32,
@@ -360,9 +360,9 @@ fn emit_symbol_name_table(symbols: &[SymbolNameEntry]) -> Vec<u8> {
     bytes
 }
 
-fn emit_entrypoints(entrypoints: &[EntryPoint]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(entrypoints.len() * EntryPoint::SIZE);
-    for ep in entrypoints {
+fn emit_entry_points(entry_points: &[EntryPoint]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(entry_points.len() * EntryPoint::SIZE);
+    for ep in entry_points {
         bytes.extend_from_slice(&u16::from(ep.name()).to_le_bytes());
         bytes.extend_from_slice(&ep.target().to_le_bytes());
         bytes.extend_from_slice(&u16::from(ep.result_type()).to_le_bytes());
