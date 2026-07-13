@@ -45,7 +45,7 @@ pub struct Session {
     lang: &'static Lang,
     compiled: CompiledQuery,
     module: Option<Module>,
-    entrypoints: Vec<String>,
+    entry_points: Vec<String>,
     info: JsonValue,
     generated_rust: OnceCell<Option<String>>,
 }
@@ -80,14 +80,14 @@ impl Session {
             .into_artifact()
             .map(|output| output.into_parts())
             .unwrap_or_else(|| (String::new(), Vec::new()));
-        let entrypoints = module.as_ref().map(entry_point_names).unwrap_or_default();
+        let entry_points = module.as_ref().map(entry_point_names).unwrap_or_default();
         let info = info_json(InfoParts {
             module: module.as_ref(),
             query_tokens: json_value!(tokens),
             diagnostics,
             typescript_declarations,
             typescript_bindings: json_value!(typescript_bindings),
-            entry_points: &entrypoints,
+            entry_points: &entry_points,
             bytecode_size_bytes,
         });
 
@@ -95,7 +95,7 @@ impl Session {
             lang,
             compiled,
             module,
-            entrypoints,
+            entry_points,
             info,
             generated_rust: OnceCell::new(),
         })
@@ -172,8 +172,8 @@ impl Session {
             return error_json("query did not compile");
         };
 
-        let entrypoint = match resolve_entry_point(module, entry, &self.entrypoints) {
-            Ok(entrypoint) => entrypoint,
+        let entry_point = match resolve_entry_point(module, entry, &self.entry_points) {
+            Ok(entry_point) => entry_point,
             Err(error) => return error_json(error),
         };
 
@@ -184,16 +184,16 @@ impl Session {
         match trace {
             TraceMode::None => {
                 let mut tracer = NoopTracer;
-                let result = vm.execute_with_stats(module, &entrypoint, &mut tracer);
-                result_json(module, &entrypoint, source, result, None)
+                let result = vm.execute_with_stats(module, &entry_point, &mut tracer);
+                result_json(module, &entry_point, source, result, None)
             }
             TraceMode::Recording(max_records) => {
                 let mut tracer = RecordingTracer::new(module, max_records);
-                let result = vm.execute_with_stats(module, &entrypoint, &mut tracer);
+                let result = vm.execute_with_stats(module, &entry_point, &mut tracer);
                 let recording = tracer.finish();
                 result_json(
                     module,
-                    &entrypoint,
+                    &entry_point,
                     source,
                     result,
                     Some(json_value!(recording)),
@@ -211,24 +211,24 @@ enum TraceMode {
 fn resolve_entry_point(
     module: &Module,
     requested: Option<&str>,
-    entrypoints: &[String],
+    entry_points: &[String],
 ) -> Result<EntryPoint, String> {
     let selected = match requested {
         Some(name) => name.to_string(),
-        None => entrypoints
+        None => entry_points
             .last()
             .cloned()
-            .ok_or_else(|| "no entrypoints in module".to_string())?,
+            .ok_or_else(|| "no entry points in module".to_string())?,
     };
 
-    let Some(entrypoint) = module.entry_point(&selected) else {
+    let Some(entry_point) = module.entry_point(&selected) else {
         return Err(format!(
-            "invalid entrypoint: {}; available entrypoints: {}",
+            "invalid entry point: {}; available entry points: {}",
             selected,
-            entrypoints.join(", ")
+            entry_points.join(", ")
         ));
     };
-    Ok(entrypoint)
+    Ok(entry_point)
 }
 
 fn entry_point_names(module: &Module) -> Vec<String> {

@@ -43,7 +43,7 @@ import { pushQueryFeedback } from "./query-feedback";
 import { usePlaygroundSession } from "./use-session";
 
 /* The playground shell: owns the user's inputs (query / source / lang /
-   entrypoint choice), feeds them to the session hook, and lays the panes
+   entry-point choice), feeds them to the session hook, and lays the panes
    out. All engine orchestration lives in use-session.ts; all wire types in
    protocol.ts.
 
@@ -207,17 +207,21 @@ export default function Playground() {
               </SelectGroup>
             </SelectContent>
           </Select>
-          {session.entrypoints.length > 1 && (
+          {session.entry_points.length > 1 && (
             <Select
               value={session.entry ?? ""}
               onValueChange={(v) => v && setEntryChoice(v)}
             >
-              <SelectTrigger size="sm" className="w-32" aria-label="entrypoint">
+              <SelectTrigger
+                size="sm"
+                className="w-32"
+                aria-label="entry point"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  {session.entrypoints.map((name) => (
+                  {session.entry_points.map((name) => (
                     <SelectItem key={name} value={name}>
                       {name}
                     </SelectItem>

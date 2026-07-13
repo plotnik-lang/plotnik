@@ -24,9 +24,9 @@ export interface SessionInput {
   query: string;
   source: string;
   lang: string;
-  /** The user's entrypoint pick; null means "default" (last entrypoint).
+  /** The user's entry-point pick; null means "default" (last entry point).
       A pick absent from the compiled query falls back, and comes back when
-      the entrypoint reappears. */
+      the entry point reappears. */
   entry: string | null;
   /** Generated-code tab is visible and may request its lazy artifact. */
   generatedOpen: boolean;
@@ -56,8 +56,8 @@ export interface PlaygroundSession {
   compiled: CompileOutcome | null;
   generated: GeneratedCode | null;
   generating: boolean;
-  entrypoints: string[];
-  /** Effective entrypoint after fallback; feed it back into the selector. */
+  entry_points: string[];
+  /** Effective entry point after fallback; feed it back into the selector. */
   entry: string | null;
   runResult: RunResult | null;
   /** `runResult` came from a query that no longer compiles to a module. */
@@ -110,11 +110,11 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
     },
   );
 
-  const entrypoints = compiled?.info.entry_points ?? [];
+  const entry_points = compiled?.info.entry_points ?? [];
   const effectiveEntry =
-    entry !== null && entrypoints.includes(entry)
+    entry !== null && entry_points.includes(entry)
       ? entry
-      : (entrypoints[entrypoints.length - 1] ?? null);
+      : (entry_points[entry_points.length - 1] ?? null);
   const hasModule =
     compiled !== null && compiled.info.bytecode_size_bytes !== null;
 
@@ -163,7 +163,7 @@ export function usePlaygroundSession(input: SessionInput): PlaygroundSession {
     compiled,
     generated,
     generating,
-    entrypoints,
+    entry_points,
     entry: effectiveEntry,
     runResult,
     stale: runResult !== null && compiled !== null && !hasModule,

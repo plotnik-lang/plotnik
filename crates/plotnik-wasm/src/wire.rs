@@ -56,7 +56,7 @@ pub fn info_json(parts: InfoParts) -> JsonValue {
 /// trace attached when tracing.
 pub fn result_json(
     module: &Module,
-    entrypoint: &EntryPoint,
+    entry_point: &EntryPoint,
     source: &str,
     result: (Result<MatchJournal<'_>, RuntimeError>, RunStats),
     execution_trace: Option<JsonValue>,
@@ -66,7 +66,7 @@ pub fn result_json(
         Ok(journal) => {
             let colors = Colors::new(false);
             let result =
-                materialize_verified(source, module, entrypoint, journal.as_slice(), colors);
+                materialize_verified(source, module, entry_point, journal.as_slice(), colors);
             let result_provenance = (!module.spans().is_empty())
                 .then(|| extract_result_provenance(journal.as_slice(), module));
             json!({
