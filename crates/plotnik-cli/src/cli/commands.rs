@@ -49,7 +49,7 @@ fn with_hidden_json_arg(cmd: Command) -> Command {
 
 pub fn build_cli() -> Command {
     Command::new("plotnik")
-        .about("Query language for tree-sitter AST with type inference")
+        .about("Query language for tree-sitter syntax trees with type inference")
         .version(env!("CARGO_PKG_VERSION"))
         .long_version(format!(
             "{} ({} bundled languages)",

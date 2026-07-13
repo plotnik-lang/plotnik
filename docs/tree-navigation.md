@@ -177,15 +177,15 @@ Anchors compile to `Nav` variants by spelling and operand type:
 
 Bare `_` is an anonymous wildcard, so `(a) . _` uses extras-only navigation. `(_)` is a named wildcard, so `(a) . (_)` uses trivia-skipping navigation.
 
-An anchor next to an alternation is classified per branch on both sides. Before: `(a) . [(b) ","]` uses `NextSkip` for `(b)` and `NextSkipExtras` for `","`. After a named follower: `[(b) ","] . (a)` emits two copies of the follower's entry instruction — `NextSkip` and `NextSkipExtras`, sharing successors — and routes the named `(b)` path to the `NextSkip` copy and the `","` path to the `NextSkipExtras` copy. Only one copy runs per match path, so duplicated capture effects fire exactly once.
+An anchor next to an alternation is classified per alternative on both sides. Before: `(a) . [(b) ","]` uses `NextSkip` for `(b)` and `NextSkipExtras` for `","`. After a named follower: `[(b) ","] . (a)` emits two copies of the follower's entry instruction — `NextSkip` and `NextSkipExtras`, sharing successors — and routes the named `(b)` path to the `NextSkip` copy and the `","` path to the `NextSkipExtras` copy. Only one copy runs per match path, so duplicated capture effects fire exactly once.
 
-The split fires when the alternation's exit is the follower's own single `Match` on a named node _and_ the matched branch ends on a named node. This covers the common forms — including inline-effect captures whose effects ride the branch instructions rather than wrapping the exit: a scalar `[(b) ","] @x . (a)` and an uncaptured enum `[A: (b) B: ","] . (a)` both split. It stays conservative (extras-only for every branch) — correct but not yet optimal — in these cases, pending follow-up:
+The split fires when the alternation's exit is the follower's own single `Match` on a named node _and_ the matched alternative ends on a named node. This covers the common forms — including inline-effect captures whose effects ride the alternative's instructions rather than wrapping the exit: a node capture `[(b) ","] @x . (a)` and an unmaterialized labeled alternation `[A: (b) B: ","] . (a)` both split. It stays conservative (extras-only for every alternative) — correct but not yet optimal — in these cases, pending follow-up:
 
 - The follower is itself anonymous (`. ","`) or `_`: both-sides-named never holds, so extras-only is in fact correct.
 - The follower is a ref (`. (Rule)`, a `Call`) or scope-wrapped (`. (a (b) @c) @x`, an epsilon entry): no single named `Match` to clone.
 - The alternation's value is materialized through a trailing effect epsilon rather than inline — a record/list scope capture, or a variant alternation captured by name (`[A: (b) B: ","] @t . (a)`) — so its exit is that epsilon (the `RecordSet`/`RecordClose`), not the follower's `Match`.
-- A branch is quantified (`[(b)? ","] . (a)`): its zero-match path leaves no named node on the anchor's left, so the upgrade is unsound. The whole branch stays extras-only.
-- A branch is a sequence ending in a named node (`[{(b) "," (c)} ";"] . (a)`): branch namedness is classified over the whole branch (matching the before-anchor classifier), so a branch containing any anonymous token is treated as anonymous even when its tail is named. Conservative, not a wrong match. A trailing-position classifier would lift this.
+- An alternative is quantified (`[(b)? ","] . (a)`): its empty-match path leaves no named node on the anchor's left, so the upgrade is unsound. The whole alternative stays extras-only.
+- An alternative is a sequence ending in a named node (`[{(b) "," (c)} ";"] . (a)`): namedness is classified over the whole alternative (matching the before-anchor classifier), so an alternative containing any anonymous token is treated as anonymous even when its tail is named. Conservative, not a wrong match. A trailing-position classifier would lift this.
 
 ### Compilation Examples
 

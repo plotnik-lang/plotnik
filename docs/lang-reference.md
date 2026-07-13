@@ -1,8 +1,8 @@
 # Plotnik Query Language Reference
 
-Plotnik is a pattern-matching language for tree-sitter syntax trees. It extends [tree-sitter's query syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with named expressions, recursion, and static type inference.
+Plotnik is a pattern-matching language for tree-sitter syntax trees. It extends [tree-sitter's query syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with definitions, recursion, and static type inference.
 
-**Pattern.** A _pattern_ is a query matcher over the target syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A node pattern `(kind)` matches a named node; a token pattern `"text"` or `_` matches an anonymous token (or any node); sequences, alternations, quantifiers, fields, and captures are all patterns.
+**Pattern.** A _pattern_ is a query matcher over the target syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A named-node pattern `(kind)` matches a named node; an anonymous-node pattern `"text"` matches a literal token; `_` is the node wildcard. Sequences, alternations, quantifiers, fields, and captures are also patterns.
 
 Tree-sitter predicates (`#eq?`, `#match?`) and directives (`#set!`) are not supported. Plotnik has its own inline predicate syntax (see [Predicates](#predicates)).
 
@@ -14,12 +14,12 @@ NFA-based cursor walk with backtracking.
 
 ### Key Properties
 
-- **Root-anchored**: Matches the entire tree structure (like `^...$` in regex)
-- **Backtracking**: Failed branches restore state and try alternatives
-- **Ordered choice**: `[A B C]` tries branches left-to-right; first match wins
-- **Zero-width is last resort**: a pattern that can match zero nodes (an
+- **Starts at the root**: An entry point begins at the supplied syntax-tree root; node patterns remain open, so unmentioned descendants are unconstrained
+- **Backtracking**: Continuation failure restores a checkpoint and tries the remaining alternatives
+- **Source-order priority**: Alternatives are tried left-to-right, but later alternatives remain available when the continuation fails
+- **Empty matches are last resort**: a pattern that can match zero nodes (an
   optional, a star, a group of optionals, a reference to such a definition)
-  matches zero-width only when no consuming match exists at its position
+  succeeds empty only after node-consuming outcomes are exhausted
 
 ### Trivia Handling
 
@@ -61,7 +61,7 @@ When either side is anonymous, `.` skips extras but not other anonymous tokens:
 
 Bare `_` is anonymous, so `(a) . _` is extras-only. `(_)` is named, so `(a) . (_)` skips trivia.
 
-An anchor next to an alternation applies per branch on both sides. Before: `(a) . [(b) ","]` uses named-named soft adjacency for `(b)` and extras-only adjacency for `","`. After a named follower: `[(b) ","] . (a)` uses named-named soft adjacency for the `(b)` path and extras-only for the `","` path, so adding an anonymous branch no longer makes the named branches stricter. When the follower is itself anonymous (`[(b) ","] . ","`), extras-only applies to every branch, since both-sides-named never holds. (Some advanced forms still stay extras-only on every branch — a ref or scope-captured follower, a scope/named-tag-captured alternation, a quantified branch, or a branch that is a sequence containing punctuation; see [Tree Navigation](tree-navigation.md).)
+An anchor next to an alternation applies per alternative on both sides. Before: `(a) . [(b) ","]` uses named-named soft adjacency for `(b)` and extras-only adjacency for `","`. After a named follower: `[(b) ","] . (a)` uses named-named soft adjacency for the `(b)` path and extras-only for the `","` path, so adding an anonymous alternative no longer makes the named alternatives stricter. When the follower is itself anonymous (`[(b) ","] . ","`), extras-only applies to every alternative, since both-sides-named never holds. (Some advanced forms still stay extras-only on every alternative — a reference or captured follower, a captured alternation, a quantified alternative, or an alternative that is a sequence containing punctuation; see [Tree Navigation](tree-navigation.md).)
 
 Use `.!` for exact adjacency:
 
@@ -102,16 +102,16 @@ A `.ptk` file contains definitions:
 
 ````
 ```
-; Helper (can also be used as entrypoint because it matches one node)
+; Helper (can also be used as an entry point because it matches one node)
 Expr = [(identifier) (number) (string)]
 
 ; Another definition
 Stmt = (statement) @stmt
 ````
 
-Definitions whose root matches exactly one node are entrypoints. Sequence- and
+Definitions whose root matches exactly one node are entry points. Sequence- and
 quantifier-rooted definitions are fragments: they can be referenced or captured
-inside an entrypoint, but `--entry <Name>` cannot select them directly. With no
+inside an entry point, but `--entry <Name>` cannot select them directly. With no
 `--entry`, the last selectable definition runs by default.
 
 ### Script vs Module Mode
@@ -186,7 +186,7 @@ The capture on the reference is what produces output — `found: DeepSearch[]`. 
 | Node kinds                 | `snake_case` | `function_declaration`, `identifier` |
 | Captures, fields           | `snake_case` | `@name`, `@func_body`                |
 
-Tree-sitter allows `@function.name`; Plotnik requires `@function_name` because captures map to struct fields.
+Tree-sitter allows `@function.name`; Plotnik requires `@function_name` because captures map to result fields.
 
 ---
 
@@ -211,21 +211,21 @@ Output type:
 { name: Node, retval: Node }  // flat, not nested
 ```
 
-The pattern is 4 levels deep, but the output is flat. You're extracting specific pieces from an AST, not reconstructing its shape.
+The pattern is 4 levels deep, but the output is flat. You're extracting specific pieces from a syntax tree, not reconstructing its shape.
 
 Definitions are the exception: references are **opaque**. A bare `(Item)` matches structurally and produces nothing; `(Item) @item` produces the definition's type. Fields never leak through a reference boundary. See [Type System: Definitions Are Types](type-system.md#definitions-are-types).
 
-### Capture-Less Definitions
+### Match-Only Definitions
 
-A capture-less definition with no output syntax is void. To return the matched
-root node, capture it explicitly:
+A definition with no output syntax is match-only. To return the matched root
+node, capture it explicitly:
 
 ```
-Program = (program)            ; Program is void
+Program = (program)            ; Program is match-only
 ProgramNode = (program) @root  ; ProgramNode is { root: Node }
 MaybeProgram = (program)?      ; MaybeProgram is Node | null
-Expr = [(identifier) (number)] ; Expr is void
-Pair = {(identifier) (number)} ; Pair is void
+Expr = [(identifier) (number)] ; Expr is match-only
+Pair = {(identifier) (number)} ; Pair is match-only
 ```
 
 If the body contains any capture, the captures define the result instead:
@@ -234,23 +234,25 @@ If the body contains any capture, the captures define the result instead:
 Q = (program (identifier) @id) ; Q is { id: Node }, not { $node, id }
 ```
 
-Void definitions still match structurally, but they cannot be captured as
+Match-only definitions still match structurally, but they cannot be captured as
 values. Add captures inside the definition, or capture a node pattern directly.
 
-### Strict Dimensionality
+### Repeated Captures Need an Item Boundary
 
-**Quantifiers (`*`, `+`) containing internal captures require a struct capture.**
+**A quantified pattern with inner captures needs a capture around each repeated
+item.**
 
 ```
-// ERROR: internal capture without struct capture
+// ERROR: no boundary groups each iteration's fields
 (method_definition name: (identifier) @name)*
 
-// OK: struct capture on the sequence
+// OK: @method groups one iteration; @methods collects the list
 { (method_definition name: (identifier) @name) @method }* @methods
 → { methods: { method: Node, name: Node }[] }
 ```
 
-This prevents association loss — each struct is a distinct object, not parallel arrays that lose per-iteration grouping.
+This preserves row identity: each iteration produces one record instead of
+parallel lists that lose the association between fields.
 
 Because references are opaque, repeating one is dimensionally simple — the definition's type is the element:
 
@@ -260,7 +262,7 @@ Item = (pair key: (_) @k value: (_) @v)
 → { items: Item[] }
 ```
 
-See [Type System: Strict Dimensionality](type-system.md#strict-dimensionality).
+See [Type System: Repeated captures](type-system.md#repeated-captures-need-an-item-boundary).
 
 ### The Node Type
 
@@ -277,34 +279,34 @@ interface Node {
 `infer --include-points` adds `startPoint` and `endPoint`. Each point has a
 zero-based `row` and a zero-based, byte-based `column`.
 
-### Cardinality: Quantifiers → Arrays
+### Cardinality: Quantifiers → Lists
 
-Quantifiers determine whether a field is singular, optional, or an array:
+Quantifiers determine whether a field is singular, optional, or a list:
 
-| Pattern   | Output Type      | Meaning                    |
-| --------- | ---------------- | -------------------------- |
-| `(x) @a`  | `a: T`           | exactly one                |
-| `(x)? @a` | `a: T \| null`   | zero or one                |
-| `(x)* @a` | `a: T[]`         | zero or more (scalar list) |
-| `(x)+ @a` | `a: [T, ...T[]]` | one or more (scalar list)  |
+| Pattern   | Output Type      | Meaning                  |
+| --------- | ---------------- | ------------------------ |
+| `(x) @a`  | `a: T`           | exactly one              |
+| `(x)? @a` | `a: T \| null`   | zero or one              |
+| `(x)* @a` | `a: T[]`         | zero or more (node list) |
+| `(x)+ @a` | `a: [T, ...T[]]` | one or more (node list)  |
 
 Every declared field is **always present** in the output: an optional field is
 `T | null` and materializes as `null` when it doesn't match (never an absent
 key), and a missing list is `[]` (never `null`). The output shape is stable.
 
-Node arrays work when the quantified pattern has **no internal captures**. For patterns with internal captures, use struct arrays:
+Node lists work when the quantified pattern has **no internal captures**. For patterns with internal captures, collect records:
 
 | Pattern         | Output Type       | Meaning              |
 | --------------- | ----------------- | -------------------- |
-| `{...}* @items` | `items: T[]`      | zero or more structs |
-| `{...}+ @items` | `items: [T, ...]` | one or more structs  |
-| `{...}? @item`  | `item: T \| null` | nullable struct      |
+| `{...}* @items` | `items: T[]`      | zero or more records |
+| `{...}+ @items` | `items: [T, ...]` | one or more records  |
+| `{...}? @item`  | `item: T \| null` | optional record      |
 
 The capture on the quantifier is required whenever the pattern has internal
 captures — for `?` just like `*`/`+` (use `@_` to match structurally and
 discard them).
 
-### Creating Nested Structure
+### Creating Nested Records
 
 Capture a sequence `{...}` or alternation `[...]` to create a new scope. Braces alone don't introduce nesting:
 
@@ -343,19 +345,18 @@ diagnosed with fixes to `str` and `bool`.
 
 A built-in capture type is applied only after the ordinary capture has been
 validated, so it cannot legalize an invalid multi-node or valueless capture.
-`str` recursively preserves optional and array dimensions: `Node?` becomes
-`string | null`, and `Node[]` becomes `string[]`. Every array item owns its
-own source range. A structured value becomes the source slice from its first
+`str` recursively preserves optional and list dimensions: `Node?` becomes
+`string | null`, and `Node[]` becomes `string[]`. Every list item owns its
+own source range. A composite value becomes the source slice from its first
 matched node through its last; a valid zero-node value becomes `null`.
 
 `bool` means presence, not truthiness. A matched optional becomes `true` and
 its absent path becomes `false`; a required value is rejected unless the same
-field is omitted by an enclosing union branch. That omitted branch supplies
-`false`.
+field is omitted by an alternative. That alternative supplies `false`.
 
-Replacing structured data with `str` or `bool` emits a warning.
+Replacing composite data with `str` or `bool` emits a warning.
 
-Every structured type has a compiler-generated name already
+Every composite type has a compiler-generated name already
 (`{Parent}{Field}` along the capture path), so custom capture types are
 optional. A custom name overrides the generated name and resets the chain —
 nested composites derive from the new name. Names are nominal: the same name
@@ -364,9 +365,10 @@ compile error. `Node` and definition names are reserved. See
 [Type System: Capture Types](type-system.md#capture-types) and
 [Type Naming](type-system.md#type-naming).
 
-### Suppressive Captures
+### Discards
 
-`@_` (or `@_name`) consumes a pattern's output and discards all of it — the subtree still matches structurally:
+`@_` (or the documenting form `@_name`) discards a pattern's result — the
+subtree still matches structurally:
 
 ```
 ; Structure required, no output at all
@@ -377,7 +379,10 @@ Q = (program
 ; Output: { d: Node }
 ```
 
-The main use since references are already opaque: intentionally discarding a labeled alternation's tags. An uncaptured labeled alternation degrades to a union with a warning; `@_` says "discard all of it" and silences the warning:
+One use is intentionally discarding a labeled alternation's case identity. If a
+labeled alternation does not produce a value, its labels have no output effect
+and the compiler warns. `@_` explicitly discards the result and silences that
+warning:
 
 ```
 (program [A: (expression_statement) B: (debugger_statement)] @_)
@@ -387,27 +392,27 @@ The main use since references are already opaque: intentionally discarding a lab
 Rules:
 
 - `@_` and `@_name` match like regular captures but produce no output
-- Named suppressive captures (`@_foo`) are equivalent to `@_` — the name is documentation only
-- Captures inside a suppressed subtree are inert; they never collide with same-named captures outside it
-- Capture types are not allowed on suppressive captures
+- Named discards (`@_foo`) are equivalent to `@_` — the name is documentation only
+- Captures inside a discarded subtree are inert; they never collide with same-named captures outside it
+- Capture types are not allowed on discards
 - Nesting works: `@_outer` containing `@_inner` correctly suppresses both
 
 ### Summary
 
-| Pattern                 | Output                                     |
-| ----------------------- | ------------------------------------------ |
-| `@name`                 | Field in current scope                     |
-| `(x)? @a`               | Optional field                             |
-| `(x)* @a`               | Node array (no internal captures)          |
-| `{...}* @items`         | Struct array (with internal captures)      |
-| `{...} @x` / `[...] @x` | Nested object (new scope)                  |
-| `(Def)`                 | Structural match, no output                |
-| `(Def) @x`              | The definition's type, or an error if void |
-| `(Def)* @xs`            | Array of the definition's type             |
-| `[...] @_`              | Match and discard                          |
-| `@x :: str`             | Source text, preserving `?`/`*`/`+`        |
-| `@x :: bool`            | Presence boolean                           |
-| `@x :: T`               | Custom type name                           |
+| Pattern                 | Output                                  |
+| ----------------------- | --------------------------------------- |
+| `@name`                 | Field in current scope                  |
+| `(x)? @a`               | Optional field                          |
+| `(x)* @a`               | Node list (no internal captures)        |
+| `{...}* @items`         | Record list (with internal captures)    |
+| `{...} @x` / `[...] @x` | Nested object (new scope)               |
+| `(Def)`                 | Structural match, no output             |
+| `(Def) @x`              | Definition type, or error if match-only |
+| `(Def)* @xs`            | List of the definition's type           |
+| `[...] @_`              | Match and discard                       |
+| `@x :: str`             | Source text, preserving `?`/`*`/`+`     |
+| `@x :: bool`            | Presence boolean                        |
+| `@x :: T`               | Custom type name                        |
 
 ---
 
@@ -553,7 +558,7 @@ patterns follow regex escaping rules.
 - `(MISSING identifier)` — matches a specific missing token kind
 - `(MISSING ";")` — matches a missing anonymous token
 
-Both match as leaves: a missing node is a zero-width token, so neither
+Both match as leaves: a missing node has an empty source range, so neither
 `ERROR` nor `MISSING` accepts children. Because error recovery only ever inserts
 tokens, a `(MISSING kind)` argument must name a leaf token — a kind with children
 like `(MISSING binary_expression)` can never match and is rejected at compile time.
@@ -615,7 +620,9 @@ decorator: (decorator)* @decorators   ; repeats the whole field
 value: [A: (x) B: (y)] @kind          ; captures the field (containing the alternation)
 ```
 
-This allows repeating fields (useful for things like decorators in JavaScript). The capture still correctly produces the value's type — for alternations, you get the enum, not a raw node.
+This allows repeating fields (useful for things like decorators in JavaScript).
+The capture still produces the field value's inferred type. A labeled
+alternation therefore produces its variant type, not a raw node.
 
 ### Negated Fields
 
@@ -657,13 +664,13 @@ Output types:
 { decorators: [Node, ...Node[]] }
 ```
 
-The `+` quantifier always produces non-empty arrays — no opt-out.
+The `+` quantifier always produces a non-empty list — no opt-out.
 
-Plotnik also supports lazy variants: `*?`, `+?`, `??`
+Plotnik also supports lazy forms: `*?`, `+?`, `??`
 
-A repeat iteration must consume input. When the element can itself match
+A repeat iteration must consume a syntax-tree node. When the element can itself match
 zero nodes — a reference to a definition rooted at `?`, or an alternation
-with an optional branch — only its consuming matches become elements:
+with an optional alternative — only its node-consuming matches become elements:
 
 ```
 A = (expression_statement (identifier) @id)? @x
@@ -672,7 +679,7 @@ Q = (program (A)* @xs)    ; xs collects one row per real match;
                           ; collected as { x: null } rows
 ```
 
-`(A)+` likewise requires at least one real match; a zero-width outcome never
+`(A)+` likewise requires at least one real match; an empty outcome never
 satisfies it.
 
 ---
@@ -749,16 +756,16 @@ interface Section {
 
 Match alternatives with `[...]`:
 
-- **Union** (no branch labels): Fields merge across branches
-- **Enum** (with branch labels): Discriminated union
+- An **unlabeled alternation** merges result fields from its alternatives.
+- A **labeled alternation** names the cases of a variant value.
 
-A branch that can match zero nodes (`[(a)? (b)]`) succeeds zero-width only
-as a last resort: every branch's consuming match, at any candidate position,
-is preferred first. The zero-width outcome needs no candidate at all — it
+An alternative that can match zero nodes (`[(a)? (b)]`) succeeds empty only
+as a last resort: every alternative's node-consuming match, at any candidate
+position, is preferred first. The empty outcome needs no candidate at all — it
 matches even in an empty parent — and leaves the cursor in place for any
-following pattern. In a union it yields every merged field at its default
-(`null`, or `[]` for a required list); in an enum it tags the variant with a
-defaulted payload.
+following pattern. In an unlabeled alternation it yields every merged field at
+its fallback (`null`, `[]`, or `false`); in a labeled alternation it selects a
+case whose payload fields use the same fallbacks.
 
 ```
 [
@@ -767,11 +774,14 @@ defaulted payload.
 ] @value
 ```
 
-### Union Style
+### Unlabeled Alternations
 
-Captures merge: present in all branches → required; some branches → nullable (`T | null`, always present). Same-name captures must have compatible types.
+Captures merge: a field produced by every alternative is required; a field
+produced by only some alternatives receives its fallback. Same-name captures
+must have compatible types.
 
-Branches must be type-compatible. Bare nodes are auto-promoted to single-field structs when mixed with structured branches.
+Alternatives must be type-compatible. A direct capture contributes its result
+field alongside fields from structured alternatives.
 
 ```
 (statement
@@ -784,10 +794,10 @@ Branches must be type-compatible. Bare nodes are auto-promoted to single-field s
 Output type:
 
 ```typescript
-{ left: Node | null, func: Node | null }  // each appears in one branch only
+{ left: Node | null, func: Node | null }  // each appears in one alternative only
 ```
 
-When the same capture appears in all branches:
+When the same capture appears in every alternative:
 
 ```
 [
@@ -801,7 +811,7 @@ Output type:
 ```typescript
 {
   name: Node;
-} // required: present in all branches, same type
+} // required: present in every alternative with the same type
 ```
 
 Mixed presence:
@@ -815,12 +825,13 @@ Mixed presence:
 ]
 ```
 
-The second branch `(identifier) @x` is auto-promoted to a structure `{ x: Node }`, making it compatible with the first branch.
+The second alternative `(identifier) @x` contributes the same `x` field as the
+first alternative.
 
 Output type:
 
 ```typescript
-{ x: Node, y: Node | null }  // x in all branches (required), y in one (nullable)
+{ x: Node, y: Node | null }  // x in every alternative; y in one
 ```
 
 Type mismatch is an error:
@@ -829,7 +840,8 @@ Type mismatch is an error:
 [(identifier) @x :: Foo (number) @x :: Bar]  // ERROR: @x has different types
 ```
 
-With a capture on the alternation itself, the type is non-optional since exactly one branch must match:
+With a capture on the alternation itself, the type is non-optional because one
+alternative must match:
 
 ```
 [
@@ -846,9 +858,10 @@ Output type:
 }
 ```
 
-### Enum Style
+### Labeled Alternations
 
-Labels create a discriminated union (`$tag` + `$data`):
+Labels name cases of a variant type. TypeScript renders the variant as a
+discriminated union; JSON uses `$tag` and, for payload-bearing cases, `$data`:
 
 ```
 [
@@ -863,13 +876,22 @@ type Stmt =
   | { $tag: "Call"; $data: { func: Node } };
 ```
 
-The tags materialize when the alternation's value is **consumed**: captured (`[...] @x`), row-captured (`[...]* @xs`), or used as a definition body (`Expr = [...]`). A labeled alternation nothing consumes has no value to tag — it degrades to a plain union (captures bubble as optional fields) and the compiler warns that the labels have no effect.
+The cases materialize when the alternation produces a value: when it is
+captured (`[...] @x`), collected (`[...]* @xs`), or used as a definition body
+(`Expr = [...]`). If no surrounding construct materializes the alternation,
+its captures merge into the enclosing record and the compiler warns that the
+labels have no output effect.
 
-A branch with no captures becomes a tag-only variant (`{ $tag: "..." }`, no `$data`) — tags-only enums are legitimate when which branch matched is all you want. A bare reference as a branch body is also tag-only; capture it (`[Call: (Inner) @data]`) to carry the definition's value.
+An alternative with no captures becomes a no-payload case (`{ $tag: "..." }`,
+with no `$data`). A variant containing only such cases is useful when the case
+identity is the result. A bare reference as an alternative body is also
+no-payload; capture it (`[Call: (Inner) @data]`) to carry the definition's
+value.
 
 ### Alternation Type Names
 
-A captured union that produces a structure gets a generated path name like any other composite; annotate to override it:
+A captured alternation that produces a record gets a generated path name like
+any other composite; use a capture type to override it:
 
 ```
 Q = (call_expression
@@ -983,7 +1005,7 @@ A **trailing anchor** combines with the leading interpretation rather than overr
 
 When `@a` is skipped, `@b` must be both the first child (leading anchor) and the last child (trailing anchor) — so only `debugger;` alone matches, while `foo; debugger;` (not first) and `debugger; foo;` (not last) do not.
 
-### Anchors Over Zero-Width Matches
+### Anchors Over Empty Matches
 
 When every item in a child list is optional and none of them matches, there is no matched child for an anchor to bind to. A leading or trailing anchor then degrades to an assertion about the node itself: it has no children the anchor's skip policy would reject — none beyond trivia for `.`, none at all for `.!` (the policy is chosen the same way as between siblings). When both anchors are present, the stricter one applies.
 
@@ -1036,21 +1058,21 @@ Q = {(a) .}                ; sequence boundary without parent
 Q = [(a) . (b)]            ; directly in alternation
 ```
 
-To anchor within alternation branches, wrap in a sequence:
+To anchor within alternatives, wrap the anchored patterns in a sequence:
 
 ```
-Q = [{(a) . (b)} (c)]      ; valid: anchor inside sequence branch
+Q = [{(a) . (b)} (c)]      ; valid: anchor inside a sequence alternative
 ```
 
 The rules:
 
 - **Boundary anchors** (at start/end of sequence) need a parent named node to provide first/last child or adjacent sibling semantics
 - **Interior anchors** (between items in a sequence) are always valid because both sides are explicitly defined
-- **Alternations** cannot contain anchors directly — anchors must be inside a branch expression
+- **Alternations** cannot contain anchors directly — anchors must be inside an alternative's sequence
 
 ---
 
-## Named Expressions
+## Definitions
 
 Define reusable patterns:
 
@@ -1070,12 +1092,12 @@ Use as node kinds:
 
 **Encapsulation**: `(Name)` matches but extracts nothing. Capture the reference to get the definition's typed result — `(BinaryOp) @expr` above produces `{ expr: BinaryOp }` where `BinaryOp` is `{ left: Node, op: Node, right: Node }`. This separates structural reuse from data extraction, and it means extracting a pattern into a definition never silently changes your output.
 
-Named expressions define both pattern and type. A capture-less single-node
-definition matches structurally and produces no data; capture the root node
-when the definition is meant to carry a value:
+Definitions name both a reusable pattern and, when the body produces a value,
+its result type. A match-only single-node definition produces no data; capture
+the root node when the definition should carry a value:
 
 ```
-Expr = [(identifier) (number)] ; void: structural only
+Expr = [(identifier) (number)] ; match-only: structural only
 ExprNode = [(identifier) (number)] @expr ; returns { expr: Node }
 (statement (Expr))     ; matches any statement containing an Expr, no output
 ```
@@ -1084,7 +1106,7 @@ ExprNode = [(identifier) (number)] @expr ; returns { expr: Node }
 
 ## Recursion
 
-Named expressions can self-reference:
+Definitions can reference themselves:
 
 ```
 NestedCall =
@@ -1095,7 +1117,7 @@ NestedCall =
 
 Matches `a()`, `a()()`, `a()()()`, etc. → `{ name: Node | null, inner: NestedCall | null }`
 
-Enum recursive example:
+Recursive variant example:
 
 ```
 MemberChain = [
@@ -1149,7 +1171,8 @@ export type Expression =
   | { $tag: "Str"; $data: { value: Node } };
 ```
 
-Enums render as one multi-line union with inline variants — variant payloads never get standalone declarations.
+Variant types render as one multi-line TypeScript union with inline cases; case
+payloads never get standalone declarations.
 
 ---
 
@@ -1158,7 +1181,7 @@ Enums render as one multi-line union with inline variants — variant payloads n
 | Feature              | Tree-sitter        | Plotnik                     |
 | -------------------- | ------------------ | --------------------------- |
 | Capture              | `@name`            | `@name` (snake_case only)   |
-| Suppressive capture  |                    | `@_` or `@_name`            |
+| Discard              |                    | `@_` or `@_name`            |
 | Capture type         |                    | `@x :: str`, `bool`, or `T` |
 | Named node           | `(type)`           | `(type)`                    |
 | Anonymous node       | `"text"`           | `"text"`                    |
@@ -1170,12 +1193,12 @@ Enums render as one multi-line union with inline variants — variant payloads n
 | Lazy                 |                    | `??` `*?` `+?`              |
 | Sequence             | `((a) (b))`        | `{(a) (b)}`                 |
 | Alternation          | `[a b]`            | `[a b]`                     |
-| Enum alternation     |                    | `[A: (a) B: (b)]`           |
+| Labeled alternation  |                    | `[A: (a) B: (b)]`           |
 | Anchor               | `.`                | `.` soft, `.!` exact        |
 | Predicate            | `(#eq? @x "foo")`  | `(node == "foo")`           |
 | Regex predicate      | `(#match? @x "p")` | `(node =~ /p/)`             |
-| Named expression     |                    | `Name = pattern`            |
-| Use named expression |                    | `(Name)`                    |
+| Definition           |                    | `Name = pattern`            |
+| Definition reference |                    | `(Name)`                    |
 
 ---
 

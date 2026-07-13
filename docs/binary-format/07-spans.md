@@ -1,8 +1,8 @@
 # Spans Section
 
 The Spans section stores query-side inspection metadata. Runtime span effects
-refer to entries by index; the playground joins those ids to source hulls,
-output paths, type/member bindings, and trace records.
+refer to entries by index; the playground joins those ids to source spans,
+result paths, type/member bindings, and trace records.
 
 ## Entry Layout
 
@@ -24,25 +24,24 @@ rejected at load.
 
 ## Kinds
 
-| Value | Name           |
-| ----- | -------------- |
-| 0     | `def`          |
-| 1     | `ref`          |
-| 2     | `pattern`      |
-| 3     | `capture`      |
-| 4     | `field`        |
-| 5     | `neg_field`    |
-| 6     | `predicate`    |
-| 7     | `quantifier`   |
-| 8     | `sequence`     |
-| 9     | `union`        |
-| 10    | `enum`         |
-| 11    | `branch`       |
-| 12    | `capture_type` |
+| Value | Name                    |
+| ----- | ----------------------- |
+| 0     | `def`                   |
+| 1     | `ref`                   |
+| 2     | `pattern`               |
+| 3     | `capture`               |
+| 4     | `field`                 |
+| 5     | `neg_field`             |
+| 6     | `predicate`             |
+| 7     | `quantifier`            |
+| 8     | `sequence`              |
+| 9     | `unlabeled_alternation` |
+| 10    | `labeled_alternation`   |
+| 11    | `alternative`           |
+| 12    | `capture_type`          |
 
-`capture_type` covers `:: T`, `:: str`, or `:: bool`. Renaming the language
-concept did not renumber the closed span-kind vocabulary: it remains value 12.
-`neg_field` and `predicate` are reserved for
+`capture_type` covers `:: T`, `:: str`, or `:: bool`. `neg_field` and
+`predicate` are reserved for
 inspection detail; v11 loaders accept the kind values, but the compiler does
 not emit them yet.
 
@@ -64,17 +63,17 @@ cursor-preserving epsilon chains.
 
 Scalar capture types contribute their exact runtime provenance independently
 of inspection-detail spans. While a capture span is open, its scalar marks are
-folded into an optional byte-range hull: a present string highlights precisely
+folded into an optional source span: a present string highlights precisely
 the text it returns, a present boolean may carry its matched range, and
 `null`/fallback `false` has no invented range. A real zero-byte node retains a
-real zero-width hull. This remains exact even when lower-priority pattern spans
+real empty span. This remains exact even when lower-priority pattern spans
 are degraded away.
 
 Construction-time effect-stack validation tracks span depth, including inside
 suppression scopes, so malformed bytecode with unbalanced span brackets is
 rejected before execution. Span effects are still recorded under runtime
 suppression: a bare `(Foo)` reference suppresses `Foo`'s output values but not
-its inspection hull.
+its inspection source span.
 
 ## Degradation
 

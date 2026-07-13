@@ -11,15 +11,15 @@ when the VM target is explicitly selected.
 result their body produces, but they do not implicitly capture the matched
 root node. Four constructs produce or name output:
 
-| Syntax      | Output                                       |
-| ----------- | -------------------------------------------- |
-| `@name`     | A field in the enclosing scope               |
-| `Def = ...` | A named type for the body's result           |
-| `Label:`    | An enum variant (when the value is consumed) |
-| `:: type`   | A built-in or custom capture type            |
+| Syntax      | Output                                               |
+| ----------- | ---------------------------------------------------- |
+| `@name`     | A field in the enclosing scope                       |
+| `Def = ...` | A named type for the body's result                   |
+| `Label:`    | A variant case when the alternation produces a value |
+| `:: type`   | A built-in or custom capture type                    |
 
 Everything else — nested node patterns, sequences, references, anchors,
-predicates — is structural unless one of those output positions consumes it.
+predicates — is structural unless one of those output positions materializes it.
 To return the root node of a definition, capture it explicitly.
 
 ## Definitions Are Types
@@ -45,22 +45,22 @@ export interface Item {
 - A **bare reference** `(Item)` matches the definition's pattern and discards
   its output — silently, by design. Use it for purely structural constraints.
 - A **captured reference** `(Item) @x` produces the definition's result type.
-  If the definition is void, the capture is rejected because there is no value
+  If the definition is match-only, the capture is rejected because there is no value
   to bind.
 - This is uniform for recursive and non-recursive definitions, so extracting a
   pattern into a definition never silently changes your output shape — you
   always say `@x` where you want the value.
 
-### Capture-Less Definitions
+### Match-Only Definitions
 
-A definition whose body produces no output is void:
+A definition whose body produces no output is match-only:
 
 - A single node root — named, anonymous, wildcard, with fields, predicates, or
   anchors — matches structurally and returns no data.
-- A plain union of capture-less node branches also returns no data.
-- A sequence root is void because no output syntax consumes it.
-- A labeled alternation is unchanged: branch labels are explicit output
-  syntax, and tag-only variants remain tag-only.
+- An unlabeled alternation of match-only node alternatives also returns no data.
+- A sequence root is match-only because no output syntax materializes it.
+- A labeled alternation used as a definition body produces a variant value;
+  no-payload cases remain no-payload.
 - A `?`, `*`, or `+` root returns the optional/list container described below.
 
 Captures define the result; there is no hybrid `{ $node, ... }` output.
@@ -74,25 +74,24 @@ Pair = {(identifier) (number)}              ; Pair = undefined
 Named = (program (identifier) @id)          ; Named = { id: Node }
 ```
 
-A definition is **void** when its body produces no output:
+A definition is **match-only** when its body produces no output:
 
 ```
 Id = (identifier) @id
-Foo = (function_declaration name: (Id)) ; bare ref only → Foo is void
+Foo = (function_declaration name: (Id)) ; bare ref only → Foo is match-only
 ```
 
 ```typescript
 export interface Id { id: Node; }
-export type Foo = undefined;              ; matches or not — no data
+export type Foo = undefined;              ; TypeScript representation of match-only output
 ```
 
 There is no pure type aliasing: `Foo = (Id)` does not re-export `Id`'s type.
 
 ### Quantifier-Rooted Definitions
 
-The definition name is a consuming position — exactly as it is for labeled
-alternations. A quantifier standing as the whole body collects into the
-definition's own output, which is the container itself:
+A definition body is a result boundary. A quantifier standing as the whole
+body therefore becomes the definition's result container:
 
 ```
 Ids = (identifier)*          ; Ids = Node[]
@@ -114,7 +113,7 @@ definition under a call-site `?` nests: `(MaybeId)? @x` → `x: MaybeId | null`
 (both nulls print the same in JSON).
 
 Containers never mint type names — names come only from definitions,
-captures, custom capture types, and variant tags. So the element must already be
+captures, custom capture types, and variant cases. So the element must already be
 a nameable type: a plain node, or a reference. An anonymous element shape is
 rejected; name it in its own definition:
 
@@ -127,11 +126,11 @@ Good = (Row)*                     ; Good = Row[]
 Two consequences:
 
 - A definition whose root is `*` or `?` can match zero nodes, but a repeat
-  iteration must consume input — so repeating a reference to it
+  iteration must consume a syntax-tree node — so repeating a reference to it
   (`(MaybeId)*`) is rejected: the wrapper's empty case could never occur
   under the repeat, and the intent is clearer with the quantifier in one
   place.
-- A quantifier-rooted definition is a fragment, not an entrypoint. To run it,
+- A quantifier-rooted definition is a fragment, not an entry point. To run it,
   nest it under a one-node root and capture the collection:
   `Q = (program (identifier)* @items)`.
 
@@ -156,10 +155,10 @@ Transparent (captures bubble through):
 
 Boundaries (a new scope starts):
 
-- **Captured sequences** `{...} @x` → nested struct
-- **Captured alternations** `[...] @x` → union struct or enum
+- **Captured sequences** `{...} @x` → nested record
+- **Captured alternations** `[...] @x` → merged record or variant value
 - **Definitions** — references are opaque (see above)
-- **Suppression** `@_` — discards the whole subtree's output
+- **Discard** `@_` — discards the whole subtree's output
 
 ```
 {
@@ -172,7 +171,7 @@ A captured sequence _without_ internal captures is only meaningful when it
 matches exactly one node — the capture takes that node (`{(a)} @x` ≡
 `(a) @x`). See the multi-node rule below.
 
-## Strict Dimensionality
+## Repeated Captures Need an Item Boundary
 
 Two rules keep repetition and captures honest:
 
@@ -189,7 +188,7 @@ collects one nullable row; `@_` discards:
 (func (id) @name)? @fn            ; OK: fn: { name: Node } | null
 ```
 
-**2. A capture needs exactly one node or a value.** A void pattern under a
+**2. A capture needs exactly one node or a value.** A match-only pattern under a
 capture must match exactly one node — several, or possibly none, and there is
 no single node to bind. Both directions fail for the same reason:
 
@@ -197,8 +196,8 @@ no single node to bind. Both directions fail for the same reason:
 {(a) (b)} @x                      ; ERROR: two nodes — which one is x?
 {(a)+} @x                        ; ERROR: a variable run of nodes
 {(a)?} @x                        ; ERROR: possibly no node at all
-[(a)+ (b)] @x                    ; ERROR: one branch is a run
-(SeqDef) @x                       ; ERROR when SeqDef is void
+[(a)+ (b)] @x                    ; ERROR: one alternative is a run
+(SeqDef) @x                       ; ERROR when SeqDef is match-only
 ```
 
 Greedy versus lazy preference never matters here: `?` and `??` (and
@@ -209,8 +208,8 @@ The fix is always to say what you mean: capture individual nodes inside the
 group, capture the quantifier directly (`(a)+ @xs` → a list), or capture
 nothing.
 
-References are opaque, so quantifying one is dimensionally simple — the
-definition's _type_ is the element, no matter how many captures it contains:
+References are opaque, so a quantified reference already has an item boundary:
+the definition's _type_ is the element, no matter how many captures it contains:
 
 ```
 Item = (pair key: (_) @k value: (_) @v)
@@ -218,18 +217,18 @@ Item = (pair key: (_) @k value: (_) @v)
 (Item)*                           ; OK: structural repeat, no output
 ```
 
-### Scalar Lists vs Row Lists
+### Node Lists vs Record Lists
 
 ```
-(identifier)* @ids                ; scalar list: ids: Node[]
-{(a) @a (b) @b}* @rows            ; row list:   rows: { a: Node, b: Node }[]
-(Item)+ @items                    ; ref list:   items: [Item, ...Item[]]
+(identifier)* @ids                ; node list:   ids: Node[]
+{(a) @a (b) @b}* @rows            ; record list: rows: { a: Node, b: Node }[]
+(Item)+ @items                    ; reference list: items: [Item, ...Item[]]
 ```
 
 ### Optional Rows
 
-A captured optional group is one nullable row — the `?` counterpart of a `*`
-row list:
+A captured optional group is one optional record — the `?` counterpart of a
+record list:
 
 ```
 {(modifier) @mod (decorator) @dec}? @attrs
@@ -241,12 +240,12 @@ and a skip yields `attrs: null`, never a hollow `{ mod: null, dec: null }`.
 A quantified named node collects the same way: `(pair (key) @k)? @p` gives
 `p: { k: Node } | null`, mirroring `(pair (key) @k)* @ps` rows.
 
-There is no uncaptured fallback (dimensionality rule 1): a bare
+There is no uncaptured fallback (the item-boundary rule): a bare
 `{(mod) @mod (dec) @dec}?` would scatter correlated nulls into the enclosing
 scope as independently-optional fields — a type that permits states the match
 can never produce. For a single optional node with no wrapper, put the capture
 on the quantifier: `(decorator)? @dec` → `dec: Node | null`. To match
-structurally and drop the captures, suppress: `{...}? @_`.
+structurally and drop the captures, discard them: `{...}? @_`.
 
 ### Null, Not Absent
 
@@ -265,27 +264,27 @@ The output shape is stable; consumers never guard for `undefined`.
 | `(A)+ @a` | `a: [T, ...T[]]` | one or more  |
 
 `T` is `Node` for plain patterns, the definition's type for references, the
-row struct for captured groups, the enum for labeled alternations.
+record for captured groups, or the variant type for labeled alternations.
 
 ## Alternations
 
-`[...]` matches one of several branches. Its output form depends on labels
-_and consumption_.
+`[...]` matches one of several alternatives. Labels affect the result only
+when the alternation produces a value.
 
-### Unions (no labels)
+### Unlabeled Alternations
 
-Branch captures merge into one struct, one level deep:
+Captures from the alternatives merge into one record, one level deep:
 
-- A capture present in **all** branches → required field.
-- A capture present in **some** branches → `T | null`.
-- A missing **list** in a branch → `[]`, not null.
-- The same capture must have the same type in every branch; a mismatch is an
-  error (`capture @x has incompatible types across branches`). Cardinality
+- A capture present in **every** alternative → required field.
+- A capture present in **some** alternatives → its fallback (`null`, `[]`, or `false`).
+- A missing **list** in an alternative → `[]`, not `null`.
+- The same capture must have the same type in every alternative; a mismatch is an
+  error (`capture @x has incompatible types across alternatives`). Cardinality
   counts: a `+` list and a `*` list do not unify.
-- A branch that is a bare node beside struct branches is fine — it simply
+- A bare node beside record-producing alternatives is fine — it simply
   contributes no fields (or its own capture, if any).
-- A branch that is a bare reference is a structural alternative: it
-  contributes nothing to the merged struct.
+- A bare reference is a structural alternative: it
+  contributes nothing to the merged record.
 
 ```
 [
@@ -295,21 +294,22 @@ Branch captures merge into one struct, one level deep:
 → { x: Node, y: Node | null }
 ```
 
-A capture on the alternation itself takes the branch's value; for all-scalar
-branches that's the matched node:
+A capture on the alternation itself takes the selected alternative's value;
+when every alternative is a single match-only node pattern, that value is the
+matched node:
 
 ```
 [(identifier) (number)] @value    → { value: Node }
 ```
 
-### Enums (labels + consumption)
+### Labeled Alternations
 
-Branch labels prepare a tagged enum. The tags materialize when the
-alternation's value is **consumed** — captured, row-captured, or used as a
-definition body:
+Alternative labels name cases of a variant type. The cases materialize when
+the alternation produces a value — when it is captured, collected, or used as
+a definition body:
 
 ```
-Expr = [                          ; def body root: consumed
+Expr = [                          ; definition body produces a value
   Lit: (number) @value
   Neg: (unary_expression (Expr) @inner)
 ]
@@ -321,14 +321,14 @@ export type Expr =
   | { $tag: "Neg"; $data: { inner: Expr } };
 ```
 
-Variant payloads come from the branch's bubbling captures:
+Case payloads come from the selected alternative's bubbling captures:
 
-- Captures → `$data` is an anonymous struct (always inlined, never a named
+- Captures → `$data` is an anonymous record (always inlined, never a named
   standalone type).
-- No captures → the variant is tag-only and omits `$data` entirely. Tags-only
-  enums are legitimate — sometimes which branch matched _is_ the data.
-- A bare reference (or `@_`) as branch body → tag-only variant.
-  `[Call: (Inner)]` tags the branch; `[Call: (Inner) @data]` also carries the
+- No captures → the case has no payload and omits `$data` entirely. A variant
+  may contain only no-payload cases when the case identity is the result.
+- A bare reference (or `@_`) as an alternative body → no-payload case.
+  `[Call: (Inner)]` tags the case; `[Call: (Inner) @data]` also carries the
   value.
 
 ```
@@ -336,48 +336,47 @@ Variant payloads come from the branch's bubbling captures:
 → kind: { $tag: "Stmt" } | { $tag: "Decl" }
 ```
 
-### Degradation
+### Labels Without a Result Value
 
-A labeled alternation that nothing consumes cannot tag anything — there is no
-value to put the tag on. It **degrades to a plain union** (captures bubble as
-optional fields) and the compiler warns:
+A labeled alternation that no surrounding construct materializes has no value
+to tag. Its captures merge into the enclosing record as they do for an
+unlabeled alternation, and the compiler warns:
 
 ```
 (program [A: (expression_statement) @e  B: (debugger_statement) @d])
 ```
 
 ```
-warning: branch labels have no effect without capture
-help: capture the alternation (`[...] @name`) to make the labels enum
-      variants, or remove them
+warning: alternative labels have no output effect here
+help: capture the alternation (`[...] @name`) to make its labels produce
+      variant cases, or remove them
 → { e: Node | null, d: Node | null }
 ```
 
-Mixing labeled and unlabeled branches in one `[...]` is an error.
+Mixing labeled and unlabeled alternatives in one `[...]` is an error.
 
-## Suppression: `@_`
+## Discards: `@_`
 
-`@_` (or `@_name` — the name is documentation) consumes a pattern's output and
-discards all of it. The subtree matches structurally; captures inside it are
-inert, labels stay meaningful but produce nothing, and no degradation warning
-fires — you said "discard all of it":
+`@_` (or `@_name` — the name is documentation) discards a pattern's result.
+The subtree matches structurally; captures inside it are inert, labels remain
+valid but produce nothing, and no unused-label warning fires:
 
 ```
 (program [A: (expression_statement) B: (debugger_statement)] @_)
 → matches, output is null; no warning
 ```
 
-Suppressed captures never collide with real ones: a `@x` inside a suppressed
+Discarded captures never collide with returned ones: a `@x` inside a discarded
 subtree does not touch a `@x` outside it. Quantifiers under `@_` carry no
-dimensionality demands — nothing is collected, so nothing can be lost.
+item-boundary requirement — nothing is collected, so nothing can be lost.
 
 ## Recursion
 
 Definitions can reference themselves (or each other) when every cycle both
-**escapes** and **consumes**:
+**escapes** and **descends**:
 
-1. **Escape**: some branch must terminate without recursing.
-2. **Consumption**: each pass around the cycle must descend into a child.
+1. **Escape**: some alternative must terminate without recursing.
+2. **Descent**: each pass around the cycle must descend into a child.
 
 ```
 Loop = (Loop)
@@ -385,11 +384,11 @@ Loop = (Loop)
 
 A = [X: (identifier) @i  Y: (B) @b]
 B = (A)
-; ERROR: infinite recursion: cycle consumes no input
+; ERROR: infinite recursion: cycle never descends into a child
 
 A = (parenthesized_expression (B))
 B = (array (A))
-; ERROR: no escape path — descending is not enough, some branch must terminate
+; ERROR: no escape path — descending is not enough, some alternative must terminate
 
 MemberChain = [
   Base: (identifier) @name
@@ -406,7 +405,7 @@ export type MemberChain =
   | { $tag: "Access"; $data: { object: MemberChain; property: Node } };
 ```
 
-A recursive reference in a union works the same way:
+A recursive reference in an unlabeled alternation works the same way:
 
 ```
 NestedCall = (call_expression
@@ -432,17 +431,17 @@ and preserves its existing containers:
 | `Node \| null`    | `string \| null`    |
 | `Node[]`          | `string[]`          |
 | nonempty `Node[]` | nonempty `string[]` |
-| struct/enum       | `string` (warning)  |
+| record/variant    | `string` (warning)  |
 
-Array items keep distinct ranges; trivia between items belongs to neither.
-A structured value uses the hull from its first contributing node to its last.
-An admitted zero-node value is `null`, while a real zero-byte node is the
+List items keep distinct ranges; trivia between items belongs to neither.
+A composite value uses the smallest source span containing its contributing
+nodes. An admitted empty value is `null`, while a real zero-byte node is the
 present empty string `""`.
 
 A capture on a non-leaf node replaces only that capture's `Node` value. Child
 captures that bubble independently into the enclosing scope remain ordinary
-fields. By contrast, converting a captured sequence or enum replaces the
-structured data it owns and warns once at the written capture type.
+fields. By contrast, converting a captured sequence or labeled alternation
+replaces the composite data it owns and warns once at the written capture type.
 
 ### Built-in `bool`
 
@@ -454,30 +453,30 @@ present -> true
 ```
 
 An optional non-boolean value becomes `boolean`. Nested optionals collapse to
-one boolean. A required node, list, struct, or enum is rejected because the
-result would always be `true`, unless that exact field is omitted by an
-enclosing union branch. In that case the capture observes branch presence and
-the omitted branch receives `false`, not `null`. `bool` never means `any()` and
-does not map list elements.
+one boolean. A required node, list, record, or variant is rejected because the
+result would always be `true`, unless an alternative omits that exact field. In
+that case the capture observes alternative presence and the omitted alternative
+receives `false`, not `null`. `bool` never means `any()` and does not map list
+elements.
 
 ### Custom capture types
 
 PascalCase capture types assign nominal names without changing the underlying
 value. `str` and `bool` are the only lowercase built-ins; `:: Str` and
 `:: Bool` are custom names. A custom name may name a captured node or a
-structured shape; it cannot name the result of a built-in capture type because
+composite shape; it cannot name the result of a built-in capture type because
 each capture has only one capture-type position.
 
 ## Type Naming
 
-Every structured type gets its name at compile time. Names are deterministic
+Every named result type gets its name at compile time. Names are deterministic
 and complete in the bytecode.
 
 ### Path Names
 
 A definition's result is named after the definition. Composite types created
 by captures are named `{ParentTypeName}{PascalCase(field)}`, following the
-capture path; arrays and optionals are transparent (the name lands on the
+capture path; lists and options are transparent (the name lands on the
 element):
 
 ```
@@ -500,9 +499,9 @@ export interface Foo {
 }
 ```
 
-Enum variant payloads are anonymous (inlined), so they take no name; a
+Variant case payloads are anonymous (inlined), so they take no name; a
 composite _inside_ a payload field is named
-`{EnumName}{VerbatimLabel}{PascalCase(field)}`:
+`{VariantName}{VerbatimLabel}{PascalCase(field)}`:
 
 ```
 Q = (program [
@@ -569,11 +568,11 @@ On a plain node capture, `:: Name` declares a named alias:
 
 ## TypeScript Rendering
 
-- Structs render as named `interface`s.
-- Enums render as one multi-line union literal with inline variants — variant
+- Records render as named `interface`s.
+- Variant types render as one multi-line union literal with inline cases; case
   payloads never get standalone declarations.
-- Void queries render as `export type Q = undefined;` — the query matches or
-  not, and carries no data.
+- Match-only queries render as `export type Q = undefined;` — the query matches
+  or not, and carries no data.
 - Optional fields are `T | null` (always present), non-empty lists are
   `[T, ...T[]]`.
 

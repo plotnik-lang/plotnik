@@ -23,7 +23,7 @@ Type system metadata for code generation and runtime validation. Describes the s
 
 ### Node Semantics
 
-The `Node` type represents a platform-dependent handle to a tree-sitter AST node:
+The `Node` type represents a platform-dependent handle to a tree-sitter syntax-tree node:
 
 | Context    | Representation                                                         |
 | :--------- | :--------------------------------------------------------------------- |
