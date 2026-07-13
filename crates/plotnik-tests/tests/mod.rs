@@ -541,14 +541,14 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
         execution_trace_json.push('\n');
 
         let output = match result {
-            Ok(effects) => {
+            Ok(journal) => {
                 // The verified variant (not plain `materialize`) so a type-unsound emission
                 // panics the fixture in debug; the check compiles out under `--release`.
                 let value = materialize_verified(
                     scenario.source,
                     scenario.module,
                     &entry_point,
-                    effects.as_slice(),
+                    journal.output_events(),
                     Colors::new(false),
                 );
                 value.format(true, Colors::new(false))
@@ -578,10 +578,9 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
     let result = vm.execute_with(scenario.module, &entry_point, &mut tracer);
     let trace = tracer.render();
     let (output, inspection) = match result {
-        Ok(effects) => {
+        Ok(journal) => {
             let inspection = (inspection == InspectionPolicy::Include).then(|| {
-                let result_provenance =
-                    extract_result_provenance(effects.as_slice(), scenario.module);
+                let result_provenance = extract_result_provenance(&journal, scenario.module);
                 let mut rendered = serde_json::to_string_pretty(&result_provenance)
                     .expect("result provenance serialization cannot fail");
                 rendered.push('\n');
@@ -593,13 +592,13 @@ fn run_vm(scenario: VmScenario<'_>) -> Result<VmArtifacts, String> {
                 scenario.source,
                 scenario.module,
                 &entry_point,
-                effects.as_slice(),
+                journal.output_events(),
                 Colors::new(false),
             );
             (value.format(true, Colors::new(false)), inspection)
         }
         Err(RuntimeError::NoMatch) => ("<no match>".to_string(), None),
-        // A no-match is a real outcome worth pinning; step/memory exhaustion is
+        // A no-match is a real outcome worth pinning; fuel/memory exhaustion is
         // not — fail the trial rather than accept a resource limit as golden output.
         Err(err) => return Err(format!("VM run failed for `{}`: {err}", scenario.entry)),
     };

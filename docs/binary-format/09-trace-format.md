@@ -61,7 +61,7 @@ Scalar capture types use the same effect sub-lines. Their stable spellings are
 `BoolValue(false)` / `BoolValue(true)`. A scalar mark's node is available to structured trace and
 inspection output even though the concise text trace prints only the effect
 name. Backtracking truncates marks and restores scalar-frame depth with the
-rest of the checkpointed trace.
+rest of the checkpointed match journal.
 
 ## Example
 

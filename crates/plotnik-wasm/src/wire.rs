@@ -66,9 +66,9 @@ pub fn result_json(
         Ok(journal) => {
             let colors = Colors::new(false);
             let result =
-                materialize_verified(source, module, entry_point, journal.as_slice(), colors);
-            let result_provenance = (!module.spans().is_empty())
-                .then(|| extract_result_provenance(journal.as_slice(), module));
+                materialize_verified(source, module, entry_point, journal.output_events(), colors);
+            let result_provenance =
+                (!module.spans().is_empty()).then(|| extract_result_provenance(&journal, module));
             json!({
                 "result": json_value!(result),
                 "result_provenance": json_value!(result_provenance),

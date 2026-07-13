@@ -86,12 +86,12 @@ fn exercise_pipeline(module: &Module, source: &str) {
             .entry_point_at(i)
             .expect("entry_point_count bounds entry_point_at");
         let vm = VM::builder(source, &tree).build();
-        if let Ok(effects) = vm.execute(module, &entry) {
+        if let Ok(journal) = vm.execute(module, &entry) {
             let value = materialize_verified(
                 source,
                 module,
                 &entry,
-                effects.as_slice(),
+                journal.output_events(),
                 Colors::new(false),
             );
             let _ = value.format(false, Colors::new(false));

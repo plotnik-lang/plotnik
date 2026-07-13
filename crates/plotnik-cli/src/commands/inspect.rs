@@ -224,10 +224,15 @@ fn run_payload_from_result(
     match result {
         Ok(journal) => {
             let colors = Colors::new(false);
-            let result =
-                materialize_verified(source_code, module, entry_point, journal.as_slice(), colors);
-            let result_provenance = (!module.spans().is_empty())
-                .then(|| extract_result_provenance(journal.as_slice(), module));
+            let result = materialize_verified(
+                source_code,
+                module,
+                entry_point,
+                journal.output_events(),
+                colors,
+            );
+            let result_provenance =
+                (!module.spans().is_empty()).then(|| extract_result_provenance(&journal, module));
             RunPayload {
                 result: json_value!(result),
                 result_provenance: json_value!(result_provenance),

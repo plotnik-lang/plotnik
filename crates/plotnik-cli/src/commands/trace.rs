@@ -74,10 +74,10 @@ pub fn run(args: TraceArgs) -> CliResult {
         .colored(args.color)
         .build();
 
-    let effects = match vm.execute_with(&module, &entry_point, &mut tracer) {
-        Ok(effects) => {
+    let journal = match vm.execute_with(&module, &entry_point, &mut tracer) {
+        Ok(journal) => {
             tracer.print();
-            effects
+            journal
         }
         Err(RuntimeError::NoMatch) => {
             tracer.print();
@@ -103,7 +103,7 @@ pub fn run(args: TraceArgs) -> CliResult {
         &source_code,
         &module,
         &entry_point,
-        effects.as_slice(),
+        journal.output_events(),
         colors,
     );
 

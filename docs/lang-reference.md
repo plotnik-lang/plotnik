@@ -2,7 +2,7 @@
 
 Plotnik is a pattern-matching language for tree-sitter syntax trees. It extends [tree-sitter's query syntax](https://tree-sitter.github.io/tree-sitter/using-parsers/queries/1-syntax.html) with definitions, recursion, and static type inference.
 
-**Pattern.** A _pattern_ is a query matcher over the target syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A named-node pattern `(kind)` matches a named node; an anonymous-node pattern `"text"` matches a literal token; `_` is the node wildcard. Sequences, alternations, quantifiers, fields, and captures are also patterns.
+**Pattern.** A _pattern_ is a query matcher over the source syntax tree. Patterns nest — every pattern is built from sub-patterns — so the query AST is a tree of patterns (`Pattern`/`PatternKind`), mirroring rustc's `Pat`/`PatKind`. A named-node pattern `(kind)` matches a named node; an anonymous-node pattern `"text"` matches a literal token; `_` is the node wildcard. Sequences, alternations, quantifiers, fields, and captures are also patterns.
 
 Tree-sitter predicates (`#eq?`, `#match?`) and directives (`#set!`) are not supported. Plotnik has its own inline predicate syntax (see [Predicates](#predicates)).
 

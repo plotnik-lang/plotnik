@@ -183,5 +183,5 @@ pub fn no_result_arg() -> Arg {
     Arg::new("no_result")
         .long("no-result")
         .action(ArgAction::SetTrue)
-        .help("Skip materialization, show effects only")
+        .help("Skip materialization, show the execution trace only")
 }

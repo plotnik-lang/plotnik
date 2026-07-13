@@ -15,7 +15,9 @@ mod vm;
 // Navigation, checkpoints, frames, the match journal, and limits live in
 // `plotnik-rt`, shared with the generated-code backend; re-exported so the
 // crate-facing paths stay `vm::...`.
-pub use plotnik_rt::{JournalEvent, Limit, MatchJournal, ResolvedRuntimeLimits, RuntimeLimitSpec};
+pub use plotnik_rt::{
+    JournalEvent, Limit, MatchJournal, OutputEvents, ResolvedRuntimeLimits, RuntimeLimitSpec,
+};
 
 pub use error::RuntimeError;
 pub use execution_trace::{ExecutionTrace, TraceEvent, TraceNode, TraceRecord, TraceRecorder};

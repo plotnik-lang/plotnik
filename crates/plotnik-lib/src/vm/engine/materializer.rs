@@ -5,7 +5,7 @@ use crate::core::Colors;
 
 use super::value::{NodeValue, Value};
 use super::verify::debug_verify_type;
-use plotnik_rt::JournalEvent;
+use plotnik_rt::{JournalEvent, OutputEvents};
 
 pub struct ValueMaterializer<'a> {
     source: &'a str,
@@ -26,7 +26,7 @@ impl<'a> ValueMaterializer<'a> {
     }
 
     fn resolve_member_name(&self, idx: u16) -> &'a str {
-        // Effect payloads are validated at module load; out of bounds here is
+        // Journal event payloads are validated at module load; out of bounds here is
         // a loader bug, and the slice-index panic is the assertion.
         self.member_names[idx as usize]
     }
@@ -43,7 +43,7 @@ pub fn materialize_verified<'s>(
     source: &'s str,
     module: &'s Module,
     entry_point: &EntryPoint,
-    events: &[JournalEvent<'_>],
+    events: OutputEvents<'_, '_>,
     colors: Colors,
 ) -> Value<'s> {
     let materializer = ValueMaterializer::new(source, module);
@@ -78,7 +78,7 @@ impl ValueAccumulator<'_> {
 }
 
 impl<'a> ValueMaterializer<'a> {
-    pub fn materialize(&self, events: &[JournalEvent<'_>]) -> Value<'a> {
+    pub fn materialize(&self, events: OutputEvents<'_, '_>) -> Value<'a> {
         let mut stack: Vec<ValueAccumulator<'a>> = vec![];
         let mut scalar_ranges: Vec<Option<std::ops::Range<usize>>> = vec![];
 

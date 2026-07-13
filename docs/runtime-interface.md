@@ -199,8 +199,8 @@ CheckpointState {
 }
 ```
 
-Restoring a checkpoint restores the position and frame, truncates the capture
-trace to its watermark, and restores all depth counters. Adding mutable engine
+Restoring a checkpoint restores the position and frame, truncates the match
+journal to its watermark, and restores all depth counters. Adding mutable engine
 state requires classifying it as restored or deliberately cumulative.
 The two effect-control depths share one packed `u64` checkpoint field, retaining
 the regression-required range above `u16` without padding every checkpoint.

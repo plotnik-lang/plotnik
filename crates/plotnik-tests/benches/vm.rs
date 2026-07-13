@@ -240,12 +240,12 @@ fn bench_scenarios(c: &mut Criterion) {
             group.bench_function(*size_name, |b| {
                 b.iter(|| {
                     let vm = VM::builder(source, &tree).build();
-                    let effects = vm.execute(&module, &entry).expect("bench query matches");
+                    let journal = vm.execute(&module, &entry).expect("bench query matches");
                     materialize_verified(
                         source,
                         &module,
                         &entry,
-                        effects.as_slice(),
+                        journal.output_events(),
                         Colors::new(false),
                     )
                 })
@@ -270,8 +270,8 @@ fn bench_scan_execute(c: &mut Criterion) {
     group.bench_function("medium", |b| {
         b.iter(|| {
             let vm = VM::builder(source, &tree).build();
-            let effects = vm.execute(&module, &entry).expect("bench query matches");
-            black_box(effects.as_slice().len());
+            let journal = vm.execute(&module, &entry).expect("bench query matches");
+            black_box(journal.as_slice().len());
         })
     });
     group.finish();

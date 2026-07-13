@@ -45,8 +45,8 @@ pub fn run(args: RunArgs) -> CliResult {
     if args.json {
         let mut tracer = NoopTracer;
         let (result, stats) = vm.execute_with_stats(&module, &entry_point, &mut tracer);
-        let effects = match result {
-            Ok(effects) => effects,
+        let journal = match result {
+            Ok(journal) => journal,
             Err(RuntimeError::NoMatch) => {
                 println!(
                     "{}",
@@ -69,11 +69,11 @@ pub fn run(args: RunArgs) -> CliResult {
             &source_code,
             &module,
             &entry_point,
-            effects.as_slice(),
+            journal.output_events(),
             colors,
         );
-        let result_provenance = (!module.spans().is_empty())
-            .then(|| extract_result_provenance(effects.as_slice(), &module));
+        let result_provenance =
+            (!module.spans().is_empty()).then(|| extract_result_provenance(&journal, &module));
         println!(
             "{}",
             serde_json::json!({
@@ -85,8 +85,8 @@ pub fn run(args: RunArgs) -> CliResult {
         return Ok(());
     }
 
-    let effects = match vm.execute(&module, &entry_point) {
-        Ok(effects) => effects,
+    let journal = match vm.execute(&module, &entry_point) {
+        Ok(journal) => journal,
         Err(RuntimeError::NoMatch) => {
             // Zero matches must never be silent
             eprintln!("no match");
@@ -103,7 +103,7 @@ pub fn run(args: RunArgs) -> CliResult {
         &source_code,
         &module,
         &entry_point,
-        effects.as_slice(),
+        journal.output_events(),
         colors,
     );
 

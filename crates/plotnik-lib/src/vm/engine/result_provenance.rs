@@ -5,7 +5,7 @@ use tree_sitter::Node;
 
 use crate::bytecode::{Module, SpanKind};
 
-use plotnik_rt::JournalEvent;
+use plotnik_rt::{JournalEvent, MatchJournal};
 
 #[derive(Debug, Serialize)]
 pub struct ResultProvenance {
@@ -65,9 +65,9 @@ impl ValueProvenance {
     }
 }
 
-pub fn extract_result_provenance(events: &[JournalEvent<'_>], module: &Module) -> ResultProvenance {
+pub fn extract_result_provenance(journal: &MatchJournal<'_>, module: &Module) -> ResultProvenance {
     let extractor = ProvenanceExtractor::new(module);
-    extractor.extract(events)
+    extractor.extract(journal.as_slice())
 }
 
 struct ProvenanceExtractor<'m> {
@@ -125,7 +125,7 @@ impl<'m> ProvenanceExtractor<'m> {
                         source_span: Some(node_span(*node)),
                     });
                     if let Some(entry) = self.current_entry_mut() {
-                        union_span(&mut entry.source_span, Some(node_span(*node)));
+                        extend_bounding_range(&mut entry.source_span, Some(node_span(*node)));
                     }
                 }
                 JournalEvent::ListOpen => {
@@ -173,7 +173,7 @@ impl<'m> ProvenanceExtractor<'m> {
                         source_span,
                     });
                     if let Some(entry) = self.current_entry_mut() {
-                        union_span(&mut entry.source_span, source_span);
+                        extend_bounding_range(&mut entry.source_span, source_span);
                     }
                 }
                 JournalEvent::BoolValue(_) => {
@@ -189,10 +189,10 @@ impl<'m> ProvenanceExtractor<'m> {
                 JournalEvent::ScalarMark(node) => {
                     let source_span = Some(node_span(*node));
                     for scalar in &mut self.scalar_frames {
-                        union_span(&mut scalar.source_span, source_span);
+                        extend_bounding_range(&mut scalar.source_span, source_span);
                     }
                     if let Some(entry) = self.current_entry_mut() {
-                        union_span(&mut entry.source_span, source_span);
+                        extend_bounding_range(&mut entry.source_span, source_span);
                     }
                 }
                 JournalEvent::StrClose | JournalEvent::BoolClose(_) => {
@@ -238,7 +238,7 @@ impl<'m> ProvenanceExtractor<'m> {
 
         if let Some(&parent) = self.open.last() {
             let parent_idx = usize::try_from(parent).expect("provenance entry index fits usize");
-            union_span(&mut self.entries[parent_idx].source_span, source_span);
+            extend_bounding_range(&mut self.entries[parent_idx].source_span, source_span);
         }
     }
 
@@ -266,7 +266,7 @@ impl<'m> ProvenanceExtractor<'m> {
             unreachable!("list frame was checked before binding ArrayPush");
         };
         if let Some(value) = provenance {
-            union_span(&mut list.source_span, value.source_span);
+            extend_bounding_range(&mut list.source_span, value.source_span);
         }
         *len += 1;
     }
@@ -349,7 +349,7 @@ impl<'m> ProvenanceExtractor<'m> {
             | Frame::Record { provenance }
             | Frame::Variant { provenance } => provenance,
         };
-        union_span(&mut provenance.source_span, source_span);
+        extend_bounding_range(&mut provenance.source_span, source_span);
     }
 
     fn current_entry_mut(&mut self) -> Option<&mut ResultProvenanceEntry> {
@@ -374,7 +374,7 @@ fn node_span(node: Node<'_>) -> (u32, u32) {
     )
 }
 
-fn union_span(target: &mut Option<(u32, u32)>, span: Option<(u32, u32)>) {
+fn extend_bounding_range(target: &mut Option<(u32, u32)>, span: Option<(u32, u32)>) {
     let Some((start, end)) = span else {
         return;
     };
