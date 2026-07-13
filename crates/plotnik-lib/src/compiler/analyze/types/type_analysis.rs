@@ -245,6 +245,13 @@ impl TypeAnalysis {
                 self.assert_type_id_registered(child_id, "child type id out of range");
             }
 
+            if let TypeShape::Option(inner) = shape {
+                assert!(
+                    !matches!(self.type_shape(*inner), Some(TypeShape::Option(_))),
+                    "Option must be idempotent",
+                );
+            }
+
             if let TypeShape::Ref(def_id) = shape {
                 assert!(
                     self.def_output.contains_key(def_id),
@@ -471,6 +478,12 @@ impl TypeAnalysisBuilder {
     /// records and variant types always mint a fresh id (they are nominal — see the
     /// `intern_index` field docs).
     pub fn intern_type(&mut self, shape: TypeShape) -> TypeId {
+        if let TypeShape::Option(inner) = &shape
+            && matches!(self.analysis.type_shape(*inner), Some(TypeShape::Option(_)))
+        {
+            return *inner;
+        }
+
         if matches!(shape, TypeShape::Record(_) | TypeShape::Variant(_)) {
             let id = TypeId(self.analysis.types.len() as u32);
             self.analysis.types.push(shape);

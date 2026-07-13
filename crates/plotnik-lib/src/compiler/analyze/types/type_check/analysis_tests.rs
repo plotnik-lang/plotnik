@@ -16,6 +16,16 @@ fn type_interning_deduplicates() {
 }
 
 #[test]
+fn option_interning_is_idempotent() {
+    let mut ctx = TypeAnalysisBuilder::new();
+
+    let option = ctx.intern_type(TypeShape::Option(TYPE_NODE));
+    let nested = ctx.intern_type(TypeShape::Option(option));
+
+    assert_eq!(nested, option);
+}
+
+#[test]
 fn record_types_are_nominal() {
     // Records mint a fresh id per occurrence: two definitions with identical
     // capture profiles are distinct named types. Structural equality is a
