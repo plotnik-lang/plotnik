@@ -25,7 +25,7 @@ pub(crate) enum SpanBindingIR {
 
 #[derive(Clone, Debug)]
 pub(crate) struct SpanEntryIR {
-    pub(crate) source: SourceId,
+    pub(crate) source_id: SourceId,
     pub(crate) range: TextRange,
     pub(crate) kind: SpanKind,
     pub(crate) binding: Option<SpanBindingIR>,
@@ -158,7 +158,7 @@ pub(crate) fn assign_spans(input: &LowerInput<'_>) -> SpanAssignment {
             SpanId(u16::try_from(table.entries.len()).expect("admitted span count fits in u16"));
         table.index.insert((candidate.node, candidate.kind), id);
         table.entries.push(SpanEntryIR {
-            source: candidate.source,
+            source_id: candidate.source,
             range: candidate.range,
             kind: candidate.kind,
             binding: candidate.binding,

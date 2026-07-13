@@ -82,19 +82,19 @@ N1: S5 → T2  ; Q
 Q = 00 :: T2
 
 [spans]
-P00 def        0..75  src0  T1
-P01 labeled_alternation 7..75  src0
-P02 alternative 11..31  src0  T1.M0
-P03 quantifier 30..31  src0
-P04 pattern    18..30  src0
-P05 alternative 34..73  src0  T1.M1
-P06 pattern    40..73  src0
-P07 ref        66..72  src0  T1
-P08 def        77..129  src0  T2
-P09 pattern    81..129  src0
-P10 pattern    92..127  src0
-P11 capture    121..126  src0  T2.M2
-P12 ref        114..120  src0  T1
+P00 def        0..75  source_id=0  T1
+P01 labeled_alternation 7..75  source_id=0
+P02 alternative 11..31  source_id=0  T1.M0
+P03 quantifier 30..31  source_id=0
+P04 pattern    18..30  source_id=0
+P05 alternative 34..73  source_id=0  T1.M1
+P06 pattern    40..73  source_id=0
+P07 ref        66..72  source_id=0  T1
+P08 def        77..129  source_id=0  T2
+P09 pattern    81..129  source_id=0
+P10 pattern    92..127  source_id=0
+P11 capture    121..126  source_id=0  T2.M2
+P12 ref        114..120  source_id=0  T1
 
 [instructions]
 Q:

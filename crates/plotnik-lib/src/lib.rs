@@ -1,4 +1,4 @@
-//! Plotnik: Query language for tree-sitter AST with type inference.
+//! Plotnik: a typed query language for Tree-sitter syntax trees.
 //!
 //! # Example
 //!

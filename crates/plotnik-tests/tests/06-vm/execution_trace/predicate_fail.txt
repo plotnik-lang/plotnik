@@ -252,11 +252,11 @@ N0: S3 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..70  src0  T1
-P1 pattern    4..70  src0
-P2 pattern    15..68  src0
-P3 capture    61..64  src0  T1.M0
-P4 pattern    41..60  src0
+P0 def        0..70  source_id=0  T1
+P1 pattern    4..70  source_id=0
+P2 pattern    15..68  source_id=0
+P3 capture    61..64  source_id=0  T1.M0
+P4 pattern    41..60  source_id=0
 
 [instructions]
 Q:

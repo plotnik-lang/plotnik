@@ -67,7 +67,7 @@ pub const SPAN_NO_BINDING: u16 = 0xFFFF;
 /// One decoded entry of the `spans` section.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SpanEntry {
-    pub source: u16,
+    pub source_id: u16,
     pub kind: SpanKind,
     pub start: u32,
     pub end: u32,
@@ -87,7 +87,7 @@ impl SpanEntry {
             Self::SIZE
         );
         Self {
-            source: u16::from_le_bytes([bytes[0], bytes[1]]),
+            source_id: u16::from_le_bytes([bytes[0], bytes[1]]),
             kind: SpanKind::try_from_u8(bytes[2]).expect("span kind validated at load"),
             start: u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
             end: u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
@@ -98,7 +98,7 @@ impl SpanEntry {
 
     pub(crate) fn to_bytes(self) -> [u8; Self::SIZE] {
         let mut bytes = [0u8; Self::SIZE];
-        bytes[0..2].copy_from_slice(&self.source.to_le_bytes());
+        bytes[0..2].copy_from_slice(&self.source_id.to_le_bytes());
         bytes[2] = self.kind as u8;
         bytes[3] = 0;
         bytes[4..8].copy_from_slice(&self.start.to_le_bytes());

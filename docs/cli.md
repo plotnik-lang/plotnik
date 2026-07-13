@@ -166,7 +166,7 @@ plotnik infer -q 'Q = (identifier) @id' -l js --no-node-type --no-export
 
 | Flag                     | Purpose                                             |
 | ------------------------ | --------------------------------------------------- |
-| `-l, --lang LANG`        | Target language grammar (required)                  |
+| `-l, --lang LANG`        | Source language (required)                          |
 | `-o, --output FILE`      | Write output to file                                |
 | `--format FORMAT`        | Output format (`typescript`, `ts`)                  |
 | `--include-points`       | Include row/byte-column points in `Node`            |
@@ -337,7 +337,7 @@ plotnik inspect query.ptk app.js --json
 # All inline
 plotnik inspect -q 'Q = (program (expression_statement (identifier) @id))' -s 'x' -l js --json
 
-# Include the step-by-step VM recording in the bundle
+# Include the VM execution trace in the bundle
 plotnik inspect query.ptk app.js --json -v
 ```
 
@@ -346,7 +346,7 @@ plotnik inspect query.ptk app.js --json -v
 | Flag           | Purpose                                    |
 | -------------- | ------------------------------------------ |
 | `--json`       | Output the full inspect bundle as JSON     |
-| `-v`           | Include VM recording in the JSON bundle    |
+| `-v`           | Include the VM execution trace             |
 | `--entry NAME` | Select a specific selectable definition    |
 | `--fuel`       | Matcher work budget (see Execution Limits) |
 | `--max-memory` | Memory limit (see Execution Limits)        |

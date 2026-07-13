@@ -32,7 +32,7 @@ impl<'q> Parser<'q, '_> {
         ident
     }
 
-    /// Capture names are strictly snake_case: they become Rust struct fields.
+    /// Capture names are strictly snake_case: they become result fields.
     pub(crate) fn validate_capture_name(&mut self, ident: Ident<'_>) {
         let name = ident.text();
         if name.contains(['.', '-']) || name.chars().any(|c| c.is_ascii_uppercase()) {

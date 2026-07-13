@@ -130,13 +130,13 @@ Name = 00 :: T2
 Q    = 06 :: T0
 
 [spans]
-P0 def        0..25  src0  T2
-P1 capture    20..25  src0  T2.M0
-P2 pattern    7..19  src0
-P3 def        26..69  src0
-P4 pattern    30..69  src0
-P5 pattern    39..68  src0
-P6 ref        61..67  src0  T2
+P0 def        0..25  source_id=0  T2
+P1 capture    20..25  source_id=0  T2.M0
+P2 pattern    7..19  source_id=0
+P3 def        26..69  source_id=0
+P4 pattern    30..69  source_id=0
+P5 pattern    39..68  source_id=0
+P6 ref        61..67  source_id=0  T2
 
 [instructions]
 Name:

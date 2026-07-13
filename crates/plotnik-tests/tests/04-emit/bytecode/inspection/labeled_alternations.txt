@@ -53,16 +53,16 @@ N0: S6 → T4  ; Expr
 Expr = 00 :: T4
 
 [spans]
-P0 def        0..70  src0  T4
-P1 labeled_alternation 7..70  src0
-P2 alternative 11..31  src0  T4.M2
-P3 capture    28..31  src0  T2.M0
-P4 pattern    15..27  src0
-P5 alternative 34..52  src0  T4.M3
-P6 capture    48..52  src0  T3.M1
-P7 pattern    39..47  src0
-P8 alternative 55..68  src0  T4.M4
-P9 pattern    60..68  src0
+P0 def        0..70  source_id=0  T4
+P1 labeled_alternation 7..70  source_id=0
+P2 alternative 11..31  source_id=0  T4.M2
+P3 capture    28..31  source_id=0  T2.M0
+P4 pattern    15..27  source_id=0
+P5 alternative 34..52  source_id=0  T4.M3
+P6 capture    48..52  source_id=0  T3.M1
+P7 pattern    39..47  source_id=0
+P8 alternative 55..68  source_id=0  T4.M4
+P9 pattern    60..68  source_id=0
 
 [instructions]
 Expr:

@@ -450,8 +450,8 @@ mod matcher {
     }
 
     /// `S04_Q` post-acceptance: effects, then successor dispatch. Shared by the dispatch
-    /// path and the match-retry resume, so a retried candidate replays exactly
-    /// what the original acceptance would have.
+    /// path and the match-retry resume, so a retried candidate emits exactly
+    /// what the original acceptance would have emitted.
     #[inline]
     fn finish_s04_q(_eng: &mut rt::Engine<'_>) -> Flow {
         Flow::Jump(S11_Q)
@@ -496,7 +496,7 @@ mod matcher {
                     return Unwound::Resumed(resume.target);
                 }
 
-                // Match retry: step past the accepted-but-failed candidate and
+                // Match retry: advance past the accepted-but-failed candidate and
                 // re-run that state's sibling search from there.
                 rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
                     Some(Flow::Jump(next)) => return Unwound::Resumed(next),

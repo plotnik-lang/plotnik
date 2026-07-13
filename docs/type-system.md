@@ -251,7 +251,7 @@ structurally and drop the captures, discard them: `{...}? @_`.
 
 Every declared field is **always present** in the output. A field with option type
 renders as `T | null` and materializes as `null` when it doesn't match — never
-as a missing key. Missing **lists** are the empty array `[]`, never `null`.
+as a missing key. An absent list fallback is the empty JSON array `[]`, never `null`.
 The output shape is stable; consumers never guard for `undefined`.
 
 ## Cardinality

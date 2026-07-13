@@ -28,7 +28,7 @@ fn assigns_dense_spans_in_walk_order() {
             SpanKind::Pattern,
         ]
     );
-    assert!(spans.iter().all(|span| span.source == 0));
+    assert!(spans.iter().all(|span| span.source_id == 0));
 }
 
 #[test]

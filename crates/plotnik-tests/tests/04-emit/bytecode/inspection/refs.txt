@@ -78,18 +78,18 @@ Captured = 08 :: T3
 Name     = 00 :: T2
 
 [spans]
-P00 def        0..25  src0  T2
-P01 capture    20..25  src0  T2.M0
-P02 pattern    7..19  src0
-P03 def        26..72  src0
-P04 pattern    33..72  src0
-P05 pattern    42..71  src0
-P06 ref        64..70  src0  T2
-P07 def        74..133  src0  T3
-P08 pattern    85..133  src0
-P09 pattern    96..131  src0
-P10 capture    125..130  src0  T3.M1
-P11 ref        118..124  src0  T2
+P00 def        0..25  source_id=0  T2
+P01 capture    20..25  source_id=0  T2.M0
+P02 pattern    7..19  source_id=0
+P03 def        26..72  source_id=0
+P04 pattern    33..72  source_id=0
+P05 pattern    42..71  source_id=0
+P06 ref        64..70  source_id=0  T2
+P07 def        74..133  source_id=0  T3
+P08 pattern    85..133  source_id=0
+P09 pattern    96..131  source_id=0
+P10 capture    125..130  source_id=0  T3.M1
+P11 ref        118..124  source_id=0  T2
 
 [instructions]
 Name:

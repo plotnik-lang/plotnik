@@ -9,7 +9,7 @@
 pub enum TypeKind {
     /// Sentinel for successful matching that produces no value.
     NoValue = 0,
-    /// AST node reference.
+    /// Tree-sitter node reference.
     Node = 1,
     /// `T?` - option type containing zero or one value.
     Option = 2,

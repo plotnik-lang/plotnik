@@ -107,7 +107,7 @@ Each of these CST constructs counts as one landmark:
 - pattern: named node, sequence, alternation, definition reference, string,
   wildcard;
 - navigation and structure: field, **labeled** alternative, anchor, negated field;
-- modifier: node predicate, quantifier, capture, capture type.
+- pattern detail: node predicate, quantifier, capture, capture type.
 
 Unlabeled alternative wrappers do not count. Definitions, comments, punctuation,
 literal contents, regex internals, and category-refinement tokens do not count.
@@ -115,13 +115,13 @@ Field and alternative-label prefixes and quantifier, capture, and capture-type s
 belong to the complete inline candidate even when the renderer flattens those
 wrappers around a group.
 
-Three match steps remain a concise path:
+Three nested match landmarks remain a concise path:
 
 ```
 Q = (foo (bar (baz)))
 ```
 
-A fourth step breaks the nearest useful container:
+A fourth nested match breaks the nearest useful container:
 
 ```
 Q = (foo

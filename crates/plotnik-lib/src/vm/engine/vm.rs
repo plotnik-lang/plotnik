@@ -235,8 +235,8 @@ impl<'t> VM<'t> {
 
     /// The post-acceptance half of a Match: run its effects, then follow its successors.
     /// Shared by the dispatch path and the match-retry resume in
-    /// [`Self::backtrack`], so a resumed candidate replays exactly what the
-    /// original acceptance would have.
+    /// [`Self::backtrack`], so a resumed candidate emits exactly what the
+    /// original acceptance would have emitted.
     fn finish_match<T: Tracer>(
         &mut self,
         m: DecodedMatch,
@@ -646,7 +646,7 @@ impl<'t> VM<'t> {
                 // Call retry: advance to the next candidate satisfying the field
                 // constraint, then re-enter the callee. The scan mirrors the
                 // navigate-time field search: non-field siblings the policy admits
-                // are stepped over, so a retry sees exactly the candidate set the
+                // are skipped, so a retry sees exactly the candidate set the
                 // original navigation saw. If siblings are exhausted, keep
                 // backtracking to an earlier checkpoint.
                 Resume::Call(resume) => {
@@ -696,11 +696,11 @@ impl<'t> VM<'t> {
                 }
 
                 // Match retry: the checkpoint sits at the accepted-but-failed
-                // candidate of an engine-owned sibling search. Step past it (the
+                // candidate of an engine-owned sibling search. Advance past it (the
                 // push gate proved the policy admits it into the gap) and re-run
                 // the same instruction's candidate search from there; acceptance
-                // replays the match — fresh retry checkpoint, effects, successor dispatch —
-                // exactly as the dispatch path would.
+                // repeats the match — fresh retry checkpoint, effects, successor
+                // dispatch — exactly as the dispatch path would.
                 Resume::Match => {
                     let DecodedInstr::Match(m) =
                         module.decoded().instruction_at(CodeAddr::from(cp.ip))

@@ -346,11 +346,11 @@ fn dump_spans(out: &mut String, module: &Module, ctx: &DumpContext) {
         };
         writeln!(
             out,
-            "P{i:0pw$} {:<10} {}..{}  src{}{}",
+            "P{i:0pw$} {:<10} {}..{}  source_id={}{}",
             span.kind.name(),
             span.start,
             span.end,
-            span.source,
+            span.source_id,
             binding
         )
         .expect("writing to a String is infallible");

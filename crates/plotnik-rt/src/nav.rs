@@ -1,6 +1,6 @@
 //! Navigation command encoding for bytecode instructions.
 //!
-//! Navigation determines how the VM moves through the tree-sitter AST.
+//! Navigation determines how the VM moves through the Tree-sitter syntax tree.
 
 use crate::SkipClass;
 
@@ -161,7 +161,7 @@ impl Nav {
         }
     }
 
-    /// Cursor-depth delta this navigation applies to the abstract AST cursor.
+    /// Cursor-depth delta this navigation applies to the abstract tree cursor.
     ///
     /// The verifier only tracks depth, not sibling position: `Down*` enters a
     /// child, `Up*` exits one or more parents, and stay/next/epsilon variants

@@ -89,7 +89,7 @@ pub enum DiagnosticKind {
     TypeNameConflict,
     UnknownCaptureType,
     InvalidCaptureType,
-    CaptureTypeSuppressesData,
+    CaptureTypeReplacesData,
     RedundantCaptureType,
     InspectionSpansDegraded,
     EntryPointNeverMatchesRoot,
@@ -135,7 +135,7 @@ impl DiagnosticKind {
     pub fn severity(&self) -> Severity {
         match self {
             Self::UnusedAlternativeLabels
-            | Self::CaptureTypeSuppressesData
+            | Self::CaptureTypeReplacesData
             | Self::RedundantCaptureType
             | Self::InspectionSpansDegraded
             | Self::EntryPointNeverMatchesRoot
@@ -415,7 +415,7 @@ impl DiagnosticKind {
             Self::TypeNameConflict => "conflicting type name",
             Self::UnknownCaptureType => "unknown capture type",
             Self::InvalidCaptureType => "invalid capture type",
-            Self::CaptureTypeSuppressesData => "capture type suppresses data",
+            Self::CaptureTypeReplacesData => "capture type replaces data",
             Self::RedundantCaptureType => "redundant capture type",
             Self::InspectionSpansDegraded => "query too large for full inspection detail",
             Self::EntryPointNeverMatchesRoot => {
@@ -484,7 +484,7 @@ impl DiagnosticKind {
                 "type name `{}` is already used for a different type".to_string()
             }
             Self::UnknownCaptureType => "unknown capture type `{}`".to_string(),
-            Self::InvalidCaptureType | Self::CaptureTypeSuppressesData => "{}".to_string(),
+            Self::InvalidCaptureType | Self::CaptureTypeReplacesData => "{}".to_string(),
             Self::RedundantCaptureType => "{}".to_string(),
             Self::InspectionSpansDegraded => "{}".to_string(),
             Self::DuplicateCaptureInScope => {

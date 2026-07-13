@@ -91,7 +91,7 @@ Pipeline:
 
 1. Parse: query text to AST
 2. Analyze: resolve names, infer types, check recursion
-3. Link (a grammar): bind node kinds and fields to the target grammar
+3. Bind: bind node kinds and grammar fields to the selected source-language grammar
 4. Lower: build and optimize the Thompson NFA
 5. Emit: NFA to binary bytecode module
 
@@ -187,7 +187,7 @@ cargo run -p plotnik-cli -- run query.ptk app.ts
 cargo run -p plotnik-cli -- run -q 'Q = (program (expression_statement (identifier) @id))' -s 'x' -l javascript
 cargo run -p plotnik-cli -- check query.ptk -l typescript   # silent on success; --json, --strict
 cargo run -p plotnik-cli -- infer query.ptk -l typescript   # emit TypeScript types
-cargo run -p plotnik-cli -- ast app.ts                      # tree-sitter AST of source
+cargo run -p plotnik-cli -- tree app.ts                     # source syntax tree
 cargo run -p plotnik-cli -- trace query.ptk app.ts -vv      # step-by-step execution
 cargo run -p plotnik-cli -- lang list                       # languages + aliases
 ```

@@ -62,14 +62,14 @@ Ident = 00 :: T1
 Q     = 06 :: T2
 
 [spans]
-P0 def        0..26  src0  T1
-P1 capture    21..26  src0  T1.M0
-P2 pattern    8..20  src0
-P3 def        28..81  src0  T2
-P4 pattern    32..81  src0
-P5 pattern    43..79  src0
-P6 capture    73..78  src0  T2.M1
-P7 ref        65..72  src0  T1
+P0 def        0..26  source_id=0  T1
+P1 capture    21..26  source_id=0  T1.M0
+P2 pattern    8..20  source_id=0
+P3 def        28..81  source_id=0  T2
+P4 pattern    32..81  source_id=0
+P5 pattern    43..79  source_id=0
+P6 capture    73..78  source_id=0  T2.M1
+P7 ref        65..72  source_id=0  T1
 
 [instructions]
 Ident:

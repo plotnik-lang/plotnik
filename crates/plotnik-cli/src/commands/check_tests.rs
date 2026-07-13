@@ -20,9 +20,9 @@ fn check_js(query: &str) -> CliResult {
 
 #[test]
 fn accepts_labeled_empty_alternative_in_quantifier() {
-    // A skippable enum arm in a quantifier (`[A: (comment)? @c]*`) used to emit
+    // A skippable labeled alternative in a quantifier (`[A: (comment)? @c]*`) used to emit
     // an unbracketed skip path rejected by bytecode validation;
-    // enum bracket dominance makes both arm paths close the enum, so it compiles.
+    // variant bracket dominance makes both paths close the variant, so it compiles.
     assert!(check_js("Q = (program [A: (comment)? @c]* @items)").is_ok());
 }
 

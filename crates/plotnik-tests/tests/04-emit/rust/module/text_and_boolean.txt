@@ -504,7 +504,7 @@ mod matcher {
                     return Unwound::Resumed(resume.target);
                 }
 
-                // Match retry: step past the accepted-but-failed candidate and
+                // Match retry: advance past the accepted-but-failed candidate and
                 // re-run that state's sibling search from there.
                 rt::Resume::Match => match match_retry(eng, _source, cp.ip) {
                     Some(Flow::Jump(next)) => return Unwound::Resumed(next),

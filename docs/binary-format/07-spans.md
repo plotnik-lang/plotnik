@@ -1,22 +1,22 @@
 # Spans Section
 
 The Spans section stores query-side inspection metadata. Runtime span effects
-refer to entries by index; the playground joins those ids to source spans,
-result paths, type/member bindings, and trace records.
+refer to entries by index; the playground joins those ids to query spans,
+result paths, type/member bindings, and execution-trace records.
 
 ## Entry Layout
 
 Each entry is 16 bytes, little-endian:
 
-| Offset | Size | Field     | Meaning                                 |
-| ------ | ---- | --------- | --------------------------------------- |
-| 0      | 2    | `source`  | Query source index                      |
-| 2      | 1    | `kind`    | `SpanKind` discriminant                 |
-| 3      | 1    | `flags`   | Reserved, must be zero                  |
-| 4      | 4    | `start`   | Query byte start                        |
-| 8      | 4    | `end`     | Query byte end                          |
-| 12     | 2    | `type_id` | Type binding, or `0xFFFF` for none      |
-| 14     | 2    | `member`  | TypeMembers index, or `0xFFFF` for none |
+| Offset | Size | Field       | Meaning                                 |
+| ------ | ---- | ----------- | --------------------------------------- |
+| 0      | 2    | `source_id` | Query source index                      |
+| 2      | 1    | `kind`      | `SpanKind` discriminant                 |
+| 3      | 1    | `flags`     | Reserved, must be zero                  |
+| 4      | 4    | `start`     | Query byte start                        |
+| 8      | 4    | `end`       | Query byte end                          |
+| 12     | 2    | `type_id`   | Type binding, or `0xFFFF` for none      |
+| 14     | 2    | `member`    | TypeMembers index, or `0xFFFF` for none |
 
 `start <= end`. Any binding value other than `0xFFFF` must be in range for its
 table, and a live `member` requires a live `type_id` — a member with no type is
@@ -63,8 +63,8 @@ cursor-preserving epsilon chains.
 
 Scalar capture types contribute their exact runtime provenance independently
 of inspection-detail spans. While a capture span is open, its scalar marks are
-folded into an optional source span: a present string highlights precisely
-the text it returns, a present boolean may carry its matched range, and
+folded into a possibly absent document source span: a present string highlights
+precisely the text it returns, a present boolean may carry its document range, and
 `null`/fallback `false` has no invented range. A real zero-byte node retains a
 real empty span. This remains exact even when lower-priority pattern spans
 are degraded away.
@@ -73,7 +73,7 @@ Construction-time effect-stack validation tracks span depth, including inside
 suppression scopes, so malformed bytecode with unbalanced span brackets is
 rejected before execution. Span effects are still recorded under runtime
 suppression: a bare `(Foo)` reference suppresses `Foo`'s output values but not
-its inspection source span.
+its result-provenance span events.
 
 ## Degradation
 

@@ -96,12 +96,12 @@ N0: S2 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..57  src0  T1
-P1 pattern    4..57  src0
-P2 capture    39..47  src0  T1.M0
-P3 capture_type 48..55  src0  T0
-P4 quantifier 37..38  src0
-P5 pattern    15..37  src0
+P0 def        0..57  source_id=0  T1
+P1 pattern    4..57  source_id=0
+P2 capture    39..47  source_id=0  T1.M0
+P3 capture_type 48..55  source_id=0  T0
+P4 quantifier 37..38  source_id=0
+P5 pattern    15..37  source_id=0
 
 [instructions]
 Q:

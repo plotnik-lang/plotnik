@@ -10,7 +10,7 @@ use crate::core::grammar::GrammarIdentity;
 use crate::core::{Interner, NodeFieldId, NodeKind, NodeKindId, Symbol};
 
 /// Resolution table produced by the bind pass: the query's node-kind and field
-/// symbols bound to the target grammar's ids, in both directions.
+/// symbols bound to the selected grammar's ids, in both directions.
 ///
 /// Immutable once binding produces it; build one with `GrammarBindingBuilder`.
 #[derive(Clone, Debug, Default)]

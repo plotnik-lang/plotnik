@@ -48,7 +48,7 @@ fn query_span_qualifies_ids_and_separates_alternation_labeling() {
     let span = query_span_json(
         3,
         SpanEntry {
-            source: 2,
+            source_id: 2,
             kind: SpanKind::LabeledAlternation,
             start: 5,
             end: 12,

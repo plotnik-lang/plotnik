@@ -593,8 +593,8 @@ impl QuantifiedPattern {
         quantifier_operator_from_syntax_kind(self.operator()?.kind())
     }
 
-    /// Whether the quantifier repeats (`*`/`+`, greedy or not) — i.e. collects an
-    /// array, as opposed to `?`. Reads [`quantifier_kind`](Self::quantifier_kind)
+    /// Whether the quantifier repeats (`*`/`+`, greedy or not) — i.e. collects a
+    /// list, as opposed to `?`. Reads [`quantifier_kind`](Self::quantifier_kind)
     /// rather than re-listing operators so the lazy twins stay included (#469).
     pub fn is_repeating(&self) -> bool {
         matches!(
@@ -629,7 +629,7 @@ impl NegatedField {
 }
 
 /// Checks if pattern is an empty group (sequence/alternation with no children).
-/// Used to distinguish `{ } @x` (empty struct) from `{(pattern) @_} @x` (Node capture).
+/// Used to distinguish `{ } @x` (empty record) from `{(pattern) @_} @x` (Node capture).
 pub fn is_empty_group(inner: &Pattern) -> bool {
     match inner {
         Pattern::SeqPattern(seq) => seq.children().next().is_none(),

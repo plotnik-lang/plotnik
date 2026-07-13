@@ -281,18 +281,18 @@ Name = 00 :: T1
 Q    = 06 :: T2
 
 [spans]
-P00 def        0..25  src0  T1
-P01 capture    20..25  src0  T1.M0
-P02 pattern    7..19  src0
-P03 def        27..132  src0  T2
-P04 pattern    31..132  src0
-P05 sequence   42..130  src0
-P06 pattern    48..84  src0
-P07 capture    77..83  src0  T2.M1
-P08 ref        70..76  src0  T1
-P09 pattern    89..126  src0
-P10 capture    118..125  src0  T2.M2
-P11 ref        111..117  src0  T1
+P00 def        0..25  source_id=0  T1
+P01 capture    20..25  source_id=0  T1.M0
+P02 pattern    7..19  source_id=0
+P03 def        27..132  source_id=0  T2
+P04 pattern    31..132  source_id=0
+P05 sequence   42..130  source_id=0
+P06 pattern    48..84  source_id=0
+P07 capture    77..83  source_id=0  T2.M1
+P08 ref        70..76  source_id=0  T1
+P09 pattern    89..126  source_id=0
+P10 capture    118..125  source_id=0  T2.M2
+P11 ref        111..117  source_id=0  T1
 
 [instructions]
 Name:

@@ -61,19 +61,19 @@ N0: S3 → T2  ; Q
 Q = 00 :: T2
 
 [spans]
-P00 def        0..113  src0  T2
-P01 pattern    4..113  src0
-P02 pattern    15..111  src0
-P03 unlabeled_alternation 41..107  src0
-P04 alternative 49..65  src0
-P05 capture    62..65  src0  T2.M0
-P06 pattern    49..61  src0
-P07 alternative 72..85  src0
-P08 capture    81..85  src0  T2.M1
-P09 pattern    72..80  src0
-P10 alternative 92..101  src0
-P11 quantifier 100..101  src0
-P12 pattern    92..100  src0
+P00 def        0..113  source_id=0  T2
+P01 pattern    4..113  source_id=0
+P02 pattern    15..111  source_id=0
+P03 unlabeled_alternation 41..107  source_id=0
+P04 alternative 49..65  source_id=0
+P05 capture    62..65  source_id=0  T2.M0
+P06 pattern    49..61  source_id=0
+P07 alternative 72..85  source_id=0
+P08 capture    81..85  source_id=0  T2.M1
+P09 pattern    72..80  source_id=0
+P10 alternative 92..101  source_id=0
+P11 quantifier 100..101  source_id=0
+P12 pattern    92..100  source_id=0
 
 [instructions]
 Q:

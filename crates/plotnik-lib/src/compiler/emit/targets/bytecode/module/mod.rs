@@ -270,9 +270,10 @@ impl<'a> EmitPipeline<'a> {
                 None => (SPAN_NO_BINDING, SPAN_NO_BINDING),
             };
 
-            let source = u16::try_from(entry.source.0).expect("source id must fit in span entry");
+            let source_id =
+                u16::try_from(entry.source_id.0).expect("source id must fit in span entry");
             let span = SpanEntry {
-                source,
+                source_id,
                 kind: entry.kind,
                 start: u32::from(entry.range.start()),
                 end: u32::from(entry.range.end()),

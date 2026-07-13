@@ -324,7 +324,7 @@ impl<'t> Engine<'t> {
     }
 
     /// Emit an inspection-span event, bypassing suppression: uncaptured
-    /// `(Foo)` bodies still produce source hulls even when they carry no
+    /// `(Foo)` bodies still produce document bounding ranges even when they carry no
     /// output bindings.
     #[inline]
     pub fn emit_span(&mut self, event: JournalEvent<'t>) {

@@ -67,19 +67,19 @@ N1: S5 → T3  ; Q
 Q = 00 :: T3
 
 [spans]
-P00 def        0..31  src0  T2
-P01 capture    26..31  src0  T2.M0
-P02 quantifier 24..25  src0
-P03 pattern    12..24  src0
-P04 def        33..148  src0  T3
-P05 pattern    37..148  src0
-P06 sequence   48..146  src0
-P07 pattern    54..95  src0
-P08 capture    88..94  src0  T3.M1
-P09 ref        76..87  src0  T2
-P10 pattern    100..142  src0
-P11 capture    134..141  src0  T3.M2
-P12 ref        122..133  src0  T2
+P00 def        0..31  source_id=0  T2
+P01 capture    26..31  source_id=0  T2.M0
+P02 quantifier 24..25  source_id=0
+P03 pattern    12..24  source_id=0
+P04 def        33..148  source_id=0  T3
+P05 pattern    37..148  source_id=0
+P06 sequence   48..146  source_id=0
+P07 pattern    54..95  source_id=0
+P08 capture    88..94  source_id=0  T3.M1
+P09 ref        76..87  source_id=0  T2
+P10 pattern    100..142  source_id=0
+P11 capture    134..141  source_id=0  T3.M2
+P12 ref        122..133  source_id=0  T2
 
 [instructions]
 Q:

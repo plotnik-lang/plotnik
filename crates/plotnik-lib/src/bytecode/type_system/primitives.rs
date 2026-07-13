@@ -6,7 +6,7 @@
 /// Index for the no-value sentinel.
 pub const TYPE_NO_VALUE: u16 = 0;
 
-/// Index for the Node type (tree-sitter AST node reference).
+/// Index for the Node type (Tree-sitter node reference).
 pub const TYPE_NODE: u16 = 1;
 
 /// Index for borrowed source text.
@@ -24,7 +24,7 @@ pub const TYPE_CUSTOM_START: u16 = 4;
 pub enum PrimitiveType {
     /// Successful matching that produces no value.
     NoValue = TYPE_NO_VALUE,
-    /// A tree-sitter AST node reference.
+    /// A Tree-sitter node reference.
     Node = TYPE_NODE,
     /// Borrowed source text.
     Text = TYPE_TEXT,

@@ -105,7 +105,7 @@ pub(super) fn query_span_json(id: usize, span: SpanEntry) -> JsonValue {
     let (kind, labeling) = query_span_kind(span.kind);
     let mut object = Map::new();
     object.insert("id".to_string(), json!(id));
-    object.insert("source_id".to_string(), json!(span.source));
+    object.insert("source_id".to_string(), json!(span.source_id));
     object.insert("kind".to_string(), json!(kind));
     if let Some(labeling) = labeling {
         object.insert("labeling".to_string(), json!(labeling));

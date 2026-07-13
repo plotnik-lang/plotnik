@@ -62,14 +62,14 @@ Inner = 00 :: T1
 Q     = 06 :: T2
 
 [spans]
-P0 def        0..23  src0  T1
-P1 capture    21..23  src0  T1.M0
-P2 pattern    8..20  src0
-P3 def        25..75  src0  T2
-P4 pattern    29..75  src0
-P5 pattern    40..73  src0
-P6 capture    70..72  src0  T2.M1
-P7 ref        62..69  src0  T1
+P0 def        0..23  source_id=0  T1
+P1 capture    21..23  source_id=0  T1.M0
+P2 pattern    8..20  source_id=0
+P3 def        25..75  source_id=0  T2
+P4 pattern    29..75  source_id=0
+P5 pattern    40..73  source_id=0
+P6 capture    70..72  source_id=0  T2.M1
+P7 ref        62..69  source_id=0  T1
 
 [instructions]
 Inner:

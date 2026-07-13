@@ -111,14 +111,14 @@ N0: S2 → T2  ; Q
 Q = 00 :: T2
 
 [spans]
-P0 def        0..60  src0  T2
-P1 pattern    4..60  src0
-P2 capture    45..51  src0  T2.M0
-P3 capture_type 52..58  src0  T0
-P4 sequence   15..44  src0
-P5 capture    32..40  src0
-P6 quantifier 30..31  src0
-P7 pattern    21..30  src0
+P0 def        0..60  source_id=0  T2
+P1 pattern    4..60  source_id=0
+P2 capture    45..51  source_id=0  T2.M0
+P3 capture_type 52..58  source_id=0  T0
+P4 sequence   15..44  source_id=0
+P5 capture    32..40  source_id=0
+P6 quantifier 30..31  source_id=0
+P7 pattern    21..30  source_id=0
 
 [instructions]
 Q:

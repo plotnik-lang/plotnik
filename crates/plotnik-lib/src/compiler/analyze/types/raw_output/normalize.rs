@@ -157,7 +157,7 @@ impl<'s, 'a, 'd> CaptureNormalizer<'s, 'a, 'd> {
         if planned.plan.suppresses_semantic_data() {
             self.session
                 .diagnostics
-                .report(DiagnosticKind::CaptureTypeSuppressesData, span)
+                .report(DiagnosticKind::CaptureTypeReplacesData, span)
                 .detail(match capture_type {
                     BuiltInCaptureType::Str => {
                         "capture type `str` replaces structured data with source text"

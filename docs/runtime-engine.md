@@ -62,7 +62,7 @@ used for forks, value/default effects, and wrapper cleanup.
 
 ### Call
 
-`Call` applies its own navigation and optional field check, pushes a frame with
+`Call` applies its own navigation and field check, when present, pushes a frame with
 the encoded return address, and jumps to the callee target. Definition bodies
 are statically verified to return at the same cursor depth they entered.
 
@@ -127,7 +127,7 @@ resumes per the checkpoint's kind: a successor checkpoint resumes at its recorde
 call-retry checkpoint advances to the next candidate satisfying the Call's
 skip policy and field constraint, then re-enters the callee; a match-retry
 checkpoint advances past the accepted-but-failed candidate and re-runs the
-same Match's candidate search from there, replaying effects and successor dispatch
+same Match's candidate search from there, re-emitting effects and dispatching its successor
 exactly as the original acceptance did. Every retryable choice leaves a
 checkpoint — which sibling binds a pattern, which successor of a fork, whether
 an optional matches — so no search ever silently commits.
@@ -186,13 +186,13 @@ pub enum JournalEvent<'t> {
 | SpanStart/SpanEnd      | Bracket result-provenance scopes                         |
 
 `ScalarMark` stores the matched node, not a byte sentinel. Each open scalar
-frame unions its marks into an optional byte-range hull. No marks means no
+frame expands an optional document bounding range to include its marks. No marks means no
 matched node; a real zero-byte node contributes `Some(n..n)`. Consequently
 `StrClose` distinguishes an absent value (`null`) from a zero-byte node (`""`).
 `BoolClose` takes its value only from its encoded boolean; marks provide
 result provenance and never implement truthiness.
 Direct node scalars use `NodeStr` or `NodeBool` instead of allocating a scalar
-frame; framed effects remain the general source-hull representation.
+frame; framed effects remain the general document-bounding-range representation.
 Non-inspection lowering has no consumer for boolean source provenance, so it
 emits `BoolValue(true)` for a present value instead of `NodeBool` or a balanced
 boolean frame. Inspection lowering retains the provenance-carrying forms.
@@ -218,7 +218,7 @@ builder frame. Open effects push builder frames; close effects pop them and
 produce the completed value.
 
 Scalar frames are part of the same balanced frame algebra as lists, records,
-and variants. `ScalarOpen` pushes a frame, `ScalarMark` expands its hull, and
+and variants. `ScalarOpen` pushes a frame, `ScalarMark` expands its document bounding range, and
 exactly one of `StrClose` or `BoolClose` closes it. Source text is sliced once
 from the validated source and remains borrowed; booleans are stored directly.
 The bytecode loader rejects mis-nested scalar effects before execution.

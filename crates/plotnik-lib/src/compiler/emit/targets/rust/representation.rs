@@ -62,7 +62,7 @@ impl TypeFacts {
     }
 
     /// Whether this `Ref` occurrence, rendered by value inside `item_ty`'s
-    /// declaration, renders as `Box<...>`. Occurrences under an array never
+    /// declaration, renders as `Box<...>`. Occurrences under a list never
     /// ask — `Vec` already indirects, so no cycle through them is by-value.
     pub(super) fn is_boxed_in(&self, item_ty: TypeId, ref_ty: TypeId) -> bool {
         self.by_value_closures

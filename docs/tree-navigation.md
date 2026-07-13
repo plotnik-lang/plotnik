@@ -81,7 +81,7 @@ Navigation and matching are intertwined. The `Nav` mode determines initial movem
 3. EFFECTS On success: execute the match's effects list in order
 ```
 
-For `Up*` variants, step 2 becomes: for each of the n levels, validate the exit
+For `Up*` variants, the SEARCH phase becomes: for each of the n levels, validate the exit
 constraint on the node being left, then ascend one level. The constraint is
 checked at **every** level, which is what lets same-mode `Up*` instructions
 compose: `Up*(a)` followed by `Up*(b)` is exactly `Up*(a+b)`.
@@ -104,7 +104,7 @@ non-exact `Down*`/`Next*` search leaves a match-retry checkpoint whenever the
 policy would admit that node as a skipped gap filler (any node under `‣`, only
 trivia/extras under `•`/`◦`). A later failure — even deep inside the accepted
 candidate's subtree — then resumes the search at the next admissible sibling
-instead of silently committing. Steps internal to a compiled retry loop
+instead of silently committing. Instructions internal to a compiled retry loop
 (`emit_position_search` wrappers) are emitted with exact navs precisely to opt
 out of this: every search has exactly one retry owner, either the engine's
 in-instruction search or the NFA loop, never both.
@@ -272,7 +272,7 @@ Anonymous operands make `.` skip extras only. Comments can appear between the op
   05  ─‣┘³                                      ◼
 ```
 
-Multi-level ascent coalesces: the compiler merges consecutive effectless `Up*` steps of the same mode into one instruction, capped at the level field's encoding limit (31). This holds for the constraint-carrying modes too — `Up*` composes, so the merged instruction re-checks the constraint at every level it ascends (see [Search Loop](#search-loop)). A run deeper than the cap splits into several adjacent instructions whose per-level checks partition the levels with no gap.
+Multi-level ascent coalesces: the compiler merges consecutive effectless `Up*` instructions of the same mode into one instruction, capped at the level field's encoding limit (31). This holds for the constraint-carrying modes too — `Up*` composes, so the merged instruction re-checks the constraint at every level it ascends (see [Search Loop](#search-loop)). A run deeper than the cap splits into several adjacent instructions whose per-level checks partition the levels with no gap.
 
 **Mixed anchors**: `(a (b) . (c) .)`
 
@@ -296,7 +296,7 @@ The `.` before `(c)` → `NextSkip`; the `.` after `(c)` → `UpSkipTrivia`.
   07  ─‣┘                                       ◼
 ```
 
-The `.` after `(pair)` produces `─•┘` (exit object, pair must be last non-trivia). Then `─‣─` finds sibling `(number)`, and `─‣┘` exits array. Steps 05 and 07 are **not** adjacent — the `─‣─` sibling match sits between them — so they are never coalesced. (Were they adjacent, merging into `UpSkipTrivia(2)` would be sound: `Up*` composes, checking each level in turn.)
+The `.` after `(pair)` produces `─•┘` (exit object, pair must be last non-trivia). Then `─‣─` finds sibling `(number)`, and `─‣┘` exits array. Instructions 05 and 07 are **not** adjacent — the `─‣─` sibling match sits between them — so they are never coalesced. (Were they adjacent, merging into `UpSkipTrivia(2)` would be sound: `Up*` composes, checking each level in turn.)
 
 ## Field Handling
 

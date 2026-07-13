@@ -1,13 +1,13 @@
 //! Generated `SerializeWithSource` impls.
 //!
-//! Mirrors the VM's materialized-value JSON exactly — struct fields in
+//! Mirrors the VM's materialized-value JSON exactly — record fields in
 //! declaration order, `None` as one flat null, nodes as
-//! `{kind, text, span}`, enums as `{"$tag": ...}` / `{"$tag", "$data"}` —
+//! `{kind, text, span}`, variants as `{"$tag": ...}` / `{"$tag", "$data"}` —
 //! so serialized generated output can be diffed against VM output verbatim.
 //! Serialized keys and tags always use the original query-side names, even
 //! when the Rust identifier had to be keyword-renamed.
 //!
-//! Enum variant payloads are anonymous records, so each payload arm defines a
+//! Rust enum variant payloads are anonymous records, so each payload arm defines a
 //! local `Data` adapter borrowing the matched fields; bindings are positional
 //! (`v0`, `v1`, ...) to keep a capture literally named `source` from
 //! shadowing the source parameter.
@@ -52,7 +52,7 @@ impl Emitter<'_, '_> {
             _ => unreachable!("serde impls are generated for structs and enums only"),
         };
 
-        // Only payload fields thread the source through; a tags-only enum
+        // Only payload fields thread the source through; a no-payload enum
         // never touches it and must not bind it, or the impl warns.
         let source = body.source_param();
         let body = body.code;

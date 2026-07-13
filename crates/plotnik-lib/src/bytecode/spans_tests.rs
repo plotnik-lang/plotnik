@@ -11,7 +11,7 @@ fn span_kind_names_are_stable() {
 #[test]
 fn span_entry_roundtrips() {
     let entry = SpanEntry {
-        source: 2,
+        source_id: 2,
         kind: SpanKind::Capture,
         start: 11,
         end: 17,
@@ -28,7 +28,7 @@ fn span_entry_roundtrips() {
 fn spans_view_decodes_entries_by_index() {
     let entries = [
         SpanEntry {
-            source: 0,
+            source_id: 0,
             kind: SpanKind::Def,
             start: 0,
             end: 10,
@@ -36,7 +36,7 @@ fn spans_view_decodes_entries_by_index() {
             member: SPAN_NO_BINDING,
         },
         SpanEntry {
-            source: 0,
+            source_id: 0,
             kind: SpanKind::Capture,
             start: 6,
             end: 9,

@@ -63,7 +63,7 @@ mod limited {
 }
 
 // Recursive output nests `Expr` values through native decoder calls, so a depth
-// policy of 1 must trip `parse`; `matches` suppresses output and never replays.
+// policy of 1 must trip `parse`; `matches` suppresses output and never decodes.
 mod depth_limited {
     plotnik::query! {
         r#"

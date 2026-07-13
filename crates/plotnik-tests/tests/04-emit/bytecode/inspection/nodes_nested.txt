@@ -52,16 +52,16 @@ N0: S3 → T1  ; Q
 Q = 00 :: T1
 
 [spans]
-P0 def        0..135  src0  T1
-P1 pattern    4..135  src0
-P2 pattern    15..133  src0
-P3 pattern    41..129  src0
-P4 capture    85..90  src0  T1.M0
-P5 field      66..70  src0
-P6 pattern    72..84  src0
-P7 capture    117..123  src0  T1.M1
-P8 field      97..102  src0
-P9 pattern    104..116  src0
+P0 def        0..135  source_id=0  T1
+P1 pattern    4..135  source_id=0
+P2 pattern    15..133  source_id=0
+P3 pattern    41..129  source_id=0
+P4 capture    85..90  source_id=0  T1.M0
+P5 field      66..70  source_id=0
+P6 pattern    72..84  source_id=0
+P7 capture    117..123  source_id=0  T1.M1
+P8 field      97..102  source_id=0
+P9 pattern    104..116  source_id=0
 
 [instructions]
 Q:

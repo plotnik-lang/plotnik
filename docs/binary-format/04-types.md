@@ -11,7 +11,7 @@ Type system metadata for code generation and runtime validation. Describes the s
 | Value | Kind             | Description                     |
 | ----- | ---------------- | ------------------------------- |
 | 0     | `NoValue`        | Successful match with no value  |
-| 1     | `Node`           | AST node reference              |
+| 1     | `Node`           | Tree-sitter node reference      |
 | 2     | `Option`         | Zero or one value               |
 | 3     | `ListZeroOrMore` | Zero or more (T\*)              |
 | 4     | `ListOneOrMore`  | One or more (T+)                |

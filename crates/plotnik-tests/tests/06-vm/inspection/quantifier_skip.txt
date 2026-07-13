@@ -161,15 +161,15 @@ N0: S3 → T2  ; Q
 Q = 00 :: T2
 
 [spans]
-P0 def        0..103  src0  T2
-P1 pattern    4..103  src0
-P2 capture    39..44  src0  T2.M0
-P3 quantifier 37..38  src0
-P4 pattern    15..37  src0
-P5 pattern    47..101  src0
-P6 capture    92..97  src0  T2.M1
-P7 field      73..77  src0
-P8 pattern    79..91  src0
+P0 def        0..103  source_id=0  T2
+P1 pattern    4..103  source_id=0
+P2 capture    39..44  source_id=0  T2.M0
+P3 quantifier 37..38  source_id=0
+P4 pattern    15..37  source_id=0
+P5 pattern    47..101  source_id=0
+P6 capture    92..97  source_id=0  T2.M1
+P7 field      73..77  source_id=0
+P8 pattern    79..91  source_id=0
 
 [instructions]
 Q:

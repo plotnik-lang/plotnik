@@ -567,7 +567,7 @@ fn forged_span_effect_before_spans_section_is_rejected() {
 fn forged_span_effect_payload_out_of_range_is_rejected() {
     let mut bytes = emit_bytes(RECORD_QUERY);
     let span = SpanEntry {
-        source: 0,
+        source_id: 0,
         kind: SpanKind::Def,
         start: 0,
         end: 42,
@@ -637,7 +637,7 @@ fn add_single_span(bytes: &mut Vec<u8>, span_bytes: [u8; SPAN_ENTRY_SIZE]) {
 fn span_section_view_decodes_valid_entry() {
     let mut bytes = emit_bytes(RECORD_QUERY);
     let span = SpanEntry {
-        source: 0,
+        source_id: 0,
         kind: SpanKind::Def,
         start: 0,
         end: 42,
@@ -656,7 +656,7 @@ fn span_section_view_decodes_valid_entry() {
 fn forged_invalid_span_kind_is_rejected() {
     let mut bytes = emit_bytes(RECORD_QUERY);
     let mut span = SpanEntry {
-        source: 0,
+        source_id: 0,
         kind: SpanKind::Def,
         start: 0,
         end: 42,
@@ -678,7 +678,7 @@ fn forged_invalid_span_kind_is_rejected() {
 fn forged_invalid_span_range_is_rejected() {
     let mut bytes = emit_bytes(RECORD_QUERY);
     let span = SpanEntry {
-        source: 0,
+        source_id: 0,
         kind: SpanKind::Pattern,
         start: 42,
         end: 7,
@@ -700,7 +700,7 @@ fn forged_member_binding_without_type_is_rejected() {
     // whole binding off `type_id`, so this combination is smuggled state.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let span = SpanEntry {
-        source: 0,
+        source_id: 0,
         kind: SpanKind::Capture,
         start: 3,
         end: 8,
@@ -820,7 +820,7 @@ fn forged_invalid_span_binding_is_rejected() {
     let mut bytes = emit_bytes(RECORD_QUERY);
     let module = Module::load_compiler_output(&bytes).expect("module validates before tampering");
     let span = SpanEntry {
-        source: 0,
+        source_id: 0,
         kind: SpanKind::Capture,
         start: 3,
         end: 8,
@@ -1107,7 +1107,7 @@ fn forged_data_variant_case_without_data_is_rejected() {
 
 #[test]
 fn forged_dropped_scope_close_is_rejected() {
-    // Turn a `RecordClose` into a no-op `Node`: the struct's `RecordOpen` is
+    // Turn a `RecordClose` into a no-op `Node`: the record's `RecordOpen` is
     // never closed, so the body returns with an open frame — the materializer
     // would leave the builder stack unbalanced. Rejected as a non-neutral body.
     let mut bytes = emit_bytes(RECORD_QUERY);
@@ -1235,7 +1235,7 @@ fn forged_variant_wrapper_hiding_callee_write_is_rejected() {
     // below-entry `RecordSet` then lands data on a no-payload case — invisible to the
     // wrapper's own walk, because the write happens inside the callee. Only a
     // call site that forks on the callee's may-write (`record_sets_caller_top`)
-    // rejects it; a stale `got_data` would let it load and mis-materialize.
+    // rejects it; stale payload-field state would let it load and mis-materialize.
     let mut bytes = emit_bytes(indoc! {r#"
         A = (program [T: (comment)] @e)
         Z = (program (function_declaration) @fn)
@@ -1642,7 +1642,7 @@ fn forged_oob_member_type_id_is_rejected() {
 #[test]
 fn forged_oob_wrapper_inner_type_id_is_rejected() {
     // A wrapper/alias TypeDef holds its inner TypeId in `data` (bytes 0-1 of the
-    // 4-byte entry); it must address a real def or `option_inner` / the array
+    // 4-byte entry); it must address a real def or `option_inner` / the list
     // element lookup resolves a type out of range.
     let mut bytes = emit_bytes(r#"Top = (program (expression_statement)* @stmts)"#);
     let (defs_off, type_defs, wrapper_idx) = {
@@ -1650,7 +1650,7 @@ fn forged_oob_wrapper_inner_type_id_is_rejected() {
         let types = m.types();
         let idx = (0..types.defs_count())
             .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Wrapper { .. }))
-            .expect("array query must emit a wrapper type def");
+            .expect("list query must emit a wrapper type def");
         (
             m.offsets().type_defs as usize,
             m.header().type_defs_count,
@@ -1758,7 +1758,7 @@ fn forged_nonzero_wrapper_typedef_count_is_rejected() {
         let types = m.types();
         let idx = (0..types.defs_count())
             .find(|&i| matches!(types.def(i).decode(), TypeDefKind::Wrapper { .. }))
-            .expect("array query must emit a wrapper type def");
+            .expect("list query must emit a wrapper type def");
         (m.offsets().type_defs as usize, idx)
     };
 

@@ -107,33 +107,33 @@ Q     = 02 :: T6
 Value = 00 :: T3
 
 [spans]
-P00 def        0..55  src0  T3
-P01 labeled_alternation 8..55  src0
-P02 alternative 12..32  src0  T3.M2
-P03 capture    29..32  src0  T1.M0
-P04 pattern    16..28  src0
-P05 alternative 35..53  src0  T3.M3
-P06 capture    49..53  src0  T2.M1
-P07 pattern    40..48  src0
-P08 def        57..292  src0  T6
-P09 pattern    61..292  src0
-P10 sequence   72..290  src0
-P11 quantifier 100..101  src0
-P12 pattern    78..100  src0
-P13 capture    281..286  src0  T6.M4
-P14 pattern    109..280  src0
-P15 pattern    136..274  src0
-P16 capture    184..189  src0  T6.M5
-P17 capture_type 190..197  src0  T4
-P18 field      165..169  src0
-P19 pattern    171..183  src0
-P20 field      206..211  src0
-P21 unlabeled_alternation 213..266  src0
-P22 alternative 225..232  src0
-P23 ref        225..232  src0  T3
-P24 alternative 243..256  src0
-P25 capture    252..256  src0  T6.M6
-P26 pattern    243..251  src0
+P00 def        0..55  source_id=0  T3
+P01 labeled_alternation 8..55  source_id=0
+P02 alternative 12..32  source_id=0  T3.M2
+P03 capture    29..32  source_id=0  T1.M0
+P04 pattern    16..28  source_id=0
+P05 alternative 35..53  source_id=0  T3.M3
+P06 capture    49..53  source_id=0  T2.M1
+P07 pattern    40..48  source_id=0
+P08 def        57..292  source_id=0  T6
+P09 pattern    61..292  source_id=0
+P10 sequence   72..290  source_id=0
+P11 quantifier 100..101  source_id=0
+P12 pattern    78..100  source_id=0
+P13 capture    281..286  source_id=0  T6.M4
+P14 pattern    109..280  source_id=0
+P15 pattern    136..274  source_id=0
+P16 capture    184..189  source_id=0  T6.M5
+P17 capture_type 190..197  source_id=0  T4
+P18 field      165..169  source_id=0
+P19 pattern    171..183  source_id=0
+P20 field      206..211  source_id=0
+P21 unlabeled_alternation 213..266  source_id=0
+P22 alternative 225..232  source_id=0
+P23 ref        225..232  source_id=0  T3
+P24 alternative 243..256  source_id=0
+P25 capture    252..256  source_id=0  T6.M6
+P26 pattern    243..251  source_id=0
 
 [instructions]
 Value:

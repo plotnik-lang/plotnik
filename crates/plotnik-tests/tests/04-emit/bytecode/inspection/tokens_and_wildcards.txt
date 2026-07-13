@@ -56,19 +56,19 @@ T0 = <NoValue>
 Q = 00 :: T0
 
 [spans]
-P00 def        0..150  src0
-P01 pattern    4..150  src0
-P02 pattern    15..148  src0
-P03 unlabeled_alternation 41..144  src0
-P04 alternative 49..120  src0
-P05 pattern    49..120  src0
-P06 pattern    76..88  src0
-P07 pattern    97..100  src0
-P08 pattern    109..112  src0
-P09 alternative 127..130  src0
-P10 pattern    127..130  src0
-P11 alternative 137..138  src0
-P12 pattern    137..138  src0
+P00 def        0..150  source_id=0
+P01 pattern    4..150  source_id=0
+P02 pattern    15..148  source_id=0
+P03 unlabeled_alternation 41..144  source_id=0
+P04 alternative 49..120  source_id=0
+P05 pattern    49..120  source_id=0
+P06 pattern    76..88  source_id=0
+P07 pattern    97..100  source_id=0
+P08 pattern    109..112  source_id=0
+P09 alternative 127..130  source_id=0
+P10 pattern    127..130  source_id=0
+P11 alternative 137..138  source_id=0
+P12 pattern    137..138  source_id=0
 
 [instructions]
 Q:

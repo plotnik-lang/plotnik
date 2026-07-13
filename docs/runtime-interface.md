@@ -326,10 +326,10 @@ production matchers reject inspection-compiled queries and do not include those
 effects in the generated-runtime ABI.
 
 Scalar effects use balanced value semantics. `ScalarOpen` starts with no range;
-every mark unions the node's half-open UTF-8 byte span into the frame's hull.
-`StrClose` returns `null` when the hull is absent and otherwise borrows that
+every mark expands the frame's document bounding range to include the node's
+half-open UTF-8 byte range. `StrClose` returns `null` when the range is absent and otherwise borrows that
 slice from the source. A real `n..n` mark therefore returns `""`, not `null`.
-`BoolClose` uses its boolean payload and retains the hull only as result
+`BoolClose` uses its boolean payload and retains the bounding range only as result
 provenance; it never derives truthiness from marks.
 For a scalar whose raw value is one node, `NodeStr` and `NodeBool` are the
 equivalent one-entry fast path; the node also carries result provenance.

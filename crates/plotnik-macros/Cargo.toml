@@ -7,7 +7,7 @@ repository.workspace = true
 description = "Proc-macro backend for plotnik - compile tree-sitter queries to typed Rust"
 documentation = "https://docs.rs/plotnik-macros"
 readme = "../../README.md"
-keywords = ["tree-sitter", "query", "ast", "proc-macro"]
+keywords = ["tree-sitter", "query", "syntax-tree", "proc-macro"]
 categories = ["development-tools", "parsing"]
 include = ["src/**/*", "Cargo.toml"]
 

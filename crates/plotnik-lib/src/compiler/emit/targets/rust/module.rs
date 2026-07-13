@@ -547,7 +547,7 @@ impl<'a> Generator<'a> {
         out.push_str("        }\n");
     }
 
-    /// The candidate loop: try the current node, step past rejected ones per
+    /// The candidate loop: try the current node, advance past rejected ones per
     /// the nav's skip policy. An `Exact` policy has exactly one candidate, so
     /// the loop degenerates to a single check.
     fn candidate_search(
@@ -618,7 +618,7 @@ impl<'a> Generator<'a> {
     }
 
     /// Post-acceptance effects, then successor dispatch — inline for states
-    /// with no retry, `finish_*` fns where the backtrack path replays them.
+    /// with no retry, `finish_*` fns where the backtrack path re-emits them.
     fn effects_and_flow(
         &self,
         out: &mut String,
@@ -987,7 +987,7 @@ impl<'a> Generator<'a> {
         splice(out, "", BACKTRACK_SKELETON, &[("SOURCE", source_arg)]);
     }
 
-    /// Per-state match-retry: step past the accepted-but-failed candidate,
+    /// Per-state match-retry: advance past the accepted-but-failed candidate,
     /// re-run the same state's candidate search and re-emit the finish. Only
     /// sibling-search states can carry a match-retry checkpoint.
     fn match_retry_fn(&self, out: &mut String) {
@@ -1393,8 +1393,8 @@ const RETURN_ARM: &str = r#"
 
 const FINISH_FN_OPEN: &str = r#"
 /// `@STATE@` post-acceptance: effects, then successor dispatch. Shared by the dispatch
-/// path and the match-retry resume, so a retried candidate replays exactly
-/// what the original acceptance would have.
+/// path and the match-retry resume, so a retried candidate emits exactly
+/// what the original acceptance would have emitted.
 #[inline]
 fn finish_@STEM@(@ENG@: &mut rt::Engine<'_>) -> Flow {
 "#;
@@ -1439,7 +1439,7 @@ fn backtrack<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str) -> Unwound {
                 return Unwound::Resumed(resume.target);
             }
 
-            // Match retry: step past the accepted-but-failed candidate and
+            // Match retry: advance past the accepted-but-failed candidate and
             // re-run that state's sibling search from there.
             rt::Resume::Match => match match_retry(eng, @SOURCE@, cp.ip) {
                 Some(Flow::Jump(next)) => return Unwound::Resumed(next),

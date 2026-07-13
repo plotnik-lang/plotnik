@@ -1261,7 +1261,7 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     /// be a type that needs no fresh name: a matched node (no-value inner) or
     /// another definition's output (a reference). Anonymous element shapes — a
     /// record of captures or a labeled alternation — have no name source (names
-    /// come only from defs, captures, custom capture types, and case tags) and are
+    /// come only from defs, captures, custom capture types, and case names) and are
     /// rejected with a hint to split the element into its own definition. The
     /// plausible element type is still returned so downstream inference isn't
     /// poisoned by no-value flow.
