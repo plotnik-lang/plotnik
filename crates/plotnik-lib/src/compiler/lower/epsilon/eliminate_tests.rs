@@ -151,7 +151,7 @@ fn laser_vision_single_succ_absorbs_effects() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -181,7 +181,7 @@ fn laser_vision_multi_succ_effectless_only() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -210,7 +210,7 @@ fn laser_vision_epsilon_source_absorbs_chain() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -239,7 +239,7 @@ fn laser_vision_branching_epsilon_skips_pure_jump() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -270,7 +270,7 @@ fn epsilon_chain_around_call_coalesces() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -303,7 +303,7 @@ fn combined_forward_then_laser() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -354,7 +354,7 @@ fn entry_point_resolution() {
             );
             m
         },
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -382,7 +382,7 @@ fn branching_epsilon_preserved_by_laser_vision() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -411,7 +411,7 @@ fn expand_branching_epsilon() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -443,7 +443,7 @@ fn expand_branching_multiple_predecessors() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -479,7 +479,7 @@ fn expand_branching_preserves_other_successors() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -507,7 +507,7 @@ fn expand_blocked_by_effects() {
     let mut result = NfaGraph {
         instructions,
         def_entries: indexmap::IndexMap::new(),
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };

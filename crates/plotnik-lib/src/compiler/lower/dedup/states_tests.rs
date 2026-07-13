@@ -11,7 +11,7 @@ fn graph(instructions: Vec<InstructionIR>, entry: u32) -> NfaGraph {
             m.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(entry));
             m
         },
-        entrypoint_wrappers: {
+        entry_point_wrappers: {
             let mut m = IndexMap::new();
             m.insert(DefId::from_raw(0), Label(entry));
             m
@@ -69,7 +69,7 @@ fn merges_identical_nav_twins() {
         nfa.def_entries[&DefVariant::ordinary(DefId::from_raw(0))],
         Label(2)
     );
-    assert_eq!(nfa.entrypoint_wrappers[&DefId::from_raw(0)], Label(2));
+    assert_eq!(nfa.entry_point_wrappers[&DefId::from_raw(0)], Label(2));
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn call_references_rewritten() {
         nfa.def_entries[&DefVariant::ordinary(DefId::from_raw(0))],
         Label(5)
     );
-    assert_eq!(nfa.entrypoint_wrappers[&DefId::from_raw(0)], Label(5));
+    assert_eq!(nfa.entry_point_wrappers[&DefId::from_raw(0)], Label(5));
 }
 
 #[test]

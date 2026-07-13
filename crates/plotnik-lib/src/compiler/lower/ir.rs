@@ -291,7 +291,7 @@ impl DefVariant {
 ///
 /// Resolved to an absolute member index at emit time: the parent type's member
 /// base (`member_base`) plus `relative_index`. The parent type is a scope or
-/// variant type that an entrypoint result reaches, so it is always present in the emitted
+/// variant type that an entry point result reaches, so it is always present in the emitted
 /// type table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct MemberRef {
@@ -921,7 +921,7 @@ pub(crate) enum LabelOrigin {
         source: SourceMode,
         route: DefRoute,
     },
-    /// Allocated for this definition's entrypoint wrapper.
+    /// Allocated for this definition's entry point wrapper.
     Wrapper(DefId),
 }
 
@@ -931,8 +931,8 @@ pub struct NfaGraph {
     pub(in crate::compiler::lower) instructions: Vec<InstructionIR>,
     /// Entry labels for every emitted definition-body variant.
     pub(in crate::compiler::lower) def_entries: IndexMap<DefVariant, Label>,
-    /// Entry labels for each emitted entrypoint wrapper, in definition order.
-    pub(in crate::compiler::lower) entrypoint_wrappers: IndexMap<DefId, Label>,
+    /// Entry labels for each emitted entry point wrapper, in definition order.
+    pub(in crate::compiler::lower) entry_point_wrappers: IndexMap<DefId, Label>,
     /// Inspection span table, present iff the query was compiled with inspection.
     pub(in crate::compiler::lower) spans: Option<SpanTable>,
     /// Origin per label id (index = `Label.0`), recorded at allocation.
@@ -945,7 +945,7 @@ impl NfaGraph {
     }
 
     pub(crate) fn entry_point_wrappers(&self) -> &IndexMap<DefId, Label> {
-        &self.entrypoint_wrappers
+        &self.entry_point_wrappers
     }
 
     pub(crate) fn spans(&self) -> Option<&SpanTable> {

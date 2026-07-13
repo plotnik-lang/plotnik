@@ -18,7 +18,7 @@ fn unbalanced_body_depth_panics() {
             entries.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
             entries
         },
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -41,7 +41,7 @@ fn zero_width_node_effect_panics() {
             entries.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
             entries
         },
-        entrypoint_wrappers: Default::default(),
+        entry_point_wrappers: Default::default(),
         spans: None,
         label_origins: Vec::new(),
     };

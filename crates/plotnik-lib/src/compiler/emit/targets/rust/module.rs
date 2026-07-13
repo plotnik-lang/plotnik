@@ -1197,7 +1197,7 @@ fn verify_language(tree: &rt::Tree) {
 "#;
 
 const ENTRY_FN: &str = r#"
-/// Match the `@DEF@` entrypoint against `tree`. `Some` carries the committed
+/// Match the `@DEF@` entry point against `tree`. `Some` carries the committed
 /// match journal — the same event sequence the VM commits for this query.
 pub fn @FN@<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
     let outcome = run::<false, false, true>(tree, source, @ENTRY@, NO_LIMITS);
@@ -1232,7 +1232,7 @@ const DRIVER_SKELETON: &str = r#"
 enum Flow {
     /// Continue at this state.
     Jump(u16),
-    /// The entrypoint accepted; the match journal is committed.
+    /// The entry point accepted; the match journal is committed.
     Accept,
     /// The state failed; unwind the checkpoint stack.
     Backtrack,
@@ -1245,7 +1245,7 @@ enum Unwound {
     NoMatch,
 }
 
-/// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
+/// One dispatch loop serves every entry point; `entry` selects the wrapper.
 /// `METERED_FUEL` and `METERED_MEMORY` gate the two budget checks
 /// independently: each folds away when its resource is unbounded, so a fully
 /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
@@ -1380,7 +1380,7 @@ eng.push_checkpoint(rt::Checkpoint::call_retry(
 const RETURN_ARM: &str = r#"
 @STATE@ => {
     if eng.frames_empty() {
-        assert_eq!(@OUTCOME@, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
+        assert_eq!(@OUTCOME@, rt::ReturnOutcome::Matched, "entry point returned zero-width");
         Flow::Accept
     } else {
         Flow::Jump(eng.exit_frame(@OUTCOME@))

@@ -805,7 +805,7 @@ mod debug_impl {
 
     fn entries(nfa: &NfaGraph) -> Vec<(WalkRoot, Label)> {
         let mut v = Vec::new();
-        for (&def_id, &label) in &nfa.entrypoint_wrappers {
+        for (&def_id, &label) in &nfa.entry_point_wrappers {
             v.push((WalkRoot::EntryPoint(def_id), label));
         }
         for (variant, &label) in &nfa.def_entries {

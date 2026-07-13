@@ -134,11 +134,11 @@ impl<'a> NfaBuilder<'a> {
             compiler.ensure_def_variant(DefVariant::ordinary(def_id));
         }
 
-        let mut entrypoint_wrappers = IndexMap::new();
+        let mut entry_point_wrappers = IndexMap::new();
         for (def_id, _) in ctx.analysis.type_analysis.iter_entry_point_outputs() {
             compiler.current_origin = Some(LabelOrigin::Wrapper(def_id));
-            let wrapper = compiler.emit_entrypoint_wrapper(def_id);
-            entrypoint_wrappers.insert(def_id, wrapper);
+            let wrapper = compiler.emit_entry_point_wrapper(def_id);
+            entry_point_wrappers.insert(def_id, wrapper);
         }
 
         verify_fresh_build(&compiler.instructions);
@@ -151,13 +151,13 @@ impl<'a> NfaBuilder<'a> {
         NfaGraph {
             instructions: compiler.instructions,
             def_entries: compiler.def_entries,
-            entrypoint_wrappers,
+            entry_point_wrappers,
             spans: compiler.spans,
             label_origins: compiler.label_origins,
         }
     }
 
-    fn emit_entrypoint_wrapper(&mut self, def_id: DefId) -> Label {
+    fn emit_entry_point_wrapper(&mut self, def_id: DefId) -> Label {
         let return_label = self.fresh_label();
         self.instructions.push(ReturnIR::new(return_label).into());
 

@@ -29,7 +29,7 @@ use super::sequences::SeqItemsCtx;
 /// The difference is the consumer, not the nav: a *match-once* item at
 /// `StayExact` is positioned by an outer search and matches exactly there, but a
 /// quantifier is a *loop* — even from a fixed `StayExact` start (a called def
-/// body, an alternation candidate, the entrypoint) it must scan its siblings
+/// body, an alternation candidate, the entry point) it must scan its siblings
 /// forward, so it owns a resumable search. A bounded anchor (`*Skip*`/`*Exact`)
 /// stays put in both. Folding this case back into `resumable_search_nav` makes
 /// alternations double-wrap and regresses; the two must stay distinct.

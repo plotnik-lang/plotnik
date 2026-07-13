@@ -190,7 +190,7 @@ mod matcher {
     const S11_Q_EP: u16 = 8;
     const S12_Q_EP: u16 = 9;
 
-    /// Match the `Q` entrypoint against `tree`. `Some` carries the committed
+    /// Match the `Q` entry point against `tree`. `Some` carries the committed
     /// match journal — the same event sequence the VM commits for this query.
     pub fn q_trace<'t>(tree: &'t rt::Tree, source: &str) -> Option<rt::MatchJournal<'t>> {
         let outcome = run::<false, false, true>(tree, source, S12_Q_EP, NO_LIMITS);
@@ -214,7 +214,7 @@ mod matcher {
     enum Flow {
         /// Continue at this state.
         Jump(u16),
-        /// The entrypoint accepted; the match journal is committed.
+        /// The entry point accepted; the match journal is committed.
         Accept,
         /// The state failed; unwind the checkpoint stack.
         Backtrack,
@@ -227,7 +227,7 @@ mod matcher {
         NoMatch,
     }
 
-    /// One dispatch loop serves every entrypoint; `entry` selects the wrapper.
+    /// One dispatch loop serves every entry point; `entry` selects the wrapper.
     /// `METERED_FUEL` and `METERED_MEMORY` gate the two budget checks
     /// independently: each folds away when its resource is unbounded, so a fully
     /// unbounded policy compiles to a plain loop that never reads `heap_bytes`.
@@ -292,7 +292,7 @@ mod matcher {
             //   01                                        ▶
             S01_Q => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned zero-width");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))
@@ -369,7 +369,7 @@ mod matcher {
             //   09                                        ▶
             S09_Q_EP => {
                 if eng.frames_empty() {
-                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entrypoint returned zero-width");
+                    assert_eq!(rt::ReturnOutcome::Matched, rt::ReturnOutcome::Matched, "entry point returned zero-width");
                     Flow::Accept
                 } else {
                     Flow::Jump(eng.exit_frame(rt::ReturnOutcome::Matched))

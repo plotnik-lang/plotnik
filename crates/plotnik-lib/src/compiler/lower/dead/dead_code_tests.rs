@@ -23,7 +23,7 @@ fn removes_unreachable_instructions() {
             m.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
             m
         },
-        entrypoint_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
+        entry_point_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -58,7 +58,7 @@ fn keeps_all_when_all_reachable() {
             m.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
             m
         },
-        entrypoint_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
+        entry_point_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -87,7 +87,7 @@ fn handles_branching() {
             m.insert(DefVariant::ordinary(DefId::from_raw(0)), Label(0));
             m
         },
-        entrypoint_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
+        entry_point_wrappers: IndexMap::from([(DefId::from_raw(0), Label(0))]),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -112,7 +112,7 @@ fn follows_call_targets_and_prunes_unreachable_definition_entries() {
     let mut result = NfaGraph {
         instructions,
         def_entries: IndexMap::from([(used.clone(), Label(3)), (unused, Label(5))]),
-        entrypoint_wrappers: IndexMap::from([(DefId::from_raw(2), Label(0))]),
+        entry_point_wrappers: IndexMap::from([(DefId::from_raw(2), Label(0))]),
         spans: None,
         label_origins: Vec::new(),
     };
@@ -142,7 +142,7 @@ fn keeps_reachable_recursive_definition() {
     let mut result = NfaGraph {
         instructions,
         def_entries: IndexMap::from([(recursive.clone(), Label(3))]),
-        entrypoint_wrappers: IndexMap::from([(DefId::from_raw(1), Label(0))]),
+        entry_point_wrappers: IndexMap::from([(DefId::from_raw(1), Label(0))]),
         spans: None,
         label_origins: Vec::new(),
     };

@@ -44,8 +44,8 @@ fn record_body_analysis() {
 pub(crate) enum SemanticVerifyError {
     #[error("semantic matcher has {0} states (max {MAX_STATES})")]
     StateLimit(usize),
-    #[error("semantic matcher has {0} entrypoints (max {max})", max = u16::MAX)]
-    EntrypointLimit(usize),
+    #[error("semantic matcher has {0} entry points (max {max})", max = u16::MAX)]
+    EntryPointLimit(usize),
     #[error("malformed semantic NFA: {0}")]
     Malformed(String),
     #[error("effect stack is imbalanced at state {0:?}")]
@@ -72,7 +72,7 @@ pub(crate) fn verify(
 
     let graph = semantic.raw();
     if graph.entry_point_wrappers().len() > u16::MAX as usize {
-        return Err(SemanticVerifyError::EntrypointLimit(
+        return Err(SemanticVerifyError::EntryPointLimit(
             graph.entry_point_wrappers().len(),
         ));
     }
@@ -143,7 +143,7 @@ mod tests {
         SemanticNfa::new(NfaGraph {
             instructions,
             def_entries: IndexMap::new(),
-            entrypoint_wrappers: IndexMap::new(),
+            entry_point_wrappers: IndexMap::new(),
             spans: None,
             label_origins: vec![None; count],
         })
@@ -333,7 +333,7 @@ impl<'a> Program<'a> {
                 .is(ReturnOutcomes::MATCHED, ReturnEntry::Caller)
             {
                 return Err(SemanticVerifyError::Malformed(format!(
-                    "entrypoint {entry:?} has the wrong return contract"
+                    "entry point {entry:?} has the wrong return contract"
                 )));
             }
         }
@@ -950,7 +950,7 @@ impl<'a> Program<'a> {
 
     fn entries(&self) -> impl Iterator<Item = Label> + '_ {
         self.graph
-            .entrypoint_wrappers
+            .entry_point_wrappers
             .values()
             .chain(self.graph.def_entries.values())
             .copied()
@@ -959,7 +959,7 @@ impl<'a> Program<'a> {
     fn depth_entries(&self) -> Vec<(Label, DefRoute)> {
         let wrappers = self
             .graph
-            .entrypoint_wrappers
+            .entry_point_wrappers
             .values()
             .copied()
             .map(|entry| (entry, DefRoute::Caller));
