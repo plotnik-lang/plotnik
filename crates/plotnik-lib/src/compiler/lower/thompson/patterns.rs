@@ -577,11 +577,11 @@ impl NfaBuilder<'_> {
         let call_entry = match lowering {
             RefLowering::ScopedCapture => {
                 // A record scope isolates the definition's internal captures before `RecordSet`.
-                let set_step =
+                let capture_state =
                     self.emit_effects_epsilon(exit, capture.post, CaptureEffects::default());
-                let record_close_step = self.emit_record_close_step(set_step);
-                let call_label = emit_call(self, ReturnAddr(record_close_step));
-                self.emit_record_open_step(call_label)
+                let record_close = self.emit_record_close(capture_state);
+                let call_label = emit_call(self, ReturnAddr(record_close));
+                self.emit_record_open(call_label)
             }
             RefLowering::CapturedValue => {
                 let return_addr =
@@ -773,12 +773,10 @@ impl NfaBuilder<'_> {
                 capture: &post,
                 outer: &[],
             };
-            let close_match = self.emit_record_close_step_with_effects(end, match_exit);
+            let close_match = self.emit_record_close_with_effects(end, match_exit);
             let close_skip = match skip_exit {
                 SkipExit::To(skip) if skip == match_exit => SkipExit::To(close_match),
-                SkipExit::To(skip) => {
-                    SkipExit::To(self.emit_record_close_step_with_effects(end, skip))
-                }
+                SkipExit::To(skip) => SkipExit::To(self.emit_record_close_with_effects(end, skip)),
                 SkipExit::Fail => SkipExit::Fail,
             };
             let (body_match_exit, def_span) = self.bracket_def_body_exit(body, close_match);
@@ -797,7 +795,7 @@ impl NfaBuilder<'_> {
                 this.compile_nullable_pattern(body, pattern_ctx, body_skip_exit)
             });
             let body_entry = self.wrap_def_body_entry(body_entry, def_span);
-            self.emit_record_open_step_with_pre(body_entry, pre)
+            self.emit_record_open_with_pre(body_entry, pre)
         } else if is_captured {
             // Non-record body: it leaves its value pending; the
             // consumer chain runs after it on either continuation.
@@ -1212,13 +1210,13 @@ impl NfaBuilder<'_> {
             outer_capture,
         } = req;
         let CaptureEffects { pre, post } = outer_capture;
-        let set_step =
+        let capture_state =
             self.emit_effects_epsilon(exit, capture_effects, CaptureEffects::new_post(post));
         let inner_entry =
-            self.dispatch_pattern(&inner, PatternCtx::with_value(set_step, nav_override));
+            self.dispatch_pattern(&inner, PatternCtx::with_value(capture_state, nav_override));
         // The enclosing variant type's `VariantOpen` (in `pre`) must run before the
         // inner produces its pending value; routing it through the trailing
-        // `RecordSet` step would drop it and unbalance the scope.
+        // `RecordSet` state would drop it and unbalance the scope.
         self.wrap_entry_pre(inner_entry, pre)
     }
 

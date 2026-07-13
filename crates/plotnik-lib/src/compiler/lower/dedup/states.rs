@@ -2,7 +2,7 @@
 //!
 //! Thompson construction freely duplicates small states — a search-nav
 //! quantifier's first and repeat iterations each emit a position search whose
-//! `navigate` and `retry` states are byte-identical wildcard `Next` steps into
+//! `navigate` and `retry` states are byte-identical wildcard `Next` transitions into
 //! the same `try` state (#475). Two instructions that perform the same
 //! operation and continue to the same successors are bisimilar: no execution
 //! can tell which one it is in, so every reference to the duplicate is

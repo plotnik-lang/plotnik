@@ -220,7 +220,7 @@ impl NfaBuilder<'_> {
         if let Some(id) = span_id {
             entry_pre.push(EffectIR::span_start(id));
         }
-        let exit = self.quant_end_step(span_id, &closes, exit);
+        let exit = self.quant_end(span_id, &closes, exit);
 
         QuantBrackets {
             inner_capture: CaptureEffects::new(vec![], post),
@@ -232,10 +232,10 @@ impl NfaBuilder<'_> {
     }
 
     fn quant_end_for(&mut self, brackets: &QuantBrackets, exit: Label) -> Label {
-        self.quant_end_step(brackets.span_id, &brackets.closes, exit)
+        self.quant_end(brackets.span_id, &brackets.closes, exit)
     }
 
-    fn quant_end_step(&mut self, span_id: Option<u16>, closes: &[EffectIR], exit: Label) -> Label {
+    fn quant_end(&mut self, span_id: Option<u16>, closes: &[EffectIR], exit: Label) -> Label {
         let mut effects: Vec<EffectIR> = span_id.map(EffectIR::span_end).into_iter().collect();
         effects.extend(closes.iter().cloned());
         self.emit_effects_if_nonempty(exit, effects)
@@ -573,9 +573,9 @@ impl NfaBuilder<'_> {
 
         let skip_exit = match skip_exit {
             SkipExit::To(skip) => {
-                let end_step = self.quant_end_for(&brackets, skip);
+                let quant_end = self.quant_end_for(&brackets, skip);
                 let skip_with_absence =
-                    self.emit_absence_for_skip_path(end_step, &brackets.inner_capture);
+                    self.emit_absence_for_skip_path(quant_end, &brackets.inner_capture);
                 SkipExit::To(self.emit_absence_for_internal_captures(skip_with_absence, &inner))
             }
             SkipExit::Fail => SkipExit::Fail,
@@ -637,14 +637,14 @@ impl NfaBuilder<'_> {
         // trailing effects still run, as they do on the match path.
         let skip_target = match skip_exit {
             SkipExit::To(skip) => {
-                let end_step = self.quant_end_for(&brackets, skip);
+                let quant_end = self.quant_end_for(&brackets, skip);
                 let mut skip_effects: Vec<EffectIR> = capture_effects
                     .iter()
                     .filter(|eff| eff.kind() == EffectKind::RecordSet)
                     .flat_map(|set_eff| [EffectIR::absent(), set_eff.clone()])
                     .collect();
                 skip_effects.extend(brackets.inner_capture.post.iter().cloned());
-                Some(self.emit_effects_if_nonempty(end_step, skip_effects))
+                Some(self.emit_effects_if_nonempty(quant_end, skip_effects))
             }
             SkipExit::Fail => None,
         };
@@ -668,14 +668,14 @@ impl NfaBuilder<'_> {
             brackets.exit,
             |this, target| {
                 let ExitNav { exit, nav } = target;
-                let record_close = this.emit_record_close_step_with_effects(end_effects, exit);
+                let record_close = this.emit_record_close_with_effects(end_effects, exit);
                 let body = this.compile_with_optional_scope(record_type_id, |t| {
                     t.compile_iteration_element(
                         &inner,
                         PatternCtx::with_nav(record_close, Some(nav)),
                     )
                 });
-                this.emit_record_open_step(body)
+                this.emit_record_open(body)
             },
         );
 
@@ -734,7 +734,7 @@ impl NfaBuilder<'_> {
         };
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
-                let list_close = self.emit_list_close_step(end_effects, exit);
+                let list_close = self.emit_list_close(end_effects, exit);
                 if let Pattern::QuantifiedPattern(quant) = &inner {
                     self.compile_quantified_for_list(quant, list_close, nav, push_effects)
                 } else {
@@ -745,11 +745,9 @@ impl NfaBuilder<'_> {
                 match_exit,
                 skip_exit,
             } => {
-                let match_list_close = self.emit_list_close_step(end_effects, match_exit);
+                let match_list_close = self.emit_list_close(end_effects, match_exit);
                 let skip_list_close = match skip_exit {
-                    SkipExit::To(skip) => {
-                        SkipExit::To(self.emit_list_close_step(end_effects, skip))
-                    }
+                    SkipExit::To(skip) => SkipExit::To(self.emit_list_close(end_effects, skip)),
                     SkipExit::Fail => SkipExit::Fail,
                 };
                 self.compile_star_for_list_with_exits(
@@ -764,8 +762,8 @@ impl NfaBuilder<'_> {
             }
         };
 
-        // Emit the list-open step at entry with outer pre-effects such as VariantOpen.
-        self.emit_list_open_step(inner_entry, outer_capture.pre, quant_start)
+        // Emit the list-open state at entry with outer pre-effects such as VariantOpen.
+        self.emit_list_open(inner_entry, outer_capture.pre, quant_start)
     }
 
     fn compile_star_for_list_with_exits(
@@ -847,7 +845,7 @@ impl NfaBuilder<'_> {
     /// mechanism as the first. A bounded nav instead compiles the body twice —
     /// the first iteration applies `first_nav`, the repeat applies its
     /// [`sibling_continuation`](Nav::sibling_continuation) — so repeated matches
-    /// are bounded sibling steps (back-to-back) rather than a forward search.
+    /// are adjacent sibling matches rather than a forward search.
     fn emit_loop_iterations(
         &mut self,
         first_nav: Nav,
@@ -1084,10 +1082,10 @@ impl NfaBuilder<'_> {
         // Skip: the value is a bare null; enclosing-scope effects still run.
         let skip_target = match skip_exit {
             SkipExit::To(skip) => {
-                let end_step = self.quant_end_for(&brackets, skip);
+                let quant_end = self.quant_end_for(&brackets, skip);
                 let mut skip_effects = vec![EffectIR::absent()];
                 skip_effects.extend(brackets.inner_capture.post.iter().cloned());
-                Some(self.emit_effects_if_nonempty(end_step, skip_effects))
+                Some(self.emit_effects_if_nonempty(quant_end, skip_effects))
             }
             SkipExit::Fail => None,
         };

@@ -256,7 +256,7 @@ fn collapse_up_merges_up_to_max() {
 #[test]
 fn collapse_up_refuses_merge_exceeding_max() {
     // A maxed-out ascent plus more would exceed Nav::MAX_UP_LEVEL. Capping would
-    // silently drop upward movement, so the merge is refused and both steps remain.
+    // silently drop upward movement, so the merge is refused and both states remain.
     let mut result = NfaGraph {
         instructions: vec![
             MatchIR::terminal(Label(0))

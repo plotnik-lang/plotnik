@@ -20,7 +20,7 @@ pub struct RecordScope(pub TypeId);
 /// restore the cursor and take a different path when the inner matches empty
 /// times, so the match and skip paths exit separately (`Split`). A scope emitter
 /// closes its scope on *every* continuation, so the only difference between the
-/// two modes is how many close steps it emits. Threading this through one
+/// two modes is how many close states it emits. Threading this through one
 /// mechanism dispatch (`compile_captured`) keeps the single- and split-exit paths
 /// from drifting — the gap behind both #470 and the `@_` discard panic.
 #[derive(Clone, Copy)]
@@ -219,7 +219,7 @@ impl NfaBuilder<'_> {
         };
         let inner_entry = match exits {
             CaptureExits::Single(exit) => {
-                let record_close = self.emit_record_close_step_with_effects(end_effects, exit);
+                let record_close = self.emit_record_close_with_effects(end_effects, exit);
                 self.compile_with_optional_scope(scope_type_id, |this| {
                     this.compile_pattern(&inner, record_close, nav)
                 })
@@ -229,10 +229,10 @@ impl NfaBuilder<'_> {
                 skip_exit,
             } => {
                 let match_record_close =
-                    self.emit_record_close_step_with_effects(end_effects, match_exit);
+                    self.emit_record_close_with_effects(end_effects, match_exit);
                 let skip_record_close = match skip_exit {
                     SkipExit::To(skip) => {
-                        SkipExit::To(self.emit_record_close_step_with_effects(end_effects, skip))
+                        SkipExit::To(self.emit_record_close_with_effects(end_effects, skip))
                     }
                     SkipExit::Fail => SkipExit::Fail,
                 };
@@ -248,12 +248,12 @@ impl NfaBuilder<'_> {
             }
         };
 
-        self.emit_record_open_step_with_pre(inner_entry, outer_capture.pre)
+        self.emit_record_open_with_pre(inner_entry, outer_capture.pre)
     }
 
     /// Compile a node capture that also contains bubbling inner captures.
     ///
-    /// `capture_effects` land on the inner match instruction, not a `RecordClose` step.
+    /// `capture_effects` land on the inner match instruction, not a `RecordClose` state.
     /// The inner captures use the already-open outer scope, so no RecordOpen/RecordClose
     /// wrapper is emitted.
     pub(super) fn compile_bubble_with_node_capture(
@@ -271,13 +271,13 @@ impl NfaBuilder<'_> {
         let actual_exit = if outer_capture.post.is_empty() {
             exit
         } else {
-            let outer_step = self.fresh_label();
+            let outer_state = self.fresh_label();
             self.instructions.push(
-                MatchIR::epsilon(outer_step, exit)
+                MatchIR::epsilon(outer_state, exit)
                     .append_effects(outer_capture.post)
                     .into(),
             );
-            outer_step
+            outer_state
         };
 
         let inner_capture = CaptureEffects::new(outer_capture.pre, capture_effects);
@@ -301,9 +301,9 @@ impl NfaBuilder<'_> {
         nav_override: Option<Nav>,
         element_type_id: Option<TypeId>,
     ) -> Label {
-        let record_close_step = self.fresh_label();
+        let record_close = self.fresh_label();
         self.instructions.push(
-            MatchIR::epsilon(record_close_step, exit)
+            MatchIR::epsilon(record_close, exit)
                 .append_effect(EffectIR::record_close())
                 .append_effect(EffectIR::array_push())
                 .into(),
@@ -311,27 +311,20 @@ impl NfaBuilder<'_> {
 
         // `element_type_id` drives `RecordSet` effects inside the record scope.
         let inner_entry = self.compile_with_optional_scope(element_type_id, |this| {
-            this.compile_iteration_element(
-                inner,
-                PatternCtx::with_nav(record_close_step, nav_override),
-            )
+            this.compile_iteration_element(inner, PatternCtx::with_nav(record_close, nav_override))
         });
 
-        let record_open_step = self.fresh_label();
+        let record_open = self.fresh_label();
         self.instructions.push(
-            MatchIR::epsilon(record_open_step, inner_entry)
+            MatchIR::epsilon(record_open, inner_entry)
                 .prepend_effect(EffectIR::record_open())
                 .into(),
         );
 
-        record_open_step
+        record_open
     }
 
-    pub(super) fn emit_list_close_step(
-        &mut self,
-        effects: ScopeCloseEffects<'_>,
-        exit: Label,
-    ) -> Label {
+    pub(super) fn emit_list_close(&mut self, effects: ScopeCloseEffects<'_>, exit: Label) -> Label {
         let label = self.fresh_label();
         self.instructions.push(
             MatchIR::epsilon(label, exit)
@@ -344,22 +337,22 @@ impl NfaBuilder<'_> {
         label
     }
 
-    /// Emit a record-open epsilon step with no enclosing pre-effects.
-    pub(super) fn emit_record_open_step(&mut self, successor: Label) -> Label {
-        self.emit_record_open_step_with_pre(successor, vec![])
+    /// Emit a record-open epsilon state with no enclosing pre-effects.
+    pub(super) fn emit_record_open(&mut self, successor: Label) -> Label {
+        self.emit_record_open_with_pre(successor, vec![])
     }
 
-    /// Emit a record-close epsilon step with no capture or outer effects.
-    pub(super) fn emit_record_close_step(&mut self, successor: Label) -> Label {
-        self.emit_record_close_step_with_effects(ScopeCloseEffects::none(), successor)
+    /// Emit a record-close epsilon state with no capture or outer effects.
+    pub(super) fn emit_record_close(&mut self, successor: Label) -> Label {
+        self.emit_record_close_with_effects(ScopeCloseEffects::none(), successor)
     }
 
-    /// Emit a record-close epsilon step carrying capture and outer effects.
+    /// Emit a record-close epsilon state carrying capture and outer effects.
     ///
-    /// The record-scope counterpart of [`emit_list_close_step`](Self::emit_list_close_step),
+    /// The record-scope counterpart of [`emit_list_close`](Self::emit_list_close),
     /// used by split-exit record captures to close the record and apply `RecordSet`
     /// on each exit.
-    pub(super) fn emit_record_close_step_with_effects(
+    pub(super) fn emit_record_close_with_effects(
         &mut self,
         effects: ScopeCloseEffects<'_>,
         exit: Label,
@@ -376,8 +369,8 @@ impl NfaBuilder<'_> {
         label
     }
 
-    /// Emit a list-open epsilon step with optional leading and trailing effects.
-    pub(super) fn emit_list_open_step(
+    /// Emit a list-open epsilon state with optional leading and trailing effects.
+    pub(super) fn emit_list_open(
         &mut self,
         successor: Label,
         leading_effects: Vec<EffectIR>,
@@ -394,12 +387,12 @@ impl NfaBuilder<'_> {
         label
     }
 
-    /// Emit a record-open epsilon step with optional leading effects.
+    /// Emit a record-open epsilon state with optional leading effects.
     ///
-    /// The record-scope counterpart of [`emit_list_open_step`](Self::emit_list_open_step),
+    /// The record-scope counterpart of [`emit_list_open`](Self::emit_list_open),
     /// used by split-exit record captures to open the record after the enclosing
     /// scope's pre-effects (e.g. a variant case's `VariantOpen`).
-    pub(super) fn emit_record_open_step_with_pre(
+    pub(super) fn emit_record_open_with_pre(
         &mut self,
         successor: Label,
         leading_effects: Vec<EffectIR>,

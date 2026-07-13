@@ -80,7 +80,7 @@ impl CaptureTerminal {
 /// Owns one capture-type transformation and its continuation protocol.
 ///
 /// The plan, navigation, and match/skip exits travel together because every
-/// recursive step changes them as one semantic route. Keeping that behavior on
+/// recursive call changes them as one semantic route. Keeping that behavior on
 /// a lowering role prevents helper calls from accepting incoherent combinations
 /// such as a string close with presence-boolean source semantics.
 pub(super) struct CaptureTypeLowerer<'b, 'a> {

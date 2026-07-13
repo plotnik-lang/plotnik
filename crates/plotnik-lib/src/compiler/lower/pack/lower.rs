@@ -27,7 +27,7 @@ pub fn pack_instructions(result: &mut NfaGraph) {
         + 1;
 
     // Earlier passes may have deleted the highest-numbered labels, so ids from
-    // `next_label` up get *reused* for cascade steps. Drop the dead labels'
+    // `next_label` up get *reused* for cascade states. Drop the dead labels'
     // origins so a reused id reads as a wire artifact (no origin), not as the
     // dead label's definition.
     result.label_origins.truncate(next_label as usize);

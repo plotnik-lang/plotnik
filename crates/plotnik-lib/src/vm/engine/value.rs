@@ -165,7 +165,7 @@ impl Value<'_> {
     }
 }
 
-/// `indent` varies per recursion step; the rest is shared state threaded through every call.
+/// `indent` varies by recursion depth; the rest is shared state threaded through every call.
 struct FormatCtx<'a> {
     out: &'a mut String,
     colors: &'a Colors,
@@ -173,7 +173,7 @@ struct FormatCtx<'a> {
 }
 
 /// One emission for the iterative formatter's work stack.
-enum Step<'a> {
+enum WorkItem<'a> {
     /// Render a value: a leaf writes directly, a composite pushes its expansion.
     Value(&'a Value<'a>, usize),
     /// Write a borrowed slice verbatim. Color codes are `'static`; record keys and
@@ -192,16 +192,16 @@ enum Step<'a> {
 /// uses an explicit work stack. Emission is byte-identical to the equivalent
 /// recursive printer; the `06-vm` golden fixtures pin that.
 fn format_value<'a>(ctx: &mut FormatCtx<'_>, value: &'a Value<'a>, indent: usize) {
-    let mut stack = vec![Step::Value(value, indent)];
-    while let Some(step) = stack.pop() {
-        match step {
-            Step::Str(s) => ctx.out.push_str(s),
-            Step::Line(n) => {
+    let mut stack = vec![WorkItem::Value(value, indent)];
+    while let Some(item) = stack.pop() {
+        match item {
+            WorkItem::Str(s) => ctx.out.push_str(s),
+            WorkItem::Line(n) => {
                 ctx.out.push('\n');
                 push_indent(ctx.out, n);
             }
-            Step::Key(key) => emit_key(ctx, key),
-            Step::Value(value, indent) => emit_value(ctx, value, indent, &mut stack),
+            WorkItem::Key(key) => emit_key(ctx, key),
+            WorkItem::Value(value, indent) => emit_value(ctx, value, indent, &mut stack),
         }
     }
 }
@@ -302,7 +302,7 @@ fn emit_value<'a>(
     ctx: &mut FormatCtx<'_>,
     value: &'a Value<'a>,
     indent: usize,
-    stack: &mut Vec<Step<'a>>,
+    stack: &mut Vec<WorkItem<'a>>,
 ) {
     let c = ctx.colors;
     match value {
@@ -334,21 +334,21 @@ fn emit_value<'a>(
             let mut deferred = Vec::with_capacity(items.len() * 3 + 3);
             for (i, item) in items.iter().enumerate() {
                 if i > 0 {
-                    deferred.push(Step::Str(c.dim));
-                    deferred.push(Step::Str(","));
-                    deferred.push(Step::Str(c.reset));
+                    deferred.push(WorkItem::Str(c.dim));
+                    deferred.push(WorkItem::Str(","));
+                    deferred.push(WorkItem::Str(c.reset));
                 }
                 if ctx.pretty {
-                    deferred.push(Step::Line(elem_indent));
+                    deferred.push(WorkItem::Line(elem_indent));
                 }
-                deferred.push(Step::Value(item, elem_indent));
+                deferred.push(WorkItem::Value(item, elem_indent));
             }
             if ctx.pretty {
-                deferred.push(Step::Line(indent));
+                deferred.push(WorkItem::Line(indent));
             }
-            deferred.push(Step::Str(c.dim));
-            deferred.push(Step::Str("]"));
-            deferred.push(Step::Str(c.reset));
+            deferred.push(WorkItem::Str(c.dim));
+            deferred.push(WorkItem::Str("]"));
+            deferred.push(WorkItem::Str(c.reset));
             stack.extend(deferred.into_iter().rev());
         }
         Value::Record(fields) => {
@@ -365,22 +365,22 @@ fn emit_value<'a>(
             let mut deferred = Vec::with_capacity(fields.len() * 4 + 3);
             for (i, (key, value)) in fields.iter().enumerate() {
                 if i > 0 {
-                    deferred.push(Step::Str(c.dim));
-                    deferred.push(Step::Str(","));
-                    deferred.push(Step::Str(c.reset));
+                    deferred.push(WorkItem::Str(c.dim));
+                    deferred.push(WorkItem::Str(","));
+                    deferred.push(WorkItem::Str(c.reset));
                 }
                 if ctx.pretty {
-                    deferred.push(Step::Line(field_indent));
+                    deferred.push(WorkItem::Line(field_indent));
                 }
-                deferred.push(Step::Key(key));
-                deferred.push(Step::Value(value, field_indent));
+                deferred.push(WorkItem::Key(key));
+                deferred.push(WorkItem::Value(value, field_indent));
             }
             if ctx.pretty {
-                deferred.push(Step::Line(indent));
+                deferred.push(WorkItem::Line(indent));
             }
-            deferred.push(Step::Str(c.dim));
-            deferred.push(Step::Str("}"));
-            deferred.push(Step::Str(c.reset));
+            deferred.push(WorkItem::Str(c.dim));
+            deferred.push(WorkItem::Str("}"));
+            deferred.push(WorkItem::Str(c.reset));
             stack.extend(deferred.into_iter().rev());
         }
         Value::Variant { tag, data } => {
@@ -426,14 +426,14 @@ fn emit_value<'a>(
                 if ctx.pretty {
                     ctx.out.push(' ');
                 }
-                deferred.push(Step::Value(d, field_indent));
+                deferred.push(WorkItem::Value(d, field_indent));
             }
             if ctx.pretty {
-                deferred.push(Step::Line(indent));
+                deferred.push(WorkItem::Line(indent));
             }
-            deferred.push(Step::Str(c.dim));
-            deferred.push(Step::Str("}"));
-            deferred.push(Step::Str(c.reset));
+            deferred.push(WorkItem::Str(c.dim));
+            deferred.push(WorkItem::Str("}"));
+            deferred.push(WorkItem::Str(c.reset));
             stack.extend(deferred.into_iter().rev());
         }
     }

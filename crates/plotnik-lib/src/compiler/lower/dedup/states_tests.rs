@@ -51,7 +51,7 @@ fn match_at(nfa: &NfaGraph, label: u32) -> &MatchIR {
 #[test]
 fn merges_identical_nav_twins() {
     // The position-search shape: `navigate` and `retry` are byte-identical
-    // wildcard Next steps into the same `try` state.
+    // wildcard `Next` transitions into the same `try` state.
     let mut nfa = graph(
         vec![
             eps(0, vec![1, 2]),   // try → [body, retry]

@@ -160,7 +160,7 @@ mod debug_impl {
     }
 
     /// What one node contributes to the walk.
-    struct WalkStep {
+    struct NodeContribution {
         /// Effect-free epsilon: contributes no ops and is not marked visited
         /// (laser vision through pure control flow).
         see_through: bool,
@@ -352,9 +352,9 @@ mod debug_impl {
 
         /// Compute one node's contribution. Cycle detection is the walker's job (it
         /// depends on traversal state), so this is a pure function of the graph.
-        fn node_step(&self, label: Label) -> WalkStep {
+        fn node_contribution(&self, label: Label) -> NodeContribution {
             let Some(&instr) = self.instr_map.get(&label) else {
-                return WalkStep {
+                return NodeContribution {
                     see_through: false,
                     ops: vec![SemanticOp::DanglingLabel],
                     succs: vec![],
@@ -364,13 +364,13 @@ mod debug_impl {
             match instr {
                 InstructionIR::Match(m) => {
                     if m.is_epsilon() && m.effects.is_empty() {
-                        return WalkStep {
+                        return NodeContribution {
                             see_through: true,
                             ops: vec![],
                             succs: m.successors.clone(),
                         };
                     }
-                    WalkStep {
+                    NodeContribution {
                         see_through: false,
                         ops: collect_match_ops(m, self.ctx),
                         succs: m.successors.clone(),
@@ -384,13 +384,13 @@ mod debug_impl {
                         .get(&c.target)
                         .map(|def_id| format!("def#{}", def_id.index()))
                         .unwrap_or_else(|| format!("label#{}", c.target.0));
-                    WalkStep {
+                    NodeContribution {
                         see_through: false,
                         ops: vec![SemanticOp::Call(name)],
                         succs: c.return_labels().to_vec(),
                     }
                 }
-                InstructionIR::Return(return_) => WalkStep {
+                InstructionIR::Return(return_) => NodeContribution {
                     see_through: false,
                     ops: vec![SemanticOp::Return(return_.outcome())],
                     succs: vec![],
@@ -429,26 +429,26 @@ mod debug_impl {
                     continue;
                 }
 
-                let walk_step = self.node_step(label);
+                let contribution = self.node_contribution(label);
 
-                if walk_step.see_through {
+                if contribution.see_through {
                     // Reversed pushes so successors pop in priority order (pre-order).
-                    for &succ in walk_step.succs.iter().rev() {
+                    for &succ in contribution.succs.iter().rev() {
                         stack.push((succ, ops.clone(), visited.clone(), depth + 1));
                     }
                     continue;
                 }
 
                 visited.insert(label);
-                ops.extend(walk_step.ops);
+                ops.extend(contribution.ops);
 
-                if walk_step.succs.is_empty() {
+                if contribution.succs.is_empty() {
                     on_path(normalize_path(ops));
                     count += 1;
                     continue;
                 }
 
-                for &succ in walk_step.succs.iter().rev() {
+                for &succ in contribution.succs.iter().rev() {
                     stack.push((succ, ops.clone(), visited.clone(), depth + 1));
                 }
             }

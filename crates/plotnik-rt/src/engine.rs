@@ -25,7 +25,7 @@ use crate::{
 ///
 /// Instruction pointers, fuel budgets, and limit policy stay with the
 /// executor: they are dispatch concerns, and each executor represents "where
-/// am I" differently (decoded step address vs. generated state id).
+/// am I" differently (decoded code address vs. generated state id).
 pub struct Engine<'t> {
     cursor: CursorWrapper<'t>,
     frames: FrameArena,

@@ -2,7 +2,7 @@
 //!
 //! Mirrors the bytecode dump's visual grammar (`docs/binary-format/08-dump-format.md`)
 //! in label space, keeping the resolution the wire format erases: symbolic labels
-//! instead of packed step addresses, definition-name section headers from label
+//! instead of packed code addresses, definition-name section headers from label
 //! provenance (`Name (consuming):` for the guarded-recursion body variant,
 //! `Name (entry point):` for wrappers), real member names on
 //! `RecordSet`/`VariantOpen`,

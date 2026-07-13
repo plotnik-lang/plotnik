@@ -290,7 +290,7 @@ impl<'t> VM<'t> {
 
     /// Accepting a candidate in an engine-owned sibling search is a choice
     /// point: leave a resume checkpoint so a later failure retries the search
-    /// past this candidate. Skipped when the search cannot legally step over
+    /// past this candidate. Skipped when the search cannot legally advance past
     /// the accepted node — either the nav owns no sibling search
     /// ([`Nav::is_sibling_search`]; NFA-level retry loops are compiled with
     /// exact navs precisely to opt out here), or the skip policy does not

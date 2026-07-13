@@ -52,7 +52,7 @@ fn opcode_sizes() {
 }
 
 #[test]
-fn opcode_step_counts() {
+fn opcode_word_counts() {
     assert_eq!(Opcode::Match8.word_count(), 1);
     assert_eq!(Opcode::Match16.word_count(), 2);
     assert_eq!(Opcode::Match32.word_count(), 4);

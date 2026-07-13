@@ -166,7 +166,7 @@ impl<'a> NfaBuilder<'a> {
         let wraps_record = matches!(output_shape, TypeShape::Record(_));
 
         let after_body = if wraps_record {
-            self.emit_record_close_step(return_label)
+            self.emit_record_close(return_label)
         } else if matches!(output_shape, TypeShape::Node) {
             self.emit_effects_epsilon(
                 return_label,
@@ -184,7 +184,7 @@ impl<'a> NfaBuilder<'a> {
         );
 
         if wraps_record {
-            self.emit_record_open_step(call)
+            self.emit_record_open(call)
         } else {
             call
         }

@@ -33,7 +33,7 @@ const SNAPSHOT_ACTIVATION_WIDE_MISSES: u32 = 32;
 const SNAPSHOT_ACTIVATION_MIN_JUMP: u32 = 32;
 
 impl SkipPolicy {
-    /// Whether a sibling search under this policy may step over `node` — both
+    /// Whether a sibling search under this policy may skip `node` — both
     /// when scanning forward past a rejected candidate and when resuming past
     /// an accepted-but-failed one (the node then sits in the pattern's gap,
     /// which must admit it).

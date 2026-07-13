@@ -89,7 +89,7 @@ impl NfaBuilder<'_> {
     /// Emit an epsilon with combined effects.
     ///
     /// Note: this consumes only `outer.post`. Callers whose capture owns no
-    /// scope-opening step (`PendingValue`, suppressed region) must route `outer.pre`
+    /// scope-opening state (`PendingValue`, suppressed region) must route `outer.pre`
     /// separately via [`wrap_entry_pre`](Self::wrap_entry_pre).
     pub(super) fn emit_effects_epsilon(
         &mut self,
@@ -112,8 +112,8 @@ impl NfaBuilder<'_> {
     /// `pre` is empty.
     ///
     /// Scope-opening captures (`compile_record_capture`, `compile_list_capture`)
-    /// fold `outer_capture.pre` onto their own `RecordOpen`/`ListOpen` step. Captures that
-    /// own no such step — `PendingValue` and suppressed regions — have nowhere to fold it,
+    /// fold `outer_capture.pre` onto their own `RecordOpen`/`ListOpen` state. Captures that
+    /// own no such state — `PendingValue` and suppressed regions — have nowhere to fold it,
     /// so they call this. Dropping it loses a case's `VariantOpen` (or an
     /// an alternative's injected defaults), and the path then closes a
     /// scope it never opened.
@@ -121,13 +121,13 @@ impl NfaBuilder<'_> {
         if pre.is_empty() {
             return entry;
         }
-        let pre_step = self.fresh_label();
+        let pre_state = self.fresh_label();
         self.instructions.push(
-            MatchIR::epsilon(pre_step, entry)
+            MatchIR::epsilon(pre_state, entry)
                 .prepend_effects(pre)
                 .into(),
         );
-        pre_step
+        pre_state
     }
 
     /// Produce absent captures on the skip path of an optional/star quantifier,
@@ -236,17 +236,17 @@ impl NfaBuilder<'_> {
         entry
     }
 
-    /// Emit a wildcard navigation step that accepts any node.
+    /// Emit a wildcard navigation state that accepts any node.
     ///
     /// Used for skip-retry logic in quantifiers: navigates to the next position
     /// and matches any node there. If navigation fails (no more siblings/children),
     /// the VM backtracks automatically.
     ///
-    /// The nav is emitted exact: a wildcard step is always internal to an
+    /// The nav is emitted exact: a wildcard state is always internal to an
     /// NFA-level retry loop (position search), and that loop owns the sibling
     /// search. The engine treats a non-exact `Down*`/`Next*` match acceptance
     /// as a choice point and leaves a resume checkpoint
-    /// (`Nav::is_sibling_search`); an exact nav opts these steps out, keeping
+    /// (`Nav::is_sibling_search`); an exact nav opts these states out, keeping
     /// every search under exactly one retry owner. Behavior is otherwise
     /// identical — with an `Any` constraint the skip policy is never consulted.
     pub(super) fn emit_wildcard_nav(&mut self, label: Label, nav: Nav, successor: Label) {

@@ -41,9 +41,9 @@ impl EffectDepths {
 /// cursor and re-enters the callee without re-running the Call's navigation.
 #[derive(Clone, Copy, Debug)]
 pub struct CallResume {
-    /// Callee entry (raw step index).
+    /// Callee entry (raw code address).
     pub target: u16,
-    /// Return address after the callee (raw step index).
+    /// Return address after the callee (raw code address).
     pub next: u16,
     /// Field constraint the next candidate must satisfy, if any.
     pub field: Option<NodeFieldId>,

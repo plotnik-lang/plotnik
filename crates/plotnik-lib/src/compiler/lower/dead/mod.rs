@@ -1,4 +1,4 @@
-//! Dead-code elimination: remove unreachable steps from the compiled IR.
+//! Dead-code elimination: remove unreachable states from the matcher NFA.
 
 mod dead_code;
 

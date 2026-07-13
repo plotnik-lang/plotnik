@@ -4,7 +4,7 @@
 
 use crate::SkipClass;
 
-/// What a sibling search may step over while looking for (or retrying past) a
+/// What a sibling search may skip while looking for (or retrying past) a
 /// candidate. Derived from the instruction's [`Nav`] via [`Nav::skip_policy`];
 /// the engine consults it both when scanning forward to a first candidate and
 /// when resuming a search past a failed one.
@@ -21,7 +21,7 @@ pub enum SkipPolicy {
 }
 
 impl SkipPolicy {
-    /// The [`SkipClass`] of nodes this policy may step over.
+    /// The [`SkipClass`] of nodes this policy may skip.
     pub fn skip_class(self) -> SkipClass {
         match self {
             Self::Any => SkipClass::Any,
@@ -241,7 +241,7 @@ impl Nav {
     }
 
     /// The skip policy this nav's match attempt runs under — the single source
-    /// of truth for what a search may step over (`CursorWrapper::navigate`
+    /// of truth for what a search may skip (`CursorWrapper::navigate`
     /// returns it after moving; backtrack resume re-derives it from the
     /// re-decoded instruction).
     ///
@@ -268,7 +268,7 @@ impl Nav {
     }
 
     /// Whether this nav performs a sibling search the *engine* owns: it moves
-    /// to a first candidate (`Down*`/`Next*`) and may step past rejected ones
+    /// to a first candidate (`Down*`/`Next*`) and may advance past rejected ones
     /// per its skip policy. Acceptance at such a position is a choice point —
     /// the engine leaves a resume checkpoint so a later failure retries the
     /// search from the next admissible candidate.
@@ -276,7 +276,7 @@ impl Nav {
     /// The `*Exact` members navigate but have a single candidate, and
     /// `Stay`/`StayExact` matches run at positions owned by an outer search
     /// (a position-search loop, a Call's retry checkpoint) — none of them are
-    /// engine-owned searches. Lowering upholds the complement: every nav step
+    /// engine-owned searches. Lowering upholds the complement: every navigation state
     /// internal to an NFA-level retry loop is emitted exact
     /// (`emit_wildcard_nav`), so a search always has exactly one retry owner.
     pub fn is_sibling_search(self) -> bool {
@@ -294,7 +294,7 @@ impl Nav {
     /// Navigation that advances to the next sibling while preserving this nav's
     /// skip policy.
     ///
-    /// Shared source of truth for the two places that step a sibling search
+    /// Shared source of truth for the two places that advance a sibling search
     /// forward: the VM's in-instruction `continue_search`, and the compiler's
     /// quantifier repeat iteration. A `Down*` entry and its `Next*` continuation
     /// share a skip policy (trivia/extras/exact), so both map to the same
