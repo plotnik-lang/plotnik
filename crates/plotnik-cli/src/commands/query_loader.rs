@@ -113,7 +113,7 @@ fn load_workspace(dir: &Path) -> Result<QuerySources, CliError> {
             &display,
         )?;
         merge_declaration(
-            "entrypoint",
+            "entry point",
             &mut shebang.entry,
             &mut entry_origin,
             declared.entry,

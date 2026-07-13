@@ -100,16 +100,16 @@ pub fn run(args: InspectArgs) -> CliResult {
         .as_ref()
         .map(query_spans_json)
         .unwrap_or_else(|| Value::Array(Vec::new()));
-    let entrypoints = module.as_ref().map(entry_point_names).unwrap_or_default();
+    let entry_points = module.as_ref().map(entry_point_names).unwrap_or_default();
 
     let run = if let Some(module) = module.as_ref() {
         let default_entry = module.entry_point_names().last().map(str::to_owned);
         let entry = args.entry.clone().or(shebang_entry).or(default_entry);
-        let entrypoint = run_common::resolve_entry_point(module, entry.as_deref())?;
+        let entry_point = run_common::resolve_entry_point(module, entry.as_deref())?;
         let tree = lang.parse_source(&source_code);
         run_module(
             module,
-            &entrypoint,
+            &entry_point,
             &source_code,
             &tree,
             args.limits,
@@ -125,7 +125,7 @@ pub fn run(args: InspectArgs) -> CliResult {
         diagnostics: json_value!(diagnostics),
         typescript_declarations,
         typescript_bindings: json_value!(typescript_bindings),
-        entry_points: json_value!(entrypoints),
+        entry_points: json_value!(entry_points),
         run: &run,
     });
 
@@ -185,7 +185,7 @@ fn bundle_json(parts: BundleParts<'_>) -> Value {
 
 fn run_module(
     module: &Module,
-    entrypoint: &plotnik_lib::bytecode::EntryPoint,
+    entry_point: &plotnik_lib::bytecode::EntryPoint,
     source_code: &str,
     tree: &tree_sitter::Tree,
     limits: RuntimeLimitSpec,
@@ -194,11 +194,11 @@ fn run_module(
     let vm = VM::builder(source_code, tree).limits(limits).build();
     if trace {
         let mut tracer = RecordingTracer::new(module, DEFAULT_MAX_RECORDS);
-        let (result, stats) = vm.execute_with_stats(module, entrypoint, &mut tracer);
+        let (result, stats) = vm.execute_with_stats(module, entry_point, &mut tracer);
         let recording = tracer.finish();
         return run_payload_from_result(
             module,
-            entrypoint,
+            entry_point,
             source_code,
             (result, stats),
             Some(json_value!(recording)),
@@ -206,13 +206,13 @@ fn run_module(
     }
 
     let mut tracer = NoopTracer;
-    let (result, stats) = vm.execute_with_stats(module, entrypoint, &mut tracer);
-    run_payload_from_result(module, entrypoint, source_code, (result, stats), None)
+    let (result, stats) = vm.execute_with_stats(module, entry_point, &mut tracer);
+    run_payload_from_result(module, entry_point, source_code, (result, stats), None)
 }
 
 fn run_payload_from_result(
     module: &Module,
-    entrypoint: &plotnik_lib::bytecode::EntryPoint,
+    entry_point: &plotnik_lib::bytecode::EntryPoint,
     source_code: &str,
     result: (
         Result<plotnik_lib::MatchJournal<'_>, RuntimeError>,
@@ -225,7 +225,7 @@ fn run_payload_from_result(
         Ok(journal) => {
             let colors = Colors::new(false);
             let result =
-                materialize_verified(source_code, module, entrypoint, journal.as_slice(), colors);
+                materialize_verified(source_code, module, entry_point, journal.as_slice(), colors);
             let result_provenance = (!module.spans().is_empty())
                 .then(|| extract_result_provenance(journal.as_slice(), module));
             RunPayload {
@@ -349,12 +349,12 @@ fn print_summary(bundle: &Value, color: bool) {
         .get("query_spans")
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
-    let entrypoints = bundle
+    let entry_points = bundle
         .get("entry_points")
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
     println!("query spans: {span_count}");
-    println!("entry points: {entrypoints}");
+    println!("entry points: {entry_points}");
     if let Some(error) = bundle.get("error") {
         eprintln!("error: {error}");
     }

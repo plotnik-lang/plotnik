@@ -95,19 +95,19 @@ pub fn resolve_run_lang(
     ))
 }
 
-/// Resolve the selected entrypoint after defaulting has already happened.
+/// Resolve the selected entry point after defaulting has already happened.
 pub fn resolve_entry_point(module: &Module, name: Option<&str>) -> Result<EntryPoint, CliError> {
     match name {
         Some(name) => module.entry_point(name).ok_or_else(|| {
             let names: Vec<&str> = module.entry_point_names().collect();
-            let mut msg = format!("invalid entrypoint: {}", name);
+            let mut msg = format!("invalid entry point: {}", name);
             if let Some(similar) = find_similar(name, &names) {
                 msg.push_str(&format!("\n\nDid you mean '{}'?", similar));
             }
-            msg.push_str(&format!("\n\nAvailable entrypoints: {}", names.join(", ")));
+            msg.push_str(&format!("\n\nAvailable entry points: {}", names.join(", ")));
             CliError::fatal(msg)
         }),
-        None => Err(CliError::fatal("no entrypoints in module")),
+        None => Err(CliError::fatal("no entry points in module")),
     }
 }
 
@@ -146,7 +146,7 @@ pub struct ExecRequest<'a> {
 /// Prepared query ready for execution.
 pub struct ExecPlan {
     pub module: Module,
-    pub entrypoint: EntryPoint,
+    pub entry_point: EntryPoint,
     pub tree: tree_sitter::Tree,
     pub source_code: String,
 }
@@ -194,12 +194,12 @@ pub fn plan_exec(input: ExecRequest) -> Result<ExecPlan, CliError> {
         .map(str::to_owned)
         .or_else(|| loaded.shebang.entry.clone())
         .or(default_entry);
-    let entrypoint = resolve_entry_point(&module, entry.as_deref())?;
+    let entry_point = resolve_entry_point(&module, entry.as_deref())?;
     let tree = lang.parse_source(&source_code);
 
     Ok(ExecPlan {
         module,
-        entrypoint,
+        entry_point,
         tree,
         source_code,
     })

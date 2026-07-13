@@ -1,7 +1,7 @@
 //! Shebang parsing: the in-file language declaration for `.ptk` files.
 //!
 //! Line 1 of a query file may declare its language (and optionally an
-//! entrypoint) via a shebang, e.g.:
+//! entry point) via a shebang, e.g.:
 //!
 //! ```text
 //! #!/usr/bin/env -S plotnik run -l typescript

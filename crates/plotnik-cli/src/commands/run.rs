@@ -27,7 +27,7 @@ pub struct RunArgs {
 pub fn run(args: RunArgs) -> CliResult {
     let ExecPlan {
         module,
-        entrypoint,
+        entry_point,
         tree,
         source_code,
     } = run_common::plan_exec(ExecRequest {
@@ -44,7 +44,7 @@ pub fn run(args: RunArgs) -> CliResult {
     let vm = VM::builder(&source_code, &tree).limits(args.limits).build();
     if args.json {
         let mut tracer = NoopTracer;
-        let (result, stats) = vm.execute_with_stats(&module, &entrypoint, &mut tracer);
+        let (result, stats) = vm.execute_with_stats(&module, &entry_point, &mut tracer);
         let effects = match result {
             Ok(effects) => effects,
             Err(RuntimeError::NoMatch) => {
@@ -68,7 +68,7 @@ pub fn run(args: RunArgs) -> CliResult {
         let result = materialize_verified(
             &source_code,
             &module,
-            &entrypoint,
+            &entry_point,
             effects.as_slice(),
             colors,
         );
@@ -85,7 +85,7 @@ pub fn run(args: RunArgs) -> CliResult {
         return Ok(());
     }
 
-    let effects = match vm.execute(&module, &entrypoint) {
+    let effects = match vm.execute(&module, &entry_point) {
         Ok(effects) => effects,
         Err(RuntimeError::NoMatch) => {
             // Zero matches must never be silent
@@ -102,7 +102,7 @@ pub fn run(args: RunArgs) -> CliResult {
     let value = materialize_verified(
         &source_code,
         &module,
-        &entrypoint,
+        &entry_point,
         effects.as_slice(),
         colors,
     );

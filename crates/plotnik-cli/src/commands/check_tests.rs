@@ -37,7 +37,7 @@ fn rejects_byte_oriented_regex_predicate() {
 
 #[test]
 fn rejects_value_less_definition() {
-    // `Q = .` compiles to a module with no entrypoints.
+    // `Q = .` compiles to a module with no entry points.
     assert!(matches!(check_js("Q = ."), Err(CliError::No)));
 }
 

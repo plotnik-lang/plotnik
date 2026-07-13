@@ -30,7 +30,7 @@ pub struct TraceArgs {
 pub fn run(args: TraceArgs) -> CliResult {
     let ExecPlan {
         module,
-        entrypoint,
+        entry_point,
         tree,
         source_code,
     } = run_common::plan_exec(ExecRequest {
@@ -48,7 +48,7 @@ pub fn run(args: TraceArgs) -> CliResult {
 
     if args.json {
         let mut tracer = RecordingTracer::new(&module, DEFAULT_MAX_RECORDS);
-        let (result, stats) = vm.execute_with_stats(&module, &entrypoint, &mut tracer);
+        let (result, stats) = vm.execute_with_stats(&module, &entry_point, &mut tracer);
         let recording = tracer.finish();
         println!(
             "{}",
@@ -74,7 +74,7 @@ pub fn run(args: TraceArgs) -> CliResult {
         .colored(args.color)
         .build();
 
-    let effects = match vm.execute_with(&module, &entrypoint, &mut tracer) {
+    let effects = match vm.execute_with(&module, &entry_point, &mut tracer) {
         Ok(effects) => {
             tracer.print();
             effects
@@ -102,7 +102,7 @@ pub fn run(args: TraceArgs) -> CliResult {
     let value = materialize_verified(
         &source_code,
         &module,
-        &entrypoint,
+        &entry_point,
         effects.as_slice(),
         colors,
     );

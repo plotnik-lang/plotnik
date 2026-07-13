@@ -17,7 +17,7 @@ fn exec_plan(query: &str, entry: Option<&str>) -> ExecPlan {
         color: false,
         inspection: false,
     })
-    .expect("query compiles and an entrypoint resolves")
+    .expect("query compiles and an entry point resolves")
 }
 
 #[test]
@@ -27,7 +27,7 @@ fn defaults_to_last_definition_when_entry_omitted() {
         .module
         .entry_point("Second")
         .expect("last selectable definition can be an entry point");
-    assert_eq!(plan.entrypoint, expected);
+    assert_eq!(plan.entry_point, expected);
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn explicit_entry_overrides_the_default() {
         .module
         .entry_point("First")
         .expect("named selectable definition can be an entry point");
-    assert_eq!(plan.entrypoint, expected);
+    assert_eq!(plan.entry_point, expected);
 }
 
 #[test]
