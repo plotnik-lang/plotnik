@@ -39,7 +39,7 @@ fn with_hidden_runtime_limit_args(cmd: Command) -> Command {
         .arg(limits_preset_arg().hide(true))
 }
 
-fn with_hidden_ast_args(cmd: Command) -> Command {
+fn with_hidden_raw_arg(cmd: Command) -> Command {
     cmd.arg(raw_arg().hide(true))
 }
 
@@ -69,7 +69,7 @@ Run 'plotnik <command> --help' for examples."#,
         )
         .subcommand(run_command())
         .subcommand(check_command())
-        .subcommand(ast_command())
+        .subcommand(tree_command())
         .subcommand(infer_command())
         .subcommand(generate_command())
         .subcommand(dump_command())
@@ -109,27 +109,26 @@ grammar name, SHA-256, and source used during linking."#,
         .arg(color_arg())
 }
 
-pub fn ast_command() -> Command {
-    let cmd = Command::new("ast")
-        .about("Show AST of query and/or source file")
+pub fn tree_command() -> Command {
+    let cmd = Command::new("tree")
+        .about("Show the query tree and/or source syntax tree")
         .override_usage(
             "\
-  plotnik ast <FILE>                 # auto-detect by extension
-  plotnik ast <QUERY> <SOURCE>       # both ASTs
-  plotnik ast -q <TEXT> [SOURCE]
-  plotnik ast -s <TEXT> -l <LANG>",
+  plotnik tree <FILE>                 # auto-detect by extension
+  plotnik tree <QUERY> <SOURCE>       # both trees
+  plotnik tree -q <TEXT> [SOURCE]
+  plotnik tree -s <TEXT> -l <LANG>",
         )
         .after_help(
             r#"EXAMPLES:
-  plotnik ast query.ptk               # query AST (.ptk extension)
-  plotnik ast app.ts                  # source AST (tree-sitter)
-  plotnik ast query.ptk app.ts        # both ASTs
-  plotnik ast query.ptk app.ts --raw  # CST / include anonymous nodes
-  plotnik ast app.ts --json           # source AST as JSON
-  plotnik ast -q '(id) @x'            # inline query AST
-  plotnik ast -s 'let x = 1' -l js    # inline source AST
-
-With --json, only the source tree is emitted; query AST output is skipped."#,
+  plotnik tree query.ptk                         # query AST (.ptk extension)
+  plotnik tree query.ptk --query-view cst        # query CST
+  plotnik tree app.ts                            # source syntax tree
+  plotnik tree query.ptk app.ts                  # both trees
+  plotnik tree app.ts --include-anonymous        # include literal tokens
+  plotnik tree app.ts --json                     # source syntax tree as JSON
+  plotnik tree -q '(id) @x'                      # inline query AST
+  plotnik tree -s 'let x = 1' -l js              # inline source syntax tree"#,
         )
         .arg(query_path_arg())
         .arg(source_path_arg())
@@ -138,8 +137,9 @@ With --json, only the source tree is emitted; query AST output is skipped."#,
         .arg(source_text_arg())
         .arg(lang_arg())
         .next_help_heading("Output options")
-        .arg(raw_arg())
-        .arg(json_arg().help("Output source tree as JSON"))
+        .arg(query_view_arg())
+        .arg(include_anonymous_arg())
+        .arg(json_arg().help("Output trees as JSON"))
         .next_help_heading("Global options")
         .arg(color_arg());
 
@@ -173,7 +173,7 @@ pub fn check_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_runtime_limit_args(with_hidden_ast_args(with_hidden_trace_args(
+    with_hidden_runtime_limit_args(with_hidden_raw_arg(with_hidden_trace_args(
         with_hidden_exec_args(with_hidden_source_args(cmd)),
     )))
 }
@@ -199,7 +199,7 @@ pub fn dump_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_ast_args(
+    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_raw_arg(
         with_hidden_trace_args(with_hidden_exec_args(with_hidden_source_args(cmd))),
     )))
 }
@@ -232,7 +232,7 @@ pub fn infer_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_ast_args(
+    with_hidden_json_arg(with_hidden_runtime_limit_args(with_hidden_raw_arg(
         with_hidden_trace_args(with_hidden_exec_args_partial(with_hidden_source_args(cmd))),
     )))
 }
@@ -270,7 +270,7 @@ pub fn run_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_ast_args(with_hidden_trace_args(cmd)))
+    with_hidden_json_arg(with_hidden_raw_arg(with_hidden_trace_args(cmd)))
 }
 
 pub fn trace_command() -> Command {
@@ -305,7 +305,7 @@ pub fn trace_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_json_arg(with_hidden_ast_args(
+    with_hidden_json_arg(with_hidden_raw_arg(
         cmd.arg(compact_arg().hide(true))
             .arg(verbose_nodes_arg().hide(true)),
     ))
@@ -343,7 +343,7 @@ pub fn inspect_command() -> Command {
         .next_help_heading("Global options")
         .arg(color_arg());
 
-    with_hidden_ast_args(
+    with_hidden_raw_arg(
         cmd.arg(compact_arg().hide(true))
             .arg(verbose_nodes_arg().hide(true))
             .arg(no_result_arg().hide(true)),

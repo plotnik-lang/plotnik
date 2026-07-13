@@ -1,4 +1,4 @@
-//! The source-AST dump doubles as copy-pasteable Plotnik patterns: leaf text
+//! The source syntax-tree dump doubles as copy-pasteable Plotnik patterns: leaf text
 //! renders as a `==` predicate, keyword leaves collapse to their kind, and
 //! containers/ERROR stay bare (see `plotnik_lib::dump_tree_text`).
 
@@ -9,10 +9,10 @@ use plotnik_lib::dump_tree_text;
 
 use crate::language_registry;
 
-fn dump_js(source: &str, raw: bool) -> String {
+fn dump_js(source: &str, include_anonymous: bool) -> String {
     let lang = language_registry::from_name("javascript").expect("javascript is enabled");
     let tree = lang.parse_source(source);
-    dump_tree_text(&tree, source, lang.grammar(), raw)
+    dump_tree_text(&tree, source, lang.grammar(), include_anonymous)
 }
 
 #[test]
@@ -122,7 +122,7 @@ fn node_table_maps_dump_ranges_to_source_ranges() {
 }
 
 #[test]
-fn raw_mode_renders_anonymous_tokens_as_strings() {
+fn anonymous_mode_renders_tokens_as_strings() {
     let dump = dump_js("1;\n", true);
 
     assert_eq!(

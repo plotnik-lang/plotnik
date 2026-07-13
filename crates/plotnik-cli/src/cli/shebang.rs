@@ -25,7 +25,7 @@ pub struct ShebangDecl {
 }
 
 const SUBCOMMANDS: &[&str] = &[
-    "run", "exec", "check", "infer", "ast", "trace", "dump", "test",
+    "run", "exec", "check", "infer", "tree", "trace", "dump", "test",
 ];
 
 const CANONICAL_FORM: &str = "#!/usr/bin/env -S plotnik run -l <lang>";

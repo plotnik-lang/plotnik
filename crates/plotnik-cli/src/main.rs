@@ -12,8 +12,8 @@ use std::process::ExitCode;
 use clap::ArgMatches;
 
 use cli::{
-    AstOpts, CheckOpts, DumpOpts, GenerateOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts,
-    TraceOpts, build_cli, route_default_subcommand,
+    CheckOpts, DumpOpts, GenerateOpts, InferOpts, InspectOpts, LangDumpOpts, RunOpts, TraceOpts,
+    TreeOpts, build_cli, route_default_subcommand,
 };
 use error::CliResult;
 
@@ -36,9 +36,9 @@ fn main() -> ExitCode {
 
 fn dispatch(matches: &ArgMatches) -> CliResult {
     match matches.subcommand() {
-        Some(("ast", m)) => {
-            let params = AstOpts::from_matches(m);
-            commands::ast::run(params.into())
+        Some(("tree", m)) => {
+            let params = TreeOpts::from_matches(m);
+            commands::tree::run(params.into())
         }
         Some(("check", m)) => {
             let params = CheckOpts::from_matches(m);

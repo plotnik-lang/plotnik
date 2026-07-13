@@ -43,7 +43,7 @@ pub fn load_source(
 /// Reject an input supplied two ways at once. clap fills the query slot from
 /// the first positional and the source slot from the second; when `-q`/`-s`
 /// also supplies that role inline, the loaders below silently prefer the text
-/// and drop the positional. The query+source commands (run/trace/inspect/ast)
+/// and drop the positional. The query+source commands (run/trace/inspect/tree)
 /// refuse to guess. Query-only commands (check/dump/infer) do not call this:
 /// they deliberately ignore an extra positional so a run-shaped command line
 /// still works.

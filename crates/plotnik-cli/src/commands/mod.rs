@@ -1,4 +1,3 @@
-pub mod ast;
 pub mod check;
 pub mod compile;
 pub mod dump;
@@ -12,9 +11,10 @@ pub mod run;
 pub mod run_common;
 pub mod runtime_report;
 pub mod trace;
+pub mod tree;
 
 #[cfg(test)]
-mod ast_tests;
+mod tree_tests;
 
 #[cfg(test)]
 mod check_tests;

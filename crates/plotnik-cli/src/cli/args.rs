@@ -71,6 +71,22 @@ pub fn raw_arg() -> Arg {
         .help("Include anonymous nodes (literals, punctuation)")
 }
 
+pub fn query_view_arg() -> Arg {
+    Arg::new("query_view")
+        .long("query-view")
+        .value_name("VIEW")
+        .default_value("ast")
+        .value_parser(["ast", "cst"])
+        .help("Choose the query tree view")
+}
+
+pub fn include_anonymous_arg() -> Arg {
+    Arg::new("include_anonymous")
+        .long("include-anonymous")
+        .action(ArgAction::SetTrue)
+        .help("Include anonymous source-tree nodes such as literals and punctuation")
+}
+
 pub fn strict_arg() -> Arg {
     Arg::new("strict")
         .long("strict")
