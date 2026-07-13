@@ -25,8 +25,8 @@ pub struct Q<'t> {
 }
 
 impl<'t> Q<'t> {
-    /// Match `Q` against `tree` and decode the committed journal into
-    /// the typed output. `None` is the no-match outcome.
+    /// Match `Q` against `tree` and decode its output events into
+    /// the typed result. `None` is the no-match outcome.
     /// The module's compiled-in limits bound total work, live
     /// backtracking state, and typed decode depth.
     pub fn parse(

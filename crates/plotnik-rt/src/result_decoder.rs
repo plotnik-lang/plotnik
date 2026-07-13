@@ -1,8 +1,8 @@
-//! The typed decoder's cursor over a committed match journal.
+//! The typed decoder's cursor over an output-event stream.
 //!
 //! A generated matcher commits the same journal the VM commits; the generated
-//! per-type decoders then decode that journal once, on the winning
-//! path, into the query's typed output. [`ResultDecoder`] is the cursor those
+//! per-type decoders then decode its logical output-event view once, on the winning
+//! path, into the query's typed result. [`ResultDecoder`] is the cursor those
 //! decoders share: it only knows the stream's vocabulary, while the decoders
 //! carry the schema (which entries are possible where — proven at emit by the
 //! same analysis the bytecode effect-stack validation checks).
@@ -54,7 +54,7 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
         let entry = self
             .events
             .get(self.pos)
-            .expect("result decoder: read past the end of the committed journal");
+            .expect("result decoder: read past the end of the output-event stream");
         self.pos += 1;
         entry
     }
@@ -75,7 +75,7 @@ impl<'a, 't, 's> ResultDecoder<'a, 't, 's> {
         let record_set_pos = *self
             .record_set_index
             .get(self.pos)
-            .expect("result decoder: peeked past the end of the committed journal");
+            .expect("result decoder: peeked past the end of the output-event stream");
         assert!(
             record_set_pos != NO_RECORD_SET,
             "result decoder: no RecordSet closes the field value at {}",

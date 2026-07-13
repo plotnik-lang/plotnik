@@ -198,11 +198,11 @@ impl<'m, 'a> DecoderGen<'m, 'a> {
         );
         let _ = writeln!(
             out,
-            "    /// Match `{def}` against `tree` and decode the committed journal into"
+            "    /// Match `{def}` against `tree` and decode its output events into"
         );
         let _ = writeln!(
             out,
-            "    /// the typed output. `None` is the no-match outcome."
+            "    /// the typed result. `None` is the no-match outcome."
         );
         let _ = writeln!(
             out,

@@ -50,8 +50,8 @@ parse(document)   -> Result<Option<Output>, LimitExceeded>
 matches(document) -> Result<Boolean, LimitExceeded>
 ```
 
-`parse` runs the matcher, then decodes its committed match journal into the
-generated output type. `matches` runs the same matcher with data effects
+`parse` runs the matcher, then decodes the output-event view of its committed
+match journal into the generated result type. `matches` runs the same matcher with data events
 suppressed; it does not allocate a match journal and cannot fail a decode-depth
 limit.
 
@@ -283,8 +283,8 @@ properties; the observable boolean result is shared.
 
 The matcher never constructs typed values while it can still backtrack. It
 records an in-memory match journal on the active path and truncates that journal
-when restoring a checkpoint. The committed journal is decoded exactly once
-after acceptance.
+when restoring a checkpoint. After acceptance, its logical output-event stream
+is decoded exactly once.
 
 Generated runtimes implement this vocabulary:
 
@@ -323,9 +323,9 @@ no scalar events.
 
 Inspection-span events belong to the VM/playground inspection path. Generated
 production matchers reject inspection-compiled queries and do not include those
-effects in the generated-runtime ABI.
+events in the generated-runtime ABI.
 
-Scalar effects use balanced value semantics. `ScalarOpen` starts with no range;
+Scalar events use balanced value semantics. `ScalarOpen` starts with no range;
 every mark expands the frame's document bounding range to include the node's
 half-open UTF-8 byte range. `StrClose` returns `null` when the range is absent and otherwise borrows that
 slice from the source. A real `n..n` mark therefore returns `""`, not `null`.
@@ -339,7 +339,8 @@ are emitted only when inspection requests that provenance.
 
 ### 6.1 Result decoder
 
-Typed decoders consume the committed match journal linearly. A runtime decoder provides:
+Typed decoders consume `OutputEvents`, the logical result-construction view of
+the committed match journal, linearly. A runtime decoder provides:
 
 - `take_absent`;
 - `expect_node`, `expect_record_set`, and `expect_variant_open`;
@@ -348,7 +349,7 @@ Typed decoders consume the committed match journal linearly. A runtime decoder p
 - `expect_array_push` and close lookahead for repeated values;
 - `peek_record_set`, which returns the first `RecordSet` after the balanced value beginning
   at the current position;
-- `finish`, which asserts that the whole journal was consumed.
+- `finish`, which asserts that the whole output-event stream was consumed.
 
 `peek_record_set` is required because a field's value precedes its member index and
 different members may require different typed decoders. Implementations should
@@ -362,7 +363,7 @@ carries the independent tree lifetime. Rust expresses the generic contract as
 `Parse<'t, 's>`, and generated types include only the lifetimes reachable from
 their output (`Q<'t>`, `Q<'s>`, `Q<'t, 's>`, or `Q`).
 
-The compiler validates balanced journal shapes. A mismatch during decoding is an
+The compiler validates balanced output-event shapes. A mismatch during decoding is an
 inside-zone generated-code/runtime defect and should assert or throw as an
 internal error, not be returned as invalid user input.
 
@@ -371,10 +372,10 @@ internal error, not be returned as invalid user input.
 Safe runs resolve independent fuel and memory policies. Each policy is
 `Auto`, an explicit nonnegative ceiling, or `Unbounded`.
 
-| Resource | Automatic ceiling                | What is metered                                                 |
-| -------- | -------------------------------- | --------------------------------------------------------------- |
-| Fuel     | `1_000_000 + 1_024 * node_count` | Matcher dispatches; one fuel unit each today.                   |
-| Memory   | `64 MiB + 256 * node_count`      | Live frames, checkpoints, capture effects, and saved positions. |
+| Resource | Automatic ceiling                | What is metered                                                |
+| -------- | -------------------------------- | -------------------------------------------------------------- |
+| Fuel     | `1_000_000 + 1_024 * node_count` | Matcher dispatches; one fuel unit each today.                  |
+| Memory   | `64 MiB + 256 * node_count`      | Live frames, checkpoints, journal events, and saved positions. |
 
 Arithmetic saturates at the target's supported maximum. A runtime may sample
 memory rather than calculate it on every dispatch; the reference implementation
