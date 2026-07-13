@@ -260,9 +260,16 @@ pub(crate) struct OutputSchema<'a> {
     pub(crate) interner: &'a Interner,
     collected_types: CollectedTypes,
     type_layout: OnceLock<OutputTypeLayout>,
-    type_names: BTreeMap<TypeId, Symbol>,
+    named_types: BTreeMap<TypeId, Symbol>,
+    type_declarations: Vec<TypeDeclaration>,
     entrypoint_items: Vec<OutputItem>,
     capture_layout: CaptureLayout,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct TypeDeclaration {
+    pub(crate) name: Symbol,
+    pub(crate) body: TypeId,
 }
 
 impl<'a> OutputSchema<'a> {
@@ -285,25 +292,32 @@ impl<'a> OutputSchema<'a> {
             deps.reachable_from(types.iter_entry_point_outputs().map(|(def_id, _)| def_id));
         let collected_types = CollectedTypes::collect(types, reachable_defs.iter());
         let capture_layout = CaptureLayout::build(types, &collected_types.custom)?;
-        let mut type_names: BTreeMap<TypeId, Symbol> = types.iter_type_names().collect();
-        // Leaf wrappers are structurally interned, so an unreachable definition
-        // can share its TypeId with a reachable one. Reassert reachable nominal
-        // names here: type reachability alone must never retain the dead name.
+        let named_types: BTreeMap<TypeId, Symbol> = types.iter_named_types().collect();
+        let mut type_declarations = named_types
+            .iter()
+            .map(|(&body, &name)| TypeDeclaration { name, body })
+            .collect::<Vec<_>>();
         for def_id in reachable_defs.iter() {
-            let output = types.expect_def_output(def_id);
-            if output == TYPE_VOID {
+            let body = types.expect_def_output(def_id);
+            if body == TYPE_VOID {
                 continue;
             }
-            type_names.insert(output, deps.def_name_sym(def_id));
+            type_declarations.push(TypeDeclaration {
+                name: deps.def_name_sym(def_id),
+                body,
+            });
         }
-        let entrypoint_items = ItemCollector::new(types, deps, &type_names).collect();
+        type_declarations.sort_by_key(|declaration| (declaration.body, declaration.name));
+        type_declarations.dedup();
+        let entrypoint_items = ItemCollector::new(types, deps, &named_types).collect();
         Ok(Self {
             types,
             deps,
             interner,
             collected_types,
             type_layout: OnceLock::new(),
-            type_names,
+            named_types,
+            type_declarations,
             entrypoint_items,
             capture_layout,
         })
@@ -319,13 +333,11 @@ impl<'a> OutputSchema<'a> {
     }
 
     pub(crate) fn type_name_of(&self, type_id: TypeId) -> Option<Symbol> {
-        self.type_names.get(&type_id).copied()
+        self.named_types.get(&type_id).copied()
     }
 
-    pub(crate) fn iter_type_names(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
-        self.type_names
-            .iter()
-            .map(|(&type_id, &name)| (type_id, name))
+    pub(crate) fn iter_type_declarations(&self) -> impl Iterator<Item = TypeDeclaration> + '_ {
+        self.type_declarations.iter().copied()
     }
 
     /// Public output items reachable from selectable definition outputs.
@@ -354,7 +366,7 @@ impl<'a> OutputSchema<'a> {
 struct ItemCollector<'a> {
     types: &'a TypeAnalysis,
     deps: &'a DependencyAnalysis,
-    type_names: &'a BTreeMap<TypeId, Symbol>,
+    named_types: &'a BTreeMap<TypeId, Symbol>,
     declared_names: HashSet<Symbol>,
     walked_types: HashSet<TypeId>,
     items: Vec<OutputItem>,
@@ -364,12 +376,12 @@ impl<'a> ItemCollector<'a> {
     fn new(
         types: &'a TypeAnalysis,
         deps: &'a DependencyAnalysis,
-        type_names: &'a BTreeMap<TypeId, Symbol>,
+        named_types: &'a BTreeMap<TypeId, Symbol>,
     ) -> Self {
         Self {
             types,
             deps,
-            type_names,
+            named_types,
             declared_names: HashSet::new(),
             walked_types: HashSet::new(),
             items: Vec::new(),
@@ -438,14 +450,14 @@ impl<'a> ItemCollector<'a> {
         match self.types.expect_type_shape(ty) {
             TypeShape::Record(_) | TypeShape::Variant(_) => {
                 let name = *self
-                    .type_names
+                    .named_types
                     .get(&ty)
                     .expect("naming pass names every non-payload composite");
                 self.add_item(name, ty);
             }
             TypeShape::Custom(name) => self.add_item(*name, ty),
             TypeShape::Array { .. } | TypeShape::Option(_) => {
-                let Some(&name) = self.type_names.get(&ty) else {
+                let Some(&name) = self.named_types.get(&ty) else {
                     self.walk(ty);
                     return;
                 };

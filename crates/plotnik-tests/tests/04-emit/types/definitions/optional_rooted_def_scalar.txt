@@ -16,7 +16,7 @@ use ::plotnik_rt::Node;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'t> {
-    pub first: ::core::option::Option<Node<'t>>,
+    pub first: MaybeId<'t>,
 }
 
 pub type MaybeId<'t> = ::core::option::Option<Node<'t>>;

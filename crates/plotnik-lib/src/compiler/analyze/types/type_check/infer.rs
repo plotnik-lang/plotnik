@@ -407,10 +407,10 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
     ///
     /// The definition's fields never bubble here. A capture may materialize the
     /// value, while a bare reference contributes no output in a fields context.
-    /// Non-recursive targets are already inferred (reverse-topological SCC
-    /// order), so their concrete output type stands in directly; a recursive
-    /// target's output is not known mid-SCC, so it is referenced as
-    /// `TypeShape::Ref` and resolved at emission.
+    /// Every non-void reference retains the definition identity as a
+    /// `TypeShape::Ref`. The declaration body is structural, but a use of that
+    /// declaration must not acquire some other name merely because its shape
+    /// happens to be interned with another type.
     fn infer_ref(&mut self, r: &DefRef) -> PatternShape {
         let Some(name_tok) = r.name() else {
             return PatternShape::void();
@@ -443,8 +443,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
             .expect("definition root extents are precomputed before inference");
 
         if self.ctx.dependency_analysis.is_recursive_def(def_id) {
-            // A recursive target's output type stays behind `TypeShape::Ref`
-            // (resolved at emission). Its void-ness, however, is real as soon
+            // A recursive target's output type is not known yet. Its
+            // void-ness, however, is real as soon
             // as the def is registered: a completed void target must flow
             // Void so the single-referent check sees it. A same-SCC target
             // not yet registered is a pending value here; those capture
@@ -467,7 +467,8 @@ impl<'a, 'd> InferVisitor<'a, 'd> {
         let flow = if output == TYPE_VOID {
             PatternFlow::Void
         } else {
-            PatternFlow::Value(output)
+            let ref_type = self.ctx.type_ctx.intern_type(TypeShape::Ref(def_id));
+            PatternFlow::Value(ref_type)
         };
         PatternShape::new(root_extent, flow)
     }

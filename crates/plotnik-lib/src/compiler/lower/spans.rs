@@ -274,7 +274,7 @@ fn collect_pattern(
                             input
                                 .analysis
                                 .type_analysis
-                                .iter_type_names()
+                                .iter_named_types()
                                 .find(|(_, sym)| {
                                     input.analysis.interner.resolve(*sym) == name.text()
                                 })

@@ -1,0 +1,32 @@
+Row = (pair
+  key: (_) @key
+  value: (_) @val
+)
+
+Pair = (pair
+  key: (_) @key
+  value: (_) @val
+)
+
+Q = (program
+  (expression_statement
+    (parenthesized_expression
+      (object
+        [
+          (Row) @x
+          (Pair) @x
+        ]
+      )
+    )
+  )
+)
+------------------ DIAGNOSTICS -------------------
+error: capture `@x` has incompatible types across alternatives
+  --> query.ptk:16:17
+   |
+16 |           (Row) @x
+   |                 ^^
+17 |           (Pair) @x
+   |                  -- and a different type here
+   |
+help: make every alternative produce the same type, or label the alternatives for a variant type

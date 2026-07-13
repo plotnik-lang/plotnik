@@ -31,7 +31,7 @@ pub enum Entry<'t> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'t> {
-    pub items: ::std::vec::Vec<Entry<'t>>,
+    pub items: Items<'t>,
 }
 
 pub type Items<'t> = ::std::vec::Vec<Entry<'t>>;

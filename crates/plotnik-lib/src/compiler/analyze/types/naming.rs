@@ -28,6 +28,7 @@ use crate::compiler::analyze::types::type_analysis::{
 use crate::compiler::analyze::types::type_shape::{TYPE_VOID, TypeId, TypeShape};
 use crate::compiler::diagnostics::report::{DiagnosticKind, Diagnostics};
 use crate::compiler::diagnostics::span::Span;
+use crate::compiler::ids::DefId;
 use crate::compiler::parse::ast;
 use crate::core::utils::to_pascal_case;
 use crate::core::{Interner, Symbol};
@@ -44,6 +45,7 @@ pub(crate) struct TypeNamer<'a, 'd> {
     interner: &'a mut Interner,
     diag: Option<&'d mut Diagnostics>,
     custom_capture_types: HashMap<TypeId, CustomCaptureTypeOccurrence>,
+    definition_names: HashMap<DefId, Symbol>,
     claims: HashMap<Symbol, Claim>,
     names: BTreeMap<TypeId, Symbol>,
 }
@@ -64,6 +66,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             interner,
             diag: Some(diag),
             custom_capture_types,
+            definition_names: HashMap::new(),
             claims: HashMap::new(),
             names: BTreeMap::new(),
         }
@@ -74,11 +77,21 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         symbol_table: &SymbolTable,
         dependency_analysis: &DependencyAnalysis,
     ) {
+        self.index_definitions(dependency_analysis);
         self.reserve_builtins();
         self.claim_definitions(symbol_table, dependency_analysis);
         self.walk_definitions(dependency_analysis);
 
-        self.ctx.set_type_names(self.names);
+        self.ctx.set_named_types(self.names);
+    }
+
+    fn index_definitions(&mut self, deps: &DependencyAnalysis) {
+        self.definition_names = deps
+            .sccs()
+            .iter()
+            .flatten()
+            .map(|&def_id| (def_id, deps.def_name_sym(def_id)))
+            .collect();
     }
 
     fn reserve_builtins(&mut self) {
@@ -92,9 +105,9 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         );
     }
 
-    /// Pass 1: every definition claims its name. Non-void results enter the
-    /// name table; void definitions still reserve the name (predictability —
-    /// a custom capture type may not squat on a definition's name).
+    /// Pass 1: every definition claims its declaration name. Definition names
+    /// stay attached to their declarations rather than to an interned body
+    /// shape; void definitions still reserve the name.
     fn claim_definitions(&mut self, symbol_table: &SymbolTable, deps: &DependencyAnalysis) {
         for &def_id in deps.sccs().iter().flatten() {
             let name_sym = deps.def_name_sym(def_id);
@@ -107,11 +120,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             let span = definition_name_span(symbol_table, self.interner, name_sym);
             let type_id = (output != TYPE_VOID).then_some(output);
 
-            if self.claim(name_sym, type_id, span)
-                && let Some(type_id) = type_id
-            {
-                self.names.insert(type_id, name_sym);
-            }
+            self.claim(name_sym, type_id, span);
         }
     }
 
@@ -184,9 +193,9 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
         match shape {
             TypeShape::Record(_) | TypeShape::Variant(_) => {
                 if let Some(&existing) = self.names.get(&element) {
-                    // A definition's result keeps its own name here (`(Foo) @val`
-                    // renders as `val: Foo`); a custom capture type on it is
-                    // redundant noise or a futile rename.
+                    // The composite already has a generated or explicit name;
+                    // a second capture type is redundant noise or a futile
+                    // rename.
                     self.check_capture_type_on_named(element, existing);
                     return;
                 }
@@ -197,7 +206,9 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                         if self.interner.resolve(capture_type.name) == generated {
                             self.warn_redundant_capture_type(
                                 capture_type.span,
-                                "matches the generated type name; omit it",
+                                &format!(
+                                    "this capture already has type `{generated}`; naming it `{generated}` has no effect"
+                                ),
                             );
                         }
                         (capture_type.name, Some(capture_type.span))
@@ -221,7 +232,7 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     if let Some(capture_type) = self.custom_capture_types.get(&element).copied() {
                         self.warn_redundant_capture_type(
                             capture_type.span,
-                            "`Node` is already the default type; omit it",
+                            "this capture already has type `Node`; naming it `Node` has no effect",
                         );
                     }
                     return;
@@ -234,13 +245,20 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
                     self.names.insert(element, sym);
                 }
             }
-            TypeShape::Ref(_) => {
+            TypeShape::Ref(def_id) => {
                 // Named by its own definition; a capture type cannot rename it.
                 if let Some(capture_type) = self.custom_capture_types.get(&element).copied() {
-                    self.warn_redundant_capture_type(
-                        capture_type.span,
-                        "a reference keeps its definition's type name; omit it",
+                    let definition_name = self
+                        .definition_names
+                        .get(&def_id)
+                        .copied()
+                        .expect("every definition reference has an indexed name");
+                    let definition_name = self.interner.resolve(definition_name).to_owned();
+                    let written_name = self.interner.resolve(capture_type.name).to_owned();
+                    let detail = format!(
+                        "this capture already has type `{definition_name}`; naming it `{written_name}` has no effect"
                     );
+                    self.warn_redundant_capture_type(capture_type.span, &detail);
                 }
             }
             TypeShape::Void
@@ -257,14 +275,21 @@ impl<'a, 'd> TypeNamer<'a, 'd> {
             return;
         };
         if capture_type.name == existing {
+            let existing = self.interner.resolve(existing);
             self.warn_redundant_capture_type(
                 capture_type.span,
-                "restates the type's own name; omit it",
+                &format!(
+                    "this capture already has type `{existing}`; naming it `{existing}` has no effect"
+                ),
             );
         } else {
+            let existing = self.interner.resolve(existing);
+            let written = self.interner.resolve(capture_type.name);
             self.warn_redundant_capture_type(
                 capture_type.span,
-                "cannot rename a type that already has a name; omit it",
+                &format!(
+                    "this capture already has type `{existing}`; naming it `{written}` has no effect"
+                ),
             );
         }
     }
@@ -369,9 +394,11 @@ impl<'a> RawTypeNameValidator<'a> {
             interner: self.interner,
             diag: None,
             custom_capture_types,
+            definition_names: HashMap::new(),
             claims: HashMap::new(),
             names: BTreeMap::new(),
         };
+        validator.index_definitions(dependency_analysis);
         validator.reserve_builtins();
         validator.claim_definitions(symbol_table, dependency_analysis);
         validator.walk_definitions(dependency_analysis);

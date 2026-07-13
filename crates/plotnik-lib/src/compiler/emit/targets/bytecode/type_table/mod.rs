@@ -101,18 +101,14 @@ fn emit_type_names(
     schema: &OutputSchema<'_>,
     ctx: &mut TypeEmitCtx,
 ) -> Result<(), EmitError> {
-    // The naming pass is the single source of names: definition results,
-    // path-generated composites, and custom `:: TypeName` capture types, in `TypeId`
-    // (deterministic) order. Naming covers the whole analyzed query; output
-    // layout deliberately keeps only names whose types survive selectable
-    // definition roots
-    // reachability.
-    for (type_id, name_sym) in schema.iter_type_names() {
-        if !schema.type_layout().contains(type_id) {
+    for declaration in schema.iter_type_declarations() {
+        if !schema.type_layout().contains(declaration.body) {
             continue;
         }
-        let bc_type_id = types.lookup(type_id).expect("named type must be mapped");
-        let name = ctx.strings.intern(name_sym, ctx.interner)?;
+        let bc_type_id = types
+            .lookup(declaration.body)
+            .expect("declared type body must be mapped");
+        let name = ctx.strings.intern(declaration.name, ctx.interner)?;
         types.push_name(TypeNameEntry::new(name, bc_type_id))?;
     }
 

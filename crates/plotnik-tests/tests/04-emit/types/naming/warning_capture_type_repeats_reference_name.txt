@@ -1,14 +1,14 @@
 Foo = (expression_statement (call_expression) @call)
 
 Q = (program
-  (Foo) @val :: Renamed
+  (Foo) @val :: Foo
 )
 ------------------ DIAGNOSTICS -------------------
-warning: this capture type cannot rename a type that already has a name; omit it
+warning: this capture already has type `Foo`; naming it `Foo` has no effect
  --> query.ptk:4:17
   |
-4 |   (Foo) @val :: Renamed
-  |                 ^^^^^^^
+4 |   (Foo) @val :: Foo
+  |                 ^^^
 ------------------- TYPESCRIPT -------------------
 export interface Foo {
   call: Node;

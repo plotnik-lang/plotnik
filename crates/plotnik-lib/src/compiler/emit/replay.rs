@@ -258,7 +258,7 @@ impl ReplayPlanBuilder<'_, '_> {
 fn collect_twins(types: &TypeAnalysis, layout: &CaptureLayout, item: OutputItem) -> Vec<TypeId> {
     let wants_record = item.is_record();
     let mut twins = BTreeSet::new();
-    for (ty, name) in types.iter_type_names() {
+    for (ty, name) in types.iter_named_types() {
         if name != item.name {
             continue;
         }

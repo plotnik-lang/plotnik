@@ -483,7 +483,7 @@ impl DiagnosticKind {
             }
             Self::UnknownCaptureType => "unknown capture type `{}`".to_string(),
             Self::InvalidCaptureType | Self::CaptureTypeSuppressesData => "{}".to_string(),
-            Self::RedundantCaptureType => "this capture type {}".to_string(),
+            Self::RedundantCaptureType => "{}".to_string(),
             Self::InspectionSpansDegraded => "{}".to_string(),
             Self::DuplicateCaptureInScope => {
                 "capture `@{}` already defined in this scope".to_string()

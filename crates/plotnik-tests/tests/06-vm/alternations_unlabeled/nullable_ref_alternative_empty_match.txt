@@ -9,10 +9,8 @@ Q = (program
 --------------------- INPUT ----------------------
 ------------------- TYPESCRIPT -------------------
 export interface Q {
-  d: A;
+  d: Node | null;
 }
-
-export type A = Node | null;
 --------------------- OUTPUT ---------------------
 {
   "d": null

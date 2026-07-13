@@ -66,13 +66,11 @@ pub struct TypeAnalysis {
     /// Final completion behavior for every merged field of each alternation.
     pub(super) field_completions: HashMap<Pattern, FieldCompletions>,
 
-    /// Every named type, assigned by the naming pass: definition results carry
-    /// their definition's name, nested composites carry path-derived names
-    /// (`FooItems`), and custom `:: TypeName` capture types override. Complete: every
-    /// record/variant type reachable from a definition output outside a case
-    /// payload position has exactly one name. `BTreeMap` for deterministic
-    /// emission order.
-    type_names: BTreeMap<TypeId, Symbol>,
+    /// Structural bodies that are referenced by a generated or explicit type
+    /// name. Definition declarations are keyed by `DefId` instead: their names
+    /// must not attach to structurally interned bodies shared with unrelated
+    /// positions. `BTreeMap` preserves deterministic body order.
+    named_types: BTreeMap<TypeId, Symbol>,
 }
 
 impl TypeAnalysis {
@@ -83,6 +81,23 @@ impl TypeAnalysis {
     pub fn expect_type_shape(&self, id: TypeId) -> &TypeShape {
         self.type_shape(id)
             .expect("admitted type id must reference a registered type")
+    }
+
+    fn type_is_option(&self, mut type_id: TypeId) -> bool {
+        let mut seen = HashSet::new();
+        while seen.insert(type_id) {
+            match self.type_shape(type_id) {
+                Some(TypeShape::Option(_)) => return true,
+                Some(TypeShape::Ref(def_id)) => {
+                    let Some(target) = self.def_output(*def_id) else {
+                        return false;
+                    };
+                    type_id = target;
+                }
+                _ => return false,
+            }
+        }
+        false
     }
 
     pub fn record_fields(&self, id: TypeId) -> Option<&BTreeMap<Symbol, RecordField>> {
@@ -213,9 +228,11 @@ impl TypeAnalysis {
             .filter(|&(def_id, _)| self.is_selectable_definition(def_id))
     }
 
-    /// Iterate all named types in `TypeId` order (deterministic).
-    pub fn iter_type_names(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
-        self.type_names.iter().map(|(&id, &sym)| (id, sym))
+    /// Iterate generated and explicitly named structural bodies in `TypeId`
+    /// order. Definition declarations are exposed separately through their
+    /// `DefId` and output body.
+    pub fn iter_named_types(&self) -> impl Iterator<Item = (TypeId, Symbol)> + '_ {
+        self.named_types.iter().map(|(&id, &sym)| (id, sym))
     }
 
     /// Admission check for [`TypeAnalysisBuilder::finish`]: the frozen result must
@@ -246,10 +263,7 @@ impl TypeAnalysis {
             }
 
             if let TypeShape::Option(inner) = shape {
-                assert!(
-                    !matches!(self.type_shape(*inner), Some(TypeShape::Option(_))),
-                    "Option must be idempotent",
-                );
+                assert!(!self.type_is_option(*inner), "Option must be idempotent",);
             }
 
             if let TypeShape::Ref(def_id) = shape {
@@ -326,7 +340,7 @@ impl TypeAnalysis {
             }
         }
 
-        for &type_id in self.type_names.keys() {
+        for &type_id in self.named_types.keys() {
             self.assert_type_id_registered(type_id, "named type id out of range");
         }
     }
@@ -424,7 +438,7 @@ impl TypeAnalysisBuilder {
                 pattern_result: HashMap::new(),
                 capture_facts: HashMap::new(),
                 field_completions: HashMap::new(),
-                type_names: BTreeMap::new(),
+                named_types: BTreeMap::new(),
             },
             intern_index: HashMap::new(),
             type_provenance: HashMap::new(),
@@ -479,7 +493,7 @@ impl TypeAnalysisBuilder {
     /// `intern_index` field docs).
     pub fn intern_type(&mut self, shape: TypeShape) -> TypeId {
         if let TypeShape::Option(inner) = &shape
-            && matches!(self.analysis.type_shape(*inner), Some(TypeShape::Option(_)))
+            && self.type_is_option(*inner)
         {
             return *inner;
         }
@@ -498,6 +512,10 @@ impl TypeAnalysisBuilder {
         self.analysis.types.push(shape.clone());
         self.intern_index.insert(shape, id);
         id
+    }
+
+    fn type_is_option(&self, type_id: TypeId) -> bool {
+        self.analysis.type_is_option(type_id)
     }
 
     pub fn intern_option(&mut self, inner: TypeId) -> TypeId {
@@ -637,17 +655,20 @@ impl TypeAnalysisBuilder {
 
     /// Install the naming pass's result. Names must be complete and validated
     /// before the analysis is frozen.
-    pub fn set_type_names(&mut self, names: BTreeMap<TypeId, Symbol>) {
-        self.analysis.type_names = names;
+    pub fn set_named_types(&mut self, names: BTreeMap<TypeId, Symbol>) {
+        self.analysis.named_types = names;
     }
 
     /// Deep structural equality over the in-progress type registry.
     ///
-    /// Records and variant types mint a fresh id per occurrence (nominal typing), so
-    /// two structurally identical composites can carry different ids; interned
-    /// shapes (Node, Custom, Ref, and wrappers over shared ids) compare by id.
-    /// `Ref` cuts recursion, so the walk terminates on recursive types.
+    /// Record and variant bodies mint a fresh id per occurrence, so two
+    /// structurally identical bodies can carry different ids. References to
+    /// declarations with record or variant bodies remain nominal; transparent
+    /// aliases compare through their bodies. `Ref` cuts recursion, so the walk
+    /// terminates on recursive types.
     pub(crate) fn types_structurally_equal(&self, a: TypeId, b: TypeId) -> bool {
+        let a = self.transparent_alias_body(a);
+        let b = self.transparent_alias_body(b);
         if a == b {
             return true;
         }
@@ -686,5 +707,24 @@ impl TypeAnalysisBuilder {
             }
             _ => false,
         }
+    }
+
+    fn transparent_alias_body(&self, mut type_id: TypeId) -> TypeId {
+        let mut seen = HashSet::new();
+        while let Some(TypeShape::Ref(def_id)) = self.analysis.type_shape(type_id) {
+            if !seen.insert(*def_id) {
+                return type_id;
+            }
+            let Some(body) = self.analysis.def_output(*def_id) else {
+                return type_id;
+            };
+            match self.analysis.type_shape(body) {
+                Some(TypeShape::Record(_) | TypeShape::Variant(_)) => return type_id,
+                Some(TypeShape::Ref(_)) => type_id = body,
+                Some(_) => return body,
+                None => return type_id,
+            }
+        }
+        type_id
     }
 }

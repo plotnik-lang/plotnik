@@ -20,8 +20,8 @@ use ::plotnik_rt::Node;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Q<'t> {
-    pub ids: ::std::vec::Vec<Node<'t>>,
-    pub runs: ::std::vec::Vec<::std::vec::Vec<Node<'t>>>,
+    pub ids: Ids<'t>,
+    pub runs: ::std::vec::Vec<Ids<'t>>,
 }
 
 pub type Ids<'t> = ::std::vec::Vec<Node<'t>>;

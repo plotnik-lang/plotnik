@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
+use crate::compiler::analyze::types::RootExtent;
 use crate::compiler::analyze::types::type_analysis::TypeAnalysisBuilder;
 use crate::compiler::analyze::types::type_shape::{RecordField, TYPE_NODE, TypeShape};
+use crate::compiler::ids::DefId;
 use crate::core::Interner;
 
 #[test]
@@ -26,10 +28,21 @@ fn option_interning_is_idempotent() {
 }
 
 #[test]
-fn record_types_are_nominal() {
-    // Records mint a fresh id per occurrence: two definitions with identical
-    // capture profiles are distinct named types. Structural equality is a
-    // separate relation used by unification.
+fn option_interning_preserves_an_option_declaration_reference() {
+    let mut ctx = TypeAnalysisBuilder::new();
+    let definition = DefId::from_raw(0);
+    let option = ctx.intern_option(TYPE_NODE);
+    ctx.record_def_output(definition, option);
+    ctx.record_def_root_extent(definition, RootExtent::SingleNode);
+    let reference = ctx.intern_type(TypeShape::Ref(definition));
+
+    let wrapped = ctx.intern_option(reference);
+
+    assert_eq!(wrapped, reference);
+}
+
+#[test]
+fn record_bodies_have_distinct_ids_but_compare_structurally() {
     let mut ctx = TypeAnalysisBuilder::new();
     let mut interner = Interner::new();
 
@@ -42,4 +55,35 @@ fn record_types_are_nominal() {
 
     assert_ne!(id1, id2);
     assert!(ctx.types_structurally_equal(id1, id2));
+}
+
+#[test]
+fn distinct_record_declarations_are_nominal() {
+    let mut ctx = TypeAnalysisBuilder::new();
+    let mut interner = Interner::new();
+    let field = interner.intern("field");
+    let left = DefId::from_raw(0);
+    let right = DefId::from_raw(1);
+    let left_body = ctx.intern_record(BTreeMap::from([(field, RecordField::new(TYPE_NODE))]));
+    let right_body = ctx.intern_record(BTreeMap::from([(field, RecordField::new(TYPE_NODE))]));
+    ctx.record_def_output(left, left_body);
+    ctx.record_def_output(right, right_body);
+    let left_ref = ctx.intern_type(TypeShape::Ref(left));
+    let right_ref = ctx.intern_type(TypeShape::Ref(right));
+
+    assert!(!ctx.types_structurally_equal(left_ref, right_ref));
+}
+
+#[test]
+fn transparent_definition_aliases_compare_by_body() {
+    let mut ctx = TypeAnalysisBuilder::new();
+    let left = DefId::from_raw(0);
+    let right = DefId::from_raw(1);
+    ctx.record_def_output(left, TYPE_NODE);
+    ctx.record_def_output(right, TYPE_NODE);
+    let left_ref = ctx.intern_type(TypeShape::Ref(left));
+    let right_ref = ctx.intern_type(TypeShape::Ref(right));
+
+    assert!(ctx.types_structurally_equal(left_ref, right_ref));
+    assert!(ctx.types_structurally_equal(left_ref, TYPE_NODE));
 }
