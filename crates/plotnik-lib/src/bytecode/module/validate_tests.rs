@@ -30,7 +30,8 @@ use crate::bytecode::effects::{EFFECT_PAYLOAD_BITS, EFFECT_PAYLOAD_MAX, EffectKi
 use crate::bytecode::type_meta::TypeDefKind;
 use crate::bytecode::type_system::TypeKind;
 use crate::bytecode::{
-    Header, Nav, SPAN_ENTRY_SIZE, SPAN_NO_BINDING, STEP_SIZE, SpanEntry, SpanKind,
+    BYTECODE_WORD_SIZE, CodeAddr, Header, Nav, SPAN_ENTRY_SIZE, SPAN_NO_BINDING, SpanEntry,
+    SpanKind,
 };
 
 fn emit_bytes(query_src: &str) -> Vec<u8> {
@@ -117,16 +118,16 @@ fn many_callable_definitions_load_without_global_fixpoint_rescans() {
 /// Byte offset of the first predicated Match's 4-byte predicate
 /// (`op_and_flags` u16 || `value_ref` u16) in the transitions stream.
 fn find_predicate_off(bytes: &[u8]) -> usize {
-    let (base, steps) = {
+    let (base, word_count) = {
         let m = Module::load_compiler_output(bytes).expect("module validates before tampering");
         (
             m.offsets().transitions as usize,
             m.header().transitions_count,
         )
     };
-    let mut step = 0u16;
-    while step < steps {
-        let instr = base + step as usize * 8;
+    let mut addr = CodeAddr::ZERO;
+    while addr.get() < word_count {
+        let instr = base + addr.as_usize() * BYTECODE_WORD_SIZE;
         let opcode = bytes[instr] & 0x0F;
         let size = match opcode {
             0 | 6 | 7 | 8 => 8,
@@ -145,7 +146,9 @@ fn find_predicate_off(bytes: &[u8]) -> usize {
                 return instr + 8 + (effects + neg) * 2;
             }
         }
-        step += (size / 8) as u16;
+        addr = addr
+            .checked_add((size / BYTECODE_WORD_SIZE) as u16)
+            .expect("instruction address fits in u16");
     }
     panic!("query must emit a string predicate");
 }
@@ -239,29 +242,33 @@ fn instr_size(opcode: u8) -> usize {
 }
 
 fn first_instr(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
-    let (base, steps) = transitions(bytes);
-    let mut step = 0u16;
-    while step < steps {
-        let off = base + step as usize * 8;
+    let (base, word_count) = transitions(bytes);
+    let mut addr = CodeAddr::ZERO;
+    while addr.get() < word_count {
+        let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
         let opcode = bytes[off] & 0x0F;
         if want(opcode) {
             return off;
         }
-        step += (instr_size(opcode) / 8) as u16;
+        addr = addr
+            .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
+            .expect("instruction address fits in u16");
     }
     panic!("no matching instruction in transitions");
 }
 
 fn first_match_nav(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
-    let (base, steps) = transitions(bytes);
-    let mut step = 0u16;
-    while step < steps {
-        let off = base + step as usize * 8;
+    let (base, word_count) = transitions(bytes);
+    let mut addr = CodeAddr::ZERO;
+    while addr.get() < word_count {
+        let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
         let opcode = bytes[off] & 0x0F;
         if (0..=5).contains(&opcode) && want(bytes[off + 1]) {
             return off + 1;
         }
-        step += (instr_size(opcode) / 8) as u16;
+        addr = addr
+            .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
+            .expect("instruction address fits in u16");
     }
     panic!("no matching match nav in transitions");
 }
@@ -269,43 +276,46 @@ fn first_match_nav(bytes: &[u8], want: impl Fn(u8) -> bool) -> usize {
 /// Byte offsets of every effect slot in the stream. Negated-field slots are
 /// skipped: those are plain field ids, not decoded effects.
 fn effect_slots(bytes: &[u8]) -> Vec<usize> {
-    let (base, steps) = transitions(bytes);
+    let (base, word_count) = transitions(bytes);
     let mut slots = Vec::new();
-    let mut step = 0u16;
-    while step < steps {
-        let off = base + step as usize * 8;
+    let mut addr = CodeAddr::ZERO;
+    while addr.get() < word_count {
+        let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
         let opcode = bytes[off] & 0x0F;
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]);
             let effects = ((counts >> 12) & 0xF) as usize;
             slots.extend((0..effects).map(|i| off + 8 + i * 2));
         }
-        step += (instr_size(opcode) / 8) as u16;
+        addr = addr
+            .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
+            .expect("instruction address fits in u16");
     }
     slots
 }
 
-/// Step index of an interior (non-start) step of the first multi-step
-/// instruction — a byte region a multi-step opcode spans beyond its header step.
-fn first_multistep_interior_step(bytes: &[u8]) -> u16 {
-    let (base, steps) = transitions(bytes);
-    let mut step = 0u16;
-    while step < steps {
-        let off = base + step as usize * 8;
-        let span = (instr_size(bytes[off] & 0x0F) / 8) as u16;
-        if span > 1 {
-            return step + 1;
+/// Address of the first interior word of the first multi-word instruction.
+fn first_multiword_interior_addr(bytes: &[u8]) -> CodeAddr {
+    let (base, word_count) = transitions(bytes);
+    let mut addr = CodeAddr::ZERO;
+    while addr.get() < word_count {
+        let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
+        let words = (instr_size(bytes[off] & 0x0F) / BYTECODE_WORD_SIZE) as u16;
+        if words > 1 {
+            return addr.checked_add(1).expect("interior address fits in u16");
         }
-        step += span;
+        addr = addr
+            .checked_add(words)
+            .expect("instruction address fits in u16");
     }
-    panic!("no multi-step instruction in transitions");
+    panic!("no multi-word instruction in transitions");
 }
 
 fn first_ext_successor(bytes: &[u8]) -> usize {
-    let (base, steps) = transitions(bytes);
-    let mut step = 0u16;
-    while step < steps {
-        let off = base + step as usize * 8;
+    let (base, word_count) = transitions(bytes);
+    let mut addr = CodeAddr::ZERO;
+    while addr.get() < word_count {
+        let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
         let opcode = bytes[off] & 0x0F;
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]);
@@ -317,7 +327,9 @@ fn first_ext_successor(bytes: &[u8]) -> usize {
                 return off + 8 + (effects + neg) * 2 + if has_pred { 4 } else { 0 };
             }
         }
-        step += (instr_size(opcode) / 8) as u16;
+        addr = addr
+            .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
+            .expect("instruction address fits in u16");
     }
     panic!("no extended-match successor in transitions");
 }
@@ -398,8 +410,8 @@ fn forged_nonzero_section_padding_is_rejected() {
 
 #[test]
 fn forged_unknown_opcode_is_rejected() {
-    // `10` is unassigned; the VM's `decode_step` would
-    // `.expect()` on the `None` from `Opcode::from_u8` for this step.
+    // `10` is unassigned; the VM's instruction decoder would
+    // `.expect()` on the `None` from `Opcode::from_u8` at this address.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let off = first_instr(&bytes, |_| true);
     bytes[off] = (bytes[off] & 0xF0) | 0x0A;
@@ -827,7 +839,7 @@ fn forged_invalid_span_binding_is_rejected() {
 
 #[test]
 fn forged_zero_successor_is_rejected() {
-    // `0` decodes through `StepId`, which panics; `0` is the terminal marker
+    // `0` cannot become a `SuccessorAddr`; it is the terminal marker
     // only for the `Match8` fast path, never an extended successor slot.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let succ_off = first_ext_successor(&bytes);
@@ -844,7 +856,7 @@ fn forged_zero_successor_is_rejected() {
 
 #[test]
 fn forged_out_of_range_successor_is_rejected() {
-    // A successor past the step count would slice past the buffer in `decode_step`.
+    // A successor past the word count would slice past the instruction buffer.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let succ_off = first_ext_successor(&bytes);
     bytes[succ_off..succ_off + 2].copy_from_slice(&u16::MAX.to_le_bytes());
@@ -967,16 +979,16 @@ fn forged_corrupt_regex_dfa_is_rejected() {
 
 #[test]
 fn forged_entrypoint_into_instruction_interior_is_rejected() {
-    // Issue #457: an entrypoint `target` that lands inside a multi-step
+    // Issue #457: an entrypoint `target` that lands inside a multi-word
     // instruction (not on a recorded instruction start) makes the VM begin
-    // decoding mid-instruction. `target < steps` is not enough — the load-time
+    // decoding mid-instruction. `target < word_count` is not enough — the load-time
     // check holds entrypoints to the same instruction-start rule as successors.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let (ep_off, interior) = {
         let m = Module::load_compiler_output(&bytes).expect("module validates before tampering");
         (
             m.offsets().entrypoints as usize,
-            first_multistep_interior_step(&bytes),
+            first_multiword_interior_addr(&bytes).get(),
         )
     };
 
@@ -1150,18 +1162,20 @@ fn forged_suppress_underflow_is_rejected() {
     assert!(matches!(err, ModuleError::EffectStackImbalance(_)));
 }
 
-/// Step index of the last `Return` instruction in the transitions stream.
-fn last_return_step(bytes: &[u8]) -> u16 {
-    let (base, steps) = transitions(bytes);
+/// Address of the last `Return` instruction in the transitions stream.
+fn last_return_addr(bytes: &[u8]) -> CodeAddr {
+    let (base, word_count) = transitions(bytes);
     let mut found = None;
-    let mut step = 0u16;
-    while step < steps {
-        let off = base + step as usize * 8;
+    let mut addr = CodeAddr::ZERO;
+    while addr.get() < word_count {
+        let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
         let opcode = bytes[off] & 0x0F;
         if opcode == 0x7 {
-            found = Some(step);
+            found = Some(addr);
         }
-        step += (instr_size(opcode) / 8) as u16;
+        addr = addr
+            .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
+            .expect("instruction address fits in u16");
     }
     found.expect("no Return in transitions")
 }
@@ -1188,19 +1202,22 @@ fn forged_accept_inside_called_def_is_rejected() {
     // contain accepts catches it.
     let mut bytes = emit_bytes(r#"Q = (program (expression_statement (identifier) @name))"#);
 
-    let def_return = last_return_step(&bytes);
-    let (base, steps) = transitions(&bytes);
-    let mut step = 0u16;
+    let def_return = last_return_addr(&bytes);
+    let (base, word_count) = transitions(&bytes);
+    let mut addr = CodeAddr::ZERO;
     let mut patched = false;
-    while step < steps {
-        let off = base + step as usize * 8;
+    while addr.get() < word_count {
+        let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
         let opcode = bytes[off] & 0x0F;
-        if opcode == 0x0 && u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]) == def_return {
+        if opcode == 0x0 && u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]) == def_return.get()
+        {
             bytes[off + 6..off + 8].copy_from_slice(&0u16.to_le_bytes());
             patched = true;
             break;
         }
-        step += (instr_size(opcode) / 8) as u16;
+        addr = addr
+            .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
+            .expect("instruction address fits in u16");
     }
     assert!(patched, "no Match8 flows into the def body's Return");
     reseal(&mut bytes);
@@ -1518,7 +1535,7 @@ fn forged_unknown_type_def_kind_is_rejected() {
 #[test]
 fn forged_out_of_range_entrypoint_target_is_rejected() {
     // The plain out-of-range case (vs the interior-target case above): `target >=
-    // steps` must be rejected before `is_start` is indexed.
+    // word_count` must be rejected before `is_start` is indexed.
     let mut bytes = emit_bytes(RECORD_QUERY);
     let ep_off = Module::load_compiler_output(&bytes)
         .expect("module validates before tampering")
@@ -1782,7 +1799,7 @@ fn forged_oob_type_name_type_id_is_rejected() {
 }
 
 /// Build a minimal-but-valid module whose only populated section is Transitions,
-/// carrying `transitions_count` steps drawn from `transitions`.
+/// carrying `transitions_count` bytecode words drawn from `transitions`.
 ///
 /// Everything else (strings, regex, types, entrypoints) is empty, which the
 /// other `validate_*` passes accept: the empty string/regex tables collapse to a
@@ -1846,9 +1863,9 @@ fn module_error_display() {
 #[test]
 fn load_accepts_single_terminal_match8() {
     // Sanity baseline: one Match8 terminal (opcode 0x0, no successor) loads.
-    let mut step = [0u8; STEP_SIZE];
-    step[0] = match_header(0x0);
-    let bytes = module_with_transitions(&step, 1);
+    let mut word = [0u8; BYTECODE_WORD_SIZE];
+    word[0] = match_header(0x0);
+    let bytes = module_with_transitions(&word, 1);
 
     let module =
         Module::load_compiler_output(&bytes).expect("valid representation should validate");
@@ -1857,19 +1874,19 @@ fn load_accepts_single_terminal_match8() {
 }
 
 #[test]
-fn load_rejects_invalid_opcode_at_reachable_step() {
-    // Step 0 carries an unknown opcode nibble (0xF); the linear walk lands on it
+fn load_rejects_invalid_opcode_at_reachable_address() {
+    // Address 0 carries an unknown opcode nibble (0xF); the linear walk lands on it
     // immediately and rejects.
-    let mut step = [0u8; STEP_SIZE];
-    step[0] = 0xF;
-    let bytes = module_with_transitions(&step, 1);
+    let mut word = [0u8; BYTECODE_WORD_SIZE];
+    word[0] = 0xF;
+    let bytes = module_with_transitions(&word, 1);
 
     let err = Module::load_compiler_output(&bytes).expect_err("unknown opcode must be rejected");
 
     assert!(matches!(
         err,
         ModuleError::InvalidOpcode {
-            step: 0,
+            addr: CodeAddr::ZERO,
             opcode: 0xF
         }
     ));
@@ -1877,14 +1894,14 @@ fn load_rejects_invalid_opcode_at_reachable_step() {
 
 #[test]
 fn load_walks_past_extended_match_payload() {
-    // A Match16 (opcode 0x1) occupies two steps. Its interior payload half
-    // (step 1) is poisoned with an invalid opcode nibble: a correct
-    // `step += step_count` walk advances from step 0 straight to step 2 and
+    // A Match16 (opcode 0x1) occupies two words. Its interior payload word
+    // (address 1) is poisoned with an invalid opcode nibble: a correct
+    // `addr += word_count` walk advances from address 0 straight to address 2 and
     // never inspects it, so the representation still validates. A buggy walk that advanced
-    // one step at a time would land on the poison and false-reject.
-    let mut transitions = [0u8; STEP_SIZE * 2];
+    // one word at a time would land on the poison and false-reject.
+    let mut transitions = [0u8; BYTECODE_WORD_SIZE * 2];
     transitions[0] = match_header(0x1);
-    transitions[STEP_SIZE] = 0xF; // interior payload, not an instruction boundary
+    transitions[BYTECODE_WORD_SIZE] = 0xF; // interior payload, not an instruction boundary
     let bytes = module_with_transitions(&transitions, 2);
 
     let module =
@@ -1895,10 +1912,10 @@ fn load_walks_past_extended_match_payload() {
 
 /// Byte offset of the first negated-field slot in the transitions stream.
 fn first_neg_slot(bytes: &[u8]) -> usize {
-    let (base, steps) = transitions(bytes);
-    let mut step = 0u16;
-    while step < steps {
-        let off = base + step as usize * 8;
+    let (base, word_count) = transitions(bytes);
+    let mut addr = CodeAddr::ZERO;
+    while addr.get() < word_count {
+        let off = base + addr.as_usize() * BYTECODE_WORD_SIZE;
         let opcode = bytes[off] & 0x0F;
         if (1..=5).contains(&opcode) {
             let counts = u16::from_le_bytes([bytes[off + 6], bytes[off + 7]]);
@@ -1908,7 +1925,9 @@ fn first_neg_slot(bytes: &[u8]) -> usize {
                 return off + 8 + effects * 2;
             }
         }
-        step += (instr_size(opcode) / 8) as u16;
+        addr = addr
+            .checked_add((instr_size(opcode) / BYTECODE_WORD_SIZE) as u16)
+            .expect("instruction address fits in u16");
     }
     panic!("query must emit a negated-field slot");
 }

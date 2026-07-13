@@ -105,7 +105,7 @@ impl<'a> EmitPipeline<'a> {
                 .ir
                 .entrypoint_wrappers()
                 .get(&def_id)
-                .and_then(|label| self.layout.step_addrs().get(label))
+                .and_then(|label| self.layout.code_addrs().get(label))
                 .copied()
                 .expect("entrypoint must have compiled target");
 
@@ -209,7 +209,7 @@ impl<'a> EmitPipeline<'a> {
             EmitError::TooManyEntrypoints,
         )?;
         let transitions_count = checked_count(
-            self.layout.total_steps() as usize,
+            self.layout.total_words() as usize,
             EmitError::MAX_TRANSITIONS,
             EmitError::TooManyTransitions,
         )?;

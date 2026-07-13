@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
 
 use crate::bytecode::{
-    HEADER_SIZE, Header, MAX_SPANS, SPAN_NO_BINDING, STEP_SIZE, SpanEntry, SpanKind,
+    BYTECODE_WORD_SIZE, HEADER_SIZE, Header, MAX_SPANS, SPAN_NO_BINDING, SpanEntry, SpanKind,
 };
 use crate::compiler::diagnostics::DiagnosticKind;
 use crate::compiler::test_utils::synthetic_grammar;
@@ -194,6 +194,6 @@ fn transition_bytes(bytes: &[u8]) -> &[u8] {
     let header = Header::from_bytes(&bytes[..HEADER_SIZE]);
     let offsets = header.compute_offsets();
     let start = offsets.transitions as usize;
-    let len = header.transitions_count as usize * STEP_SIZE;
+    let len = header.transitions_count as usize * BYTECODE_WORD_SIZE;
     &bytes[start..start + len]
 }

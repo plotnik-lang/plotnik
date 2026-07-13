@@ -208,18 +208,18 @@ impl<'t> Engine<'t> {
     /// reverse so LIFO backtracking takes them in order. One state snapshot
     /// serves every push: nothing in the loop moves the cursor or touches the
     /// arenas the snapshot reads.
-    pub fn push_branches(&mut self, alts: &[u16]) {
+    pub fn push_branches<A: Copy + Into<u16>>(&mut self, alts: &[A]) {
         let state = self.checkpoint_state();
         if self.snapshot_cursor_active {
             let refs = u32::try_from(alts.len()).expect("branch fan-out count fits u32");
             let snapshot = self.cursor_snapshot(refs);
             for &alt in alts.iter().rev() {
                 self.checkpoints
-                    .push_with_snapshot(Checkpoint::branch(state, alt), snapshot);
+                    .push_with_snapshot(Checkpoint::branch(state, alt.into()), snapshot);
             }
         } else {
             for &alt in alts.iter().rev() {
-                self.checkpoints.push(Checkpoint::branch(state, alt));
+                self.checkpoints.push(Checkpoint::branch(state, alt.into()));
             }
         }
     }

@@ -3,8 +3,9 @@
 use tree_sitter::Tree;
 
 use crate::bytecode::{
-    DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedRoutedCall, DecodedSplitCall,
-    Effect, EffectKind, Entrypoint, Module, Nav, NodeKindConstraint, PredicateOp,
+    CodeAddr, DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedRoutedCall,
+    DecodedSplitCall, Effect, EffectKind, Entrypoint, Module, Nav, NodeKindConstraint, PredicateOp,
+    SuccessorAddr,
 };
 
 use crate::core::NodeFieldId;
@@ -41,8 +42,8 @@ pub struct RunStats {
 /// fuel/memory budget.
 pub struct VM<'t> {
     pub(crate) engine: Engine<'t>,
-    /// Current instruction pointer (raw u16, 0 is valid at runtime).
-    pub(crate) ip: u16,
+    /// Current address in the decoded instruction stream.
+    pub(crate) ip: CodeAddr,
 
     pub(crate) fuel_used: u64,
     pub(crate) limits: ResolvedRuntimeLimits,
@@ -79,7 +80,7 @@ impl<'t> VMBuilder<'t> {
             u32::try_from(self.tree.root_node().descendant_count()).unwrap_or(u32::MAX);
         VM {
             engine: Engine::new(self.tree.walk()),
-            ip: 0,
+            ip: CodeAddr::ZERO,
             fuel_used: 0,
             limits: self.spec.resolve(source_nodes),
             source: self.source,
@@ -94,8 +95,8 @@ impl<'t> VM<'t> {
 
     /// Checkpoint that, on backtrack, advances the cursor and re-enters the
     /// callee. `call_ip` is the Call's address (for trace rendering only).
-    fn call_retry_checkpoint(&self, call_ip: u16, resume: CallResume) -> Checkpoint {
-        Checkpoint::call_retry(self.engine.checkpoint_state(), call_ip, resume)
+    fn call_retry_checkpoint(&self, call_ip: CodeAddr, resume: CallResume) -> Checkpoint {
+        Checkpoint::call_retry(self.engine.checkpoint_state(), u16::from(call_ip), resume)
     }
 
     /// Execute a query from an entrypoint, returning its committed match journal.
@@ -132,7 +133,7 @@ impl<'t> VM<'t> {
         entrypoint: &Entrypoint,
         tracer: &mut T,
     ) -> (Result<MatchJournal<'t>, RuntimeError>, RunStats) {
-        self.ip = u16::from(entrypoint.target());
+        self.ip = entrypoint.target();
         if T::ENABLED {
             tracer.trace_enter_entrypoint(self.ip);
         }
@@ -170,21 +171,21 @@ impl<'t> VM<'t> {
             }
 
             // Fetch and dispatch. The IP must address a validated instruction
-            // start; a violation localizes a bad jump to the step that wrote `ip`,
-            // before `decode_step` begins decoding mid-instruction.
+            // start; a violation localizes a bad jump to the address that wrote
+            // `ip`, before decoding begins mid-instruction.
             #[cfg(debug_assertions)]
             debug_assert!(
-                module.is_validated_step_start(self.ip),
+                module.is_validated_instruction_start(self.ip),
                 "ip {} is not a validated instruction start",
                 self.ip
             );
             // Tracing renders from the byte-level decoder so trace output stays
             // identical; the hot path reads the pre-decoded stream.
             if T::ENABLED {
-                tracer.trace_instruction(self.ip, &module.decode_step(self.ip));
+                tracer.trace_instruction(self.ip, &module.decode_instruction(self.ip));
             }
 
-            let result = match module.decoded().step(self.ip) {
+            let result = match module.decoded().instruction_at(self.ip) {
                 DecodedInstr::Match(m) => self.exec_match(m, module, tracer),
                 DecodedInstr::Call(c) => self.exec_call(c, module, tracer),
                 DecodedInstr::RoutedCall(c) => self.exec_routed_call(c, tracer),
@@ -305,7 +306,7 @@ impl<'t> VM<'t> {
             return;
         }
 
-        let cp = Checkpoint::match_retry(self.engine.checkpoint_state(), self.ip);
+        let cp = Checkpoint::match_retry(self.engine.checkpoint_state(), u16::from(self.ip));
         self.engine.push_checkpoint(cp);
         if T::ENABLED {
             tracer.trace_checkpoint_created(self.ip);
@@ -454,7 +455,7 @@ impl<'t> VM<'t> {
             }
         }
 
-        self.ip = succs[0];
+        self.ip = CodeAddr::from(u16::from(succs[0]));
         Ok(())
     }
 
@@ -474,8 +475,8 @@ impl<'t> VM<'t> {
             && policy != SkipPolicy::Exact
         {
             let resume = CallResume {
-                target: c.target,
-                next: c.next,
+                target: u16::from(c.target),
+                next: u16::from(c.next),
                 field: c.node_field,
                 policy,
             };
@@ -496,10 +497,11 @@ impl<'t> VM<'t> {
         tracer: &mut T,
     ) -> Result<(), Signal> {
         if T::ENABLED {
-            tracer.trace_call(call.target);
+            tracer.trace_call(CodeAddr::from(u16::from(call.target)));
         }
-        self.engine.enter_split_frame(call.matched, call.zero);
-        self.ip = call.target;
+        self.engine
+            .enter_split_frame(u16::from(call.matched), u16::from(call.zero));
+        self.ip = CodeAddr::from(u16::from(call.target));
         Ok(())
     }
 
@@ -509,20 +511,25 @@ impl<'t> VM<'t> {
         tracer: &mut T,
     ) -> Result<(), Signal> {
         if T::ENABLED {
-            tracer.trace_call(call.target);
+            tracer.trace_call(CodeAddr::from(u16::from(call.target)));
         }
-        self.engine.enter_frame(call.next);
-        self.ip = call.target;
+        self.engine.enter_frame(u16::from(call.next));
+        self.ip = CodeAddr::from(u16::from(call.target));
         Ok(())
     }
 
     /// Push a frame for `target` (returning to `next`) and jump in.
-    fn enter_callee<T: Tracer>(&mut self, target: u16, next: u16, tracer: &mut T) {
+    fn enter_callee<T: Tracer>(
+        &mut self,
+        target: SuccessorAddr,
+        next: SuccessorAddr,
+        tracer: &mut T,
+    ) {
         if T::ENABLED {
-            tracer.trace_call(target);
+            tracer.trace_call(CodeAddr::from(u16::from(target)));
         }
-        self.engine.enter_frame(next);
-        self.ip = target;
+        self.engine.enter_frame(u16::from(next));
+        self.ip = CodeAddr::from(u16::from(target));
     }
 
     /// Navigate to a field and return the skip policy for retry support.
@@ -609,7 +616,7 @@ impl<'t> VM<'t> {
             return Err(ControlFlow::Accept.into());
         }
 
-        self.ip = self.engine.exit_frame(outcome);
+        self.ip = CodeAddr::from(self.engine.exit_frame(outcome));
         Ok(())
     }
 
@@ -632,7 +639,7 @@ impl<'t> VM<'t> {
 
             match cp.resume {
                 Resume::Branch => {
-                    self.ip = cp.ip;
+                    self.ip = CodeAddr::from(cp.ip);
                     return ControlFlow::Backtracked.into();
                 }
 
@@ -673,12 +680,18 @@ impl<'t> VM<'t> {
                         }
                     }
 
-                    let retry = self.call_retry_checkpoint(cp.ip, resume);
+                    let retry = self.call_retry_checkpoint(CodeAddr::from(cp.ip), resume);
                     self.engine.push_checkpoint(retry);
                     if T::ENABLED {
-                        tracer.trace_checkpoint_created(cp.ip);
+                        tracer.trace_checkpoint_created(CodeAddr::from(cp.ip));
                     }
-                    self.enter_callee(resume.target, resume.next, tracer);
+                    self.enter_callee(
+                        SuccessorAddr::try_from(resume.target)
+                            .expect("validated call target is non-zero"),
+                        SuccessorAddr::try_from(resume.next)
+                            .expect("validated call continuation is non-zero"),
+                        tracer,
+                    );
                     return ControlFlow::Backtracked.into();
                 }
 
@@ -689,7 +702,9 @@ impl<'t> VM<'t> {
                 // replays the match — fresh retry checkpoint, effects, branches —
                 // exactly as the dispatch path would.
                 Resume::Match => {
-                    let DecodedInstr::Match(m) = module.decoded().step(cp.ip) else {
+                    let DecodedInstr::Match(m) =
+                        module.decoded().instruction_at(CodeAddr::from(cp.ip))
+                    else {
                         unreachable!("match-retry checkpoint ip must address a Match");
                     };
                     let policy = m.nav.skip_policy();
@@ -722,7 +737,7 @@ impl<'t> VM<'t> {
                         tracer.trace_field_success(field_id);
                     }
 
-                    self.ip = cp.ip;
+                    self.ip = CodeAddr::from(cp.ip);
                     self.push_match_retry_if_resumable(m, policy, tracer);
                     return match self.finish_match(m, module, tracer) {
                         Ok(()) => ControlFlow::Backtracked.into(),

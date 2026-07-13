@@ -9,7 +9,7 @@ use super::entrypoint::Entrypoint;
 use super::sections::SymbolNameEntry;
 use super::type_meta::{TypeDef, TypeMember, TypeNameEntry};
 use super::{
-    HEADER_SIZE, MAGIC, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STEP_SIZE,
+    BYTECODE_WORD_SIZE, HEADER_SIZE, MAGIC, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE,
     STRING_TABLE_ENTRY_SIZE, VERSION,
 };
 
@@ -224,7 +224,7 @@ impl Header {
             self.type_members_count as u64 * TypeMember::SIZE as u64,
             self.type_names_count as u64 * TypeNameEntry::SIZE as u64,
             self.entrypoints_count as u64 * Entrypoint::SIZE as u64,
-            self.transitions_count as u64 * STEP_SIZE as u64,
+            self.transitions_count as u64 * BYTECODE_WORD_SIZE as u64,
             self.spans_count as u64 * SPAN_ENTRY_SIZE as u64,
         ]
     }

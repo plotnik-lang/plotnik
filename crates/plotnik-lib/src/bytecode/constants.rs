@@ -28,8 +28,8 @@ pub const SECTION_ALIGN: usize = 64;
 /// size.
 pub const HEADER_SIZE: usize = SECTION_ALIGN;
 
-/// Step size in bytes (all instructions are 8-byte aligned).
-pub const STEP_SIZE: usize = 8;
+/// Bytecode-word size in bytes. Instructions are word-aligned and may span words.
+pub const BYTECODE_WORD_SIZE: usize = 8;
 
 /// String offset table entry size: one little-endian `u32` offset per string.
 pub const STRING_TABLE_ENTRY_SIZE: usize = size_of::<u32>();

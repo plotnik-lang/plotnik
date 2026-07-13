@@ -2,7 +2,7 @@
 //!
 //! Both dump and trace use the same column layout:
 //! ```text
-//! | 2 | step | 1 |   5   | 1 | content              | 1 | succ |
+//! | 2 | addr | 1 |   5   | 1 | content              | 1 | succ |
 //! |   | pad  |   | (sym) |   |                      |   |      |
 //! ```
 
@@ -194,26 +194,26 @@ pub fn truncate_text(s: &str, max_len: usize) -> String {
 /// Builder for formatted output lines.
 ///
 /// Constructs lines following the column layout:
-/// `<indent><step><gap><symbol><gap><content>...<successors>`
+/// `<indent><addr><gap><symbol><gap><content>...<successors>`
 pub struct LineBuilder {
-    step_width: usize,
+    addr_width: usize,
 }
 
 impl LineBuilder {
-    /// Create a new line builder with the given step width.
-    pub fn new(step_width: usize) -> Self {
-        Self { step_width }
+    /// Create a new line builder with the given address width.
+    pub fn new(addr_width: usize) -> Self {
+        Self { addr_width }
     }
 
-    /// Build an instruction line prefix: `  <step> <symbol> `
-    pub fn instruction_prefix(&self, step: u16, symbol: Symbol) -> String {
+    /// Build an instruction line prefix: `  <addr> <symbol> `
+    pub fn instruction_prefix(&self, addr: u16, symbol: Symbol) -> String {
         format!(
-            "{:indent$}{:0sw$} {} ",
+            "{:indent$}{:0aw$} {} ",
             "",
-            step,
+            addr,
             symbol.format(),
             indent = cols::INDENT,
-            sw = self.step_width,
+            aw = self.addr_width,
         )
     }
 

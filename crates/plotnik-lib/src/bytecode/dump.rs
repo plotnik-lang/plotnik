@@ -9,7 +9,7 @@ use crate::core::Colors;
 
 use super::format::{LineBuilder, Symbol, nav_symbol, width_for_count};
 use super::ids::TypeId;
-use super::instructions::StepId;
+use super::instructions::{CodeAddr, SuccessorAddr};
 use super::module::{Instruction, Module};
 use super::node_kind_constraint::NodeKindConstraint;
 use super::render::ModuleRenderContext;
@@ -36,8 +36,8 @@ pub fn dump(module: &Module, colors: Colors) -> String {
 
 /// Context for dump formatting, precomputes lookups for O(1) access.
 struct DumpContext {
-    /// Maps step ID to entrypoint name for labeling.
-    step_labels: BTreeMap<u16, String>,
+    /// Maps instruction addresses to entrypoint names for labeling.
+    addr_labels: BTreeMap<CodeAddr, String>,
     /// Shared symbol/string decoding and match rendering.
     render: ModuleRenderContext,
     /// Width for string indices (S#).
@@ -48,8 +48,8 @@ struct DumpContext {
     member_width: usize,
     /// Width for name indices (N#).
     name_width: usize,
-    /// Width for step indices.
-    step_width: usize,
+    /// Width for instruction addresses.
+    addr_width: usize,
     /// Color palette.
     colors: Colors,
 }
@@ -60,10 +60,10 @@ impl DumpContext {
         let strings = module.strings();
         let entrypoints = module.entrypoints();
 
-        let mut step_labels = BTreeMap::new();
+        let mut addr_labels = BTreeMap::new();
         for ep in entrypoints.iter() {
             let name = strings.get(ep.name()).to_string();
-            step_labels.insert(u16::from(ep.target()), name);
+            addr_labels.insert(ep.target(), name);
         }
 
         let str_count = header.str_table_count as usize;
@@ -75,22 +75,24 @@ impl DumpContext {
         let type_width = width_for_count(type_count);
         let member_width = width_for_count(types.members_count());
         let name_width = width_for_count(types.names_count());
-        let step_width = width_for_count(header.transitions_count as usize);
+        let addr_width = width_for_count(header.transitions_count as usize);
 
         Self {
-            step_labels,
+            addr_labels,
             render: ModuleRenderContext::new(module),
             str_width,
             type_width,
             member_width,
             name_width,
-            step_width,
+            addr_width,
             colors,
         }
     }
 
-    fn label_for(&self, step: StepId) -> Option<&str> {
-        self.step_labels.get(&u16::from(step)).map(|s| s.as_str())
+    fn label_for(&self, addr: SuccessorAddr) -> Option<&str> {
+        self.addr_labels
+            .get(&CodeAddr::from(u16::from(addr)))
+            .map(|s| s.as_str())
     }
 }
 
@@ -291,7 +293,7 @@ fn dump_entrypoints(out: &mut String, module: &Module, ctx: &DumpContext) {
     let c = &ctx.colors;
     let strings = module.strings();
     let entrypoints = module.entrypoints();
-    let stw = ctx.step_width;
+    let stw = ctx.addr_width;
     let tw = ctx.type_width;
 
     writeln!(out, "{}[entrypoints]{}", c.blue, c.reset).expect("writing to a String is infallible");
@@ -378,16 +380,15 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
     let transitions_count = header.transitions_count as usize;
     let fmt = DumpFormatter {
         ctx,
-        step_width: ctx.step_width,
+        addr_width: ctx.addr_width,
     };
 
     writeln!(out, "{}[transitions]{}", c.blue, c.reset).expect("writing to a String is infallible");
 
-    let mut step = 0u16;
+    let mut addr = CodeAddr::ZERO;
     let mut first_label = true;
-    while (step as usize) < transitions_count {
-        // Check if this step has a label (using raw u16)
-        if let Some(label) = ctx.step_labels.get(&step) {
+    while addr.as_usize() < transitions_count {
+        if let Some(label) = ctx.addr_labels.get(&addr) {
             if first_label {
                 writeln!(out, "{}{label}{}:", c.blue, c.reset)
                     .expect("writing to a String is infallible");
@@ -398,33 +399,37 @@ fn dump_code(out: &mut String, module: &Module, ctx: &DumpContext) {
             }
         }
 
-        let instr = module.decode_step(step);
+        let instr = module.decode_instruction(addr);
 
         if is_padding(&instr) {
-            writeln!(out, "{}", fmt.padding_step(step)).expect("writing to a String is infallible");
-            step += 1;
+            writeln!(out, "{}", fmt.padding_word(addr)).expect("writing to a String is infallible");
+            addr = addr
+                .checked_add(1)
+                .expect("instruction address fits in u16");
             continue;
         }
 
-        let line = fmt.instruction(step, &instr);
+        let line = fmt.instruction(addr, &instr);
         out.push_str(&line);
         out.push('\n');
 
-        let size = instruction_step_count(&instr);
-        step += size;
+        let words = instruction_word_count(&instr);
+        addr = addr
+            .checked_add(words)
+            .expect("instruction address fits in u16");
     }
 }
 
-/// Bundles the precomputed context and step-index width threaded through every
+/// Bundles the precomputed context and address width threaded through every
 /// per-instruction formatting routine.
 struct DumpFormatter<'a> {
     ctx: &'a DumpContext,
-    step_width: usize,
+    addr_width: usize,
 }
 
-fn instruction_step_count(instr: &Instruction) -> u16 {
+fn instruction_word_count(instr: &Instruction) -> u16 {
     match instr {
-        Instruction::Match(m) => m.step_count(),
+        Instruction::Match(m) => m.word_count(),
         Instruction::Call(_)
         | Instruction::RoutedCall(_)
         | Instruction::SplitCall(_)
@@ -433,79 +438,79 @@ fn instruction_step_count(instr: &Instruction) -> u16 {
 }
 
 impl DumpFormatter<'_> {
-    /// Format a single padding step line.
+    /// Format a single padding word line.
     ///
-    /// Output: `  07  ...` (step number and "..." in the symbol column)
-    fn padding_step(&self, step: u16) -> String {
-        LineBuilder::new(self.step_width)
-            .instruction_prefix(step, Symbol::PADDING)
+    /// Output: `  07  ...` (word address and "..." in the symbol column)
+    fn padding_word(&self, addr: CodeAddr) -> String {
+        LineBuilder::new(self.addr_width)
+            .instruction_prefix(addr.get(), Symbol::PADDING)
             .trim_end()
             .to_string()
     }
 
-    fn instruction(&self, step: u16, instr: &Instruction) -> String {
+    fn instruction(&self, addr: CodeAddr, instr: &Instruction) -> String {
         match instr {
-            Instruction::Match(m) => self.format_match(step, m),
-            Instruction::Call(c) => self.format_call(step, c),
-            Instruction::RoutedCall(c) => self.format_routed_call(step, c),
-            Instruction::SplitCall(c) => self.format_split_call(step, c),
-            Instruction::Return(r) => self.format_return(step, r),
+            Instruction::Match(m) => self.format_match(addr, m),
+            Instruction::Call(c) => self.format_call(addr, c),
+            Instruction::RoutedCall(c) => self.format_routed_call(addr, c),
+            Instruction::SplitCall(c) => self.format_split_call(addr, c),
+            Instruction::Return(r) => self.format_return(addr, r),
         }
     }
 
-    fn format_routed_call(&self, step: u16, call: &RoutedCall) -> String {
+    fn format_routed_call(&self, addr: CodeAddr, call: &RoutedCall) -> String {
         let colors = &self.ctx.colors;
-        let builder = LineBuilder::new(self.step_width);
+        let builder = LineBuilder::new(self.addr_width);
         let prefix = format!(
             "  {:0sw$} {} ",
-            step,
+            addr,
             Symbol::EMPTY.format(),
-            sw = self.step_width
+            sw = self.addr_width
         );
         let target_name = self
             .ctx
             .label_for(call.target)
             .map(String::from)
-            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.step_width));
+            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.addr_width));
         let content = format!("({}{}{})", colors.blue, target_name, colors.reset);
         let successors = format!(
             "{:0w$} : {:0w$}",
             u16::from(call.target),
             u16::from(call.next),
-            w = self.step_width
+            w = self.addr_width
         );
         builder.pad_successors(format!("{prefix}{content}"), &successors)
     }
 
-    fn format_split_call(&self, step: u16, call: &SplitCall) -> String {
+    fn format_split_call(&self, addr: CodeAddr, call: &SplitCall) -> String {
         let colors = &self.ctx.colors;
-        let builder = LineBuilder::new(self.step_width);
+        let builder = LineBuilder::new(self.addr_width);
         let prefix = format!(
             "  {:0sw$} {} ",
-            step,
+            addr,
             Symbol::EMPTY.format(),
-            sw = self.step_width
+            sw = self.addr_width
         );
         let target_name = self
             .ctx
             .label_for(call.target)
             .map(String::from)
-            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.step_width));
+            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.addr_width));
         let content = format!("({}{}{})", colors.blue, target_name, colors.reset);
         let successors = format!(
             "{:0w$} : {:0w$} / {:0w$}",
             u16::from(call.target),
             u16::from(call.returns.matched),
             u16::from(call.returns.zero),
-            w = self.step_width
+            w = self.addr_width
         );
         builder.pad_successors(format!("{prefix}{content}"), &successors)
     }
 
-    fn format_match(&self, step: u16, m: &Match) -> String {
-        let builder = LineBuilder::new(self.step_width);
+    fn format_match(&self, addr: CodeAddr, m: &Match) -> String {
+        let builder = LineBuilder::new(self.addr_width);
         let symbol = nav_symbol(m.nav);
-        let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = self.step_width);
+        let prefix = format!("  {:0aw$} {} ", addr, symbol.format(), aw = self.addr_width);
 
         let content = self.format_match_content(m);
         let successors = self.format_match_successors(m);
@@ -523,17 +528,17 @@ impl DumpFormatter<'_> {
             "◼".to_string()
         } else {
             m.successors()
-                .map(|s| self.format_step(s))
+                .map(|s| self.format_addr(s))
                 .collect::<Vec<_>>()
                 .join(", ")
         }
     }
 
-    fn format_call(&self, step: u16, call: &Call) -> String {
+    fn format_call(&self, addr: CodeAddr, call: &Call) -> String {
         let c = &self.ctx.colors;
-        let builder = LineBuilder::new(self.step_width);
+        let builder = LineBuilder::new(self.addr_width);
         let symbol = nav_symbol(call.nav);
-        let prefix = format!("  {:0sw$} {} ", step, symbol.format(), sw = self.step_width);
+        let prefix = format!("  {:0aw$} {} ", addr, symbol.format(), aw = self.addr_width);
 
         // Format field constraint if present
         let field_part = if let Some(field_id) = call.node_field {
@@ -547,7 +552,7 @@ impl DumpFormatter<'_> {
             .ctx
             .label_for(call.target)
             .map(String::from)
-            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.step_width));
+            .unwrap_or_else(|| format!("@{:0w$}", u16::from(call.target), w = self.addr_width));
         // Definition name in call is blue
         let content = format!("{field_part}({}{}{})", c.blue, target_name, c.reset);
         // Format as "target : return" with numeric IDs
@@ -555,20 +560,20 @@ impl DumpFormatter<'_> {
             "{:0w$} : {:0w$}",
             u16::from(call.target),
             u16::from(call.next),
-            w = self.step_width
+            w = self.addr_width
         );
 
         let base = format!("{prefix}{content}");
         builder.pad_successors(base, &successors)
     }
 
-    fn format_return(&self, step: u16, return_: &Return) -> String {
-        let builder = LineBuilder::new(self.step_width);
+    fn format_return(&self, addr: CodeAddr, return_: &Return) -> String {
+        let builder = LineBuilder::new(self.addr_width);
         let prefix = format!(
             "  {:0sw$} {} ",
-            step,
+            addr,
             Symbol::EMPTY.format(),
-            sw = self.step_width
+            sw = self.addr_width
         );
         let outcome = match return_.mode.outcome() {
             plotnik_rt::ReturnOutcome::Matched => "▶",
@@ -577,12 +582,12 @@ impl DumpFormatter<'_> {
         builder.pad_successors(prefix, outcome)
     }
 
-    fn format_step(&self, step: StepId) -> String {
+    fn format_addr(&self, addr: SuccessorAddr) -> String {
         let c = &self.ctx.colors;
-        if let Some(label) = self.ctx.label_for(step) {
+        if let Some(label) = self.ctx.label_for(addr) {
             format!("▶({}{}{})", c.blue, label, c.reset)
         } else {
-            format!("{:0w$}", u16::from(step), w = self.step_width)
+            format!("{:0w$}", u16::from(addr), w = self.addr_width)
         }
     }
 }

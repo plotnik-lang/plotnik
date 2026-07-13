@@ -3,7 +3,7 @@
 use serde::Serialize;
 use tree_sitter::Node;
 
-use crate::bytecode::{EffectKind, Instruction, Module, ModuleRenderContext, Nav};
+use crate::bytecode::{CodeAddr, EffectKind, Instruction, Module, ModuleRenderContext, Nav};
 use crate::core::NodeFieldId;
 
 use super::trace::Tracer;
@@ -67,7 +67,7 @@ pub struct RecordingTracer {
     shadow: Vec<Shadow>,
     max_records: usize,
     truncated: bool,
-    current_ip: u16,
+    current_ip: CodeAddr,
     journal_len: u32,
     records_seen: u32,
 }
@@ -81,7 +81,7 @@ impl RecordingTracer {
             shadow: Vec::new(),
             max_records,
             truncated: false,
-            current_ip: 0,
+            current_ip: CodeAddr::ZERO,
             journal_len: 0,
             records_seen: 0,
         }
@@ -99,7 +99,7 @@ impl RecordingTracer {
         self.add_record_at(self.current_ip, event, node)
     }
 
-    fn add_record_at(&mut self, ip: u16, event: StepEvent, node: Option<NodeRef>) -> u32 {
+    fn add_record_at(&mut self, ip: CodeAddr, event: StepEvent, node: Option<NodeRef>) -> u32 {
         let record_idx = self.records_seen;
         self.records_seen = self
             .records_seen
@@ -108,7 +108,7 @@ impl RecordingTracer {
 
         if self.steps.len() < self.max_records {
             self.steps.push(StepRecord {
-                ip,
+                ip: ip.get(),
                 event,
                 span: self.span_stack.last().copied(),
                 node,
@@ -220,7 +220,7 @@ impl RecordingTracer {
 }
 
 impl Tracer for RecordingTracer {
-    fn trace_instruction(&mut self, ip: u16, _instr: &Instruction<'_>) {
+    fn trace_instruction(&mut self, ip: CodeAddr, _instr: &Instruction<'_>) {
         self.current_ip = ip;
         self.add_record(StepEvent::Instruction, None);
     }
@@ -308,15 +308,20 @@ impl Tracer for RecordingTracer {
         self.add_record(event, None);
     }
 
-    fn trace_call(&mut self, target_ip: u16) {
-        self.add_record(StepEvent::Call { target: target_ip }, None);
+    fn trace_call(&mut self, target_ip: CodeAddr) {
+        self.add_record(
+            StepEvent::Call {
+                target: target_ip.get(),
+            },
+            None,
+        );
     }
 
     fn trace_return(&mut self, _outcome: plotnik_rt::ReturnOutcome) {
         self.add_record(StepEvent::Return, None);
     }
 
-    fn trace_checkpoint_created(&mut self, ip: u16) {
+    fn trace_checkpoint_created(&mut self, ip: CodeAddr) {
         let record_idx = self.add_record_at(ip, StepEvent::CheckpointNew, None);
         self.shadow.push(Shadow {
             span_depth: self.span_stack.len(),
@@ -342,9 +347,14 @@ impl Tracer for RecordingTracer {
         );
     }
 
-    fn trace_enter_entrypoint(&mut self, target_ip: u16) {
+    fn trace_enter_entrypoint(&mut self, target_ip: CodeAddr) {
         self.current_ip = target_ip;
-        self.add_record(StepEvent::EnterEntrypoint { target: target_ip }, None);
+        self.add_record(
+            StepEvent::EnterEntrypoint {
+                target: target_ip.get(),
+            },
+            None,
+        );
     }
 }
 

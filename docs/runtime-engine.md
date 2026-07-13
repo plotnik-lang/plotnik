@@ -9,7 +9,7 @@ JSON value after a match accepts.
 ```rust
 struct VM<'t> {
     cursor: TreeCursor<'t>,
-    ip: StepId,
+    ip: CodeAddr,
     frames: FrameArena,
     checkpoints: CheckpointStack,
     journal: MatchJournal<'t>,
@@ -117,7 +117,7 @@ struct Checkpoint {
     frame_index: Option<u32>,
     recursion_depth: u32,
     effect_depths: u64, // suppression u32 | scalar u32
-    ip: StepId,
+    ip: CodeAddr,
 }
 ```
 

@@ -33,15 +33,15 @@ pub mod type_system;
 pub use dump::dump;
 pub use entrypoint::Entrypoint;
 pub use ids::{StringId, TypeId};
-pub use instructions::{EncodeError, StepAddr};
+pub use instructions::{CodeAddr, EncodeError};
 pub use module::{EntrypointsView, Module, StringsView, TypesView};
 pub use spans::{SPAN_NO_BINDING, SpanEntry, SpanKind, SpansView};
 pub use type_meta::{TypeDef, TypeDefKind, TypeMember, TypeNameEntry};
 pub use type_system::{PrimitiveType, TypeKind};
 
 pub(crate) use constants::{
-    HEADER_SIZE, MAGIC, MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_SPANS,
-    REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
+    BYTECODE_WORD_SIZE, HEADER_SIZE, MAGIC, MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS,
+    MAX_SPANS, REGEX_TABLE_ENTRY_SIZE, SECTION_ALIGN, SPAN_ENTRY_SIZE, STRING_TABLE_ENTRY_SIZE,
     VERSION,
 };
 pub(crate) use effects::{Effect, EffectKind, EffectSuppression, FrameAction, ValueFrameKind};
@@ -51,7 +51,7 @@ pub(crate) use format::{
 pub(crate) use header::Header;
 pub(crate) use instructions::{
     Call, Match, MatchInstr, MatchPredicate, Return, ReturnEntry, ReturnMode, RoutedCall,
-    SplitCall, SplitCallReturns, StepId, select_match_opcode,
+    SplitCall, SplitCallReturns, SuccessorAddr, select_match_opcode,
 };
 pub(crate) use module::{
     DecodedCall, DecodedInstr, DecodedMatch, DecodedPredicate, DecodedRoutedCall, DecodedSplitCall,

@@ -9,7 +9,7 @@ The VM uses `TreeCursor` exclusively, never the `Node` API for traversal.
 ```rust
 struct VM<'t> {
     cursor: TreeCursor<'t>,          // created at tree root, never reset
-    ip: StepId,                      // current step index
+    ip: CodeAddr,                    // current instruction address
     frames: Vec<Frame>,              // call stack
     journal: MatchJournal<'t>,       // rollbackable match journal
     suppress_depth: u64,             // suppressive capture depth
@@ -19,7 +19,7 @@ struct Checkpoint {
     descendant_index: u32,             // cursor position (4 bytes)
     journal_watermark: usize,          // match journal length
     frame_index: Option<u32>,          // call stack state
-    ip: StepId,                        // branch target, or the owning Call/Match
+    ip: CodeAddr,                      // branch target, or the owning Call/Match
     resume: Resume,                    // Branch | Call(CallResume) | Match
 }
 ```
@@ -346,8 +346,8 @@ Both constraints participate in the skip policy — a mismatch triggers retry (f
 pub struct Call {
     pub nav: Nav,
     pub node_field: Option<NonZeroU16>,
-    pub next: StepId,      // return address
-    pub target: StepId,    // callee entry
+    pub next: SuccessorAddr,      // return address
+    pub target: SuccessorAddr,    // callee entry
 }
 ```
 

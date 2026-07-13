@@ -32,14 +32,14 @@
 //! ## Why state *sets* (collecting semantics)
 //!
 //! The panic-freedom property is per *path*: every graph path must execute to a
-//! well-shaped effect sequence. Distinct paths may legally reach the same step
+//! well-shaped effect sequence. Distinct paths may legally reach the same instruction
 //! with different abstract states — the dedup pass hash-conses structurally
 //! identical branch tails, so e.g. two alternatives share one `VariantClose`
-//! step, reached once under `Variant(A)` and once under `Variant(B)`. Each arrival
+//! instruction, reached once under `Variant(A)` and once under `Variant(B)`. Each arrival
 //! is individually sound (dedup is a bisimulation quotient: it preserves the
-//! op-labeled path set exactly), so the walk keeps a *set* of states per step
+//! op-labeled path set exactly), so the walk keeps a *set* of states per instruction
 //! and verifies every effect against every state that reaches it. Requiring a
-//! single state per step — as this pass once did — rejected modules the
+//! single state per instruction — as this pass once did — rejected modules the
 //! compiler itself emitted.
 //!
 //! Termination cannot rely on the state sets converging on their own — malformed
@@ -48,17 +48,17 @@
 //! them:
 //!
 //! - **Derived depth bounds.** A state's frame stack can never legitimately be
-//!   deeper than the total number of frame-opening effects on the steps the
-//!   walk has visited: every push comes from a visited step, and revisiting a
-//!   step at a strictly greater depth proves a net-positive cycle, which can
+//!   deeper than the total number of frame-opening effects on the instructions the
+//!   walk has visited: every push comes from a visited instruction, and revisiting
+//!   one at a strictly greater depth proves a net-positive cycle, which can
 //!   never rebalance — every exit requires an empty local stack, so some path
 //!   through such a cycle is provably ill-formed. The suppression counter and
 //!   span stack get the same treatment against their own opener counts.
 //! - **A state budget.** Frame payloads (variant member, `got_data`, pending) are
 //!   finite but can multiply across nesting; a hard cap on states explored per
 //!   body bounds load time on pathological compiler output. Valid output stays
-//!   far below it: the states at a merged step correspond to the pre-dedup
-//!   twins, and step addresses are `u16`, so a body contributes at most tens of
+//!   far below it: the states at a merged instruction correspond to the pre-dedup
+//!   twins, and code addresses are `u16`, so a body contributes at most tens of
 //!   thousands of states in total.
 //!
 //! ## Why summaries
@@ -112,7 +112,9 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{Instruction, Module, ModuleError};
-use crate::bytecode::{Effect, EffectKind, FrameAction, TypeDefKind, TypeKind, ValueFrameKind};
+use crate::bytecode::{
+    CodeAddr, Effect, EffectKind, FrameAction, TypeDefKind, TypeKind, ValueFrameKind,
+};
 
 /// Builder frames the materializer pushes. The root/result frame can be a
 /// scalar, but compiled effects only push these three frame kinds.
@@ -173,7 +175,7 @@ const KS_ANY: u8 = KS_LIST | KS_RECORD | KS_VARIANT | KS_SCALAR;
 const KS_RECORD_SET_TARGET: u8 = KS_RECORD | KS_VARIANT;
 
 /// Hard cap on abstract states explored per body walk. Valid output is bounded
-/// by the pre-dedup instruction count (`u16` step space); pathological compiler
+/// by the pre-dedup instruction count (`u16` address space); pathological compiler
 /// output is rejected before a combinatorial frame-payload blowup can monopolize
 /// load time.
 const STATE_BUDGET: usize = 1 << 18;
@@ -233,12 +235,12 @@ impl DefSummary {
     }
 }
 
-/// Summaries keyed by definition-entry step.
-type DefSummaries = HashMap<u16, DefSummary>;
+/// Summaries keyed by definition-entry address.
+type DefSummaries = HashMap<CodeAddr, DefSummary>;
 
 /// Verify that no path can drive the materializer or the suppression counter
 /// into a panic. Assumes [`Module::validate_transitions`] has already run, so
-/// every `decode_step` and every jump target is safe.
+/// every instruction decode and every jump target is safe.
 pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> {
     let entrypoints = module.entrypoints();
 
@@ -248,7 +250,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     let mut queue = VecDeque::new();
     let mut queued = HashSet::new();
     for entrypoint in entrypoints.iter() {
-        let target = u16::from(entrypoint.target());
+        let target = entrypoint.target();
         if known.insert(target) {
             defs.push(target);
             summaries.insert(target, DefSummary::unknown());
@@ -260,7 +262,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     let mut called = HashSet::new();
     // A summary change only invalidates direct callers. Keeping reverse edges
     // avoids rescanning every definition for every link in a dependency chain.
-    let mut callers: HashMap<u16, Vec<u16>> = HashMap::new();
+    let mut callers: HashMap<CodeAddr, Vec<CodeAddr>> = HashMap::new();
     let mut call_edges = HashSet::new();
 
     // Monotone fixpoint: `entry_tos` only ever shrinks (intersection),
@@ -327,7 +329,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     // caller-top constraint means some effect would read below the frames the
     // wrapper itself opened and hit the materializer's result root frame.
     for entrypoint in entrypoints.iter() {
-        let target = u16::from(entrypoint.target());
+        let target = entrypoint.target();
         let wrapper = analyze(
             module,
             &summaries,
@@ -343,7 +345,7 @@ pub(crate) fn validate_effect_stack(module: &Module) -> Result<(), ModuleError> 
     Ok(())
 }
 
-fn enqueue(queue: &mut VecDeque<u16>, queued: &mut HashSet<u16>, entry: u16) {
+fn enqueue(queue: &mut VecDeque<CodeAddr>, queued: &mut HashSet<CodeAddr>, entry: CodeAddr) {
     if queued.insert(entry) {
         queue.push_back(entry);
     }
@@ -357,7 +359,7 @@ struct Analysis {
     /// Whether some path applies `RecordSet` to the caller's top frame.
     record_sets_caller_top: bool,
     /// Call targets reached — definitions to summarize.
-    discovered: Vec<u16>,
+    discovered: Vec<CodeAddr>,
 }
 
 /// Abstract state at instruction entry: the builder frames pushed so far
@@ -384,19 +386,19 @@ impl AbsState {
     fn record_exit(
         &self,
         returns_pending: &mut Option<bool>,
-        step: u16,
+        addr: CodeAddr,
     ) -> Result<(), ModuleError> {
         if !self.stack.is_empty() || self.suppress != 0 {
-            return Err(ModuleError::EffectStackImbalance(step));
+            return Err(ModuleError::EffectStackImbalance(addr));
         }
         if !self.span_stack.is_empty() {
-            return Err(ModuleError::SpanImbalance(step));
+            return Err(ModuleError::SpanImbalance(addr));
         }
         if let Some(pending) = self.pending.known() {
             if let Some(seen) = *returns_pending
                 && seen != pending
             {
-                return Err(ModuleError::EffectStackImbalance(step));
+                return Err(ModuleError::EffectStackImbalance(addr));
             }
             *returns_pending = Some(pending);
         }
@@ -418,12 +420,12 @@ fn take_unseen_state(seen: &mut HashMap<AbsState, ()>, state: AbsState) -> Optio
 }
 
 /// Walk one body, computing its summary facts and verifying its structural
-/// invariants against every abstract state that reaches each step. When
-/// In the final phase, also verify each call site against `summaries`.
+/// invariants against every abstract state that reaches each instruction. In
+/// the final phase, also verify each call site against `summaries`.
 fn analyze(
     module: &Module,
     summaries: &DefSummaries,
-    entry: u16,
+    entry: CodeAddr,
     role: BodyRole,
     phase: VerifyPhase,
 ) -> Result<Analysis, ModuleError> {
@@ -436,22 +438,22 @@ fn analyze(
     let mut discovered = Vec::new();
     let mut discovered_set = HashSet::new();
 
-    // Collecting semantics: every distinct abstract state a step is reached
+    // Collecting semantics: every distinct abstract state an instruction is reached
     // with is kept and processed once. The opener tallies accumulate, per
-    // visited step, how many frame/suppression/span openers exist — a state
+    // visited instruction, how many frame/suppression/span openers exist — a state
     // outgrowing them proves a net-positive cycle (see module docs).
-    let mut memo: HashMap<u16, HashMap<AbsState, ()>> = HashMap::new();
+    let mut memo: HashMap<CodeAddr, HashMap<AbsState, ()>> = HashMap::new();
     let mut states_spent: usize = 0;
     let mut frame_openers: usize = 0;
     let mut suppress_openers: i32 = 0;
     let mut span_openers: usize = 0;
 
-    let mut work: Vec<(u16, AbsState)> = vec![(entry, AbsState::initial())];
+    let mut work: Vec<(CodeAddr, AbsState)> = vec![(entry, AbsState::initial())];
 
-    while let Some((step, state)) = work.pop() {
-        let instruction = module.decode_step(step);
+    while let Some((addr, state)) = work.pop() {
+        let instruction = module.decode_instruction(addr);
 
-        let seen = memo.entry(step).or_insert_with(|| {
+        let seen = memo.entry(addr).or_insert_with(|| {
             if let Instruction::Match(m) = &instruction {
                 for eff in m.effects() {
                     match eff.kind {
@@ -473,17 +475,17 @@ fn analyze(
             continue;
         };
         if state.stack.len() > frame_openers || state.suppress > suppress_openers {
-            return Err(ModuleError::EffectStackImbalance(step));
+            return Err(ModuleError::EffectStackImbalance(addr));
         }
         if state.span_stack.len() > span_openers {
-            return Err(ModuleError::SpanImbalance(step));
+            return Err(ModuleError::SpanImbalance(addr));
         }
         states_spent += 1;
         if states_spent > STATE_BUDGET {
-            return Err(ModuleError::EffectStackBudget(step));
+            return Err(ModuleError::EffectStackBudget(addr));
         }
         if matches!(instruction, Instruction::Return(_)) {
-            state.record_exit(&mut returns_pending, step)?;
+            state.record_exit(&mut returns_pending, addr)?;
             continue;
         }
         let AbsState {
@@ -513,7 +515,7 @@ fn analyze(
                 continue;
             }
             if pending == PendingState::Full {
-                return Err(ModuleError::EffectStackImbalance(step));
+                return Err(ModuleError::EffectStackImbalance(addr));
             }
 
             let summary = summaries
@@ -524,7 +526,7 @@ fn analyze(
                 Some(&kind)
                     if phase == VerifyPhase::Final && kind.bit() & summary.entry_tos == 0 =>
                 {
-                    return Err(ModuleError::EffectStackImbalance(step));
+                    return Err(ModuleError::EffectStackImbalance(addr));
                 }
                 None => {
                     // The callee's reads and writes land on *our* caller's top
@@ -586,7 +588,7 @@ fn analyze(
                             entry_tos: &mut entry_tos,
                             record_sets_caller_top: &mut record_sets_caller_top,
                         },
-                        step,
+                        addr,
                     )?;
                 }
                 if m.succ_count() == 0 {
@@ -595,18 +597,18 @@ fn analyze(
                     // here is exact; under a `Call` the caller's frames are
                     // still open in the log, so this is never sound.
                     if role == BodyRole::Called {
-                        return Err(ModuleError::EffectStackImbalance(step));
+                        return Err(ModuleError::EffectStackImbalance(addr));
                     }
                     if !stack.is_empty() || suppress != 0 {
-                        return Err(ModuleError::EffectStackImbalance(step));
+                        return Err(ModuleError::EffectStackImbalance(addr));
                     }
                     if !span_stack.is_empty() {
-                        return Err(ModuleError::SpanImbalance(step));
+                        return Err(ModuleError::SpanImbalance(addr));
                     }
                 } else {
                     for succ in m.successors() {
                         work.push((
-                            u16::from(succ),
+                            CodeAddr::from(u16::from(succ)),
                             AbsState {
                                 stack: stack.clone(),
                                 suppress,
@@ -633,36 +635,36 @@ fn analyze(
 
 #[derive(Clone, Copy)]
 struct CallRoute {
-    target: u16,
-    returns: CallReturnSteps,
+    target: CodeAddr,
+    returns: CallReturnAddrs,
 }
 
 impl CallRoute {
     fn from_instruction(instruction: Instruction<'_>) -> Option<Self> {
         match instruction {
             Instruction::Call(call) => Some(Self {
-                target: u16::from(call.target),
-                returns: CallReturnSteps::Single([u16::from(call.next)]),
+                target: CodeAddr::from(u16::from(call.target)),
+                returns: CallReturnAddrs::Single([CodeAddr::from(u16::from(call.next))]),
             }),
             Instruction::RoutedCall(call) => Some(Self {
-                target: u16::from(call.target),
-                returns: CallReturnSteps::Single([u16::from(call.next)]),
+                target: CodeAddr::from(u16::from(call.target)),
+                returns: CallReturnAddrs::Single([CodeAddr::from(u16::from(call.next))]),
             }),
             Instruction::SplitCall(call) => Some(Self {
-                target: u16::from(call.target),
-                returns: CallReturnSteps::Split([
-                    u16::from(call.returns.matched),
-                    u16::from(call.returns.zero),
+                target: CodeAddr::from(u16::from(call.target)),
+                returns: CallReturnAddrs::Split([
+                    CodeAddr::from(u16::from(call.returns.matched)),
+                    CodeAddr::from(u16::from(call.returns.zero)),
                 ]),
             }),
             Instruction::Match(_) | Instruction::Return(_) => None,
         }
     }
 
-    fn push_returns(self, work: &mut Vec<(u16, AbsState)>, state: AbsState) {
+    fn push_returns(self, work: &mut Vec<(CodeAddr, AbsState)>, state: AbsState) {
         match self.returns {
-            CallReturnSteps::Single([return_]) => work.push((return_, state)),
-            CallReturnSteps::Split([matched, zero]) => {
+            CallReturnAddrs::Single([return_]) => work.push((return_, state)),
+            CallReturnAddrs::Split([matched, zero]) => {
                 work.push((zero, state.clone()));
                 work.push((matched, state));
             }
@@ -671,9 +673,9 @@ impl CallRoute {
 }
 
 #[derive(Clone, Copy)]
-enum CallReturnSteps {
-    Single([u16; 1]),
-    Split([u16; 2]),
+enum CallReturnAddrs {
+    Single([CodeAddr; 1]),
+    Split([CodeAddr; 2]),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -704,7 +706,7 @@ fn apply_effect(
     module: &Module,
     effect: Effect,
     state: EffectState<'_>,
-    step: u16,
+    addr: CodeAddr,
 ) -> Result<(), ModuleError> {
     use EffectKind::*;
 
@@ -715,7 +717,7 @@ fn apply_effect(
             SuppressBegin => *state.suppress += 1,
             SuppressEnd => *state.suppress -= 1,
             SpanStartAt | SpanStart => state.span_stack.push(effect.payload as u16),
-            SpanEnd => close_span(state.span_stack, effect.payload as u16, step)?,
+            SpanEnd => close_span(state.span_stack, effect.payload as u16, addr)?,
             ScalarMark => {}
             _ => {}
         }
@@ -723,10 +725,10 @@ fn apply_effect(
     }
 
     if effect.kind.frame_action().is_some() {
-        return apply_frame_action(module, effect, state, step);
+        return apply_frame_action(module, effect, state, addr);
     }
 
-    let err = || ModuleError::EffectStackImbalance(step);
+    let err = || ModuleError::EffectStackImbalance(addr);
     match effect.kind {
         Node | Absent | NodeStr | NodeBool | BoolValue => {
             if *state.pending == PendingState::Full {
@@ -739,7 +741,7 @@ fn apply_effect(
         // exact underflow the VM panics on.
         SuppressEnd => return Err(err()),
         SpanStartAt | SpanStart => state.span_stack.push(effect.payload as u16),
-        SpanEnd => close_span(state.span_stack, effect.payload as u16, step)?,
+        SpanEnd => close_span(state.span_stack, effect.payload as u16, addr)?,
         ScalarMark => {}
         ArrayPush => {
             if *state.pending == PendingState::Empty {
@@ -779,13 +781,13 @@ fn apply_frame_action(
     module: &Module,
     effect: Effect,
     state: EffectState<'_>,
-    step: u16,
+    addr: CodeAddr,
 ) -> Result<(), ModuleError> {
     let action = effect
         .kind
         .frame_action()
         .expect("frame action effects are dispatched here");
-    let err = || ModuleError::EffectStackImbalance(step);
+    let err = || ModuleError::EffectStackImbalance(addr);
     match action {
         FrameAction::Open(kind) => {
             if *state.pending == PendingState::Full {
@@ -804,7 +806,7 @@ fn apply_frame_action(
         }
         FrameAction::Close(ValueFrameKind::Variant) => match state.stack.pop() {
             Some(FrameKind::Variant { member, got_data }) => {
-                let is_void = variant_member_is_void(module, member, step)?;
+                let is_void = variant_member_is_void(module, member, addr)?;
                 let data_pending = match *state.pending {
                     PendingState::Full => true,
                     PendingState::Empty => false,
@@ -844,18 +846,22 @@ struct EffectState<'a> {
 
 /// A `SpanEnd` must close the innermost open span, with the id the matching
 /// bracket opened — a lone or mis-paired close is malformed bytecode.
-fn close_span(span_stack: &mut Vec<u16>, id: u16, step: u16) -> Result<(), ModuleError> {
+fn close_span(span_stack: &mut Vec<u16>, id: u16, addr: CodeAddr) -> Result<(), ModuleError> {
     match span_stack.pop() {
         Some(open) if open == id => Ok(()),
-        _ => Err(ModuleError::SpanImbalance(step)),
+        _ => Err(ModuleError::SpanImbalance(addr)),
     }
 }
 
-fn variant_member_is_void(module: &Module, member: u16, step: u16) -> Result<bool, ModuleError> {
+fn variant_member_is_void(
+    module: &Module,
+    member: u16,
+    addr: CodeAddr,
+) -> Result<bool, ModuleError> {
     let types = module.types();
     let type_id = types.member_type_id(member as usize);
     let Some(type_def) = types.get(type_id) else {
-        return Err(ModuleError::EffectStackImbalance(step));
+        return Err(ModuleError::EffectStackImbalance(addr));
     };
     Ok(matches!(
         type_def.decode(),

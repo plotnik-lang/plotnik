@@ -1,13 +1,13 @@
 //! Instruction IR with symbolic labels.
 //!
 //! Pre-layout instructions use `Label` for symbolic references.
-//! After layout, labels are resolved to step addresses (u16) for serialization.
+//! After layout, labels are resolved to bytecode-word addresses (u16) for serialization.
 //! A `MemberRef` stores a parent type plus a relative index, resolved to an
 //! absolute member index at emit time.
 
 use std::collections::BTreeMap;
 
-use crate::bytecode::{EffectKind, Nav, PredicateOp, StepAddr, select_match_opcode};
+use crate::bytecode::{CodeAddr, EffectKind, Nav, PredicateOp, select_match_opcode};
 use indexmap::IndexMap;
 
 use crate::compiler::analyze::types::CaptureTypePlan;
@@ -25,13 +25,13 @@ pub use plotnik_rt::ReturnOutcome;
 /// consumers can name it as `ir::NodeKindConstraint`.
 pub(crate) use crate::bytecode::NodeKindConstraint;
 
-/// Symbolic reference, resolved to step address at layout time.
+/// Symbolic reference, resolved to a bytecode-word address at layout time.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Label(pub u32);
 
 impl Label {
     #[inline]
-    pub fn resolve(self, map: &BTreeMap<Label, StepAddr>) -> StepAddr {
+    pub fn resolve(self, map: &BTreeMap<Label, CodeAddr>) -> CodeAddr {
         *map.get(&self).expect("label not in layout")
     }
 }

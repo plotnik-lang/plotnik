@@ -6,7 +6,7 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use crate::bytecode::{SECTION_ALIGN as CACHE_LINE, STEP_SIZE, StepAddr};
+use crate::bytecode::{BYTECODE_WORD_SIZE, CodeAddr, SECTION_ALIGN as CACHE_LINE};
 
 use crate::compiler::emit::targets::bytecode::layout_map::LayoutMap;
 use crate::compiler::lower::ir::{InstructionIR, Label};
@@ -96,22 +96,23 @@ impl BlockArena {
 
     fn finalize(self) -> LayoutMap {
         let mut mapping = BTreeMap::new();
-        // Accumulate in u32 so the step count never wraps; the emitter rejects a
-        // layout exceeding the u16 address space before any `step as u16` (which
+        // Accumulate in u32 so the word count never wraps; the emitter rejects a
+        // layout exceeding the u16 address space before any `word_addr as u16` (which
         // may wrap here) is read.
-        let mut max_step_end: u32 = 0;
+        let mut max_word_end: u32 = 0;
 
         for (block_idx, block) in self.blocks.iter().enumerate() {
-            let block_base_step = (block_idx * CACHE_LINE / STEP_SIZE) as u32;
+            let block_base_addr = (block_idx * CACHE_LINE / BYTECODE_WORD_SIZE) as u32;
             for placement in &block.placements {
-                let step = block_base_step + (placement.offset / STEP_SIZE as u8) as u32;
-                mapping.insert(placement.label, StepAddr::from(step as u16));
-                let step_end = step + (placement.size / STEP_SIZE as u8) as u32;
-                max_step_end = max_step_end.max(step_end);
+                let word_addr =
+                    block_base_addr + (placement.offset / BYTECODE_WORD_SIZE as u8) as u32;
+                mapping.insert(placement.label, CodeAddr::from(word_addr as u16));
+                let word_end = word_addr + (placement.size / BYTECODE_WORD_SIZE as u8) as u32;
+                max_word_end = max_word_end.max(word_end);
             }
         }
 
-        LayoutMap::new(mapping, max_step_end)
+        LayoutMap::new(mapping, max_word_end)
     }
 }
 
@@ -224,7 +225,7 @@ pub struct CacheAligned;
 impl CacheAligned {
     /// Compute layout for instructions with given entry points.
     ///
-    /// Returns mapping from labels to step IDs and total step count.
+    /// Returns the label-to-address mapping and total bytecode-word count.
     pub fn layout(instructions: &[InstructionIR], entries: &[Label]) -> LayoutMap {
         if instructions.is_empty() {
             return LayoutMap::empty();

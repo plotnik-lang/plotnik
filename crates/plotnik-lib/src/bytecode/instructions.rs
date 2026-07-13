@@ -10,16 +10,16 @@ use crate::core::{NodeFieldId, ZeroIdError};
 #[cfg(test)]
 use super::constants::SECTION_ALIGN;
 use super::constants::{
-    MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_SUCCESSORS, STEP_SIZE,
+    BYTECODE_WORD_SIZE, MAX_EFFECTS, MAX_MATCH_PAYLOAD_SLOTS, MAX_NEG_FIELDS, MAX_SUCCESSORS,
 };
 use super::effects::{EFFECT_PAYLOAD_MAX, Effect};
 use super::node_kind_constraint::NodeKindConstraint;
 use plotnik_rt::Nav;
 
 /// Fixed header bytes before an extended Match's payload — exactly the first
-/// step. Effects, negated fields, an optional predicate, and successors follow,
+/// bytecode word. Effects, negated fields, an optional predicate, and successors follow,
 /// each occupying [`PAYLOAD_SLOT_SIZE`] bytes.
-pub(crate) const MATCH_PAYLOAD_START: usize = STEP_SIZE;
+pub(crate) const MATCH_PAYLOAD_START: usize = BYTECODE_WORD_SIZE;
 
 /// Each Match payload slot is one little-endian `u16`.
 pub(crate) const PAYLOAD_SLOT_SIZE: usize = size_of::<u16>();
@@ -126,18 +126,33 @@ impl MatchCounts {
     }
 }
 
-/// Step address in bytecode.
+/// Bytecode-word address in the instruction stream.
 ///
 /// Used for layout addresses, entrypoint targets, bootstrap parameter, etc.
-/// For decoded instruction successors (where 0 = terminal), use [`StepId`] instead.
+/// For decoded instruction successors (where 0 = terminal), use [`SuccessorAddr`] instead.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
-pub struct StepAddr(u16);
+pub struct CodeAddr(u16);
 
-impl StepAddr {
+impl CodeAddr {
+    pub const ZERO: Self = Self(0);
+
     #[inline]
     pub const fn get(self) -> u16 {
         self.0
+    }
+
+    #[inline]
+    pub const fn as_usize(self) -> usize {
+        self.0 as usize
+    }
+
+    #[inline]
+    pub const fn checked_add(self, words: u16) -> Option<Self> {
+        match self.0.checked_add(words) {
+            Some(addr) => Some(Self(addr)),
+            None => None,
+        }
     }
 
     #[inline]
@@ -146,54 +161,53 @@ impl StepAddr {
     }
 }
 
-impl From<u16> for StepAddr {
+impl From<u16> for CodeAddr {
     #[inline]
     fn from(n: u16) -> Self {
         Self(n)
     }
 }
 
-impl From<StepAddr> for u16 {
+impl From<CodeAddr> for u16 {
     #[inline]
-    fn from(v: StepAddr) -> Self {
+    fn from(v: CodeAddr) -> Self {
         v.0
     }
 }
 
-impl std::fmt::Display for StepAddr {
+impl std::fmt::Display for CodeAddr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.0, f)
     }
 }
 
-/// Successor step address in decoded instructions.
+/// Encoded non-terminal successor address in decoded instructions.
 ///
 /// Uses NonZeroU16 because raw 0 means "terminal" (no successor).
-/// This type is only for decoded instruction successors - use raw `u16`
-/// for addresses in layout, entrypoints, and VM internals.
+/// Use [`CodeAddr`] where zero is a valid address rather than a terminal marker.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
-pub struct StepId(NonZeroU16);
+pub struct SuccessorAddr(NonZeroU16);
 
-impl From<NonZeroU16> for StepId {
+impl From<NonZeroU16> for SuccessorAddr {
     #[inline]
     fn from(n: NonZeroU16) -> Self {
         Self(n)
     }
 }
-impl From<StepId> for NonZeroU16 {
+impl From<SuccessorAddr> for NonZeroU16 {
     #[inline]
-    fn from(v: StepId) -> Self {
+    fn from(v: SuccessorAddr) -> Self {
         v.0
     }
 }
-impl From<StepId> for u16 {
+impl From<SuccessorAddr> for u16 {
     #[inline]
-    fn from(v: StepId) -> Self {
+    fn from(v: SuccessorAddr) -> Self {
         v.0.get()
     }
 }
-impl TryFrom<u16> for StepId {
+impl TryFrom<u16> for SuccessorAddr {
     type Error = ZeroIdError;
     #[inline]
     fn try_from(n: u16) -> Result<Self, Self::Error> {
@@ -201,14 +215,14 @@ impl TryFrom<u16> for StepId {
     }
 }
 
-impl TryFrom<StepAddr> for StepId {
+impl TryFrom<CodeAddr> for SuccessorAddr {
     type Error = ZeroIdError;
     #[inline]
-    fn try_from(addr: StepAddr) -> Result<Self, Self::Error> {
+    fn try_from(addr: CodeAddr) -> Result<Self, Self::Error> {
         Self::try_from(u16::from(addr))
     }
 }
-impl std::fmt::Display for StepId {
+impl std::fmt::Display for SuccessorAddr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0.get())
     }
@@ -250,7 +264,7 @@ impl Opcode {
     }
 
     /// Instruction size in bytes. The variant ladder is defined here; payload
-    /// capacity and step count derive from it.
+    /// capacity and word count derive from it.
     pub const fn size(self) -> usize {
         match self {
             Self::Match8 => 8,
@@ -259,13 +273,13 @@ impl Opcode {
             Self::Match32 => 32,
             Self::Match48 => 48,
             Self::Match64 => 64,
-            Self::Call | Self::Return | Self::SplitCall | Self::RoutedCall => STEP_SIZE,
+            Self::Call | Self::Return | Self::SplitCall | Self::RoutedCall => BYTECODE_WORD_SIZE,
         }
     }
 
-    /// Number of steps this instruction occupies.
-    pub const fn step_count(self) -> u16 {
-        (self.size() / STEP_SIZE) as u16
+    /// Number of bytecode words this instruction occupies.
+    pub const fn word_count(self) -> u16 {
+        (self.size() / BYTECODE_WORD_SIZE) as u16
     }
 
     pub const fn is_match(self) -> bool {
@@ -280,7 +294,7 @@ impl Opcode {
         )
     }
 
-    /// Payload capacity in u16 slots — whatever follows the one-step header.
+    /// Payload capacity in u16 slots — whatever follows the one-word header.
     /// Zero for non-extended variants (Match8, Call, Return).
     pub const fn payload_slots(self) -> usize {
         (self.size() - MATCH_PAYLOAD_START) / PAYLOAD_SLOT_SIZE
@@ -333,7 +347,10 @@ impl<'a> Match<'a> {
     /// Header byte layout: `segment(2) | node_class(2) | opcode(4)`
     #[inline]
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
-        debug_assert!(bytes.len() >= STEP_SIZE, "Match instruction too short");
+        debug_assert!(
+            bytes.len() >= BYTECODE_WORD_SIZE,
+            "Match instruction too short"
+        );
 
         let header = bytes[0];
         let segment = header_byte::segment(header);
@@ -388,12 +405,12 @@ impl<'a> Match<'a> {
         matches!(self.layout, MatchLayout::Match8 { .. })
     }
 
-    /// Steps (8-byte slots) this instruction occupies, read from its opcode.
+    /// Bytecode words this instruction occupies, read from its opcode.
     #[inline]
-    pub fn step_count(&self) -> u16 {
+    pub fn word_count(&self) -> u16 {
         header_byte::opcode(self.bytes[0])
             .expect("decoded Match has a valid opcode")
-            .step_count()
+            .word_count()
     }
 
     /// Number of successors.
@@ -406,21 +423,21 @@ impl<'a> Match<'a> {
     }
 
     #[inline]
-    pub fn successor(&self, idx: usize) -> StepId {
+    pub fn successor(&self, idx: usize) -> SuccessorAddr {
         debug_assert!(idx < self.succ_count(), "successor index out of bounds");
         match self.layout {
             MatchLayout::Match8 { next } => {
                 debug_assert!(idx == 0);
                 debug_assert!(next != 0, "terminal has no successors");
-                StepId::try_from(next).expect("step id must be non-zero")
+                SuccessorAddr::try_from(next).expect("successor address must be non-zero")
             }
             MatchLayout::Extended { .. } => {
                 let offset = self.succ_offset() + idx * PAYLOAD_SLOT_SIZE;
-                StepId::try_from(u16::from_le_bytes([
+                SuccessorAddr::try_from(u16::from_le_bytes([
                     self.bytes[offset],
                     self.bytes[offset + 1],
                 ]))
-                .expect("step id must be non-zero")
+                .expect("successor address must be non-zero")
             }
         }
     }
@@ -447,7 +464,7 @@ impl<'a> Match<'a> {
     }
 
     #[inline]
-    pub fn successors(&self) -> impl Iterator<Item = StepId> + '_ {
+    pub fn successors(&self) -> impl Iterator<Item = SuccessorAddr> + '_ {
         (0..self.succ_count()).map(move |i| self.successor(i))
     }
 
@@ -595,7 +612,7 @@ pub struct MatchInstr {
     pub effects: Vec<Effect>,
     pub neg_fields: Vec<NodeFieldId>,
     pub predicate: Option<MatchPredicate>,
-    pub successors: Vec<StepId>,
+    pub successors: Vec<SuccessorAddr>,
 }
 
 /// Error returned when an instruction cannot be encoded into bytecode.
@@ -725,13 +742,18 @@ pub struct Call {
     /// Field constraint (None = no constraint).
     pub node_field: Option<NodeFieldId>,
     /// Return address (current segment).
-    pub next: StepId,
+    pub next: SuccessorAddr,
     /// Callee entry point (target segment from type_id).
-    pub target: StepId,
+    pub target: SuccessorAddr,
 }
 
 impl Call {
-    pub fn new(nav: Nav, node_field: Option<NodeFieldId>, next: StepId, target: StepId) -> Self {
+    pub fn new(
+        nav: Nav,
+        node_field: Option<NodeFieldId>,
+        next: SuccessorAddr,
+        target: SuccessorAddr,
+    ) -> Self {
         Self {
             segment: 0,
             nav,
@@ -760,10 +782,10 @@ impl Call {
             nav: Nav::from_byte(bytes[1]),
             node_field: NonZeroU16::new(u16::from_le_bytes([bytes[2], bytes[3]]))
                 .map(NodeFieldId::from),
-            next: StepId::try_from(u16::from_le_bytes([bytes[4], bytes[5]]))
-                .expect("step id must be non-zero"),
-            target: StepId::try_from(u16::from_le_bytes([bytes[6], bytes[7]]))
-                .expect("step id must be non-zero"),
+            next: SuccessorAddr::try_from(u16::from_le_bytes([bytes[4], bytes[5]]))
+                .expect("successor address must be non-zero"),
+            target: SuccessorAddr::try_from(u16::from_le_bytes([bytes[6], bytes[7]]))
+                .expect("successor address must be non-zero"),
         }
     }
 
@@ -787,12 +809,12 @@ pub struct RoutedCall {
     pub segment: u8,
     /// Navigation owned by the routed callee, retained for validation.
     pub entry_nav: Nav,
-    pub next: StepId,
-    pub target: StepId,
+    pub next: SuccessorAddr,
+    pub target: SuccessorAddr,
 }
 
 impl RoutedCall {
-    pub fn new(entry_nav: Nav, next: StepId, target: StepId) -> Self {
+    pub fn new(entry_nav: Nav, next: SuccessorAddr, target: SuccessorAddr) -> Self {
         Self {
             segment: 0,
             entry_nav,
@@ -811,15 +833,15 @@ impl RoutedCall {
         );
         assert_eq!(opcode, Opcode::RoutedCall, "expected RoutedCall opcode");
 
-        let step = |offset| {
-            StepId::try_from(u16::from_le_bytes([bytes[offset], bytes[offset + 1]]))
-                .expect("step id must be non-zero")
+        let successor_addr = |offset| {
+            SuccessorAddr::try_from(u16::from_le_bytes([bytes[offset], bytes[offset + 1]]))
+                .expect("successor address must be non-zero")
         };
         Self {
             segment,
             entry_nav: Nav::from_byte(bytes[1]),
-            next: step(4),
-            target: step(6),
+            next: successor_addr(4),
+            target: successor_addr(6),
         }
     }
 
@@ -842,17 +864,17 @@ pub struct SplitCall {
     pub entry_nav: Nav,
     pub returns: SplitCallReturns,
     /// Callee entry point.
-    pub target: StepId,
+    pub target: SuccessorAddr,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct SplitCallReturns {
-    pub matched: StepId,
-    pub zero: StepId,
+    pub matched: SuccessorAddr,
+    pub zero: SuccessorAddr,
 }
 
 impl SplitCall {
-    pub fn new(entry_nav: Nav, returns: SplitCallReturns, target: StepId) -> Self {
+    pub fn new(entry_nav: Nav, returns: SplitCallReturns, target: SuccessorAddr) -> Self {
         Self {
             segment: 0,
             entry_nav,
@@ -871,18 +893,18 @@ impl SplitCall {
         );
         assert_eq!(opcode, Opcode::SplitCall, "expected SplitCall opcode");
 
-        let step = |offset| {
-            StepId::try_from(u16::from_le_bytes([bytes[offset], bytes[offset + 1]]))
-                .expect("step id must be non-zero")
+        let successor_addr = |offset| {
+            SuccessorAddr::try_from(u16::from_le_bytes([bytes[offset], bytes[offset + 1]]))
+                .expect("successor address must be non-zero")
         };
         Self {
             segment,
             entry_nav: Nav::from_byte(bytes[1]),
             returns: SplitCallReturns {
-                matched: step(2),
-                zero: step(4),
+                matched: successor_addr(2),
+                zero: successor_addr(4),
             },
-            target: step(6),
+            target: successor_addr(6),
         }
     }
 

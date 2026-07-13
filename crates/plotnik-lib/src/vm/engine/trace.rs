@@ -22,8 +22,9 @@
 use tree_sitter::Node;
 
 use crate::bytecode::{
-    EffectKind, Instruction, LineBuilder, Match, Module, ModuleRenderContext, Nav, SECTION_ALIGN,
-    STEP_SIZE, Symbol, cols, nav_symbol, trace, truncate_text, width_for_count,
+    BYTECODE_WORD_SIZE, CodeAddr, EffectKind, Instruction, LineBuilder, Match, Module,
+    ModuleRenderContext, Nav, SECTION_ALIGN, Symbol, cols, nav_symbol, trace, truncate_text,
+    width_for_count,
 };
 use crate::core::{Colors, NodeFieldId};
 
@@ -55,7 +56,7 @@ pub trait Tracer {
     const ENABLED: bool = true;
 
     /// Called before executing an instruction.
-    fn trace_instruction(&mut self, ip: u16, instr: &Instruction<'_>);
+    fn trace_instruction(&mut self, ip: CodeAddr, instr: &Instruction<'_>);
 
     /// Called after navigation succeeds.
     fn trace_nav(&mut self, nav: Nav, node: Node<'_>);
@@ -92,20 +93,20 @@ pub trait Tracer {
     fn trace_suppress_control(&mut self, opcode: EffectKind, suppressed: bool);
 
     /// Called when entering a definition via Call.
-    fn trace_call(&mut self, target_ip: u16);
+    fn trace_call(&mut self, target_ip: CodeAddr);
 
     /// Called when returning from a definition.
     fn trace_return(&mut self, outcome: ReturnOutcome);
 
     /// Called when a checkpoint is created.
-    fn trace_checkpoint_created(&mut self, ip: u16);
+    fn trace_checkpoint_created(&mut self, ip: CodeAddr);
 
     /// Called when backtracking occurs, with the call depth being restored to
     /// (the checkpoint's `recursion_depth`, before the cursor/frames are reset).
     fn trace_backtrack(&mut self, depth: u32);
 
     /// Called when entering an entrypoint (for section labels).
-    fn trace_enter_entrypoint(&mut self, target_ip: u16);
+    fn trace_enter_entrypoint(&mut self, target_ip: CodeAddr);
 }
 
 /// No-op tracer that gets optimized away completely.
@@ -115,7 +116,7 @@ impl Tracer for NoopTracer {
     const ENABLED: bool = false;
 
     #[inline(always)]
-    fn trace_instruction(&mut self, _ip: u16, _instr: &Instruction<'_>) {}
+    fn trace_instruction(&mut self, _ip: CodeAddr, _instr: &Instruction<'_>) {}
 
     #[inline(always)]
     fn trace_nav(&mut self, _nav: Nav, _node: Node<'_>) {}
@@ -151,19 +152,19 @@ impl Tracer for NoopTracer {
     fn trace_suppress_control(&mut self, _opcode: EffectKind, _suppressed: bool) {}
 
     #[inline(always)]
-    fn trace_call(&mut self, _target_ip: u16) {}
+    fn trace_call(&mut self, _target_ip: CodeAddr) {}
 
     #[inline(always)]
     fn trace_return(&mut self, _outcome: ReturnOutcome) {}
 
     #[inline(always)]
-    fn trace_checkpoint_created(&mut self, _ip: u16) {}
+    fn trace_checkpoint_created(&mut self, _ip: CodeAddr) {}
 
     #[inline(always)]
     fn trace_backtrack(&mut self, _depth: u32) {}
 
     #[inline(always)]
-    fn trace_enter_entrypoint(&mut self, _target_ip: u16) {}
+    fn trace_enter_entrypoint(&mut self, _target_ip: CodeAddr) {}
 }
 
 pub struct PrintTracer<'s> {
@@ -175,10 +176,10 @@ pub struct PrintTracer<'s> {
     /// Parallel stack of checkpoint creation IPs (for backtrack display).
     pub(crate) checkpoints: Vec<TraceCheckpoint>,
     pub(crate) call_stack: Vec<String>,
-    pub(crate) deferred_return_ip: Option<u16>,
-    pub(crate) step_width: usize,
+    pub(crate) deferred_return_ip: Option<CodeAddr>,
+    pub(crate) addr_width: usize,
     pub(crate) colors: Colors,
-    pub(crate) prev_ip: Option<u16>,
+    pub(crate) prev_ip: Option<CodeAddr>,
 }
 
 pub struct PrintTracerBuilder<'s, 'm> {
@@ -213,18 +214,18 @@ impl<'s, 'm> PrintTracerBuilder<'s, 'm> {
     /// Build the PrintTracer.
     pub fn build(self) -> PrintTracer<'s> {
         let header = self.module.header();
-        let step_width = width_for_count(header.transitions_count as usize);
+        let addr_width = width_for_count(header.transitions_count as usize);
 
         PrintTracer {
             source: self.source.as_bytes(),
             verbosity: self.verbosity,
             lines: Vec::new(),
-            builder: LineBuilder::new(step_width),
+            builder: LineBuilder::new(addr_width),
             render: ModuleRenderContext::new(self.module),
             checkpoints: Vec::new(),
             call_stack: Vec::new(),
             deferred_return_ip: None,
-            step_width,
+            addr_width,
             colors: self.colors,
             prev_ip: None,
         }
@@ -330,11 +331,11 @@ impl<'s> PrintTracer<'s> {
     /// name; a call into an internal body (or an entry that isn't a named
     /// definition) falls back to its address `@{ip}`, exactly as the bytecode
     /// dump renders the same target.
-    fn def_ref_name(&self, ip: u16) -> String {
+    fn def_ref_name(&self, ip: CodeAddr) -> String {
         self.render
-            .entrypoint_name(ip)
+            .entrypoint_name(ip.get())
             .map(str::to_string)
-            .unwrap_or_else(|| format!("@{:0w$}", ip, w = self.step_width))
+            .unwrap_or_else(|| format!("@{:0w$}", ip, w = self.addr_width))
     }
 
     /// Format kind without text content.
@@ -357,8 +358,8 @@ impl<'s> PrintTracer<'s> {
     fn format_kind_with_text(&self, kind: &str, text: &str, is_named: bool) -> String {
         let c = &self.colors;
 
-        // Available content width = TOTAL_WIDTH - prefix_width + step_width.
-        // prefix_width = INDENT + step_width + GAP + SYMBOL + GAP; the +step_width
+        // Available content width = TOTAL_WIDTH - prefix_width + addr_width.
+        // prefix_width = INDENT + addr_width + GAP + SYMBOL + GAP; the +addr_width
         // cancels because the ellipsis can extend into the successors column
         // (sub-lines have no successors, so we reuse that space).
         let available = cols::TOTAL_WIDTH - (cols::INDENT + cols::GAP + cols::SYMBOL + cols::GAP);
@@ -431,18 +432,18 @@ impl<'s> PrintTracer<'s> {
         self.lines.join("\n")
     }
 
-    fn add_instruction(&mut self, ip: u16, symbol: Symbol, content: &str, successors: &str) {
-        let prefix = format!("  {:0sw$} {} ", ip, symbol.format(), sw = self.step_width);
+    fn add_instruction(&mut self, ip: CodeAddr, symbol: Symbol, content: &str, successors: &str) {
+        let prefix = format!("  {:0aw$} {} ", ip, symbol.format(), aw = self.addr_width);
         let line = self
             .builder
             .pad_successors(format!("{prefix}{content}"), successors);
         self.lines.push(line);
     }
 
-    /// Add a sub-line (blank step area + symbol + content).
+    /// Add a sub-line (blank address area + symbol + content).
     fn add_subline(&mut self, symbol: Symbol, content: &str) {
-        let step_area = cols::INDENT + self.step_width + cols::GAP;
-        let prefix = format!("{:step_area$}{} ", "", symbol.format());
+        let addr_area = cols::INDENT + self.addr_width + cols::GAP;
+        let prefix = format!("{:addr_area$}{} ", "", symbol.format());
         self.lines.push(format!("{prefix}{content}"));
     }
 
@@ -486,17 +487,17 @@ impl<'s> PrintTracer<'s> {
 
     /// Check if IPs cross a cache line boundary and insert separator if so.
     ///
-    /// Cache line = 64 bytes = 8 steps (each step is 8 bytes).
+    /// Cache line = 64 bytes = 8 bytecode words.
     /// Only shows separator in verbose modes (-v, -vv).
-    fn check_cache_line_boundary(&mut self, ip: u16) {
+    fn check_cache_line_boundary(&mut self, ip: CodeAddr) {
         if self.verbosity == Verbosity::Default {
             self.prev_ip = Some(ip);
             return;
         }
 
-        const STEPS_PER_CACHE_LINE: u16 = (SECTION_ALIGN / STEP_SIZE) as u16;
+        const WORDS_PER_CACHE_LINE: u16 = (SECTION_ALIGN / BYTECODE_WORD_SIZE) as u16;
         if let Some(prev) = self.prev_ip
-            && prev / STEPS_PER_CACHE_LINE != ip / STEPS_PER_CACHE_LINE
+            && prev.get() / WORDS_PER_CACHE_LINE != ip.get() / WORDS_PER_CACHE_LINE
         {
             self.lines.push(self.format_cache_line_separator());
         }
@@ -505,7 +506,7 @@ impl<'s> PrintTracer<'s> {
 }
 
 impl Tracer for PrintTracer<'_> {
-    fn trace_instruction(&mut self, ip: u16, instr: &Instruction<'_>) {
+    fn trace_instruction(&mut self, ip: CodeAddr, instr: &Instruction<'_>) {
         self.check_cache_line_boundary(ip);
 
         match instr {
@@ -521,19 +522,19 @@ impl Tracer for PrintTracer<'_> {
                 self.add_instruction(ip, symbol, &content, &successors);
             }
             Instruction::Call(c) => {
-                let name = self.def_ref_name(u16::from(c.target));
+                let name = self.def_ref_name(CodeAddr::from(u16::from(c.target)));
                 let content = self.format_def_ref(&name);
                 let successors = format!("{:02} : {:02}", u16::from(c.target), u16::from(c.next));
                 self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
             }
             Instruction::RoutedCall(c) => {
-                let name = self.def_ref_name(u16::from(c.target));
+                let name = self.def_ref_name(CodeAddr::from(u16::from(c.target)));
                 let content = self.format_def_ref(&name);
                 let successors = format!("{:02} : {:02}", u16::from(c.target), u16::from(c.next));
                 self.add_instruction(ip, Symbol::EMPTY, &content, &successors);
             }
             Instruction::SplitCall(c) => {
-                let name = self.def_ref_name(u16::from(c.target));
+                let name = self.def_ref_name(CodeAddr::from(u16::from(c.target)));
                 let content = self.format_def_ref(&name);
                 let successors = format!(
                     "{:02} : {:02} / {:02}",
@@ -654,7 +655,7 @@ impl Tracer for PrintTracer<'_> {
         self.add_subline(symbol, name);
     }
 
-    fn trace_call(&mut self, target_ip: u16) {
+    fn trace_call(&mut self, target_ip: CodeAddr) {
         let name = self.def_ref_name(target_ip);
         self.add_subline(trace::CALL, &self.format_def_ref(&name));
         self.push_def_header(&name);
@@ -687,7 +688,7 @@ impl Tracer for PrintTracer<'_> {
         }
     }
 
-    fn trace_checkpoint_created(&mut self, ip: u16) {
+    fn trace_checkpoint_created(&mut self, ip: CodeAddr) {
         self.checkpoints.push(TraceCheckpoint {
             ip,
             call_stack: self.call_stack.clone(),
@@ -705,15 +706,15 @@ impl Tracer for PrintTracer<'_> {
         self.call_stack = checkpoint.call_stack;
         debug_assert_eq!(self.call_stack.len(), depth as usize + 1);
         let line = format!(
-            "  {:0sw$} {}",
+            "  {:0aw$} {}",
             checkpoint.ip,
             trace::BACKTRACK.format(),
-            sw = self.step_width
+            aw = self.addr_width
         );
         self.lines.push(line);
     }
 
-    fn trace_enter_entrypoint(&mut self, target_ip: u16) {
+    fn trace_enter_entrypoint(&mut self, target_ip: CodeAddr) {
         let name = self.def_ref_name(target_ip);
         self.push_def_header(&name);
         self.call_stack.push(name);
@@ -722,7 +723,7 @@ impl Tracer for PrintTracer<'_> {
 
 #[derive(Clone)]
 pub(crate) struct TraceCheckpoint {
-    ip: u16,
+    ip: CodeAddr,
     call_stack: Vec<String>,
 }
 

@@ -1,6 +1,6 @@
 //! Bytecode module with unified storage.
 //!
-//! [`Module`] holds compiled bytecode plus a pre-decoded transition stream.
+//! [`Module`] holds compiled bytecode plus a pre-decoded instruction stream.
 //! Construction remains crate-private so only compiler output can cross the
 //! checked loader boundary.
 
@@ -14,7 +14,8 @@ use super::sections::SymbolNameEntry;
 use super::spans::SpansView;
 use super::type_meta::{TypeDef, TypeDefKind, TypeKind, TypeMember, TypeNameEntry};
 use super::{
-    Entrypoint, REGEX_TABLE_ENTRY_SIZE, SPAN_ENTRY_SIZE, STEP_SIZE, STRING_TABLE_ENTRY_SIZE,
+    BYTECODE_WORD_SIZE, CodeAddr, Entrypoint, REGEX_TABLE_ENTRY_SIZE, SPAN_ENTRY_SIZE,
+    STRING_TABLE_ENTRY_SIZE,
 };
 use plotnik_rt::RegexDfas;
 
@@ -79,7 +80,7 @@ pub enum Instruction<'a> {
 impl<'a> Instruction<'a> {
     #[inline]
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
-        debug_assert!(bytes.len() >= STEP_SIZE, "instruction too short");
+        debug_assert!(bytes.len() >= BYTECODE_WORD_SIZE, "instruction too short");
 
         let opcode = header_byte::opcode(bytes[0]).expect("invalid opcode");
         match opcode {
@@ -106,7 +107,7 @@ impl<'a> Instruction<'a> {
 
 /// A compiled bytecode module.
 ///
-/// Instructions are decoded lazily via [`decode_step`](Self::decode_step).
+/// Instructions are decoded lazily via [`decode_instruction`](Self::decode_instruction).
 /// Cold data (strings, symbols, types) is accessed through view methods.
 #[derive(Debug)]
 pub struct Module {
@@ -118,12 +119,12 @@ pub struct Module {
     /// VM on every evaluation instead of being rebuilt from the blob each time
     /// (issue #426).
     regex_dfas: RegexDfas,
-    /// Pre-decoded transitions, built at module load after validation (the hot loop
+    /// Pre-decoded instructions, built at module load after validation (the hot loop
     /// indexes this instead of re-parsing bytes; see `decoded`).
     decoded: DecodedProgram,
-    /// Per-step "is an instruction start" bitmap from load validation
+    /// Per-word "is an instruction start" bitmap from load validation
     /// ([`validate_transitions`](Self::validate_transitions)), retained only in
-    /// debug builds to back the VM's pre-`decode_step` IP assertion. It does not
+    /// debug builds to back the VM's pre-decode IP assertion. It does not
     /// exist in release, so the steady-state module carries no extra memory.
     #[cfg(debug_assertions)]
     instr_start_bitmap: Vec<bool>,
@@ -157,8 +158,8 @@ impl Module {
     }
 
     #[inline]
-    pub(crate) fn decode_step(&self, step: u16) -> Instruction<'_> {
-        let offset = self.offsets.transitions as usize + (step as usize) * STEP_SIZE;
+    pub(crate) fn decode_instruction(&self, addr: CodeAddr) -> Instruction<'_> {
+        let offset = self.offsets.transitions as usize + addr.as_usize() * BYTECODE_WORD_SIZE;
         Instruction::from_bytes(&self.storage[offset..])
     }
 
@@ -167,16 +168,16 @@ impl Module {
         &self.decoded
     }
 
-    /// Whether `step` is a validated instruction start.
+    /// Whether `addr` is a validated instruction start.
     ///
-    /// Backs the VM's pre-decode IP assertion, localizing a bad jump to the step
-    /// that wrote `ip` rather than letting [`decode_step`](Self::decode_step)
+    /// Backs the VM's pre-decode IP assertion, localizing a bad jump to the address
+    /// that wrote `ip` rather than letting [`decode_instruction`](Self::decode_instruction)
     /// begin mid-instruction. Debug-only: the backing bitmap is retained at load
     /// under `debug_assertions` and does not exist in release.
     #[cfg(debug_assertions)]
-    pub fn is_validated_step_start(&self, step: u16) -> bool {
+    pub fn is_validated_instruction_start(&self, addr: CodeAddr) -> bool {
         self.instr_start_bitmap
-            .get(step as usize)
+            .get(addr.as_usize())
             .copied()
             .unwrap_or(false)
     }
@@ -289,7 +290,7 @@ impl Module {
 
     fn transitions_slice(&self) -> &[u8] {
         let offset = self.offsets.transitions as usize;
-        let len = self.header.transitions_count as usize * STEP_SIZE;
+        let len = self.header.transitions_count as usize * BYTECODE_WORD_SIZE;
         &self.storage[offset..offset + len]
     }
 
