@@ -355,7 +355,7 @@ mod matcher {
             S07_Q => {
                 eng.emit_data(|_| rt::JournalEvent::RecordClose);
                 eng.emit_data(|_| rt::JournalEvent::ArrayPush);
-                eng.push_branches(&[S03_Q]);
+                eng.push_successors(&[S03_Q]);
                 Flow::Jump(S13_Q)
             }
             //   08   !   (function_declaration) [RecordOpen]  10
@@ -396,7 +396,7 @@ mod matcher {
                 if eng.cursor_mut().navigate(rt::Nav::NextExact).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_branches(&[S13_Q]);
+                eng.push_successors(&[S13_Q]);
                 Flow::Jump(S08_Q)
             }
             //   14  └─!  _                                08, 13
@@ -404,13 +404,13 @@ mod matcher {
                 if eng.cursor_mut().navigate(rt::Nav::DownExact).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_branches(&[S13_Q]);
+                eng.push_successors(&[S13_Q]);
                 Flow::Jump(S08_Q)
             }
             //   19  -ε-  [ListOpen]                       14, 05
             S19_Q => {
                 eng.emit_data(|_| rt::JournalEvent::ListOpen);
-                eng.push_branches(&[S05_Q]);
+                eng.push_successors(&[S05_Q]);
                 Flow::Jump(S14_Q)
             }
             //   20                                        ▶
@@ -478,7 +478,7 @@ mod matcher {
         true
     }
 
-    /// `S10_Q` post-acceptance: effects, then branch. Shared by the dispatch
+    /// `S10_Q` post-acceptance: effects, then successor dispatch. Shared by the dispatch
     /// path and the match-retry resume, so a retried candidate replays exactly
     /// what the original acceptance would have.
     #[inline]
@@ -488,7 +488,7 @@ mod matcher {
         Flow::Jump(S09_Q)
     }
 
-    /// Unwind the checkpoint stack: branch alternatives resume dispatch, Call and
+    /// Unwind the checkpoint stack: successor checkpoints resume dispatch, Call and
     /// Match checkpoints advance their sibling search and re-enter. Loops, never
     /// recurses — a run of exhausted retries unwinds in one call.
     fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
@@ -499,7 +499,7 @@ mod matcher {
             eng.restore_checkpoint_state(cp.state, snapshot);
 
             match cp.resume {
-                rt::Resume::Branch => return Unwound::Resumed(cp.ip),
+                rt::Resume::Successor => return Unwound::Resumed(cp.ip),
 
                 // Call retry: advance to the next candidate satisfying the field
                 // constraint, then re-enter the callee. Exhausted siblings keep

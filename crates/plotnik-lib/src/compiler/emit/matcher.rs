@@ -155,11 +155,11 @@ pub(crate) struct RoutedCallPlan {
 pub(crate) enum FlowPlan {
     Accept,
     Jump(StateId),
-    Branch {
+    Fork {
         next: StateId,
         /// Checkpoints in the NFA's declared order. The runtime pushes this
         /// slice with its established reverse/LIFO discipline.
-        alternatives: Vec<StateId>,
+        successors: Vec<StateId>,
     },
 }
 
@@ -624,9 +624,9 @@ impl<'p, 'a> MatcherPlanBuilder<'p, 'a> {
         match successors {
             [] => FlowPlan::Accept,
             [next] => FlowPlan::Jump(resolve_state(self.ids, *next)),
-            [next, alternatives @ ..] => FlowPlan::Branch {
+            [next, successors @ ..] => FlowPlan::Fork {
                 next: resolve_state(self.ids, *next),
-                alternatives: alternatives
+                successors: successors
                     .iter()
                     .map(|&label| resolve_state(self.ids, label))
                     .collect(),

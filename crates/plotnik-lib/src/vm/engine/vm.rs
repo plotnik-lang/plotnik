@@ -233,7 +233,7 @@ impl<'t> VM<'t> {
         self.finish_match(m, module, tracer)
     }
 
-    /// The post-acceptance half of a Match: run its effects, then branch.
+    /// The post-acceptance half of a Match: run its effects, then follow its successors.
     /// Shared by the dispatch path and the match-retry resume in
     /// [`Self::backtrack`], so a resumed candidate replays exactly what the
     /// original acceptance would have.
@@ -247,7 +247,7 @@ impl<'t> VM<'t> {
             self.emit_effect(op, tracer);
         }
 
-        self.branch_to_successors(m, module, tracer)
+        self.follow_successors(m, module, tracer)
     }
 
     fn navigate_and_match<T: Tracer>(
@@ -433,7 +433,7 @@ impl<'t> VM<'t> {
         true
     }
 
-    fn branch_to_successors<T: Tracer>(
+    fn follow_successors<T: Tracer>(
         &mut self,
         m: DecodedMatch,
         module: &Module,
@@ -444,10 +444,10 @@ impl<'t> VM<'t> {
             return Err(ControlFlow::Accept.into());
         }
 
-        // Push checkpoints for alternate branches (in reverse order, so LIFO
+        // Push checkpoints for non-preferred successors (in reverse order, so LIFO
         // backtracking takes them in priority order).
         if succs.len() > 1 {
-            self.engine.push_branches(&succs[1..]);
+            self.engine.push_successors(&succs[1..]);
             if T::ENABLED {
                 for _ in &succs[1..] {
                     tracer.trace_checkpoint_created(self.ip);
@@ -638,7 +638,7 @@ impl<'t> VM<'t> {
             self.engine.restore_checkpoint_state(cp.state, snapshot);
 
             match cp.resume {
-                Resume::Branch => {
+                Resume::Successor => {
                     self.ip = CodeAddr::from(cp.ip);
                     return ControlFlow::Backtracked.into();
                 }
@@ -699,7 +699,7 @@ impl<'t> VM<'t> {
                 // candidate of an engine-owned sibling search. Step past it (the
                 // push gate proved the policy admits it into the gap) and re-run
                 // the same instruction's candidate search from there; acceptance
-                // replays the match — fresh retry checkpoint, effects, branches —
+                // replays the match — fresh retry checkpoint, effects, successor dispatch —
                 // exactly as the dispatch path would.
                 Resume::Match => {
                     let DecodedInstr::Match(m) =

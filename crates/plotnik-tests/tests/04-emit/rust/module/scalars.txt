@@ -335,7 +335,7 @@ mod matcher {
                 if eng.cursor_mut().navigate(rt::Nav::NextExact).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_branches(&[S07_Q]);
+                eng.push_successors(&[S07_Q]);
                 Flow::Jump(S05_Q)
             }
             //   08  └─!  _                                05, 07
@@ -343,7 +343,7 @@ mod matcher {
                 if eng.cursor_mut().navigate(rt::Nav::DownExact).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_branches(&[S07_Q]);
+                eng.push_successors(&[S07_Q]);
                 Flow::Jump(S05_Q)
             }
             //   09  -ε-  [BoolValue(0) RecordSet(has_statement)]  01
@@ -362,14 +362,14 @@ mod matcher {
             S18_Q => {
                 eng.emit_data(|_| rt::JournalEvent::ListClose);
                 eng.emit_data(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(comments)
-                eng.push_branches(&[S16_Q]);
+                eng.push_successors(&[S16_Q]);
                 Flow::Jump(S07_Q)
             }
             //   19  -ε-  [ListClose RecordSet(comments)]  08, 09
             S19_Q => {
                 eng.emit_data(|_| rt::JournalEvent::ListClose);
                 eng.emit_data(|_| rt::JournalEvent::RecordSet(0)); // RecordSet(comments)
-                eng.push_branches(&[S09_Q]);
+                eng.push_successors(&[S09_Q]);
                 Flow::Jump(S08_Q)
             }
             //   21   !   (comment) [NodeStr ArrayPush]    23, 18
@@ -379,7 +379,7 @@ mod matcher {
                 }
                 eng.node_str();
                 eng.emit_data(|_| rt::JournalEvent::ArrayPush);
-                eng.push_branches(&[S18_Q]);
+                eng.push_successors(&[S18_Q]);
                 Flow::Jump(S23_Q)
             }
             //   23  ──!  _                                21, 23
@@ -387,7 +387,7 @@ mod matcher {
                 if eng.cursor_mut().navigate(rt::Nav::NextExact).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_branches(&[S23_Q]);
+                eng.push_successors(&[S23_Q]);
                 Flow::Jump(S21_Q)
             }
             //   24  └─!  _                                21, 23
@@ -395,13 +395,13 @@ mod matcher {
                 if eng.cursor_mut().navigate(rt::Nav::DownExact).is_none() {
                     break 'state Flow::Backtrack;
                 }
-                eng.push_branches(&[S23_Q]);
+                eng.push_successors(&[S23_Q]);
                 Flow::Jump(S21_Q)
             }
             //   29  -ε-  [ListOpen]                       24, 19
             S29_Q => {
                 eng.emit_data(|_| rt::JournalEvent::ListOpen);
-                eng.push_branches(&[S19_Q]);
+                eng.push_successors(&[S19_Q]);
                 Flow::Jump(S24_Q)
             }
             //   30                                        ▶
@@ -465,7 +465,7 @@ mod matcher {
         true
     }
 
-    /// Unwind the checkpoint stack: branch alternatives resume dispatch, Call and
+    /// Unwind the checkpoint stack: successor checkpoints resume dispatch, Call and
     /// Match checkpoints advance their sibling search and re-enter. Loops, never
     /// recurses — a run of exhausted retries unwinds in one call.
     fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
@@ -476,7 +476,7 @@ mod matcher {
             eng.restore_checkpoint_state(cp.state, snapshot);
 
             match cp.resume {
-                rt::Resume::Branch => return Unwound::Resumed(cp.ip),
+                rt::Resume::Successor => return Unwound::Resumed(cp.ip),
 
                 // Call retry: advance to the next candidate satisfying the field
                 // constraint, then re-enter the callee. Exhausted siblings keep

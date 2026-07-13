@@ -51,14 +51,14 @@ is the only legal one).
 
 If a match has multiple successors, the VM pushes checkpoints for later
 successors and tries the first successor. A zero-successor match accepts.
-Branch checkpoints stack above the match-retry checkpoint, so all downstream
-alternatives at one candidate are exhausted before the search moves on —
-ordered-choice priority is preserved.
+Successor checkpoints stack above the match-retry checkpoint, so all downstream
+successor paths at one candidate are exhausted before the search moves on and
+source-order preference is preserved.
 
 ### Epsilon
 
 `Nav::Epsilon` is pure control flow: no cursor movement and no node check. It is
-used for branches, value/default effects, and wrapper cleanup.
+used for forks, value/default effects, and wrapper cleanup.
 
 ### Call
 
@@ -70,7 +70,7 @@ are statically verified to return at the same cursor depth they entered.
 
 A nullable recursive call carries matched and zero-width continuations. The
 call itself does not navigate or create a retry checkpoint; its specialized
-callee owns the call-site navigation. This preserves the body's exact branch
+callee owns the call-site navigation. This preserves the body's exact alternative
 order even when consuming and zero-width outcomes are interleaved. Matched
 returns keep the routed navigation depth; zero-width returns restore the
 caller's original depth.
@@ -123,14 +123,14 @@ struct Checkpoint {
 
 Backtracking restores cursor position, truncates the match journal, restores the
 frame arena pointer, restores suppression and open-scalar depth, and then
-resumes per the checkpoint's kind: a branch checkpoint resumes at its recorded instruction; a
+resumes per the checkpoint's kind: a successor checkpoint resumes at its recorded instruction; a
 call-retry checkpoint advances to the next candidate satisfying the Call's
 skip policy and field constraint, then re-enters the callee; a match-retry
 checkpoint advances past the accepted-but-failed candidate and re-runs the
-same Match's candidate search from there, replaying effects and branching
-exactly as the original acceptance did. Every point with alternatives leaves a
-checkpoint — which sibling binds a pattern, which branch of a fan-out, whether
-an optional consumes — so no search ever silently commits.
+same Match's candidate search from there, replaying effects and successor dispatch
+exactly as the original acceptance did. Every retryable choice leaves a
+checkpoint — which sibling binds a pattern, which successor of a fork, whether
+an optional matches — so no search ever silently commits.
 
 Frame pruning after `Return` keeps the arena bounded by active checkpoints plus
 the current call stack.

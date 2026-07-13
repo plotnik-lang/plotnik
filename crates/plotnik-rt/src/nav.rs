@@ -36,7 +36,7 @@ impl SkipPolicy {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub enum Nav {
     /// Epsilon transition: pure control flow, no cursor movement or node check.
-    /// Used for branching, quantifier loops, and effect-only transitions.
+    /// Used for forks, quantifier loops, and effect-only transitions.
     #[default]
     Epsilon,
     /// Stay at current position.
@@ -318,7 +318,7 @@ impl Nav {
         }
     }
 
-    /// Alternation branches match at their exact cursor position; the search
+    /// Alternation alternatives match at their exact cursor position; the search
     /// among positions is owned by the parent (quantifier skip-retry, sequence
     /// advancement). Strips the search loop from any nav variant.
     pub fn to_exact(self) -> Self {

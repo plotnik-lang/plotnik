@@ -8,7 +8,7 @@
 use crate::checkpoint::{Checkpoint, CheckpointStack, CheckpointState, EffectDepths};
 
 fn cp(frame_index: Option<u32>) -> Checkpoint {
-    Checkpoint::branch(
+    Checkpoint::successor(
         CheckpointState {
             descendant_index: 0,
             journal_watermark: 0,

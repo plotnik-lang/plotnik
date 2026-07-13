@@ -207,16 +207,16 @@ the regression-required range above `u16` without padding every checkpoint.
 
 There are three resume forms:
 
-- `Branch(target)` resumes dispatch at an alternative successor;
+- `Successor(target)` resumes dispatch at a non-preferred successor;
 - `CallRetry(target, return, field, policy)` advances to the next admissible
   candidate and re-enters the callee without repeating the call's initial
   navigation;
 - `MatchRetry(state, policy)` advances past the accepted candidate and repeats
   that match's candidate checks, effects, and successor flow.
 
-Branch alternatives are pushed in reverse priority order so a LIFO pop tries
-them in source order. A match-retry checkpoint sits below branch checkpoints
-created after accepting that candidate. All alternatives at one candidate are
+Non-preferred successors are pushed in reverse priority order so a LIFO pop tries
+them in source order. A match-retry checkpoint sits below successor checkpoints
+created after accepting that candidate. All successor paths at one candidate are
 therefore exhausted before the search advances.
 
 A `Call` enters a frame carrying its return state. `Return` exits that frame;
@@ -488,8 +488,8 @@ with the VM oracle on:
 - grammar-skew and runtime-ABI failures.
 
 The corpus must cover every navigation and resume mode, field and missing-node
-checks, all predicate operators, suppression, recursive calls, ordered branch
-priority, journal truncation after backtracking, nested decode shapes, automatic
+checks, all predicate operators, suppression, recursive calls, source-order
+alternative priority, journal truncation after backtracking, nested decode shapes, automatic
 and explicit limits, scalar item boundaries and zero-byte ranges, and non-ASCII
 source before captured nodes. Regex cases
 exercise every dialect printer's semantic traps and are the tripwire for

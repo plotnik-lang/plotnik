@@ -515,9 +515,9 @@ impl<'a> Generator<'a> {
     }
 
     /// The dispatch arm for a Match instruction. Epsilon runs effects and
-    /// branches; everything else navigates, searches candidates, leaves a
+    /// follows successors; everything else navigates, searches candidates, leaves a
     /// retry checkpoint when the engine owns the sibling search, then runs
-    /// the shared finish (effects + branch).
+    /// the shared finish (effects plus successor dispatch).
     fn match_arm(&self, out: &mut String, state: &StatePlan, plan: &MatchPlan) {
         let info = self.state(state.id);
 
@@ -617,7 +617,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// Post-acceptance effects, then the successor branch — inline for states
+    /// Post-acceptance effects, then successor dispatch — inline for states
     /// with no retry, `finish_*` fns where the backtrack path replays them.
     fn effects_and_flow(
         &self,
@@ -636,13 +636,13 @@ impl<'a> Generator<'a> {
             FlowPlan::Jump(next) => {
                 let _ = writeln!(out, "{indent}Flow::Jump({})", self.state(*next).const_name);
             }
-            FlowPlan::Branch { next, alternatives } => {
-                let alt_names = alternatives
+            FlowPlan::Fork { next, successors } => {
+                let successor_names = successors
                     .iter()
-                    .map(|alt| self.state(*alt).const_name.as_str())
+                    .map(|successor| self.state(*successor).const_name.as_str())
                     .collect::<Vec<_>>()
                     .join(", ");
-                let _ = writeln!(out, "{indent}eng.push_branches(&[{alt_names}]);");
+                let _ = writeln!(out, "{indent}eng.push_successors(&[{successor_names}]);");
                 let _ = writeln!(out, "{indent}Flow::Jump({})", self.state(*next).const_name);
             }
         }
@@ -949,9 +949,9 @@ impl<'a> Generator<'a> {
                 continue;
             }
             let info = self.state(state.id);
-            // `eng` feeds effect emission and branch pushes; a finish that
+            // `eng` feeds effect emission and successor pushes; a finish that
             // only jumps must not bind it, or every such fn warns.
-            let eng = if plan.effects.is_empty() && !matches!(plan.flow, FlowPlan::Branch { .. }) {
+            let eng = if plan.effects.is_empty() && !matches!(plan.flow, FlowPlan::Fork { .. }) {
                 "_eng"
             } else {
                 "eng"
@@ -1389,7 +1389,7 @@ const RETURN_ARM: &str = r#"
 "#;
 
 const FINISH_FN_OPEN: &str = r#"
-/// `@STATE@` post-acceptance: effects, then branch. Shared by the dispatch
+/// `@STATE@` post-acceptance: effects, then successor dispatch. Shared by the dispatch
 /// path and the match-retry resume, so a retried candidate replays exactly
 /// what the original acceptance would have.
 #[inline]
@@ -1397,7 +1397,7 @@ fn finish_@STEM@(@ENG@: &mut rt::Engine<'_>) -> Flow {
 "#;
 
 const BACKTRACK_SKELETON: &str = r#"
-/// Unwind the checkpoint stack: branch alternatives resume dispatch, Call and
+/// Unwind the checkpoint stack: successor checkpoints resume dispatch, Call and
 /// Match checkpoints advance their sibling search and re-enter. Loops, never
 /// recurses — a run of exhausted retries unwinds in one call.
 fn backtrack<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str) -> Unwound {
@@ -1408,7 +1408,7 @@ fn backtrack<'t>(eng: &mut rt::Engine<'t>, @SOURCE@: &str) -> Unwound {
         eng.restore_checkpoint_state(cp.state, snapshot);
 
         match cp.resume {
-            rt::Resume::Branch => return Unwound::Resumed(cp.ip),
+            rt::Resume::Successor => return Unwound::Resumed(cp.ip),
 
             // Call retry: advance to the next candidate satisfying the field
             // constraint, then re-enter the callee. Exhausted siblings keep

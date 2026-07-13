@@ -203,23 +203,23 @@ impl<'t> Engine<'t> {
         }
     }
 
-    /// Push branch checkpoints for every alternative in `alts` — the
-    /// non-preferred successors of a branch, in priority order. Pushed in
+    /// Push checkpoints for the non-preferred `successors`, in priority order. Pushed in
     /// reverse so LIFO backtracking takes them in order. One state snapshot
     /// serves every push: nothing in the loop moves the cursor or touches the
     /// arenas the snapshot reads.
-    pub fn push_branches<A: Copy + Into<u16>>(&mut self, alts: &[A]) {
+    pub fn push_successors<A: Copy + Into<u16>>(&mut self, successors: &[A]) {
         let state = self.checkpoint_state();
         if self.snapshot_cursor_active {
-            let refs = u32::try_from(alts.len()).expect("branch fan-out count fits u32");
+            let refs = u32::try_from(successors.len()).expect("successor count fits u32");
             let snapshot = self.cursor_snapshot(refs);
-            for &alt in alts.iter().rev() {
+            for &successor in successors.iter().rev() {
                 self.checkpoints
-                    .push_with_snapshot(Checkpoint::branch(state, alt.into()), snapshot);
+                    .push_with_snapshot(Checkpoint::successor(state, successor.into()), snapshot);
             }
         } else {
-            for &alt in alts.iter().rev() {
-                self.checkpoints.push(Checkpoint::branch(state, alt.into()));
+            for &successor in successors.iter().rev() {
+                self.checkpoints
+                    .push(Checkpoint::successor(state, successor.into()));
             }
         }
     }

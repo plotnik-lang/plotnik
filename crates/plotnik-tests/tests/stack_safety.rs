@@ -43,12 +43,12 @@ const STACK_SIZE: usize = 256 * 1024;
 /// - `Top` anchors at the program root and descends to the unary chain. The root
 ///   preamble matches once (no tree-wide search), so the work stays linear in
 ///   `DEPTH` rather than quadratic.
-/// - `Rec`'s escape branch matches `number` — a real expression, so the pattern is
+/// - `Rec`'s escape alternative matches `number` — a real expression, so the pattern is
 ///   matchable in principle (the grammar checker admits it) yet one that never
 ///   appears in a chain of `!` operators over an identifier. Trying it fails and
-///   *consumes* the branch checkpoint at every level, so the descent leaves only
+///   *consumes* the successor checkpoint at every level, so the descent leaves only
 ///   call-retry checkpoints — a contiguous run that backtrack pops without
-///   re-entering. At the leaf `identifier`, both branches fail and the whole run
+///   re-entering. At the leaf `identifier`, both alternatives fail and the whole run
 ///   unwinds at once.
 const QUERY: &str = indoc! {"
     Rec = [Leaf: (number) Deep: (unary_expression (Rec))]

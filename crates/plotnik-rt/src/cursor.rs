@@ -94,7 +94,7 @@ pub(crate) struct SnapshotPool<'t> {
 
 struct SnapshotEntry<'t> {
     seq: NonZeroU64,
-    /// Checkpoints on the stack still holding this seq. A branch fan-out shares
+    /// Checkpoints on the stack still holding this seq. A successor fan-out shares
     /// one snapshot across all its alternative checkpoints.
     refs: u32,
     cursor: TreeCursor<'t>,

@@ -402,7 +402,7 @@ mod matcher {
         true
     }
 
-    /// `S05_Q` post-acceptance: effects, then branch. Shared by the dispatch
+    /// `S05_Q` post-acceptance: effects, then successor dispatch. Shared by the dispatch
     /// path and the match-retry resume, so a retried candidate replays exactly
     /// what the original acceptance would have.
     #[inline]
@@ -412,7 +412,7 @@ mod matcher {
         Flow::Jump(S04_Q)
     }
 
-    /// `S06_Q` post-acceptance: effects, then branch. Shared by the dispatch
+    /// `S06_Q` post-acceptance: effects, then successor dispatch. Shared by the dispatch
     /// path and the match-retry resume, so a retried candidate replays exactly
     /// what the original acceptance would have.
     #[inline]
@@ -422,7 +422,7 @@ mod matcher {
         Flow::Jump(S05_Q)
     }
 
-    /// Unwind the checkpoint stack: branch alternatives resume dispatch, Call and
+    /// Unwind the checkpoint stack: successor checkpoints resume dispatch, Call and
     /// Match checkpoints advance their sibling search and re-enter. Loops, never
     /// recurses — a run of exhausted retries unwinds in one call.
     fn backtrack<'t>(eng: &mut rt::Engine<'t>, _source: &str) -> Unwound {
@@ -433,7 +433,7 @@ mod matcher {
             eng.restore_checkpoint_state(cp.state, snapshot);
 
             match cp.resume {
-                rt::Resume::Branch => return Unwound::Resumed(cp.ip),
+                rt::Resume::Successor => return Unwound::Resumed(cp.ip),
 
                 // Call retry: advance to the next candidate satisfying the field
                 // constraint, then re-enter the callee. Exhausted siblings keep
